@@ -11,6 +11,12 @@ import Data.Semiring (Ring (..), Semiring (..), one)
 
 --------------------------------------------------------------------------------
 
+type Addr = Int
+
+type Var = Int
+
+--------------------------------------------------------------------------------
+
 data Type
   = Num -- numbers
   | Bool -- booleans (well, special numbers!)
@@ -23,7 +29,7 @@ data Type
 data Value :: * -> Type -> * where
   Number :: n -> Value n 'Num
   Boolean :: Bool -> Value n 'Bool
-  Array :: Type -> Int -> Value n ty
+  Array :: Type -> Addr -> Value n ty
 
 instance Show n => Show (Value n ty) where
   show (Number n) = show n
@@ -34,10 +40,16 @@ instance Show n => Show (Value n ty) where
 
 -- | Variables are indexed by Type
 data Variable :: Type -> * where
-  Variable :: Type -> Int -> Variable ty
+  Variable :: Type -> Var -> Variable ty
+
+--   BoolVar :: Var -> Variable 'Bool
+--   NumVar :: Var -> Variable 'Num
 
 instance Show (Variable ty) where
   show (Variable _ i) = "$" <> show i
+
+--   show (BoolVar i) = "$" <> show i
+--   show (NumVar i) = "$" <> show i
 
 --------------------------------------------------------------------------------
 
