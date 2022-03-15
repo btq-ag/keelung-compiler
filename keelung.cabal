@@ -38,15 +38,20 @@ library
     , containers
     , galois-field
     , mtl
+    , random
     , semirings
   default-language: Haskell2010
 
 executable keelung-exe
   main-is: Main.hs
   other-modules:
+      AggregateSignature.Program
+      AggregateSignature.Util
+      Basic
       Paths_keelung
   hs-source-dirs:
-      app
+      app/
+      examples/
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       base >=4.7 && <5
@@ -54,6 +59,7 @@ executable keelung-exe
     , galois-field
     , keelung
     , mtl
+    , random
     , semirings
   default-language: Haskell2010
 
@@ -71,5 +77,6 @@ test-suite keelung-test
     , galois-field
     , keelung
     , mtl
+    , random
     , semirings
   default-language: Haskell2010

@@ -57,7 +57,7 @@ freshAddr = do
 writeHeap :: [((Addr, Int), HeapData)] -> M f ty ()
 writeHeap bindings = modify (\st -> st {envHeap = Map.fromList bindings <> envHeap st})
 
-readHeap :: (Addr, Int) -> Comp ty f
+readHeap :: (Addr, Int) -> Comp n ty
 readHeap (addr, i) = do
   m <- gets envHeap
   case Map.lookup (addr, i) m of
@@ -118,13 +118,13 @@ instance Show n => Show (Assignment n) where
 --------------------------------------------------------------------------------
 
 -- | Computation elaboration
-elaborate :: Comp n ty -> Either String (Elaborad n ty)
+elaborate :: Comp n ty -> Either String (Elaborated n ty)
 elaborate prog = do
   ((expr, assertions), env) <- runM (Env 0 0 mempty mempty) prog
-  return $ Elaborad (envNexVariable env) (envInpuVariables env) expr assertions
+  return $ Elaborated (envNexVariable env) (envInpuVariables env) expr assertions
 
 -- | The result of elaborating a computation
-data Elaborad n ty = Elaborad
+data Elaborated n ty = Elaborated
   { -- | The number of free variables in the computation
     elabNumOfVars :: Int,
     -- | Variables marked as inputs
@@ -143,6 +143,14 @@ data Elaborad n ty = Elaborad
 class Proper ty where
   freshInput :: Comp n ty
   freshInputs :: Int -> Comp n ('Arr ty)
+
+instance Proper 'Num where
+  freshInput = freshInput' Num
+  freshInputs = freshInputs' Num
+
+instance Proper 'Bool where
+  freshInput = freshInput' Bool
+  freshInputs = freshInputs' Bool
 
 -- inrnal function for drawing 1 fresh input
 freshInput' :: Type -> Comp n ty
@@ -221,3 +229,18 @@ update (Val (Array t l)) i e = do
   assign (Variable t x) e
 -- Err: expression does not satisfy [INVARIANT].
 update e1 _ _ = throwError ("expecd " ++ show e1 ++ " a loc")
+
+--------------------------------------------------------------------------------
+
+reduce :: Expr n ty -> [a] -> (Expr n ty -> a -> Comp n ty) -> Comp n ty
+reduce a xs f = foldM f a xs
+
+everyM :: (Foldable t, Monad m) => t a -> (a -> m (Expr n 'Bool)) -> m (Expr n 'Bool)
+everyM xs f =
+  foldM
+    ( \accum x -> do
+        result <- f x
+        return (accum `And` result)
+    )
+    true
+    xs

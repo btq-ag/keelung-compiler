@@ -42,14 +42,8 @@ instance Show n => Show (Value n ty) where
 data Variable :: Type -> * where
   Variable :: Type -> Var -> Variable ty
 
---   BoolVar :: Var -> Variable 'Bool
---   NumVar :: Var -> Variable 'Num
-
 instance Show (Variable ty) where
   show (Variable _ i) = "$" <> show i
-
---   show (BoolVar i) = "$" <> show i
---   show (NumVar i) = "$" <> show i
 
 --------------------------------------------------------------------------------
 
@@ -107,3 +101,25 @@ instance GaloisField n => Ring (Expr n 'Num) where
 instance GaloisField n => Fractional (Expr n 'Num) where
   fromRational = Val . Number . fromRational
   (/) = Div
+
+--------------------------------------------------------------------------------
+
+true :: Expr n 'Bool
+true = Val (Boolean True)
+
+false :: Expr n 'Bool
+false = Val (Boolean False)
+
+
+--------------------------------------------------------------------------------
+
+-- fromBool :: GaloisField n => Expr n 'Bool -> Expr n 'Num 
+-- fromBool (Val (Boolean False)) = zero 
+-- fromBool (Val (Boolean True)) = one 
+-- fromBool (Val (Array ty n)) = Val (Array ty n)
+-- fromBool (Var (Variable _ n)) = Var (Variable Num n)
+-- fromBool (Eq x y) = 
+-- fromBool (And x y) = _wd
+-- fromBool (Or x y) = _we
+-- fromBool (Xor x y) = _wf
+-- fromBool (BEq x y) = _wg
