@@ -55,10 +55,9 @@ data Expr :: * -> Type -> * where
   Xor :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
   BEq :: Expr n 'Num -> Expr n 'Num -> Expr n 'Bool
 
-
 instance Show n => Show (Expr n ty) where
-  showsPrec prec expr = case expr of 
-    Val val -> shows val 
+  showsPrec prec expr = case expr of
+    Val val -> shows val
     Var var -> shows var
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y

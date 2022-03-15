@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Keelung
+      Keelung.Monad
       Keelung.Syntax
   other-modules:
       Paths_keelung
@@ -34,6 +35,8 @@ library
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       base >=4.7 && <5
+    , containers
+    , mtl
   default-language: Haskell2010
 
 executable keelung-exe
@@ -45,7 +48,9 @@ executable keelung-exe
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       base >=4.7 && <5
+    , containers
     , keelung
+    , mtl
   default-language: Haskell2010
 
 test-suite keelung-test
@@ -58,5 +63,7 @@ test-suite keelung-test
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       base >=4.7 && <5
+    , containers
     , keelung
+    , mtl
   default-language: Haskell2010
