@@ -14,7 +14,7 @@ import Data.Semiring (Ring (..), Semiring (..), one)
 data Type
   = Num -- numbers
   | Bool -- booleans (well, special numbers!)
-  | Arr -- a bunch of numbers
+  | Arr Type -- a bunch of numbers
   deriving (Show)
 
 --------------------------------------------------------------------------------
@@ -34,10 +34,10 @@ instance Show n => Show (Value n ty) where
 
 -- | Variables are indexed by Type
 data Variable :: Type -> * where
-  Variable :: Int -> Variable ty
+  Variable :: Type -> Int -> Variable ty
 
 instance Show (Variable ty) where
-  show (Variable i) = "$" <> show i
+  show (Variable _ i) = "$" <> show i
 
 --------------------------------------------------------------------------------
 
