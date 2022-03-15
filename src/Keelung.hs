@@ -1,4 +1,4 @@
-module Lib
+module Keelung
     ( someFunc
     ) where
 

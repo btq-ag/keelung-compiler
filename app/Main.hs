@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import Keelung
 
 main :: IO ()
 main = someFunc
