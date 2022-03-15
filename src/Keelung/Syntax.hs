@@ -1,9 +1,13 @@
 -- Datatype of the DSL
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 
 module Keelung.Syntax where
+
+import Data.Field.Galois (GaloisField)
+import Data.Semiring (Ring (..), Semiring (..), one)
 
 --------------------------------------------------------------------------------
 
@@ -68,3 +72,26 @@ instance Show n => Show (Expr n ty) where
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+
+instance GaloisField n => Num (Expr n 'Num) where
+  (+) = Add
+  (-) = Sub
+  (*) = Mul
+  abs = id
+
+  -- law of `signum`: abs x * signum x == x
+  signum = const one
+  fromInteger = Val . Number . fromNatural . fromInteger
+
+instance GaloisField n => Semiring (Expr n 'Num) where
+  plus = Add
+  times = Mul
+  zero = Val (Number 0)
+  one = Val (Number 1)
+
+instance GaloisField n => Ring (Expr n 'Num) where
+  negate = id
+
+instance GaloisField n => Fractional (Expr n 'Num) where
+  fromRational = Val . Number . fromRational
+  (/) = Div

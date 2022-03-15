@@ -24,7 +24,7 @@ runM st p = runExcept (runStateT (runWriterT p) st)
 data Env a = Env
   { -- Counter for generating fresh variables
     envNextVar :: Int,
-    -- Counter for allocating fresh address
+    -- Counter for allocating fresh addresses
     envNextAddr :: Int,
     -- Variables marked as inputs
     envInputVars :: Set Int
