@@ -67,11 +67,13 @@ data Expr :: * -> Type -> * where
   Mul :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num
   Div :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num
   Eq :: Expr n 'Num -> Expr n 'Num -> Expr n 'Bool
-  -- -- operators on booleans
+  -- operators on booleans
   And :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
   Or :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
   Xor :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
   BEq :: Expr n 'Num -> Expr n 'Num -> Expr n 'Bool
+  -- if...then...else 
+  IfThenElse :: Expr n 'Bool -> Expr n ty -> Expr n ty -> Expr n ty
 
 instance Show n => Show (Expr n ty) where
   showsPrec prec expr = case expr of
@@ -86,6 +88,7 @@ instance Show n => Show (Expr n ty) where
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
+    IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y 
 
 instance GaloisField n => Num (Expr n 'Num) where
   (+) = Add
@@ -120,13 +123,13 @@ false = Val (Boolean False)
 
 --------------------------------------------------------------------------------
 
--- fromBool :: GaloisField n => Expr n 'Bool -> Expr n 'Num
--- fromBool (Val (Boolean False)) = zero
--- fromBool (Val (Boolean True)) = one
--- fromBool (Val (Array ty n)) = Val (Array ty n)
--- fromBool (Var (Variable _ n)) = Var (Variable Num n)
--- fromBool (Eq x y) =
--- fromBool (And x y) = _wd
--- fromBool (Or x y) = _we
--- fromBool (Xor x y) = _wf
--- fromBool (BEq x y) = _wg
+fromBool :: GaloisField n => Expr n 'Bool -> Expr n 'Num
+fromBool (Val (Boolean False)) = zero 
+fromBool (Val (Boolean True)) = one 
+fromBool (Var (Variable n)) = Var (Variable n)
+fromBool (Eq x y) = IfThenElse (Eq x y) one zero 
+fromBool (And x y) = IfThenElse (And x y) one zero 
+fromBool (Or x y) = IfThenElse (Or x y) one zero 
+fromBool (Xor x y) = IfThenElse (Xor x y) one zero 
+fromBool (BEq x y) = IfThenElse (BEq x y) one zero 
+fromBool (IfThenElse p x y) = IfThenElse p (fromBool x) (fromBool y)

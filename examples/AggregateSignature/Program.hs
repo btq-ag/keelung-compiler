@@ -13,7 +13,7 @@ import Data.Semiring (Semiring (one, zero))
 import Keelung
 
 -- ensure that a signature is smaller than 16384 (target: 12289)
--- checkSignaturesBitString :: (Integral a, GaloisField a) => Int -> [Signature a] -> Expr n ('Arr ('Arr ('Arr 'Bool))) -> Comp n 'Bool
+-- checkSignaturesBitString :: (Integral a, GaloisField a) => Int -> [Signature a] -> Reference ('A ('A ('V 'Bool))) -> Comp n 'Bool
 -- checkSignaturesBitString dimension signatures bitStringss =
 --     everyM [0 .. length signatures - 1] checkSignature
 --     where
