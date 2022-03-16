@@ -40,19 +40,20 @@ loop1 = do
 
   return (Var arr2 + a)
 
-loop2 :: Comp GF181 'Num
+loop2 :: Comp GF181 'Bool
 loop2 = do
-  a <- freshInput
-  arr <- freshInputs 1
-  b <- reduce 0 [0 .. 0] $ \accum i -> do 
-    x <- access arr i 
-    return $ accum + Var x
-  return (Var a + b)
+  arr <- freshInputs 2
+  -- b <- reduce 0 [0 .. 1] $ \accum i -> do 
+  --   x <- access arr i 
+  --   return $ accum + Var x
+  arr2 <- freshInputs 2
+  arrayEq 2 arr arr2 
+  -- return (Var a + Var c + b)
 
 aggSig :: Comp GF181 'Bool
 aggSig = do
   let settings = Settings True True True True 
-  let setup = makeSetup 1 1 42 settings
+  let setup = makeSetup 10 10 42 settings
   aggregateSignature setup
 
 --------------------------------------------------------------------------------

@@ -47,7 +47,6 @@ computeAggregateSignature publicKey signatures = do
   let dimension = length publicKey
   -- actual calculated aggregate signature are stored here
   actualAggSig <- allocate dimension
-
   -- for shifting the public key
   loop [0 .. dimension - 1] $ \i -> do
     let shiftedPublicKey = shiftPublicKeyBy i publicKey
@@ -58,9 +57,7 @@ computeAggregateSignature publicKey signatures = do
         let sig = signature !! k
         let prod = pk * sig
         return (accum' + fromIntegral prod)
-
     update actualAggSig i total
-
   return actualAggSig
 
 checkSquares :: (GaloisField n, Integral n) => Int -> Int -> [Signature n] -> Ref ('A ('A ('V 'Num))) -> Comp n 'Bool

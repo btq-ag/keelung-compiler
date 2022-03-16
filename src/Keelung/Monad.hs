@@ -116,6 +116,9 @@ data Assignment n = forall ty. Assignment (Ref ('V ty)) (Expr n ty)
 instance Show n => Show (Assignment n) where
   show (Assignment var expr) = show var <> " := " <> show expr
 
+instance Functor Assignment where 
+  fmap f (Assignment var expr) = Assignment var (mapValue f expr)
+
 --------------------------------------------------------------------------------
 
 -- | Computation elaboration
@@ -149,7 +152,7 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated n ty
       ++ show (mapValue DebugGF expr)
       ++ "\n\
          \  assignments: "
-      ++ show assignments
+      ++ show (map (fmap DebugGF) assignments)
       ++ "\n\
          \}"
 
@@ -198,7 +201,9 @@ freshInputs3 sizeM sizeN sizeO = do
 writeHeap :: Int -> [(Int, Int)] -> M n ()
 writeHeap i array = do
   let bindings = IntMap.fromList array
-  modify (\st -> st {envHeap = IntMap.fromList [(i, bindings)] <> envHeap st})
+  heap <- gets envHeap 
+  let heap' = IntMap.insertWith (<>) i bindings heap
+  modify (\st -> st {envHeap = heap'})
 
 readHeap :: (Int, Int) -> M n Int
 readHeap (addr, i) = do
