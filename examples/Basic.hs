@@ -1,4 +1,4 @@
--- {-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE DataKinds #-}
 
 module Basic where
@@ -16,13 +16,12 @@ add3 = do
   x <- freshInput
   return $ Var x + 3
 
--- cond :: Comp GF181 'Num
--- cond = do
---   x <- freshInput
---   let p = x `eq` 3
---   if p
---     then return 12
---     else return 789
+cond :: Comp GF181 'Num
+cond = do
+  x <- freshInput
+  if Var x `Eq` 3
+    then return 12
+    else return 789
 
 -- cond2 :: M GF181 ty (TExpr TBool GF181)
 -- cond2 = do

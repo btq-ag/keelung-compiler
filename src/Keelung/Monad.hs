@@ -6,26 +6,28 @@ module Keelung.Monad
   ( M,
     Comp,
     elaborate,
-    -- creates an assignment 
+    -- creates an assignment
     assign,
-    -- declare input vars 
+    -- declare input vars
     freshInput,
     freshInputs,
     freshInputs2,
     freshInputs3,
-    -- declare array of vars 
+    -- declare array of vars
     allocate,
-    -- 
+    --
     access,
     access2,
     access3,
     update,
-    -- 
+    --
     reduce,
     every,
     everyM,
     loop,
-    arrayEq
+    arrayEq,
+    --
+    ifThenElse,
   )
 where
 
@@ -269,3 +271,8 @@ arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
   a <- access xs i
   b <- access ys i
   return (Var a `Eq` Var b)
+
+--------------------------------------------------------------------------------
+
+ifThenElse :: Expr n 'Bool -> Comp n ty -> Comp n ty -> Comp n ty
+ifThenElse p x y = IfThenElse p <$> x <*> y
