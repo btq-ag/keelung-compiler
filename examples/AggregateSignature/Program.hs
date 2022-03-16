@@ -13,8 +13,8 @@ import AggregateSignature.Util
 import Keelung
 
 -- ensure that a signature is smaller than 16384 (target: 12289)
-checkSignaturesBitString :: (GaloisField n, Integral n) => Int -> [Signature n] -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp n 'Bool
-checkSignaturesBitString dimension signatures bitStringss =
+checkSignaturesBitStringSize :: (GaloisField n, Integral n) => Int -> [Signature n] -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp n 'Bool
+checkSignaturesBitStringSize dimension signatures bitStringss =
   everyM [0 .. length signatures - 1] checkSignature
   where
     checkSignature i = do
@@ -98,38 +98,32 @@ aggregateSignature (Setup dimension n publicKey signatures _ settings) = do
       actualAggSig <- computeAggregateSignature publicKey signatures
       arrayEq dimension expectedAggSig actualAggSig
 
-  -- expected bitstring of signatures as input
-  sigBitStrings <- case enableBitStringChecking settings || enableSigSquareChecking settings of
-    False -> freshInputs3 0 0 0 
-    True -> freshInputs3 n dimension 14
-
   -- check signature size
-  sigSizeOk <- case enableBitStringChecking settings of
+  sigSizeOk <- case enableBitStringSizeChecking settings of
     False -> return true
-    True -> checkSignaturesBitString dimension signatures sigBitStrings
+    True -> do 
+      sigBitStrings <- freshInputs3 n dimension 14
+      checkSignaturesBitStringSize dimension signatures sigBitStrings
 
-  -- check signature bits
-  sigBitsOk <- case enableSigSquareChecking settings of
-    False -> return true
-    True -> checkSignaturesBits n dimension sigBitStrings
-
-  -- expected squares of signatures as input
-  sigSquares <- case enableSigSquareChecking settings || enableSigSquareChecking settings of
-    False -> freshInputs2 0 0
-    True -> freshInputs2 n dimension
-
-  -- check squares of signatures
-  sigSquaresOk <- case enableSigSquareChecking settings of
-    False -> return true
-    True -> do
+  -- check squares & length of signatures
+  sigSquaresAndLengthsOk <- case (enableSigSquareChecking settings, enableSigLengthChecking settings) of
+    (False, False) -> return true 
+    (True, False) -> do 
+      sigSquares <- freshInputs2 n dimension
       checkSquares n dimension signatures sigSquares
-
-  -- check length of signatures
-  sigLengthsOk <- case enableSigSquareChecking settings of
-    False -> return true
-    True -> do
+    (False, True) -> do 
+      sigSquares <- freshInputs2 n dimension
       -- expected length of signatures as input
       sigLengths <- freshInputs n
       checkLength n dimension sigSquares sigLengths
+    (True, True) -> do 
+      sigSquares <- freshInputs2 n dimension
+      squareOk <- checkSquares n dimension signatures sigSquares
+      -- expected length of signatures as input
+      sigLengths <- freshInputs n
+      lengthOk <- checkLength n dimension sigSquares sigLengths
 
-  every id [aggSigOk, sigSizeOk, sigBitsOk, sigSquaresOk, sigLengthsOk]
+      return (squareOk `And` lengthOk)
+
+  every id [aggSigOk, sigSizeOk, sigSquaresAndLengthsOk]
+

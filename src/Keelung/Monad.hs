@@ -66,7 +66,7 @@ freshVars :: Int -> M n IntSet
 freshVars n = do
   index <- gets envNexVariable
   modify (\st -> st {envNexVariable = n + index})
-  return $ IntSet.fromDistinctAscList [index .. pred n]
+  return $ IntSet.fromDistinctAscList [index .. index + n - 1]
 
 -- internal function for marking one variable as input
 markVarAsInput :: Int -> M n ()
@@ -159,7 +159,7 @@ freshInput :: M n (Ref ('V ty))
 freshInput = do
   var <- freshVar
   markVarAsInput var
-  return (Variable var)
+  return $ Variable var
 
 --------------------------------------------------------------------------------
 
@@ -221,11 +221,8 @@ readHeap (addr, i) = do
 allocateArray' :: IntSet -> M n (Ref ('A ty))
 allocateArray' vars = do
   let size = IntSet.size vars
-
   addr <- freshAddr
-
   writeHeap addr $ zip [0 .. pred size] $ IntSet.toList vars
-
   return $ Array addr
 
 allocate :: Int -> M n (Ref ('A ty))
