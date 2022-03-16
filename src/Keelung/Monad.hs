@@ -20,36 +20,34 @@ type M n = WriterT [Assignment n] (StateT (Env n) (Except String))
 
 type Comp n ty = M n (Expr n ty)
 
-type RefM n ty = M n (Reference ty)
-
 -- how to run the monad
 runM :: Env n -> M n a -> Either String ((a, [Assignment n]), Env n)
 runM st p = runExcept (runStateT (runWriterT p) st)
 
--- inrnal function for generating one fresh variable
+-- internal function for generating one fresh variable
 freshVar :: M n Int
 freshVar = do
   index <- gets envNexVariable
   modify (\st -> st {envNexVariable = succ index})
   return index
 
--- inrnal function for generating many fresh variables
+-- internal function for generating many fresh variables
 freshVars :: Int -> M n IntSet
 freshVars n = do
   index <- gets envNexVariable
   modify (\st -> st {envNexVariable = n + index})
   return $ IntSet.fromDistinctAscList [index .. pred n]
 
--- inrnal function for marking one variable as input
+-- internal function for marking one variable as input
 markVarAsInput :: Int -> M n ()
 markVarAsInput = markVarsAsInput . IntSet.singleton
 
--- inrnal function for marking many variables as input
+-- internal function for marking many variables as input
 markVarsAsInput :: IntSet -> M n ()
 markVarsAsInput vars =
   modify (\st -> st {envInpuVariables = vars <> envInpuVariables st})
 
--- inrnal function for allocating one fresh address
+-- internal function for allocating one fresh address
 freshAddr :: M n Int
 freshAddr = do
   addr <- gets envNextAddr
@@ -73,7 +71,7 @@ freshAddr = do
 --------------------------------------------------------------------------------
 
 -- | Add assignment
-assign :: Reference ('V val) -> Expr n val -> M n ()
+assign :: Ref ('V val) -> Expr n val -> M n ()
 assign var e = tell [Assignment var e]
 
 --------------------------------------------------------------------------------
@@ -109,7 +107,7 @@ type Heap = Map (Int, Int) Int
 
 --------------------------------------------------------------------------------
 
-data Assignment n = forall ty. Assignment (Reference ('V ty)) (Expr n ty)
+data Assignment n = forall ty. Assignment (Ref ('V ty)) (Expr n ty)
 
 instance Show n => Show (Assignment n) where
   show (Assignment var expr) = show var <> " := " <> show expr
@@ -154,8 +152,7 @@ data Elaborated n ty = Elaborated
 
 -- freshInputs = freshInputs' Bool
 
--- inrnal function for drawing 1 fresh input
-freshInput :: M n (Reference ('V ty))
+freshInput :: M n (Ref ('V ty))
 freshInput = do
   var <- freshVar
   markVarAsInput var
@@ -164,19 +161,36 @@ freshInput = do
 --------------------------------------------------------------------------------
 
 -- | Array-relad functions
-
--- helper of `freshInputs`
-freshInputs' :: Type -> Int -> RefM n ('A ty)
-freshInputs' _ 0 = throwError "input array must have size > 0"
-freshInputs' _ len = do
+freshInputs :: Int -> M n (Ref ('A ty))
+freshInputs 0 = throwError "input array must have size > 0"
+freshInputs size = do
   -- draw new variables and mark them as inputs
-  vars <- freshVars len
+  vars <- freshVars size
   markVarsAsInput vars
+  -- allocate a new array and associate it's content with the new variables
+  allocateArray' vars
 
-  -- allocate a new array
-  addr <- allocateArray vars
+freshInputs2 :: Int -> Int -> M n (Ref ('A ('A ty)))
+freshInputs2 0 _ = throwError "input array must have size > 0"
+freshInputs2 sizeM sizeN = do
+  -- allocate `sizeM` input arrays each of size `sizeN`
+  innerArrays <- replicateM sizeM (freshInputs sizeN)
+  -- collect references of these arrays 
+  vars <- forM innerArrays $ \array -> do 
+    case array of Array addr -> return addr
+  -- and allocate a new array with these references
+  allocateArray' $ IntSet.fromList vars
 
-  return $ Array addr
+freshInputs3 :: Int -> Int -> Int -> M n (Ref ('A ('A ('A ty))))
+freshInputs3 0 _ _ = throwError "input array must have size > 0"
+freshInputs3 sizeM sizeN sizeO = do
+  -- allocate `sizeM` input arrays each of size `sizeN * sizeO`
+  innerArrays <- replicateM sizeM (freshInputs2 sizeN sizeO)
+  -- collect references of these arrays 
+  vars <- forM innerArrays $ \array -> do 
+    case array of Array addr -> return addr
+  -- and allocate a new array with these references
+  allocateArray' $ IntSet.fromList vars
 
 writeHeap :: [((Int, Int), Int)] -> M n ()
 writeHeap bindings = modify (\st -> st {envHeap = Map.fromList bindings <> envHeap st})
@@ -192,9 +206,9 @@ readHeap (addr, i) = do
           ++ show heap
     Just n -> return n
 
--- inrnal function allocating an array with a set of variables to associate with
-allocateArray :: IntSet -> M n Addr
-allocateArray vars = do
+-- internal function allocating an array with a set of variables to associate with
+allocateArray' :: IntSet -> M n (Ref ('A ty))
+allocateArray' vars = do
   let size = IntSet.size vars
 
   addr <- freshAddr
@@ -206,28 +220,36 @@ allocateArray vars = do
   -- write that to the heap
   writeHeap bindings
 
-  return addr
+  return $ Array addr
+
+allocate :: Int -> M n (Ref ('A ty))
+allocate 0 = throwError "array must have size > 0"
+allocate size = do
+  -- declare new variables
+  vars <- freshVars size
+  -- allocate a new array and associate it's content with the new variables
+  allocateArray' vars
 
 -- 1-d array access
-access :: Reference ('A ('V ty)) -> Int -> M n (Reference ('V ty))
+access :: Ref ('A ('V ty)) -> Int -> M n (Ref ('V ty))
 access (Array addr) i = Variable <$> readHeap (addr, i)
 
-access2 :: Reference ('A ('A ('V ty))) -> (Int, Int) -> M n (Reference ('V ty))
+access2 :: Ref ('A ('A ('V ty))) -> (Int, Int) -> M n (Ref ('V ty))
 access2 addr (i, j) = do
   array <- accessArr addr i
   access array j
 
-access3 :: Reference ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> M n (Reference ('V ty))
+access3 :: Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> M n (Ref ('V ty))
 access3 addr (i, j, k) = do
   addr' <- accessArr addr i
   array <- accessArr addr' j
   access array k
 
-accessArr :: Reference ('A ('A ty)) -> Int -> M n (Reference ('A ty))
+accessArr :: Ref ('A ('A ty)) -> Int -> M n (Ref ('A ty))
 accessArr (Array addr) i = Array <$> readHeap (addr, i)
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
-update :: Reference ('A ('V ty)) -> Int -> Expr n ty -> M n ()
+update :: Ref ('A ('V ty)) -> Int -> Expr n ty -> M n ()
 update (Array addr) i (Var (Variable n)) = writeHeap [((addr, i), n)]
 update (Array addr) i expr = do
   ref <- freshVar
@@ -236,10 +258,13 @@ update (Array addr) i expr = do
 
 --------------------------------------------------------------------------------
 
-reduce :: Expr n ty -> [a] -> (Expr n ty -> a -> Comp n ty) -> Comp n ty
+reduce :: Foldable t => Expr n ty -> t a -> (Expr n ty -> a -> Comp n ty) -> Comp n ty
 reduce a xs f = foldM f a xs
 
-everyM :: (Foldable t, Monad m) => t a -> (a -> m (Expr n 'Bool)) -> m (Expr n 'Bool)
+every :: Foldable t => (a -> Expr n 'Bool) -> t a -> Comp n 'Bool
+every f xs = reduce true xs $ \accum x -> return (accum `And` f x)
+
+everyM :: Foldable t => t a -> (a -> Comp n 'Bool) -> Comp n 'Bool
 everyM xs f =
   foldM
     ( \accum x -> do
@@ -248,3 +273,12 @@ everyM xs f =
     )
     true
     xs
+
+loop :: Foldable t => t a -> (a -> M n b) -> M n ()
+loop = forM_
+
+arrayEq :: Int -> Ref ('A ('V 'Num)) -> Ref ('A ('V 'Num)) -> Comp n 'Bool
+arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
+  a <- access xs i
+  b <- access ys i
+  return (Var a `Eq` Var b)

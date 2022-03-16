@@ -16,9 +16,9 @@ data Type
   | Bool -- booleans
   deriving (Show)
 
-data Ref
+data Reference
   = V Type
-  | A Ref
+  | A Reference
   deriving (Show)
 
 --------------------------------------------------------------------------------
@@ -34,22 +34,13 @@ instance Show n => Show (Value n ty) where
 
 --------------------------------------------------------------------------------
 
--- data Addr :: * where
-  -- Addr :: Int -> Addr ('A val)
-  -- AddrOfAddr :: Addr ('A val) -> Addr ('A ('A val))
+type Addr = Int
 
-type Addr = Int 
+data Ref :: Reference -> * where
+  Variable :: Int -> Ref ('V val)
+  Array :: Addr -> Ref ('A val)
 
--- instance Show (Addr ref) where
---   show (Addr n) = show n
---   show (AddrOfAddr n) = "@" <> show n
-
--- | Variables are indexed by Type
-data Reference :: Ref -> * where
-  Variable :: Int -> Reference ('V val)
-  Array :: Addr -> Reference ('A val)
-
-instance Show (Reference ref) where
+instance Show (Ref ref) where
   show (Variable i) = "$" <> show i
   show (Array addr) = "@" <> show addr
 
@@ -60,7 +51,7 @@ data Expr :: * -> Type -> * where
   -- value
   Val :: Value n val -> Expr n val
   -- variable referecing
-  Var :: Reference ('V val) -> Expr n val
+  Var :: Ref ('V val) -> Expr n val
   -- operators on numbers
   Add :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num
   Sub :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num
@@ -72,7 +63,7 @@ data Expr :: * -> Type -> * where
   Or :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
   Xor :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
   BEq :: Expr n 'Num -> Expr n 'Num -> Expr n 'Bool
-  -- if...then...else 
+  -- if...then...else
   IfThenElse :: Expr n 'Bool -> Expr n ty -> Expr n ty -> Expr n ty
 
 instance Show n => Show (Expr n ty) where
@@ -88,7 +79,7 @@ instance Show n => Show (Expr n ty) where
     Or x y -> showParen (prec > 2) $ showsPrec 3 x . showString " ∨ " . showsPrec 2 y
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
-    IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y 
+    IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 instance GaloisField n => Num (Expr n 'Num) where
   (+) = Add
@@ -124,12 +115,12 @@ false = Val (Boolean False)
 --------------------------------------------------------------------------------
 
 fromBool :: GaloisField n => Expr n 'Bool -> Expr n 'Num
-fromBool (Val (Boolean False)) = zero 
-fromBool (Val (Boolean True)) = one 
+fromBool (Val (Boolean False)) = zero
+fromBool (Val (Boolean True)) = one
 fromBool (Var (Variable n)) = Var (Variable n)
-fromBool (Eq x y) = IfThenElse (Eq x y) one zero 
-fromBool (And x y) = IfThenElse (And x y) one zero 
-fromBool (Or x y) = IfThenElse (Or x y) one zero 
-fromBool (Xor x y) = IfThenElse (Xor x y) one zero 
-fromBool (BEq x y) = IfThenElse (BEq x y) one zero 
+fromBool (Eq x y) = IfThenElse (Eq x y) one zero
+fromBool (And x y) = IfThenElse (And x y) one zero
+fromBool (Or x y) = IfThenElse (Or x y) one zero
+fromBool (Xor x y) = IfThenElse (Xor x y) one zero
+fromBool (BEq x y) = IfThenElse (BEq x y) one zero
 fromBool (IfThenElse p x y) = IfThenElse p (fromBool x) (fromBool y)

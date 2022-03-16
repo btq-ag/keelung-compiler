@@ -7,7 +7,7 @@ import Keelung
 
 --------------------------------------------------------------------------------
 
-identity :: M GF181 (Reference ('V 'Num))
+identity :: M GF181 (Ref ('V 'Num))
 identity = freshInput
 
 add3 :: Comp GF181 'Num
