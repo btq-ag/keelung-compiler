@@ -7,13 +7,14 @@ import Keelung
 
 --------------------------------------------------------------------------------
 
-identity :: Comp GF181 'Num
+identity :: M GF181 ('Ref ('Var 'Num)) (Reference ('Var 'Num))
 identity = freshInput
 
-add3 :: Comp GF181 'Num
+add3 :: Comp GF181 ('Val 'Num)
+-- add3 :: M GF181 ('Ref ('Var 'Num)) (Reference ('Var 'Num))
 add3 = do
   x <- freshInput
-  return $ x + 3
+  return $ Deref x + 3
 
 -- cond :: Comp GF181 'Num
 -- cond = do
