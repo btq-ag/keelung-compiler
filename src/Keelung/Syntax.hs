@@ -74,9 +74,9 @@ mapValue f expr = case expr of
     Boolean b -> Boolean b
   Var ref -> Var ref
   Add x y -> Add (mapValue f x) (mapValue f y)
-  Sub x y -> Add (mapValue f x) (mapValue f y)
-  Mul x y -> Add (mapValue f x) (mapValue f y)
-  Div x y -> Add (mapValue f x) (mapValue f y)
+  Sub x y -> Sub (mapValue f x) (mapValue f y)
+  Mul x y -> Mul (mapValue f x) (mapValue f y)
+  Div x y -> Div (mapValue f x) (mapValue f y)
   Eq x y -> Eq (mapValue f x) (mapValue f y)
   And x y -> And (mapValue f x) (mapValue f y)
   Or x y -> Or (mapValue f x) (mapValue f y)

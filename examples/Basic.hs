@@ -52,8 +52,8 @@ loop2 = do
 
 aggSig :: Comp GF181 'Bool
 aggSig = do
-  let settings = Settings True True True True 
-  let setup = makeSetup 10 10 42 settings
+  let settings = Settings False True False False 
+  let setup = makeSetup 1 1 42 settings
   aggregateSignature setup
 
 --------------------------------------------------------------------------------
