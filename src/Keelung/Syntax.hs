@@ -11,12 +11,6 @@ import Data.Semiring (Ring (..), Semiring (..), one)
 
 --------------------------------------------------------------------------------
 
-type Addr = Int
-
--- type Var = Int
-
---------------------------------------------------------------------------------
-
 data Type
   = Num -- numbers
   | Bool -- booleans
@@ -40,6 +34,16 @@ instance Show n => Show (Value n ty) where
 
 --------------------------------------------------------------------------------
 
+-- data Addr :: * where
+  -- Addr :: Int -> Addr ('A val)
+  -- AddrOfAddr :: Addr ('A val) -> Addr ('A ('A val))
+
+type Addr = Int 
+
+-- instance Show (Addr ref) where
+--   show (Addr n) = show n
+--   show (AddrOfAddr n) = "@" <> show n
+
 -- | Variables are indexed by Type
 data Reference :: Ref -> * where
   Variable :: Int -> Reference ('V val)
@@ -55,7 +59,7 @@ instance Show (Reference ref) where
 data Expr :: * -> Type -> * where
   -- value
   Val :: Value n val -> Expr n val
-  -- variable
+  -- variable referecing
   Var :: Reference ('V val) -> Expr n val
   -- operators on numbers
   Add :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num

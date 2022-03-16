@@ -50,16 +50,14 @@ markVarsAsInput vars =
   modify (\st -> st {envInpuVariables = vars <> envInpuVariables st})
 
 -- inrnal function for allocating one fresh address
-freshAddr :: M n Addr
+freshAddr :: M n Int
 freshAddr = do
   addr <- gets envNextAddr
   modify (\st -> st {envNextAddr = succ addr})
   return addr
 
-writeHeap :: [((Addr, Int), HeapData)] -> M n ()
-writeHeap bindings = modify (\st -> st {envHeap = Map.fromList bindings <> envHeap st})
+-- readHeap ((AddrOfAddr n), i) = _wd
 
--- readHeap :: (Addr, Int) -> RefM n ty
 -- readHeap (addr, i) = do
 --   m <- gets envHeap
 --   case Map.lookup (addr, i) m of
@@ -84,7 +82,7 @@ data Env a = Env
   { -- Counr for generating fresh variables
     envNexVariable :: Int,
     -- Counr for allocating fresh heap addresses
-    envNextAddr :: Addr,
+    envNextAddr :: Int,
     -- Variables marked as inputs
     envInpuVariables :: IntSet,
     -- Heap for arrays
@@ -94,12 +92,20 @@ data Env a = Env
 
 --------------------------------------------------------------------------------
 
-type Heap = Map (Addr, Int) HeapData
+type Heap = Map (Int, Int) Int
 
-data HeapData
-  = HeapArr Ref Addr -- here Type denotes the type of elements
-  | HeapVar Type Int
-  deriving (Show)
+-- data HeapData :: * where
+--   HeapVar :: Int -> HeapData
+--   HeapArr :: Addr -> HeapData
+
+-- instance Show HeapData where
+--   show (HeapArr n) = "HeapArr" <> show n
+--   show (HeapVar n) = "HeapVar" <> show n
+
+-- data HeapData
+--   = HeapArr Ref Addr -- here Type denotes the type of elements
+--   | HeapVar Type Int
+--   deriving (Show)
 
 --------------------------------------------------------------------------------
 
@@ -155,88 +161,90 @@ freshInput = do
   markVarAsInput var
   return (Variable var)
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- -- | Array-relad functions
+-- | Array-relad functions
 
 -- helper of `freshInputs`
 freshInputs' :: Type -> Int -> RefM n ('A ty)
 freshInputs' _ 0 = throwError "input array must have size > 0"
-freshInputs' t len = do
+freshInputs' _ len = do
   -- draw new variables and mark them as inputs
   vars <- freshVars len
   markVarsAsInput vars
 
   -- allocate a new array
-  addr <- allocateArray vars t
+  addr <- allocateArray vars
 
   return $ Array addr
 
--- inrnal function allocating an array with a set of variables to associa with
-allocateArray :: IntSet -> Type -> M n Addr
-allocateArray vars t = do
+writeHeap :: [((Int, Int), Int)] -> M n ()
+writeHeap bindings = modify (\st -> st {envHeap = Map.fromList bindings <> envHeap st})
+
+readHeap :: (Int, Int) -> M n Int
+readHeap (addr, i) = do
+  heap <- gets envHeap
+  case Map.lookup (addr, i) heap of
+    Nothing ->
+      throwError $
+        "unbound addr " ++ show (addr, i)
+          ++ " in heap "
+          ++ show heap
+    Just n -> return n
+
+-- inrnal function allocating an array with a set of variables to associate with
+allocateArray :: IntSet -> M n Addr
+allocateArray vars = do
   let size = IntSet.size vars
 
   addr <- freshAddr
 
   let addrPairs = [(addr, i) | i <- [0 .. pred size]]
   let bindings =
-        zip addrPairs $
-          map (HeapVar t) $ IntSet.toList vars
+        zip addrPairs $ IntSet.toList vars
 
   -- write that to the heap
   writeHeap bindings
 
   return addr
 
--- -- read from array
--- access :: Expr n ('Arr ty) -> Int -> Comp n ty
--- access (Val (Array _ addr)) i = readHeap (addr, i)
--- access (Var _) _ = throwError "cannot access variable of array"
+-- 1-d array access
+access :: Reference ('A ('V ty)) -> Int -> M n (Reference ('V ty))
+access (Array addr) i = Variable <$> readHeap (addr, i)
 
--- access2 :: Expr n ('Arr ('Arr ty)) -> (Int, Int) -> Comp n ty
--- access2 a (i, j) = do
---   a' <- access a i
---   access a' j
+access2 :: Reference ('A ('A ('V ty))) -> (Int, Int) -> M n (Reference ('V ty))
+access2 addr (i, j) = do
+  array <- accessArr addr i
+  access array j
 
--- access3 :: Expr n ('Arr ('Arr ('Arr ty))) -> (Int, Int, Int) -> Comp n ty
--- access3 a (i, j, k) = do
---   a' <- access2 a (i, j)
---   access a' k
+access3 :: Reference ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> M n (Reference ('V ty))
+access3 addr (i, j, k) = do
+  addr' <- accessArr addr i
+  array <- accessArr addr' j
+  access array k
 
--- -- | Update array 'a' at position 'i' to expression 'e'. We special-case
--- -- variable and location expressions, because they're representable untyped
--- -- in the object map.
--- update :: Show f => Expr f ('Arr ty) -> Int -> Expr f ty -> M n ()
--- -- The following specialization (to variable expressions) is an
--- -- optimization: we avoid introducing a fresh variable.
--- update (Val (Array _ l)) i (Var (Variable t x)) =
---   writeHeap [((l, i), HeapVar t x)]
--- -- The following specialization (to location values) is necessary to
--- -- satisfy [INVARIANT]: All expressions of compound types (sums,
--- -- products, arrays, ...) have the form (Val (Array l)), for
--- -- some location l.
--- update (Val (Array _ l)) i (Val (Array t l')) =
---   writeHeap [((l, i), HeapRef t l')]
--- -- Default:
--- update (Val (Array t l)) i e = do
---   x <- freshVar
---   writeHeap [((l, i), HeapVar t x)]
---   assign (Variable t x) e
--- -- Err: expression does not satisfy [INVARIANT].
--- update e1 _ _ = throwError ("expecd " ++ show e1 ++ " a loc")
+accessArr :: Reference ('A ('A ty)) -> Int -> M n (Reference ('A ty))
+accessArr (Array addr) i = Array <$> readHeap (addr, i)
 
--- --------------------------------------------------------------------------------
+-- | Update array 'addr' at position 'i' to expression 'expr'
+update :: Reference ('A ('V ty)) -> Int -> Expr n ty -> M n ()
+update (Array addr) i (Var (Variable n)) = writeHeap [((addr, i), n)]
+update (Array addr) i expr = do
+  ref <- freshVar
+  writeHeap [((addr, i), ref)]
+  assign (Variable ref) expr
 
--- reduce :: Expr n ty -> [a] -> (Expr n ty -> a -> Comp n ty) -> Comp n ty
--- reduce a xs f = foldM f a xs
+--------------------------------------------------------------------------------
 
--- everyM :: (Foldable t, Monad m) => t a -> (a -> m (Expr n 'Bool)) -> m (Expr n 'Bool)
--- everyM xs f =
---   foldM
---     ( \accum x -> do
---         result <- f x
---         return (accum `And` result)
---     )
---     true
---     xs
+reduce :: Expr n ty -> [a] -> (Expr n ty -> a -> Comp n ty) -> Comp n ty
+reduce a xs f = foldM f a xs
+
+everyM :: (Foldable t, Monad m) => t a -> (a -> m (Expr n 'Bool)) -> m (Expr n 'Bool)
+everyM xs f =
+  foldM
+    ( \accum x -> do
+        result <- f x
+        return (accum `And` result)
+    )
+    true
+    xs
