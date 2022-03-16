@@ -7,10 +7,10 @@ module Keelung.Monad where
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Keelung.Syntax
 
 --------------------------------------------------------------------------------
@@ -54,20 +54,6 @@ freshAddr = do
   modify (\st -> st {envNextAddr = succ addr})
   return addr
 
--- readHeap ((AddrOfAddr n), i) = _wd
-
--- readHeap (addr, i) = do
---   m <- gets envHeap
---   case Map.lookup (addr, i) m of
---     Just (HeapArr t addr') -> return $ Array addr'
---     Just (HeapVar t var) -> return _
---     Nothing ->
---       throwError
---         ( "unbound addr " ++ show (addr, i)
---             ++ " in heap "
---             ++ show m
---         )
-
 --------------------------------------------------------------------------------
 
 -- | Add assignment
@@ -90,20 +76,8 @@ data Env a = Env
 
 --------------------------------------------------------------------------------
 
-type Heap = Map (Int, Int) Int
-
--- data HeapData :: * where
---   HeapVar :: Int -> HeapData
---   HeapArr :: Addr -> HeapData
-
--- instance Show HeapData where
---   show (HeapArr n) = "HeapArr" <> show n
---   show (HeapVar n) = "HeapVar" <> show n
-
--- data HeapData
---   = HeapArr Ref Addr -- here Type denotes the type of elements
---   | HeapVar Type Int
---   deriving (Show)
+-- A Heap is an mapping of mappings of variables
+type Heap = IntMap (IntMap Int)
 
 --------------------------------------------------------------------------------
 
@@ -175,8 +149,8 @@ freshInputs2 0 _ = throwError "input array must have size > 0"
 freshInputs2 sizeM sizeN = do
   -- allocate `sizeM` input arrays each of size `sizeN`
   innerArrays <- replicateM sizeM (freshInputs sizeN)
-  -- collect references of these arrays 
-  vars <- forM innerArrays $ \array -> do 
+  -- collect references of these arrays
+  vars <- forM innerArrays $ \array -> do
     case array of Array addr -> return addr
   -- and allocate a new array with these references
   allocateArray' $ IntSet.fromList vars
@@ -186,25 +160,33 @@ freshInputs3 0 _ _ = throwError "input array must have size > 0"
 freshInputs3 sizeM sizeN sizeO = do
   -- allocate `sizeM` input arrays each of size `sizeN * sizeO`
   innerArrays <- replicateM sizeM (freshInputs2 sizeN sizeO)
-  -- collect references of these arrays 
-  vars <- forM innerArrays $ \array -> do 
+  -- collect references of these arrays
+  vars <- forM innerArrays $ \array -> do
     case array of Array addr -> return addr
   -- and allocate a new array with these references
   allocateArray' $ IntSet.fromList vars
 
-writeHeap :: [((Int, Int), Int)] -> M n ()
-writeHeap bindings = modify (\st -> st {envHeap = Map.fromList bindings <> envHeap st})
+writeHeap :: Int -> [(Int, Int)] -> M n ()
+writeHeap i array = do
+  let bindings = map (\(j, n) -> (i, IntMap.fromList [(j, n)])) array
+  modify (\st -> st {envHeap = IntMap.fromList bindings <> envHeap st})
 
 readHeap :: (Int, Int) -> M n Int
 readHeap (addr, i) = do
   heap <- gets envHeap
-  case Map.lookup (addr, i) heap of
+  case IntMap.lookup addr heap of
     Nothing ->
       throwError $
         "unbound addr " ++ show (addr, i)
           ++ " in heap "
           ++ show heap
-    Just n -> return n
+    Just array -> case IntMap.lookup i array of
+      Nothing ->
+        throwError $
+          "unbound addr " ++ show (addr, i)
+            ++ " in heap "
+            ++ show heap
+      Just n -> return n
 
 -- internal function allocating an array with a set of variables to associate with
 allocateArray' :: IntSet -> M n (Ref ('A ty))
@@ -213,12 +195,9 @@ allocateArray' vars = do
 
   addr <- freshAddr
 
-  let addrPairs = [(addr, i) | i <- [0 .. pred size]]
-  let bindings =
-        zip addrPairs $ IntSet.toList vars
-
+  let array = zip [0 .. pred size] $ IntSet.toList vars
   -- write that to the heap
-  writeHeap bindings
+  writeHeap addr array
 
   return $ Array addr
 
@@ -250,10 +229,10 @@ accessArr (Array addr) i = Array <$> readHeap (addr, i)
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
 update :: Ref ('A ('V ty)) -> Int -> Expr n ty -> M n ()
-update (Array addr) i (Var (Variable n)) = writeHeap [((addr, i), n)]
+update (Array addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
 update (Array addr) i expr = do
   ref <- freshVar
-  writeHeap [((addr, i), ref)]
+  writeHeap addr [(i, ref)]
   assign (Variable ref) expr
 
 --------------------------------------------------------------------------------
