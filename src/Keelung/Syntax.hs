@@ -112,6 +112,9 @@ true = Val (Boolean True)
 false :: Expr n 'Bool
 false = Val (Boolean False)
 
+neq :: Expr n 'Num -> Expr n 'Num -> Expr n 'Bool
+neq x y = IfThenElse (x `Eq` y) false true
+
 --------------------------------------------------------------------------------
 
 fromBool :: GaloisField n => Expr n 'Bool -> Expr n 'Num
@@ -124,3 +127,13 @@ fromBool (Or x y) = IfThenElse (Or x y) one zero
 fromBool (Xor x y) = IfThenElse (Xor x y) one zero
 fromBool (BEq x y) = IfThenElse (BEq x y) one zero
 fromBool (IfThenElse p x y) = IfThenElse p (fromBool x) (fromBool y)
+
+toBool :: GaloisField n => Expr n 'Num -> Expr n 'Bool
+toBool (Val (Number 0)) = false
+toBool (Val (Number _)) = true
+toBool (Var (Variable n)) = Var (Variable n)
+toBool (Add x y) = Add x y `neq` 0
+toBool (Sub x y) = Sub x y `neq` 0
+toBool (Mul x y) = Mul x y `neq` 0
+toBool (Div x y) = Div x y `neq` 0
+toBool (IfThenElse p x y) = IfThenElse p (toBool x) (toBool y)

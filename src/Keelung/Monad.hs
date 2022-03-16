@@ -2,7 +2,32 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 
-module Keelung.Monad where
+module Keelung.Monad
+  ( M,
+    Comp,
+    elaborate,
+    -- creates an assignment 
+    assign,
+    -- declare input vars 
+    freshInput,
+    freshInputs,
+    freshInputs2,
+    freshInputs3,
+    -- declare array of vars 
+    allocate,
+    -- 
+    access,
+    access2,
+    access3,
+    update,
+    -- 
+    reduce,
+    every,
+    everyM,
+    loop,
+    arrayEq
+  )
+where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -108,23 +133,6 @@ data Elaborated n ty = Elaborated
   deriving (Show)
 
 --------------------------------------------------------------------------------
-
--- Inrface for drawing fresh inputs and allocating arrays.
--- Types of `Type` like `Num` and `Arr (Arr Bool)` are all considered "proper"
--- class Proper val where
---   freshInput :: M n (Reference ('V val))
-
--- -- freshInputs :: Int -> Comp n ('Ref ('Arr ('Var val)))
-
--- instance Proper 'Num where
---   freshInput = freshInput'
-
--- -- freshInputs = freshInputs' Num
-
--- instance Proper 'Bool where
---   freshInput = freshInput'
-
--- freshInputs = freshInputs' Bool
 
 freshInput :: M n (Ref ('V ty))
 freshInput = do
