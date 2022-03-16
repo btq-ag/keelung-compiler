@@ -16,53 +16,55 @@ import Keelung.Syntax
 --------------------------------------------------------------------------------
 
 -- The monad
-type M n (ty :: Type) = WriterT [Assignment n] (StateT (Env n) (Except String))
+type M n = WriterT [Assignment n] (StateT (Env n) (Except String))
 
-type Comp n ty = M n ty (Expr n ty)
+type Comp n ty = M n (Expr n ty)
+
+type RefM n ty = M n (Reference ty)
 
 -- how to run the monad
-runM :: Env n -> M n ty a -> Either String ((a, [Assignment n]), Env n)
+runM :: Env n -> M n a -> Either String ((a, [Assignment n]), Env n)
 runM st p = runExcept (runStateT (runWriterT p) st)
 
 -- inrnal function for generating one fresh variable
-freshVar :: M n ty Int
+freshVar :: M n Int
 freshVar = do
   index <- gets envNexVariable
   modify (\st -> st {envNexVariable = succ index})
   return index
 
 -- inrnal function for generating many fresh variables
-freshVars :: Int -> M n ty IntSet
+freshVars :: Int -> M n IntSet
 freshVars n = do
   index <- gets envNexVariable
   modify (\st -> st {envNexVariable = n + index})
   return $ IntSet.fromDistinctAscList [index .. pred n]
 
 -- inrnal function for marking one variable as input
-markVarAsInput :: Int -> M n ty ()
+markVarAsInput :: Int -> M n ()
 markVarAsInput = markVarsAsInput . IntSet.singleton
 
 -- inrnal function for marking many variables as input
-markVarsAsInput :: IntSet -> M n ty ()
+markVarsAsInput :: IntSet -> M n ()
 markVarsAsInput vars =
   modify (\st -> st {envInpuVariables = vars <> envInpuVariables st})
 
 -- inrnal function for allocating one fresh address
-freshAddr :: M n ty Addr
+freshAddr :: M n Addr
 freshAddr = do
   addr <- gets envNextAddr
   modify (\st -> st {envNextAddr = succ addr})
   return addr
 
--- writeHeap :: [((Addr, Int), HeapData)] -> M f ty ()
--- writeHeap bindings = modify (\st -> st {envHeap = Map.fromList bindings <> envHeap st})
+writeHeap :: [((Addr, Int), HeapData)] -> M n ()
+writeHeap bindings = modify (\st -> st {envHeap = Map.fromList bindings <> envHeap st})
 
--- readHeap :: (Addr, Int) -> Comp n ty
+-- readHeap :: (Addr, Int) -> RefM n ty
 -- readHeap (addr, i) = do
 --   m <- gets envHeap
 --   case Map.lookup (addr, i) m of
---     Just (HeapRef t addr') -> return $ Val (Array t addr')
---     Just (HeapVar t var) -> return $ Var (Variable t var)
+--     Just (HeapArr t addr') -> return $ Array addr'
+--     Just (HeapVar t var) -> return _
 --     Nothing ->
 --       throwError
 --         ( "unbound addr " ++ show (addr, i)
@@ -73,19 +75,8 @@ freshAddr = do
 --------------------------------------------------------------------------------
 
 -- | Add assignment
-assign :: Reference ('Var val) -> Expr n ('Val val) -> M n ty ()
-assign (Variable var) e = tell [Assignment (Variable var) e]
-
--- do
---   e_bot <- isBot e
---   e_true <- isTrue e
---   e_false <- isFalse e
---   case (e_bot, e_true, e_false) of
---     (True, _, _) -> assertBot var
---     (_, True, _) -> assertTrue var
---     (_, _, True) -> assertFalse var
---     _ -> return ()
--- tell [Assignment var e]
+assign :: Reference ('V val) -> Expr n val -> M n ()
+assign var e = tell [Assignment var e]
 
 --------------------------------------------------------------------------------
 
@@ -106,13 +97,13 @@ data Env a = Env
 type Heap = Map (Addr, Int) HeapData
 
 data HeapData
-  = HeapRef Ref Addr -- here Type denos the type of elements
-  | HeapVar Val Int
+  = HeapArr Ref Addr -- here Type denotes the type of elements
+  | HeapVar Type Int
   deriving (Show)
 
 --------------------------------------------------------------------------------
 
-data Assignment n = forall val. Assignment (Reference ('Var val)) (Expr n ('Val val))
+data Assignment n = forall ty. Assignment (Reference ('V ty)) (Expr n ty)
 
 instance Show n => Show (Assignment n) where
   show (Assignment var expr) = show var <> " := " <> show expr
@@ -142,25 +133,24 @@ data Elaborated n ty = Elaborated
 
 -- Inrface for drawing fresh inputs and allocating arrays.
 -- Types of `Type` like `Num` and `Arr (Arr Bool)` are all considered "proper"
-class Proper val where
-  freshInput :: M n ty (Reference ('Var val))
+-- class Proper val where
+--   freshInput :: M n (Reference ('V val))
 
--- freshInputs :: Int -> Comp n ('Ref ('Arr ('Var val)))
+-- -- freshInputs :: Int -> Comp n ('Ref ('Arr ('Var val)))
 
-instance Proper 'Num where
-  freshInput = freshInput'
+-- instance Proper 'Num where
+--   freshInput = freshInput'
 
--- freshInputs = freshInputs' Num
+-- -- freshInputs = freshInputs' Num
 
-instance Proper 'Bool where
-  freshInput = freshInput'
+-- instance Proper 'Bool where
+--   freshInput = freshInput'
 
 -- freshInputs = freshInputs' Bool
 
 -- inrnal function for drawing 1 fresh input
-freshInput' :: M n ('Ref ('Var val)) (Reference ('Var val))
--- Comp n ('Ref ('Var val))
-freshInput' = do
+freshInput :: M n (Reference ('V ty))
+freshInput = do
   var <- freshVar
   markVarAsInput var
   return (Variable var)
@@ -169,35 +159,35 @@ freshInput' = do
 
 -- -- | Array-relad functions
 
--- -- helper of `freshInputs`
--- freshInputs' :: Type -> Int -> Comp n ('Arr ty)
--- freshInputs' _ 0 = throwError "input array must have size > 0"
--- freshInputs' t len = do
---   -- draw new variables and mark them as inputs
---   vars <- freshVars len
---   markVarsAsInput vars
+-- helper of `freshInputs`
+freshInputs' :: Type -> Int -> RefM n ('A ty)
+freshInputs' _ 0 = throwError "input array must have size > 0"
+freshInputs' t len = do
+  -- draw new variables and mark them as inputs
+  vars <- freshVars len
+  markVarsAsInput vars
 
---   -- alloca a new array
---   addr <- allocaArray vars t
+  -- allocate a new array
+  addr <- allocateArray vars t
 
---   return $ Val (Array t addr)
+  return $ Array addr
 
--- -- inrnal function allocating an array with a set of variables to associa with
--- allocaArray :: IntSet -> Type -> M n ty Addr
--- allocaArray vars t = do
---   let size = IntSet.size vars
+-- inrnal function allocating an array with a set of variables to associa with
+allocateArray :: IntSet -> Type -> M n Addr
+allocateArray vars t = do
+  let size = IntSet.size vars
 
---   addr <- freshAddr
+  addr <- freshAddr
 
---   let addrPairs = [(addr, i) | i <- [0 .. pred size]]
---   let bindings =
---         zip addrPairs $
---           map (HeapVar t) $ IntSet.toList vars
+  let addrPairs = [(addr, i) | i <- [0 .. pred size]]
+  let bindings =
+        zip addrPairs $
+          map (HeapVar t) $ IntSet.toList vars
 
---   -- wri that to the heap
---   writeHeap bindings
+  -- write that to the heap
+  writeHeap bindings
 
---   return addr
+  return addr
 
 -- -- read from array
 -- access :: Expr n ('Arr ty) -> Int -> Comp n ty
@@ -217,7 +207,7 @@ freshInput' = do
 -- -- | Update array 'a' at position 'i' to expression 'e'. We special-case
 -- -- variable and location expressions, because they're representable untyped
 -- -- in the object map.
--- update :: Show f => Expr f ('Arr ty) -> Int -> Expr f ty -> M f ty ()
+-- update :: Show f => Expr f ('Arr ty) -> Int -> Expr f ty -> M n ()
 -- -- The following specialization (to variable expressions) is an
 -- -- optimization: we avoid introducing a fresh variable.
 -- update (Val (Array _ l)) i (Var (Variable t x)) =

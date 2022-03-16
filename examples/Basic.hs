@@ -7,14 +7,14 @@ import Keelung
 
 --------------------------------------------------------------------------------
 
-identity :: M GF181 ('Ref ('Var 'Num)) (Reference ('Var 'Num))
+identity :: M GF181 (Reference ('Ref 'Num))
 identity = freshInput
 
-add3 :: Comp GF181 ('Val 'Num)
+add3 :: Comp GF181 'Num
 -- add3 :: M GF181 ('Ref ('Var 'Num)) (Reference ('Var 'Num))
 add3 = do
   x <- freshInput
-  return $ Deref x + 3
+  return $ Var x + 3
 
 -- cond :: Comp GF181 'Num
 -- cond = do
@@ -32,7 +32,7 @@ add3 = do
 --------------------------------------------------------------------------------
 
 -- run :: Either String (Elaborated Type GF181)
--- run = elaborate 
+-- run = elaborate
 
 -- com ::
 --   GaloisField f =>
