@@ -5,6 +5,7 @@
 module Keelung.Monad
   ( M,
     Comp,
+    Elaborated (..),
     elaborate,
     -- creates an assignment
     assign,
@@ -39,6 +40,8 @@ import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Keelung.Syntax
+import Keelung.Util
+import Data.Field.Galois (GaloisField)
 
 --------------------------------------------------------------------------------
 
@@ -132,7 +135,23 @@ data Elaborated n ty = Elaborated
     -- | Assignements
     elabAssignments :: [Assignment n]
   }
-  deriving (Show)
+
+instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated n ty) where
+  show (Elaborated n inputs expr assignments) =
+    "{\n\
+    \  number of variables: "
+      ++ show n
+      ++ "\n\
+         \  input variables: "
+      ++ show (IntSet.toList inputs)
+      ++ "\n\
+         \  expression: "
+      ++ show (mapValue DebugGF expr)
+      ++ "\n\
+         \  assignments: "
+      ++ show assignments
+      ++ "\n\
+         \}"
 
 --------------------------------------------------------------------------------
 
@@ -178,8 +197,8 @@ freshInputs3 sizeM sizeN sizeO = do
 
 writeHeap :: Int -> [(Int, Int)] -> M n ()
 writeHeap i array = do
-  let bindings = map (\(j, n) -> (i, IntMap.fromList [(j, n)])) array
-  modify (\st -> st {envHeap = IntMap.fromList bindings <> envHeap st})
+  let bindings = IntMap.fromList array
+  modify (\st -> st {envHeap = IntMap.fromList [(i, bindings)] <> envHeap st})
 
 readHeap :: (Int, Int) -> M n Int
 readHeap (addr, i) = do
@@ -187,7 +206,7 @@ readHeap (addr, i) = do
   case IntMap.lookup addr heap of
     Nothing ->
       throwError $
-        "unbound addr " ++ show (addr, i)
+        "unbound array " ++ show (addr, i)
           ++ " in heap "
           ++ show heap
     Just array -> case IntMap.lookup i array of
@@ -198,16 +217,14 @@ readHeap (addr, i) = do
             ++ show heap
       Just n -> return n
 
--- internal function allocating an array with a set of variables to associate with
+-- internal function for allocating an array with a set of variables to associate with
 allocateArray' :: IntSet -> M n (Ref ('A ty))
 allocateArray' vars = do
   let size = IntSet.size vars
 
   addr <- freshAddr
 
-  let array = zip [0 .. pred size] $ IntSet.toList vars
-  -- write that to the heap
-  writeHeap addr array
+  writeHeap addr $ zip [0 .. pred size] $ IntSet.toList vars
 
   return $ Array addr
 

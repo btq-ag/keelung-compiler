@@ -66,6 +66,24 @@ data Expr :: * -> Type -> * where
   -- if...then...else
   IfThenElse :: Expr n 'Bool -> Expr n ty -> Expr n ty -> Expr n ty
 
+-- Basically `fmap`
+mapValue :: (a -> b) -> Expr a ty -> Expr b ty
+mapValue f expr = case expr of 
+  Val val -> Val $ case val of
+    Number a -> Number (f a)
+    Boolean b -> Boolean b
+  Var ref -> Var ref
+  Add x y -> Add (mapValue f x) (mapValue f y)
+  Sub x y -> Add (mapValue f x) (mapValue f y)
+  Mul x y -> Add (mapValue f x) (mapValue f y)
+  Div x y -> Add (mapValue f x) (mapValue f y)
+  Eq x y -> Eq (mapValue f x) (mapValue f y)
+  And x y -> And (mapValue f x) (mapValue f y)
+  Or x y -> Or (mapValue f x) (mapValue f y)
+  Xor x y -> Xor (mapValue f x) (mapValue f y)
+  BEq x y -> BEq (mapValue f x) (mapValue f y)
+  IfThenElse p x y -> IfThenElse  (mapValue f p) (mapValue f x) (mapValue f y)
+
 instance Show n => Show (Expr n ty) where
   showsPrec prec expr = case expr of
     Val val -> shows val
