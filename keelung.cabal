@@ -32,6 +32,7 @@ library
       Keelung.Interpret
       Keelung.Monad
       Keelung.Syntax
+      Keelung.Syntax.Untyped
       Keelung.Util
   other-modules:
       Paths_keelung
