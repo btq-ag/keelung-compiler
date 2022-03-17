@@ -26,12 +26,13 @@ source-repository head
 library
   exposed-modules:
       Keelung
-      Keelung.Common
+      Keelung.Compile
       Keelung.Constraint
       Keelung.Constraint.CoeffMap
       Keelung.Interpret
       Keelung.Monad
       Keelung.Syntax
+      Keelung.Syntax.Common
       Keelung.Syntax.Untyped
       Keelung.Util
   other-modules:

@@ -2,8 +2,8 @@
 
 module Keelung.Syntax.Untyped where
 
-import Keelung.Syntax (Var)
 import qualified Keelung.Syntax as T
+import Keelung.Syntax.Common
 
 --------------------------------------------------------------------------------
 
@@ -17,6 +17,7 @@ data Op
   | Or
   | Xor
   | Eq
+  | BEq
   deriving (Eq)
 
 -- See if an operator is associative, so that we can chain them together
@@ -30,6 +31,7 @@ isAssoc op = case op of
   Or -> True
   Xor -> True
   Eq -> True
+  BEq -> True
 
 --------------------------------------------------------------------------------
 
@@ -40,6 +42,14 @@ data Expr n
   | BinOp Op [Expr n]
   | IfThenElse (Expr n) (Expr n) (Expr n)
   deriving (Eq)
+
+instance Num n => Num (Expr n) where
+  x + y = BinOp Add [x, y]
+  x - y = BinOp Sub [x, y]
+  x * y = BinOp Mul [x, y]
+  abs = id
+  signum = const 1
+  fromInteger = Val . fromInteger
 
 --------------------------------------------------------------------------------
 
@@ -58,7 +68,7 @@ eraseType expr = case expr of
   T.And x y -> chainExprs And (eraseType x) (eraseType y)
   T.Or x y -> chainExprs Or (eraseType x) (eraseType y)
   T.Xor x y -> chainExprs Xor (eraseType x) (eraseType y)
-  T.BEq x y -> chainExprs Eq (eraseType x) (eraseType y)
+  T.BEq x y -> chainExprs BEq (eraseType x) (eraseType y)
   T.IfThenElse b x y -> IfThenElse (eraseType b) (eraseType x) (eraseType y)
 
 -- Flatten and chain expressions together when possible

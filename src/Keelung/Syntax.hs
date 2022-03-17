@@ -8,6 +8,7 @@ module Keelung.Syntax where
 
 import Data.Field.Galois (GaloisField)
 import Data.Semiring (Ring (..), Semiring (..), one)
+import Keelung.Syntax.Common
 
 --------------------------------------------------------------------------------
 
@@ -33,9 +34,6 @@ instance Show n => Show (Value n ty) where
   show (Boolean b) = show b
 
 --------------------------------------------------------------------------------
-
-type Var = Int
-type Addr = Int
 
 data Ref :: Reference -> * where
   Variable :: Var -> Ref ('V val)
@@ -69,7 +67,7 @@ data Expr :: * -> Type -> * where
 
 -- Basically `fmap`
 mapValue :: (a -> b) -> Expr a ty -> Expr b ty
-mapValue f expr = case expr of 
+mapValue f expr = case expr of
   Val val -> Val $ case val of
     Number a -> Number (f a)
     Boolean b -> Boolean b
@@ -83,7 +81,7 @@ mapValue f expr = case expr of
   Or x y -> Or (mapValue f x) (mapValue f y)
   Xor x y -> Xor (mapValue f x) (mapValue f y)
   BEq x y -> BEq (mapValue f x) (mapValue f y)
-  IfThenElse p x y -> IfThenElse  (mapValue f p) (mapValue f x) (mapValue f y)
+  IfThenElse p x y -> IfThenElse (mapValue f p) (mapValue f x) (mapValue f y)
 
 instance Show n => Show (Expr n ty) where
   showsPrec prec expr = case expr of

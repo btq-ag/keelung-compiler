@@ -43,6 +43,7 @@ import qualified Data.IntSet as IntSet
 import Keelung.Syntax
 import Keelung.Util
 import Data.Field.Galois (GaloisField)
+import Keelung.Syntax.Common
 
 --------------------------------------------------------------------------------
 
