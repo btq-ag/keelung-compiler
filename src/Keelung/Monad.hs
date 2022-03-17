@@ -6,6 +6,7 @@ module Keelung.Monad
   ( M,
     Comp,
     Elaborated (..),
+    Assignment(..),
     elaborate,
     -- creates an assignment
     assign,
