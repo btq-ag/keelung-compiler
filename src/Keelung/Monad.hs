@@ -89,8 +89,23 @@ freshAddr = do
 --------------------------------------------------------------------------------
 
 -- | Add assignment
-assign :: Ref ('V val) -> Expr n val -> M n ()
-assign var e = tell [Assignment var e]
+class Proper ty where 
+  assign :: Ref ('V ty) -> Expr n ty -> M n ()
+  arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n 'Bool
+
+instance Proper 'Num where 
+  assign var e = tell [Assignment Num var e]
+  arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
+    a <- access xs i
+    b <- access ys i
+    return (Var Num a `Eq` Var Num b)
+
+instance Proper 'Bool where 
+  assign var e = tell [Assignment Bool var e]
+  arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
+    a <- access xs i
+    b <- access ys i
+    return (Var Bool a `BEq` Var Bool b)
 
 --------------------------------------------------------------------------------
 
@@ -113,13 +128,13 @@ type Heap = IntMap (IntMap Int)
 
 --------------------------------------------------------------------------------
 
-data Assignment n = forall ty. Assignment (Ref ('V ty)) (Expr n ty)
+data Assignment n = forall ty. Assignment Type (Ref ('V ty)) (Expr n ty)
 
 instance Show n => Show (Assignment n) where
-  show (Assignment var expr) = show var <> " := " <> show expr
+  show (Assignment _ var expr) = show var <> " := " <> show expr
 
 instance Functor Assignment where
-  fmap f (Assignment var expr) = Assignment var (mapValue f expr)
+  fmap f (Assignment t var expr) = Assignment t var (mapValue f expr)
 
 --------------------------------------------------------------------------------
 
@@ -259,7 +274,7 @@ accessArr :: Ref ('A ('A ty)) -> Int -> M n (Ref ('A ty))
 accessArr (Array addr) i = Array <$> readHeap (addr, i)
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
-update :: Ref ('A ('V ty)) -> Int -> Expr n ty -> M n ()
+update :: Proper ty => Ref ('A ('V ty)) -> Int -> Expr n ty -> M n ()
 update (Array addr) i (Var _ (Variable n)) = writeHeap addr [(i, n)]
 update (Array addr) i expr = do
   ref <- freshVar
@@ -286,12 +301,6 @@ everyM xs f =
 
 loop :: Foldable t => t a -> (a -> M n b) -> M n ()
 loop = forM_
-
-arrayEq :: Int -> Ref ('A ('V 'Num)) -> Ref ('A ('V 'Num)) -> Comp n 'Bool
-arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
-  a <- access xs i
-  b <- access ys i
-  return (Var Num a `Eq` Var Num b)
 
 --------------------------------------------------------------------------------
 

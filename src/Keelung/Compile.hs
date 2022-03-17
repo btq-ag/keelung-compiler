@@ -4,10 +4,11 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compile where
+module Keelung.Compile (compile) where
 
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
+import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Maybe (mapMaybe)
 import Data.Set (Set)
@@ -15,6 +16,8 @@ import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Monad (Assignment (Assignment), Elaborated (Elaborated))
+import Keelung.Syntax (Ref (Variable))
+import qualified Keelung.Syntax as T
 import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped
 
@@ -77,14 +80,6 @@ encode out expr = case expr of
           [ BinOp Mul [b, x],
             BinOp Mul [BinOp Sub [Val 1, b], y]
           ]
-
-goOther :: GaloisField n => Expr n -> M n Int
-goOther (Var var) =
-  return var
-goOther expr = do
-  out <- freshVar
-  encode out expr
-  return out
 
 ----------------------------------------------------------------
 
@@ -196,44 +191,45 @@ encodeBinaryOp op out x y = case op of
     encode out $
       Var x * Var y + ((1 - Var x) * (1 - Var y))
 
--- -- | Ensure that boolean variables have constraint 'b^2 = b'
--- encodeBooleanVars :: GaloisField n => T.Expr n -> M n ()
--- encodeBooleanVars b = do 
---   mapM_ (\b -> encodeBinaryOp Mul b b b) booleanInputVars
---   where 
---     -- collect variables that are in InputVars & are boolean
---     booleanInputVars :: Set Var
---     booleanInputVars =
---       let inExpr = Set.fromList (booleanVarsOfTExpr typedExpr)
---           inAssignments = Set.fromList $ concatMap (\(Assignment var e) -> booleanVarsOfTExpr (TEVar var) <> booleanVarsOfTExpr e) assignments
---         in (inExpr <> inAssignments) `Set.intersection` Set.fromList inputVars
+-- | Ensure that boolean variables have constraint 'b^2 = b'
+encodeBooleanVars :: GaloisField n => Elaborated n ty -> M n ()
+encodeBooleanVars (Elaborated _ inputVars typedExpr assignments) = do
+  mapM_ (\b -> encodeBinaryOp Mul b b b) (IntSet.toList booleanInputVars)
+  where
+    -- collect variables that are in InputVars & are boolean
+    booleanInputVars :: IntSet
+    booleanInputVars =
+      let inExpr = IntSet.fromList (T.collectBooleanVars typedExpr)
+          inAssignments =
+            IntSet.fromList $
+              concatMap
+                ( \(Assignment t (Variable var) e) ->
+                    ([var | t == T.Bool]) <> T.collectBooleanVars e
+                )
+                assignments
+       in (inExpr <> inAssignments) `IntSet.intersection` inputVars
 
-  
-  
+-- | Compile an expression to a constraint system.  Takes as input the
+-- expression, the expression's input variables, and the name of the
+-- output variable.
+compile ::
+  GaloisField n =>
+  Elaborated n ty ->
+  ConstraintSystem n
+compile elaborated@(Elaborated outputVar inputVars typedExpr _) = runM outputVar $ do
+  let untypedExpr = eraseType typedExpr
+  -- e = propogateConstant e0
 
--- -- | Compile an expression to a constraint system.  Takes as input the
--- -- expression, the expression's input variables, and the name of the
--- -- output variable.
--- compile ::
---   GaloisField n =>
---   Elaborated n ty ->
---   ConstraintSystem n
--- compile (Elaborated outputVar inputVars typedExpr assignments) = runM outputVar $ do
---   let untypedExpr = eraseType assignments typedExpr
---   -- e = propogateConstant e0
+  -- Compile `untypedExpr` to constraints with output wire 'outputVar'.
+  encode outputVar untypedExpr
 
---   -- Compile `untypedExpr` to constraints with output wire 'outputVar'.
---   encode outputVar untypedExpr
+  encodeBooleanVars elaborated
 
---   encodeBooleanVars
+  constraints <- gets envConstraints
 
---   constraints <- gets envConstraints
-
-
---   return $
---     ConstraintSystem
---       constraints
---       (Set.size constraints)
---       inputVars
---       (IntSet.singleton outputVar)
---   where
+  return $
+    ConstraintSystem
+      constraints
+      (Set.size constraints)
+      inputVars
+      (IntSet.singleton outputVar)

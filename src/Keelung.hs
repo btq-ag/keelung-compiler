@@ -8,6 +8,7 @@ module Keelung
     DebugGF (..),
     Semiring (one, zero),
     module Prelude,
+    compile
   )
 where
 
@@ -16,4 +17,5 @@ import Data.Semiring (Semiring (one, zero))
 import Keelung.Syntax.Common
 import Keelung.Monad
 import Keelung.Syntax
+import Keelung.Compile (compile)
 import Keelung.Util (DebugGF (..))

@@ -15,7 +15,7 @@ import Keelung.Syntax.Common
 data Type
   = Num -- numbers
   | Bool -- booleans
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Reference
   = V Type
@@ -61,7 +61,7 @@ data Expr :: * -> Type -> * where
   And :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
   Or :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
   Xor :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
-  BEq :: Expr n 'Num -> Expr n 'Num -> Expr n 'Bool
+  BEq :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
   -- if...then...else
   IfThenElse :: Expr n 'Bool -> Expr n ty -> Expr n ty -> Expr n ty
 
@@ -82,6 +82,23 @@ mapValue f expr = case expr of
   Xor x y -> Xor (mapValue f x) (mapValue f y)
   BEq x y -> BEq (mapValue f x) (mapValue f y)
   IfThenElse p x y -> IfThenElse (mapValue f p) (mapValue f x) (mapValue f y)
+
+collectBooleanVars :: Expr n ty -> [Var]
+collectBooleanVars expr = case expr of
+  Var Bool (Variable n) -> [n]
+  Var Num (Variable _) -> []
+  Val _ -> []
+  Add x y -> collectBooleanVars x <> collectBooleanVars y
+  Sub x y -> collectBooleanVars x <> collectBooleanVars y
+  Mul x y -> collectBooleanVars x <> collectBooleanVars y
+  Div x y -> collectBooleanVars x <> collectBooleanVars y
+  Eq x y -> collectBooleanVars x <> collectBooleanVars y
+  And x y -> collectBooleanVars x <> collectBooleanVars y
+  Or x y -> collectBooleanVars x <> collectBooleanVars y
+  Xor x y -> collectBooleanVars x <> collectBooleanVars y
+  BEq x y -> collectBooleanVars x <> collectBooleanVars y
+  IfThenElse b x y ->
+    collectBooleanVars b <> collectBooleanVars x <> collectBooleanVars y
 
 instance Show n => Show (Expr n ty) where
   showsPrec prec expr = case expr of
@@ -137,7 +154,7 @@ neq x y = IfThenElse (x `Eq` y) false true
 fromBool :: GaloisField n => Expr n 'Bool -> Expr n 'Num
 fromBool (Val (Boolean False)) = zero
 fromBool (Val (Boolean True)) = one
-fromBool (Var t (Variable n)) = Var Num (Variable n)
+fromBool (Var _ (Variable n)) = Var Num (Variable n)
 fromBool (Eq x y) = IfThenElse (Eq x y) one zero
 fromBool (And x y) = IfThenElse (And x y) one zero
 fromBool (Or x y) = IfThenElse (Or x y) one zero

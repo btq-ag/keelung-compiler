@@ -84,7 +84,7 @@ instance GaloisField n => Interpret (Expr n ty) n where
 interpret :: GaloisField n => Elaborated n ty -> [n] -> Either String n
 interpret (Elaborated _ inputVars expr assignments) inputs = runM bindings $ do
   -- interpret the assignments first
-  forM_ assignments $ \(Assignment ref e) -> do
+  forM_ assignments $ \(Assignment _ ref e) -> do
     value <- interp e
     let var = case ref of
           Variable n -> n
@@ -92,6 +92,5 @@ interpret (Elaborated _ inputVars expr assignments) inputs = runM bindings $ do
 
   -- and then the expression
   interp expr
-  
   where
     bindings = IntMap.fromAscList $ zip (IntSet.toAscList inputVars) inputs
