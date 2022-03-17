@@ -3,7 +3,7 @@
 
 module Basic where
 
-import AggregateSignature.Program (aggregateSignature)
+import AggregateSignature.Program.Keelung (aggregateSignature)
 import AggregateSignature.Util
 import Keelung
 
@@ -52,7 +52,7 @@ loop2 = do
 
 aggSig :: Comp GF181 'Bool
 aggSig = do
-  let settings = Settings False True False False 
+  let settings = Settings True True True True True 
   let setup = makeSetup 1 1 42 settings
   aggregateSignature setup
 

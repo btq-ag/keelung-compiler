@@ -37,6 +37,7 @@ data Input a = Input
 data Settings = Settings
   { enableAggSigChecking :: Bool,
     enableBitStringSizeChecking :: Bool,
+    enableBitStringValueChecking :: Bool,
     enableSigSquareChecking :: Bool,
     enableSigLengthChecking :: Bool
   }

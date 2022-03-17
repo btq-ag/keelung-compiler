@@ -2,14 +2,10 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use if" #-}
 
--- {-# LANGUAGE RebindableSyntax #-}
 
-module AggregateSignature.Program where
+module AggregateSignature.Program.Keelung where
 
 import AggregateSignature.Util
--- import Data.Bits (Bits (shiftL, testBit, (.|.)))
--- import qualified Data.Bool as Bool
--- import Data.Foldable (for_)
 import Keelung
 
 -- ensure that a signature is smaller than 16384 (target: 12289)

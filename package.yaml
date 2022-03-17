@@ -26,9 +26,14 @@ dependencies:
 - semirings
 - galois-field
 - random
+- hspec
 
 library:
   source-dirs: src
+  ghc-options:
+    - -Wall
+    - -Werror=incomplete-patterns
+    - -fno-warn-orphans
 
 executables:
   keelung-exe:
@@ -38,19 +43,28 @@ executables:
       - examples/
     dependencies:
     - keelung
+    - snarkl
+
+    ghc-options:
+      - -Wall
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -Werror=incomplete-patterns
+      - -fno-warn-orphans
+
 
 tests:
   keelung-test:
-    main:                Spec.hs
-    source-dirs:         test
+    main:                Main.hs
+    source-dirs:        
+      - test/
+      - examples/
     dependencies:
     - keelung
+    - snarkl
 
-ghc-options:
-  - -Wall
-  - -threaded
-  - -rtsopts
-  - -with-rtsopts=-N
-  - -Werror=incomplete-patterns
-  - -fno-warn-orphans
-
+    ghc-options:
+      - -Wall
+      - -Werror=incomplete-patterns
+      - -fno-warn-orphans
