@@ -59,7 +59,7 @@ eraseType expr = case expr of
     (T.Number n) -> Val n
     (T.Boolean True) -> Val 1
     (T.Boolean False) -> Val 0
-  T.Var (T.Variable n) -> Var n
+  T.Var _ (T.Variable n) -> Var n
   T.Add x y -> chainExprs Add (eraseType x) (eraseType y)
   T.Sub x y -> chainExprs Sub (eraseType x) (eraseType y)
   T.Mul x y -> chainExprs Mul (eraseType x) (eraseType y)

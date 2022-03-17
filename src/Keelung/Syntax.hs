@@ -50,7 +50,7 @@ data Expr :: * -> Type -> * where
   -- value
   Val :: Value n val -> Expr n val
   -- variable referecing
-  Var :: Ref ('V val) -> Expr n val
+  Var :: Type -> Ref ('V val) -> Expr n val
   -- operators on numbers
   Add :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num
   Sub :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num
@@ -71,7 +71,7 @@ mapValue f expr = case expr of
   Val val -> Val $ case val of
     Number a -> Number (f a)
     Boolean b -> Boolean b
-  Var ref -> Var ref
+  Var t ref -> Var t ref
   Add x y -> Add (mapValue f x) (mapValue f y)
   Sub x y -> Sub (mapValue f x) (mapValue f y)
   Mul x y -> Mul (mapValue f x) (mapValue f y)
@@ -86,7 +86,7 @@ mapValue f expr = case expr of
 instance Show n => Show (Expr n ty) where
   showsPrec prec expr = case expr of
     Val val -> shows val
-    Var var -> shows var
+    Var _ var -> shows var
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -137,7 +137,7 @@ neq x y = IfThenElse (x `Eq` y) false true
 fromBool :: GaloisField n => Expr n 'Bool -> Expr n 'Num
 fromBool (Val (Boolean False)) = zero
 fromBool (Val (Boolean True)) = one
-fromBool (Var (Variable n)) = Var (Variable n)
+fromBool (Var t (Variable n)) = Var Num (Variable n)
 fromBool (Eq x y) = IfThenElse (Eq x y) one zero
 fromBool (And x y) = IfThenElse (And x y) one zero
 fromBool (Or x y) = IfThenElse (Or x y) one zero
@@ -148,7 +148,7 @@ fromBool (IfThenElse p x y) = IfThenElse p (fromBool x) (fromBool y)
 toBool :: GaloisField n => Expr n 'Num -> Expr n 'Bool
 toBool (Val (Number 0)) = false
 toBool (Val (Number _)) = true
-toBool (Var (Variable n)) = Var (Variable n)
+toBool (Var _ (Variable n)) = Var Bool (Variable n)
 toBool (Add x y) = Add x y `neq` 0
 toBool (Sub x y) = Sub x y `neq` 0
 toBool (Mul x y) = Mul x y `neq` 0

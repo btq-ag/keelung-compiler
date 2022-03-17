@@ -6,7 +6,7 @@ module Keelung.Monad
   ( M,
     Comp,
     Elaborated (..),
-    Assignment(..),
+    Assignment (..),
     elaborate,
     -- creates an assignment
     assign,
@@ -36,14 +36,14 @@ where
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Keelung.Syntax
-import Keelung.Util
-import Data.Field.Galois (GaloisField)
 import Keelung.Syntax.Common
+import Keelung.Util
 
 --------------------------------------------------------------------------------
 
@@ -118,7 +118,7 @@ data Assignment n = forall ty. Assignment (Ref ('V ty)) (Expr n ty)
 instance Show n => Show (Assignment n) where
   show (Assignment var expr) = show var <> " := " <> show expr
 
-instance Functor Assignment where 
+instance Functor Assignment where
   fmap f (Assignment var expr) = Assignment var (mapValue f expr)
 
 --------------------------------------------------------------------------------
@@ -203,7 +203,7 @@ freshInputs3 sizeM sizeN sizeO = do
 writeHeap :: Addr -> [(Int, Var)] -> M n ()
 writeHeap addr array = do
   let bindings = IntMap.fromList array
-  heap <- gets envHeap 
+  heap <- gets envHeap
   let heap' = IntMap.insertWith (<>) addr bindings heap
   modify (\st -> st {envHeap = heap'})
 
@@ -260,7 +260,7 @@ accessArr (Array addr) i = Array <$> readHeap (addr, i)
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
 update :: Ref ('A ('V ty)) -> Int -> Expr n ty -> M n ()
-update (Array addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
+update (Array addr) i (Var _ (Variable n)) = writeHeap addr [(i, n)]
 update (Array addr) i expr = do
   ref <- freshVar
   writeHeap addr [(i, ref)]
@@ -291,7 +291,7 @@ arrayEq :: Int -> Ref ('A ('V 'Num)) -> Ref ('A ('V 'Num)) -> Comp n 'Bool
 arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
   a <- access xs i
   b <- access ys i
-  return (Var a `Eq` Var b)
+  return (Var Num a `Eq` Var Num b)
 
 --------------------------------------------------------------------------------
 

@@ -8,11 +8,13 @@ module Keelung.Compile where
 
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
+import qualified Data.IntSet as IntSet
 import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
+import Keelung.Monad (Assignment (Assignment), Elaborated (Elaborated))
 import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped
 
@@ -21,14 +23,13 @@ import Keelung.Syntax.Untyped
 -- | Monad for compilation
 data Env n = Env
   { envConstraints :: Set (Constraint n),
-    envNextVar :: Var,
-    envAssignments :: [(Var, Expr n)]
+    envNextVar :: Var
   }
 
 type M n = State (Env n)
 
-runM :: Var -> [(Var, Expr n)] -> M n a -> a
-runM outVar assignments program = evalState program (Env Set.empty (outVar + 1) assignments)
+runM :: Var -> M n a -> a
+runM outVar program = evalState program (Env Set.empty (outVar + 1))
 
 addConstraint :: Ord n => Constraint n -> M n ()
 addConstraint c =
@@ -39,10 +40,6 @@ freshVar = do
   next <- gets envNextVar
   modify (\st -> st {envNextVar = next + 1})
   return next
-
--- | Add assignment
-assign :: Var -> Expr n -> M n ()
-assign var e = modify (\st -> st {envAssignments = (var, e) : envAssignments st})
 
 ----------------------------------------------------------------
 
@@ -198,3 +195,45 @@ encodeBinaryOp op out x y = case op of
     -- The encoding is: x*y + (1-x)*(1-y) = z.
     encode out $
       Var x * Var y + ((1 - Var x) * (1 - Var y))
+
+-- -- | Ensure that boolean variables have constraint 'b^2 = b'
+-- encodeBooleanVars :: GaloisField n => T.Expr n -> M n ()
+-- encodeBooleanVars b = do 
+--   mapM_ (\b -> encodeBinaryOp Mul b b b) booleanInputVars
+--   where 
+--     -- collect variables that are in InputVars & are boolean
+--     booleanInputVars :: Set Var
+--     booleanInputVars =
+--       let inExpr = Set.fromList (booleanVarsOfTExpr typedExpr)
+--           inAssignments = Set.fromList $ concatMap (\(Assignment var e) -> booleanVarsOfTExpr (TEVar var) <> booleanVarsOfTExpr e) assignments
+--         in (inExpr <> inAssignments) `Set.intersection` Set.fromList inputVars
+
+  
+  
+
+-- -- | Compile an expression to a constraint system.  Takes as input the
+-- -- expression, the expression's input variables, and the name of the
+-- -- output variable.
+-- compile ::
+--   GaloisField n =>
+--   Elaborated n ty ->
+--   ConstraintSystem n
+-- compile (Elaborated outputVar inputVars typedExpr assignments) = runM outputVar $ do
+--   let untypedExpr = eraseType assignments typedExpr
+--   -- e = propogateConstant e0
+
+--   -- Compile `untypedExpr` to constraints with output wire 'outputVar'.
+--   encode outputVar untypedExpr
+
+--   encodeBooleanVars
+
+--   constraints <- gets envConstraints
+
+
+--   return $
+--     ConstraintSystem
+--       constraints
+--       (Set.size constraints)
+--       inputVars
+--       (IntSet.singleton outputVar)
+--   where
