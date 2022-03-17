@@ -3,21 +3,17 @@
 module Keelung
   ( module Keelung.Monad,
     module Keelung.Syntax,
+    module Keelung.Common,
     GaloisField,
-    GF64,
-    GF181,
     DebugGF (..),
     Semiring (one, zero),
-    module Prelude
+    module Prelude,
   )
 where
 
-import Data.Field.Galois (Binary, GaloisField, Prime)
+import Data.Field.Galois (GaloisField)
 import Data.Semiring (Semiring (one, zero))
+import Keelung.Common
 import Keelung.Monad
 import Keelung.Syntax
-import Keelung.Util (DebugGF(..))
-
-type GF64 = Binary 18446744073709551643
-
-type GF181 = Prime 1552511030102430251236801561344621993261920897571225601
+import Keelung.Util (DebugGF (..))

@@ -4,6 +4,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Keelung.Common (GF181)
 import Keelung.Constraint.CoeffMap (CoeffMap)
 import Keelung.Syntax
 import Keelung.Util (DebugGF (DebugGF))
@@ -16,6 +17,7 @@ import Keelung.Util (DebugGF (DebugGF))
 data Constraint n
   = CAdd !n !(CoeffMap n)
   | CMult !(n, Var) !(n, Var) !(n, Maybe Var)
+  deriving (Eq)
 
 instance (Show n, Eq n, Num n) => Show (Constraint n) where
   show (CAdd 0 m) = show m
@@ -28,6 +30,17 @@ instance (Show n, Eq n, Num n) => Show (Constraint n) where
           <> case z of
             Nothing -> show c
             Just z' -> showTerm c z'
+
+instance Ord n => Ord (Constraint n) where
+  {-# SPECIALIZE instance Ord (Constraint GF181) #-}
+  compare CMult {} CAdd {} = GT
+  compare CAdd {} CMult {} = LT
+  compare (CAdd c m) (CAdd c' m') =
+    -- perform lexicographical comparison with tuples
+    compare (c, m) (c', m')
+  compare (CMult (a, x) (b, y) (c, z)) (CMult (a', x') (b', y') (c', z')) =
+    -- perform lexicographical comparison with tuples
+    compare (x, y, z, a, b, c) (x', y', z', a', b', c')
 
 --------------------------------------------------------------------------------
 

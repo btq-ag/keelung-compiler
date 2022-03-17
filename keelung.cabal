@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Keelung
+      Keelung.Common
       Keelung.Constraint
       Keelung.Constraint.CoeffMap
       Keelung.Interpret
