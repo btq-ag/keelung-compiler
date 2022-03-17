@@ -70,7 +70,7 @@ freshVars n = do
   return $ IntSet.fromDistinctAscList [index .. index + n - 1]
 
 -- internal function for marking one variable as input
-markVarAsInput :: Int -> M n ()
+markVarAsInput :: Var -> M n ()
 markVarAsInput = markVarsAsInput . IntSet.singleton
 
 -- internal function for marking many variables as input
@@ -79,7 +79,7 @@ markVarsAsInput vars =
   modify (\st -> st {envInpuVariables = vars <> envInpuVariables st})
 
 -- internal function for allocating one fresh address
-freshAddr :: M n Int
+freshAddr :: M n Addr
 freshAddr = do
   addr <- gets envNextAddr
   modify (\st -> st {envNextAddr = succ addr})
@@ -199,14 +199,14 @@ freshInputs3 sizeM sizeN sizeO = do
   -- and allocate a new array with these references
   allocateArray' $ IntSet.fromList vars
 
-writeHeap :: Int -> [(Int, Int)] -> M n ()
-writeHeap i array = do
+writeHeap :: Addr -> [(Int, Var)] -> M n ()
+writeHeap addr array = do
   let bindings = IntMap.fromList array
   heap <- gets envHeap 
-  let heap' = IntMap.insertWith (<>) i bindings heap
+  let heap' = IntMap.insertWith (<>) addr bindings heap
   modify (\st -> st {envHeap = heap'})
 
-readHeap :: (Int, Int) -> M n Int
+readHeap :: (Addr, Int) -> M n Int
 readHeap (addr, i) = do
   heap <- gets envHeap
   case IntMap.lookup addr heap of

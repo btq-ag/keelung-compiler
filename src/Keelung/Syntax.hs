@@ -34,10 +34,11 @@ instance Show n => Show (Value n ty) where
 
 --------------------------------------------------------------------------------
 
+type Var = Int
 type Addr = Int
 
 data Ref :: Reference -> * where
-  Variable :: Int -> Ref ('V val)
+  Variable :: Var -> Ref ('V val)
   Array :: Addr -> Ref ('A val)
 
 instance Show (Ref ref) where
