@@ -53,7 +53,7 @@ instance Num n => Num (Expr n) where
 
 --------------------------------------------------------------------------------
 
-eraseType :: Num n => T.Expr n ty -> Expr n
+eraseType :: Num n => T.Expr ty n -> Expr n
 eraseType expr = case expr of
   T.Val val -> case val of
     (T.Number n) -> Val n

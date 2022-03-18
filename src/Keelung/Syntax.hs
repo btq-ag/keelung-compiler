@@ -46,44 +46,43 @@ instance Show (Ref ref) where
 --------------------------------------------------------------------------------
 
 -- | Expressions are parameterised by some field and indexed by Type
-data Expr :: * -> Type -> * where
+data Expr :: Type -> * -> * where
   -- value
-  Val :: Value n val -> Expr n val
+  Val :: Value n val -> Expr val n
   -- variable referecing
-  Var :: Type -> Ref ('V val) -> Expr n val
+  Var :: Type -> Ref ('V val) -> Expr val n
   -- operators on numbers
-  Add :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num
-  Sub :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num
-  Mul :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num
-  Div :: Expr n 'Num -> Expr n 'Num -> Expr n 'Num
-  Eq :: Expr n 'Num -> Expr n 'Num -> Expr n 'Bool
+  Add :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
+  Sub :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
+  Mul :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
+  Div :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
+  Eq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n
   -- operators on booleans
-  And :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
-  Or :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
-  Xor :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
-  BEq :: Expr n 'Bool -> Expr n 'Bool -> Expr n 'Bool
+  And :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
+  Or :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
+  Xor :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
+  BEq :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
   -- if...then...else
-  IfThenElse :: Expr n 'Bool -> Expr n ty -> Expr n ty -> Expr n ty
+  IfThenElse :: Expr 'Bool n -> Expr ty n -> Expr ty n -> Expr ty n
 
--- Basically `fmap`
-mapValue :: (a -> b) -> Expr a ty -> Expr b ty
-mapValue f expr = case expr of
-  Val val -> Val $ case val of
-    Number a -> Number (f a)
-    Boolean b -> Boolean b
-  Var t ref -> Var t ref
-  Add x y -> Add (mapValue f x) (mapValue f y)
-  Sub x y -> Sub (mapValue f x) (mapValue f y)
-  Mul x y -> Mul (mapValue f x) (mapValue f y)
-  Div x y -> Div (mapValue f x) (mapValue f y)
-  Eq x y -> Eq (mapValue f x) (mapValue f y)
-  And x y -> And (mapValue f x) (mapValue f y)
-  Or x y -> Or (mapValue f x) (mapValue f y)
-  Xor x y -> Xor (mapValue f x) (mapValue f y)
-  BEq x y -> BEq (mapValue f x) (mapValue f y)
-  IfThenElse p x y -> IfThenElse (mapValue f p) (mapValue f x) (mapValue f y)
+instance Functor (Expr ty) where
+  fmap f expr = case expr of
+    Val val -> Val $ case val of
+      Number a -> Number (f a)
+      Boolean b -> Boolean b
+    Var t ref -> Var t ref
+    Add x y -> Add (fmap f x) (fmap f y)
+    Sub x y -> Sub (fmap f x) (fmap f y)
+    Mul x y -> Mul (fmap f x) (fmap f y)
+    Div x y -> Div (fmap f x) (fmap f y)
+    Eq x y -> Eq (fmap f x) (fmap f y)
+    And x y -> And (fmap f x) (fmap f y)
+    Or x y -> Or (fmap f x) (fmap f y)
+    Xor x y -> Xor (fmap f x) (fmap f y)
+    BEq x y -> BEq (fmap f x) (fmap f y)
+    IfThenElse p x y -> IfThenElse (fmap f p) (fmap f x) (fmap f y)
 
-collectBooleanVars :: Expr n ty -> [Var]
+collectBooleanVars :: Expr ty n -> [Var]
 collectBooleanVars expr = case expr of
   Var Bool (Variable n) -> [n]
   Var Num (Variable _) -> []
@@ -100,7 +99,7 @@ collectBooleanVars expr = case expr of
   IfThenElse b x y ->
     collectBooleanVars b <> collectBooleanVars x <> collectBooleanVars y
 
-instance Show n => Show (Expr n ty) where
+instance Show n => Show (Expr ty n) where
   showsPrec prec expr = case expr of
     Val val -> shows val
     Var _ var -> shows var
@@ -115,7 +114,7 @@ instance Show n => Show (Expr n ty) where
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
-instance GaloisField n => Num (Expr n 'Num) where
+instance GaloisField n => Num (Expr 'Num n) where
   (+) = Add
   (-) = Sub
   (*) = Mul
@@ -125,33 +124,33 @@ instance GaloisField n => Num (Expr n 'Num) where
   signum = const (Val (Number 1))
   fromInteger = Val . Number . fromNatural . fromInteger
 
-instance GaloisField n => Semiring (Expr n 'Num) where
+instance GaloisField n => Semiring (Expr 'Num n) where
   plus = Add
   times = Mul
   zero = Val (Number 0)
   one = Val (Number 1)
 
-instance GaloisField n => Ring (Expr n 'Num) where
+instance GaloisField n => Ring (Expr 'Num n) where
   negate = id
 
-instance GaloisField n => Fractional (Expr n 'Num) where
+instance GaloisField n => Fractional (Expr 'Num n) where
   fromRational = Val . Number . fromRational
   (/) = Div
 
 --------------------------------------------------------------------------------
 
-true :: Expr n 'Bool
+true :: Expr 'Bool n
 true = Val (Boolean True)
 
-false :: Expr n 'Bool
+false :: Expr 'Bool n
 false = Val (Boolean False)
 
-neq :: Expr n 'Num -> Expr n 'Num -> Expr n 'Bool
+neq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n
 neq x y = IfThenElse (x `Eq` y) false true
 
 --------------------------------------------------------------------------------
 
-fromBool :: GaloisField n => Expr n 'Bool -> Expr n 'Num
+fromBool :: GaloisField n => Expr 'Bool n -> Expr 'Num n
 fromBool (Val (Boolean False)) = zero
 fromBool (Val (Boolean True)) = one
 fromBool (Var _ (Variable n)) = Var Num (Variable n)
@@ -162,7 +161,7 @@ fromBool (Xor x y) = IfThenElse (Xor x y) one zero
 fromBool (BEq x y) = IfThenElse (BEq x y) one zero
 fromBool (IfThenElse p x y) = IfThenElse p (fromBool x) (fromBool y)
 
-toBool :: GaloisField n => Expr n 'Num -> Expr n 'Bool
+toBool :: GaloisField n => Expr 'Num n -> Expr 'Bool n
 toBool (Val (Number 0)) = false
 toBool (Val (Number _)) = true
 toBool (Var _ (Variable n)) = Var Bool (Variable n)

@@ -10,25 +10,25 @@ import Keelung
 --------------------------------------------------------------------------------
 
 identity :: Comp GF181 'Num
-identity = Var <$> freshInput
+identity = Var Num <$> freshInput
 
 add3 :: Comp GF181 'Num
 -- add3 :: M GF181 ('Ref ('Var 'Num)) (Reference ('Var 'Num))
 add3 = do
   x <- freshInput
-  return $ Var x + 3
+  return $ Var Num x + 3
 
 cond :: Comp GF181 'Num
 cond = do
   x <- freshInput
-  if Var x `Eq` 3
+  if Var Num x `Eq` 3
     then return 12
     else return 789
 
 cond2 :: Comp GF181 'Bool
 cond2 = do
   x <- freshInput
-  return $ Var x `Eq` 3
+  return $ Var Num x `Eq` 3
 
 loop1 :: Comp GF181 'Num
 loop1 = do
@@ -36,18 +36,18 @@ loop1 = do
   arr <- freshInputs 4
   a <- reduce 0 [0 .. 3] $ \accum i -> do 
     x <- access arr i 
-    return $ accum + Var x
+    return $ accum + Var Num x
 
-  return (Var arr2 + a)
+  return (Var Num arr2 + a)
 
 loop2 :: Comp GF181 'Bool
 loop2 = do
-  arr <- freshInputs 2
+  arr <- freshInputs 2 
   -- b <- reduce 0 [0 .. 1] $ \accum i -> do 
   --   x <- access arr i 
   --   return $ accum + Var x
   arr2 <- freshInputs 2
-  arrayEq 2 arr arr2 
+  arrayEq 2 arr (arr2 :: (Ref ('A ('V 'Num))))
   -- return (Var a + Var c + b)
 
 aggSig :: Comp GF181 'Bool

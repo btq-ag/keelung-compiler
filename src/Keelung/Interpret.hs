@@ -51,7 +51,7 @@ instance GaloisField n => Interpret (Value n ty) n where
     Number n -> return n
     Boolean b -> interp b
 
-instance GaloisField n => Interpret (Expr n ty) n where
+instance GaloisField n => Interpret (Expr ty n) n where
   interp expr = case expr of
     Val val -> interp val
     Var _ (Variable n) -> lookupVar n

@@ -50,7 +50,7 @@ import Keelung.Util
 -- The monad
 type M n = WriterT [Assignment n] (StateT (Env n) (Except String))
 
-type Comp n ty = M n (Expr n ty)
+type Comp n ty = M n (Expr ty n)
 
 -- how to run the monad
 runM :: Env n -> M n a -> Either String ((a, [Assignment n]), Env n)
@@ -90,7 +90,7 @@ freshAddr = do
 
 -- | Add assignment
 class Proper ty where 
-  assign :: Ref ('V ty) -> Expr n ty -> M n ()
+  assign :: Ref ('V ty) -> Expr ty n -> M n ()
   arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n 'Bool
 
 instance Proper 'Num where 
@@ -128,13 +128,13 @@ type Heap = IntMap (IntMap Int)
 
 --------------------------------------------------------------------------------
 
-data Assignment n = forall ty. Assignment Type (Ref ('V ty)) (Expr n ty)
+data Assignment n = forall ty. Assignment Type (Ref ('V ty)) (Expr ty n)
 
 instance Show n => Show (Assignment n) where
   show (Assignment _ var expr) = show var <> " := " <> show expr
 
 instance Functor Assignment where
-  fmap f (Assignment t var expr) = Assignment t var (mapValue f expr)
+  fmap f (Assignment t var expr) = Assignment t var (fmap f expr)
 
 --------------------------------------------------------------------------------
 
@@ -151,7 +151,7 @@ data Elaborated n ty = Elaborated
     -- | Variables marked as inputs
     elabInpuVariables :: IntSet,
     -- | The resulting 'Expr'
-    elabExpr :: Expr n ty,
+    elabExpr :: Expr ty n,
     -- | Assignements
     elabAssignments :: [Assignment n]
   }
@@ -166,7 +166,7 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated n ty
       ++ show (IntSet.toList inputs)
       ++ "\n\
          \  expression: "
-      ++ show (mapValue DebugGF expr)
+      ++ show (fmap DebugGF expr)
       ++ "\n\
          \  assignments: "
       ++ show (map (fmap DebugGF) assignments)
@@ -274,7 +274,7 @@ accessArr :: Ref ('A ('A ty)) -> Int -> M n (Ref ('A ty))
 accessArr (Array addr) i = Array <$> readHeap (addr, i)
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
-update :: Proper ty => Ref ('A ('V ty)) -> Int -> Expr n ty -> M n ()
+update :: Proper ty => Ref ('A ('V ty)) -> Int -> Expr ty n -> M n ()
 update (Array addr) i (Var _ (Variable n)) = writeHeap addr [(i, n)]
 update (Array addr) i expr = do
   ref <- freshVar
@@ -283,10 +283,10 @@ update (Array addr) i expr = do
 
 --------------------------------------------------------------------------------
 
-reduce :: Foldable t => Expr n ty -> t a -> (Expr n ty -> a -> Comp n ty) -> Comp n ty
+reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp n ty) -> Comp n ty
 reduce a xs f = foldM f a xs
 
-every :: Foldable t => (a -> Expr n 'Bool) -> t a -> Comp n 'Bool
+every :: Foldable t => (a -> Expr 'Bool n) -> t a -> Comp n 'Bool
 every f xs = reduce true xs $ \accum x -> return (accum `And` f x)
 
 everyM :: Foldable t => t a -> (a -> Comp n 'Bool) -> Comp n 'Bool
@@ -304,5 +304,5 @@ loop = forM_
 
 --------------------------------------------------------------------------------
 
-ifThenElse :: Expr n 'Bool -> Comp n ty -> Comp n ty -> Comp n ty
+ifThenElse :: Expr 'Bool n -> Comp n ty -> Comp n ty -> Comp n ty
 ifThenElse p x y = IfThenElse p <$> x <*> y
