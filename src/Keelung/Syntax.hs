@@ -25,11 +25,11 @@ data Reference
 --------------------------------------------------------------------------------
 
 -- | Values are parameterised by some field and indexed by Type
-data Value :: * -> Type -> * where
-  Number :: n -> Value n 'Num
-  Boolean :: Bool -> Value n 'Bool
+data Value :: Type -> * -> * where
+  Number :: n -> Value 'Num n
+  Boolean :: Bool -> Value 'Bool n
 
-instance Show n => Show (Value n ty) where
+instance Show n => Show (Value ty n) where
   show (Number n) = show n
   show (Boolean b) = show b
 
@@ -48,7 +48,7 @@ instance Show (Ref ref) where
 -- | Expressions are parameterised by some field and indexed by Type
 data Expr :: Type -> * -> * where
   -- value
-  Val :: Value n val -> Expr val n
+  Val :: Value val n -> Expr val n
   -- variable referecing
   Var :: Type -> Ref ('V val) -> Expr val n
   -- operators on numbers

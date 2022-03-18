@@ -46,7 +46,7 @@ instance GaloisField n => Interpret Bool n where
   interp True = return one
   interp False = return zero
 
-instance GaloisField n => Interpret (Value n ty) n where
+instance GaloisField n => Interpret (Value ty n) n where
   interp v = case v of
     Number n -> return n
     Boolean b -> interp b

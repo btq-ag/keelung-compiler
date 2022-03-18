@@ -211,15 +211,17 @@ encodeBooleanVars (Elaborated _ inputVars typedExpr _ boolAssignments) = do
 -- expression, the expression's input variables, and the name of the
 -- output variable.
 compile ::
-  GaloisField n =>
+  (GaloisField n, Erase ty) =>
   Elaborated n ty ->
   ConstraintSystem n
-compile elaborated@(Elaborated outputVar inputVars typedExpr _ _) = runM outputVar $ do
-  let untypedExpr = eraseType typedExpr
+compile elaborated@(Elaborated outputVar inputVars typedExpr numAssignments boolAssignments) = runM outputVar $ do
+  let (untypedExpr, booleanVarsInExpr) = eraseType typedExpr
+  -- let (assignments, booleanVarsInAssignments) = mapM (\(Assignment (Variable var) expr) ->  ) eraseType typedExpr
   -- e = propogateConstant e0
 
   -- Compile `untypedExpr` to constraints with output wire 'outputVar'.
   encode outputVar untypedExpr
+  -- Compile assignments to constraints with output wire 'outputVar'.
 
   encodeBooleanVars elaborated
 

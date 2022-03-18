@@ -1,7 +1,11 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 
-module Keelung.Syntax.Untyped where
+module Keelung.Syntax.Untyped (Op (..), Expr (..), Erase (..), eraseType) where
 
+import Control.Monad.Writer
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import qualified Keelung.Syntax as T
 import Keelung.Syntax.Common
 
@@ -53,23 +57,53 @@ instance Num n => Num (Expr n) where
 
 --------------------------------------------------------------------------------
 
-eraseType :: Num n => T.Expr ty n -> Expr n
-eraseType expr = case expr of
-  T.Val val -> case val of
-    (T.Number n) -> Val n
-    (T.Boolean True) -> Val 1
-    (T.Boolean False) -> Val 0
-  T.Var _ (T.Variable n) -> Var n
-  T.Add x y -> chainExprs Add (eraseType x) (eraseType y)
-  T.Sub x y -> chainExprs Sub (eraseType x) (eraseType y)
-  T.Mul x y -> chainExprs Mul (eraseType x) (eraseType y)
-  T.Div x y -> chainExprs Div (eraseType x) (eraseType y)
-  T.Eq x y -> chainExprs Eq (eraseType x) (eraseType y)
-  T.And x y -> chainExprs And (eraseType x) (eraseType y)
-  T.Or x y -> chainExprs Or (eraseType x) (eraseType y)
-  T.Xor x y -> chainExprs Xor (eraseType x) (eraseType y)
-  T.BEq x y -> chainExprs BEq (eraseType x) (eraseType y)
-  T.IfThenElse b x y -> IfThenElse (eraseType b) (eraseType x) (eraseType y)
+-- data Assignment n = Assignment Var (Expr n)
+
+-- instance Show n => Show (Assignment n) where
+--   show (Assignment var expr) = show var <> " := " <> show expr
+
+-- instance Functor Assignment where
+--   fmap f (Assignment var expr) = Assignment var (fmap f expr)
+
+--------------------------------------------------------------------------------
+
+-- monad for collecting boolean vars along the way
+type M = Writer IntSet
+
+eraseType :: (Erase ty, Num n) => T.Expr ty n -> (Expr n, IntSet)
+eraseType = runWriter . eraseExpr
+
+--------------------------------------------------------------------------------
+
+-- for stealing type info in runtime from the typeclass dictionary
+class Erase ty where
+  eraseExpr :: Num n => T.Expr ty n -> M (Expr n)
+
+instance Erase 'T.Num where
+  eraseExpr expr = case expr of
+    T.Val val -> case val of
+      (T.Number n) -> return (Val n)
+    T.Var _ (T.Variable var) -> do
+      tell (IntSet.singleton var)
+      return (Var var)
+    T.Add x y -> chainExprs Add <$> eraseExpr x <*> eraseExpr y
+    T.Sub x y -> chainExprs Sub <$> eraseExpr x <*> eraseExpr y
+    T.Mul x y -> chainExprs Mul <$> eraseExpr x <*> eraseExpr y
+    T.Div x y -> chainExprs Div <$> eraseExpr x <*> eraseExpr y
+    T.IfThenElse b x y -> IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
+
+instance Erase 'T.Bool where
+  eraseExpr expr = case expr of
+    T.Val val -> case val of
+      (T.Boolean True) -> return (Val 1)
+      (T.Boolean False) -> return (Val 0)
+    T.Var _ (T.Variable n) -> return (Var n)
+    T.Eq x y -> chainExprs Eq <$> eraseExpr x <*> eraseExpr y
+    T.And x y -> chainExprs And <$> eraseExpr x <*> eraseExpr y
+    T.Or x y -> chainExprs Or <$> eraseExpr x <*> eraseExpr y
+    T.Xor x y -> chainExprs Xor <$> eraseExpr x <*> eraseExpr y
+    T.BEq x y -> chainExprs BEq <$> eraseExpr x <*> eraseExpr y
+    T.IfThenElse b x y -> IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
 
 -- Flatten and chain expressions together when possible
 chainExprs :: Op -> Expr n -> Expr n -> Expr n

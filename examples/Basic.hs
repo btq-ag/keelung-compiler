@@ -13,7 +13,6 @@ identity :: Comp GF181 'Num
 identity = Var Num <$> freshInput
 
 add3 :: Comp GF181 'Num
--- add3 :: M GF181 ('Ref ('Var 'Num)) (Reference ('Var 'Num))
 add3 = do
   x <- freshInput
   return $ Var Num x + 3
@@ -32,23 +31,17 @@ cond2 = do
 
 loop1 :: Comp GF181 'Num
 loop1 = do
-  arr2 <- freshInput
   arr <- freshInputs 4
-  a <- reduce 0 [0 .. 3] $ \accum i -> do 
+  
+  reduce 0 [0 .. 3] $ \accum i -> do 
     x <- access arr i 
     return $ accum + Var Num x
-
-  return (Var Num arr2 + a)
 
 loop2 :: Comp GF181 'Bool
 loop2 = do
   arr <- freshInputs 2 
-  -- b <- reduce 0 [0 .. 1] $ \accum i -> do 
-  --   x <- access arr i 
-  --   return $ accum + Var x
   arr2 <- freshInputs 2
   arrayEq 2 arr (arr2 :: (Ref ('A ('V 'Num))))
-  -- return (Var a + Var c + b)
 
 aggSig :: Comp GF181 'Bool
 aggSig = do
