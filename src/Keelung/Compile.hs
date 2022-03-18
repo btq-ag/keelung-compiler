@@ -193,7 +193,7 @@ encodeBinaryOp op out x y = case op of
 
 -- | Ensure that boolean variables have constraint 'b^2 = b'
 encodeBooleanVars :: GaloisField n => Elaborated n ty -> M n ()
-encodeBooleanVars (Elaborated _ inputVars typedExpr assignments) = do
+encodeBooleanVars (Elaborated _ inputVars typedExpr _ boolAssignments) = do
   mapM_ (\b -> encodeBinaryOp Mul b b b) (IntSet.toList booleanInputVars)
   where
     -- collect variables that are in InputVars & are boolean
@@ -203,10 +203,8 @@ encodeBooleanVars (Elaborated _ inputVars typedExpr assignments) = do
           inAssignments =
             IntSet.fromList $
               concatMap
-                ( \(Assignment t (Variable var) e) ->
-                    ([var | t == T.Bool]) <> T.collectBooleanVars e
-                )
-                assignments
+                (\(Assignment (Variable var) e) -> var : T.collectBooleanVars e)
+                boolAssignments
        in (inExpr <> inAssignments) `IntSet.intersection` inputVars
 
 -- | Compile an expression to a constraint system.  Takes as input the
@@ -216,7 +214,7 @@ compile ::
   GaloisField n =>
   Elaborated n ty ->
   ConstraintSystem n
-compile elaborated@(Elaborated outputVar inputVars typedExpr _) = runM outputVar $ do
+compile elaborated@(Elaborated outputVar inputVars typedExpr _ _) = runM outputVar $ do
   let untypedExpr = eraseType typedExpr
   -- e = propogateConstant e0
 

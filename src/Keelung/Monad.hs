@@ -48,13 +48,16 @@ import Keelung.Util
 --------------------------------------------------------------------------------
 
 -- The monad
-type M n = WriterT [Assignment n] (StateT (Env n) (Except String))
+type M n =
+  WriterT
+    [Assignment 'Num n]
+    (WriterT [Assignment 'Bool n] (StateT (Env n) (Except String)))
 
 type Comp n ty = M n (Expr ty n)
 
 -- how to run the monad
-runM :: Env n -> M n a -> Either String ((a, [Assignment n]), Env n)
-runM st p = runExcept (runStateT (runWriterT p) st)
+runM :: Env n -> M n a -> Either String (((a, [Assignment 'Num n]), [Assignment 'Bool n]), Env n)
+runM st p = runExcept (runStateT (runWriterT (runWriterT p)) st)
 
 -- internal function for generating one fresh variable
 freshVar :: M n Int
@@ -89,19 +92,19 @@ freshAddr = do
 --------------------------------------------------------------------------------
 
 -- | Add assignment
-class Proper ty where 
+class Proper ty where
   assign :: Ref ('V ty) -> Expr ty n -> M n ()
   arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n 'Bool
 
-instance Proper 'Num where 
-  assign var e = tell [Assignment Num var e]
+instance Proper 'Num where
+  assign var e = tell [Assignment var e]
   arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
     a <- access xs i
     b <- access ys i
     return (Var Num a `Eq` Var Num b)
 
-instance Proper 'Bool where 
-  assign var e = tell [Assignment Bool var e]
+instance Proper 'Bool where
+  assign var e = lift $ tell [Assignment var e]
   arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
     a <- access xs i
     b <- access ys i
@@ -128,21 +131,21 @@ type Heap = IntMap (IntMap Int)
 
 --------------------------------------------------------------------------------
 
-data Assignment n = forall ty. Assignment Type (Ref ('V ty)) (Expr ty n)
+data Assignment ty n = Assignment (Ref ('V ty)) (Expr ty n)
 
-instance Show n => Show (Assignment n) where
-  show (Assignment _ var expr) = show var <> " := " <> show expr
+instance Show n => Show (Assignment ty n) where
+  show (Assignment var expr) = show var <> " := " <> show expr
 
-instance Functor Assignment where
-  fmap f (Assignment t var expr) = Assignment t var (fmap f expr)
+instance Functor (Assignment ty) where
+  fmap f (Assignment var expr) = Assignment var (fmap f expr)
 
 --------------------------------------------------------------------------------
 
 -- | Computation elaboration
 elaborate :: Comp n ty -> Either String (Elaborated n ty)
 elaborate prog = do
-  ((expr, assertions), env) <- runM (Env 0 0 mempty mempty) prog
-  return $ Elaborated (envNexVariable env) (envInpuVariables env) expr assertions
+  (((expr, numAssignments), boolAssignments), env) <- runM (Env 0 0 mempty mempty) prog
+  return $ Elaborated (envNexVariable env) (envInpuVariables env) expr numAssignments boolAssignments
 
 -- | The result of elaborating a computation
 data Elaborated n ty = Elaborated
@@ -153,11 +156,12 @@ data Elaborated n ty = Elaborated
     -- | The resulting 'Expr'
     elabExpr :: Expr ty n,
     -- | Assignements
-    elabAssignments :: [Assignment n]
+    elabNumAssignments :: [Assignment 'Num n],
+    elabBoolAssignments :: [Assignment 'Bool n]
   }
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated n ty) where
-  show (Elaborated n inputs expr assignments) =
+  show (Elaborated n inputs expr numAssignments boolAssignments) =
     "{\n\
     \  number of variables: "
       ++ show n
@@ -167,9 +171,10 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated n ty
       ++ "\n\
          \  expression: "
       ++ show (fmap DebugGF expr)
-      ++ "\n\
-         \  assignments: "
-      ++ show (map (fmap DebugGF) assignments)
+      ++ "\n  num assignments: "
+      ++ show (map (fmap DebugGF) numAssignments)
+      ++ "\n  bool assignments: "
+      ++ show (map (fmap DebugGF) boolAssignments)
       ++ "\n\
          \}"
 
