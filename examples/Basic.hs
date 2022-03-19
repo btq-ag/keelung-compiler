@@ -32,30 +32,23 @@ cond2 = do
 loop1 :: Comp GF181 'Num
 loop1 = do
   arr <- freshInputs 4
-  
-  reduce 0 [0 .. 3] $ \accum i -> do 
-    x <- access arr i 
+  reduce 0 [0 .. 3] $ \accum i -> do
+    x <- access arr i
     return $ accum + Var Num x
 
 loop2 :: Comp GF181 'Bool
 loop2 = do
-  arr <- freshInputs 2 
+  arr <- freshInputs 2
   arr2 <- freshInputs 2
   arrayEq 2 arr (arr2 :: (Ref ('A ('V 'Num))))
 
 aggSig :: Comp GF181 'Bool
 aggSig = do
-  let settings = Settings True True True True True 
+  let settings = Settings True True True True True
   let setup = makeSetup 1 1 42 settings
   aggregateSignature setup
 
 --------------------------------------------------------------------------------
 
--- run :: Either String (Elaborated Type GF181)
--- run = elaborate
-
--- com ::
---   GaloisField f =>
---   Comp ty f ->
---   Either String (ConstraintSystem f)
--- com = fmap compile . elaborate
+comp :: (GaloisField n, Erase ty) => Comp n ty -> Either String (ConstraintSystem n)
+comp program = fmap compile (elaborate program)

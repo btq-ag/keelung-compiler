@@ -33,10 +33,13 @@ instance (Show f, Eq f, Num f) => Show (CoeffMap f) where
   show = go . IntMap.toList . toIntMap
     where
       go [] = " = 0"
-      go [(x, c)] = show c ++ "x[" ++ show x ++ "]" ++ go []
-      go ((_, 0) : xs) = go xs
-      go ((x, 1) : xs) = "x[" ++ show x ++ "] + " ++ go xs
-      go ((x, c) : xs) = show c ++ "x[" ++ show x ++ "] + " ++ go xs
+      go [terms] = printTerm terms ++ go []
+      go (term : xs) = printTerm term ++ " + " ++ go xs
+
+      printTerm (_, 0) = ""
+      printTerm (x, 1) = "$" ++ show x
+      printTerm (x, -1) = "-$" ++ show x
+      printTerm (x, c) = show c ++ "$" ++ show x
 
 fromList :: GaloisField f => [(Var, f)] -> CoeffMap f
 fromList xs = CoeffMap . IntMap.filter (zero /=) $ IntMap.fromListWith plus xs

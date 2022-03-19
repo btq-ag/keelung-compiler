@@ -8,7 +8,9 @@ module Keelung
     DebugGF (..),
     Semiring (one, zero),
     module Prelude,
-    compile
+    compile,
+    ConstraintSystem(..),
+    Erase
   )
 where
 
@@ -19,3 +21,5 @@ import Keelung.Monad
 import Keelung.Syntax
 import Keelung.Compile (compile)
 import Keelung.Util (DebugGF (..))
+import Keelung.Constraint (ConstraintSystem(..))
+import Keelung.Syntax.Untyped (Erase)
