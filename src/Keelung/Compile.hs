@@ -15,9 +15,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
-import Keelung.Monad (Assignment (Assignment), Elaborated (Elaborated))
-import Keelung.Syntax (Ref (Variable))
-import qualified Keelung.Syntax as T
+import Keelung.Monad (Elaborated (Elaborated))
 import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped
 
@@ -80,6 +78,9 @@ encode out expr = case expr of
           [ BinOp Mul [b, x],
             BinOp Mul [BinOp Sub [Val 1, b], y]
           ]
+
+encodeAssignment :: GaloisField n => Assignment n -> M n ()
+encodeAssignment (Assignment var expr) = encode var expr
 
 ----------------------------------------------------------------
 
@@ -192,20 +193,20 @@ encodeBinaryOp op out x y = case op of
       Var x * Var y + ((1 - Var x) * (1 - Var y))
 
 -- | Ensure that boolean variables have constraint 'b^2 = b'
-encodeBooleanVars :: GaloisField n => Elaborated n ty -> M n ()
-encodeBooleanVars (Elaborated _ inputVars typedExpr _ boolAssignments) = do
-  mapM_ (\b -> encodeBinaryOp Mul b b b) (IntSet.toList booleanInputVars)
-  where
-    -- collect variables that are in InputVars & are boolean
-    booleanInputVars :: IntSet
-    booleanInputVars =
-      let inExpr = IntSet.fromList (T.collectBooleanVars typedExpr)
-          inAssignments =
-            IntSet.fromList $
-              concatMap
-                (\(Assignment (Variable var) e) -> var : T.collectBooleanVars e)
-                boolAssignments
-       in (inExpr <> inAssignments) `IntSet.intersection` inputVars
+encodeBooleanVars :: GaloisField n => IntSet -> M n ()
+encodeBooleanVars booleanInputVars = mapM_ (\b -> encodeBinaryOp Mul b b b) $ IntSet.toList booleanInputVars
+
+-- where
+--   -- collect variables that are in InputVars & are boolean
+--   booleanInputVars :: IntSet
+--   booleanInputVars =
+--     let inExpr = IntSet.fromList (T.collectBooleanVars typedExpr)
+--         inAssignments =
+--           IntSet.fromList $
+--             concatMap
+--               (\(Assignment (Variable var) e) -> var : T.collectBooleanVars e)
+--               boolAssignments
+--      in (inExpr <> inAssignments) `IntSet.intersection` inputVars
 
 -- | Compile an expression to a constraint system.  Takes as input the
 -- expression, the expression's input variables, and the name of the
@@ -214,16 +215,23 @@ compile ::
   (GaloisField n, Erase ty) =>
   Elaborated n ty ->
   ConstraintSystem n
-compile elaborated@(Elaborated outputVar inputVars typedExpr numAssignments boolAssignments) = runM outputVar $ do
+compile (Elaborated outputVar inputVars typedExpr numAssignments boolAssignments) = runM outputVar $ do
   let (untypedExpr, booleanVarsInExpr) = eraseType typedExpr
-  -- let (assignments, booleanVarsInAssignments) = mapM (\(Assignment (Variable var) expr) ->  ) eraseType typedExpr
+  let (numAssignments', booleanVarsInNumAssignments) = eraseTypeFromAssignments numAssignments
+  let (boolAssignments', booleanVarsInBoolAssignments) = eraseTypeFromAssignments boolAssignments
+
+  -- optimization: constant propogation
   -- e = propogateConstant e0
 
   -- Compile `untypedExpr` to constraints with output wire 'outputVar'.
   encode outputVar untypedExpr
   -- Compile assignments to constraints with output wire 'outputVar'.
+  let assignments = numAssignments' <> boolAssignments'
+  mapM_ encodeAssignment assignments
 
-  encodeBooleanVars elaborated
+  -- ensure that boolean variables are boolean
+  let booleanVarsInProgram = booleanVarsInExpr <> booleanVarsInNumAssignments <> booleanVarsInBoolAssignments
+  encodeBooleanVars (booleanVarsInProgram `IntSet.intersection` inputVars)
 
   constraints <- gets envConstraints
 
