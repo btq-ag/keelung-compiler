@@ -22,7 +22,7 @@ checkSignaturesBitStringSize dimension signatures bitStringss =
       total <- reduce 0 [0 .. 13] $ \accum k -> do
         bit <- access3 bitStringss (i, j, k)
         let bitValue = fromIntegral (2 ^ k :: Integer)
-        let prod = fromBool (Var Bool bit) * bitValue
+        let prod = fromBool (Var bit) * bitValue
         return (accum + prod)
       return (fromIntegral term `Eq` total)
 
@@ -65,7 +65,7 @@ checkSquares numberOfSignatures dimension signatures sigSquares = do
     everyM [0 .. dimension - 1] $ \j -> do
       let term = fromIntegral (signature !! j)
       square <- access2 sigSquares (i, j)
-      return (Var Num square `Eq` (term * term))
+      return (Var square `Eq` (term * term))
 
 checkLength :: (Integral n, GaloisField n) => Int -> Int -> Ref ('A ('A ('V 'Num))) -> Ref ('A ('V 'Num)) -> Comp n 'Bool
 checkLength numberOfSignatures dimension sigSquares sigLengths = do
@@ -75,9 +75,9 @@ checkLength numberOfSignatures dimension sigSquares sigLengths = do
     -- for each term of signature
     actualLength <- reduce 0 [0 .. dimension - 1] $ \accum j -> do
       square <- access2 sigSquares (i, j)
-      return (accum + Var Num square)
+      return (accum + Var square)
 
-    return (Var Num expectedLength `Eq` actualLength)
+    return (Var expectedLength `Eq` actualLength)
 
 aggregateSignature :: (Integral n, GaloisField n) => Setup n -> Comp n 'Bool
 aggregateSignature (Setup dimension n publicKey signatures _ settings) = do

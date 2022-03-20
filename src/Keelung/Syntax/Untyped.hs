@@ -117,7 +117,7 @@ instance Erase 'T.Num where
   eraseExpr expr = case expr of
     T.Val val -> case val of
       (T.Number n) -> return (Val n)
-    T.Var _ (T.Variable var) -> return (Var var)
+    T.Var (T.Variable var) -> return (Var var)
     T.Add x y -> chainExprs Add <$> eraseExpr x <*> eraseExpr y
     T.Sub x y -> chainExprs Sub <$> eraseExpr x <*> eraseExpr y
     T.Mul x y -> chainExprs Mul <$> eraseExpr x <*> eraseExpr y
@@ -130,7 +130,7 @@ instance Erase 'T.Bool where
     T.Val val -> case val of
       (T.Boolean True) -> return (Val 1)
       (T.Boolean False) -> return (Val 0)
-    T.Var _ (T.Variable var) -> do
+    T.Var (T.Variable var) -> do
       tell (IntSet.singleton var)
       return (Var var)
     T.Eq x y -> chainExprs Eq <$> eraseExpr x <*> eraseExpr y

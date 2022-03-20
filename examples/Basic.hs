@@ -10,31 +10,31 @@ import Keelung
 --------------------------------------------------------------------------------
 
 identity :: Comp GF181 'Num
-identity = Var Num <$> freshInput
+identity = Var <$> freshInput
 
 add3 :: Comp GF181 'Num
 add3 = do
   x <- freshInput
-  return $ Var Num x + 3
+  return $ Var x + 3
 
 cond :: Comp GF181 'Num
 cond = do
   x <- freshInput
-  if Var Num x `Eq` 3
+  if Var x `Eq` 3
     then return 12
     else return 789
 
 cond2 :: Comp GF181 'Bool
 cond2 = do
   x <- freshInput
-  return $ Var Num x `Eq` 3
+  return $ Var x `Eq` 3
 
 loop1 :: Comp GF181 'Num
 loop1 = do
   arr <- freshInputs 4
   reduce 0 [0 .. 3] $ \accum i -> do
     x <- access arr i
-    return $ accum + Var Num x
+    return $ accum + Var x
 
 loop2 :: Comp GF181 'Bool
 loop2 = do

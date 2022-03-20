@@ -50,7 +50,7 @@ data Expr :: Type -> * -> * where
   -- value
   Val :: Value val n -> Expr val n
   -- variable referecing
-  Var :: Type -> Ref ('V val) -> Expr val n
+  Var :: Ref ('V val) -> Expr val n
   -- operators on numbers
   Add :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
   Sub :: Expr 'Num n -> Expr 'Num n -> Expr 'Num n
@@ -70,7 +70,7 @@ instance Functor (Expr ty) where
     Val val -> Val $ case val of
       Number a -> Number (f a)
       Boolean b -> Boolean b
-    Var t ref -> Var t ref
+    Var ref -> Var ref
     Add x y -> Add (fmap f x) (fmap f y)
     Sub x y -> Sub (fmap f x) (fmap f y)
     Mul x y -> Mul (fmap f x) (fmap f y)
@@ -82,27 +82,10 @@ instance Functor (Expr ty) where
     BEq x y -> BEq (fmap f x) (fmap f y)
     IfThenElse p x y -> IfThenElse (fmap f p) (fmap f x) (fmap f y)
 
-collectBooleanVars :: Expr ty n -> [Var]
-collectBooleanVars expr = case expr of
-  Var Bool (Variable n) -> [n]
-  Var Num (Variable _) -> []
-  Val _ -> []
-  Add x y -> collectBooleanVars x <> collectBooleanVars y
-  Sub x y -> collectBooleanVars x <> collectBooleanVars y
-  Mul x y -> collectBooleanVars x <> collectBooleanVars y
-  Div x y -> collectBooleanVars x <> collectBooleanVars y
-  Eq x y -> collectBooleanVars x <> collectBooleanVars y
-  And x y -> collectBooleanVars x <> collectBooleanVars y
-  Or x y -> collectBooleanVars x <> collectBooleanVars y
-  Xor x y -> collectBooleanVars x <> collectBooleanVars y
-  BEq x y -> collectBooleanVars x <> collectBooleanVars y
-  IfThenElse b x y ->
-    collectBooleanVars b <> collectBooleanVars x <> collectBooleanVars y
-
 instance Show n => Show (Expr ty n) where
   showsPrec prec expr = case expr of
     Val val -> shows val
-    Var _ var -> shows var
+    Var var -> shows var
     Add x y -> showParen (prec > 6) $ showsPrec 6 x . showString " + " . showsPrec 7 y
     Sub x y -> showParen (prec > 6) $ showsPrec 6 x . showString " - " . showsPrec 7 y
     Mul x y -> showParen (prec > 7) $ showsPrec 7 x . showString " * " . showsPrec 8 y
@@ -153,7 +136,7 @@ neq x y = IfThenElse (x `Eq` y) false true
 fromBool :: GaloisField n => Expr 'Bool n -> Expr 'Num n
 fromBool (Val (Boolean False)) = zero
 fromBool (Val (Boolean True)) = one
-fromBool (Var _ (Variable n)) = Var Num (Variable n)
+fromBool (Var (Variable n)) = Var (Variable n)
 fromBool (Eq x y) = IfThenElse (Eq x y) one zero
 fromBool (And x y) = IfThenElse (And x y) one zero
 fromBool (Or x y) = IfThenElse (Or x y) one zero
@@ -164,7 +147,7 @@ fromBool (IfThenElse p x y) = IfThenElse p (fromBool x) (fromBool y)
 toBool :: GaloisField n => Expr 'Num n -> Expr 'Bool n
 toBool (Val (Number 0)) = false
 toBool (Val (Number _)) = true
-toBool (Var _ (Variable n)) = Var Bool (Variable n)
+toBool (Var (Variable n)) = Var (Variable n)
 toBool (Add x y) = Add x y `neq` 0
 toBool (Sub x y) = Sub x y `neq` 0
 toBool (Mul x y) = Mul x y `neq` 0

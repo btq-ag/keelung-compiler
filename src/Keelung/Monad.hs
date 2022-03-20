@@ -101,14 +101,14 @@ instance Proper 'Num where
   arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
     a <- access xs i
     b <- access ys i
-    return (Var Num a `Eq` Var Num b)
+    return (Var a `Eq` Var b)
 
 instance Proper 'Bool where
   assign var e = lift $ tell [Assignment var e]
   arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
     a <- access xs i
     b <- access ys i
-    return (Var Bool a `BEq` Var Bool b)
+    return (Var a `BEq` Var b)
 
 --------------------------------------------------------------------------------
 
@@ -280,7 +280,7 @@ accessArr (Array addr) i = Array <$> readHeap (addr, i)
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
 update :: Proper ty => Ref ('A ('V ty)) -> Int -> Expr ty n -> M n ()
-update (Array addr) i (Var _ (Variable n)) = writeHeap addr [(i, n)]
+update (Array addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
 update (Array addr) i expr = do
   ref <- freshVar
   writeHeap addr [(i, ref)]

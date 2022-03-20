@@ -54,7 +54,7 @@ instance GaloisField n => Interpret (Value ty n) n where
 instance GaloisField n => Interpret (Expr ty n) n where
   interp expr = case expr of
     Val val -> interp val
-    Var _ (Variable n) -> lookupVar n
+    Var (Variable n) -> lookupVar n
     Add x y -> (+) <$> interp x <*> interp y
     Sub x y -> (-) <$> interp x <*> interp y
     Mul x y -> (*) <$> interp x <*> interp y
