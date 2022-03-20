@@ -18,6 +18,8 @@ import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Monad (Elaborated (Elaborated))
 import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped
+import Debug.Trace
+import Keelung.Util (DebugGF(DebugGF))
 
 ----------------------------------------------------------------
 
@@ -206,12 +208,13 @@ varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
 -- expression, the expression's input variables, and the name of the
 -- output variable.
 compile ::
-  (GaloisField n, Erase ty) =>
+  (GaloisField n, Erase ty, Bounded n, Integral n) =>
   Elaborated n ty ->
   ConstraintSystem n
 compile (Elaborated outputVar inputVars typedExpr numAssignments boolAssignments) = runM outputVar $ do
   let (untypedExpr, booleanVarsInExpr) = eraseType typedExpr
-  let (numAssignments', booleanVarsInNumAssignments) = eraseTypeFromAssignments numAssignments
+
+  let (numAssignments', booleanVarsInNumAssignments) = traceShow (fmap DebugGF untypedExpr) $  eraseTypeFromAssignments numAssignments
   let (boolAssignments', booleanVarsInBoolAssignments) = eraseTypeFromAssignments boolAssignments
 
   -- optimization: constant propogation

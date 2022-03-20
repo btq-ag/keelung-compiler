@@ -15,7 +15,6 @@ where
 import Control.Monad.Writer
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import qualified Data.List as List
 import qualified Keelung.Monad as T
 import qualified Keelung.Syntax as T
 import Keelung.Syntax.Common
@@ -71,18 +70,23 @@ instance Show n => Show (Expr n) where
     Val val -> shows val
     Var var -> shows var
     BinOp op operands -> case op of
-      Add -> chain " + " 6
-      Sub -> chain " - " 6
-      Mul -> chain " * " 7
-      Div -> chain " / " 7
-      And -> chain " ∧ " 3
-      Or -> chain " ∨ " 2
-      Xor -> chain " ⊕ " 4
-      Eq -> chain " = " 5
-      BEq -> chain " = " 5
+      Add -> chain " + " 6 operands
+      Sub -> chain " - " 6 operands
+      Mul -> chain " * " 7 operands
+      Div -> chain " / " 7 operands
+      And -> chain " ∧ " 3 operands
+      Or -> chain " ∨ " 2 operands
+      Xor -> chain " ⊕ " 4 operands
+      Eq -> chain " = " 5 operands
+      BEq -> chain " = " 5 operands
       where
-        chain :: String -> Int -> String -> String
-        chain delim n = showParen (prec > n) $ mconcat $ List.intersperse (showString delim) (map (showsPrec (succ n)) operands)
+        chain :: Show n => String -> Int -> [Expr n] -> String -> String
+        chain delim n xs = showParen (prec > n) $ go delim n xs
+
+        go :: Show n => String -> Int -> [Expr n] -> String -> String
+        go _ _ [] = showString ""
+        go _ n [x] = showsPrec (succ n) x
+        go delim n (x : xs) = showsPrec (succ n) x . showString delim . go delim n xs
     IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 --------------------------------------------------------------------------------

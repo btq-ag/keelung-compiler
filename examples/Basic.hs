@@ -50,5 +50,5 @@ aggSig = do
 
 --------------------------------------------------------------------------------
 
-comp :: (GaloisField n, Erase ty) => Comp n ty -> Either String (ConstraintSystem n)
+comp :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp n ty -> Either String (ConstraintSystem n)
 comp program = fmap compile (elaborate program)
