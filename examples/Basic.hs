@@ -17,17 +17,17 @@ add3 = do
   x <- freshInput
   return $ Var x + 3
 
+eq1 :: Comp GF181 'Bool
+eq1 = do
+  x <- freshInput
+  return $ Var x `Eq` 3
+
 cond :: Comp GF181 'Num
 cond = do
   x <- freshInput
   if Var x `Eq` 3
     then return 12
     else return 789
-
-eq1 :: Comp GF181 'Bool
-eq1 = do
-  x <- freshInput
-  return $ Var x `Eq` 3
 
 loop1 :: Comp GF181 'Num
 loop1 = do
@@ -52,3 +52,6 @@ aggSig = do
 
 comp :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp n ty -> Either String (ConstraintSystem n)
 comp program = fmap compile (elaborate program)
+
+run :: GaloisField b => Comp b ty -> [b] -> Either String b
+run program input = elaborate program >>= (`interpret` input)

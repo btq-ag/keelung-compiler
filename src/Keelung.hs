@@ -10,7 +10,8 @@ module Keelung
     module Prelude,
     compile,
     ConstraintSystem(..),
-    Erase
+    Erase,
+    interpret
   )
 where
 
@@ -23,3 +24,4 @@ import Keelung.Compile (compile)
 import Keelung.Util (DebugGF (..))
 import Keelung.Constraint (ConstraintSystem(..))
 import Keelung.Syntax.Untyped (Erase)
+import Keelung.Interpret (interpret)

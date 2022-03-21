@@ -31,6 +31,9 @@ library
       Keelung.Constraint.CoeffMap
       Keelung.Interpret
       Keelung.Monad
+      Keelung.Optimiser
+      Keelung.Optimiser.Monad
+      Keelung.Optimiser.UnionFind
       Keelung.R1CS
       Keelung.Syntax
       Keelung.Syntax.Common

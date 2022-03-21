@@ -4,12 +4,7 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (..))
-import Keelung.Syntax.Common (Var)
-
---------------------------------------------------------------------------------
-
--- A Witness is a mapping from variables to their values
-type Witness n = IntMap n
+import Keelung.Syntax.Common
 
 -- -- | Starting from an initial partial assignment [env], solve the
 -- -- constraints [cs] and return the resulting complete assignment.
