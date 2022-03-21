@@ -3,16 +3,12 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use if" #-}
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 module AggregateSignature.Program.Snarkl where
 
 import AggregateSignature.Util
-import Control.Monad (foldM)
-import Data.Bits (Bits (shiftL, testBit, (.|.)))
-import Data.Foldable (for_)
-import Data.Semiring (Semiring (one, zero))
 import Snarkl
-import System.Random (Random (randoms), mkStdGen)
 
 
 -- ensure that a signature is smaller than 16384 (target: 12289)
