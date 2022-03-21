@@ -30,9 +30,10 @@ data Op
   | And
   | Or
   | Xor
+  | NEq
   | Eq
   | BEq
-  deriving (Eq)
+  deriving (Eq, Show)
 
 -- See if an operator is associative, so that we can chain them together
 isAssoc :: Op -> Bool
@@ -44,6 +45,7 @@ isAssoc op = case op of
   And -> True
   Or -> True
   Xor -> True
+  NEq -> True
   Eq -> True
   BEq -> True
 
@@ -68,7 +70,7 @@ instance Num n => Num (Expr n) where
 instance Show n => Show (Expr n) where
   showsPrec prec expr = case expr of
     Val val -> shows val
-    Var var -> shows var
+    Var var -> showString "$" . shows var
     BinOp op operands -> case op of
       Add -> chain " + " 6 operands
       Sub -> chain " - " 6 operands
@@ -77,8 +79,9 @@ instance Show n => Show (Expr n) where
       And -> chain " ∧ " 3 operands
       Or -> chain " ∨ " 2 operands
       Xor -> chain " ⊕ " 4 operands
-      Eq -> chain " = " 5 operands
-      BEq -> chain " = " 5 operands
+      NEq -> chain " != " 5 operands
+      Eq -> chain " == " 5 operands
+      BEq -> chain " == " 5 operands
       where
         chain :: Show n => String -> Int -> [Expr n] -> String -> String
         chain delim n xs = showParen (prec > n) $ go delim n xs

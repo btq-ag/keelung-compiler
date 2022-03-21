@@ -18,8 +18,6 @@ import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Monad (Elaborated (Elaborated))
 import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped
-import Debug.Trace
-import Keelung.Util (DebugGF(DebugGF))
 
 ----------------------------------------------------------------
 
@@ -156,7 +154,7 @@ encodeOtherBinOp op out exprs = do
         encodeVars (out' : xs)
         encodeBinaryOp op out' x y
 
--- | Encode the constraint 'x op y = z'.
+-- | Encode the constraint 'x op y = out'.
 encodeBinaryOp :: GaloisField n => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
   Add -> cadd 0 [(x, 1), (y, 1), (out, -1)]
@@ -165,16 +163,14 @@ encodeBinaryOp op out x y = case op of
   Div -> cmult (1, y) (1, out) (1, Just x)
   And -> encodeBinaryOp Mul out x y
   Or -> do
-    -- Constraint 'x \/ y = z'.
-    -- The encoding is: x+y - z = x*y; assumes x and y are boolean.
+    -- Constraint 'x \/ y = out'.
+    -- The encoding is: x+y - out = x*y; assumes x and y are boolean.
     xy <- freshVar
     encode xy (Var x * Var y)
-    encode
-      xy
-      (Var x + Var y - Var out)
+    encode xy (Var x + Var y - Var out)
   Xor -> do
-    -- Constraint 'x xor y = z'.
-    -- The encoding is: x+y - z = 2(x*y); assumes x and y are boolean.
+    -- Constraint 'x xor y = out'.
+    -- The encoding is: x+y - out = 2(x*y); assumes x and y are boolean.
     xy <- freshVar
     encodeBinaryOp Mul xy x y
     cadd
@@ -184,13 +180,26 @@ encodeBinaryOp op out x y = case op of
         (out, - 1),
         (xy, -2)
       ]
+  NEq -> do
+    -- Constraint 'x != y = out'
+    -- The encoding is, for some 'm':
+    --  1. (x - y) * m = out
+    --  2. (x - y) * (1 - out) = 0
+    diff <- freshVar
+    encode diff (Var x - Var y)
+
+    m <- freshVar
+    encode out (Var diff * Var m)
+    encode 0 (Var diff * (1 - Var out))
   Eq -> do
-    -- Constraint 'x == y = z'.
-    -- The encoding is: z = (x-y == 0).
-    encode out (BinOp Eq [Var x - Var y, 0])
+    -- Constraint 'x == y = out'.
+    -- The encoding is: out = 1 - (x-y != 0).
+    result <- freshVar
+    encodeBinaryOp NEq result x y
+    encode out (BinOp Sub [1, Var result])
   BEq -> do
-    -- Constraint 'x == y = z' ASSUMING x, y are boolean.
-    -- The encoding is: x*y + (1-x)*(1-y) = z.
+    -- Constraint 'x == y = out' ASSUMING x, y are boolean.
+    -- The encoding is: x*y + (1-x)*(1-y) = out.
     encode out $
       Var x * Var y + ((1 - Var x) * (1 - Var y))
 
@@ -214,7 +223,7 @@ compile ::
 compile (Elaborated outputVar inputVars typedExpr numAssignments boolAssignments) = runM outputVar $ do
   let (untypedExpr, booleanVarsInExpr) = eraseType typedExpr
 
-  let (numAssignments', booleanVarsInNumAssignments) = traceShow (fmap DebugGF untypedExpr) $  eraseTypeFromAssignments numAssignments
+  let (numAssignments', booleanVarsInNumAssignments) = eraseTypeFromAssignments numAssignments
   let (boolAssignments', booleanVarsInBoolAssignments) = eraseTypeFromAssignments boolAssignments
 
   -- optimization: constant propogation

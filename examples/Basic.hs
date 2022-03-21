@@ -24,8 +24,8 @@ cond = do
     then return 12
     else return 789
 
-cond2 :: Comp GF181 'Bool
-cond2 = do
+eq1 :: Comp GF181 'Bool
+eq1 = do
   x <- freshInput
   return $ Var x `Eq` 3
 
