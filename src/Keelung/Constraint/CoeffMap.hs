@@ -1,10 +1,9 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 module Keelung.Constraint.CoeffMap
-  ( CoeffMap,
+  ( CoeffMap(..),
     fromList,
     toList,
-    toIntMap,
     null,
     insert,
     keysSet,
