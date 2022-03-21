@@ -1,3 +1,6 @@
+--------------------------------------------------------------------------------
+--  Constraint Set Minimization
+--------------------------------------------------------------------------------
 {-# LANGUAGE BangPatterns #-}
 
 module Keelung.Optimiser where
@@ -6,7 +9,9 @@ import Control.Monad
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Keelung.Constraint
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Keelung.Constraint ( Constraint(..) )
 import Keelung.Constraint.CoeffMap (CoeffMap (..))
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Optimiser.Monad
@@ -80,3 +85,47 @@ substConstraint !constraint = case constraint of
         case result of
           Left rz -> return (Left (e, rz))
           Right e0 -> return (Right (e * e0))
+
+-- | Is a constriant of `0 = 0` ?
+isTautology :: GaloisField n => Constraint n -> Bool
+isTautology constraint = case constraint of
+  CAdd _ coeffMap -> CoeffMap.null coeffMap
+  CMul {} -> False
+
+-- | Learn bindings and variable equalities from a constraint
+learn :: GaloisField n => Constraint n -> OptiM n ()
+learn (CAdd a xs) = case CoeffMap.toList xs of
+  [(x, c)] ->
+    if c == 0
+      then return ()
+      else bindVar x (- a / c)
+  [(x, c), (y, d)] -> when ((a == 0) && (c == - d)) $ unifyVars x y
+  _ -> return ()
+learn _ = return ()
+
+-- TODO: see if the steps after `goOverConstraints` is necessary
+simplifyOnce ::
+  GaloisField a =>
+  -- | Initial constraint set
+  Set (Constraint a) ->
+  -- | Resulting simplified constraint set
+  OptiM a (Set (Constraint a))
+simplifyOnce constraints = do
+  --
+  constraints' <- goOverConstraints Set.empty constraints
+  -- substitute roots/constants in constraints
+  substituted <- mapM substConstraint $ Set.toList constraints'
+  -- keep only constraints that is not tautologous
+  return $ Set.fromList $ filter (not . isTautology) substituted
+
+goOverConstraints :: GaloisField n => Set (Constraint n) -> Set (Constraint n) -> OptiM n (Set (Constraint n))
+goOverConstraints accum constraints = case Set.minView constraints of
+  Nothing -> return accum -- no more
+  Just (picked, constraints') -> do
+    -- pick the "smallest" constraint
+    substituted <- substConstraint picked
+    if isTautology substituted
+      then goOverConstraints accum constraints'
+      else do
+        learn substituted
+        goOverConstraints (Set.insert substituted accum) constraints'
