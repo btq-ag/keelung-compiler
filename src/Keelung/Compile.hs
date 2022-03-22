@@ -207,12 +207,6 @@ encodeBinaryOp op out x y = case op of
 encodeBooleanVars :: GaloisField n => IntSet -> M n ()
 encodeBooleanVars booleanInputVars = mapM_ (\b -> encodeBinaryOp Mul b b b) $ IntSet.toList booleanInputVars
 
--- | Return the list of variables occurring in constraints 'cs'.
-varsInConstraint :: Constraint a -> IntSet
-varsInConstraint (CAdd _ m) = CoeffMap.keysSet m
-varsInConstraint (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
-varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
-
 -- | Compile an expression to a constraint system.  Takes as input the
 -- expression, the expression's input variables, and the name of the
 -- output variable.
@@ -242,7 +236,7 @@ compile (Elaborated outputVar inputVars typedExpr numAssignments boolAssignments
   constraints <- gets envConstraints
 
   --
-  let vars = IntSet.unions $ map varsInConstraint $ Set.toList constraints
+  let vars = varsInConstraints constraints
 
   return $
     ConstraintSystem

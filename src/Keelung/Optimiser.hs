@@ -9,9 +9,10 @@ import Control.Monad
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Constraint ( Constraint(..) )
+import Keelung.Constraint
 import Keelung.Constraint.CoeffMap (CoeffMap (..))
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Optimiser.Monad
@@ -103,13 +104,83 @@ learn (CAdd a xs) = case CoeffMap.toList xs of
   _ -> return ()
 learn _ = return ()
 
+simplifyConstrantSystem :: GaloisField n => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
+simplifyConstrantSystem env cs =
+  -- NOTE: Pinned vars include:
+  --   - input vars
+  --   - output vars
+  -- Pinned vars are never optimized away.
+  let pinnedVars = IntSet.toList $ csInputVars cs <> csOutputVars cs
+   in runOptiM env $ do
+        constraints <- simplifyConstraintSet pinnedVars (csConstraints cs)
+        -- NOTE: In the next line, it's OK that 'pinnedVars'
+        -- may overlap with 'constraintVars cs'.
+        -- 'assignmentOfVars' might do a bit of duplicate
+        -- work (to look up the same key more than once).
+        assignments <- assignmentOfVars $ pinnedVars ++ IntSet.toList (varsInConstraints (csConstraints cs))
+        return (assignments, cs {csConstraints = constraints})
+
+simplifyConstraintSet ::
+  GaloisField n =>
+  [Var] ->
+  Set (Constraint n) ->
+  OptiM n (Set (Constraint n))
+simplifyConstraintSet pinnedVars constraints =
+  do
+    simplified <- simplifyManyTimes constraints
+    -- substitute roots/constants in constraints
+    substituted <- mapM substConstraint $ Set.toList simplified
+    -- keep only constraints that is not tautologous
+    let removedTautology = filter (not . isTautology) substituted
+
+    pinned <- handlePinnedVars pinnedVars
+    return $ Set.fromList (pinned ++ removedTautology)
+
+-- NOTE: We handle pinned variables 'var' as follows:
+--  (1) Look up the term associated with
+--      the pinned variable, if any (call it 't').
+--  (2) If there is no such term (other than 'x' itself),
+--      do nothing (clauses containing the pinned
+--      variable must still contain the pinned variable).
+--  (3) Otherwise, introduce a new equation 'x = t'.
+handlePinnedVars :: GaloisField n => [Var] -> OptiM n [Constraint n]
+handlePinnedVars pinnedVars = do
+  pinnedTerms <- forM pinnedVars $ \var -> do
+    result <- lookupVar var
+    return (var, result)
+  let pinnedEquations =
+        map
+          ( \(var, result) -> case result of
+              Left root -> cadd 0 [(var, 1), (root, -1)] -- var == root
+              Right c -> cadd (- c) [(var, 1)] -- var == c
+          )
+          $ filter (\(var, reuslt) -> Left var /= reuslt) pinnedTerms
+  return pinnedEquations
+
+simplifyManyTimes ::
+  GaloisField n =>
+  -- | Initial constraint set
+  Set (Constraint n) ->
+  -- | Resulting simplified constraint set
+  OptiM n (Set (Constraint n))
+simplifyManyTimes constraints = do
+  constraints' <- simplifyOnce constraints
+  let hasShrunk = Set.size constraints' < Set.size constraints
+
+  if hasShrunk
+    then simplifyManyTimes constraints'
+    else
+      if Set.null (Set.difference constraints constraints')
+        then return constraints'
+        else simplifyManyTimes constraints'
+
 -- TODO: see if the steps after `goOverConstraints` is necessary
 simplifyOnce ::
-  GaloisField a =>
+  GaloisField n =>
   -- | Initial constraint set
-  Set (Constraint a) ->
+  Set (Constraint n) ->
   -- | Resulting simplified constraint set
-  OptiM a (Set (Constraint a))
+  OptiM n (Set (Constraint n))
 simplifyOnce constraints = do
   --
   constraints' <- goOverConstraints Set.empty constraints

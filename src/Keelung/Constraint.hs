@@ -5,6 +5,7 @@ import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint.CoeffMap (CoeffMap)
+import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Syntax.Common
 import Keelung.Util (DebugGF (DebugGF))
 
@@ -40,6 +41,15 @@ instance Ord n => Ord (Constraint n) where
   compare (CMul (a, x) (b, y) (c, z)) (CMul (a', x') (b', y') (c', z')) =
     -- perform lexicographical comparison with tuples
     compare (x, y, z, a, b, c) (x', y', z', a', b', c')
+
+-- | Return the list of variables occurring in constraints
+varsInConstraint :: Constraint a -> IntSet
+varsInConstraint (CAdd _ m) = CoeffMap.keysSet m
+varsInConstraint (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
+varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
+
+varsInConstraints :: Set (Constraint a) -> IntSet
+varsInConstraints = IntSet.unions . map varsInConstraint . Set.toList
 
 --------------------------------------------------------------------------------
 

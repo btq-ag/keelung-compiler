@@ -4,49 +4,50 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (..))
+import Keelung.Constraint
+import Keelung.Optimiser (simplifyConstrantSystem)
 import Keelung.Syntax.Common
 
--- -- | Starting from an initial partial assignment [env], solve the
--- -- constraints [cs] and return the resulting complete assignment.
--- -- If the constraints are unsolvable from [env], report the first
--- -- constraint that is violated (under normal operation, this error
--- -- case should NOT occur).
--- generateWitness ::
---   (GaloisField a, Bounded a, Integral a) =>
---   -- | Constraints to be solved
---   ConstraintSystem a ->
---   -- | Initial assignment
---   IntMap a ->
---   -- | Resulting assignment
---   Witness a
--- generateWitness cs env =
---   let pinnedVars = csInputVars cs <> csOutputVars cs
---       variables = [0 .. csNumberOfVars cs - 1]
---       (assgn, cs') = simplifyConstrantSystem True env cs
---    in if all_assigned variables assgn
---         then assgn
---         else
---           fail_with $
---             ErrMsg
---               ( "unassigned variables,\n  "
---                   ++ show (unassigned variables assgn)
---                   ++ ",\n"
---                   ++ "in assignment context\n  "
---                   ++ show assgn
---                   ++ ",\n"
---                   ++ "in pinned-variable context\n  "
---                   ++ show pinnedVars
---                   ++ ",\n"
---                   ++ "in reduced-constraint context\n  "
---                   ++ show cs'
---                   ++ ",\n"
---                   ++ "in constraint context\n  "
---                   ++ show cs
---               )
---   where
---     all_assigned vars0 assgn = all (is_mapped assgn) vars0
---     is_mapped assgn x = isJust (IntMap.lookup x assgn)
---     unassigned vars0 assgn = [x | x <- vars0, not $ is_mapped assgn x]
+-- | Starting from an initial partial assignment [env], solve the
+-- constraints [cs] and return the resulting complete assignment.
+-- If the constraints are unsolvable from [env], report the first
+-- constraint that is violated (under normal operation, this error
+-- case should NOT occur).
+generateWitness ::
+  (GaloisField a, Bounded a, Integral a) =>
+  -- | Constraints to be solved
+  ConstraintSystem a ->
+  -- | Initial assignment
+  IntMap a ->
+  -- | Resulting assignment
+  Either String (Witness a)
+generateWitness cs env =
+  let pinnedVars = csInputVars cs <> csOutputVars cs
+      variables = [0 .. csNumberOfVars cs - 1]
+      (witness, cs') = simplifyConstrantSystem env cs
+   in if all (isMapped witness) variables
+        then Right witness
+        else
+          Left
+            ( "unassigned variables,\n  "
+                ++ show [x | x <- variables, not $ isMapped witness x]
+                ++ ",\n"
+                ++ "in assignment context\n  "
+                ++ show witness
+                ++ ",\n"
+                ++ "in pinned-variable context\n  "
+                ++ show pinnedVars
+                ++ ",\n"
+                ++ "in reduced-constraint context\n  "
+                ++ show cs'
+                ++ ",\n"
+                ++ "in constraint context\n  "
+                ++ show cs
+            )
+  where
+    isMapped witness var = case IntMap.lookup var witness of
+      Nothing -> False
+      Just _ -> True
 
 --------------------------------------------------------------------------------
 
