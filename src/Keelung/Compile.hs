@@ -243,4 +243,4 @@ compile (Elaborated outputVar inputVars typedExpr numAssignments boolAssignments
       constraints
       (IntSet.size vars)
       inputVars
-      (IntSet.singleton outputVar)
+      outputVar

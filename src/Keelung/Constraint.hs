@@ -58,11 +58,11 @@ data ConstraintSystem n = ConstraintSystem
   { csConstraints :: Set (Constraint n),
     csNumberOfVars :: Int,
     csInputVars :: IntSet,
-    csOutputVars :: IntSet
+    csOutputVar :: Var
   }
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem set numVars inputVars outputVars) =
+  show (ConstraintSystem set numVars inputVars outputVar) =
     "ConstraintSystem {\n\
     \  number of constraints: "
       <> show (Set.size set)
@@ -77,7 +77,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
          \  number of input variables: "
       <> show (IntSet.size inputVars)
       <> "\n  output variables: "
-      <> show (IntSet.toList outputVars)
+      <> show outputVar
       <> "\n\
          \}"
     where

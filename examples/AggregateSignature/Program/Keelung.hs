@@ -9,7 +9,7 @@ import AggregateSignature.Util
 import Keelung
 
 -- ensure that a signature is smaller than 16384 (target: 12289)
-checkSignaturesBitStringSize :: (GaloisField n, Integral n) => Int -> [Signature n] -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp n 'Bool
+checkSignaturesBitStringSize :: (GaloisField n, Integral n) => Int -> [Signature n] -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp 'Bool n 
 checkSignaturesBitStringSize dimension signatures bitStringss =
   everyM [0 .. length signatures - 1] checkSignature
   where
@@ -27,7 +27,7 @@ checkSignaturesBitStringSize dimension signatures bitStringss =
       return (fromIntegral term `Eq` total)
 
 -- ensure that a signature's bitstring is really made of bits (either 1 or 0)
-checkSignaturesBits :: GaloisField n => Int -> Int -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp n 'Bool
+checkSignaturesBits :: GaloisField n => Int -> Int -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp 'Bool n 
 checkSignaturesBits _numberOfSignatures _dimension _bitStringss = return true
 
 -- everyM
@@ -56,7 +56,7 @@ computeAggregateSignature publicKey signatures = do
     update actualAggSig i total
   return actualAggSig
 
-checkSquares :: (GaloisField n, Integral n) => Int -> Int -> [Signature n] -> Ref ('A ('A ('V 'Num))) -> Comp n 'Bool
+checkSquares :: (GaloisField n, Integral n) => Int -> Int -> [Signature n] -> Ref ('A ('A ('V 'Num))) -> Comp 'Bool n 
 checkSquares numberOfSignatures dimension signatures sigSquares = do
   -- for each signature
   everyM [0 .. numberOfSignatures - 1] $ \i -> do
@@ -67,7 +67,7 @@ checkSquares numberOfSignatures dimension signatures sigSquares = do
       square <- access2 sigSquares (i, j)
       return (Var square `Eq` (term * term))
 
-checkLength :: (Integral n, GaloisField n) => Int -> Int -> Ref ('A ('A ('V 'Num))) -> Ref ('A ('V 'Num)) -> Comp n 'Bool
+checkLength :: (Integral n, GaloisField n) => Int -> Int -> Ref ('A ('A ('V 'Num))) -> Ref ('A ('V 'Num)) -> Comp 'Bool n 
 checkLength numberOfSignatures dimension sigSquares sigLengths = do
   -- for each signature
   everyM [0 .. numberOfSignatures - 1] $ \i -> do
@@ -79,7 +79,7 @@ checkLength numberOfSignatures dimension sigSquares sigLengths = do
 
     return (Var expectedLength `Eq` actualLength)
 
-aggregateSignature :: (Integral n, GaloisField n) => Setup n -> Comp n 'Bool
+aggregateSignature :: (Integral n, GaloisField n) => Setup n -> Comp 'Bool n 
 aggregateSignature (Setup dimension n publicKey signatures _ settings) = do
   -- check aggregate signature
   aggSigOk <- case enableAggSigChecking settings of

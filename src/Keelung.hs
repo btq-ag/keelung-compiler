@@ -11,7 +11,8 @@ module Keelung
     compile,
     ConstraintSystem(..),
     Erase,
-    interpret
+    interpret,
+    module Keelung.R1CS
   )
 where
 
@@ -25,3 +26,4 @@ import Keelung.Util (DebugGF (..))
 import Keelung.Constraint (ConstraintSystem(..))
 import Keelung.Syntax.Untyped (Erase)
 import Keelung.Interpret (interpret)
+import Keelung.R1CS

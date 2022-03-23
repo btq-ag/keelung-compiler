@@ -4,6 +4,7 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
 import Keelung.Constraint
@@ -23,7 +24,7 @@ generateWitness ::
   -- | Resulting assignment
   Either String (Witness a)
 generateWitness cs env =
-  let pinnedVars = csInputVars cs <> csOutputVars cs
+  let pinnedVars = csInputVars cs <> IntSet.singleton (csOutputVar cs)
       variables = [0 .. csNumberOfVars cs - 1]
       (witness, cs') = simplifyConstrantSystem env cs
    in if all (isMapped witness) variables
@@ -91,7 +92,7 @@ data R1CS n = R1CS
   { r1csClauses :: [R1C n],
     r1csNumVars :: Int,
     r1csInputVars :: IntSet,
-    r1csOutputVars :: IntSet,
+    r1csOutputVar :: Var,
     r1csWitnessGen :: Witness n -> Either String (Witness n)
   }
 
@@ -107,7 +108,7 @@ fromConstraintSystem cs =
     (map toR1C (Set.toList (csConstraints cs)))
     (csNumberOfVars cs)
     (csInputVars cs)
-    (csOutputVars cs)
+    (csOutputVar cs)
     (generateWitness cs)
   where
     toR1C :: GaloisField n => Constraint n -> R1C n
@@ -120,3 +121,18 @@ fromConstraintSystem cs =
       R1C (varPoly cx) (varPoly dy) (constPoly e)
     toR1C (CMul cx dy (e, Just z)) =
       R1C (varPoly cx) (varPoly dy) (varPoly (e, z))
+
+witnessOfR1CS :: [n] -> R1CS n -> Either String (Witness n)
+witnessOfR1CS inputs r1cs =
+  let inputVars = r1csInputVars r1cs
+   in if IntSet.size inputVars /= length inputs
+        then
+          Left
+            ( "expected "
+                ++ show (IntSet.size inputVars)
+                ++ " input(s)"
+                ++ " but got "
+                ++ show (length inputs)
+                ++ " input(s)"
+            )
+        else r1csWitnessGen r1cs $ IntMap.fromList (zip (IntSet.toList inputVars) inputs)

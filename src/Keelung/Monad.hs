@@ -53,7 +53,7 @@ type M n =
     [Assignment 'Num n]
     (WriterT [Assignment 'Bool n] (StateT (Env n) (Except String)))
 
-type Comp n ty = M n (Expr ty n)
+type Comp ty n  = M n (Expr ty n)
 
 -- how to run the monad
 runM :: Env n -> M n a -> Either String (((a, [Assignment 'Num n]), [Assignment 'Bool n]), Env n)
@@ -94,7 +94,7 @@ freshAddr = do
 -- | Add assignment
 class Proper ty where
   assign :: Ref ('V ty) -> Expr ty n -> M n ()
-  arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n 'Bool
+  arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp 'Bool n 
 
 instance Proper 'Num where
   assign var e = tell [Assignment var e]
@@ -142,7 +142,7 @@ instance Functor (Assignment ty) where
 --------------------------------------------------------------------------------
 
 -- | Computation elaboration
-elaborate :: Comp n ty -> Either String (Elaborated n ty)
+elaborate :: Comp ty n -> Either String (Elaborated n ty)
 elaborate prog = do
   (((expr, numAssignments), boolAssignments), env) <- runM (Env 0 0 mempty mempty) prog
   return $ Elaborated (envNexVariable env) (envInpuVariables env) expr numAssignments boolAssignments
@@ -288,13 +288,13 @@ update (Array addr) i expr = do
 
 --------------------------------------------------------------------------------
 
-reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp n ty) -> Comp n ty
+reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp ty n) -> Comp ty n
 reduce a xs f = foldM f a xs
 
-every :: Foldable t => (a -> Expr 'Bool n) -> t a -> Comp n 'Bool
+every :: Foldable t => (a -> Expr 'Bool n) -> t a -> Comp 'Bool n 
 every f xs = reduce true xs $ \accum x -> return (accum `And` f x)
 
-everyM :: Foldable t => t a -> (a -> Comp n 'Bool) -> Comp n 'Bool
+everyM :: Foldable t => t a -> (a -> Comp 'Bool n ) -> Comp 'Bool n 
 everyM xs f =
   foldM
     ( \accum x -> do
@@ -309,5 +309,5 @@ loop = forM_
 
 --------------------------------------------------------------------------------
 
-ifThenElse :: Expr 'Bool n -> Comp n ty -> Comp n ty -> Comp n ty
+ifThenElse :: Expr 'Bool n -> Comp ty n -> Comp ty n -> Comp ty n
 ifThenElse p x y = IfThenElse p <$> x <*> y

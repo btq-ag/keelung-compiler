@@ -110,7 +110,7 @@ simplifyConstrantSystem env cs =
   --   - input vars
   --   - output vars
   -- Pinned vars are never optimized away.
-  let pinnedVars = IntSet.toList $ csInputVars cs <> csOutputVars cs
+  let pinnedVars = IntSet.toList (csInputVars cs) ++ [csOutputVar cs]
    in runOptiM env $ do
         constraints <- simplifyConstraintSet pinnedVars (csConstraints cs)
         -- NOTE: In the next line, it's OK that 'pinnedVars'
