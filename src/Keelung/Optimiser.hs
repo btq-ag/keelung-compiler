@@ -86,12 +86,23 @@ substConstraint !constraint = case constraint of
         case result of
           Left rz -> return (Left (e, rz))
           Right e0 -> return (Right (e * e0))
+  CNQZ _ _ -> return $ cadd 0 []
 
 -- | Is a constriant of `0 = 0` ?
-isTautology :: GaloisField n => Constraint n -> Bool
+isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
-  CAdd _ coeffMap -> CoeffMap.null coeffMap
-  CMul {} -> False
+  CAdd _ coeffMap -> return $ CoeffMap.null coeffMap
+  CMul {} -> return False
+  CNQZ var m -> do
+    result <- lookupVar var
+    case result of
+      Left _ -> return False
+      Right 0 -> do
+        bindVar m 0
+        return True
+      Right n -> do
+        bindVar m (recip n)
+        return True
 
 -- | Learn bindings and variable equalities from a constraint
 learn :: GaloisField n => Constraint n -> OptiM n ()
@@ -131,7 +142,7 @@ simplifyConstraintSet pinnedVars constraints =
     -- substitute roots/constants in constraints
     substituted <- mapM substConstraint $ Set.toList simplified
     -- keep only constraints that is not tautologous
-    let removedTautology = filter (not . isTautology) substituted
+    removedTautology <- filterM (fmap not . isTautology) substituted
 
     pinned <- handlePinnedVars pinnedVars
     return $ Set.fromList (pinned ++ removedTautology)
@@ -187,7 +198,8 @@ simplifyOnce constraints = do
   -- substitute roots/constants in constraints
   substituted <- mapM substConstraint $ Set.toList constraints'
   -- keep only constraints that is not tautologous
-  return $ Set.fromList $ filter (not . isTautology) substituted
+  removedTautology <- filterM (fmap not . isTautology) substituted
+  return $ Set.fromList removedTautology
 
 goOverConstraints :: GaloisField n => Set (Constraint n) -> Set (Constraint n) -> OptiM n (Set (Constraint n))
 goOverConstraints accum constraints = case Set.minView constraints of
@@ -195,7 +207,9 @@ goOverConstraints accum constraints = case Set.minView constraints of
   Just (picked, constraints') -> do
     -- pick the "smallest" constraint
     substituted <- substConstraint picked
-    if isTautology substituted
+    -- if the constraint is tautologous, remove it  
+    tautologous <- isTautology substituted 
+    if tautologous
       then goOverConstraints accum constraints'
       else do
         learn substituted

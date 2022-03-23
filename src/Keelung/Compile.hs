@@ -52,6 +52,10 @@ cadd !c !xs = addConstraint $ CAdd c (CoeffMap.fromList xs)
 cmult :: GaloisField n => (n, Var) -> (n, Var) -> (n, Maybe Var) -> M n ()
 cmult (a, x) (b, y) (c, z) = addConstraint $ CMul (a, x) (b, y) (c, z)
 
+-- | Helper for adding CMul constraint
+cnqz :: GaloisField n => Var -> Var -> M n ()
+cnqz x m = addConstraint $ CNQZ x m
+
 ----------------------------------------------------------------
 
 -- class Encode n a where
@@ -190,8 +194,11 @@ encodeBinaryOp op out x y = case op of
     diff <- freshVar
     encode diff (Var x - Var y)
 
+    -- introduce a new variable m
+    -- if diff = 0 then m = 0 else m = recip diff
     m <- freshVar
     encode out (Var diff * Var m)
+    cnqz diff m 
 
     -- notOut = 1 - out
     notOut <- freshVar      

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 module Keelung.Constraint where
 
 import Data.IntSet (IntSet)
@@ -14,9 +15,11 @@ import Keelung.Util (DebugGF (DebugGF))
 -- | Constraint
 --      CAdd: 0 = c + c₀x₀ + c₁x₁ ... cₙxₙ
 --      CMul: nx + by = c or nx + by = cz
+--      CNQZ: if x == 0 then m = 0 else m = recip x
 data Constraint n
   = CAdd !n !(CoeffMap n)
   | CMul !(n, Var) !(n, Var) !(n, Maybe Var)
+  | CNQZ Var Var -- x & m
   deriving (Eq)
 
 instance (Show n, Eq n, Num n) => Show (Constraint n) where
@@ -30,6 +33,7 @@ instance (Show n, Eq n, Num n) => Show (Constraint n) where
           <> case z of
             Nothing -> show c
             Just z' -> showTerm c z'
+  show (CNQZ x m) = show "CNQZ $" <> show x <> " $" <> show m
 
 instance Ord n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
@@ -41,12 +45,16 @@ instance Ord n => Ord (Constraint n) where
   compare (CMul (a, x) (b, y) (c, z)) (CMul (a', x') (b', y') (c', z')) =
     -- perform lexicographical comparison with tuples
     compare (x, y, z, a, b, c) (x', y', z', a', b', c')
+  compare CNQZ {} CNQZ {} = EQ
+  compare CNQZ {} _ = LT
+  compare _ CNQZ {} = GT
 
 -- | Return the list of variables occurring in constraints
 varsInConstraint :: Constraint a -> IntSet
 varsInConstraint (CAdd _ m) = CoeffMap.keysSet m
 varsInConstraint (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
 varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
+varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
 
 varsInConstraints :: Set (Constraint a) -> IntSet
 varsInConstraints = IntSet.unions . map varsInConstraint . Set.toList
@@ -86,6 +94,9 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
         "    " <> show (CAdd (DebugGF n) (fmap DebugGF xs))
       printConstraint (CMul (a, x) (b, y) (c, z)) =
         "    " <> show (CMul (DebugGF a, x) (DebugGF b, y) (DebugGF c, z))
+      printConstraint (CNQZ x y) =
+        "    " <> show (CNQZ x y)
+
 
       printConstraints :: (Show n, Bounded n, Fractional n, Integral n) => Set (Constraint n) -> String
       printConstraints = unlines . map printConstraint . Set.toList

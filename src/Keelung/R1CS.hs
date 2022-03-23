@@ -5,6 +5,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Maybe (mapMaybe)
 import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
 import Keelung.Constraint
@@ -104,22 +105,26 @@ satisfyR1CS witness = all (satisfyR1C witness) . r1csClauses
 fromConstraintSystem :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> R1CS n
 fromConstraintSystem cs =
   R1CS
-    (map toR1C (Set.toList (csConstraints cs)))
+    (mapMaybe toR1C (Set.toList (csConstraints cs)))
     (csNumberOfVars cs)
     (csInputVars cs)
     (csOutputVar cs)
     (generateWitness cs)
   where
-    toR1C :: GaloisField n => Constraint n -> R1C n
+    toR1C :: GaloisField n => Constraint n -> Maybe (R1C n)
     toR1C (CAdd a m) =
-      R1C
-        (constPoly one)
-        (CoeffMap.toIntMap $ CoeffMap.insert (-1) a m)
-        (constPoly zero)
+      Just $
+        R1C
+          (constPoly one)
+          (CoeffMap.toIntMap $ CoeffMap.insert (-1) a m)
+          (constPoly zero)
     toR1C (CMul cx dy (e, Nothing)) =
-      R1C (varPoly cx) (varPoly dy) (constPoly e)
+      Just $
+        R1C (varPoly cx) (varPoly dy) (constPoly e)
     toR1C (CMul cx dy (e, Just z)) =
-      R1C (varPoly cx) (varPoly dy) (varPoly (e, z))
+      Just $
+        R1C (varPoly cx) (varPoly dy) (varPoly (e, z))
+    toR1C CNQZ {} = Nothing
 
 witnessOfR1CS :: [n] -> R1CS n -> Either String (Witness n)
 witnessOfR1CS inputs r1cs =
