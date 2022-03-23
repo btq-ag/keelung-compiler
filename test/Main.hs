@@ -121,5 +121,10 @@ main = hspec $ do
       execute Basic.eq1 [3] `shouldBe` Right 1
     it "cond 1" $
       execute Basic.cond [0] `shouldBe` Right 789
+
+
+    -- NOTE: 
+    --    some variables are of "don't care"
+    --    they get thrown away and won't be in the witness 
     -- it "cond 2" $
     --   execute Basic.cond [3] `shouldBe` Right 12
