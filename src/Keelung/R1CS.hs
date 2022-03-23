@@ -9,8 +9,9 @@ import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
-import Keelung.Optimiser (simplifyConstrantSystem)
+import Keelung.Optimiser (optimise)
 import Keelung.Syntax.Common
+import Keelung.Util
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -24,9 +25,9 @@ generateWitness ::
   -- | Resulting assignment
   Either String (Witness a)
 generateWitness cs env =
-  let pinnedVars = csInputVars cs <> IntSet.singleton (csOutputVar cs)
+  let pinnedVars = IntSet.toList (csInputVars cs) ++ [csOutputVar cs]
       variables = [0 .. csNumberOfVars cs - 1]
-      (witness, cs') = simplifyConstrantSystem env cs
+      (witness, cs') = optimise env cs
    in if all (isMapped witness) variables
         then Right witness
         else
@@ -35,7 +36,7 @@ generateWitness cs env =
                 ++ show [x | x <- variables, not $ isMapped witness x]
                 ++ ",\n"
                 ++ "in assignment context\n  "
-                ++ show witness
+                ++ show (fmap DebugGF witness)
                 ++ ",\n"
                 ++ "in pinned-variable context\n  "
                 ++ show pinnedVars
@@ -47,9 +48,7 @@ generateWitness cs env =
                 ++ show cs
             )
   where
-    isMapped witness var = case IntMap.lookup var witness of
-      Nothing -> False
-      Just _ -> True
+    isMapped witness var = IntMap.member var witness
 
 --------------------------------------------------------------------------------
 

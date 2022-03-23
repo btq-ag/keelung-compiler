@@ -86,39 +86,39 @@ runKeelungAggSig dimension numberOfSignatures =
 
 main :: IO ()
 main = hspec $ do
-  describe "Aggregate Signature" $ do
-    describe "Snarkl" $ do
-      it "dim:1 sig:1" $
-        runSnarklAggSig 1 1 `shouldBe` 1
-      it "dim:1 sig:10" $
-        runSnarklAggSig 1 10 `shouldBe` 1
-      it "dim:10 sig:1" $
-        runSnarklAggSig 10 1 `shouldBe` 1
-      it "dim:10 sig:10" $
-        runSnarklAggSig 10 10 `shouldBe` 1
-    describe "Keelung" $ do
-      it "dim:1 sig:1" $
-        runSnarklAggSig 1 1 `shouldBe` 1
-      it "dim:1 sig:10" $
-        runSnarklAggSig 1 10 `shouldBe` 1
-      it "dim:10 sig:1" $
-        runSnarklAggSig 10 1 `shouldBe` 1
-      it "dim:10 sig:10" $
-        runSnarklAggSig 10 10 `shouldBe` 1
+  -- describe "Aggregate Signature" $ do
+  --   describe "Snarkl" $ do
+  --     it "dim:1 sig:1" $
+  --       runSnarklAggSig 1 1 `shouldBe` 1
+  --     it "dim:1 sig:10" $
+  --       runSnarklAggSig 1 10 `shouldBe` 1
+  --     it "dim:10 sig:1" $
+  --       runSnarklAggSig 10 1 `shouldBe` 1
+  --     it "dim:10 sig:10" $
+  --       runSnarklAggSig 10 10 `shouldBe` 1
+  --   describe "Keelung" $ do
+  --     it "dim:1 sig:1" $
+  --       runSnarklAggSig 1 1 `shouldBe` 1
+  --     it "dim:1 sig:10" $
+  --       runSnarklAggSig 1 10 `shouldBe` 1
+  --     it "dim:10 sig:1" $
+  --       runSnarklAggSig 10 1 `shouldBe` 1
+  --     it "dim:10 sig:10" $
+  --       runSnarklAggSig 10 10 `shouldBe` 1
 
   describe "Basic" $ do
-    it "identity (Num)" $
-      execute Basic.identity [42] `shouldBe` Right 42
-    it "identity (Bool)" $
-      execute Basic.identityB [1] `shouldBe` Right 1
-    it "identity (Bool)" $
-      execute Basic.identityB [0] `shouldBe` Right 0
-    it "add3" $
-      execute Basic.add3 [0] `shouldBe` Right 3
-    it "eq1 1" $
-      execute Basic.eq1 [0] `shouldBe` Right 0
-    -- it "eq1 2" $
-    --   execute Basic.eq1 [3] `shouldBe` Right 1
+    -- it "identity (Num)" $
+    --   execute Basic.identity [42] `shouldBe` Right 42
+    -- it "identity (Bool)" $
+    --   execute Basic.identityB [1] `shouldBe` Right 1
+    -- it "identity (Bool)" $
+    --   execute Basic.identityB [0] `shouldBe` Right 0
+    -- it "add3" $
+    --   execute Basic.add3 [0] `shouldBe` Right 3
+    -- it "eq1 1" $
+    --   execute Basic.eq1 [0] `shouldBe` Right 0
+    it "eq1 2" $
+      execute Basic.eq1 [3] `shouldBe` Right 1
 
 -- it "cond 1" $
 --   execute Basic.cond [0] `shouldBe` Right 12

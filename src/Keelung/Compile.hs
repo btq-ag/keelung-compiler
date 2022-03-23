@@ -185,12 +185,19 @@ encodeBinaryOp op out x y = case op of
     -- The encoding is, for some 'm':
     --  1. (x - y) * m = out
     --  2. (x - y) * (1 - out) = 0
+
+    -- diff = (x - y)
     diff <- freshVar
     encode diff (Var x - Var y)
 
     m <- freshVar
     encode out (Var diff * Var m)
-    encode 0 (Var diff * (1 - Var out))
+
+    -- notOut = 1 - out
+    notOut <- freshVar      
+    encode notOut (1 - Var out)
+    cmult (1, diff) (1, notOut) (0, Nothing)
+
   Eq -> do
     -- Constraint 'x == y = out'.
     -- The encoding is: out = 1 - (x-y != 0).

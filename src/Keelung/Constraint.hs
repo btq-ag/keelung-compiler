@@ -76,7 +76,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
       <> "\n\
          \  number of input variables: "
       <> show (IntSet.size inputVars)
-      <> "\n  output variables: "
+      <> "\n  output variable: $"
       <> show outputVar
       <> "\n\
          \}"

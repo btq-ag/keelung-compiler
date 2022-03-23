@@ -12,6 +12,7 @@ module Keelung
     ConstraintSystem(..),
     Erase,
     interpret,
+    optimise,
     module Keelung.R1CS
   )
 where
@@ -27,3 +28,4 @@ import Keelung.Constraint (ConstraintSystem(..))
 import Keelung.Syntax.Untyped (Erase)
 import Keelung.Interpret (interpret)
 import Keelung.R1CS
+import Keelung.Optimiser (optimise)

@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
---  Constraint Set Minimization
+--  Constraint Set Minimisation
 --------------------------------------------------------------------------------
 {-# LANGUAGE BangPatterns #-}
 
@@ -104,20 +104,20 @@ learn (CAdd a xs) = case CoeffMap.toList xs of
   _ -> return ()
 learn _ = return ()
 
-simplifyConstrantSystem :: GaloisField n => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
-simplifyConstrantSystem env cs =
+optimise :: (GaloisField n, Bounded n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
+optimise env cs =
   -- NOTE: Pinned vars include:
   --   - input vars
   --   - output vars
-  -- Pinned vars are never optimized away.
-  let pinnedVars = IntSet.toList (csInputVars cs) ++ [csOutputVar cs]
+  -- Pinned vars are never optimised away.
+  let pinnedVars = IntSet.insert (csOutputVar cs) (csInputVars cs)
    in runOptiM env $ do
-        constraints <- simplifyConstraintSet pinnedVars (csConstraints cs)
+        constraints <- simplifyConstraintSet (IntSet.toList pinnedVars) (csConstraints cs)
         -- NOTE: In the next line, it's OK that 'pinnedVars'
         -- may overlap with 'constraintVars cs'.
         -- 'assignmentOfVars' might do a bit of duplicate
         -- work (to look up the same key more than once).
-        assignments <- assignmentOfVars $ pinnedVars ++ IntSet.toList (varsInConstraints (csConstraints cs))
+        assignments <- assignmentOfVars $ IntSet.toList $ pinnedVars <> varsInConstraints (csConstraints cs)
         return (assignments, cs {csConstraints = constraints})
 
 simplifyConstraintSet ::
