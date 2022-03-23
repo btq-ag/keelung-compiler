@@ -12,6 +12,9 @@ import Keelung
 identity :: Comp 'Num GF181
 identity = Var <$> freshInput
 
+identityB :: Comp 'Bool GF181
+identityB = Var <$> freshInput
+
 add3 :: Comp 'Num GF181
 add3 = do
   x <- freshInput
