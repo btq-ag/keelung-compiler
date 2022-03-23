@@ -22,18 +22,18 @@ data Constraint n
   | CNQZ Var Var -- x & m
   deriving (Eq)
 
-instance (Show n, Eq n, Num n) => Show (Constraint n) where
-  show (CAdd 0 m) = show m
-  show (CAdd n m) = show n <> " + " <> show m
+instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
+  show (CAdd 0 m) = show m 
+  show (CAdd n m) = show (DebugGF n) <> " + " <> show m
   show (CMul (a, x) (b, y) (c, z)) =
     let showTerm 1 var = "$" <> show var
-        showTerm coeff var = show coeff <> "$" <> show var
+        showTerm coeff var = show (DebugGF coeff) <> "$" <> show var
      in showTerm a x <> " * " <> showTerm b y
           <> " = "
           <> case z of
-            Nothing -> show c
+            Nothing -> show $ DebugGF c
             Just z' -> showTerm c z'
-  show (CNQZ x m) = show "CNQZ $" <> show x <> " $" <> show m
+  show (CNQZ x m) = "CNQZ $" <> show x <> " $" <> show m
 
 instance Ord n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
@@ -89,14 +89,5 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
       <> "\n\
          \}"
     where
-      printConstraint :: (Show n, Bounded n, Fractional n, Integral n) => Constraint n -> String
-      printConstraint (CAdd n xs) =
-        "    " <> show (CAdd (DebugGF n) (fmap DebugGF xs))
-      printConstraint (CMul (a, x) (b, y) (c, z)) =
-        "    " <> show (CMul (DebugGF a, x) (DebugGF b, y) (DebugGF c, z))
-      printConstraint (CNQZ x y) =
-        "    " <> show (CNQZ x y)
-
-
       printConstraints :: (Show n, Bounded n, Fractional n, Integral n) => Set (Constraint n) -> String
-      printConstraints = unlines . map printConstraint . Set.toList
+      printConstraints = unlines . map (\c -> "    " <> show c) . Set.toList
