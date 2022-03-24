@@ -12,8 +12,9 @@ module Keelung
     ConstraintSystem(..),
     Erase,
     interpret,
-    optimiseWithInput,
-    module Keelung.R1CS
+    eraseType,
+    module Keelung.R1CS,
+    module Keelung.Optimiser
   )
 where
 
@@ -25,7 +26,7 @@ import Keelung.Syntax
 import Keelung.Compile (compile)
 import Keelung.Util (DebugGF (..))
 import Keelung.Constraint (ConstraintSystem(..))
-import Keelung.Syntax.Untyped (Erase)
+import Keelung.Syntax.Untyped (Erase, eraseType)
 import Keelung.Interpret (interpret)
 import Keelung.R1CS
-import Keelung.Optimiser (optimiseWithInput)
+import Keelung.Optimiser

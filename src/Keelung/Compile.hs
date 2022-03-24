@@ -15,8 +15,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
-import Keelung.Monad (Elaborated (elabNumOfVars))
-import Keelung.Syntax.Common
+import Keelung.Syntax.Common (Var)
 import Keelung.Syntax.Untyped
 
 ----------------------------------------------------------------
@@ -198,13 +197,12 @@ encodeBinaryOp op out x y = case op of
     -- if diff = 0 then m = 0 else m = recip diff
     m <- freshVar
     encode out (Var diff * Var m)
-    cnqz diff m 
+    cnqz diff m
 
     -- notOut = 1 - out
-    notOut <- freshVar      
+    notOut <- freshVar
     encode notOut (1 - Var out)
     cmult (1, diff) (1, notOut) (0, Nothing)
-
   Eq -> do
     -- Constraint 'x == y = out'.
     -- The encoding is: out = 1 - (x-y != 0).
@@ -221,16 +219,9 @@ encodeBinaryOp op out x y = case op of
 encodeBooleanVars :: GaloisField n => IntSet -> M n ()
 encodeBooleanVars booleanInputVars = mapM_ (\b -> encodeBinaryOp Mul b b b) $ IntSet.toList booleanInputVars
 
--- | Compile an expression to a constraint system.  Takes as input the
--- expression, the expression's input variables, and the name of the
--- output variable.
-compile ::
-  (GaloisField n, Erase ty, Bounded n, Integral n) =>
-  Elaborated ty n ->
-  ConstraintSystem n
-compile elaborated = runM (elabNumOfVars elaborated) $ do
-  let (TypeErased untypedExpr assignments numOfVars inputVars booleanVars) = eraseType elaborated
-
+-- | Compile an untyped expression to a constraint system
+compile :: (GaloisField n, Bounded n, Integral n) => TypeErased n -> ConstraintSystem n
+compile (TypeErased untypedExpr assignments numOfVars inputVars booleanVars) = runM numOfVars $ do
   -- optimization: constant propogation
   -- let bindings = IntMap.fromList $ map (\(Assignment var expr) -> (var, expr)) assignments
   -- let untypedExpr' = propogateConstant bindings untypedExpr
@@ -239,7 +230,7 @@ compile elaborated = runM (elabNumOfVars elaborated) $ do
 
   -- Compile `untypedExpr'` to constraints with output wire 'outputVar'.
   encode outputVar untypedExpr
-  -- Compile assignments to constraints 
+  -- Compile assignments to constraints
   mapM_ encodeAssignment assignments
 
   -- ensure that boolean input variables are boolean

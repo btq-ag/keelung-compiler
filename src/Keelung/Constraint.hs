@@ -64,7 +64,7 @@ varsInConstraints = IntSet.unions . map varsInConstraint . Set.toList
 -- | Constraint System
 data ConstraintSystem n = ConstraintSystem
   { csConstraints :: Set (Constraint n),
-    csNumberOfVars :: Int,
+    csNumVars :: Int,
     csInputVars :: IntSet,
     csOutputVar :: Var
   }

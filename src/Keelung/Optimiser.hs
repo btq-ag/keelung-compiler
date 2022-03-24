@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 {-# LANGUAGE BangPatterns #-}
 
-module Keelung.Optimiser where
+module Keelung.Optimiser (optimiseWithInput, optimise) where
 
 import Control.Monad
 import Data.Field.Galois (GaloisField)
@@ -131,10 +131,8 @@ optimiseWithInput env cs =
         assignments <- assignmentOfVars $ IntSet.toList $ pinnedVars <> varsInConstraints (csConstraints cs)
         return (assignments, cs {csConstraints = constraints})
 
-
 optimise :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> ConstraintSystem n
-optimise = snd . optimiseWithInput mempty 
-
+optimise = snd . optimiseWithInput mempty
 
 simplifyConstraintSet ::
   (GaloisField n, Bounded n, Integral n) =>
@@ -147,7 +145,7 @@ simplifyConstraintSet pinnedVars constraints = do
   substituted <- mapM substConstraint $ Set.toList simplified
   -- keep only constraints that is not tautologous
   removedTautology <- filterM (fmap not . isTautology) substituted
-  
+
   pinned <- handlePinnedVars pinnedVars
   return $ Set.fromList (pinned ++ removedTautology)
 

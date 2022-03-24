@@ -45,16 +45,22 @@ loop2 = do
   arr2 <- freshInputs 2
   arrayEq 2 arr (arr2 :: (Ref ('A ('V 'Num))))
 
-aggSig :: Comp 'Bool GF181
-aggSig = do
+aggSig :: Int -> Int -> Comp 'Bool GF181
+aggSig dim num = do
   let settings = Settings True True True True True
-  let setup = makeSetup 1 1 42 settings
+  let setup = makeSetup dim num 42 settings
   aggregateSignature setup
 
 --------------------------------------------------------------------------------
 
 comp :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
-comp program = fmap compile (elaborate program)
+comp program = fmap (compile . eraseType) (elaborate program)
 
-run :: GaloisField n => Comp ty n -> [n] -> Either String n
-run program input = elaborate program >>= (`interpret` input)
+optm :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
+optm program = optimise <$> comp program
+
+-- run :: GaloisField n => Comp ty n -> [n] -> Either String n
+-- run program input = elaborate program >>= (`interpret` input)
+
+exec :: GaloisField n => Comp ty n -> [n] -> Either String n
+exec program input = elaborate program >>= (`interpret` input)

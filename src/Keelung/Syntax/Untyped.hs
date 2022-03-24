@@ -7,15 +7,13 @@ module Keelung.Syntax.Untyped
     Expr (..),
     Erase,
     TypeErased (..),
-    Assignment(..),
+    Assignment (..),
     eraseType,
-    propogateConstant,
+    -- propogateConstant,
   )
 where
 
 import Control.Monad.Writer
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Keelung.Monad as T
@@ -200,19 +198,3 @@ chainExprs op x y = case (x, y) of
       BinOp op (x : ys)
   -- there's nothing left we can do
   _ -> BinOp op [x, y]
-
---------------------------------------------------------------------------------
-
--- constant propogation
-propogateConstant :: IntMap a -> Expr a -> Expr a
-propogateConstant bindings = propogate
-  where
-    propogate e = case e of
-      Var var -> lookupVar var
-      Val _ -> e
-      BinOp op es -> BinOp op (map propogate es)
-      IfThenElse p x y -> IfThenElse (propogate p) (propogate x) (propogate y)
-
-    lookupVar var = case IntMap.lookup var bindings of
-      Nothing -> Var var
-      Just val -> Val val
