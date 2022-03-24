@@ -10,7 +10,7 @@ import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
-import Keelung.Optimiser (optimise)
+import Keelung.Optimiser (optimiseWithInput)
 import Keelung.Syntax.Common
 import Keelung.Util
 
@@ -28,7 +28,7 @@ generateWitness ::
 generateWitness cs env =
   let pinnedVars = IntSet.toList (csInputVars cs) ++ [csOutputVar cs]
       variables = [0 .. csNumberOfVars cs - 1]
-      (witness, cs') = optimise env cs
+      (witness, cs') = optimiseWithInput env cs
    in if all (isMapped witness) variables
         then Right witness
         else

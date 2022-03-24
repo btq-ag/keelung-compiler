@@ -115,8 +115,8 @@ learn (CAdd a xs) = case CoeffMap.toList xs of
   _ -> return ()
 learn _ = return ()
 
-optimise :: (GaloisField n, Bounded n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
-optimise env cs =
+optimiseWithInput :: (GaloisField n, Bounded n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
+optimiseWithInput env cs =
   -- NOTE: Pinned vars include:
   --   - input vars
   --   - output vars
@@ -130,6 +130,11 @@ optimise env cs =
         -- work (to look up the same key more than once).
         assignments <- assignmentOfVars $ IntSet.toList $ pinnedVars <> varsInConstraints (csConstraints cs)
         return (assignments, cs {csConstraints = constraints})
+
+
+optimise :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> ConstraintSystem n
+optimise = snd . optimiseWithInput mempty 
+
 
 simplifyConstraintSet ::
   (GaloisField n, Bounded n, Integral n) =>

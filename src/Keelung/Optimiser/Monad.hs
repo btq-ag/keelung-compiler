@@ -25,23 +25,23 @@ import Keelung.Syntax.Common
 -- together with a partial map from variables
 -- to constants (hidden inside the "UnionFind"
 -- data structure).
-type OptiM a = State (UnionFind a)
+type OptiM n = State (UnionFind n)
 
-runOptiM :: IntMap f -> OptiM f a -> a
+runOptiM :: IntMap n -> OptiM n a -> a
 runOptiM env f = evalState f (UnionFind.new env)
 
 -- | Unify variables 'x' and 'y'.
-unifyVars :: GaloisField a => Var -> Var -> OptiM a ()
+unifyVars :: GaloisField n => Var -> Var -> OptiM n ()
 unifyVars x y = modify (\xs -> UnionFind.union xs x y)
 
 -- | Bind variable 'x' to 'c'.
-bindVar :: GaloisField a => Var -> a -> OptiM a ()
+bindVar :: GaloisField n => Var -> n -> OptiM n ()
 bindVar x val = do
   root <- rootOfVar x
   modify $ \xs -> UnionFind.bindVar xs root val
 
 -- | Return 'x''s root (the representative of its equivalence class).
-rootOfVar :: GaloisField a => Var -> OptiM a Var
+rootOfVar :: GaloisField n => Var -> OptiM n Var
 rootOfVar x = do
   xs <- get
   let (root, xs') = UnionFind.find xs x
@@ -50,7 +50,7 @@ rootOfVar x = do
 
 -- | Return the binding associated with variable 'x', or 'x''s root
 -- if no binding exists.
-lookupVar :: GaloisField a => Var -> OptiM a (Either Var a)
+lookupVar :: GaloisField n => Var -> OptiM n (Either Var n)
 lookupVar x = do
   root <- rootOfVar x
   xs <- get
@@ -59,7 +59,7 @@ lookupVar x = do
     Just c -> return $ Right c
 
 -- | Construct a partial assignment from 'vars' to field elements.
-assignmentOfVars :: GaloisField a => [Var] -> OptiM a (Witness a)
+assignmentOfVars :: GaloisField n => [Var] -> OptiM n (Witness n)
 assignmentOfVars vars = do
   binds <- mapM lookupVar vars
   return $
