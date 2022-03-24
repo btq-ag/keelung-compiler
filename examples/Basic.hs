@@ -3,9 +3,10 @@
 
 module Basic where
 
-import AggregateSignature.Program.Keelung (aggregateSignature)
+import AggregateSignature.Program.Keelung (aggregateSignature, computeAggregateSignature)
 import AggregateSignature.Util
 import Keelung
+import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
 
 --------------------------------------------------------------------------------
 
@@ -45,13 +46,42 @@ loop2 = do
   arr2 <- freshInputs 2
   arrayEq 2 arr (arr2 :: (Ref ('A ('V 'Num))))
 
+
+
 aggSig :: Int -> Int -> Comp 'Bool GF181
 aggSig dim num = do
-  let settings = Settings True True True True True
+  let settings = Settings True False False False False
+  -- let settings = Settings True True True True True
   let setup = makeSetup dim num 42 settings
+
+
   aggregateSignature setup
 
+q1 :: Comp 'Bool GF181
+q1 = aggSig 1 1
+
+q2 :: Comp 'Bool GF181
+q2 = aggSig 1 10
+
+checkSig :: Comp 'Bool GF181 
+checkSig = do
+  let settings = Settings True False False False False
+  let Setup dimension _ publicKey signatures _ _ = makeSetup 1 10 42 settings
+  expectedAggSig <- freshInputs dimension
+  actualAggSig <- computeAggregateSignature publicKey signatures
+  arrayEq dimension expectedAggSig actualAggSig
+
 --------------------------------------------------------------------------------
+
+
+-- elab :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
+elab :: (Erase ty, Num n) => Comp ty n -> Either String (TypeErased n)
+elab program = fmap eraseType (elaborate program)
+
+cp :: (Erase ty, Num n) => Comp ty n -> Either String (TypeErased n)
+cp program = ConstantPropagation.run <$> elab program
+
+
 
 comp :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
 comp program = fmap (compile . eraseType) (elaborate program)
@@ -59,8 +89,6 @@ comp program = fmap (compile . eraseType) (elaborate program)
 optm :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
 optm program = optimise <$> comp program
 
--- run :: GaloisField n => Comp ty n -> [n] -> Either String n
--- run program input = elaborate program >>= (`interpret` input)
 
 exec :: GaloisField n => Comp ty n -> [n] -> Either String n
 exec program input = elaborate program >>= (`interpret` input)

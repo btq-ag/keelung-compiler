@@ -9,7 +9,7 @@ module Keelung.Syntax.Untyped
     TypeErased (..),
     Assignment (..),
     eraseType,
-    -- propogateConstant,
+    -- propagateConstant,
   )
 where
 
@@ -18,6 +18,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Keelung.Monad as T
 import qualified Keelung.Syntax as T
+import Keelung.Util
 import Keelung.Syntax.Common
 
 --------------------------------------------------------------------------------
@@ -98,7 +99,7 @@ instance Show n => Show (Expr n) where
 data Assignment n = Assignment Var (Expr n)
 
 instance Show n => Show (Assignment n) where
-  show (Assignment var expr) = show var <> " := " <> show expr
+  show (Assignment var expr) = "$" <> show var <> " := " <> show expr
 
 instance Functor Assignment where
   fmap f (Assignment var expr) = Assignment var (fmap f expr)
@@ -129,6 +130,26 @@ data TypeErased n = TypeErased
     -- | Variables that are boolean
     erasedBooleanVars :: IntSet
   }
+
+instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) where
+  show (TypeErased expr assignments numOfVars inputVars boolVars) =
+    "TypeErased {\n\
+    \  expression: "
+      <> show (fmap DebugGF expr) 
+      <> "\n"
+      <> ( if length assignments < 20
+             then "  assignments:\n" <> show assignments  <> "\n"
+             else ""
+         )
+      <> "  number of variables: "
+      <> show numOfVars
+      <> "\n\
+         \  number of input variables: "
+      <> show (IntSet.size inputVars)
+      <> "\n  boolean variable: "
+      <> show boolVars
+      <> "\n\
+         \}"
 
 eraseType :: (Erase ty, Num n) => T.Elaborated ty n -> TypeErased n
 eraseType (T.Elaborated expr numAssignments boolAssignments numOfVars inputVars) =

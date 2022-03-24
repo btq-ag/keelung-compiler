@@ -27,7 +27,7 @@ generateWitness ::
   Either String (Witness a)
 generateWitness cs env =
   let pinnedVars = IntSet.toList (csInputVars cs) ++ [csOutputVar cs]
-      variables = [0 .. csNumVars cs - 1]
+      variables = [0 .. csNumOfVars cs - 1]
       (witness, cs') = optimiseWithInput env cs
    in if all (isMapped witness) variables
         then Right witness
@@ -90,7 +90,7 @@ satisfyR1C witness constraint
 -- | Rank-1 Constraint Systems
 data R1CS n = R1CS
   { r1csClauses :: [R1C n],
-    r1csNumVars :: Int,
+    r1csNumOfVars :: Int,
     r1csInputVars :: IntSet,
     r1csOutputVar :: Var,
     r1csWitnessGen :: Witness n -> Either String (Witness n)
@@ -108,7 +108,7 @@ fromConstraintSystem cs =
   in 
   R1CS
     (mapMaybe toR1C (Set.toList (csConstraints cs')))
-    (csNumVars cs')
+    (csNumOfVars cs')
     (csInputVars cs')
     (csOutputVar cs')
     (generateWitness cs')

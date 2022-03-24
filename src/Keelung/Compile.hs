@@ -224,7 +224,7 @@ compile :: (GaloisField n, Bounded n, Integral n) => TypeErased n -> ConstraintS
 compile (TypeErased untypedExpr assignments numOfVars inputVars booleanVars) = runM numOfVars $ do
   -- optimization: constant propogation
   -- let bindings = IntMap.fromList $ map (\(Assignment var expr) -> (var, expr)) assignments
-  -- let untypedExpr' = propogateConstant bindings untypedExpr
+  -- let untypedExpr' = propagateConstant bindings untypedExpr
 
   let outputVar = numOfVars
 

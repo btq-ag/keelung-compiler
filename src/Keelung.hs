@@ -13,6 +13,7 @@ module Keelung
     Erase,
     interpret,
     eraseType,
+    TypeErased(..),
     module Keelung.R1CS,
     module Keelung.Optimiser
   )
@@ -26,7 +27,7 @@ import Keelung.Syntax
 import Keelung.Compile (compile)
 import Keelung.Util (DebugGF (..))
 import Keelung.Constraint (ConstraintSystem(..))
-import Keelung.Syntax.Untyped (Erase, eraseType)
+import Keelung.Syntax.Untyped (Erase, eraseType, TypeErased (..))
 import Keelung.Interpret (interpret)
 import Keelung.R1CS
 import Keelung.Optimiser
