@@ -53,7 +53,7 @@ type M n =
     [Assignment 'Num n]
     (WriterT [Assignment 'Bool n] (StateT (Env n) (Except String)))
 
-type Comp ty n  = M n (Expr ty n)
+type Comp ty n = M n (Expr ty n)
 
 -- how to run the monad
 runM :: Env n -> M n a -> Either String (((a, [Assignment 'Num n]), [Assignment 'Bool n]), Env n)
@@ -94,7 +94,7 @@ freshAddr = do
 -- | Add assignment
 class Proper ty where
   assign :: Ref ('V ty) -> Expr ty n -> M n ()
-  arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp 'Bool n 
+  arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp 'Bool n
 
 instance Proper 'Num where
   assign var e = tell [Assignment var e]
@@ -142,32 +142,32 @@ instance Functor (Assignment ty) where
 --------------------------------------------------------------------------------
 
 -- | Computation elaboration
-elaborate :: Comp ty n -> Either String (Elaborated n ty)
+elaborate :: Comp ty n -> Either String (Elaborated ty n)
 elaborate prog = do
   (((expr, numAssignments), boolAssignments), env) <- runM (Env 0 0 mempty mempty) prog
-  return $ Elaborated (envNexVariable env) (envInpuVariables env) expr numAssignments boolAssignments
+  return $ Elaborated expr numAssignments boolAssignments (envNexVariable env) (envInpuVariables env)
 
 -- | The result of elaborating a computation
-data Elaborated n ty = Elaborated
-  { -- | The number of free variables in the computation
-    elabNumOfVars :: Int,
-    -- | Variables marked as inputs
-    elabInpuVariables :: IntSet,
-    -- | The resulting 'Expr'
+data Elaborated ty n = Elaborated
+  { -- | The resulting 'Expr'
     elabExpr :: Expr ty n,
     -- | Assignements
     elabNumAssignments :: [Assignment 'Num n],
-    elabBoolAssignments :: [Assignment 'Bool n]
+    elabBoolAssignments :: [Assignment 'Bool n],
+    -- | The number of variables
+    elabNumOfVars :: Int,
+    -- | Variables marked as inputs
+    elabInpuVars :: IntSet
   }
 
-instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated n ty) where
-  show (Elaborated n inputs expr numAssignments boolAssignments) =
+instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where
+  show (Elaborated expr numAssignments boolAssignments n inputVars) =
     "{\n\
     \  number of variables: "
       ++ show n
       ++ "\n\
          \  input variables: "
-      ++ show (IntSet.toList inputs)
+      ++ show (IntSet.toList inputVars)
       ++ "\n\
          \  expression: "
       ++ show (fmap DebugGF expr)
@@ -291,10 +291,10 @@ update (Array addr) i expr = do
 reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp ty n) -> Comp ty n
 reduce a xs f = foldM f a xs
 
-every :: Foldable t => (a -> Expr 'Bool n) -> t a -> Comp 'Bool n 
+every :: Foldable t => (a -> Expr 'Bool n) -> t a -> Comp 'Bool n
 every f xs = reduce true xs $ \accum x -> return (accum `And` f x)
 
-everyM :: Foldable t => t a -> (a -> Comp 'Bool n ) -> Comp 'Bool n 
+everyM :: Foldable t => t a -> (a -> Comp 'Bool n) -> Comp 'Bool n
 everyM xs f =
   foldM
     ( \accum x -> do

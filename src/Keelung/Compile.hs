@@ -15,7 +15,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
-import Keelung.Monad (Elaborated (Elaborated))
+import Keelung.Monad (Elaborated (elabNumOfVars))
 import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped
 
@@ -226,30 +226,26 @@ encodeBooleanVars booleanInputVars = mapM_ (\b -> encodeBinaryOp Mul b b b) $ In
 -- output variable.
 compile ::
   (GaloisField n, Erase ty, Bounded n, Integral n) =>
-  Elaborated n ty ->
+  Elaborated ty n ->
   ConstraintSystem n
-compile (Elaborated outputVar inputVars typedExpr numAssignments boolAssignments) = runM outputVar $ do
-  let (untypedExpr, booleanVarsInExpr) = eraseType typedExpr
-
-  let (numAssignments', booleanVarsInNumAssignments) = eraseTypeFromAssignments numAssignments
-  let (boolAssignments', booleanVarsInBoolAssignments) = eraseTypeFromAssignments boolAssignments
+compile elaborated = runM (elabNumOfVars elaborated) $ do
+  let (TypeErased untypedExpr assignments numOfVars inputVars booleanVars) = eraseType elaborated
 
   -- optimization: constant propogation
-  -- e = propogateConstant e0
+  -- let bindings = IntMap.fromList $ map (\(Assignment var expr) -> (var, expr)) assignments
+  -- let untypedExpr' = propogateConstant bindings untypedExpr
 
-  -- Compile `untypedExpr` to constraints with output wire 'outputVar'.
+  let outputVar = numOfVars
+
+  -- Compile `untypedExpr'` to constraints with output wire 'outputVar'.
   encode outputVar untypedExpr
-  -- Compile assignments to constraints with output wire 'outputVar'.
-  let assignments = numAssignments' <> boolAssignments'
+  -- Compile assignments to constraints 
   mapM_ encodeAssignment assignments
 
-  -- ensure that boolean variables are boolean
-  let booleanVarsInProgram = booleanVarsInExpr <> booleanVarsInNumAssignments <> booleanVarsInBoolAssignments
-  encodeBooleanVars (booleanVarsInProgram `IntSet.intersection` inputVars)
+  -- ensure that boolean input variables are boolean
+  encodeBooleanVars (booleanVars `IntSet.intersection` inputVars)
 
   constraints <- gets envConstraints
-
-  --
   let vars = varsInConstraints constraints
 
   return $

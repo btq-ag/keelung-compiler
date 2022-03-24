@@ -5,14 +5,17 @@
 module Keelung.Syntax.Untyped
   ( Op (..),
     Expr (..),
-    Assignment (..),
     Erase,
+    TypeErased (..),
+    Assignment(..),
     eraseType,
-    eraseTypeFromAssignments,
+    propogateConstant,
   )
 where
 
 import Control.Monad.Writer
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Keelung.Monad as T
@@ -107,13 +110,43 @@ instance Functor Assignment where
 -- monad for collecting boolean vars along the way
 type M = Writer IntSet
 
-eraseType :: (Erase ty, Num n) => T.Expr ty n -> (Expr n, IntSet)
-eraseType = runWriter . eraseExpr
+-- eraseType :: (Erase ty, Num n) => T.Expr ty n -> (Expr n, IntSet)
+-- eraseType = runWriter . eraseExpr
 
-eraseTypeFromAssignments :: (Erase ty, Num n) => [T.Assignment ty n] -> ([Assignment n], IntSet)
-eraseTypeFromAssignments = runWriter . mapM eraseAssignment
+-- eraseTypeFromAssignments :: (Erase ty, Num n) => [T.Assignment ty n] -> ([Assignment n], IntSet)
+-- eraseTypeFromAssignments = runWriter . mapM eraseAssignment
 
 --------------------------------------------------------------------------------
+
+-- | The result after type erasure
+data TypeErased n = TypeErased
+  { -- | The expression after type erasure
+    erasedExpr :: Expr n,
+    -- | Assignments after type erasure
+    erasedAssignments :: [Assignment n],
+    -- | Number of variables
+    erasedNumOfVars :: Int,
+    -- | Variables marked as inputs
+    erasedInputVars :: IntSet,
+    -- | Variables that are boolean
+    erasedBooleanVars :: IntSet
+  }
+
+eraseType :: (Erase ty, Num n) => T.Elaborated ty n -> TypeErased n
+eraseType (T.Elaborated expr numAssignments boolAssignments numOfVars inputVars) =
+  let ((erasedExpr', erasedAssignments'), booleanVars) = runWriter $ do
+        expr' <- eraseExpr expr
+        numAssignments' <- mapM eraseAssignment numAssignments
+        boolAssignments' <- mapM eraseAssignment boolAssignments
+        let assignments = numAssignments' <> boolAssignments'
+        return (expr', assignments)
+   in TypeErased
+        { erasedExpr = erasedExpr',
+          erasedAssignments = erasedAssignments',
+          erasedNumOfVars = numOfVars,
+          erasedInputVars = inputVars,
+          erasedBooleanVars = booleanVars
+        }
 
 -- for stealing type info in runtime from the typeclass dictionary
 class Erase ty where
@@ -167,3 +200,19 @@ chainExprs op x y = case (x, y) of
       BinOp op (x : ys)
   -- there's nothing left we can do
   _ -> BinOp op [x, y]
+
+--------------------------------------------------------------------------------
+
+-- constant propogation
+propogateConstant :: IntMap a -> Expr a -> Expr a
+propogateConstant bindings = propogate
+  where
+    propogate e = case e of
+      Var var -> lookupVar var
+      Val _ -> e
+      BinOp op es -> BinOp op (map propogate es)
+      IfThenElse p x y -> IfThenElse (propogate p) (propogate x) (propogate y)
+
+    lookupVar var = case IntMap.lookup var bindings of
+      Nothing -> Var var
+      Just val -> Val val
