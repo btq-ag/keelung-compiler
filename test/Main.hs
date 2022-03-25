@@ -10,6 +10,9 @@ import qualified Data.IntMap as IntMap
 import Keelung
 import qualified Snarkl
 import Test.Hspec
+import qualified Data.Set as Set
+import qualified Keelung.Optimiser.Monad as Optimiser
+import qualified Keelung.Optimiser as Optimiser
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
@@ -18,7 +21,8 @@ import Test.Hspec
 execute :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp ty n -> [n] -> Either String n
 execute prog inputs = do
   elaborated <- elaborate prog
-  let constraintSystem = compile elaborated
+  let typeErased = eraseType elaborated
+  let constraintSystem = compile typeErased
   let r1cs = fromConstraintSystem constraintSystem
 
   let outputVar = r1csOutputVar r1cs
@@ -106,25 +110,43 @@ main = hspec $ do
       it "dim:10 sig:10" $
         runSnarklAggSig 10 10 `shouldBe` 1
 
-  describe "Basic" $ do
-    it "identity (Num)" $
-      execute Basic.identity [42] `shouldBe` Right 42
-    it "identity (Bool)" $
-      execute Basic.identityB [1] `shouldBe` Right 1
-    it "identity (Bool)" $
-      execute Basic.identityB [0] `shouldBe` Right 0
-    it "add3" $
-      execute Basic.add3 [0] `shouldBe` Right 3
-    it "eq1 1" $
-      execute Basic.eq1 [0] `shouldBe` Right 0
-    it "eq1 2" $
-      execute Basic.eq1 [3] `shouldBe` Right 1
-    it "cond 1" $
-      execute Basic.cond [0] `shouldBe` Right 789
-
+  -- describe "Compilation" $ do
+  --   it "identity (Num)" $
+  --     execute Basic.identity [42] `shouldBe` Right 42
+  --   it "identity (Bool)" $
+  --     execute Basic.identityB [1] `shouldBe` Right 1
+  --   it "identity (Bool)" $
+  --     execute Basic.identityB [0] `shouldBe` Right 0
+  --   it "add3" $
+  --     execute Basic.add3 [0] `shouldBe` Right 3
+  --   it "eq1 1" $
+  --     execute Basic.eq1 [0] `shouldBe` Right 0
+  --   it "eq1 2" $
+  --     execute Basic.eq1 [3] `shouldBe` Right 1
+  --   it "cond 1" $
+  --     execute Basic.cond [0] `shouldBe` Right 789
 
     -- NOTE: 
     --    some variables are of "don't care"
     --    they get thrown away and won't be in the witness 
     -- it "cond 2" $
     --   execute Basic.cond [3] `shouldBe` Right 12
+
+  describe "Optimisation" $ do
+    -- describe "Constant Propagation" $ do
+    --   it "1 + 1" $
+    --     erasedExpr <$> Basic.elab Basic.constant1 `shouldBe` Right 2
+
+    describe "Constraint Set Reduction" $ do
+      it "$0 = $1" $ 
+        let constraints = Set.singleton $ cadd 0 [(0, 1), (1, -1)]
+
+            run :: Optimiser.OptiM GF181 a -> a
+            run = Optimiser.runOptiM mempty
+
+            pinnedVars = [0, 1]
+        in 
+          run (Optimiser.simplifyConstraintSet pinnedVars constraints) `shouldBe` 
+          constraints
+
+

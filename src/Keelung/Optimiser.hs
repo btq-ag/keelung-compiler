@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 {-# LANGUAGE BangPatterns #-}
 
-module Keelung.Optimiser (optimiseWithInput, optimiseWithWitness, optimise) where
+module Keelung.Optimiser where
 
 import Control.Monad
 import Data.Field.Galois (GaloisField)
@@ -17,6 +17,28 @@ import Keelung.Constraint.CoeffMap (CoeffMap (..))
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Optimiser.Monad
 import Keelung.Syntax.Common
+import Keelung.Syntax.Untyped (TypeErased (..))
+
+--------------------------------------------------------------------------------
+
+-- | Result of optimisation
+data Result = Result
+  { -- | The number of constraints that have been optimised away
+    resultConstraintReduction :: Int,
+    -- | The number of variables that have been optimised away
+    resultVariableReduction :: Int,
+    -- | The number of assignments that have been optimised away
+    resultAssignmentReduction :: Int
+  }
+  deriving (Eq, Ord, Show)
+
+compareTypeErased :: TypeErased n -> TypeErased n -> Result
+compareTypeErased x y =
+  Result
+    { resultConstraintReduction = 0,
+      resultVariableReduction = erasedNumOfVars x - erasedNumOfVars y,
+      resultAssignmentReduction = length (erasedAssignments x) - length (erasedAssignments y)
+    }
 
 --------------------------------------------------------------------------------
 
@@ -111,7 +133,7 @@ learn (CAdd a xs) = case CoeffMap.toList xs of
     if c == 0
       then return ()
       else bindVar x (- a / c)
-  [(x, c), (y, d)] -> when ((a == 0) && (c == - d)) $ unifyVars x y
+  [(x, c), (y, d)] -> when (a == 0 && c == - d) $ unifyVars x y
   _ -> return ()
 learn _ = return ()
 
@@ -145,7 +167,7 @@ simplifyConstraintSet ::
   Set (Constraint n) ->
   OptiM n (Set (Constraint n))
 simplifyConstraintSet pinnedVars constraints = do
-  simplified <- simplifyManyTimes constraints
+  simplified <-  simplifyManyTimes constraints
   -- substitute roots/constants in constraints
   substituted <- mapM substConstraint $ Set.toList simplified
   -- keep only constraints that is not tautologous

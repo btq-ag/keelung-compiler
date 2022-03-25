@@ -25,7 +25,7 @@ generateWitness ::
   Witness a ->
   -- | Resulting assignment
   Either String (Witness a)
-generateWitness cs env =
+generateWitness cs env = 
   let pinnedVars = IntSet.toList (csInputVars cs) ++ [csOutputVar cs]
       variables = [0 .. csNumOfVars cs - 1]
       (witness, cs') = optimiseWithWitness env cs
@@ -105,8 +105,7 @@ satisfyR1CS witness = all (satisfyR1C witness) . r1csClauses
 fromConstraintSystem :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> R1CS n
 fromConstraintSystem cs =
   let cs' = optimise cs 
-  in 
-  R1CS
+  in R1CS
     (mapMaybe toR1C (Set.toList (csConstraints cs')))
     (csNumOfVars cs')
     (csInputVars cs')

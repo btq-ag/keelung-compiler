@@ -13,6 +13,10 @@ import qualified Data.IntMap as IntMap
 
 --------------------------------------------------------------------------------
 
+constant1 :: Comp 'Num GF181
+constant1 = do
+  return $ 1 + 1 
+
 identity :: Comp 'Num GF181
 identity = Var <$> freshInput
 
@@ -66,6 +70,9 @@ q1 = aggSig 1 1
 
 q2 :: Comp 'Bool GF181
 q2 = aggSig 1 10
+
+q3 :: Comp 'Bool GF181
+q3 = aggSig 10 10
 
 checkSig :: Int -> Int -> Comp 'Bool GF181 
 checkSig dimension n = do
