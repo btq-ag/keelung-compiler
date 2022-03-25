@@ -5,6 +5,7 @@ module Keelung.Optimiser.Monad
     lookupVar,
     assignmentOfVars,
     OptiM,
+    Lookup(..),
     runOptiM,
     runOptiM'
   )
@@ -52,15 +53,17 @@ rootOfVar x = do
   put xs'
   return root
 
+data Lookup n = Root Var | Value n deriving (Eq, Show)
+
 -- | Return the binding associated with variable 'x', or 'x''s root
 -- if no binding exists.
-lookupVar :: GaloisField n => Var -> OptiM n (Either Var n)
+lookupVar :: GaloisField n => Var -> OptiM n (Lookup n)
 lookupVar x = do
   root <- rootOfVar x
   xs <- get
   case UnionFind.lookupVar xs root of
-    Nothing -> return $ Left root
-    Just c -> return $ Right c
+    Nothing -> return $ Root root
+    Just c -> return $ Value c
 
 -- | Construct a partial assignment from 'vars' to field elements.
 assignmentOfVars :: GaloisField n => [Var] -> OptiM n (Witness n)
@@ -70,7 +73,7 @@ assignmentOfVars vars = do
     Map.fromList $
       concatMap
         ( \(x, ec) -> case ec of
-            Left _ -> []
-            Right c -> [(x, c)]
+            Root _ -> []
+            Value c -> [(x, c)]
         )
         $ zip vars binds

@@ -61,12 +61,12 @@ substConstraint !constraint = case constraint of
         -- see if we can substitute a variable with some constant
         result <- lookupVar var
         case result of
-          Left _ -> do
+          Root _ -> do
             -- it's okay if we cannot substitute a variable with some constant
             -- we can still replace the variable with its root
             var' <- rootOfVar var
             return (accConstant, IntMap.insert var' coeff accMapping)
-          Right val -> do
+          Value val -> do
             let val' = val * coeff
             -- if `value * coeff` is 0 then we should remove it
             if val' == 0
@@ -77,28 +77,28 @@ substConstraint !constraint = case constraint of
     by <- lookupVar y
     bz <- lookupTerm ez
     case (bx, by, bz) of
-      (Left rx, Left ry, Left (e, rz)) ->
+      (Root rx, Root ry, Left (e, rz)) ->
         return
           $! CMul (c, rx) (d, ry) (e, Just rz)
-      (Left rx, Left ry, Right e) ->
+      (Root rx, Root ry, Right e) ->
         return
           $! CMul (c, rx) (d, ry) (e, Nothing)
-      (Left rx, Right d0, Left (e, rz)) ->
+      (Root rx, Value d0, Left (e, rz)) ->
         return
           $! cadd 0 [(rx, c * d * d0), (rz, - e)]
-      (Left rx, Right d0, Right e) ->
+      (Root rx, Value d0, Right e) ->
         return
           $! cadd (- e) [(rx, c * d * d0)]
-      (Right c0, Left ry, Left (e, rz)) ->
+      (Value c0, Root ry, Left (e, rz)) ->
         return
           $! cadd 0 [(ry, c0 * c * d), (rz, - e)]
-      (Right c0, Left ry, Right e) ->
+      (Value c0, Root ry, Right e) ->
         return
           $! cadd (- e) [(ry, c0 * c * d)]
-      (Right c0, Right d0, Left (e, rz)) ->
+      (Value c0, Value d0, Left (e, rz)) ->
         return
           $! cadd (c * c0 * d * d0) [(rz, - e)]
-      (Right c0, Right d0, Right e) ->
+      (Value c0, Value d0, Right e) ->
         return
           $! cadd (c * c0 * d * d0 - e) []
     where
@@ -106,8 +106,8 @@ substConstraint !constraint = case constraint of
       lookupTerm (e, Just z) = do
         result <- lookupVar z
         case result of
-          Left rz -> return (Left (e, rz))
-          Right e0 -> return (Right (e * e0))
+          Root rz -> return (Left (e, rz))
+          Value e0 -> return (Right (e * e0))
   CNQZ _ _ -> return constraint
 
 -- | Is a constriant of `0 = 0` ?
@@ -118,11 +118,11 @@ isTautology constraint = case constraint of
   CNQZ var m -> do
     result <- lookupVar var
     case result of
-      Left _ -> return False
-      Right 0 -> do
+      Root _ -> return False
+      Value 0 -> do
         bindVar m 0
         return True
-      Right n -> do
+      Value n -> do
         bindVar m (recip n)
         return True
 
@@ -190,12 +190,12 @@ handlePinnedVars pinnedVars = do
     result <- lookupVar var
     return (var, result)
 
-  let isNotRoot (var, reuslt) = Left var /= reuslt
+  let isNotRoot (var, reuslt) = Root var /= reuslt
   let pinnedEquations =
         map
           ( \(var, result) -> case result of
-              Left root -> cadd 0 [(var, 1), (root, -1)] -- var == root
-              Right c -> cadd (- c) [(var, 1)] -- var == c
+              Root root -> cadd 0 [(var, 1), (root, -1)] -- var == root
+              Value c -> cadd (- c) [(var, 1)] -- var == c
           )
           $ filter isNotRoot pinnedTerms
   return pinnedEquations
