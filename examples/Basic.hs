@@ -1,12 +1,15 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use <&>" #-}
 
 module Basic where
 
-import AggregateSignature.Program.Keelung (aggregateSignature, computeAggregateSignature)
+import AggregateSignature.Program.Keelung as Keelung 
 import AggregateSignature.Util
 import Keelung
 import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
+import qualified Data.IntMap as IntMap
 
 --------------------------------------------------------------------------------
 
@@ -21,10 +24,11 @@ add3 = do
   x <- freshInput
   return $ Var x + 3
 
+-- takes an input and see if its equal to 3 
 eq1 :: Comp 'Bool GF181
 eq1 = do
-  x <- freshInput
-  return $ Var x `Eq` 3
+  x <- freshInput 
+  return $ Var x `Eq` 3 
 
 cond :: Comp 'Num GF181
 cond = do
@@ -63,32 +67,43 @@ q1 = aggSig 1 1
 q2 :: Comp 'Bool GF181
 q2 = aggSig 1 10
 
-checkSig :: Comp 'Bool GF181 
-checkSig = do
+checkSig :: Int -> Int -> Comp 'Bool GF181 
+checkSig dimension n = do
   let settings = Settings True False False False False
-  let Setup dimension _ publicKey signatures _ _ = makeSetup 1 10 42 settings
+  let Setup _ _ publicKey signatures _ _ = makeSetup dimension n 42 settings
   expectedAggSig <- freshInputs dimension
   actualAggSig <- computeAggregateSignature publicKey signatures
   arrayEq dimension expectedAggSig actualAggSig
 
+checkSquares :: Int -> Int -> Comp 'Bool GF181
+checkSquares dimension n = do
+  let settings = Settings False False False True False
+  let Setup _ _ _ signatures _ _ = makeSetup dimension n 42 settings
+  sigSquares <- freshInputs2 n dimension
+  Keelung.checkSquares n dimension signatures sigSquares
+
+
 --------------------------------------------------------------------------------
 
 
--- elab :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
+-- elaborate & erase type 
 elab :: (Erase ty, Num n) => Comp ty n -> Either String (TypeErased n)
 elab program = fmap eraseType (elaborate program)
 
+-- elaborate & erase type & propagate constants 
 cp :: (Erase ty, Num n) => Comp ty n -> Either String (TypeErased n)
 cp program = ConstantPropagation.run <$> elab program
 
-
-
 comp :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
-comp program = fmap (compile . eraseType) (elaborate program)
+comp program = elaborate program >>= return . compile . ConstantPropagation.run . eraseType
+
 
 optm :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
 optm program = optimise <$> comp program
 
-
-exec :: GaloisField n => Comp ty n -> [n] -> Either String n
-exec program input = elaborate program >>= (`interpret` input)
+-- partial evaluation with inputs 
+optmWithInput :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp ty n -> [n] -> Either String ([(Var ,DebugGF n)], ConstraintSystem n)
+optmWithInput program input = do 
+  cs <- optm program
+  let (witness', cs') = optimiseWithInput input cs 
+  return (IntMap.toList $ fmap DebugGF witness', cs')

@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 {-# LANGUAGE BangPatterns #-}
 
-module Keelung.Optimiser (optimiseWithInput, optimise) where
+module Keelung.Optimiser (optimiseWithInput, optimiseWithWitness, optimise) where
 
 import Control.Monad
 import Data.Field.Galois (GaloisField)
@@ -115,14 +115,14 @@ learn (CAdd a xs) = case CoeffMap.toList xs of
   _ -> return ()
 learn _ = return ()
 
-optimiseWithInput :: (GaloisField n, Bounded n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
-optimiseWithInput env cs =
+optimiseWithWitness :: (GaloisField n, Bounded n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
+optimiseWithWitness witness cs =
   -- NOTE: Pinned vars include:
   --   - input vars
   --   - output vars
   -- Pinned vars are never optimised away.
   let pinnedVars = IntSet.insert (csOutputVar cs) (csInputVars cs)
-   in runOptiM env $ do
+   in runOptiM witness $ do
         constraints <- simplifyConstraintSet (IntSet.toList pinnedVars) (csConstraints cs)
         -- NOTE: In the next line, it's OK that 'pinnedVars'
         -- may overlap with 'constraintVars cs'.
@@ -130,6 +130,11 @@ optimiseWithInput env cs =
         -- work (to look up the same key more than once).
         assignments <- assignmentOfVars $ IntSet.toList $ pinnedVars <> varsInConstraints (csConstraints cs)
         return (assignments, cs {csConstraints = constraints})
+
+optimiseWithInput :: (GaloisField n, Bounded n, Integral n) => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
+optimiseWithInput input cs =
+  let witness = IntMap.fromList (zip (IntSet.toList (csInputVars cs)) input)
+   in optimiseWithWitness witness cs
 
 optimise :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 optimise = snd . optimiseWithInput mempty
