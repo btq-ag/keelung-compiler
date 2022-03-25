@@ -138,15 +138,26 @@ main = hspec $ do
     --     erasedExpr <$> Basic.elab Basic.constant1 `shouldBe` Right 2
 
     describe "Constraint Set Reduction" $ do
+
       it "$0 = $1" $ 
-        let constraints = Set.singleton $ cadd 0 [(0, 1), (1, -1)]
-
+        let constraint = cadd 0 [(0, 1), (1, -1)]
+            links = IntMap.fromList $ [(1, 0)]
+            sizes = IntMap.fromList $ [(0, 2)]
             run :: Optimiser.OptiM GF181 a -> a
-            run = Optimiser.runOptiM mempty
-
-            pinnedVars = [0, 1]
+            run = Optimiser.runOptiM' links sizes mempty
         in 
-          run (Optimiser.simplifyConstraintSet pinnedVars constraints) `shouldBe` 
-          constraints
+          run (Optimiser.substConstraint constraint) `shouldBe` 
+          constraint
+
+
+
+      -- it "$0 = $1 2" $ 
+      --   let constraints = Set.singleton $ cadd 0 [(0, 1), (1, -1)]
+      --       run :: Optimiser.OptiM GF181 a -> a
+      --       run = Optimiser.runOptiM mempty
+      --       pinnedVars = [0, 1]
+      --   in 
+      --     run (Optimiser.simplifyConstraintSet pinnedVars constraints) `shouldBe` 
+      --     constraints
 
 

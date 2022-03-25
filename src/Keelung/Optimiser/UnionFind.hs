@@ -1,5 +1,5 @@
 module Keelung.Optimiser.UnionFind
-  ( UnionFind,
+  ( UnionFind(..),
     new,
     find,
     union,
@@ -22,6 +22,7 @@ data UnionFind f = UnionFind
 
 new :: IntMap f -> UnionFind f
 new = UnionFind mempty mempty
+
 
 -- | Bind variable 'x' to 'c'
 bindVar :: UnionFind f -> Var -> f -> UnionFind f

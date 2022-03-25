@@ -6,6 +6,7 @@ module Keelung.Optimiser.Monad
     assignmentOfVars,
     OptiM,
     runOptiM,
+    runOptiM'
   )
 where
 
@@ -13,7 +14,7 @@ import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Lazy as Map
-import Keelung.Optimiser.UnionFind (UnionFind)
+import Keelung.Optimiser.UnionFind (UnionFind (..))
 import qualified Keelung.Optimiser.UnionFind as UnionFind
 import Keelung.Syntax.Common
 
@@ -28,7 +29,10 @@ import Keelung.Syntax.Common
 type OptiM n = State (UnionFind n)
 
 runOptiM :: IntMap n -> OptiM n a -> a
-runOptiM env f = evalState f (UnionFind.new env)
+runOptiM xs f = evalState f (UnionFind.new xs)
+
+runOptiM' :: IntMap Var -> IntMap Int -> IntMap f -> State (UnionFind f) a -> a
+runOptiM' xs ys zs f = evalState f (UnionFind xs ys zs)
 
 -- | Unify variables 'x' and 'y'.
 unifyVars :: GaloisField n => Var -> Var -> OptiM n ()

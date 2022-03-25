@@ -167,10 +167,11 @@ simplifyConstraintSet ::
   Set (Constraint n) ->
   OptiM n (Set (Constraint n))
 simplifyConstraintSet pinnedVars constraints = do
-  simplified <-  simplifyManyTimes constraints
+  simplified <- simplifyManyTimes constraints
   -- substitute roots/constants in constraints
   substituted <- mapM substConstraint $ Set.toList simplified
   -- keep only constraints that is not tautologous
+
   removedTautology <- filterM (fmap not . isTautology) substituted
 
   pinned <- handlePinnedVars pinnedVars
@@ -188,13 +189,15 @@ handlePinnedVars pinnedVars = do
   pinnedTerms <- forM pinnedVars $ \var -> do
     result <- lookupVar var
     return (var, result)
+
+  let isNotRoot (var, reuslt) = Left var /= reuslt
   let pinnedEquations =
         map
           ( \(var, result) -> case result of
               Left root -> cadd 0 [(var, 1), (root, -1)] -- var == root
               Right c -> cadd (- c) [(var, 1)] -- var == c
           )
-          $ filter (\(var, reuslt) -> Left var /= reuslt) pinnedTerms
+          $ filter isNotRoot pinnedTerms
   return pinnedEquations
 
 simplifyManyTimes ::
@@ -228,9 +231,9 @@ simplifyOnce constraints = do
   substituted <- mapM substConstraint $ Set.toList constraints'
   -- keep only constraints that is not tautologous
   removedTautology <- filterM (fmap not . isTautology) substituted
-
   return $ Set.fromList removedTautology
 
+--
 goOverConstraints :: (GaloisField n, Bounded n, Integral n) => Set (Constraint n) -> Set (Constraint n) -> OptiM n (Set (Constraint n))
 goOverConstraints accum constraints = case Set.minView constraints of
   Nothing -> return accum -- no more
