@@ -118,12 +118,12 @@ main = hspec $ do
       execute Basic.identityB [0] `shouldBe` Right 0
     it "add3" $
       execute Basic.add3 [0] `shouldBe` Right 3
-    -- it "eq1 1" $
-    --   execute Basic.eq1 [0] `shouldBe` Right 0
-    -- it "eq1 2" $
-    --   execute Basic.eq1 [3] `shouldBe` Right 1
-    -- it "cond 1" $
-    --   execute Basic.cond [0] `shouldBe` Right 789
+    it "eq1 1" $
+      execute Basic.eq1 [0] `shouldBe` Right 0
+    it "eq1 2" $
+      execute Basic.eq1 [3] `shouldBe` Right 1
+    it "cond 1" $
+      execute Basic.cond [0] `shouldBe` Right 789
 
     -- NOTE: 
     --    some variables are of "don't care"
@@ -140,8 +140,8 @@ main = hspec $ do
 
       it "$0 = $1" $ 
         let constraint = cadd 0 [(0, 1), (1, -1)]
-            links = IntMap.fromList $ [(1, 0)]
-            sizes = IntMap.fromList $ [(0, 2)]
+            links = IntMap.fromList [(1, 0)]
+            sizes = IntMap.fromList [(0, 2)]
             run :: Optimiser.OptiM GF181 a -> a
             run = Optimiser.runOptiM' links sizes mempty
         in 

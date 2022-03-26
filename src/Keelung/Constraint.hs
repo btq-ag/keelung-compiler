@@ -1,8 +1,10 @@
 {-# OPTIONS_GHC -Wno-type-defaults #-}
+
 module Keelung.Constraint where
 
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint.CoeffMap (CoeffMap)
@@ -23,7 +25,7 @@ data Constraint n
   deriving (Eq)
 
 instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
-  show (CAdd 0 m) = show m 
+  show (CAdd 0 m) = show m
   show (CAdd n m) = show (DebugGF n) <> " + " <> show m
   show (CMul (a, x) (b, y) (c, z)) =
     let showTerm 1 var = "$" <> show var
@@ -91,3 +93,48 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
     where
       printConstraints :: (Show n, Bounded n, Fractional n, Integral n) => Set (Constraint n) -> String
       printConstraints = unlines . map (\c -> "    " <> show c) . Set.toList
+
+-- | Sequentially renumber term variables '0..max_var'.  Return
+--   renumbered constraints, together with the total number of
+--   variables in the (renumbered) constraint set and the (possibly
+--   renumbered) in and out variables.
+renumberConstraints :: Ord n => ConstraintSystem n -> ConstraintSystem n
+renumberConstraints cs =
+  ConstraintSystem
+    (Set.map renumberConstraint (csConstraints cs))
+    (Map.size variableMap)
+    (IntSet.map renumber (csInputVars cs))
+    (renumber (csOutputVar cs))
+  where
+    variableMap =
+      Map.fromList $
+        zip (IntSet.toList (csInputVars cs) ++ filter isNotInput all_vars) [0 ..]
+      where
+        isNotInput = not . flip IntSet.member (csInputVars cs)
+        all_vars = IntSet.toList $ constraintVars $ csConstraints cs
+
+    renumber x = case Map.lookup x variableMap of
+      Nothing ->
+        error
+          ( "can't find a binding for variable " ++ show x
+              ++ " in map "
+              ++ show variableMap
+          )
+      Just x' -> x'
+
+    renumberConstraint c0 = case c0 of
+      CAdd a m ->
+        CAdd a $ CoeffMap.mapKeys renumber m
+      CMul (a, x) (b, y) (c, z) ->
+        CMul (a, renumber x) (b, renumber y) (c, renumber <$> z)
+      CNQZ x y ->
+        CNQZ (renumber x) (renumber y)
+
+-- | Return the list of variables occurring in constraints 'cs'.
+constraintVars :: Set (Constraint n) -> IntSet
+constraintVars = IntSet.unions . Set.map getVars
+  where
+    getVars (CAdd _ m) = CoeffMap.keysSet m
+    getVars (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
+    getVars (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
+    getVars (CNQZ x y) = IntSet.fromList [x, y]

@@ -148,7 +148,8 @@ optimiseWithWitness witness cs =
         -- 'assignmentOfVars' might do a bit of duplicate
         -- work (to look up the same key more than once).
         assignments <- assignmentOfVars $ IntSet.toList $ pinnedVars <> varsInConstraints (csConstraints cs)
-        return (assignments, cs {csConstraints = constraints})
+
+        return (assignments, renumberConstraints $ cs {csConstraints = constraints})
 
 optimiseWithInput :: (GaloisField n, Bounded n, Integral n) => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimiseWithInput input cs =
