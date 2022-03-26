@@ -10,7 +10,6 @@ import qualified Data.IntMap as IntMap
 import Keelung
 import qualified Snarkl
 import Test.Hspec
-import qualified Data.Set as Set
 import qualified Keelung.Optimiser.Monad as Optimiser
 import qualified Keelung.Optimiser as Optimiser
 
@@ -110,21 +109,21 @@ main = hspec $ do
       it "dim:10 sig:10" $
         runSnarklAggSig 10 10 `shouldBe` 1
 
-  -- describe "Compilation" $ do
-  --   it "identity (Num)" $
-  --     execute Basic.identity [42] `shouldBe` Right 42
-  --   it "identity (Bool)" $
-  --     execute Basic.identityB [1] `shouldBe` Right 1
-  --   it "identity (Bool)" $
-  --     execute Basic.identityB [0] `shouldBe` Right 0
-  --   it "add3" $
-  --     execute Basic.add3 [0] `shouldBe` Right 3
-  --   it "eq1 1" $
-  --     execute Basic.eq1 [0] `shouldBe` Right 0
-  --   it "eq1 2" $
-  --     execute Basic.eq1 [3] `shouldBe` Right 1
-  --   it "cond 1" $
-  --     execute Basic.cond [0] `shouldBe` Right 789
+  describe "Compilation" $ do
+    it "identity (Num)" $
+      execute Basic.identity [42] `shouldBe` Right 42
+    it "identity (Bool)" $
+      execute Basic.identityB [1] `shouldBe` Right 1
+    it "identity (Bool)" $
+      execute Basic.identityB [0] `shouldBe` Right 0
+    it "add3" $
+      execute Basic.add3 [0] `shouldBe` Right 3
+    -- it "eq1 1" $
+    --   execute Basic.eq1 [0] `shouldBe` Right 0
+    -- it "eq1 2" $
+    --   execute Basic.eq1 [3] `shouldBe` Right 1
+    -- it "cond 1" $
+    --   execute Basic.cond [0] `shouldBe` Right 789
 
     -- NOTE: 
     --    some variables are of "don't care"
@@ -147,7 +146,7 @@ main = hspec $ do
             run = Optimiser.runOptiM' links sizes mempty
         in 
           run (Optimiser.substConstraint constraint) `shouldBe` 
-          constraint
+          cadd 0 []
 
 
 

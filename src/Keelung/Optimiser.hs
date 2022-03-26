@@ -7,13 +7,11 @@ module Keelung.Optimiser where
 
 import Control.Monad
 import Data.Field.Galois (GaloisField)
-import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint
-import Keelung.Constraint.CoeffMap (CoeffMap (..))
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Optimiser.Monad
 import Keelung.Syntax.Common
@@ -50,22 +48,21 @@ cadd !c !xs = CAdd c (CoeffMap.fromList xs)
 -- for the variables that appear in the constraint. Note that, when
 -- normalizing a multiplicative constraint, it may be necessary to
 -- convert it into an additive constraint.
-substConstraint :: GaloisField n => Constraint n -> OptiM n (Constraint n)
+substConstraint :: (GaloisField n, Bounded n, Integral n) => Constraint n -> OptiM n (Constraint n)
 substConstraint !constraint = case constraint of
   CAdd constant coeffMap -> do
     (constant', coeffMap') <- foldM go (constant, mempty) (CoeffMap.toList coeffMap)
-    return $ CAdd constant' (CoeffMap coeffMap')
+    return $ CAdd constant' (CoeffMap.fromList coeffMap')
     where
-      go :: GaloisField n => (n, IntMap n) -> (Var, n) -> OptiM n (n, IntMap n)
+      go :: GaloisField n => (n, [(Var, n)]) -> (Var, n) -> OptiM n (n, [(Var, n)])
       go (accConstant, accMapping) (var, coeff) = do
         -- see if we can substitute a variable with some constant
         result <- lookupVar var
         case result of
-          Root _ -> do
+          Root root -> do
             -- it's okay if we cannot substitute a variable with some constant
             -- we can still replace the variable with its root
-            var' <- rootOfVar var
-            return (accConstant, IntMap.insert var' coeff accMapping)
+            return (accConstant, (root, coeff) : accMapping)
           Value val -> do
             let val' = val * coeff
             -- if `value * coeff` is 0 then we should remove it

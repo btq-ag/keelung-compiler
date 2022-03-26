@@ -1,7 +1,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 module Keelung.Constraint.CoeffMap
-  ( CoeffMap(..),
+  ( CoeffMap,
+    toIntMap,
     fromList,
     toList,
     null,
@@ -31,11 +32,12 @@ newtype CoeffMap f = CoeffMap {toIntMap :: IntMap f}
 instance (Show f, Eq f, Num f) => Show (CoeffMap f) where
   show = go . IntMap.toList . toIntMap
     where
-      go [] = " = 0"
-      go [terms] = printTerm terms ++ go []
+      go [] = "<empty>"
+      go [(_, 0)] = error "printTerm: coefficient of 0"
+      go [terms] = printTerm terms ++ " = 0"
       go (term : xs) = printTerm term ++ " + " ++ go xs
 
-      printTerm (_, 0) = ""
+      printTerm (_, 0) = error "printTerm: coefficient of 0"
       printTerm (x, 1) = "$" ++ show x
       printTerm (x, -1) = "-$" ++ show x
       printTerm (x, c) = show c ++ "$" ++ show x
@@ -50,7 +52,12 @@ null :: CoeffMap f -> Bool
 null = IntMap.null . toIntMap
 
 insert :: GaloisField f => Var -> f -> CoeffMap f -> CoeffMap f
-insert var x = CoeffMap . IntMap.insertWith plus var x . toIntMap
+insert var x (CoeffMap xs) = case IntMap.lookup var xs of
+  Nothing -> CoeffMap $ IntMap.insert var x xs
+  Just f ->
+    if f + x == 0
+      then CoeffMap $ IntMap.delete var xs
+      else CoeffMap $ IntMap.insert var (f + x) xs
 
 keysSet :: CoeffMap f -> IntSet
 keysSet = IntMap.keysSet . toIntMap
