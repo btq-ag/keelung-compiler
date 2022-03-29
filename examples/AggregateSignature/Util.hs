@@ -105,7 +105,7 @@ genInputFromSetup (Setup _ _ _ _ inputs settings) =
                (True, True) -> sigSquares <> sigLengths
                (False, True) -> sigSquares <> sigLengths
                (True, False) -> sigSquares
-               (False, False) -> sigSquares
+               (False, False) -> []
            )
 
 --------------------------------------------------------------------------------
