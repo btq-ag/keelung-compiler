@@ -7,6 +7,7 @@ import qualified AggregateSignature.Program.Snarkl as Snarkl
 import AggregateSignature.Util
 import qualified Basic
 import qualified Data.IntMap as IntMap
+import qualified Data.IntSet as IntSet
 import Keelung
 import qualified Snarkl
 import Test.Hspec
@@ -104,6 +105,18 @@ main = hspec $ do
         runSnarklAggSig 10 1 `shouldBe` 1
       it "dim:10 sig:10" $
         runSnarklAggSig 10 10 `shouldBe` 1
+
+  describe "Type Erasure" $ do
+    it "boolean variables in Aggregate Signature" $
+      let settings =
+            Settings
+              { enableAggSigChecking = True,
+                enableSigSizeChecking = True,
+                enableSigLengthChecking = True
+              }
+          setup = makeSetup 1 1 42 settings :: Setup GF181
+          result = IntSet.toList . erasedBooleanVars . eraseType <$> elaborate (Keelung.aggregateSignature setup :: Comp 'Bool GF181)
+       in result `shouldBe` Right [0 .. 13]
 
   describe "Compilation" $ do
     it "identity (Num)" $
