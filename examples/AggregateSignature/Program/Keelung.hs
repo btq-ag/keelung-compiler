@@ -92,24 +92,16 @@ aggregateSignature (Setup dimension n publicKey signatures _ settings) = do
       arrayEq dimension expectedAggSig actualAggSig
 
   -- check signature size
-  sigSizeOk <- case enableBitStringSizeChecking settings of
+  sigSizeOk <- case enableSigSizeChecking settings of
     False -> return true
     True -> do 
       sigBitStrings <- freshInputs3 n dimension 14
       checkSignaturesBitStringSize dimension signatures sigBitStrings
 
   -- check squares & length of signatures
-  sigSquaresAndLengthsOk <- case (enableSigSquareChecking settings, enableSigLengthChecking settings) of
-    (False, False) -> return true 
-    (True, False) -> do 
-      sigSquares <- freshInputs2 n dimension
-      checkSquares n dimension signatures sigSquares
-    (False, True) -> do 
-      sigSquares <- freshInputs2 n dimension
-      -- expected length of signatures as input
-      sigLengths <- freshInputs n
-      checkLength n dimension sigSquares sigLengths
-    (True, True) -> do 
+  sigSquaresAndLengthsOk <- case enableSigLengthChecking settings of
+    False -> return true 
+    True -> do 
       sigSquares <- freshInputs2 n dimension
       squareOk <- checkSquares n dimension signatures sigSquares
       -- expected length of signatures as input

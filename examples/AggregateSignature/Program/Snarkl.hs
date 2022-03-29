@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RebindableSyntax #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use if" #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
@@ -9,7 +8,6 @@ module AggregateSignature.Program.Snarkl where
 
 import AggregateSignature.Util
 import Snarkl
-
 
 -- ensure that a signature is smaller than 16384 (target: 12289)
 checkSignaturesBitString :: (Integral a, GaloisField a) => Int -> [Signature a] -> TExp ('TArr ('TArr ('TArr 'TField))) a -> Comp 'TBool a
@@ -84,11 +82,11 @@ checkLength numberOfSignatures dimension sigSquares sigLengths = do
 
     return (expectedLength `eq` actualLength)
 
-  -- { enableAggSigChecking :: Bool,
-  --   enableBitStringSizeChecking :: Bool,
-  --   enableBitStringValueChecking :: Bool,
-  --   enableSigSquareChecking :: Bool,
-  --   enableSigLengthChecking :: Bool
+-- { enableAggSigChecking :: Bool,
+--   enableBitStringSizeChecking :: Bool,
+--   enableBitStringValueChecking :: Bool,
+--   enableSigSquareChecking :: Bool,
+--   enableSigLengthChecking :: Bool
 aggregateSignature :: (Integral a, GaloisField a) => Setup a -> Comp 'TBool a
 aggregateSignature (Setup dimension n publicKey signatures _ settings) = do
   -- check aggregate signature
@@ -102,37 +100,36 @@ aggregateSignature (Setup dimension n publicKey signatures _ settings) = do
       arrayEq dimension expectedAggSig actualAggSig
 
   -- expected bitstring of signatures as input
-  sigBitStrings <- case enableBitStringSizeChecking settings || enableBitStringValueChecking settings of
-    False -> freshInputs3 0 0 0 :: Show a => Comp ('TArr ('TArr ('TArr 'TField))) a
-    True -> freshInputs3 n dimension 14 :: Show a => Comp ('TArr ('TArr ('TArr 'TField))) a
-
-  -- check signature size
-  sigSizeOk <- case enableBitStringSizeChecking settings of
-    False -> return true
-    True -> checkSignaturesBitString dimension signatures sigBitStrings
-
-  -- check signature bits
-  sigBitsOk <- case enableBitStringValueChecking settings of
-    False -> return true
-    True -> checkSignaturesBits n dimension sigBitStrings
-
-  -- expected squares of signatures as input
-  sigSquares <- case enableSigSquareChecking settings || enableSigLengthChecking settings of
-    False -> freshInputs2 0 0 :: Show a => Comp ('TArr ('TArr 'TField)) a
-    True -> freshInputs2 n dimension :: Show a => Comp ('TArr ('TArr 'TField)) a
-
-  -- check squares of signatures
-  sigSquaresOk <- case enableSigSquareChecking settings of
+  sigBitAndSizeOk <- case enableSigSizeChecking settings of
     False -> return true
     True -> do
-      checkSquares n dimension signatures sigSquares
+      sigBitStrings <- freshInputs3 n dimension 14 :: Show a => Comp ('TArr ('TArr ('TArr 'TField))) a
+      sigBitsOk <- checkSignaturesBits n dimension sigBitStrings
+      sigSizeOk <- checkSignaturesBitString dimension signatures sigBitStrings
+      return $ sigBitsOk && sigSizeOk
 
-  -- check length of signatures
+  -- expected squares of signatures as input
   sigLengthsOk <- case enableSigLengthChecking settings of
     False -> return true
     True -> do
+      sigSquares <- freshInputs2 n dimension :: Show a => Comp ('TArr ('TArr 'TField)) a
+      checkSquares n dimension signatures sigSquares
       -- expected length of signatures as input
       sigLengths <- createArrayFromInput n :: Show a => Comp ('TArr 'TField) a
       checkLength n dimension sigSquares sigLengths
 
-  every id [aggSigOk, sigSizeOk, sigBitsOk, sigSquaresOk, sigLengthsOk]
+  -- -- check squares of signatures
+  -- sigSquaresOk <- case enableSigSquareChecking settings of
+  --   False -> return true
+  --   True -> do
+  --     checkSquares n dimension signatures sigSquares
+
+  -- -- check length of signatures
+  -- sigLengthsOk <- case enableSigLengthChecking settings of
+  --   False -> return true
+  --   True -> do
+  --     -- expected length of signatures as input
+  --     sigLengths <- createArrayFromInput n :: Show a => Comp ('TArr 'TField) a
+  --     checkLength n dimension sigSquares sigLengths
+
+  every id [aggSigOk, sigBitAndSizeOk, sigLengthsOk]

@@ -36,9 +36,7 @@ data Input a = Input
 -- | Settings for enabling/disabling different part of Aggregate Signature
 data Settings = Settings
   { enableAggSigChecking :: Bool,
-    enableBitStringSizeChecking :: Bool,
-    enableBitStringValueChecking :: Bool,
-    enableSigSquareChecking :: Bool,
+    enableSigSizeChecking :: Bool,
     enableSigLengthChecking :: Bool
   }
 
@@ -97,15 +95,11 @@ genInputFromSetup (Setup _ _ _ _ inputs settings) =
           then aggSigs
           else []
       )
-        <> ( if enableBitStringSizeChecking settings
+        <> ( if enableSigSizeChecking settings
                then bitStrings
                else []
            )
-        <> ( case (enableSigSquareChecking settings, enableSigLengthChecking settings) of
-               (True, True) -> sigSquares <> sigLengths
-               (False, True) -> sigSquares <> sigLengths
-               (True, False) -> sigSquares
-               (False, False) -> []
+        <> ( if enableSigLengthChecking settings then sigSquares <> sigLengths else []
            )
 
 --------------------------------------------------------------------------------

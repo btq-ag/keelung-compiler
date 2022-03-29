@@ -58,14 +58,14 @@ loop2 = do
 
 aggSig :: Int -> Int -> Comp 'Bool GF181
 aggSig dim num = do
-  let settings = Settings True True True True True
+  let settings = Settings True True True
   let setup = makeSetup dim num 42 settings
   Keelung.aggregateSignature setup
 
 -- components of aggregate signature
 checkSig :: Int -> Int -> Comp 'Bool GF181
 checkSig dimension n = do
-  let settings = Settings True False False False False
+  let settings = Settings True False False
   let Setup _ _ publicKey signatures _ _ = makeSetup dimension n 42 settings
   expectedAggSig <- freshInputs dimension
   actualAggSig <- Keelung.computeAggregateSignature publicKey signatures
@@ -77,26 +77,23 @@ checkSig dimension n = do
 --       setup = makeSetup dimension n 42 settings
 --   in  genInputFromSetup setup
 
-checkSquares :: Int -> Int -> Comp 'Bool GF181
-checkSquares dimension n = do
-  let settings = Settings False False False True False
-  let Setup _ _ _ signatures _ _ = makeSetup dimension n 42 settings
-  sigSquares <- freshInputs2 n dimension
-  Keelung.checkSquares n dimension signatures sigSquares
-
+-- #2
 checkSigSize :: Int -> Int -> Comp 'Bool GF181
 checkSigSize dimension n = do
-  let settings = Settings False False False True False
+  let settings = Settings False True False
   let Setup _ _ _ signatures _ _ = makeSetup dimension n 42 settings
   sigBitStrings <- freshInputs3 n dimension 14
-
   Keelung.checkSignaturesBitStringSize dimension signatures sigBitStrings
 
 checkSigLength :: Int -> Int -> Comp 'Bool GF181
 checkSigLength dimension n = do
+  let settings = Settings False False True
+  let Setup _ _ _ signatures _ _ = makeSetup dimension n 42 settings
   sigSquares <- freshInputs2 n dimension
   sigLengths <- freshInputs n
-  Keelung.checkLength n dimension sigSquares sigLengths
+  squaresOk <- Keelung.checkSquares n dimension signatures sigSquares
+  lengthsOk <- Keelung.checkLength n dimension sigSquares sigLengths
+  return $ squaresOk `And` lengthsOk
 
 --------------------------------------------------------------------------------
 
@@ -111,31 +108,31 @@ bench program settings dimension n = do
 -- #1
 runAggSig :: Int -> Int -> Either String (Int, Int, Int)
 runAggSig dimension n = do
-  let settings = Settings True True True True True
+  let settings = Settings True True True
   bench (aggSig dimension n) settings dimension n
 
 -- #1
 runCheckSig :: Int -> Int -> Either String (Int, Int, Int)
 runCheckSig dimension n = do
-  let settings = Settings True False False False False
+  let settings = Settings True False False
   bench (checkSig dimension n) settings dimension n
 
 -- #2 !!
 runCheckSigSize :: Int -> Int -> Either String (Int, Int, Int)
 runCheckSigSize dimension n = do
-  let settings = Settings False True False False False
+  let settings = Settings False True False
   bench (checkSigSize dimension n) settings dimension n
 
--- #4
-runCheckSquares :: Int -> Int -> Either String (Int, Int, Int)
-runCheckSquares dimension n = do
-  let settings = Settings False False False True False
-  bench (checkSquares dimension n) settings dimension n
+-- -- #4
+-- runCheckSquares :: Int -> Int -> Either String (Int, Int, Int)
+-- runCheckSquares dimension n = do
+--   let settings = Settings False False False True False
+--   bench (checkSquares dimension n) settings dimension n
 
--- #5 !!
+-- #3 !!
 runCheckLength :: Int -> Int -> Either String (Int, Int, Int)
 runCheckLength dimension n = do
-  let settings = Settings False False False True True
+  let settings = Settings False False True
   bench (checkSigLength dimension n) settings dimension n
 
 --------------------------------------------------------------------------------

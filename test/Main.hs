@@ -56,9 +56,7 @@ runSnarklAggSig dimension numberOfSignatures =
   let settings =
         Settings
           { enableAggSigChecking = True,
-            enableBitStringSizeChecking = True,
-            enableBitStringValueChecking = True,
-            enableSigSquareChecking = True,
+            enableSigSizeChecking = True,
             enableSigLengthChecking = True
           }
       setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
@@ -73,9 +71,7 @@ runKeelungAggSig dimension numberOfSignatures =
   let settings =
         Settings
           { enableAggSigChecking = True,
-            enableBitStringSizeChecking = True,
-            enableBitStringValueChecking = True,
-            enableSigSquareChecking = True,
+            enableSigSizeChecking = True,
             enableSigLengthChecking = True
           }
       setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
