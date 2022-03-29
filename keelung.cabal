@@ -49,7 +49,6 @@ library
       base >=4.7 && <5
     , containers
     , galois-field
-    , hspec
     , mtl
     , random
     , semirings
@@ -71,7 +70,6 @@ executable keelung-exe
       base >=4.7 && <5
     , containers
     , galois-field
-    , hspec
     , keelung
     , mtl
     , random
@@ -97,6 +95,47 @@ test-suite keelung-test
     , containers
     , galois-field
     , hspec
+    , keelung
+    , mtl
+    , random
+    , semirings
+    , snarkl
+  default-language: Haskell2010
+
+benchmark keelung-bench
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Keelung
+      Keelung.Compile
+      Keelung.Constraint
+      Keelung.Constraint.CoeffMap
+      Keelung.Interpret
+      Keelung.Monad
+      Keelung.Optimiser
+      Keelung.Optimiser.ConstantPropagation
+      Keelung.Optimiser.Monad
+      Keelung.Optimiser.UnionFind
+      Keelung.R1CS
+      Keelung.Syntax
+      Keelung.Syntax.Common
+      Keelung.Syntax.Untyped
+      Keelung.Util
+      AggregateSignature.Program.Keelung
+      AggregateSignature.Program.Snarkl
+      AggregateSignature.Util
+      Basic
+      Paths_keelung
+  hs-source-dirs:
+      src
+      benchmark/
+      examples/
+  ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , criterion >=1.0
+    , galois-field
     , keelung
     , mtl
     , random

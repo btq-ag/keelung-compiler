@@ -26,7 +26,6 @@ dependencies:
 - semirings
 - galois-field
 - random
-- hspec
 
 library:
   source-dirs: src
@@ -63,8 +62,28 @@ tests:
     dependencies:
     - keelung
     - snarkl
+    - hspec
+
 
     ghc-options:
       - -Wall
       - -Werror=incomplete-patterns
       - -fno-warn-orphans
+
+benchmarks:
+  keelung-bench:
+    main: Main.hs
+    source-dirs:
+      - src
+      - benchmark/
+      - examples/
+    dependencies:
+      - keelung
+      - snarkl
+      - criterion 		>=1.0
+
+    ghc-options:
+      - -Wall
+      - -Werror=incomplete-patterns
+      - -fno-warn-orphans
+
