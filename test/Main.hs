@@ -116,7 +116,7 @@ main = hspec $ do
               }
           setup = makeSetup 1 1 42 settings :: Setup GF181
           result = IntSet.toList . erasedBooleanVars . eraseType <$> elaborate (Keelung.aggregateSignature setup :: Comp 'Bool GF181)
-       in result `shouldBe` Right [0 .. 13]
+       in result `shouldBe` Right [3 .. 16]
 
   describe "Compilation" $ do
     it "identity (Num)" $

@@ -78,6 +78,8 @@ instance GaloisField n => Interpret (Expr ty n) n where
       case b' of
         0 -> interp y
         _ -> interp x
+    ToBool x -> interp x
+    ToNum x -> interp x
 
 --------------------------------------------------------------------------------
 

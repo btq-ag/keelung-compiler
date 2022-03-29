@@ -64,6 +64,9 @@ data Expr :: Type -> * -> * where
   BEq :: Expr 'Bool n -> Expr 'Bool n -> Expr 'Bool n
   -- if...then...else
   IfThenElse :: Expr 'Bool n -> Expr ty n -> Expr ty n -> Expr ty n
+  -- bool <-> num conversion
+  ToBool :: Expr 'Num n -> Expr 'Bool n
+  ToNum :: Expr 'Bool n -> Expr 'Num n 
 
 instance Functor (Expr ty) where
   fmap f expr = case expr of
@@ -81,6 +84,8 @@ instance Functor (Expr ty) where
     Xor x y -> Xor (fmap f x) (fmap f y)
     BEq x y -> BEq (fmap f x) (fmap f y)
     IfThenElse p x y -> IfThenElse (fmap f p) (fmap f x) (fmap f y)
+    ToBool x -> ToBool (fmap f x)
+    ToNum x -> ToNum (fmap f x)
 
 instance Show n => Show (Expr ty n) where
   showsPrec prec expr = case expr of
@@ -96,6 +101,8 @@ instance Show n => Show (Expr ty n) where
     Xor x y -> showParen (prec > 4) $ showsPrec 5 x . showString " ⊕ " . showsPrec 4 y
     BEq x y -> showParen (prec > 5) $ showsPrec 6 x . showString " = " . showsPrec 6 y
     IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    ToBool x -> showString "ToBool " . showsPrec prec x
+    ToNum x -> showString "ToNum " . showsPrec prec x
 
 instance GaloisField n => Num (Expr 'Num n) where
   (+) = Add
@@ -134,22 +141,7 @@ neq x y = IfThenElse (x `Eq` y) false true
 --------------------------------------------------------------------------------
 
 fromBool :: GaloisField n => Expr 'Bool n -> Expr 'Num n
-fromBool (Val (Boolean False)) = zero
-fromBool (Val (Boolean True)) = one
-fromBool (Var (Variable n)) = Var (Variable n)
-fromBool (Eq x y) = IfThenElse (Eq x y) one zero
-fromBool (And x y) = IfThenElse (And x y) one zero
-fromBool (Or x y) = IfThenElse (Or x y) one zero
-fromBool (Xor x y) = IfThenElse (Xor x y) one zero
-fromBool (BEq x y) = IfThenElse (BEq x y) one zero
-fromBool (IfThenElse p x y) = IfThenElse p (fromBool x) (fromBool y)
+fromBool = ToNum
 
 toBool :: GaloisField n => Expr 'Num n -> Expr 'Bool n
-toBool (Val (Number 0)) = false
-toBool (Val (Number _)) = true
-toBool (Var (Variable n)) = Var (Variable n)
-toBool (Add x y) = Add x y `neq` 0
-toBool (Sub x y) = Sub x y `neq` 0
-toBool (Mul x y) = Mul x y `neq` 0
-toBool (Div x y) = Div x y `neq` 0
-toBool (IfThenElse p x y) = IfThenElse p (toBool x) (toBool y)
+toBool = ToBool 
