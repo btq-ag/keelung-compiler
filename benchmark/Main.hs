@@ -122,6 +122,20 @@ compileAndOptimise setup =
           ]
       ]
 
+keelungOnly :: Setup GF181 -> [Benchmark]
+keelungOnly setup =
+  let keelung = Keelung.aggregateSignature setup
+      input = genInputFromSetup setup
+   in [ 
+        bench "Elaboration" $ nf Keelung.benchElaborate keelung,
+        bench "Interpretation" $ nf (Keelung.benchInterpret keelung) input,
+        bench "Type Erasure" $ nf Keelung.benchEraseType keelung,
+        bench "Constant Propagation" $ nf Keelung.benchPropogateConstant keelung,
+        bench "Compilation" $ nf Keelung.benchCompile keelung,
+        bench "Optimisation" $ nf Keelung.benchOptimise keelung,
+        bench "Partial Evaluation" $ nf (Keelung.benchOptimiseWithInput keelung) input
+      ]
+
 run :: IO ()
 run = do
   let dimension = 128
@@ -134,7 +148,8 @@ run = do
           }
   let setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
 
-  defaultMain (benchmarks setup)
+  defaultMain (keelungOnly setup)
+  -- defaultMain (benchmarks setup)
   -- defaultMain (compileAndOptimise setup)
 
 main :: IO ()
