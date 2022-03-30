@@ -13,13 +13,13 @@ module Keelung.Syntax.Untyped
   )
 where
 
-import Control.Monad.Writer
+import Control.Monad.State.Strict
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Keelung.Monad as T
 import qualified Keelung.Syntax as T
-import Keelung.Util
 import Keelung.Syntax.Common
+import Keelung.Util
 
 --------------------------------------------------------------------------------
 
@@ -107,13 +107,7 @@ instance Functor Assignment where
 --------------------------------------------------------------------------------
 
 -- monad for collecting boolean vars along the way
-type M = Writer IntSet
-
--- eraseType :: (Erase ty, Num n) => T.Expr ty n -> (Expr n, IntSet)
--- eraseType = runWriter . eraseExpr
-
--- eraseTypeFromAssignments :: (Erase ty, Num n) => [T.Assignment ty n] -> ([Assignment n], IntSet)
--- eraseTypeFromAssignments = runWriter . mapM eraseAssignment
+type M = State IntSet
 
 --------------------------------------------------------------------------------
 
@@ -135,10 +129,10 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) wh
   show (TypeErased expr assignments numOfVars inputVars boolVars) =
     "TypeErased {\n\
     \  expression: "
-      <> show (fmap DebugGF expr) 
+      <> show (fmap DebugGF expr)
       <> "\n"
       <> ( if length assignments < 20
-             then "  assignments:\n" <> show assignments  <> "\n"
+             then "  assignments:\n" <> show assignments <> "\n"
              else ""
          )
       <> "  number of variables: "
@@ -153,7 +147,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) wh
 
 eraseType :: (Erase ty, Num n) => T.Elaborated ty n -> TypeErased n
 eraseType (T.Elaborated expr numAssignments boolAssignments numOfVars inputVars) =
-  let ((erasedExpr', erasedAssignments'), booleanVars) = runWriter $ do
+  let ((erasedExpr', erasedAssignments'), booleanVars) = flip runState mempty $ do
         expr' <- eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAssignments
         boolAssignments' <- mapM eraseAssignment boolAssignments
@@ -191,7 +185,7 @@ instance Erase 'T.Bool where
       (T.Boolean True) -> return (Val 1)
       (T.Boolean False) -> return (Val 0)
     T.Var (T.Variable var) -> do
-      tell (IntSet.singleton var)
+      modify' $ \st -> IntSet.insert var st
       return (Var var)
     T.Eq x y -> chainExprs Eq <$> eraseExpr x <*> eraseExpr y
     T.And x y -> chainExprs And <$> eraseExpr x <*> eraseExpr y
@@ -201,7 +195,7 @@ instance Erase 'T.Bool where
     T.IfThenElse b x y -> IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
     T.ToBool x -> eraseExpr x
   eraseAssignment (T.Assignment (T.Variable var) expr) = do
-    tell (IntSet.singleton var)
+    modify' $ \st -> IntSet.insert var st
     Assignment var <$> eraseExpr expr
 
 -- Flatten and chain expressions together when possible
