@@ -34,8 +34,7 @@ module Keelung.Monad
 where
 
 import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Writer
+import Control.Monad.State.Strict
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -48,16 +47,13 @@ import Keelung.Util
 --------------------------------------------------------------------------------
 
 -- The monad
-type M n =
-  WriterT
-    [Assignment 'Num n]
-    (WriterT [Assignment 'Bool n] (StateT (Env n) (Except String)))
+type M n = StateT (Env n) (Except String)
 
 type Comp ty n = M n (Expr ty n)
 
 -- how to run the monad
-runM :: Env n -> M n a -> Either String (((a, [Assignment 'Num n]), [Assignment 'Bool n]), Env n)
-runM st p = runExcept (runStateT (runWriterT (runWriterT p)) st)
+runM :: Env n -> M n a -> Either String (a, Env n)
+runM st p = runExcept (runStateT p st)
 
 -- internal function for generating one fresh variable
 freshVar :: M n Int
@@ -97,14 +93,14 @@ class Proper ty where
   arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp 'Bool n
 
 instance Proper 'Num where
-  assign var e = tell [Assignment var e]
+  assign var e = modify' $ \st -> st {envNumAssignments = Assignment var e : envNumAssignments st}
   arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
     a <- access xs i
     b <- access ys i
     return (Var a `Eq` Var b)
 
 instance Proper 'Bool where
-  assign var e = lift $ tell [Assignment var e]
+  assign var e = modify' $ \st -> st {envBoolAssignments = Assignment var e : envBoolAssignments st}
   arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
     a <- access xs i
     b <- access ys i
@@ -112,7 +108,7 @@ instance Proper 'Bool where
 
 --------------------------------------------------------------------------------
 
-data Env a = Env
+data Env n = Env
   { -- Counr for generating fresh variables
     envNexVariable :: Int,
     -- Counr for allocating fresh heap addresses
@@ -120,7 +116,9 @@ data Env a = Env
     -- Variables marked as inputs
     envInpuVariables :: IntSet,
     -- Heap for arrays
-    envHeap :: Heap
+    envHeap :: Heap,
+    envNumAssignments :: [Assignment 'Num n],
+    envBoolAssignments :: [Assignment 'Bool n]
   }
   deriving (Show)
 
@@ -144,7 +142,11 @@ instance Functor (Assignment ty) where
 -- | Computation elaboration
 elaborate :: Comp ty n -> Either String (Elaborated ty n)
 elaborate prog = do
-  (((expr, numAssignments), boolAssignments), env) <- runM (Env 0 0 mempty mempty) prog
+  (expr, env) <- runM (Env 0 0 mempty mempty mempty mempty) prog
+  let numAssignments = envNumAssignments env
+  let boolAssignments = envBoolAssignments env
+
+  -- (((expr, numAssignments), boolAssignments), env) <- runM (Env 0 0 mempty mempty) prog
   return $ Elaborated expr numAssignments boolAssignments (envNexVariable env) (envInpuVariables env)
 
 -- | The result of elaborating a computation
