@@ -11,10 +11,11 @@ import qualified AggregateSignature.Program.Keelung as Keelung
 
 import qualified AggregateSignature.Program.Snarkl as Snarkl
 import AggregateSignature.Util
-import qualified Benchmark.Snarkl as Snarkl
 import qualified Benchmark.Keelung as Keelung
+import qualified Benchmark.Snarkl as Snarkl
 import Criterion.Main
 import Keelung (GF181)
+import qualified Snarkl
 
 -- import qualified Snarkl
 -- import Snarkl.Common (GF181)
@@ -74,34 +75,57 @@ benchmarks :: Setup GF181 -> [Benchmark]
 benchmarks setup =
   let snarkl = Snarkl.aggregateSignature setup
       keelung = Keelung.aggregateSignature setup
-   in [ --    bgroup
-        --       "Interpretation"
-        --       [ bench "Snarkl" $ nf Snarkl.interpret snarkl,
-        --         bench "Keelung" $ nf Keelung.interpret keelung
-        --       ],
+      input = genInputFromSetup setup
+   in [ 
         bgroup
           "Elaboration"
           [ bench "Snarkl" $ nf Snarkl.benchElaborate snarkl,
             bench "Keelung" $ nf Keelung.benchElaborate keelung
+          ],
+        bgroup
+          "Interpretation"
+          [ bench "Snarkl" $ nf (Snarkl.interpret snarkl) input,
+            bench "Keelung" $ nf (Keelung.benchInterpret keelung) input
+          ],
+        bgroup
+          "Type Erasure"
+          [ bench "Snarkl" $ nf Snarkl.benchEraseType snarkl,
+            bench "Keelung" $ nf Keelung.benchEraseType keelung
+          ],
+        bgroup
+          "Compilation"
+          [ bench "Snarkl (with Constant Propagation)" $ nf Snarkl.benchCompile snarkl,
+            bench "Keelung (only Constant Propagation)" $ nf Keelung.benchPropogateConstant keelung,
+            bench "Keelung (only Compilation)" $ nf Keelung.benchCompile keelung
+          ],
+        bgroup
+          "Optimisation"
+          [ bench "Snarkl" $ nf Snarkl.benchOptimise snarkl,
+            bench "Keelung" $ nf Keelung.benchOptimise keelung,
+            bench "Keelung (partial evaluation)" $ nf (Keelung.benchOptimiseWithInput keelung) input
           ]
-            ,
-          bgroup
-            "Type Erasure"
-            [ bench "Snarkl" $ nf Snarkl.benchEraseType snarkl,
-              bench "Keelung" $ nf Keelung.benchEraseType keelung
-            ]
-          --   ,
-          -- bgroup
-          --   "Compilation"
-          --   [ bench "Snarkl" $ nfIO $ Snarkl.benchCompile snarkl,
-          --     bench "Keelung" $ nfIO $ Keelung.benchCompile keelung
-          --   ]
+      ]
+
+compileAndOptimise :: Setup GF181 -> [Benchmark]
+compileAndOptimise setup =
+  let 
+      -- snarkl = Snarkl.aggregateSignature setup
+      keelung = Keelung.aggregateSignature setup
+      -- input = genInputFromSetup setup
+   in [ bgroup
+          "Optimisation"
+          [ 
+            -- bench "Snarkl" $ nf Snarkl.benchOptimise snarkl,
+            bench "Keelung" $ nf Keelung.benchOptimise keelung
+            -- ,
+            -- bench "Keelung (partial evaluation)" $ nf (Keelung.benchOptimiseWithInput keelung) input
+          ]
       ]
 
 run :: IO ()
 run = do
-  let dimension = 512
-  let numberOfSignatures = 2
+  let dimension = 128
+  let numberOfSignatures = 4
   let settings =
         Settings
           { enableAggSigChecking = True,
@@ -111,6 +135,7 @@ run = do
   let setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
 
   defaultMain (benchmarks setup)
+  -- defaultMain (compileAndOptimise setup)
 
 main :: IO ()
 main = run

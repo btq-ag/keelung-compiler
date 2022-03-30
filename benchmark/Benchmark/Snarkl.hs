@@ -4,7 +4,6 @@ module Benchmark.Snarkl where
 
 import Data.Foldable (toList)
 import qualified Data.IntMap.Lazy as IntMap
-import qualified Data.Set as Set
 import Data.Typeable
 import GHC.IO.Exception
 import Snarkl hiding (return)
@@ -43,18 +42,17 @@ benchEraseType = extract_rat . eraseType . lastSeq . elabTExp . elaborate
       EUnit -> 7
 
 -- Just compile to constraints (no simplification yet).
-benchCompile :: (Typeable ty, GaloisField a, Serialize a) => Comp ty a -> IO [String]
+benchCompile :: (Typeable ty, GaloisField a, Serialize a) => Comp ty a -> [String]
 benchCompile prog = do
   let constraints =
         cs_constraints $
           compile $
             Snarkl.elaborate prog
-  putStrLn $ "Number of constraints: " ++ show (Set.size constraints)
-  return $ map serialize $ toList constraints
+    in map serialize $ toList constraints
 
 -- Compile to constraints and simplify.
-benchSimplify :: (Typeable ty, GaloisField a, Serialize a) => Comp ty a -> [String]
-benchSimplify =
+benchOptimise :: (Typeable ty, GaloisField a, Serialize a) => Comp ty a -> [String]
+benchOptimise =
   map serialize . toList . cs_constraints . snd
     . simplifyConstrantSystem False IntMap.empty
     . compile
