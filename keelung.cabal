@@ -121,6 +121,8 @@ benchmark keelung-bench
       Keelung.Syntax.Common
       Keelung.Syntax.Untyped
       Keelung.Util
+      Benchmark.Keelung
+      Benchmark.Snarkl
       AggregateSignature.Program.Keelung
       AggregateSignature.Program.Snarkl
       AggregateSignature.Util

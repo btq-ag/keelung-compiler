@@ -1,16 +1,21 @@
 module Main where
 
--- import qualified AggregateSignature.Program.Keelung as Keelung
--- import qualified AggregateSignature.Program.Snarkl as Snarkl
--- import AggregateSignature.Util
+import qualified AggregateSignature.Program.Keelung as Keelung
 -- -- import qualified Benchmark.Keelung as Keelung
 -- -- import qualified Benchmark.Snarkl as Snarkl
--- import Criterion.Main
+
 -- import Data.Data (Typeable)
 -- import qualified Example.Snarkl.Keccak as Keccak
 -- import qualified Example.Snarkl.List as List
 -- import qualified Example.Snarkl.Matrix as Matrix
--- import qualified Keelung
+
+import qualified AggregateSignature.Program.Snarkl as Snarkl
+import AggregateSignature.Util
+import qualified Benchmark.Snarkl as Snarkl
+import qualified Benchmark.Keelung as Keelung
+import Criterion.Main
+import Keelung (GF181)
+
 -- import qualified Snarkl
 -- import Snarkl.Common (GF181)
 -- import Snarkl.Compile (SimplParam (..))
@@ -65,45 +70,47 @@ module Main where
 --       2048215153250
 --   ]
 
--- benchmarks :: Setup GF181 -> [Benchmark]
--- benchmarks setup =
---   let snarkl = Snarkl.aggregateSignature setup
---       keelung = Keelung.aggregateSignature setup
---    in [ bgroup
---           "Interpretation"
---           [ bench "Snarkl" $ nf Snarkl.interpret snarkl,
---             bench "Keelung" $ nf Keelung.interpret keelung
---           ],
---         bgroup
---           "Elaboration"
---           [ bench "Snarkl" $ nf Snarkl.benchElaborate snarkl,
---             bench "Keelung" $ nf Keelung.benchElaborate keelung
---           ],
---         bgroup
---           "Compilation"
---           [ bench "Snarkl" $ nfIO $ Snarkl.benchCompile snarkl,
---             bench "Keelung" $ nfIO $ Keelung.benchCompile keelung
---           ]
---       ]
+benchmarks :: Setup GF181 -> [Benchmark]
+benchmarks setup =
+  let snarkl = Snarkl.aggregateSignature setup
+      keelung = Keelung.aggregateSignature setup
+   in [ --    bgroup
+        --       "Interpretation"
+        --       [ bench "Snarkl" $ nf Snarkl.interpret snarkl,
+        --         bench "Keelung" $ nf Keelung.interpret keelung
+        --       ],
+        bgroup
+          "Elaboration"
+          [ bench "Snarkl" $ nf Snarkl.benchElaborate snarkl,
+            bench "Keelung" $ nf Keelung.benchElaborate keelung
+          ]
+            ,
+          bgroup
+            "Type Erasure"
+            [ bench "Snarkl" $ nf Snarkl.benchEraseType snarkl,
+              bench "Keelung" $ nf Keelung.benchEraseType keelung
+            ]
+          --   ,
+          -- bgroup
+          --   "Compilation"
+          --   [ bench "Snarkl" $ nfIO $ Snarkl.benchCompile snarkl,
+          --     bench "Keelung" $ nfIO $ Keelung.benchCompile keelung
+          --   ]
+      ]
 
--- run :: IO ()
--- run = do
---   let dimension = 20
---   let numberOfSignatures = 20
---   let settings =
---         Settings
---           { enableAggSigChecking = True,
---             enableBitStringChecking = True,
---             enableBitValueChecking = True,
---             enableSigSquareChecking = True,
---             enableSigLengthChecking = True
---           }
---   let setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
+run :: IO ()
+run = do
+  let dimension = 512
+  let numberOfSignatures = 2
+  let settings =
+        Settings
+          { enableAggSigChecking = True,
+            enableSigSizeChecking = True,
+            enableSigLengthChecking = True
+          }
+  let setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
 
---   defaultMain (benchmarks setup)
-
--- main :: IO ()
--- main = run
+  defaultMain (benchmarks setup)
 
 main :: IO ()
-main = return ()
+main = run
