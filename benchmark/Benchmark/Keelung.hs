@@ -1,77 +1,60 @@
 {-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use <&>" #-}
 {-# LANGUAGE BangPatterns #-}
 
 module Benchmark.Keelung where
 
 import Keelung
-import qualified Keelung.Syntax.Untyped as Untyped
 import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
 
-benchElaborate :: Comp ty a -> Int
-benchElaborate prog = case elaborate prog of
-  Left _ -> -1
-  Right elab -> toNumber $ elabExpr elab
-  where
-    toNumber :: Expr ty a -> Int
-    toNumber !te = case te of
-      Val _ -> 0
-      Var _ -> 1
-      Add _ _-> 2
-      Sub _ _-> 3
-      Mul _ _-> 4
-      Div _ _-> 5
-      Eq _ _-> 6
-      And _ _-> 7
-      Or _ _-> 8
-      Xor _ _-> 9
-      BEq _ _-> 10
-      IfThenElse {} -> 11
-      ToBool _ -> 12
-      ToNum _ -> 13
+benchElaborate :: (GaloisField a, Bounded a, Integral a) => Comp ty a -> Int
+benchElaborate prog =
+  case elaborate prog of
+    Left _ -> -1
+    Right elab -> toNumber $ elabExpr elab
+      where
+        toNumber :: Expr ty a -> Int
+        toNumber !te = case te of
+          Val _ -> 0
+          Var _ -> 1
+          Add _ _ -> 2
+          Sub _ _ -> 3
+          Mul _ _ -> 4
+          Div _ _ -> 5
+          Eq _ _ -> 6
+          And _ _ -> 7
+          Or _ _ -> 8
+          Xor _ _ -> 9
+          BEq _ _ -> 10
+          IfThenElse {} -> 11
+          ToBool _ -> 12
+          ToNum _ -> 13
 
 benchInterpret :: (Show a, GaloisField a) => Comp ty a -> [a] -> String
-benchInterpret prog input = 
+benchInterpret prog input =
   show $ elaborate prog >>= \elab -> interpret elab input
 
-benchEraseType :: (Erase ty, Num a) => Comp ty a -> Int
-benchEraseType prog = case elaborate prog of
-  Left _ -> -1
-  Right elab -> toNumber $ erasedExpr $  eraseType elab
-  where
-    toNumber :: Untyped.Expr a -> Int
-    toNumber !te = case te of
-      Untyped.Var _ -> 0
-      Untyped.Val _ -> 1
-      Untyped.BinOp _ _ -> 2
-      Untyped.IfThenElse {} -> 3
-      
+benchEraseType :: (Erase ty, Num a, Show a, Bounded a, Integral a, Fractional a) => Comp ty a -> String
+benchEraseType prog =
+  show $ elaborate prog >>= return . eraseType
 
-benchPropogateConstant :: (GaloisField a, Bounded a, Integral a, Erase ty) => Comp ty a -> Int 
-benchPropogateConstant prog = case elaborate prog of
-  Left _ -> -1 
-  Right elab -> toNumber $ erasedExpr $ ConstantPropagation.run $ eraseType elab
-  where
-    toNumber :: Untyped.Expr a -> Int
-    toNumber !te = case te of
-      Untyped.Var _ -> 0
-      Untyped.Val _ -> 1
-      Untyped.BinOp _ _ -> 2
-      Untyped.IfThenElse {} -> 3
+benchPropogateConstant :: (GaloisField a, Bounded a, Integral a, Erase ty) => Comp ty a -> String
+benchPropogateConstant prog =
+  show $ elaborate prog >>= return . ConstantPropagation.run . eraseType
 
 benchCompile :: (GaloisField a, Bounded a, Integral a, Erase ty) => Comp ty a -> String
-benchCompile prog = case elaborate prog of
-  Left _ -> ""
-  Right elab -> show $ compile $ eraseType elab
+benchCompile prog =
+  show $ elaborate prog >>= return . compile . eraseType
 
 benchOptimise :: (GaloisField a, Bounded a, Integral a, Erase ty) => Comp ty a -> String
-benchOptimise prog = case elaborate prog of
-  Left _ -> ""
-  Right elab -> show $ optimise $ compile $ ConstantPropagation.run $ eraseType elab
+benchOptimise prog =
+  show $ elaborate prog >>= return . optimise . compile . ConstantPropagation.run . eraseType
 
 benchOptimiseWithInput :: (GaloisField a, Bounded a, Integral a, Erase ty) => Comp ty a -> [a] -> String
-benchOptimiseWithInput prog input = case elaborate prog of
-  Left _ -> ""
-  Right elab -> show $ optimiseWithInput input $ compile $ ConstantPropagation.run $ eraseType elab
+benchOptimiseWithInput prog input =
+  show $ elaborate prog >>= return . optimiseWithInput input . compile . ConstantPropagation.run . eraseType
 
 -- -- This function "executes" the comp two ways, once by interpreting
 -- -- the resulting TExp and second by interpreting the resulting circuit

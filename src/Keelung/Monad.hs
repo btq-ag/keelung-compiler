@@ -152,14 +152,14 @@ elaborate prog = do
 -- | The result of elaborating a computation
 data Elaborated ty n = Elaborated
   { -- | The resulting 'Expr'
-    elabExpr :: Expr ty n,
+    elabExpr :: !(Expr ty n),
     -- | Assignements
-    elabNumAssignments :: [Assignment 'Num n],
-    elabBoolAssignments :: [Assignment 'Bool n],
+    elabNumAssignments :: ![Assignment 'Num n],
+    elabBoolAssignments :: ![Assignment 'Bool n],
     -- | The number of variables
-    elabNumOfVars :: Int,
+    elabNumOfVars :: !Int,
     -- | Variables marked as inputs
-    elabInpuVars :: IntSet
+    elabInpuVars :: !IntSet
   }
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where

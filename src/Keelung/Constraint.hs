@@ -65,10 +65,10 @@ varsInConstraints = IntSet.unions . map varsInConstraint . Set.toList
 
 -- | Constraint System
 data ConstraintSystem n = ConstraintSystem
-  { csConstraints :: Set (Constraint n),
-    csNumOfVars :: Int,
-    csInputVars :: IntSet,
-    csOutputVar :: Var
+  { csConstraints :: !(Set (Constraint n)),
+    csNumOfVars :: !Int,
+    csInputVars :: !IntSet,
+    csOutputVar :: !Var
   }
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem n) where

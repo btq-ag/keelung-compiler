@@ -120,15 +120,15 @@ type M = Writer IntSet
 -- | The result after type erasure
 data TypeErased n = TypeErased
   { -- | The expression after type erasure
-    erasedExpr :: Expr n,
+    erasedExpr :: !(Expr n),
     -- | Assignments after type erasure
-    erasedAssignments :: [Assignment n],
+    erasedAssignments :: ![Assignment n],
     -- | Number of variables
-    erasedNumOfVars :: Int,
+    erasedNumOfVars :: !Int,
     -- | Variables marked as inputs
-    erasedInputVars :: IntSet,
+    erasedInputVars :: !IntSet,
     -- | Variables that are boolean
-    erasedBooleanVars :: IntSet
+    erasedBooleanVars :: !IntSet
   }
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) where
