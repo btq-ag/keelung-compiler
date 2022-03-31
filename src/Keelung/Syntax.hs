@@ -129,6 +129,26 @@ instance GaloisField n => Fractional (Expr 'Num n) where
 
 --------------------------------------------------------------------------------
 
+-- calculate the "size" of an expression
+sizeOfExpr :: Expr ty n -> Int 
+sizeOfExpr expr = case expr of 
+  Val _ -> 1 
+  Var _ -> 1 
+  Add x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Sub x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Mul x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Div x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Eq x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  And x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Or x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  Xor x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  BEq x y -> 1 + sizeOfExpr x + sizeOfExpr y
+  IfThenElse x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+  ToBool x -> 1 + sizeOfExpr x
+  ToNum x -> 1 + sizeOfExpr x
+  
+--------------------------------------------------------------------------------
+
 true :: Expr 'Bool n
 true = Val (Boolean True)
 

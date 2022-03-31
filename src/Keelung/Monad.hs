@@ -146,7 +146,6 @@ elaborate prog = do
   let numAssignments = envNumAssignments env
   let boolAssignments = envBoolAssignments env
 
-  -- (((expr, numAssignments), boolAssignments), env) <- runM (Env 0 0 mempty mempty) prog
   return $ Elaborated expr numAssignments boolAssignments (envNexVariable env) (envInpuVariables env)
 
 -- | The result of elaborating a computation
@@ -159,7 +158,7 @@ data Elaborated ty n = Elaborated
     -- | The number of variables
     elabNumOfVars :: !Int,
     -- | Variables marked as inputs
-    elabInpuVars :: !IntSet
+    elabInputVars :: !IntSet
   }
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where

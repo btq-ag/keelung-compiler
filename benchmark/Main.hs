@@ -163,18 +163,18 @@ complexityOfElaboration =
 
 run :: IO ()
 run = do
-  -- let dimension = 128
-  -- let numberOfSignatures = 4
-  -- let settings =
-  --       Settings
-  --         { enableAggSigChecking = True,
-  --           enableSigSizeChecking = True,
-  --           enableSigLengthChecking = True
-  --         }
-  -- let setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
+  let dimension = 128
+  let numberOfSignatures = 4
+  let settings =
+        Settings
+          { enableAggSigChecking = True,
+            enableSigSizeChecking = True,
+            enableSigLengthChecking = True
+          }
+  let setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
 
-  defaultMain complexityOfElaboration
-  -- defaultMain (keelungOnly setup)
+  -- defaultMain complexityOfElaboration
+  defaultMain (keelungOnly setup)
   -- defaultMain (benchmarks setup)
   -- defaultMain (compileAndOptimise setup)
 
