@@ -22,43 +22,6 @@ import qualified Snarkl
 -- import Snarkl.Common (GF181)
 -- import Snarkl.Compile (SimplParam (..))
 
--- snarkl ::
---   (Typeable ty) =>
---   String ->
---   Snarkl.Comp ty GF181 ->
---   [GF181] ->
---   GF181 ->
---   Benchmark
--- snarkl name prog inputs result =
---   bgroup
---     name
---     [ bench (name ++ " interpret") $ nf Snarkl.interpret prog,
---       bench (name ++ " elaborate") $ nf Snarkl.benchElaborate prog,
---       bench (name ++ "-constraints") $ nfIO $ Snarkl.benchCompile prog
---       -- bench (name ++ "-simplify") $ nf Snarkl.simplify prog,
---       -- bench (name ++ "-r1cs") $ nf (Snarkl.serialize . Snarkl.compileToR1CS Simplify) prog,
---       -- bench (name ++ "-witgen") $ nf (Snarkl.witgen Simplify prog) inputs,
---       -- bench (name ++ "-full") $ nf (Snarkl.compareWithResult Simplify prog inputs) result
---     ]
-
--- keelung ::
---   (Typeable ty) =>
---   String ->
---   Keelung.Comp ty GF181 ->
---   [GF181] ->
---   GF181 ->
---   Benchmark
--- keelung name prog inputs result =
---   bgroup
---     name
---     [ bench (name ++ " interpret") $ nf Keelung.interpret prog,
---       bench (name ++ " elaborate") $ nf Keelung.benchElaborate prog,
---       bench (name ++ "-constraints") $ nfIO $ Keelung.benchCompile prog
---       -- bench (name ++ "-simplify") $ nf Keelung.simplify prog,
---       -- bench (name ++ "-r1cs") $ nf (Snarkl.serialize . Keelung.compileToR1CS Simplify) prog,
---       -- bench (name ++ "-witgen") $ nf (Keelung.witgen Simplify prog) inputs,
---       -- bench (name ++ "-full") $ nf (Keelung.compareWithResult Simplify prog inputs) result
---     ]
 
 -- oldBenchmarks :: [Benchmark]
 -- oldBenchmarks =
@@ -179,4 +142,4 @@ run = do
   -- defaultMain (compileAndOptimise setup)
 
 main :: IO ()
-main = run
+main = run 

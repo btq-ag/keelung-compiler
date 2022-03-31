@@ -8,7 +8,6 @@ module Basic where
 
 import qualified AggregateSignature.Program.Keelung as Keelung
 import AggregateSignature.Util
-import qualified Data.IntMap as IntMap
 import qualified Data.Set as Set
 import Keelung
 import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
@@ -102,7 +101,7 @@ bench program settings dimension n = do
   let input = genInputFromSetup (makeSetup dimension n 42 settings)
   cs <- comp program -- before optimisation (only constant propagation)
   cs' <- optm program -- after optimisation (constant propagation + constraint set reduction)
-  (_, cs'') <- optmWithInput program input -- after optimisation (constant propagation + constraint set reduction with input)
+  cs'' <- optmWithInput program input -- after optimisation (constant propagation + constraint set reduction with input)
   return (Set.size (csConstraints cs), Set.size (csConstraints cs'), Set.size (csConstraints cs''))
 
 -- #1
@@ -137,23 +136,6 @@ runCheckLength dimension n = do
 
 --------------------------------------------------------------------------------
 
--- elaborate & erase type
-elab :: (Erase ty, Num n) => Comp ty n -> Either String (TypeErased n)
-elab program = fmap eraseType (elaborate program)
-
 -- elaborate & erase type & propagate constants
 cp :: (Erase ty, Num n) => Comp ty n -> Either String (TypeErased n)
 cp program = ConstantPropagation.run <$> elab program
-
-comp :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
-comp program = elaborate program >>= return . compile . ConstantPropagation.run . eraseType
-
-optm :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
-optm program = optimise <$> comp program
-
--- partial evaluation with inputs
-optmWithInput :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp ty n -> [n] -> Either String ([(Var, DebugGF n)], ConstraintSystem n)
-optmWithInput program input = do
-  cs <- optm program
-  let (witness', cs') = optimiseWithInput input cs
-  return (IntMap.toList $ fmap DebugGF witness', cs')
