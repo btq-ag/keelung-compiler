@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 module Main where
 
 import qualified AggregateSignature.Program.Keelung as Keelung
@@ -14,7 +15,7 @@ import AggregateSignature.Util
 import qualified Benchmark.Keelung as Keelung
 import qualified Benchmark.Snarkl as Snarkl
 import Criterion.Main
-import Keelung (GF181)
+import Keelung (GF181, Type (..), Comp)
 import qualified Snarkl
 
 -- import qualified Snarkl
@@ -136,19 +137,44 @@ keelungOnly setup =
         bench "Partial Evaluation" $ nf (Keelung.benchOptimiseWithInput keelung) input
       ]
 
+complexityOfElaboration :: [Benchmark]
+complexityOfElaboration =
+      [ 
+        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 8 4),
+        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 16 4),
+        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 32 4),
+        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 64 4),
+        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 128 4),
+        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 256 4)
+      ]
+
+  where 
+    makeKeelung :: Int -> Int -> Keelung.Comp 'Keelung.Bool GF181
+    makeKeelung dimension numberOfSignatures = 
+      let settings =
+            Settings
+              { enableAggSigChecking = True,
+                enableSigSizeChecking = True,
+                enableSigLengthChecking = True
+              }
+          setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
+          -- input = genInputFromSetup setup
+      in  Keelung.aggregateSignature setup
+
 run :: IO ()
 run = do
-  let dimension = 128
-  let numberOfSignatures = 4
-  let settings =
-        Settings
-          { enableAggSigChecking = True,
-            enableSigSizeChecking = True,
-            enableSigLengthChecking = True
-          }
-  let setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
+  -- let dimension = 128
+  -- let numberOfSignatures = 4
+  -- let settings =
+  --       Settings
+  --         { enableAggSigChecking = True,
+  --           enableSigSizeChecking = True,
+  --           enableSigLengthChecking = True
+  --         }
+  -- let setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
 
-  defaultMain (keelungOnly setup)
+  defaultMain complexityOfElaboration
+  -- defaultMain (keelungOnly setup)
   -- defaultMain (benchmarks setup)
   -- defaultMain (compileAndOptimise setup)
 
