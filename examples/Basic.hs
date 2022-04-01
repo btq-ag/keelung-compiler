@@ -70,29 +70,17 @@ checkSig dimension n = do
   actualAggSig <- Keelung.computeAggregateSignature publicKey signatures
   arrayEq dimension expectedAggSig actualAggSig
 
--- checkBitBoolean :: Int -> Int -> [GF181]
--- checkBitBoolean dimension n =
---   let settings = Settings False False True False False
---       setup = makeSetup dimension n 42 settings
---   in  genInputFromSetup setup
-
 -- #2
 checkSigSize :: Int -> Int -> Comp 'Bool GF181
 checkSigSize dimension n = do
   let settings = Settings False True False
-  let Setup _ _ _ signatures _ _ = makeSetup dimension n 42 settings
-  sigBitStrings <- freshInputs3 n dimension 14
-  Keelung.checkSignaturesBitStringSize dimension signatures sigBitStrings
+  Keelung.checkSize $ makeSetup dimension n 42 settings
 
+-- #3
 checkSigLength :: Int -> Int -> Comp 'Bool GF181
 checkSigLength dimension n = do
   let settings = Settings False False True
-  let Setup _ _ _ signatures _ _ = makeSetup dimension n 42 settings
-  sigSquares <- freshInputs2 n dimension
-  sigLengths <- freshInputs n
-  squaresOk <- Keelung.checkSquares n dimension signatures sigSquares
-  lengthsOk <- Keelung.checkLength n dimension sigSquares sigLengths
-  return $ squaresOk `And` lengthsOk
+  Keelung.checkLength $ makeSetup dimension n 42 settings
 
 --------------------------------------------------------------------------------
 
