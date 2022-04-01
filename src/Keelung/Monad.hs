@@ -36,8 +36,8 @@ where
 import Control.Monad.Except
 import Control.Monad.State.Strict
 import Data.Field.Galois (GaloisField)
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Keelung.Syntax
