@@ -51,7 +51,7 @@ snarklConstraints = do
             enableSigLengthChecking = True
           }
   let setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
-  let input = genInputFromSetup setup
+  -- let input = genInputFromSetup setup
   
   let aggSig = Snarkl.aggregateSignature setup
   let constraints =

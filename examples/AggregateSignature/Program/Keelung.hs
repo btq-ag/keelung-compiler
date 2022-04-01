@@ -7,6 +7,7 @@ module AggregateSignature.Program.Keelung where
 
 import AggregateSignature.Util
 import Keelung
+import Data.Array
 
 -- ensure that a signature is smaller than 16384 (target: 12289)
 checkSignaturesBitStringSize :: (GaloisField n, Integral n) => Int -> [Signature n] -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp 'Bool n 
@@ -18,12 +19,12 @@ checkSignaturesBitStringSize dimension signatures bitStringss =
       everyM [0 .. dimension - 1] (checkSignatureTerm signature i)
 
     checkSignatureTerm signature i j = do
-      let term = signature !! j
-      total <- reduce 0 [0 .. 13] $ \accum k -> do
+      let term = signature ! j
+      total <- reduce 0 [0 .. 13] $ \acc k -> do
         bit <- access3 bitStringss (i, j, k)
         let bitValue = fromIntegral (2 ^ k :: Integer)
         let prod = fromBool (Var bit) * bitValue
-        return (accum + prod)
+        return (acc + prod)
       return (fromIntegral term `Eq` total)
 
 -- ensure that a signature's bitstring is really made of bits (either 1 or 0)
@@ -45,14 +46,14 @@ computeAggregateSignature publicKey signatures = do
   actualAggSig <- allocate dimension
   -- for shifting the public key
   loop [0 .. dimension - 1] $ \i -> do
-    let shiftedPublicKey = shiftPublicKeyBy i publicKey
+    let shiftedPublicKey = shiftPublicKeyBy dimension i publicKey
     -- for each signature
-    total <- reduce 0 signatures $ \accum signature -> do
-      reduce accum [0 .. dimension - 1] $ \accum' k -> do
-        let pk = shiftedPublicKey !! k
-        let sig = signature !! k
+    total <- reduce 0 signatures $ \acc signature -> do
+      reduce acc [0 .. dimension - 1] $ \acc' k -> do
+        let pk = shiftedPublicKey ! k
+        let sig = signature ! k
         let prod = pk * sig
-        return (accum' + fromIntegral prod)
+        return (acc' + fromIntegral prod)
     update actualAggSig i total
   return actualAggSig
 
@@ -63,7 +64,7 @@ checkSquares numberOfSignatures dimension signatures sigSquares = do
     let signature = signatures !! i
     -- for each term of signature
     everyM [0 .. dimension - 1] $ \j -> do
-      let term = fromIntegral (signature !! j)
+      let term = fromIntegral (signature ! j)
       square <- access2 sigSquares (i, j)
       return (Var square `Eq` (term * term))
 
@@ -73,9 +74,9 @@ checkLength numberOfSignatures dimension sigSquares sigLengths = do
   everyM [0 .. numberOfSignatures - 1] $ \i -> do
     expectedLength <- access sigLengths i
     -- for each term of signature
-    actualLength <- reduce 0 [0 .. dimension - 1] $ \accum j -> do
+    actualLength <- reduce 0 [0 .. dimension - 1] $ \acc j -> do
       square <- access2 sigSquares (i, j)
-      return (accum + Var square)
+      return (acc + Var square)
 
     return (Var expectedLength `Eq` actualLength)
 

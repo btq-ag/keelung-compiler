@@ -13,7 +13,7 @@ benchElaborate :: (GaloisField a, Bounded a, Integral a) => Comp ty a -> Int
 benchElaborate prog =
   case elaborate prog of
     Left _ -> -1
-    Right elab -> toNumber $ elabExpr elab
+    Right elaborated -> toNumber $ elabExpr elaborated
       where
         toNumber :: Expr ty a -> Int
         toNumber !te = case te of
@@ -34,7 +34,7 @@ benchElaborate prog =
 
 benchInterpret :: (Show a, GaloisField a) => Comp ty a -> [a] -> String
 benchInterpret prog input =
-  show $ elaborate prog >>= \elab -> interpret elab input
+  show $ elaborate prog >>= \elaborated -> interpret elaborated input
 
 benchEraseType :: (Erase ty, Num a, Show a, Bounded a, Integral a, Fractional a) => Comp ty a -> String
 benchEraseType prog =

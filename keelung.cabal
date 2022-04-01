@@ -46,7 +46,8 @@ library
       src
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      base >=4.7 && <5
+      array
+    , base >=4.7 && <5
     , containers
     , galois-field
     , mtl
@@ -57,6 +58,21 @@ library
 executable keelung-exe
   main-is: Main.hs
   other-modules:
+      Keelung
+      Keelung.Compile
+      Keelung.Constraint
+      Keelung.Constraint.CoeffMap
+      Keelung.Interpret
+      Keelung.Monad
+      Keelung.Optimiser
+      Keelung.Optimiser.ConstantPropagation
+      Keelung.Optimiser.Monad
+      Keelung.Optimiser.UnionFind
+      Keelung.R1CS
+      Keelung.Syntax
+      Keelung.Syntax.Common
+      Keelung.Syntax.Untyped
+      Keelung.Util
       AggregateSignature.Program.Keelung
       AggregateSignature.Program.Snarkl
       AggregateSignature.Util
@@ -64,10 +80,12 @@ executable keelung-exe
       Paths_keelung
   hs-source-dirs:
       app/
+      src/
       examples/
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      base >=4.7 && <5
+      array
+    , base >=4.7 && <5
     , containers
     , galois-field
     , keelung
@@ -91,7 +109,8 @@ test-suite keelung-test
       examples/
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      base >=4.7 && <5
+      array
+    , base >=4.7 && <5
     , containers
     , galois-field
     , hspec
@@ -134,7 +153,8 @@ benchmark keelung-bench
       examples/
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      base >=4.7 && <5
+      array
+    , base >=4.7 && <5
     , containers
     , criterion >=1.0
     , galois-field

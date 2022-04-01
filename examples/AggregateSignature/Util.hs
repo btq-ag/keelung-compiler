@@ -1,5 +1,6 @@
 module AggregateSignature.Util where
 
+import Data.Array
 import Data.Bits (testBit)
 import Data.Field.Galois (GaloisField)
 import Data.Semiring (Semiring (..))
@@ -7,19 +8,19 @@ import System.Random
 
 --------------------------------------------------------------------------------
 
-type Signature a = [a]
+type Signature n = Array Int n
 
-type PublicKey a = [a]
+type PublicKey n = Array Int n
 
 --------------------------------------------------------------------------------
 
 -- | Settings for Aggregate Signature
-data Setup a = Setup
+data Setup n = Setup
   { setupDimension :: Int,
     setupNumberOfSignatures :: Int,
-    setupPublicKey :: PublicKey a,
-    setupSignatures :: [Signature a],
-    setupInputs :: Input a,
+    setupPublicKey :: PublicKey n,
+    setupSignatures :: [Signature n],
+    setupInputs :: Input n,
     setupSettings :: Settings
   }
 
@@ -27,9 +28,9 @@ data Setup a = Setup
 
 -- | Inputs for the system
 data Input a = Input
-  { inputAggSigs :: [a],
+  { inputAggSigs :: Signature a,
     inputSigBitStrings :: [[[a]]],
-    inputSigSquares :: [[a]],
+    inputSigSquares :: [Signature a],
     inputSigLengths :: [a]
   }
 
@@ -42,7 +43,7 @@ data Settings = Settings
 
 --------------------------------------------------------------------------------
 
-makeSetup :: (Random a, GaloisField a, Integral a, Num a) => Int -> Int -> Int -> Settings -> Setup a
+makeSetup :: (Random n, GaloisField n, Integral n, Num n) => Int -> Int -> Int -> Settings -> Setup n
 makeSetup dimension t seed settings =
   Setup
     { setupDimension = dimension,
@@ -54,32 +55,34 @@ makeSetup dimension t seed settings =
     }
   where
     -- NOTE: somehow generating new `StdGen` from IO would result in segmentation fault (possibly due to FFI)
-    publicKey = take dimension $ randoms (mkStdGen seed)
+    publicKey = listArray (0, dimension - 1) $ take dimension $ randoms (mkStdGen seed)
 
     genInts :: Int -> [Int]
     genInts amount = take amount $ randoms (mkStdGen (succ seed))
 
-    signatures = splitEvery dimension $ map (\i -> fromIntegral (i `mod` 12289)) $ genInts (dimension * t)
+    signatures :: Num n => [Signature n]
+    signatures = splitEvery dimension $ map (fromIntegral . (`mod` 12289)) $ genInts (dimension * t)
 
-    aggSigs = map ithSum [0 .. dimension - 1]
+    aggSigs = listArray (0, dimension - 1) $ map ithSum [0 .. dimension - 1]
       where
         ithSum i =
-          let shiftedPublicKey = shiftPublicKeyBy i publicKey
-           in sum $ map (sum . zipWith (*) shiftedPublicKey) signatures
+          let shiftedPublicKey = shiftPublicKeyBy dimension i publicKey
+           in sum $ map (sum . zipWith (*) (elems shiftedPublicKey) . elems) signatures
 
-    bisStrings = map toBitStrings signatures
+    bisStrings = map (toBitStrings . elems) signatures
+
+    toBitStrings :: GaloisField n => [Integer] -> [[n]]
     toBitStrings = map (toListLE . toInteger)
 
     {-# INLINE toListLE #-}
-    toListLE :: GaloisField a => Integer -> [a]
+    toListLE :: GaloisField n => Integer -> [n]
     toListLE b = fmap (toGF . testBit b) [0 .. 13]
 
-    toGF :: GaloisField a => Bool -> a
+    toGF :: GaloisField n => Bool -> n
     toGF True = one
     toGF False = zero
 
-    sigSquares = map (map (\x -> x * x)) signatures
-
+    sigSquares = map (fmap (\x -> x * x)) signatures
     sigLengths = map sum sigSquares
 
 --------------------------------------------------------------------------------
@@ -89,10 +92,10 @@ genInputFromSetup :: Setup a -> [a]
 genInputFromSetup (Setup _ _ _ _ inputs settings) =
   let aggSigs = inputAggSigs inputs
       bitStrings = concat (concat (inputSigBitStrings inputs))
-      sigSquares = concat (inputSigSquares inputs)
+      sigSquares = concatMap elems (inputSigSquares inputs)
       sigLengths = inputSigLengths inputs
    in ( if enableAggSigChecking settings
-          then aggSigs
+          then elems aggSigs
           else []
       )
         <> ( if enableSigSizeChecking settings
@@ -104,9 +107,9 @@ genInputFromSetup (Setup _ _ _ _ inputs settings) =
 
 --------------------------------------------------------------------------------
 
-splitEvery :: Int -> [a] -> [[a]]
-splitEvery _ [] = []
-splitEvery n list = first : splitEvery n rest
+splitEvery :: Int -> [a] -> [Signature a]
+splitEvery _ [] = mempty
+splitEvery n list = listArray (0, n - 1) first : splitEvery n rest
   where
     (first, rest) = splitAt n list
 
@@ -132,8 +135,8 @@ splitEvery n list = first : splitEvery n rest
 
 --   [-e, a, b, c, ..., d]
 
-shiftPublicKeyBy :: GaloisField a => Int -> PublicKey a -> PublicKey a
-shiftPublicKeyBy i xs =
-  let (withInBound, outOfBound) = splitAt (length xs - i) xs
+shiftPublicKeyBy :: GaloisField a => Int -> Int -> PublicKey a -> PublicKey a
+shiftPublicKeyBy dimension i xs =
+  let (withInBound, outOfBound) = splitAt (dimension - i) (elems xs)
       wrapped = map negate outOfBound
-   in wrapped ++ withInBound
+   in listArray (0, dimension - 1) $ wrapped ++ withInBound
