@@ -90,7 +90,7 @@ makeSetup dimension t seed settings =
 -- | Generate inputs from a Setup
 genInputFromSetup :: Setup a -> [a]
 genInputFromSetup (Setup _ _ _ _ inputs settings) =
-  let aggSigs = inputAggSigs inputs
+  let aggSigs = inputAggSigs inputs -- 512 terms x 512  
       bitStrings = concat (concat (inputSigBitStrings inputs))
       sigSquares = concatMap elems (inputSigSquares inputs)
       sigLengths = inputSigLengths inputs
