@@ -30,6 +30,8 @@ module Keelung.Monad
     arrayEq,
     --
     ifThenElse,
+    -- 
+    assert
   )
 where
 
@@ -109,16 +111,18 @@ instance Proper 'Bool where
 --------------------------------------------------------------------------------
 
 data Env n = Env
-  { -- Counr for generating fresh variables
+  { -- Counter for generating fresh variables
     envNexVariable :: Int,
-    -- Counr for allocating fresh heap addresses
+    -- Counter for allocating fresh heap addresses
     envNextAddr :: Int,
     -- Variables marked as inputs
     envInpuVariables :: IntSet,
     -- Heap for arrays
     envHeap :: Heap,
     envNumAssignments :: [Assignment 'Num n],
-    envBoolAssignments :: [Assignment 'Bool n]
+    envBoolAssignments :: [Assignment 'Bool n],
+    -- Assertions 
+    envAssertions :: [Expr 'Bool n]
   }
   deriving (Show)
 
@@ -142,7 +146,7 @@ instance Functor (Assignment ty) where
 -- | Computation elaboration
 elaborate :: Comp ty n -> Either String (Elaborated ty n)
 elaborate prog = do
-  (expr, env) <- runM (Env 0 0 mempty mempty mempty mempty) prog
+  (expr, env) <- runM (Env 0 0 mempty mempty mempty mempty mempty) prog
   let numAssignments = envNumAssignments env
   let boolAssignments = envBoolAssignments env
 
@@ -312,3 +316,8 @@ loop = forM_
 
 ifThenElse :: Expr 'Bool n -> Comp ty n -> Comp ty n -> Comp ty n
 ifThenElse p x y = IfThenElse p <$> x <*> y
+
+--------------------------------------------------------------------------------
+
+assert :: Expr 'Bool n -> M n ()
+assert expr = modify' $ \st -> st {envAssertions = expr : envAssertions st}
