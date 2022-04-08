@@ -7,14 +7,15 @@ import Keelung.Syntax.Untyped
 --------------------------------------------------------------------------------
 
 -- 1. Propagate constant in assignments
--- 2. Propagate constant in the expression
+-- 2. Propagate constant in the expression and assertions 
 run :: TypeErased n -> TypeErased n
-run (TypeErased expr assignments n inputVars booleanVars) =
+run (TypeErased expr assertions assignments n inputVars booleanVars) =
   let (bindings, assignments') = propagateInAssignments assignments
       expr' = propagateConstant bindings expr
+      assertions' = map (propagateConstant bindings) assertions
 
       assignments'' = assignments' <> map (\(var, val) -> Assignment var (Val val)) (IntMap.toList bindings)
-   in TypeErased expr' assignments'' n inputVars booleanVars
+   in TypeErased expr' assertions' assignments'' n inputVars booleanVars
 
 -- Propagate constant in assignments and return the bindings for later use 
 propagateInAssignments :: [Assignment n] -> (IntMap n, [Assignment n])

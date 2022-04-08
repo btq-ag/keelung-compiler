@@ -84,7 +84,7 @@ instance GaloisField n => Interpret (Expr ty n) n where
 --------------------------------------------------------------------------------
 
 interpret :: GaloisField n => Elaborated ty n -> [n] -> Either String n
-interpret (Elaborated expr numAssignments boolAssignments _ inputVars) inputs = runM bindings $ do
+interpret (Elaborated expr _assertions numAssignments boolAssignments _ inputVars) inputs = runM bindings $ do
   -- interpret the assignments first
   forM_ numAssignments $ \(Assignment (Variable var) e) -> do
     value <- interp e

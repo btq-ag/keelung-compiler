@@ -30,8 +30,8 @@ module Keelung.Monad
     arrayEq,
     --
     ifThenElse,
-    -- 
-    assert
+    --
+    assert,
   )
 where
 
@@ -121,7 +121,7 @@ data Env n = Env
     envHeap :: Heap,
     envNumAssignments :: [Assignment 'Num n],
     envBoolAssignments :: [Assignment 'Bool n],
-    -- Assertions 
+    -- Assertions
     envAssertions :: [Expr 'Bool n]
   }
   deriving (Show)
@@ -149,13 +149,23 @@ elaborate prog = do
   (expr, env) <- runM (Env 0 0 mempty mempty mempty mempty mempty) prog
   let numAssignments = envNumAssignments env
   let boolAssignments = envBoolAssignments env
+  let assertions = envAssertions env
 
-  return $ Elaborated expr numAssignments boolAssignments (envNexVariable env) (envInpuVariables env)
+  return $
+    Elaborated
+      expr
+      assertions
+      numAssignments
+      boolAssignments
+      (envNexVariable env)
+      (envInpuVariables env)
 
 -- | The result of elaborating a computation
 data Elaborated ty n = Elaborated
   { -- | The resulting 'Expr'
     elabExpr :: !(Expr ty n),
+    -- | Assertions
+    elabAssertions :: ![Expr 'Bool n],
     -- | Assignements
     elabNumAssignments :: ![Assignment 'Num n],
     elabBoolAssignments :: ![Assignment 'Bool n],
@@ -166,7 +176,7 @@ data Elaborated ty n = Elaborated
   }
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where
-  show (Elaborated expr numAssignments boolAssignments n inputVars) =
+  show (Elaborated expr assertions numAssignments boolAssignments n inputVars) =
     "{\n\
     \  number of variables: "
       ++ show n
@@ -176,6 +186,8 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n
       ++ "\n\
          \  expression: "
       ++ show (fmap DebugGF expr)
+      ++ "\n  assertions: "
+      ++ show (map (fmap DebugGF) assertions)
       ++ "\n  num assignments: "
       ++ show (map (fmap DebugGF) numAssignments)
       ++ "\n  bool assignments: "

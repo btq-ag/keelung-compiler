@@ -115,6 +115,8 @@ type M = State IntSet
 data TypeErased n = TypeErased
   { -- | The expression after type erasure
     erasedExpr :: !(Expr n),
+    -- | Assertions after type erasure
+    erasedAssertions :: ![Expr n],
     -- | Assignments after type erasure
     erasedAssignments :: ![Assignment n],
     -- | Number of variables
@@ -126,13 +128,17 @@ data TypeErased n = TypeErased
   }
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) where
-  show (TypeErased expr assignments numOfVars inputVars boolVars) =
+  show (TypeErased expr assertions assignments numOfVars inputVars boolVars) =
     "TypeErased {\n\
     \  expression: "
       <> show (fmap DebugGF expr)
       <> "\n"
       <> ( if length assignments < 20
              then "  assignments:\n" <> show assignments <> "\n"
+             else ""
+         )
+      <> ( if length assertions < 20
+             then "  assertions:\n" <> show assertions <> "\n"
              else ""
          )
       <> "  number of variables: "
@@ -146,15 +152,17 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) wh
          \}"
 
 eraseType :: (Erase ty, Num n) => T.Elaborated ty n -> TypeErased n
-eraseType (T.Elaborated expr numAssignments boolAssignments numOfVars inputVars) =
-  let ((erasedExpr', erasedAssignments'), booleanVars) = flip runState mempty $ do
+eraseType (T.Elaborated expr assertions numAssignments boolAssignments numOfVars inputVars) =
+  let ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
         expr' <- eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAssignments
         boolAssignments' <- mapM eraseAssignment boolAssignments
         let assignments = numAssignments' <> boolAssignments'
-        return (expr', assignments)
+        assertions' <- mapM eraseExpr assertions
+        return (expr', assignments, assertions')
    in TypeErased
         { erasedExpr = erasedExpr',
+          erasedAssertions = erasedAssertions',
           erasedAssignments = erasedAssignments',
           erasedNumOfVars = numOfVars,
           erasedInputVars = inputVars,

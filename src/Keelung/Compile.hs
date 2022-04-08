@@ -60,7 +60,6 @@ cnqz x m = addConstraint $ CNQZ x m
 -- class Encode n a where
 --   encode :: Var -> a -> M n ()
 
--- instance GaloisField n => Encode n (Expr n) where
 encode :: GaloisField n => Var -> Expr n -> M n ()
 encode out expr = case expr of
   Val val -> cadd val [(out, -1)] -- out = val
@@ -219,19 +218,24 @@ encodeBinaryOp op out x y = case op of
 encodeBooleanVars :: GaloisField n => IntSet -> M n ()
 encodeBooleanVars booleanInputVars = mapM_ (\b -> encodeBinaryOp Mul b b b) $ IntSet.toList booleanInputVars
 
+-- | Encode the constraint 'x = out'.
+encodeAssertion :: GaloisField n => Expr n -> M n ()
+encodeAssertion expr = do
+  out <- freshVar
+  encode out expr
+  cadd 1 [(out, -1)] -- 1 = expr
+
 -- | Compile an untyped expression to a constraint system
 compile :: (GaloisField n, Bounded n, Integral n) => TypeErased n -> ConstraintSystem n
-compile (TypeErased untypedExpr assignments numOfVars inputVars booleanVars) = runM numOfVars $ do
-  -- optimization: constant propogation
-  -- let bindings = IntMap.fromList $ map (\(Assignment var expr) -> (var, expr)) assignments
-  -- let untypedExpr' = propagateConstant bindings untypedExpr
-
+compile (TypeErased untypedExpr assertions assignments numOfVars inputVars booleanVars) = runM numOfVars $ do
   let outputVar = numOfVars
 
   -- Compile `untypedExpr'` to constraints with output wire 'outputVar'.
   encode outputVar untypedExpr
   -- Compile assignments to constraints
   mapM_ encodeAssignment assignments
+  -- Compile assertions to constraints
+  mapM_ encodeAssertion assertions
 
   -- ensure that boolean input variables are boolean
   encodeBooleanVars (booleanVars `IntSet.intersection` inputVars)
