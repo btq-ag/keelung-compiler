@@ -1,30 +1,34 @@
-# 3 variables 
+# 2 variables (BA)
+1. BA = 0
+2. B = 0
+3. B(1-A) = 1
 
-1. (A + B + C) = 0 
-2. (1-A)(1-B) = 1 
-3. (1-A)(2 - B - C) = 1 
-4. A = 1 
-5. (2 - A + C)(2 - A + B) = 1 
-6. AB = 0 
-7. (A + B + C) = 3 
+# 3 variables (CBA)
+1. C + B + A = 0 
+2. (1-B)(1-A) = 1 
+3. (1-C)(2 - B - A) = 1 
+4. C = 1 
+5. (2 - C + A)(2 - C + B) = 1 
+6. CB = 0 
+7. CBA = 0                      (needs 2 constraints !!)
 
-# 4 variables 
+# 4 variables (DCBA)
 
-1. A + B + C + D = 0
-2. A + B + C = 0 
-3. A + B + CD = 1         
-4. A + B = 0 
-5. A + BC + BD= 0       
-6. A + BC = 0 
-7. A + BCD = 0 
-8. A = 0 
-9. A(B + C + D) = 0
-10. A(B + C) = 0 
-11. AB + ACD = 0     (needs 2 constraints !!)
-12. AB = 0 
-13. AB(C + D) = 0     (needs 2 constraints !!) 
-14. ABC = 0 
-14. ABCD = 0 
+1. D + C + B + A = 0
+2. D + C + B     = 0 
+3. D + C + BA = 1         
+4. D + C = 0 
+5. D + CB + CA = 0
+6. D + CB = 0 
+7. D + CBA = 0 
+8. D = 0 
+9. D(C + B + A) = 0
+10. D(C + B) = 0 
+11. DC + DBA = 0     (needs 2 constraints !!)
+12. CD = 0 
+13. DC(B + A) = 0    (needs 2 constraints !!) 
+14. DCB = 0          (needs 2 constraints !!) 
+15. DCBA = 0         (needs 3 constraints !!) 
 
 -----------
 

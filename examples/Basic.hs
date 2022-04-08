@@ -49,6 +49,12 @@ loop1 = do
     x <- access arr i
     return $ accum + Var x
 
+assert1 :: Comp 'Num GF181
+assert1 = do
+  x <- freshInput
+  assert (Var x `Eq` 3)
+  return $ Var x
+
 loop2 :: Comp 'Bool GF181
 loop2 = do
   arr <- freshInputs 2

@@ -133,6 +133,8 @@ main = hspec $ do
       execute Basic.eq1 [3] `shouldBe` Right 1
     it "cond 1" $
       execute Basic.cond [0] `shouldBe` Right 789
+    -- it "assert 1" $
+    --   execute Basic.assert1 [0] `shouldBe` Right 0
 
     -- NOTE: 
     --    some variables are of "don't care"

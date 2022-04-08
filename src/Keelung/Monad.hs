@@ -144,19 +144,16 @@ instance Functor (Assignment ty) where
 --------------------------------------------------------------------------------
 
 -- | Computation elaboration
+
 elaborate :: Comp ty n -> Either String (Elaborated ty n)
 elaborate prog = do
   (expr, env) <- runM (Env 0 0 mempty mempty mempty mempty mempty) prog
-  let numAssignments = envNumAssignments env
-  let boolAssignments = envBoolAssignments env
-  let assertions = envAssertions env
-
   return $
     Elaborated
       expr
-      assertions
-      numAssignments
-      boolAssignments
+      (envAssertions env)
+      (envNumAssignments env)
+      (envBoolAssignments env)
       (envNexVariable env)
       (envInpuVariables env)
 
