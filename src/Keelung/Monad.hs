@@ -3,8 +3,7 @@
 {-# LANGUAGE KindSignatures #-}
 
 module Keelung.Monad
-  ( M,
-    Comp,
+  ( Comp,
     Computation (..),
     Elaborated (..),
     Assignment (..),
@@ -50,39 +49,37 @@ import Keelung.Util
 --------------------------------------------------------------------------------
 
 -- The monad
-type M n = StateT (Computation n) (Except String)
-
-type Comp ty n = M n (Expr ty n)
+type Comp n = StateT (Computation n) (Except String)
 
 -- how to run the monad
-runM :: Computation n -> M n a -> Either String (a, Computation n)
-runM st p = runExcept (runStateT p st)
+runComp :: Computation n -> Comp n a -> Either String (a, Computation n)
+runComp st p = runExcept (runStateT p st)
 
 -- internal function for generating one fresh variable
-freshVar :: M n Int
+freshVar :: Comp n Int
 freshVar = do
   index <- gets compNextVar
   modify (\st -> st {compNextVar = succ index})
   return index
 
 -- internal function for generating many fresh variables
-freshVars :: Int -> M n IntSet
+freshVars :: Int -> Comp n IntSet
 freshVars n = do
   index <- gets compNextVar
   modify (\st -> st {compNextVar = n + index})
   return $ IntSet.fromDistinctAscList [index .. index + n - 1]
 
 -- internal function for marking one variable as input
-markVarAsInput :: Var -> M n ()
+markVarAsInput :: Var -> Comp n ()
 markVarAsInput = markVarsAsInput . IntSet.singleton
 
 -- internal function for marking many variables as input
-markVarsAsInput :: IntSet -> M n ()
+markVarsAsInput :: IntSet -> Comp n ()
 markVarsAsInput vars =
   modify (\st -> st {compInputVars = vars <> compInputVars st})
 
 -- internal function for allocating one fresh address
-freshAddr :: M n Addr
+freshAddr :: Comp n Addr
 freshAddr = do
   addr <- gets compNextAddr
   modify (\st -> st {compNextAddr = succ addr})
@@ -92,8 +89,8 @@ freshAddr = do
 
 -- | Add assignment
 class Proper ty where
-  assign :: Ref ('V ty) -> Expr ty n -> M n ()
-  arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp 'Bool n
+  assign :: Ref ('V ty) -> Expr ty n -> Comp n ()
+  arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n (Expr 'Bool n)
 
 instance Proper 'Num where
   assign var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
@@ -160,9 +157,9 @@ instance Functor (Assignment ty) where
 --------------------------------------------------------------------------------
 
 -- | Computation elaboration
-elaborate :: Comp ty n -> Either String (Elaborated ty n)
+elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
 elaborate prog = do
-  (expr, comp) <- runM (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  (expr, comp) <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $
     Elaborated
       expr
@@ -186,7 +183,7 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n
 
 --------------------------------------------------------------------------------
 
-freshInput :: M n (Ref ('V ty))
+freshInput :: Comp n (Ref ('V ty))
 freshInput = do
   var <- freshVar
   markVarAsInput var
@@ -195,7 +192,7 @@ freshInput = do
 --------------------------------------------------------------------------------
 
 -- | Array-relad functions
-freshInputs :: Int -> M n (Ref ('A ty))
+freshInputs :: Int -> Comp n (Ref ('A ty))
 freshInputs 0 = throwError "input array must have size > 0"
 freshInputs size = do
   -- draw new variables and mark them as inputs
@@ -204,7 +201,7 @@ freshInputs size = do
   -- allocate a new array and associate it's content with the new variables
   allocateArray' vars
 
-freshInputs2 :: Int -> Int -> M n (Ref ('A ('A ty)))
+freshInputs2 :: Int -> Int -> Comp n (Ref ('A ('A ty)))
 freshInputs2 0 _ = throwError "input array must have size > 0"
 freshInputs2 sizeM sizeN = do
   -- allocate `sizeM` input arrays each of size `sizeN`
@@ -215,7 +212,7 @@ freshInputs2 sizeM sizeN = do
   -- and allocate a new array with these references
   allocateArray' $ IntSet.fromList vars
 
-freshInputs3 :: Int -> Int -> Int -> M n (Ref ('A ('A ('A ty))))
+freshInputs3 :: Int -> Int -> Int -> Comp n (Ref ('A ('A ('A ty))))
 freshInputs3 0 _ _ = throwError "input array must have size > 0"
 freshInputs3 sizeM sizeN sizeO = do
   -- allocate `sizeM` input arrays each of size `sizeN * sizeO`
@@ -226,14 +223,14 @@ freshInputs3 sizeM sizeN sizeO = do
   -- and allocate a new array with these references
   allocateArray' $ IntSet.fromList vars
 
-writeHeap :: Addr -> [(Int, Var)] -> M n ()
+writeHeap :: Addr -> [(Int, Var)] -> Comp n ()
 writeHeap addr array = do
   let bindings = IntMap.fromList array
   heap <- gets compHeap
   let heap' = IntMap.insertWith (<>) addr bindings heap
   modify (\st -> st {compHeap = heap'})
 
-readHeap :: (Addr, Int) -> M n Int
+readHeap :: (Addr, Int) -> Comp n Int
 readHeap (addr, i) = do
   heap <- gets compHeap
   case IntMap.lookup addr heap of
@@ -251,14 +248,14 @@ readHeap (addr, i) = do
       Just n -> return n
 
 -- internal function for allocating an array with a set of variables to associate with
-allocateArray' :: IntSet -> M n (Ref ('A ty))
+allocateArray' :: IntSet -> Comp n (Ref ('A ty))
 allocateArray' vars = do
   let size = IntSet.size vars
   addr <- freshAddr
   writeHeap addr $ zip [0 .. pred size] $ IntSet.toList vars
   return $ Array addr
 
-allocate :: Int -> M n (Ref ('A ty))
+allocate :: Int -> Comp n (Ref ('A ty))
 allocate 0 = throwError "array must have size > 0"
 allocate size = do
   -- declare new variables
@@ -267,25 +264,25 @@ allocate size = do
   allocateArray' vars
 
 -- 1-d array access
-access :: Ref ('A ('V ty)) -> Int -> M n (Ref ('V ty))
+access :: Ref ('A ('V ty)) -> Int -> Comp n (Ref ('V ty))
 access (Array addr) i = Variable <$> readHeap (addr, i)
 
-access2 :: Ref ('A ('A ('V ty))) -> (Int, Int) -> M n (Ref ('V ty))
+access2 :: Ref ('A ('A ('V ty))) -> (Int, Int) -> Comp n (Ref ('V ty))
 access2 addr (i, j) = do
   array <- accessArr addr i
   access array j
 
-access3 :: Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> M n (Ref ('V ty))
+access3 :: Ref ('A ('A ('A ('V ty)))) -> (Int, Int, Int) -> Comp n (Ref ('V ty))
 access3 addr (i, j, k) = do
   addr' <- accessArr addr i
   array <- accessArr addr' j
   access array k
 
-accessArr :: Ref ('A ('A ty)) -> Int -> M n (Ref ('A ty))
+accessArr :: Ref ('A ('A ty)) -> Int -> Comp n (Ref ('A ty))
 accessArr (Array addr) i = Array <$> readHeap (addr, i)
 
 -- | Update array 'addr' at position 'i' to expression 'expr'
-update :: Proper ty => Ref ('A ('V ty)) -> Int -> Expr ty n -> M n ()
+update :: Proper ty => Ref ('A ('V ty)) -> Int -> Expr ty n -> Comp n ()
 update (Array addr) i (Var (Variable n)) = writeHeap addr [(i, n)]
 update (Array addr) i expr = do
   ref <- freshVar
@@ -294,13 +291,13 @@ update (Array addr) i expr = do
 
 --------------------------------------------------------------------------------
 
-reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp ty n) -> Comp ty n
+reduce :: Foldable t => Expr ty n -> t a -> (Expr ty n -> a -> Comp n (Expr ty n)) -> Comp n (Expr ty n)
 reduce a xs f = foldM f a xs
 
-every :: Foldable t => (a -> Expr 'Bool n) -> t a -> Comp 'Bool n
+every :: Foldable t => (a -> Expr 'Bool n) -> t a -> Comp n (Expr 'Bool n)
 every f xs = reduce true xs $ \accum x -> return (accum `And` f x)
 
-everyM :: Foldable t => t a -> (a -> Comp 'Bool n) -> Comp 'Bool n
+everyM :: Foldable t => t a -> (a -> Comp n (Expr 'Bool n)) -> Comp n (Expr 'Bool n)
 everyM xs f =
   foldM
     ( \accum x -> do
@@ -310,15 +307,15 @@ everyM xs f =
     true
     xs
 
-loop :: Foldable t => t a -> (a -> M n b) -> M n ()
+loop :: Foldable t => t a -> (a -> Comp n b) -> Comp n ()
 loop = forM_
 
 --------------------------------------------------------------------------------
 
-ifThenElse :: Expr 'Bool n -> Comp ty n -> Comp ty n -> Comp ty n
+ifThenElse :: Expr 'Bool n -> Comp n (Expr ty n) -> Comp n (Expr ty n) -> Comp n (Expr ty n)
 ifThenElse p x y = IfThenElse p <$> x <*> y
 
 --------------------------------------------------------------------------------
 
-assert :: Expr 'Bool n -> M n ()
+assert :: Expr 'Bool n -> Comp n ()
 assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}

@@ -14,61 +14,61 @@ import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
 
 --------------------------------------------------------------------------------
 
-constant1 :: Comp 'Num GF181
+constant1 :: Comp GF181 (Expr 'Num GF181)
 constant1 = do
   return $ 1 + 1
 
-identity :: Comp 'Num GF181
+identity :: Comp GF181 (Expr 'Num GF181)
 identity = Var <$> freshInput
 
-identityB :: Comp 'Bool GF181
+identityB :: Comp GF181 (Expr 'Bool GF181)
 identityB = Var <$> freshInput
 
-add3 :: Comp 'Num GF181
+add3 :: Comp GF181 (Expr 'Num GF181)
 add3 = do
   x <- freshInput
   return $ Var x + 3
 
 -- takes an input and see if its equal to 3
-eq1 :: Comp 'Bool GF181
+eq1 :: Comp GF181 (Expr 'Bool GF181)
 eq1 = do
   x <- freshInput
   return $ Var x `Eq` 3
 
-cond :: Comp 'Num GF181
+cond :: Comp GF181 (Expr 'Num GF181)
 cond = do
   x <- freshInput
   if Var x `Eq` 3
     then return 12
     else return 789
 
-loop1 :: Comp 'Num GF181
+loop1 :: Comp GF181 (Expr 'Num GF181)
 loop1 = do
   arr <- freshInputs 4
   reduce 0 [0 .. 3] $ \accum i -> do
     x <- access arr i
     return $ accum + Var x
 
-assert1 :: Comp 'Num GF181
+assert1 :: Comp GF181 (Expr 'Num GF181)
 assert1 = do
   x <- freshInput
   assert (Var x `Eq` 3)
   return $ Var x
 
-loop2 :: Comp 'Bool GF181
+loop2 :: Comp GF181 (Expr 'Bool GF181)
 loop2 = do
   arr <- freshInputs 2
   arr2 <- freshInputs 2
   arrayEq 2 arr (arr2 :: (Ref ('A ('V 'Num))))
 
-aggSig :: Int -> Int -> Comp 'Bool GF181
+aggSig :: Int -> Int -> Comp GF181 (Expr 'Bool GF181)
 aggSig dim num = do
   let settings = Settings True True True
   let setup = makeSetup dim num 42 settings
   Keelung.aggregateSignature setup
 
 -- components of aggregate signature
-checkSig :: Int -> Int -> Comp 'Bool GF181
+checkSig :: Int -> Int -> Comp GF181 (Expr 'Bool GF181)
 checkSig dimension n = do
   let settings = Settings True False False
   let Setup _ _ publicKey signatures _ _ = makeSetup dimension n 42 settings
@@ -77,20 +77,20 @@ checkSig dimension n = do
   arrayEq dimension expectedAggSig actualAggSig
 
 -- #2
-checkSigSize :: Int -> Int -> Comp 'Bool GF181
+checkSigSize :: Int -> Int -> Comp GF181 (Expr 'Bool GF181)
 checkSigSize dimension n = do
   let settings = Settings False True False
   Keelung.checkSize $ makeSetup dimension n 42 settings
 
 -- #3
-checkSigLength :: Int -> Int -> Comp 'Bool GF181
+checkSigLength :: Int -> Int -> Comp GF181 (Expr 'Bool GF181)
 checkSigLength dimension n = do
   let settings = Settings False False True
   Keelung.checkLength $ makeSetup dimension n 42 settings
 
 --------------------------------------------------------------------------------
 
-bench :: Comp 'Bool GF181 -> Settings -> Int -> Int -> Either String (Int, Int, Int)
+bench :: Comp GF181 (Expr 'Bool GF181) -> Settings -> Int -> Int -> Either String (Int, Int, Int)
 bench program settings dimension n = do
   let input = genInputFromSetup (makeSetup dimension n 42 settings)
   cs <- comp program -- before optimisation (only constant propagation)
@@ -131,5 +131,5 @@ runCheckLength dimension n = do
 --------------------------------------------------------------------------------
 
 -- elaborate & erase type & propagate constants
-cp :: (Erase ty, Num n) => Comp ty n -> Either String (TypeErased n)
+cp :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
 cp program = ConstantPropagation.run <$> elab program

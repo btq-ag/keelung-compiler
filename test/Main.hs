@@ -18,7 +18,7 @@ import qualified Keelung.Optimiser as Optimiser
 --   (2) Generate a satisfying assignment, 'w'.
 --   (3) Check whether 'w' satisfies the constraint system produced in (1).
 --   (4) Check whether the R1CS result matches the interpreter result.
-execute :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp ty n -> [n] -> Either String n
+execute :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp n (Expr ty n) -> [n] -> Either String n
 execute prog inputs = do
   elaborated <- elaborate prog
   let typeErased = eraseType elaborated
@@ -78,7 +78,7 @@ runKeelungAggSig dimension numberOfSignatures =
       setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
       result =
         execute
-          (Keelung.aggregateSignature setup :: Comp 'Bool GF181)
+          (Keelung.aggregateSignature setup :: Comp GF181 (Expr 'Bool GF181))
           (genInputFromSetup setup)
    in case result of
         Left _ -> Nothing
@@ -115,7 +115,7 @@ main = hspec $ do
                 enableSigLengthChecking = True
               }
           setup = makeSetup 1 1 42 settings :: Setup GF181
-          result = IntSet.toList . erasedBooleanVars . eraseType <$> elaborate (Keelung.aggregateSignature setup :: Comp 'Bool GF181)
+          result = IntSet.toList . erasedBooleanVars . eraseType <$> elaborate (Keelung.aggregateSignature setup :: Comp GF181 (Expr 'Bool GF181))
        in result `shouldBe` Right [3 .. 16]
 
   describe "Compilation" $ do

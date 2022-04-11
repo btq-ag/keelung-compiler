@@ -9,7 +9,7 @@ module Benchmark.Keelung where
 import Keelung
 import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
 
-benchElaborate :: (GaloisField a, Bounded a, Integral a) => Comp ty a -> Int
+benchElaborate :: (GaloisField n, Bounded n, Integral n) => Comp n (Expr ty n) -> Int
 benchElaborate prog =
   case elaborate prog of
     Left _ -> -1
@@ -32,27 +32,27 @@ benchElaborate prog =
           ToBool _ -> 12
           ToNum _ -> 13
 
-benchInterpret :: (Show a, GaloisField a) => Comp ty a -> [a] -> String
+benchInterpret :: (Show n, GaloisField n) => Comp n (Expr ty n) -> [n] -> String
 benchInterpret prog input =
   show $ elaborate prog >>= \elaborated -> interpret elaborated input
 
-benchEraseType :: (Erase ty, Num a, Show a, Bounded a, Integral a, Fractional a) => Comp ty a -> String
+benchEraseType :: (Erase ty, Num n, Show n, Bounded n, Integral n, Fractional n) => Comp n (Expr ty n) -> String
 benchEraseType prog =
   show $ elaborate prog >>= return . eraseType
 
-benchPropogateConstant :: (GaloisField a, Bounded a, Integral a, Erase ty) => Comp ty a -> String
+benchPropogateConstant :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp n (Expr ty n) -> String
 benchPropogateConstant prog =
   show $ elaborate prog >>= return . ConstantPropagation.run . eraseType
 
-benchCompile :: (GaloisField a, Bounded a, Integral a, Erase ty) => Comp ty a -> String
+benchCompile :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp n (Expr ty n) -> String
 benchCompile prog =
   show $ elaborate prog >>= return . compile . eraseType
 
-benchOptimise :: (GaloisField a, Bounded a, Integral a, Erase ty) => Comp ty a -> String
+benchOptimise :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp n (Expr ty n) -> String
 benchOptimise prog =
   show $ elaborate prog >>= return . optimise . compile . ConstantPropagation.run . eraseType
 
-benchOptimiseWithInput :: (GaloisField a, Bounded a, Integral a, Erase ty) => Comp ty a -> [a] -> String
+benchOptimiseWithInput :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp n (Expr ty n) -> [n] -> String
 benchOptimiseWithInput prog input =
   show $ elaborate prog >>= return . optimiseWithInput input . compile . ConstantPropagation.run . eraseType
 
@@ -62,7 +62,7 @@ benchOptimiseWithInput prog input =
 -- -- The function outputs a 'Result' that details number of variables and
 -- -- constraints in the resulting constraint system.
 -- compareWithResult ::
---   (Typeable ty, GaloisField a, Serialize a, Bounded a, Integral a) => SimplParam -> Comp ty a -> [a] -> a -> Bool
+--   (Typeable ty, GaloisField a, Serialize a, Bounded a, Integral a) => SimplParam -> Comp n (Expr ty n) -> [a] -> a -> Bool
 -- compareWithResult flag prog inputs output =
 --   case execute flag prog inputs of
 --     Left _ -> False

@@ -44,19 +44,19 @@ import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
 -- Some top-level functions
 
 -- just elaborate & erase types 
-elab :: (Erase ty, Num n) => Comp ty n -> Either String (TypeErased n)
+elab :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
 elab program = fmap eraseType (elaborate program)
 
 -- without optimisation (but with constant propagation)
-comp :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
+comp :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp n (Expr ty n) -> Either String (ConstraintSystem n)
 comp program = elaborate program >>= return . compile . ConstantPropagation.run . eraseType
 
 -- with optimisation 
-optm :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp ty n -> Either String (ConstraintSystem n)
+optm :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp n (Expr ty n) -> Either String (ConstraintSystem n)
 optm program = optimise <$> comp program
 
 -- with optimisation + partial evaluation with inputs
-optmWithInput :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp ty n -> [n] -> Either String (ConstraintSystem n)
+optmWithInput :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp n (Expr ty n) -> [n] -> Either String (ConstraintSystem n)
 optmWithInput program input = do
   cs <- optm program
   let (_, cs') = optimiseWithInput input cs

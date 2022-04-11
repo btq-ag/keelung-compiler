@@ -15,7 +15,7 @@ import AggregateSignature.Util
 import qualified Benchmark.Keelung as Keelung
 import qualified Benchmark.Snarkl as Snarkl
 import Criterion.Main
-import Keelung (GF181, Type (..), Comp)
+import Keelung (GF181, Type (..), Expr, Comp)
 import qualified Snarkl
 
 -- import qualified Snarkl
@@ -112,7 +112,7 @@ complexityOfElaboration =
       ]
 
   where 
-    makeKeelung :: Int -> Int -> Keelung.Comp 'Keelung.Bool GF181
+    makeKeelung :: Int -> Int -> Keelung.Comp GF181 (Keelung.Expr 'Keelung.Bool GF181)
     makeKeelung dimension numberOfSignatures = 
       let settings =
             Settings

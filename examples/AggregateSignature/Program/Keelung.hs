@@ -10,7 +10,7 @@ import Data.Array
 import Keelung
 
 -- ensure that a signature's bitstring is really made of bits (either 1 or 0)
--- checkSignaturesBits :: GaloisField n => Int -> Int -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp 'Bool n
+-- checkSignaturesBits :: GaloisField n => Int -> Int -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp n (Expr 'Bool n)
 -- checkSignaturesBits _numberOfSignatures _dimension _bitStringss = return true
 
 -- -- everyM
@@ -21,7 +21,7 @@ import Keelung
 -- --     bit <- fromBool . Var <$> access3 bitStringss (i, j, k)
 -- --     return $ (bit * bit) `Eq` bit
 
-checkAgg :: (Integral n, GaloisField n) => Setup n -> Comp 'Bool n
+checkAgg :: (Integral n, GaloisField n) => Setup n -> Comp n (Expr 'Bool n)
 checkAgg (Setup dimension _ publicKey signatures _ _) = do
   -- expected computed aggregate signature as input
   expectedAggSig <- freshInputs dimension
@@ -29,7 +29,7 @@ checkAgg (Setup dimension _ publicKey signatures _ _) = do
   actualAggSig <- computeAggregateSignature publicKey signatures
   arrayEq dimension expectedAggSig actualAggSig
 
-computeAggregateSignature :: (Integral n, GaloisField n) => PublicKey n -> [Signature n] -> M n (Ref ('A ('V 'Num)))
+computeAggregateSignature :: (Integral n, GaloisField n) => PublicKey n -> [Signature n] -> Comp n (Ref ('A ('V 'Num)))
 computeAggregateSignature publicKey signatures = do
   let dimension = length publicKey
   -- actual calculated aggregate signature are stored here
@@ -48,7 +48,7 @@ computeAggregateSignature publicKey signatures = do
   return actualAggSig
 
 -- ensure that a signature has the right size (smaller than 16384 (target: 12289))
-checkSize :: (GaloisField n, Integral n) => Setup n -> Comp 'Bool n
+checkSize :: (GaloisField n, Integral n) => Setup n -> Comp n (Expr 'Bool n)
 checkSize (Setup dimension numOfSigs _ signatures _ _) = do
   sigBitStrings <- freshInputs3 numOfSigs dimension 14
   everyM [0 .. length signatures - 1] $ \i -> do
@@ -62,7 +62,7 @@ checkSize (Setup dimension numOfSigs _ signatures _ _) = do
         return (acc + prod)
       return (fromIntegral term `Eq` total)
 
-checkLength :: (Integral n, GaloisField n) => Setup n -> Comp 'Bool n
+checkLength :: (Integral n, GaloisField n) => Setup n -> Comp n (Expr 'Bool n)
 checkLength (Setup dimension numOfSigs _ signatures _ _) = do
   -- expected square of signatures as input
   sigSquares <- freshInputs2 numOfSigs dimension
@@ -89,7 +89,7 @@ checkLength (Setup dimension numOfSigs _ signatures _ _) = do
       return (Var expectedLength `Eq` actualLength)
   return (squareOk `And` lengthOk)
 
-aggregateSignature :: (Integral n, GaloisField n) => Setup n -> Comp 'Bool n
+aggregateSignature :: (Integral n, GaloisField n) => Setup n -> Comp n (Expr 'Bool n)
 aggregateSignature setup = do
   let settings = setupSettings setup
   -- check aggregate signature
