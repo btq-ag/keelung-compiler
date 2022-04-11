@@ -6,28 +6,37 @@ module Keelung.Optimiser.Rewriting
 where
 
 import Keelung.Monad
--- import Keelung.Syntax
+import Keelung.Syntax
+import Control.Monad
+import Control.Monad.State
 
 --------------------------------------------------------------------------------
 
-run :: Elaborated ty n -> Elaborated ty n
-run (Elaborated expr comp) =
---   let assertions' = map rewriteAssertEq assertions
-   Elaborated expr comp
+run :: Elaborated ty n -> Either String (Elaborated ty n)
+run (Elaborated expr comp) = runElab comp $ do 
 
--- -- assert X `Eq` Y => X = Y
--- rewriteAssertEq :: Expr 'Bool n -> Expr 'Bool n
--- rewriteAssertEq expr = case expr of 
---   Eq (Var ref) y -> _ 
---   Eq x (Var ref) -> _ 
---   Eq x y ->
---   _ -> expr 
+  let assertions = compAssertions comp 
+  assertions' <- filterM rewriteAssertEq assertions
+  modify' $ \st -> st { compAssertions = assertions' }
 
---   Val val -> _
---   Var ref -> _
---   And x y -> _
---   Or x y -> _
---   Xor x y -> _
---   BEq x y -> _
---   IfThenElse x y z -> _
---   ToBool x -> _
+  return expr
+
+-- assert X `Eq` Y => X = Y
+-- rewrite assertion as assignments, returns False if rewriting was made
+rewriteAssertEq :: Expr 'Bool n -> Comp n Bool 
+rewriteAssertEq expr = case expr of 
+  Eq (Var ref) y -> do 
+    assign ref y
+    return False 
+  Eq x (Var ref) -> do 
+    assign ref x 
+    return False 
+  Eq x y -> do 
+    -- introduce a fresh variable 
+    -- and assign both expressions to it
+    var <- freshVar
+    let ref = Variable var 
+    assign ref x 
+    assign ref y
+    return False 
+  _ -> return True 

@@ -4,10 +4,12 @@
 
 module Keelung.Monad
   ( Comp,
+    runElab,
     Computation (..),
     Elaborated (..),
     Assignment (..),
     elaborate,
+    freshVar,
     -- creates an assignment
     assign,
     -- declare input vars
@@ -53,7 +55,12 @@ type Comp n = StateT (Computation n) (Except String)
 
 -- how to run the monad
 runComp :: Computation n -> Comp n a -> Either String (a, Computation n)
-runComp st p = runExcept (runStateT p st)
+runComp comp f = runExcept (runStateT f comp)
+
+runElab :: Computation n -> Comp n (Expr ty n) -> Either String (Elaborated ty n)
+runElab comp f = do
+  (expr, comp') <- runComp comp f
+  return $ Elaborated expr comp'
 
 -- internal function for generating one fresh variable
 freshVar :: Comp n Int
@@ -158,12 +165,7 @@ instance Functor (Assignment ty) where
 
 -- | Computation elaboration
 elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
-elaborate prog = do
-  (expr, comp) <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $
-    Elaborated
-      expr
-      comp
+elaborate = runElab (Computation 0 0 mempty mempty mempty mempty mempty)
 
 -- | The result of elaborating a computation
 data Elaborated ty n = Elaborated
