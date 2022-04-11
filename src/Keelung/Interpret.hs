@@ -11,7 +11,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung.Monad (Assignment (..), Elaborated (..))
+import Keelung.Monad (Assignment (..), Computation (..), Elaborated (..))
 import Keelung.Syntax
 
 --------------------------------------------------------------------------------
@@ -84,17 +84,17 @@ instance GaloisField n => Interpret (Expr ty n) n where
 --------------------------------------------------------------------------------
 
 interpret :: GaloisField n => Elaborated ty n -> [n] -> Either String n
-interpret (Elaborated expr _assertions numAssignments boolAssignments _ inputVars) inputs = runM bindings $ do
+interpret (Elaborated expr comp) inputs = runM bindings $ do
   -- interpret the assignments first
-  forM_ numAssignments $ \(Assignment (Variable var) e) -> do
+  forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
     value <- interp e
     addBinding var value
 
-  forM_ boolAssignments $ \(Assignment (Variable var) e) -> do
+  forM_ (compBoolAsgns comp) $ \(Assignment (Variable var) e) -> do
     value <- interp e
     addBinding var value
 
   -- and then the expression
   interp expr
   where
-    bindings = IntMap.fromAscList $ zip (IntSet.toAscList inputVars) inputs
+    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs

@@ -5,6 +5,7 @@
 module Keelung.Monad
   ( M,
     Comp,
+    Computation (..),
     Elaborated (..),
     Assignment (..),
     elaborate,
@@ -49,26 +50,26 @@ import Keelung.Util
 --------------------------------------------------------------------------------
 
 -- The monad
-type M n = StateT (Env n) (Except String)
+type M n = StateT (Computation n) (Except String)
 
 type Comp ty n = M n (Expr ty n)
 
 -- how to run the monad
-runM :: Env n -> M n a -> Either String (a, Env n)
+runM :: Computation n -> M n a -> Either String (a, Computation n)
 runM st p = runExcept (runStateT p st)
 
 -- internal function for generating one fresh variable
 freshVar :: M n Int
 freshVar = do
-  index <- gets envNexVariable
-  modify (\st -> st {envNexVariable = succ index})
+  index <- gets compNextVar
+  modify (\st -> st {compNextVar = succ index})
   return index
 
 -- internal function for generating many fresh variables
 freshVars :: Int -> M n IntSet
 freshVars n = do
-  index <- gets envNexVariable
-  modify (\st -> st {envNexVariable = n + index})
+  index <- gets compNextVar
+  modify (\st -> st {compNextVar = n + index})
   return $ IntSet.fromDistinctAscList [index .. index + n - 1]
 
 -- internal function for marking one variable as input
@@ -78,13 +79,13 @@ markVarAsInput = markVarsAsInput . IntSet.singleton
 -- internal function for marking many variables as input
 markVarsAsInput :: IntSet -> M n ()
 markVarsAsInput vars =
-  modify (\st -> st {envInpuVariables = vars <> envInpuVariables st})
+  modify (\st -> st {compInputVars = vars <> compInputVars st})
 
 -- internal function for allocating one fresh address
 freshAddr :: M n Addr
 freshAddr = do
-  addr <- gets envNextAddr
-  modify (\st -> st {envNextAddr = succ addr})
+  addr <- gets compNextAddr
+  modify (\st -> st {compNextAddr = succ addr})
   return addr
 
 --------------------------------------------------------------------------------
@@ -95,14 +96,14 @@ class Proper ty where
   arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp 'Bool n
 
 instance Proper 'Num where
-  assign var e = modify' $ \st -> st {envNumAssignments = Assignment var e : envNumAssignments st}
+  assign var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
   arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
     a <- access xs i
     b <- access ys i
     return (Var a `Eq` Var b)
 
 instance Proper 'Bool where
-  assign var e = modify' $ \st -> st {envBoolAssignments = Assignment var e : envBoolAssignments st}
+  assign var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
   arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
     a <- access xs i
     b <- access ys i
@@ -110,21 +111,36 @@ instance Proper 'Bool where
 
 --------------------------------------------------------------------------------
 
-data Env n = Env
+data Computation n = Computation
   { -- Counter for generating fresh variables
-    envNexVariable :: Int,
+    compNextVar :: Int,
     -- Counter for allocating fresh heap addresses
-    envNextAddr :: Int,
+    compNextAddr :: Int,
     -- Variables marked as inputs
-    envInpuVariables :: IntSet,
+    compInputVars :: IntSet,
     -- Heap for arrays
-    envHeap :: Heap,
-    envNumAssignments :: [Assignment 'Num n],
-    envBoolAssignments :: [Assignment 'Bool n],
+    compHeap :: Heap,
+    compNumAsgns :: [Assignment 'Num n],
+    compBoolAsgns :: [Assignment 'Bool n],
     -- Assertions
-    envAssertions :: [Expr 'Bool n]
+    compAssertions :: [Expr 'Bool n]
   }
-  deriving (Show)
+
+instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) where
+  show (Computation nextVar nextAddr inputVars _ numAsgns boolAsgns assertions) =
+    "{\n  variable counter: " ++ show nextVar
+      ++ "\n  address counter: "
+      ++ show nextAddr
+      ++ "\n  input variables: "
+      ++ show (IntSet.toList inputVars)
+      ++ "\n  num assignments: "
+      ++ show (map (fmap DebugGF) numAsgns)
+      ++ "\n  bool assignments: "
+      ++ show (map (fmap DebugGF) boolAsgns)
+      ++ "\n  assertions: "
+      ++ show (map (fmap DebugGF) assertions)
+      ++ "\n\
+         \}"
 
 --------------------------------------------------------------------------------
 
@@ -144,53 +160,29 @@ instance Functor (Assignment ty) where
 --------------------------------------------------------------------------------
 
 -- | Computation elaboration
-
 elaborate :: Comp ty n -> Either String (Elaborated ty n)
 elaborate prog = do
-  (expr, env) <- runM (Env 0 0 mempty mempty mempty mempty mempty) prog
+  (expr, comp) <- runM (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $
     Elaborated
       expr
-      (envAssertions env)
-      (envNumAssignments env)
-      (envBoolAssignments env)
-      (envNexVariable env)
-      (envInpuVariables env)
+      comp
 
 -- | The result of elaborating a computation
 data Elaborated ty n = Elaborated
   { -- | The resulting 'Expr'
     elabExpr :: !(Expr ty n),
-    -- | Assertions
-    elabAssertions :: ![Expr 'Bool n],
-    -- | Assignements
-    elabNumAssignments :: ![Assignment 'Num n],
-    elabBoolAssignments :: ![Assignment 'Bool n],
-    -- | The number of variables
-    elabNumOfVars :: !Int,
-    -- | Variables marked as inputs
-    elabInputVars :: !IntSet
+    -- | The state of computation after elaboration
+    elabComp :: Computation n
   }
 
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where
-  show (Elaborated expr assertions numAssignments boolAssignments n inputVars) =
-    "{\n\
-    \  number of variables: "
-      ++ show n
-      ++ "\n\
-         \  input variables: "
-      ++ show (IntSet.toList inputVars)
-      ++ "\n\
-         \  expression: "
+  show (Elaborated expr comp) =
+    "{\n expression: "
       ++ show (fmap DebugGF expr)
-      ++ "\n  assertions: "
-      ++ show (map (fmap DebugGF) assertions)
-      ++ "\n  num assignments: "
-      ++ show (map (fmap DebugGF) numAssignments)
-      ++ "\n  bool assignments: "
-      ++ show (map (fmap DebugGF) boolAssignments)
-      ++ "\n\
-         \}"
+      ++ "\n  compuation state: \n"
+      ++ show comp
+      ++ "\n}"
 
 --------------------------------------------------------------------------------
 
@@ -237,13 +229,13 @@ freshInputs3 sizeM sizeN sizeO = do
 writeHeap :: Addr -> [(Int, Var)] -> M n ()
 writeHeap addr array = do
   let bindings = IntMap.fromList array
-  heap <- gets envHeap
+  heap <- gets compHeap
   let heap' = IntMap.insertWith (<>) addr bindings heap
-  modify (\st -> st {envHeap = heap'})
+  modify (\st -> st {compHeap = heap'})
 
 readHeap :: (Addr, Int) -> M n Int
 readHeap (addr, i) = do
-  heap <- gets envHeap
+  heap <- gets compHeap
   case IntMap.lookup addr heap of
     Nothing ->
       throwError $
@@ -329,4 +321,4 @@ ifThenElse p x y = IfThenElse p <$> x <*> y
 --------------------------------------------------------------------------------
 
 assert :: Expr 'Bool n -> M n ()
-assert expr = modify' $ \st -> st {envAssertions = expr : envAssertions st}
+assert expr = modify' $ \st -> st {compAssertions = expr : compAssertions st}

@@ -152,11 +152,12 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) wh
          \}"
 
 eraseType :: (Erase ty, Num n) => T.Elaborated ty n -> TypeErased n
-eraseType (T.Elaborated expr assertions numAssignments boolAssignments numOfVars inputVars) =
-  let ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
+eraseType (T.Elaborated expr comp) =
+  let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions = comp
+      ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
         expr' <- eraseExpr expr
-        numAssignments' <- mapM eraseAssignment numAssignments
-        boolAssignments' <- mapM eraseAssignment boolAssignments
+        numAssignments' <- mapM eraseAssignment numAsgns
+        boolAssignments' <- mapM eraseAssignment boolAsgns
         let assignments = numAssignments' <> boolAssignments'
         assertions' <- mapM eraseExpr assertions
         return (expr', assignments, assertions')
@@ -164,7 +165,7 @@ eraseType (T.Elaborated expr assertions numAssignments boolAssignments numOfVars
         { erasedExpr = erasedExpr',
           erasedAssertions = erasedAssertions',
           erasedAssignments = erasedAssignments',
-          erasedNumOfVars = numOfVars,
+          erasedNumOfVars = nextVar,
           erasedInputVars = inputVars,
           erasedBooleanVars = booleanVars
         }

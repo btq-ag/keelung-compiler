@@ -11,9 +11,9 @@ import Keelung.Monad
 --------------------------------------------------------------------------------
 
 run :: Elaborated ty n -> Elaborated ty n
-run (Elaborated expr assertions ns bs n ins) =
+run (Elaborated expr comp) =
 --   let assertions' = map rewriteAssertEq assertions
-   Elaborated expr assertions ns bs n ins
+   Elaborated expr comp
 
 -- -- assert X `Eq` Y => X = Y
 -- rewriteAssertEq :: Expr 'Bool n -> Expr 'Bool n

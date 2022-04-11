@@ -179,9 +179,9 @@ keelungElaborate = do
       Right elaborated -> do
         print
           ( Keelung.sizeOfExpr (Keelung.elabExpr elaborated),
-            length (Keelung.elabNumAssignments elaborated),
-            length (Keelung.elabBoolAssignments elaborated),
-            Keelung.elabNumOfVars elaborated
+            length (Keelung.compNumAsgns (Keelung.elabComp elaborated)),
+            length (Keelung.compBoolAsgns (Keelung.elabComp elaborated)),
+            Keelung.compNextVar (Keelung.elabComp elaborated)
           )
   where
     -- run (2 ^ i) 4
