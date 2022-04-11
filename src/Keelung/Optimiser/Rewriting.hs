@@ -23,7 +23,7 @@ run (Elaborated expr comp) = runElab comp $ do
 
 -- assert X `Eq` Y => X = Y
 -- rewrite assertion as assignments, returns False if rewriting was made
-rewriteAssertEq :: Expr 'Bool n -> Comp n Bool 
+rewriteAssertEq :: Expr ty n -> Comp n Bool 
 rewriteAssertEq expr = case expr of 
   Eq (Var ref) y -> do 
     assign ref y
@@ -39,4 +39,18 @@ rewriteAssertEq expr = case expr of
     assign ref x 
     assign ref y
     return False 
-  _ -> return True 
+  BEq (Var ref) y -> do 
+    assign ref y
+    return False 
+  BEq x (Var ref) -> do 
+    assign ref x 
+    return False 
+  BEq x y -> do 
+    -- introduce a fresh variable 
+    -- and assign both expressions to it
+    var <- freshVar
+    let ref = Variable var 
+    assign ref x 
+    assign ref y
+    return False 
+  _ -> return True
