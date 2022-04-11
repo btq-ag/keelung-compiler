@@ -29,14 +29,16 @@ execute prog inputs = do
   witness <- witnessOfR1CS inputs r1cs
 
   -- extract the output value from the witness
-  actualOutput <- case IntMap.lookup outputVar witness of
-    Nothing ->
-      Left $
-        "output variable "
-          ++ show outputVar
-          ++ "is not mapped in\n  "
-          ++ show witness
-    Just value -> return value
+  actualOutput <- case outputVar of 
+        Nothing -> Left "No output variable"
+        Just var -> case IntMap.lookup var witness of
+          Nothing ->
+            Left $
+              "output variable "
+                ++ show outputVar
+                ++ "is not mapped in\n  "
+                ++ show witness
+          Just value -> return value
 
   -- interpret the program to see if the output value is correct
   expectedOutput <- interpret elaborated inputs

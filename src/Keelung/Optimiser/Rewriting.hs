@@ -13,13 +13,12 @@ import Control.Monad.State
 --------------------------------------------------------------------------------
 
 run :: Elaborated ty n -> Either String (Elaborated ty n)
-run (Elaborated expr comp) = runElab comp $ do 
-
-  let assertions = compAssertions comp 
-  assertions' <- filterM rewriteAssertEq assertions
-  modify' $ \st -> st { compAssertions = assertions' }
-
-  return expr
+run (Elaborated expr comp) = do
+  ((), comp') <- runComp comp $ do 
+    let assertions = compAssertions comp 
+    assertions' <- filterM rewriteAssertEq assertions
+    modify' $ \st -> st { compAssertions = assertions' }
+  return $ Elaborated expr comp'
 
 -- assert X `Eq` Y => X = Y
 -- rewrite assertion as assignments, returns False if rewriting was made

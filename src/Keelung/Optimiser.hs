@@ -140,7 +140,11 @@ optimiseWithWitness witness cs =
   --   - input vars
   --   - output vars
   -- Pinned vars are never optimised away.
-  let pinnedVars = IntSet.insert (csOutputVar cs) (csInputVars cs)
+
+  let pinnedVars = case csOutputVar cs of 
+        Nothing -> csInputVars cs
+        Just outputVar -> IntSet.insert outputVar (csInputVars cs)
+        
    in runOptiM witness $ do
         constraints <- simplifyConstraintSet (IntSet.toList pinnedVars) (csConstraints cs)
         -- NOTE: In the next line, it's OK that 'pinnedVars'

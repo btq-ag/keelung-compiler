@@ -228,10 +228,13 @@ encodeAssertion expr = do
 -- | Compile an untyped expression to a constraint system
 compile :: (GaloisField n, Bounded n, Integral n) => TypeErased n -> ConstraintSystem n
 compile (TypeErased untypedExpr assertions assignments numOfVars inputVars booleanVars) = runM numOfVars $ do
-  let outputVar = numOfVars
-
   -- Compile `untypedExpr'` to constraints with output wire 'outputVar'.
-  encode outputVar untypedExpr
+  outputVar <- case untypedExpr of
+    Nothing -> return Nothing
+    Just expr -> do
+      encode numOfVars expr
+      return $ Just numOfVars
+
   -- Compile assignments to constraints
   mapM_ encodeAssignment assignments
   -- Compile assertions to constraints

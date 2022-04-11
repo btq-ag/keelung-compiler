@@ -114,7 +114,7 @@ type M = State IntSet
 -- | The result after type erasure
 data TypeErased n = TypeErased
   { -- | The expression after type erasure
-    erasedExpr :: !(Expr n),
+    erasedExpr :: !(Maybe (Expr n)),
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
     -- | Assignments after type erasure
@@ -131,7 +131,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) wh
   show (TypeErased expr assertions assignments numOfVars inputVars boolVars) =
     "TypeErased {\n\
     \  expression: "
-      <> show (fmap DebugGF expr)
+      <> show (fmap (fmap DebugGF) expr)
       <> "\n"
       <> ( if length assignments < 20
              then "  assignments:\n" <> show assignments <> "\n"
@@ -155,7 +155,7 @@ eraseType :: (Erase ty, Num n) => T.Elaborated ty n -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions = comp
       ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
-        expr' <- eraseExpr expr
+        expr' <- mapM eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAsgns
         boolAssignments' <- mapM eraseAssignment boolAsgns
         let assignments = numAssignments' <> boolAssignments'

@@ -68,7 +68,7 @@ data ConstraintSystem n = ConstraintSystem
   { csConstraints :: !(Set (Constraint n)),
     csNumOfVars :: !Int,
     csInputVars :: !IntSet,
-    csOutputVar :: !Var
+    csOutputVar :: !(Maybe Var)
   }
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem n) where
@@ -104,7 +104,7 @@ renumberConstraints cs =
     (Set.map renumberConstraint (csConstraints cs))
     (Map.size variableMap)
     (IntSet.map renumber (csInputVars cs))
-    (renumber (csOutputVar cs))
+    (renumber <$> csOutputVar cs)
   where
     variableMap =
       Map.fromList $

@@ -4,6 +4,7 @@
 
 module Keelung.Monad
   ( Comp,
+    runComp,
     runElab,
     Computation (..),
     Elaborated (..),
@@ -60,7 +61,7 @@ runComp comp f = runExcept (runStateT f comp)
 runElab :: Computation n -> Comp n (Expr ty n) -> Either String (Elaborated ty n)
 runElab comp f = do
   (expr, comp') <- runComp comp f
-  return $ Elaborated expr comp'
+  return $ Elaborated (Just expr) comp'
 
 -- internal function for generating one fresh variable
 freshVar :: Comp n Int
@@ -170,7 +171,7 @@ elaborate = runElab (Computation 0 0 mempty mempty mempty mempty mempty)
 -- | The result of elaborating a computation
 data Elaborated ty n = Elaborated
   { -- | The resulting 'Expr'
-    elabExpr :: !(Expr ty n),
+    elabExpr :: !(Maybe (Expr ty n)),
     -- | The state of computation after elaboration
     elabComp :: Computation n
   }
@@ -178,7 +179,7 @@ data Elaborated ty n = Elaborated
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where
   show (Elaborated expr comp) =
     "{\n expression: "
-      ++ show (fmap DebugGF expr)
+      ++ show (fmap (fmap DebugGF) expr)
       ++ "\n  compuation state: \n"
       ++ show comp
       ++ "\n}"

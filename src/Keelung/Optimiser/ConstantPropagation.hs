@@ -11,7 +11,7 @@ import Keelung.Syntax.Untyped
 run :: TypeErased n -> TypeErased n
 run (TypeErased expr assertions assignments n inputVars booleanVars) =
   let (bindings, assignments') = propagateInAssignments assignments
-      expr' = propagateConstant bindings expr
+      expr' = propagateConstant bindings <$> expr
       assertions' = map (propagateConstant bindings) assertions
 
       assignments'' = assignments' <> map (\(var, val) -> Assignment var (Val val)) (IntMap.toList bindings)

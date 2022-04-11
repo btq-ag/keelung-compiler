@@ -10,7 +10,7 @@ import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
-import Keelung.Optimiser (optimiseWithWitness, optimise)
+import Keelung.Optimiser (optimise, optimiseWithWitness)
 import Keelung.Syntax.Common
 import Keelung.Util
 
@@ -25,8 +25,12 @@ generateWitness ::
   Witness a ->
   -- | Resulting assignment
   Either String (Witness a)
-generateWitness cs env = 
-  let pinnedVars = IntSet.toList (csInputVars cs) ++ [csOutputVar cs]
+generateWitness cs env =
+  let pinnedVars =
+        IntSet.toList (csInputVars cs)
+          ++ case csOutputVar cs of
+            Nothing -> []
+            Just v -> [v]
       variables = [0 .. csNumOfVars cs - 1]
       (witness, cs') = optimiseWithWitness env cs
    in if all (isMapped witness) variables
@@ -92,7 +96,7 @@ data R1CS n = R1CS
   { r1csClauses :: [R1C n],
     r1csNumOfVars :: Int,
     r1csInputVars :: IntSet,
-    r1csOutputVar :: Var,
+    r1csOutputVar :: Maybe Var,
     r1csWitnessGen :: Witness n -> Either String (Witness n)
   }
 
@@ -104,13 +108,13 @@ satisfyR1CS witness = all (satisfyR1C witness) . r1csClauses
 
 fromConstraintSystem :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> R1CS n
 fromConstraintSystem cs =
-  let cs' = optimise cs 
-  in R1CS
-    (mapMaybe toR1C (Set.toList (csConstraints cs')))
-    (csNumOfVars cs')
-    (csInputVars cs')
-    (csOutputVar cs')
-    (generateWitness cs')
+  let cs' = optimise cs
+   in R1CS
+        (mapMaybe toR1C (Set.toList (csConstraints cs')))
+        (csNumOfVars cs')
+        (csInputVars cs')
+        (csOutputVar cs')
+        (generateWitness cs')
   where
     toR1C :: GaloisField n => Constraint n -> Maybe (R1C n)
     toR1C (CAdd a m) =

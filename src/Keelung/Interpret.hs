@@ -83,7 +83,7 @@ instance GaloisField n => Interpret (Expr ty n) n where
 
 --------------------------------------------------------------------------------
 
-interpret :: GaloisField n => Elaborated ty n -> [n] -> Either String n
+interpret :: GaloisField n => Elaborated ty n -> [n] -> Either String (Maybe n)
 interpret (Elaborated expr comp) inputs = runM bindings $ do
   -- interpret the assignments first
   forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
@@ -95,6 +95,6 @@ interpret (Elaborated expr comp) inputs = runM bindings $ do
     addBinding var value
 
   -- and then the expression
-  interp expr
+  mapM interp expr
   where
     bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
