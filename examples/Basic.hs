@@ -61,7 +61,7 @@ loop2 = do
   arr2 <- freshInputs 2
   arrayEq 2 arr (arr2 :: (Ref ('A ('V 'Num))))
 
-aggSig :: Int -> Int -> Comp GF181 (Expr 'Bool GF181)
+aggSig :: Int -> Int -> Comp GF181 ()
 aggSig dim num = do
   let settings = Settings True True True
   let setup = makeSetup dim num 42 settings
@@ -77,13 +77,13 @@ checkSig dimension n = do
   arrayEq dimension expectedAggSig actualAggSig
 
 -- #2
-checkSigSize :: Int -> Int -> Comp GF181 (Expr 'Bool GF181)
+checkSigSize :: Int -> Int -> Comp GF181 ()
 checkSigSize dimension n = do
   let settings = Settings False True False
   Keelung.checkSize $ makeSetup dimension n 42 settings
 
 -- #3
-checkSigLength :: Int -> Int -> Comp GF181 (Expr 'Bool GF181)
+checkSigLength :: Int -> Int -> Comp GF181 ()
 checkSigLength dimension n = do
   let settings = Settings False False True
   Keelung.checkLength $ makeSetup dimension n 42 settings

@@ -8,6 +8,7 @@ module AggregateSignature.Program.Keelung where
 import AggregateSignature.Util
 import Data.Array
 import Keelung
+import Control.Monad
 
 -- ensure that a signature's bitstring is really made of bits (either 1 or 0)
 -- checkSignaturesBits :: GaloisField n => Int -> Int -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp n (Expr 'Bool n)
@@ -48,48 +49,47 @@ computeAggregateSignature publicKey signatures = do
   return actualAggSig
 
 -- ensure that a signature has the right size (smaller than 16384 (target: 12289))
-checkSize :: (GaloisField n, Integral n) => Setup n -> Comp n (Expr 'Bool n)
+checkSize :: (GaloisField n, Integral n) => Setup n -> Comp n ()
 checkSize (Setup dimension numOfSigs _ signatures _ _) = do
   sigBitStrings <- freshInputs3 numOfSigs dimension 14
-  everyM [0 .. length signatures - 1] $ \i -> do
+  forM_ [0 .. length signatures - 1] $ \i -> do
     let signature = signatures !! i
-    everyM [0 .. dimension - 1] $ \j -> do
+    forM_ [0 .. dimension - 1] $ \j -> do
       let term = signature ! j
       total <- reduce 0 [0 .. 13] $ \acc k -> do
         bit <- access3 sigBitStrings (i, j, k)
         let bitValue = fromIntegral (2 ^ k :: Integer)
         let prod = fromBool (Var bit) * bitValue
         return (acc + prod)
-      return (fromIntegral term `Eq` total)
+      assert (fromIntegral term `Eq` total)
 
-checkLength :: (Integral n, GaloisField n) => Setup n -> Comp n (Expr 'Bool n)
+checkLength :: (Integral n, GaloisField n) => Setup n -> Comp n ()
 checkLength (Setup dimension numOfSigs _ signatures _ _) = do
   -- expected square of signatures as input
   sigSquares <- freshInputs2 numOfSigs dimension
-  squareOk <- do
-    -- for each signature
-    everyM [0 .. numOfSigs - 1] $ \i -> do
-      let signature = signatures !! i
-      -- for each term of signature
-      everyM [0 .. dimension - 1] $ \j -> do
-        let term = fromIntegral (signature ! j)
-        square <- access2 sigSquares (i, j)
-        return (Var square `Eq` (term * term))
+  -- for each signature
+  forM_ [0 .. numOfSigs - 1] $ \i -> do
+    let signature = signatures !! i
+    -- for each term of signature
+    forM_ [0 .. dimension - 1] $ \j -> do
+      let term = fromIntegral (signature ! j)
+      square <- access2 sigSquares (i, j)
+      assert (Var square `Eq` (term * term))
+
   -- expected length of signatures as input
   sigLengths <- freshInputs numOfSigs
-  lengthOk <- do
-    -- for each signature
-    everyM [0 .. numOfSigs - 1] $ \i -> do
-      expectedLength <- access sigLengths i
-      -- for each term of signature
-      actualLength <- reduce 0 [0 .. dimension - 1] $ \acc j -> do
-        square <- access2 sigSquares (i, j)
-        return (acc + Var square)
 
-      return (Var expectedLength `Eq` actualLength)
-  return (squareOk `And` lengthOk)
+  -- for each signature
+  forM_ [0 .. numOfSigs - 1] $ \i -> do
+    expectedLength <- access sigLengths i
+    -- for each term of signature
+    actualLength <- reduce 0 [0 .. dimension - 1] $ \acc j -> do
+      square <- access2 sigSquares (i, j)
+      return (acc + Var square)
 
-aggregateSignature :: (Integral n, GaloisField n) => Setup n -> Comp n (Expr 'Bool n)
+    assert (Var expectedLength `Eq` actualLength)
+
+aggregateSignature :: (Integral n, GaloisField n) => Setup n -> Comp n ()
 aggregateSignature setup = do
   let settings = setupSettings setup
   -- check aggregate signature
@@ -98,13 +98,11 @@ aggregateSignature setup = do
     True -> checkAgg setup
 
   -- check signature size
-  sigSizeOk <- case enableSigSizeChecking settings of
-    False -> return true
+  case enableSigSizeChecking settings of
+    False -> return ()
     True -> checkSize setup
 
   -- check squares & length of signatures
-  sigSquaresAndLengthsOk <- case enableSigLengthChecking settings of
-    False -> return true
+  case enableSigLengthChecking settings of
+    False -> return ()
     True -> checkLength setup
-
-  return $ sigSizeOk `And` sigSquaresAndLengthsOk

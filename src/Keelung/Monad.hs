@@ -9,8 +9,6 @@ module Keelung.Monad
     Computation (..),
     Elaborated (..),
     Assignment (..),
-    elaborate,
-    elaborate',
     freshVar,
     -- creates an assignment
     assign,
@@ -166,13 +164,13 @@ instance Functor (Assignment ty) where
 --------------------------------------------------------------------------------
 
 -- | Computation elaboration
-elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
-elaborate = runElab (Computation 0 0 mempty mempty mempty mempty mempty)
+-- elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
+-- elaborate = runElab (Computation 0 0 mempty mempty mempty mempty mempty)
 
-elaborate' :: Comp n () -> Either String (Elaborated ty n)
-elaborate' prog = do
-  ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ Elaborated Nothing comp'
+-- elaborate' :: Comp n () -> Either String (Elaborated ty n)
+-- elaborate' prog = do
+--   ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+--   return $ Elaborated Nothing comp'
 
 
 -- | The result of elaborating a computation

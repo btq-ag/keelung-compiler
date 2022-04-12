@@ -21,6 +21,8 @@ module Keelung
     module Keelung.R1CS,
     module Keelung.Optimiser,
     Compilable (..),
+    elaborate,
+    elaborate',
     comp,
     optm,
     optmWithInput,
@@ -44,6 +46,16 @@ import Keelung.Util (DebugGF (..))
 
 --------------------------------------------------------------------------------
 -- Some top-level functions
+
+elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
+elaborate prog = do
+  (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  return $ Elaborated (Just expr) comp'
+
+elaborate' :: Comp n () -> Either String (Elaborated ty n)
+elaborate' prog = do
+  ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  return $ Elaborated Nothing comp'
 
 class Compilable n a where
   -- elaboration => rewriting => type erasure

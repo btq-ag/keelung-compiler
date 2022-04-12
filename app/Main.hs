@@ -173,7 +173,7 @@ keelungElaborate = do
     let numOfSigs = 4
     let setup = makeSetup dimension numOfSigs 42 settings :: Setup GF181
 
-    let result = Keelung.elaborate (Keelung.aggregateSignature setup)
+    let result = Keelung.elaborate' (Keelung.aggregateSignature setup)
     case result of
       Left err -> print err
       Right elaborated -> do
