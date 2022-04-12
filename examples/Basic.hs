@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use <&>" #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Basic where
 
@@ -10,7 +11,6 @@ import qualified AggregateSignature.Program.Keelung as Keelung
 import AggregateSignature.Util
 import qualified Data.Set as Set
 import Keelung
-import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
 
 --------------------------------------------------------------------------------
 
@@ -55,7 +55,7 @@ assert1 = do
   assert (Var x `Eq` 3)
   return $ Var x
 
-loop2 :: Comp GF181 (Expr 'Bool GF181)
+loop2 :: Comp GF181 ()
 loop2 = do
   arr <- freshInputs 2
   arr2 <- freshInputs 2
@@ -68,7 +68,7 @@ aggSig dim num = do
   Keelung.aggregateSignature setup
 
 -- components of aggregate signature
-checkSig :: Int -> Int -> Comp GF181 (Expr 'Bool GF181)
+checkSig :: Int -> Int -> Comp GF181 ()
 checkSig dimension n = do
   let settings = Settings True False False
   let Setup _ _ publicKey signatures _ _ = makeSetup dimension n 42 settings
@@ -90,7 +90,7 @@ checkSigLength dimension n = do
 
 --------------------------------------------------------------------------------
 
-bench :: Comp GF181 (Expr 'Bool GF181) -> Settings -> Int -> Int -> Either String (Int, Int, Int)
+bench :: Compilable GF181 a => Comp GF181 a -> Settings -> Int -> Int -> Either String (Int, Int, Int)
 bench program settings dimension n = do
   let input = genInputFromSetup (makeSetup dimension n 42 settings)
   cs <- comp program -- before optimisation (only constant propagation)
@@ -131,5 +131,5 @@ runCheckLength dimension n = do
 --------------------------------------------------------------------------------
 
 -- elaborate & erase type & propagate constants
-cp :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
-cp program = ConstantPropagation.run <$> erase program
+-- cp :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
+-- cp program = ConstantPropagation.run <$> erase program

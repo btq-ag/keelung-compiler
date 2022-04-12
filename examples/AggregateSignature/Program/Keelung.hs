@@ -21,7 +21,7 @@ import Keelung
 -- --     bit <- fromBool . Var <$> access3 bitStringss (i, j, k)
 -- --     return $ (bit * bit) `Eq` bit
 
-checkAgg :: (Integral n, GaloisField n) => Setup n -> Comp n (Expr 'Bool n)
+checkAgg :: (Integral n, GaloisField n) => Setup n -> Comp n ()
 checkAgg (Setup dimension _ publicKey signatures _ _) = do
   -- expected computed aggregate signature as input
   expectedAggSig <- freshInputs dimension
@@ -93,8 +93,8 @@ aggregateSignature :: (Integral n, GaloisField n) => Setup n -> Comp n (Expr 'Bo
 aggregateSignature setup = do
   let settings = setupSettings setup
   -- check aggregate signature
-  aggSigOk <- case enableAggSigChecking settings of
-    False -> return true
+  case enableAggSigChecking settings of
+    False -> return ()
     True -> checkAgg setup
 
   -- check signature size
@@ -107,4 +107,4 @@ aggregateSignature setup = do
     False -> return true
     True -> checkLength setup
 
-  return $ aggSigOk `And` sigSizeOk `And` sigSquaresAndLengthsOk
+  return $ sigSizeOk `And` sigSquaresAndLengthsOk

@@ -1,8 +1,7 @@
-{-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use <&>" #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Benchmark.Keelung where
 
@@ -13,7 +12,9 @@ benchElaborate :: (GaloisField n, Bounded n, Integral n) => Comp n (Expr ty n) -
 benchElaborate prog =
   case elaborate prog of
     Left _ -> -1
-    Right elaborated -> toNumber $ elabExpr elaborated
+    Right elaborated -> case elabExpr elaborated of
+      Nothing -> -2
+      Just n -> toNumber n
       where
         toNumber :: Expr ty a -> Int
         toNumber !te = case te of

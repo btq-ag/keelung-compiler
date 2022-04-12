@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
+{-# LANGUAGE FlexibleInstances #-}
 {-# HLINT ignore "Use <&>" #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Keelung
   ( module Keelung.Monad,
@@ -19,8 +20,7 @@ module Keelung
     TypeErased (..),
     module Keelung.R1CS,
     module Keelung.Optimiser,
-    erase,
-    erase',
+    Compilable (..),
     comp,
     optm,
     optmWithInput,
@@ -45,35 +45,35 @@ import Keelung.Util (DebugGF (..))
 --------------------------------------------------------------------------------
 -- Some top-level functions
 
--- elaborate = elaborate
+class Compilable n a where
+  -- elaboration => rewriting => type erasure
+  erase :: Comp n a -> Either String (TypeErased n)
 
+instance (Erase ty, Num n) => Compilable n (Expr ty n) where
+  erase prog = elaborate prog >>= Rewriting.run >>= return . eraseType
 
--- elaboration => type erasure 
--- erase :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
--- erase program = fmap eraseType (elaborate program)
-
--- elaboration => rewriting => type erasure
-erase :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
-erase prog = fmap eraseType (elaborate prog >>= Rewriting.run)
-
-erase' :: (Num n) => Comp n () -> Either String (TypeErased n)
-erase' prog = do
-  ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ eraseType' comp'
+instance Num n => Compilable n () where
+  erase prog = do
+    ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+    return $ eraseType' comp'
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
--- compC :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp n (Expr ty n) -> Either String (ConstraintSystem n)
--- compC program = elaborate program >>= return . compile . ConstantPropagation.run . eraseType
+comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either String (ConstraintSystem n)
+comp prog = erase prog >>= return . compile . ConstantPropagation.run
 
-comp :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp n (Expr ty n) -> Either String (ConstraintSystem n)
-comp program = elaborate program >>= Rewriting.run >>= return . compile . ConstantPropagation.run . eraseType
-
--- with optimisation
-optm :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp n (Expr ty n) -> Either String (ConstraintSystem n)
-optm program = optimise <$> comp program
+-- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation
+optm ::
+  (Compilable n a, GaloisField n, Bounded n, Integral n) =>
+  Comp n a ->
+  Either String (ConstraintSystem n)
+optm prog = comp prog >>= return . optimise
 
 -- with optimisation + partial evaluation with inputs
-optmWithInput :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp n (Expr ty n) -> [n] -> Either String (ConstraintSystem n)
+optmWithInput ::
+  (Compilable n a, GaloisField n, Bounded n, Integral n) =>
+  Comp n a ->
+  [n] ->
+  Either String (ConstraintSystem n)
 optmWithInput program input = do
   cs <- optm program
   let (_, cs') = optimiseWithInput input cs

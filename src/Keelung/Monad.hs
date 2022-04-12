@@ -99,21 +99,21 @@ freshAddr = do
 -- | Add assignment
 class Proper ty where
   assign :: Ref ('V ty) -> Expr ty n -> Comp n ()
-  arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n (Expr 'Bool n)
+  arrayEq :: Int -> Ref ('A ('V ty)) -> Ref ('A ('V ty)) -> Comp n ()
 
 instance Proper 'Num where
   assign var e = modify' $ \st -> st {compNumAsgns = Assignment var e : compNumAsgns st}
-  arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
+  arrayEq len xs ys = forM_ [0 .. len - 1] $ \i -> do
     a <- access xs i
     b <- access ys i
-    return (Var a `Eq` Var b)
+    assert (Var a `Eq` Var b)
 
 instance Proper 'Bool where
   assign var e = modify' $ \st -> st {compBoolAsgns = Assignment var e : compBoolAsgns st}
-  arrayEq len xs ys = everyM [0 .. len - 1] $ \i -> do
+  arrayEq len xs ys = forM_ [0 .. len - 1] $ \i -> do
     a <- access xs i
     b <- access ys i
-    return (Var a `BEq` Var b)
+    assert (Var a `BEq` Var b)
 
 --------------------------------------------------------------------------------
 
