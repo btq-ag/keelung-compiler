@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Interpret (interpret) where
+module Keelung.Interpret (interpretProc, interpretExpr) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -11,7 +11,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung.Monad (Assignment (..), Computation (..), Elaborated (..))
+import Keelung.Monad (Assignment (..), Comp, Computation (..), Elaborated (..), elaborate, elaborate')
 import Keelung.Syntax
 
 --------------------------------------------------------------------------------
@@ -83,18 +83,54 @@ instance GaloisField n => Interpret (Expr ty n) n where
 
 --------------------------------------------------------------------------------
 
-interpret :: GaloisField n => Elaborated ty n -> [n] -> Either String (Maybe n)
-interpret (Elaborated expr comp) inputs = runM bindings $ do
-  -- interpret the assignments first
-  forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
-    value <- interp e
-    addBinding var value
+-- interpret :: GaloisField n => Elaborated ty n -> [n] -> Either String (Maybe n)
+-- interpret (Elaborated expr comp) inputs = runM bindings $ do
+--   -- interpret the assignments first
+--   forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
+--     value <- interp e
+--     addBinding var value
 
-  forM_ (compBoolAsgns comp) $ \(Assignment (Variable var) e) -> do
-    value <- interp e
-    addBinding var value
+--   forM_ (compBoolAsgns comp) $ \(Assignment (Variable var) e) -> do
+--     value <- interp e
+--     addBinding var value
 
-  -- and then the expression
-  mapM interp expr
-  where
-    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
+--   -- and then the expression
+--   mapM interp expr
+--   where
+--     bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
+
+interpretExpr :: GaloisField n => Comp n (Expr ty n) -> [n] -> Either String (Maybe n)
+interpretExpr prog inputs = case elaborate prog of
+  Left err -> Left err
+  Right (Elaborated expr comp) -> runM bindings $ do
+    -- interpret the assignments first
+    forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
+      value <- interp e
+      addBinding var value
+
+    forM_ (compBoolAsgns comp) $ \(Assignment (Variable var) e) -> do
+      value <- interp e
+      addBinding var value
+
+    -- and then the expression
+    mapM interp expr
+    where
+      bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
+
+interpretProc :: GaloisField n => Comp n () -> [n] -> Either String (Maybe n)
+interpretProc prog inputs = case elaborate' prog of
+  Left err -> Left err
+  Right (Elaborated expr comp) -> runM bindings $ do
+    -- interpret the assignments first
+    forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
+      value <- interp e
+      addBinding var value
+
+    forM_ (compBoolAsgns comp) $ \(Assignment (Variable var) e) -> do
+      value <- interp e
+      addBinding var value
+
+    -- and then the expression
+    mapM interp expr
+    where
+      bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs

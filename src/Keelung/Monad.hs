@@ -6,6 +6,8 @@ module Keelung.Monad
   ( Comp,
     runComp,
     runElab,
+    elaborate,
+    elaborate',
     Computation (..),
     Elaborated (..),
     Assignment (..),
@@ -61,6 +63,16 @@ runElab :: Computation n -> Comp n (Expr ty n) -> Either String (Elaborated ty n
 runElab comp f = do
   (expr, comp') <- runComp comp f
   return $ Elaborated (Just expr) comp'
+
+elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
+elaborate prog = do
+  (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  return $ Elaborated (Just expr) comp'
+
+elaborate' :: Comp n () -> Either String (Elaborated ty n)
+elaborate' prog = do
+  ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  return $ Elaborated Nothing comp'
 
 -- internal function for generating one fresh variable
 freshVar :: Comp n Int

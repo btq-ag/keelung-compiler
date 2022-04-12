@@ -15,14 +15,11 @@ module Keelung
     compile,
     ConstraintSystem (..),
     Erase,
-    interpret,
     eraseType,
     TypeErased (..),
     module Keelung.R1CS,
     module Keelung.Optimiser,
     Compilable (..),
-    elaborate,
-    elaborate',
     comp,
     optm,
     optmWithInput,
@@ -33,7 +30,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Semiring (Semiring (one, zero))
 import Keelung.Compile (compile)
 import Keelung.Constraint (ConstraintSystem (..))
-import Keelung.Interpret (interpret)
+import Keelung.Interpret 
 import Keelung.Monad
 import Keelung.Optimiser
 import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
@@ -47,28 +44,24 @@ import Keelung.Util (DebugGF (..))
 --------------------------------------------------------------------------------
 -- Some top-level functions
 
-elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
-elaborate prog = do
-  (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ Elaborated (Just expr) comp'
-
-elaborate' :: Comp n () -> Either String (Elaborated ty n)
-elaborate' prog = do
-  ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ Elaborated Nothing comp'
-
 class Compilable n a where
   -- elaboration => rewriting => type erasure
   erase :: Comp n a -> Either String (TypeErased n)
 
-instance (Erase ty, Num n) => Compilable n (Expr ty n) where
-  erase prog = elaborate prog >>= Rewriting.run >>= return . eraseType
+  interpret :: Comp n a -> [n] -> Either String (Maybe n)
 
-instance Num n => Compilable n () where
+  -- elab :: Comp n a -> Either String (Elaborated ty n)
+
+instance (Erase ty, Num n, GaloisField n) => Compilable n (Expr ty n) where
+  erase prog = elaborate prog >>= Rewriting.run >>= return . eraseType
+  interpret = interpretExpr 
+
+instance (Num n, GaloisField n) => Compilable n () where
   erase prog = do
     ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
     return $ eraseType' comp'
-
+  interpret = interpretProc
+  
 -- elaboration => rewriting => type erasure => constant propagation => compilation
 comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either String (ConstraintSystem n)
 comp prog = erase prog >>= return . compile . ConstantPropagation.run

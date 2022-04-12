@@ -20,7 +20,6 @@ import qualified Keelung.Optimiser as Optimiser
 --   (4) Check whether the R1CS result matches the interpreter result.
 execute :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either String (Maybe n)
 execute prog inputs = do
-  -- elaborated <- elaborate prog
   typeErased <- erase prog
   let constraintSystem = compile typeErased
   let r1cs = fromConstraintSystem constraintSystem
@@ -41,7 +40,7 @@ execute prog inputs = do
           Just value -> return $ Just value
 
   -- interpret the program to see if the output value is correct
-  expectedOutput <- interpret elaborated inputs
+  expectedOutput <- interpret prog inputs
 
   if actualOutput == expectedOutput && satisfyR1CS witness r1cs
     then return actualOutput
@@ -117,7 +116,8 @@ main = hspec $ do
                 enableSigLengthChecking = True
               }
           setup = makeSetup 1 1 42 settings :: Setup GF181
-          result = IntSet.toList . erasedBooleanVars . eraseType <$> elaborate (Keelung.aggregateSignature setup :: Comp GF181 (Expr 'Bool GF181))
+          erased = erase (Keelung.aggregateSignature setup :: Comp GF181 ())
+          result = IntSet.toList . erasedBooleanVars <$> erased
        in result `shouldBe` Right [3 .. 16]
 
   describe "Compilation" $ do
