@@ -132,4 +132,4 @@ runCheckLength dimension n = do
 
 -- elaborate & erase type & propagate constants
 cp :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
-cp program = ConstantPropagation.run <$> elab program
+cp program = ConstantPropagation.run <$> erase program

@@ -178,7 +178,7 @@ keelungElaborate = do
       Left err -> print err
       Right elaborated -> do
         print
-          ( Keelung.sizeOfExpr (Keelung.elabExpr elaborated),
+          ( Keelung.sizeOfExpr <$> Keelung.elabExpr elaborated,
             length (Keelung.compNumAsgns (Keelung.elabComp elaborated)),
             length (Keelung.compBoolAsgns (Keelung.elabComp elaborated)),
             Keelung.compNextVar (Keelung.elabComp elaborated)

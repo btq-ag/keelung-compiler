@@ -19,10 +19,9 @@ module Keelung
     TypeErased (..),
     module Keelung.R1CS,
     module Keelung.Optimiser,
+    erase,
+    erase',
     comp,
-    comp1,
-    elab,
-    elab',
     optm,
     optmWithInput,
   )
@@ -40,22 +39,31 @@ import qualified Keelung.Optimiser.Rewriting as Rewriting
 import Keelung.R1CS
 import Keelung.Syntax
 import Keelung.Syntax.Common
-import Keelung.Syntax.Untyped (Erase, TypeErased (..), eraseType)
+import Keelung.Syntax.Untyped (Erase, TypeErased (..), eraseType, eraseType')
 import Keelung.Util (DebugGF (..))
 
 --------------------------------------------------------------------------------
 -- Some top-level functions
 
--- just elaborate & erase types
-elab :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
-elab program = fmap eraseType (elaborate program)
+-- elaborate = elaborate
 
--- elaborate & erase types & rewrite 
-elab' :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
-elab' program = fmap eraseType (elaborate program >>= Rewriting.run)
 
-comp1 :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp n (Expr ty n) -> Either String (ConstraintSystem n)
-comp1 program = elaborate program >>= return . compile . ConstantPropagation.run . eraseType
+-- elaboration => type erasure 
+-- erase :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
+-- erase program = fmap eraseType (elaborate program)
+
+-- elaboration => rewriting => type erasure
+erase :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
+erase prog = fmap eraseType (elaborate prog >>= Rewriting.run)
+
+erase' :: (Num n) => Comp n () -> Either String (TypeErased n)
+erase' prog = do
+  ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+  return $ eraseType' comp'
+
+-- elaboration => rewriting => type erasure => constant propagation => compilation
+-- compC :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp n (Expr ty n) -> Either String (ConstraintSystem n)
+-- compC program = elaborate program >>= return . compile . ConstantPropagation.run . eraseType
 
 comp :: (GaloisField n, Erase ty, Bounded n, Integral n) => Comp n (Expr ty n) -> Either String (ConstraintSystem n)
 comp program = elaborate program >>= Rewriting.run >>= return . compile . ConstantPropagation.run . eraseType

@@ -18,7 +18,7 @@ import qualified Keelung.Optimiser as Optimiser
 --   (2) Generate a satisfying assignment, 'w'.
 --   (3) Check whether 'w' satisfies the constraint system produced in (1).
 --   (4) Check whether the R1CS result matches the interpreter result.
-execute :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp n (Expr ty n) -> [n] -> Either String n
+execute :: (GaloisField n, Bounded n, Integral n, Erase ty) => Comp n (Expr ty n) -> [n] -> Either String (Maybe n)
 execute prog inputs = do
   elaborated <- elaborate prog
   let typeErased = eraseType elaborated
@@ -30,7 +30,7 @@ execute prog inputs = do
 
   -- extract the output value from the witness
   actualOutput <- case outputVar of 
-        Nothing -> Left "No output variable"
+        Nothing -> return Nothing
         Just var -> case IntMap.lookup var witness of
           Nothing ->
             Left $
@@ -38,7 +38,7 @@ execute prog inputs = do
                 ++ show outputVar
                 ++ "is not mapped in\n  "
                 ++ show witness
-          Just value -> return value
+          Just value -> return $ Just value
 
   -- interpret the program to see if the output value is correct
   expectedOutput <- interpret elaborated inputs
@@ -84,7 +84,7 @@ runKeelungAggSig dimension numberOfSignatures =
           (genInputFromSetup setup)
    in case result of
         Left _ -> Nothing
-        Right val -> Just val
+        Right val -> val
 
 main :: IO ()
 main = hspec $ do
@@ -122,19 +122,19 @@ main = hspec $ do
 
   describe "Compilation" $ do
     it "identity (Num)" $
-      execute Basic.identity [42] `shouldBe` Right 42
+      execute Basic.identity [42] `shouldBe` Right (Just 42)
     it "identity (Bool)" $
-      execute Basic.identityB [1] `shouldBe` Right 1
+      execute Basic.identityB [1] `shouldBe` Right (Just 1)
     it "identity (Bool)" $
-      execute Basic.identityB [0] `shouldBe` Right 0
+      execute Basic.identityB [0] `shouldBe` Right (Just 0)
     it "add3" $
-      execute Basic.add3 [0] `shouldBe` Right 3
+      execute Basic.add3 [0] `shouldBe` Right (Just 3)
     it "eq1 1" $
-      execute Basic.eq1 [0] `shouldBe` Right 0
+      execute Basic.eq1 [0] `shouldBe` Right (Just 0)
     it "eq1 2" $
-      execute Basic.eq1 [3] `shouldBe` Right 1
+      execute Basic.eq1 [3] `shouldBe` Right (Just 1)
     it "cond 1" $
-      execute Basic.cond [0] `shouldBe` Right 789
+      execute Basic.cond [0] `shouldBe` Right (Just 789)
     -- it "assert 1" $
     --   execute Basic.assert1 [0] `shouldBe` Right 0
 

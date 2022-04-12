@@ -9,6 +9,7 @@ module Keelung.Syntax.Untyped
     TypeErased (..),
     Assignment (..),
     eraseType,
+    eraseType'
     -- propagateConstant,
   )
 where
@@ -163,6 +164,24 @@ eraseType (T.Elaborated expr comp) =
         return (expr', assignments, assertions')
    in TypeErased
         { erasedExpr = erasedExpr',
+          erasedAssertions = erasedAssertions',
+          erasedAssignments = erasedAssignments',
+          erasedNumOfVars = nextVar,
+          erasedInputVars = inputVars,
+          erasedBooleanVars = booleanVars
+        }
+
+eraseType' :: Num n => T.Computation n -> TypeErased n
+eraseType' comp =
+  let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions = comp
+      ((erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
+        numAssignments' <- mapM eraseAssignment numAsgns
+        boolAssignments' <- mapM eraseAssignment boolAsgns
+        let assignments = numAssignments' <> boolAssignments'
+        assertions' <- mapM eraseExpr assertions
+        return (assignments, assertions')
+   in TypeErased
+        { erasedExpr = Nothing,
           erasedAssertions = erasedAssertions',
           erasedAssignments = erasedAssignments',
           erasedNumOfVars = nextVar,
