@@ -15,6 +15,7 @@ import Keelung.Syntax.Common
 data Type
   = Num -- numbers
   | Bool -- booleans
+  | Unit -- booleans
   deriving (Show, Eq)
 
 data Reference

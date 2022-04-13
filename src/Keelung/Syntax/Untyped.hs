@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE EmptyCase #-}
 
 module Keelung.Syntax.Untyped
   ( Op (..),
@@ -9,8 +10,6 @@ module Keelung.Syntax.Untyped
     TypeErased (..),
     Assignment (..),
     eraseType,
-    eraseType'
-    -- propagateConstant,
   )
 where
 
@@ -171,28 +170,17 @@ eraseType (T.Elaborated expr comp) =
           erasedBooleanVars = booleanVars
         }
 
-eraseType' :: Num n => T.Computation n -> TypeErased n
-eraseType' comp =
-  let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions = comp
-      ((erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
-        numAssignments' <- mapM eraseAssignment numAsgns
-        boolAssignments' <- mapM eraseAssignment boolAsgns
-        let assignments = numAssignments' <> boolAssignments'
-        assertions' <- mapM eraseExpr assertions
-        return (assignments, assertions')
-   in TypeErased
-        { erasedExpr = Nothing,
-          erasedAssertions = erasedAssertions',
-          erasedAssignments = erasedAssignments',
-          erasedNumOfVars = nextVar,
-          erasedInputVars = inputVars,
-          erasedBooleanVars = booleanVars
-        }
-
 -- for stealing type info in runtime from the typeclass dictionary
 class Erase ty where
   eraseExpr :: Num n => T.Expr ty n -> M (Expr n)
   eraseAssignment :: Num n => T.Assignment ty n -> M (Assignment n)
+
+instance Erase 'T.Unit where
+  eraseExpr expr = case expr of 
+    T.Val val -> case val of {}
+    T.Var (T.Variable var) -> return (Var var)
+    T.IfThenElse b x y -> IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
+  eraseAssignment (T.Assignment (T.Variable var) expr) = Assignment var <$> eraseExpr expr
 
 instance Erase 'T.Num where
   eraseExpr expr = case expr of
