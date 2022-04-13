@@ -15,7 +15,7 @@ import AggregateSignature.Util
 import qualified Benchmark.Keelung as Keelung
 import qualified Benchmark.Snarkl as Snarkl
 import Criterion.Main
-import Keelung (GF181, Type (..), Expr, Comp)
+import Keelung (GF181, Comp)
 import qualified Snarkl
 
 -- import qualified Snarkl
@@ -44,7 +44,7 @@ benchmarks setup =
         bgroup
           "Elaboration"
           [ bench "Snarkl" $ nf Snarkl.benchElaborate snarkl,
-            bench "Keelung" $ nf Keelung.benchElaborate keelung
+            bench "Keelung" $ nf Keelung.benchElaborate' keelung
           ],
         bgroup
           "Interpretation"
@@ -91,7 +91,7 @@ keelungOnly setup =
   let keelung = Keelung.aggregateSignature setup
       input = genInputFromSetup setup
    in [ 
-        bench "Elaboration" $ nf Keelung.benchElaborate keelung,
+        bench "Elaboration" $ nf Keelung.benchElaborate' keelung,
         bench "Interpretation" $ nf (Keelung.benchInterpret keelung) input,
         bench "Type Erasure" $ nf Keelung.benchEraseType keelung,
         bench "Constant Propagation" $ nf Keelung.benchPropogateConstant keelung,
@@ -103,16 +103,16 @@ keelungOnly setup =
 complexityOfElaboration :: [Benchmark]
 complexityOfElaboration =
       [ 
-        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 8 4),
-        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 16 4),
-        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 32 4),
-        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 64 4),
-        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 128 4),
-        bench "Elaboration" $ nf Keelung.benchElaborate (makeKeelung 256 4)
+        bench "Elaboration" $ nf Keelung.benchElaborate' (makeKeelung 8 4),
+        bench "Elaboration" $ nf Keelung.benchElaborate' (makeKeelung 16 4),
+        bench "Elaboration" $ nf Keelung.benchElaborate' (makeKeelung 32 4),
+        bench "Elaboration" $ nf Keelung.benchElaborate' (makeKeelung 64 4),
+        bench "Elaboration" $ nf Keelung.benchElaborate' (makeKeelung 128 4),
+        bench "Elaboration" $ nf Keelung.benchElaborate' (makeKeelung 256 4)
       ]
 
   where 
-    makeKeelung :: Int -> Int -> Keelung.Comp GF181 (Keelung.Expr 'Keelung.Bool GF181)
+    makeKeelung :: Int -> Int -> Keelung.Comp GF181 ()
     makeKeelung dimension numberOfSignatures = 
       let settings =
             Settings
