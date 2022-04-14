@@ -237,6 +237,7 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
 
   -- Compile assignments to constraints
   mapM_ encodeAssignment assignments
+
   -- Compile assertions to constraints
   mapM_ encodeAssertion assertions
 

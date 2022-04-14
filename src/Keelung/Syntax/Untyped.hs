@@ -10,6 +10,7 @@ module Keelung.Syntax.Untyped
     TypeErased (..),
     Assignment (..),
     eraseType,
+    sizeOfExpr
   )
 where
 
@@ -94,6 +95,14 @@ instance Show n => Show (Expr n) where
         go delim n (x : xs) = showsPrec (succ n) x . showString delim . go delim n xs
     IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
+-- calculate the "size" of an expression
+sizeOfExpr :: Expr n -> Int 
+sizeOfExpr expr = case expr of
+    Val _ -> 1 
+    Var _ -> 1 
+    BinOp _ operands ->  sum (map sizeOfExpr operands) + (length operands - 1)
+    IfThenElse x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+    
 --------------------------------------------------------------------------------
 
 data Assignment n = Assignment Var (Expr n)
