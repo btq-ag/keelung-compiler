@@ -2,6 +2,7 @@
 --  Constraint Set Minimisation
 --------------------------------------------------------------------------------
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 
 module Keelung.Optimiser where
 
@@ -16,6 +17,20 @@ import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Optimiser.Monad
 import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped (TypeErased (..))
+import Keelung.Monad
+import Keelung.Syntax
+import qualified Keelung.Optimiser.Rewriting as Rewriting
+
+
+
+--------------------------------------------------------------------------------
+
+elaborateAndRewrite :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
+elaborateAndRewrite prog = elaborate prog >>= Rewriting.run 
+  
+elaborateAndRewrite' :: Comp n () -> Either String (Elaborated 'Unit n)
+elaborateAndRewrite' prog = elaborate' prog >>= Rewriting.run 
+
 
 --------------------------------------------------------------------------------
 
