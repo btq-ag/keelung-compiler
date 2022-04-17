@@ -17,6 +17,8 @@ import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Syntax.Common (Var)
 import Keelung.Syntax.Untyped
+import Debug.Trace (traceShowM)
+import Keelung.Util (DebugGF(DebugGF))
 
 ----------------------------------------------------------------
 
@@ -237,6 +239,7 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
 
   -- Compile assignments to constraints
   mapM_ encodeAssignment assignments
+  traceShowM $ "Assignments: " ++ show (map (fmap DebugGF) assignments)
 
   -- Compile assertions to constraints
   mapM_ encodeAssertion assertions
@@ -246,10 +249,11 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
 
   constraints <- gets envConstraints
   let vars = varsInConstraints constraints
-
-  return $
-    ConstraintSystem
-      constraints
-      (IntSet.size vars)
-      inputVars
-      outputVar
+  -- traceShow ("assignments / constraints: " ++ show (length assignments, sum (map (\(Assignment _ expr) -> sizeOfExpr expr) assignments)), length constraints) $
+  return
+      ( ConstraintSystem
+          constraints
+          (IntSet.size vars)
+          inputVars
+          outputVar
+      )

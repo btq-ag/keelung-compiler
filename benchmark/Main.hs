@@ -2,13 +2,6 @@
 module Main where
 
 import qualified AggregateSignature.Program.Keelung as Keelung
--- -- import qualified Benchmark.Keelung as Keelung
--- -- import qualified Benchmark.Snarkl as Snarkl
-
--- import Data.Data (Typeable)
--- import qualified Example.Snarkl.Keccak as Keccak
--- import qualified Example.Snarkl.List as List
--- import qualified Example.Snarkl.Matrix as Matrix
 
 import qualified AggregateSignature.Program.Snarkl as Snarkl
 import AggregateSignature.Util
@@ -17,11 +10,6 @@ import qualified Benchmark.Snarkl as Snarkl
 import Criterion.Main
 import Keelung (GF181, Comp)
 import qualified Snarkl
-
--- import qualified Snarkl
--- import Snarkl.Common (GF181)
--- import Snarkl.Compile (SimplParam (..))
-
 
 -- oldBenchmarks :: [Benchmark]
 -- oldBenchmarks =
@@ -89,16 +77,15 @@ compileAndOptimise setup =
 keelungOnly :: Setup GF181 -> [Benchmark]
 keelungOnly setup =
   let keelung = Keelung.aggregateSignature setup
-      input = genInputFromSetup setup
    in [ 
-        bench "Elaboration" $ nf Keelung.benchElaborate' keelung,
-        bench "Rewriting" $ nf Keelung.benchRewrite' keelung,
+        -- bench "Elaboration" $ nf Keelung.benchElaborate' keelung,
+        -- bench "Rewriting" $ nf Keelung.benchRewrite' keelung,
         -- bench "Interpretation" $ nf (Keelung.benchInterpret keelung) input,
-        bench "Type Erasure" $ nf Keelung.benchEraseType keelung,
-        bench "Constant Propagation" $ nf Keelung.benchPropogateConstant keelung,
-        bench "Compilation" $ nf Keelung.benchCompile keelung,
-        bench "Optimisation" $ nf Keelung.benchOptimise keelung,
-        bench "Partial Evaluation" $ nf (Keelung.benchOptimiseWithInput keelung) input
+        -- bench "Type Erasure" $ nf Keelung.benchEraseType keelung,
+        -- bench "Constant Propagation" $ nf Keelung.benchPropogateConstant keelung,
+        bench "Compilation" $ nf Keelung.benchCompile keelung
+        -- bench "Optimisation" $ nf Keelung.benchOptimise keelung,
+        -- bench "Partial Evaluation" $ nf (Keelung.benchOptimiseWithInput keelung) input
       ]
 
 complexityOfElaboration :: [Benchmark]
