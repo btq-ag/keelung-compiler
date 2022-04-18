@@ -8,17 +8,18 @@ module Keelung.Compile (compile) where
 
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Maybe (mapMaybe)
+import Data.Sequence (Seq (..))
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Syntax.Common (Var)
 import Keelung.Syntax.Untyped
-import Debug.Trace (traceShowM)
-import Keelung.Util (DebugGF(DebugGF))
 
 ----------------------------------------------------------------
 
@@ -79,9 +80,11 @@ encode out expr = case expr of
       e =
         BinOp
           Add
-          [ BinOp Mul [b, x],
-            BinOp Mul [BinOp Sub [Val 1, b], y]
-          ]
+          ( Seq.fromList
+              [ BinOp Mul (Seq.fromList [b, x]),
+                BinOp Mul (Seq.fromList [BinOp Sub (Seq.fromList [Val 1, b]), y])
+              ]
+          )
 
 encodeAssignment :: GaloisField n => Assignment n -> M n ()
 encodeAssignment (Assignment var expr) = encode var expr
@@ -95,15 +98,15 @@ data Term n
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
 toTerm :: GaloisField n => Expr n -> M n (Term n)
-toTerm (BinOp Mul [Var var, Val n]) =
+toTerm (BinOp Mul (Var var :<| Val n :<| Empty)) =
   return $ WithVars var n
-toTerm (BinOp Mul [Val n, Var var]) =
+toTerm (BinOp Mul (Val n :<| Var var :<| Empty)) =
   return $ WithVars var n
-toTerm (BinOp Mul [expr, Val n]) = do
+toTerm (BinOp Mul (expr :<| Val n :<| Empty)) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (BinOp Mul [Val n, expr]) = do
+toTerm (BinOp Mul (Val n :<| expr :<| Empty)) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
@@ -116,17 +119,17 @@ toTerm expr = do
   encode out expr
   return $ WithVars out 1
 
-negateTailTerms :: Num n => [Term n] -> [Term n]
-negateTailTerms [] = []
-negateTailTerms (x : xs) = x : map negateConstant xs
+negateTailTerms :: Num n => Seq (Term n) -> Seq (Term n)
+negateTailTerms Empty = Empty
+negateTailTerms (x :<| xs) = x :<| fmap negateConstant xs -- don't negate the first element
   where
     negateConstant (WithVars var c) = WithVars var (negate c)
     negateConstant (Constant c) = Constant (negate c)
 
-encodeTerms :: GaloisField n => Var -> [Term n] -> M n ()
+encodeTerms :: GaloisField n => Var -> Seq (Term n) -> M n ()
 encodeTerms out terms =
-  let c = sum $ map extractConstant terms
-   in cadd c $ (out, - 1) : mapMaybe extractVarWithCoeff terms
+  let c = sum $ fmap extractConstant terms
+   in cadd c $ (out, - 1) : mapMaybe extractVarWithCoeff (toList terms)
   where
     extractConstant :: Num n => Term n -> n
     extractConstant (Constant n) = n
@@ -136,7 +139,7 @@ encodeTerms out terms =
     extractVarWithCoeff (Constant _) = Nothing
     extractVarWithCoeff (WithVars var coeff) = Just (var, coeff)
 
-encodeOtherBinOp :: GaloisField n => Op -> Var -> [Expr n] -> M n ()
+encodeOtherBinOp :: GaloisField n => Op -> Var -> Seq (Expr n) -> M n ()
 encodeOtherBinOp op out exprs = do
   vars <- mapM wireAsVar exprs
   encodeVars vars
@@ -148,14 +151,14 @@ encodeOtherBinOp op out exprs = do
       encode out' expr
       return out'
 
-    encodeVars :: GaloisField n => [Var] -> M n ()
+    encodeVars :: GaloisField n => Seq Var -> M n ()
     encodeVars vars = case vars of
-      [] -> return ()
-      [_] -> return ()
-      [x, y] -> encodeBinaryOp op out x y
-      (x : y : xs) -> do
+      Empty -> return ()
+      _ :<| Empty -> return ()
+      x :<| y :<| Empty -> encodeBinaryOp op out x y
+      x :<| y :<| xs -> do
         out' <- freshVar
-        encodeVars (out' : xs)
+        encodeVars (out' :<| xs)
         encodeBinaryOp op out' x y
 
 -- | Encode the constraint 'x op y = out'.
@@ -209,7 +212,7 @@ encodeBinaryOp op out x y = case op of
     -- The encoding is: out = 1 - (x-y != 0).
     result <- freshVar
     encodeBinaryOp NEq result x y
-    encode out (BinOp Sub [1, Var result])
+    encode out (BinOp Sub (1 :<| Var result :<| Empty))
   BEq -> do
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.
     -- The encoding is: x*y + (1-x)*(1-y) = out.
@@ -239,7 +242,7 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
 
   -- Compile assignments to constraints
   mapM_ encodeAssignment assignments
-  traceShowM $ "Assignments: " ++ show (map (fmap DebugGF) assignments)
+  -- traceShowM $ "Assignments: " ++ show (map (fmap DebugGF) assignments)
 
   -- Compile assertions to constraints
   mapM_ encodeAssertion assertions
@@ -251,9 +254,9 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
   let vars = varsInConstraints constraints
   -- traceShow ("assignments / constraints: " ++ show (length assignments, sum (map (\(Assignment _ expr) -> sizeOfExpr expr) assignments)), length constraints) $
   return
-      ( ConstraintSystem
-          constraints
-          (IntSet.size vars)
-          inputVars
-          outputVar
-      )
+    ( ConstraintSystem
+        constraints
+        (IntSet.size vars)
+        inputVars
+        outputVar
+    )

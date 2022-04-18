@@ -47,7 +47,7 @@ propagateConstant bindings = propogate
     propogate e = case e of
       Var var -> lookupVar var
       Val _ -> e
-      BinOp op es -> BinOp op (map propogate es)
+      BinOp op es -> BinOp op (fmap propogate es)
       IfThenElse p x y -> IfThenElse (propogate p) (propogate x) (propogate y)
 
     lookupVar var = case IntMap.lookup var bindings of

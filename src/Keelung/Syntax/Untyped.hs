@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE GADTs #-}
 
 module Keelung.Syntax.Untyped
   ( Op (..),
@@ -10,13 +10,15 @@ module Keelung.Syntax.Untyped
     TypeErased (..),
     Assignment (..),
     eraseType,
-    sizeOfExpr
+    sizeOfExpr,
   )
 where
 
 import Control.Monad.State.Strict
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Sequence (Seq (..), (<|), (|>))
+import qualified Data.Sequence as Seq
 import qualified Keelung.Monad as T
 import qualified Keelung.Syntax as T
 import Keelung.Syntax.Common
@@ -58,14 +60,14 @@ isAssoc op = case op of
 data Expr n
   = Var Var
   | Val n
-  | BinOp Op [Expr n]
+  | BinOp Op (Seq (Expr n))
   | IfThenElse (Expr n) (Expr n) (Expr n)
   deriving (Eq, Functor)
 
 instance Num n => Num (Expr n) where
-  x + y = BinOp Add [x, y]
-  x - y = BinOp Sub [x, y]
-  x * y = BinOp Mul [x, y]
+  x + y = BinOp Add (Seq.fromList [x, y])
+  x - y = BinOp Sub (Seq.fromList [x, y])
+  x * y = BinOp Mul (Seq.fromList [x, y])
   abs = id
   signum = const 1
   fromInteger = Val . fromInteger
@@ -86,23 +88,23 @@ instance Show n => Show (Expr n) where
       Eq -> chain " == " 5 operands
       BEq -> chain " == " 5 operands
       where
-        chain :: Show n => String -> Int -> [Expr n] -> String -> String
+        chain :: Show n => String -> Int -> Seq (Expr n) -> String -> String
         chain delim n xs = showParen (prec > n) $ go delim n xs
 
-        go :: Show n => String -> Int -> [Expr n] -> String -> String
-        go _ _ [] = showString ""
-        go _ n [x] = showsPrec (succ n) x
-        go delim n (x : xs) = showsPrec (succ n) x . showString delim . go delim n xs
+        go :: Show n => String -> Int -> Seq (Expr n) -> String -> String
+        go _ _ Empty = showString ""
+        go _ n (x :<| Empty) = showsPrec (succ n) x
+        go delim n (x :<| xs) = showsPrec (succ n) x . showString delim . go delim n xs
     IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 -- calculate the "size" of an expression
-sizeOfExpr :: Expr n -> Int 
+sizeOfExpr :: Expr n -> Int
 sizeOfExpr expr = case expr of
-    Val _ -> 1 
-    Var _ -> 1 
-    BinOp _ operands ->  sum (map sizeOfExpr operands) + (length operands - 1)
-    IfThenElse x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
-    
+  Val _ -> 1
+  Var _ -> 1
+  BinOp _ operands -> sum (fmap sizeOfExpr operands) + (length operands - 1)
+  IfThenElse x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+
 --------------------------------------------------------------------------------
 
 data Assignment n = Assignment Var (Expr n)
@@ -185,8 +187,8 @@ class Erase ty where
   eraseAssignment :: Num n => T.Assignment ty n -> M (Assignment n)
 
 instance Erase 'T.Unit where
-  eraseExpr expr = case expr of 
-    T.Val val -> case val of {}
+  eraseExpr expr = case expr of
+    T.Val val -> case val of
     T.Var (T.Variable var) -> return (Var var)
     T.IfThenElse b x y -> IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
   eraseAssignment (T.Assignment (T.Variable var) expr) = Assignment var <$> eraseExpr expr
@@ -229,14 +231,14 @@ chainExprs op x y = case (x, y) of
   (BinOp op1 xs, BinOp op2 ys)
     | op1 == op2 && op2 == op && isAssoc op ->
       -- chaining `op`, `op1`, and `op2`
-      BinOp op (xs ++ ys)
+      BinOp op (xs <> ys)
   (BinOp op1 xs, _)
     | op1 == op && isAssoc op ->
       -- chaining `op` and `op1`
-      BinOp op (xs ++ [y])
+      BinOp op (xs |> y)
   (_, BinOp op2 ys)
     | op2 == op && isAssoc op ->
       -- chaining `op` and `op2`
-      BinOp op (x : ys)
+      BinOp op (x <| ys)
   -- there's nothing left we can do
-  _ -> BinOp op [x, y]
+  _ -> BinOp op (Seq.fromList [x, y])
