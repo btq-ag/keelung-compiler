@@ -116,7 +116,7 @@ complexityOfElaboration =
 run :: IO ()
 run = do
   let dimension = 512
-  let numberOfSignatures = 8
+  let numberOfSignatures = 1
   let settings =
         Settings
           { enableAggSigChecking = True,

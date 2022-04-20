@@ -15,7 +15,7 @@ import qualified Snarkl
 main :: IO ()
 main = do
   let parameters =
-        [ (1, 1)
+        [ (512, 16)
         -- ,
         -- , (1, 2)
         -- , (1, 4)
