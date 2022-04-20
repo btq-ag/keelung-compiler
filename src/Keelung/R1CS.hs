@@ -10,7 +10,7 @@ import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
-import Keelung.Optimiser (optimise, optimiseWithWitness)
+import Keelung.Optimise (optimise, optimiseWithWitness)
 import Keelung.Syntax.Common
 import Keelung.Util
 

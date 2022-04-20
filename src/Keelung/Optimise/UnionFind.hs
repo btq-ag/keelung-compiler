@@ -1,4 +1,4 @@
-module Keelung.Optimiser.UnionFind
+module Keelung.Optimise.UnionFind
   ( UnionFind(..),
     new,
     find,

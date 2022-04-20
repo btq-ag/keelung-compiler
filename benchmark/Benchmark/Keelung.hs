@@ -6,7 +6,7 @@
 module Benchmark.Keelung where
 
 import Keelung
-import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
+import qualified Keelung.Optimise.ConstantPropagation as ConstantPropagation
 
 benchElaborate :: (GaloisField n, Bounded n, Integral n) => Comp n (Expr ty n) -> Int
 benchElaborate prog =

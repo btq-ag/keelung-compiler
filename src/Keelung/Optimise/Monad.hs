@@ -1,4 +1,4 @@
-module Keelung.Optimiser.Monad
+module Keelung.Optimise.Monad
   ( unifyVars,
     bindVar,
     rootOfVar,
@@ -15,8 +15,8 @@ import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Lazy as Map
-import Keelung.Optimiser.UnionFind (UnionFind (..))
-import qualified Keelung.Optimiser.UnionFind as UnionFind
+import Keelung.Optimise.UnionFind (UnionFind (..))
+import qualified Keelung.Optimise.UnionFind as UnionFind
 import Keelung.Syntax.Common
 
 ----------------------------------------------------------------

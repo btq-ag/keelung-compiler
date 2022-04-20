@@ -31,11 +31,12 @@ library
       Keelung.Constraint.CoeffMap
       Keelung.Interpret
       Keelung.Monad
-      Keelung.Optimiser
-      Keelung.Optimiser.ConstantPropagation
-      Keelung.Optimiser.Monad
-      Keelung.Optimiser.Rewriting
-      Keelung.Optimiser.UnionFind
+      Keelung.Optimise
+      Keelung.Optimise.ConstantPropagation
+      Keelung.Optimise.MinimiseConstraints
+      Keelung.Optimise.Monad
+      Keelung.Optimise.Rewriting
+      Keelung.Optimise.UnionFind
       Keelung.R1CS
       Keelung.Syntax
       Keelung.Syntax.Common
@@ -65,11 +66,12 @@ executable keelung-exe
       Keelung.Constraint.CoeffMap
       Keelung.Interpret
       Keelung.Monad
-      Keelung.Optimiser
-      Keelung.Optimiser.ConstantPropagation
-      Keelung.Optimiser.Monad
-      Keelung.Optimiser.Rewriting
-      Keelung.Optimiser.UnionFind
+      Keelung.Optimise
+      Keelung.Optimise.ConstantPropagation
+      Keelung.Optimise.MinimiseConstraints
+      Keelung.Optimise.Monad
+      Keelung.Optimise.Rewriting
+      Keelung.Optimise.UnionFind
       Keelung.R1CS
       Keelung.Syntax
       Keelung.Syntax.Common
@@ -133,11 +135,12 @@ benchmark keelung-bench
       Keelung.Constraint.CoeffMap
       Keelung.Interpret
       Keelung.Monad
-      Keelung.Optimiser
-      Keelung.Optimiser.ConstantPropagation
-      Keelung.Optimiser.Monad
-      Keelung.Optimiser.Rewriting
-      Keelung.Optimiser.UnionFind
+      Keelung.Optimise
+      Keelung.Optimise.ConstantPropagation
+      Keelung.Optimise.MinimiseConstraints
+      Keelung.Optimise.Monad
+      Keelung.Optimise.Rewriting
+      Keelung.Optimise.UnionFind
       Keelung.R1CS
       Keelung.Syntax
       Keelung.Syntax.Common

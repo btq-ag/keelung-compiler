@@ -11,8 +11,8 @@ import qualified Data.IntSet as IntSet
 import Keelung
 import qualified Snarkl
 import Test.Hspec
-import qualified Keelung.Optimiser.Monad as Optimiser
-import qualified Keelung.Optimiser as Optimiser
+import qualified Keelung.Optimise.Monad as Optimiser
+import qualified Keelung.Optimise as Optimiser
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.

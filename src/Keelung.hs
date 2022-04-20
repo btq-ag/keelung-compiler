@@ -18,7 +18,7 @@ module Keelung
     eraseType,
     TypeErased (..),
     module Keelung.R1CS,
-    module Keelung.Optimiser,
+    module Keelung.Optimise,
     Compilable (..),
     comp,
     optm,
@@ -32,9 +32,9 @@ import Keelung.Compile (compile)
 import Keelung.Constraint (ConstraintSystem (..))
 import Keelung.Interpret
 import Keelung.Monad
-import Keelung.Optimiser
-import qualified Keelung.Optimiser.ConstantPropagation as ConstantPropagation
-import qualified Keelung.Optimiser.Rewriting as Rewriting
+import Keelung.Optimise
+import qualified Keelung.Optimise.ConstantPropagation as ConstantPropagation
+import qualified Keelung.Optimise.Rewriting as Rewriting
 import Keelung.R1CS
 import Keelung.Syntax
 import Keelung.Syntax.Common
