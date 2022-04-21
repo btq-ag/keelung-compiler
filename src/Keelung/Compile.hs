@@ -8,10 +8,9 @@ module Keelung.Compile (compile) where
 
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
+import Data.Foldable (Foldable (foldl'))
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.Maybe (mapMaybe)
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
@@ -128,16 +127,12 @@ negateTailTerms (x :<| xs) = x :<| fmap negateConstant xs -- don't negate the fi
 
 encodeTerms :: GaloisField n => Var -> Seq (Term n) -> M n ()
 encodeTerms out terms =
-  let c = sum $ fmap extractConstant terms
-   in cadd c $ (out, - 1) : mapMaybe extractVarWithCoeff (toList terms)
+  let (constant, varsWithCoeffs) = foldl' go (0, []) terms
+   in cadd constant $ (out, - 1) : varsWithCoeffs
   where
-    extractConstant :: Num n => Term n -> n
-    extractConstant (Constant n) = n
-    extractConstant (WithVars _ _) = 0
-
-    extractVarWithCoeff :: Term n -> Maybe (Var, n)
-    extractVarWithCoeff (Constant _) = Nothing
-    extractVarWithCoeff (WithVars var coeff) = Just (var, coeff)
+    go :: Num n => (n, [(Var, n)]) -> Term n -> (n, [(Var, n)])
+    go (constant, pairs) (Constant n) = (constant + n, pairs)
+    go (constant, pairs) (WithVars var coeff) = (constant, (var, coeff) : pairs)
 
 encodeOtherBinOp :: GaloisField n => Op -> Var -> Seq (Expr n) -> M n ()
 encodeOtherBinOp op out exprs = do
