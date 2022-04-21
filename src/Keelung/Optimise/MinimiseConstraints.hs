@@ -17,48 +17,45 @@ run ::
   Set (Constraint n) ->
   OptiM n (Set (Constraint n))
 run pinnedVars constraints = do
-  simplified <- simplifyManyTimes constraints
-  -- substitute roots/constants in constraints
-  substituted <- mapM substConstraint $ Set.toList simplified
-  -- keep only constraints that is not tautologous
+  minimised <- minimiseManyTimes constraints
+  -- -- substitute roots/constants in constraints
+  -- substituted <- mapM substConstraint $ Set.toList simplified
+  -- -- keep only constraints that is not tautologous
 
-  removedTautology <- filterM (fmap not . isTautology) substituted
+  -- removedTautology <- filterM (fmap not . isTautology) substituted
 
   pinned <- handlePinnedVars pinnedVars
-  return $ Set.fromList (pinned ++ removedTautology)
+  return (Set.fromList pinned <> minimised)
 
-simplifyManyTimes ::
+minimiseManyTimes ::
   (GaloisField n, Bounded n, Integral n) =>
   -- | Initial constraint set
   Set (Constraint n) ->
   -- | Resulting simplified constraint set
   OptiM n (Set (Constraint n))
-simplifyManyTimes constraints = do
-  constraints' <- simplifyOnce constraints
+minimiseManyTimes constraints = do
+  constraints' <- minimiseOnce constraints
   let hasShrunk = Set.size constraints' < Set.size constraints
+  let hasChanged = not $ Set.null (Set.difference constraints constraints')
+  -- keep minimising if the constraints have shrunk or changed 
+  if hasShrunk || hasChanged
+    then minimiseManyTimes constraints' -- keep going
+    else return constraints' -- stop here
 
-  if hasShrunk
-    then simplifyManyTimes constraints'
-    else
-      if Set.null (Set.difference constraints constraints')
-        then return constraints'
-        else simplifyManyTimes constraints'
-
--- TODO: see if the steps after `goOverConstraints` is necessary
-simplifyOnce ::
+minimiseOnce ::
   (GaloisField n, Bounded n, Integral n) =>
   -- | Initial constraint set
   Set (Constraint n) ->
   -- | Resulting simplified constraint set
   OptiM n (Set (Constraint n))
-simplifyOnce constraints = do
-  --
-  constraints' <- goOverConstraints Set.empty constraints
-  -- substitute roots/constants in constraints
-  substituted <- mapM substConstraint $ Set.toList constraints'
-  -- keep only constraints that is not tautologous
-  removedTautology <- filterM (fmap not . isTautology) substituted
-  return $ Set.fromList removedTautology
+minimiseOnce = goOverConstraints Set.empty
+  -- --
+  -- -- constraints' <- goOverConstraints Set.empty constraints
+  -- -- -- substitute roots/constants in constraints
+  -- -- substituted <- mapM substConstraint $ Set.toList constraints'
+  -- -- -- keep only constraints that is not tautologous
+  -- -- removedTautology <- filterM (fmap not . isTautology) substituted
+  -- return $ Set.fromList removedTautology
 
 --
 goOverConstraints ::
@@ -70,6 +67,7 @@ goOverConstraints accum constraints = case Set.minView constraints of
   Nothing -> return accum -- no more
   Just (picked, constraints') -> do
     -- pick the "smallest" constraint
+    -- and substitute roots/constants in constraints
     substituted <- substConstraint picked
     -- if the constraint is tautologous, remove it
     tautologous <- isTautology substituted
