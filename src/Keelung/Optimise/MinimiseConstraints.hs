@@ -1,12 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
 
-module Keelung.Optimise.MinimiseConstraints (run) where
+module Keelung.Optimise.MinimiseConstraints (run, substConstraint) where
 
 import Control.Monad
 import Data.Field.Galois (GaloisField)
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Constraint (Constraint (..))
+import Keelung.Constraint (Constraint (..), cadd)
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Optimise.Monad
 import Keelung.Syntax.Common (Var)
@@ -79,10 +79,6 @@ goOverConstraints accum constraints = case Set.minView constraints of
         goOverConstraints (Set.insert substituted accum) constraints'
 
 --------------------------------------------------------------------------------
-
--- | Smart constructor for the CAdd constraint
-cadd :: GaloisField n => n -> [(Var, n)] -> Constraint n
-cadd !c !xs = CAdd c (CoeffMap.fromList xs)
 
 -- | Normalize constraints by substituting roots/constants
 -- for the variables that appear in the constraint. Note that, when

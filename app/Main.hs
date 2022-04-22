@@ -20,7 +20,7 @@ main = do
   if generateFlamegraph
     then do
       let dimension = 512
-      let numOfSigs = 128
+      let numOfSigs = 16
       keelung dimension numOfSigs
     else do
       let parameters =

@@ -1,7 +1,9 @@
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 
 module Keelung.Constraint where
 
+import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
@@ -23,6 +25,10 @@ data Constraint n
   | CMul !(n, Var) !(n, Var) !(n, Maybe Var)
   | CNQZ Var Var -- x & m
   deriving (Eq)
+
+-- | Smart constructor for the CAdd constraint
+cadd :: GaloisField n => n -> [(Var, n)] -> Constraint n
+cadd !c !xs = CAdd c (CoeffMap.fromList xs)
 
 instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
   show (CAdd 0 m) = show m
@@ -110,22 +116,22 @@ renumberConstraints cs =
   where
     -- mapping of old variable indices to new variable indices
     -- input variables are placed in the front
-    variableMap = Map.fromAscList $ zip (inputVars ++ otherVars) [0 ..]
+    variableMap = Map.fromList $ zip (inputVars ++ otherVars) [0 ..]
       where
         inputVars = IntSet.toList (csInputVars cs)
         otherVars = filter isNotInput $ IntSet.toList $ varsInConstraints $ csConstraints cs
         isNotInput = not . flip IntSet.member (csInputVars cs)
 
-    renumber x = case Map.lookup x variableMap of
+    renumber var = case Map.lookup var variableMap of
       Nothing ->
         error
-          ( "can't find a binding for variable " ++ show x
+          ( "can't find a binding for variable " ++ show var
               ++ " in map "
               ++ show variableMap
           )
-      Just x' -> x'
+      Just var' -> var'
 
-    renumberConstraint c0 = case c0 of
+    renumberConstraint constraint = case constraint of
       CAdd a m ->
         CAdd a $ CoeffMap.mapKeys renumber m
       CMul (a, x) (b, y) (c, z) ->

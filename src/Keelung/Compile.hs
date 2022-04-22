@@ -15,7 +15,7 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Constraint
+import Keelung.Constraint hiding (cadd)
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Syntax.Common (Var)
 import Keelung.Syntax.Untyped
@@ -241,13 +241,11 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
 
   -- Compile assignments to constraints
   mapM_ encodeAssignment assignments
-  -- traceShowM $ "Assignments: " ++ show (map (fmap DebugGF) assignments)
 
   -- Compile assertions to constraints
   mapM_ encodeAssertion assertions
 
   -- ensure that boolean input variables are boolean
-  -- setBooleanVars (booleanVars `IntSet.intersection` inputVars)
   encodeBooleanVars (booleanVars `IntSet.intersection` inputVars)
 
   constraints <- gets envConstraints

@@ -9,10 +9,11 @@ import qualified Basic
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Keelung
+import Keelung.Constraint (cadd)
+import qualified Keelung.Optimise.MinimiseConstraints as Optimise
+import qualified Keelung.Optimise.Monad as Optimise
 import qualified Snarkl
 import Test.Hspec
-import qualified Keelung.Optimise.Monad as Optimiser
-import qualified Keelung.Optimise as Optimiser
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
@@ -28,16 +29,16 @@ execute prog inputs = do
   witness <- witnessOfR1CS inputs r1cs
 
   -- extract the output value from the witness
-  actualOutput <- case outputVar of 
-        Nothing -> return Nothing
-        Just var -> case IntMap.lookup var witness of
-          Nothing ->
-            Left $
-              "output variable "
-                ++ show outputVar
-                ++ "is not mapped in\n  "
-                ++ show witness
-          Just value -> return $ Just value
+  actualOutput <- case outputVar of
+    Nothing -> return Nothing
+    Just var -> case IntMap.lookup var witness of
+      Nothing ->
+        Left $
+          "output variable "
+            ++ show outputVar
+            ++ "is not mapped in\n  "
+            ++ show witness
+      Just value -> return $ Just value
 
   -- interpret the program to see if the output value is correct
   expectedOutput <- interpret prog inputs
@@ -135,14 +136,14 @@ main = hspec $ do
       execute Basic.eq1 [3] `shouldBe` Right (Just 1)
     it "cond 1" $
       execute Basic.cond [0] `shouldBe` Right (Just 789)
-    -- it "assert 1" $
-    --   execute Basic.assert1 [0] `shouldBe` Right 0
+  -- it "assert 1" $
+  --   execute Basic.assert1 [0] `shouldBe` Right 0
 
-    -- NOTE: 
-    --    some variables are of "don't care"
-    --    they get thrown away and won't be in the witness 
-    -- it "cond 2" $
-    --   execute Basic.cond [3] `shouldBe` Right 12
+  -- NOTE:
+  --    some variables are of "don't care"
+  --    they get thrown away and won't be in the witness
+  -- it "cond 2" $
+  --   execute Basic.cond [3] `shouldBe` Right 12
 
   describe "Optimisation" $ do
     -- describe "Constant Propagation" $ do
@@ -150,26 +151,20 @@ main = hspec $ do
     --     erasedExpr <$> Basic.elab Basic.constant1 `shouldBe` Right 2
 
     describe "Constraint Set Reduction" $ do
-
-      it "$0 = $1" $ 
+      it "$0 = $1" $
         let constraint = cadd 0 [(0, 1), (1, -1)]
             links = IntMap.fromList [(1, 0)]
             sizes = IntMap.fromList [(0, 2)]
-            run :: Optimiser.OptiM GF181 a -> a
-            run = Optimiser.runOptiM' links sizes mempty
-        in 
-          run (Optimiser.substConstraint constraint) `shouldBe` 
-          cadd 0 []
+            run :: Optimise.OptiM GF181 a -> a
+            run = Optimise.runOptiM' links sizes mempty
+         in run (Optimise.substConstraint constraint)
+              `shouldBe` cadd 0 []
 
-
-
-      -- it "$0 = $1 2" $ 
-      --   let constraints = Set.singleton $ cadd 0 [(0, 1), (1, -1)]
-      --       run :: Optimiser.OptiM GF181 a -> a
-      --       run = Optimiser.runOptiM mempty
-      --       pinnedVars = [0, 1]
-      --   in 
-      --     run (Optimiser.simplifyConstraintSet pinnedVars constraints) `shouldBe` 
-      --     constraints
-
-
+-- it "$0 = $1 2" $
+--   let constraints = Set.singleton $ cadd 0 [(0, 1), (1, -1)]
+--       run :: Optimise.OptiM GF181 a -> a
+--       run = Optimise.runOptiM mempty
+--       pinnedVars = [0, 1]
+--   in
+--     run (Optimise.simplifyConstraintSet pinnedVars constraints) `shouldBe`
+--     constraints
