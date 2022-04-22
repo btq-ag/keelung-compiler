@@ -74,13 +74,19 @@ varsInConstraints = IntSet.unions . Set.map varsInConstraint
 -- | Constraint System
 data ConstraintSystem n = ConstraintSystem
   { csConstraints :: !(Set (Constraint n)),
+    csBooleanInputVarConstraints :: ![Constraint n],
     csNumOfVars :: !Int,
     csInputVars :: !IntSet,
+    -- csBooleanInputVars :: !IntSet,
     csOutputVar :: !(Maybe Var)
   }
 
+-- | return the number of constraints (including constraints of boolean input vars)
+numberOfConstraints :: ConstraintSystem n -> Int
+numberOfConstraints (ConstraintSystem cs cs' _ _ _) = Set.size cs + length cs'
+
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem set numOfVars inputVars outputVar) =
+  show (ConstraintSystem set _ numOfVars inputVars outputVar) =
     "ConstraintSystem {\n\
     \  number of constraints: "
       <> show (Set.size set)
@@ -110,6 +116,7 @@ renumberConstraints :: Ord n => ConstraintSystem n -> ConstraintSystem n
 renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))
+    (map renumberConstraint (csBooleanInputVarConstraints cs))
     (Map.size variableMap)
     (IntSet.map renumber (csInputVars cs))
     (renumber <$> csOutputVar cs)

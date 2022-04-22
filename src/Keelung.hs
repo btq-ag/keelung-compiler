@@ -14,6 +14,7 @@ module Keelung
     module Prelude,
     compile,
     ConstraintSystem (..),
+    numberOfConstraints,
     Erase,
     eraseType,
     TypeErased (..),
@@ -23,13 +24,14 @@ module Keelung
     comp,
     optm,
     optmWithInput,
+
   )
 where
 
 import Data.Field.Galois (GaloisField)
 import Data.Semiring (Semiring (one, zero))
 import Keelung.Compile (compile)
-import Keelung.Constraint (ConstraintSystem (..))
+import Keelung.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Interpret
 import Keelung.Monad
 import Keelung.Optimise

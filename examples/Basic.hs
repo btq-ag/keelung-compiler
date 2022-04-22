@@ -1,15 +1,13 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE RebindableSyntax #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use <&>" #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Basic where
 
 import qualified AggregateSignature.Program.Keelung as Keelung
 import AggregateSignature.Util
-import qualified Data.Set as Set
 import Keelung
 
 --------------------------------------------------------------------------------
@@ -96,7 +94,11 @@ bench program settings dimension n = do
   cs <- comp program -- before optimisation (only constant propagation)
   cs' <- optm program -- after optimisation (constant propagation + constraint set reduction)
   cs'' <- optmWithInput program input -- after optimisation (constant propagation + constraint set reduction with input)
-  return (Set.size (csConstraints cs), Set.size (csConstraints cs'), Set.size (csConstraints cs''))
+  return
+    ( numberOfConstraints cs,
+      numberOfConstraints cs',
+      numberOfConstraints cs''
+    )
 
 -- #1
 runAggSig :: Int -> Int -> Either String (Int, Int, Int)

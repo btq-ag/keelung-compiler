@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -15,8 +14,7 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Constraint hiding (cadd)
-import qualified Keelung.Constraint.CoeffMap as CoeffMap
+import Keelung.Constraint
 import Keelung.Syntax.Common (Var)
 import Keelung.Syntax.Untyped
 
@@ -34,12 +32,9 @@ type M n = State (Env n)
 runM :: Var -> M n a -> a
 runM outVar program = evalState program (Env Set.empty (outVar + 1))
 
-addConstraint :: Ord n => Constraint n -> M n ()
-addConstraint c =
+add :: Ord n => Constraint n -> M n ()
+add c =
   modify (\env -> env {envConstraints = Set.insert c $ envConstraints env})
-
--- setBooleanVars :: IntSet -> M n ()
--- setBooleanVars vars = modify (\env -> env {envBooleanVars = vars})
 
 freshVar :: M n Var
 freshVar = do
@@ -49,27 +44,10 @@ freshVar = do
 
 ----------------------------------------------------------------
 
--- | Helper for adding CAdd constraint
-cadd :: GaloisField n => n -> [(Var, n)] -> M n ()
-cadd !c !xs = addConstraint $ CAdd c (CoeffMap.fromList xs)
-
--- | Helper for adding CMul constraint
-cmult :: GaloisField n => (n, Var) -> (n, Var) -> (n, Maybe Var) -> M n ()
-cmult (a, x) (b, y) (c, z) = addConstraint $ CMul (a, x) (b, y) (c, z)
-
--- | Helper for adding CMul constraint
-cnqz :: GaloisField n => Var -> Var -> M n ()
-cnqz x m = addConstraint $ CNQZ x m
-
-----------------------------------------------------------------
-
--- class Encode n a where
---   encode :: Var -> a -> M n ()
-
 encode :: GaloisField n => Var -> Expr n -> M n ()
 encode out expr = case expr of
-  Val val -> cadd val [(out, -1)] -- out = val
-  Var var -> cadd 0 [(out, 1), (var, -1)] -- out = var
+  Val val -> add $ cadd val [(out, -1)] -- out = val
+  Var var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   BinOp op operands -> case op of
     Add -> do
       terms <- mapM toTerm operands
@@ -132,7 +110,7 @@ negateTailTerms (x :<| xs) = x :<| fmap negateConstant xs -- don't negate the fi
 encodeTerms :: GaloisField n => Var -> Seq (Term n) -> M n ()
 encodeTerms out terms =
   let (constant, varsWithCoeffs) = foldl' go (0, []) terms
-   in cadd constant $ (out, - 1) : varsWithCoeffs
+   in add $ cadd constant $ (out, - 1) : varsWithCoeffs
   where
     go :: Num n => (n, [(Var, n)]) -> Term n -> (n, [(Var, n)])
     go (constant, pairs) (Constant n) = (constant + n, pairs)
@@ -163,10 +141,10 @@ encodeOtherBinOp op out exprs = do
 -- | Encode the constraint 'x op y = out'.
 encodeBinaryOp :: GaloisField n => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
-  Add -> cadd 0 [(x, 1), (y, 1), (out, -1)]
-  Sub -> cadd 0 [(x, 1), (y, negate 1), (out, negate 1)]
-  Mul -> cmult (1, x) (1, y) (1, Just out)
-  Div -> cmult (1, y) (1, out) (1, Just x)
+  Add -> add $ cadd 0 [(x, 1), (y, 1), (out, -1)]
+  Sub -> add $ cadd 0 [(x, 1), (y, negate 1), (out, negate 1)]
+  Mul -> add $ CMul (1, x) (1, y) (1, Just out)
+  Div -> add $ CMul (1, y) (1, out) (1, Just x)
   And -> encodeBinaryOp Mul out x y
   Or -> do
     -- Constraint 'x \/ y = out'.
@@ -179,13 +157,14 @@ encodeBinaryOp op out x y = case op of
     -- The encoding is: x+y - out = 2(x*y); assumes x and y are boolean.
     xy <- freshVar
     encodeBinaryOp Mul xy x y
-    cadd
-      0
-      [ (x, 1),
-        (y, 1),
-        (out, - 1),
-        (xy, -2)
-      ]
+    add $
+      cadd
+        0
+        [ (x, 1),
+          (y, 1),
+          (out, - 1),
+          (xy, -2)
+        ]
   NEq -> do
     -- Constraint 'x != y = out'
     -- The encoding is, for some 'm':
@@ -200,12 +179,12 @@ encodeBinaryOp op out x y = case op of
     -- if diff = 0 then m = 0 else m = recip diff
     m <- freshVar
     encode out (Var diff * Var m)
-    cnqz diff m
+    add $ CNQZ diff m
 
     -- notOut = 1 - out
     notOut <- freshVar
     encode notOut (1 - Var out)
-    cmult (1, diff) (1, notOut) (0, Nothing)
+    add $ CMul (1, diff) (1, notOut) (0, Nothing)
   Eq -> do
     -- Constraint 'x == y = out'.
     -- The encoding is: out = 1 - (x-y != 0).
@@ -219,15 +198,17 @@ encodeBinaryOp op out x y = case op of
       Var x * Var y + ((1 - Var x) * (1 - Var y))
 
 -- | Ensure that boolean variables have constraint 'b^2 = b'
-encodeBooleanVars :: GaloisField n => IntSet -> M n ()
-encodeBooleanVars booleanInputVars = mapM_ (\b -> encodeBinaryOp Mul b b b) $ IntSet.toList booleanInputVars
+convertBooleanVars :: GaloisField n => IntSet -> [Constraint n]
+convertBooleanVars booleanInputVars =
+  map (\b -> CMul (1, b) (1, b) (1, Just b)) $
+    IntSet.toList booleanInputVars
 
 -- | Encode the constraint 'x = out'.
 encodeAssertion :: GaloisField n => Expr n -> M n ()
 encodeAssertion expr = do
   out <- freshVar
   encode out expr
-  cadd 1 [(out, -1)] -- 1 = expr
+  add $ cadd 1 [(out, -1)] -- 1 = expr
 
 -- | Compile an untyped expression to a constraint system
 compile :: (GaloisField n, Bounded n, Integral n) => TypeErased n -> ConstraintSystem n
@@ -246,7 +227,8 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
   mapM_ encodeAssertion assertions
 
   -- ensure that boolean input variables are boolean
-  encodeBooleanVars (booleanVars `IntSet.intersection` inputVars)
+  let booleanInputVars = booleanVars `IntSet.intersection` inputVars
+  let booleanInputVarConstraints = convertBooleanVars booleanInputVars
 
   constraints <- gets envConstraints
   let vars = varsInConstraints constraints
@@ -254,6 +236,7 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
   return
     ( ConstraintSystem
         constraints
+        booleanInputVarConstraints
         (IntSet.size vars)
         inputVars
         outputVar

@@ -110,7 +110,7 @@ fromConstraintSystem :: (GaloisField n, Bounded n, Integral n) => ConstraintSyst
 fromConstraintSystem cs =
   let cs' = optimise cs
    in R1CS
-        (mapMaybe toR1C (Set.toList (csConstraints cs')))
+        (mapMaybe toR1C (Set.toList (csConstraints cs') ++ csBooleanInputVarConstraints cs'))
         (csNumOfVars cs')
         (csInputVars cs')
         (csOutputVar cs')

@@ -81,7 +81,7 @@ keelungOnly setup =
    in [ 
         bench "Elaboration" $ nf Keelung.benchElaborate' keelung,
         bench "Rewriting" $ nf Keelung.benchRewrite' keelung,
-        bench "Interpretation" $ nf (Keelung.benchInterpret keelung) input,
+        -- bench "Interpretation" $ nf (Keelung.benchInterpret keelung) input,
         bench "Type Erasure" $ nf Keelung.benchEraseType keelung,
         bench "Constant Propagation" $ nf Keelung.benchPropogateConstant keelung,
         bench "Compilation" $ nf Keelung.benchCompile keelung,
