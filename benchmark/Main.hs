@@ -79,14 +79,14 @@ keelungOnly setup =
   let keelung = Keelung.aggregateSignature setup
       input = genInputFromSetup setup
    in [ 
-        bench "Elaboration" $ nf Keelung.benchElaborate' keelung,
-        bench "Rewriting" $ nf Keelung.benchRewrite' keelung,
+        -- bench "Elaboration" $ nf Keelung.benchElaborate' keelung,
+        -- bench "Rewriting" $ nf Keelung.benchRewrite' keelung,
         -- bench "Interpretation" $ nf (Keelung.benchInterpret keelung) input,
-        bench "Type Erasure" $ nf Keelung.benchEraseType keelung,
-        bench "Constant Propagation" $ nf Keelung.benchPropogateConstant keelung,
-        bench "Compilation" $ nf Keelung.benchCompile keelung,
-        bench "Optimisation" $ nf Keelung.benchOptimise keelung,
-        bench "Partial Evaluation" $ nf (Keelung.benchOptimiseWithInput keelung) input
+        -- bench "Type Erasure" $ nf Keelung.benchEraseType keelung,
+        -- bench "Constant Propagation" $ nf Keelung.benchPropogateConstant keelung,
+        bench "Compilation" $ nf Keelung.benchCompile keelung
+        -- bench "Optimisation" $ nf Keelung.benchOptimise keelung,
+        -- bench "Partial Evaluation" $ nf (Keelung.benchOptimiseWithInput keelung) input
       ]
 
 complexityOfElaboration :: [Benchmark]
@@ -116,7 +116,7 @@ complexityOfElaboration =
 run :: IO ()
 run = do
   let dimension = 512
-  let numberOfSignatures = 1
+  let numberOfSignatures = 8
   let settings =
         Settings
           { enableAggSigChecking = True,
