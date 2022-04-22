@@ -25,6 +25,7 @@ import Keelung.Syntax.Untyped
 -- | Monad for compilation
 data Env n = Env
   { envConstraints :: Set (Constraint n),
+    -- envBooleanVars :: IntSet,
     envNextVar :: Var
   }
 
@@ -36,6 +37,9 @@ runM outVar program = evalState program (Env Set.empty (outVar + 1))
 addConstraint :: Ord n => Constraint n -> M n ()
 addConstraint c =
   modify (\env -> env {envConstraints = Set.insert c $ envConstraints env})
+
+-- setBooleanVars :: IntSet -> M n ()
+-- setBooleanVars vars = modify (\env -> env {envBooleanVars = vars})
 
 freshVar :: M n Var
 freshVar = do
@@ -243,6 +247,7 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
   mapM_ encodeAssertion assertions
 
   -- ensure that boolean input variables are boolean
+  -- setBooleanVars (booleanVars `IntSet.intersection` inputVars)
   encodeBooleanVars (booleanVars `IntSet.intersection` inputVars)
 
   constraints <- gets envConstraints

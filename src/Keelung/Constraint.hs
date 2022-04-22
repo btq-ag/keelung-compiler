@@ -51,6 +51,8 @@ instance Ord n => Ord (Constraint n) where
   compare CNQZ {} _ = LT
   compare _ CNQZ {} = GT
 
+--------------------------------------------------------------------------------
+
 -- | Return the list of variables occurring in constraints
 varsInConstraint :: Constraint a -> IntSet
 varsInConstraint (CAdd _ m) = CoeffMap.keysSet m
@@ -59,7 +61,7 @@ varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
 varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
 
 varsInConstraints :: Set (Constraint a) -> IntSet
-varsInConstraints = IntSet.unions . map varsInConstraint . Set.toList
+varsInConstraints = IntSet.unions . Set.map varsInConstraint
 
 --------------------------------------------------------------------------------
 
@@ -106,12 +108,13 @@ renumberConstraints cs =
     (IntSet.map renumber (csInputVars cs))
     (renumber <$> csOutputVar cs)
   where
-    variableMap =
-      Map.fromList $
-        zip (IntSet.toList (csInputVars cs) ++ filter isNotInput all_vars) [0 ..]
+    -- mapping of old variable indices to new variable indices
+    -- input variables are placed in the front
+    variableMap = Map.fromAscList $ zip (inputVars ++ otherVars) [0 ..]
       where
+        inputVars = IntSet.toList (csInputVars cs)
+        otherVars = filter isNotInput $ IntSet.toList $ varsInConstraints $ csConstraints cs
         isNotInput = not . flip IntSet.member (csInputVars cs)
-        all_vars = IntSet.toList $ constraintVars $ csConstraints cs
 
     renumber x = case Map.lookup x variableMap of
       Nothing ->
@@ -129,12 +132,3 @@ renumberConstraints cs =
         CMul (a, renumber x) (b, renumber y) (c, renumber <$> z)
       CNQZ x y ->
         CNQZ (renumber x) (renumber y)
-
--- | Return the list of variables occurring in constraints 'cs'.
-constraintVars :: Set (Constraint n) -> IntSet
-constraintVars = IntSet.unions . Set.map getVars
-  where
-    getVars (CAdd _ m) = CoeffMap.keysSet m
-    getVars (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
-    getVars (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
-    getVars (CNQZ x y) = IntSet.fromList [x, y]
