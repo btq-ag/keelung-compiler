@@ -29,7 +29,7 @@ type Var = Int
 newtype CoeffMap f = CoeffMap {toIntMap :: IntMap f}
   deriving (Eq, Ord, Functor)
 
-instance (Show f, Eq f, Num f) => Show (CoeffMap f) where
+instance (Show f, Eq f, Num f, Integral f) => Show (CoeffMap f) where
   show = go . IntMap.toList . toIntMap
     where
       go [] = "<empty>"
@@ -40,7 +40,7 @@ instance (Show f, Eq f, Num f) => Show (CoeffMap f) where
       printTerm (_, 0) = error "printTerm: coefficient of 0"
       printTerm (x, 1) = "$" ++ show x
       printTerm (x, -1) = "-$" ++ show x
-      printTerm (x, c) = show c ++ "$" ++ show x
+      printTerm (x, c) = show (toInteger c) ++ "$" ++ show x
 
 fromList :: GaloisField f => [(Var, f)] -> CoeffMap f
 fromList xs = CoeffMap . IntMap.filter (zero /=) $ IntMap.fromListWith plus xs

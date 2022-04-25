@@ -4,6 +4,7 @@
 module Keelung.Constraint where
 
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
@@ -31,17 +32,17 @@ cadd :: GaloisField n => n -> [(Var, n)] -> Constraint n
 cadd !c !xs = CAdd c (CoeffMap.fromList xs)
 
 instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
-  show (CAdd 0 m) = show m
-  show (CAdd n m) = show (DebugGF n) <> " + " <> show m
+  show (CAdd 0 m) = "A " ++ show m
+  show (CAdd n m) = "A " ++ show (DebugGF n) <> " + " <> show m
   show (CMul (a, x) (b, y) (c, z)) =
     let showTerm 1 var = "$" <> show var
         showTerm coeff var = show (DebugGF coeff) <> "$" <> show var
-     in showTerm a x <> " * " <> showTerm b y
+     in "M " ++ showTerm a x <> " * " <> showTerm b y
           <> " = "
           <> case z of
             Nothing -> show $ DebugGF c
             Just z' -> showTerm c z'
-  show (CNQZ x m) = "CNQZ $" <> show x <> " $" <> show m
+  show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
 
 instance Ord n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
@@ -85,17 +86,24 @@ numberOfConstraints :: ConstraintSystem n -> Int
 numberOfConstraints (ConstraintSystem cs cs' _ _ _) = Set.size cs + length cs'
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem set _ numOfVars inputVars outputVar) =
+  show (ConstraintSystem constraints boolConstraints vars inputVars outputVar) =
     "ConstraintSystem {\n\
-    \  number of constraints: "
-      <> show (Set.size set)
-      <> "\n"
-      <> ( if Set.size set < 20
-             then "  constraints:\n" <> printConstraints set <> "\n"
-             else ""
+    \  constraints ("
+      <> show (length boolConstraints)
+      <> ")"
+      <> ( if Set.size constraints < 20
+             then ":\n  \n" <> printConstraints (toList constraints) <> "\n"
+             else "\n"
+         )
+      <> "  boolean constraints ("
+      <> show (length boolConstraints)
+      <> ")"
+      <> ( if length boolConstraints < 20
+             then ":\n  \n" <> printConstraints boolConstraints <> "\n"
+             else "\n"
          )
       <> "  number of variables: "
-      <> show numOfVars
+      <> show (IntSet.size vars)
       <> "\n\
          \  number of input variables: "
       <> show (IntSet.size inputVars)
@@ -104,8 +112,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
       <> "\n\
          \}"
     where
-      printConstraints :: (Show n, Bounded n, Fractional n, Integral n) => Set (Constraint n) -> String
-      printConstraints = unlines . map (\c -> "    " <> show c) . Set.toList
+      printConstraints = unlines . map (\c -> "    " <> show c)
 
 -- | Sequentially renumber term variables '0..max_var'.  Return
 --   renumbered constraints, together with the total number of
