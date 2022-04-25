@@ -75,9 +75,8 @@ varsInConstraints = IntSet.unions . Set.map varsInConstraint
 data ConstraintSystem n = ConstraintSystem
   { csConstraints :: !(Set (Constraint n)),
     csBooleanInputVarConstraints :: ![Constraint n],
-    csNumOfVars :: !Int,
+    csVars :: !IntSet,
     csInputVars :: !IntSet,
-    -- csBooleanInputVars :: !IntSet,
     csOutputVar :: !(Maybe Var)
   }
 
@@ -117,7 +116,7 @@ renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))
     (map renumberConstraint (csBooleanInputVarConstraints cs))
-    (Map.size variableMap)
+    (IntSet.fromList $ Map.elems variableMap)
     (IntSet.map renumber (csInputVars cs))
     (renumber <$> csOutputVar cs)
   where
@@ -126,7 +125,7 @@ renumberConstraints cs =
     variableMap = Map.fromList $ zip (inputVars ++ otherVars) [0 ..]
       where
         inputVars = IntSet.toList (csInputVars cs)
-        otherVars = filter isNotInput $ IntSet.toList $ varsInConstraints $ csConstraints cs
+        otherVars = filter isNotInput (IntSet.toList (csVars cs))
         isNotInput = not . flip IntSet.member (csInputVars cs)
 
     renumber var = case Map.lookup var variableMap of

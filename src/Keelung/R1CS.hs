@@ -31,7 +31,7 @@ generateWitness cs env =
           ++ case csOutputVar cs of
             Nothing -> []
             Just v -> [v]
-      variables = [0 .. csNumOfVars cs - 1]
+      variables = [0 .. IntSet.size (csVars cs) - 1]
       (witness, cs') = optimiseWithWitness env cs
    in if all (isMapped witness) variables
         then Right witness
@@ -111,7 +111,7 @@ fromConstraintSystem cs =
   let cs' = optimise cs
    in R1CS
         (mapMaybe toR1C (Set.toList (csConstraints cs') ++ csBooleanInputVarConstraints cs'))
-        (csNumOfVars cs')
+        (IntSet.size (csVars cs'))
         (csInputVars cs')
         (csOutputVar cs')
         (generateWitness cs')

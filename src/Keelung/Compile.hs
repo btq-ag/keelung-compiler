@@ -202,6 +202,7 @@ convertBooleanVars :: GaloisField n => IntSet -> [Constraint n]
 convertBooleanVars booleanInputVars =
   map (\b -> CMul (1, b) (1, b) (1, Just b)) $
     IntSet.toList booleanInputVars
+{-# SCC convertBooleanVars #-} 
 
 -- | Encode the constraint 'x = out'.
 encodeAssertion :: GaloisField n => Expr n -> M n ()
@@ -237,7 +238,7 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
     ( ConstraintSystem
         constraints
         booleanInputVarConstraints
-        (IntSet.size vars)
+        vars 
         inputVars
         outputVar
     )

@@ -41,7 +41,7 @@ optimiseWithWitness witness cs =
         -- may overlap with 'constraintVars cs'.
         -- 'assignmentOfVars' might do a bit of duplicate
         -- work (to look up the same key more than once).
-        assignments <- assignmentOfVars $ IntSet.toList $ pinnedVars <> varsInConstraints (csConstraints cs)
+        assignments <- assignmentOfVars $ IntSet.toList $ pinnedVars <> csVars cs 
 
         return (assignments, renumberConstraints $ cs {csConstraints = constraints})
 
