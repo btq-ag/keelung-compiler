@@ -89,7 +89,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
   show (ConstraintSystem constraints boolConstraints vars inputVars outputVar) =
     "ConstraintSystem {\n\
     \  constraints ("
-      <> show (length boolConstraints)
+      <> show (length constraints)
       <> ")"
       <> ( if Set.size constraints < 20
              then ":\n  \n" <> printConstraints (toList constraints) <> "\n"

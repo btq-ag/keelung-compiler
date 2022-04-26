@@ -19,8 +19,8 @@ main :: IO ()
 main = do
   if generateFlamegraph
     then do
-      let dimension = 512
-      let numOfSigs = 16
+      let dimension = 2
+      let numOfSigs = 1
       keelung dimension numOfSigs
     else do
       let parameters =
@@ -63,8 +63,27 @@ keelung dimension numOfSigs = run $ do
             enableSigLengthChecking = True
           }
   let setup = makeSetup dimension numOfSigs 42 settings :: Setup GF181
-  aggSig <- liftEither $ Keelung.optm (Keelung.aggregateSignature setup)
 
+  -- compile & optimise
+  -- erased <- liftEither $ Keelung.erase (Keelung.aggregateSignature setup)
+  -- liftIO $ do
+  --   print ("erasedExpr", Keelung.Untyped.sizeOfExpr <$> Keelung.erasedExpr erased)
+  --   print ("erasedAssertions", length $ Keelung.erasedAssertions erased, sum $ map Keelung.Untyped.sizeOfExpr (Keelung.erasedAssertions erased))
+  --   print ("erasedAssignments", length $ Keelung.erasedAssignments erased, sum $ map (\(Keelung.Untyped.Assignment _ expr) -> Keelung.Untyped.sizeOfExpr expr) (Keelung.erasedAssignments erased))
+  --   print ("erasedNumOfVars", Keelung.erasedNumOfVars erased)
+  --   print ("erasedInputVars size", IntSet.size $ Keelung.erasedInputVars erased)
+  --   print ("erasedBooleanVars size", IntSet.size $ Keelung.erasedBooleanVars erased)
+
+  -- print ("compNextVar", Keelung.compNextVar computed)
+  -- print ("compNextAddr", Keelung.compNextAddr computed)
+  -- print ("compInputVars", IntSet.size $ Keelung.compInputVars computed)
+  -- print ("compHeap", IntMap.size $ Keelung.compHeap computed)
+  -- print ("compNumAsgns", length $ Keelung.compNumAsgns computed, sum $ map (\(Keelung.Assignment _ expr) -> Keelung.sizeOfExpr expr) (Keelung.compNumAsgns computed))
+  -- print ("compBoolAsgns", length $ Keelung.compBoolAsgns computed, sum $ map (\(Keelung.Assignment _ expr) -> Keelung.sizeOfExpr expr) (Keelung.compBoolAsgns computed))
+  -- print ("compAssertions", length $ Keelung.compAssertions computed, sum $ map Keelung.sizeOfExpr (Keelung.compAssertions computed))
+
+  -- compile & optimise
+  aggSig <- liftEither $ Keelung.optm (Keelung.aggregateSignature setup)
   liftIO $
     print (Keelung.numberOfConstraints aggSig)
 

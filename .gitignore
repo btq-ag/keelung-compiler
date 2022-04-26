@@ -7,5 +7,4 @@
 # profiling 
 ._*
 profiling/exec.prof
-profiling/space.svg
-profiling/time.svg
+profiling/*.svg

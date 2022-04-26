@@ -145,7 +145,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) wh
       <> show (fmap (fmap DebugGF) expr)
       <> "\n"
       <> ( if length assignments < 20
-             then "  assignments:\n" <> show assignments <> "\n"
+             then "  assignments:\n" <> show (map (fmap DebugGF) assignments) <> "\n"
              else ""
          )
       <> ( if length assertions < 20

@@ -118,12 +118,6 @@ runCheckSigSize dimension n = do
   let settings = Settings False True False
   bench (checkSigSize dimension n) settings dimension n
 
--- -- #4
--- runCheckSquares :: Int -> Int -> Either String (Int, Int, Int)
--- runCheckSquares dimension n = do
---   let settings = Settings False False False True False
---   bench (checkSquares dimension n) settings dimension n
-
 -- #3 !!
 runCheckLength :: Int -> Int -> Either String (Int, Int, Int)
 runCheckLength dimension n = do

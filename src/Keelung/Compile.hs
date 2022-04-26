@@ -49,9 +49,9 @@ encode out expr = case expr of
   Val val -> add $ cadd val [(out, -1)] -- out = val
   Var var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   BinOp op operands -> case op of
-    Add -> do
-      terms <- mapM toTerm operands
-      encodeTerms out terms
+    Add -> do 
+      terms <- {-# SCC "mapMtoTerm" #-} mapM toTerm operands
+      {-# SCC "encodeTerms" #-} encodeTerms out terms
     Sub -> do
       terms <- mapM toTerm operands
       encodeTerms out (negateTailTerms terms)
@@ -66,7 +66,6 @@ encode out expr = case expr of
                 BinOp Mul (Seq.fromList [BinOp Sub (Seq.fromList [Val 1, b]), y])
               ]
           )
-
 encodeAssignment :: GaloisField n => Assignment n -> M n ()
 encodeAssignment (Assignment var expr) = encode var expr
 
@@ -202,7 +201,6 @@ convertBooleanVars :: GaloisField n => IntSet -> [Constraint n]
 convertBooleanVars booleanInputVars =
   map (\b -> CMul (1, b) (1, b) (1, Just b)) $
     IntSet.toList booleanInputVars
-{-# SCC convertBooleanVars #-} 
 
 -- | Encode the constraint 'x = out'.
 encodeAssertion :: GaloisField n => Expr n -> M n ()
@@ -238,7 +236,7 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
     ( ConstraintSystem
         constraints
         booleanInputVarConstraints
-        vars 
+        vars
         inputVars
         outputVar
     )
