@@ -19,7 +19,7 @@ import Keelung.Util (DebugGF (DebugGF))
 
 -- | Constraint
 --      CAdd: 0 = c + c₀x₀ + c₁x₁ ... cₙxₙ
---      CMul: nx + by = c or nx + by = cz
+--      CMul: ax * by = c or ax * by = cz
 --      CNQZ: if x == 0 then m = 0 else m = recip x
 data Constraint n
   = CAdd !n !(CoeffMap n)

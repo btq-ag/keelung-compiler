@@ -10,9 +10,10 @@ import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
-import Keelung.Optimise (optimise, optimiseWithWitness)
+import Keelung.Optimise (optimiseWithWitness)
 import Keelung.Syntax.Common
 import Keelung.Util
+-- import qualified Data.List as List
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -75,7 +76,24 @@ varPoly (coeff, x) = IntMap.insert x coeff IntMap.empty
 data R1C n = R1C (Poly n) (Poly n) (Poly n)
 
 instance Show n => Show (R1C n) where
-  show (R1C aV bV cV) = show aV ++ "*" ++ show bV ++ "==" ++ show cV
+  show (R1C aX bX cX) = show aX ++ "*" ++ show bX ++ "==" ++ show cX
+
+    -- where 
+
+
+
+  -- show (R1CS cs nvs ivs ovs _) = 
+  --   "R1CS {\n\
+  --   \  R1C clauses (" ++ show numberOfClauses ++ ")" 
+  --   ++ showClauses
+  --   ++
+  --   "}"
+  --   where 
+  --     numberOfClauses = length cs
+  --     showClauses = if numberOfClauses > 30 
+  --       then "\n"
+  --       else ":\n" ++ List.intercalate "\n" (map show cs)
+
 
 satisfyR1C :: GaloisField a => Witness a -> R1C a -> Bool
 satisfyR1C witness constraint
@@ -102,19 +120,33 @@ data R1CS n = R1CS
 
 instance Show n => Show (R1CS n) where
   show (R1CS cs nvs ivs ovs _) = show (cs, nvs, ivs, ovs)
+    -- "R1CS {\n\
+    -- \  R1C clauses (" ++ show numberOfClauses ++ ")" 
+    -- ++ showClauses
+    -- ++
+    -- "}"
+    -- where 
+    --   numberOfClauses = length cs
+    --   showClauses = if numberOfClauses > 30 
+    --     then "\n"
+    --     else ":\n" ++ List.intercalate "\n" (map show cs)
+
+-- instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem n) where
+--   show (ConstraintSystem constraints boolConstraints vars inputVars outputVar) =
+--     "ConstraintSystem {\n\
+
 
 satisfyR1CS :: GaloisField n => Witness n -> R1CS n -> Bool
 satisfyR1CS witness = all (satisfyR1C witness) . r1csClauses
 
-fromConstraintSystem :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> R1CS n
-fromConstraintSystem cs =
-  let cs' = optimise cs
-   in R1CS
-        (mapMaybe toR1C (Set.toList (csConstraints cs') ++ csBooleanInputVarConstraints cs'))
-        (IntSet.size (csVars cs'))
-        (csInputVars cs')
-        (csOutputVar cs')
-        (generateWitness cs')
+toR1CS :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> R1CS n
+toR1CS cs =
+  R1CS
+    (mapMaybe toR1C (Set.toList (csConstraints cs) ++ csBooleanInputVarConstraints cs))
+    (IntSet.size (csVars cs))
+    (csInputVars cs)
+    (csOutputVar cs)
+    (generateWitness cs)
   where
     toR1C :: GaloisField n => Constraint n -> Maybe (R1C n)
     toR1C (CAdd a m) =

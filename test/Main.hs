@@ -23,7 +23,7 @@ execute :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a ->
 execute prog inputs = do
   typeErased <- erase prog
   let constraintSystem = compile typeErased
-  let r1cs = fromConstraintSystem constraintSystem
+  let r1cs = toR1CS constraintSystem
 
   let outputVar = r1csOutputVar r1cs
   witness <- witnessOfR1CS inputs r1cs

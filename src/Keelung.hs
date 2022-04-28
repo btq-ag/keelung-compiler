@@ -24,7 +24,7 @@ module Keelung
     comp,
     optm,
     optmWithInput,
-
+    conv
   )
 where
 
@@ -80,3 +80,10 @@ optmWithInput program input = do
   cs <- optm program
   let (_, cs') = optimiseWithInput input cs
   return cs'
+
+-- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation => toR1CS
+conv ::
+  (Compilable n a, GaloisField n, Bounded n, Integral n) =>
+  Comp n a ->
+  Either String (R1CS n)
+conv prog = comp prog >>= return . toR1CS . optimise
