@@ -3,7 +3,7 @@
 
 {-# HLINT ignore "Use if" #-}
 
-module AggregateSignature.Program.Keelung where
+module AggregateSignature.Program where
 
 import AggregateSignature.Util
 import Data.Array

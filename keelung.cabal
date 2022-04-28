@@ -77,8 +77,7 @@ executable keelung-exe
       Keelung.Syntax.Common
       Keelung.Syntax.Untyped
       Keelung.Util
-      AggregateSignature.Program.Keelung
-      AggregateSignature.Program.Snarkl
+      AggregateSignature.Program
       AggregateSignature.Util
       Basic
       Paths_keelung
@@ -103,8 +102,7 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      AggregateSignature.Program.Keelung
-      AggregateSignature.Program.Snarkl
+      AggregateSignature.Program
       AggregateSignature.Util
       Basic
       Paths_keelung
@@ -147,9 +145,7 @@ benchmark keelung-bench
       Keelung.Syntax.Untyped
       Keelung.Util
       Benchmark.Keelung
-      Benchmark.Snarkl
-      AggregateSignature.Program.Keelung
-      AggregateSignature.Program.Snarkl
+      AggregateSignature.Program
       AggregateSignature.Util
       Basic
       Paths_keelung

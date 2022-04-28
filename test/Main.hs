@@ -2,8 +2,7 @@
 
 module Main where
 
-import qualified AggregateSignature.Program.Keelung as Keelung
-import qualified AggregateSignature.Program.Snarkl as Snarkl
+import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import qualified Basic
 import qualified Data.IntMap as IntMap
@@ -12,7 +11,6 @@ import Keelung
 import Keelung.Constraint (cadd)
 import qualified Keelung.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Optimise.Monad as Optimise
-import qualified Snarkl
 import Test.Hspec
 
 -- | (1) Compile to R1CS.
@@ -54,20 +52,20 @@ execute prog inputs = do
 
 -- return $ Result result nw ng out r1cs
 
-runSnarklAggSig :: Int -> Int -> GF181
-runSnarklAggSig dimension numberOfSignatures =
-  let settings =
-        Settings
-          { enableAggSigChecking = True,
-            enableSigSizeChecking = True,
-            enableSigLengthChecking = True
-          }
-      setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
-   in Snarkl.resultResult $
-        Snarkl.execute
-          Snarkl.Simplify
-          (Snarkl.aggregateSignature setup :: Snarkl.Comp 'Snarkl.TBool GF181)
-          (genInputFromSetup setup)
+-- runSnarklAggSig :: Int -> Int -> GF181
+-- runSnarklAggSig dimension numberOfSignatures =
+--   let settings =
+--         Settings
+--           { enableAggSigChecking = True,
+--             enableSigSizeChecking = True,
+--             enableSigLengthChecking = True
+--           }
+--       setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
+--    in Snarkl.resultResult $
+--         Snarkl.execute
+--           Snarkl.Simplify
+--           (Snarkl.aggregateSignature setup :: Snarkl.Comp 'Snarkl.TBool GF181)
+--           (genInputFromSetup setup)
 
 runKeelungAggSig :: Int -> Int -> Maybe GF181
 runKeelungAggSig dimension numberOfSignatures =
@@ -80,7 +78,7 @@ runKeelungAggSig dimension numberOfSignatures =
       setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
       result =
         execute
-          (Keelung.aggregateSignature setup :: Comp GF181 ())
+          (AggSig.aggregateSignature setup :: Comp GF181 ())
           (genInputFromSetup setup)
    in case result of
         Left _ -> Nothing
@@ -89,24 +87,24 @@ runKeelungAggSig dimension numberOfSignatures =
 main :: IO ()
 main = hspec $ do
   describe "Aggregate Signature" $ do
-    describe "Snarkl" $ do
-      it "dim:1 sig:1" $
-        runSnarklAggSig 1 1 `shouldBe` 1
-      it "dim:1 sig:10" $
-        runSnarklAggSig 1 10 `shouldBe` 1
-      it "dim:10 sig:1" $
-        runSnarklAggSig 10 1 `shouldBe` 1
-      it "dim:10 sig:10" $
-        runSnarklAggSig 10 10 `shouldBe` 1
-    describe "Keelung" $ do
-      it "dim:1 sig:1" $
-        runSnarklAggSig 1 1 `shouldBe` 1
-      it "dim:1 sig:10" $
-        runSnarklAggSig 1 10 `shouldBe` 1
-      it "dim:10 sig:1" $
-        runSnarklAggSig 10 1 `shouldBe` 1
-      it "dim:10 sig:10" $
-        runSnarklAggSig 10 10 `shouldBe` 1
+    -- describe "Snarkl" $ do
+    --   it "dim:1 sig:1" $
+    --     runSnarklAggSig 1 1 `shouldBe` 1
+    --   it "dim:1 sig:10" $
+    --     runSnarklAggSig 1 10 `shouldBe` 1
+    --   it "dim:10 sig:1" $
+    --     runSnarklAggSig 10 1 `shouldBe` 1
+    --   it "dim:10 sig:10" $
+    --     runSnarklAggSig 10 10 `shouldBe` 1
+
+    it "dim:1 sig:1" $
+      runKeelungAggSig 1 1 `shouldBe` Nothing
+    it "dim:1 sig:10" $
+      runKeelungAggSig 1 10 `shouldBe` Nothing
+    it "dim:10 sig:1" $
+      runKeelungAggSig 10 1 `shouldBe` Nothing
+    it "dim:10 sig:10" $
+      runKeelungAggSig 10 10 `shouldBe` Nothing
 
   describe "Type Erasure" $ do
     it "boolean variables in Aggregate Signature" $
@@ -117,7 +115,7 @@ main = hspec $ do
                 enableSigLengthChecking = True
               }
           setup = makeSetup 1 1 42 settings :: Setup GF181
-          erased = erase (Keelung.aggregateSignature setup :: Comp GF181 ())
+          erased = erase (AggSig.aggregateSignature setup :: Comp GF181 ())
           result = IntSet.toList . erasedBooleanVars <$> erased
        in result `shouldBe` Right [3 .. 16]
 

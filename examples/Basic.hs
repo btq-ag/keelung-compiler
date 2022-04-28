@@ -6,7 +6,7 @@
 
 module Basic where
 
-import qualified AggregateSignature.Program.Keelung as Keelung
+import AggregateSignature.Program
 import AggregateSignature.Util
 import Keelung
 
@@ -63,7 +63,7 @@ aggSig :: Int -> Int -> Comp GF181 ()
 aggSig dim num = do
   let settings = Settings True True True
   let setup = makeSetup dim num 42 settings
-  Keelung.aggregateSignature setup
+  aggregateSignature setup
 
 -- components of aggregate signature
 checkSig :: Int -> Int -> Comp GF181 ()
@@ -71,20 +71,20 @@ checkSig dimension n = do
   let settings = Settings True False False
   let Setup _ _ publicKey signatures _ _ = makeSetup dimension n 42 settings
   expectedAggSig <- freshInputs dimension
-  actualAggSig <- Keelung.computeAggregateSignature publicKey signatures
+  actualAggSig <- computeAggregateSignature publicKey signatures
   arrayEq dimension expectedAggSig actualAggSig
 
 -- #2
 checkSigSize :: Int -> Int -> Comp GF181 ()
 checkSigSize dimension n = do
   let settings = Settings False True False
-  Keelung.checkSize $ makeSetup dimension n 42 settings
+  checkSize $ makeSetup dimension n 42 settings
 
 -- #3
 checkSigLength :: Int -> Int -> Comp GF181 ()
 checkSigLength dimension n = do
   let settings = Settings False False True
-  Keelung.checkLength $ makeSetup dimension n 42 settings
+  checkLength $ makeSetup dimension n 42 settings
 
 --------------------------------------------------------------------------------
 
