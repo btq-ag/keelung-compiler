@@ -5,6 +5,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified Data.List as List
 import Data.Maybe (mapMaybe)
 import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
@@ -13,6 +14,7 @@ import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Optimise (optimiseWithWitness)
 import Keelung.Syntax.Common
 import Keelung.Util
+
 -- import qualified Data.List as List
 
 -- | Starting from an initial partial assignment, solve the
@@ -59,15 +61,35 @@ generateWitness cs env =
 --------------------------------------------------------------------------------
 
 -- A Polynomial is a mapping from variables to their coefficients
-type Poly n = IntMap n
+data Poly n
+  = Poly n (IntMap n) -- the first field `n` is the constant term
 
--- | The constant polynomial equal 'c'
-constPoly :: a -> Poly a
-constPoly c = IntMap.insert (-1) c IntMap.empty
+-- Helper function for printing polynomials
+--    empty polynomial is printed as ""
+--    variables are prefixed with "$"
+showPolynomial :: (Integral n, Show n, Bounded n, Fractional n) => IntMap n -> String
+showPolynomial poly = go (IntMap.toList poly)
+  where
+    go [] = ""
+    go [term] = printTerm term
+    go (term : xs) = printTerm term ++ " + " ++ go xs
 
--- | The polynomial equal variable 'x'
-varPoly :: (a, Var) -> Poly a
-varPoly (coeff, x) = IntMap.insert x coeff IntMap.empty
+    printTerm (x, 1) = "$" ++ show x
+    printTerm (x, -1) = "-$" ++ show x
+    printTerm (x, c) = show (DebugGF c) ++ "$" ++ show x
+
+constantOnly :: Poly n -> Maybe n
+constantOnly (Poly c xs) = if IntMap.null xs then Just c else Nothing
+
+instance (Show n, Integral n, Bounded n, Fractional n) => Show (Poly n) where
+  show (Poly n poly) = case (n, IntMap.size poly) of
+    (0, 0) -> "0"
+    (0, _) -> showPolynomial poly
+    (_, 0) -> show (DebugGF n)
+    (_, _) -> show (DebugGF n) ++ " + " ++ showPolynomial poly
+
+varPoly :: Semiring a => (a, Var) -> Poly a
+varPoly (coeff, x) = Poly zero (IntMap.insert x coeff IntMap.empty)
 
 --------------------------------------------------------------------------------
 
@@ -75,25 +97,13 @@ varPoly (coeff, x) = IntMap.insert x coeff IntMap.empty
 --      Ax * Bx = Cx
 data R1C n = R1C (Poly n) (Poly n) (Poly n)
 
-instance Show n => Show (R1C n) where
-  show (R1C aX bX cX) = show aX ++ "*" ++ show bX ++ "==" ++ show cX
-
-    -- where 
-
-
-
-  -- show (R1CS cs nvs ivs ovs _) = 
-  --   "R1CS {\n\
-  --   \  R1C clauses (" ++ show numberOfClauses ++ ")" 
-  --   ++ showClauses
-  --   ++
-  --   "}"
-  --   where 
-  --     numberOfClauses = length cs
-  --     showClauses = if numberOfClauses > 30 
-  --       then "\n"
-  --       else ":\n" ++ List.intercalate "\n" (map show cs)
-
+instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
+  show (R1C aX bX cX) = case (constantOnly aX, constantOnly bX, constantOnly cX) of
+    (Just 0, _, _) -> "0 = " ++ show cX
+    (_, Just 0, _) -> "0 = " ++ show cX
+    (Just 1, _, _) -> show bX ++ " = " ++ show cX
+    (_, Just 1, _) -> show aX ++ " = " ++ show cX
+    (_, _, _) -> show aX ++ " * " ++ show bX ++ " = " ++ show cX
 
 satisfyR1C :: GaloisField a => Witness a -> R1C a -> Bool
 satisfyR1C witness constraint
@@ -101,11 +111,11 @@ satisfyR1C witness constraint
     inner aV witness `times` inner bV witness == inner cV witness
   where
     inner :: GaloisField a => Poly a -> Witness a -> a
-    inner polynoomial w =
+    inner (Poly n poly) w =
       IntMap.foldlWithKey
         (\acc k v -> (v `times` IntMap.findWithDefault zero k w) `plus` acc)
-        (IntMap.findWithDefault zero (-1) polynoomial)
-        polynoomial
+        n
+        poly
 
 --------------------------------------------------------------------------------
 
@@ -118,23 +128,23 @@ data R1CS n = R1CS
     r1csWitnessGen :: Witness n -> Either String (Witness n)
   }
 
-instance Show n => Show (R1CS n) where
-  show (R1CS cs nvs ivs ovs _) = show (cs, nvs, ivs, ovs)
-    -- "R1CS {\n\
-    -- \  R1C clauses (" ++ show numberOfClauses ++ ")" 
-    -- ++ showClauses
-    -- ++
-    -- "}"
-    -- where 
-    --   numberOfClauses = length cs
-    --   showClauses = if numberOfClauses > 30 
-    --     then "\n"
-    --     else ":\n" ++ List.intercalate "\n" (map show cs)
-
--- instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem n) where
---   show (ConstraintSystem constraints boolConstraints vars inputVars outputVar) =
---     "ConstraintSystem {\n\
-
+instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
+  show (R1CS cs n ivs ovs _) =
+    "R1CS {\n\
+    \  R1C clauses ("
+      ++ show numberOfClauses
+      ++ ")"
+      ++ showClauses
+      ++ "\n  number of variables: " ++ show n  ++ "\n"
+      ++ "  number of input vars: " ++ show (IntSet.size ivs) ++ "\n"
+      ++ "  output var: " ++ show ovs ++ "\n"
+      ++ "}"
+    where
+      numberOfClauses = length cs
+      showClauses =
+        if numberOfClauses > 30
+          then "\n"
+          else ":\n" ++ List.intercalate "\n" (map (\s -> "    " ++ show s) cs)
 
 satisfyR1CS :: GaloisField n => Witness n -> R1CS n -> Bool
 satisfyR1CS witness = all (satisfyR1C witness) . r1csClauses
@@ -152,12 +162,12 @@ toR1CS cs =
     toR1C (CAdd a m) =
       Just $
         R1C
-          (constPoly one)
-          (CoeffMap.toIntMap $ CoeffMap.insert (-1) a m)
-          (constPoly zero)
+          (Poly one mempty)
+          (Poly a (CoeffMap.toIntMap m))
+          (Poly zero mempty)
     toR1C (CMul cx dy (e, Nothing)) =
       Just $
-        R1C (varPoly cx) (varPoly dy) (constPoly e)
+        R1C (varPoly cx) (varPoly dy) (Poly e mempty)
     toR1C (CMul cx dy (e, Just z)) =
       Just $
         R1C (varPoly cx) (varPoly dy) (varPoly (e, z))
