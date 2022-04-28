@@ -60,8 +60,22 @@ makeSetup dimension t seed settings =
     genInts :: Int -> [Int]
     genInts amount = take amount $ randoms (mkStdGen (succ seed))
 
+    -- generate fake numbers for populating fake signatures & public keys
+    randomNumbers :: [Int]
+    randomNumbers = take (dimension * t * 2) $ randoms (mkStdGen (succ seed))
+
+    -- split random numbers into small arrays (of size `dimension`) for fake signatures & public keys
+    arraysForSignatures :: [Array Int Int]
+    arraysForPublicKeys :: [Array Int Int]
+    (arraysForSignatures, arraysForPublicKeys) = splitAt t $ splitListIntoArrays dimension randomNumbers
+
+    -- domain of terms of signatures: [0, 12289)
     signatures :: Num n => [Signature n]
-    signatures = splitEvery dimension $ map (fromIntegral . (`mod` 12289)) $ genInts (dimension * t)
+    signatures = map (fmap (fromIntegral . (`mod` 12289))) arraysForSignatures
+
+    -- domain of terms of public keys: [0, 2^181)
+    publicKeys :: Num n => [PublicKey n]
+    publicKeys = map (fmap fromIntegral) arraysForPublicKeys
 
     aggSigs = listArray (0, dimension - 1) $ map ithSum [0 .. dimension - 1]
       where
@@ -107,11 +121,14 @@ genInputFromSetup (Setup _ _ _ _ inputs settings) =
 
 --------------------------------------------------------------------------------
 
-splitEvery :: Int -> [a] -> [Signature a]
-splitEvery _ [] = mempty
-splitEvery n list = listArray (0, n - 1) first : splitEvery n rest
+-- split a list into Arrays each of length n
+splitListIntoArrays :: Int -> [a] -> [Array Int a]
+splitListIntoArrays _ [] = mempty
+splitListIntoArrays n list = listArray (0, n - 1) first : splitListIntoArrays n rest
   where
     (first, rest) = splitAt n list
+
+--------------------------------------------------------------------------------
 
 -- shiftPublicKeyBy i xs = xs ^ i mod xⁿ + 1
 -- OBSERVATION:
