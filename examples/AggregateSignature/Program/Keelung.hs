@@ -48,21 +48,46 @@ computeAggregateSignature publicKey signatures = do
     update actualAggSig i total
   return actualAggSig
 
--- ensure that a signature has the right size (smaller than 16384 (target: 12289))
+-- ensure that the coefficients of signatures are in the range of [0, 12289)
+-- representing the coefficients with bitstrings of length 14 
+-- would put them in the range of [0, 16384)
+-- since 12288 is 3/4 of 16384, we can use the highest 2 bits to check
+-- if the coefficients are in the right quarters 
+-- 
+-- the highest 2 bits (bitstring[13, 12]): 
+--      00 -> within range 
+--      01 -> within range 
+--      10 -> within range 
+--      11 -> within range only when the remaining bits are 0s
+--
+-- the coefficients will only be in the range of [0, 12289) if and only if:
+--      bitstring[13] * bitstring[12] * (sum of bitstring[11 .. 0]) = 0
+
 checkSize :: (GaloisField n, Integral n) => Setup n -> Comp n ()
 checkSize (Setup dimension numOfSigs _ signatures _ _) = do
   sigBitStrings <- freshInputs3 numOfSigs dimension 14
   forM_ [0 .. length signatures - 1] $ \i -> do
     let signature = signatures !! i
     forM_ [0 .. dimension - 1] $ \j -> do
-      let term = signature ! j
-      total <- reduce 0 [0 .. 13] $ \acc k -> do
+      let coeff = signature ! j
+
+      -- within the range of [0, 16384)
+      value <- reduce 0 [0 .. 13] $ \acc k -> do
         bit <- access3 sigBitStrings (i, j, k)
         let bitValue = fromIntegral (2 ^ k :: Integer)
         let prod = fromBool (Var bit) * bitValue
         return (acc + prod)
-      assert (fromIntegral term `Eq` total)
+      assert (fromIntegral coeff `Eq` value)
 
+      bit13 <- access3 sigBitStrings (i, j, 13)
+      bit12 <- access3 sigBitStrings (i, j, 12)
+      bit11to0 <- reduce 0 [0 .. 11] $ \acc k -> do
+        bit <- access3 sigBitStrings (i, j, k)
+        return (acc + fromBool (Var bit))
+
+      let smallerThan12289 = fromBool (Var bit13) * fromBool (Var bit12) * bit11to0
+      assert (smallerThan12289 `Eq` 0)
+      
 checkLength :: (Integral n, GaloisField n) => Setup n -> Comp n ()
 checkLength (Setup dimension numOfSigs _ signatures _ _) = do
   -- expected square of signatures as input

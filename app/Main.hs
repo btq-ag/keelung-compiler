@@ -19,7 +19,7 @@ main :: IO ()
 main = do
   if generateFlamegraph
     then do
-      let dimension = 2
+      let dimension = 1
       let numOfSigs = 1
       keelung dimension numOfSigs
     else do
