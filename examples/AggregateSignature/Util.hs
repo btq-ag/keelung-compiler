@@ -26,11 +26,24 @@ data Setup n = Setup
 
 --------------------------------------------------------------------------------
 
+q :: (Integral n, Num n) => n 
+q = 12289
+
 -- | Inputs for the system
 data Input a = Input
-  { inputAggSigs :: Signature a,
+  { -- | Signatures to be aggregated
+    inputSignatures :: [Signature a],
+    -- | "Remainders"
+    inputSigRemainders :: [Array Int a],
+    -- | "Quotients"
+    inputSigQuotients :: [Array Int a],
+    -- | Aggregate signature
+    inputAggSigs :: Signature a,
+    -- | Bit strings of signatures
     inputSigBitStrings :: [[[a]]],
+    -- | Squares of coefficients of signatures
     inputSigSquares :: [Signature a],
+    -- | Sume of squares of coefficients signatures
     inputSigLengths :: [a]
   }
 
@@ -50,15 +63,27 @@ makeSetup dimension t seed settings =
       setupNumberOfSignatures = t,
       setupPublicKey = publicKey,
       setupSignatures = signatures,
-      setupInputs = Input aggSigs bisStrings sigSquares sigLengths,
+      setupInputs = Input signatures remainders quotients aggSigs bisStrings sigSquares sigLengths,
       setupSettings = settings
     }
   where
+    -- raw input numbers range from of `-q/2` to `q/2`
+    -- this function move the negative numbers from [ -q/2 , 0 ) to [ q/2 , q ) by adding `q`
+    -- rectify :: (Integral n, Num n, Eq n) => n -> n
+    -- rectify n = if signum n == -1 then n + q else n
+
+    -- domain of coefficients of signatures: [0, 12289)
+    signatures :: Num n => [Signature n]
+    signatures = map (fmap (fromIntegral . (`mod` 12289))) arraysForSignatures
+
+    -- domain of terms of public keys: [0, 2^181)
+    publicKeys :: Num n => [PublicKey n]
+    publicKeys = map (fmap fromIntegral) arraysForPublicKeys
+
+    (remainders, quotients) = unzip $ zipWith (calculate dimension) signatures publicKeys
+
     -- NOTE: somehow generating new `StdGen` from IO would result in segmentation fault (possibly due to FFI)
     publicKey = listArray (0, dimension - 1) $ take dimension $ randoms (mkStdGen seed)
-
-    genInts :: Int -> [Int]
-    genInts amount = take amount $ randoms (mkStdGen (succ seed))
 
     -- generate fake numbers for populating fake signatures & public keys
     randomNumbers :: [Int]
@@ -68,14 +93,6 @@ makeSetup dimension t seed settings =
     arraysForSignatures :: [Array Int Int]
     arraysForPublicKeys :: [Array Int Int]
     (arraysForSignatures, arraysForPublicKeys) = splitAt t $ splitListIntoArrays dimension randomNumbers
-
-    -- domain of terms of signatures: [0, 12289)
-    signatures :: Num n => [Signature n]
-    signatures = map (fmap (fromIntegral . (`mod` 12289))) arraysForSignatures
-
-    -- domain of terms of public keys: [0, 2^181)
-    publicKeys :: Num n => [PublicKey n]
-    publicKeys = map (fmap fromIntegral) arraysForPublicKeys
 
     aggSigs = listArray (0, dimension - 1) $ map ithSum [0 .. dimension - 1]
       where
@@ -99,12 +116,52 @@ makeSetup dimension t seed settings =
     sigSquares = map (fmap (\x -> x * x)) signatures
     sigLengths = map sum sigSquares
 
+--    let S be the signature and P be the public key
+--    let Q = q - P
+--
+--        j     0       1       2      ...      510     511
+--        ┌──────────────────────────  ...  ────────────────────┐
+--    i   │                                                     │
+--    0   │   S₀P₀    S₁Q₅₁₁  S₂Q₅₁₀   ...    S₅₁₀Q₂  S₅₁₁Q₁    │
+--        │                                                     │
+--    1   │   S₀P₁    S₁P₀    S₂Q₅₁₁   ...    S₅₁₀Q₃  S₅₁₁Q₂    │
+--        │                                                     │
+--    2   │   S₀P₂    S₁P₁    S₂P₀     ...    S₅₁₀Q₄  S₅₁₁Q₃    │
+--        │                                                     │
+--    .   │   .       .       .        .      .       .         .
+--    .   │   .       .       .         .     .       .         .
+--    .   │   .       .       .          .    .       .         .
+--        │                                                     │
+--   510  │   S₀P₅₁₀  S₁P₅₀₉  S₂P₅₀₈   ...    S₅₁₀P₀  S₅₁₁Q₅₁₁  │
+--        │                                                     │
+--   511  │   S₀P₅₁₁  S₁P₅₁₀  S₂P₅₀₉   ...    S₅₁₀P₁  S₅₁₁P₀    │
+--        │                                                     │
+--        └─────────────────────────── ... ─────────────────────┘
+
+-- Get an array of remainders and an array of quotients from a signature and a public key 
+calculate :: (Integral n, Num n) => Int -> Signature n -> PublicKey n -> (Array Int n, Array Int n)
+calculate dimension signature publicKey =
+  let (remainders, quotients) = unzip [handleRow i | i <- [0 .. dimension]]
+   in (listArray (0, dimension - 1) remainders, listArray (0, dimension - 1) quotients)
+  where
+
+    handleRow i =
+      let total = sum [lookupSigPk i j | j <- [0 .. dimension]]
+       in (total `mod` q, total `div` q)
+
+    lookupSigPk i j =
+      signature ! j
+        * ( if i < j
+              then q - (publicKey ! (dimension + i - j))
+              else publicKey ! (i - j)
+          )
+
 --------------------------------------------------------------------------------
 
 -- | Generate inputs from a Setup
 genInputFromSetup :: Setup a -> [a]
 genInputFromSetup (Setup _ _ _ _ inputs settings) =
-  let aggSigs = inputAggSigs inputs -- 512 terms x 512  
+  let aggSigs = inputAggSigs inputs -- 512 terms x 512
       bitStrings = concat (concat (inputSigBitStrings inputs))
       sigSquares = concatMap elems (inputSigSquares inputs)
       sigLengths = inputSigLengths inputs
