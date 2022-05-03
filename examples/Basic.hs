@@ -60,9 +60,9 @@ loop2 = do
   arrayEq 2 arr (arr2 :: (Ref ('A ('V 'Num))))
 
 aggSig :: Int -> Int -> Comp GF181 ()
-aggSig dim num = do
+aggSig dim n = do
   let settings = Settings True True True
-  let setup = makeParam dim num 42 settings
+  let setup = makeParam dim n 42 settings
   aggregateSignature setup
 
 -- components of aggregate signature

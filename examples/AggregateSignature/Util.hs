@@ -25,11 +25,11 @@ data Param n = Param
 
 --------------------------------------------------------------------------------
 
-q :: (Integral n, Num n) => n 
+q :: (Integral n, Num n) => n
 q = 12289
 
 -- Note: allocation of inputs in Jackie's implementation
---  
+--
 --  nT  : coefficients of signatures  <multiplication> <bit value> <square>
 --  nT  : "remainders"                <multiplication> <summation>
 --  nT  : "quotients"                 <multiplication>
@@ -54,15 +54,15 @@ data Setup n = Setup
     setupSigBitStrings :: [[[n]]],
     -- | Squares of coefficients of signatures
     setupSigSquares :: [Signature n],
-    -- | 
+    -- |
     setupSigLengths :: [n]
   }
 
 -- | Settings for enabling/disabling different part of Aggregate Signature
 data Settings = Settings
-  { enableAggSigChecking :: Bool,
-    enableSigSizeChecking :: Bool,
-    enableSigLengthChecking :: Bool
+  { enableAggChecking :: Bool,
+    enableSizeChecking :: Bool,
+    enableLengthChecking :: Bool
   }
 
 --------------------------------------------------------------------------------
@@ -89,7 +89,7 @@ makeParam dimension t seed settings =
     publicKeys :: Num n => [PublicKey n]
     publicKeys = map (fmap fromIntegral) arraysForPublicKeys
 
-    (remainders, quotients) = unzip $ zipWith (calculateRemQuot dimension) signatures publicKeys
+    (remainders, quotients) = computeRemsAndQuots dimension signatures publicKeys
 
     -- NOTE: somehow generating new `StdGen` from IO would result in segmentation fault (possibly due to FFI)
     publicKey = listArray (0, dimension - 1) $ take dimension $ randoms (mkStdGen seed)
@@ -147,15 +147,17 @@ makeParam dimension t seed settings =
 --        │                                                     │
 --        └──────────────────────────  ...  ────────────────────┘
 
--- Get an array of remainders and an array of quotients from a signature and a public key 
-calculateRemQuot :: (Integral n, Num n) => Int -> Signature n -> PublicKey n -> (Array Int n, Array Int n)
-calculateRemQuot dimension signature publicKey =
-  let (remainders, quotients) = unzip [handleRow i | i <- [0 .. dimension]]
+-- Get an array of remainders and an array of quotients from a signature and a public key
+computeRemsAndQuots :: (Integral n, Num n) => Int -> [Signature n] -> [PublicKey n] -> ([Array Int n], [Array Int n])
+computeRemsAndQuots dimension signatures publicKeys = unzip $ zipWith (computeRemsAndQuot dimension) signatures publicKeys
+
+computeRemsAndQuot :: (Integral n, Num n) => Int -> Signature n -> PublicKey n -> (Array Int n, Array Int n)
+computeRemsAndQuot dimension signature publicKey =
+  let (remainders, quotients) = unzip [handleRow i | i <- [0 .. dimension - 1]]
    in (listArray (0, dimension - 1) remainders, listArray (0, dimension - 1) quotients)
   where
-
     handleRow i =
-      let total = sum [lookupSigPk i j | j <- [0 .. dimension]]
+      let total = sum [lookupSigPk i j | j <- [0 .. dimension - 1]]
        in (total `mod` q, total `div` q)
 
     lookupSigPk i j =
@@ -167,23 +169,42 @@ calculateRemQuot dimension signature publicKey =
 
 --------------------------------------------------------------------------------
 
--- | Generate inputs from ``Param``
+-- Allocation of inputs when all components are enabled
+--
+--  size    inputs                      components that need them
+----------------------------------------------------------------------------
+--  nT    : coefficients of signatures  <agg> <size> <length>
+--  nT    : "remainders"                <agg>
+--  nT    : "quotients"                 <agg>
+--  14nT  : bitstring                   <size>
+--  nT    : square of coeffs of sigs    <length>
+--  T     : sum(squares) % Q            <length>
+
+-- | Generate inputs from `Param`
 genInputFromParam :: Param a -> [a]
 genInputFromParam (Param _ _ setup settings) =
-  let aggSigs = setupAggSigs setup -- 512 terms x 512
-      bitStrings = concat (concat (setupSigBitStrings setup))
+  let forAggChecking =
+        if enableAggChecking settings
+          then
+            (setupSignatures setup >>= elems)
+              ++ (setupSigRemainders setup >>= elems)
+              ++ (setupSigQuotients setup >>= elems)
+          else []
+
+      forSizeChecking =
+        if enableSizeChecking settings
+          then concat (concat (setupSigBitStrings setup))
+          else []
+
+      forLengthChecking =
+        if enableLengthChecking settings
+          then sigSquares <> sigLengths
+          else []
       sigSquares = concatMap elems (setupSigSquares setup)
       sigLengths = setupSigLengths setup
-   in ( if enableAggSigChecking settings
-          then elems aggSigs
-          else []
-      )
-        <> ( if enableSigSizeChecking settings
-               then bitStrings
-               else []
-           )
-        <> ( if enableSigLengthChecking settings then sigSquares <> sigLengths else []
-           )
+   in forAggChecking
+        ++ forSizeChecking
+        ++ forLengthChecking
 
 --------------------------------------------------------------------------------
 

@@ -56,9 +56,9 @@ execute prog inputs = do
 -- runSnarklAggSig dimension numberOfSignatures =
 --   let settings =
 --         Settings
---           { enableAggSigChecking = True,
---             enableSigSizeChecking = True,
---             enableSigLengthChecking = True
+--           { enableAggChecking = True,
+--             enableSizeChecking = True,
+--             enableLengthChecking = True
 --           }
 --       setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
 --    in Snarkl.resultResult $
@@ -71,15 +71,15 @@ runKeelungAggSig :: Int -> Int -> Maybe GF181
 runKeelungAggSig dimension numberOfSignatures =
   let settings =
         Settings
-          { enableAggSigChecking = True,
-            enableSigSizeChecking = True,
-            enableSigLengthChecking = True
+          { enableAggChecking = True,
+            enableSizeChecking = True,
+            enableLengthChecking = True
           }
-      setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
-      result =
+      param =  makeParam dimension numberOfSignatures 42 settings :: Param GF181
+      result = 
         execute
-          (AggSig.aggregateSignature setup :: Comp GF181 ())
-          (genInputFromParam setup)
+          (AggSig.aggregateSignature param :: Comp GF181 ())
+          (genInputFromParam param)
    in case result of
         Left _ -> Nothing
         Right val -> val
@@ -110,9 +110,9 @@ main = hspec $ do
     it "boolean variables in Aggregate Signature" $
       let settings =
             Settings
-              { enableAggSigChecking = True,
-                enableSigSizeChecking = True,
-                enableSigLengthChecking = True
+              { enableAggChecking = True,
+                enableSizeChecking = True,
+                enableLengthChecking = True
               }
           setup = makeParam 1 1 42 settings :: Param GF181
           erased = erase (AggSig.aggregateSignature setup :: Comp GF181 ())

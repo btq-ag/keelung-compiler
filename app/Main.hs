@@ -54,9 +54,9 @@ keelung :: Int -> Int -> IO ()
 keelung dimension numOfSigs = run $ do
   let settings =
         Settings
-          { enableAggSigChecking = True,
-            enableSigSizeChecking = True,
-            enableSigLengthChecking = True
+          { enableAggChecking = True,
+            enableSizeChecking = True,
+            enableLengthChecking = True
           }
   let param = makeParam dimension numOfSigs 42 settings :: Param GF181
 
@@ -88,9 +88,9 @@ keelungConstraints :: Int -> Int -> IO ()
 keelungConstraints dimension numOfSigs = run $ do
   let settings =
         Settings
-          { enableAggSigChecking = True,
-            enableSigSizeChecking = True,
-            enableSigLengthChecking = True
+          { enableAggChecking = True,
+            enableSizeChecking = True,
+            enableLengthChecking = True
           }
   let param = makeParam dimension numOfSigs 42 settings :: Param GF181
   -- let input = genInputFromParam setup
@@ -237,7 +237,7 @@ keelungElaborate = do
     settings :: Settings
     settings =
       Settings
-        { enableAggSigChecking = True,
-          enableSigSizeChecking = True,
-          enableSigLengthChecking = True
+        { enableAggChecking = True,
+          enableSizeChecking = True,
+          enableLengthChecking = True
         }

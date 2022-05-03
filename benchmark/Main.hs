@@ -95,9 +95,9 @@ complexityOfElaboration =
     makeKeelung dimension numberOfSignatures = 
       let settings =
             Settings
-              { enableAggSigChecking = True,
-                enableSigSizeChecking = True,
-                enableSigLengthChecking = True
+              { enableAggChecking = True,
+                enableSizeChecking = True,
+                enableLengthChecking = True
               }
           setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
           -- input = genInputFromParam setup
@@ -109,9 +109,9 @@ run = do
   let numberOfSignatures = 8
   let settings =
         Settings
-          { enableAggSigChecking = True,
-            enableSigSizeChecking = True,
-            enableSigLengthChecking = True
+          { enableAggChecking = True,
+            enableSizeChecking = True,
+            enableLengthChecking = True
           }
   let setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
 

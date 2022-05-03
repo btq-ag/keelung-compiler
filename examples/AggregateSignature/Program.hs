@@ -6,70 +6,88 @@
 module AggregateSignature.Program where
 
 import AggregateSignature.Util
+import Control.Monad
 import Data.Array
 import Keelung
-import Control.Monad
 
--- ensure that a signature's bitstring is really made of bits (either 1 or 0)
--- checkSignaturesBits :: GaloisField n => Int -> Int -> Ref ('A ('A ('A ('V 'Bool)))) -> Comp n (Expr 'Bool n)
--- checkSignaturesBits _numberOfSignatures _dimension _bitStringss = return true
-
--- -- everyM
--- --   [0 .. numberOfSignatures - 1]
--- --   (\i -> everyM [0 .. dimension - 1] (everyM [0 .. 13] . either1or0 i))
--- -- where
--- --   either1or0 i j k = do
--- --     bit <- fromBool . Var <$> access3 bitStringss (i, j, k)
--- --     return $ (bit * bit) `Eq` bit
-
-checkRemainder :: (Integral n, GaloisField n) => Param n -> Comp n ()
-checkRemainder (Param _dimension _ _setup _) = do
-
-  -- expecting "remainders" as input 
-  -- expectedAggSig <- freshInputs dimension
-
-  -- let (remainders, quotients) = unzip $ zipWith (calculateRemQuot dimension) signatures publicKeys
-
-
-  return ()
+--    let S be the signature and P be the public key
+--    let Q = q - P
+--
+--        j     0       1       2      ...      510     511
+--    i   ┌──────────────────────────  ...  ────────────────────┐
+--        │                                                     │
+--    0   │   S₀P₀    S₁Q₅₁₁  S₂Q₅₁₀   ...    S₅₁₀Q₂  S₅₁₁Q₁    │
+--        │                                                     │
+--    1   │   S₀P₁    S₁P₀    S₂Q₅₁₁   ...    S₅₁₀Q₃  S₅₁₁Q₂    │
+--        │                                                     │
+--    2   │   S₀P₂    S₁P₁    S₂P₀     ...    S₅₁₀Q₄  S₅₁₁Q₃    │
+--        │                                                     │
+--    .   │   .       .       .        .      .       .         .
+--    .   │   .       .       .         .     .       .         .
+--    .   │   .       .       .          .    .       .         .
+--        │                                                     │
+--   510  │   S₀P₅₁₀  S₁P₅₀₉  S₂P₅₀₈   ...    S₅₁₀P₀  S₅₁₁Q₅₁₁  │
+--        │                                                     │
+--   511  │   S₀P₅₁₁  S₁P₅₁₀  S₂P₅₀₉   ...    S₅₁₀P₁  S₅₁₁P₀    │
+--        │                                                     │
+--        └──────────────────────────  ...  ────────────────────┘
 
 checkAgg :: (Integral n, GaloisField n) => Param n -> Comp n ()
-checkAgg (Param _dimension _ _setup _) = do
-  -- expected computed aggregate signature as input
-  -- expectedAggSig <- freshInputs dimension
+checkAgg (Param dimension numOfSigs setup _) = do
+  -- allocation of inputs:
+  --    nT: coefficients of terms of signatures as input
+  --    nT: remainders of product of signatures & public keys
+  --    nT: quotients of product of signatures & public keys
+  sigs <- freshInputs2 numOfSigs dimension
+  expectedRemainders <- freshInputs2 numOfSigs dimension
+  expectedQuotients <- freshInputs2 numOfSigs dimension
 
-  -- actualAggSig <- computeAggregateSignature publicKey (inputSignatures setup)
-  -- arrayEq dimension expectedAggSig actualAggSig
-  return ()
+  -- pairs for iterating through public keys with indices
+  let publicKeyPairs = zip [0 ..] (setupPublicKeys setup)
 
-computeAggregateSignature :: (Integral n, GaloisField n) => PublicKey n -> [Signature n] -> Comp n (Ref ('A ('V 'Num)))
-computeAggregateSignature publicKey signatures = do
-  let dimension = length publicKey
-  -- actual calculated aggregate signature are stored here
-  actualAggSig <- allocate dimension
-  -- for shifting the public key
-  loop [0 .. dimension - 1] $ \i -> do
-    let shiftedPublicKey = shiftPublicKeyBy dimension i publicKey
-    -- for each signature
-    total <- reduce 0 signatures $ \acc signature -> do
-      reduce acc [0 .. dimension - 1] $ \acc' k -> do
-        let pk = shiftedPublicKey ! k
-        let sig = signature ! k
-        let prod = pk * sig
-        return (acc' + fromIntegral prod)
-    update actualAggSig i total
-  return actualAggSig
+  forM_ publicKeyPairs $ \(t, publicKey) -> do
+    forM_ [0 .. dimension - 1] $ \i -> do
+      summation <- reduce 0 [0 .. dimension - 1] $ \acc j -> do
+        let indexForPublicKey = (i - j) `mod` dimension
+        let pk = publicKey ! indexForPublicKey
+        let pk' =
+              if i < j
+                then q - pk
+                else pk
+        sig <- access2 sigs (t, j)
+        return $ acc + (Var sig * num pk')
+      remainder <- access2 expectedRemainders (t, i)
+      quotient <- access2 expectedQuotients (t, i)
+      assert $ summation `Eq` (Var remainder * num q + Var quotient)
+
+-- computeAggregateSignature :: (Integral n, GaloisField n) => PublicKey n -> [Signature n] -> Comp n (Ref ('A ('V 'Num)))
+-- computeAggregateSignature publicKey signatures = do
+--   let dimension = length publicKey
+--   -- actual calculated aggregate signature are stored here
+--   actualAggSig <- allocate dimension
+--   -- for shifting the public key
+--   loop [0 .. dimension - 1] $ \i -> do
+--     let shiftedPublicKey = shiftPublicKeyBy dimension i publicKey
+--     -- for each signature
+--     total <- reduce 0 signatures $ \acc signature -> do
+--       reduce acc [0 .. dimension - 1] $ \acc' k -> do
+--         let pk = shiftedPublicKey ! k
+--         let sig = signature ! k
+--         let prod = pk * sig
+--         return (acc' + fromIntegral prod)
+--     update actualAggSig i total
+--   return actualAggSig
 
 -- ensure that the coefficients of signatures are in the range of [0, 12289)
--- representing the coefficients with bitstrings of length 14 
+-- representing the coefficients with bitstrings of length 14
 -- would put them in the range of [0, 16384)
 -- since 12288 is 3/4 of 16384, we can use the highest 2 bits to check
--- if the coefficients are in the right quarters 
--- 
--- the highest 2 bits (bitstring[13, 12]): 
---      00 -> within range 
---      01 -> within range 
---      10 -> within range 
+-- if the coefficients are in the right quarters
+--
+-- the highest 2 bits (bitstring[13, 12]):
+--      00 -> within range
+--      01 -> within range
+--      10 -> within range
 --      11 -> within range only when the remaining bits are 0s
 --
 -- the coefficients will only be in the range of [0, 12289) if and only if:
@@ -80,7 +98,7 @@ checkSize (Param dimension numOfSigs setup _) = do
   let signatures = setupSignatures setup
 
   sigBitStrings <- freshInputs3 numOfSigs dimension 14
-  forM_ [0 .. length signatures - 1] $ \i -> do
+  forM_ [0 .. numOfSigs - 1] $ \i -> do
     let signature = signatures !! i
     forM_ [0 .. dimension - 1] $ \j -> do
       let coeff = signature ! j
@@ -101,7 +119,7 @@ checkSize (Param dimension numOfSigs setup _) = do
 
       let smallerThan12289 = fromBool (Var bit13) * fromBool (Var bit12) * bit11to0
       assert (smallerThan12289 `Eq` 0)
-      
+
 checkLength :: (Integral n, GaloisField n) => Param n -> Comp n ()
 checkLength (Param dimension numOfSigs setup _) = do
   let signatures = setupSignatures setup
@@ -133,16 +151,16 @@ aggregateSignature :: (Integral n, GaloisField n) => Param n -> Comp n ()
 aggregateSignature param = do
   let settings = paramSettings param
   -- check aggregate signature
-  case enableAggSigChecking settings of
+  case enableAggChecking settings of
     False -> return ()
     True -> checkAgg param
 
   -- check signature size
-  case enableSigSizeChecking settings of
+  case enableSizeChecking settings of
     False -> return ()
     True -> checkSize param
 
   -- check squares & length of signatures
-  case enableSigLengthChecking settings of
+  case enableLengthChecking settings of
     False -> return ()
     True -> checkLength param

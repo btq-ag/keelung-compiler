@@ -150,6 +150,9 @@ sizeOfExpr expr = case expr of
   
 --------------------------------------------------------------------------------
 
+num :: n -> Expr 'Num n
+num = Val . Number 
+
 true :: Expr 'Bool n
 true = Val (Boolean True)
 
