@@ -22,13 +22,25 @@ import Control.Monad
 -- --     bit <- fromBool . Var <$> access3 bitStringss (i, j, k)
 -- --     return $ (bit * bit) `Eq` bit
 
-checkAgg :: (Integral n, GaloisField n) => Setup n -> Comp n ()
-checkAgg (Setup dimension _ publicKey signatures _ _) = do
-  -- expected computed aggregate signature as input
-  expectedAggSig <- freshInputs dimension
+checkRemainder :: (Integral n, GaloisField n) => Param n -> Comp n ()
+checkRemainder (Param _dimension _ _setup _) = do
 
-  actualAggSig <- computeAggregateSignature publicKey signatures
-  arrayEq dimension expectedAggSig actualAggSig
+  -- expecting "remainders" as input 
+  -- expectedAggSig <- freshInputs dimension
+
+  -- let (remainders, quotients) = unzip $ zipWith (calculateRemQuot dimension) signatures publicKeys
+
+
+  return ()
+
+checkAgg :: (Integral n, GaloisField n) => Param n -> Comp n ()
+checkAgg (Param _dimension _ _setup _) = do
+  -- expected computed aggregate signature as input
+  -- expectedAggSig <- freshInputs dimension
+
+  -- actualAggSig <- computeAggregateSignature publicKey (inputSignatures setup)
+  -- arrayEq dimension expectedAggSig actualAggSig
+  return ()
 
 computeAggregateSignature :: (Integral n, GaloisField n) => PublicKey n -> [Signature n] -> Comp n (Ref ('A ('V 'Num)))
 computeAggregateSignature publicKey signatures = do
@@ -63,8 +75,10 @@ computeAggregateSignature publicKey signatures = do
 -- the coefficients will only be in the range of [0, 12289) if and only if:
 --      bitstring[13] * bitstring[12] * (sum of bitstring[11 .. 0]) = 0
 
-checkSize :: (GaloisField n, Integral n) => Setup n -> Comp n ()
-checkSize (Setup dimension numOfSigs _ signatures _ _) = do
+checkSize :: (GaloisField n, Integral n) => Param n -> Comp n ()
+checkSize (Param dimension numOfSigs setup _) = do
+  let signatures = setupSignatures setup
+
   sigBitStrings <- freshInputs3 numOfSigs dimension 14
   forM_ [0 .. length signatures - 1] $ \i -> do
     let signature = signatures !! i
@@ -88,8 +102,9 @@ checkSize (Setup dimension numOfSigs _ signatures _ _) = do
       let smallerThan12289 = fromBool (Var bit13) * fromBool (Var bit12) * bit11to0
       assert (smallerThan12289 `Eq` 0)
       
-checkLength :: (Integral n, GaloisField n) => Setup n -> Comp n ()
-checkLength (Setup dimension numOfSigs _ signatures _ _) = do
+checkLength :: (Integral n, GaloisField n) => Param n -> Comp n ()
+checkLength (Param dimension numOfSigs setup _) = do
+  let signatures = setupSignatures setup
   -- expected square of signatures as input
   sigSquares <- freshInputs2 numOfSigs dimension
   -- for each signature
@@ -114,20 +129,20 @@ checkLength (Setup dimension numOfSigs _ signatures _ _) = do
 
     assert (Var expectedLength `Eq` actualLength)
 
-aggregateSignature :: (Integral n, GaloisField n) => Setup n -> Comp n ()
-aggregateSignature setup = do
-  let settings = setupSettings setup
+aggregateSignature :: (Integral n, GaloisField n) => Param n -> Comp n ()
+aggregateSignature param = do
+  let settings = paramSettings param
   -- check aggregate signature
   case enableAggSigChecking settings of
     False -> return ()
-    True -> checkAgg setup
+    True -> checkAgg param
 
   -- check signature size
   case enableSigSizeChecking settings of
     False -> return ()
-    True -> checkSize setup
+    True -> checkSize param
 
   -- check squares & length of signatures
   case enableSigLengthChecking settings of
     False -> return ()
-    True -> checkLength setup
+    True -> checkLength param

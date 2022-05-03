@@ -19,10 +19,10 @@ import Benchmark.Keelung
 --       2048215153250
 --   ]
 
-benchmarks :: Setup GF181 -> [Benchmark]
-benchmarks setup =
-  let keelung = AggSig.aggregateSignature setup
-      input = genInputFromSetup setup
+benchmarks :: Param GF181 -> [Benchmark]
+benchmarks param =
+  let keelung = AggSig.aggregateSignature param
+      input = genInputFromParam param
    in [ 
         bgroup
           "Elaboration"
@@ -48,12 +48,12 @@ benchmarks setup =
           ]
       ]
 
-compileAndOptimise :: Setup GF181 -> [Benchmark]
+compileAndOptimise :: Param GF181 -> [Benchmark]
 compileAndOptimise setup =
   let 
       -- snarkl = Snarkl.aggregateSignature setup
       keelung = AggSig.aggregateSignature setup
-      -- input = genInputFromSetup setup
+      -- input = genInputFromParam setup
    in [ bgroup
           "Optimisation"
           [ 
@@ -64,10 +64,10 @@ compileAndOptimise setup =
           ]
       ]
 
-keelungOnly :: Setup GF181 -> [Benchmark]
+keelungOnly :: Param GF181 -> [Benchmark]
 keelungOnly setup =
   let keelung = AggSig.aggregateSignature setup
-      input = genInputFromSetup setup
+      input = genInputFromParam setup
    in [ 
         bench "Elaboration" $ nf benchElaborate' keelung,
         bench "Rewriting" $ nf benchRewrite' keelung,
@@ -99,8 +99,8 @@ complexityOfElaboration =
                 enableSigSizeChecking = True,
                 enableSigLengthChecking = True
               }
-          setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
-          -- input = genInputFromSetup setup
+          setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
+          -- input = genInputFromParam setup
       in  AggSig.aggregateSignature setup
 
 run :: IO ()
@@ -113,7 +113,7 @@ run = do
             enableSigSizeChecking = True,
             enableSigLengthChecking = True
           }
-  let setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
+  let setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
 
   -- defaultMain complexityOfElaboration
   defaultMain (keelungOnly setup)

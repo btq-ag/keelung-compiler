@@ -58,7 +58,7 @@ keelung dimension numOfSigs = run $ do
             enableSigSizeChecking = True,
             enableSigLengthChecking = True
           }
-  let setup = makeSetup dimension numOfSigs 42 settings :: Setup GF181
+  let param = makeParam dimension numOfSigs 42 settings :: Param GF181
 
   -- compile & optimise
   -- erased <- liftEither $ erase (aggregateSignature setup)
@@ -79,7 +79,7 @@ keelung dimension numOfSigs = run $ do
   -- print ("compAssertions", length $ compAssertions computed, sum $ map sizeOfExpr (compAssertions computed))
 
   -- compile & optimise
-  aggSig <- liftEither $ optm (AggSig.aggregateSignature setup)
+  aggSig <- liftEither $ optm (AggSig.aggregateSignature param)
   liftIO $
     print (numberOfConstraints aggSig)
 
@@ -92,14 +92,14 @@ keelungConstraints dimension numOfSigs = run $ do
             enableSigSizeChecking = True,
             enableSigLengthChecking = True
           }
-  let setup = makeSetup dimension numOfSigs 42 settings :: Setup GF181
-  -- let input = genInputFromSetup setup
+  let param = makeParam dimension numOfSigs 42 settings :: Param GF181
+  -- let input = genInputFromParam setup
 
   checkAgg <-
     liftEither $
       comp $
         AggSig.checkAgg $
-          makeSetup dimension numOfSigs 42 (Settings True False False)
+          makeParam dimension numOfSigs 42 (Settings True False False)
   let checkAgg' = optimise checkAgg :: ConstraintSystem GF181
   -- let checkAgg'' = snd $ optimiseWithInput input checkAgg'
 
@@ -107,7 +107,7 @@ keelungConstraints dimension numOfSigs = run $ do
     liftEither $
       comp $
         AggSig.checkSize $
-          makeSetup dimension numOfSigs 42 (Settings False True False)
+          makeParam dimension numOfSigs 42 (Settings False True False)
   let checkSize' = optimise checkSize :: ConstraintSystem GF181
   -- let checkSize'' = snd $ optimiseWithInput input checkSize'
 
@@ -115,11 +115,11 @@ keelungConstraints dimension numOfSigs = run $ do
     liftEither $
       comp $
         AggSig.checkLength $
-          makeSetup dimension numOfSigs 42 (Settings False False True)
+          makeParam dimension numOfSigs 42 (Settings False False True)
   let checkLength' = optimise checkLength :: ConstraintSystem GF181
   -- let checkLength'' = snd $ optimiseWithInput input checkLength'
 
-  aggSig <- liftEither $ comp (AggSig.aggregateSignature setup)
+  aggSig <- liftEither $ comp (AggSig.aggregateSignature param)
   let aggSig' = optimise aggSig :: ConstraintSystem GF181
   -- let aggSig'' = snd $ optimiseWithInput input aggSig'
 
@@ -202,16 +202,16 @@ keelungConstraints dimension numOfSigs = run $ do
 --           ++ count aggSig
 --   where
 --     checkAgg :: Snarkl.Comp 'Snarkl.TBool GF181
---     checkAgg = Snarkl.checkAgg $ makeSetup dimension numOfSigs 42 $ Settings True False False
+--     checkAgg = Snarkl.checkAgg $ makeParam dimension numOfSigs 42 $ Settings True False False
 
 --     checkSize :: Snarkl.Comp 'Snarkl.TBool GF181
---     checkSize = Snarkl.checkSize $ makeSetup dimension numOfSigs 42 $ Settings False True False
+--     checkSize = Snarkl.checkSize $ makeParam dimension numOfSigs 42 $ Settings False True False
 
 --     checkLength :: Snarkl.Comp 'Snarkl.TBool GF181
---     checkLength = Snarkl.checkLength $ makeSetup dimension numOfSigs 42 $ Settings False False True
+--     checkLength = Snarkl.checkLength $ makeParam dimension numOfSigs 42 $ Settings False False True
 
 --     aggSig :: Snarkl.Comp 'Snarkl.TBool GF181
---     aggSig = Snarkl.aggregateSignature $ makeSetup dimension numOfSigs 42 $ Settings True True True
+--     aggSig = Snarkl.aggregateSignature $ makeParam dimension numOfSigs 42 $ Settings True True True
 
 -- for examing the complexity of expression generated after elaboration
 keelungElaborate :: IO ()
@@ -219,9 +219,9 @@ keelungElaborate = do
   forM_ [2 :: Int .. 7] $ \i -> do
     let dimension = 2 ^ i
     let numOfSigs = 4
-    let setup = makeSetup dimension numOfSigs 42 settings :: Setup GF181
+    let param = makeParam dimension numOfSigs 42 settings :: Param GF181
 
-    let result = elaborate' (AggSig.aggregateSignature setup)
+    let result = elaborate' (AggSig.aggregateSignature param)
     case result of
       Left err -> print err
       Right elaborated -> do

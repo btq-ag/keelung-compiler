@@ -60,12 +60,12 @@ execute prog inputs = do
 --             enableSigSizeChecking = True,
 --             enableSigLengthChecking = True
 --           }
---       setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
+--       setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
 --    in Snarkl.resultResult $
 --         Snarkl.execute
 --           Snarkl.Simplify
 --           (Snarkl.aggregateSignature setup :: Snarkl.Comp 'Snarkl.TBool GF181)
---           (genInputFromSetup setup)
+--           (genInputFromParam setup)
 
 runKeelungAggSig :: Int -> Int -> Maybe GF181
 runKeelungAggSig dimension numberOfSignatures =
@@ -75,11 +75,11 @@ runKeelungAggSig dimension numberOfSignatures =
             enableSigSizeChecking = True,
             enableSigLengthChecking = True
           }
-      setup = makeSetup dimension numberOfSignatures 42 settings :: Setup GF181
+      setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
       result =
         execute
           (AggSig.aggregateSignature setup :: Comp GF181 ())
-          (genInputFromSetup setup)
+          (genInputFromParam setup)
    in case result of
         Left _ -> Nothing
         Right val -> val
@@ -114,7 +114,7 @@ main = hspec $ do
                 enableSigSizeChecking = True,
                 enableSigLengthChecking = True
               }
-          setup = makeSetup 1 1 42 settings :: Setup GF181
+          setup = makeParam 1 1 42 settings :: Param GF181
           erased = erase (AggSig.aggregateSignature setup :: Comp GF181 ())
           result = IntSet.toList . erasedBooleanVars <$> erased
        in result `shouldBe` Right [3 .. 16]

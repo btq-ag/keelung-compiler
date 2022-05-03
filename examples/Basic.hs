@@ -62,35 +62,36 @@ loop2 = do
 aggSig :: Int -> Int -> Comp GF181 ()
 aggSig dim num = do
   let settings = Settings True True True
-  let setup = makeSetup dim num 42 settings
+  let setup = makeParam dim num 42 settings
   aggregateSignature setup
 
 -- components of aggregate signature
-checkSig :: Int -> Int -> Comp GF181 ()
-checkSig dimension n = do
-  let settings = Settings True False False
-  let Setup _ _ publicKey signatures _ _ = makeSetup dimension n 42 settings
-  expectedAggSig <- freshInputs dimension
-  actualAggSig <- computeAggregateSignature publicKey signatures
-  arrayEq dimension expectedAggSig actualAggSig
+-- checkSig :: Int -> Int -> Comp GF181 ()
+-- checkSig dimension n = do
+--   let settings = Settings True False False
+--   let Setup _ _ _ setup _ = makeParam dimension n 42 settings
+--   let signatures = inputSignatures setup
+--   expectedAggSig <- freshInputs dimension
+--   actualAggSig <- computeAggregateSignature publicKey signatures
+--   arrayEq dimension expectedAggSig actualAggSig
 
--- #2
-checkSigSize :: Int -> Int -> Comp GF181 ()
-checkSigSize dimension n = do
-  let settings = Settings False True False
-  checkSize $ makeSetup dimension n 42 settings
+-- -- #2
+-- checkSigSize :: Int -> Int -> Comp GF181 ()
+-- checkSigSize dimension n = do
+--   let settings = Settings False True False
+--   checkSize $ makeParam dimension n 42 settings
 
--- #3
-checkSigLength :: Int -> Int -> Comp GF181 ()
-checkSigLength dimension n = do
-  let settings = Settings False False True
-  checkLength $ makeSetup dimension n 42 settings
+-- -- #3
+-- checkSigLength :: Int -> Int -> Comp GF181 ()
+-- checkSigLength dimension n = do
+--   let settings = Settings False False True
+--   checkLength $ makeParam dimension n 42 settings
 
 --------------------------------------------------------------------------------
 
 bench :: Compilable GF181 a => Comp GF181 a -> Settings -> Int -> Int -> Either String (Int, Int, Int)
 bench program settings dimension n = do
-  let input = genInputFromSetup (makeSetup dimension n 42 settings)
+  let input = genInputFromParam (makeParam dimension n 42 settings)
   cs <- comp program -- before optimisation (only constant propagation)
   cs' <- optm program -- after optimisation (constant propagation + constraint set reduction)
   cs'' <- optmWithInput program input -- after optimisation (constant propagation + constraint set reduction with input)
@@ -106,23 +107,23 @@ runAggSig dimension n = do
   let settings = Settings True True True
   bench (aggSig dimension n) settings dimension n
 
--- #1
-runCheckSig :: Int -> Int -> Either String (Int, Int, Int)
-runCheckSig dimension n = do
-  let settings = Settings True False False
-  bench (checkSig dimension n) settings dimension n
+-- -- #1
+-- runCheckSig :: Int -> Int -> Either String (Int, Int, Int)
+-- runCheckSig dimension n = do
+--   let settings = Settings True False False
+--   bench (checkSig dimension n) settings dimension n
 
--- #2 !!
-runCheckSigSize :: Int -> Int -> Either String (Int, Int, Int)
-runCheckSigSize dimension n = do
-  let settings = Settings False True False
-  bench (checkSigSize dimension n) settings dimension n
+-- -- #2 !!
+-- runCheckSigSize :: Int -> Int -> Either String (Int, Int, Int)
+-- runCheckSigSize dimension n = do
+--   let settings = Settings False True False
+--   bench (checkSigSize dimension n) settings dimension n
 
--- #3 !!
-runCheckLength :: Int -> Int -> Either String (Int, Int, Int)
-runCheckLength dimension n = do
-  let settings = Settings False False True
-  bench (checkSigLength dimension n) settings dimension n
+-- -- #3 !!
+-- runCheckLength :: Int -> Int -> Either String (Int, Int, Int)
+-- runCheckLength dimension n = do
+--   let settings = Settings False False True
+--   bench (checkSigLength dimension n) settings dimension n
 
 --------------------------------------------------------------------------------
 

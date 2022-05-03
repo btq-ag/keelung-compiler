@@ -8,20 +8,19 @@ import System.Random
 
 --------------------------------------------------------------------------------
 
+-- coefficients of terms of signatures
 type Signature n = Array Int n
 
 type PublicKey n = Array Int n
 
 --------------------------------------------------------------------------------
 
--- | Settings for Aggregate Signature
-data Setup n = Setup
-  { setupDimension :: Int,
-    setupNumberOfSignatures :: Int,
-    setupPublicKey :: PublicKey n,
-    setupSignatures :: [Signature n],
-    setupInputs :: Input n,
-    setupSettings :: Settings
+-- | Parameters for Aggregate Signature
+data Param n = Param
+  { paramDimension :: Int,
+    paramNumberOfSignatures :: Int,
+    paramSetup :: Setup n,
+    paramSettings :: Settings
   }
 
 --------------------------------------------------------------------------------
@@ -29,22 +28,34 @@ data Setup n = Setup
 q :: (Integral n, Num n) => n 
 q = 12289
 
--- | Inputs for the system
-data Input a = Input
-  { -- | Signatures to be aggregated
-    inputSignatures :: [Signature a],
-    -- | "Remainders"
-    inputSigRemainders :: [Array Int a],
-    -- | "Quotients"
-    inputSigQuotients :: [Array Int a],
-    -- | Aggregate signature
-    inputAggSigs :: Signature a,
-    -- | Bit strings of signatures
-    inputSigBitStrings :: [[[a]]],
+-- Note: allocation of inputs in Jackie's implementation
+--  
+--  nT  : coefficients of signatures  <multiplication> <bit value> <square>
+--  nT  : "remainders"                <multiplication> <summation>
+--  nT  : "quotients"                 <multiplication>
+--  14nT: bitstring                   <bit value> <bit range> <bit check>
+--  nT  : most significant 2 bits     <bit range>                 (unnecessary)
+--  nT  : square of coeffs of sigs    <square> <length>
+--  T   : sum(squares) % Q            <square> <length>
+
+-- | Setups for the system
+data Setup n = Setup
+  { -- | nT: Coefficients of terms of public keys
+    setupPublicKeys :: [PublicKey n],
+    -- | nT: Coefficients of terms of signatures
+    setupSignatures :: [Signature n],
+    -- | nT: "Remainders"
+    setupSigRemainders :: [Array Int n],
+    -- | nT: "Quotients"
+    setupSigQuotients :: [Array Int n],
+    -- | n: Aggregate signature
+    setupAggSigs :: Signature n,
+    -- | 14nT: Bit strings of signatures
+    setupSigBitStrings :: [[[n]]],
     -- | Squares of coefficients of signatures
-    inputSigSquares :: [Signature a],
-    -- | Sume of squares of coefficients signatures
-    inputSigLengths :: [a]
+    setupSigSquares :: [Signature n],
+    -- | 
+    setupSigLengths :: [n]
   }
 
 -- | Settings for enabling/disabling different part of Aggregate Signature
@@ -56,15 +67,13 @@ data Settings = Settings
 
 --------------------------------------------------------------------------------
 
-makeSetup :: (Random n, GaloisField n, Integral n, Num n) => Int -> Int -> Int -> Settings -> Setup n
-makeSetup dimension t seed settings =
-  Setup
-    { setupDimension = dimension,
-      setupNumberOfSignatures = t,
-      setupPublicKey = publicKey,
-      setupSignatures = signatures,
-      setupInputs = Input signatures remainders quotients aggSigs bisStrings sigSquares sigLengths,
-      setupSettings = settings
+makeParam :: (Random n, GaloisField n, Integral n, Num n) => Int -> Int -> Int -> Settings -> Param n
+makeParam dimension t seed settings =
+  Param
+    { paramDimension = dimension,
+      paramNumberOfSignatures = t,
+      paramSetup = Setup publicKeys signatures remainders quotients aggSigs bisStrings sigSquares sigLengths,
+      paramSettings = settings
     }
   where
     -- raw input numbers range from of `-q/2` to `q/2`
@@ -80,7 +89,7 @@ makeSetup dimension t seed settings =
     publicKeys :: Num n => [PublicKey n]
     publicKeys = map (fmap fromIntegral) arraysForPublicKeys
 
-    (remainders, quotients) = unzip $ zipWith (calculate dimension) signatures publicKeys
+    (remainders, quotients) = unzip $ zipWith (calculateRemQuot dimension) signatures publicKeys
 
     -- NOTE: somehow generating new `StdGen` from IO would result in segmentation fault (possibly due to FFI)
     publicKey = listArray (0, dimension - 1) $ take dimension $ randoms (mkStdGen seed)
@@ -120,8 +129,8 @@ makeSetup dimension t seed settings =
 --    let Q = q - P
 --
 --        j     0       1       2      ...      510     511
---        ┌──────────────────────────  ...  ────────────────────┐
---    i   │                                                     │
+--    i   ┌──────────────────────────  ...  ────────────────────┐
+--        │                                                     │
 --    0   │   S₀P₀    S₁Q₅₁₁  S₂Q₅₁₀   ...    S₅₁₀Q₂  S₅₁₁Q₁    │
 --        │                                                     │
 --    1   │   S₀P₁    S₁P₀    S₂Q₅₁₁   ...    S₅₁₀Q₃  S₅₁₁Q₂    │
@@ -136,11 +145,11 @@ makeSetup dimension t seed settings =
 --        │                                                     │
 --   511  │   S₀P₅₁₁  S₁P₅₁₀  S₂P₅₀₉   ...    S₅₁₀P₁  S₅₁₁P₀    │
 --        │                                                     │
---        └─────────────────────────── ... ─────────────────────┘
+--        └──────────────────────────  ...  ────────────────────┘
 
 -- Get an array of remainders and an array of quotients from a signature and a public key 
-calculate :: (Integral n, Num n) => Int -> Signature n -> PublicKey n -> (Array Int n, Array Int n)
-calculate dimension signature publicKey =
+calculateRemQuot :: (Integral n, Num n) => Int -> Signature n -> PublicKey n -> (Array Int n, Array Int n)
+calculateRemQuot dimension signature publicKey =
   let (remainders, quotients) = unzip [handleRow i | i <- [0 .. dimension]]
    in (listArray (0, dimension - 1) remainders, listArray (0, dimension - 1) quotients)
   where
@@ -158,13 +167,13 @@ calculate dimension signature publicKey =
 
 --------------------------------------------------------------------------------
 
--- | Generate inputs from a Setup
-genInputFromSetup :: Setup a -> [a]
-genInputFromSetup (Setup _ _ _ _ inputs settings) =
-  let aggSigs = inputAggSigs inputs -- 512 terms x 512
-      bitStrings = concat (concat (inputSigBitStrings inputs))
-      sigSquares = concatMap elems (inputSigSquares inputs)
-      sigLengths = inputSigLengths inputs
+-- | Generate inputs from ``Param``
+genInputFromParam :: Param a -> [a]
+genInputFromParam (Param _ _ setup settings) =
+  let aggSigs = setupAggSigs setup -- 512 terms x 512
+      bitStrings = concat (concat (setupSigBitStrings setup))
+      sigSquares = concatMap elems (setupSigSquares setup)
+      sigLengths = setupSigLengths setup
    in ( if enableAggSigChecking settings
           then elems aggSigs
           else []
