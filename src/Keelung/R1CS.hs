@@ -29,13 +29,14 @@ generateWitness ::
   -- | Resulting assignment
   Either String (Witness a)
 generateWitness cs env =
-  let pinnedVars =
+  let cs' = renumberConstraints cs
+      pinnedVars =
         IntSet.toList (csInputVars cs)
           ++ case csOutputVar cs of
             Nothing -> []
             Just v -> [v]
       variables = [0 .. IntSet.size (csVars cs) - 1]
-      (witness, cs') = optimiseWithWitness env cs
+      (witness, cs'') = optimiseWithWitness env cs'
    in if all (isMapped witness) variables
         then Right witness
         else
@@ -50,10 +51,10 @@ generateWitness cs env =
                 ++ show pinnedVars
                 ++ ",\n"
                 ++ "in reduced-constraint context\n  "
-                ++ show cs'
+                ++ show cs''
                 ++ ",\n"
                 ++ "in constraint context\n  "
-                ++ show cs
+                ++ show cs'
             )
   where
     isMapped witness var = IntMap.member var witness

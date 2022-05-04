@@ -138,8 +138,6 @@ interpretProc prog inputs = case elaborate' prog of
       value <- interp e
       addBinding var value
 
-    
-
     -- interpret the assertions next
     -- throw error if any assertion fails
     forM_ (compAssertions comp) $ \e -> do
