@@ -231,7 +231,6 @@ compile (TypeErased untypedExpr assertions assignments numOfVars inputVars boole
 
   constraints <- gets envConstraints
   let vars = varsInConstraints constraints
-  -- traceShow ("assignments / constraints: " ++ show (length assignments, sum (map (\(Assignment _ expr) -> sizeOfExpr expr) assignments)), length constraints) $
   return
     ( ConstraintSystem
         constraints

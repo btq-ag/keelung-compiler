@@ -85,9 +85,9 @@ makeParam dimension t seed settings =
     signatures :: Num n => [Signature n]
     signatures = map (fmap (fromIntegral . (`mod` 12289))) arraysForSignatures
 
-    -- domain of terms of public keys: [0, 2^181)
+    -- domain of terms of public keys: [0, 12289)
     publicKeys :: Num n => [PublicKey n]
-    publicKeys = map (fmap fromIntegral) arraysForPublicKeys
+    publicKeys = map (fmap (fromIntegral . (`mod` 12289))) arraysForPublicKeys
 
     (remainders, quotients) = computeRemsAndQuots dimension signatures publicKeys
 
@@ -148,17 +148,22 @@ makeParam dimension t seed settings =
 --        └──────────────────────────  ...  ────────────────────┘
 
 -- Get an array of remainders and an array of quotients from a signature and a public key
-computeRemsAndQuots :: (Integral n, Num n) => Int -> [Signature n] -> [PublicKey n] -> ([Array Int n], [Array Int n])
+computeRemsAndQuots :: (Integral n, Num n, Show n) => Int -> [Signature n] -> [PublicKey n] -> ([Array Int n], [Array Int n])
 computeRemsAndQuots dimension signatures publicKeys = unzip $ zipWith (computeRemsAndQuot dimension) signatures publicKeys
 
-computeRemsAndQuot :: (Integral n, Num n) => Int -> Signature n -> PublicKey n -> (Array Int n, Array Int n)
+computeRemsAndQuot :: (Integral n, Num n, Show n) => Int -> Signature n -> PublicKey n -> (Array Int n, Array Int n)
 computeRemsAndQuot dimension signature publicKey =
   let (remainders, quotients) = unzip [handleRow i | i <- [0 .. dimension - 1]]
    in (listArray (0, dimension - 1) remainders, listArray (0, dimension - 1) quotients)
   where
+    -- NOTE: forall x, y. x `mod` y = 0 on any Galois field
+    -- we need to convert these numbers to Integers 
+    -- to get the remainders and quotients we want 
     handleRow i =
       let total = sum [lookupSigPk i j | j <- [0 .. dimension - 1]]
-       in (total `mod` q, total `div` q)
+       in ( fromInteger $ toInteger total `mod` (q :: Integer),
+            fromInteger $ toInteger total `div` (q :: Integer)
+          )
 
     lookupSigPk i j =
       signature ! j

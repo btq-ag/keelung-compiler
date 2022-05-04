@@ -7,8 +7,10 @@
 module Keelung.Syntax where
 
 import Data.Field.Galois (GaloisField)
+import Data.IntSet (IntSet)
 import Data.Semiring (Ring (..), Semiring (..), one)
 import Keelung.Syntax.Common
+import qualified Data.IntSet as IntSet
 
 --------------------------------------------------------------------------------
 
@@ -67,7 +69,7 @@ data Expr :: Type -> * -> * where
   IfThenElse :: Expr 'Bool n -> Expr ty n -> Expr ty n -> Expr ty n
   -- bool <-> num conversion
   ToBool :: Expr 'Num n -> Expr 'Bool n
-  ToNum :: Expr 'Bool n -> Expr 'Num n 
+  ToNum :: Expr 'Bool n -> Expr 'Num n
 
 instance Functor (Expr ty) where
   fmap f expr = case expr of
@@ -131,10 +133,10 @@ instance GaloisField n => Fractional (Expr 'Num n) where
 --------------------------------------------------------------------------------
 
 -- calculate the "size" of an expression
-sizeOfExpr :: Expr ty n -> Int 
-sizeOfExpr expr = case expr of 
-  Val _ -> 1 
-  Var _ -> 1 
+sizeOfExpr :: Expr ty n -> Int
+sizeOfExpr expr = case expr of
+  Val _ -> 1
+  Var _ -> 1
   Add x y -> 1 + sizeOfExpr x + sizeOfExpr y
   Sub x y -> 1 + sizeOfExpr x + sizeOfExpr y
   Mul x y -> 1 + sizeOfExpr x + sizeOfExpr y
@@ -147,11 +149,29 @@ sizeOfExpr expr = case expr of
   IfThenElse x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
   ToBool x -> 1 + sizeOfExpr x
   ToNum x -> 1 + sizeOfExpr x
-  
+
+-- collect free variables of an expression
+freeVars :: Expr ty n -> IntSet
+freeVars expr = case expr of
+  Val _ -> mempty
+  Var (Variable n) -> IntSet.singleton n
+  Add x y -> freeVars x <> freeVars y
+  Sub x y -> freeVars x <> freeVars y
+  Mul x y -> freeVars x <> freeVars y
+  Div x y -> freeVars x <> freeVars y
+  Eq x y -> freeVars x <> freeVars y
+  And x y -> freeVars x <> freeVars y
+  Or x y -> freeVars x <> freeVars y
+  Xor x y -> freeVars x <> freeVars y
+  BEq x y -> freeVars x <> freeVars y
+  IfThenElse x y z -> freeVars x <> freeVars y <> freeVars z
+  ToBool x -> freeVars x
+  ToNum x -> freeVars x
+
 --------------------------------------------------------------------------------
 
 num :: n -> Expr 'Num n
-num = Val . Number 
+num = Val . Number
 
 true :: Expr 'Bool n
 true = Val (Boolean True)
@@ -168,4 +188,4 @@ fromBool :: GaloisField n => Expr 'Bool n -> Expr 'Num n
 fromBool = ToNum
 
 toBool :: GaloisField n => Expr 'Num n -> Expr 'Bool n
-toBool = ToBool 
+toBool = ToBool

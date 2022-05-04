@@ -58,7 +58,7 @@ checkAgg (Param dimension numOfSigs setup _) = do
         return $ acc + (Var sig * num pk')
       remainder <- access2 expectedRemainders (t, i)
       quotient <- access2 expectedQuotients (t, i)
-      assert $ summation `Eq` (Var remainder * num q + Var quotient)
+      assert $ summation `Eq` (Var quotient * num q + Var remainder)
 
 -- computeAggregateSignature :: (Integral n, GaloisField n) => PublicKey n -> [Signature n] -> Comp n (Ref ('A ('V 'Num)))
 -- computeAggregateSignature publicKey signatures = do

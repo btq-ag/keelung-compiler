@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TupleSections #-}
 
 module Keelung.Interpret (interpretProc, interpretExpr) where
 
@@ -118,7 +119,13 @@ interpretExpr prog inputs = case elaborate prog of
     forM_ (compAssertions comp) $ \e -> do
       value <- interp e
       when (value /= 1) $ do
-        throwError $ "Assertion failed: " ++ show (fmap DebugGF e)
+        -- collect variables and their assignments in the expression 
+        let vars = freeVars e
+        assignments <- mapM (\var -> (var,) . DebugGF <$> lookupVar var) $ IntSet.toList vars
+        throwError $
+          "Assertion failed: " ++ show (fmap DebugGF e)
+            ++ "\nassignments of variables: "
+            ++ show assignments
 
     -- lastly interpret the expression and return the result
     mapM interp expr
@@ -143,7 +150,13 @@ interpretProc prog inputs = case elaborate' prog of
     forM_ (compAssertions comp) $ \e -> do
       value <- interp e
       when (value /= 1) $ do
-        throwError $ "Assertion failed: " ++ show (fmap DebugGF e)
+        -- collect variables and their assignments in the expression 
+        let vars = freeVars e
+        assignments <- mapM (\var -> (var,) . DebugGF <$> lookupVar var) $ IntSet.toList vars
+        throwError $
+          "Assertion failed: " ++ show (fmap DebugGF e)
+            ++ "\nassignments of variables: "
+            ++ show assignments
 
     -- lastly interpret the expression and return the result
     mapM interp expr
