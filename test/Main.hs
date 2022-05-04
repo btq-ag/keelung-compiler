@@ -5,6 +5,7 @@ module Main where
 import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import qualified Basic
+import Control.Monad (unless, when)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Keelung
@@ -12,7 +13,6 @@ import Keelung.Constraint (cadd)
 import qualified Keelung.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Optimise.Monad as Optimise
 import Test.Hspec
-import Control.Monad (when, unless)
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
@@ -42,7 +42,6 @@ execute prog inputs = do
   -- interpret the program to see if the output value is correct
   expectedOutput <- interpret prog inputs
 
-
   when (actualOutput /= expectedOutput) $ do
     Left $
       "interpreted result:\n"
@@ -50,14 +49,24 @@ execute prog inputs = do
         ++ "\ndiffers from actual result:\n"
         ++ show (fmap DebugGF actualOutput)
 
-  unless (satisfyR1CS actualWitness r1cs) $ do
-    Left $
-      "actual witness:\n"
-        ++ show (fmap DebugGF actualWitness)
-        ++ "\ndoesn't satisfy R1CS:\n"
-        ++ show r1cs
+  case satisfyR1CS actualWitness r1cs of
+    Nothing -> return ()
+    Just r1c's ->
+      Left $
+        "these R1C constraints cannot be satisfied:\n"
+          ++ show r1c's
+          ++ "\nby the witness:\n"
+          ++ show (fmap DebugGF actualWitness)
+
+  -- unless (satisfyR1CS actualWitness r1cs) $ do
+  --   Left $
+  --     "actual witness:\n"
+  --       ++ show (fmap DebugGF actualWitness)
+  --       ++ "\ndoesn't satisfy R1CS:\n"
+  --       ++ show r1cs
 
   return actualOutput
+
 -- return $ Result result nw ng out r1cs
 
 -- runSnarklAggSig :: Int -> Int -> GF181
@@ -83,22 +92,22 @@ runKeelungAggSig dimension numberOfSignatures =
             enableSizeChecking = True,
             enableLengthChecking = True
           }
-      param =  makeParam dimension numberOfSignatures 42 settings :: Param GF181
-  in  execute
-          (AggSig.aggregateSignature param :: Comp GF181 ())
-          (genInputFromParam param)
+      param = makeParam dimension numberOfSignatures 42 settings :: Param GF181
+   in execute
+        (AggSig.aggregateSignature param :: Comp GF181 ())
+        (genInputFromParam param)
 
 main :: IO ()
 main = hspec $ do
   describe "Aggregate Signature" $ do
     it "dim:1 sig:1" $
       runKeelungAggSig 1 1 `shouldBe` Right Nothing
-    -- it "dim:1 sig:10" $
-    --   runKeelungAggSig 1 10 `shouldBe` Right Nothing
-    -- it "dim:10 sig:1" $
-    --   runKeelungAggSig 10 1 `shouldBe` Right Nothing
-    -- it "dim:10 sig:10" $
-    --   runKeelungAggSig 10 10 `shouldBe` Right Nothing
+  -- it "dim:1 sig:10" $
+  --   runKeelungAggSig 1 10 `shouldBe` Right Nothing
+  -- it "dim:10 sig:1" $
+  --   runKeelungAggSig 10 1 `shouldBe` Right Nothing
+  -- it "dim:10 sig:10" $
+  --   runKeelungAggSig 10 10 `shouldBe` Right Nothing
 
   describe "Type Erasure" $ do
     it "boolean variables in Aggregate Signature" $
@@ -129,7 +138,7 @@ main = hspec $ do
     it "cond 1" $
       execute Basic.cond [0] `shouldBe` Right (Just 789)
     it "assert fail" $
-      execute Basic.assert1 [0] `shouldBe` Left "Assertion failed: $0 = 3"
+      execute Basic.assert1 [0] `shouldBe` Left "Assertion failed: $0 = 3\nassignments of variables: [(0,0)]"
     it "assert success" $
       execute Basic.assert1 [3] `shouldBe` Right (Just 3)
 

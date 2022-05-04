@@ -147,8 +147,15 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
           then "\n"
           else ":\n" ++ List.intercalate "\n" (map (\s -> "    " ++ show s) cs)
 
-satisfyR1CS :: GaloisField n => Witness n -> R1CS n -> Bool
-satisfyR1CS witness = all (satisfyR1C witness) . r1csClauses
+-- `Nothing` if all constraints are satisfiable
+-- `Just [R1C]` if at least one constraint is unsatisfiable
+satisfyR1CS :: GaloisField n => Witness n -> R1CS n -> Maybe [R1C n]
+satisfyR1CS witness r1cs = 
+  let clauses = r1csClauses r1cs 
+      unsatisfiable = filter (not . satisfyR1C witness) clauses
+   in if null unsatisfiable
+        then Nothing
+        else Just unsatisfiable
 
 toR1CS :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> R1CS n
 toR1CS cs =
