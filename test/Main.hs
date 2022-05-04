@@ -12,6 +12,7 @@ import Keelung.Constraint (cadd)
 import qualified Keelung.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Optimise.Monad as Optimise
 import Test.Hspec
+import Control.Monad (when, unless)
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
@@ -24,32 +25,39 @@ execute prog inputs = do
   let r1cs = toR1CS constraintSystem
 
   let outputVar = r1csOutputVar r1cs
-  witness <- witnessOfR1CS inputs r1cs
+  actualWitness <- witnessOfR1CS inputs r1cs
 
   -- extract the output value from the witness
   actualOutput <- case outputVar of
     Nothing -> return Nothing
-    Just var -> case IntMap.lookup var witness of
+    Just var -> case IntMap.lookup var actualWitness of
       Nothing ->
         Left $
           "output variable "
             ++ show outputVar
             ++ "is not mapped in\n  "
-            ++ show witness
+            ++ show actualWitness
       Just value -> return $ Just value
 
   -- interpret the program to see if the output value is correct
   expectedOutput <- interpret prog inputs
 
-  if actualOutput == expectedOutput && satisfyR1CS witness r1cs
-    then return actualOutput
-    else
-      Left $
-        "interpreter result "
-          ++ show expectedOutput
-          ++ " differs from actual result "
-          ++ show actualOutput
 
+  when (actualOutput /= expectedOutput) $ do
+    Left $
+      "interpreted result:\n"
+        ++ show (fmap DebugGF expectedOutput)
+        ++ "\ndiffers from actual result:\n"
+        ++ show (fmap DebugGF actualOutput)
+
+  unless (satisfyR1CS actualWitness r1cs) $ do
+    Left $
+      "actual witness:\n"
+        ++ show (fmap DebugGF actualWitness)
+        ++ "\ndoesn't satisfy R1CS:\n"
+        ++ show r1cs
+
+  return actualOutput
 -- return $ Result result nw ng out r1cs
 
 -- runSnarklAggSig :: Int -> Int -> GF181
@@ -67,7 +75,7 @@ execute prog inputs = do
 --           (Snarkl.aggregateSignature setup :: Snarkl.Comp 'Snarkl.TBool GF181)
 --           (genInputFromParam setup)
 
-runKeelungAggSig :: Int -> Int -> Maybe GF181
+runKeelungAggSig :: Int -> Int -> Either String (Maybe GF181)
 runKeelungAggSig dimension numberOfSignatures =
   let settings =
         Settings
@@ -76,35 +84,21 @@ runKeelungAggSig dimension numberOfSignatures =
             enableLengthChecking = True
           }
       param =  makeParam dimension numberOfSignatures 42 settings :: Param GF181
-      result = 
-        execute
+  in  execute
           (AggSig.aggregateSignature param :: Comp GF181 ())
           (genInputFromParam param)
-   in case result of
-        Left _ -> Nothing
-        Right val -> val
 
 main :: IO ()
 main = hspec $ do
   describe "Aggregate Signature" $ do
-    -- describe "Snarkl" $ do
-    --   it "dim:1 sig:1" $
-    --     runSnarklAggSig 1 1 `shouldBe` 1
-    --   it "dim:1 sig:10" $
-    --     runSnarklAggSig 1 10 `shouldBe` 1
-    --   it "dim:10 sig:1" $
-    --     runSnarklAggSig 10 1 `shouldBe` 1
-    --   it "dim:10 sig:10" $
-    --     runSnarklAggSig 10 10 `shouldBe` 1
-
     it "dim:1 sig:1" $
-      runKeelungAggSig 1 1 `shouldBe` Nothing
+      runKeelungAggSig 1 1 `shouldBe` Right Nothing
     it "dim:1 sig:10" $
-      runKeelungAggSig 1 10 `shouldBe` Nothing
+      runKeelungAggSig 1 10 `shouldBe` Right Nothing
     it "dim:10 sig:1" $
-      runKeelungAggSig 10 1 `shouldBe` Nothing
+      runKeelungAggSig 10 1 `shouldBe` Right Nothing
     it "dim:10 sig:10" $
-      runKeelungAggSig 10 10 `shouldBe` Nothing
+      runKeelungAggSig 10 10 `shouldBe` Right Nothing
 
   describe "Type Erasure" $ do
     it "boolean variables in Aggregate Signature" $
@@ -134,8 +128,10 @@ main = hspec $ do
       execute Basic.eq1 [3] `shouldBe` Right (Just 1)
     it "cond 1" $
       execute Basic.cond [0] `shouldBe` Right (Just 789)
-  -- it "assert 1" $
-  --   execute Basic.assert1 [0] `shouldBe` Right 0
+    it "assert fail" $
+      execute Basic.assert1 [0] `shouldBe` Left "Assertion failed: $0 = 3"
+    it "assert success" $
+      execute Basic.assert1 [3] `shouldBe` Right (Just 3)
 
   -- NOTE:
   --    some variables are of "don't care"

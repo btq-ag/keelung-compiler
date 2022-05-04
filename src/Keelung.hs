@@ -51,11 +51,11 @@ class Compilable n a where
   erase :: Comp n a -> Either String (TypeErased n)
   interpret :: Comp n a -> [n] -> Either String (Maybe n)
 
-instance (Erase ty, Num n, GaloisField n) => Compilable n (Expr ty n) where
+instance (Erase ty, Num n, GaloisField n, Bounded n, Integral n) => Compilable n (Expr ty n) where
   erase prog = elaborate prog >>= Rewriting.run >>= return . eraseType
   interpret = interpretExpr
 
-instance (Num n, GaloisField n) => Compilable n () where
+instance (Num n, GaloisField n, Bounded n, Integral n) => Compilable n () where
   erase prog = elaborate' prog >>= Rewriting.run >>= return . eraseType
   interpret = interpretProc
 

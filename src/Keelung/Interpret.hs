@@ -13,6 +13,7 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Monad (Assignment (..), Comp, Computation (..), Elaborated (..), elaborate, elaborate')
 import Keelung.Syntax
+import Keelung.Util (DebugGF (..))
 
 --------------------------------------------------------------------------------
 
@@ -99,7 +100,7 @@ instance GaloisField n => Interpret (Expr ty n) n where
 --   where
 --     bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
 
-interpretExpr :: GaloisField n => Comp n (Expr ty n) -> [n] -> Either String (Maybe n)
+interpretExpr :: (GaloisField n, Bounded n, Integral n) => Comp n (Expr ty n) -> [n] -> Either String (Maybe n)
 interpretExpr prog inputs = case elaborate prog of
   Left err -> Left err
   Right (Elaborated expr comp) -> runM bindings $ do
@@ -112,12 +113,19 @@ interpretExpr prog inputs = case elaborate prog of
       value <- interp e
       addBinding var value
 
-    -- and then the expression
+    -- interpret the assertions next
+    -- throw error if any assertion fails
+    forM_ (compAssertions comp) $ \e -> do
+      value <- interp e
+      when (value /= 1) $ do
+        throwError $ "Assertion failed: " ++ show (fmap DebugGF e)
+
+    -- lastly interpret the expression and return the result
     mapM interp expr
     where
       bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
 
-interpretProc :: GaloisField n => Comp n () -> [n] -> Either String (Maybe n)
+interpretProc :: (GaloisField n, Bounded n, Integral n) => Comp n () -> [n] -> Either String (Maybe n)
 interpretProc prog inputs = case elaborate' prog of
   Left err -> Left err
   Right (Elaborated expr comp) -> runM bindings $ do
@@ -130,7 +138,16 @@ interpretProc prog inputs = case elaborate' prog of
       value <- interp e
       addBinding var value
 
-    -- and then the expression
+    
+
+    -- interpret the assertions next
+    -- throw error if any assertion fails
+    forM_ (compAssertions comp) $ \e -> do
+      value <- interp e
+      when (value /= 1) $ do
+        throwError $ "Assertion failed: " ++ show (fmap DebugGF e)
+
+    -- lastly interpret the expression and return the result
     mapM interp expr
     where
       bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
