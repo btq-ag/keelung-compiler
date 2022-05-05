@@ -24,7 +24,9 @@ module Keelung
     comp,
     optm,
     optmWithInput,
-    conv
+    conv,
+    witn,
+    execute
   )
 where
 
@@ -42,6 +44,8 @@ import Keelung.Syntax
 import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped (Erase, TypeErased (..), eraseType)
 import Keelung.Util (DebugGF (..))
+import qualified Data.IntMap as IntMap
+import Control.Monad (when)
 
 --------------------------------------------------------------------------------
 -- Some top-level functions
@@ -87,3 +91,56 @@ conv ::
   Comp n a ->
   Either String (R1CS n)
 conv prog = comp prog >>= return . toR1CS . optimise
+
+-- witn :: 
+-- (Compilable n a, GaloisField n, Bounded n, Integral n) =>
+  -- Comp n a ->
+  -- Either String (R1CS n)
+witn :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either String (Witness n)
+witn prog inputs = conv prog >>= witnessOfR1CS inputs
+
+-- | (1) Compile to R1CS.
+--   (2) Generate a satisfying assignment, 'w'.
+--   (3) Check whether 'w' satisfies the constraint system produced in (1).
+--   (4) Check whether the R1CS result matches the interpreter result.
+execute :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either String (Maybe n)
+execute prog inputs = do
+  typeErased <- erase prog
+  let constraintSystem = compile typeErased
+  let r1cs = toR1CS constraintSystem
+
+  let outputVar = r1csOutputVar r1cs
+  actualWitness <- witnessOfR1CS inputs r1cs
+
+  -- extract the output value from the witness
+  actualOutput <- case outputVar of
+    Nothing -> return Nothing
+    Just var -> case IntMap.lookup var actualWitness of
+      Nothing ->
+        Left $
+          "output variable "
+            ++ show outputVar
+            ++ "is not mapped in\n  "
+            ++ show actualWitness
+      Just value -> return $ Just value
+
+  -- interpret the program to see if the output value is correct
+  expectedOutput <- interpret prog inputs
+
+  when (actualOutput /= expectedOutput) $ do
+    Left $
+      "interpreted result:\n"
+        ++ show (fmap DebugGF expectedOutput)
+        ++ "\ndiffers from actual result:\n"
+        ++ show (fmap DebugGF actualOutput)
+
+  case satisfyR1CS actualWitness r1cs of
+    Nothing -> return ()
+    Just r1c's ->
+      Left $
+        "these R1C constraints cannot be satisfied:\n"
+          ++ show r1c's
+          ++ "\nby the witness:\n"
+          ++ show (fmap DebugGF actualWitness)
+
+  return actualOutput

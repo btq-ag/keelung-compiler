@@ -6,7 +6,7 @@
 
 module Basic where
 
-import AggregateSignature.Program
+import qualified AggregateSignature.Program
 import AggregateSignature.Util
 import Keelung
 
@@ -59,33 +59,23 @@ loop2 = do
   arr2 <- freshInputs 2
   arrayEq 2 arr (arr2 :: (Ref ('A ('V 'Num))))
 
+make :: (GaloisField n, Integral n) => Int -> Int -> Param n
+make dim n = makeParam dim n 42 $ Settings True True True
+
 aggSig :: Int -> Int -> Comp GF181 ()
-aggSig dim n = do
-  let settings = Settings True True True
-  let setup = makeParam dim n 42 settings
-  aggregateSignature setup
+aggSig dim n = AggregateSignature.Program.aggregateSignature (make dim n)
 
 -- components of aggregate signature
--- checkSig :: Int -> Int -> Comp GF181 ()
--- checkSig dimension n = do
---   let settings = Settings True False False
---   let Setup _ _ _ setup _ = makeParam dimension n 42 settings
---   let signatures = inputSignatures setup
---   expectedAggSig <- freshInputs dimension
---   actualAggSig <- computeAggregateSignature publicKey signatures
---   arrayEq dimension expectedAggSig actualAggSig
+checkAgg :: Int -> Int -> Comp GF181 ()
+checkAgg dim n = AggregateSignature.Program.checkAgg (make dim n)
 
 -- -- #2
--- checkSigSize :: Int -> Int -> Comp GF181 ()
--- checkSigSize dimension n = do
---   let settings = Settings False True False
---   checkSize $ makeParam dimension n 42 settings
+checkSize :: Int -> Int -> Comp GF181 ()
+checkSize dim n = AggregateSignature.Program.checkSize (make dim n)
 
 -- -- #3
--- checkSigLength :: Int -> Int -> Comp GF181 ()
--- checkSigLength dimension n = do
---   let settings = Settings False False True
---   checkLength $ makeParam dimension n 42 settings
+checkLength :: Int -> Int -> Comp GF181 ()
+checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 
 --------------------------------------------------------------------------------
 

@@ -5,7 +5,6 @@ module Main where
 import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import qualified Basic
-import Control.Monad (unless, when)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Keelung
@@ -14,83 +13,13 @@ import qualified Keelung.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Optimise.Monad as Optimise
 import Test.Hspec
 
--- | (1) Compile to R1CS.
---   (2) Generate a satisfying assignment, 'w'.
---   (3) Check whether 'w' satisfies the constraint system produced in (1).
---   (4) Check whether the R1CS result matches the interpreter result.
-execute :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either String (Maybe n)
-execute prog inputs = do
-  typeErased <- erase prog
-  let constraintSystem = compile typeErased
-  let r1cs = toR1CS constraintSystem
-
-  let outputVar = r1csOutputVar r1cs
-  actualWitness <- witnessOfR1CS inputs r1cs
-
-  -- extract the output value from the witness
-  actualOutput <- case outputVar of
-    Nothing -> return Nothing
-    Just var -> case IntMap.lookup var actualWitness of
-      Nothing ->
-        Left $
-          "output variable "
-            ++ show outputVar
-            ++ "is not mapped in\n  "
-            ++ show actualWitness
-      Just value -> return $ Just value
-
-  -- interpret the program to see if the output value is correct
-  expectedOutput <- interpret prog inputs
-
-  when (actualOutput /= expectedOutput) $ do
-    Left $
-      "interpreted result:\n"
-        ++ show (fmap DebugGF expectedOutput)
-        ++ "\ndiffers from actual result:\n"
-        ++ show (fmap DebugGF actualOutput)
-
-  case satisfyR1CS actualWitness r1cs of
-    Nothing -> return ()
-    Just r1c's ->
-      Left $
-        "these R1C constraints cannot be satisfied:\n"
-          ++ show r1c's
-          ++ "\nby the witness:\n"
-          ++ show (fmap DebugGF actualWitness)
-
-  -- unless (satisfyR1CS actualWitness r1cs) $ do
-  --   Left $
-  --     "actual witness:\n"
-  --       ++ show (fmap DebugGF actualWitness)
-  --       ++ "\ndoesn't satisfy R1CS:\n"
-  --       ++ show r1cs
-
-  return actualOutput
-
--- return $ Result result nw ng out r1cs
-
--- runSnarklAggSig :: Int -> Int -> GF181
--- runSnarklAggSig dimension numberOfSignatures =
---   let settings =
---         Settings
---           { enableAggChecking = True,
---             enableSizeChecking = True,
---             enableLengthChecking = True
---           }
---       setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
---    in Snarkl.resultResult $
---         Snarkl.execute
---           Snarkl.Simplify
---           (Snarkl.aggregateSignature setup :: Snarkl.Comp 'Snarkl.TBool GF181)
---           (genInputFromParam setup)
-
 runKeelungAggSig :: Int -> Int -> Either String (Maybe GF181)
 runKeelungAggSig dimension numberOfSignatures =
   let settings =
         Settings
-          { enableAggChecking = True,
+          { enableAggChecking = False,
             enableSizeChecking = True,
-            enableLengthChecking = True
+            enableLengthChecking = False
           }
       param = makeParam dimension numberOfSignatures 42 settings :: Param GF181
    in execute
