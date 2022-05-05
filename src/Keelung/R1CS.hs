@@ -21,42 +21,42 @@ import Keelung.Util
 -- constraints and return the resulting complete assignment.
 -- Return `Left String` if the constraints are unsolvable.
 generateWitness ::
-  (GaloisField a, Bounded a, Integral a) =>
+  (GaloisField n, Bounded n, Integral n) =>
   -- | Constraints to be solved
-  ConstraintSystem a ->
+  ConstraintSystem n ->
   -- | Initial assignment
-  Witness a ->
+  Witness n ->
   -- | Resulting assignment
-  Either String (Witness a)
+  Either (ExecError n) (Witness n)
 generateWitness cs env =
   let cs' = renumberConstraints cs
-      pinnedVars =
-        IntSet.toList (csInputVars cs)
-          ++ case csOutputVar cs of
-            Nothing -> []
-            Just v -> [v]
+      -- pinnedVars =
+      --   IntSet.toList (csInputVars cs)
+      --     ++ case csOutputVar cs of
+      --       Nothing -> []
+      --       Just v -> [v]
       variables = [0 .. IntSet.size (csVars cs) - 1]
-      (witness, cs'') = optimiseWithWitness env cs'
+      (witness, _) = optimiseWithWitness env cs'
    in if all (isMapped witness) variables
         then Right witness
-        else
-          Left
-            ( "unassigned variables,\n  "
-                ++ show [x | x <- variables, not $ isMapped witness x]
-                ++ ",\n"
-                ++ "in assignment context\n  "
-                ++ show (fmap DebugGF witness)
-                ++ ",\n"
-                ++ "in pinned-variable context\n  "
-                ++ show pinnedVars
-                ++ ",\n"
-                ++ "in reduced-constraint context\n  "
-                ++ show cs''
-                ++ ",\n"
-                ++ "in constraint context\n  "
-                ++ show cs'
-            )
+        else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
   where
+    -- ( "unassigned variables,\n  "
+    --     ++ show [x | x <- variables, not $ isMapped witness x]
+    --     ++ ",\n"
+    --     ++ "in assignment context\n  "
+    --     ++ show (fmap DebugGF witness)
+    --     ++ ",\n"
+    --     ++ "in pinned-variable context\n  "
+    --     ++ show pinnedVars
+    --     ++ ",\n"
+    --     ++ "in reduced-constraint context\n  "
+    --     ++ show cs''
+    --     ++ ",\n"
+    --     ++ "in constraint context\n  "
+    --     ++ show cs'
+    -- )
+
     isMapped witness var = IntMap.member var witness
 
 --------------------------------------------------------------------------------
@@ -128,7 +128,7 @@ data R1CS n = R1CS
     r1csNumOfVars :: Int,
     r1csInputVars :: IntSet,
     r1csOutputVar :: Maybe Var,
-    r1csWitnessGen :: Witness n -> Either String (Witness n)
+    r1csWitnessGen :: Witness n -> Either (ExecError n) (Witness n)
   }
 
 instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
@@ -138,9 +138,15 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
       ++ show numberOfClauses
       ++ ")"
       ++ showClauses
-      ++ "\n  number of variables: " ++ show n  ++ "\n"
-      ++ "  number of input vars: " ++ show (IntSet.size ivs) ++ "\n"
-      ++ "  output var: " ++ show ovs ++ "\n"
+      ++ "\n  number of variables: "
+      ++ show n
+      ++ "\n"
+      ++ "  number of input vars: "
+      ++ show (IntSet.size ivs)
+      ++ "\n"
+      ++ "  output var: "
+      ++ show ovs
+      ++ "\n"
       ++ "}"
     where
       numberOfClauses = length cs
@@ -152,8 +158,8 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
 -- `Nothing` if all constraints are satisfiable
 -- `Just [R1C]` if at least one constraint is unsatisfiable
 satisfyR1CS :: GaloisField n => Witness n -> R1CS n -> Maybe [R1C n]
-satisfyR1CS witness r1cs = 
-  let clauses = r1csClauses r1cs 
+satisfyR1CS witness r1cs =
+  let clauses = r1csClauses r1cs
       unsatisfiable = filter (not . satisfyR1C witness) clauses
    in if null unsatisfiable
         then Nothing
@@ -183,17 +189,59 @@ toR1CS cs =
         R1C (varPoly cx) (varPoly dy) (varPoly (e, z))
     toR1C CNQZ {} = Nothing
 
-witnessOfR1CS :: [n] -> R1CS n -> Either String (Witness n)
+witnessOfR1CS :: [n] -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
   let inputVars = r1csInputVars r1cs
    in if IntSet.size inputVars /= length inputs
-        then
-          Left
-            ( "expected "
-                ++ show (IntSet.size inputVars)
-                ++ " input(s)"
-                ++ " but got "
-                ++ show (length inputs)
-                ++ " input(s)"
-            )
+        then Left $ ExecInputUnmatchedError (IntSet.size inputVars) (length inputs)
         else r1csWitnessGen r1cs $ IntMap.fromList (zip (IntSet.toList inputVars) inputs)
+
+--------------------------------------------------------------------------------
+
+data ExecError n
+  = ExecOutputVarNotMappedError (Maybe Var) (IntMap n)
+  | ExecOutputError (Maybe n) (Maybe n)
+  | ExecR1CUnsatisfiableError [R1C n] (IntMap n)
+  | ExecInputUnmatchedError Int Int
+  | ExecVarUnassignedError [Var] (IntMap n)
+  deriving (Eq)
+
+instance (Show n, Bounded n, Integral n, Fractional n) => Show (ExecError n) where
+  show (ExecOutputVarNotMappedError var witness) =
+    "output variable "
+      ++ show var
+      ++ " is not mapped in\n  "
+      ++ show witness
+  show (ExecOutputError expected actual) =
+    "interpreted output:\n"
+      ++ show (fmap DebugGF expected)
+      ++ "\nactual output:\n"
+      ++ show (fmap DebugGF actual)
+  show (ExecR1CUnsatisfiableError r1c's witness) =
+    "these R1C constraints cannot be satisfied:\n"
+      ++ show r1c's
+      ++ "\nby the witness:\n"
+      ++ show (fmap DebugGF witness)
+  show (ExecInputUnmatchedError expected actual) =
+    "expecting " ++ show expected ++ " input(s) but got " ++ show actual
+      ++ " input(s)"
+  show (ExecVarUnassignedError vars witness) =
+    "these variables:\n " ++ show vars
+      ++ "\n are not assigned in: \n"
+      ++ show (fmap DebugGF witness)
+
+-- ( "unassigned variables,\n  "
+--     ++ show [x | x <- variables, not $ isMapped witness x]
+--     ++ ",\n"
+--     ++ "in assignment context\n  "
+--     ++ show (fmap DebugGF witness)
+--     ++ ",\n"
+--     ++ "in pinned-variable context\n  "
+--     ++ show pinnedVars
+--     ++ ",\n"
+--     ++ "in reduced-constraint context\n  "
+--     ++ show cs''
+--     ++ ",\n"
+--     ++ "in constraint context\n  "
+--     ++ show cs'
+-- )

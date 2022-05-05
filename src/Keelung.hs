@@ -100,7 +100,7 @@ conv prog = comp prog >>= return . toR1CS . optimise
 -- Comp n a ->
 -- Either String (R1CS n)
 witn :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either (Error n) (Witness n)
-witn prog inputs = conv prog >>= left OtherError . witnessOfR1CS inputs
+witn prog inputs = conv prog >>= left ExecError . witnessOfR1CS inputs
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
@@ -113,7 +113,7 @@ execute prog inputs = do
   let r1cs = toR1CS constraintSystem
 
   let outputVar = r1csOutputVar r1cs
-  actualWitness <- left OtherError $ witnessOfR1CS inputs r1cs
+  actualWitness <- left ExecError $ witnessOfR1CS inputs r1cs
 
   -- extract the output value from the witness
   actualOutput <- case outputVar of
