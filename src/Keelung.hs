@@ -7,6 +7,7 @@
 module Keelung
   ( module Keelung.Monad,
     module Keelung.Syntax,
+    module Keelung.Error,
     module Keelung.Syntax.Common,
     GaloisField,
     DebugGF (..),
@@ -26,14 +27,18 @@ module Keelung
     optmWithInput,
     conv,
     witn,
-    execute
+    execute,
   )
 where
 
+import Control.Arrow (left)
+import Control.Monad (when)
 import Data.Field.Galois (GaloisField)
+import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (one, zero))
 import Keelung.Compile (compile)
 import Keelung.Constraint (ConstraintSystem (..), numberOfConstraints)
+import Keelung.Error
 import Keelung.Interpret
 import Keelung.Monad
 import Keelung.Optimise
@@ -44,8 +49,6 @@ import Keelung.Syntax
 import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped (Erase, TypeErased (..), eraseType)
 import Keelung.Util (DebugGF (..))
-import qualified Data.IntMap as IntMap
-import Control.Monad (when)
 
 --------------------------------------------------------------------------------
 -- Some top-level functions
@@ -64,14 +67,14 @@ instance (Num n, GaloisField n, Bounded n, Integral n) => Compilable n () where
   interpret = interpretProc
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
-comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either String (ConstraintSystem n)
-comp prog = erase prog >>= return . compile . ConstantPropagation.run
+comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either (Error n) (ConstraintSystem n)
+comp prog = left OtherError (erase prog) >>= return . compile . ConstantPropagation.run
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation
 optm ::
   (Compilable n a, GaloisField n, Bounded n, Integral n) =>
   Comp n a ->
-  Either String (ConstraintSystem n)
+  Either (Error n) (ConstraintSystem n)
 optm prog = comp prog >>= return . optimise
 
 -- with optimisation + partial evaluation with inputs
@@ -79,7 +82,7 @@ optmWithInput ::
   (Compilable n a, GaloisField n, Bounded n, Integral n) =>
   Comp n a ->
   [n] ->
-  Either String (ConstraintSystem n)
+  Either (Error n) (ConstraintSystem n)
 optmWithInput program input = do
   cs <- optm program
   let (_, cs') = optimiseWithInput input cs
@@ -89,28 +92,28 @@ optmWithInput program input = do
 conv ::
   (Compilable n a, GaloisField n, Bounded n, Integral n) =>
   Comp n a ->
-  Either String (R1CS n)
+  Either (Error n) (R1CS n)
 conv prog = comp prog >>= return . toR1CS . optimise
 
--- witn :: 
+-- witn ::
 -- (Compilable n a, GaloisField n, Bounded n, Integral n) =>
-  -- Comp n a ->
-  -- Either String (R1CS n)
-witn :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either String (Witness n)
-witn prog inputs = conv prog >>= witnessOfR1CS inputs
+-- Comp n a ->
+-- Either String (R1CS n)
+witn :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either (Error n) (Witness n)
+witn prog inputs = conv prog >>= left OtherError . witnessOfR1CS inputs
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
 --   (3) Check whether 'w' satisfies the constraint system produced in (1).
 --   (4) Check whether the R1CS result matches the interpreter result.
-execute :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either String (Maybe n)
+execute :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either (Error n) (Maybe n)
 execute prog inputs = do
-  typeErased <- erase prog
+  typeErased <- left OtherError $ erase prog
   let constraintSystem = compile typeErased
   let r1cs = toR1CS constraintSystem
 
   let outputVar = r1csOutputVar r1cs
-  actualWitness <- witnessOfR1CS inputs r1cs
+  actualWitness <- left OtherError $ witnessOfR1CS inputs r1cs
 
   -- extract the output value from the witness
   actualOutput <- case outputVar of
@@ -118,29 +121,21 @@ execute prog inputs = do
     Just var -> case IntMap.lookup var actualWitness of
       Nothing ->
         Left $
-          "output variable "
-            ++ show outputVar
-            ++ "is not mapped in\n  "
-            ++ show actualWitness
+          ExecError $
+            ExecOutputVarNotMappedError outputVar actualWitness
       Just value -> return $ Just value
 
   -- interpret the program to see if the output value is correct
-  expectedOutput <- interpret prog inputs
+  expectedOutput <- left OtherError $ interpret prog inputs
 
   when (actualOutput /= expectedOutput) $ do
-    Left $
-      "interpreted result:\n"
-        ++ show (fmap DebugGF expectedOutput)
-        ++ "\ndiffers from actual result:\n"
-        ++ show (fmap DebugGF actualOutput)
+    Left $ ExecError $ ExecOutputError expectedOutput actualOutput
 
   case satisfyR1CS actualWitness r1cs of
     Nothing -> return ()
     Just r1c's ->
       Left $
-        "these R1C constraints cannot be satisfied:\n"
-          ++ show r1c's
-          ++ "\nby the witness:\n"
-          ++ show (fmap DebugGF actualWitness)
+        ExecError $
+          ExecR1CUnsatisfiableError r1c's actualWitness
 
   return actualOutput

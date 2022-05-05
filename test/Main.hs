@@ -13,7 +13,7 @@ import qualified Keelung.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Optimise.Monad as Optimise
 import Test.Hspec
 
-runKeelungAggSig :: Int -> Int -> Either String (Maybe GF181)
+runKeelungAggSig :: Int -> Int -> Either (Error GF181) (Maybe GF181)
 runKeelungAggSig dimension numberOfSignatures =
   let settings =
         Settings
@@ -67,7 +67,7 @@ main = hspec $ do
     it "cond 1" $
       execute Basic.cond [0] `shouldBe` Right (Just 789)
     it "assert fail" $
-      execute Basic.assert1 [0] `shouldBe` Left "Assertion failed: $0 = 3\nassignments of variables: [(0,0)]"
+      execute Basic.assert1 [0] `shouldBe` Left (OtherError "Assertion failed: $0 = 3\nassignments of variables: [(0,0)]")
     it "assert success" $
       execute Basic.assert1 [3] `shouldBe` Right (Just 3)
 

@@ -64,6 +64,7 @@ generateWitness cs env =
 -- A Polynomial is a mapping from variables to their coefficients
 data Poly n
   = Poly n (IntMap n) -- the first field `n` is the constant term
+  deriving (Eq)
 
 -- Helper function for printing polynomials
 --    empty polynomial is printed as ""
@@ -97,6 +98,7 @@ varPoly (coeff, x) = Poly zero (IntMap.insert x coeff IntMap.empty)
 -- | A Rank-1 Constraint is a relation between 3 polynomials
 --      Ax * Bx = Cx
 data R1C n = R1C (Poly n) (Poly n) (Poly n)
+  deriving (Eq)
 
 instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
   show (R1C aX bX cX) = case (constantOnly aX, constantOnly bX, constantOnly cX) of

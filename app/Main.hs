@@ -6,7 +6,7 @@ import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import Control.Monad
 import Control.Monad.Except
-import Keelung 
+import Keelung
 
 generateFlamegraph :: Bool
 generateFlamegraph = True
@@ -41,11 +41,11 @@ main = do
 
         keelungConstraints dimension numOfSigs
 
-run :: ExceptT String IO () -> IO ()
+run :: (Show n, Bounded n, Integral n, Fractional n) => ExceptT (Error n) IO () -> IO ()
 run f = do
   res <- runExceptT f
   case res of
-    Left err -> putStrLn err
+    Left err -> print err
     Right () -> return ()
 
 --------------------------------------------------------------------------------

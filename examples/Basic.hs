@@ -65,6 +65,15 @@ make dim n = makeParam dim n 42 $ Settings True True True
 aggSig :: Int -> Int -> Comp GF181 ()
 aggSig dim n = AggregateSignature.Program.aggregateSignature (make dim n)
 
+p :: Param GF181
+p = makeParam 1 1 42 $ Settings False True False 
+
+inputs :: [GF181]
+inputs = genInputFromParam p 
+
+a :: Comp GF181 ()
+a = checkSize 1 1 
+
 -- components of aggregate signature
 checkAgg :: Int -> Int -> Comp GF181 ()
 checkAgg dim n = AggregateSignature.Program.checkAgg (make dim n)
@@ -79,7 +88,7 @@ checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 
 --------------------------------------------------------------------------------
 
-bench :: Compilable GF181 a => Comp GF181 a -> Settings -> Int -> Int -> Either String (Int, Int, Int)
+bench :: Compilable GF181 a => Comp GF181 a -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
 bench program settings dimension n = do
   let input = genInputFromParam (makeParam dimension n 42 settings)
   cs <- comp program -- before optimisation (only constant propagation)
@@ -92,7 +101,7 @@ bench program settings dimension n = do
     )
 
 -- #1
-runAggSig :: Int -> Int -> Either String (Int, Int, Int)
+runAggSig :: Int -> Int -> Either (Error GF181) (Int, Int, Int)
 runAggSig dimension n = do
   let settings = Settings True True True
   bench (aggSig dimension n) settings dimension n

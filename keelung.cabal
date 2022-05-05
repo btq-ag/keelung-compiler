@@ -29,6 +29,7 @@ library
       Keelung.Compile
       Keelung.Constraint
       Keelung.Constraint.CoeffMap
+      Keelung.Error
       Keelung.Interpret
       Keelung.Monad
       Keelung.Optimise
@@ -64,6 +65,7 @@ executable keelung-exe
       Keelung.Compile
       Keelung.Constraint
       Keelung.Constraint.CoeffMap
+      Keelung.Error
       Keelung.Interpret
       Keelung.Monad
       Keelung.Optimise
@@ -131,6 +133,7 @@ benchmark keelung-bench
       Keelung.Compile
       Keelung.Constraint
       Keelung.Constraint.CoeffMap
+      Keelung.Error
       Keelung.Interpret
       Keelung.Monad
       Keelung.Optimise

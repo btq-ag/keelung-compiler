@@ -7,18 +7,6 @@ import Criterion.Main
 import Keelung (GF181, Comp)
 import Benchmark.Keelung
 
--- oldBenchmarks :: [Benchmark]
--- oldBenchmarks =
---   [ snarkl "keccak800" (Keccak.keccak1 22) (map fromIntegral Keccak.input_vals) 1,
---     snarkl "map-list" List.test_listN (90 : take 100 [0 ..]) 90,
---     snarkl "fixed-matrix600" (Matrix.test1 600) [0 .. 599] 754740000,
---     snarkl
---       "input-matrix70"
---       (Matrix.test2 70)
---       (Matrix.t2_m0 4900 ++ Matrix.t2_m1 4900)
---       2048215153250
---   ]
-
 benchmarks :: Param GF181 -> [Benchmark]
 benchmarks param =
   let keelung = AggSig.aggregateSignature param
