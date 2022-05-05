@@ -129,11 +129,11 @@ renumberConstraints cs =
   where
     -- mapping of old variable indices to new variable indices
     -- input variables are placed in the front
-    variableMap = Map.fromList $ zip (inputVars ++ otherVars) [0 ..]
+    variableMap = Map.fromList $ zip vars' [0 ..]
       where
-        inputVars = IntSet.toList (csInputVars cs)
-        otherVars = filter isNotInput (IntSet.toList (csVars cs))
-        isNotInput = not . flip IntSet.member (csInputVars cs)
+        vars = varsInConstraints (csConstraints cs)
+        otherVars = IntSet.difference vars (csInputVars cs)
+        vars' = IntSet.toList (csInputVars cs) ++ IntSet.toList otherVars 
 
     renumber var = case Map.lookup var variableMap of
       Nothing ->
