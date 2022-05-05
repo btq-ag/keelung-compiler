@@ -50,22 +50,21 @@ import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped (Erase, TypeErased (..), eraseType)
 import Keelung.Util (DebugGF (..))
 
-
 --------------------------------------------------------------------------------
 -- Some top-level functions
 
 class Compilable n a where
   -- elaboration => rewriting => type erasure
   erase :: Comp n a -> Either String (TypeErased n)
-  interpret :: Comp n a -> [n] -> Either String (Maybe n)
+  interpret :: Comp n a -> [n] -> Either (Error n) (Maybe n)
 
 instance (Erase ty, Num n, GaloisField n, Bounded n, Integral n) => Compilable n (Expr ty n) where
   erase prog = elaborate prog >>= Rewriting.run >>= return . eraseType
-  interpret = interpretExpr
+  interpret prog inputs = left OtherError (elaborate prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
 
 instance (Num n, GaloisField n, Bounded n, Integral n) => Compilable n () where
   erase prog = elaborate' prog >>= Rewriting.run >>= return . eraseType
-  interpret = interpretProc
+  interpret prog inputs = left OtherError (elaborate' prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
 comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either (Error n) (ConstraintSystem n)
@@ -125,7 +124,7 @@ execute prog inputs = do
       Just value -> return $ Just value
 
   -- interpret the program to see if the output value is correct
-  expectedOutput <- left OtherError $ interpret prog inputs
+  expectedOutput <- interpret prog inputs
 
   when (actualOutput /= expectedOutput) $ do
     Left $ ExecError $ ExecOutputError expectedOutput actualOutput

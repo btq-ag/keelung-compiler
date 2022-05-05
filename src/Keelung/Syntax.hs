@@ -8,9 +8,9 @@ module Keelung.Syntax where
 
 import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Semiring (Ring (..), Semiring (..), one)
 import Keelung.Syntax.Common
-import qualified Data.IntSet as IntSet
 
 --------------------------------------------------------------------------------
 
@@ -36,6 +36,10 @@ instance Show n => Show (Value ty n) where
   show (Number n) = show n
   show (Boolean b) = show b
 
+instance Eq n => Eq (Value ty n) where
+  Number n == Number m = n == m
+  Boolean b == Boolean c = b == c
+
 --------------------------------------------------------------------------------
 
 data Ref :: Reference -> * where
@@ -45,6 +49,10 @@ data Ref :: Reference -> * where
 instance Show (Ref ref) where
   show (Variable i) = "$" <> show i
   show (Array addr) = "@" <> show addr
+
+instance Eq (Ref ref) where
+  Variable i == Variable j = i == j
+  Array addr == Array addr' = addr == addr'
 
 --------------------------------------------------------------------------------
 
@@ -106,6 +114,24 @@ instance Show n => Show (Expr ty n) where
     IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     ToBool x -> showString "ToBool " . showsPrec prec x
     ToNum x -> showString "ToNum " . showsPrec prec x
+
+instance Eq n => Eq (Expr ty n) where
+  a == b = case (a, b) of
+    (Val x, Val y) -> x == y
+    (Var x, Var y) -> x == y
+    (Add x y, Add z w) -> x == z && y == w
+    (Sub x y, Sub z w) -> x == z && y == w
+    (Mul x y, Mul z w) -> x == z && y == w
+    (Div x y, Div z w) -> x == z && y == w
+    (Eq x y, Eq z w) -> x == z && y == w
+    (And x y, And z w) -> x == z && y == w
+    (Or x y, Or z w) -> x == z && y == w
+    (Xor x y, Xor z w) -> x == z && y == w
+    (BEq x y, BEq z w) -> x == z && y == w
+    (IfThenElse x y z, IfThenElse u v w) -> x == u && y == v && z == w
+    (ToBool x, ToBool y) -> x == y
+    (ToNum x, ToNum y) -> x == y
+    _ -> False
 
 instance GaloisField n => Num (Expr 'Num n) where
   (+) = Add

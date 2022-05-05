@@ -1,9 +1,10 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Interpret (interpretProc, interpretExpr) where
+module Keelung.Interpret (InterpretError (..), interpretElaborated) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -12,16 +13,17 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung.Monad (Assignment (..), Comp, Computation (..), Elaborated (..), elaborate, elaborate')
+import Keelung.Monad (Assignment (..), Computation (..), Elaborated (..))
 import Keelung.Syntax
+import Keelung.Syntax.Common (Var)
 import Keelung.Util (DebugGF (..))
 
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = StateT (IntMap n) (Except String)
+type M n = StateT (IntMap n) (Except (InterpretError n))
 
-runM :: IntMap n -> M n a -> Either String a
+runM :: IntMap n -> M n a -> Either (InterpretError n) a
 runM st p = runExcept (evalStateT p st)
 
 addBinding :: Int -> n -> M n ()
@@ -31,11 +33,7 @@ lookupVar :: Show n => Int -> M n n
 lookupVar var = do
   bindings <- get
   case IntMap.lookup var bindings of
-    Nothing ->
-      throwError $
-        "unbound var " ++ show var
-          ++ " in environment "
-          ++ show bindings
+    Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val
 
 --------------------------------------------------------------------------------
@@ -85,80 +83,45 @@ instance GaloisField n => Interpret (Expr ty n) n where
 
 --------------------------------------------------------------------------------
 
--- interpret :: GaloisField n => Elaborated ty n -> [n] -> Either String (Maybe n)
--- interpret (Elaborated expr comp) inputs = runM bindings $ do
---   -- interpret the assignments first
---   forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
---     value <- interp e
---     addBinding var value
+interpretElaborated :: (GaloisField n, Bounded n, Integral n) => Elaborated ty n -> [n] -> Either (InterpretError n) (Maybe n)
+interpretElaborated (Elaborated expr comp) inputs = runM bindings $ do
+  -- interpret the assignments first
+  forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
+    value <- interp e
+    addBinding var value
 
---   forM_ (compBoolAsgns comp) $ \(Assignment (Variable var) e) -> do
---     value <- interp e
---     addBinding var value
+  forM_ (compBoolAsgns comp) $ \(Assignment (Variable var) e) -> do
+    value <- interp e
+    addBinding var value
 
---   -- and then the expression
---   mapM interp expr
---   where
---     bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
+  -- interpret the assertions next
+  -- throw error if any assertion fails
+  forM_ (compAssertions comp) $ \e -> do
+    value <- interp e
+    when (value /= 1) $ do
+      -- collect variables and their bindings in the expression
+      let vars = freeVars e
+      bindings' <- mapM (\var -> (var,) <$> lookupVar var) $ IntSet.toList vars
+      throwError $ InterpretAssertionError e (IntMap.fromList bindings')
 
-interpretExpr :: (GaloisField n, Bounded n, Integral n) => Comp n (Expr ty n) -> [n] -> Either String (Maybe n)
-interpretExpr prog inputs = case elaborate prog of
-  Left err -> Left err
-  Right (Elaborated expr comp) -> runM bindings $ do
-    -- interpret the assignments first
-    forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
-      value <- interp e
-      addBinding var value
+  -- lastly interpret the expression and return the result
+  mapM interp expr
+  where
+    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
 
-    forM_ (compBoolAsgns comp) $ \(Assignment (Variable var) e) -> do
-      value <- interp e
-      addBinding var value
+--------------------------------------------------------------------------------
 
-    -- interpret the assertions next
-    -- throw error if any assertion fails
-    forM_ (compAssertions comp) $ \e -> do
-      value <- interp e
-      when (value /= 1) $ do
-        -- collect variables and their assignments in the expression 
-        let vars = freeVars e
-        assignments <- mapM (\var -> (var,) . DebugGF <$> lookupVar var) $ IntSet.toList vars
-        throwError $
-          "Assertion failed: " ++ show (fmap DebugGF e)
-            ++ "\nassignments of variables: "
-            ++ show assignments
+data InterpretError n
+  = InterpretUnboundVarError Var (IntMap n)
+  | InterpretAssertionError (Expr 'Bool n) (IntMap n)
+  deriving (Eq)
 
-    -- lastly interpret the expression and return the result
-    mapM interp expr
-    where
-      bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
-
-interpretProc :: (GaloisField n, Bounded n, Integral n) => Comp n () -> [n] -> Either String (Maybe n)
-interpretProc prog inputs = case elaborate' prog of
-  Left err -> Left err
-  Right (Elaborated expr comp) -> runM bindings $ do
-    -- interpret the assignments first
-    forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
-      value <- interp e
-      addBinding var value
-
-    forM_ (compBoolAsgns comp) $ \(Assignment (Variable var) e) -> do
-      value <- interp e
-      addBinding var value
-
-    -- interpret the assertions next
-    -- throw error if any assertion fails
-    forM_ (compAssertions comp) $ \e -> do
-      value <- interp e
-      when (value /= 1) $ do
-        -- collect variables and their assignments in the expression 
-        let vars = freeVars e
-        assignments <- mapM (\var -> (var,) . DebugGF <$> lookupVar var) $ IntSet.toList vars
-        throwError $
-          "Assertion failed: " ++ show (fmap DebugGF e)
-            ++ "\nassignments of variables: "
-            ++ show assignments
-
-    -- lastly interpret the expression and return the result
-    mapM interp expr
-    where
-      bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
+instance (Show n, Bounded n, Integral n, Fractional n) => Show (InterpretError n) where
+  show (InterpretUnboundVarError var bindings) =
+    "unbound variable " ++ show var
+      ++ " in bindings "
+      ++ show (fmap DebugGF bindings)
+  show (InterpretAssertionError expr bindings) =
+    "assertion failed: " ++ show (fmap DebugGF expr)
+      ++ "\nbindings of variables: "
+      ++ show (fmap DebugGF bindings)

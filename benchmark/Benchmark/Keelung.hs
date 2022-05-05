@@ -83,7 +83,7 @@ benchRewrite' prog =
           ToBool _ -> 12
           ToNum _ -> 13
 
-benchInterpret :: (Compilable n a, Show n) => Comp n a -> [n] -> String
+benchInterpret :: (Compilable n a, Show n, Bounded n, Integral n, Fractional n) => Comp n a -> [n] -> String
 benchInterpret prog input =
   show $ interpret prog input
 
