@@ -123,15 +123,20 @@ renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))
     (map renumberConstraint (csBooleanInputVarConstraints cs))
-    (IntSet.fromList $ Map.elems variableMap)
+    (IntSet.fromList renumberedVars)
     (IntSet.map renumber (csInputVars cs))
     (renumber <$> csOutputVar cs)
   where
-    -- mapping of old variable indices to new variable indices
+    -- variables in constraints (that should be kept after renumbering!)
+    vars = varsInConstraints (csConstraints cs)
+
+    -- variables after renumbering (should have the same size as `vars`)
+    renumberedVars = [0 .. IntSet.size vars - 1]
+
+    -- mapping of old variables to new variables
     -- input variables are placed in the front
-    variableMap = Map.fromList $ zip vars' [0 ..]
+    variableMap = Map.fromList $ zip vars' renumberedVars
       where
-        vars = varsInConstraints (csConstraints cs)
         otherVars = IntSet.difference vars (csInputVars cs)
         vars' = IntSet.toList (csInputVars cs) ++ IntSet.toList otherVars 
 
