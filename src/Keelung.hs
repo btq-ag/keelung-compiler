@@ -50,6 +50,7 @@ import Keelung.Syntax.Common
 import Keelung.Syntax.Untyped (Erase, TypeErased (..), eraseType)
 import Keelung.Util (DebugGF (..))
 
+
 --------------------------------------------------------------------------------
 -- Some top-level functions
 
@@ -108,9 +109,7 @@ witn prog inputs = conv prog >>= left ExecError . witnessOfR1CS inputs
 --   (4) Check whether the R1CS result matches the interpreter result.
 execute :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either (Error n) (Maybe n)
 execute prog inputs = do
-  typeErased <- left OtherError $ erase prog
-  let constraintSystem = compile typeErased
-  let r1cs = toR1CS constraintSystem
+  r1cs <- conv prog
 
   let outputVar = r1csOutputVar r1cs
   actualWitness <- left ExecError $ witnessOfR1CS inputs r1cs

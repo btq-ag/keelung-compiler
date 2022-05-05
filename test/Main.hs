@@ -31,12 +31,12 @@ main = hspec $ do
   describe "Aggregate Signature" $ do
     it "dim:1 sig:1" $
       runKeelungAggSig 1 1 `shouldBe` Right Nothing
-  -- it "dim:1 sig:10" $
-  --   runKeelungAggSig 1 10 `shouldBe` Right Nothing
-  -- it "dim:10 sig:1" $
-  --   runKeelungAggSig 10 1 `shouldBe` Right Nothing
-  -- it "dim:10 sig:10" $
-  --   runKeelungAggSig 10 10 `shouldBe` Right Nothing
+    it "dim:1 sig:10" $
+      runKeelungAggSig 1 10 `shouldBe` Right Nothing
+    it "dim:10 sig:1" $
+      runKeelungAggSig 10 1 `shouldBe` Right Nothing
+    it "dim:10 sig:10" $
+      runKeelungAggSig 10 10 `shouldBe` Right Nothing
 
   describe "Type Erasure" $ do
     it "boolean variables in Aggregate Signature" $
