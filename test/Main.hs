@@ -18,9 +18,9 @@ runKeelungAggSig :: Int -> Int -> Either (Error GF181) (Maybe GF181)
 runKeelungAggSig dimension numberOfSignatures =
   let settings =
         Settings
-          { enableAggChecking = False,
+          { enableAggChecking = True,
             enableSizeChecking = True,
-            enableLengthChecking = False
+            enableLengthChecking = True
           }
       param = makeParam dimension numberOfSignatures 42 settings :: Param GF181
    in execute

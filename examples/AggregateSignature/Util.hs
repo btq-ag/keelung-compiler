@@ -49,13 +49,15 @@ data Setup n = Setup
     -- | nT: "Quotients"
     setupSigQuotients :: [Array Int n],
     -- | n: Coefficients of terms of Aggregate signature
-    setupAggSigs :: Signature n,
+    setupAggSig :: Signature n,
     -- | 14nT: Bit strings of signatures
     setupSigBitStrings :: [[[n]]],
-    -- | Squares of coefficients of signatures
+    -- | nT: Squares of coefficients of signatures
     setupSigSquares :: [Signature n],
-    -- |
-    setupSigLengths :: [n]
+    -- | t: Remainders of sum of squares of signatures
+    setupSigLengthRemainders :: [n],
+    -- | t: Quotients of sum of squares of signatures
+    setupSigLengthQuotients :: [n]
   }
 
 -- | Settings for enabling/disabling different part of Aggregate Signature
@@ -72,7 +74,17 @@ makeParam dimension t seed settings =
   Param
     { paramDimension = dimension,
       paramNumberOfSignatures = t,
-      paramSetup = Setup publicKeys signatures remainders quotients aggSig bisStrings sigSquares sigLengths,
+      paramSetup =
+        Setup
+          publicKeys
+          signatures
+          remainders
+          quotients
+          aggSig
+          bisStrings
+          sigSquares
+          sigLengthRemainders
+          sigLengthQuotients,
       paramSettings = settings
     }
   where
@@ -120,7 +132,10 @@ makeParam dimension t seed settings =
     toGF False = zero
 
     sigSquares = map (fmap (\x -> x * x)) signatures
+
     sigLengths = map sum sigSquares
+    sigLengthRemainders = map (\len -> fromInteger $ toInteger len `mod` (q :: Integer)) sigLengths
+    sigLengthQuotients = map (\len -> fromInteger $ toInteger len `div` (q :: Integer)) sigLengths
 
 --    let S be the signature and P be the public key
 --    let Q = q - P
@@ -154,8 +169,8 @@ computeRemsAndQuot dimension signature publicKey =
    in (listArray (0, dimension - 1) remainders, listArray (0, dimension - 1) quotients)
   where
     -- NOTE: forall x, y. x `mod` y = 0 on any Galois field
-    -- we need to convert these numbers to Integers 
-    -- to get the remainders and quotients we want 
+    -- we need to convert these numbers to Integers
+    -- to get the remainders and quotients we want
     handleRow i =
       let total = sum [lookupSigPk i j | j <- [0 .. dimension - 1]]
        in ( fromInteger $ toInteger total `mod` (q :: Integer),
@@ -181,6 +196,7 @@ computeRemsAndQuot dimension signature publicKey =
 --  14nT  : bitstring                   <size>
 --  nT    : square of coeffs of sigs    <length>
 --  T     : sum(squares) % Q            <length>
+--  T     : sum(squares) / Q            <length>
 
 -- | Generate inputs from `Param`
 genInputFromParam :: Param a -> [a]
@@ -200,10 +216,15 @@ genInputFromParam (Param _ _ setup settings) =
 
       forLengthChecking =
         if enableLengthChecking settings
-          then sigSquares <> sigLengths
+          then
+            (setupSignatures setup >>= elems)
+              <> sigSquares
+              <> sigLengthRemainders
+              <> sigLengthQuotients
           else []
       sigSquares = concatMap elems (setupSigSquares setup)
-      sigLengths = setupSigLengths setup
+      sigLengthRemainders = setupSigLengthRemainders setup
+      sigLengthQuotients = setupSigLengthQuotients setup
    in forAggChecking
         ++ forSizeChecking
         ++ forLengthChecking
@@ -216,33 +237,3 @@ splitListIntoArrays _ [] = mempty
 splitListIntoArrays n list = listArray (0, n - 1) first : splitListIntoArrays n rest
   where
     (first, rest) = splitAt n list
-
---------------------------------------------------------------------------------
-
--- shiftPublicKeyBy i xs = xs ^ i mod xⁿ + 1
--- OBSERVATION:
--- suppose the public key is a polynomial:
-
---   a  + bx  + cx² + ... + dx⁽ⁿ ⁻ ²⁾ + ex⁽ⁿ ⁻ ¹⁾
-
--- if we times it by x:
-
---   ax + bx² + cx³ + ... + dx⁽ⁿ ⁻ ¹⁾ + exⁿ
-
--- and then mod it by (xⁿ + 1), the resulting polynomial should look like this:
-
---   -e + ax + bx² + cx³ + ... dx⁽ⁿ ⁻ ¹⁾
-
--- if the public key is a polynomial made up of this array of coefficients:
-
---   [a, b, c, ..., d, e]
-
--- we should rotate the array to right by 1 and then make the wrapped coefficients negative:
-
---   [-e, a, b, c, ..., d]
-
-shiftPublicKeyBy :: GaloisField a => Int -> Int -> PublicKey a -> PublicKey a
-shiftPublicKeyBy dimension i xs =
-  let (withInBound, outOfBound) = splitAt (dimension - i) (elems xs)
-      wrapped = map negate outOfBound
-   in listArray (0, dimension - 1) $ wrapped ++ withInBound

@@ -59,11 +59,11 @@ checkAgg (Param dimension numOfSigs setup _) = do
       remainder <- access2 expectedRemainders (t, i)
       quotient <- access2 expectedQuotients (t, i)
 
-      -- assert that the relation between rowSum, remainder and quotient
+      -- assert the relation between rowSum, remainder and quotient
       assert $ rowSum `Eq` (Var quotient * num q + Var remainder)
 
   forM_ [0 .. dimension - 1] $ \i -> do
-    let expected = setupAggSigs setup ! i
+    let expected = setupAggSig setup ! i
     actual <- reduce 0 [0 .. numOfSigs - 1] $ \acc t -> do
       remainder <- access2 expectedRemainders (t, i)
       return $ acc + Var remainder
@@ -99,31 +99,36 @@ checkSize (Param dimension numOfSigs setup _) = do
       assert (smallerThan12289 `Eq` 0)
 
 checkLength :: (Integral n, GaloisField n) => Param n -> Comp n ()
-checkLength (Param dimension numOfSigs setup _) = do
-  let signatures = setupSignatures setup
-  -- expected square of signatures as input
+checkLength (Param dimension numOfSigs _ _) = do
+  sigs <- freshInputs2 numOfSigs dimension
+
+  -- expecting square of signatures as input
   sigSquares <- freshInputs2 numOfSigs dimension
   -- for each signature
-  forM_ [0 .. numOfSigs - 1] $ \i -> do
-    let signature = signatures !! i
+  forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
-    forM_ [0 .. dimension - 1] $ \j -> do
-      let term = fromIntegral (signature ! j)
-      square <- access2 sigSquares (i, j)
-      assert (Var square `Eq` (term * term))
+    forM_ [0 .. dimension - 1] $ \i -> do
+      sig <- access2 sigs (t, i)
+      square <- access2 sigSquares (t, i)
+      assert (Var square `Eq` (Var sig * Var sig))
 
-  -- expected length of signatures as input
-  sigLengths <- freshInputs numOfSigs
+  -- expecting remainders of length of signatures as input
+  sigLengthRemainders <- freshInputs numOfSigs
+  -- expecting quotients of length of signatures as input
+  sigLengthQuotients <- freshInputs numOfSigs
 
   -- for each signature
-  forM_ [0 .. numOfSigs - 1] $ \i -> do
-    expectedLength <- access sigLengths i
+  forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
-    actualLength <- reduce 0 [0 .. dimension - 1] $ \acc j -> do
-      square <- access2 sigSquares (i, j)
+    actualLength <- reduce 0 [0 .. dimension - 1] $ \acc i -> do
+      square <- access2 sigSquares (t, i)
       return (acc + Var square)
 
-    assert (Var expectedLength `Eq` actualLength)
+    remainder <- access sigLengthRemainders t
+    quotient <- access sigLengthQuotients t
+
+    -- assert the relation between actualLength, remainder and quotient
+    assert $ actualLength `Eq` (Var quotient * num q + Var remainder)
 
 aggregateSignature :: (Integral n, GaloisField n) => Param n -> Comp n ()
 aggregateSignature param = do
