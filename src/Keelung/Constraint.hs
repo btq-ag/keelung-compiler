@@ -80,6 +80,7 @@ data ConstraintSystem n = ConstraintSystem
     csInputVars :: !IntSet,
     csOutputVar :: !(Maybe Var)
   }
+  deriving Eq 
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
@@ -107,6 +108,10 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
       <> "\n\
          \  number of input variables: "
       <> show (IntSet.size inputVars)
+      <> ( if IntSet.size inputVars < 20
+             then ":\n    " <> show (IntSet.toList inputVars) <> "\n"
+             else "\n"
+         )
       <> "\n  output variable: $"
       <> show outputVar
       <> "\n\

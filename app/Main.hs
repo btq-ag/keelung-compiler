@@ -9,7 +9,7 @@ import Control.Monad.Except
 import Keelung
 
 generateFlamegraph :: Bool
-generateFlamegraph = True
+generateFlamegraph = False
 
 main :: IO ()
 main = do

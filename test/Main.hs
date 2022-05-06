@@ -7,9 +7,11 @@ import AggregateSignature.Util
 import qualified Basic
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
+import qualified Data.Set as Set
 import Keelung
 import Keelung.Constraint (cadd)
 import Keelung.Interpret (InterpretError (..))
+import qualified Keelung.Optimise as Optimse
 import qualified Keelung.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Optimise.Monad as Optimise
 import Test.Hspec
@@ -98,6 +100,31 @@ main = hspec $ do
             run = Optimise.runOptiM' links sizes mempty
          in run (Optimise.substConstraint constraint)
               `shouldBe` cadd 0 []
+
+      it "should work 1" $
+        let cs =
+              ConstraintSystem
+                { csConstraints =
+                    Set.fromList
+                      [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
+                        cadd 0 [(0, 10582), (1, 7317), (17, -1)],
+                        cadd 0 [(2, 3853), (3, 4216), (15, -1)],
+                        cadd 0 [(2, 8073), (3, 3853), (14, -1)],
+                        cadd 0 [(4, 1), (8, 12289), (17, -1)],
+                        cadd 0 [(5, 1), (9, 12289), (16, -1)],
+                        cadd 0 [(6, 1), (10, 12289), (15, -1)],
+                        cadd 0 [(7, 1), (11, 12289), (14, -1)],
+                        cadd 0 [(4, 1), (6, 1), (13, -1)],
+                        cadd 0 [(5, 1), (7, 1), (12, -1)],
+                        cadd 10623 [(13, -1)],
+                        cadd 11179 [(12, -1)]
+                      ],
+                  csBooleanInputVarConstraints = mempty,
+                  csVars = IntSet.fromList [0 .. 17],
+                  csInputVars = IntSet.fromList [0 .. 11],
+                  csOutputVar = Nothing
+                }
+         in Optimse.optimise (cs :: ConstraintSystem GF181) `shouldNotBe` cs
 
 -- it "$0 = $1 2" $
 --   let constraints = Set.singleton $ cadd 0 [(0, 1), (1, -1)]
