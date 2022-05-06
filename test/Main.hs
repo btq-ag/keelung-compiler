@@ -9,6 +9,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Keelung
 import Keelung.Constraint (cadd)
+import Keelung.Interpret (InterpretError (..))
 import qualified Keelung.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Optimise.Monad as Optimise
 import Test.Hspec
@@ -67,7 +68,13 @@ main = hspec $ do
     it "cond 1" $
       execute Basic.cond [0] `shouldBe` Right (Just 789)
     it "assert fail" $
-      execute Basic.assert1 [0] `shouldBe` Left (OtherError "Assertion failed: $0 = 3\nassignments of variables: [(0,0)]")
+      execute Basic.assert1 [0]
+        `shouldBe` Left
+          ( InterpretError $
+              InterpretAssertionError
+                (Eq (Var (Variable 0)) (Val (Number 3)))
+                (IntMap.fromList [(0, 0)])
+          )
     it "assert success" $
       execute Basic.assert1 [3] `shouldBe` Right (Just 3)
 

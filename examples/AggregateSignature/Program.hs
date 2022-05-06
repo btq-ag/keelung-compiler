@@ -47,7 +47,7 @@ checkAgg (Param dimension numOfSigs setup _) = do
 
   forM_ publicKeyPairs $ \(t, publicKey) -> do
     forM_ [0 .. dimension - 1] $ \i -> do
-      summation <- reduce 0 [0 .. dimension - 1] $ \acc j -> do
+      rowSum <- reduce 0 [0 .. dimension - 1] $ \acc j -> do
         let indexForPublicKey = (i - j) `mod` dimension
         let pk = publicKey ! indexForPublicKey
         let pk' =
@@ -58,40 +58,18 @@ checkAgg (Param dimension numOfSigs setup _) = do
         return $ acc + (Var sig * num pk')
       remainder <- access2 expectedRemainders (t, i)
       quotient <- access2 expectedQuotients (t, i)
-      assert $ summation `Eq` (Var quotient * num q + Var remainder)
 
--- computeAggregateSignature :: (Integral n, GaloisField n) => PublicKey n -> [Signature n] -> Comp n (Ref ('A ('V 'Num)))
--- computeAggregateSignature publicKey signatures = do
---   let dimension = length publicKey
---   -- actual calculated aggregate signature are stored here
---   actualAggSig <- allocate dimension
---   -- for shifting the public key
---   loop [0 .. dimension - 1] $ \i -> do
---     let shiftedPublicKey = shiftPublicKeyBy dimension i publicKey
---     -- for each signature
---     total <- reduce 0 signatures $ \acc signature -> do
---       reduce acc [0 .. dimension - 1] $ \acc' k -> do
---         let pk = shiftedPublicKey ! k
---         let sig = signature ! k
---         let prod = pk * sig
---         return (acc' + fromIntegral prod)
---     update actualAggSig i total
---   return actualAggSig
+      -- assert that the relation between rowSum, remainder and quotient
+      assert $ rowSum `Eq` (Var quotient * num q + Var remainder)
 
--- ensure that the coefficients of signatures are in the range of [0, 12289)
--- representing the coefficients with bitstrings of length 14
--- would put them in the range of [0, 16384)
--- since 12288 is 3/4 of 16384, we can use the highest 2 bits to check
--- if the coefficients are in the right quarters
---
--- the highest 2 bits (bitstring[13, 12]):
---      00 -> within range
---      01 -> within range
---      10 -> within range
---      11 -> within range only when the remaining bits are 0s
---
--- the coefficients will only be in the range of [0, 12289) if and only if:
---      bitstring[13] * bitstring[12] * (sum of bitstring[11 .. 0]) = 0
+  forM_ [0 .. dimension - 1] $ \i -> do
+    let expected = setupAggSigs setup ! i
+    actual <- reduce 0 [0 .. numOfSigs - 1] $ \acc t -> do
+      remainder <- access2 expectedRemainders (t, i)
+      return $ acc + Var remainder
+
+    -- assert that the sum of remainders forms a term of aggregate signature
+    assert $ actual `Eq` num expected
 
 checkSize :: (GaloisField n, Integral n) => Param n -> Comp n ()
 checkSize (Param dimension numOfSigs setup _) = do

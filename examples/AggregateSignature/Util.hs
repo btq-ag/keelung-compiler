@@ -48,7 +48,7 @@ data Setup n = Setup
     setupSigRemainders :: [Array Int n],
     -- | nT: "Quotients"
     setupSigQuotients :: [Array Int n],
-    -- | n: Aggregate signature
+    -- | n: Coefficients of terms of Aggregate signature
     setupAggSigs :: Signature n,
     -- | 14nT: Bit strings of signatures
     setupSigBitStrings :: [[[n]]],
@@ -72,7 +72,7 @@ makeParam dimension t seed settings =
   Param
     { paramDimension = dimension,
       paramNumberOfSignatures = t,
-      paramSetup = Setup publicKeys signatures remainders quotients aggSigs bisStrings sigSquares sigLengths,
+      paramSetup = Setup publicKeys signatures remainders quotients aggSig bisStrings sigSquares sigLengths,
       paramSettings = settings
     }
   where
@@ -92,7 +92,6 @@ makeParam dimension t seed settings =
     (remainders, quotients) = computeRemsAndQuots dimension signatures publicKeys
 
     -- NOTE: somehow generating new `StdGen` from IO would result in segmentation fault (possibly due to FFI)
-    publicKey = listArray (0, dimension - 1) $ take dimension $ randoms (mkStdGen seed)
 
     -- generate fake numbers for populating fake signatures & public keys
     randomNumbers :: [Int]
@@ -103,11 +102,9 @@ makeParam dimension t seed settings =
     arraysForPublicKeys :: [Array Int Int]
     (arraysForSignatures, arraysForPublicKeys) = splitAt t $ splitListIntoArrays dimension randomNumbers
 
-    aggSigs = listArray (0, dimension - 1) $ map ithSum [0 .. dimension - 1]
+    aggSig = listArray (0, dimension - 1) $ map ithSum [0 .. dimension - 1]
       where
-        ithSum i =
-          let shiftedPublicKey = shiftPublicKeyBy dimension i publicKey
-           in sum $ map (sum . zipWith (*) (elems shiftedPublicKey) . elems) signatures
+        ithSum i = sum $ map (! i) remainders
 
     bisStrings = map (toBitStrings . elems) signatures
 
