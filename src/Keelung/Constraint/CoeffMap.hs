@@ -5,6 +5,7 @@ module Keelung.Constraint.CoeffMap
     toIntMap,
     fromList,
     toList,
+    size,
     null,
     insert,
     keysSet,
@@ -27,7 +28,11 @@ type Var = Int
 --  3. No terms with coefficient of 0.
 
 newtype CoeffMap f = CoeffMap {toIntMap :: IntMap f}
-  deriving (Eq, Ord, Functor)
+  deriving (Eq, Functor)
+
+instance Ord n => Ord (CoeffMap n) where
+  compare (CoeffMap x) (CoeffMap y) = 
+    compare (IntMap.size x, x) (IntMap.size y, y)
 
 instance (Show f, Eq f, Num f, Integral f) => Show (CoeffMap f) where
   show = go . IntMap.toList . toIntMap
@@ -44,6 +49,9 @@ instance (Show f, Eq f, Num f, Integral f) => Show (CoeffMap f) where
 
 fromList :: GaloisField f => [(Var, f)] -> CoeffMap f
 fromList xs = CoeffMap . IntMap.filter (zero /=) $ IntMap.fromListWith plus xs
+
+size :: CoeffMap a -> Int
+size = IntMap.size . toIntMap
 
 toList :: CoeffMap f -> [(Var, f)]
 toList = IntMap.toList . toIntMap

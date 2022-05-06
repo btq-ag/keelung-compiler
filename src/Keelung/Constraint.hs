@@ -50,7 +50,7 @@ instance Ord n => Ord (Constraint n) where
   compare CAdd {} CMul {} = LT
   compare (CAdd c m) (CAdd c' m') =
     -- perform lexicographical comparison with tuples
-    compare (c, m) (c', m')
+    compare (m, c) (m', c')
   compare (CMul (a, x) (b, y) (c, z)) (CMul (a', x') (b', y') (c', z')) =
     -- perform lexicographical comparison with tuples
     compare (x, y, z, a, b, c) (x', y', z', a', b', c')
@@ -80,7 +80,7 @@ data ConstraintSystem n = ConstraintSystem
     csInputVars :: !IntSet,
     csOutputVar :: !(Maybe Var)
   }
-  deriving Eq 
+  deriving (Eq)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
@@ -143,7 +143,7 @@ renumberConstraints cs =
     variableMap = Map.fromList $ zip vars' renumberedVars
       where
         otherVars = IntSet.difference vars (csInputVars cs)
-        vars' = IntSet.toList (csInputVars cs) ++ IntSet.toList otherVars 
+        vars' = IntSet.toList (csInputVars cs) ++ IntSet.toList otherVars
 
     renumber var = case Map.lookup var variableMap of
       Nothing ->

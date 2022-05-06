@@ -10,8 +10,6 @@ import Keelung.Constraint (Constraint (..), cadd)
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Optimise.Monad
 import Keelung.Syntax.Common (Var)
-import Control.Monad.State
-import Debug.Trace
 
 run ::
   (GaloisField n, Bounded n, Integral n) =>
@@ -27,11 +25,8 @@ run pinnedVars constraints = do
   -- removedTautology <- filterM (fmap not . isTautology) substituted
 
   pinned <- handlePinnedVars pinnedVars
-
-  u <- get
    
-
-  return $ traceShow u (Set.fromList pinned <> minimised)
+  return (Set.fromList pinned <> minimised)
 
 minimiseManyTimes ::
   (GaloisField n, Bounded n, Integral n) =>
@@ -76,13 +71,15 @@ goOverConstraints accum constraints = case Set.minView constraints of
     -- and substitute roots/constants in constraints
     substituted <- substConstraint picked
     -- if the constraint is tautologous, remove it
-    tautologous <- isTautology substituted
+    tautologous <-  isTautology substituted
 
     if tautologous
       then goOverConstraints accum constraints'
       else do
         learn substituted
         goOverConstraints (Set.insert substituted accum) constraints'
+
+-- traceShow (show picked <> " => " <> show substituted) $
 
 --------------------------------------------------------------------------------
 
