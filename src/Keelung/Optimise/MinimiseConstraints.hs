@@ -10,6 +10,8 @@ import Keelung.Constraint (Constraint (..), cadd)
 import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Optimise.Monad
 import Keelung.Syntax.Common (Var)
+import Control.Monad.State
+import Debug.Trace
 
 run ::
   (GaloisField n, Bounded n, Integral n) =>
@@ -25,7 +27,11 @@ run pinnedVars constraints = do
   -- removedTautology <- filterM (fmap not . isTautology) substituted
 
   pinned <- handlePinnedVars pinnedVars
-  return (Set.fromList pinned <> minimised)
+
+  u <- get
+   
+
+  return $ traceShow u (Set.fromList pinned <> minimised)
 
 minimiseManyTimes ::
   (GaloisField n, Bounded n, Integral n) =>

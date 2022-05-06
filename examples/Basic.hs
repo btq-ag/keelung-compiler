@@ -9,6 +9,9 @@ module Basic where
 import qualified AggregateSignature.Program
 import AggregateSignature.Util
 import Keelung
+import qualified Data.Set as Set
+import qualified Data.IntSet as IntSet
+import Keelung.Constraint (cadd)
 
 --------------------------------------------------------------------------------
 
@@ -66,13 +69,13 @@ aggSig :: Int -> Int -> Comp GF181 ()
 aggSig dim n = AggregateSignature.Program.aggregateSignature (make dim n)
 
 p :: Param GF181
-p = makeParam 1 1 42 $ Settings False True False 
+p = makeParam 1 1 42 $ Settings False True False
 
 inputs :: [GF181]
-inputs = genInputFromParam p 
+inputs = genInputFromParam p
 
 a :: Comp GF181 ()
-a = checkSize 1 1 
+a = checkSize 1 1
 
 -- components of aggregate signature
 checkAgg :: Int -> Int -> Comp GF181 ()
@@ -124,8 +127,26 @@ runAggSig dimension n = do
 --   let settings = Settings False False True
 --   bench (checkSigLength dimension n) settings dimension n
 
---------------------------------------------------------------------------------
-
--- elaborate & erase type & propagate constants
--- cp :: (Erase ty, Num n) => Comp n (Expr ty n) -> Either String (TypeErased n)
--- cp program = ConstantPropagation.run <$> erase program
+cs1 :: ConstraintSystem GF181 
+cs1 =
+  ConstraintSystem
+    { csConstraints =
+        Set.fromList
+          [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
+            cadd 0 [(0, 10582), (1, 7317), (17, -1)],
+            cadd 0 [(2, 3853), (3, 4216), (15, -1)],
+            cadd 0 [(2, 8073), (3, 3853), (14, -1)],
+            cadd 0 [(4, 1), (8, 12289), (17, -1)],
+            cadd 0 [(5, 1), (9, 12289), (16, -1)],
+            cadd 0 [(6, 1), (10, 12289), (15, -1)],
+            cadd 0 [(7, 1), (11, 12289), (14, -1)],
+            cadd 0 [(4, 1), (6, 1), (13, -1)],
+            cadd 0 [(5, 1), (7, 1), (12, -1)],
+            cadd 10623 [(13, -1)],
+            cadd 11179 [(12, -1)]
+          ],
+      csBooleanInputVarConstraints = mempty,
+      csVars = IntSet.fromList [0 .. 17],
+      csInputVars = IntSet.fromList [0 .. 11],
+      csOutputVar = Nothing
+    }

@@ -1,5 +1,5 @@
 module Keelung.Optimise.UnionFind
-  ( UnionFind(..),
+  ( UnionFind (..),
     new,
     find,
     union,
@@ -12,27 +12,33 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Maybe (fromMaybe)
 import Keelung.Syntax.Common (Var)
+import Keelung.Util (DebugGF(DebugGF))
 
-data UnionFind f = UnionFind
+data UnionFind n = UnionFind
   { links :: IntMap Var,
     sizes :: IntMap Int,
-    values :: IntMap f -- values in associate with some Var
+    values :: IntMap n -- values in associate with some Var
   }
-  deriving (Show)
 
-new :: IntMap f -> UnionFind f
+instance (Show n, Bounded n, Integral n, Fractional n) => Show (UnionFind n) where
+  show xs = "UnionFind {\n"
+    ++ "  links = " ++ show (IntMap.toList $links xs) ++ "\n"
+    ++ "  sizes = " ++ show (IntMap.toList $sizes xs) ++ "\n"
+    ++ "  values = " ++ show (IntMap.toList $ fmap (fmap DebugGF) values xs) ++ "\n"
+    ++ "}"
+
+new :: IntMap n -> UnionFind n
 new = UnionFind mempty mempty
 
-
 -- | Bind variable 'x' to 'c'
-bindVar :: UnionFind f -> Var -> f -> UnionFind f
+bindVar :: UnionFind n -> Var -> n -> UnionFind n
 bindVar xs var x = xs {values = IntMap.insert var x (values xs)}
 
 -- | Lookup variable 'x'
-lookupVar :: UnionFind f -> Var -> Maybe f
+lookupVar :: UnionFind n -> Var -> Maybe n
 lookupVar xs x = IntMap.lookup x (values xs)
 
-find :: (Show f, Eq f) => UnionFind f -> Var -> (Var, UnionFind f)
+find :: (Show n, Eq n) => UnionFind n -> Var -> (Var, UnionFind n)
 find xs var =
   let parent = parentOf xs var
    in if parent == var
@@ -49,11 +55,11 @@ find xs var =
                 parent
 
 -- Root returns itself has its parent
-parentOf :: UnionFind f -> Var -> Var
+parentOf :: UnionFind n -> Var -> Var
 parentOf xs var = fromMaybe var $ IntMap.lookup var (links xs)
 
 -- Merge 2 mappings of values
-mergeValues :: (Show f, Eq f) => IntMap f -> Var -> Var -> IntMap f
+mergeValues :: (Show n, Eq n) => IntMap n -> Var -> Var -> IntMap n
 mergeValues xs x y = case (IntMap.lookup x xs, IntMap.lookup y xs) of
   (Nothing, Nothing) -> xs
   (Nothing, Just d) -> IntMap.insert x d xs
@@ -73,7 +79,7 @@ mergeValues xs x y = case (IntMap.lookup x xs, IntMap.lookup y xs) of
 -- a heuristic that biases toward pinned variables, many of which are
 -- low-numbered input vars. This way, we avoid introducing pinned
 -- eqns. in some cases.
-union :: (Show f, Eq f) => UnionFind f -> Var -> Var -> UnionFind f
+union :: (Show n, Eq n) => UnionFind n -> Var -> Var -> UnionFind n
 union xs x y
   | x < y =
     go x y
@@ -100,5 +106,5 @@ union xs x y
                   sizes = IntMap.insert y0 (sizeOfRootX + sizeOfRootY) (sizes xs3)
                 }
 
-size :: UnionFind f -> Var -> Int
+size :: UnionFind n -> Var -> Int
 size xs x = fromMaybe 1 $ IntMap.lookup x (sizes xs)
