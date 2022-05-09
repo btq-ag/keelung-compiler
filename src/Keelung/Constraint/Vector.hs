@@ -1,6 +1,7 @@
 module Keelung.Constraint.Vector
   ( Vector,
     build,
+    singleton,
     vars,
     coeffs,
     constant,
@@ -47,6 +48,10 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (Vector n) where
 --   Coefficients of 0 are discarded.
 build :: (Eq n, Num n) => n -> [(Var, n)] -> Vector n
 build c = Vector c . IntMap.filter (0 /=) . IntMap.fromListWith (+)
+
+-- | Create a vector from a single variable and its coefficient.
+singleton :: (Eq n, Num n) => Var -> n -> Vector n
+singleton x c = build 0 [(x, c)]
 
 -- | Return the set of variables.
 vars :: Vector n -> IntSet

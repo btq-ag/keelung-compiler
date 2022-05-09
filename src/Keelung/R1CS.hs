@@ -10,10 +10,11 @@ import Data.Maybe (mapMaybe)
 import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
 import Keelung.Constraint
+import Keelung.Constraint.Vector (Vector)
+import qualified Keelung.Constraint.Vector as Vector
 import Keelung.Optimise (optimiseWithWitness)
 import Keelung.Syntax.Common
 import Keelung.Util
-import qualified Keelung.Constraint.Vector as Vector
 
 -- import qualified Data.List as List
 
@@ -61,47 +62,15 @@ generateWitness cs env =
 
 --------------------------------------------------------------------------------
 
--- A Polynomial is a mapping from variables to their coefficients
-data Poly n
-  = Poly n (IntMap n) -- the first field `n` is the constant term
-  deriving (Eq)
-
--- Helper function for printing polynomials
---    empty polynomial is printed as ""
---    variables are prefixed with "$"
-showPolynomial :: (Integral n, Show n, Bounded n, Fractional n) => IntMap n -> String
-showPolynomial poly = go (IntMap.toList poly)
-  where
-    go [] = ""
-    go [term] = printTerm term
-    go (term : xs) = printTerm term ++ " + " ++ go xs
-
-    printTerm (x, 1) = "$" ++ show x
-    printTerm (x, -1) = "-$" ++ show x
-    printTerm (x, c) = show (DebugGF c) ++ "$" ++ show x
-
-constantOnly :: Poly n -> Maybe n
-constantOnly (Poly c xs) = if IntMap.null xs then Just c else Nothing
-
-instance (Show n, Integral n, Bounded n, Fractional n) => Show (Poly n) where
-  show (Poly n poly) = case (n, IntMap.size poly) of
-    (0, 0) -> "0"
-    (0, _) -> showPolynomial poly
-    (_, 0) -> show (DebugGF n)
-    (_, _) -> show (DebugGF n) ++ " + " ++ showPolynomial poly
-
-varPoly :: Semiring a => (a, Var) -> Poly a
-varPoly (coeff, x) = Poly zero (IntMap.insert x coeff IntMap.empty)
-
 --------------------------------------------------------------------------------
 
 -- | A Rank-1 Constraint is a relation between 3 polynomials
 --      Ax * Bx = Cx
-data R1C n = R1C (Poly n) (Poly n) (Poly n)
+data R1C n = R1C (Vector n) (Vector n) (Vector n)
   deriving (Eq)
 
 instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
-  show (R1C aX bX cX) = case (constantOnly aX, constantOnly bX, constantOnly cX) of
+  show (R1C aX bX cX) = case (Vector.constantOnly aX, Vector.constantOnly bX, Vector.constantOnly cX) of
     (Just 0, _, _) -> "0 = " ++ show cX
     (_, Just 0, _) -> "0 = " ++ show cX
     (Just 1, _, _) -> show bX ++ " = " ++ show cX
@@ -111,14 +80,7 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
 satisfyR1C :: GaloisField a => Witness a -> R1C a -> Bool
 satisfyR1C witness constraint
   | R1C aV bV cV <- constraint =
-    inner aV witness `times` inner bV witness == inner cV witness
-  where
-    inner :: GaloisField a => Poly a -> Witness a -> a
-    inner (Poly n poly) w =
-      IntMap.foldlWithKey
-        (\acc k v -> (v `times` IntMap.findWithDefault zero k w) `plus` acc)
-        n
-        poly
+    Vector.evaluate aV witness `times` Vector.evaluate bV witness == Vector.evaluate cV witness
 
 --------------------------------------------------------------------------------
 
@@ -178,15 +140,15 @@ toR1CS cs =
     toR1C (CAdd xs) =
       Just $
         R1C
-          (Poly one mempty)
-          (Poly (Vector.constant xs) (Vector.coeffs xs))
-          (Poly zero mempty)
+          (Vector.build 1 mempty)
+          xs
+          (Vector.build 0 mempty)
     toR1C (CMul cx dy (e, Nothing)) =
       Just $
-        R1C (varPoly cx) (varPoly dy) (Poly e mempty)
+        R1C (uncurry (flip Vector.singleton) cx) (uncurry (flip Vector.singleton) dy) (Vector.build e mempty)
     toR1C (CMul cx dy (e, Just z)) =
       Just $
-        R1C (varPoly cx) (varPoly dy) (varPoly (e, z))
+        R1C (uncurry (flip Vector.singleton) cx) (uncurry (flip Vector.singleton) dy) (uncurry (flip Vector.singleton) (e, z))
     toR1C CNQZ {} = Nothing
 
 witnessOfR1CS :: [n] -> R1CS n -> Either (ExecError n) (Witness n)
