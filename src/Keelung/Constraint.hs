@@ -92,7 +92,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
     \  constraints ("
       <> show (length constraints)
       <> ")"
-      <> ( if Set.size constraints < 20
+      <> ( if Set.size constraints < 30 
              then ":\n  \n" <> printConstraints (toList constraints) <> "\n"
              else "\n"
          )
@@ -108,10 +108,11 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
       <> "\n\
          \  number of input variables: "
       <> show (IntSet.size inputVars)
-      <> ( if IntSet.size inputVars < 20
-             then ":\n    " <> show (IntSet.toList inputVars) <> "\n"
-             else "\n"
-         )
+      <> ":\n    " <> show (IntSet.toList inputVars) <> "\n"
+      -- <> ( if IntSet.size inputVars < 20
+      --        then ":\n    " <> show (IntSet.toList inputVars) <> "\n"
+      --        else "\n"
+      --    )
       <> "\n  output variable: $"
       <> show outputVar
       <> "\n\

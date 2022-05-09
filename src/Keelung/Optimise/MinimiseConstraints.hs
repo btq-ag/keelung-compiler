@@ -18,14 +18,7 @@ run ::
   OptiM n (Set (Constraint n))
 run pinnedVars constraints = do
   minimised <- minimiseManyTimes constraints
-  -- -- substitute roots/constants in constraints
-  -- substituted <- mapM substConstraint $ Set.toList simplified
-  -- -- keep only constraints that is not tautologous
-
-  -- removedTautology <- filterM (fmap not . isTautology) substituted
-
   pinned <- handlePinnedVars pinnedVars
-   
   return (Set.fromList pinned <> minimised)
 
 minimiseManyTimes ::

@@ -11,6 +11,7 @@ import qualified Data.IntSet as IntSet
 import Keelung.Constraint
 import Keelung.Monad
 import qualified Keelung.Optimise.MinimiseConstraints as MinimiseConstraints
+import qualified Keelung.Optimise.MinimiseConstraints2 as MinimiseConstraints2
 import Keelung.Optimise.Monad
 import qualified Keelung.Optimise.Rewriting as Rewriting
 import Keelung.Syntax
@@ -41,7 +42,7 @@ optimiseWithWitness witness cs =
         -- may overlap with 'constraintVars cs'.
         -- 'assignmentOfVars' might do a bit of duplicate
         -- work (to look up the same key more than once).
-        assignments <- assignmentOfVars $ IntSet.toList $ pinnedVars <> csVars cs 
+        assignments <- assignmentOfVars $ IntSet.toList $ pinnedVars <> csVars cs
 
         return (assignments, renumberConstraints $ cs {csConstraints = constraints})
 
@@ -52,6 +53,19 @@ optimiseWithInput input cs =
 
 optimise :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 optimise = snd . optimiseWithInput mempty
+
+optimise2 :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> ConstraintSystem n
+optimise2 cs =
+  -- NOTE: Pinned vars include:
+  --   - input vars
+  --   - output vars
+  -- Pinned vars are never optimised away.
+  let pinnedVars = case csOutputVar cs of
+        Nothing -> csInputVars cs
+        Just outputVar -> IntSet.insert outputVar (csInputVars cs)
+
+      constraints = MinimiseConstraints2.run (IntSet.toList pinnedVars) (csConstraints cs)
+   in renumberConstraints $ cs {csConstraints = constraints}
 
 --------------------------------------------------------------------------------
 
