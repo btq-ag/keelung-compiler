@@ -10,10 +10,10 @@ import Data.Maybe (mapMaybe)
 import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
 import Keelung.Constraint
-import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Optimise (optimiseWithWitness)
 import Keelung.Syntax.Common
 import Keelung.Util
+import qualified Keelung.Constraint.Vector as Vector
 
 -- import qualified Data.List as List
 
@@ -175,11 +175,11 @@ toR1CS cs =
     (generateWitness cs)
   where
     toR1C :: GaloisField n => Constraint n -> Maybe (R1C n)
-    toR1C (CAdd a m) =
+    toR1C (CAdd xs) =
       Just $
         R1C
           (Poly one mempty)
-          (Poly a (CoeffMap.toIntMap m))
+          (Poly (Vector.constant xs) (Vector.coeffs xs))
           (Poly zero mempty)
     toR1C (CMul cx dy (e, Nothing)) =
       Just $

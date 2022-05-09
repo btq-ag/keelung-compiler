@@ -4,10 +4,11 @@ module Keelung.Optimise.MinimiseConstraints (run, substConstraint) where
 
 import Control.Monad
 import Data.Field.Galois (GaloisField)
+import qualified Data.IntMap as IntMap
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint (Constraint (..), cadd)
-import qualified Keelung.Constraint.CoeffMap as CoeffMap
+import qualified Keelung.Constraint.Vector as Vector
 import Keelung.Optimise.Monad
 import Keelung.Syntax.Common (Var)
 
@@ -31,7 +32,7 @@ minimiseManyTimes constraints = do
   constraints' <- minimiseOnce constraints
   let hasShrunk = Set.size constraints' < Set.size constraints
   let hasChanged = not $ Set.null (Set.difference constraints constraints')
-  -- keep minimising if the constraints have shrunk or changed 
+  -- keep minimising if the constraints have shrunk or changed
   if hasShrunk || hasChanged
     then minimiseManyTimes constraints' -- keep going
     else return constraints' -- stop here
@@ -43,13 +44,14 @@ minimiseOnce ::
   -- | Resulting simplified constraint set
   OptiM n (Set (Constraint n))
 minimiseOnce = goOverConstraints Set.empty
-  -- --
-  -- -- constraints' <- goOverConstraints Set.empty constraints
-  -- -- -- substitute roots/constants in constraints
-  -- -- substituted <- mapM substConstraint $ Set.toList constraints'
-  -- -- -- keep only constraints that is not tautologous
-  -- -- removedTautology <- filterM (fmap not . isTautology) substituted
-  -- return $ Set.fromList removedTautology
+
+-- --
+-- -- constraints' <- goOverConstraints Set.empty constraints
+-- -- -- substitute roots/constants in constraints
+-- -- substituted <- mapM substConstraint $ Set.toList constraints'
+-- -- -- keep only constraints that is not tautologous
+-- -- removedTautology <- filterM (fmap not . isTautology) substituted
+-- return $ Set.fromList removedTautology
 
 --
 goOverConstraints ::
@@ -64,7 +66,7 @@ goOverConstraints accum constraints = case Set.minView constraints of
     -- and substitute roots/constants in constraints
     substituted <- substConstraint picked
     -- if the constraint is tautologous, remove it
-    tautologous <-  isTautology substituted
+    tautologous <- isTautology substituted
 
     if tautologous
       then goOverConstraints accum constraints'
@@ -82,9 +84,9 @@ goOverConstraints accum constraints = case Set.minView constraints of
 -- convert it into an additive constraint.
 substConstraint :: (GaloisField n, Bounded n, Integral n) => Constraint n -> OptiM n (Constraint n)
 substConstraint !constraint = case constraint of
-  CAdd constant coeffMap -> do
-    (constant', coeffMap') <- foldM go (constant, mempty) (CoeffMap.toList coeffMap)
-    return $ CAdd constant' (CoeffMap.fromList coeffMap')
+  CAdd vector -> do
+    (constant', coeffMap') <- foldM go (Vector.constant vector, mempty) (IntMap.toList (Vector.coeffs vector))
+    return $ CAdd $ Vector.build constant' coeffMap'
     where
       go :: GaloisField n => (n, [(Var, n)]) -> (Var, n) -> OptiM n (n, [(Var, n)])
       go (accConstant, accMapping) (var, coeff) = do
@@ -142,7 +144,7 @@ substConstraint !constraint = case constraint of
 -- | Is a constriant of `0 = 0` ?
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
-  CAdd _ coeffMap -> return $ CoeffMap.null coeffMap
+  CAdd xs -> return $ Vector.isConstant xs
   CMul {} -> return False
   CNQZ var m -> do
     result <- lookupVar var
@@ -157,13 +159,20 @@ isTautology constraint = case constraint of
 
 -- | Learn bindings and variable equalities from a constraint
 learn :: GaloisField n => Constraint n -> OptiM n ()
-learn (CAdd a xs) = case CoeffMap.toList xs of
+learn (CAdd xs) = case IntMap.toList (Vector.coeffs xs) of
   [(x, c)] ->
     if c == 0
       then return ()
-      else bindVar x (- a / c)
-  [(x, c), (y, d)] -> when (a == 0 && c == - d) $ unifyVars x y
+      else bindVar x (- Vector.constant xs / c)
+  [(x, c), (y, d)] -> when (Vector.constant xs == 0 && c == - d) $ unifyVars x y
   _ -> return ()
+-- learn (CAdd a xs) = case CoeffMap.toList xs of
+--   [(x, c)] ->
+--     if c == 0
+--       then return ()
+--       else bindVar x (- a / c)
+--   [(x, c), (y, d)] -> when (a == 0 && c == - d) $ unifyVars x y
+--   _ -> return ()
 learn _ = return ()
 
 -- NOTE: We handle pinned variables 'var' as follows:

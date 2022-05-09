@@ -10,10 +10,10 @@ import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Constraint.CoeffMap (CoeffMap)
-import qualified Keelung.Constraint.CoeffMap as CoeffMap
 import Keelung.Syntax.Common
 import Keelung.Util (DebugGF (DebugGF))
+import Keelung.Constraint.Vector (Vector)
+import qualified Keelung.Constraint.Vector as Vector
 
 --------------------------------------------------------------------------------
 
@@ -22,18 +22,17 @@ import Keelung.Util (DebugGF (DebugGF))
 --      CMul: ax * by = c or ax * by = cz
 --      CNQZ: if x == 0 then m = 0 else m = recip x
 data Constraint n
-  = CAdd !n !(CoeffMap n)
+  = CAdd !(Vector n)
   | CMul !(n, Var) !(n, Var) !(n, Maybe Var)
   | CNQZ Var Var -- x & m
   deriving (Eq)
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> Constraint n
-cadd !c !xs = CAdd c (CoeffMap.fromList xs)
+cadd !c !xs = CAdd $ Vector.build c xs
 
 instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
-  show (CAdd 0 m) = "A " ++ show m
-  show (CAdd n m) = "A " ++ show (DebugGF n) <> " + " <> show m
+  show (CAdd xs) = "A " ++ show xs
   show (CMul (a, x) (b, y) (c, z)) =
     let showTerm 1 var = "$" <> show var
         showTerm coeff var = show (DebugGF coeff) <> "$" <> show var
@@ -48,9 +47,7 @@ instance Ord n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
   compare CMul {} CAdd {} = GT
   compare CAdd {} CMul {} = LT
-  compare (CAdd c m) (CAdd c' m') =
-    -- perform lexicographical comparison with tuples
-    compare (m, c) (m', c')
+  compare (CAdd xs) (CAdd ys) = compare xs ys 
   compare (CMul (a, x) (b, y) (c, z)) (CMul (a', x') (b', y') (c', z')) =
     -- perform lexicographical comparison with tuples
     compare (x, y, z, a, b, c) (x', y', z', a', b', c')
@@ -62,7 +59,7 @@ instance Ord n => Ord (Constraint n) where
 
 -- | Return the list of variables occurring in constraints
 varsInConstraint :: Constraint a -> IntSet
-varsInConstraint (CAdd _ m) = CoeffMap.keysSet m
+varsInConstraint (CAdd xs) = Vector.vars xs 
 varsInConstraint (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
 varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
 varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
@@ -156,8 +153,8 @@ renumberConstraints cs =
       Just var' -> var'
 
     renumberConstraint constraint = case constraint of
-      CAdd a m ->
-        CAdd a $ CoeffMap.mapKeys renumber m
+      CAdd xs ->
+        CAdd $ Vector.mapVars renumber xs
       CMul (a, x) (b, y) (c, z) ->
         CMul (a, renumber x) (b, renumber y) (c, renumber <$> z)
       CNQZ x y ->
