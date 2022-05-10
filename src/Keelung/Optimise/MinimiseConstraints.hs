@@ -8,6 +8,7 @@ import qualified Data.IntMap as IntMap
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint (Constraint (..), cadd)
+import Keelung.Constraint.Vector (Vector)
 import qualified Keelung.Constraint.Vector as Vector
 import Keelung.Optimise.Monad
 import Keelung.Syntax.Common (Var)
@@ -78,58 +79,72 @@ goOverConstraints accum constraints = case Set.minView constraints of
 
 --------------------------------------------------------------------------------
 
+-- | Normalize a vector by substituting roots/constants
+-- for the variables that appear in the vector.
+substVector :: (GaloisField n, Bounded n, Integral n) => Vector n -> OptiM n (Vector n)
+substVector vector = do
+  let coeffs = IntMap.toList (Vector.coeffs vector)
+  (constant', coeffs') <- foldM go (Vector.constant vector, mempty) coeffs
+  return $ Vector.build constant' coeffs'
+  where
+    go :: GaloisField n => (n, [(Var, n)]) -> (Var, n) -> OptiM n (n, [(Var, n)])
+    go (accConstant, accMapping) (var, coeff) = do
+      -- see if we can substitute a variable with some constant
+      result <- lookupVar var
+      case result of
+        Root root -> do
+          -- it's okay if we cannot substitute a variable with some constant
+          -- we can still replace the variable with its root
+          return (accConstant, (root, coeff) : accMapping)
+        Value val -> do
+          let val' = val * coeff
+          -- if `value * coeff` is 0 then we should remove it
+          if val' == 0
+            then return (accConstant, accMapping)
+            else return (accConstant + val', accMapping)
+
 -- | Normalize constraints by substituting roots/constants
 -- for the variables that appear in the constraint. Note that, when
 -- normalizing a multiplicative constraint, it may be necessary to
 -- convert it into an additive constraint.
 substConstraint :: (GaloisField n, Bounded n, Integral n) => Constraint n -> OptiM n (Constraint n)
 substConstraint !constraint = case constraint of
-  CAdd vector -> do
-    (constant', coeffMap') <- foldM go (Vector.constant vector, mempty) (IntMap.toList (Vector.coeffs vector))
-    return $ CAdd $ Vector.build constant' coeffMap'
-    where
-      go :: GaloisField n => (n, [(Var, n)]) -> (Var, n) -> OptiM n (n, [(Var, n)])
-      go (accConstant, accMapping) (var, coeff) = do
-        -- see if we can substitute a variable with some constant
-        result <- lookupVar var
-        case result of
-          Root root -> do
-            -- it's okay if we cannot substitute a variable with some constant
-            -- we can still replace the variable with its root
-            return (accConstant, (root, coeff) : accMapping)
-          Value val -> do
-            let val' = val * coeff
-            -- if `value * coeff` is 0 then we should remove it
-            if val' == 0
-              then return (accConstant, accMapping)
-              else return (accConstant + val', accMapping)
+  CAdd vector -> CAdd <$> substVector vector
   CMul (c, x) (d, y) !ez -> do
     bx <- lookupVar x
     by <- lookupVar y
     bz <- lookupTerm ez
     case (bx, by, bz) of
       (Root rx, Root ry, Left (e, rz)) ->
+        -- ax * by = cz
         return
           $! CMul (c, rx) (d, ry) (e, Just rz)
       (Root rx, Root ry, Right e) ->
+        -- ax * by = c
         return
           $! CMul (c, rx) (d, ry) (e, Nothing)
       (Root rx, Value d0, Left (e, rz)) ->
+        -- ax * b = cz => ax * b - cz = 0
         return
           $! cadd 0 [(rx, c * d * d0), (rz, - e)]
       (Root rx, Value d0, Right e) ->
+        -- ax * b = c => ax * b - c = 0
         return
           $! cadd (- e) [(rx, c * d * d0)]
       (Value c0, Root ry, Left (e, rz)) ->
+        -- a * bx = cz => a * bx - cz = 0
         return
           $! cadd 0 [(ry, c0 * c * d), (rz, - e)]
       (Value c0, Root ry, Right e) ->
+        -- a * bx = c => a * bx - c = 0
         return
           $! cadd (- e) [(ry, c0 * c * d)]
       (Value c0, Value d0, Left (e, rz)) ->
+        -- a * b = cz => a * b - cz = 0
         return
           $! cadd (c * c0 * d * d0) [(rz, - e)]
       (Value c0, Value d0, Right e) ->
+        -- a * b = c => a * b - c = 0
         return
           $! cadd (c * c0 * d * d0 - e) []
     where
@@ -139,6 +154,43 @@ substConstraint !constraint = case constraint of
         case result of
           Root rz -> return (Left (e, rz))
           Value e0 -> return (Right (e * e0))
+  CMul2 aV bV cV -> do
+    aV' <- substVector aV
+    bV' <- substVector bV
+    cV' <- substVector cV
+
+    -- if either aV' or bV' is constant
+    -- we can convert this multiplicative constraint into an additive one
+    return $ case (Vector.view aV', Vector.view bV', Vector.view cV') of
+      -- a * b = c => a * b - c = 0
+      (Left a, Left b, Left c) -> CAdd $ Vector.build' (a * b - c) mempty
+      -- a * b = c + cx => a * b - c - cx = 0
+      (Left a, Left b, Right (c, cX)) ->
+        CAdd $ Vector.build' (a * b - c) cX
+      -- a * (b + bx) = c => a * bx + a * b - c = 0
+      (Left a, Right (b, bX), Left c) -> do
+        let constant = a * b - c
+        let coeffs = fmap (a *) bX
+        CAdd $ Vector.build' constant coeffs
+      -- a * (b + bx) = c + cx => a * bx - cx + a * b - c = 0
+      (Left a, Right (b, bX), Right (c, cX)) -> do
+        let constant = a * b - c
+        let coeffs = Vector.mergeCoeffs (fmap (a *) bX) (fmap negate cX)
+        CAdd $ Vector.build' constant coeffs
+      -- (a + ax) * b = c => ax * b + a * b - c= 0
+      (Right (a, aX), Left b, Left c) -> do
+        let constant = a * b - c
+        let coeffs = fmap (* b) aX
+        CAdd $ Vector.build' constant coeffs
+      -- (a + ax) * b = c + cx => ax * b - cx + a * b - c = 0
+      (Right (a, aX), Left b, Right (c, cX)) -> do
+        let constant = a * b - c
+        let coeffs = Vector.mergeCoeffs (fmap (* b) aX) (fmap negate cX)
+        CAdd $ Vector.build' constant coeffs
+      -- (a + ax) * (b + bx) = c
+      -- (a + ax) * (b + bx) = c + cx
+      (Right _, Right _, _) -> do
+        CMul2 aV' bV' cV'
   CNQZ _ _ -> return constraint
 
 -- | Is a constriant of `0 = 0` ?
@@ -146,6 +198,7 @@ isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
   CAdd xs -> return $ Vector.isConstant xs
   CMul {} -> return False
+  CMul2 {} -> return False
   CNQZ var m -> do
     result <- lookupVar var
     case result of

@@ -24,6 +24,7 @@ import qualified Keelung.Constraint.Vector as Vector
 data Constraint n
   = CAdd !(Vector n)
   | CMul !(n, Var) !(n, Var) !(n, Maybe Var)
+  | CMul2 !(Vector n) !(Vector n) !(Vector n)
   | CNQZ Var Var -- x & m
   deriving (Eq)
 
@@ -41,10 +42,14 @@ instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Con
           <> case z of
             Nothing -> show $ DebugGF c
             Just z' -> showTerm c z'
+  show (CMul2 aV bV cV) = "M " ++ show aV <> " * " <> show bV <> " = " <> show cV
   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
 
 instance Ord n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
+  compare (CMul2 aV bV cV) (CMul2 aX bX cX)  = compare (aV, bV, cV) (aX, bX, cX)
+  compare _ CMul2 {} = LT -- CMul2 is always greater than anything 
+  compare CMul2 {} _ = GT
   compare CMul {} CAdd {} = GT
   compare CAdd {} CMul {} = LT
   compare (CAdd xs) (CAdd ys) = compare xs ys 
@@ -62,6 +67,7 @@ varsInConstraint :: Constraint a -> IntSet
 varsInConstraint (CAdd xs) = Vector.vars xs 
 varsInConstraint (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
 varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
+varsInConstraint (CMul2 aV bV cV) = IntSet.unions $ map Vector.vars [aV, bV, cV]
 varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
 
 varsInConstraints :: Set (Constraint a) -> IntSet
@@ -157,5 +163,7 @@ renumberConstraints cs =
         CAdd $ Vector.mapVars renumber xs
       CMul (a, x) (b, y) (c, z) ->
         CMul (a, renumber x) (b, renumber y) (c, renumber <$> z)
+      CMul2 aV bV cV ->
+        CMul2 (Vector.mapVars renumber aV) (Vector.mapVars renumber bV) (Vector.mapVars renumber cV)
       CNQZ x y ->
         CNQZ (renumber x) (renumber y)

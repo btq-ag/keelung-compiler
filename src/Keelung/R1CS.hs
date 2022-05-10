@@ -149,6 +149,8 @@ toR1CS cs =
     toR1C (CMul cx dy (e, Just z)) =
       Just $
         R1C (uncurry (flip Vector.singleton) cx) (uncurry (flip Vector.singleton) dy) (uncurry (flip Vector.singleton) (e, z))
+    toR1C (CMul2 aX bX cX) =
+      Just $ R1C aX bX cX
     toR1C CNQZ {} = Nothing
 
 witnessOfR1CS :: [n] -> R1CS n -> Either (ExecError n) (Witness n)

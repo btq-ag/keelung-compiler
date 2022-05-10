@@ -1,10 +1,13 @@
 module Keelung.Constraint.Vector
   ( Vector,
     build,
+    build',
     singleton,
     vars,
     coeffs,
+    mergeCoeffs,
     constant,
+    view,
     isConstant,
     constantOnly,
     mapVars,
@@ -49,6 +52,10 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (Vector n) where
 build :: (Eq n, Num n) => n -> [(Var, n)] -> Vector n
 build c = Vector c . IntMap.filter (0 /=) . IntMap.fromListWith (+)
 
+-- | IntMap version of 'build'.
+build' :: (Eq n, Num n) => n -> IntMap n -> Vector n
+build' c = Vector c . IntMap.filter (0 /=)
+
 -- | Create a vector from a single variable and its coefficient.
 singleton :: (Eq n, Num n) => Var -> n -> Vector n
 singleton x c = build 0 [(x, c)]
@@ -61,9 +68,17 @@ vars = IntMap.keysSet . coeffs
 coeffs :: Vector n -> IntMap n
 coeffs (Vector _ xs) = xs
 
+-- | Merge coefficients of the same variable by adding them up
+mergeCoeffs :: (Eq n, Num n) => IntMap n -> IntMap n -> IntMap n
+mergeCoeffs xs ys = IntMap.filter (0 /=) $ IntMap.unionWith (+) xs ys
+
 -- | Return the constant.
 constant :: Vector n -> n
 constant (Vector c _) = c
+
+-- | View pattern for Vector
+view :: Vector n -> Either n (n, IntMap n)
+view (Vector c xs) = if IntMap.null xs then Left c else Right (c, xs)
 
 -- | See if the polynomial has no variables.
 isConstant :: Vector n -> Bool
