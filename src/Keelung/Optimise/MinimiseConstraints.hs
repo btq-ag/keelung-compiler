@@ -8,8 +8,8 @@ import qualified Data.IntMap as IntMap
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint (Constraint (..), cadd)
-import Keelung.Constraint.Vector (Vector)
-import qualified Keelung.Constraint.Vector as Vector
+import Keelung.Constraint.Polynomial (Poly)
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Optimise.Monad
 import Keelung.Syntax.Common (Var)
 
@@ -79,13 +79,13 @@ goOverConstraints accum constraints = case Set.minView constraints of
 
 --------------------------------------------------------------------------------
 
--- | Normalize a vector by substituting roots/constants
--- for the variables that appear in the vector.
-substVector :: (GaloisField n, Bounded n, Integral n) => Vector n -> OptiM n (Vector n)
-substVector vector = do
-  let coeffs = IntMap.toList (Vector.coeffs vector)
-  (constant', coeffs') <- foldM go (Vector.constant vector, mempty) coeffs
-  return $ Vector.build constant' coeffs'
+-- | Normalize a polynomial by substituting roots/constants
+-- for the variables that appear in the polynomial.
+substPoly :: (GaloisField n, Bounded n, Integral n) => Poly n -> OptiM n (Poly n)
+substPoly poly = do
+  let coeffs = IntMap.toList (Poly.coeffs poly)
+  (constant', coeffs') <- foldM go (Poly.constant poly, mempty) coeffs
+  return $ Poly.build constant' coeffs'
   where
     go :: GaloisField n => (n, [(Var, n)]) -> (Var, n) -> OptiM n (n, [(Var, n)])
     go (accConstant, accMapping) (var, coeff) = do
@@ -109,84 +109,40 @@ substVector vector = do
 -- convert it into an additive constraint.
 substConstraint :: (GaloisField n, Bounded n, Integral n) => Constraint n -> OptiM n (Constraint n)
 substConstraint !constraint = case constraint of
-  CAdd vector -> CAdd <$> substVector vector
-  -- CMul (c, x) (d, y) !ez -> do
-  --   bx <- lookupVar x
-  --   by <- lookupVar y
-  --   bz <- lookupTerm ez
-  --   case (bx, by, bz) of
-  --     (Root rx, Root ry, Left (e, rz)) ->
-  --       -- ax * by = cz
-  --       return
-  --         $! CMul (c, rx) (d, ry) (e, Just rz)
-  --     (Root rx, Root ry, Right e) ->
-  --       -- ax * by = c
-  --       return
-  --         $! CMul (c, rx) (d, ry) (e, Nothing)
-  --     (Root rx, Value d0, Left (e, rz)) ->
-  --       -- ax * b = cz => ax * b - cz = 0
-  --       return
-  --         $! cadd 0 [(rx, c * d * d0), (rz, - e)]
-  --     (Root rx, Value d0, Right e) ->
-  --       -- ax * b = c => ax * b - c = 0
-  --       return
-  --         $! cadd (- e) [(rx, c * d * d0)]
-  --     (Value c0, Root ry, Left (e, rz)) ->
-  --       -- a * bx = cz => a * bx - cz = 0
-  --       return
-  --         $! cadd 0 [(ry, c0 * c * d), (rz, - e)]
-  --     (Value c0, Root ry, Right e) ->
-  --       -- a * bx = c => a * bx - c = 0
-  --       return
-  --         $! cadd (- e) [(ry, c0 * c * d)]
-  --     (Value c0, Value d0, Left (e, rz)) ->
-  --       -- a * b = cz => a * b - cz = 0
-  --       return
-  --         $! cadd (c * c0 * d * d0) [(rz, - e)]
-  --     (Value c0, Value d0, Right e) ->
-  --       -- a * b = c => a * b - c = 0
-  --       return
-  --         $! cadd (c * c0 * d * d0 - e) []
-  --   where
-  --     lookupTerm (e, Nothing) = return (Right e)
-  --     lookupTerm (e, Just z) = do
-  --       result <- lookupVar z
-  --       case result of
-  --         Root rz -> return (Left (e, rz))
-  --         Value e0 -> return (Right (e * e0))
+  CAdd poly -> CAdd <$> substPoly poly
   CMul2 aV bV cV -> do
-    aV' <- substVector aV
-    bV' <- substVector bV
-    cV' <- substVector cV
+    aV' <- substPoly aV
+    bV' <- substPoly bV
+    cV' <- substPoly cV
 
     -- if either aV' or bV' is constant
     -- we can convert this multiplicative constraint into an additive one
-    return $ case (Vector.view aV', Vector.view bV', Vector.view cV') of
+    return $ case (Poly.view aV', Poly.view bV', Poly.view cV') of
       -- a * b = c => a * b - c = 0
-      (Left a, Left b, Left c) -> CAdd $ Vector.build' (a * b - c) mempty
+      (Left a, Left b, Left c) -> CAdd $ Poly.build' (a * b - c) mempty
       -- a * b = c + cx => a * b - c - cx = 0
       (Left a, Left b, Right (c, cX)) ->
-        CAdd $ Vector.build' (a * b - c) cX
+        CAdd $ Poly.build' (a * b - c) cX
       -- a * (b + bx) = c => a * bx + a * b - c = 0
       (Left a, Right (b, bX), Left c) -> do
         let constant = a * b - c
         let coeffs = fmap (a *) bX
-        CAdd $ Vector.build' constant coeffs
+        CAdd $ Poly.build' constant coeffs
       -- a * (b + bx) = c + cx => a * bx - cx + a * b - c = 0
       (Left a, Right (b, bX), Right (c, cX)) -> do
         let constant = a * b - c
-        let coeffs = Vector.mergeCoeffs (fmap (a *) bX) (fmap negate cX)
-        CAdd $ Vector.build' constant coeffs
+        let coeffs = Poly.mergeCoeffs (fmap (a *) bX) (fmap negate cX)
+        CAdd $ Poly.build' constant coeffs
       -- (a + ax) * b = c => ax * b + a * b - c= 0
       (Right (a, aX), Left b, Left c) -> do
         let constant = a * b - c
         let coeffs = fmap (* b) aX
-        CAdd $ Vector.build' constant coeffs
+        CAdd $ Poly.build' constant coeffs
       -- (a + ax) * b = c + cx => ax * b - cx + a * b - c = 0
       (Right (a, aX), Left b, Right (c, cX)) -> do
         let constant = a * b - c
-        let coeffs = Vector.mergeCoeffs (fmap (* b) aX) (fmap negate cX)
-        CAdd $ Vector.build' constant coeffs
+        let coeffs = Poly.mergeCoeffs (fmap (* b) aX) (fmap negate cX)
+        CAdd $ Poly.build' constant coeffs
       -- (a + ax) * (b + bx) = c
       -- (a + ax) * (b + bx) = c + cx
       (Right _, Right _, _) -> do
@@ -196,8 +152,8 @@ substConstraint !constraint = case constraint of
 -- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
-  CAdd xs -> return $ Vector.isConstant xs
-  CMul2 aV bV cV -> case (Vector.view aV, Vector.view bV, Vector.view cV) of
+  CAdd xs -> return $ Poly.isConstant xs
+  CMul2 aV bV cV -> case (Poly.view aV, Poly.view bV, Poly.view cV) of
     (Left a, Right (b, bX), Right (c, cX)) ->
       return $
         a * b == c && fmap (a *) bX == cX
@@ -221,12 +177,12 @@ isTautology constraint = case constraint of
 
 -- | Learn bindings and variable equalities from a constraint
 learn :: GaloisField n => Constraint n -> OptiM n ()
-learn (CAdd xs) = case IntMap.toList (Vector.coeffs xs) of
+learn (CAdd xs) = case IntMap.toList (Poly.coeffs xs) of
   [(x, c)] ->
     if c == 0
       then return ()
-      else bindVar x (- Vector.constant xs / c)
-  [(x, c), (y, d)] -> when (Vector.constant xs == 0 && c == - d) $ unifyVars x y
+      else bindVar x (- Poly.constant xs / c)
+  [(x, c), (y, d)] -> when (Poly.constant xs == 0 && c == - d) $ unifyVars x y
   _ -> return ()
 -- learn (CAdd a xs) = case CoeffMap.toList xs of
 --   [(x, c)] ->

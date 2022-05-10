@@ -15,7 +15,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint
-import qualified Keelung.Constraint.Vector as Vector
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Syntax.Common (Var)
 import Keelung.Syntax.Untyped
 
@@ -144,8 +144,8 @@ encodeBinaryOp :: GaloisField n => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
   Add -> add $ cadd 0 [(x, 1), (y, 1), (out, -1)]
   Sub -> add $ cadd 0 [(x, 1), (y, negate 1), (out, negate 1)]
-  Mul -> add $ CMul2 (Vector.singleton x 1) (Vector.singleton y 1) (Vector.singleton out 1)
-  Div -> add $ CMul2 (Vector.singleton x 1) (Vector.singleton out 1) (Vector.singleton x 1)
+  Mul -> add $ CMul2 (Poly.singleton x 1) (Poly.singleton y 1) (Poly.singleton out 1)
+  Div -> add $ CMul2 (Poly.singleton x 1) (Poly.singleton out 1) (Poly.singleton x 1)
   And -> encodeBinaryOp Mul out x y
   Or -> do
     -- Constraint 'x \/ y = out'.
@@ -185,7 +185,7 @@ encodeBinaryOp op out x y = case op of
     -- notOut = 1 - out
     notOut <- freshVar
     encode notOut (1 - Var out)
-    add $ CMul2 (Vector.singleton diff 1) (Vector.singleton notOut 1) Vector.empty
+    add $ CMul2 (Poly.singleton diff 1) (Poly.singleton notOut 1) Poly.empty
   Eq -> do
     -- Constraint 'x == y = out'.
     -- The encoding is: out = 1 - (x-y != 0).
@@ -201,7 +201,7 @@ encodeBinaryOp op out x y = case op of
 -- | Ensure that boolean variables have constraint 'b^2 = b'
 convertBooleanVars :: GaloisField n => IntSet -> [Constraint n]
 convertBooleanVars booleanInputVars =
-  map (\b -> CMul2 (Vector.singleton b 1) (Vector.singleton b 1) (Vector.singleton b 1)) $
+  map (\b -> CMul2 (Poly.singleton b 1) (Poly.singleton b 1) (Poly.singleton b 1)) $
     IntSet.toList booleanInputVars
 
 -- | Encode the constraint 'x = out'.

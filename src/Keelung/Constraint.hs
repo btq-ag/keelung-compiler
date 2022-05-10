@@ -11,8 +11,8 @@ import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Constraint.Vector (Vector)
-import qualified Keelung.Constraint.Vector as Vector
+import Keelung.Constraint.Polynomial (Poly)
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Syntax.Common
 
 --------------------------------------------------------------------------------
@@ -22,24 +22,24 @@ import Keelung.Syntax.Common
 --      CMul: ax * by = c or ax * by = cz
 --      CNQZ: if x == 0 then m = 0 else m = recip x
 data Constraint n
-  = CAdd !(Vector n)
+  = CAdd !(Poly n)
   | -- | CMul !(n, Var) !(n, Var) !(n, Maybe Var)
-    CMul2 !(Vector n) !(Vector n) !(Vector n)
+    CMul2 !(Poly n) !(Poly n) !(Poly n)
   | CNQZ Var Var -- x & m
   deriving (Eq)
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> Constraint n
-cadd !c !xs = CAdd $ Vector.build c xs
+cadd !c !xs = CAdd $ Poly.build c xs
 
 instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
   show (CAdd xs) = "A " ++ show xs ++ " = 0"
-  show (CMul2 aV bV cV) = "M " ++ showVec aV <> " * " <> showVec bV <> " = " <> showVec cV
+  show (CMul2 aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly cV
     where
-      showVec vec =
-        if IntMap.size (Vector.coeffs vec) > 1
-          then "(" <> show vec <> ")"
-          else show vec
+      showPoly poly =
+        if IntMap.size (Poly.coeffs poly) > 1
+          then "(" <> show poly <> ")"
+          else show poly
   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
 
 instance Ord n => Ord (Constraint n) where
@@ -61,10 +61,10 @@ instance Ord n => Ord (Constraint n) where
 
 -- | Return the list of variables occurring in constraints
 varsInConstraint :: Constraint a -> IntSet
-varsInConstraint (CAdd xs) = Vector.vars xs
+varsInConstraint (CAdd xs) = Poly.vars xs
 -- varsInConstraint (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
 -- varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
-varsInConstraint (CMul2 aV bV cV) = IntSet.unions $ map Vector.vars [aV, bV, cV]
+varsInConstraint (CMul2 aV bV cV) = IntSet.unions $ map Poly.vars [aV, bV, cV]
 varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
 
 varsInConstraints :: Set (Constraint a) -> IntSet
@@ -159,10 +159,10 @@ renumberConstraints cs =
 
     renumberConstraint constraint = case constraint of
       CAdd xs ->
-        CAdd $ Vector.mapVars renumber xs
+        CAdd $ Poly.mapVars renumber xs
       -- CMul (a, x) (b, y) (c, z) ->
       --   CMul (a, renumber x) (b, renumber y) (c, renumber <$> z)
       CMul2 aV bV cV ->
-        CMul2 (Vector.mapVars renumber aV) (Vector.mapVars renumber bV) (Vector.mapVars renumber cV)
+        CMul2 (Poly.mapVars renumber aV) (Poly.mapVars renumber bV) (Poly.mapVars renumber cV)
       CNQZ x y ->
         CNQZ (renumber x) (renumber y)

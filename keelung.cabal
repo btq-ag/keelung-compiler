@@ -28,7 +28,7 @@ library
       Keelung
       Keelung.Compile
       Keelung.Constraint
-      Keelung.Constraint.Vector
+      Keelung.Constraint.Polynomial
       Keelung.Error
       Keelung.Interpret
       Keelung.Monad
@@ -65,7 +65,7 @@ executable keelung-exe
       Keelung
       Keelung.Compile
       Keelung.Constraint
-      Keelung.Constraint.Vector
+      Keelung.Constraint.Polynomial
       Keelung.Error
       Keelung.Interpret
       Keelung.Monad
@@ -134,7 +134,7 @@ benchmark keelung-bench
       Keelung
       Keelung.Compile
       Keelung.Constraint
-      Keelung.Constraint.Vector
+      Keelung.Constraint.Polynomial
       Keelung.Error
       Keelung.Interpret
       Keelung.Monad

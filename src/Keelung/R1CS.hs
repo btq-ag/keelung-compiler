@@ -10,8 +10,8 @@ import Data.Maybe (mapMaybe)
 import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
 import Keelung.Constraint
-import Keelung.Constraint.Vector (Vector)
-import qualified Keelung.Constraint.Vector as Vector
+import Keelung.Constraint.Polynomial (Poly)
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Optimise (optimiseWithWitness)
 import Keelung.Syntax.Common
 import Keelung.Util
@@ -66,11 +66,11 @@ generateWitness cs env =
 
 -- | A Rank-1 Constraint is a relation between 3 polynomials
 --      Ax * Bx = Cx
-data R1C n = R1C (Vector n) (Vector n) (Vector n)
+data R1C n = R1C (Poly n) (Poly n) (Poly n)
   deriving (Eq)
 
 instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
-  show (R1C aX bX cX) = case (Vector.constantOnly aX, Vector.constantOnly bX, Vector.constantOnly cX) of
+  show (R1C aX bX cX) = case (Poly.constantOnly aX, Poly.constantOnly bX, Poly.constantOnly cX) of
     (Just 0, _, _) -> "0 = " ++ show cX
     (_, Just 0, _) -> "0 = " ++ show cX
     (Just 1, _, _) -> show bX ++ " = " ++ show cX
@@ -80,7 +80,7 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
 satisfyR1C :: GaloisField a => Witness a -> R1C a -> Bool
 satisfyR1C witness constraint
   | R1C aV bV cV <- constraint =
-    Vector.evaluate aV witness `times` Vector.evaluate bV witness == Vector.evaluate cV witness
+    Poly.evaluate aV witness `times` Poly.evaluate bV witness == Poly.evaluate cV witness
 
 --------------------------------------------------------------------------------
 
@@ -140,15 +140,15 @@ toR1CS cs =
     toR1C (CAdd xs) =
       Just $
         R1C
-          (Vector.build 1 mempty)
+          (Poly.build 1 mempty)
           xs
-          (Vector.build 0 mempty)
+          (Poly.build 0 mempty)
     -- toR1C (CMul cx dy (e, Nothing)) =
     --   Just $
-    --     R1C (uncurry (flip Vector.singleton) cx) (uncurry (flip Vector.singleton) dy) (Vector.build e mempty)
+    --     R1C (uncurry (flip Poly.singleton) cx) (uncurry (flip Poly.singleton) dy) (Poly.build e mempty)
     -- toR1C (CMul cx dy (e, Just z)) =
     --   Just $
-    --     R1C (uncurry (flip Vector.singleton) cx) (uncurry (flip Vector.singleton) dy) (uncurry (flip Vector.singleton) (e, z))
+    --     R1C (uncurry (flip Poly.singleton) cx) (uncurry (flip Poly.singleton) dy) (uncurry (flip Poly.singleton) (e, z))
     toR1C (CMul2 aX bX cX) =
       Just $ R1C aX bX cX
     toR1C CNQZ {} = Nothing
