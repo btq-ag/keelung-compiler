@@ -2,6 +2,7 @@ module Keelung.Constraint.Vector
   ( Vector,
     build,
     build',
+    empty,
     singleton,
     vars,
     coeffs,
@@ -33,19 +34,18 @@ instance Ord n => Ord (Vector n) where
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (Vector n) where
   --   show (Vector 0 xs) = IntMap.toList go xs
-  show (Vector n xs) =
-    if IntMap.null xs
-      then show (DebugGF n)
-      else show (DebugGF n) <> " + " <> go (IntMap.toList xs)
+  show (Vector n xs)
+    | IntMap.null xs = show (DebugGF n)
+    | n == 0 = go (IntMap.toList xs)
+    | otherwise = show (DebugGF n) <> " + " <> go (IntMap.toList xs)
     where
-      go [] = "<empty>"
-      go [term] = printTerm term
-      go (term : terms) = printTerm term ++ " + " ++ go terms
-
-      printTerm (_, 0) = error "printTerm: coefficient of 0"
-      printTerm (x, 1) = "$" ++ show x
-      printTerm (x, -1) = "-$" ++ show x
-      printTerm (x, c) = show (toInteger c) ++ "$" ++ show x
+        go [] = "<empty>"
+        go [term] = printTerm term
+        go (term : terms) = printTerm term ++ " + " ++ go terms
+        printTerm (_, 0) = error "printTerm: coefficient of 0"
+        printTerm (x, 1) = "$" ++ show x
+        printTerm (x, -1) = "-$" ++ show x
+        printTerm (x, c) = show (toInteger c) ++ "$" ++ show x
 
 -- | Create a vector from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.
@@ -55,6 +55,9 @@ build c = Vector c . IntMap.filter (0 /=) . IntMap.fromListWith (+)
 -- | IntMap version of 'build'.
 build' :: (Eq n, Num n) => n -> IntMap n -> Vector n
 build' c = Vector c . IntMap.filter (0 /=)
+
+empty :: Num n => Vector n
+empty = Vector 0 mempty
 
 -- | Create a vector from a single variable and its coefficient.
 singleton :: (Eq n, Num n) => Var -> n -> Vector n

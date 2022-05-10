@@ -5,15 +5,15 @@ module Keelung.Constraint where
 
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
+import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Syntax.Common
-import Keelung.Util (DebugGF (DebugGF))
 import Keelung.Constraint.Vector (Vector)
 import qualified Keelung.Constraint.Vector as Vector
+import Keelung.Syntax.Common
 
 --------------------------------------------------------------------------------
 
@@ -23,8 +23,8 @@ import qualified Keelung.Constraint.Vector as Vector
 --      CNQZ: if x == 0 then m = 0 else m = recip x
 data Constraint n
   = CAdd !(Vector n)
-  | CMul !(n, Var) !(n, Var) !(n, Maybe Var)
-  | CMul2 !(Vector n) !(Vector n) !(Vector n)
+  | -- | CMul !(n, Var) !(n, Var) !(n, Maybe Var)
+    CMul2 !(Vector n) !(Vector n) !(Vector n)
   | CNQZ Var Var -- x & m
   deriving (Eq)
 
@@ -33,29 +33,26 @@ cadd :: GaloisField n => n -> [(Var, n)] -> Constraint n
 cadd !c !xs = CAdd $ Vector.build c xs
 
 instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
-  show (CAdd xs) = "A " ++ show xs
-  show (CMul (a, x) (b, y) (c, z)) =
-    let showTerm 1 var = "$" <> show var
-        showTerm coeff var = show (DebugGF coeff) <> "$" <> show var
-     in "M " ++ showTerm a x <> " * " <> showTerm b y
-          <> " = "
-          <> case z of
-            Nothing -> show $ DebugGF c
-            Just z' -> showTerm c z'
-  show (CMul2 aV bV cV) = "M " ++ show aV <> " * " <> show bV <> " = " <> show cV
+  show (CAdd xs) = "A " ++ show xs ++ " = 0"
+  show (CMul2 aV bV cV) = "M " ++ showVec aV <> " * " <> showVec bV <> " = " <> showVec cV
+    where
+      showVec vec =
+        if IntMap.size (Vector.coeffs vec) > 1
+          then "(" <> show vec <> ")"
+          else show vec
   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
 
 instance Ord n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
-  compare (CMul2 aV bV cV) (CMul2 aX bX cX)  = compare (aV, bV, cV) (aX, bX, cX)
-  compare _ CMul2 {} = LT -- CMul2 is always greater than anything 
+  compare (CMul2 aV bV cV) (CMul2 aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
+  compare _ CMul2 {} = LT -- CMul2 is always greater than anything
   compare CMul2 {} _ = GT
-  compare CMul {} CAdd {} = GT
-  compare CAdd {} CMul {} = LT
-  compare (CAdd xs) (CAdd ys) = compare xs ys 
-  compare (CMul (a, x) (b, y) (c, z)) (CMul (a', x') (b', y') (c', z')) =
-    -- perform lexicographical comparison with tuples
-    compare (x, y, z, a, b, c) (x', y', z', a', b', c')
+  -- compare CMul {} CAdd {} = GT
+  -- compare CAdd {} CMul {} = LT
+  compare (CAdd xs) (CAdd ys) = compare xs ys
+  -- compare (CMul (a, x) (b, y) (c, z)) (CMul (a', x') (b', y') (c', z')) =
+  -- perform lexicographical comparison with tuples
+  -- compare (x, y, z, a, b, c) (x', y', z', a', b', c')
   compare CNQZ {} CNQZ {} = EQ
   compare CNQZ {} _ = LT
   compare _ CNQZ {} = GT
@@ -64,9 +61,9 @@ instance Ord n => Ord (Constraint n) where
 
 -- | Return the list of variables occurring in constraints
 varsInConstraint :: Constraint a -> IntSet
-varsInConstraint (CAdd xs) = Vector.vars xs 
-varsInConstraint (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
-varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
+varsInConstraint (CAdd xs) = Vector.vars xs
+-- varsInConstraint (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
+-- varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
 varsInConstraint (CMul2 aV bV cV) = IntSet.unions $ map Vector.vars [aV, bV, cV]
 varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
 
@@ -95,7 +92,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
     \  constraints ("
       <> show (length constraints)
       <> ")"
-      <> ( if Set.size constraints < 30 
+      <> ( if Set.size constraints < 30
              then ":\n  \n" <> printConstraints (toList constraints) <> "\n"
              else "\n"
          )
@@ -111,7 +108,9 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
       <> "\n\
          \  number of input variables: "
       <> show (IntSet.size inputVars)
-      <> ":\n    " <> show (IntSet.toList inputVars) <> "\n"
+      <> ":\n    "
+      <> show (IntSet.toList inputVars)
+      <> "\n"
       -- <> ( if IntSet.size inputVars < 20
       --        then ":\n    " <> show (IntSet.toList inputVars) <> "\n"
       --        else "\n"
@@ -161,8 +160,8 @@ renumberConstraints cs =
     renumberConstraint constraint = case constraint of
       CAdd xs ->
         CAdd $ Vector.mapVars renumber xs
-      CMul (a, x) (b, y) (c, z) ->
-        CMul (a, renumber x) (b, renumber y) (c, renumber <$> z)
+      -- CMul (a, x) (b, y) (c, z) ->
+      --   CMul (a, renumber x) (b, renumber y) (c, renumber <$> z)
       CMul2 aV bV cV ->
         CMul2 (Vector.mapVars renumber aV) (Vector.mapVars renumber bV) (Vector.mapVars renumber cV)
       CNQZ x y ->

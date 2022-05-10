@@ -15,6 +15,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Constraint
+import qualified Keelung.Constraint.Vector as Vector
 import Keelung.Syntax.Common (Var)
 import Keelung.Syntax.Untyped
 
@@ -49,7 +50,7 @@ encode out expr = case expr of
   Val val -> add $ cadd val [(out, -1)] -- out = val
   Var var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   BinOp op operands -> case op of
-    Add -> do 
+    Add -> do
       terms <- {-# SCC "mapMtoTerm" #-} mapM toTerm operands
       {-# SCC "encodeTerms" #-} encodeTerms out terms
     Sub -> do
@@ -66,6 +67,7 @@ encode out expr = case expr of
                 BinOp Mul (Seq.fromList [BinOp Sub (Seq.fromList [Val 1, b]), y])
               ]
           )
+
 encodeAssignment :: GaloisField n => Assignment n -> M n ()
 encodeAssignment (Assignment var expr) = encode var expr
 
@@ -142,8 +144,8 @@ encodeBinaryOp :: GaloisField n => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
   Add -> add $ cadd 0 [(x, 1), (y, 1), (out, -1)]
   Sub -> add $ cadd 0 [(x, 1), (y, negate 1), (out, negate 1)]
-  Mul -> add $ CMul (1, x) (1, y) (1, Just out)
-  Div -> add $ CMul (1, y) (1, out) (1, Just x)
+  Mul -> add $ CMul2 (Vector.singleton x 1) (Vector.singleton y 1) (Vector.singleton out 1)
+  Div -> add $ CMul2 (Vector.singleton x 1) (Vector.singleton out 1) (Vector.singleton x 1)
   And -> encodeBinaryOp Mul out x y
   Or -> do
     -- Constraint 'x \/ y = out'.
@@ -183,7 +185,7 @@ encodeBinaryOp op out x y = case op of
     -- notOut = 1 - out
     notOut <- freshVar
     encode notOut (1 - Var out)
-    add $ CMul (1, diff) (1, notOut) (0, Nothing)
+    add $ CMul2 (Vector.singleton diff 1) (Vector.singleton notOut 1) Vector.empty
   Eq -> do
     -- Constraint 'x == y = out'.
     -- The encoding is: out = 1 - (x-y != 0).
@@ -199,7 +201,7 @@ encodeBinaryOp op out x y = case op of
 -- | Ensure that boolean variables have constraint 'b^2 = b'
 convertBooleanVars :: GaloisField n => IntSet -> [Constraint n]
 convertBooleanVars booleanInputVars =
-  map (\b -> CMul (1, b) (1, b) (1, Just b)) $
+  map (\b -> CMul2 (Vector.singleton b 1) (Vector.singleton b 1) (Vector.singleton b 1)) $
     IntSet.toList booleanInputVars
 
 -- | Encode the constraint 'x = out'.

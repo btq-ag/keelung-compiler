@@ -110,50 +110,50 @@ substVector vector = do
 substConstraint :: (GaloisField n, Bounded n, Integral n) => Constraint n -> OptiM n (Constraint n)
 substConstraint !constraint = case constraint of
   CAdd vector -> CAdd <$> substVector vector
-  CMul (c, x) (d, y) !ez -> do
-    bx <- lookupVar x
-    by <- lookupVar y
-    bz <- lookupTerm ez
-    case (bx, by, bz) of
-      (Root rx, Root ry, Left (e, rz)) ->
-        -- ax * by = cz
-        return
-          $! CMul (c, rx) (d, ry) (e, Just rz)
-      (Root rx, Root ry, Right e) ->
-        -- ax * by = c
-        return
-          $! CMul (c, rx) (d, ry) (e, Nothing)
-      (Root rx, Value d0, Left (e, rz)) ->
-        -- ax * b = cz => ax * b - cz = 0
-        return
-          $! cadd 0 [(rx, c * d * d0), (rz, - e)]
-      (Root rx, Value d0, Right e) ->
-        -- ax * b = c => ax * b - c = 0
-        return
-          $! cadd (- e) [(rx, c * d * d0)]
-      (Value c0, Root ry, Left (e, rz)) ->
-        -- a * bx = cz => a * bx - cz = 0
-        return
-          $! cadd 0 [(ry, c0 * c * d), (rz, - e)]
-      (Value c0, Root ry, Right e) ->
-        -- a * bx = c => a * bx - c = 0
-        return
-          $! cadd (- e) [(ry, c0 * c * d)]
-      (Value c0, Value d0, Left (e, rz)) ->
-        -- a * b = cz => a * b - cz = 0
-        return
-          $! cadd (c * c0 * d * d0) [(rz, - e)]
-      (Value c0, Value d0, Right e) ->
-        -- a * b = c => a * b - c = 0
-        return
-          $! cadd (c * c0 * d * d0 - e) []
-    where
-      lookupTerm (e, Nothing) = return (Right e)
-      lookupTerm (e, Just z) = do
-        result <- lookupVar z
-        case result of
-          Root rz -> return (Left (e, rz))
-          Value e0 -> return (Right (e * e0))
+  -- CMul (c, x) (d, y) !ez -> do
+  --   bx <- lookupVar x
+  --   by <- lookupVar y
+  --   bz <- lookupTerm ez
+  --   case (bx, by, bz) of
+  --     (Root rx, Root ry, Left (e, rz)) ->
+  --       -- ax * by = cz
+  --       return
+  --         $! CMul (c, rx) (d, ry) (e, Just rz)
+  --     (Root rx, Root ry, Right e) ->
+  --       -- ax * by = c
+  --       return
+  --         $! CMul (c, rx) (d, ry) (e, Nothing)
+  --     (Root rx, Value d0, Left (e, rz)) ->
+  --       -- ax * b = cz => ax * b - cz = 0
+  --       return
+  --         $! cadd 0 [(rx, c * d * d0), (rz, - e)]
+  --     (Root rx, Value d0, Right e) ->
+  --       -- ax * b = c => ax * b - c = 0
+  --       return
+  --         $! cadd (- e) [(rx, c * d * d0)]
+  --     (Value c0, Root ry, Left (e, rz)) ->
+  --       -- a * bx = cz => a * bx - cz = 0
+  --       return
+  --         $! cadd 0 [(ry, c0 * c * d), (rz, - e)]
+  --     (Value c0, Root ry, Right e) ->
+  --       -- a * bx = c => a * bx - c = 0
+  --       return
+  --         $! cadd (- e) [(ry, c0 * c * d)]
+  --     (Value c0, Value d0, Left (e, rz)) ->
+  --       -- a * b = cz => a * b - cz = 0
+  --       return
+  --         $! cadd (c * c0 * d * d0) [(rz, - e)]
+  --     (Value c0, Value d0, Right e) ->
+  --       -- a * b = c => a * b - c = 0
+  --       return
+  --         $! cadd (c * c0 * d * d0 - e) []
+  --   where
+  --     lookupTerm (e, Nothing) = return (Right e)
+  --     lookupTerm (e, Just z) = do
+  --       result <- lookupVar z
+  --       case result of
+  --         Root rz -> return (Left (e, rz))
+  --         Value e0 -> return (Right (e * e0))
   CMul2 aV bV cV -> do
     aV' <- substVector aV
     bV' <- substVector bV
@@ -197,8 +197,8 @@ substConstraint !constraint = case constraint of
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
   CAdd xs -> return $ Vector.isConstant xs
-  CMul {} -> return False
-  CMul2 {} -> return False
+  -- CMul {} -> return False
+  CMul2 {} -> return False -- TODO: revise this 
   CNQZ var m -> do
     result <- lookupVar var
     case result of

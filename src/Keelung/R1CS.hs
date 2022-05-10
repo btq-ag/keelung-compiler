@@ -143,12 +143,12 @@ toR1CS cs =
           (Vector.build 1 mempty)
           xs
           (Vector.build 0 mempty)
-    toR1C (CMul cx dy (e, Nothing)) =
-      Just $
-        R1C (uncurry (flip Vector.singleton) cx) (uncurry (flip Vector.singleton) dy) (Vector.build e mempty)
-    toR1C (CMul cx dy (e, Just z)) =
-      Just $
-        R1C (uncurry (flip Vector.singleton) cx) (uncurry (flip Vector.singleton) dy) (uncurry (flip Vector.singleton) (e, z))
+    -- toR1C (CMul cx dy (e, Nothing)) =
+    --   Just $
+    --     R1C (uncurry (flip Vector.singleton) cx) (uncurry (flip Vector.singleton) dy) (Vector.build e mempty)
+    -- toR1C (CMul cx dy (e, Just z)) =
+    --   Just $
+    --     R1C (uncurry (flip Vector.singleton) cx) (uncurry (flip Vector.singleton) dy) (uncurry (flip Vector.singleton) (e, z))
     toR1C (CMul2 aX bX cX) =
       Just $ R1C aX bX cX
     toR1C CNQZ {} = Nothing
