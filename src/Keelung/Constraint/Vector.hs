@@ -39,13 +39,13 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (Vector n) where
     | n == 0 = go (IntMap.toList xs)
     | otherwise = show (DebugGF n) <> " + " <> go (IntMap.toList xs)
     where
-        go [] = "<empty>"
-        go [term] = printTerm term
-        go (term : terms) = printTerm term ++ " + " ++ go terms
-        printTerm (_, 0) = error "printTerm: coefficient of 0"
-        printTerm (x, 1) = "$" ++ show x
-        printTerm (x, -1) = "-$" ++ show x
-        printTerm (x, c) = show (toInteger c) ++ "$" ++ show x
+      go [] = "<empty>"
+      go [term] = printTerm term
+      go (term : terms) = printTerm term ++ " + " ++ go terms
+      printTerm (_, 0) = error "printTerm: coefficient of 0"
+      printTerm (x, 1) = "$" ++ show x
+      printTerm (x, -1) = "-$" ++ show x
+      printTerm (x, c) = show (toInteger c) ++ "$" ++ show x
 
 -- | Create a vector from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.

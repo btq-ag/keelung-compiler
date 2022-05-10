@@ -193,12 +193,21 @@ substConstraint !constraint = case constraint of
         CMul2 aV' bV' cV'
   CNQZ _ _ -> return constraint
 
--- | Is a constriant of `0 = 0` ?
+-- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
   CAdd xs -> return $ Vector.isConstant xs
-  -- CMul {} -> return False
-  CMul2 {} -> return False -- TODO: revise this 
+  CMul2 aV bV cV -> case (Vector.view aV, Vector.view bV, Vector.view cV) of
+    (Left a, Right (b, bX), Right (c, cX)) ->
+      return $
+        a * b == c && fmap (a *) bX == cX
+    (Right (a, aX), Left b, Right (c, cX)) ->
+      return $
+        a * b == c && fmap (* b) aX == cX
+    (Left a, Left b, Left c) ->
+      return $
+        a * b == c
+    _ -> return False
   CNQZ var m -> do
     result <- lookupVar var
     case result of
