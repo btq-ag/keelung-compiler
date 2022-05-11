@@ -65,15 +65,24 @@ goOverConstraints accum constraints = case Set.minView constraints of
   Just (picked, constraints') -> do
     -- pick the "smallest" constraint
     -- and substitute roots/constants in constraints
-    substituted <- substConstraint picked
-    -- if the constraint is tautologous, remove it
-    tautologous <- isTautology substituted
 
-    if tautologous
-      then goOverConstraints accum constraints'
-      else do
-        learn substituted
-        goOverConstraints (Set.insert substituted accum) constraints'
+
+
+
+    substitutionResult <- substConstraint picked
+
+    case substitutionResult of
+      -- constaint got optimised away 
+      Nothing -> goOverConstraints accum constraints'
+      Just substituted -> do 
+        -- if the constraint is tautologous, remove it
+        tautologous <- isTautology substituted
+
+        if tautologous
+          then goOverConstraints accum constraints'
+          else do
+            learn substituted
+            goOverConstraints (Set.insert substituted accum) constraints'
 
 -- traceShow (show picked <> " => " <> show substituted) $
 
@@ -81,11 +90,11 @@ goOverConstraints accum constraints = case Set.minView constraints of
 
 -- | Normalize a polynomial by substituting roots/constants
 -- for the variables that appear in the polynomial.
-substPoly :: (GaloisField n, Bounded n, Integral n) => Poly n -> OptiM n (Poly n)
+substPoly :: (GaloisField n, Bounded n, Integral n) => Poly n -> OptiM n (Either n (Poly n))
 substPoly poly = do
   let coeffs = IntMap.toList (Poly.coeffs poly)
   (constant', coeffs') <- foldM go (Poly.constant poly, mempty) coeffs
-  return $ Poly.build constant' coeffs'
+  return $ Right $ Poly.build constant' coeffs'
   where
     go :: GaloisField n => (n, [(Var, n)]) -> (Var, n) -> OptiM n (n, [(Var, n)])
     go (accConstant, accMapping) (var, coeff) = do
@@ -107,9 +116,14 @@ substPoly poly = do
 -- for the variables that appear in the constraint. Note that, when
 -- normalizing a multiplicative constraint, it may be necessary to
 -- convert it into an additive constraint.
-substConstraint :: (GaloisField n, Bounded n, Integral n) => Constraint n -> OptiM n (Constraint n)
+substConstraint :: (GaloisField n, Bounded n, Integral n) => Constraint n -> OptiM n (Maybe (Constraint n))
 substConstraint !constraint = case constraint of
-  CAdd poly -> CAdd <$> substPoly poly
+  CAdd poly -> do 
+    result <- substPoly poly
+    case result of
+      Left _ -> return Nothing
+      Right poly' -> return $ Just $ CAdd poly'
+  -- CAdd poly -> Just . CAdd <$> substPoly poly
   CMul2 aV bV cV -> do
     aV' <- substPoly aV
     bV' <- substPoly bV
@@ -117,37 +131,39 @@ substConstraint !constraint = case constraint of
 
     -- if either aV' or bV' is constant
     -- we can convert this multiplicative constraint into an additive one
-    return $ case (Poly.view aV', Poly.view bV', Poly.view cV') of
+    return $ case (Poly.view =<< aV', Poly.view =<< bV', Poly.view =<< cV') of
       -- a * b = c => a * b - c = 0
-      (Left a, Left b, Left c) -> CAdd $ Poly.build' (a * b - c) mempty
+      (Left a, Left b, Left c) -> Just $ CAdd $ Poly.build' (a * b - c) mempty
       -- a * b = c + cx => a * b - c - cx = 0
       (Left a, Left b, Right (c, cX)) ->
-        CAdd $ Poly.build' (a * b - c) cX
+        Just $ CAdd $ Poly.build' (a * b - c) cX
       -- a * (b + bx) = c => a * bx + a * b - c = 0
       (Left a, Right (b, bX), Left c) -> do
         let constant = a * b - c
         let coeffs = fmap (a *) bX
-        CAdd $ Poly.build' constant coeffs
+        Just $ CAdd $ Poly.build' constant coeffs
       -- a * (b + bx) = c + cx => a * bx - cx + a * b - c = 0
       (Left a, Right (b, bX), Right (c, cX)) -> do
         let constant = a * b - c
         let coeffs = Poly.mergeCoeffs (fmap (a *) bX) (fmap negate cX)
-        CAdd $ Poly.build' constant coeffs
+        Just $ CAdd $ Poly.build' constant coeffs
       -- (a + ax) * b = c => ax * b + a * b - c= 0
       (Right (a, aX), Left b, Left c) -> do
         let constant = a * b - c
         let coeffs = fmap (* b) aX
-        CAdd $ Poly.build' constant coeffs
+        Just $ CAdd $ Poly.build' constant coeffs
       -- (a + ax) * b = c + cx => ax * b - cx + a * b - c = 0
       (Right (a, aX), Left b, Right (c, cX)) -> do
         let constant = a * b - c
         let coeffs = Poly.mergeCoeffs (fmap (* b) aX) (fmap negate cX)
-        CAdd $ Poly.build' constant coeffs
+        Just $ CAdd $ Poly.build' constant coeffs
       -- (a + ax) * (b + bx) = c
       -- (a + ax) * (b + bx) = c + cx
-      (Right _, Right _, _) -> do
-        CMul2 aV' bV' cV'
-  CNQZ _ _ -> return constraint
+      (Right (a, aX), Right (b, bX), Left c) -> do
+        Just $ CMul2 (Poly.build' a aX) (Poly.build' b bX) (Poly.build' c mempty)
+      (Right (a, aX), Right (b, bX), Right (c, cX)) -> do
+        Just $ CMul2 (Poly.build' a aX) (Poly.build' b bX) (Poly.build' c cX)
+  CNQZ _ _ -> return $ Just constraint
 
 -- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool

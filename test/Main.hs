@@ -99,7 +99,7 @@ main = hspec $ do
             run :: Optimise.OptiM GF181 a -> a
             run = Optimise.runOptiM' links sizes mempty
          in run (Optimise.substConstraint constraint)
-              `shouldBe` cadd 0 []
+              `shouldBe` Just (cadd 0 []) 
 
       it "should work 1" $
         let cs =
@@ -126,32 +126,32 @@ main = hspec $ do
                 }
          in Optimse.optimise (cs :: ConstraintSystem GF181) `shouldNotBe` cs
 
-    describe "Constraint Set Reduction (new algorithm)" $ do
-      it "constant propogation 1" $
-        let cs =
-              ConstraintSystem
-                { csConstraints =
-                    Set.fromList
-                      [ cadd 0 [(0, 1), (1, 1), (4, 1)],
-                        cadd 0 [(2, 1), (3, 1), (4, 1)]
-                      ],
-                  csBooleanInputVarConstraints = mempty,
-                  csVars = IntSet.fromList [0 .. 3],
-                  csInputVars = IntSet.fromList [0],
-                  csOutputVar = Nothing
-                }
-            cs' =
-              ConstraintSystem
-                { csConstraints =
-                    Set.fromList
-                      [ cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)]
-                      ],
-                  csBooleanInputVarConstraints = mempty,
-                  csVars = IntSet.fromList [0],
-                  csInputVars = IntSet.fromList [0],
-                  csOutputVar = Nothing
-                }
-         in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+    -- describe "Constraint Set Reduction (new algorithm)" $ do
+    --   it "constant propogation 1" $
+    --     let cs =
+    --           ConstraintSystem
+    --             { csConstraints =
+    --                 Set.fromList
+    --                   [ cadd 0 [(0, 1), (1, 1), (4, 1)],
+    --                     cadd 0 [(2, 1), (3, 1), (4, 1)]
+    --                   ],
+    --               csBooleanInputVarConstraints = mempty,
+    --               csVars = IntSet.fromList [0 .. 3],
+    --               csInputVars = IntSet.fromList [0],
+    --               csOutputVar = Nothing
+    --             }
+    --         cs' =
+    --           ConstraintSystem
+    --             { csConstraints =
+    --                 Set.fromList
+    --                   [ cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)]
+    --                   ],
+    --               csBooleanInputVarConstraints = mempty,
+    --               csVars = IntSet.fromList [0],
+    --               csInputVars = IntSet.fromList [0],
+    --               csOutputVar = Nothing
+    --             }
+    --      in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
 -- it "$0 = $1 2" $
 --   let constraints = Set.singleton $ cadd 0 [(0, 1), (1, -1)]
