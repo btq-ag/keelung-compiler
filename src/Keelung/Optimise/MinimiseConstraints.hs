@@ -66,15 +66,12 @@ goOverConstraints accum constraints = case Set.minView constraints of
     -- pick the "smallest" constraint
     -- and substitute roots/constants in constraints
 
-
-
-
     substitutionResult <- substConstraint picked
 
     case substitutionResult of
-      -- constaint got optimised away 
+      -- constaint got optimised away
       Nothing -> goOverConstraints accum constraints'
-      Just substituted -> do 
+      Just substituted -> do
         -- if the constraint is tautologous, remove it
         tautologous <- isTautology substituted
 
@@ -94,7 +91,7 @@ substPoly :: (GaloisField n, Bounded n, Integral n) => Poly n -> OptiM n (Either
 substPoly poly = do
   let coeffs = IntMap.toList (Poly.coeffs poly)
   (constant', coeffs') <- foldM go (Poly.constant poly, mempty) coeffs
-  return $ Right $ Poly.build constant' coeffs'
+  return $ Poly.buildEither constant' (IntMap.fromList coeffs')
   where
     go :: GaloisField n => (n, [(Var, n)]) -> (Var, n) -> OptiM n (n, [(Var, n)])
     go (accConstant, accMapping) (var, coeff) = do
@@ -118,12 +115,11 @@ substPoly poly = do
 -- convert it into an additive constraint.
 substConstraint :: (GaloisField n, Bounded n, Integral n) => Constraint n -> OptiM n (Maybe (Constraint n))
 substConstraint !constraint = case constraint of
-  CAdd poly -> do 
+  CAdd poly -> do
     result <- substPoly poly
     case result of
-      Left _ -> return Nothing
+      Left _ -> return Nothing 
       Right poly' -> return $ Just $ CAdd poly'
-  -- CAdd poly -> Just . CAdd <$> substPoly poly
   CMul2 aV bV cV -> do
     aV' <- substPoly aV
     bV' <- substPoly bV

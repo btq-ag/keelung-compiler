@@ -61,8 +61,8 @@ build' c = Poly c . IntMap.filter (0 /=)
 buildEither :: (Eq n, Num n) => n -> IntMap n -> Either n (Poly n)
 buildEither c xs =
   if IntMap.null xs
-    then Right $ build' c xs
-    else Left c
+    then Left c
+    else Right $ build' c xs
 
 empty :: Num n => Poly n
 empty = Poly 0 mempty
