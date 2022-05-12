@@ -64,7 +64,7 @@ optimise2 cs =
         Nothing -> csInputVars cs
         Just outputVar -> IntSet.insert outputVar (csInputVars cs)
 
-      constraints = MinimiseConstraints2.run (IntSet.toList pinnedVars) (csConstraints cs)
+      constraints = MinimiseConstraints2.run pinnedVars (csConstraints cs)
    in renumberConstraints $ cs {csConstraints = constraints}
 
 --------------------------------------------------------------------------------

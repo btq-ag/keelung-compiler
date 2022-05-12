@@ -24,8 +24,7 @@ import Keelung.Util (DebugGF(DebugGF))
 --      CNQZ: if x == 0 then m = 0 else m = recip x
 data Constraint n
   = CAdd !(Poly n)
-  | -- | CMul !(n, Var) !(n, Var) !(n, Maybe Var)
-    CMul2 !(Poly n) !(Poly n) !(Either n (Poly n))
+  | CMul2 !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNQZ Var Var -- x & m
   deriving (Eq)
 
@@ -167,8 +166,6 @@ renumberConstraints cs =
     renumberConstraint constraint = case constraint of
       CAdd xs ->
         CAdd $ Poly.mapVars renumber xs
-      -- CMul (a, x) (b, y) (c, z) ->
-      --   CMul (a, renumber x) (b, renumber y) (c, renumber <$> z)
       CMul2 aV bV cV ->
         CMul2 (Poly.mapVars renumber aV) (Poly.mapVars renumber bV) (Poly.mapVars renumber <$> cV)
       CNQZ x y ->
