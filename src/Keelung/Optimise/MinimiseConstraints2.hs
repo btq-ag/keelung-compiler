@@ -65,7 +65,7 @@ dumpInsert constraint = do
           return () -- abort the loop
 
 -- Returns `Just newConstraint` if the merge is successful.
-merge :: (Ord n, Num n, Eq n) => Constraint n -> Constraint n -> M n (Maybe (Constraint n))
+merge :: (Ord n, Num n, Eq n, Show n, Bounded n, Integral n, Fractional n) => Constraint n -> Constraint n -> M n (Maybe (Constraint n))
 merge (CAdd aX) (CAdd bX) = do
   pinned <- gets poolPinnedVars
   let candidateVars = Poly.vars aX `IntSet.intersection` Poly.vars bX `IntSet.difference` pinned
@@ -80,7 +80,37 @@ merge (CAdd aX) (CAdd bX) = do
             new <- Poly.merge aX' (Poly.negate bX')
             return $ CAdd new
       return result
-      -- return Nothing 
+merge (CAdd aX) (CMul2 dX eX (Left f)) = do
+  pinned <- gets poolPinnedVars
+  -- in `dX`
+  let candidateVars =
+        (Poly.vars aX `IntSet.intersection` Poly.vars dX)
+          `IntSet.difference` pinned
+  case IntSet.maxView candidateVars of
+    Nothing -> return Nothing
+    Just (var, _) -> do
+      let result = do
+            -- move and single out `var` to one side of the equation
+            aX' <- Poly.negate <$> Poly.delete var aX
+            -- substitute `var` with `aX'`
+            dX' <- Poly.substitute dX var aX'
+            return (CMul2 dX' eX (Left f))
+      return result
+-- merge (CAdd aX) (CMul2 dX eX fX) = do
+--   pinned <- gets poolPinnedVars
+--   let candidateVars =
+--         (Poly.vars aX `IntSet.intersection` (Poly.vars dX `IntSet.intersection` Poly.vars eX `IntSet.intersection` Poly.vars fX))
+--           `IntSet.difference` pinned
+--   case IntSet.maxView candidateVars of
+--     Nothing -> return Nothing
+--     Just (var, _) -> do
+--       let result = do
+--             -- in Maybe Monad
+--             aX' <- Poly.delete var aX
+--             bX' <- Poly.delete var bX
+--             new <- Poly.merge aX' (Poly.negate bX')
+--             return $ CAdd new
+--       return result
 merge _ _ = return Nothing
 
 -- merge (CMul2 po po' e) b = _wk

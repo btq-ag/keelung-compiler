@@ -17,6 +17,7 @@ module Keelung.Constraint.Polynomial
     delete,
     merge,
     negate,
+    substitute
   )
 where
 
@@ -132,3 +133,12 @@ merge (Poly c xs) (Poly d ys) = buildMaybe' (c + d) (mergeCoeffs xs ys)
 -- | Negate a polynomial.
 negate :: (Eq n, Num n) => Poly n -> Poly n
 negate (Poly c xs) = Poly (- c) (fmap Prelude.negate xs)
+
+-- | Substitute a variable in a polynomial with another polynomial.
+substitute :: (Eq n, Num n) => Poly n -> Var -> Poly n -> Maybe (Poly n)
+substitute (Poly c xs) var (Poly d ys) =
+  if IntMap.member var xs
+    then do
+      let xs' = ys <> IntMap.delete var xs
+      buildMaybe' (c + d) xs'
+    else return $ Poly c xs

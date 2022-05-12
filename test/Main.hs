@@ -9,7 +9,8 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung
-import Keelung.Constraint (cadd)
+import Keelung.Constraint (Constraint (..), cadd)
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Interpret (InterpretError (..))
 import qualified Keelung.Optimise as Optimse
 import qualified Keelung.Optimise.MinimiseConstraints as Optimise
@@ -126,8 +127,8 @@ main = hspec $ do
                 }
          in Optimse.optimise (cs :: ConstraintSystem GF181) `shouldNotBe` cs
 
-    describe "Constraint Set Reduction (new algorithm)" $ do
-      it "constant propogation 1" $
+    describe "Constraint merging" $ do
+      it "CAdd & CAdd" $
         let cs =
               ConstraintSystem
                 { csConstraints =
@@ -153,11 +154,55 @@ main = hspec $ do
                 }
          in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
--- it "$0 = $1 2" $
---   let constraints = Set.singleton $ cadd 0 [(0, 1), (1, -1)]
---       run :: Optimise.OptiM GF181 a -> a
---       run = Optimise.runOptiM mempty
---       pinnedVars = [0, 1]
---   in
---     run (Optimise.simplifyConstraintSet pinnedVars constraints) `shouldBe`
---     constraints
+      it "CAdd & CMul 1" $
+        let cs =
+              ConstraintSystem
+                { csConstraints =
+                    Set.fromList
+                      [ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
+                        CMul2 (Poly.build 0 [(3, 1)]) (Poly.build 0 [(2, 1)]) (Left 42) --- $3 * $2 = 42
+                      ],
+                  csBooleanInputVarConstraints = mempty,
+                  csVars = IntSet.fromList [0 .. 3],
+                  csInputVars = IntSet.fromList [0 .. 2],
+                  csOutputVar = Nothing
+                }
+            cs' =
+              ConstraintSystem
+                { csConstraints =
+                    Set.fromList
+                      [ CMul2 (Poly.build 0 [(0, -1), (1, -1)]) (Poly.build 0 [(2, 1)]) (Left 42) --- (- $0 - $1) * $2 = 42
+                      ],
+                  csBooleanInputVarConstraints = mempty,
+                  csVars = IntSet.fromList [0 .. 2],
+                  csInputVars = IntSet.fromList [0 .. 2],
+                  csOutputVar = Nothing
+                }
+         in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+
+      -- it "CAdd & CMul 2" $
+      --   let cs =
+      --         ConstraintSystem
+      --           { csConstraints =
+      --               Set.fromList
+      --                 [ cadd 0 [(4, 1), (0, 1), (1, 1)], --- 0 = $4 + $0 + $1
+      --                   CMul2 (Poly.build 0 [(4, 1)]) (Poly.build 0 [(2, 1)]) (Left 42) --- $4 * $2 = 42
+      --                 ],
+      --             csBooleanInputVarConstraints = mempty,
+      --             csVars = IntSet.fromList [0 .. 4],
+      --             csInputVars = IntSet.fromList [0 .. 3],
+      --             csOutputVar = Nothing
+      --           }
+      --       cs' =
+      --         ConstraintSystem
+      --           { csConstraints =
+      --               Set.fromList
+      --                 [ CMul2 (Poly.build 0 [(0, -1), (1, -1)]) (Poly.build 0 [(2, 1)]) (Left 42) --- (- $0 - $1) * $2 = 42
+      --                 ],
+      --             csBooleanInputVarConstraints = mempty,
+      --             csVars = IntSet.fromList [0 .. 2],
+      --             csInputVars = IntSet.fromList [0 .. 2],
+      --             csOutputVar = Nothing
+      --           }
+      --    in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+
