@@ -5,7 +5,6 @@
 --                =>  A + B = C + D
 --    C + D = X
 --
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Keelung.Optimise.MinimiseConstraints2 (run) where
 
@@ -20,15 +19,12 @@ module Keelung.Optimise.MinimiseConstraints2 (run) where
 
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)
+import qualified Data.Set as Set
 import Keelung.Constraint
 import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Syntax.Common
-import qualified Data.Set as Set
 
 --------------------------------------------------------------------------------
 
@@ -37,27 +33,58 @@ run ::
   IntSet ->
   Set (Constraint n) ->
   Set (Constraint n)
-run pinnedVars constraints = poolConstraints $
-  flip execState (Pool pinnedVars mempty) $ do
-    forM_ constraints $ \constraint -> insert constraint
-
--- Pool pinnedVars constraints
+run pinnedVars constraints =
+  poolConstraints $
+    execState (forM_ constraints dumpInsert) (Pool pinnedVars mempty)
 
 --------------------------------------------------------------------------------
 
--- type M = Reader IntSet -- pinned vars of a constraint system
-
 type M n = State (Pool n)
 
---
 data Pool n = Pool
   { poolPinnedVars :: IntSet,
     poolConstraints :: Set (Constraint n)
   }
 
-insert :: Ord n => Constraint n -> M n ()
-insert constraint = do 
-  modify' $ \pool -> pool {poolConstraints = Set.insert constraint (poolConstraints pool)}
+-- | Iterate over all constraints and try to merge them with the given constraint.
+--   Stops on the first successful merge.
+dumpInsert :: (Ord n, Num n, Show n, Bounded n, Integral n, Fractional n) => Constraint n -> M n ()
+dumpInsert constraint = do
+  constraints <- gets poolConstraints
+  go (Set.toList constraints)
+  where
+    go [] = modify' $ \pool -> pool {poolConstraints = Set.insert constraint (poolConstraints pool)}
+    go (c : cs) = do
+      result <- merge c constraint
+      case result of
+        -- merge failed, keep going
+        Nothing -> go cs
+        -- merge success, delete the old constraint and add the new one
+        Just new -> do
+          modify' $ \pool -> pool {poolConstraints = Set.delete c $ Set.insert new (poolConstraints pool)}
+          return () -- abort the loop
+
+-- Returns `Just newConstraint` if the merge is successful.
+merge :: (Ord n, Num n, Eq n) => Constraint n -> Constraint n -> M n (Maybe (Constraint n))
+merge (CAdd aX) (CAdd bX) = do
+  pinned <- gets poolPinnedVars
+  let candidateVars = Poly.vars aX `IntSet.intersection` Poly.vars bX `IntSet.difference` pinned
+  -- pick a variable
+  case IntSet.maxView candidateVars of
+    Nothing -> return Nothing
+    Just (var, _) -> do
+      let result = do
+            -- in Maybe Monad
+            aX' <- Poly.delete var aX
+            bX' <- Poly.delete var bX
+            new <- Poly.merge aX' (Poly.negate bX')
+            return $ CAdd new
+      return result
+      -- return Nothing 
+merge _ _ = return Nothing
+
+-- merge (CMul2 po po' e) b = _wk
+-- merge (CNQZ n i) b = _wl
 
 --------------------------------------------------------------------------------
 --

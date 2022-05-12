@@ -11,10 +11,12 @@ module Keelung.Constraint.Polynomial
     mergeCoeffs,
     constant,
     view,
-    -- isConstant,
-    -- constantOnly,
     mapVars,
     evaluate,
+    --
+    delete,
+    merge,
+    negate,
   )
 where
 
@@ -24,6 +26,8 @@ import Data.IntSet (IntSet)
 import Data.Semiring (Semiring (..))
 import Keelung.Syntax.Common (Var)
 import Keelung.Util (DebugGF (DebugGF))
+import Prelude hiding (negate)
+import qualified Prelude
 
 -- A Poly is a polynomial of the form "c + c₀x₀ + c₁x₁ ... cₙxₙ = 0"
 --   Invariances:
@@ -105,14 +109,6 @@ constant (Poly c _) = c
 view :: Poly n -> (n, IntMap n)
 view (Poly c xs) = (c, xs)
 
--- -- | See if the polynomial has no variables.
--- isConstant :: Poly n -> Bool
--- isConstant = IntMap.null . coeffs
-
--- -- | See if the polynomial has no variables and return the constant.
--- constantOnly :: Poly n -> Maybe n
--- constantOnly (Poly c xs) = if IntMap.null xs then Just c else Nothing
-
 -- | For renumbering the variables.
 mapVars :: (Var -> Var) -> Poly n -> Poly n
 mapVars f (Poly c xs) = Poly c (IntMap.mapKeys f xs)
@@ -124,3 +120,15 @@ evaluate (Poly c xs) assignment =
     (\acc k v -> (v `times` IntMap.findWithDefault zero k assignment) `plus` acc)
     c
     xs
+
+-- | Delete a variable from the polynomial.
+delete :: (Eq n, Num n) => Var -> Poly n -> Maybe (Poly n)
+delete x (Poly c xs) = buildMaybe' c (IntMap.delete x xs)
+
+-- | Merge two polynomials.
+merge :: (Eq n, Num n) => Poly n -> Poly n -> Maybe (Poly n)
+merge (Poly c xs) (Poly d ys) = buildMaybe' (c + d) (mergeCoeffs xs ys)
+
+-- | Negate a polynomial.
+negate :: (Eq n, Num n) => Poly n -> Poly n
+negate (Poly c xs) = Poly (- c) (fmap Prelude.negate xs)
