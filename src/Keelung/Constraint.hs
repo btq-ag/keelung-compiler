@@ -14,6 +14,7 @@ import qualified Data.Set as Set
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Syntax.Common
+import Keelung.Util (DebugGF(DebugGF))
 
 --------------------------------------------------------------------------------
 
@@ -24,7 +25,7 @@ import Keelung.Syntax.Common
 data Constraint n
   = CAdd !(Poly n)
   | -- | CMul !(n, Var) !(n, Var) !(n, Maybe Var)
-    CMul2 !(Poly n) !(Poly n) !(Poly n)
+    CMul2 !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNQZ Var Var -- x & m
   deriving (Eq)
 
@@ -34,9 +35,14 @@ cadd !c !xs = CAdd $ Poly.build c xs
 
 instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
   show (CAdd xs) = "A " ++ show xs ++ " = 0"
-  show (CMul2 aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly cV
+  show (CMul2 aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly' cV
     where
       showPoly poly =
+        if IntMap.size (Poly.coeffs poly) > 1
+          then "(" <> show poly <> ")"
+          else show poly
+      showPoly' (Left x) = show (DebugGF x)
+      showPoly' (Right poly) =
         if IntMap.size (Poly.coeffs poly) > 1
           then "(" <> show poly <> ")"
           else show poly
@@ -64,7 +70,8 @@ varsInConstraint :: Constraint a -> IntSet
 varsInConstraint (CAdd xs) = Poly.vars xs
 -- varsInConstraint (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
 -- varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
-varsInConstraint (CMul2 aV bV cV) = IntSet.unions $ map Poly.vars [aV, bV, cV]
+varsInConstraint (CMul2 aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
+varsInConstraint (CMul2 aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
 varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
 
 varsInConstraints :: Set (Constraint a) -> IntSet
@@ -163,6 +170,6 @@ renumberConstraints cs =
       -- CMul (a, x) (b, y) (c, z) ->
       --   CMul (a, renumber x) (b, renumber y) (c, renumber <$> z)
       CMul2 aV bV cV ->
-        CMul2 (Poly.mapVars renumber aV) (Poly.mapVars renumber bV) (Poly.mapVars renumber cV)
+        CMul2 (Poly.mapVars renumber aV) (Poly.mapVars renumber bV) (Poly.mapVars renumber <$> cV)
       CNQZ x y ->
         CNQZ (renumber x) (renumber y)

@@ -91,6 +91,7 @@ substPoly :: (GaloisField n, Bounded n, Integral n) => Poly n -> OptiM n (Either
 substPoly poly = do
   let coeffs = IntMap.toList (Poly.coeffs poly)
   (constant', coeffs') <- foldM go (Poly.constant poly, mempty) coeffs
+  
   return $ Poly.buildEither constant' coeffs'
   where
     go :: GaloisField n => (n, [(Var, n)]) -> (Var, n) -> OptiM n (n, [(Var, n)])
@@ -118,64 +119,65 @@ substConstraint !constraint = case constraint of
   CAdd poly -> do
     result <- substPoly poly
     case result of
-      Left _ -> return Nothing 
+      Left _ -> return Nothing
       Right poly' -> return $ Just $ CAdd poly'
   CMul2 aV bV cV -> do
     aV' <- substPoly aV
     bV' <- substPoly bV
-    cV' <- substPoly cV
+    cV' <- join <$> mapM substPoly cV
 
     -- if either aV' or bV' is constant
     -- we can convert this multiplicative constraint into an additive one
-    return $ case (Poly.view =<< aV', Poly.view =<< bV', Poly.view =<< cV') of
+    return $ case (Poly.view <$> aV', Poly.view <$> bV', Poly.view <$> cV') of
       -- a * b = c => a * b - c = 0
-      (Left a, Left b, Left c) -> Just $ CAdd $ Poly.build' (a * b - c) mempty
+      (Left _, Left _, Left _) -> Nothing
       -- a * b = c + cx => a * b - c - cx = 0
       (Left a, Left b, Right (c, cX)) ->
-        Just $ CAdd $ Poly.build' (a * b - c) cX
+        CAdd <$> Poly.buildMaybe' (a * b - c) cX
       -- a * (b + bx) = c => a * bx + a * b - c = 0
       (Left a, Right (b, bX), Left c) -> do
         let constant = a * b - c
         let coeffs = fmap (a *) bX
-        Just $ CAdd $ Poly.build' constant coeffs
+        CAdd <$> Poly.buildMaybe' constant coeffs
       -- a * (b + bx) = c + cx => a * bx - cx + a * b - c = 0
       (Left a, Right (b, bX), Right (c, cX)) -> do
         let constant = a * b - c
         let coeffs = Poly.mergeCoeffs (fmap (a *) bX) (fmap negate cX)
-        Just $ CAdd $ Poly.build' constant coeffs
+        CAdd <$> Poly.buildMaybe' constant coeffs
       -- (a + ax) * b = c => ax * b + a * b - c= 0
       (Right (a, aX), Left b, Left c) -> do
         let constant = a * b - c
         let coeffs = fmap (* b) aX
-        Just $ CAdd $ Poly.build' constant coeffs
+        CAdd <$> Poly.buildMaybe' constant coeffs
       -- (a + ax) * b = c + cx => ax * b - cx + a * b - c = 0
       (Right (a, aX), Left b, Right (c, cX)) -> do
         let constant = a * b - c
         let coeffs = Poly.mergeCoeffs (fmap (* b) aX) (fmap negate cX)
-        Just $ CAdd $ Poly.build' constant coeffs
+        CAdd <$> Poly.buildMaybe' constant coeffs
       -- (a + ax) * (b + bx) = c
       -- (a + ax) * (b + bx) = c + cx
       (Right (a, aX), Right (b, bX), Left c) -> do
-        Just $ CMul2 (Poly.build' a aX) (Poly.build' b bX) (Poly.build' c mempty)
+        Just $ CMul2 (Poly.build' a aX) (Poly.build' b bX) (Left c)
       (Right (a, aX), Right (b, bX), Right (c, cX)) -> do
-        Just $ CMul2 (Poly.build' a aX) (Poly.build' b bX) (Poly.build' c cX)
+        Just $ CMul2 (Poly.build' a aX) (Poly.build' b bX) (Right $ Poly.build' c cX)
   CNQZ _ _ -> return $ Just constraint
 
 -- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
-  CAdd xs -> return $ Poly.isConstant xs
-  CMul2 aV bV cV -> case (Poly.view aV, Poly.view bV, Poly.view cV) of
-    (Left a, Right (b, bX), Right (c, cX)) ->
-      return $
-        a * b == c && fmap (a *) bX == cX
-    (Right (a, aX), Left b, Right (c, cX)) ->
-      return $
-        a * b == c && fmap (* b) aX == cX
-    (Left a, Left b, Left c) ->
-      return $
-        a * b == c
-    _ -> return False
+  CAdd _ -> return False
+  CMul2 {} -> return False
+  -- CMul2 aV bV cV -> case (Poly.view aV, Poly.view bV, Poly.view cV) of
+  --   (Left a, Right (b, bX), Right (c, cX)) ->
+  --     return $
+  --       a * b == c && fmap (a *) bX == cX
+  --   (Right (a, aX), Left b, Right (c, cX)) ->
+  --     return $
+  --       a * b == c && fmap (* b) aX == cX
+  --   (Left a, Left b, Left c) ->
+  --     return $
+  --       a * b == c
+  --   _ -> return False
   CNQZ var m -> do
     result <- lookupVar var
     case result of

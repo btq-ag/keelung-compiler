@@ -66,21 +66,25 @@ generateWitness cs env =
 
 -- | A Rank-1 Constraint is a relation between 3 polynomials
 --      Ax * Bx = Cx
-data R1C n = R1C (Poly n) (Poly n) (Poly n)
+data R1C n = R1C (Either n (Poly n)) (Either n (Poly n)) (Either n (Poly n))
   deriving (Eq)
 
 instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
-  show (R1C aX bX cX) = case (Poly.constantOnly aX, Poly.constantOnly bX, Poly.constantOnly cX) of
-    (Just 0, _, _) -> "0 = " ++ show cX
-    (_, Just 0, _) -> "0 = " ++ show cX
-    (Just 1, _, _) -> show bX ++ " = " ++ show cX
-    (_, Just 1, _) -> show aX ++ " = " ++ show cX
+  show (R1C aX bX cX) = case (aX, bX, cX) of
+    (Left 0, _, _) -> "0 = " ++ show cX
+    (_, Left 0, _) -> "0 = " ++ show cX
+    (Left 1, _, _) -> show bX ++ " = " ++ show cX
+    (_, Left 1, _) -> show aX ++ " = " ++ show cX
     (_, _, _) -> show aX ++ " * " ++ show bX ++ " = " ++ show cX
 
 satisfyR1C :: GaloisField a => Witness a -> R1C a -> Bool
 satisfyR1C witness constraint
   | R1C aV bV cV <- constraint =
-    Poly.evaluate aV witness `times` Poly.evaluate bV witness == Poly.evaluate cV witness
+    evaluate aV witness `times` evaluate bV witness == evaluate cV witness
+  where
+    evaluate :: GaloisField a => Either a (Poly a) -> Witness a -> a
+    evaluate (Left x) _ = x
+    evaluate (Right p) w = Poly.evaluate p w
 
 --------------------------------------------------------------------------------
 
@@ -140,9 +144,9 @@ toR1CS cs =
     toR1C (CAdd xs) =
       Just $
         R1C
-          (Poly.build 1 mempty)
-          xs
-          (Poly.build 0 mempty)
+          (Left 1)
+          (Right xs)
+          (Left 0)
     -- toR1C (CMul cx dy (e, Nothing)) =
     --   Just $
     --     R1C (uncurry (flip Poly.singleton) cx) (uncurry (flip Poly.singleton) dy) (Poly.build e mempty)
@@ -150,7 +154,7 @@ toR1CS cs =
     --   Just $
     --     R1C (uncurry (flip Poly.singleton) cx) (uncurry (flip Poly.singleton) dy) (uncurry (flip Poly.singleton) (e, z))
     toR1C (CMul2 aX bX cX) =
-      Just $ R1C aX bX cX
+      Just $ R1C (Right aX) (Right bX) cX
     toR1C CNQZ {} = Nothing
 
 witnessOfR1CS :: [n] -> R1CS n -> Either (ExecError n) (Witness n)
