@@ -26,7 +26,15 @@ data Constraint n
   = CAdd !(Poly n)
   | CMul2 !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNQZ Var Var -- x & m
-  deriving (Eq)
+  
+
+instance (Eq n, Num n) => Eq (Constraint n) where
+  xs == ys = case (xs, ys) of 
+    (CAdd x, CAdd y) -> x == y || Poly.negate x == y 
+    (CMul2 x y z, CMul2 u v w) -> 
+        ((x == u && y == v) || (x == v && y == u)) && z == w
+    (CNQZ x y, CNQZ u v) -> x == u && y == v
+    _ -> False
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> Constraint n
@@ -47,7 +55,7 @@ instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Con
           else show poly
   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
 
-instance Ord n => Ord (Constraint n) where
+instance (Ord n, Num n) => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
   compare (CMul2 aV bV cV) (CMul2 aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMul2 {} = LT -- CMul2 is always greater than anything
@@ -132,7 +140,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
 --   renumbered constraints, together with the total number of
 --   variables in the (renumbered) constraint set and the (possibly
 --   renumbered) in and out variables.
-renumberConstraints :: Ord n => ConstraintSystem n -> ConstraintSystem n
+renumberConstraints :: (Ord n, Num n) => ConstraintSystem n -> ConstraintSystem n
 renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))

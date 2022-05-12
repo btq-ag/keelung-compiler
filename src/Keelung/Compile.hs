@@ -33,7 +33,7 @@ type M n = State (Env n)
 runM :: Var -> M n a -> a
 runM outVar program = evalState program (Env Set.empty (outVar + 1))
 
-add :: Ord n => Constraint n -> M n ()
+add :: (Ord n, Num n) => Constraint n -> M n ()
 add c =
   modify (\env -> env {envConstraints = Set.insert c $ envConstraints env})
 

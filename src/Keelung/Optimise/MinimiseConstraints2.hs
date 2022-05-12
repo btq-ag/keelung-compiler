@@ -75,10 +75,14 @@ merge (CAdd aX) (CAdd bX) = do
     Just (var, _) -> do
       let result = do
             -- in Maybe Monad
-            aX' <- Poly.delete var aX
-            bX' <- Poly.delete var bX
-            new <- Poly.merge aX' (Poly.negate bX')
-            return $ CAdd new
+            aX' <- Poly.negate <$> Poly.delete var aX
+            -- bX' <- Poly.delete var bX
+            -- new <- Poly.merge aX' (Poly.negate bX')
+
+            -- substitute `var` with `aX'`
+            bX' <- Poly.substitute bX var aX'
+
+            return $ CAdd bX'
       return result
 merge (CAdd aX) (CMul2 dX eX (Left f)) = do
   pinned <- gets poolPinnedVars
