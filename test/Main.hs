@@ -80,11 +80,11 @@ main = hspec $ do
     it "assert success" $
       execute Basic.assert1 [3] `shouldBe` Right (Just 3)
 
-  -- NOTE:
-  --    some variables are of "don't care"
-  --    they get thrown away and won't be in the witness
-  -- it "cond 2" $
-  --   execute Basic.cond [3] `shouldBe` Right 12
+  -- -- NOTE:
+  -- --    some variables are of "don't care"
+  -- --    they get thrown away and won't be in the witness
+  -- -- it "cond 2" $
+  -- --   execute Basic.cond [3] `shouldBe` Right 12
 
   describe "Optimisation" $ do
     -- describe "Constant Propagation" $ do

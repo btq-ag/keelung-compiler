@@ -3,6 +3,7 @@ module Keelung.Constraint.Polynomial
     build,
     build',
     buildEither,
+    buildEither',
     empty,
     singleton,
     vars,
@@ -58,8 +59,14 @@ build' :: (Eq n, Num n) => n -> IntMap n -> Poly n
 build' c = Poly c . IntMap.filter (0 /=)
 
 -- | Type-safe version of 'build''
-buildEither :: (Eq n, Num n) => n -> IntMap n -> Either n (Poly n)
-buildEither c xs =
+buildEither :: (Eq n, Num n) => n -> [(Var, n)] -> Either n (Poly n)
+buildEither c xs = let xs' = IntMap.fromListWith (+) xs in 
+  if IntMap.null xs'
+    then Left c
+    else Right $ build' c xs'
+
+buildEither' :: (Eq n, Num n) => n -> IntMap n -> Either n (Poly n)
+buildEither' c xs =
   if IntMap.null xs
     then Left c
     else Right $ build' c xs

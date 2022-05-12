@@ -91,7 +91,7 @@ substPoly :: (GaloisField n, Bounded n, Integral n) => Poly n -> OptiM n (Either
 substPoly poly = do
   let coeffs = IntMap.toList (Poly.coeffs poly)
   (constant', coeffs') <- foldM go (Poly.constant poly, mempty) coeffs
-  return $ Poly.buildEither constant' (IntMap.fromList coeffs')
+  return $ Poly.buildEither constant' coeffs'
   where
     go :: GaloisField n => (n, [(Var, n)]) -> (Var, n) -> OptiM n (n, [(Var, n)])
     go (accConstant, accMapping) (var, coeff) = do
