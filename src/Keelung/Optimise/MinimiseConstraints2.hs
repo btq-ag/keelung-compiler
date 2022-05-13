@@ -8,14 +8,6 @@
 
 module Keelung.Optimise.MinimiseConstraints2 (run) where
 
--- import Data.IntMap (IntMap)
--- import qualified Data.IntMap as IntMap
--- import Data.IntSet (IntSet)
--- import qualified Data.IntSet as IntSet
-
--- import Debug.Trace
-
--- import qualified Keelung.Constraint.Polynomial as Poly
 
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
@@ -76,22 +68,17 @@ merge (CAdd aX) (CAdd bX) = do
       let result = do
             -- in Maybe Monad
             aX' <- Poly.negate <$> Poly.delete var aX
-            -- bX' <- Poly.delete var bX
-            -- new <- Poly.merge aX' (Poly.negate bX')
-
             -- substitute `var` with `aX'`
             bX' <- Poly.substitute bX var aX'
-
             return $ CAdd bX'
       return result
 merge (CAdd aX) (CMul2 dX eX (Left f)) = do
   pinned <- gets poolPinnedVars
   -- in `dX`
-  let candidateVars =
+  let candidateVarsInDX =
         (Poly.vars aX `IntSet.intersection` Poly.vars dX)
           `IntSet.difference` pinned
-  case IntSet.maxView candidateVars of
-    Nothing -> return Nothing
+  case IntSet.maxView candidateVarsInDX of
     Just (var, _) -> do
       let result = do
             -- move and single out `var` to one side of the equation
@@ -100,25 +87,60 @@ merge (CAdd aX) (CMul2 dX eX (Left f)) = do
             dX' <- Poly.substitute dX var aX'
             return (CMul2 dX' eX (Left f))
       return result
--- merge (CAdd aX) (CMul2 dX eX fX) = do
---   pinned <- gets poolPinnedVars
---   let candidateVars =
---         (Poly.vars aX `IntSet.intersection` (Poly.vars dX `IntSet.intersection` Poly.vars eX `IntSet.intersection` Poly.vars fX))
---           `IntSet.difference` pinned
---   case IntSet.maxView candidateVars of
---     Nothing -> return Nothing
---     Just (var, _) -> do
---       let result = do
---             -- in Maybe Monad
---             aX' <- Poly.delete var aX
---             bX' <- Poly.delete var bX
---             new <- Poly.merge aX' (Poly.negate bX')
---             return $ CAdd new
---       return result
+    Nothing -> do
+      let result = do
+            let candidateVarsInEX =
+                  (Poly.vars aX `IntSet.intersection` Poly.vars eX)
+                    `IntSet.difference` pinned
+            (var, _) <- IntSet.maxView candidateVarsInEX
+            -- move and single out `var` to one side of the equation
+            aX' <- Poly.negate <$> Poly.delete var aX
+            -- substitute `var` with `aX'`
+            eX' <- Poly.substitute eX var aX'
+            return (CMul2 dX eX' (Left f))
+      return result
+merge (CAdd aX) (CMul2 dX eX (Right fX)) = do
+  pinned <- gets poolPinnedVars
+  -- in `dX`
+  let candidateVarsInDX =
+        (Poly.vars aX `IntSet.intersection` Poly.vars dX)
+          `IntSet.difference` pinned
+  case IntSet.maxView candidateVarsInDX of
+    Just (var, _) -> do
+      let result = do
+            -- move and single out `var` to one side of the equation
+            aX' <- Poly.negate <$> Poly.delete var aX
+            -- substitute `var` with `aX'`
+            dX' <- Poly.substitute dX var aX'
+            return (CMul2 dX' eX (Right fX))
+      return result
+    Nothing -> do
+      let result = do
+            let candidateVarsInEX =
+                  (Poly.vars aX `IntSet.intersection` Poly.vars eX)
+                    `IntSet.difference` pinned
+            case IntSet.maxView candidateVarsInEX of
+              Just (var, _) -> do
+                -- move and single out `var` to one side of the equation
+                aX' <- Poly.negate <$> Poly.delete var aX
+                -- substitute `var` with `aX'`
+                eX' <- Poly.substitute eX var aX'
+                return (CMul2 dX eX' (Right fX))
+              Nothing -> do
+                let candidateVarsInFX =
+                      (Poly.vars aX `IntSet.intersection` Poly.vars fX)
+                        `IntSet.difference` pinned
+                case IntSet.maxView candidateVarsInFX of
+                  Just (var, _) -> do
+                    -- move and single out `var` to one side of the equation
+                    aX' <- Poly.negate <$> Poly.delete var aX
+                    -- substitute `var` with `aX'`
+                    fX' <- Poly.substitute fX var aX'
+                    return (CMul2 dX eX (Right fX'))
+                  Nothing -> Nothing
+      return result
+merge a@CMul2 {} b@CAdd {} = merge b a
 merge _ _ = return Nothing
-
--- merge (CMul2 po po' e) b = _wk
--- merge (CNQZ n i) b = _wl
 
 --------------------------------------------------------------------------------
 --
