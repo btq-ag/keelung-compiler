@@ -8,7 +8,6 @@
 
 module Keelung.Optimise.MinimiseConstraints2 (run) where
 
-
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
@@ -57,90 +56,42 @@ dumpInsert constraint = do
           return () -- abort the loop
 
 -- Returns `Just newConstraint` if the merge is successful.
-merge :: (Ord n, Num n, Eq n, Show n, Bounded n, Integral n, Fractional n) => Constraint n -> Constraint n -> M n (Maybe (Constraint n))
+merge :: (Ord n, Num n, Eq n) => Constraint n -> Constraint n -> M n (Maybe (Constraint n))
 merge (CAdd aX) (CAdd bX) = do
   pinned <- gets poolPinnedVars
-  let candidateVars = Poly.vars aX `IntSet.intersection` Poly.vars bX `IntSet.difference` pinned
-  -- pick a variable
-  case IntSet.maxView candidateVars of
-    Nothing -> return Nothing
-    Just (var, _) -> do
-      let result = do
-            -- in Maybe Monad
-            aX' <- Poly.negate <$> Poly.delete var aX
-            -- substitute `var` with `aX'`
-            bX' <- Poly.substitute bX var aX'
-            return $ CAdd bX'
-      return result
+  return $ case mergePoly pinned aX bX of
+    Just bX' -> Just (CAdd bX')
+    Nothing -> Nothing
 merge (CAdd aX) (CMul2 dX eX (Left f)) = do
   pinned <- gets poolPinnedVars
-  -- in `dX`
-  let candidateVarsInDX =
-        (Poly.vars aX `IntSet.intersection` Poly.vars dX)
-          `IntSet.difference` pinned
-  case IntSet.maxView candidateVarsInDX of
-    Just (var, _) -> do
-      let result = do
-            -- move and single out `var` to one side of the equation
-            aX' <- Poly.negate <$> Poly.delete var aX
-            -- substitute `var` with `aX'`
-            dX' <- Poly.substitute dX var aX'
-            return (CMul2 dX' eX (Left f))
-      return result
+  return $ case mergePoly pinned aX dX of
+    Just dX' -> Just (CMul2 dX' eX (Left f))
     Nothing -> do
-      let result = do
-            let candidateVarsInEX =
-                  (Poly.vars aX `IntSet.intersection` Poly.vars eX)
-                    `IntSet.difference` pinned
-            (var, _) <- IntSet.maxView candidateVarsInEX
-            -- move and single out `var` to one side of the equation
-            aX' <- Poly.negate <$> Poly.delete var aX
-            -- substitute `var` with `aX'`
-            eX' <- Poly.substitute eX var aX'
-            return (CMul2 dX eX' (Left f))
-      return result
+      case mergePoly pinned aX eX of
+        Just eX' -> Just (CMul2 dX eX' (Left f))
+        Nothing -> Nothing
 merge (CAdd aX) (CMul2 dX eX (Right fX)) = do
   pinned <- gets poolPinnedVars
-  -- in `dX`
-  let candidateVarsInDX =
-        (Poly.vars aX `IntSet.intersection` Poly.vars dX)
-          `IntSet.difference` pinned
-  case IntSet.maxView candidateVarsInDX of
-    Just (var, _) -> do
-      let result = do
-            -- move and single out `var` to one side of the equation
-            aX' <- Poly.negate <$> Poly.delete var aX
-            -- substitute `var` with `aX'`
-            dX' <- Poly.substitute dX var aX'
-            return (CMul2 dX' eX (Right fX))
-      return result
+  return $ case mergePoly pinned aX dX of
+    Just dX' -> Just (CMul2 dX' eX (Right fX))
     Nothing -> do
-      let result = do
-            let candidateVarsInEX =
-                  (Poly.vars aX `IntSet.intersection` Poly.vars eX)
-                    `IntSet.difference` pinned
-            case IntSet.maxView candidateVarsInEX of
-              Just (var, _) -> do
-                -- move and single out `var` to one side of the equation
-                aX' <- Poly.negate <$> Poly.delete var aX
-                -- substitute `var` with `aX'`
-                eX' <- Poly.substitute eX var aX'
-                return (CMul2 dX eX' (Right fX))
-              Nothing -> do
-                let candidateVarsInFX =
-                      (Poly.vars aX `IntSet.intersection` Poly.vars fX)
-                        `IntSet.difference` pinned
-                case IntSet.maxView candidateVarsInFX of
-                  Just (var, _) -> do
-                    -- move and single out `var` to one side of the equation
-                    aX' <- Poly.negate <$> Poly.delete var aX
-                    -- substitute `var` with `aX'`
-                    fX' <- Poly.substitute fX var aX'
-                    return (CMul2 dX eX (Right fX'))
-                  Nothing -> Nothing
-      return result
+      case mergePoly pinned aX eX of
+        Just eX' -> Just (CMul2 dX eX' (Right fX))
+        Nothing -> do
+          case mergePoly pinned aX fX of
+            Just fX' -> Just (CMul2 dX eX (Right fX'))
+            Nothing -> Nothing
 merge a@CMul2 {} b@CAdd {} = merge b a
 merge _ _ = return Nothing
+
+mergePoly :: (Ord n, Num n, Eq n) => IntSet -> Poly.Poly n -> Poly.Poly n -> Maybe (Poly.Poly n)
+mergePoly pinned xs ys = do
+  let vars = Poly.vars xs `IntSet.intersection` Poly.vars ys `IntSet.difference` pinned
+  (var, _) <- IntSet.maxView vars
+  -- single out `var` and move it to one side of the equation
+  xs' <- Poly.negate <$> Poly.delete var xs
+  -- substitute `var` with `xs'`
+  Poly.substitute ys var xs'
 
 --------------------------------------------------------------------------------
 --
