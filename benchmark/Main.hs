@@ -63,7 +63,8 @@ keelungOnly setup =
         bench "Type Erasure" $ nf benchEraseType keelung,
         bench "Constant Propagation" $ nf benchPropogateConstant keelung,
         bench "Compilation" $ nf benchCompile keelung,
-        bench "Optimisation" $ nf benchOptimise keelung,
+        bench "Optimisation I" $ nf benchOptimise keelung,
+        bench "Optimisation II" $ nf benchOptimise2 keelung,
         bench "Partial Evaluation" $ nf (benchOptimiseWithInput keelung) input
       ]
 
@@ -94,7 +95,7 @@ complexityOfElaboration =
 run :: IO ()
 run = do
   let dimension = 512
-  let numberOfSignatures = 8
+  let numberOfSignatures = 2
   let settings =
         Settings
           { enableAggChecking = True,

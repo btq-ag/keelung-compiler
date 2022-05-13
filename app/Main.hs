@@ -100,7 +100,7 @@ keelungConstraints dimension numOfSigs = run $ do
       comp $
         AggSig.checkAgg $
           makeParam dimension numOfSigs 42 (Settings True False False)
-  let checkAgg' = optimise checkAgg :: ConstraintSystem GF181
+  let checkAgg' = optimise2 $ optimise checkAgg :: ConstraintSystem GF181
   -- let checkAgg'' = snd $ optimiseWithInput input checkAgg'
 
   checkSize <-
@@ -108,7 +108,7 @@ keelungConstraints dimension numOfSigs = run $ do
       comp $
         AggSig.checkSize $
           makeParam dimension numOfSigs 42 (Settings False True False)
-  let checkSize' = optimise checkSize :: ConstraintSystem GF181
+  let checkSize' = optimise2 $ optimise checkSize :: ConstraintSystem GF181
   -- let checkSize'' = snd $ optimiseWithInput input checkSize'
 
   checkLength <-
@@ -116,11 +116,11 @@ keelungConstraints dimension numOfSigs = run $ do
       comp $
         AggSig.checkLength $
           makeParam dimension numOfSigs 42 (Settings False False True)
-  let checkLength' = optimise checkLength :: ConstraintSystem GF181
+  let checkLength' = optimise2 $ optimise checkLength :: ConstraintSystem GF181
   -- let checkLength'' = snd $ optimiseWithInput input checkLength'
 
   aggSig <- liftEither $ comp (AggSig.aggregateSignature param)
-  let aggSig' = optimise aggSig :: ConstraintSystem GF181
+  let aggSig' = optimise2 $ optimise aggSig :: ConstraintSystem GF181
   -- let aggSig'' = snd $ optimiseWithInput input aggSig'
 
   liftIO $ putStrLn "  Keelung: "

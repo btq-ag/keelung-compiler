@@ -23,6 +23,7 @@ module Keelung
     module Keelung.Optimise,
     Compilable (..),
     comp,
+    optm2,
     optm,
     optmWithInput,
     conv,
@@ -70,12 +71,19 @@ instance (Num n, GaloisField n, Bounded n, Integral n) => Compilable n () where
 comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either (Error n) (ConstraintSystem n)
 comp prog = left OtherError (erase prog) >>= return . compile . ConstantPropagation.run
 
--- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation
+-- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
 optm ::
   (Compilable n a, GaloisField n, Bounded n, Integral n) =>
   Comp n a ->
   Either (Error n) (ConstraintSystem n)
 optm prog = comp prog >>= return . optimise
+
+-- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
+optm2 ::
+  (Compilable n a, GaloisField n, Bounded n, Integral n) =>
+  Comp n a ->
+  Either (Error n) (ConstraintSystem n)
+optm2 prog = comp prog >>= return . optimise2 . optimise
 
 -- with optimisation + partial evaluation with inputs
 optmWithInput ::

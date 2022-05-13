@@ -99,6 +99,9 @@ benchCompile prog = show $ comp prog
 benchOptimise :: (Compilable n a, GaloisField n, Bounded n, Integral n, Show n) => Comp n a -> String
 benchOptimise prog = show $ optm prog
 
+benchOptimise2 :: (Compilable n a, GaloisField n, Bounded n, Integral n, Show n) => Comp n a -> String
+benchOptimise2 prog = show $ optm2 prog
+
 benchOptimiseWithInput :: (Compilable n a, GaloisField n, Bounded n, Integral n, Show n) => Comp n a -> [n] -> String
 benchOptimiseWithInput prog input = show $ optmWithInput prog input
 
