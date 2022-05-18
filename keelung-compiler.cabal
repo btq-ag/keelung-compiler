@@ -4,14 +4,14 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           keelung
+name:           keelung-compiler
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/keelung#readme>
-homepage:       https://github.com/githubuser/keelung#readme
-bug-reports:    https://github.com/githubuser/keelung/issues
+description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung-compiler#readme>
+homepage:       https://github.com/btq-ag/keelung-compiler#readme
+bug-reports:    https://github.com/btq-ag/keelung-compiler/issues
 author:         Ting-GIan LUA
 maintainer:     ty.lai@btq.li
-copyright:      2022 Author name here
+copyright:      2022 BTQ AG
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -21,7 +21,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/keelung
+  location: https://github.com/btq-ag/keelung-compiler
 
 library
   exposed-modules:
@@ -45,7 +45,7 @@ library
       Keelung.Syntax.Untyped
       Keelung.Util
   other-modules:
-      Paths_keelung
+      Paths_keelung_compiler
   hs-source-dirs:
       src
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
@@ -59,7 +59,7 @@ library
     , semirings
   default-language: Haskell2010
 
-executable keelung-exe
+executable keelungc
   main-is: Main.hs
   other-modules:
       Keelung
@@ -84,7 +84,7 @@ executable keelung-exe
       AggregateSignature.Program
       AggregateSignature.Util
       Basic
-      Paths_keelung
+      Paths_keelung_compiler
   hs-source-dirs:
       app/
       src/
@@ -95,7 +95,7 @@ executable keelung-exe
     , base >=4.7 && <5
     , containers
     , galois-field
-    , keelung
+    , keelung-compiler
     , mtl
     , random
     , semirings
@@ -109,7 +109,7 @@ test-suite keelung-test
       AggregateSignature.Program
       AggregateSignature.Util
       Basic
-      Paths_keelung
+      Paths_keelung_compiler
   hs-source-dirs:
       test/
       examples/
@@ -120,7 +120,7 @@ test-suite keelung-test
     , containers
     , galois-field
     , hspec
-    , keelung
+    , keelung-compiler
     , mtl
     , random
     , semirings
@@ -154,7 +154,7 @@ benchmark keelung-bench
       AggregateSignature.Program
       AggregateSignature.Util
       Basic
-      Paths_keelung
+      Paths_keelung_compiler
   hs-source-dirs:
       src
       benchmark/
@@ -166,7 +166,7 @@ benchmark keelung-bench
     , containers
     , criterion >=1.0
     , galois-field
-    , keelung
+    , keelung-compiler
     , mtl
     , random
     , semirings
