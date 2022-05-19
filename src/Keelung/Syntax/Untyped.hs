@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE GADTs #-}
 
 module Keelung.Syntax.Untyped
@@ -188,7 +187,7 @@ class Erase ty where
 
 instance Erase 'T.Unit where
   eraseExpr expr = case expr of
-    T.Val val -> case val of
+    T.Val val -> case val of T.UnitVal -> return (Val 0)
     T.Var (T.Variable var) -> return (Var var)
     T.IfThenElse b x y -> IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
   eraseAssignment (T.Assignment (T.Variable var) expr) = Assignment var <$> eraseExpr expr

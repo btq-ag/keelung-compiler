@@ -50,6 +50,7 @@ instance GaloisField n => Interpret (Value ty n) n where
   interp v = case v of
     Number n -> return n
     Boolean b -> interp b
+    UnitVal -> return zero
 
 instance GaloisField n => Interpret (Expr ty n) n where
   interp expr = case expr of

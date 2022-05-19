@@ -31,14 +31,17 @@ data Reference
 data Value :: Type -> * -> * where
   Number :: n -> Value 'Num n
   Boolean :: Bool -> Value 'Bool n
+  UnitVal :: Value 'Unit n
 
 instance Show n => Show (Value ty n) where
   show (Number n) = show n
   show (Boolean b) = show b
+  show UnitVal = "unit"
 
 instance Eq n => Eq (Value ty n) where
   Number n == Number m = n == m
   Boolean b == Boolean c = b == c
+  UnitVal == UnitVal = True
 
 --------------------------------------------------------------------------------
 
@@ -84,6 +87,7 @@ instance Functor (Expr ty) where
     Val val -> Val $ case val of
       Number a -> Number (f a)
       Boolean b -> Boolean b
+      UnitVal -> UnitVal
     Var ref -> Var ref
     Add x y -> Add (fmap f x) (fmap f y)
     Sub x y -> Sub (fmap f x) (fmap f y)
