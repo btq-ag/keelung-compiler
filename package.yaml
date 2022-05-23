@@ -27,6 +27,7 @@ dependencies:
 - semirings
 - galois-field
 - random
+- keelung 
 
 library:
   source-dirs: src

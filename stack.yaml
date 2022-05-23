@@ -47,6 +47,8 @@ extra-deps:
 - protolude-0.2.4@sha256:ec6c01be631050f8c1b9153a782d329a52609d058cb4b461104222862f7792af,2292
 - git: git@github.com:btq-ag/private-snarkl.git
   commit: babdfc7febf81fef99d72a3ecc1ea152f0e39dcb
+- git: git@github.com:btq-ag/keelung.git
+  commit: 332a0880be7c64466e4e680a4bf79e9ecc89a7b7
 
 
 # Override default flag values for local packages and extra-deps

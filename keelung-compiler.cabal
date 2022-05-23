@@ -54,6 +54,7 @@ library
     , base >=4.7 && <5
     , containers
     , galois-field
+    , keelung
     , mtl
     , random
     , semirings
@@ -95,6 +96,7 @@ executable keelungc
     , base >=4.7 && <5
     , containers
     , galois-field
+    , keelung
     , keelung-compiler
     , mtl
     , random
@@ -120,6 +122,7 @@ test-suite keelung-test
     , containers
     , galois-field
     , hspec
+    , keelung
     , keelung-compiler
     , mtl
     , random
@@ -166,6 +169,7 @@ benchmark keelung-bench
     , containers
     , criterion >=1.0
     , galois-field
+    , keelung
     , keelung-compiler
     , mtl
     , random
