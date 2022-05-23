@@ -8,9 +8,7 @@ module Keelung.Compiler
   ( module Keelung.Compiler.Monad,
     module Keelung.Compiler.Syntax,
     module Keelung.Compiler.Error,
-    module Keelung.Compiler.Syntax.Common,
     GaloisField,
-    DebugGF (..),
     Semiring (one, zero),
     module Prelude,
     compile,
@@ -47,9 +45,8 @@ import qualified Keelung.Compiler.Optimise.ConstantPropagation as ConstantPropag
 import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting
 import Keelung.Compiler.R1CS
 import Keelung.Compiler.Syntax
-import Keelung.Compiler.Syntax.Common
 import Keelung.Compiler.Syntax.Untyped (Erase, TypeErased (..), eraseType)
-import Keelung.Compiler.Util (DebugGF (..))
+import Keelung.Compiler.Util (Witness)
 
 --------------------------------------------------------------------------------
 -- Some top-level functions

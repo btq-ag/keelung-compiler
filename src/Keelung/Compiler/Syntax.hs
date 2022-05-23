@@ -10,7 +10,7 @@ import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Ring (..), Semiring (..), one)
-import Keelung.Compiler.Syntax.Common
+import Keelung.Syntax (Addr, Var)
 
 --------------------------------------------------------------------------------
 

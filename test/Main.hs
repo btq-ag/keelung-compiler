@@ -16,6 +16,7 @@ import qualified Keelung.Compiler.Optimise as Optimse
 import qualified Keelung.Compiler.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Compiler.Optimise.Monad as Optimise
 import Test.Hspec
+import Keelung.Field (GF181)
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) (Maybe GF181)
 runKeelungAggSig dimension numberOfSignatures =

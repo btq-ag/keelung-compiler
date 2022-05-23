@@ -7,6 +7,7 @@ import AggregateSignature.Util
 import Control.Monad
 import Control.Monad.Except
 import Keelung.Compiler
+import Keelung.Field (GF181)
 
 generateFlamegraph :: Bool
 generateFlamegraph = False

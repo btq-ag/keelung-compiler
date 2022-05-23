@@ -13,10 +13,9 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
 import Keelung.Compiler.Optimise (optimiseWithWitness)
-import Keelung.Compiler.Syntax.Common
 import Keelung.Compiler.Util
-
--- import qualified Data.List as List
+import Keelung.Syntax (Var)
+import Keelung.Field (N(..))
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -46,7 +45,7 @@ generateWitness cs env =
     --     ++ show [x | x <- variables, not $ isMapped witness x]
     --     ++ ",\n"
     --     ++ "in assignment context\n  "
-    --     ++ show (fmap DebugGF witness)
+    --     ++ show (fmap N witness)
     --     ++ ",\n"
     --     ++ "in pinned-variable context\n  "
     --     ++ show pinnedVars
@@ -182,27 +181,27 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ExecError n) whe
       ++ show witness
   show (ExecOutputError expected actual) =
     "interpreted output:\n"
-      ++ show (fmap DebugGF expected)
+      ++ show (fmap N expected)
       ++ "\nactual output:\n"
-      ++ show (fmap DebugGF actual)
+      ++ show (fmap N actual)
   show (ExecR1CUnsatisfiableError r1c's witness) =
     "these R1C constraints cannot be satisfied:\n"
       ++ show r1c's
       ++ "\nby the witness:\n"
-      ++ show (fmap DebugGF witness)
+      ++ show (fmap N witness)
   show (ExecInputUnmatchedError expected actual) =
     "expecting " ++ show expected ++ " input(s) but got " ++ show actual
       ++ " input(s)"
   show (ExecVarUnassignedError vars witness) =
     "these variables:\n " ++ show vars
       ++ "\n are not assigned in: \n"
-      ++ show (fmap DebugGF witness)
+      ++ show (fmap N witness)
 
 -- ( "unassigned variables,\n  "
 --     ++ show [x | x <- variables, not $ isMapped witness x]
 --     ++ ",\n"
 --     ++ "in assignment context\n  "
---     ++ show (fmap DebugGF witness)
+--     ++ show (fmap N witness)
 --     ++ ",\n"
 --     ++ "in pinned-variable context\n  "
 --     ++ show pinnedVars

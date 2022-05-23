@@ -5,9 +5,9 @@ module Keelung.Compiler.Optimise.Monad
     lookupVar,
     assignmentOfVars,
     OptiM,
-    Lookup(..),
+    Lookup (..),
     runOptiM,
-    runOptiM'
+    runOptiM',
   )
 where
 
@@ -17,7 +17,8 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap.Lazy as Map
 import Keelung.Compiler.Optimise.UnionFind (UnionFind (..))
 import qualified Keelung.Compiler.Optimise.UnionFind as UnionFind
-import Keelung.Compiler.Syntax.Common
+import Keelung.Syntax (Var)
+import Keelung.Compiler.Util (Witness)
 
 ----------------------------------------------------------------
 --                  Simplifier State Monad                    --

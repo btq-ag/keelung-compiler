@@ -41,7 +41,6 @@ library
       Keelung.Compiler.Optimise.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax
-      Keelung.Compiler.Syntax.Common
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
   other-modules:
@@ -79,7 +78,6 @@ executable keelungc
       Keelung.Compiler.Optimise.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax
-      Keelung.Compiler.Syntax.Common
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       AggregateSignature.Program
@@ -150,7 +148,6 @@ benchmark keelung-bench
       Keelung.Compiler.Optimise.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax
-      Keelung.Compiler.Syntax.Common
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Benchmark.Keelung

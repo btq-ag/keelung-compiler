@@ -16,8 +16,11 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
-import Keelung.Compiler.Syntax.Common (Var)
+import Keelung.Syntax (Var)
+
 import Keelung.Compiler.Syntax.Untyped
+
+----------------------------------------------------------------
 
 ----------------------------------------------------------------
 

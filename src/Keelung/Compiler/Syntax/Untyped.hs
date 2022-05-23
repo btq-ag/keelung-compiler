@@ -20,8 +20,8 @@ import Data.Sequence (Seq (..), (<|), (|>))
 import qualified Data.Sequence as Seq
 import qualified Keelung.Compiler.Monad as T
 import qualified Keelung.Compiler.Syntax as T
-import Keelung.Compiler.Syntax.Common
-import Keelung.Compiler.Util
+import Keelung.Syntax (Var)
+import Keelung.Field (N(..))
 
 --------------------------------------------------------------------------------
 
@@ -141,10 +141,10 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) wh
   show (TypeErased expr assertions assignments numOfVars inputVars boolVars) =
     "TypeErased {\n\
     \  expression: "
-      <> show (fmap (fmap DebugGF) expr)
+      <> show (fmap (fmap N) expr)
       <> "\n"
       <> ( if length assignments < 20
-             then "  assignments:\n" <> show (map (fmap DebugGF) assignments) <> "\n"
+             then "  assignments:\n" <> show (map (fmap N) assignments) <> "\n"
              else ""
          )
       <> ( if length assertions < 20

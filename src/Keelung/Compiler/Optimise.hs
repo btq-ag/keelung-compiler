@@ -15,8 +15,8 @@ import qualified Keelung.Compiler.Optimise.MinimiseConstraints2 as MinimiseConst
 import Keelung.Compiler.Optimise.Monad
 import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting
 import Keelung.Compiler.Syntax
-import Keelung.Compiler.Syntax.Common
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
+import Keelung.Compiler.Util (Witness)
 
 --------------------------------------------------------------------------------
 

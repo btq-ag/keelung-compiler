@@ -11,8 +11,8 @@ where
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Maybe (fromMaybe)
-import Keelung.Compiler.Syntax.Common (Var)
-import Keelung.Compiler.Util (DebugGF(DebugGF))
+import Keelung.Syntax (Var)
+import Keelung.Field (N(..))
 
 data UnionFind n = UnionFind
   { links :: IntMap Var,
@@ -24,7 +24,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (UnionFind n) whe
   show xs = "UnionFind {\n"
     ++ "  links = " ++ show (IntMap.toList $links xs) ++ "\n"
     ++ "  sizes = " ++ show (IntMap.toList $sizes xs) ++ "\n"
-    ++ "  values = " ++ show (IntMap.toList $ fmap (fmap DebugGF) values xs) ++ "\n"
+    ++ "  values = " ++ show (IntMap.toList $ fmap (fmap N) values xs) ++ "\n"
     ++ "}"
 
 new :: IntMap n -> UnionFind n

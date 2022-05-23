@@ -25,10 +25,10 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import Data.Semiring (Semiring (..))
-import Keelung.Compiler.Syntax.Common (Var)
-import Keelung.Compiler.Util (DebugGF (DebugGF))
+import Keelung.Syntax (Var)
 import Prelude hiding (negate)
 import qualified Prelude
+import Keelung.Field (N(..))
 
 -- A Poly is a polynomial of the form "c + c₀x₀ + c₁x₁ ... cₙxₙ = 0"
 --   Invariances:
@@ -44,7 +44,7 @@ instance Ord n => Ord (Poly n) where
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (Poly n) where
   show (Poly n xs)
     | n == 0 = go (IntMap.toList xs)
-    | otherwise = show (DebugGF n) <> " + " <> go (IntMap.toList xs)
+    | otherwise = show (N n) <> " + " <> go (IntMap.toList xs)
     where
       go [] = "<empty>"
       go [term] = printTerm term

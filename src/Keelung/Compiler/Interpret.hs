@@ -15,8 +15,8 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Monad (Assignment (..), Computation (..), Elaborated (..))
 import Keelung.Compiler.Syntax
-import Keelung.Compiler.Syntax.Common (Var)
-import Keelung.Compiler.Util (DebugGF (..))
+import Keelung.Syntax (Var)
+import Keelung.Field (N (..))
 
 --------------------------------------------------------------------------------
 
@@ -121,8 +121,8 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (InterpretError n
   show (InterpretUnboundVarError var bindings) =
     "unbound variable " ++ show var
       ++ " in bindings "
-      ++ show (fmap DebugGF bindings)
+      ++ show (fmap N bindings)
   show (InterpretAssertionError expr bindings) =
-    "assertion failed: " ++ show (fmap DebugGF expr)
+    "assertion failed: " ++ show (fmap N expr)
       ++ "\nbindings of variables: "
-      ++ show (fmap DebugGF bindings)
+      ++ show (fmap N bindings)

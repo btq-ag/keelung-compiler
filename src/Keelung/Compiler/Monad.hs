@@ -46,8 +46,8 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Keelung.Compiler.Syntax
-import Keelung.Compiler.Syntax.Common
-import Keelung.Compiler.Util
+import Keelung.Syntax (Addr, Var)
+import Keelung.Field (N(..))
 
 --------------------------------------------------------------------------------
 
@@ -144,11 +144,11 @@ instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Computation n) 
       ++ "\n  input variables: "
       ++ show (IntSet.toList inputVars)
       ++ "\n  num assignments: "
-      ++ show (map (fmap DebugGF) numAsgns)
+      ++ show (map (fmap N) numAsgns)
       ++ "\n  bool assignments: "
-      ++ show (map (fmap DebugGF) boolAsgns)
+      ++ show (map (fmap N) boolAsgns)
       ++ "\n  assertions: "
-      ++ show (map (fmap DebugGF) assertions)
+      ++ show (map (fmap N) assertions)
       ++ "\n\
          \}"
 
@@ -190,7 +190,7 @@ data Elaborated ty n = Elaborated
 instance (Show n, GaloisField n, Bounded n, Integral n) => Show (Elaborated ty n) where
   show (Elaborated expr comp) =
     "{\n expression: "
-      ++ show (fmap (fmap DebugGF) expr)
+      ++ show (fmap (fmap N) expr)
       ++ "\n  compuation state: \n"
       ++ show comp
       ++ "\n}"

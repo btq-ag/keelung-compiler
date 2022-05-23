@@ -12,6 +12,7 @@ import Keelung.Compiler
 import qualified Data.Set as Set
 import qualified Data.IntSet as IntSet
 import Keelung.Compiler.Constraint (cadd)
+import Keelung.Field (GF181)
 
 --------------------------------------------------------------------------------
 

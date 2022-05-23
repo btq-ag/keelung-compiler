@@ -13,8 +13,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
-import Keelung.Compiler.Syntax.Common
-import Keelung.Compiler.Util (DebugGF(DebugGF))
+import Keelung.Field ( N(..), GF181 )
+import Keelung.Syntax (Var)
 
 --------------------------------------------------------------------------------
 
@@ -26,12 +26,12 @@ data Constraint n
   = CAdd !(Poly n)
   | CMul2 !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNQZ Var Var -- x & m
-  
+
 
 instance (Eq n, Num n) => Eq (Constraint n) where
-  xs == ys = case (xs, ys) of 
-    (CAdd x, CAdd y) -> x == y || Poly.negate x == y 
-    (CMul2 x y z, CMul2 u v w) -> 
+  xs == ys = case (xs, ys) of
+    (CAdd x, CAdd y) -> x == y || Poly.negate x == y
+    (CMul2 x y z, CMul2 u v w) ->
         ((x == u && y == v) || (x == v && y == u)) && z == w
     (CNQZ x y, CNQZ u v) -> x == u && y == v
     _ -> False
@@ -48,7 +48,7 @@ instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Con
         if IntMap.size (Poly.coeffs poly) > 1
           then "(" <> show poly <> ")"
           else show poly
-      showPoly' (Left x) = show (DebugGF x)
+      showPoly' (Left x) = show (N x)
       showPoly' (Right poly) =
         if IntMap.size (Poly.coeffs poly) > 1
           then "(" <> show poly <> ")"
