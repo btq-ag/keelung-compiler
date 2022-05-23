@@ -1,12 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
-module Keelung.Optimise.Rewriting
+module Keelung.Compiler.Optimise.Rewriting
   ( run,
   )
 where
 
-import Keelung.Monad
-import Keelung.Syntax
+import Keelung.Compiler.Monad
+import Keelung.Compiler.Syntax
 import Control.Monad
 import Control.Monad.State
 

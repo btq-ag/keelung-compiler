@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 
-module Keelung.Syntax.Untyped
+module Keelung.Compiler.Syntax.Untyped
   ( Op (..),
     Expr (..),
     Erase,
@@ -18,10 +18,10 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Sequence (Seq (..), (<|), (|>))
 import qualified Data.Sequence as Seq
-import qualified Keelung.Monad as T
-import qualified Keelung.Syntax as T
-import Keelung.Syntax.Common
-import Keelung.Util
+import qualified Keelung.Compiler.Monad as T
+import qualified Keelung.Compiler.Syntax as T
+import Keelung.Compiler.Syntax.Common
+import Keelung.Compiler.Util
 
 --------------------------------------------------------------------------------
 

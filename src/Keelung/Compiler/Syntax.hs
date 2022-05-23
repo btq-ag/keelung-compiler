@@ -4,13 +4,13 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 
-module Keelung.Syntax where
+module Keelung.Compiler.Syntax where
 
 import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Ring (..), Semiring (..), one)
-import Keelung.Syntax.Common
+import Keelung.Compiler.Syntax.Common
 
 --------------------------------------------------------------------------------
 

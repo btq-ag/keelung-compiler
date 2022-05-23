@@ -3,20 +3,20 @@
 --------------------------------------------------------------------------------
 {-# LANGUAGE DataKinds #-}
 
-module Keelung.Optimise where
+module Keelung.Compiler.Optimise where
 
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
-import Keelung.Constraint
-import Keelung.Monad
-import qualified Keelung.Optimise.MinimiseConstraints as MinimiseConstraints
-import qualified Keelung.Optimise.MinimiseConstraints2 as MinimiseConstraints2
-import Keelung.Optimise.Monad
-import qualified Keelung.Optimise.Rewriting as Rewriting
-import Keelung.Syntax
-import Keelung.Syntax.Common
-import Keelung.Syntax.Untyped (TypeErased (..))
+import Keelung.Compiler.Constraint
+import Keelung.Compiler.Monad
+import qualified Keelung.Compiler.Optimise.MinimiseConstraints as MinimiseConstraints
+import qualified Keelung.Compiler.Optimise.MinimiseConstraints2 as MinimiseConstraints2
+import Keelung.Compiler.Optimise.Monad
+import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting
+import Keelung.Compiler.Syntax
+import Keelung.Compiler.Syntax.Common
+import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 
 --------------------------------------------------------------------------------
 

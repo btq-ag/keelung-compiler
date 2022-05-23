@@ -1,4 +1,4 @@
-module Keelung.Optimise.UnionFind
+module Keelung.Compiler.Optimise.UnionFind
   ( UnionFind (..),
     new,
     find,
@@ -11,8 +11,8 @@ where
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Maybe (fromMaybe)
-import Keelung.Syntax.Common (Var)
-import Keelung.Util (DebugGF(DebugGF))
+import Keelung.Compiler.Syntax.Common (Var)
+import Keelung.Compiler.Util (DebugGF(DebugGF))
 
 data UnionFind n = UnionFind
   { links :: IntMap Var,

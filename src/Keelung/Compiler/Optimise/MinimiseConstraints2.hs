@@ -6,7 +6,7 @@
 --    C + D = X
 --
 
-module Keelung.Optimise.MinimiseConstraints2 (run) where
+module Keelung.Compiler.Optimise.MinimiseConstraints2 (run) where
 
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
@@ -14,8 +14,8 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Constraint
-import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Compiler.Constraint
+import qualified Keelung.Compiler.Constraint.Polynomial as Poly
 
 --------------------------------------------------------------------------------
 

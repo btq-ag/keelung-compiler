@@ -8,7 +8,7 @@ module AggregateSignature.Program where
 import AggregateSignature.Util
 import Control.Monad
 import Data.Array
-import Keelung
+import Keelung.Compiler
 
 --    let S be the signature and P be the public key
 --    let Q = q - P

@@ -1,6 +1,6 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Keelung.Util where
+module Keelung.Compiler.Util where
 
 import Data.Euclidean (Field, Euclidean, GcdDomain)
 import Data.Semiring (Ring, Semiring)

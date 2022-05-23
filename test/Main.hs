@@ -8,13 +8,13 @@ import qualified Basic
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
-import Keelung
-import Keelung.Constraint (Constraint (..), cadd)
-import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Interpret (InterpretError (..))
-import qualified Keelung.Optimise as Optimse
-import qualified Keelung.Optimise.MinimiseConstraints as Optimise
-import qualified Keelung.Optimise.Monad as Optimise
+import Keelung.Compiler
+import Keelung.Compiler.Constraint (Constraint (..), cadd)
+import qualified Keelung.Compiler.Constraint.Polynomial as Poly
+import Keelung.Compiler.Interpret (InterpretError (..))
+import qualified Keelung.Compiler.Optimise as Optimse
+import qualified Keelung.Compiler.Optimise.MinimiseConstraints as Optimise
+import qualified Keelung.Compiler.Optimise.Monad as Optimise
 import Test.Hspec
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) (Maybe GF181)

@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Interpret (InterpretError (..), interpretElaborated) where
+module Keelung.Compiler.Interpret (InterpretError (..), interpretElaborated) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -13,10 +13,10 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung.Monad (Assignment (..), Computation (..), Elaborated (..))
-import Keelung.Syntax
-import Keelung.Syntax.Common (Var)
-import Keelung.Util (DebugGF (..))
+import Keelung.Compiler.Monad (Assignment (..), Computation (..), Elaborated (..))
+import Keelung.Compiler.Syntax
+import Keelung.Compiler.Syntax.Common (Var)
+import Keelung.Compiler.Util (DebugGF (..))
 
 --------------------------------------------------------------------------------
 

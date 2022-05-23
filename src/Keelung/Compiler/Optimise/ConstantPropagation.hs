@@ -1,8 +1,8 @@
-module Keelung.Optimise.ConstantPropagation (run) where
+module Keelung.Compiler.Optimise.ConstantPropagation (run) where
 
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Keelung.Syntax.Untyped
+import Keelung.Compiler.Syntax.Untyped
 
 --------------------------------------------------------------------------------
 

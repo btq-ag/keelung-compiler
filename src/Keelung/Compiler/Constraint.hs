@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 
-module Keelung.Constraint where
+module Keelung.Compiler.Constraint where
 
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
@@ -11,10 +11,10 @@ import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Syntax.Common
-import Keelung.Util (DebugGF(DebugGF))
+import Keelung.Compiler.Constraint.Polynomial (Poly)
+import qualified Keelung.Compiler.Constraint.Polynomial as Poly
+import Keelung.Compiler.Syntax.Common
+import Keelung.Compiler.Util (DebugGF(DebugGF))
 
 --------------------------------------------------------------------------------
 

@@ -4,11 +4,11 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Keelung
-  ( module Keelung.Monad,
-    module Keelung.Syntax,
-    module Keelung.Error,
-    module Keelung.Syntax.Common,
+module Keelung.Compiler
+  ( module Keelung.Compiler.Monad,
+    module Keelung.Compiler.Syntax,
+    module Keelung.Compiler.Error,
+    module Keelung.Compiler.Syntax.Common,
     GaloisField,
     DebugGF (..),
     Semiring (one, zero),
@@ -19,8 +19,8 @@ module Keelung
     Erase,
     eraseType,
     TypeErased (..),
-    module Keelung.R1CS,
-    module Keelung.Optimise,
+    module Keelung.Compiler.R1CS,
+    module Keelung.Compiler.Optimise,
     Compilable (..),
     comp,
     optm2,
@@ -37,19 +37,19 @@ import Control.Monad (when)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (one, zero))
-import Keelung.Compile (compile)
-import Keelung.Constraint (ConstraintSystem (..), numberOfConstraints)
-import Keelung.Error
-import Keelung.Interpret
-import Keelung.Monad
-import Keelung.Optimise
-import qualified Keelung.Optimise.ConstantPropagation as ConstantPropagation
-import qualified Keelung.Optimise.Rewriting as Rewriting
-import Keelung.R1CS
-import Keelung.Syntax
-import Keelung.Syntax.Common
-import Keelung.Syntax.Untyped (Erase, TypeErased (..), eraseType)
-import Keelung.Util (DebugGF (..))
+import Keelung.Compiler.Compile (compile)
+import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
+import Keelung.Compiler.Error
+import Keelung.Compiler.Interpret
+import Keelung.Compiler.Monad
+import Keelung.Compiler.Optimise
+import qualified Keelung.Compiler.Optimise.ConstantPropagation as ConstantPropagation
+import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting
+import Keelung.Compiler.R1CS
+import Keelung.Compiler.Syntax
+import Keelung.Compiler.Syntax.Common
+import Keelung.Compiler.Syntax.Untyped (Erase, TypeErased (..), eraseType)
+import Keelung.Compiler.Util (DebugGF (..))
 
 --------------------------------------------------------------------------------
 -- Some top-level functions

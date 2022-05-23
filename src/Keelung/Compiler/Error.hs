@@ -1,7 +1,7 @@
-module Keelung.Error where
+module Keelung.Compiler.Error where
 
-import Keelung.R1CS (ExecError)
-import Keelung.Interpret (InterpretError)
+import Keelung.Compiler.R1CS (ExecError)
+import Keelung.Compiler.Interpret (InterpretError)
 
 data Error n
   = ExecError (ExecError n)

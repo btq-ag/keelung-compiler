@@ -6,7 +6,7 @@ import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import Control.Monad
 import Control.Monad.Except
-import Keelung
+import Keelung.Compiler
 
 generateFlamegraph :: Bool
 generateFlamegraph = False

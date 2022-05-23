@@ -25,25 +25,25 @@ source-repository head
 
 library
   exposed-modules:
-      Keelung
-      Keelung.Compile
-      Keelung.Constraint
-      Keelung.Constraint.Polynomial
-      Keelung.Error
-      Keelung.Interpret
-      Keelung.Monad
-      Keelung.Optimise
-      Keelung.Optimise.ConstantPropagation
-      Keelung.Optimise.MinimiseConstraints
-      Keelung.Optimise.MinimiseConstraints2
-      Keelung.Optimise.Monad
-      Keelung.Optimise.Rewriting
-      Keelung.Optimise.UnionFind
-      Keelung.R1CS
-      Keelung.Syntax
-      Keelung.Syntax.Common
-      Keelung.Syntax.Untyped
-      Keelung.Util
+      Keelung.Compiler
+      Keelung.Compiler.Compile
+      Keelung.Compiler.Constraint
+      Keelung.Compiler.Constraint.Polynomial
+      Keelung.Compiler.Error
+      Keelung.Compiler.Interpret
+      Keelung.Compiler.Monad
+      Keelung.Compiler.Optimise
+      Keelung.Compiler.Optimise.ConstantPropagation
+      Keelung.Compiler.Optimise.MinimiseConstraints
+      Keelung.Compiler.Optimise.MinimiseConstraints2
+      Keelung.Compiler.Optimise.Monad
+      Keelung.Compiler.Optimise.Rewriting
+      Keelung.Compiler.Optimise.UnionFind
+      Keelung.Compiler.R1CS
+      Keelung.Compiler.Syntax
+      Keelung.Compiler.Syntax.Common
+      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Util
   other-modules:
       Paths_keelung_compiler
   hs-source-dirs:
@@ -62,25 +62,25 @@ library
 executable keelungc
   main-is: Main.hs
   other-modules:
-      Keelung
-      Keelung.Compile
-      Keelung.Constraint
-      Keelung.Constraint.Polynomial
-      Keelung.Error
-      Keelung.Interpret
-      Keelung.Monad
-      Keelung.Optimise
-      Keelung.Optimise.ConstantPropagation
-      Keelung.Optimise.MinimiseConstraints
-      Keelung.Optimise.MinimiseConstraints2
-      Keelung.Optimise.Monad
-      Keelung.Optimise.Rewriting
-      Keelung.Optimise.UnionFind
-      Keelung.R1CS
-      Keelung.Syntax
-      Keelung.Syntax.Common
-      Keelung.Syntax.Untyped
-      Keelung.Util
+      Keelung.Compiler
+      Keelung.Compiler.Compile
+      Keelung.Compiler.Constraint
+      Keelung.Compiler.Constraint.Polynomial
+      Keelung.Compiler.Error
+      Keelung.Compiler.Interpret
+      Keelung.Compiler.Monad
+      Keelung.Compiler.Optimise
+      Keelung.Compiler.Optimise.ConstantPropagation
+      Keelung.Compiler.Optimise.MinimiseConstraints
+      Keelung.Compiler.Optimise.MinimiseConstraints2
+      Keelung.Compiler.Optimise.Monad
+      Keelung.Compiler.Optimise.Rewriting
+      Keelung.Compiler.Optimise.UnionFind
+      Keelung.Compiler.R1CS
+      Keelung.Compiler.Syntax
+      Keelung.Compiler.Syntax.Common
+      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Util
       AggregateSignature.Program
       AggregateSignature.Util
       Basic
@@ -131,25 +131,25 @@ benchmark keelung-bench
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Keelung
-      Keelung.Compile
-      Keelung.Constraint
-      Keelung.Constraint.Polynomial
-      Keelung.Error
-      Keelung.Interpret
-      Keelung.Monad
-      Keelung.Optimise
-      Keelung.Optimise.ConstantPropagation
-      Keelung.Optimise.MinimiseConstraints
-      Keelung.Optimise.MinimiseConstraints2
-      Keelung.Optimise.Monad
-      Keelung.Optimise.Rewriting
-      Keelung.Optimise.UnionFind
-      Keelung.R1CS
-      Keelung.Syntax
-      Keelung.Syntax.Common
-      Keelung.Syntax.Untyped
-      Keelung.Util
+      Keelung.Compiler
+      Keelung.Compiler.Compile
+      Keelung.Compiler.Constraint
+      Keelung.Compiler.Constraint.Polynomial
+      Keelung.Compiler.Error
+      Keelung.Compiler.Interpret
+      Keelung.Compiler.Monad
+      Keelung.Compiler.Optimise
+      Keelung.Compiler.Optimise.ConstantPropagation
+      Keelung.Compiler.Optimise.MinimiseConstraints
+      Keelung.Compiler.Optimise.MinimiseConstraints2
+      Keelung.Compiler.Optimise.Monad
+      Keelung.Compiler.Optimise.Rewriting
+      Keelung.Compiler.Optimise.UnionFind
+      Keelung.Compiler.R1CS
+      Keelung.Compiler.Syntax
+      Keelung.Compiler.Syntax.Common
+      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Util
       Benchmark.Keelung
       AggregateSignature.Program
       AggregateSignature.Util

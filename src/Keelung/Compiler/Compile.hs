@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compile (compile) where
+module Keelung.Compiler.Compile (compile) where
 
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
@@ -14,10 +14,10 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Constraint
-import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Syntax.Common (Var)
-import Keelung.Syntax.Untyped
+import Keelung.Compiler.Constraint
+import qualified Keelung.Compiler.Constraint.Polynomial as Poly
+import Keelung.Compiler.Syntax.Common (Var)
+import Keelung.Compiler.Syntax.Untyped
 
 ----------------------------------------------------------------
 

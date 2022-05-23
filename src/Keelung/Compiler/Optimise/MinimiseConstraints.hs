@@ -1,17 +1,17 @@
 {-# LANGUAGE BangPatterns #-}
 
-module Keelung.Optimise.MinimiseConstraints (run, substConstraint) where
+module Keelung.Compiler.Optimise.MinimiseConstraints (run, substConstraint) where
 
 import Control.Monad
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Constraint (Constraint (..), cadd)
-import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Optimise.Monad
-import Keelung.Syntax.Common (Var)
+import Keelung.Compiler.Constraint (Constraint (..), cadd)
+import Keelung.Compiler.Constraint.Polynomial (Poly)
+import qualified Keelung.Compiler.Constraint.Polynomial as Poly
+import Keelung.Compiler.Optimise.Monad
+import Keelung.Compiler.Syntax.Common (Var)
 
 run ::
   (GaloisField n, Bounded n, Integral n) =>

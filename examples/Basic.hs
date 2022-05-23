@@ -8,10 +8,10 @@ module Basic where
 
 import qualified AggregateSignature.Program
 import AggregateSignature.Util
-import Keelung
+import Keelung.Compiler
 import qualified Data.Set as Set
 import qualified Data.IntSet as IntSet
-import Keelung.Constraint (cadd)
+import Keelung.Compiler.Constraint (cadd)
 
 --------------------------------------------------------------------------------
 

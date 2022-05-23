@@ -1,4 +1,4 @@
-module Keelung.R1CS where
+module Keelung.Compiler.R1CS where
 
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
@@ -9,12 +9,12 @@ import qualified Data.List as List
 import Data.Maybe (mapMaybe)
 import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
-import Keelung.Constraint
-import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Optimise (optimiseWithWitness)
-import Keelung.Syntax.Common
-import Keelung.Util
+import Keelung.Compiler.Constraint
+import Keelung.Compiler.Constraint.Polynomial (Poly)
+import qualified Keelung.Compiler.Constraint.Polynomial as Poly
+import Keelung.Compiler.Optimise (optimiseWithWitness)
+import Keelung.Compiler.Syntax.Common
+import Keelung.Compiler.Util
 
 -- import qualified Data.List as List
 

@@ -1,4 +1,4 @@
-module Keelung.Constraint.Polynomial
+module Keelung.Compiler.Constraint.Polynomial
   ( Poly,
     build,
     build',
@@ -25,8 +25,8 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import Data.Semiring (Semiring (..))
-import Keelung.Syntax.Common (Var)
-import Keelung.Util (DebugGF (DebugGF))
+import Keelung.Compiler.Syntax.Common (Var)
+import Keelung.Compiler.Util (DebugGF (DebugGF))
 import Prelude hiding (negate)
 import qualified Prelude
 

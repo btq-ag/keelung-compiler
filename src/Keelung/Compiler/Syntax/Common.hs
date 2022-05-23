@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 
-module Keelung.Syntax.Common where
+module Keelung.Compiler.Syntax.Common where
 
 import Data.Field.Galois (Binary, Prime)
 import Data.IntMap (IntMap)

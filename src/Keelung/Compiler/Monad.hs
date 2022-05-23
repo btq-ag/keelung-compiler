@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 
-module Keelung.Monad
+module Keelung.Compiler.Monad
   ( Comp,
     runComp,
     elaborate,
@@ -45,9 +45,9 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Keelung.Syntax
-import Keelung.Syntax.Common
-import Keelung.Util
+import Keelung.Compiler.Syntax
+import Keelung.Compiler.Syntax.Common
+import Keelung.Compiler.Util
 
 --------------------------------------------------------------------------------
 

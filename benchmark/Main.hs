@@ -4,7 +4,7 @@ module Main where
 import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import Criterion.Main
-import Keelung (GF181, Comp)
+import Keelung.Compiler (GF181, Comp)
 import Benchmark.Keelung
 
 benchmarks :: Param GF181 -> [Benchmark]
