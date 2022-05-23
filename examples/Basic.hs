@@ -9,6 +9,8 @@ module Basic where
 import qualified AggregateSignature.Program
 import AggregateSignature.Util
 import Keelung.Compiler
+import Keelung.Monad
+import Keelung.Syntax
 import qualified Data.Set as Set
 import qualified Data.IntSet as IntSet
 import Keelung.Compiler.Constraint (cadd)
@@ -21,47 +23,47 @@ constant1 = do
   return $ 1 + 1
 
 identity :: Comp GF181 (Expr 'Num GF181)
-identity = Var <$> freshInput
+identity = Var <$> inputVar
 
 identityB :: Comp GF181 (Expr 'Bool GF181)
-identityB = Var <$> freshInput
+identityB = Var <$> inputVar
 
 add3 :: Comp GF181 (Expr 'Num GF181)
 add3 = do
-  x <- freshInput
+  x <- inputVar
   return $ Var x + 3
 
 -- takes an input and see if its equal to 3
 eq1 :: Comp GF181 (Expr 'Bool GF181)
 eq1 = do
-  x <- freshInput
+  x <- inputVar
   return $ Var x `Eq` 3
 
 cond :: Comp GF181 (Expr 'Num GF181)
 cond = do
-  x <- freshInput
+  x <- inputVar
   if Var x `Eq` 3
     then return 12
     else return 789
 
 loop1 :: Comp GF181 (Expr 'Num GF181)
 loop1 = do
-  arr <- freshInputs 4
+  arr <- inputArray 4
   reduce 0 [0 .. 3] $ \accum i -> do
     x <- access arr i
     return $ accum + Var x
 
 assert1 :: Comp GF181 (Expr 'Num GF181)
 assert1 = do
-  x <- freshInput
+  x <- inputVar
   assert (Var x `Eq` 3)
   return $ Var x
 
 loop2 :: Comp GF181 ()
 loop2 = do
-  arr <- freshInputs 2
-  arr2 <- freshInputs 2
-  arrayEq 2 arr (arr2 :: (Ref ('A ('V 'Num))))
+  arr <- inputArray 2
+  arr2 <- inputArray 2
+  assertArrayEqual 2 arr (arr2 :: (Ref ('A ('V 'Num))))
 
 make :: (GaloisField n, Integral n) => Int -> Int -> Param n
 make dim n = makeParam dim n 42 $ Settings True True True

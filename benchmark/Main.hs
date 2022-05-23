@@ -4,7 +4,7 @@ module Main where
 import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import Criterion.Main
-import Keelung.Compiler (Comp)
+import Keelung.Monad 
 import Benchmark.Keelung
 import Keelung.Field (GF181)
 
@@ -15,7 +15,7 @@ benchmarks param =
    in [ 
         bgroup
           "Elaboration"
-          [ bench "Keelung" $ nf benchElaborate' keelung
+          [ bench "Keelung" $ nf benchElaborate_ keelung
           ],
         bgroup
           "Interpretation"
@@ -58,7 +58,7 @@ keelungOnly setup =
   let keelung = AggSig.aggregateSignature setup
       input = genInputFromParam setup
    in [ 
-        bench "Elaboration" $ nf benchElaborate' keelung,
+        bench "Elaboration" $ nf benchElaborate_ keelung,
         bench "Rewriting" $ nf benchRewrite' keelung,
         -- bench "Interpretation" $ nf (benchInterpret keelung) input,
         bench "Type Erasure" $ nf benchEraseType keelung,
@@ -72,12 +72,12 @@ keelungOnly setup =
 complexityOfElaboration :: [Benchmark]
 complexityOfElaboration =
       [ 
-        bench "Elaboration" $ nf benchElaborate' (makeKeelung 8 4),
-        bench "Elaboration" $ nf benchElaborate' (makeKeelung 16 4),
-        bench "Elaboration" $ nf benchElaborate' (makeKeelung 32 4),
-        bench "Elaboration" $ nf benchElaborate' (makeKeelung 64 4),
-        bench "Elaboration" $ nf benchElaborate' (makeKeelung 128 4),
-        bench "Elaboration" $ nf benchElaborate' (makeKeelung 256 4)
+        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 8 4),
+        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 16 4),
+        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 32 4),
+        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 64 4),
+        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 128 4),
+        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 256 4)
       ]
 
   where 

@@ -36,17 +36,6 @@ packages:
   original:
     git: git@github.com:btq-ag/private-snarkl.git
     commit: babdfc7febf81fef99d72a3ecc1ea152f0e39dcb
-- completed:
-    name: keelung
-    version: 0.1.0.0
-    git: git@github.com:btq-ag/keelung.git
-    pantry-tree:
-      size: 807
-      sha256: 19c2d62ba950855222a182f3fb4410ea107eb06cc9690919f17d93a787598594
-    commit: 332a0880be7c64466e4e680a4bf79e9ecc89a7b7
-  original:
-    git: git@github.com:btq-ag/keelung.git
-    commit: 332a0880be7c64466e4e680a4bf79e9ecc89a7b7
 snapshots:
 - completed:
     size: 590100

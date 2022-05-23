@@ -5,15 +5,17 @@ module Keelung.Compiler.Optimise.Rewriting
   )
 where
 
-import Keelung.Compiler.Monad
-import Keelung.Compiler.Syntax
+import Keelung.Monad
+import Keelung.Syntax
 import Control.Monad
 import Control.Monad.State
+import Control.Arrow (left)
+
 
 --------------------------------------------------------------------------------
 
 run :: Elaborated ty n -> Either String (Elaborated ty n)
-run (Elaborated expr comp) = do
+run (Elaborated expr comp) = left show $ do
   ((), comp') <- runComp comp $ do 
     let assertions = compAssertions comp 
     assertions' <- filterM rewriteAssertEq assertions
@@ -33,7 +35,7 @@ rewriteAssertEq expr = case expr of
   Eq x y -> do 
     -- introduce a fresh variable 
     -- and assign both expressions to it
-    var <- freshVar
+    var <- allocVar
     let ref = Variable var 
     assign ref x 
     assign ref y
@@ -47,7 +49,7 @@ rewriteAssertEq expr = case expr of
   BEq x y -> do 
     -- introduce a fresh variable 
     -- and assign both expressions to it
-    var <- freshVar
+    var <- allocVar
     let ref = Variable var 
     assign ref x 
     assign ref y

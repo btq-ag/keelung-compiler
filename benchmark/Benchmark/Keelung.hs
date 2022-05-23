@@ -6,9 +6,11 @@
 module Benchmark.Keelung where
 
 import Keelung.Compiler
+import Keelung.Monad
+import Keelung.Syntax 
 import qualified Keelung.Compiler.Optimise.ConstantPropagation as ConstantPropagation
 
-benchElaborate :: (GaloisField n, Bounded n, Integral n) => Comp n (Expr ty n) -> Int
+benchElaborate :: (Elaborable ty, GaloisField n, Bounded n, Integral n) => Comp n (Expr ty n) -> Int
 benchElaborate prog =
   case elaborate prog of
     Left _ -> -1
@@ -33,9 +35,9 @@ benchElaborate prog =
           ToBool _ -> 12
           ToNum _ -> 13
 
-benchElaborate' :: (GaloisField n, Bounded n, Integral n) => Comp n () -> Int
-benchElaborate' prog =
-  case elaborate' prog of
+benchElaborate_ :: (GaloisField n, Bounded n, Integral n) => Comp n () -> Int
+benchElaborate_ prog =
+  case elaborate_ prog of
     Left _ -> -1
     Right elaborated -> case elabExpr elaborated of
       Nothing -> -2

@@ -5,9 +5,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Keelung.Compiler
-  ( module Keelung.Compiler.Monad,
-    module Keelung.Compiler.Syntax,
-    module Keelung.Compiler.Error,
+  ( module Keelung.Compiler.Error,
     GaloisField,
     Semiring (one, zero),
     module Prelude,
@@ -39,12 +37,12 @@ import Keelung.Compiler.Compile (compile)
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
 import Keelung.Compiler.Interpret
-import Keelung.Compiler.Monad
+import Keelung.Monad
 import Keelung.Compiler.Optimise
 import qualified Keelung.Compiler.Optimise.ConstantPropagation as ConstantPropagation
 import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting
 import Keelung.Compiler.R1CS
-import Keelung.Compiler.Syntax
+import Keelung.Syntax
 import Keelung.Compiler.Syntax.Untyped (Erase, TypeErased (..), eraseType)
 import Keelung.Compiler.Util (Witness)
 

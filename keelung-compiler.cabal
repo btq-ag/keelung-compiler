@@ -31,7 +31,6 @@ library
       Keelung.Compiler.Constraint.Polynomial
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Monad
       Keelung.Compiler.Optimise
       Keelung.Compiler.Optimise.ConstantPropagation
       Keelung.Compiler.Optimise.MinimiseConstraints
@@ -40,7 +39,6 @@ library
       Keelung.Compiler.Optimise.Rewriting
       Keelung.Compiler.Optimise.UnionFind
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Syntax
       Keelung.Compiler.Syntax.Typed
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
@@ -69,7 +67,6 @@ executable keelungc
       Keelung.Compiler.Constraint.Polynomial
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Monad
       Keelung.Compiler.Optimise
       Keelung.Compiler.Optimise.ConstantPropagation
       Keelung.Compiler.Optimise.MinimiseConstraints
@@ -78,7 +75,6 @@ executable keelungc
       Keelung.Compiler.Optimise.Rewriting
       Keelung.Compiler.Optimise.UnionFind
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Syntax
       Keelung.Compiler.Syntax.Typed
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
@@ -140,7 +136,6 @@ benchmark keelung-bench
       Keelung.Compiler.Constraint.Polynomial
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Monad
       Keelung.Compiler.Optimise
       Keelung.Compiler.Optimise.ConstantPropagation
       Keelung.Compiler.Optimise.MinimiseConstraints
@@ -149,7 +144,6 @@ benchmark keelung-bench
       Keelung.Compiler.Optimise.Rewriting
       Keelung.Compiler.Optimise.UnionFind
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Syntax
       Keelung.Compiler.Syntax.Typed
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util

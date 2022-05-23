@@ -9,6 +9,8 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung.Compiler
+import Keelung.Monad
+import Keelung.Syntax 
 import Keelung.Compiler.Constraint (Constraint (..), cadd)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
 import Keelung.Compiler.Interpret (InterpretError (..))

@@ -18,8 +18,8 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Sequence (Seq (..), (<|), (|>))
 import qualified Data.Sequence as Seq
-import qualified Keelung.Compiler.Monad as T
-import qualified Keelung.Compiler.Syntax as T
+import qualified Keelung.Monad as T
+import qualified Keelung.Syntax as T
 import Keelung.Syntax (Var)
 import Keelung.Field (N(..))
 

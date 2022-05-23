@@ -9,6 +9,8 @@ import AggregateSignature.Util
 import Control.Monad
 import Data.Array
 import Keelung.Compiler
+import Keelung.Syntax
+import Keelung.Monad
 
 --    let S be the signature and P be the public key
 --    let Q = q - P
@@ -38,9 +40,9 @@ checkAgg (Param dimension numOfSigs setup _) = do
   --    nT: coefficients of terms of signatures as input
   --    nT: remainders of product of signatures & public keys
   --    nT: quotients of product of signatures & public keys
-  sigs <- freshInputs2 numOfSigs dimension
-  expectedRemainders <- freshInputs2 numOfSigs dimension
-  expectedQuotients <- freshInputs2 numOfSigs dimension
+  sigs <- inputArray2 numOfSigs dimension
+  expectedRemainders <- inputArray2 numOfSigs dimension
+  expectedQuotients <- inputArray2 numOfSigs dimension
 
   -- pairs for iterating through public keys with indices
   let publicKeyPairs = zip [0 ..] (setupPublicKeys setup)
@@ -75,7 +77,7 @@ checkSize :: (GaloisField n, Integral n) => Param n -> Comp n ()
 checkSize (Param dimension numOfSigs setup _) = do
   let signatures = setupSignatures setup
 
-  sigBitStrings <- freshInputs3 numOfSigs dimension 14
+  sigBitStrings <- inputArray3 numOfSigs dimension 14
   forM_ [0 .. numOfSigs - 1] $ \i -> do
     let signature = signatures !! i
     forM_ [0 .. dimension - 1] $ \j -> do
@@ -100,10 +102,10 @@ checkSize (Param dimension numOfSigs setup _) = do
 
 checkLength :: (Integral n, GaloisField n) => Param n -> Comp n ()
 checkLength (Param dimension numOfSigs _ _) = do
-  sigs <- freshInputs2 numOfSigs dimension
+  sigs <- inputArray2 numOfSigs dimension
 
   -- expecting square of signatures as input
-  sigSquares <- freshInputs2 numOfSigs dimension
+  sigSquares <- inputArray2 numOfSigs dimension
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
@@ -113,19 +115,19 @@ checkLength (Param dimension numOfSigs _ _) = do
       assert (Var square `Eq` (Var sig * Var sig))
 
   -- expecting remainders of length of signatures as input
-  sigLengthRemainders <- freshInputs numOfSigs
+  sigLengthRemainders <- inputArray numOfSigs
   -- expecting quotients of length of signatures as input
-  sigLengthQuotients <- freshInputs numOfSigs
+  sigLengthQuotients <- inputArray numOfSigs
 
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
     actualLength <- reduce 0 [0 .. dimension - 1] $ \acc i -> do
-      square <- access2 sigSquares (t, i)
+      square <- access2 sigSquares (t, i) 
       return (acc + Var square)
 
-    remainder <- access sigLengthRemainders t
-    quotient <- access sigLengthQuotients t
+    remainder <- access sigLengthRemainders t 
+    quotient <- access sigLengthQuotients t 
 
     -- assert the relation between actualLength, remainder and quotient
     assert $ actualLength `Eq` (Var quotient * num q + Var remainder)

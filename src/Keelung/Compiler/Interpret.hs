@@ -13,9 +13,9 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung.Compiler.Monad (Assignment (..), Computation (..), Elaborated (..))
-import Keelung.Compiler.Syntax
-import Keelung.Syntax (Var)
+import Keelung.Monad (Assignment (..), Computation (..), Elaborated (..))
+import Keelung.Syntax
+import Keelung.Compiler.Syntax.Typed (freeVars)
 import Keelung.Field (N (..))
 
 --------------------------------------------------------------------------------

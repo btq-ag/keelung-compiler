@@ -9,12 +9,12 @@ import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.Monad
+import Keelung.Monad
 import qualified Keelung.Compiler.Optimise.MinimiseConstraints as MinimiseConstraints
 import qualified Keelung.Compiler.Optimise.MinimiseConstraints2 as MinimiseConstraints2
 import Keelung.Compiler.Optimise.Monad
 import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting
-import Keelung.Compiler.Syntax
+import Keelung.Syntax
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 

@@ -8,6 +8,9 @@ import Control.Monad
 import Control.Monad.Except
 import Keelung.Compiler
 import Keelung.Field (GF181)
+import Keelung.Monad 
+
+import qualified Keelung.Compiler.Syntax.Typed as Typed
 
 generateFlamegraph :: Bool
 generateFlamegraph = False
@@ -227,7 +230,7 @@ keelungElaborate = do
       Left err -> print err
       Right elaborated -> do
         print
-          ( sizeOfExpr <$> elabExpr elaborated,
+          ( Typed.sizeOfExpr <$> elabExpr elaborated,
             length (compNumAsgns (elabComp elaborated)),
             length (compBoolAsgns (elabComp elaborated)),
             compNextVar (elabComp elaborated)
