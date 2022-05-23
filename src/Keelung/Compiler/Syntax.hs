@@ -212,6 +212,10 @@ false = Val (Boolean False)
 neq :: Expr 'Num n -> Expr 'Num n -> Expr 'Bool n
 neq x y = IfThenElse (x `Eq` y) false true
 
+-- | Smart constructor for 'Unit'
+unit :: Expr 'Unit n
+unit = Val UnitVal
+
 --------------------------------------------------------------------------------
 
 fromBool :: GaloisField n => Expr 'Bool n -> Expr 'Num n

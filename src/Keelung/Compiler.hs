@@ -56,13 +56,13 @@ class Compilable n a where
   erase :: Comp n a -> Either String (TypeErased n)
   interpret :: Comp n a -> [n] -> Either (Error n) (Maybe n)
 
-instance (Erase ty, Num n, GaloisField n, Bounded n, Integral n) => Compilable n (Expr ty n) where
+instance (Erase ty, Num n, GaloisField n, Bounded n, Integral n, Elaborable ty) => Compilable n (Expr ty n) where
   erase prog = elaborate prog >>= Rewriting.run >>= return . eraseType
   interpret prog inputs = left OtherError (elaborate prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
 
 instance (Num n, GaloisField n, Bounded n, Integral n) => Compilable n () where
-  erase prog = elaborate' prog >>= Rewriting.run >>= return . eraseType
-  interpret prog inputs = left OtherError (elaborate' prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
+  erase prog = elaborate_ prog >>= Rewriting.run >>= return . eraseType
+  interpret prog inputs = left OtherError (elaborate_ prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
 comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either (Error n) (ConstraintSystem n)

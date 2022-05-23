@@ -5,8 +5,9 @@
 module Keelung.Compiler.Monad
   ( Comp,
     runComp,
-    elaborate,
-    elaborate',
+    Elaborable(..),
+    -- elaborate,
+    elaborate_,
     Computation (..),
     Elaborated (..),
     Assignment (..),
@@ -58,13 +59,27 @@ type Comp n = StateT (Computation n) (Except String)
 runComp :: Computation n -> Comp n a -> Either String (a, Computation n)
 runComp comp f = runExcept (runStateT f comp)
 
-elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
-elaborate prog = do
-  (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
-  return $ Elaborated (Just expr) comp'
+class Elaborable ty where
+  elaborate :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
 
-elaborate' :: Comp n () -> Either String (Elaborated 'Unit n)
-elaborate' prog = do
+instance Elaborable 'Num where 
+  elaborate prog = do
+    (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+    return $ Elaborated (Just expr) comp'
+
+instance Elaborable 'Bool where 
+  elaborate prog = do
+    (expr, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+    return $ Elaborated (Just expr) comp'
+
+instance Elaborable 'Unit where 
+  elaborate prog = do
+    (_, comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
+    return $ Elaborated Nothing comp'
+
+-- | An alternative to 'elaborate' that returns '()' instead of 'Expr'
+elaborate_ :: Comp n () -> Either String (Elaborated 'Unit n)
+elaborate_ prog = do
   ((), comp') <- runComp (Computation 0 0 mempty mempty mempty mempty mempty) prog
   return $ Elaborated Nothing comp'
 

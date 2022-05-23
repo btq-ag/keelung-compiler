@@ -20,11 +20,11 @@ import Keelung.Compiler.Util (Witness)
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
+elaborateAndRewrite :: Elaborable ty => Comp n (Expr ty n) -> Either String (Elaborated ty n)
 elaborateAndRewrite prog = elaborate prog >>= Rewriting.run
 
 elaborateAndRewrite' :: Comp n () -> Either String (Elaborated 'Unit n)
-elaborateAndRewrite' prog = elaborate' prog >>= Rewriting.run
+elaborateAndRewrite' prog = elaborate_ prog >>= Rewriting.run
 
 optimiseWithWitness :: (GaloisField n, Bounded n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimiseWithWitness witness cs =
