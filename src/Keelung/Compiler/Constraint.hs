@@ -64,7 +64,8 @@ instance (Ord n, Num n) => Ord (Constraint n) where
   compare CMul2 {} _ = GT
   -- compare CMul {} CAdd {} = GT
   -- compare CAdd {} CMul {} = LT
-  compare (CAdd xs) (CAdd ys) = compare xs ys
+  compare (CAdd xs) (CAdd ys) =
+    if xs == ys then EQ else compare xs ys
   -- compare (CMul (a, x) (b, y) (c, z)) (CMul (a', x') (b', y') (c', z')) =
   -- perform lexicographical comparison with tuples
   -- compare (x, y, z, a, b, c) (x', y', z', a', b', c')
