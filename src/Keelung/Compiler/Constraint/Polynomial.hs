@@ -17,7 +17,7 @@ module Keelung.Compiler.Constraint.Polynomial
     delete,
     merge,
     negate,
-    substitute
+    substitute,
   )
 where
 
@@ -25,19 +25,26 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import Data.Semiring (Semiring (..))
+import Keelung.Field (N (..))
 import Keelung.Syntax (Var)
 import Prelude hiding (negate)
 import qualified Prelude
-import Keelung.Field (N(..))
 
 -- A Poly is a polynomial of the form "c + c₀x₀ + c₁x₁ ... cₙxₙ = 0"
 --   Invariances:
 --      * The coefficients are non-zone
 --      * The degree of the polynomial is 1 (there's at least one variable)
 data Poly n = Poly !n !(IntMap n)
-  deriving (Eq)
 
-instance Ord n => Ord (Poly n) where
+-- 2 Poly's are the same, if they have the same coefficients and variables
+-- or one is the negation of the other
+instance (Eq n, Num n) => Eq (Poly n) where
+  (Poly c1 v1) == (Poly c2 v2) =
+    if c1 == c2 
+      then v1 == v2 || v1 == IntMap.map Prelude.negate v2
+      else (c1 == (- c2)) && (v1 == IntMap.map Prelude.negate v2)
+
+instance (Ord n, Num n) => Ord (Poly n) where
   compare (Poly c x) (Poly d y) =
     compare (IntMap.size x, x, c) (IntMap.size y, y, d)
 

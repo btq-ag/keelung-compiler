@@ -18,6 +18,12 @@ import Keelung.Field (GF181)
 
 --------------------------------------------------------------------------------
 
+assertToBe42 :: Comp GF181 (Expr 'Unit GF181)
+assertToBe42 = do
+  x <- inputVar
+  assert $ Var x `Eq` 42 
+  return unit
+
 constant1 :: Comp GF181 (Expr 'Num GF181)
 constant1 = do
   return $ 1 + 1

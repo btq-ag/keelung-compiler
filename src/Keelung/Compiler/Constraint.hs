@@ -13,7 +13,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
-import Keelung.Field ( N(..), GF181 )
+import Keelung.Field (GF181, N (..))
 import Keelung.Syntax (Var)
 
 --------------------------------------------------------------------------------
@@ -27,18 +27,20 @@ data Constraint n
   | CMul2 !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNQZ Var Var -- x & m
 
-
 instance (Eq n, Num n) => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
-    (CAdd x, CAdd y) -> x == y || Poly.negate x == y
+    (CAdd x, CAdd y) -> x == y
     (CMul2 x y z, CMul2 u v w) ->
-        ((x == u && y == v) || (x == v && y == u)) && z == w
+      ((x == u && y == v) || (x == v && y == u)) && z == w
     (CNQZ x y, CNQZ u v) -> x == u && y == v
     _ -> False
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> Constraint n
 cadd !c !xs = CAdd $ Poly.build c xs
+
+cmul :: GaloisField n => Var -> Var -> (n, [(Var, n)]) -> Constraint n
+cmul !x !y (c, zs) = CMul2 (Poly.singleton x 1) (Poly.singleton y 1) (Poly.buildEither c zs)
 
 instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
   show (CAdd xs) = "A " ++ show xs ++ " = 0"

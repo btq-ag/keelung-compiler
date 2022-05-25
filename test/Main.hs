@@ -9,16 +9,17 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung.Compiler
-import Keelung.Monad
-import Keelung.Syntax 
 import Keelung.Compiler.Constraint (Constraint (..), cadd)
+import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
 import Keelung.Compiler.Interpret (InterpretError (..))
 import qualified Keelung.Compiler.Optimise as Optimse
 import qualified Keelung.Compiler.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Compiler.Optimise.Monad as Optimise
-import Test.Hspec
 import Keelung.Field (GF181)
+import Keelung.Monad
+import Keelung.Syntax
+import Test.Hspec
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) (Maybe GF181)
 runKeelungAggSig dimension numberOfSignatures =
@@ -57,6 +58,25 @@ main = hspec $ do
           erased = erase (AggSig.aggregateSignature setup :: Comp GF181 ())
           result = IntSet.toList . erasedBooleanVars <$> erased
        in result `shouldBe` Right [3 .. 16]
+
+  describe "Poly" $ do
+    it "instance Eq 1" $ Poly.build 42 [(1, 1)] `shouldBe` (Poly.build 42 [(1, 1)] :: Poly GF181)
+    it "instance Eq 2" $ Poly.build 42 [(1, 1)] `shouldBe` (Poly.build (-42) [(1, -1)] :: Poly GF181)
+
+  describe "Constraint Generation" $ do
+    it "assertToBe42" $
+      let cs =
+            ConstraintSystem
+              { csConstraints =
+                  Set.fromList
+                    [ cadd (-42) [(0, 1)]
+                    ],
+                csBooleanInputVarConstraints = mempty,
+                csVars = IntSet.fromList [0],
+                csInputVars = IntSet.fromList [0],
+                csOutputVar = Nothing
+              }
+       in optm Basic.assertToBe42 `shouldBe` Right cs
 
   describe "Compilation" $ do
     it "identity (Num)" $
