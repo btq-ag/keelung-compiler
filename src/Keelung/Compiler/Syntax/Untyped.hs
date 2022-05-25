@@ -18,10 +18,10 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Sequence (Seq (..), (<|), (|>))
 import qualified Data.Sequence as Seq
+import Keelung.Field (N (..))
 import qualified Keelung.Monad as T
-import qualified Keelung.Syntax as T
 import Keelung.Syntax (Var)
-import Keelung.Field (N(..))
+import qualified Keelung.Syntax as T
 
 --------------------------------------------------------------------------------
 
@@ -165,7 +165,7 @@ eraseType :: (Erase ty, Num n) => T.Elaborated ty n -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions = comp
       ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
-        expr' <- mapM eraseExpr expr
+        expr' <- join <$> mapM eraseExprM expr
         numAssignments' <- mapM eraseAssignment numAsgns
         boolAssignments' <- mapM eraseAssignment boolAsgns
         let assignments = numAssignments' <> boolAssignments'
@@ -183,6 +183,7 @@ eraseType (T.Elaborated expr comp) =
 -- for stealing type info in runtime from the typeclass dictionary
 class Erase ty where
   eraseExpr :: Num n => T.Expr ty n -> M (Expr n)
+  eraseExprM :: Num n => T.Expr ty n -> M (Maybe (Expr n))
   eraseAssignment :: Num n => T.Assignment ty n -> M (Assignment n)
 
 instance Erase 'T.Unit where
@@ -190,6 +191,10 @@ instance Erase 'T.Unit where
     T.Val val -> case val of T.UnitVal -> return (Val 0)
     T.Var (T.Variable var) -> return (Var var)
     T.IfThenElse b x y -> IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
+  eraseExprM expr = case expr of
+    T.Val val -> case val of T.UnitVal -> return Nothing
+    T.Var (T.Variable var) -> return (Just (Var var))
+    T.IfThenElse b x y -> Just <$> (IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y)
   eraseAssignment (T.Assignment (T.Variable var) expr) = Assignment var <$> eraseExpr expr
 
 instance Erase 'T.Num where
@@ -203,6 +208,16 @@ instance Erase 'T.Num where
     T.Div x y -> chainExprs Div <$> eraseExpr x <*> eraseExpr y
     T.IfThenElse b x y -> IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
     T.ToNum x -> eraseExpr x
+  eraseExprM expr = case expr of
+    T.Val val -> case val of
+      (T.Number n) -> return (Just (Val n))
+    T.Var (T.Variable var) -> return (Just (Var var))
+    T.Add x y -> Just <$> (chainExprs Add <$> eraseExpr x <*> eraseExpr y)
+    T.Sub x y -> Just <$> (chainExprs Sub <$> eraseExpr x <*> eraseExpr y)
+    T.Mul x y -> Just <$> (chainExprs Mul <$> eraseExpr x <*> eraseExpr y)
+    T.Div x y -> Just <$> (chainExprs Div <$> eraseExpr x <*> eraseExpr y)
+    T.IfThenElse b x y -> Just <$> (IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y)
+    T.ToNum x -> eraseExprM x
   eraseAssignment (T.Assignment (T.Variable var) expr) = Assignment var <$> eraseExpr expr
 
 instance Erase 'T.Bool where
@@ -220,6 +235,20 @@ instance Erase 'T.Bool where
     T.BEq x y -> chainExprs BEq <$> eraseExpr x <*> eraseExpr y
     T.IfThenElse b x y -> IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
     T.ToBool x -> eraseExpr x
+  eraseExprM expr = case expr of
+    T.Val val -> case val of
+      (T.Boolean True) -> return (Just (Val 1))
+      (T.Boolean False) -> return (Just (Val 0))
+    T.Var (T.Variable var) -> do
+      modify' $ \st -> IntSet.insert var st
+      return (Just (Var var))
+    T.Eq x y -> Just <$> (chainExprs Eq <$> eraseExpr x <*> eraseExpr y)
+    T.And x y -> Just <$> (chainExprs And <$> eraseExpr x <*> eraseExpr y)
+    T.Or x y -> Just <$> (chainExprs Or <$> eraseExpr x <*> eraseExpr y)
+    T.Xor x y -> Just <$> (chainExprs Xor <$> eraseExpr x <*> eraseExpr y)
+    T.BEq x y -> Just <$> (chainExprs BEq <$> eraseExpr x <*> eraseExpr y)
+    T.IfThenElse b x y -> Just <$> (IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y)
+    T.ToBool x -> eraseExprM x
   eraseAssignment (T.Assignment (T.Variable var) expr) = do
     modify' $ \st -> IntSet.insert var st
     Assignment var <$> eraseExpr expr
