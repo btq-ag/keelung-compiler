@@ -50,6 +50,8 @@ library
   build-depends:
       array
     , base >=4.7 && <5
+    , bytestring
+    , cereal
     , containers
     , galois-field
     , keelung
@@ -92,6 +94,8 @@ executable keelungc
   build-depends:
       array
     , base >=4.7 && <5
+    , bytestring
+    , cereal
     , containers
     , galois-field
     , keelung
@@ -118,6 +122,8 @@ test-suite keelung-test
   build-depends:
       array
     , base >=4.7 && <5
+    , bytestring
+    , cereal
     , containers
     , galois-field
     , hspec
@@ -164,6 +170,8 @@ benchmark keelung-bench
   build-depends:
       array
     , base >=4.7 && <5
+    , bytestring
+    , cereal
     , containers
     , criterion >=1.0
     , galois-field

@@ -6,17 +6,22 @@ import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import Control.Monad
 import Control.Monad.Except
+import qualified Data.ByteString as BS
+import Data.Serialize (decode)
 import Keelung.Compiler
 import qualified Keelung.Compiler.Syntax.Typed as Typed
 import Keelung.Field (GF181)
 import Keelung.Monad
 import Option
+import Keelung.Syntax (ValKind(Unit))
 
 main :: IO ()
 main = do
   options <- getOptions
   case options of
-    Compile (CompileOptions filepath) -> putStrLn $ "Compile " ++ filepath
+    Compile (CompileOptions filepath) -> do
+      blob <- BS.readFile filepath
+      print $ optmElab (decode blob :: Either String (Elaborated 'Unit GF181))
     Profile dimension numOfSigs -> profile dimension numOfSigs
     Count dimension numOfSigs -> do
       putStrLn $ show dimension ++ ":" ++ show numOfSigs

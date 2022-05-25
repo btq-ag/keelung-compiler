@@ -18,6 +18,7 @@ module Keelung.Compiler
     module Keelung.Compiler.R1CS,
     module Keelung.Compiler.Optimise,
     Compilable (..),
+    optmElab,
     comp,
     optm2,
     optm,
@@ -61,6 +62,13 @@ instance (Erase ty, Num n, GaloisField n, Bounded n, Integral n, Elaborable ty) 
 instance (Num n, GaloisField n, Bounded n, Integral n) => Compilable n () where
   erase prog = elaborate_ prog >>= Rewriting.run >>= return . eraseType
   interpret prog inputs = left OtherError (elaborate_ prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
+
+
+optmElab :: (GaloisField n, Bounded n, Integral n, Erase ty) => Either String (Elaborated ty n) -> Either (Error n) (ConstraintSystem n)
+optmElab (Left err) = Left (OtherError err)
+optmElab (Right elab) = do 
+  rewritten <- left OtherError (Rewriting.run elab)
+  return $ optimise $ compile $ ConstantPropagation.run $ eraseType rewritten
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
 comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either (Error n) (ConstraintSystem n)
