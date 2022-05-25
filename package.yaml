@@ -28,6 +28,7 @@ dependencies:
 - galois-field
 - random
 - keelung 
+- optparse-applicative
 
 library:
   source-dirs: src

@@ -54,6 +54,7 @@ library
     , galois-field
     , keelung
     , mtl
+    , optparse-applicative
     , random
     , semirings
   default-language: Haskell2010
@@ -61,6 +62,7 @@ library
 executable keelungc
   main-is: Main.hs
   other-modules:
+      Option
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
@@ -95,6 +97,7 @@ executable keelungc
     , keelung
     , keelung-compiler
     , mtl
+    , optparse-applicative
     , random
     , semirings
     , snarkl
@@ -121,6 +124,7 @@ test-suite keelung-test
     , keelung
     , keelung-compiler
     , mtl
+    , optparse-applicative
     , random
     , semirings
     , snarkl
@@ -166,6 +170,7 @@ benchmark keelung-bench
     , keelung
     , keelung-compiler
     , mtl
+    , optparse-applicative
     , random
     , semirings
     , snarkl

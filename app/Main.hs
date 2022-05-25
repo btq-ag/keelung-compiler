@@ -7,43 +7,22 @@ import AggregateSignature.Util
 import Control.Monad
 import Control.Monad.Except
 import Keelung.Compiler
-import Keelung.Field (GF181)
-import Keelung.Monad 
-
 import qualified Keelung.Compiler.Syntax.Typed as Typed
-
-generateFlamegraph :: Bool
-generateFlamegraph = False
+import Keelung.Field (GF181)
+import Keelung.Monad
+import Option
 
 main :: IO ()
 main = do
-  if generateFlamegraph
-    then do
-      let dimension = 1
-      let numOfSigs = 1
-      keelung dimension numOfSigs
-    else do
-      let parameters =
-            [ -- (512, 16)
-              -- ,
-              -- , (1, 2)
-              -- , (1, 4)
-              -- (1, 1),
-              -- (10, 1),
-              -- (1, 10),
-              -- (10, 10),
-              (512, 1),
-              (512, 2),
-              (512, 4),
-              (512, 8)
-            ]
-
-      forM_ parameters $ \(dimension, numOfSigs) -> do
-        putStrLn $ show dimension ++ ":" ++ show numOfSigs
-        -- snarklConstraints dimension numOfSigs
-        -- keelung dimension numOfSigs
-
-        keelungConstraints dimension numOfSigs
+  options <- getOptions
+  case options of
+    Compile (CompileOptions filepath) -> putStrLn $ "Compile " ++ filepath
+    Profile dimension numOfSigs -> profile dimension numOfSigs
+    Count dimension numOfSigs -> do
+      putStrLn $ show dimension ++ ":" ++ show numOfSigs
+      -- snarklConstraints dimension numOfSigs
+      -- keelung dimension numOfSigs
+      keelungConstraints dimension numOfSigs
 
 run :: (Show n, Bounded n, Integral n, Fractional n) => ExceptT (Error n) IO () -> IO ()
 run f = do
@@ -54,8 +33,8 @@ run f = do
 
 --------------------------------------------------------------------------------
 
-keelung :: Int -> Int -> IO ()
-keelung dimension numOfSigs = run $ do
+profile :: Int -> Int -> IO ()
+profile dimension numOfSigs = run $ do
   let settings =
         Settings
           { enableAggChecking = True,
