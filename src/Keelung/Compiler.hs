@@ -9,7 +9,6 @@ module Keelung.Compiler
     GaloisField,
     Semiring (one, zero),
     module Prelude,
-    compile,
     ConstraintSystem (..),
     numberOfConstraints,
     Erase,
@@ -34,7 +33,7 @@ import Control.Monad (when)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (one, zero))
-import Keelung.Compiler.Compile (compile)
+import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
 import Keelung.Compiler.Interpret
@@ -68,11 +67,11 @@ optmElab :: (GaloisField n, Bounded n, Integral n, Erase ty) => Either String (E
 optmElab (Left err) = Left (OtherError err)
 optmElab (Right elab) = do 
   rewritten <- left OtherError (Rewriting.run elab)
-  return $ optimise $ compile $ ConstantPropagation.run $ eraseType rewritten
+  return $ optimise $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
 comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either (Error n) (ConstraintSystem n)
-comp prog = left OtherError (erase prog) >>= return . compile . ConstantPropagation.run
+comp prog = left OtherError (erase prog) >>= return . Compile.run . ConstantPropagation.run
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
 optm ::

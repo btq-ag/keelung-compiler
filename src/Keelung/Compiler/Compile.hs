@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compiler.Compile (compile) where
+module Keelung.Compiler.Compile (run) where
 
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
@@ -215,8 +215,8 @@ encodeAssertion expr = do
   add $ cadd 1 [(out, -1)] -- 1 = expr
 
 -- | Compile an untyped expression to a constraint system
-compile :: (GaloisField n, Bounded n, Integral n) => TypeErased n -> ConstraintSystem n
-compile (TypeErased untypedExpr assertions assignments numOfVars inputVars booleanVars) = runM numOfVars $ do
+run :: (GaloisField n, Bounded n, Integral n) => TypeErased n -> ConstraintSystem n
+run (TypeErased untypedExpr assertions assignments numOfVars inputVars booleanVars) = runM numOfVars $ do
   -- Compile `untypedExpr'` to constraints with output wire 'outputVar'.
   outputVar <- case untypedExpr of
     Nothing -> return Nothing

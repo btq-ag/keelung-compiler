@@ -12,8 +12,8 @@ import Keelung.Compiler
 import qualified Keelung.Compiler.Syntax.Typed as Typed
 import Keelung.Field (GF181)
 import Keelung.Monad
+import Keelung.Syntax (ValKind (Unit))
 import Option
-import Keelung.Syntax (ValKind(Unit))
 
 main :: IO ()
 main = do
@@ -21,6 +21,9 @@ main = do
   case options of
     Compile (CompileOptions filepath) -> do
       blob <- BS.readFile filepath
+      print $ optmElab (decode blob :: Either String (Elaborated 'Unit GF181))
+    Stream -> do
+      blob <- BS.getContents
       print $ optmElab (decode blob :: Either String (Elaborated 'Unit GF181))
     Profile dimension numOfSigs -> profile dimension numOfSigs
     Count dimension numOfSigs -> do

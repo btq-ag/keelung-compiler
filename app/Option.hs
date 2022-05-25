@@ -14,6 +14,7 @@ getOptions =
 
 data Options
   = Compile CompileOptions
+  | Stream
   | Profile Int Int
   | Count Int Int
   deriving (Show)
@@ -21,6 +22,7 @@ data Options
 options :: Parser Options
 options =
   parseCompile
+    <|> parseStream
     <|> parseProfile
     <|> parseCount
 
@@ -38,8 +40,8 @@ parseCompile =
           ( info
               (compile <**> helper)
               ( fullDesc
-                  <> progDesc "Compile a Keelung program"
-                  -- <> header "hello - a test for optparse-applicative"
+                  <> progDesc "Compile a elaborated .keel file"
+                  --   <> header "hello - a test for optparse-applicative"
               )
           )
       )
@@ -48,10 +50,28 @@ compile :: Parser CompileOptions
 compile =
   CompileOptions
     <$> argument
-      str
+      auto
       ( metavar "SOURCE"
           <> help "Source Keelung program to compile"
       )
+
+--------------------------------------------------------------------------------
+
+stream :: Parser Options
+stream = pure Stream
+
+parseStream :: Parser Options
+parseStream =
+  subparser
+    ( command
+        "stream"
+        ( info
+            (stream <**> helper)
+            ( fullDesc
+                <> progDesc "DEV: profiling"
+            )
+        )
+    )
 
 --------------------------------------------------------------------------------
 
