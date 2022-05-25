@@ -14,8 +14,8 @@ import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
 import Keelung.Compiler.Optimise (optimiseWithWitness)
 import Keelung.Compiler.Util
+import Keelung.Field (N (..))
 import Keelung.Syntax (Var)
-import Keelung.Field (N(..))
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -70,11 +70,14 @@ data R1C n = R1C (Either n (Poly n)) (Either n (Poly n)) (Either n (Poly n))
 
 instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1C n) where
   show (R1C aX bX cX) = case (aX, bX, cX) of
-    (Left 0, _, _) -> "0 = " ++ show cX
-    (_, Left 0, _) -> "0 = " ++ show cX
-    (Left 1, _, _) -> show bX ++ " = " ++ show cX
-    (_, Left 1, _) -> show aX ++ " = " ++ show cX
-    (_, _, _) -> show aX ++ " * " ++ show bX ++ " = " ++ show cX
+    (Left 0, _, _) -> "0 = " ++ showVec cX
+    (_, Left 0, _) -> "0 = " ++ showVec cX
+    (Left 1, _, _) -> showVec bX ++ " = " ++ showVec cX
+    (_, Left 1, _) -> showVec aX ++ " = " ++ showVec cX
+    (_, _, _) -> showVec aX ++ " * " ++ showVec bX ++ " = " ++ showVec cX
+    where
+      showVec (Left c) = show (N c)
+      showVec (Right xs) = show xs
 
 satisfyR1C :: GaloisField a => Witness a -> R1C a -> Bool
 satisfyR1C witness constraint
