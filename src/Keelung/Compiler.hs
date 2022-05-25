@@ -18,6 +18,7 @@ module Keelung.Compiler
     module Keelung.Compiler.Optimise,
     Compilable (..),
     optmElab,
+    convElab,
     comp,
     optm2,
     optm,
@@ -68,6 +69,9 @@ optmElab (Left err) = Left (OtherError err)
 optmElab (Right elab) = do 
   rewritten <- left OtherError (Rewriting.run elab)
   return $ optimise $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
+
+convElab :: (GaloisField n, Bounded n, Integral n, Erase ty) => Either String (Elaborated ty n) -> Either (Error n) (R1CS n)
+convElab xs = toR1CS <$> optmElab xs
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
 comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either (Error n) (ConstraintSystem n)

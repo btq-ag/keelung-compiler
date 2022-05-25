@@ -22,9 +22,12 @@ main = do
     Compile (CompileOptions filepath) -> do
       blob <- BS.readFile filepath
       print $ optmElab (decode blob :: Either String (Elaborated 'Unit GF181))
-    Stream -> do
+    ToCS -> do
       blob <- BS.getContents
       print $ optmElab (decode blob :: Either String (Elaborated 'Unit GF181))
+    ToR1CS -> do
+      blob <- BS.getContents
+      print $ convElab (decode blob :: Either String (Elaborated 'Unit GF181))
     Profile dimension numOfSigs -> profile dimension numOfSigs
     Count dimension numOfSigs -> do
       putStrLn $ show dimension ++ ":" ++ show numOfSigs

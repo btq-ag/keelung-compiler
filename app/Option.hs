@@ -14,7 +14,8 @@ getOptions =
 
 data Options
   = Compile CompileOptions
-  | Stream
+  | ToCS
+  | ToR1CS
   | Profile Int Int
   | Count Int Int
   deriving (Show)
@@ -22,7 +23,8 @@ data Options
 options :: Parser Options
 options =
   parseCompile
-    <|> parseStream
+    <|> parseToCS
+    <|> parseToR1CS
     <|> parseProfile
     <|> parseCount
 
@@ -57,18 +59,36 @@ compile =
 
 --------------------------------------------------------------------------------
 
-stream :: Parser Options
-stream = pure Stream
+toCS :: Parser Options
+toCS = pure ToCS
 
-parseStream :: Parser Options
-parseStream =
+parseToCS :: Parser Options
+parseToCS =
   subparser
     ( command
-        "stream"
+        "toCS"
         ( info
-            (stream <**> helper)
+            (toCS <**> helper)
             ( fullDesc
-                <> progDesc "DEV: profiling"
+                <> progDesc "Compile a Keelung program to ConstraintSystem"
+            )
+        )
+    )
+
+--------------------------------------------------------------------------------
+
+toR1CS :: Parser Options
+toR1CS = pure ToR1CS
+
+parseToR1CS :: Parser Options
+parseToR1CS =
+  subparser
+    ( command
+        "toR1CS"
+        ( info
+            (toR1CS <**> helper)
+            ( fullDesc
+                <> progDesc "Compile a Keelung program to R1CS"
             )
         )
     )
