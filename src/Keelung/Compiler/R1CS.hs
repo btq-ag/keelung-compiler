@@ -103,9 +103,9 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
   show (R1CS cs n ivs ovs _) =
     "R1CS {\n\
     \  R1C clauses ("
-      ++ show numberOfClauses
-      ++ ")"
-      ++ showClauses
+      <> show numberOfClauses
+      <> ")"
+      <> showClauses
       ++ "\n  number of variables: "
       ++ show n
       ++ "\n"
@@ -118,10 +118,11 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
       ++ "}"
     where
       numberOfClauses = length cs
-      showClauses =
-        if numberOfClauses > 30
-          then "\n"
-          else ":\n" ++ List.intercalate "\n" (map (\s -> "    " ++ show s) cs)
+      showClauses = ":\n" ++ List.intercalate "\n" (map (\s -> "    " ++ show s) cs)
+
+-- if numberOfClauses > 30
+--   then "\n"
+--   else ":\n" ++ List.intercalate "\n" (map (\s -> "    " ++ show s) cs)
 
 -- `Nothing` if all constraints are satisfiable
 -- `Just [R1C]` if at least one constraint is unsatisfiable

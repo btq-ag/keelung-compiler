@@ -109,14 +109,14 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
     \  constraints ("
       <> show (length constraints)
       <> ")"
-      <> ( if Set.size constraints < 30
+      <> ( if True -- Set.size constraints < 30
              then ":\n  \n" <> printConstraints (toList constraints) <> "\n"
              else "\n"
          )
       <> "  boolean constraints ("
       <> show (length boolConstraints)
       <> ")"
-      <> ( if length boolConstraints < 20
+      <> ( if True
              then ":\n  \n" <> printConstraints boolConstraints <> "\n"
              else "\n"
          )
