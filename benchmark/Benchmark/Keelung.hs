@@ -7,10 +7,11 @@ module Benchmark.Keelung where
 
 import Keelung.Compiler
 import Keelung.Monad
+import Keelung (elaborate, elaborate_)
 import Keelung.Syntax 
 import qualified Keelung.Compiler.Optimise.ConstantPropagation as ConstantPropagation
 
-benchElaborate :: (Elaborable ty, GaloisField n, Bounded n, Integral n) => Comp n (Expr ty n) -> Int
+benchElaborate :: (GaloisField n, Bounded n, Integral n) => Comp n (Expr ty n) -> Int
 benchElaborate prog =
   case elaborate prog of
     Left _ -> -1

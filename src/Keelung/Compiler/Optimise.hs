@@ -15,12 +15,13 @@ import qualified Keelung.Compiler.Optimise.MinimiseConstraints2 as MinimiseConst
 import Keelung.Compiler.Optimise.Monad
 import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting
 import Keelung.Syntax
+import Keelung (elaborate)
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: Elaborable ty => Comp n (Expr ty n) -> Either String (Elaborated ty n)
+elaborateAndRewrite :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
 elaborateAndRewrite prog = elaborate prog >>= Rewriting.run
 
 elaborateAndRewrite' :: Comp n () -> Either String (Elaborated 'Unit n)

@@ -46,6 +46,7 @@ import Keelung.Compiler.R1CS
 import Keelung.Syntax
 import Keelung.Compiler.Syntax.Untyped (Erase, TypeErased (..), eraseType)
 import Keelung.Compiler.Util (Witness)
+import Keelung (elaborate)
 
 --------------------------------------------------------------------------------
 -- Some top-level functions
@@ -55,7 +56,7 @@ class Compilable n a where
   erase :: Comp n a -> Either String (TypeErased n)
   interpret :: Comp n a -> [n] -> Either (Error n) (Maybe n)
 
-instance (Erase ty, Num n, GaloisField n, Bounded n, Integral n, Elaborable ty) => Compilable n (Expr ty n) where
+instance (Erase ty, Num n, GaloisField n, Bounded n, Integral n) => Compilable n (Expr ty n) where
   erase prog = elaborate prog >>= Rewriting.run >>= return . eraseType
   interpret prog inputs = left OtherError (elaborate prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
 
