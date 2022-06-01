@@ -9,12 +9,12 @@ import Control.Monad.Except
 import qualified Data.ByteString as BS
 import Data.Serialize (decode)
 import Keelung.Compiler
-import qualified Keelung.Compiler.Syntax.Typed as Typed
 import Keelung.Field (GF181)
-import Keelung.Monad
-import Keelung.Syntax (ValKind (Unit))
+-- import Keelung.Monad
+import Keelung.Syntax.Unkinded
 import Option
-import Keelung (elaborate)
+import Keelung (elaborateAndFlatten)
+import qualified Keelung.Syntax.Unkinded as U
 
 main :: IO ()
 main = do
@@ -22,13 +22,13 @@ main = do
   case options of
     Compile (CompileOptions filepath) -> do
       blob <- BS.readFile filepath
-      print $ optmElab (decode blob :: Either String (Elaborated 'Unit GF181))
+      print $ optmElab (decode blob :: Either String (Elaborated GF181))
     ToCS -> do
       blob <- BS.getContents
-      print $ optmElab (decode blob :: Either String (Elaborated 'Unit GF181))
+      print $ optmElab (decode blob :: Either String (Elaborated GF181))
     ToR1CS -> do
       blob <- BS.getContents
-      print $ convElab (decode blob :: Either String (Elaborated 'Unit GF181))
+      print $ convElab (decode blob :: Either String (Elaborated GF181))
     Profile dimension numOfSigs -> profile dimension numOfSigs
     Count dimension numOfSigs -> do
       putStrLn $ show dimension ++ ":" ++ show numOfSigs
@@ -216,12 +216,12 @@ keelungElaborate = do
     let numOfSigs = 4
     let param = makeParam dimension numOfSigs 42 settings :: Param GF181
 
-    let result = elaborate (AggSig.aggregateSignature param)
+    let result = elaborateAndFlatten (AggSig.aggregateSignature param)
     case result of
       Left err -> print err
       Right elaborated -> do
         print
-          ( Typed.sizeOfExpr <$> elabExpr elaborated,
+          ( U.sizeOfExpr <$> U.elabExpr elaborated,
             length (compNumAsgns (elabComp elaborated)),
             length (compBoolAsgns (elabComp elaborated)),
             compNextVar (elabComp elaborated)

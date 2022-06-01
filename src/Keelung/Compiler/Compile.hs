@@ -16,9 +16,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
-import Keelung.Syntax (Var)
-
 import Keelung.Compiler.Syntax.Untyped
+import Keelung.Syntax (Var)
 
 ----------------------------------------------------------------
 
@@ -188,7 +187,7 @@ encodeBinaryOp op out x y = case op of
     -- notOut = 1 - out
     notOut <- freshVar
     encode notOut (1 - Var out)
-    add $ CMul2 (Poly.singleton diff 1) (Poly.singleton notOut 1) (Left 0) 
+    add $ CMul2 (Poly.singleton diff 1) (Poly.singleton notOut 1) (Left 0)
   Eq -> do
     -- Constraint 'x == y = out'.
     -- The encoding is: out = 1 - (x-y != 0).

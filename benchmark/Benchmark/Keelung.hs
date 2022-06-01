@@ -19,26 +19,26 @@ benchElaborate = encode . elaborateAndFlatten
 benchRewrite :: (GaloisField n, Bounded n, Integral n, Serialize n, Typeable kind) => Comp n (Expr kind n) -> ByteString
 benchRewrite = encode . elaborateAndRewrite
   
-benchInterpret :: (GaloisField n, Show n, Bounded n, Integral n, Fractional n, Erase kind) => Comp n (Expr kind n) -> [n] -> String
+benchInterpret :: (GaloisField n, Show n, Bounded n, Integral n, Fractional n, Typeable kind) => Comp n (Expr kind n) -> [n] -> String
 benchInterpret prog input =
   show $ interpret prog input
 
-benchEraseType :: (GaloisField n, Num n, Show n, Bounded n, Integral n, Fractional n, Erase kind) => Comp n (Expr kind n) -> String
+benchEraseType :: (GaloisField n, Num n, Show n, Bounded n, Integral n, Fractional n, Typeable kind) => Comp n (Expr kind n) -> String
 benchEraseType prog = show $ erase prog
 
-benchPropogateConstant :: (GaloisField n, Bounded n, Integral n, Erase kind) => Comp n (Expr kind n) -> String
+benchPropogateConstant :: (GaloisField n, Bounded n, Integral n, Typeable kind) => Comp n (Expr kind n) -> String
 benchPropogateConstant prog = show $ erase prog >>= return . ConstantPropagation.run
 
-benchCompile :: (GaloisField n, Bounded n, Integral n, Show n, Erase kind) => Comp n (Expr kind n) -> String
+benchCompile :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> String
 benchCompile prog = show $ comp prog
 
-benchOptimise :: (GaloisField n, Bounded n, Integral n, Show n, Erase kind) => Comp n (Expr kind n) -> String
+benchOptimise :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> String
 benchOptimise prog = show $ optm prog
 
-benchOptimise2 :: (GaloisField n, Bounded n, Integral n, Show n, Erase kind) => Comp n (Expr kind n) -> String
+benchOptimise2 :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> String
 benchOptimise2 prog = show $ optm2 prog
 
-benchOptimiseWithInput :: (GaloisField n, Bounded n, Integral n, Show n, Erase kind) => Comp n (Expr kind n) -> [n] -> String
+benchOptimiseWithInput :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> [n] -> String
 benchOptimiseWithInput prog input = show $ optmWithInput prog input
 
 -- -- This function "executes" the comp two ways, once by interpreting

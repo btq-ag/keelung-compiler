@@ -31,7 +31,7 @@ runKeelungAggSig dimension numberOfSignatures =
           }
       param = makeParam dimension numberOfSignatures 42 settings :: Param GF181
    in execute
-        (AggSig.aggregateSignature param :: Comp GF181 ())
+        (AggSig.aggregateSignature param :: Comp GF181 (Expr 'Unit GF181))
         (genInputFromParam param)
 
 main :: IO ()
@@ -55,7 +55,7 @@ main = hspec $ do
                 enableLengthChecking = True
               }
           setup = makeParam 1 1 42 settings :: Param GF181
-          erased = erase (AggSig.aggregateSignature setup :: Comp GF181 ())
+          erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Expr 'Unit GF181))
           result = IntSet.toList . erasedBooleanVars <$> erased
        in result `shouldBe` Right [3 .. 16]
 

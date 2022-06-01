@@ -15,6 +15,7 @@ import qualified Data.Set as Set
 import qualified Data.IntSet as IntSet
 import Keelung.Compiler.Constraint (cadd)
 import Keelung.Field (GF181)
+import Data.Typeable (Typeable)
 
 --------------------------------------------------------------------------------
 
@@ -100,7 +101,7 @@ checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 
 --------------------------------------------------------------------------------
 
-bench :: Erase kind => Comp GF181 (Expr kind GF181) -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
+bench :: Typeable kind => Comp GF181 (Expr kind GF181) -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
 bench program settings dimension n = do
   let input = genInputFromParam (makeParam dimension n 42 settings)
   cs <- comp program -- before optimisation (only constant propagation)
