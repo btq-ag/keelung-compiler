@@ -6,7 +6,7 @@ import AggregateSignature.Util
 import Criterion.Main
 import Keelung.Monad 
 import Benchmark.Keelung
-import Keelung.Field (GF181)
+import Keelung
 
 benchmarks :: Param GF181 -> [Benchmark]
 benchmarks param =
@@ -15,7 +15,7 @@ benchmarks param =
    in [ 
         bgroup
           "Elaboration"
-          [ bench "Keelung" $ nf benchElaborate_ keelung
+          [ bench "Keelung" $ nf benchElaborate keelung
           ],
         bgroup
           "Interpretation"
@@ -58,8 +58,8 @@ keelungOnly setup =
   let keelung = AggSig.aggregateSignature setup
       input = genInputFromParam setup
    in [ 
-        bench "Elaboration" $ nf benchElaborate_ keelung,
-        bench "Rewriting" $ nf benchRewrite' keelung,
+        bench "Elaboration" $ nf benchElaborate keelung,
+        bench "Rewriting" $ nf benchRewrite keelung,
         -- bench "Interpretation" $ nf (benchInterpret keelung) input,
         bench "Type Erasure" $ nf benchEraseType keelung,
         bench "Constant Propagation" $ nf benchPropogateConstant keelung,
@@ -72,16 +72,16 @@ keelungOnly setup =
 complexityOfElaboration :: [Benchmark]
 complexityOfElaboration =
       [ 
-        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 8 4),
-        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 16 4),
-        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 32 4),
-        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 64 4),
-        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 128 4),
-        bench "Elaboration" $ nf benchElaborate_ (makeKeelung 256 4)
+        bench "Elaboration" $ nf benchElaborate (makeKeelung 8 4),
+        bench "Elaboration" $ nf benchElaborate (makeKeelung 16 4),
+        bench "Elaboration" $ nf benchElaborate (makeKeelung 32 4),
+        bench "Elaboration" $ nf benchElaborate (makeKeelung 64 4),
+        bench "Elaboration" $ nf benchElaborate (makeKeelung 128 4),
+        bench "Elaboration" $ nf benchElaborate (makeKeelung 256 4)
       ]
 
   where 
-    makeKeelung :: Int -> Int -> Comp GF181 ()
+    makeKeelung :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
     makeKeelung dimension numberOfSignatures = 
       let settings =
             Settings

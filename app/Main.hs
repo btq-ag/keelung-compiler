@@ -14,6 +14,7 @@ import Keelung.Field (GF181)
 import Keelung.Monad
 import Keelung.Syntax (ValKind (Unit))
 import Option
+import Keelung (elaborate)
 
 main :: IO ()
 main = do
@@ -215,7 +216,7 @@ keelungElaborate = do
     let numOfSigs = 4
     let param = makeParam dimension numOfSigs 42 settings :: Param GF181
 
-    let result = elaborate_ (AggSig.aggregateSignature param)
+    let result = elaborate (AggSig.aggregateSignature param)
     case result of
       Left err -> print err
       Right elaborated -> do

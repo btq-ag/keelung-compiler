@@ -74,7 +74,7 @@ loop2 = do
 make :: (GaloisField n, Integral n) => Int -> Int -> Param n
 make dim n = makeParam dim n 42 $ Settings True True True
 
-aggSig :: Int -> Int -> Comp GF181 ()
+aggSig :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
 aggSig dim n = AggregateSignature.Program.aggregateSignature (make dim n)
 
 p :: Param GF181
@@ -83,24 +83,24 @@ p = makeParam 1 1 42 $ Settings False True False
 inputs :: [GF181]
 inputs = genInputFromParam p
 
-a :: Comp GF181 ()
+a :: Comp GF181 (Expr 'Unit GF181)
 a = checkSize 1 1
 
 -- components of aggregate signature
-checkAgg :: Int -> Int -> Comp GF181 ()
+checkAgg :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
 checkAgg dim n = AggregateSignature.Program.checkAgg (make dim n)
 
 -- -- #2
-checkSize :: Int -> Int -> Comp GF181 ()
+checkSize :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
 checkSize dim n = AggregateSignature.Program.checkSize (make dim n)
 
 -- -- #3
-checkLength :: Int -> Int -> Comp GF181 ()
+checkLength :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
 checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 
 --------------------------------------------------------------------------------
 
-bench :: Compilable GF181 a => Comp GF181 a -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
+bench :: Comp GF181 (Expr kind GF181) -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
 bench program settings dimension n = do
   let input = genInputFromParam (makeParam dimension n 42 settings)
   cs <- comp program -- before optimisation (only constant propagation)

@@ -16,7 +16,8 @@ module Keelung.Compiler
     TypeErased (..),
     module Keelung.Compiler.R1CS,
     module Keelung.Compiler.Optimise,
-    Compilable (..),
+    erase,
+    interpret,
     optmElab,
     convElab,
     comp,
@@ -51,19 +52,24 @@ import Keelung (elaborate)
 --------------------------------------------------------------------------------
 -- Some top-level functions
 
-class Compilable n a where
-  -- elaboration => rewriting => type erasure
-  erase :: Comp n a -> Either String (TypeErased n)
-  interpret :: Comp n a -> [n] -> Either (Error n) (Maybe n)
+-- class Compilable n a where
+--   -- elaboration => rewriting => type erasure
+--   erase :: Comp n (Expr kind n) -> Either String (TypeErased n)
+--   interpret :: Comp n (Expr kind n) -> [n] -> Either (Error n) (Maybe n)
 
-instance (Erase ty, Num n, GaloisField n, Bounded n, Integral n) => Compilable n (Expr ty n) where
-  erase prog = elaborate prog >>= Rewriting.run >>= return . eraseType
-  interpret prog inputs = left OtherError (elaborate prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
+-- instance (Erase ty, Num n, GaloisField n, Bounded n, Integral n) => Compilable n (Expr ty n) where
+--   erase prog = elaborate prog >>= Rewriting.run >>= return . eraseType
+--   interpret prog inputs = left OtherError (elaborate prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
 
-instance (Num n, GaloisField n, Bounded n, Integral n) => Compilable n () where
-  erase prog = elaborate_ prog >>= Rewriting.run >>= return . eraseType
-  interpret prog inputs = left OtherError (elaborate_ prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
+-- instance (Num n, GaloisField n, Bounded n, Integral n) => Compilable n () where
+--   erase prog = elaborate_ prog >>= Rewriting.run >>= return . eraseType
+--   interpret prog inputs = left OtherError (elaborate_ prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
 
+erase :: (GaloisField n, Erase kind) => Comp n (Expr kind n) -> Either String (TypeErased n)
+erase prog = elaborate prog >>= Rewriting.run >>= return . eraseType
+
+interpret :: (GaloisField n, Bounded n, Integral n) => Comp n (Expr kind n) -> [n] -> Either (Error n) (Maybe n)
+interpret prog inputs = left OtherError (elaborate prog) >>= \elab -> left InterpretError (interpretElaborated elab inputs)
 
 optmElab :: (GaloisField n, Bounded n, Integral n, Erase ty) => Either String (Elaborated ty n) -> Either (Error n) (ConstraintSystem n)
 optmElab (Left err) = Left (OtherError err)
@@ -75,27 +81,27 @@ convElab :: (GaloisField n, Bounded n, Integral n, Erase ty) => Either String (E
 convElab xs = toR1CS <$> optmElab xs
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
-comp :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> Either (Error n) (ConstraintSystem n)
+comp :: (GaloisField n, Bounded n, Integral n, Erase kind) => Comp n (Expr kind n) -> Either (Error n) (ConstraintSystem n)
 comp prog = left OtherError (erase prog) >>= return . Compile.run . ConstantPropagation.run
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
 optm ::
-  (Compilable n a, GaloisField n, Bounded n, Integral n) =>
-  Comp n a ->
+  (GaloisField n, Bounded n, Integral n, Erase kind) =>
+  Comp n (Expr kind n) ->
   Either (Error n) (ConstraintSystem n)
 optm prog = comp prog >>= return . optimise
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
 optm2 ::
-  (Compilable n a, GaloisField n, Bounded n, Integral n) =>
-  Comp n a ->
+  (GaloisField n, Bounded n, Integral n, Erase kind) =>
+  Comp n (Expr kind n) ->
   Either (Error n) (ConstraintSystem n)
 optm2 prog = comp prog >>= return . optimise2 . optimise
 
 -- with optimisation + partial evaluation with inputs
 optmWithInput ::
-  (Compilable n a, GaloisField n, Bounded n, Integral n) =>
-  Comp n a ->
+  (GaloisField n, Bounded n, Integral n, Erase kind) =>
+  Comp n (Expr kind n) ->
   [n] ->
   Either (Error n) (ConstraintSystem n)
 optmWithInput program input = do
@@ -105,23 +111,23 @@ optmWithInput program input = do
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation => toR1CS
 conv ::
-  (Compilable n a, GaloisField n, Bounded n, Integral n) =>
-  Comp n a ->
+  (GaloisField n, Bounded n, Integral n, Erase kind) =>
+  Comp n (Expr kind n) ->
   Either (Error n) (R1CS n)
 conv prog = comp prog >>= return . toR1CS . optimise
 
 -- witn ::
--- (Compilable n a, GaloisField n, Bounded n, Integral n) =>
--- Comp n a ->
+-- (GaloisField n, Bounded n, Integral n) =>
+-- Comp n (Expr kind n) ->
 -- Either String (R1CS n)
-witn :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either (Error n) (Witness n)
+witn :: (GaloisField n, Bounded n, Integral n, Erase kind) => Comp n (Expr kind n) -> [n] -> Either (Error n) (Witness n)
 witn prog inputs = conv prog >>= left ExecError . witnessOfR1CS inputs
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
 --   (3) Check whether 'w' satisfies the constraint system produced in (1).
 --   (4) Check whether the R1CS result matches the interpreter result.
-execute :: (Compilable n a, GaloisField n, Bounded n, Integral n) => Comp n a -> [n] -> Either (Error n) (Maybe n)
+execute :: (GaloisField n, Bounded n, Integral n, Erase kind) => Comp n (Expr kind n) -> [n] -> Either (Error n) (Maybe n)
 execute prog inputs = do
   r1cs <- conv prog
 
