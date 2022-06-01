@@ -41,6 +41,7 @@ library
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Typed
       Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Untyped2
       Keelung.Compiler.Util
   other-modules:
       Paths_keelung_compiler
@@ -81,6 +82,7 @@ executable keelungc
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Typed
       Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Untyped2
       Keelung.Compiler.Util
       AggregateSignature.Program
       AggregateSignature.Util
@@ -156,6 +158,7 @@ benchmark keelung-bench
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Typed
       Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Untyped2
       Keelung.Compiler.Util
       Benchmark.Keelung
       AggregateSignature.Program
