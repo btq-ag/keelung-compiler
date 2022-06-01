@@ -7,7 +7,7 @@ module Keelung.Compiler.Syntax.Untyped2
     Expr (..),
     TypeErased (..),
     Assignment (..),
-    eraseElaborated,
+    erase,
     sizeOfExpr,
   )
 where
@@ -159,8 +159,8 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) wh
       <> "\n\
          \}"
 
-eraseElaborated :: Num n => T.Elaborated n -> TypeErased n
-eraseElaborated (T.Elaborated expr comp) =
+erase :: Num n => T.Elaborated n -> TypeErased n
+erase (T.Elaborated expr comp) =
   let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions = comp
       ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
         expr' <- join <$> mapM eraseExprM expr
