@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Interpret (InterpretError (..), interpretElaborated) where
+module Keelung.Compiler.Interpret (InterpretError (..), interpretElaborated, interpretElaborated2) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -13,10 +13,12 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung.Monad (Assignment (..), Computation (..), Elaborated (..))
-import Keelung.Syntax
 import Keelung.Compiler.Syntax.Typed (freeVars)
 import Keelung.Field (N (..))
+import Keelung.Monad (Assignment (..), Computation (..), Elaborated (..))
+import Keelung.Syntax
+import qualified Keelung.Syntax.Unkinded as U
+import qualified Keelung.Compiler.Syntax.Untyped2 as U
 
 --------------------------------------------------------------------------------
 
@@ -28,6 +30,11 @@ runM st p = runExcept (evalStateT p st)
 
 addBinding :: Int -> n -> M n ()
 addBinding var val = modify $ \xs -> IntMap.insert var val xs
+
+addBinding2 :: U.VarRef -> n -> M n ()
+addBinding2 (U.NumVar var) val = modify $ \xs -> IntMap.insert var val xs
+addBinding2 (U.BoolVar var) val = modify $ \xs -> IntMap.insert var val xs
+addBinding2 (U.UnitVar var) val = modify $ \xs -> IntMap.insert var val xs
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
@@ -51,6 +58,44 @@ instance GaloisField n => Interpret (Value ty n) n where
     Number n -> return n
     Boolean b -> interp b
     UnitVal -> return zero
+
+instance GaloisField n => Interpret (U.Value n) n where
+  interp (U.Number n) = return n
+  interp (U.Boolean b) = interp b
+  interp U.Unit = return zero
+
+instance GaloisField n => Interpret (U.Expr n) n where
+  interp expr = case expr of
+    U.Val val -> interp val
+    U.Var (U.NumVar n) ->lookupVar n
+    U.Var (U.BoolVar n) ->lookupVar n
+    U.Var (U.UnitVar n) ->lookupVar n
+    U.Add x y -> (+) <$> interp x <*> interp y
+    U.Sub x y -> (-) <$> interp x <*> interp y
+    U.Mul x y -> (*) <$> interp x <*> interp y
+    U.Div x y -> (/) <$> interp x <*> interp y
+    U.Eq x y -> do
+      x' <- interp x
+      y' <- interp y
+      interp (x' == y')
+    U.And x y -> (*) <$> interp x <*> interp y
+    U.Or x y -> (+) <$> interp x <*> interp y
+    U.Xor x y -> do
+      x' <- interp x
+      y' <- interp y
+      return $ x' + y' - x' * y'
+    U.BEq x y -> do
+      x' <- interp x
+      y' <- interp y
+      interp (x' == y')
+    U.IfThenElse b x y -> do
+      b' <- interp b
+      case b' of
+        0 -> interp y
+        _ -> interp x
+    U.ToBool x -> interp x
+    U.ToNum x -> interp x
+
 
 instance GaloisField n => Interpret (Expr ty n) n where
   interp expr = case expr of
@@ -110,11 +155,38 @@ interpretElaborated (Elaborated expr comp) inputs = runM bindings $ do
   where
     bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
 
+interpretElaborated2 :: (GaloisField n, Bounded n, Integral n) => U.Elaborated n -> [n] -> Either (InterpretError n) (Maybe n)
+interpretElaborated2 (U.Elaborated expr comp) inputs = runM bindings $ do
+  -- interpret the assignments first
+  forM_ (U.compNumAsgns comp) $ \(U.Assignment var e) -> do
+    value <- interp e
+    addBinding2 var value
+
+  forM_ (U.compBoolAsgns comp) $ \(U.Assignment var e) -> do
+    value <- interp e
+    addBinding2 var value
+
+  -- interpret the assertions next
+  -- throw error if any assertion fails
+  forM_ (U.compAssertions comp) $ \e -> do
+    value <- interp e
+    when (value /= 1) $ do
+      -- collect variables and their bindings in the expression
+      let vars = U.freeVars e
+      bindings' <- mapM (\var -> (var,) <$> lookupVar var) $ IntSet.toList vars
+      throwError $ InterpretAssertionError2 e (IntMap.fromList bindings')
+
+  -- lastly interpret the expression and return the result
+  mapM interp expr
+  where
+    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (U.compInputVars comp)) inputs
+
 --------------------------------------------------------------------------------
 
 data InterpretError n
   = InterpretUnboundVarError Var (IntMap n)
   | InterpretAssertionError (Expr 'Bool n) (IntMap n)
+  | InterpretAssertionError2 (U.Expr n) (IntMap n)
   deriving (Eq)
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (InterpretError n) where
@@ -123,6 +195,10 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (InterpretError n
       ++ " in bindings "
       ++ show (fmap N bindings)
   show (InterpretAssertionError expr bindings) =
+    "assertion failed: " ++ show (fmap N expr)
+      ++ "\nbindings of variables: "
+      ++ show (fmap N bindings)
+  show (InterpretAssertionError2 expr bindings) =
     "assertion failed: " ++ show (fmap N expr)
       ++ "\nbindings of variables: "
       ++ show (fmap N bindings)

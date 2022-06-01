@@ -19,7 +19,7 @@ benchElaborate = encode . elaborateAndFlatten
 benchRewrite :: (GaloisField n, Bounded n, Integral n, Serialize n, Typeable kind) => Comp n (Expr kind n) -> ByteString
 benchRewrite = encode . elaborateAndRewrite
   
-benchInterpret :: (GaloisField n, Show n, Bounded n, Integral n, Fractional n) => Comp n (Expr kind n) -> [n] -> String
+benchInterpret :: (GaloisField n, Show n, Bounded n, Integral n, Fractional n, Erase kind) => Comp n (Expr kind n) -> [n] -> String
 benchInterpret prog input =
   show $ interpret prog input
 

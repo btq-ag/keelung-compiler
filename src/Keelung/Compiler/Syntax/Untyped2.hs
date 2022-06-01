@@ -3,12 +3,13 @@
 {-# LANGUAGE GADTs #-}
 
 module Keelung.Compiler.Syntax.Untyped2
-  ( Op (..),
-    Expr (..),
-    TypeErased (..),
-    Assignment (..),
+  ( -- Op (..),
+    -- Expr (..),
+    -- TypeErased (..),
+    -- Assignment (..),
     erase,
     sizeOfExpr,
+    freeVars,
   )
 where
 
@@ -178,7 +179,6 @@ erase (T.Elaborated expr comp) =
           erasedBooleanVars = booleanVars
         }
 
-
 eraseExpr :: Num n => T.Expr n -> M (Expr n)
 eraseExpr expr = case expr of
   T.Val val -> case val of
@@ -254,3 +254,23 @@ chainExprs op x y = case (x, y) of
       BinOp op (x <| ys)
   -- there's nothing left we can do
   _ -> BinOp op (Seq.fromList [x, y])
+
+-- collect free variables of an expression
+freeVars :: T.Expr n -> IntSet
+freeVars expr = case expr of
+  T.Val _ -> mempty
+  T.Var (T.NumVar n) -> IntSet.singleton n
+  T.Var (T.BoolVar n) -> IntSet.singleton n
+  T.Var (T.UnitVar n) -> IntSet.singleton n
+  T.Add x y -> freeVars x <> freeVars y
+  T.Sub x y -> freeVars x <> freeVars y
+  T.Mul x y -> freeVars x <> freeVars y
+  T.Div x y -> freeVars x <> freeVars y
+  T.Eq x y -> freeVars x <> freeVars y
+  T.And x y -> freeVars x <> freeVars y
+  T.Or x y -> freeVars x <> freeVars y
+  T.Xor x y -> freeVars x <> freeVars y
+  T.BEq x y -> freeVars x <> freeVars y
+  T.IfThenElse x y z -> freeVars x <> freeVars y <> freeVars z
+  T.ToBool x -> freeVars x
+  T.ToNum x -> freeVars x
