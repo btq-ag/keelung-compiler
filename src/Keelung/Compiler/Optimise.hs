@@ -13,19 +13,18 @@ import Keelung.Monad
 import qualified Keelung.Compiler.Optimise.MinimiseConstraints as MinimiseConstraints
 import qualified Keelung.Compiler.Optimise.MinimiseConstraints2 as MinimiseConstraints2
 import Keelung.Compiler.Optimise.Monad
-import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting
 import Keelung.Syntax
-import Keelung (elaborate)
+import Keelung (elaborateAndFlatten)
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
+import qualified Keelung.Syntax.Unkinded as U
+import qualified Keelung.Compiler.Optimise.Rewriting2 as Rewriting2
+import Data.Typeable (Typeable)
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: Comp n (Expr ty n) -> Either String (Elaborated ty n)
-elaborateAndRewrite prog = elaborate prog >>= Rewriting.run
-
--- elaborateAndRewrite' :: Comp n () -> Either String (Elaborated 'Unit n)
--- elaborateAndRewrite' prog = elaborate_ prog >>= Rewriting.run
+elaborateAndRewrite :: Typeable kind => Comp n (Expr kind n) -> Either String (U.Elaborated n)
+elaborateAndRewrite prog = elaborateAndFlatten prog >>= Rewriting2.run
 
 optimiseWithWitness :: (GaloisField n, Bounded n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimiseWithWitness witness cs =

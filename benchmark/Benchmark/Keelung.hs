@@ -1,67 +1,24 @@
 {-# HLINT ignore "Use <&>" #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Benchmark.Keelung where
 
+import Data.ByteString (ByteString)
+import Data.Serialize (Serialize, encode)
+import Data.Typeable (Typeable)
+import Keelung (elaborateAndFlatten)
 import Keelung.Compiler
-import Keelung.Monad
-import Keelung (elaborate)
-import Keelung.Syntax 
 import qualified Keelung.Compiler.Optimise.ConstantPropagation as ConstantPropagation
+import Keelung.Monad
+import Keelung.Syntax
 
-benchElaborate :: (GaloisField n, Bounded n, Integral n) => Comp n (Expr ty n) -> Int
-benchElaborate prog =
-  case elaborate prog of
-    Left _ -> -1
-    Right elaborated -> case elabExpr elaborated of
-      Nothing -> -2
-      Just n -> toNumber n
-      where
-        toNumber :: Expr ty a -> Int
-        toNumber !te = case te of
-          Val _ -> 0
-          Var _ -> 1
-          Add _ _ -> 2
-          Sub _ _ -> 3
-          Mul _ _ -> 4
-          Div _ _ -> 5
-          Eq _ _ -> 6
-          And _ _ -> 7
-          Or _ _ -> 8
-          Xor _ _ -> 9
-          BEq _ _ -> 10
-          IfThenElse {} -> 11
-          ToBool _ -> 12
-          ToNum _ -> 13
+benchElaborate :: (Typeable kind, Serialize n, GaloisField n, Bounded n, Integral n) => Comp n (Expr kind n) -> ByteString
+benchElaborate = encode . elaborateAndFlatten
 
-
-benchRewrite :: (GaloisField n, Bounded n, Integral n) => Comp n (Expr kind n) -> Int
-benchRewrite prog =
-  case elaborateAndRewrite prog of
-    Left _ -> -1
-    Right elaborated -> case elabExpr elaborated of
-      Nothing -> -2
-      Just n -> toNumber n
-      where
-        toNumber :: Expr ty a -> Int
-        toNumber !te = case te of
-          Val _ -> 0
-          Var _ -> 1
-          Add _ _ -> 2
-          Sub _ _ -> 3
-          Mul _ _ -> 4
-          Div _ _ -> 5
-          Eq _ _ -> 6
-          And _ _ -> 7
-          Or _ _ -> 8
-          Xor _ _ -> 9
-          BEq _ _ -> 10
-          IfThenElse {} -> 11
-          ToBool _ -> 12
-          ToNum _ -> 13
-
+benchRewrite :: (GaloisField n, Bounded n, Integral n, Serialize n, Typeable kind) => Comp n (Expr kind n) -> ByteString
+benchRewrite = encode . elaborateAndRewrite
+  
 benchInterpret :: (GaloisField n, Show n, Bounded n, Integral n, Fractional n) => Comp n (Expr kind n) -> [n] -> String
 benchInterpret prog input =
   show $ interpret prog input
