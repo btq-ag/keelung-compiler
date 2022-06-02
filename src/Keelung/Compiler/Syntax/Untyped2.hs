@@ -25,7 +25,7 @@ eraseType :: Num n => T.Elaborated n -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions = comp
       ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
-        expr' <- join <$> mapM eraseExprM expr
+        expr' <- eraseExprM expr
         numAssignments' <- mapM eraseAssignment numAsgns
         boolAssignments' <- mapM eraseAssignment boolAsgns
         let assignments = numAssignments' <> boolAssignments'

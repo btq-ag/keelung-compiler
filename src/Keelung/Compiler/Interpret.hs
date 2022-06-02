@@ -129,7 +129,7 @@ instance GaloisField n => Interpret (Expr ty n) n where
 
 --------------------------------------------------------------------------------
 
-interpretElaborated :: (GaloisField n, Bounded n, Integral n) => Elaborated ty n -> [n] -> Either (InterpretError n) (Maybe n)
+interpretElaborated :: (GaloisField n, Bounded n, Integral n) => Elaborated ty n -> [n] -> Either (InterpretError n) n
 interpretElaborated (Elaborated expr comp) inputs = runM bindings $ do
   -- interpret the assignments first
   forM_ (compNumAsgns comp) $ \(Assignment (Variable var) e) -> do
@@ -151,7 +151,7 @@ interpretElaborated (Elaborated expr comp) inputs = runM bindings $ do
       throwError $ InterpretAssertionError e (IntMap.fromList bindings')
 
   -- lastly interpret the expression and return the result
-  mapM interp expr
+  interp expr
   where
     bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
 
@@ -177,7 +177,9 @@ interpretElaborated2 (U.Elaborated expr comp) inputs = runM bindings $ do
       throwError $ InterpretAssertionError2 e (IntMap.fromList bindings')
 
   -- lastly interpret the expression and return the result
-  mapM interp expr
+  if U.isOfUnit expr 
+    then return Nothing 
+    else Just <$> interp expr
   where
     bindings = IntMap.fromAscList $ zip (IntSet.toAscList (U.compInputVars comp)) inputs
 

@@ -221,7 +221,7 @@ keelungElaborate = do
       Left err -> print err
       Right elaborated -> do
         print
-          ( U.sizeOfExpr <$> U.elabExpr elaborated,
+          ( U.sizeOfExpr (U.elabExpr elaborated),
             length (compNumAsgns (elabComp elaborated)),
             length (compBoolAsgns (elabComp elaborated)),
             compNextVar (elabComp elaborated)

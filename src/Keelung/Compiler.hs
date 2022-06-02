@@ -51,6 +51,7 @@ import Data.Typeable (Typeable)
 import qualified Keelung.Compiler.Optimise.Rewriting2 as Rewriting2
 import qualified Keelung.Syntax.Unkinded as U
 
+
 --------------------------------------------------------------------------------
 -- Some top-level functions
 
