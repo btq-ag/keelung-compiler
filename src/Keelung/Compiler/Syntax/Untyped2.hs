@@ -95,7 +95,9 @@ eraseExprM expr = case expr of
 
 eraseAssignment :: Num n => T.Assignment n -> M (Assignment n)
 eraseAssignment (T.Assignment (T.NumVar n) expr) = Assignment n <$> eraseExpr expr
-eraseAssignment (T.Assignment (T.BoolVar n) expr) = Assignment n <$> eraseExpr expr
+eraseAssignment (T.Assignment (T.BoolVar n) expr) = do 
+  modify' (IntSet.insert n) -- keep track of all boolean variables
+  Assignment n <$> eraseExpr expr
 eraseAssignment (T.Assignment (T.UnitVar n) expr) = Assignment n <$> eraseExpr expr
 
 -- Flatten and chain expressions together when possible

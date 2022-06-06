@@ -20,6 +20,7 @@ import Keelung.Field (GF181)
 import Keelung.Monad
 import Keelung.Syntax
 import Test.Hspec
+import qualified Keelung.Syntax.Unkinded as U
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) (Maybe GF181)
 runKeelungAggSig dimension numberOfSignatures =
@@ -97,8 +98,8 @@ main = hspec $ do
       execute Basic.assert1 [0]
         `shouldBe` Left
           ( InterpretError $
-              InterpretAssertionError
-                (Eq (Var (Variable 0)) (Val (Number 3)))
+              InterpretAssertionError2
+                (U.Eq (U.Var (U.NumVar 0)) (U.Val (U.Number 3)))
                 (IntMap.fromList [(0, 0)])
           )
     it "assert success" $
