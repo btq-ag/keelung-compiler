@@ -18,7 +18,7 @@ import Keelung (elaborateAndFlatten)
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import qualified Keelung.Syntax.Unkinded as U
-import qualified Keelung.Compiler.Optimise.Rewriting2 as Rewriting2
+import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting2
 import Data.Typeable (Typeable)
 
 --------------------------------------------------------------------------------

@@ -98,7 +98,7 @@ main = hspec $ do
       execute Basic.assert1 [0]
         `shouldBe` Left
           ( InterpretError $
-              InterpretAssertionError2
+              InterpretAssertionError
                 (U.Eq (U.Var (U.NumVar 0)) (U.Val (U.Number 3)))
                 (IntMap.fromList [(0, 0)])
           )
