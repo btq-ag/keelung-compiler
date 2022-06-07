@@ -11,30 +11,32 @@ import Data.Serialize (decode)
 import Keelung.Compiler
 import Keelung.Field (GF181)
 -- import Keelung.Monad
-import Keelung.Syntax.Unkinded
+import Keelung.Syntax.Concrete
 import Option
 import Keelung (elaborateAndFlatten)
-import qualified Keelung.Syntax.Unkinded as U
 
 main :: IO ()
-main = do
-  options <- getOptions
-  case options of
-    Compile (CompileOptions filepath) -> do
-      blob <- BS.readFile filepath
-      print $ optmElab (decode blob :: Either String (Elaborated GF181))
-    ToCS -> do
-      blob <- BS.getContents
-      print $ optmElab (decode blob :: Either String (Elaborated GF181))
-    ToR1CS -> do
-      blob <- BS.getContents
-      print $ convElab (decode blob :: Either String (Elaborated GF181))
-    Profile dimension numOfSigs -> profile dimension numOfSigs
-    Count dimension numOfSigs -> do
-      putStrLn $ show dimension ++ ":" ++ show numOfSigs
-      -- snarklConstraints dimension numOfSigs
-      -- keelung dimension numOfSigs
-      keelungConstraints dimension numOfSigs
+main = return ()
+
+-- main :: IO ()
+-- main = do
+--   options <- getOptions
+--   case options of
+--     Compile (CompileOptions filepath) -> do
+--       blob <- BS.readFile filepath
+--       print $ optmElab (decode blob :: Either String Elaborated)
+--     ToCS -> do
+--       blob <- BS.getContents
+--       print $ optmElab (decode blob :: Either String Elaborated)
+--     ToR1CS -> do
+--       blob <- BS.getContents
+--       print $ convElab (decode blob :: Either String Elaborated)
+--     Profile dimension numOfSigs -> profile dimension numOfSigs
+--     Count dimension numOfSigs -> do
+--       putStrLn $ show dimension ++ ":" ++ show numOfSigs
+--       -- snarklConstraints dimension numOfSigs
+--       -- keelung dimension numOfSigs
+--       keelungConstraints dimension numOfSigs
 
 run :: (Show n, Bounded n, Integral n, Fractional n) => ExceptT (Error n) IO () -> IO ()
 run f = do
@@ -221,7 +223,7 @@ keelungElaborate = do
       Left err -> print err
       Right elaborated -> do
         print
-          ( U.sizeOfExpr (U.elabExpr elaborated),
+          ( sizeOfExpr (elabExpr elaborated),
             length (compNumAsgns (elabComp elaborated)),
             length (compBoolAsgns (elabComp elaborated)),
             compNextVar (elabComp elaborated)

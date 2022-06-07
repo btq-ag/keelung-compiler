@@ -14,7 +14,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Field (N (..))
-import Keelung.Syntax.Unkinded
+import Keelung.Syntax.Concrete
 
 --------------------------------------------------------------------------------
 
@@ -46,12 +46,12 @@ instance GaloisField n => Interpret Bool n where
   interp True = return one
   interp False = return zero
 
-instance GaloisField n => Interpret (Value n) n where
-  interp (Number n) = return n
+instance GaloisField n => Interpret Value n where
+  interp (Number n) = return (fromIntegral n)
   interp (Boolean b) = interp b
   interp Unit = return zero
 
-instance GaloisField n => Interpret (Expr n) n where
+instance GaloisField n => Interpret Expr n where
   interp expr = case expr of
     Val val -> interp val
     Var (NumVar n) -> lookupVar n
@@ -85,7 +85,7 @@ instance GaloisField n => Interpret (Expr n) n where
 
 --------------------------------------------------------------------------------
 
-interpretElaborated2 :: (GaloisField n, Bounded n, Integral n) => Elaborated n -> [n] -> Either (InterpretError n) (Maybe n)
+interpretElaborated2 :: (GaloisField n, Bounded n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) (Maybe n)
 interpretElaborated2 (Elaborated expr comp) inputs = runM bindings $ do
   -- interpret the assignments first
   forM_ (compNumAsgns comp) $ \(Assignment var e) -> do
@@ -117,7 +117,7 @@ interpretElaborated2 (Elaborated expr comp) inputs = runM bindings $ do
 
 data InterpretError n
   = InterpretUnboundVarError Int (IntMap n)
-  | InterpretAssertionError (Expr n) (IntMap n)
+  | InterpretAssertionError Expr (IntMap n)
   deriving (Eq)
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (InterpretError n) where
@@ -126,6 +126,6 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (InterpretError n
       ++ " in bindings "
       ++ show (fmap N bindings)
   show (InterpretAssertionError expr bindings) =
-    "assertion failed: " ++ show (fmap N expr)
+    "assertion failed: " ++ show expr
       ++ "\nbindings of variables: "
       ++ show (fmap N bindings)

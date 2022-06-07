@@ -17,13 +17,13 @@ import Keelung.Syntax
 import Keelung (elaborateAndFlatten)
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
-import qualified Keelung.Syntax.Unkinded as U
+import qualified Keelung.Syntax.Concrete as C
 import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting2
 import Data.Typeable (Typeable)
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: Typeable kind => Comp n (Expr kind n) -> Either String (U.Elaborated n)
+elaborateAndRewrite :: (Typeable kind, Integral n, C.AcceptedField n) => Comp n (Expr kind n) -> Either String C.Elaborated
 elaborateAndRewrite prog = elaborateAndFlatten prog >>= Rewriting2.run
 
 optimiseWithWitness :: (GaloisField n, Bounded n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)

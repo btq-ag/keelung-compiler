@@ -20,7 +20,7 @@ import Data.Sequence (Seq (..), (<|), (|>))
 import qualified Data.Sequence as Seq
 import Keelung.Field (N (..))
 import Keelung.Syntax (Var)
-import qualified Keelung.Syntax.Unkinded as T
+import qualified Keelung.Syntax.Concrete as T
 
 --------------------------------------------------------------------------------
 
@@ -160,9 +160,9 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) wh
 -- monad for collecting boolean vars along the way
 type M = State IntSet
 
-eraseType :: Num n => T.Elaborated n -> TypeErased n
+eraseType :: Num n => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
-  let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions = comp
+  let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions fieldType = comp
       ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
         expr' <- eraseExprM expr
         numAssignments' <- mapM eraseAssignment numAsgns
@@ -179,10 +179,10 @@ eraseType (T.Elaborated expr comp) =
           erasedBooleanVars = booleanVars
         }
 
-eraseExpr :: Num n => T.Expr n -> M (Expr n)
+eraseExpr :: Num n => T.Expr -> M (Expr n)
 eraseExpr expr = case expr of
   T.Val val -> case val of
-    (T.Number n) -> return (Val n)
+    (T.Number n) -> return (Val (fromIntegral n))
     (T.Boolean False) -> return (Val 0)
     (T.Boolean True) -> return (Val 1)
     T.Unit -> return (Val 0) -- TODO: revise this
@@ -206,10 +206,10 @@ eraseExpr expr = case expr of
   T.ToNum x -> eraseExpr x
 
 -- | Like `eraseExpr` but returns `Nothing` on `T.Unit`
-eraseExprM :: Num n => T.Expr n -> M (Maybe (Expr n))
+eraseExprM :: Num n => T.Expr -> M (Maybe (Expr n))
 eraseExprM expr = case expr of
   T.Val val -> case val of
-    (T.Number n) -> return $ Just (Val n)
+    (T.Number n) -> return $ Just (Val (fromInteger n))
     (T.Boolean False) -> return $ Just (Val 0)
     (T.Boolean True) -> return $ Just (Val 1)
     T.Unit -> return Nothing
@@ -232,7 +232,7 @@ eraseExprM expr = case expr of
   T.ToBool x -> eraseExprM x
   T.ToNum x -> eraseExprM x
 
-eraseAssignment :: Num n => T.Assignment n -> M (Assignment n)
+eraseAssignment :: Num n => T.Assignment -> M (Assignment n)
 eraseAssignment (T.Assignment (T.NumVar n) expr) = Assignment n <$> eraseExpr expr
 eraseAssignment (T.Assignment (T.BoolVar n) expr) = do
   modify' (IntSet.insert n) -- keep track of all boolean variables

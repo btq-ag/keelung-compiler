@@ -5,7 +5,7 @@ module Keelung.Compiler.Optimise.Rewriting
   )
 where
 
-import Keelung.Syntax.Unkinded
+import Keelung.Syntax.Concrete
 import Control.Monad
 import Control.Monad.State
 import Control.Arrow (left)
@@ -13,7 +13,7 @@ import Control.Arrow (left)
 
 --------------------------------------------------------------------------------
 
-run :: Elaborated n -> Either String (Elaborated n)
+run :: Elaborated -> Either String Elaborated
 run (Elaborated expr comp) = left show $ do
   ((), comp') <- runComp comp $ do 
     let assertions = compAssertions comp 
@@ -23,7 +23,7 @@ run (Elaborated expr comp) = left show $ do
 
 -- assert X `Eq` Y => X = Y
 -- rewrite assertion as assignments, returns False if rewriting was made
-rewriteAssertEq :: Expr n -> Comp n Bool 
+rewriteAssertEq :: Expr -> Comp Bool 
 rewriteAssertEq expr = case expr of 
   Eq (Var ref) y -> do 
     assignNum ref y
