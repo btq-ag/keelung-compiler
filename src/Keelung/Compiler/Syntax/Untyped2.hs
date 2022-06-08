@@ -116,31 +116,34 @@ instance Functor Assignment where
 --------------------------------------------------------------------------------
 
 -- | The result after type erasure
-data TypeErased = forall n.
-  (T.AcceptedField n, Show n, Bounded n, Integral n, Fractional n) =>
+data TypeErased =
+  -- forall n.
+  -- (AcceptedField n, Show n, Bounded n, Integral n, Fractional n) =>
   TypeErased
   { -- | The expression after type erasure
-    erasedExpr :: !(Maybe (Expr n)),
+    erasedExpr :: !(Maybe (Expr Integer)),
     -- | Assertions after type erasure
-    erasedAssertions :: ![Expr n],
+    erasedAssertions :: ![Expr Integer],
     -- | Assignments after type erasure
-    erasedAssignments :: ![Assignment n],
+    erasedAssignments :: ![Assignment Integer],
     -- | Number of variables
     erasedNumOfVars :: !Int,
     -- | Variables marked as inputs
     erasedInputVars :: !IntSet,
     -- | Variables that are boolean
-    erasedBooleanVars :: !IntSet
+    erasedBooleanVars :: !IntSet,
+    -- | Field type of the numbers
+    erasedFieldType :: !FieldType
   }
 
 instance Show TypeErased where
-  show (TypeErased expr assertions assignments numOfVars inputVars boolVars) =
+  show (TypeErased expr assertions assignments numOfVars inputVars boolVars fieldType) =
     "TypeErased {\n\
     \  expression: "
-      <> show (fmap (fmap N) expr)
+      <> show (fmap (fmap (display fieldType)) expr)
       <> "\n"
       <> ( if length assignments < 20
-             then "  assignments:\n" <> show (map (fmap N) assignments) <> "\n"
+             then "  assignments:\n" <> show (map (fmap (display fieldType)) assignments) <> "\n"
              else ""
          )
       <> ( if length assertions < 20
@@ -154,6 +157,8 @@ instance Show TypeErased where
       <> show (IntSet.size inputVars)
       <> "\n  boolean variable: "
       <> show boolVars
+      <> "\n  field type: "
+      <> show fieldType
       <> "\n\
          \}"
 
@@ -164,56 +169,77 @@ type M = State IntSet
 
 eraseType :: T.Elaborated -> TypeErased
 eraseType (T.Elaborated expr comp) =
-  let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions _ = comp
-   in case T.compFieldType comp of
-        T.B64 -> flip evalState mempty $ do
-          expr' <- eraseExprM expr
-          numAssignments' <- mapM eraseAssignment numAsgns
-          boolAssignments' <- mapM eraseAssignment boolAsgns
-          let assignments = numAssignments' <> boolAssignments'
-          assertions' <- mapM eraseExpr assertions
-          booleanVars <- get
-          return $
-            TypeErased
-              { erasedExpr = expr' :: Maybe (Expr B64),
-                erasedAssertions = assertions',
-                erasedAssignments = assignments,
-                erasedNumOfVars = nextVar,
-                erasedInputVars = inputVars,
-                erasedBooleanVars = booleanVars
-              }
-        T.GF181 -> flip evalState mempty $ do
-          expr' <- eraseExprM expr
-          numAssignments' <- mapM eraseAssignment numAsgns
-          boolAssignments' <- mapM eraseAssignment boolAsgns
-          let assignments = numAssignments' <> boolAssignments'
-          assertions' <- mapM eraseExpr assertions
-          booleanVars <- get
-          return $
-            TypeErased
-              { erasedExpr = expr' :: Maybe (Expr GF181),
-                erasedAssertions = assertions',
-                erasedAssignments = assignments,
-                erasedNumOfVars = nextVar,
-                erasedInputVars = inputVars,
-                erasedBooleanVars = booleanVars
-              }
-        T.BN128 -> flip evalState mempty $ do
-          expr' <- eraseExprM expr
-          numAssignments' <- mapM eraseAssignment numAsgns
-          boolAssignments' <- mapM eraseAssignment boolAsgns
-          let assignments = numAssignments' <> boolAssignments'
-          assertions' <- mapM eraseExpr assertions
-          booleanVars <- get
-          return $
-            TypeErased
-              { erasedExpr = expr' :: Maybe (Expr BN128),
-                erasedAssertions = assertions',
-                erasedAssignments = assignments,
-                erasedNumOfVars = nextVar,
-                erasedInputVars = inputVars,
-                erasedBooleanVars = booleanVars
-              }
+  let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions fieldType = comp
+   in flip evalState mempty $ do
+        expr' <- eraseExprM expr
+        numAssignments' <- mapM eraseAssignment numAsgns
+        boolAssignments' <- mapM eraseAssignment boolAsgns
+        let assignments = numAssignments' <> boolAssignments'
+        assertions' <- mapM eraseExpr assertions
+        booleanVars <- get
+        return $
+          TypeErased
+            { erasedExpr = expr',
+              erasedAssertions = assertions',
+              erasedAssignments = assignments,
+              erasedNumOfVars = nextVar,
+              erasedInputVars = inputVars,
+              erasedBooleanVars = booleanVars,
+              erasedFieldType = fieldType
+            }
+
+--  in case T.compFieldType comp of
+--       B64 -> flip evalState mempty $ do
+--         expr' <- eraseExprM expr
+--         numAssignments' <- mapM eraseAssignment numAsgns
+--         boolAssignments' <- mapM eraseAssignment boolAsgns
+--         let assignments = numAssignments' <> boolAssignments'
+--         assertions' <- mapM eraseExpr assertions
+--         booleanVars <- get
+--         return $
+--           TypeErased
+--             { erasedExpr = expr' :: Maybe (Expr B64),
+--               erasedAssertions = assertions',
+--               erasedAssignments = assignments,
+--               erasedNumOfVars = nextVar,
+--               erasedInputVars = inputVars,
+--               erasedBooleanVars = booleanVars,
+--               erasedFieldType = fieldType
+--             }
+--       GF181 -> flip evalState mempty $ do
+--         expr' <- eraseExprM expr
+--         numAssignments' <- mapM eraseAssignment numAsgns
+--         boolAssignments' <- mapM eraseAssignment boolAsgns
+--         let assignments = numAssignments' <> boolAssignments'
+--         assertions' <- mapM eraseExpr assertions
+--         booleanVars <- get
+--         return $
+--           TypeErased
+--             { erasedExpr = expr' :: Maybe (Expr GF181),
+--               erasedAssertions = assertions',
+--               erasedAssignments = assignments,
+--               erasedNumOfVars = nextVar,
+--               erasedInputVars = inputVars,
+--               erasedBooleanVars = booleanVars,
+--               erasedFieldType = fieldType
+--             }
+--       BN128 -> flip evalState mempty $ do
+--         expr' <- eraseExprM expr
+--         numAssignments' <- mapM eraseAssignment numAsgns
+--         boolAssignments' <- mapM eraseAssignment boolAsgns
+--         let assignments = numAssignments' <> boolAssignments'
+--         assertions' <- mapM eraseExpr assertions
+--         booleanVars <- get
+--         return $
+--           TypeErased
+--             { erasedExpr = expr' :: Maybe (Expr BN128),
+--               erasedAssertions = assertions',
+--               erasedAssignments = assignments,
+--               erasedNumOfVars = nextVar,
+--               erasedInputVars = inputVars,
+--               erasedBooleanVars = booleanVars,
+--               erasedFieldType = fieldType
+--             }
 
 eraseExpr :: Num n => T.Expr -> M (Expr n)
 eraseExpr expr = case expr of
