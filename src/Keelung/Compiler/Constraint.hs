@@ -13,7 +13,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
-import Keelung.Field 
+import Keelung.Field
 import Keelung.Syntax (Var)
 
 --------------------------------------------------------------------------------
@@ -161,15 +161,16 @@ renumberConstraints cs =
     -- variables in constraints (that should be kept after renumbering!)
     vars = varsInConstraints (csConstraints cs)
 
-    -- variables after renumbering (should have the same size as `vars`)
-    renumberedVars = [0 .. IntSet.size vars - 1]
+    -- new variables after renumbering
+    -- invariant: size == |vars in constraints| `max` |input vars|
+    renumberedVars = [0 .. (IntSet.size vars `max` IntSet.size (csInputVars cs)) - 1]
 
     -- mapping of old variables to new variables
     -- input variables are placed in the front
-    variableMap = Map.fromList $ zip vars' renumberedVars
+    variableMap = Map.fromList $ zip oldVars renumberedVars
       where
         otherVars = IntSet.difference vars (csInputVars cs)
-        vars' = IntSet.toList (csInputVars cs) ++ IntSet.toList otherVars
+        oldVars = IntSet.toList (csInputVars cs) ++ IntSet.toList otherVars
 
     renumber var = case Map.lookup var variableMap of
       Nothing ->
@@ -177,6 +178,14 @@ renumberConstraints cs =
           ( "can't find a binding for variable " ++ show var
               ++ " in map "
               ++ show variableMap
+              ++ " test:\n"
+              ++ show
+                ( length $ csConstraints cs,
+                  IntSet.toList $ varsInConstraints (csConstraints cs),
+                  IntSet.toList vars,
+                  IntSet.toList (csInputVars cs),
+                  renumberedVars
+                )
           )
       Just var' -> var'
 
