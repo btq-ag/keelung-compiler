@@ -8,42 +8,66 @@ import Control.Monad
 import Control.Monad.Except
 import qualified Data.ByteString as BS
 import Data.Serialize (decode)
-import Keelung.Compiler
-    ( ConstraintSystem,
-      numberOfConstraints,
-      optimise,
-      optimise2,
-      Error,
-      comp,
-      optm )
-import Keelung.Field (GF181)
 -- import Keelung.Monad
+
+import Keelung (elaborateAndFlatten)
+import Keelung.Compiler
+  ( ConstraintSystem,
+    Error (..),
+    comp,
+    numberOfConstraints,
+    optimise,
+    optimise2,
+    optm,
+    optmElab, R1CS, convElab
+  )
+import Keelung.Field
 import Keelung.Syntax.Concrete
 import Option
-import Keelung (elaborateAndFlatten)
-
-main :: IO ()
-main = return ()
 
 -- main :: IO ()
--- main = do
---   options <- getOptions
---   case options of
---     Compile (CompileOptions filepath) -> do
---       blob <- BS.readFile filepath
---       print $ optmElab (decode blob :: Either String Elaborated)
---     ToCS -> do
---       blob <- BS.getContents
---       print $ optmElab (decode blob :: Either String Elaborated)
---     ToR1CS -> do
---       blob <- BS.getContents
---       print $ convElab (decode blob :: Either String Elaborated)
---     Profile dimension numOfSigs -> profile dimension numOfSigs
---     Count dimension numOfSigs -> do
---       putStrLn $ show dimension ++ ":" ++ show numOfSigs
---       -- snarklConstraints dimension numOfSigs
---       -- keelung dimension numOfSigs
---       keelungConstraints dimension numOfSigs
+-- main = return ()
+
+main :: IO ()
+main = do
+  options <- getOptions
+  case options of
+    Compile (CompileOptions filepath) -> do
+      blob <- BS.readFile filepath
+      let decoded = decode blob :: Either String Elaborated
+      case decoded of
+        Left err -> print err
+        Right elaborated -> do
+          case compFieldType (elabComp elaborated) of
+            B64 -> print (optmElab elaborated :: Either (Error B64) (ConstraintSystem B64))
+            GF181 -> print (optmElab elaborated :: Either (Error GF181) (ConstraintSystem GF181))
+            BN128 -> print (optmElab elaborated :: Either (Error BN128) (ConstraintSystem BN128))
+    ToCS -> do
+      blob <- BS.getContents
+      let decoded = decode blob :: Either String Elaborated
+      case decoded of
+        Left err -> print err
+        Right elaborated -> do
+          case compFieldType (elabComp elaborated) of
+            B64 -> print (optmElab elaborated :: Either (Error B64) (ConstraintSystem B64))
+            GF181 -> print (optmElab elaborated :: Either (Error GF181) (ConstraintSystem GF181))
+            BN128 -> print (optmElab elaborated :: Either (Error BN128) (ConstraintSystem BN128))
+    ToR1CS -> do
+      blob <- BS.getContents
+      let decoded = decode blob :: Either String Elaborated
+      case decoded of
+        Left err -> print err
+        Right elaborated -> do
+          case compFieldType (elabComp elaborated) of
+            B64 -> print (convElab elaborated :: Either (Error B64) (R1CS B64))
+            GF181 -> print (convElab elaborated :: Either (Error GF181) (R1CS GF181))
+            BN128 -> print (convElab elaborated :: Either (Error BN128) (R1CS BN128))
+    Profile dimension numOfSigs -> profile dimension numOfSigs
+    Count dimension numOfSigs -> do
+      putStrLn $ show dimension ++ ":" ++ show numOfSigs
+      -- snarklConstraints dimension numOfSigs
+      -- keelung dimension numOfSigs
+      keelungConstraints dimension numOfSigs
 
 run :: (Show n, Bounded n, Integral n, Fractional n) => ExceptT (Error n) IO () -> IO ()
 run f = do

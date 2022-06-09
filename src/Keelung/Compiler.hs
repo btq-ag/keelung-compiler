@@ -18,6 +18,7 @@ module Keelung.Compiler
     erase,
     interpret,
     optmElab,
+    -- Compilable (..),
     convElab,
     comp,
     optm2,
@@ -46,10 +47,10 @@ import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting2
 import Keelung.Compiler.R1CS
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Compiler.Util (Witness)
+import Keelung.Field
 import Keelung.Monad
 import qualified Keelung.Syntax as K
 import qualified Keelung.Syntax.Concrete as C
-import Keelung.Field
 
 --------------------------------------------------------------------------------
 -- Some top-level functions
@@ -60,13 +61,35 @@ erase prog = elaborateAndFlatten prog >>= Rewriting2.run >>= return . eraseType
 interpret :: (GaloisField n, Bounded n, Integral n, Typeable kind, AcceptedField n) => Comp n (K.Expr kind n) -> [n] -> Either (Error n) (Maybe n)
 interpret prog inputs = left OtherError (elaborateAndFlatten prog) >>= \elab -> left InterpretError (interpretElaborated2 elab inputs)
 
-optmElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => Either String C.Elaborated -> Either (Error n) (ConstraintSystem n)
-optmElab (Left err) = Left (OtherError err)
-optmElab (Right elab) = do
+optmElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => C.Elaborated -> Either (Error n) (ConstraintSystem n)
+-- optmElab (Left err) = Left (OtherError err)
+optmElab elab = do
   rewritten <- left OtherError (Rewriting2.run elab)
   return $ optimise $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
 
-convElab :: (GaloisField n, Bounded n, Integral n, AcceptedField n) => Either String C.Elaborated -> Either (Error n) (R1CS n)
+-- optmElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => Either String C.Elaborated -> Either (Error n) (ConstraintSystem n)
+-- optmElab (Left err) = Left (OtherError err)
+-- optmElab (Right elab) = do
+--   rewritten <- left OtherError (Rewriting2.run elab)
+--   return $ optimise $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
+
+-- class Compilable n where
+--   optmElab2 :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => Either String C.Elaborated -> Either (Error n) (ConstraintSystem n)
+--   convElab2 :: (GaloisField n, Bounded n, Integral n, AcceptedField n) => Either String C.Elaborated -> Either (Error n) (R1CS n)
+
+-- instance Compilable B64 where
+--   optmElab2 = optmElab
+--   convElab2 = convElab
+
+-- instance Compilable GF181 where
+--   optmElab2 = optmElab
+--   convElab2 = convElab
+
+-- instance Compilable BN128 where
+--   optmElab2 = optmElab
+--   convElab2 = convElab
+
+convElab :: (GaloisField n, Bounded n, Integral n, AcceptedField n) => C.Elaborated -> Either (Error n) (R1CS n)
 convElab xs = toR1CS <$> optmElab xs
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
