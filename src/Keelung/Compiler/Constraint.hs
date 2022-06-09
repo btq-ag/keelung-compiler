@@ -13,7 +13,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
-import Keelung.Field (GF181, N (..))
+import Keelung.Field 
 import Keelung.Syntax (Var)
 
 --------------------------------------------------------------------------------
@@ -35,6 +35,12 @@ instance (Eq n, Num n) => Eq (Constraint n) where
     (CNQZ x y, CNQZ u v) -> x == u && y == v
     _ -> False
 
+instance Functor Constraint where
+  fmap f (CAdd x) = CAdd (fmap f x)
+  fmap f (CMul2 x y (Left z)) = CMul2 (fmap f x) (fmap f y) (Left (f z))
+  fmap f (CMul2 x y (Right z)) = CMul2 (fmap f x) (fmap f y) (Right (fmap f z))
+  fmap _ (CNQZ x y) = CNQZ x y
+
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> Constraint n
 cadd !c !xs = CAdd $ Poly.build c xs
@@ -42,7 +48,7 @@ cadd !c !xs = CAdd $ Poly.build c xs
 cmul :: GaloisField n => Var -> Var -> (n, [(Var, n)]) -> Constraint n
 cmul !x !y (c, zs) = CMul2 (Poly.singleton x 1) (Poly.singleton y 1) (Poly.buildEither c zs)
 
-instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
+instance (Show n, Eq n, Num n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " ++ show xs ++ " = 0"
   show (CMul2 aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly' cV
     where
@@ -50,12 +56,27 @@ instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Con
         if IntMap.size (Poly.coeffs poly) > 1
           then "(" <> show poly <> ")"
           else show poly
-      showPoly' (Left x) = show (N x)
+      showPoly' (Left x) = show x
       showPoly' (Right poly) =
         if IntMap.size (Poly.coeffs poly) > 1
           then "(" <> show poly <> ")"
           else show poly
   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
+
+-- instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
+--   show (CAdd xs) = "A " ++ show xs ++ " = 0"
+--   show (CMul2 aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly' cV
+--     where
+--       showPoly poly =
+--         if IntMap.size (Poly.coeffs poly) > 1
+--           then "(" <> show poly <> ")"
+--           else show poly
+--       showPoly' (Left x) = show (N x)
+--       showPoly' (Right poly) =
+--         if IntMap.size (Poly.coeffs poly) > 1
+--           then "(" <> show poly <> ")"
+--           else show poly
+--   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
 
 instance (Ord n, Num n) => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}

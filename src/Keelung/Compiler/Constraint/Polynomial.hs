@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 module Keelung.Compiler.Constraint.Polynomial
   ( Poly,
     build,
@@ -25,7 +26,6 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import Data.Semiring (Semiring (..))
-import Keelung.Field (N (..))
 import Keelung.Syntax (Var)
 import Prelude hiding (negate)
 import qualified Prelude
@@ -35,6 +35,7 @@ import qualified Prelude
 --      * The coefficients are non-zone
 --      * The degree of the polynomial is 1 (there's at least one variable)
 data Poly n = Poly !n !(IntMap n)
+  deriving (Functor)
 
 -- 2 Poly's are the same, if they have the same coefficients and variables
 -- or one is the negation of the other
@@ -48,10 +49,23 @@ instance (Ord n, Num n) => Ord (Poly n) where
   compare (Poly c x) (Poly d y) =
     compare (IntMap.size x, x, c) (IntMap.size y, y, d)
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (Poly n) where
+-- instance (Show n, Bounded n, Integral n, Fractional n) => Show (Poly n) where
+--   show (Poly n xs)
+--     | n == 0 = go (IntMap.toList xs)
+--     | otherwise = show (N n) <> " + " <> go (IntMap.toList xs)
+--     where
+--       go [] = "<empty>"
+--       go [term] = printTerm term
+--       go (term : terms) = printTerm term ++ " + " ++ go terms
+--       printTerm (_, 0) = error "printTerm: coefficient of 0"
+--       printTerm (x, 1) = "$" ++ show x
+--       printTerm (x, -1) = "-$" ++ show x
+--       printTerm (x, c) = show (toInteger c) ++ "$" ++ show x
+
+instance (Show n, Integral n) => Show (Poly n) where
   show (Poly n xs)
     | n == 0 = go (IntMap.toList xs)
-    | otherwise = show (N n) <> " + " <> go (IntMap.toList xs)
+    | otherwise = show n <> " + " <> go (IntMap.toList xs)
     where
       go [] = "<empty>"
       go [term] = printTerm term

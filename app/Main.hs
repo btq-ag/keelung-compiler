@@ -9,6 +9,13 @@ import Control.Monad.Except
 import qualified Data.ByteString as BS
 import Data.Serialize (decode)
 import Keelung.Compiler
+    ( ConstraintSystem,
+      numberOfConstraints,
+      optimise,
+      optimise2,
+      Error,
+      comp,
+      optm )
 import Keelung.Field (GF181)
 -- import Keelung.Monad
 import Keelung.Syntax.Concrete
