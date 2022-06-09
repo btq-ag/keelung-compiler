@@ -29,6 +29,7 @@ import Data.Semiring (Semiring (..))
 import Keelung.Syntax (Var)
 import Prelude hiding (negate)
 import qualified Prelude
+import Keelung.Field (N(..))
 
 -- A Poly is a polynomial of the form "c + c₀x₀ + c₁x₁ ... cₙxₙ = 0"
 --   Invariances:
@@ -49,23 +50,10 @@ instance (Ord n, Num n) => Ord (Poly n) where
   compare (Poly c x) (Poly d y) =
     compare (IntMap.size x, x, c) (IntMap.size y, y, d)
 
--- instance (Show n, Bounded n, Integral n, Fractional n) => Show (Poly n) where
---   show (Poly n xs)
---     | n == 0 = go (IntMap.toList xs)
---     | otherwise = show (N n) <> " + " <> go (IntMap.toList xs)
---     where
---       go [] = "<empty>"
---       go [term] = printTerm term
---       go (term : terms) = printTerm term ++ " + " ++ go terms
---       printTerm (_, 0) = error "printTerm: coefficient of 0"
---       printTerm (x, 1) = "$" ++ show x
---       printTerm (x, -1) = "-$" ++ show x
---       printTerm (x, c) = show (toInteger c) ++ "$" ++ show x
-
-instance (Show n, Integral n) => Show (Poly n) where
+instance (Show n, Bounded n, Integral n, Fractional n) => Show (Poly n) where
   show (Poly n xs)
     | n == 0 = go (IntMap.toList xs)
-    | otherwise = show n <> " + " <> go (IntMap.toList xs)
+    | otherwise = show (N n) <> " + " <> go (IntMap.toList xs)
     where
       go [] = "<empty>"
       go [term] = printTerm term

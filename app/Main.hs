@@ -25,17 +25,14 @@ import Keelung.Field
 import Keelung.Syntax.Concrete
 import Option
 
--- main :: IO ()
--- main = return ()
-
 main :: IO ()
 main = do
   options <- getOptions
   case options of
     Compile (CompileOptions filepath) -> do
       blob <- BS.readFile filepath
-      let decoded = decode blob :: Either String Elaborated
-      case decoded of
+      let decoded = decode blob :: Either String (Either String Elaborated)
+      case join decoded of
         Left err -> print err
         Right elaborated -> do
           case compFieldType (elabComp elaborated) of
@@ -44,8 +41,8 @@ main = do
             BN128 -> print (optmElab elaborated :: Either (Error BN128) (ConstraintSystem BN128))
     ToCS -> do
       blob <- BS.getContents
-      let decoded = decode blob :: Either String Elaborated
-      case decoded of
+      let decoded = decode blob :: Either String (Either String Elaborated)
+      case join decoded of
         Left err -> print err
         Right elaborated -> do
           case compFieldType (elabComp elaborated) of
@@ -54,8 +51,8 @@ main = do
             BN128 -> print (optmElab elaborated :: Either (Error BN128) (ConstraintSystem BN128))
     ToR1CS -> do
       blob <- BS.getContents
-      let decoded = decode blob :: Either String Elaborated
-      case decoded of
+      let decoded = decode blob :: Either String (Either String Elaborated)
+      case join decoded of
         Left err -> print err
         Right elaborated -> do
           case compFieldType (elabComp elaborated) of

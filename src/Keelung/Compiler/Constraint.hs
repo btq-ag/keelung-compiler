@@ -48,7 +48,7 @@ cadd !c !xs = CAdd $ Poly.build c xs
 cmul :: GaloisField n => Var -> Var -> (n, [(Var, n)]) -> Constraint n
 cmul !x !y (c, zs) = CMul2 (Poly.singleton x 1) (Poly.singleton y 1) (Poly.buildEither c zs)
 
-instance (Show n, Integral n) => Show (Constraint n) where
+instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
   show (CAdd xs) = "A " ++ show xs ++ " = 0"
   show (CMul2 aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly' cV
     where
@@ -56,27 +56,12 @@ instance (Show n, Integral n) => Show (Constraint n) where
         if IntMap.size (Poly.coeffs poly) > 1
           then "(" <> show poly <> ")"
           else show poly
-      showPoly' (Left x) = show x
+      showPoly' (Left x) = show (N x)
       showPoly' (Right poly) =
         if IntMap.size (Poly.coeffs poly) > 1
           then "(" <> show poly <> ")"
           else show poly
   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
-
--- instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
---   show (CAdd xs) = "A " ++ show xs ++ " = 0"
---   show (CMul2 aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly' cV
---     where
---       showPoly poly =
---         if IntMap.size (Poly.coeffs poly) > 1
---           then "(" <> show poly <> ")"
---           else show poly
---       showPoly' (Left x) = show (N x)
---       showPoly' (Right poly) =
---         if IntMap.size (Poly.coeffs poly) > 1
---           then "(" <> show poly <> ")"
---           else show poly
---   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
 
 instance (Ord n, Num n) => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
