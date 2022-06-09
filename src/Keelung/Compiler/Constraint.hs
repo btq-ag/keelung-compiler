@@ -114,36 +114,40 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
-      <> ")"
-      <> ( if True -- Set.size constraints < 30
-             then ":\n  \n" <> printConstraints (toList constraints) <> "\n"
-             else "\n"
-         )
-      <> "  boolean constraints ("
-      <> show (length boolConstraints)
-      <> ")"
-      <> ( if True
-             then ":\n  \n" <> printConstraints boolConstraints <> "\n"
-             else "\n"
-         )
-      <> "  number of variables: "
-      <> show (IntSet.size vars)
-      <> "\n\
-         \  number of input variables: "
-      <> show (IntSet.size inputVars)
-      <> ":\n    "
-      <> show (IntSet.toList inputVars)
+      <> "):\n\n"
+      <> printConstraints (toList constraints)
       <> "\n"
-      -- <> ( if IntSet.size inputVars < 20
-      --        then ":\n    " <> show (IntSet.toList inputVars) <> "\n"
-      --        else "\n"
-      --    )
-      <> "\n  output variable: $"
-      <> show outputVar
-      <> "\n\
-         \}"
+      <> printBooleanConstraints
+      <> printNumOfVars
+      <> printInputVars
+      <> printOutputVar
+      <> "\n}"
     where
       printConstraints = unlines . map (\c -> "    " <> show c)
+
+      printBooleanConstraints =
+        if null boolConstraints
+          then ""
+          else
+            "  boolean constraints (" <> show (length boolConstraints)
+              <> "):\n\n"
+              <> printConstraints boolConstraints
+              <> "\n\n"
+
+      printNumOfVars =
+        "  number of variables: "
+          <> show (IntSet.size vars)
+          <> "\n"
+
+      printInputVars =
+        "  input variables (" <> show (IntSet.size inputVars) <> "):\n"
+          <> "    "
+          <> show (IntSet.toList inputVars)
+          <> "\n"
+
+      printOutputVar = case outputVar of
+        Nothing -> "  no output variable"
+        Just x -> "  output variable: $" <> show x <> "\n"
 
 -- | Sequentially renumber term variables '0..max_var'.  Return
 --   renumbered constraints, together with the total number of
