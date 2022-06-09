@@ -140,10 +140,10 @@ instance Show TypeErased where
   show (TypeErased expr assertions assignments numOfVars inputVars boolVars fieldType) =
     "TypeErased {\n\
     \  expression: "
-      <> show (fmap (fmap (display fieldType)) expr)
+      <> show (fmap (fmap (normalize fieldType)) expr)
       <> "\n"
       <> ( if length assignments < 20
-             then "  assignments:\n" <> show (map (fmap (display fieldType)) assignments) <> "\n"
+             then "  assignments:\n" <> show (map (fmap (normalize fieldType)) assignments) <> "\n"
              else ""
          )
       <> ( if length assertions < 20

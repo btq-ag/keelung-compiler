@@ -31,7 +31,7 @@ numberOfConstraints :: ConstraintSystem -> Int
 numberOfConstraints (ConstraintSystem cs cs' _ _ _ _) = Set.size cs + length cs'
 
 instance Show ConstraintSystem where
-  show (ConstraintSystem constraints boolConstraints vars inputVars outputVar _fieldType) =
+  show (ConstraintSystem constraints boolConstraints vars inputVars outputVar fieldType) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
@@ -65,7 +65,7 @@ instance Show ConstraintSystem where
          \}"
     where
       printConstraints :: [Constraint Integer] -> String
-      printConstraints xs = unlines $ map (\c -> "    " <> show c) xs
+      printConstraints xs = unlines $ map (\c -> "    " <> show (fmap (normalize fieldType) c)) xs
 
 -- | Sequentially renumber term variables '0..max_var'.  Return
 --   renumbered constraints, together with the total number of

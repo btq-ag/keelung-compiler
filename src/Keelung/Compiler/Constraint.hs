@@ -48,7 +48,7 @@ cadd !c !xs = CAdd $ Poly.build c xs
 cmul :: GaloisField n => Var -> Var -> (n, [(Var, n)]) -> Constraint n
 cmul !x !y (c, zs) = CMul2 (Poly.singleton x 1) (Poly.singleton y 1) (Poly.buildEither c zs)
 
-instance (Show n, Eq n, Num n, Integral n) => Show (Constraint n) where
+instance (Show n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " ++ show xs ++ " = 0"
   show (CMul2 aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly' cV
     where
