@@ -166,8 +166,8 @@ renumberConstraints cs =
     vars = varsInConstraints (csConstraints cs)
 
     -- new variables after renumbering
-    -- invariant: size == |vars in constraints| `max` |input vars|
-    renumberedVars = [0 .. (IntSet.size vars `max` IntSet.size (csInputVars cs)) - 1]
+    -- invariant: size == |vars in constraints| `union` |input vars|
+    renumberedVars = [0 .. IntSet.size (vars `IntSet.union` csInputVars cs) - 1]
 
     -- mapping of old variables to new variables
     -- input variables are placed in the front
@@ -185,7 +185,6 @@ renumberConstraints cs =
               ++ " test:\n"
               ++ show
                 ( length $ csConstraints cs,
-                  IntSet.toList $ varsInConstraints (csConstraints cs),
                   IntSet.toList vars,
                   IntSet.toList (csInputVars cs),
                   renumberedVars
