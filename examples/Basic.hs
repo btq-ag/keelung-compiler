@@ -57,7 +57,7 @@ loop1 :: Comp GF181 (Expr 'Num GF181)
 loop1 = do
   arr <- inputArray 4
   reduce 0 [0 .. 3] $ \accum i -> do
-    x <- access arr i
+    x <- access i arr
     return $ accum + Var x
 
 assert1 :: Comp GF181 (Expr 'Num GF181)
