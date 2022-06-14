@@ -48,7 +48,6 @@ executables:
       - examples/
     dependencies:
     - keelung-compiler
-    - snarkl
 
     ghc-options:
       - -Wall
@@ -68,7 +67,6 @@ tests:
       - examples/
     dependencies:
     - keelung-compiler
-    - snarkl
     - hspec
 
 

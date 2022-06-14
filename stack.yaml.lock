@@ -26,16 +26,16 @@ packages:
   original:
     hackage: protolude-0.2.4@sha256:ec6c01be631050f8c1b9153a782d329a52609d058cb4b461104222862f7792af,2292
 - completed:
-    name: snarkl
+    name: keelung
     version: 0.1.0.0
-    git: git@github.com:btq-ag/private-snarkl.git
+    git: git@github.com:btq-ag/keelung.git
     pantry-tree:
-      size: 5644
-      sha256: 7d30bd22877d6c7b41906d2dc363bff09222699aaf1fd12173826aeafdfbee08
-    commit: babdfc7febf81fef99d72a3ecc1ea152f0e39dcb
+      size: 990
+      sha256: f3dd6b758e3dcd385ebf4dd7ddd943bb148bd76e875ad3da6d55fcf2f534d46b
+    commit: 12ac0099ddd6f719ad9880a07128fa31b127904c
   original:
-    git: git@github.com:btq-ag/private-snarkl.git
-    commit: babdfc7febf81fef99d72a3ecc1ea152f0e39dcb
+    git: git@github.com:btq-ag/keelung.git
+    commit: 12ac0099ddd6f719ad9880a07128fa31b127904c
 snapshots:
 - completed:
     size: 590100
