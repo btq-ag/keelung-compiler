@@ -1,4 +1,4 @@
-module Option (Options (..), getOptions, CompileOptions (..)) where
+module Option (Options (..), getOptions, ProtocolOptions(..)) where
 
 import Options.Applicative
 
@@ -13,84 +13,57 @@ getOptions =
       )
 
 data Options
-  = Compile CompileOptions
-  | ToCS
-  | ToR1CS
+  = Protocol ProtocolOptions
   | Profile Int Int
   | Count Int Int
   deriving (Show)
 
+
 options :: Parser Options
 options =
-  parseCompile
-    <|> parseToCS
-    <|> parseToR1CS
-    <|> parseProfile
-    <|> parseCount
-
+  hsubparser
+    ( command
+        "count"
+        (info count (fullDesc <> progDesc "Computes constraint count"))
+        <> command
+          "profile"
+          (info profile (fullDesc <> progDesc "Generates Flamegraphs for profiling"))
+        <> commandGroup "Internal Debugging commands:"
+        <> metavar "DEBUG"
+    )
+    <|> hsubparser
+      ( command
+          "protocol"
+          (info (Protocol <$> protocol) (fullDesc <> progDesc "Interal protocol for functions like 'compile' in Keelung"))
+          <> commandGroup "Internal binary protocol:"
+          <> metavar "PROTOCOL"
+      )
 --------------------------------------------------------------------------------
 
-newtype CompileOptions = CompileOptions String
+data ProtocolOptions
+  = ToCS
+  | ToR1CS
   deriving (Show)
 
-parseCompile :: Parser Options
-parseCompile =
-  Compile
-    <$> subparser
-      ( command
-          "compile"
-          ( info
-              (compile <**> helper)
-              ( fullDesc
-                  <> progDesc "Compile a elaborated .keel file"
-                  --   <> header "hello - a test for optparse-applicative"
-              )
-          )
-      )
-
-compile :: Parser CompileOptions
-compile =
-  CompileOptions
-    <$> argument
-      auto
-      ( metavar "SOURCE"
-          <> help "Source Keelung program to compile"
-      )
-
---------------------------------------------------------------------------------
-
-toCS :: Parser Options
-toCS = pure ToCS
-
-parseToCS :: Parser Options
-parseToCS =
-  subparser
+protocol :: Parser ProtocolOptions
+protocol =
+  hsubparser
     ( command
         "toCS"
         ( info
-            (toCS <**> helper)
+            (pure ToCS <**> helper)
             ( fullDesc
                 <> progDesc "Compile a Keelung program to ConstraintSystem"
             )
         )
-    )
-
---------------------------------------------------------------------------------
-
-toR1CS :: Parser Options
-toR1CS = pure ToR1CS
-
-parseToR1CS :: Parser Options
-parseToR1CS =
-  subparser
-    ( command
-        "toR1CS"
-        ( info
-            (toR1CS <**> helper)
-            ( fullDesc
-                <> progDesc "Compile a Keelung program to R1CS"
-            )
-        )
+        <> command
+          "toR1CS"
+          ( info
+              (pure ToR1CS <**> helper)
+              ( fullDesc
+                  <> progDesc "Compile a Keelung program to R1CS"
+              )
+          )
     )
 
 --------------------------------------------------------------------------------
@@ -101,60 +74,8 @@ profile =
     <$> argument auto (metavar "DIM" <> help "Dimension of Falcon")
     <*> argument auto (metavar "SIG" <> help "Number of signatures")
 
-parseProfile :: Parser Options
-parseProfile =
-  subparser
-    ( command
-        "profile"
-        ( info
-            (profile <**> helper)
-            ( fullDesc
-                <> progDesc "DEV: profiling"
-            )
-        )
-    )
-
---------------------------------------------------------------------------------
-
 count :: Parser Options
 count =
   Count
     <$> argument auto (metavar "DIM" <> help "Dimension of Falcon")
     <*> argument auto (metavar "SIG" <> help "Number of signatures")
-
-parseCount :: Parser Options
-parseCount =
-  subparser
-    ( command
-        "count"
-        ( info
-            (count <**> helper)
-            ( fullDesc
-                <> progDesc "DEV: counting"
-            )
-        )
-    )
-
---------------------------------------------------------------------------------
-
--- sample :: Parser Options
--- sample =
---   Sample
---     <$> strOption
---       ( long "hello"
---           <> metavar "TARGET"
---           <> help "Target for the greeting"
---       )
---     <*> switch
---       ( long "quiet"
---           <> short 'q'
---           <> help "Whether to be quiet"
---       )
---     <*> option
---       auto
---       ( long "enthusiasm"
---           <> help "How enthusiastically to greet"
---           <> showDefault
---           <> value 1
---           <> metavar "INT"
---       )

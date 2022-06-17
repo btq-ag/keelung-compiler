@@ -29,17 +29,17 @@ main :: IO ()
 main = do
   options <- getOptions
   case options of
-    Compile (CompileOptions filepath) -> do
-      blob <- BS.readFile filepath
-      let decoded = decode blob :: Either String (Either String Elaborated)
-      case join decoded of
-        Left err -> print err
-        Right elaborated -> do
-          case compFieldType (elabComp elaborated) of
-            B64 -> print (optmElab elaborated :: Either (Error B64) (ConstraintSystem B64))
-            GF181 -> print (optmElab elaborated :: Either (Error GF181) (ConstraintSystem GF181))
-            BN128 -> print (optmElab elaborated :: Either (Error BN128) (ConstraintSystem BN128))
-    ToCS -> do
+    -- Compile (CompileOptions filepath) -> do
+    --   blob <- BS.readFile filepath
+    --   let decoded = decode blob :: Either String (Either String Elaborated)
+    --   case join decoded of
+    --     Left err -> print err
+    --     Right elaborated -> do
+    --       case compFieldType (elabComp elaborated) of
+    --         B64 -> print (optmElab elaborated :: Either (Error B64) (ConstraintSystem B64))
+    --         GF181 -> print (optmElab elaborated :: Either (Error GF181) (ConstraintSystem GF181))
+    --         BN128 -> print (optmElab elaborated :: Either (Error BN128) (ConstraintSystem BN128))
+    Protocol ToCS -> do
       blob <- BS.getContents
       let decoded = decode blob :: Either String (Either String Elaborated)
       case join decoded of
@@ -49,7 +49,7 @@ main = do
             B64 -> print (optmElab elaborated :: Either (Error B64) (ConstraintSystem B64))
             GF181 -> print (optmElab elaborated :: Either (Error GF181) (ConstraintSystem GF181))
             BN128 -> print (optmElab elaborated :: Either (Error BN128) (ConstraintSystem BN128))
-    ToR1CS -> do
+    Protocol ToR1CS -> do
       blob <- BS.getContents
       let decoded = decode blob :: Either String (Either String Elaborated)
       case join decoded of
