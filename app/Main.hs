@@ -14,12 +14,14 @@ import Keelung (elaborateAndFlatten)
 import Keelung.Compiler
   ( ConstraintSystem,
     Error (..),
+    R1CS,
     comp,
+    convElab,
     numberOfConstraints,
     optimise,
     optimise2,
     optm,
-    optmElab, R1CS, convElab
+    optmElab, interpElab
   )
 import Keelung.Field
 import Keelung.Syntax.Concrete
@@ -29,16 +31,6 @@ main :: IO ()
 main = do
   options <- getOptions
   case options of
-    -- Compile (CompileOptions filepath) -> do
-    --   blob <- BS.readFile filepath
-    --   let decoded = decode blob :: Either String (Either String Elaborated)
-    --   case join decoded of
-    --     Left err -> print err
-    --     Right elaborated -> do
-    --       case compFieldType (elabComp elaborated) of
-    --         B64 -> print (optmElab elaborated :: Either (Error B64) (ConstraintSystem B64))
-    --         GF181 -> print (optmElab elaborated :: Either (Error GF181) (ConstraintSystem GF181))
-    --         BN128 -> print (optmElab elaborated :: Either (Error BN128) (ConstraintSystem BN128))
     Protocol ToCS -> do
       blob <- BS.getContents
       let decoded = decode blob :: Either String (Either String Elaborated)
@@ -59,6 +51,16 @@ main = do
             B64 -> print (convElab elaborated :: Either (Error B64) (R1CS B64))
             GF181 -> print (convElab elaborated :: Either (Error GF181) (R1CS GF181))
             BN128 -> print (convElab elaborated :: Either (Error BN128) (R1CS BN128))
+    Protocol Interpret -> do
+      blob <- BS.getContents
+      let decoded = decode blob :: Either String (Either String (Elaborated, [Integer]))
+      case join decoded of
+        Left err -> print err
+        Right (elaborated, inputs) -> do
+          case compFieldType (elabComp elaborated) of
+            B64 -> print (interpElab elaborated (map fromInteger inputs) :: Either (Error B64) (Maybe B64))
+            GF181 -> print (interpElab elaborated (map fromInteger inputs) :: Either (Error GF181) (Maybe GF181))
+            BN128 -> print (interpElab elaborated (map fromInteger inputs) :: Either (Error BN128) (Maybe BN128))
     Profile dimension numOfSigs -> profile dimension numOfSigs
     Count dimension numOfSigs -> do
       putStrLn $ show dimension ++ ":" ++ show numOfSigs

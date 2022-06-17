@@ -1,4 +1,4 @@
-module Option (Options (..), getOptions, ProtocolOptions(..)) where
+module Option (Options (..), getOptions, ProtocolOptions (..)) where
 
 import Options.Applicative
 
@@ -17,7 +17,6 @@ data Options
   | Profile Int Int
   | Count Int Int
   deriving (Show)
-
 
 options :: Parser Options
 options =
@@ -38,11 +37,13 @@ options =
           <> commandGroup "Internal binary protocol:"
           <> metavar "PROTOCOL"
       )
+
 --------------------------------------------------------------------------------
 
 data ProtocolOptions
   = ToCS
   | ToR1CS
+  | Interpret
   deriving (Show)
 
 protocol :: Parser ProtocolOptions
@@ -62,6 +63,14 @@ protocol =
               (pure ToR1CS <**> helper)
               ( fullDesc
                   <> progDesc "Compile a Keelung program to R1CS"
+              )
+          )
+        <> command
+          "interpret"
+          ( info
+              (pure Interpret <**> helper)
+              ( fullDesc
+                  <> progDesc "Interpret a Keelung program with given inputs"
               )
           )
     )
