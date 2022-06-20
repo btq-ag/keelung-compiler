@@ -62,8 +62,8 @@ erase prog = elaborateAndFlatten prog >>= Rewriting2.run >>= return . eraseType
 interpret :: (GaloisField n, Bounded n, Integral n, Typeable kind, AcceptedField n) => Comp n (K.Expr kind n) -> [n] -> Either (Error n) (Maybe n)
 interpret prog inputs = left OtherError (elaborateAndFlatten prog) >>= \elab -> left InterpretError (interpretElaborated2 elab inputs)
 
-interpElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => C.Elaborated ->  [n] -> Either (Error n) (Maybe n)
-interpElab elab inputs = left InterpretError (interpretElaborated2 elab inputs)
+interpElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => C.Elaborated ->  [n] -> Either String (Maybe n)
+interpElab elab inputs = left (show . InterpretError) (interpretElaborated2 elab inputs)
 
 optmElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => C.Elaborated -> Either (Error n) (ConstraintSystem n)
 -- optmElab (Left err) = Left (OtherError err)

@@ -7,9 +7,10 @@ import AggregateSignature.Util
 import Control.Monad
 import Control.Monad.Except
 import qualified Data.ByteString as BS
-import Data.Serialize (decode)
 -- import Keelung.Monad
 
+import qualified Data.ByteString.Char8 as BSC
+import Data.Serialize (decode, encode)
 import Keelung (elaborateAndFlatten)
 import Keelung.Compiler
   ( ConstraintSystem,
@@ -17,11 +18,12 @@ import Keelung.Compiler
     R1CS,
     comp,
     convElab,
+    interpElab,
     numberOfConstraints,
     optimise,
     optimise2,
     optm,
-    optmElab, interpElab
+    optmElab,
   )
 import Keelung.Field
 import Keelung.Syntax.Concrete
@@ -58,9 +60,9 @@ main = do
         Left err -> print err
         Right (elaborated, inputs) -> do
           case compFieldType (elabComp elaborated) of
-            B64 -> print (interpElab elaborated (map fromInteger inputs) :: Either (Error B64) (Maybe B64))
-            GF181 -> print (interpElab elaborated (map fromInteger inputs) :: Either (Error GF181) (Maybe GF181))
-            BN128 -> print (interpElab elaborated (map fromInteger inputs) :: Either (Error BN128) (Maybe BN128))
+            B64 -> BSC.putStrLn $ encode (interpElab elaborated (map fromInteger inputs) :: Either String (Maybe B64))
+            GF181 -> BSC.putStrLn $ encode (interpElab elaborated (map fromInteger inputs) :: Either String (Maybe GF181))
+            BN128 -> BSC.putStrLn $ encode (interpElab elaborated (map fromInteger inputs) :: Either String (Maybe BN128))
     Profile dimension numOfSigs -> profile dimension numOfSigs
     Count dimension numOfSigs -> do
       putStrLn $ show dimension ++ ":" ++ show numOfSigs
