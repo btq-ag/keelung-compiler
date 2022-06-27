@@ -59,7 +59,7 @@ encode out expr = case expr of
       terms <- mapM toTerm operands
       encodeTerms out (negateTailTerms terms)
     _ -> encodeOtherBinOp op out operands
-  IfThenElse b x y -> encode out e -- out = b * x + (1-b) * y
+  If b x y -> encode out e -- out = b * x + (1-b) * y
     where
       e =
         BinOp

@@ -75,7 +75,7 @@ instance GaloisField n => Interpret Expr n where
       x' <- interp x
       y' <- interp y
       interp (x' == y')
-    IfThenElse b x y -> do
+    If b x y -> do
       b' <- interp b
       case b' of
         0 -> interp y

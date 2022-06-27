@@ -59,7 +59,7 @@ data Expr n
   = Var Var
   | Val n
   | BinOp Op (Seq (Expr n))
-  | IfThenElse (Expr n) (Expr n) (Expr n)
+  | If (Expr n) (Expr n) (Expr n)
   deriving (Eq, Functor)
 
 instance Num n => Num (Expr n) where
@@ -93,7 +93,7 @@ instance Show n => Show (Expr n) where
         go _ _ Empty = showString ""
         go _ n (x :<| Empty) = showsPrec (succ n) x
         go delim n (x :<| xs) = showsPrec (succ n) x . showString delim . go delim n xs
-    IfThenElse p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 -- calculate the "size" of an expression
 sizeOfExpr :: Expr n -> Int
@@ -101,7 +101,7 @@ sizeOfExpr expr = case expr of
   Val _ -> 1
   Var _ -> 1
   BinOp _ operands -> sum (fmap sizeOfExpr operands) + (length operands - 1)
-  IfThenElse x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+  If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
 
 --------------------------------------------------------------------------------
 
@@ -201,7 +201,7 @@ eraseExpr expr = case expr of
   T.Or x y -> chainExprs Or <$> eraseExpr x <*> eraseExpr y
   T.Xor x y -> chainExprs Xor <$> eraseExpr x <*> eraseExpr y
   T.BEq x y -> chainExprs BEq <$> eraseExpr x <*> eraseExpr y
-  T.IfThenElse b x y -> IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
+  T.If b x y -> If <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
   T.ToBool x -> eraseExpr x
   T.ToNum x -> eraseExpr x
 
@@ -228,7 +228,7 @@ eraseExprM expr = case expr of
   T.Or x y -> Just <$> (chainExprs Or <$> eraseExpr x <*> eraseExpr y)
   T.Xor x y -> Just <$> (chainExprs Xor <$> eraseExpr x <*> eraseExpr y)
   T.BEq x y -> Just <$> (chainExprs BEq <$> eraseExpr x <*> eraseExpr y)
-  T.IfThenElse b x y -> Just <$> (IfThenElse <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y)
+  T.If b x y -> Just <$> (If <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y)
   T.ToBool x -> eraseExprM x
   T.ToNum x -> eraseExprM x
 
