@@ -58,11 +58,18 @@ loop1 = do
     x <- access arr i
     return $ accum + x
 
+loopB :: Comp GF181 (Expr 'Bool GF181)
+loopB = do
+  arr <- inputs 4
+  reduce true [0 .. 3] $ \accum i -> do
+    x <- access arr i
+    return $ accum `And` x
+
 assert1 :: Comp GF181 (Expr 'Num GF181)
 assert1 = do
   x <- input
   assert (x `Eq` 3)
-  return $ x
+  return x
 
 -- loop2 :: Comp GF181 ()
 -- loop2 = do
@@ -101,10 +108,10 @@ checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 
 bench :: Compilable t => Comp GF181 (Expr t GF181) -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
 bench program settings dimension n = do
-  let input = genInputFromParam (makeParam dimension n 42 settings)
+  let inputVal = genInputFromParam (makeParam dimension n 42 settings)
   cs <- comp program -- before optimisation (only constant propagation)
   cs' <- optm program -- after optimisation (constant propagation + constraint set reduction)
-  cs'' <- optmWithInput program input -- after optimisation (constant propagation + constraint set reduction with input)
+  cs'' <- optmWithInput program inputVal -- after optimisation (constant propagation + constraint set reduction with input)
   return
     ( numberOfConstraints cs,
       numberOfConstraints cs',

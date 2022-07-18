@@ -48,17 +48,35 @@ main = hspec $ do
       runKeelungAggSig 10 10 `shouldBe` Right Nothing
 
   describe "Type Erasure" $ do
-    it "boolean variables in Aggregate Signature" $
-      let settings =
-            Settings
-              { enableAggChecking = True,
-                enableSizeChecking = True,
-                enableLengthChecking = True
-              }
-          setup = makeParam 1 1 42 settings :: Param GF181
-          erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Expr 'Unit GF181))
-          result = IntSet.toList . erasedBooleanVars <$> erased
-       in result `shouldBe` Right [3 .. 16]
+
+    describe "Boolean variables" $ do
+
+      it "Basic.identity" $
+        let erased = erase Basic.identity
+            result = IntSet.toList . erasedBooleanVars <$> erased
+        in result `shouldBe` Right []
+
+      it "Basic.identityB" $
+        let erased = erase Basic.identityB
+            result = IntSet.toList . erasedBooleanVars <$> erased
+        in result `shouldBe` Right [0]
+
+      it "Basic.loopB" $
+        let erased = erase Basic.identityB
+            result = IntSet.toList . erasedBooleanVars <$> erased
+        in result `shouldBe` Right [0 .. 3]
+
+      it "Boolean variables in Aggregate Signature" $
+        let settings =
+              Settings
+                { enableAggChecking = True,
+                  enableSizeChecking = True,
+                  enableLengthChecking = True
+                }
+            setup = makeParam 1 1 42 settings :: Param GF181
+            erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Expr 'Unit GF181))
+            result = IntSet.toList . erasedBooleanVars <$> erased
+        in result `shouldBe` Right [3 .. 16]
 
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.build 42 [(1, 1)] `shouldBe` (Poly.build 42 [(1, 1)] :: Poly GF181)

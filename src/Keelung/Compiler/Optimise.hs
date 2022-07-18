@@ -47,8 +47,8 @@ optimiseWithWitness witness cs =
         return (assignments, renumberConstraints $ cs {csConstraints = constraints})
 
 optimiseWithInput :: (GaloisField n, Bounded n, Integral n) => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
-optimiseWithInput input cs =
-  let witness = IntMap.fromList (zip (IntSet.toList (csInputVars cs)) input)
+optimiseWithInput ins cs =
+  let witness = IntMap.fromList (zip (IntSet.toList (csInputVars cs)) ins)
    in optimiseWithWitness witness cs
 
 optimise :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> ConstraintSystem n

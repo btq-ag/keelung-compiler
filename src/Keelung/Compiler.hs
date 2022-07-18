@@ -36,7 +36,6 @@ import Control.Monad (when)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (one, zero))
-import Data.Typeable (Typeable)
 import Keelung (Compilable(elaborateAndFlatten))
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
@@ -60,10 +59,10 @@ erase :: (GaloisField n, Integral n, AcceptedField n, Compilable t) => Comp n (K
 erase prog = elaborateAndFlatten prog >>= Rewriting2.run >>= return . eraseType
 
 interpret :: (GaloisField n, Bounded n, Integral n, AcceptedField n, Compilable t) => Comp n (K.Expr t n) -> [n] -> Either (Error n) (Maybe n)
-interpret prog inputs = left OtherError (elaborateAndFlatten prog) >>= \elab -> left InterpretError (interpretElaborated2 elab inputs)
+interpret prog ins = left OtherError (elaborateAndFlatten prog) >>= \elab -> left InterpretError (interpretElaborated2 elab ins)
 
 interpElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => C.Elaborated ->  [n] -> Either String (Maybe n)
-interpElab elab inputs = left (show . InterpretError) (interpretElaborated2 elab inputs)
+interpElab elab ins = left (show . InterpretError) (interpretElaborated2 elab ins)
 
 optmElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => C.Elaborated -> Either (Error n) (ConstraintSystem n)
 optmElab elab = do
@@ -97,9 +96,9 @@ optmWithInput ::
   Comp n (K.Expr t n) ->
   [n] ->
   Either (Error n) (ConstraintSystem n)
-optmWithInput program input = do
+optmWithInput program ins = do
   cs <- optm program
-  let (_, cs') = optimiseWithInput input cs
+  let (_, cs') = optimiseWithInput ins cs
   return cs'
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation => toR1CS
@@ -114,18 +113,18 @@ conv prog = comp prog >>= return . toR1CS . optimise
 -- Comp n (Expr t n) ->
 -- Either String (R1CS n)
 witn :: (GaloisField n, Bounded n, Integral n, AcceptedField n, Compilable t) => Comp n (K.Expr t n) -> [n] -> Either (Error n) (Witness n)
-witn prog inputs = conv prog >>= left ExecError . witnessOfR1CS inputs
+witn prog ins = conv prog >>= left ExecError . witnessOfR1CS ins
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
 --   (3) Check whether 'w' satisfies the constraint system produced in (1).
 --   (4) Check whether the R1CS result matches the interpreter result.
 execute :: (GaloisField n, Bounded n, Integral n, AcceptedField n, Compilable t) => Comp n (K.Expr t n) -> [n] -> Either (Error n) (Maybe n)
-execute prog inputs = do
+execute prog ins = do
   r1cs <- conv prog
 
   let outputVar = r1csOutputVar r1cs
-  actualWitness <- left ExecError $ witnessOfR1CS inputs r1cs
+  actualWitness <- left ExecError $ witnessOfR1CS ins r1cs
 
   -- extract the output value from the witness
   actualOutput <- case outputVar of
@@ -138,7 +137,7 @@ execute prog inputs = do
       Just value -> return $ Just value
 
   -- interpret the program to see if the output value is correct
-  expectedOutput <- interpret prog inputs
+  expectedOutput <- interpret prog ins
 
   when (actualOutput /= expectedOutput) $ do
     Left $ ExecError $ ExecOutputError expectedOutput actualOutput

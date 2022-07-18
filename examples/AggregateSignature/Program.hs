@@ -62,7 +62,7 @@ checkAgg (Param dimension numOfSigs setup _) = do
       quotient <- access2 expectedQuotients (t, i)
 
       -- assert the relation between rowSum, remainder and quotient
-      assert $ rowSum `Eq` (quotient * fromIntegral q + remainder)
+      assert $ rowSum `Eq` (quotient * fromInteger q + remainder)
 
   forM_ [0 .. dimension - 1] $ \i -> do
     let expected = setupAggSig setup ! i
@@ -89,7 +89,7 @@ checkSize (Param dimension numOfSigs setup _) = do
       value <- reduce 0 [0 .. 13] $ \acc k -> do
         bit <- access3 sigBitStrings (i, j, k)
         let bitValue = fromIntegral (2 ^ k :: Integer)
-        let prod = fromBool (bit) * bitValue
+        let prod = fromBool bit * bitValue
         return (acc + prod)
       assert (fromIntegral coeff `Eq` value)
 
@@ -97,9 +97,9 @@ checkSize (Param dimension numOfSigs setup _) = do
       bit12 <- access3 sigBitStrings (i, j, 12)
       bit11to0 <- reduce 0 [0 .. 11] $ \acc k -> do
         bit <- access3 sigBitStrings (i, j, k)
-        return (acc + fromBool (bit))
+        return (acc + fromBool bit)
 
-      let smallerThan12289 = fromBool (bit13) * fromBool (bit12) * bit11to0
+      let smallerThan12289 = fromBool bit13 * fromBool bit12 * bit11to0
       assert (smallerThan12289 `Eq` 0)
 
   return unit
@@ -134,7 +134,7 @@ checkLength (Param dimension numOfSigs _ _) = do
     quotient <- access sigLengthQuotients t
 
     -- assert the relation between actualLength, remainder and quotient
-    assert $ actualLength `Eq` (quotient * fromIntegral q + remainder)
+    assert $ actualLength `Eq` (quotient * fromInteger q + remainder)
 
   return unit
 

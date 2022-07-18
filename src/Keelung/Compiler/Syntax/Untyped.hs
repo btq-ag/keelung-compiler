@@ -191,7 +191,6 @@ eraseExpr expr = case expr of
     T.BoolVar n -> do
       modify' (IntSet.insert n) -- keep track of all boolean variables
       return (Var n)
-    -- T.UnitVar n -> return (Var n)
   T.Add x y -> chainExprs Add <$> eraseExpr x <*> eraseExpr y
   T.Sub x y -> chainExprs Sub <$> eraseExpr x <*> eraseExpr y
   T.Mul x y -> chainExprs Mul <$> eraseExpr x <*> eraseExpr y

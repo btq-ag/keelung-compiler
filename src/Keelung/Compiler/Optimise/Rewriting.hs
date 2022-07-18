@@ -9,6 +9,7 @@ import Keelung.Syntax.Concrete
 import Control.Monad
 import Control.Monad.State
 import Control.Arrow (left)
+import Debug.Trace
 
 
 --------------------------------------------------------------------------------
