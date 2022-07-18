@@ -191,7 +191,7 @@ eraseExpr expr = case expr of
     T.BoolVar n -> do
       modify' (IntSet.insert n) -- keep track of all boolean variables
       return (Var n)
-    T.UnitVar n -> return (Var n)
+    -- T.UnitVar n -> return (Var n)
   T.Add x y -> chainExprs Add <$> eraseExpr x <*> eraseExpr y
   T.Sub x y -> chainExprs Sub <$> eraseExpr x <*> eraseExpr y
   T.Mul x y -> chainExprs Mul <$> eraseExpr x <*> eraseExpr y
@@ -218,7 +218,7 @@ eraseExprM expr = case expr of
     T.BoolVar n -> do
       modify' (IntSet.insert n) -- keep track of all boolean variables
       return $ Just (Var n)
-    T.UnitVar n -> return $ Just (Var n)
+    -- T.UnitVar n -> return $ Just (Var n)
   T.Add x y -> Just <$> (chainExprs Add <$> eraseExpr x <*> eraseExpr y)
   T.Sub x y -> Just <$> (chainExprs Sub <$> eraseExpr x <*> eraseExpr y)
   T.Mul x y -> Just <$> (chainExprs Mul <$> eraseExpr x <*> eraseExpr y)
@@ -237,7 +237,7 @@ eraseAssignment (T.Assignment (T.NumVar n) expr) = Assignment n <$> eraseExpr ex
 eraseAssignment (T.Assignment (T.BoolVar n) expr) = do
   modify' (IntSet.insert n) -- keep track of all boolean variables
   Assignment n <$> eraseExpr expr
-eraseAssignment (T.Assignment (T.UnitVar n) expr) = Assignment n <$> eraseExpr expr
+-- eraseAssignment (T.Assignment (T.UnitVar n) expr) = Assignment n <$> eraseExpr expr
 
 -- Flatten and chain expressions together when possible
 chainExprs :: Op -> Expr n -> Expr n -> Expr n

@@ -14,17 +14,16 @@ import qualified Keelung.Compiler.Optimise.MinimiseConstraints as MinimiseConstr
 import qualified Keelung.Compiler.Optimise.MinimiseConstraints2 as MinimiseConstraints2
 import Keelung.Compiler.Optimise.Monad
 import Keelung.Syntax
-import Keelung (elaborateAndFlatten)
+import Keelung (elaborateAndFlatten, Compilable)
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import qualified Keelung.Syntax.Concrete as C
 import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting2
-import Data.Typeable (Typeable)
 import Keelung.Field
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: (Typeable kind, Integral n, AcceptedField n) => Comp n (Expr kind n) -> Either String C.Elaborated
+elaborateAndRewrite :: (Integral n, AcceptedField n, Compilable t) => Comp n (Expr t n) -> Either String C.Elaborated
 elaborateAndRewrite prog = elaborateAndFlatten prog >>= Rewriting2.run
 
 optimiseWithWitness :: (GaloisField n, Bounded n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)

@@ -24,10 +24,9 @@ type M n = StateT (IntMap n) (Except (InterpretError n))
 runM :: IntMap n -> M n a -> Either (InterpretError n) a
 runM st p = runExcept (evalStateT p st)
 
-addBinding :: VarRef -> n -> M n ()
+addBinding :: Ref -> n -> M n ()
 addBinding (NumVar var) val = modify $ \xs -> IntMap.insert var val xs
 addBinding (BoolVar var) val = modify $ \xs -> IntMap.insert var val xs
-addBinding (UnitVar var) val = modify $ \xs -> IntMap.insert var val xs
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
@@ -46,7 +45,7 @@ instance GaloisField n => Interpret Bool n where
   interp True = return one
   interp False = return zero
 
-instance GaloisField n => Interpret Value n where
+instance GaloisField n => Interpret Val n where
   interp (Number n) = return (fromIntegral n)
   interp (Boolean b) = interp b
   interp Unit = return zero
@@ -56,7 +55,7 @@ instance GaloisField n => Interpret Expr n where
     Val val -> interp val
     Var (NumVar n) -> lookupVar n
     Var (BoolVar n) -> lookupVar n
-    Var (UnitVar n) -> lookupVar n
+    -- Var (UnitVar n) -> lookupVar n
     Add x y -> (+) <$> interp x <*> interp y
     Sub x y -> (-) <$> interp x <*> interp y
     Mul x y -> (*) <$> interp x <*> interp y

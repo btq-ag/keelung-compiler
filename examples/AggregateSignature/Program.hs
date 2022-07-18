@@ -40,9 +40,9 @@ checkAgg (Param dimension numOfSigs setup _) = do
   --    nT: coefficients of terms of signatures as input
   --    nT: remainders of product of signatures & public keys
   --    nT: quotients of product of signatures & public keys
-  sigs <- inputArray2 numOfSigs dimension
-  expectedRemainders <- inputArray2 numOfSigs dimension
-  expectedQuotients <- inputArray2 numOfSigs dimension
+  sigs <- inputs2 numOfSigs dimension
+  expectedRemainders <- inputs2 numOfSigs dimension
+  expectedQuotients <- inputs2 numOfSigs dimension
 
   -- pairs for iterating through public keys with indices
   let publicKeyPairs = zip [0 ..] (setupPublicKeys setup)
@@ -57,21 +57,21 @@ checkAgg (Param dimension numOfSigs setup _) = do
                 then q - pk
                 else pk
         sig <- access2 sigs (t, j)
-        return $ acc + (Var sig * num pk')
+        return $ acc + (sig * fromIntegral pk')
       remainder <- access2 expectedRemainders (t, i)
       quotient <- access2 expectedQuotients (t, i)
 
       -- assert the relation between rowSum, remainder and quotient
-      assert $ rowSum `Eq` (Var quotient * num q + Var remainder)
+      assert $ rowSum `Eq` (quotient * fromIntegral q + remainder)
 
   forM_ [0 .. dimension - 1] $ \i -> do
     let expected = setupAggSig setup ! i
     actual <- reduce 0 [0 .. numOfSigs - 1] $ \acc t -> do
       remainder <- access2 expectedRemainders (t, i)
-      return $ acc + Var remainder
+      return $ acc + remainder
 
     -- assert that the sum of remainders forms a term of aggregate signature
-    assert $ actual `Eq` num expected
+    assert $ actual `Eq` fromIntegral expected
 
   return unit
 
@@ -79,7 +79,7 @@ checkSize :: (GaloisField n, Integral n) => Param n -> Comp n (Expr 'Unit n)
 checkSize (Param dimension numOfSigs setup _) = do
   let signatures = setupSignatures setup
 
-  sigBitStrings <- inputArray3 numOfSigs dimension 14
+  sigBitStrings <- inputs3 numOfSigs dimension 14
   forM_ [0 .. numOfSigs - 1] $ \i -> do
     let signature = signatures !! i
     forM_ [0 .. dimension - 1] $ \j -> do
@@ -89,7 +89,7 @@ checkSize (Param dimension numOfSigs setup _) = do
       value <- reduce 0 [0 .. 13] $ \acc k -> do
         bit <- access3 sigBitStrings (i, j, k)
         let bitValue = fromIntegral (2 ^ k :: Integer)
-        let prod = fromBool (Var bit) * bitValue
+        let prod = fromBool (bit) * bitValue
         return (acc + prod)
       assert (fromIntegral coeff `Eq` value)
 
@@ -97,44 +97,44 @@ checkSize (Param dimension numOfSigs setup _) = do
       bit12 <- access3 sigBitStrings (i, j, 12)
       bit11to0 <- reduce 0 [0 .. 11] $ \acc k -> do
         bit <- access3 sigBitStrings (i, j, k)
-        return (acc + fromBool (Var bit))
+        return (acc + fromBool (bit))
 
-      let smallerThan12289 = fromBool (Var bit13) * fromBool (Var bit12) * bit11to0
+      let smallerThan12289 = fromBool (bit13) * fromBool (bit12) * bit11to0
       assert (smallerThan12289 `Eq` 0)
 
   return unit
 
 checkLength :: (Integral n, GaloisField n) => Param n -> Comp n (Expr 'Unit n)
 checkLength (Param dimension numOfSigs _ _) = do
-  sigs <- inputArray2 numOfSigs dimension
+  sigs <- inputs2 numOfSigs dimension
 
   -- expecting square of signatures as input
-  sigSquares <- inputArray2 numOfSigs dimension
+  sigSquares <- inputs2 numOfSigs dimension
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
     forM_ [0 .. dimension - 1] $ \i -> do
       sig <- access2 sigs (t, i)
       square <- access2 sigSquares (t, i)
-      assert (Var square `Eq` (Var sig * Var sig))
+      assert (square `Eq` (sig * sig))
 
   -- expecting remainders of length of signatures as input
-  sigLengthRemainders <- inputArray numOfSigs
+  sigLengthRemainders <- inputs numOfSigs
   -- expecting quotients of length of signatures as input
-  sigLengthQuotients <- inputArray numOfSigs
+  sigLengthQuotients <- inputs numOfSigs
 
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
     actualLength <- reduce 0 [0 .. dimension - 1] $ \acc i -> do
       square <- access2 sigSquares (t, i)
-      return (acc + Var square)
+      return (acc + square)
 
     remainder <- access sigLengthRemainders t
     quotient <- access sigLengthQuotients t
 
     -- assert the relation between actualLength, remainder and quotient
-    assert $ actualLength `Eq` (Var quotient * num q + Var remainder)
+    assert $ actualLength `Eq` (quotient * fromIntegral q + remainder)
 
   return unit
 

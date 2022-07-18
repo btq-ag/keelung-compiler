@@ -93,7 +93,7 @@ main = hspec $ do
     it "eq1 2" $
       execute Basic.eq1 [3] `shouldBe` Right (Just 1)
     it "cond 1" $
-      execute Basic.cond [0] `shouldBe` Right (Just 789)
+      execute Basic.cond' [0] `shouldBe` Right (Just 789)
     it "assert fail" $
       execute Basic.assert1 [0]
         `shouldBe` Left
