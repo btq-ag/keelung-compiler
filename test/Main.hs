@@ -19,8 +19,8 @@ import qualified Keelung.Compiler.Optimise.Monad as Optimise
 import Keelung.Field (GF181)
 import Keelung.Monad
 import Keelung.Syntax
-import Test.Hspec
 import qualified Keelung.Syntax.Concrete as C
+import Test.Hspec
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) (Maybe GF181)
 runKeelungAggSig dimension numberOfSignatures =
@@ -38,72 +38,67 @@ runKeelungAggSig dimension numberOfSignatures =
 main :: IO ()
 main = hspec $ do
   describe "Aggregate Signature" $ do
-
-    -- it "dim:1 sig:1" $
-    --   runKeelungAggSig 1 1 `shouldBe` Right Nothing
-    -- it "dim:1 sig:10" $
-    --   runKeelungAggSig 1 10 `shouldBe` Right Nothing
+    it "dim:1 sig:1" $
+      runKeelungAggSig 1 1 `shouldBe` Right Nothing
+    it "dim:1 sig:10" $
+      runKeelungAggSig 1 10 `shouldBe` Right Nothing
     it "dim:10 sig:1" $
       runKeelungAggSig 10 1 `shouldBe` Right Nothing
     it "dim:10 sig:10" $
       runKeelungAggSig 10 10 `shouldBe` Right Nothing
-  
+
   describe "Execution" $ do
-    it "Basic.identity" $ 
+    it "Basic.identity" $
       execute Basic.identity [42] `shouldBe` Right (Just 42)
-    it "Basic.summation" $ 
+    it "Basic.summation" $
       execute Basic.summation [0, 2, 4, 8] `shouldBe` Right (Just 14)
-    it "Basic.summation2" $ 
+    it "Basic.summation2" $
       execute Basic.summation2 [0, 2, 4, 8] `shouldBe` Right Nothing
-    it "Basic.assertArraysEqual" $ 
+    it "Basic.assertArraysEqual" $
       execute Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right Nothing
-    it "Basic.assertArraysEqual2" $ 
+    it "Basic.assertArraysEqual2" $
       execute Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right Nothing
 
-
   describe "Type Erasure" $ do
-
     describe "Boolean variables" $ do
-
       it "Basic.identity" $
         let erased = erase Basic.identity
             result = IntSet.toList . erasedBooleanVars <$> erased
-        in result `shouldBe` Right []
+         in result `shouldBe` Right []
 
       it "Basic.identityB" $
         let erased = erase Basic.identityB
             result = IntSet.toList . erasedBooleanVars <$> erased
-        in result `shouldBe` Right [0]
+         in result `shouldBe` Right [0]
 
       it "Basic.every" $
         let erased = erase Basic.every
             result = IntSet.toList . erasedBooleanVars <$> erased
-        in result `shouldBe` Right [0 .. 3]
+         in result `shouldBe` Right [0 .. 3]
 
-      -- it "Boolean variables in Aggregate Signature" $
-      --   let settings =
-      --         Settings
-      --           { enableAggChecking = True,
-      --             enableSizeChecking = True,
-      --             enableLengthChecking = True
-      --           }
-      --       setup = makeParam 1 1 42 settings :: Param GF181
-      --       erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Expr 'Unit GF181))
-      --       result = IntSet.toList . erasedBooleanVars <$> erased
-      --   in result `shouldBe` Right [3 .. 16]
+  it "Boolean variables in Aggregate Signature" $
+    let settings =
+          Settings
+            { enableAggChecking = True,
+              enableSizeChecking = True,
+              enableLengthChecking = True
+            }
+        setup = makeParam 1 1 42 settings :: Param GF181
+        erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Expr 'Unit GF181))
+        result = IntSet.toList . erasedBooleanVars <$> erased
+    in result `shouldBe` Right [3 .. 16]
 
   describe "Poly" $ do
-    it "instance Eq 1" $ Poly.build 42 [(1, 1)] `shouldBe` (Poly.build 42 [(1, 1)] :: Poly GF181)
-    it "instance Eq 2" $ Poly.build 42 [(1, 1)] `shouldBe` (Poly.build (-42) [(1, -1)] :: Poly GF181)
+    it "instance Eq 1" $ Poly.buildMaybe' 42 [(1, 1)] `shouldBe` (Poly.buildMaybe' 42 [(1, 1)] :: Maybe (Poly GF181))
+    it "instance Eq 2" $ Poly.buildMaybe' 42 [(1, 1)] `shouldBe` (Poly.buildMaybe' (-42) [(1, -1)] :: Maybe (Poly GF181))
 
   describe "Constraint Generation" $ do
     it "assertToBe42" $
       let cs =
             ConstraintSystem
               { csConstraints =
-                  Set.fromList
-                    [ cadd (-42) [(0, 1)]
-                    ],
+                  Set.fromList $
+                    cadd (-42) [(0, 1)],
                 csBooleanInputVarConstraints = mempty,
                 csVars = IntSet.fromList [0],
                 csInputVars = IntSet.fromList [0],
@@ -150,7 +145,7 @@ main = hspec $ do
 
     describe "Constraint Set Reduction" $ do
       it "$0 = $1" $
-        let constraint = cadd 0 [(0, 1), (1, -1)]
+        let constraint = head $ cadd 0 [(0, 1), (1, -1)]
             links = IntMap.fromList [(1, 0)]
             sizes = IntMap.fromList [(0, 2)]
             run :: Optimise.OptiM GF181 a -> a
@@ -162,20 +157,21 @@ main = hspec $ do
         let cs =
               ConstraintSystem
                 { csConstraints =
-                    Set.fromList
-                      [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
-                        cadd 0 [(0, 10582), (1, 7317), (17, -1)],
-                        cadd 0 [(2, 3853), (3, 4216), (15, -1)],
-                        cadd 0 [(2, 8073), (3, 3853), (14, -1)],
-                        cadd 0 [(4, 1), (8, 12289), (17, -1)],
-                        cadd 0 [(5, 1), (9, 12289), (16, -1)],
-                        cadd 0 [(6, 1), (10, 12289), (15, -1)],
-                        cadd 0 [(7, 1), (11, 12289), (14, -1)],
-                        cadd 0 [(4, 1), (6, 1), (13, -1)],
-                        cadd 0 [(5, 1), (7, 1), (12, -1)],
-                        cadd 10623 [(13, -1)],
-                        cadd 11179 [(12, -1)]
-                      ],
+                    Set.fromList $
+                      concat
+                        [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
+                          cadd 0 [(0, 10582), (1, 7317), (17, -1)],
+                          cadd 0 [(2, 3853), (3, 4216), (15, -1)],
+                          cadd 0 [(2, 8073), (3, 3853), (14, -1)],
+                          cadd 0 [(4, 1), (8, 12289), (17, -1)],
+                          cadd 0 [(5, 1), (9, 12289), (16, -1)],
+                          cadd 0 [(6, 1), (10, 12289), (15, -1)],
+                          cadd 0 [(7, 1), (11, 12289), (14, -1)],
+                          cadd 0 [(4, 1), (6, 1), (13, -1)],
+                          cadd 0 [(5, 1), (7, 1), (12, -1)],
+                          cadd 10623 [(13, -1)],
+                          cadd 11179 [(12, -1)]
+                        ],
                   csBooleanInputVarConstraints = mempty,
                   csVars = IntSet.fromList [0 .. 17],
                   csInputVars = IntSet.fromList [0 .. 11],
@@ -188,10 +184,9 @@ main = hspec $ do
         let cs =
               ConstraintSystem
                 { csConstraints =
-                    Set.fromList
-                      [ cadd 0 [(0, 1), (1, 1), (4, 1)],
-                        cadd 0 [(2, 1), (3, 1), (4, 1)]
-                      ],
+                    Set.fromList $
+                      cadd 0 [(0, 1), (1, 1), (4, 1)]
+                        ++ cadd 0 [(2, 1), (3, 1), (4, 1)],
                   csBooleanInputVarConstraints = mempty,
                   csVars = IntSet.fromList [0 .. 4],
                   csInputVars = IntSet.fromList [0 .. 3],
@@ -200,9 +195,8 @@ main = hspec $ do
             cs' =
               ConstraintSystem
                 { csConstraints =
-                    Set.fromList
-                      [ cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)]
-                      ],
+                    Set.fromList $
+                      cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)],
                   csBooleanInputVarConstraints = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 3],
@@ -214,10 +208,9 @@ main = hspec $ do
         let cs =
               ConstraintSystem
                 { csConstraints =
-                    Set.fromList
-                      [ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
-                        CMul2 (Poly.build 0 [(3, 1)]) (Poly.build 0 [(2, 1)]) (Left 42) --- $3 * $2 = 42
-                      ],
+                    Set.fromList $
+                      cadd 0 [(3, 1), (0, 1), (1, 1)]
+                        ++ [CMul2 (Poly.build 0 $ IntMap.fromList [(3, 1)]) (Poly.build 0 $ IntMap.fromList [(2, 1)]) (Left 42)], --- 0 = $3 + $0 + $1
                   csBooleanInputVarConstraints = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 2],
@@ -227,7 +220,7 @@ main = hspec $ do
               ConstraintSystem
                 { csConstraints =
                     Set.fromList
-                      [ CMul2 (Poly.build 0 [(0, -1), (1, -1)]) (Poly.build 0 [(2, 1)]) (Left 42) --- (- $0 - $1) * $2 = 42
+                      [ CMul2 (Poly.build 0 $ IntMap.fromList [(0, -1), (1, -1)]) (Poly.build 0 $ IntMap.fromList [(2, 1)]) (Left 42) --- (- $0 - $1) * $2 = 42
                       ],
                   csBooleanInputVarConstraints = mempty,
                   csVars = IntSet.fromList [0 .. 2],
@@ -240,10 +233,9 @@ main = hspec $ do
         let cs =
               ConstraintSystem
                 { csConstraints =
-                    Set.fromList
-                      [ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
-                        CMul2 (Poly.build 0 [(2, 1)]) (Poly.build 0 [(3, 1)]) (Left 42) --- $2 * $3 = 42
-                      ],
+                    Set.fromList $
+                      cadd 0 [(3, 1), (0, 1), (1, 1)]
+                        ++ [CMul2 (Poly.build 0 $ IntMap.fromList [(2, 1)]) (Poly.build 0 $ IntMap.fromList [(3, 1)]) (Left 42)], --- 0 = $3 + $0 + $1
                   csBooleanInputVarConstraints = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 2],
@@ -253,7 +245,7 @@ main = hspec $ do
               ConstraintSystem
                 { csConstraints =
                     Set.fromList
-                      [ CMul2 (Poly.build 0 [(2, 1)]) (Poly.build 0 [(0, -1), (1, -1)]) (Left 42) --- $2 * (- $0 - $1) = 42
+                      [ CMul2 (Poly.build 0 $ IntMap.fromList [(2, 1)]) (Poly.build 0 $ IntMap.fromList [(0, -1), (1, -1)]) (Left 42) --- $2 * (- $0 - $1) = 42
                       ],
                   csBooleanInputVarConstraints = mempty,
                   csVars = IntSet.fromList [0 .. 2],
@@ -267,9 +259,12 @@ main = hspec $ do
               ConstraintSystem
                 { csConstraints =
                     Set.fromList
-                      [ cadd 0 [(4, 1), (0, 1), (1, 1)], --- 0 = $4 + $0 + $1
-                        CMul2 (Poly.build 0 [(2, 1)]) (Poly.build 0 [(3, 1)]) (Right (Poly.build 0 [(4, 1)])) --- $2 * $3 = $4
-                      ],
+                      ( cadd
+                          0
+                          [(4, 1), (0, 1), (1, 1)] --- 0 = $4 + $0 + $1
+                          ++ [ CMul2 (Poly.singleton 2 1) (Poly.singleton 3 1) (Right (Poly.singleton 4 1)) --- $2 * $3 = $4
+                             ]
+                      ),
                   csBooleanInputVarConstraints = mempty,
                   csVars = IntSet.fromList [0 .. 4],
                   csInputVars = IntSet.fromList [0 .. 3],
@@ -279,7 +274,7 @@ main = hspec $ do
               ConstraintSystem
                 { csConstraints =
                     Set.fromList
-                      [ CMul2 (Poly.build 0 [(2, 1)]) (Poly.build 0 [(3, 1)]) (Right (Poly.build 0 [(0, -1), (1, -1)])) --- $2 * $3 = - $0 - $1
+                      [ CMul2 (Poly.singleton 2 1) (Poly.singleton 3 1) (Right (Poly.build 0 $ IntMap.fromList [(0, -1), (1, -1)])) --- $2 * $3 = - $0 - $1
                       ],
                   csBooleanInputVarConstraints = mempty,
                   csVars = IntSet.fromList [0 .. 3],
@@ -294,7 +289,7 @@ main = hspec $ do
 --           { csConstraints =
 --               Set.fromList
 --                 [ cadd 0 [(4, 1), (0, 1), (1, 1)], --- 0 = $4 + $0 + $1
---                   CMul2 (Poly.build 0 [(4, 1)]) (Poly.build 0 [(2, 1)]) (Left 42) --- $4 * $2 = 42
+--                   CMul2 (Poly.singleton 4 1) (Poly.singleton 2 1) (Left 42) --- $4 * $2 = 42
 --                 ],
 --             csBooleanInputVarConstraints = mempty,
 --             csVars = IntSet.fromList [0 .. 4],
@@ -305,7 +300,7 @@ main = hspec $ do
 --         ConstraintSystem
 --           { csConstraints =
 --               Set.fromList
---                 [ CMul2 (Poly.build 0 [(0, -1), (1, -1)]) (Poly.build 0 [(2, 1)]) (Left 42) --- (- $0 - $1) * $2 = 42
+--                 [ CMul2 (Poly.build 0 [(0, -1), (1, -1)]) (Poly.singleton 2 1) (Left 42) --- (- $0 - $1) * $2 = 42
 --                 ],
 --             csBooleanInputVarConstraints = mempty,
 --             csVars = IntSet.fromList [0 .. 2],

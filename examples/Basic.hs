@@ -186,7 +186,7 @@ cs1 :: ConstraintSystem GF181
 cs1 =
   ConstraintSystem
     { csConstraints =
-        Set.fromList
+        Set.fromList $ concat 
           [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
             cadd 0 [(0, 10582), (1, 7317), (17, -1)],
             cadd 0 [(2, 3853), (3, 4216), (15, -1)],

@@ -1,11 +1,11 @@
 {-# LANGUAGE DeriveFunctor #-}
+
 module Keelung.Compiler.Constraint.Polynomial
   ( Poly,
     build,
-    build',
     buildEither,
-    buildEither',
     buildMaybe',
+    buildMaybe,
     singleton,
     vars,
     coeffs,
@@ -26,10 +26,10 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import Data.Semiring (Semiring (..))
+import Keelung.Field (N (..))
 import Keelung.Syntax (Var)
 import Prelude hiding (negate)
 import qualified Prelude
-import Keelung.Field (N(..))
 
 -- A Poly is a polynomial of the form "c + c₀x₀ + c₁x₁ ... cₙxₙ = 0"
 --   Invariances:
@@ -42,7 +42,7 @@ data Poly n = Poly !n !(IntMap n)
 -- or one is the negation of the other
 instance (Eq n, Num n) => Eq (Poly n) where
   (Poly c1 v1) == (Poly c2 v2) =
-    if c1 == c2 
+    if c1 == c2
       then v1 == v2 || v1 == IntMap.map Prelude.negate v2
       else (c1 == (- c2)) && (v1 == IntMap.map Prelude.negate v2)
 
@@ -65,39 +65,37 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (Poly n) where
 
 -- | Create a polynomial from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.
-build :: (Eq n, Num n) => n -> [(Var, n)] -> Poly n
-build c = build' c . IntMap.filter (0 /=) . IntMap.fromListWith (+)
-
--- | IntMap version of 'build'.
-build' :: (Eq n, Num n) => n -> IntMap n -> Poly n
-build' c xs =
+build :: (Eq n, Num n) => n -> IntMap n -> Poly n
+build c xs =
   if IntMap.null xs
-    then error "error: build': no variables in polynomial"
+    then error "error: build: no variables in polynomial"
     else Poly c xs
 
--- | Type-safe version of 'build''
+-- | Type-safe version of 'build'
 buildEither :: (Eq n, Num n) => n -> [(Var, n)] -> Either n (Poly n)
 buildEither c xs =
   let xs' = IntMap.filter (0 /=) $ IntMap.fromListWith (+) xs
    in if IntMap.null xs'
         then Left c
-        else Right $ build' c xs'
+        else Right $ build c xs'
 
-buildEither' :: (Eq n, Num n) => n -> IntMap n -> Either n (Poly n)
-buildEither' c xs =
-  if IntMap.null xs
-    then Left c
-    else Right $ build' c xs
-
-buildMaybe' :: (Eq n, Num n) => n -> IntMap n -> Maybe (Poly n)
+buildMaybe' :: (Eq n, Num n) => n -> [(Var, n)] -> Maybe (Poly n)
 buildMaybe' c xs =
-  if IntMap.null xs
-    then Nothing
-    else Just $ build' c xs
+  let xs' = IntMap.filter (0 /=) $ IntMap.fromListWith (+) xs
+   in if IntMap.null xs'
+        then Nothing
+        else Just $ build c xs'
+
+buildMaybe :: (Eq n, Num n) => n -> IntMap n -> Maybe (Poly n)
+buildMaybe c xs =
+  let xs' = IntMap.filter (0 /=) xs
+   in if IntMap.null xs'
+        then Nothing
+        else Just $ build c xs'
 
 -- | Create a polynomial from a single variable and its coefficient.
 singleton :: (Eq n, Num n) => Var -> n -> Poly n
-singleton x c = build 0 [(x, c)]
+singleton x c = build 0 $ IntMap.singleton x c
 
 -- | Return the set of variables.
 vars :: Poly n -> IntSet
@@ -133,11 +131,11 @@ evaluate (Poly c xs) assignment =
 
 -- | Delete a variable from the polynomial.
 delete :: (Eq n, Num n) => Var -> Poly n -> Maybe (Poly n)
-delete x (Poly c xs) = buildMaybe' c (IntMap.delete x xs)
+delete x (Poly c xs) = buildMaybe c (IntMap.delete x xs)
 
 -- | Merge two polynomials.
 merge :: (Eq n, Num n) => Poly n -> Poly n -> Maybe (Poly n)
-merge (Poly c xs) (Poly d ys) = buildMaybe' (c + d) (mergeCoeffs xs ys)
+merge (Poly c xs) (Poly d ys) = buildMaybe (c + d) (mergeCoeffs xs ys)
 
 -- | Negate a polynomial.
 negate :: (Eq n, Num n) => Poly n -> Poly n
@@ -149,5 +147,5 @@ substitute (Poly c xs) var (Poly d ys) =
   if IntMap.member var xs
     then do
       let xs' = ys <> IntMap.delete var xs
-      buildMaybe' (c + d) xs'
+      buildMaybe (c + d) xs'
     else return $ Poly c xs

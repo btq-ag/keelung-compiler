@@ -35,9 +35,9 @@ type M n = State (Env n)
 runM :: Var -> M n a -> a
 runM outVar program = evalState program (Env Set.empty (outVar + 1))
 
-add :: (Ord n, Num n) => Constraint n -> M n ()
-add c =
-  modify (\env -> env {envConstraints = Set.insert c $ envConstraints env})
+add :: (Ord n, Num n) => [Constraint n] -> M n ()
+add cs =
+  modify (\env -> env {envConstraints = Set.union (Set.fromList cs) (envConstraints env)})
 
 freshVar :: M n Var
 freshVar = do
@@ -146,8 +146,8 @@ encodeBinaryOp :: GaloisField n => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
   Add -> add $ cadd 0 [(x, 1), (y, 1), (out, -1)]
   Sub -> add $ cadd 0 [(x, 1), (y, negate 1), (out, negate 1)]
-  Mul -> add $ CMul2 (Poly.singleton x 1) (Poly.singleton y 1) (Right $ Poly.singleton out 1)
-  Div -> add $ CMul2 (Poly.singleton x 1) (Poly.singleton out 1) (Right $ Poly.singleton x 1)
+  Mul -> add [CMul2 (Poly.singleton x 1) (Poly.singleton y 1) (Right $ Poly.singleton out 1)]
+  Div -> add [CMul2 (Poly.singleton x 1) (Poly.singleton out 1) (Right $ Poly.singleton x 1)]
   And -> encodeBinaryOp Mul out x y
   Or -> do
     -- Constraint 'x \/ y = out'.
@@ -182,12 +182,12 @@ encodeBinaryOp op out x y = case op of
     -- if diff = 0 then m = 0 else m = recip diff
     m <- freshVar
     encode out (Var diff * Var m)
-    add $ CNQZ diff m
+    add [CNQZ diff m]
 
     -- notOut = 1 - out
     notOut <- freshVar
     encode notOut (1 - Var out)
-    add $ CMul2 (Poly.singleton diff 1) (Poly.singleton notOut 1) (Left 0)
+    add [CMul2 (Poly.singleton diff 1) (Poly.singleton notOut 1) (Left 0)]
   Eq -> do
     -- Constraint 'x == y = out'.
     -- The encoding is: out = 1 - (x-y != 0).

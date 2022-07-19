@@ -91,7 +91,7 @@ substPoly :: (GaloisField n, Bounded n, Integral n) => Poly n -> OptiM n (Either
 substPoly poly = do
   let coeffs = IntMap.toList (Poly.coeffs poly)
   (constant', coeffs') <- foldM go (Poly.constant poly, mempty) coeffs
-  
+
   return $ Poly.buildEither constant' coeffs'
   where
     go :: GaloisField n => (n, [(Var, n)]) -> (Var, n) -> OptiM n (n, [(Var, n)])
@@ -133,33 +133,33 @@ substConstraint !constraint = case constraint of
       (Left _, Left _, Left _) -> Nothing
       -- a * b = c + cx => a * b - c - cx = 0
       (Left a, Left b, Right (c, cX)) ->
-        CAdd <$> Poly.buildMaybe' (a * b - c) cX
+        CAdd <$> Poly.buildMaybe (a * b - c) cX
       -- a * (b + bx) = c => a * bx + a * b - c = 0
       (Left a, Right (b, bX), Left c) -> do
         let constant = a * b - c
         let coeffs = fmap (a *) bX
-        CAdd <$> Poly.buildMaybe' constant coeffs
+        CAdd <$> Poly.buildMaybe constant coeffs
       -- a * (b + bx) = c + cx => a * bx - cx + a * b - c = 0
       (Left a, Right (b, bX), Right (c, cX)) -> do
         let constant = a * b - c
         let coeffs = Poly.mergeCoeffs (fmap (a *) bX) (fmap negate cX)
-        CAdd <$> Poly.buildMaybe' constant coeffs
+        CAdd <$> Poly.buildMaybe constant coeffs
       -- (a + ax) * b = c => ax * b + a * b - c= 0
       (Right (a, aX), Left b, Left c) -> do
         let constant = a * b - c
         let coeffs = fmap (* b) aX
-        CAdd <$> Poly.buildMaybe' constant coeffs
+        CAdd <$> Poly.buildMaybe constant coeffs
       -- (a + ax) * b = c + cx => ax * b - cx + a * b - c = 0
       (Right (a, aX), Left b, Right (c, cX)) -> do
         let constant = a * b - c
         let coeffs = Poly.mergeCoeffs (fmap (* b) aX) (fmap negate cX)
-        CAdd <$> Poly.buildMaybe' constant coeffs
+        CAdd <$> Poly.buildMaybe constant coeffs
       -- (a + ax) * (b + bx) = c
       -- (a + ax) * (b + bx) = c + cx
       (Right (a, aX), Right (b, bX), Left c) -> do
-        Just $ CMul2 (Poly.build' a aX) (Poly.build' b bX) (Left c)
+        Just $ CMul2 (Poly.build a aX) (Poly.build b bX) (Left c)
       (Right (a, aX), Right (b, bX), Right (c, cX)) -> do
-        Just $ CMul2 (Poly.build' a aX) (Poly.build' b bX) (Right $ Poly.build' c cX)
+        Just $ CMul2 (Poly.build a aX) (Poly.build b bX) (Right $ Poly.build c cX)
   CNQZ _ _ -> return $ Just constraint
 
 -- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
@@ -221,11 +221,9 @@ handlePinnedVars pinnedVars = do
     return (var, result)
 
   let isNotRoot (var, reuslt) = Root var /= reuslt
-  let pinnedEquations =
-        map
+  let pinnedEquations = concatMap
           ( \(var, result) -> case result of
               Root root -> cadd 0 [(var, 1), (root, -1)] -- var == root
               Value c -> cadd (- c) [(var, 1)] -- var == c
-          )
-          $ filter isNotRoot pinnedTerms
+          ) (filter isNotRoot pinnedTerms)
   return pinnedEquations
