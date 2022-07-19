@@ -37,17 +37,18 @@ runKeelungAggSig dimension numberOfSignatures =
 
 main :: IO ()
 main = hspec $ do
-  describe "Aggregate Signature" $ do
-    it "dim:1 sig:1" $
-      runKeelungAggSig 1 1 `shouldBe` Right Nothing
-    it "dim:1 sig:10" $
-      runKeelungAggSig 1 10 `shouldBe` Right Nothing
-    it "dim:10 sig:1" $
-      runKeelungAggSig 10 1 `shouldBe` Right Nothing
-    it "dim:10 sig:10" $
-      runKeelungAggSig 10 10 `shouldBe` Right Nothing
-
   describe "Execution" $ do
+
+    describe "Aggregate Signature" $ do
+      it "dim:1 sig:1" $
+        runKeelungAggSig 1 1 `shouldBe` Right Nothing
+      it "dim:1 sig:10" $
+        runKeelungAggSig 1 10 `shouldBe` Right Nothing
+      it "dim:10 sig:1" $
+        runKeelungAggSig 10 1 `shouldBe` Right Nothing
+      it "dim:10 sig:10" $
+        runKeelungAggSig 10 10 `shouldBe` Right Nothing
+
     it "Basic.identity" $
       execute Basic.identity [42] `shouldBe` Right (Just 42)
     it "Basic.summation" $
@@ -58,6 +59,12 @@ main = hspec $ do
       execute Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right Nothing
     it "Basic.assertArraysEqual2" $
       execute Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right Nothing
+
+    it "Basic.array2D" $
+          execute (Basic.array2D 1 1) [2, 4] `shouldBe` Right Nothing
+
+    it "Basic.toArray1" $
+          execute Basic.toArray1 [0 .. 7] `shouldBe` Right Nothing
 
   describe "Type Erasure" $ do
     describe "Boolean variables" $ do

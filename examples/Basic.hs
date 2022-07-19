@@ -104,11 +104,38 @@ assert1 = do
   assert (x `Eq` 3)
   return x
 
--- loop2 :: Comp GF181 ()
--- loop2 = do
---   arr <-  inputs 2
---   arr2 <-  inputs 2
---   assertArrayEqual 2 arr (arr2 :: (Ref ('A ('V 'Num))))
+array2D :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
+array2D n m = do
+  xs <- inputs2 n m
+  -- expecting square of signatures as input
+  squares <- inputs2 n m
+  -- for each signature
+  forM_ [0 .. n - 1] $ \i -> do
+    -- for each term of signature
+    forM_ [0 .. m - 1] $ \j -> do
+      x <- access2 xs (i, j)
+      x' <- access2 squares (i, j)
+      assert (x' `Eq` (x * x))
+
+  return unit 
+
+
+toArray1 :: Comp GF181 (Expr 'Unit GF181)
+toArray1 = do 
+  xss <- inputs2 2 4 
+  yss <- do 
+    ys0 <- toArray [0, 1, 2, 3]
+    ys1 <- toArray [4, 5, 6, 7]
+    toArray [ys0, ys1]
+
+  forM_ [0 .. 1] $ \i -> do
+    xs <- access xss i 
+    ys <- access yss i 
+    forM_ [0 .. 3] $ \j -> do
+      x <- access xs j 
+      y <- access ys j 
+      assert $ x `Eq` y
+  return unit 
 
 make :: (GaloisField n, Integral n) => Int -> Int -> Param n
 make dim n = makeParam dim n 42 $ Settings True True True
@@ -128,9 +155,11 @@ a1 = checkAgg 1 1
 a2 :: Comp GF181 (Expr 'Unit GF181)
 a2 = checkSize 1 1
 
+a3 :: Comp GF181 (Expr 'Unit GF181)
+a3 = checkLength 1 1
+
 agg :: Comp GF181 (Expr 'Unit GF181)
-agg = do 
-  a1 >> a2
+agg = a1 >> a2 >> a3 
 
 -- components of aggregate signature
 checkAgg :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
