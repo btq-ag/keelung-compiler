@@ -16,6 +16,7 @@ import Keelung.Field (GF181)
 import Keelung.Monad
 import Keelung.Syntax
 import Keelung (Compilable)
+import Control.Monad (forM_)
 
 --------------------------------------------------------------------------------
 
@@ -51,15 +52,47 @@ cond' = do
   x <- input
   return $ cond (x `Eq` 3) 12 789
 
-loop1 :: Comp GF181 (Expr 'Num GF181)
-loop1 = do
+summation :: Comp GF181 (Expr 'Num GF181)
+summation = do
   arr <- inputs 4
   reduce 0 [0 .. 3] $ \accum i -> do
     x <- access arr i
     return $ accum + x
 
-loopB :: Comp GF181 (Expr 'Bool GF181)
-loopB = do
+summation2 :: Comp GF181 (Expr 'Unit GF181)
+summation2 = do
+  arr <- inputs 4
+  sumA <- reduce 0 [0 .. 3] $ \accum i -> do
+    x <- access arr i
+    return $ accum + x
+  sumB <- reduce 0 [3, 2, 1, 0] $ \accum i -> do
+    x <- access arr i
+    return $ accum + x
+  assert $ sumA `Eq` sumB
+  return unit 
+
+assertArraysEqual :: Comp GF181 (Expr 'Unit GF181)
+assertArraysEqual = do 
+  arrA <- inputs 4
+  arrB <- inputs 4
+  forM_ [0 .. 3] $ \i -> do
+    x <- access arrA i
+    y <- access arrB i
+    assert $ x `Eq` y
+  return unit 
+
+assertArraysEqual2 :: Comp GF181 (Expr 'Unit GF181)
+assertArraysEqual2 = do 
+  arr <- inputs2 2 4 
+  forM_ [0 .. 1] $ \i -> do
+    forM_ [0 .. 3] $ \j -> do
+      x <- access2 arr (i, j)
+      y <- access2 arr (i, j)
+      assert $ x `Eq` y
+  return unit 
+
+every :: Comp GF181 (Expr 'Bool GF181)
+every = do
   arr <- inputs 4
   reduce true [0 .. 3] $ \accum i -> do
     x <- access arr i
@@ -89,8 +122,15 @@ p = makeParam 1 1 42 $ Settings False True False
 -- inputs :: [GF181]
 -- inputs = genInputFromParam p
 
-a :: Comp GF181 (Expr 'Unit GF181)
-a = checkSize 1 1
+a1 :: Comp GF181 (Expr 'Unit GF181)
+a1 = checkAgg 1 1
+
+a2 :: Comp GF181 (Expr 'Unit GF181)
+a2 = checkSize 1 1
+
+agg :: Comp GF181 (Expr 'Unit GF181)
+agg = do 
+  a1 >> a2
 
 -- components of aggregate signature
 checkAgg :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
