@@ -69,7 +69,7 @@ instance GaloisField n => Interpret Expr n where
     Xor x y -> do
       x' <- interp x
       y' <- interp y
-      return $ x' + y' - x' * y'
+      return $ x' + y' - 2 * (x' * y')
     BEq x y -> do
       x' <- interp x
       y' <- interp y
