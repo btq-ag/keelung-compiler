@@ -61,7 +61,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (Poly n) where
       printTerm (_, 0) = error "printTerm: coefficient of 0"
       printTerm (x, 1) = "$" ++ show x
       printTerm (x, -1) = "-$" ++ show x
-      printTerm (x, c) = show (toInteger c) ++ "$" ++ show x
+      printTerm (x, c) = show (N c) ++ "$" ++ show x
 
 -- | Create a polynomial from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.
