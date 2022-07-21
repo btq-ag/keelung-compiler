@@ -8,7 +8,7 @@ import qualified Basic
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
-import Keelung.Compiler
+import Keelung.Compiler 
 import Keelung.Compiler.Constraint (Constraint (..), cadd)
 import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
@@ -16,9 +16,7 @@ import Keelung.Compiler.Interpret (InterpretError (..))
 import qualified Keelung.Compiler.Optimise as Optimse
 import qualified Keelung.Compiler.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Compiler.Optimise.Monad as Optimise
-import Keelung.Field (GF181)
-import Keelung.Monad
-import Keelung.Syntax
+import Keelung hiding (Error(..))
 import qualified Keelung.Syntax.Concrete as C
 import Test.Hspec
 
@@ -32,7 +30,7 @@ runKeelungAggSig dimension numberOfSignatures =
           }
       param = makeParam dimension numberOfSignatures 42 settings :: Param GF181
    in execute
-        (AggSig.aggregateSignature param :: Comp GF181 (Expr 'Unit GF181))
+        (AggSig.aggregateSignature param :: Comp GF181 (Val 'Unit GF181))
         (genInputFromParam param)
 
 main :: IO ()
@@ -91,7 +89,7 @@ main = hspec $ do
               enableLengthChecking = True
             }
         setup = makeParam 1 1 42 settings :: Param GF181
-        erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Expr 'Unit GF181))
+        erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Val 'Unit GF181))
         result = IntSet.toList . erasedBooleanVars <$> erased
     in result `shouldBe` Right [3 .. 16]
 
