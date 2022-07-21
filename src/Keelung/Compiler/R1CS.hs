@@ -15,7 +15,7 @@ import qualified Keelung.Compiler.Constraint.Polynomial as Poly
 import Keelung.Compiler.Optimise (optimiseWithWitness)
 import Keelung.Compiler.Util
 import Keelung.Field (N (..))
-import Keelung.Syntax (Var)
+import Keelung.Types (Var)
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.

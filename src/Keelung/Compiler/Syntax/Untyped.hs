@@ -19,7 +19,7 @@ import qualified Data.IntSet as IntSet
 import Data.Sequence (Seq (..), (<|), (|>))
 import qualified Data.Sequence as Seq
 import Keelung.Field (N (..))
-import Keelung.Syntax (Var)
+import Keelung.Types (Var)
 import qualified Keelung.Syntax.Concrete as T
 
 --------------------------------------------------------------------------------

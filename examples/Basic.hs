@@ -15,51 +15,51 @@ import Keelung.Compiler.Constraint (cadd)
 import Keelung.Field (GF181)
 import Keelung.Monad
 import Keelung.Syntax
-import Keelung (Compilable)
+import Keelung (Compilable, Kind(..))
 import Control.Monad (forM_)
 
 --------------------------------------------------------------------------------
 
-assertToBe42 :: Comp GF181 (Expr 'Unit GF181)
+assertToBe42 :: Comp GF181 (Val 'Unit GF181)
 assertToBe42 = do
   x <- input
   assert $ x `Eq` 42
   return unit
 
-constant1 :: Comp GF181 (Expr 'Num GF181)
+constant1 :: Comp GF181 (Val 'Num GF181)
 constant1 = do
   return $ 1 + 1
 
-identity :: Comp GF181 (Expr 'Num GF181)
+identity :: Comp GF181 (Val 'Num GF181)
 identity = input
 
-identityB :: Comp GF181 (Expr 'Bool GF181)
+identityB :: Comp GF181 (Val 'Bool GF181)
 identityB = input
 
-add3 :: Comp GF181 (Expr 'Num GF181)
+add3 :: Comp GF181 (Val 'Num GF181)
 add3 = do
   x <- input
   return $ x + 3
 
 -- takes an input and see if its equal to 3
-eq1 :: Comp GF181 (Expr 'Bool GF181)
+eq1 :: Comp GF181 (Val 'Bool GF181)
 eq1 = do
   x <- input
   return $ x `Eq` 3
 
-cond' :: Comp GF181 (Expr 'Num GF181)
+cond' :: Comp GF181 (Val 'Num GF181)
 cond' = do
   x <- input
   return $ cond (x `Eq` 3) 12 789
 
-summation :: Comp GF181 (Expr 'Num GF181)
+summation :: Comp GF181 (Val 'Num GF181)
 summation = do
   arr <- inputs 4
   reduce 0 [0 .. 3] $ \accum i -> do
     x <- access arr i
     return $ accum + x
 
-summation2 :: Comp GF181 (Expr 'Unit GF181)
+summation2 :: Comp GF181 (Val 'Unit GF181)
 summation2 = do
   arr <- inputs 4
   sumA <- reduce 0 [0 .. 3] $ \accum i -> do
@@ -71,7 +71,7 @@ summation2 = do
   assert $ sumA `Eq` sumB
   return unit 
 
-assertArraysEqual :: Comp GF181 (Expr 'Unit GF181)
+assertArraysEqual :: Comp GF181 (Val 'Unit GF181)
 assertArraysEqual = do 
   arrA <- inputs 4
   arrB <- inputs 4
@@ -81,7 +81,7 @@ assertArraysEqual = do
     assert $ x `Eq` y
   return unit 
 
-assertArraysEqual2 :: Comp GF181 (Expr 'Unit GF181)
+assertArraysEqual2 :: Comp GF181 (Val 'Unit GF181)
 assertArraysEqual2 = do 
   arr <- inputs2 2 4 
   forM_ [0 .. 1] $ \i -> do
@@ -91,20 +91,20 @@ assertArraysEqual2 = do
       assert $ x `Eq` y
   return unit 
 
-every :: Comp GF181 (Expr 'Bool GF181)
+every :: Comp GF181 (Val 'Bool GF181)
 every = do
   arr <- inputs 4
   reduce true [0 .. 3] $ \accum i -> do
     x <- access arr i
     return $ accum `And` x
 
-assert1 :: Comp GF181 (Expr 'Num GF181)
+assert1 :: Comp GF181 (Val 'Num GF181)
 assert1 = do
   x <- input
   assert (x `Eq` 3)
   return x
 
-array2D :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
+array2D :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
 array2D n m = do
   xs <- inputs2 n m
   -- expecting square of signatures as input
@@ -120,7 +120,7 @@ array2D n m = do
   return unit 
 
 
-toArray1 :: Comp GF181 (Expr 'Unit GF181)
+toArray1 :: Comp GF181 (Val 'Unit GF181)
 toArray1 = do 
   xss <- inputs2 2 4 
   yss <- do 
@@ -140,7 +140,7 @@ toArray1 = do
 make :: (GaloisField n, Integral n) => Int -> Int -> Param n
 make dim n = makeParam dim n 42 $ Settings True True True
 
-aggSig :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
+aggSig :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
 aggSig dim n = AggregateSignature.Program.aggregateSignature (make dim n)
 
 p :: Param GF181
@@ -149,33 +149,33 @@ p = makeParam 1 1 42 $ Settings False True False
 -- inputs :: [GF181]
 -- inputs = genInputFromParam p
 
-a1 :: Comp GF181 (Expr 'Unit GF181)
+a1 :: Comp GF181 (Val 'Unit GF181)
 a1 = checkAgg 1 1
 
-a2 :: Comp GF181 (Expr 'Unit GF181)
+a2 :: Comp GF181 (Val 'Unit GF181)
 a2 = checkSize 1 1
 
-a3 :: Comp GF181 (Expr 'Unit GF181)
+a3 :: Comp GF181 (Val 'Unit GF181)
 a3 = checkLength 1 1
 
-agg :: Comp GF181 (Expr 'Unit GF181)
+agg :: Comp GF181 (Val 'Unit GF181)
 agg = a1 >> a2 >> a3 
 
 -- components of aggregate signature
-checkAgg :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
+checkAgg :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
 checkAgg dim n = AggregateSignature.Program.checkAgg (make dim n)
 
 -- -- #2
-checkSize :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
+checkSize :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
 checkSize dim n = AggregateSignature.Program.checkSize (make dim n)
 
 -- -- #3
-checkLength :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
+checkLength :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
 checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 
 --------------------------------------------------------------------------------
 
-bench :: Compilable t => Comp GF181 (Expr t GF181) -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
+bench :: Compilable t => Comp GF181 (Val t GF181) -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
 bench program settings dimension n = do
   let inputVal = genInputFromParam (makeParam dimension n 42 settings)
   cs <- comp program -- before optimisation (only constant propagation)

@@ -11,7 +11,7 @@ import Keelung.Compiler.Constraint (Constraint (..), cadd)
 import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
 import Keelung.Compiler.Optimise.Monad
-import Keelung.Syntax (Var)
+import Keelung.Types (Var)
 
 run ::
   (GaloisField n, Bounded n, Integral n) =>

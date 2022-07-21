@@ -17,7 +17,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap.Lazy as Map
 import Keelung.Compiler.Optimise.UnionFind (UnionFind (..))
 import qualified Keelung.Compiler.Optimise.UnionFind as UnionFind
-import Keelung.Syntax (Var)
+import Keelung.Types (Var)
 import Keelung.Compiler.Util (Witness)
 
 ----------------------------------------------------------------

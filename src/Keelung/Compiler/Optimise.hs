@@ -23,7 +23,7 @@ import Keelung.Field
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: (Integral n, AcceptedField n, Compilable t) => Comp n (Expr t n) -> Either String C.Elaborated
+elaborateAndRewrite :: (Integral n, AcceptedField n, Compilable t) => Comp n (Val t n) -> Either String C.Elaborated
 elaborateAndRewrite prog = elaborateAndFlatten prog >>= Rewriting2.run
 
 optimiseWithWitness :: (GaloisField n, Bounded n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)

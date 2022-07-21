@@ -27,7 +27,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import Data.Semiring (Semiring (..))
 import Keelung.Field (N (..))
-import Keelung.Syntax (Var)
+import Keelung.Types (Var)
 import Prelude hiding (negate)
 import qualified Prelude
 

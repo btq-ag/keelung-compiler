@@ -11,7 +11,7 @@ where
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Maybe (fromMaybe)
-import Keelung.Syntax (Var)
+import Keelung.Types (Var)
 import Keelung.Field (N(..))
 
 data UnionFind n = UnionFind

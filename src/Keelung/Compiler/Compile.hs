@@ -17,7 +17,7 @@ import qualified Data.Set as Set
 import Keelung.Compiler.Constraint
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
 import Keelung.Compiler.Syntax.Untyped
-import Keelung.Syntax (Var)
+import Keelung.Types (Var)
 
 ----------------------------------------------------------------
 

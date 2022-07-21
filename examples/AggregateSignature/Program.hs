@@ -10,7 +10,8 @@ import Control.Monad
 import Data.Array
 import Keelung.Compiler
 import Keelung.Monad
-import Keelung.Syntax
+-- import Keelung.Syntax
+import Keelung
 
 --    let S be the signature and P be the public key
 --    let Q = q - P
@@ -34,7 +35,7 @@ import Keelung.Syntax
 --        │                                                     │
 --        └──────────────────────────  ...  ────────────────────┘
 
-checkAgg :: (Integral n, GaloisField n) => Param n -> Comp n (Expr 'Unit n)
+checkAgg :: (Integral n, GaloisField n) => Param n -> Comp n (Val 'Unit n)
 checkAgg (Param dimension numOfSigs setup _) = do
   -- allocation of inputs:
   --    nT: coefficients of terms of signatures as input
@@ -75,7 +76,7 @@ checkAgg (Param dimension numOfSigs setup _) = do
 
   return unit
 
-checkSize :: (GaloisField n, Integral n) => Param n -> Comp n (Expr 'Unit n)
+checkSize :: (GaloisField n, Integral n) => Param n -> Comp n (Val 'Unit n)
 checkSize (Param dimension numOfSigs setup _) = do
   let signatures = setupSignatures setup
 
@@ -104,7 +105,7 @@ checkSize (Param dimension numOfSigs setup _) = do
 
   return unit
 
-checkLength :: (Integral n, GaloisField n) => Param n -> Comp n (Expr 'Unit n)
+checkLength :: (Integral n, GaloisField n) => Param n -> Comp n (Val 'Unit n)
 checkLength (Param dimension numOfSigs _ _) = do
   sigs <- inputs2 numOfSigs dimension
 
@@ -138,7 +139,7 @@ checkLength (Param dimension numOfSigs _ _) = do
 
   return unit
 
-aggregateSignature :: (Integral n, GaloisField n) => Param n -> Comp n (Expr 'Unit n)
+aggregateSignature :: (Integral n, GaloisField n) => Param n -> Comp n (Val 'Unit n)
 aggregateSignature param = do
   let settings = paramSettings param
   -- check aggregate signature
