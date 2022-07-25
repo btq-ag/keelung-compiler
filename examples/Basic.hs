@@ -12,10 +12,8 @@ import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung.Compiler
 import Keelung.Compiler.Constraint (cadd)
-import Keelung.Field (GF181)
 import Keelung.Monad
-import Keelung.Syntax
-import Keelung (Compilable, Kind(..))
+import Keelung hiding (Error)
 import Control.Monad (forM_)
 
 --------------------------------------------------------------------------------

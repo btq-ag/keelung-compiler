@@ -60,9 +60,9 @@ main = do
         Left err -> print err
         Right (elaborated, inputs) -> do
           case compFieldType (elabComp elaborated) of
-            B64 -> BSC.putStrLn $ encode (interpElab elaborated (map fromInteger inputs) :: Either String (Maybe B64))
-            GF181 -> BSC.putStrLn $ encode (interpElab elaborated (map fromInteger inputs) :: Either String (Maybe GF181))
-            BN128 -> BSC.putStrLn $ encode (interpElab elaborated (map fromInteger inputs) :: Either String (Maybe BN128))
+            B64 -> putStrLn $ BSC.unpack $ encode (interpElab elaborated (map fromInteger inputs) :: Either String (Maybe B64))
+            GF181 -> putStrLn $ BSC.unpack $ encode (interpElab elaborated (map fromInteger inputs) :: Either String (Maybe GF181))
+            BN128 -> putStrLn $ BSC.unpack $ encode (interpElab elaborated (map fromInteger inputs) :: Either String (Maybe BN128))
     Profile dimension numOfSigs -> profile dimension numOfSigs
     Count dimension numOfSigs -> do
       putStrLn $ show dimension ++ ":" ++ show numOfSigs
