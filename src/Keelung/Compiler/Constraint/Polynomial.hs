@@ -2,11 +2,10 @@
 
 module Keelung.Compiler.Constraint.Polynomial
   ( Poly,
-    build,
+    -- build,
     buildEither,
-    buildMaybe',
     buildMaybe,
-    singleton,
+    singleVar,
     vars,
     coeffs,
     mergeCoeffs,
@@ -65,37 +64,25 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (Poly n) where
 
 -- | Create a polynomial from a constant and a list of coefficients.
 --   Coefficients of 0 are discarded.
-build :: (Eq n, Num n) => n -> IntMap n -> Poly n
-build c xs =
-  if IntMap.null xs
-    then error "error: build: no variables in polynomial"
-    else Poly c xs
-
--- | Type-safe version of 'build'
 buildEither :: (Eq n, Num n) => n -> [(Var, n)] -> Either n (Poly n)
 buildEither c xs =
   let xs' = IntMap.filter (0 /=) $ IntMap.fromListWith (+) xs
    in if IntMap.null xs'
         then Left c
-        else Right $ build c xs'
+        else Right (Poly c xs')
 
-buildMaybe' :: (Eq n, Num n) => n -> [(Var, n)] -> Maybe (Poly n)
-buildMaybe' c xs =
-  let xs' = IntMap.filter (0 /=) $ IntMap.fromListWith (+) xs
-   in if IntMap.null xs'
-        then Nothing
-        else Just $ build c xs'
-
+-- | Create a polynomial from a constant and a list of coefficients.
+--   Coefficients of 0 are discarded.
 buildMaybe :: (Eq n, Num n) => n -> IntMap n -> Maybe (Poly n)
 buildMaybe c xs =
   let xs' = IntMap.filter (0 /=) xs
    in if IntMap.null xs'
         then Nothing
-        else Just $ build c xs'
+        else Just (Poly c xs')
 
 -- | Create a polynomial from a single variable and its coefficient.
-singleton :: (Eq n, Num n) => Var -> n -> Poly n
-singleton x c = build 0 $ IntMap.singleton x c
+singleVar :: (Eq n, Num n) => Var -> Poly n
+singleVar x = Poly 0 (IntMap.singleton x 1)
 
 -- | Return the set of variables.
 vars :: Poly n -> IntSet

@@ -157,9 +157,11 @@ substConstraint !constraint = case constraint of
       -- (a + ax) * (b + bx) = c
       -- (a + ax) * (b + bx) = c + cx
       (Right (a, aX), Right (b, bX), Left c) -> do
-        Just $ CMul2 (Poly.build a aX) (Poly.build b bX) (Left c)
+        CMul2 <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
+          <*> pure (Left c)
       (Right (a, aX), Right (b, bX), Right (c, cX)) -> do
-        Just $ CMul2 (Poly.build a aX) (Poly.build b bX) (Right $ Poly.build c cX)
+        CMul2 <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
+          <*> pure (Poly.buildEither c (IntMap.toList cX))
   CNQZ _ _ -> return $ Just constraint
 
 -- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
@@ -221,9 +223,11 @@ handlePinnedVars pinnedVars = do
     return (var, result)
 
   let isNotRoot (var, reuslt) = Root var /= reuslt
-  let pinnedEquations = concatMap
+  let pinnedEquations =
+        concatMap
           ( \(var, result) -> case result of
               Root root -> cadd 0 [(var, 1), (root, -1)] -- var == root
               Value c -> cadd (- c) [(var, 1)] -- var == c
-          ) (filter isNotRoot pinnedTerms)
+          )
+          (filter isNotRoot pinnedTerms)
   return pinnedEquations

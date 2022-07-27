@@ -150,12 +150,6 @@ toR1CS cs =
           (Left 1)
           (Right xs)
           (Left 0)
-    -- toR1C (CMul cx dy (e, Nothing)) =
-    --   Just $
-    --     R1C (uncurry (flip Poly.singleton) cx) (uncurry (flip Poly.singleton) dy) (Poly.build e mempty)
-    -- toR1C (CMul cx dy (e, Just z)) =
-    --   Just $
-    --     R1C (uncurry (flip Poly.singleton) cx) (uncurry (flip Poly.singleton) dy) (uncurry (flip Poly.singleton) (e, z))
     toR1C (CMul2 aX bX cX) =
       Just $ R1C (Right aX) (Right bX) cX
     toR1C CNQZ {} = Nothing

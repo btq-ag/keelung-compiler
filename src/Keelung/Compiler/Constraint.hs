@@ -9,7 +9,6 @@ import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
-import Data.Maybe (maybeToList)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint.Polynomial (Poly)
@@ -44,10 +43,19 @@ instance Functor Constraint where
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
-cadd !c !xs = map CAdd $ maybeToList (Poly.buildMaybe' c xs)
+cadd !c !xs = map CAdd $ case Poly.buildEither c xs of
+  Left _ -> []
+  Right xs' -> [xs']
 
-cmul :: GaloisField n => Var -> Var -> (n, [(Var, n)]) -> Constraint n
-cmul !x !y (c, zs) = CMul2 (Poly.singleton x 1) (Poly.singleton y 1) (Poly.buildEither c zs)
+-- | Smart constructor for the CAdd constraint
+cmul :: GaloisField n => [(Var, n)] -> [(Var, n)] -> (n, [(Var, n)]) -> [Constraint n]
+cmul !xs !ys (c, zs) = case ( do
+                                xs' <- Poly.buildEither 0 xs
+                                ys' <- Poly.buildEither 0 ys
+                                return $ CMul2 xs' ys' (Poly.buildEither c zs)
+                            ) of
+  Left _ -> []
+  Right result -> [result]
 
 instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
   show (CAdd xs) = "A " ++ show xs ++ " = 0"
