@@ -6,8 +6,6 @@ import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import Control.Monad
 import Control.Monad.Except
-import qualified Data.ByteString as BS
--- import Keelung.Monad
 
 import qualified Data.ByteString.Char8 as BSC
 import Data.Serialize (decode, encode)
@@ -34,8 +32,8 @@ main = do
   options <- getOptions
   case options of
     Protocol ToCS -> do
-      blob <- BS.getContents
-      let decoded = decode blob :: Either String (Either String Elaborated)
+      blob <- getContents
+      let decoded = decode (BSC.pack blob) :: Either String (Either String Elaborated)
       case join decoded of
         Left err -> print err
         Right elaborated -> do
@@ -44,8 +42,8 @@ main = do
             GF181 -> print (optmElab elaborated :: Either (Error GF181) (ConstraintSystem GF181))
             BN128 -> print (optmElab elaborated :: Either (Error BN128) (ConstraintSystem BN128))
     Protocol ToR1CS -> do
-      blob <- BS.getContents
-      let decoded = decode blob :: Either String (Either String Elaborated)
+      blob <- getContents
+      let decoded = decode (BSC.pack blob) :: Either String (Either String Elaborated)
       case join decoded of
         Left err -> print err
         Right elaborated -> do
@@ -54,8 +52,8 @@ main = do
             GF181 -> print (convElab elaborated :: Either (Error GF181) (R1CS GF181))
             BN128 -> print (convElab elaborated :: Either (Error BN128) (R1CS BN128))
     Protocol Interpret -> do
-      blob <- BS.getContents
-      let decoded = decode blob :: Either String (Either String (Elaborated, [Integer]))
+      blob <- getContents
+      let decoded = decode (BSC.pack blob) :: Either String (Either String (Elaborated, [Integer]))
       case join decoded of
         Left err -> print err
         Right (elaborated, inputs) -> do
