@@ -13,6 +13,7 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
 import Keelung.Compiler.Optimise (optimiseWithWitness)
+import Keelung.Compiler.Optimise.Monad (assignmentOfVars, runOptiM)
 import Keelung.Compiler.Util
 import Keelung.Field (N (..))
 import Keelung.Types (Var)
@@ -30,36 +31,33 @@ generateWitness ::
   Either (ExecError n) (Witness n)
 generateWitness cs env =
   let cs' = renumberConstraints cs
-      -- pinnedVars =
-      --   IntSet.toList (csInputVars cs)
-      --     ++ case csOutputVar cs of
-      --       Nothing -> []
-      --       Just v -> [v]
       variables = [0 .. IntSet.size (csVars cs) - 1]
       (witness, _) = optimiseWithWitness env cs'
    in if all (isMapped witness) variables
         then Right witness
         else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
   where
-    -- ( "unassigned variables,\n  "
-    --     ++ show [x | x <- variables, not $ isMapped witness x]
-    --     ++ ",\n"
-    --     ++ "in assignment context\n  "
-    --     ++ show (fmap N witness)
-    --     ++ ",\n"
-    --     ++ "in pinned-variable context\n  "
-    --     ++ show pinnedVars
-    --     ++ ",\n"
-    --     ++ "in reduced-constraint context\n  "
-    --     ++ show cs''
-    --     ++ ",\n"
-    --     ++ "in constraint context\n  "
-    --     ++ show cs'
-    -- )
-
     isMapped witness var = IntMap.member var witness
 
---------------------------------------------------------------------------------
+-- | Starting from an initial partial assignment, solve the
+-- constraints and return the resulting complete assignment.
+-- Return `Left String` if the constraints are unsolvable.
+generateWitness2 ::
+  GaloisField n =>
+  -- | Constraints to be solved
+  R1CS n ->
+  -- | Initial assignment
+  Witness n ->
+  -- | Resulting assignment
+  Either (ExecError n) (Witness n)
+generateWitness2 r1cs env =
+  let variables = [0 .. r1csNumOfVars r1cs - 1]
+      witness = runOptiM env (assignmentOfVars variables)
+      -- variables in `variables` but not in `witness`
+      varsNotInWitness = IntSet.difference (IntSet.fromList variables) (IntMap.keysSet witness)
+   in if IntSet.null varsNotInWitness
+        then Right witness
+        else Left $ ExecVarUnassignedError (IntSet.toList varsNotInWitness) witness
 
 --------------------------------------------------------------------------------
 

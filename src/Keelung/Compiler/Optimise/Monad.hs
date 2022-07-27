@@ -69,7 +69,7 @@ lookupVar x = do
 -- | Construct a partial assignment from 'vars' to field elements.
 assignmentOfVars :: GaloisField n => [Var] -> OptiM n (Witness n)
 assignmentOfVars vars = do
-  binds <- mapM lookupVar vars
+  bindings <- mapM lookupVar vars
   return $
     Map.fromList $
       concatMap
@@ -77,4 +77,4 @@ assignmentOfVars vars = do
             Root _ -> []
             Value c -> [(x, c)]
         )
-        $ zip vars binds
+        $ zip vars bindings
