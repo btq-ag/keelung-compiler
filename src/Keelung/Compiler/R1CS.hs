@@ -3,7 +3,6 @@ module Keelung.Compiler.R1CS where
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.List as List
 import Data.Maybe (mapMaybe)
@@ -90,15 +89,20 @@ satisfyR1C witness constraint
 
 -- | Rank-1 Constraint Systems
 data R1CS n = R1CS
-  { r1csClauses :: [R1C n],
+  { -- List of constraints
+    r1csClauses :: [R1C n],
+    -- Number of variables in the constraint system
     r1csNumOfVars :: Int,
-    r1csInputVars :: IntSet,
+    -- Number of input variables in the system 
+    -- Input variables are placed in the front 
+    -- (so we don't have to enumerate them all here)
+    r1csNumOfInputVars :: Int,
     r1csOutputVar :: Maybe Var,
     r1csWitnessGen :: Witness n -> Either (ExecError n) (Witness n)
   }
 
 instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
-  show (R1CS cs n ivs ovs _) =
+  show (R1CS cs n is os _) =
     "R1CS {\n\
     \  R1C clauses ("
       <> show numberOfClauses
@@ -108,10 +112,10 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
       ++ show n
       ++ "\n"
       ++ "  number of input vars: "
-      ++ show (IntSet.size ivs)
+      ++ show is
       ++ "\n"
       ++ "  output var: "
-      ++ show ovs
+      ++ show os
       ++ "\n"
       ++ "}"
     where
@@ -137,7 +141,7 @@ toR1CS cs =
   R1CS
     (mapMaybe toR1C (Set.toList (csConstraints cs) ++ csBooleanInputVarConstraints cs))
     (IntSet.size (csVars cs))
-    (csInputVars cs)
+    (IntSet.size (csInputVars cs))
     (csOutputVar cs)
     (generateWitness cs)
   where
@@ -154,10 +158,9 @@ toR1CS cs =
 
 witnessOfR1CS :: [n] -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
-  let inputVars = r1csInputVars r1cs
-   in if IntSet.size inputVars /= length inputs
-        then Left $ ExecInputUnmatchedError (IntSet.size inputVars) (length inputs)
-        else r1csWitnessGen r1cs $ IntMap.fromList (zip (IntSet.toList inputVars) inputs)
+  if r1csNumOfInputVars r1cs /= length inputs
+    then Left $ ExecInputUnmatchedError (r1csNumOfInputVars r1cs) (length inputs)
+    else r1csWitnessGen r1cs $ IntMap.fromDistinctAscList (zip [0 ..] inputs)
 
 --------------------------------------------------------------------------------
 
