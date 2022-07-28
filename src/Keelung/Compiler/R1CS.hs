@@ -1,18 +1,17 @@
 module Keelung.Compiler.R1CS where
 
+import Data.Either (lefts, rights)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import qualified Data.List as List
-import Data.Maybe (mapMaybe)
 import Data.Semiring (Semiring (..))
 import qualified Data.Set as Set
-import Keelung.Compiler.Constraint
+import Keelung.Compiler.Constraint hiding (numberOfConstraints)
 import Keelung.Compiler.Constraint.Polynomial (Poly)
 import qualified Keelung.Compiler.Constraint.Polynomial as Poly
 import Keelung.Compiler.Optimise (optimiseWithWitness)
-import Keelung.Compiler.Optimise.Monad (assignmentOfVars, runOptiM)
 import Keelung.Compiler.Util
 import Keelung.Field (N (..))
 import Keelung.Types (Var)
@@ -21,7 +20,7 @@ import Keelung.Types (Var)
 -- constraints and return the resulting complete assignment.
 -- Return `Left String` if the constraints are unsolvable.
 generateWitness ::
-  (GaloisField n, Bounded n, Integral n) =>
+  GaloisField n =>
   -- | Constraints to be solved
   ConstraintSystem n ->
   -- | Initial assignment
@@ -38,25 +37,18 @@ generateWitness cs env =
   where
     isMapped witness var = IntMap.member var witness
 
--- | Starting from an initial partial assignment, solve the
--- constraints and return the resulting complete assignment.
--- Return `Left String` if the constraints are unsolvable.
-generateWitness2 ::
-  GaloisField n =>
-  -- | Constraints to be solved
-  R1CS n ->
-  -- | Initial assignment
-  Witness n ->
-  -- | Resulting assignment
-  Either (ExecError n) (Witness n)
-generateWitness2 r1cs env =
-  let variables = [0 .. r1csNumOfVars r1cs - 1]
-      witness = runOptiM env (assignmentOfVars variables)
-      -- variables in `variables` but not in `witness`
-      varsNotInWitness = IntSet.difference (IntSet.fromList variables) (IntMap.keysSet witness)
-   in if IntSet.null varsNotInWitness
-        then Right witness
-        else Left $ ExecVarUnassignedError (IntSet.toList varsNotInWitness) witness
+-- -- | Starting from an initial partial assignment, solve the
+-- -- constraints and return the resulting complete assignment.
+-- -- Return `Left String` if the constraints are unsolvable.
+-- generateWitness' ::
+--   GaloisField n =>
+--   -- | Constraints to be solved
+--   R1CS n ->
+--   -- | Initial assignment
+--   Witness n ->
+--   -- | Resulting assignment
+--   Either (ExecError n) (Witness n)
+-- generateWitness' r1cs = generateWitness (fromR1CS r1cs)
 
 --------------------------------------------------------------------------------
 
@@ -90,24 +82,26 @@ satisfyR1C witness constraint
 -- | Rank-1 Constraint Systems
 data R1CS n = R1CS
   { -- List of constraints
-    r1csClauses :: [R1C n],
+    r1csConstraints :: [R1C n],
     -- Number of variables in the constraint system
     r1csNumOfVars :: Int,
     -- Number of input variables in the system
     -- Input variables are placed in the front
     -- (so we don't have to enumerate them all here)
     r1csNumOfInputVars :: Int,
+    -- Set of Boolean input vars
+    r1csBooleanInputVars :: IntSet,
     r1csOutputVar :: Maybe Var,
-    r1csWitnessGen :: Witness n -> Either (ExecError n) (Witness n)
+    r1csCNQZPairs :: [(Var, Var)]
   }
 
-instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
-  show (R1CS cs n is os _) =
+instance (Show n, GaloisField n, Integral n, Bounded n) => Show (R1CS n) where
+  show r1cs@(R1CS cs n is _ os _) =
     "R1CS {\n\
-    \  R1C clauses ("
-      <> show numberOfClauses
-      <> ")"
-      <> showClauses
+    \  R1C constraints ("
+      <> show numberOfConstraints
+      <> "):\n"
+      <> showConstraints
       ++ "\n  number of variables: "
       ++ show n
       ++ "\n"
@@ -119,43 +113,15 @@ instance (Show n, Integral n, Bounded n, Fractional n) => Show (R1CS n) where
       ++ "\n"
       ++ "}"
     where
-      numberOfClauses = length cs
-      showClauses = ":\n" ++ List.intercalate "\n" (map (\s -> "    " ++ show s) cs)
+      numberOfConstraints = length cs + is
+      showConstraints = unlines (map (\s -> "    " ++ show s) (toR1Cs r1cs))
 
--- if numberOfClauses > 30
---   then "\n"
---   else ":\n" ++ List.intercalate "\n" (map (\s -> "    " ++ show s) cs)
-
--- `Nothing` if all constraints are satisfiable
--- `Just [R1C]` if at least one constraint is unsatisfiable
-satisfyR1CS :: GaloisField n => Witness n -> R1CS n -> Maybe [R1C n]
-satisfyR1CS witness r1cs =
-  let clauses = r1csClauses r1cs
-      unsatisfiable = filter (not . satisfyR1C witness) clauses
-   in if null unsatisfiable
-        then Nothing
-        else Just unsatisfiable
-
-toR1CS :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> R1CS n
-toR1CS cs =
-  R1CS
-    (mapMaybe toR1C (Set.toList (csConstraints cs)) ++ booleanInputVarConstraints)
-    (IntSet.size (csVars cs))
-    (IntSet.size (csInputVars cs))
-    (csOutputVar cs)
-    (generateWitness cs)
+-- | Returns R1C constraints from a R1CS
+--   (includes boolean constraints for input variables)
+toR1Cs :: GaloisField n => R1CS n -> [R1C n]
+toR1Cs (R1CS cs _ _ bis _ _) = cs <> booleanInputVarConstraints
   where
-    toR1C :: GaloisField n => Constraint n -> Maybe (R1C n)
-    toR1C (CAdd xs) =
-      Just $
-        R1C
-          (Left 1)
-          (Right xs)
-          (Left 0)
-    toR1C (CMul2 aX bX cX) =
-      Just $ R1C (Right aX) (Right bX) cX
-    toR1C CNQZ {} = Nothing
-
+    booleanInputVarConstraints :: GaloisField n => [R1C n]
     booleanInputVarConstraints =
       map
         ( \var ->
@@ -164,30 +130,66 @@ toR1CS cs =
               (Right (Poly.singleVar var))
               (Right (Poly.singleVar var))
         )
-        (IntSet.toList (csBooleanInputVars cs))
+        (IntSet.toList bis)
 
--- fromR1CS :: (GaloisField n) => R1CS n -> ConstraintSystem n
--- fromR1CS r1cs =
---   ConstraintSystem
---     { csConstraints = Set.fromList (map fromR1C (r1csClauses r1cs)),
---       csBooleanInputVarConstraints = _,
---       csVars = IntSet.fromDistinctAscList [0 .. r1csNumOfVars r1cs - 1],
---       csInputVars = IntSet.fromDistinctAscList [0 .. r1csNumOfInputVars r1cs - 1],
---       csOutputVar = r1csOutputVar r1cs
---     }
---   where
---     fromR1C (R1C aX bX cX) =
---       case (aX, bX, cX) of
---         (Left 1, Right xs, Left 0) -> CAdd xs
---         (Right xs, Left 1, Left 0) -> CAdd xs
---         (Right xs, Right ys, _) -> CMul2 xs ys cX
---         _ -> error "fromR1C: invalid R1C"
+-- | Returns `Nothing`    if all constraints are satisfiable,
+--   returns `Just [R1C]` if at least one constraint is unsatisfiable
+satisfyR1CS :: GaloisField n => Witness n -> R1CS n -> Maybe [R1C n]
+satisfyR1CS witness r1cs =
+  let constraints = r1csConstraints r1cs
+      unsatisfiable = filter (not . satisfyR1C witness) constraints
+   in if null unsatisfiable
+        then Nothing
+        else Just unsatisfiable
 
-witnessOfR1CS :: [n] -> R1CS n -> Either (ExecError n) (Witness n)
+-- | Converts ConstraintSystem to R1CS
+toR1CS :: GaloisField n => ConstraintSystem n -> R1CS n
+toR1CS cs =
+  R1CS
+    (rights convertedConstratins)
+    (IntSet.size (csVars cs))
+    (IntSet.size (csInputVars cs))
+    (csBooleanInputVars cs)
+    (csOutputVar cs)
+    (lefts convertedConstratins)
+  where
+    convertedConstratins = map toR1C (Set.toList (csConstraints cs))
+
+    toR1C :: GaloisField n => Constraint n -> Either (Var, Var) (R1C n)
+    toR1C (CAdd xs) =
+      Right $
+        R1C
+          (Left 1)
+          (Right xs)
+          (Left 0)
+    toR1C (CMul2 aX bX cX) =
+      Right $ R1C (Right aX) (Right bX) cX
+    toR1C (CNQZ x m) = Left (x, m)
+
+fromR1CS :: GaloisField n => R1CS n -> ConstraintSystem n
+fromR1CS r1cs =
+  ConstraintSystem
+    { csConstraints =
+        Set.fromList (map fromR1C (r1csConstraints r1cs))
+          <> Set.fromList (map (uncurry CNQZ) (r1csCNQZPairs r1cs)),
+      csBooleanInputVars = r1csBooleanInputVars r1cs,
+      csVars = IntSet.fromDistinctAscList [0 .. r1csNumOfVars r1cs - 1],
+      csInputVars = IntSet.fromDistinctAscList [0 .. r1csNumOfInputVars r1cs - 1],
+      csOutputVar = r1csOutputVar r1cs
+    }
+  where
+    fromR1C (R1C aX bX cX) =
+      case (aX, bX, cX) of
+        (Left 1, Right xs, Left 0) -> CAdd xs
+        (Right xs, Left 1, Left 0) -> CAdd xs
+        (Right xs, Right ys, _) -> CMul2 xs ys cX
+        _ -> error "fromR1C: invalid R1C"
+
+witnessOfR1CS :: GaloisField n => [n] -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
   if r1csNumOfInputVars r1cs /= length inputs
     then Left $ ExecInputUnmatchedError (r1csNumOfInputVars r1cs) (length inputs)
-    else r1csWitnessGen r1cs $ IntMap.fromDistinctAscList (zip [0 ..] inputs)
+    else generateWitness (fromR1CS r1cs) $ IntMap.fromDistinctAscList (zip [0 ..] inputs)
 
 --------------------------------------------------------------------------------
 
@@ -222,19 +224,3 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ExecError n) whe
     "these variables:\n " ++ show vars
       ++ "\n are not assigned in: \n"
       ++ show (fmap N witness)
-
--- ( "unassigned variables,\n  "
---     ++ show [x | x <- variables, not $ isMapped witness x]
---     ++ ",\n"
---     ++ "in assignment context\n  "
---     ++ show (fmap N witness)
---     ++ ",\n"
---     ++ "in pinned-variable context\n  "
---     ++ show pinnedVars
---     ++ ",\n"
---     ++ "in reduced-constraint context\n  "
---     ++ show cs''
---     ++ ",\n"
---     ++ "in constraint context\n  "
---     ++ show cs'
--- )

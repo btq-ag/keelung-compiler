@@ -14,7 +14,7 @@ import Keelung.Compiler.Optimise.Monad
 import Keelung.Types (Var)
 
 run ::
-  (GaloisField n, Bounded n, Integral n) =>
+  GaloisField n =>
   [Var] ->
   Set (Constraint n) ->
   OptiM n (Set (Constraint n))
@@ -24,7 +24,7 @@ run pinnedVars constraints = do
   return (Set.fromList pinned <> minimised)
 
 minimiseManyTimes ::
-  (GaloisField n, Bounded n, Integral n) =>
+  GaloisField n =>
   -- | Initial constraint set
   Set (Constraint n) ->
   -- | Resulting simplified constraint set
@@ -39,7 +39,7 @@ minimiseManyTimes constraints = do
     else return constraints' -- stop here
 
 minimiseOnce ::
-  (GaloisField n, Bounded n, Integral n) =>
+  GaloisField n =>
   -- | Initial constraint set
   Set (Constraint n) ->
   -- | Resulting simplified constraint set
@@ -56,7 +56,7 @@ minimiseOnce = goOverConstraints Set.empty
 
 --
 goOverConstraints ::
-  (GaloisField n, Bounded n, Integral n) =>
+  GaloisField n =>
   Set (Constraint n) ->
   Set (Constraint n) ->
   OptiM n (Set (Constraint n))
@@ -87,7 +87,7 @@ goOverConstraints accum constraints = case Set.minView constraints of
 
 -- | Normalize a polynomial by substituting roots/constants
 -- for the variables that appear in the polynomial.
-substPoly :: (GaloisField n, Bounded n, Integral n) => Poly n -> OptiM n (Either n (Poly n))
+substPoly :: GaloisField n => Poly n -> OptiM n (Either n (Poly n))
 substPoly poly = do
   let coeffs = IntMap.toList (Poly.coeffs poly)
   (constant', coeffs') <- foldM go (Poly.constant poly, mempty) coeffs
@@ -114,7 +114,7 @@ substPoly poly = do
 -- for the variables that appear in the constraint. Note that, when
 -- normalizing a multiplicative constraint, it may be necessary to
 -- convert it into an additive constraint.
-substConstraint :: (GaloisField n, Bounded n, Integral n) => Constraint n -> OptiM n (Maybe (Constraint n))
+substConstraint :: GaloisField n => Constraint n -> OptiM n (Maybe (Constraint n))
 substConstraint !constraint = case constraint of
   CAdd poly -> do
     result <- substPoly poly
@@ -213,7 +213,7 @@ learn _ = return ()
 --  (1) Look up the term associated with
 --      the pinned variable, if any (call it 't').
 --  (2) If there is no such term (other than 'x' itself),
---      do nothing (clauses containing the pinned
+--      do nothing (constraints containing the pinned
 --      variable must still contain the pinned variable).
 --  (3) Otherwise, introduce a new equation 'x = t'.
 handlePinnedVars :: GaloisField n => [Var] -> OptiM n [Constraint n]
