@@ -227,7 +227,7 @@ cs1 =
             cadd 10623 [(13, -1)],
             cadd 11179 [(12, -1)]
           ],
-      csBooleanInputVarConstraints = mempty,
+      csBooleanInputVars = mempty,
       csVars = IntSet.fromList [0 .. 17],
       csInputVars = IntSet.fromList [0 .. 11],
       csOutputVar = Nothing

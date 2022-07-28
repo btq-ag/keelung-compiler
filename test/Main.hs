@@ -103,7 +103,7 @@ main = hspec $ do
               { csConstraints =
                   Set.fromList $
                     cadd (-42) [(0, 1)],
-                csBooleanInputVarConstraints = mempty,
+                csBooleanInputVars = mempty,
                 csVars = IntSet.fromList [0],
                 csInputVars = IntSet.fromList [0],
                 csOutputVar = Nothing
@@ -176,7 +176,7 @@ main = hspec $ do
                           cadd 10623 [(13, -1)],
                           cadd 11179 [(12, -1)]
                         ],
-                  csBooleanInputVarConstraints = mempty,
+                  csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 17],
                   csInputVars = IntSet.fromList [0 .. 11],
                   csOutputVar = Nothing
@@ -191,7 +191,7 @@ main = hspec $ do
                     Set.fromList $
                       cadd 0 [(0, 1), (1, 1), (4, 1)]
                         ++ cadd 0 [(2, 1), (3, 1), (4, 1)],
-                  csBooleanInputVarConstraints = mempty,
+                  csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 4],
                   csInputVars = IntSet.fromList [0 .. 3],
                   csOutputVar = Nothing
@@ -201,7 +201,7 @@ main = hspec $ do
                 { csConstraints =
                     Set.fromList $
                       cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)],
-                  csBooleanInputVarConstraints = mempty,
+                  csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 3],
                   csOutputVar = Nothing
@@ -215,7 +215,7 @@ main = hspec $ do
                     Set.fromList $
                       cmul [(3, 1)] [(2, 1)] (42, []) --- $3 * $2 = 42
                         ++ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
-                  csBooleanInputVarConstraints = mempty,
+                  csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 2],
                   csOutputVar = Nothing
@@ -224,7 +224,7 @@ main = hspec $ do
               ConstraintSystem
                 { csConstraints =
                     Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
-                  csBooleanInputVarConstraints = mempty,
+                  csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 2],
                   csInputVars = IntSet.fromList [0 .. 2],
                   csOutputVar = Nothing
@@ -238,7 +238,7 @@ main = hspec $ do
                     Set.fromList $
                       cadd 0 [(3, 1), (0, 1), (1, 1)] --- 0 = $3 + $0 + $1
                         ++ cmul [(2, 1)] [(3, 1)] (42, []), --- $2 * $3 = 42
-                  csBooleanInputVarConstraints = mempty,
+                  csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 2],
                   csOutputVar = Nothing
@@ -247,7 +247,7 @@ main = hspec $ do
               ConstraintSystem
                 { csConstraints =
                     Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
-                  csBooleanInputVarConstraints = mempty,
+                  csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 2],
                   csInputVars = IntSet.fromList [0 .. 2],
                   csOutputVar = Nothing
@@ -261,7 +261,7 @@ main = hspec $ do
                     Set.fromList $
                       cadd 0 [(4, 1), (0, 1), (1, 1)] --- 0 = $4 + $0 + $1
                         ++ cmul [(2, 1)] [(3, 1)] (0, [(4, 1)]), --- $2 * $3 = $4
-                  csBooleanInputVarConstraints = mempty,
+                  csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 4],
                   csInputVars = IntSet.fromList [0 .. 3],
                   csOutputVar = Nothing
@@ -271,7 +271,7 @@ main = hspec $ do
                 { csConstraints =
                     Set.fromList $
                       cmul [(2, 1)] [(3, 1)] (0, [(0, -1), (1, -1)]), --- $2 * $3 = - $0 - $1
-                  csBooleanInputVarConstraints = mempty,
+                  csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 3],
                   csOutputVar = Nothing

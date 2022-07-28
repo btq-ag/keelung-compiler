@@ -106,8 +106,11 @@ varsInConstraints = IntSet.unions . Set.map varsInConstraint
 
 -- | Constraint System
 data ConstraintSystem n = ConstraintSystem
-  { csConstraints :: !(Set (Constraint n)),
-    csBooleanInputVarConstraints :: ![Constraint n],
+  { -- | Constraints
+    csConstraints :: !(Set (Constraint n)),
+    -- | Input variables that are Booleans 
+    -- should generate constraints like $A * $A = $A for each Boolean variables 
+    csBooleanInputVars :: !IntSet,
     csVars :: !IntSet,
     csInputVars :: !IntSet,
     csOutputVar :: !(Maybe Var)
@@ -116,17 +119,17 @@ data ConstraintSystem n = ConstraintSystem
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem cs cs' _ _ _) = Set.size cs + length cs'
+numberOfConstraints (ConstraintSystem cs cs' _ _ _) = Set.size cs + IntSet.size cs'
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints boolConstraints vars inputVars outputVar) =
+  show (ConstraintSystem constraints boolInputVars vars inputVars outputVar) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
       <> "):\n\n"
       <> printConstraints (toList constraints)
       <> "\n"
-      <> printBooleanConstraints
+      <> printBooleanVars
       <> printNumOfVars
       <> printInputVars
       <> printOutputVar
@@ -134,14 +137,12 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
     where
       printConstraints = unlines . map (\c -> "    " <> show c)
 
-      printBooleanConstraints =
-        if null boolConstraints
+      printBooleanVars =
+        if IntSet.null boolInputVars
           then ""
           else
-            "  boolean constraints (" <> show (length boolConstraints)
-              <> "):\n\n"
-              <> printConstraints boolConstraints
-              <> "\n\n"
+            "  boolean input variables (" <> show (IntSet.size boolInputVars)
+              <> ")\n\n"
 
       printNumOfVars =
         "  number of variables: "
@@ -166,7 +167,7 @@ renumberConstraints :: (Ord n, Num n) => ConstraintSystem n -> ConstraintSystem 
 renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))
-    (map renumberConstraint (csBooleanInputVarConstraints cs))
+    (IntSet.map renumber (csBooleanInputVars cs))
     (IntSet.fromList renumberedVars)
     (IntSet.map renumber (csInputVars cs))
     (renumber <$> csOutputVar cs)

@@ -8,7 +8,6 @@ module Keelung.Compiler.Compile (run) where
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'))
-import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
@@ -201,10 +200,10 @@ encodeBinaryOp op out x y = case op of
       Var x * Var y + ((1 - Var x) * (1 - Var y))
 
 -- | Ensure that boolean variables have constraint 'b^2 = b'
-convertBooleanVars :: GaloisField n => IntSet -> [Constraint n]
-convertBooleanVars booleanInputVars =
-  map (\b -> CMul2 (Poly.singleVar b) (Poly.singleVar b) (Right $ Poly.singleVar b)) $
-    IntSet.toList booleanInputVars
+-- convertBooleanVars :: GaloisField n => IntSet -> [Constraint n]
+-- convertBooleanVars booleanInputVars =
+--   map (\b -> CMul2 (Poly.singleVar b) (Poly.singleVar b) (Right $ Poly.singleVar b)) $
+--     IntSet.toList booleanInputVars
 
 -- | Encode the constraint 'x = out'.
 encodeAssertion :: GaloisField n => Expr n -> M n ()
@@ -231,14 +230,13 @@ run (TypeErased untypedExpr assertions assignments numOfVars inputVars booleanVa
 
   -- ensure that boolean input variables are boolean
   let booleanInputVars = booleanVars `IntSet.intersection` inputVars
-  let booleanInputVarConstraints = convertBooleanVars booleanInputVars
 
   constraints <- gets envConstraints
   let vars = varsInConstraints constraints
   return
     ( ConstraintSystem
         constraints
-        booleanInputVarConstraints
+        booleanInputVars
         vars
         inputVars
         outputVar

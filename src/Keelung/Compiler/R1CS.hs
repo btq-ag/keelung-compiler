@@ -93,8 +93,8 @@ data R1CS n = R1CS
     r1csClauses :: [R1C n],
     -- Number of variables in the constraint system
     r1csNumOfVars :: Int,
-    -- Number of input variables in the system 
-    -- Input variables are placed in the front 
+    -- Number of input variables in the system
+    -- Input variables are placed in the front
     -- (so we don't have to enumerate them all here)
     r1csNumOfInputVars :: Int,
     r1csOutputVar :: Maybe Var,
@@ -139,7 +139,7 @@ satisfyR1CS witness r1cs =
 toR1CS :: (GaloisField n, Bounded n, Integral n) => ConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
-    (mapMaybe toR1C (Set.toList (csConstraints cs) ++ csBooleanInputVarConstraints cs))
+    (mapMaybe toR1C (Set.toList (csConstraints cs)) ++ booleanInputVarConstraints)
     (IntSet.size (csVars cs))
     (IntSet.size (csInputVars cs))
     (csOutputVar cs)
@@ -155,6 +155,33 @@ toR1CS cs =
     toR1C (CMul2 aX bX cX) =
       Just $ R1C (Right aX) (Right bX) cX
     toR1C CNQZ {} = Nothing
+
+    booleanInputVarConstraints =
+      map
+        ( \var ->
+            R1C
+              (Right (Poly.singleVar var))
+              (Right (Poly.singleVar var))
+              (Right (Poly.singleVar var))
+        )
+        (IntSet.toList (csBooleanInputVars cs))
+
+-- fromR1CS :: (GaloisField n) => R1CS n -> ConstraintSystem n
+-- fromR1CS r1cs =
+--   ConstraintSystem
+--     { csConstraints = Set.fromList (map fromR1C (r1csClauses r1cs)),
+--       csBooleanInputVarConstraints = _,
+--       csVars = IntSet.fromDistinctAscList [0 .. r1csNumOfVars r1cs - 1],
+--       csInputVars = IntSet.fromDistinctAscList [0 .. r1csNumOfInputVars r1cs - 1],
+--       csOutputVar = r1csOutputVar r1cs
+--     }
+--   where
+--     fromR1C (R1C aX bX cX) =
+--       case (aX, bX, cX) of
+--         (Left 1, Right xs, Left 0) -> CAdd xs
+--         (Right xs, Left 1, Left 0) -> CAdd xs
+--         (Right xs, Right ys, _) -> CMul2 xs ys cX
+--         _ -> error "fromR1C: invalid R1C"
 
 witnessOfR1CS :: [n] -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
