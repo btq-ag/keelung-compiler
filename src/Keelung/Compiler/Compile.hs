@@ -14,7 +14,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint
-import qualified Keelung.Compiler.Constraint.Polynomial as Poly
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Types (Var)
 

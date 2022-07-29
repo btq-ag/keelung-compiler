@@ -13,7 +13,6 @@ import Keelung (elaborateAndFlatten)
 import Keelung.Compiler
   ( ConstraintSystem,
     Error (..),
-    R1CS,
     comp,
     convElab,
     interpElab,
@@ -26,6 +25,7 @@ import Keelung.Compiler
 import Keelung.Field
 import Keelung.Syntax.Concrete
 import Option
+import Keelung.Constraint.R1CS (R1CS)
 
 main :: IO ()
 main = do

@@ -28,7 +28,6 @@ library
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
-      Keelung.Compiler.Constraint.Polynomial
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Optimise
@@ -67,7 +66,6 @@ executable keelungc
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
-      Keelung.Compiler.Constraint.Polynomial
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Optimise
@@ -139,7 +137,6 @@ benchmark keelung-bench
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
-      Keelung.Compiler.Constraint.Polynomial
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Optimise

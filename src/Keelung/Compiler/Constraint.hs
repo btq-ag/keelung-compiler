@@ -11,8 +11,8 @@ import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Compiler.Constraint.Polynomial (Poly)
-import qualified Keelung.Compiler.Constraint.Polynomial as Poly
+import Keelung.Constraint.Polynomial (Poly)
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Field
 import Keelung.Types (Var)
 

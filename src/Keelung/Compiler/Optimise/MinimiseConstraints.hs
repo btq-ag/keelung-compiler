@@ -8,8 +8,8 @@ import qualified Data.IntMap as IntMap
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint (Constraint (..), cadd)
-import Keelung.Compiler.Constraint.Polynomial (Poly)
-import qualified Keelung.Compiler.Constraint.Polynomial as Poly
+import Keelung.Constraint.Polynomial (Poly)
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Compiler.Optimise.Monad
 import Keelung.Types (Var)
 

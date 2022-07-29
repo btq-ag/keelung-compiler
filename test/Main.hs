@@ -11,8 +11,8 @@ import qualified Data.Set as Set
 import Keelung hiding (Error (..))
 import Keelung.Compiler
 import Keelung.Compiler.Constraint (cadd, cmul)
-import Keelung.Compiler.Constraint.Polynomial (Poly)
-import qualified Keelung.Compiler.Constraint.Polynomial as Poly
+import Keelung.Constraint.Polynomial (Poly)
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Compiler.Interpret (InterpretError (..))
 import qualified Keelung.Compiler.Optimise as Optimse
 import qualified Keelung.Compiler.Optimise.MinimiseConstraints as Optimise

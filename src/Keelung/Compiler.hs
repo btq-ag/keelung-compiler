@@ -51,6 +51,7 @@ import Keelung.Field
 import Keelung.Monad
 import qualified Keelung.Syntax as K
 import qualified Keelung.Syntax.Concrete as C
+import Keelung.Constraint.R1CS (R1CS (..))
 
 --------------------------------------------------------------------------------
 -- Some top-level functions
