@@ -26,6 +26,7 @@ import Keelung.Field
 import Keelung.Syntax.Concrete
 import Option
 import Keelung.Constraint.R1CS (R1CS)
+import Control.Arrow (left)
 
 main :: IO ()
 main = do
@@ -48,9 +49,9 @@ main = do
         Left err -> print err
         Right elaborated -> do
           case compFieldType (elabComp elaborated) of
-            B64 -> print (convElab elaborated :: Either (Error B64) (R1CS B64))
-            GF181 -> print (convElab elaborated :: Either (Error GF181) (R1CS GF181))
-            BN128 -> print (convElab elaborated :: Either (Error BN128) (R1CS BN128))
+            B64 -> putStrLn $ BSC.unpack $ encode (left show (convElab elaborated) :: Either String (R1CS B64))
+            GF181 -> putStrLn $ BSC.unpack $ encode (left show (convElab elaborated) :: Either String (R1CS GF181))
+            BN128 -> putStrLn $ BSC.unpack $ encode (left show (convElab elaborated) :: Either String (R1CS BN128))
     Protocol Interpret -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (Either String (Elaborated, [Integer]))
