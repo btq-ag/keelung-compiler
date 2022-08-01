@@ -41,8 +41,7 @@ options =
 --------------------------------------------------------------------------------
 
 data ProtocolOptions
-  = ToCS
-  | ToR1CS
+  = ToR1CS
   | Interpret
   deriving (Show)
 
@@ -50,14 +49,6 @@ protocol :: Parser ProtocolOptions
 protocol =
   hsubparser
     ( command
-        "toCS"
-        ( info
-            (pure ToCS <**> helper)
-            ( fullDesc
-                <> progDesc "Compile a Keelung program to ConstraintSystem"
-            )
-        )
-        <> command
           "toR1CS"
           ( info
               (pure ToR1CS <**> helper)

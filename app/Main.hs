@@ -19,8 +19,7 @@ import Keelung.Compiler
     numberOfConstraints,
     optimise,
     optimise2,
-    optm,
-    optmElab,
+    optm
   )
 import Keelung.Field
 import Keelung.Syntax.Concrete
@@ -32,16 +31,6 @@ main :: IO ()
 main = do
   options <- getOptions
   case options of
-    Protocol ToCS -> do
-      blob <- getContents
-      let decoded = decode (BSC.pack blob) :: Either String (Either String Elaborated)
-      case join decoded of
-        Left err -> print err
-        Right elaborated -> do
-          case compFieldType (elabComp elaborated) of
-            B64 -> print (optmElab elaborated :: Either (Error B64) (ConstraintSystem B64))
-            GF181 -> print (optmElab elaborated :: Either (Error GF181) (ConstraintSystem GF181))
-            BN128 -> print (optmElab elaborated :: Either (Error BN128) (ConstraintSystem BN128))
     Protocol ToR1CS -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (Either String Elaborated)
