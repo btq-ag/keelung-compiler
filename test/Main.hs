@@ -8,7 +8,7 @@ import qualified Basic
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
-import Keelung hiding (Error (..))
+import Keelung 
 import Keelung.Compiler
 import Keelung.Compiler.Constraint (cadd, cmul)
 import Keelung.Constraint.Polynomial (Poly)
@@ -63,6 +63,9 @@ main = hspec $ do
     it "Basic.toArray1" $
       execute Basic.toArray1 [0 .. 7] `shouldBe` Right Nothing
 
+    it "Basic.xorLists" $
+      execute Basic.xorLists [] `shouldBe` Right Nothing
+    
   describe "Type Erasure" $ do
     describe "Boolean variables" $ do
       it "Basic.identity" $

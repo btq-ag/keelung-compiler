@@ -127,6 +127,8 @@ execute prog ins = do
   let outputVar = r1csOutputVar r1cs
   actualWitness <- left ExecError $ witnessOfR1CS ins r1cs
 
+
+
   -- extract the output value from the witness
   actualOutput <- case outputVar of
     Nothing -> return Nothing
@@ -137,8 +139,10 @@ execute prog ins = do
             ExecOutputVarNotMappedError outputVar actualWitness
       Just value -> return $ Just value
 
+
   -- interpret the program to see if the output value is correct
   expectedOutput <- interpret prog ins
+
 
   when (actualOutput /= expectedOutput) $ do
     Left $ ExecError $ ExecOutputError expectedOutput actualOutput

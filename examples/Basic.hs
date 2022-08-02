@@ -13,8 +13,8 @@ import qualified Data.Set as Set
 import Keelung.Compiler
 import Keelung.Compiler.Constraint (cadd)
 import Keelung.Monad
-import Keelung hiding (Error)
-import Control.Monad (forM_)
+import Keelung 
+import Control.Monad (forM_, foldM)
 
 --------------------------------------------------------------------------------
 
@@ -232,3 +232,21 @@ cs1 =
       csInputVars = IntSet.fromList [0 .. 11],
       csOutputVar = Nothing
     }
+
+
+xorLists :: Comp GF181 (Val 'Bool GF181)
+xorLists = do
+  xs <- toArray [false]
+  ys <- toArray [true]
+  x <- access xs 0 
+  y <- access ys 0 
+  actual <- toArray [x `Xor` y]
+  expected <- toArray [true]
+  foldM
+    ( \acc i -> do
+        a <- access actual i
+        b <- access expected i
+        return (acc `And` a `BEq` b)
+    )
+    true
+    [0]

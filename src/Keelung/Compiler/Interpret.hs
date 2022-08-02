@@ -25,8 +25,8 @@ runM :: IntMap n -> M n a -> Either (InterpretError n) a
 runM st p = runExcept (evalStateT p st)
 
 addBinding :: Ref -> n -> M n ()
-addBinding (NumVar var) val = modify $ \xs -> IntMap.insert var val xs
-addBinding (BoolVar var) val = modify $ \xs -> IntMap.insert var val xs
+addBinding (NumVar var) val = modify (IntMap.insert var val)
+addBinding (BoolVar var) val = modify (IntMap.insert var val)
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
@@ -86,12 +86,17 @@ instance GaloisField n => Interpret Expr n where
 
 interpretElaborated2 :: (GaloisField n, Bounded n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) (Maybe n)
 interpretElaborated2 (Elaborated expr comp) inputs = runM bindings $ do
+
   -- interpret the assignments first
-  forM_ (compNumAsgns comp) $ \(Assignment var e) -> do
+  -- reverse the list assignments so that "simple values" are binded first
+  -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
+  let numAssignments = reverse (compNumAsgns comp)
+  forM_ numAssignments $ \(Assignment var e) -> do
     value <- interp e
     addBinding var value
 
-  forM_ (compBoolAsgns comp) $ \(Assignment var e) -> do
+  let boolAssignments = reverse (compBoolAsgns comp)
+  forM_ boolAssignments $ \(Assignment var e) -> do
     value <- interp e
     addBinding var value
 
