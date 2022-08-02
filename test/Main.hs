@@ -8,7 +8,7 @@ import qualified Basic
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
-import Keelung 
+import Keelung
 import Keelung.Compiler
 import Keelung.Compiler.Constraint (cadd, cmul)
 import Keelung.Constraint.Polynomial (Poly)
@@ -19,6 +19,7 @@ import qualified Keelung.Compiler.Optimise.MinimiseConstraints as Optimise
 import qualified Keelung.Compiler.Optimise.Monad as Optimise
 import qualified Keelung.Syntax.Concrete as C
 import Test.Hspec
+import Control.Arrow (left)
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) (Maybe GF181)
 runKeelungAggSig dimension numberOfSignatures =
@@ -64,8 +65,8 @@ main = hspec $ do
       execute Basic.toArray1 [0 .. 7] `shouldBe` Right Nothing
 
     it "Basic.xorLists" $
-      execute Basic.xorLists [] `shouldBe` Right Nothing
-    
+      execute Basic.xorLists [] `shouldBe` Right (Just 1)
+
   describe "Type Erasure" $ do
     describe "Boolean variables" $ do
       it "Basic.identity" $
@@ -281,28 +282,9 @@ main = hspec $ do
                 }
          in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
--- it "CAdd & CMul 2" $
---   let cs =
---         ConstraintSystem
---           { csConstraints =
---               Set.fromList
---                 [ cadd 0 [(4, 1), (0, 1), (1, 1)], --- 0 = $4 + $0 + $1
---                   CMul2 (Poly.singleVar 4 1) (Poly.singleVar 2 1) (Left 42) --- $4 * $2 = 42
---                 ],
---             csBooleanInputVarConstraints = mempty,
---             csVars = IntSet.fromList [0 .. 4],
---             csInputVars = IntSet.fromList [0 .. 3],
---             csOutputVar = Nothing
---           }
---       cs' =
---         ConstraintSystem
---           { csConstraints =
---               Set.fromList
---                 [ CMul2 (Poly.build 0 [(0, -1), (1, -1)]) (Poly.singleVar 2 1) (Left 42) --- (- $0 - $1) * $2 = 42
---                 ],
---             csBooleanInputVarConstraints = mempty,
---             csVars = IntSet.fromList [0 .. 2],
---             csInputVars = IntSet.fromList [0 .. 2],
---             csOutputVar = Nothing
---           }
---    in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+  describe "Serialization/deserialization" $ do
+    it "Program that throws ElabError" $ do
+      let expected = left show (toR1CS <$> comp Basic.outOfBound)
+      actual <- left show <$> Keelung.compile Basic.outOfBound
+      actual `shouldBe` expected
+

@@ -9,7 +9,7 @@ import Control.Monad.Except
 
 import qualified Data.ByteString.Char8 as BSC
 import Data.Serialize (decode, encode)
-import Keelung (elaborateAndFlatten)
+import Keelung (elaborate)
 import Keelung.Compiler
   ( ConstraintSystem,
     Error (..),
@@ -22,7 +22,7 @@ import Keelung.Compiler
     optm
   )
 import Keelung.Field
-import Keelung.Syntax.Concrete
+import Keelung.Syntax.Concrete hiding (elaborate)
 import Option
 import Keelung.Constraint.R1CS (R1CS)
 import Control.Arrow (left)
@@ -33,8 +33,8 @@ main = do
   case options of
     Protocol ToR1CS -> do
       blob <- getContents
-      let decoded = decode (BSC.pack blob) :: Either String (Either String Elaborated)
-      case join decoded of
+      let decoded = decode (BSC.pack blob) :: Either String Elaborated
+      case decoded of
         Left err -> print err
         Right elaborated -> do
           case compFieldType (elabComp elaborated) of
@@ -238,7 +238,7 @@ keelungElaborate = do
     let numOfSigs = 4
     let param = makeParam dimension numOfSigs 42 settings :: Param GF181
 
-    let result = elaborateAndFlatten (AggSig.aggregateSignature param)
+    let result = elaborate (AggSig.aggregateSignature param)
     case result of
       Left err -> print err
       Right elaborated -> do

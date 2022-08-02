@@ -7,14 +7,14 @@ module Benchmark.Keelung where
 import Data.ByteString (ByteString)
 import Data.Serialize (Serialize, encode)
 import Data.Typeable (Typeable)
-import Keelung (elaborateAndFlatten)
+import Keelung (elaborate)
 import Keelung.Compiler
 import qualified Keelung.Compiler.Optimise.ConstantPropagation as ConstantPropagation
 import Keelung.Monad
 import Keelung.Syntax
 
 benchElaborate :: (Typeable kind, Serialize n, GaloisField n, Bounded n, Integral n) => Comp n (Expr kind n) -> ByteString
-benchElaborate = encode . elaborateAndFlatten
+benchElaborate = encode . elaborate
 
 benchRewrite :: (GaloisField n, Bounded n, Integral n, Serialize n, Typeable kind) => Comp n (Expr kind n) -> ByteString
 benchRewrite = encode . elaborateAndRewrite

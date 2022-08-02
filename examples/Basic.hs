@@ -246,7 +246,13 @@ xorLists = do
     ( \acc i -> do
         a <- access actual i
         b <- access expected i
-        return (acc `And` a `BEq` b)
+        return (acc `And` (a `BEq` b))
     )
     true
     [0]
+
+outOfBound :: Comp GF181 (Val 'Unit GF181)
+outOfBound = do
+  xs <- toArray [true]
+  _ <- access xs 2 
+  return unit 

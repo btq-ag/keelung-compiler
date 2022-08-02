@@ -8,12 +8,12 @@ where
 import Keelung.Syntax.Concrete
 import Control.Monad
 import Control.Monad.State
-import Control.Arrow (left)
+import Keelung.Error (ElabError)
 
 --------------------------------------------------------------------------------
 
-run :: Elaborated -> Either String Elaborated
-run (Elaborated expr comp) = left show $ do
+run :: Elaborated -> Either ElabError Elaborated
+run (Elaborated expr comp) = do
   ((), comp') <- runComp comp $ do 
     let assertions = compAssertions comp 
     assertions' <- filterM rewriteAssertEq assertions
