@@ -256,3 +256,8 @@ outOfBound = do
   xs <- toArray [true]
   _ <- access xs 2 
   return unit 
+
+emptyArray :: Comp GF181 (Val 'Unit GF181)
+emptyArray = do
+  _ <- toArray [] :: Comp GF181 (Val ('Arr 'Bool) GF181)
+  return unit 

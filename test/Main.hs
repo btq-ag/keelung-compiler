@@ -283,8 +283,13 @@ main = hspec $ do
          in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
   describe "Serialization/deserialization" $ do
-    it "Program that throws ElabError" $ do
+    it "Program that throws ElabError.IndexOutOfBoundsError" $ do
       let expected = left show (toR1CS <$> comp Basic.outOfBound)
       actual <- left show <$> Keelung.compile Basic.outOfBound
+      actual `shouldBe` expected
+
+    it "Program that throws ElabError.EmptyArrayError" $ do
+      let expected = left show (toR1CS <$> comp Basic.emptyArray)
+      actual <- left show <$> Keelung.compile Basic.emptyArray
       actual `shouldBe` expected
 
