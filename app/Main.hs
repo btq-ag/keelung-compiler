@@ -43,8 +43,8 @@ main = do
             BN128 -> putStrLn $ BSC.unpack $ encode (left show (convElab elaborated) :: Either String (R1CS BN128))
     Protocol Interpret -> do
       blob <- getContents
-      let decoded = decode (BSC.pack blob) :: Either String (Either String (Elaborated, [Integer]))
-      case join decoded of
+      let decoded = decode (BSC.pack blob) :: Either String (Elaborated, [Integer])
+      case decoded of
         Left err -> print err
         Right (elaborated, inputs) -> do
           case compFieldType (elabComp elaborated) of
