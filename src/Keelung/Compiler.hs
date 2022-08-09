@@ -32,9 +32,11 @@ module Keelung.Compiler
 where
 
 import Control.Arrow (left)
-import Control.Monad (when)
+import Control.Monad (forM, unless, when)
+import qualified Data.Either as Either
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
+import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (one, zero))
 import Keelung (Compilable (elaborate))
 import qualified Keelung.Compiler.Compile as Compile
@@ -125,24 +127,29 @@ execute :: (GaloisField n, Bounded n, Integral n, AcceptedField n, Compilable t)
 execute prog ins = do
   r1cs <- conv prog
 
-  let outputVar = r1csOutputVar r1cs
   actualWitness <- left ExecError $ witnessOfR1CS ins r1cs
 
   -- extract the output value from the witness
-  actualOutput <- case outputVar of
-    Nothing -> return []
-    Just var -> case IntMap.lookup var actualWitness of
-      Nothing ->
-        Left $
-          ExecError $
-            ExecOutputVarNotMappedError outputVar actualWitness
-      Just value -> return [value]
+
+  let outputVars = IntSet.toList (r1csOutputVars r1cs)
+  let (execErrors, actualOutputs) =
+        Either.partitionEithers $
+          map
+            ( \var ->
+                case IntMap.lookup var actualWitness of
+                  Nothing -> Left var
+                  Just value -> Right value
+            )
+            outputVars
+
+  unless (null execErrors) $ do
+    Left $ ExecError $ ExecOutputVarsNotMappedError outputVars actualWitness
 
   -- interpret the program to see if the output value is correct
-  expectedOutput <- interpret prog ins
+  expectedOutputs <- interpret prog ins
 
-  when (actualOutput /= expectedOutput) $ do
-    Left $ ExecError $ ExecOutputError expectedOutput actualOutput
+  when (actualOutputs /= expectedOutputs) $ do
+    Left $ ExecError $ ExecOutputError expectedOutputs actualOutputs
 
   case satisfyR1CS actualWitness r1cs of
     Nothing -> return ()
@@ -151,4 +158,4 @@ execute prog ins = do
         ExecError $
           ExecR1CUnsatisfiableError r1c's actualWitness
 
-  return actualOutput
+  return actualOutputs

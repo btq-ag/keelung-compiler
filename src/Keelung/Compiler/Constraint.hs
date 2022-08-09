@@ -108,12 +108,12 @@ varsInConstraints = IntSet.unions . Set.map varsInConstraint
 data ConstraintSystem n = ConstraintSystem
   { -- | Constraints
     csConstraints :: !(Set (Constraint n)),
-    -- | Input variables that are Booleans 
-    -- should generate constraints like $A * $A = $A for each Boolean variables 
+    -- | Input variables that are Booleans
+    -- should generate constraints like $A * $A = $A for each Boolean variables
     csBooleanInputVars :: !IntSet,
     csVars :: !IntSet,
     csInputVars :: !IntSet,
-    csOutputVar :: !(Maybe Var)
+    csOutputVars :: !IntSet
   }
   deriving (Eq)
 
@@ -122,7 +122,7 @@ numberOfConstraints :: ConstraintSystem n -> Int
 numberOfConstraints (ConstraintSystem cs cs' _ _ _) = Set.size cs + IntSet.size cs'
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints boolInputVars vars inputVars outputVar) =
+  show (ConstraintSystem constraints boolInputVars vars inputVars outputVars) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
@@ -132,7 +132,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
       <> printBooleanVars
       <> printNumOfVars
       <> printInputVars
-      <> printOutputVar
+      <> printOutputVars
       <> "\n}"
     where
       printConstraints = unlines . map (\c -> "    " <> show c)
@@ -155,9 +155,10 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
           <> show (IntSet.toList inputVars)
           <> "\n"
 
-      printOutputVar = case outputVar of
-        Nothing -> "  no output variable"
-        Just x -> "  output variable: $" <> show x <> "\n"
+      printOutputVars =
+        if IntSet.null outputVars
+          then "  no output variable"
+          else "  output variables: $" <> show (IntSet.toList outputVars) <> "\n"
 
 -- | Sequentially renumber term variables '0..max_var'.  Return
 --   renumbered constraints, together with the total number of
@@ -170,7 +171,7 @@ renumberConstraints cs =
     (IntSet.map renumber (csBooleanInputVars cs))
     (IntSet.fromList renumberedVars)
     (IntSet.map renumber (csInputVars cs))
-    (renumber <$> csOutputVar cs)
+    (IntSet.map renumber (csOutputVars cs))
   where
     -- variables in constraints (that should be kept after renumbering!)
     vars = varsInConstraints (csConstraints cs)

@@ -34,9 +34,7 @@ optimiseWithWitness witness cs =
   --   - output vars
   -- Pinned vars are never optimised away.
 
-  let pinnedVars = case csOutputVar cs of
-        Nothing -> csInputVars cs
-        Just outputVar -> IntSet.insert outputVar (csInputVars cs)
+  let pinnedVars = IntSet.union (csOutputVars cs) (csInputVars cs)
    in runOptiM witness $ do
         constraints <- MinimiseConstraints.run (IntSet.toList pinnedVars) (csConstraints cs)
         -- NOTE: In the next line, it's OK that 'pinnedVars'
@@ -61,9 +59,7 @@ optimise2 cs =
   --   - input vars
   --   - output vars
   -- Pinned vars are never optimised away.
-  let pinnedVars = case csOutputVar cs of
-        Nothing -> csInputVars cs
-        Just outputVar -> IntSet.insert outputVar (csInputVars cs)
+  let pinnedVars = IntSet.union (csOutputVars cs) (csInputVars cs)
 
       constraints = MinimiseConstraints2.run pinnedVars (csConstraints cs)
    in renumberConstraints $ cs {csConstraints = constraints}

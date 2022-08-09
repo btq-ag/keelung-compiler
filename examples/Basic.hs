@@ -237,7 +237,7 @@ cs1 =
       csBooleanInputVars = mempty,
       csVars = IntSet.fromList [0 .. 17],
       csInputVars = IntSet.fromList [0 .. 11],
-      csOutputVar = Nothing
+      csOutputVars = IntSet.empty 
     }
 
 

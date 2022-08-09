@@ -118,7 +118,7 @@ instance Functor Assignment where
 -- | The result after type erasure
 data TypeErased n = TypeErased
   { -- | The expression after type erasure
-    erasedExpr :: !(Maybe (Expr n)),
+    erasedExpr :: ![Expr n],
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
     -- | Assignments after type erasure
@@ -164,7 +164,7 @@ eraseType :: Num n => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions _fieldType = comp
       ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
-        expr' <- eraseExprM expr
+        expr' <- eraseExprN expr
         numAssignments' <- mapM eraseAssignment numAsgns
         boolAssignments' <- mapM eraseAssignment boolAsgns
         let assignments = numAssignments' <> boolAssignments'

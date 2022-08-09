@@ -119,7 +119,7 @@ main = hspec $ do
                 csBooleanInputVars = mempty,
                 csVars = IntSet.fromList [0],
                 csInputVars = IntSet.fromList [0],
-                csOutputVar = Nothing
+                csOutputVars = IntSet.empty 
               }
        in optm Basic.assertToBe42 `shouldBe` Right cs
 
@@ -192,7 +192,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 17],
                   csInputVars = IntSet.fromList [0 .. 11],
-                  csOutputVar = Nothing
+                  csOutputVars = IntSet.empty 
                 }
          in Optimse.optimise (cs :: ConstraintSystem GF181) `shouldNotBe` cs
 
@@ -207,7 +207,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 4],
                   csInputVars = IntSet.fromList [0 .. 3],
-                  csOutputVar = Nothing
+                  csOutputVars = IntSet.empty 
                 }
             cs' =
               ConstraintSystem
@@ -217,7 +217,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 3],
-                  csOutputVar = Nothing
+                  csOutputVars = IntSet.empty 
                 }
          in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -231,7 +231,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 2],
-                  csOutputVar = Nothing
+                  csOutputVars = IntSet.empty 
                 }
             cs' =
               ConstraintSystem
@@ -240,7 +240,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 2],
                   csInputVars = IntSet.fromList [0 .. 2],
-                  csOutputVar = Nothing
+                  csOutputVars = IntSet.empty 
                 }
          in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -254,7 +254,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 2],
-                  csOutputVar = Nothing
+                  csOutputVars = IntSet.empty 
                 }
             cs' =
               ConstraintSystem
@@ -263,7 +263,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 2],
                   csInputVars = IntSet.fromList [0 .. 2],
-                  csOutputVar = Nothing
+                  csOutputVars = IntSet.empty 
                 }
          in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -277,7 +277,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 4],
                   csInputVars = IntSet.fromList [0 .. 3],
-                  csOutputVar = Nothing
+                  csOutputVars = IntSet.empty 
                 }
             cs' =
               ConstraintSystem
@@ -287,7 +287,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 3],
-                  csOutputVar = Nothing
+                  csOutputVars = IntSet.empty 
                 }
          in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 

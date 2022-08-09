@@ -56,7 +56,7 @@ toR1CS cs =
     (IntSet.size (csVars cs))
     (IntSet.size (csInputVars cs))
     (csBooleanInputVars cs)
-    (csOutputVar cs)
+    (csOutputVars cs)
     (lefts convertedConstratins)
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
@@ -81,7 +81,7 @@ fromR1CS r1cs =
       csBooleanInputVars = r1csBooleanInputVars r1cs,
       csVars = IntSet.fromDistinctAscList [0 .. r1csNumOfVars r1cs - 1],
       csInputVars = IntSet.fromDistinctAscList [0 .. r1csNumOfInputVars r1cs - 1],
-      csOutputVar = r1csOutputVar r1cs
+      csOutputVars = r1csOutputVars r1cs
     }
   where
     fromR1C (R1C aX bX cX) =
@@ -101,7 +101,7 @@ witnessOfR1CS inputs r1cs =
 --------------------------------------------------------------------------------
 
 data ExecError n
-  = ExecOutputVarNotMappedError (Maybe Var) (IntMap n)
+  = ExecOutputVarsNotMappedError [Var] (IntMap n)
   | ExecOutputError [n] [n]
   | ExecR1CUnsatisfiableError [R1C n] (IntMap n)
   | ExecInputUnmatchedError Int Int
@@ -109,10 +109,10 @@ data ExecError n
   deriving (Eq)
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (ExecError n) where
-  show (ExecOutputVarNotMappedError var witness) =
-    "output variable "
-      ++ show var
-      ++ " is not mapped in\n  "
+  show (ExecOutputVarsNotMappedError vars witness) =
+    "output variables "
+      ++ show vars 
+      ++ " are not mapped in\n  "
       ++ show witness
   show (ExecOutputError expected actual) =
     "interpreted output:\n"
