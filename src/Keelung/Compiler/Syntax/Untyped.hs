@@ -19,8 +19,8 @@ import qualified Data.IntSet as IntSet
 import Data.Sequence (Seq (..), (<|), (|>))
 import qualified Data.Sequence as Seq
 import Keelung.Field (N (..))
-import Keelung.Types (Var)
 import qualified Keelung.Syntax.Concrete as T
+import Keelung.Types (Var)
 
 --------------------------------------------------------------------------------
 
@@ -164,11 +164,11 @@ eraseType :: Num n => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions _fieldType = comp
       ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
-        expr' <- eraseExprN expr
+        expr' <- eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAsgns
         boolAssignments' <- mapM eraseAssignment boolAsgns
         let assignments = numAssignments' <> boolAssignments'
-        assertions' <- mapM eraseExpr assertions
+        assertions' <- concat <$> mapM eraseExpr assertions
         return (expr', assignments, assertions')
    in TypeErased
         { erasedExpr = erasedExpr',
@@ -179,61 +179,9 @@ eraseType (T.Elaborated expr comp) =
           erasedBooleanVars = booleanVars
         }
 
-eraseExpr :: Num n => T.Expr -> M (Expr n)
+-- | Like `eraseExpr` but returns a list of `Expr n`
+eraseExpr :: Num n => T.Expr -> M [Expr n]
 eraseExpr expr = case expr of
-  T.Val val -> case val of
-    (T.Number n) -> return (Val (fromIntegral n))
-    (T.Boolean False) -> return (Val 0)
-    (T.Boolean True) -> return (Val 1)
-    T.Unit -> return (Val 0) -- TODO: revise this
-  T.Var var -> case var of
-    T.NumVar n -> return (Var n)
-    T.BoolVar n -> do
-      modify' (IntSet.insert n) -- keep track of all boolean variables
-      return (Var n)
-  T.Add x y -> chainExprs Add <$> eraseExpr x <*> eraseExpr y
-  T.Sub x y -> chainExprs Sub <$> eraseExpr x <*> eraseExpr y
-  T.Mul x y -> chainExprs Mul <$> eraseExpr x <*> eraseExpr y
-  T.Div x y -> chainExprs Div <$> eraseExpr x <*> eraseExpr y
-  T.Eq x y -> chainExprs Eq <$> eraseExpr x <*> eraseExpr y
-  T.And x y -> chainExprs And <$> eraseExpr x <*> eraseExpr y
-  T.Or x y -> chainExprs Or <$> eraseExpr x <*> eraseExpr y
-  T.Xor x y -> chainExprs Xor <$> eraseExpr x <*> eraseExpr y
-  T.BEq x y -> chainExprs BEq <$> eraseExpr x <*> eraseExpr y
-  T.If b x y -> If <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y
-  T.ToBool x -> eraseExpr x
-  T.ToNum x -> eraseExpr x
-
--- | Like `eraseExpr` but returns `Nothing` on `T.Unit`
-eraseExprM :: Num n => T.Expr -> M (Maybe (Expr n))
-eraseExprM expr = case expr of
-  T.Val val -> case val of
-    (T.Number n) -> return $ Just (Val (fromInteger n))
-    (T.Boolean False) -> return $ Just (Val 0)
-    (T.Boolean True) -> return $ Just (Val 1)
-    T.Unit -> return Nothing
-  T.Var var -> case var of
-    T.NumVar n -> return $ Just (Var n)
-    T.BoolVar n -> do
-      modify' (IntSet.insert n) -- keep track of all boolean variables
-      return $ Just (Var n)
-    -- T.UnitVar n -> return $ Just (Var n)
-  T.Add x y -> Just <$> (chainExprs Add <$> eraseExpr x <*> eraseExpr y)
-  T.Sub x y -> Just <$> (chainExprs Sub <$> eraseExpr x <*> eraseExpr y)
-  T.Mul x y -> Just <$> (chainExprs Mul <$> eraseExpr x <*> eraseExpr y)
-  T.Div x y -> Just <$> (chainExprs Div <$> eraseExpr x <*> eraseExpr y)
-  T.Eq x y -> Just <$> (chainExprs Eq <$> eraseExpr x <*> eraseExpr y)
-  T.And x y -> Just <$> (chainExprs And <$> eraseExpr x <*> eraseExpr y)
-  T.Or x y -> Just <$> (chainExprs Or <$> eraseExpr x <*> eraseExpr y)
-  T.Xor x y -> Just <$> (chainExprs Xor <$> eraseExpr x <*> eraseExpr y)
-  T.BEq x y -> Just <$> (chainExprs BEq <$> eraseExpr x <*> eraseExpr y)
-  T.If b x y -> Just <$> (If <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y)
-  T.ToBool x -> eraseExprM x
-  T.ToNum x -> eraseExprM x
-
--- | Like `eraseExpr` but returns a list of `Expr n` 
-eraseExprN :: Num n => T.Expr -> M [Expr n]
-eraseExprN expr = case expr of
   T.Val val -> case val of
     (T.Number n) -> return [Val (fromInteger n)]
     (T.Boolean False) -> return [Val 0]
@@ -244,24 +192,59 @@ eraseExprN expr = case expr of
     T.BoolVar n -> do
       modify' (IntSet.insert n) -- keep track of all boolean variables
       return [Var n]
-  T.Add x y -> pure <$> (chainExprs Add <$> eraseExpr x <*> eraseExpr y)
-  T.Sub x y -> pure <$> (chainExprs Sub <$> eraseExpr x <*> eraseExpr y)
-  T.Mul x y -> pure <$> (chainExprs Mul <$> eraseExpr x <*> eraseExpr y)
-  T.Div x y -> pure <$> (chainExprs Div <$> eraseExpr x <*> eraseExpr y)
-  T.Eq x y -> pure <$> (chainExprs Eq <$> eraseExpr x <*> eraseExpr y)
-  T.And x y -> pure <$> (chainExprs And <$> eraseExpr x <*> eraseExpr y)
-  T.Or x y -> pure <$> (chainExprs Or <$> eraseExpr x <*> eraseExpr y)
-  T.Xor x y -> pure <$> (chainExprs Xor <$> eraseExpr x <*> eraseExpr y)
-  T.BEq x y -> pure <$> (chainExprs BEq <$> eraseExpr x <*> eraseExpr y)
-  T.If b x y -> pure <$> (If <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y)
-  T.ToBool x -> eraseExprN x
-  T.ToNum x -> eraseExprN x
+  T.Add x y -> do
+    xs <- eraseExpr x
+    ys <- eraseExpr y
+    return [chainExprs Add (head xs) (head ys)]
+  T.Sub x y -> do
+    xs <- eraseExpr x
+    ys <- eraseExpr y
+    return [chainExprs Sub (head xs) (head ys)]
+  T.Mul x y -> do
+    xs <- eraseExpr x
+    ys <- eraseExpr y
+    return [chainExprs Mul (head xs) (head ys)]
+  T.Div x y -> do
+    xs <- eraseExpr x
+    ys <- eraseExpr y
+    return [chainExprs Div (head xs) (head ys)]
+  T.Eq x y -> do
+    xs <- eraseExpr x
+    ys <- eraseExpr y
+    return [chainExprs Eq (head xs) (head ys)]
+  T.And x y -> do
+    xs <- eraseExpr x
+    ys <- eraseExpr y
+    return [chainExprs And (head xs) (head ys)]
+  T.Or x y -> do
+    xs <- eraseExpr x
+    ys <- eraseExpr y
+    return [chainExprs Or (head xs) (head ys)]
+  T.Xor x y -> do
+    xs <- eraseExpr x
+    ys <- eraseExpr y
+    return [chainExprs Xor (head xs) (head ys)]
+  T.BEq x y -> do
+    xs <- eraseExpr x
+    ys <- eraseExpr y
+    return [chainExprs BEq (head xs) (head ys)]
+  T.If b x y -> do
+    bs <- eraseExpr b
+    xs <- eraseExpr x
+    ys <- eraseExpr y
+    return [If (head bs) (head xs) (head ys)]
+  T.ToBool x -> eraseExpr x
+  T.ToNum x -> eraseExpr x
 
 eraseAssignment :: Num n => T.Assignment -> M (Assignment n)
-eraseAssignment (T.Assignment (T.NumVar n) expr) = Assignment n <$> eraseExpr expr
+eraseAssignment (T.Assignment (T.NumVar n) expr) = do 
+  exprs <- eraseExpr expr
+  return $ Assignment n (head exprs)
 eraseAssignment (T.Assignment (T.BoolVar n) expr) = do
   modify' (IntSet.insert n) -- keep track of all boolean variables
-  Assignment n <$> eraseExpr expr
+  exprs <- eraseExpr expr
+  return $ Assignment n (head exprs)
+
 -- eraseAssignment (T.Assignment (T.UnitVar n) expr) = Assignment n <$> eraseExpr expr
 
 -- Flatten and chain expressions together when possible

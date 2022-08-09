@@ -32,7 +32,7 @@ module Keelung.Compiler
 where
 
 import Control.Arrow (left)
-import Control.Monad (forM, unless, when)
+import Control.Monad (unless, when)
 import qualified Data.Either as Either
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
