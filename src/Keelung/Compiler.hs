@@ -40,7 +40,7 @@ import Keelung (Compilable (elaborate))
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
-import Keelung.Compiler.Interpret
+import qualified Keelung.Compiler.Interpret as Interpret
 import Keelung.Compiler.Optimise
 import qualified Keelung.Compiler.Optimise.ConstantPropagation as ConstantPropagation
 import qualified Keelung.Compiler.Optimise.Rewriting as Rewriting2
@@ -60,11 +60,11 @@ import qualified Keelung.Syntax.Concrete as C
 erase :: (GaloisField n, Integral n, AcceptedField n, Compilable t) => Comp n (K.Val t n) -> Either ElabError (TypeErased n)
 erase prog = elaborate prog >>= Rewriting2.run >>= return . eraseType
 
-interpret :: (GaloisField n, Bounded n, Integral n, AcceptedField n, Compilable t) => Comp n (K.Val t n) -> [n] -> Either (Error n) (Maybe n)
-interpret prog ins = left ElabError (elaborate prog) >>= \elab -> left InterpretError (interpretElaborated2 elab ins)
+interpret :: (GaloisField n, Bounded n, Integral n, AcceptedField n, Compilable t) => Comp n (K.Val t n) -> [n] -> Either (Error n) [n]
+interpret prog ins = left ElabError (elaborate prog) >>= \elab -> left InterpretError (Interpret.run elab ins)
 
-interpElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => C.Elaborated -> [n] -> Either String (Maybe n)
-interpElab elab ins = left (show . InterpretError) (interpretElaborated2 elab ins)
+interpElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => C.Elaborated -> [n] -> Either String [n]
+interpElab elab ins = left (show . InterpretError) (Interpret.run elab ins)
 
 optmElab :: (Show n, GaloisField n, Bounded n, Integral n, AcceptedField n) => C.Elaborated -> Either (Error n) (ConstraintSystem n)
 optmElab elab = do
@@ -121,7 +121,7 @@ witn prog ins = conv prog >>= left ExecError . witnessOfR1CS ins
 --   (2) Generate a satisfying assignment, 'w'.
 --   (3) Check whether 'w' satisfies the constraint system produced in (1).
 --   (4) Check whether the R1CS result matches the interpreter result.
-execute :: (GaloisField n, Bounded n, Integral n, AcceptedField n, Compilable t) => Comp n (K.Val t n) -> [n] -> Either (Error n) (Maybe n)
+execute :: (GaloisField n, Bounded n, Integral n, AcceptedField n, Compilable t) => Comp n (K.Val t n) -> [n] -> Either (Error n) [n]
 execute prog ins = do
   r1cs <- conv prog
 
@@ -130,13 +130,13 @@ execute prog ins = do
 
   -- extract the output value from the witness
   actualOutput <- case outputVar of
-    Nothing -> return Nothing
+    Nothing -> return []
     Just var -> case IntMap.lookup var actualWitness of
       Nothing ->
         Left $
           ExecError $
             ExecOutputVarNotMappedError outputVar actualWitness
-      Just value -> return $ Just value
+      Just value -> return [value]
 
   -- interpret the program to see if the output value is correct
   expectedOutput <- interpret prog ins

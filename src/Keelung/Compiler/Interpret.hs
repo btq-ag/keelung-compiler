@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Interpret (InterpretError (..), interpretElaborated2) where
+module Keelung.Compiler.Interpret (InterpretError (..), run) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -24,9 +24,12 @@ type M n = StateT (IntMap n) (Except (InterpretError n))
 runM :: IntMap n -> M n a -> Either (InterpretError n) a
 runM st p = runExcept (evalStateT p st)
 
-addBinding :: Ref -> n -> M n ()
-addBinding (NumVar var) val = modify (IntMap.insert var val)
-addBinding (BoolVar var) val = modify (IntMap.insert var val)
+-- | A `Ref` is given a list of numbers
+-- but in reality it should be just a single number.
+addBinding :: Ref -> [n] -> M n ()
+addBinding _ [] = error "addBinding: empty list"
+addBinding (NumVar var) val = modify (IntMap.insert var (head val))
+addBinding (BoolVar var) val = modify (IntMap.insert var (head val))
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
@@ -39,37 +42,33 @@ lookupVar var = do
 
 -- | The interpreter typeclass
 class Interpret a n where
-  interp :: a -> M n n
+  interp :: a -> M n [n]
 
 instance GaloisField n => Interpret Bool n where
-  interp True = return one
-  interp False = return zero
+  interp True = return [one]
+  interp False = return [zero]
 
 instance GaloisField n => Interpret Val n where
-  interp (Number n) = return (fromIntegral n)
+  interp (Number n) = return [fromIntegral n]
   interp (Boolean b) = interp b
-  interp Unit = return zero
+  interp Unit = return []
 
 instance GaloisField n => Interpret Expr n where
   interp expr = case expr of
     Val val -> interp val
-    Var (NumVar n) -> lookupVar n
-    Var (BoolVar n) -> lookupVar n
-    -- Var (UnitVar n) -> lookupVar n
-    Add x y -> (+) <$> interp x <*> interp y
-    Sub x y -> (-) <$> interp x <*> interp y
-    Mul x y -> (*) <$> interp x <*> interp y
-    Div x y -> (/) <$> interp x <*> interp y
+    Var (NumVar n) -> pure <$> lookupVar n
+    Var (BoolVar n) -> pure <$> lookupVar n
+    Add x y -> zipWith (+) <$> interp x <*> interp y
+    Sub x y -> zipWith (-) <$> interp x <*> interp y
+    Mul x y -> zipWith (*) <$> interp x <*> interp y
+    Div x y -> zipWith (/) <$> interp x <*> interp y
     Eq x y -> do
       x' <- interp x
       y' <- interp y
       interp (x' == y')
-    And x y -> (*) <$> interp x <*> interp y
-    Or x y -> (+) <$> interp x <*> interp y
-    Xor x y -> do
-      x' <- interp x
-      y' <- interp y
-      return $ x' + y' - 2 * (x' * y')
+    And x y -> zipWith (*) <$> interp x <*> interp y
+    Or x y -> zipWith (+) <$> interp x <*> interp y
+    Xor x y -> zipWith (\x' y' -> x' + y' - 2 * (x' * y')) <$> interp x <*> interp y
     BEq x y -> do
       x' <- interp x
       y' <- interp y
@@ -77,43 +76,40 @@ instance GaloisField n => Interpret Expr n where
     If b x y -> do
       b' <- interp b
       case b' of
-        0 -> interp y
+        [0] -> interp y
         _ -> interp x
     ToBool x -> interp x
     ToNum x -> interp x
 
 --------------------------------------------------------------------------------
 
-interpretElaborated2 :: (GaloisField n, Bounded n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) (Maybe n)
-interpretElaborated2 (Elaborated expr comp) inputs = runM bindings $ do
-
+run :: (GaloisField n, Bounded n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) [n]
+run (Elaborated expr comp) inputs = runM bindings $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
   let numAssignments = reverse (compNumAsgns comp)
   forM_ numAssignments $ \(Assignment var e) -> do
-    value <- interp e
-    addBinding var value
+    values <- interp e
+    addBinding var values
 
   let boolAssignments = reverse (compBoolAsgns comp)
   forM_ boolAssignments $ \(Assignment var e) -> do
-    value <- interp e
-    addBinding var value
+    values <- interp e
+    addBinding var values
 
   -- interpret the assertions next
   -- throw error if any assertion fails
   forM_ (compAssertions comp) $ \e -> do
-    value <- interp e
-    when (value /= 1) $ do
+    values <- interp e
+    when (values /= [1]) $ do
       -- collect variables and their bindings in the expression
       let vars = freeVars e
       bindings' <- mapM (\var -> (var,) <$> lookupVar var) $ IntSet.toList vars
       throwError $ InterpretAssertionError e (IntMap.fromList bindings')
 
   -- lastly interpret the expression and return the result
-  if isOfUnit expr
-    then return Nothing
-    else Just <$> interp expr
+  interp expr
   where
     bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
 

@@ -102,7 +102,7 @@ witnessOfR1CS inputs r1cs =
 
 data ExecError n
   = ExecOutputVarNotMappedError (Maybe Var) (IntMap n)
-  | ExecOutputError (Maybe n) (Maybe n)
+  | ExecOutputError [n] [n]
   | ExecR1CUnsatisfiableError [R1C n] (IntMap n)
   | ExecInputUnmatchedError Int Int
   | ExecVarUnassignedError [Var] (IntMap n)

@@ -21,7 +21,7 @@ import qualified Keelung.Syntax.Concrete as C
 import Test.Hspec
 import Control.Arrow (left)
 
-runKeelungAggSig :: Int -> Int -> Either (Error GF181) (Maybe GF181)
+runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
   let settings =
         Settings
@@ -39,42 +39,42 @@ main = hspec $ do
   describe "Execution" $ do
     describe "Aggregate Signature" $ do
       it "dim:1 sig:1" $
-        runKeelungAggSig 1 1 `shouldBe` Right Nothing
+        runKeelungAggSig 1 1 `shouldBe` Right []
       it "dim:1 sig:10" $
-        runKeelungAggSig 1 10 `shouldBe` Right Nothing
+        runKeelungAggSig 1 10 `shouldBe` Right []
       it "dim:10 sig:1" $
-        runKeelungAggSig 10 1 `shouldBe` Right Nothing
+        runKeelungAggSig 10 1 `shouldBe` Right []
       it "dim:10 sig:10" $
-        runKeelungAggSig 10 10 `shouldBe` Right Nothing
+        runKeelungAggSig 10 10 `shouldBe` Right []
 
     it "Basic.identity" $
-      execute Basic.identity [42] `shouldBe` Right (Just 42)
+      execute Basic.identity [42] `shouldBe` Right [42]
     it "Basic.summation" $
-      execute Basic.summation [0, 2, 4, 8] `shouldBe` Right (Just 14)
+      execute Basic.summation [0, 2, 4, 8] `shouldBe` Right [14]
     it "Basic.summation2" $
-      execute Basic.summation2 [0, 2, 4, 8] `shouldBe` Right Nothing
+      execute Basic.summation2 [0, 2, 4, 8] `shouldBe` Right []
     it "Basic.assertArraysEqual" $
-      execute Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right Nothing
+      execute Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right []
     it "Basic.assertArraysEqual2" $
-      execute Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right Nothing
+      execute Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right []
 
     it "Basic.array1D" $
-      execute (Basic.array1D 1) [2, 4] `shouldBe` Right Nothing
+      execute (Basic.array1D 1) [2, 4] `shouldBe` Right []
 
     it "Basic.array2D 1" $
-      execute (Basic.array2D 1 1) [2, 4] `shouldBe` Right Nothing
+      execute (Basic.array2D 1 1) [2, 4] `shouldBe` Right []
 
     it "Basic.array2D 2" $
-      execute (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9] `shouldBe` Right Nothing
+      execute (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9] `shouldBe` Right []
 
     it "Basic.toArray1" $
-      execute Basic.toArray1 [0 .. 7] `shouldBe` Right Nothing
+      execute Basic.toArray1 [0 .. 7] `shouldBe` Right []
 
     it "Basic.xorLists" $
-      execute Basic.xorLists [] `shouldBe` Right (Just 1)
+      execute Basic.xorLists [] `shouldBe` Right [1]
 
     it "Basic.dupArray" $
-      execute Basic.dupArray [1] `shouldBe` Right (Just 1)
+      execute Basic.dupArray [1] `shouldBe` Right [1]
 
   describe "Type Erasure" $ do
     describe "Boolean variables" $ do
@@ -125,19 +125,19 @@ main = hspec $ do
 
   describe "Compilation" $ do
     it "identity (Num)" $
-      execute Basic.identity [42] `shouldBe` Right (Just 42)
+      execute Basic.identity [42] `shouldBe` Right [42]
     it "identity (Bool)" $
-      execute Basic.identityB [1] `shouldBe` Right (Just 1)
+      execute Basic.identityB [1] `shouldBe` Right [1]
     it "identity (Bool)" $
-      execute Basic.identityB [0] `shouldBe` Right (Just 0)
+      execute Basic.identityB [0] `shouldBe` Right [0]
     it "add3" $
-      execute Basic.add3 [0] `shouldBe` Right (Just 3)
+      execute Basic.add3 [0] `shouldBe` Right [3]
     it "eq1 1" $
-      execute Basic.eq1 [0] `shouldBe` Right (Just 0)
+      execute Basic.eq1 [0] `shouldBe` Right [0]
     it "eq1 2" $
-      execute Basic.eq1 [3] `shouldBe` Right (Just 1)
+      execute Basic.eq1 [3] `shouldBe` Right [1]
     it "cond 1" $
-      execute Basic.cond' [0] `shouldBe` Right (Just 789)
+      execute Basic.cond' [0] `shouldBe` Right [789]
     it "assert fail" $
       execute Basic.assert1 [0]
         `shouldBe` Left
@@ -147,7 +147,7 @@ main = hspec $ do
                 (IntMap.fromList [(0, 0)])
           )
     it "assert success" $
-      execute Basic.assert1 [3] `shouldBe` Right (Just 3)
+      execute Basic.assert1 [3] `shouldBe` Right [3]
 
   -- NOTE:
   --    some variables are of "don't care"
