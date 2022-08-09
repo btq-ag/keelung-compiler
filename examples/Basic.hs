@@ -102,17 +102,24 @@ assert1 = do
   assert (x `Eq` 3)
   return x
 
+array1D :: Int -> Comp GF181 (Val 'Unit GF181)
+array1D n = do
+  xs <- inputs n
+  expected <- inputs n
+  forM_ [0 .. n - 1] $ \i -> do
+      x <- access xs i 
+      x' <- access expected i 
+      assert (x' `Eq` (x * x))
+  return unit 
+
 array2D :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
 array2D n m = do
   xs <- inputs2 n m
-  -- expecting square of signatures as input
-  squares <- inputs2 n m
-  -- for each signature
+  expected <- inputs2 n m
   forM_ [0 .. n - 1] $ \i -> do
-    -- for each term of signature
     forM_ [0 .. m - 1] $ \j -> do
       x <- access2 xs (i, j)
-      x' <- access2 squares (i, j)
+      x' <- access2 expected (i, j)
       assert (x' `Eq` (x * x))
 
   return unit 
@@ -261,3 +268,9 @@ emptyArray :: Comp GF181 (Val 'Unit GF181)
 emptyArray = do
   _ <- toArray [] :: Comp GF181 (Val ('Arr 'Bool) GF181)
   return unit 
+
+dupArray :: Comp GF181 (Val 'Num GF181)
+dupArray = do
+  x <- input 
+  xs <- toArray [x, x]
+  access xs 1 

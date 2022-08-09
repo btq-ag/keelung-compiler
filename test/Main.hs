@@ -58,14 +58,23 @@ main = hspec $ do
     it "Basic.assertArraysEqual2" $
       execute Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right Nothing
 
-    it "Basic.array2D" $
+    it "Basic.array1D" $
+      execute (Basic.array1D 1) [2, 4] `shouldBe` Right Nothing
+
+    it "Basic.array2D 1" $
       execute (Basic.array2D 1 1) [2, 4] `shouldBe` Right Nothing
+
+    it "Basic.array2D 2" $
+      execute (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9] `shouldBe` Right Nothing
 
     it "Basic.toArray1" $
       execute Basic.toArray1 [0 .. 7] `shouldBe` Right Nothing
 
     it "Basic.xorLists" $
       execute Basic.xorLists [] `shouldBe` Right (Just 1)
+
+    it "Basic.dupArray" $
+      execute Basic.dupArray [1] `shouldBe` Right (Just 1)
 
   describe "Type Erasure" $ do
     describe "Boolean variables" $ do
@@ -82,19 +91,19 @@ main = hspec $ do
       it "Basic.every" $
         let erased = erase Basic.every
             result = IntSet.toList . erasedBooleanVars <$> erased
-         in result `shouldBe` Right [0 .. 3]
+         in result `shouldBe` Right [0 .. 7]
 
-  it "Boolean variables in Aggregate Signature" $
-    let settings =
-          Settings
-            { enableAggChecking = True,
-              enableSizeChecking = True,
-              enableLengthChecking = True
-            }
-        setup = makeParam 1 1 42 settings :: Param GF181
-        erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Val 'Unit GF181))
-        result = IntSet.toList . erasedBooleanVars <$> erased
-     in result `shouldBe` Right [3 .. 16]
+      -- it "Aggregate Signature" $
+      --   let settings =
+      --         Settings
+      --           { enableAggChecking = True,
+      --             enableSizeChecking = True,
+      --             enableLengthChecking = True
+      --           }
+      --       setup = makeParam 1 1 42 settings :: Param GF181
+      --       erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Val 'Unit GF181))
+      --       result = IntSet.toList . erasedBooleanVars <$> erased
+      --   in result `shouldBe` Right [3 .. 16]
 
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))
