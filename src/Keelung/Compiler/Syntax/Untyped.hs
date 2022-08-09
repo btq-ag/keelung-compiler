@@ -231,6 +231,32 @@ eraseExprM expr = case expr of
   T.ToBool x -> eraseExprM x
   T.ToNum x -> eraseExprM x
 
+-- | Like `eraseExpr` but returns a list of `Expr n` 
+eraseExprN :: Num n => T.Expr -> M [Expr n]
+eraseExprN expr = case expr of
+  T.Val val -> case val of
+    (T.Number n) -> return [Val (fromInteger n)]
+    (T.Boolean False) -> return [Val 0]
+    (T.Boolean True) -> return [Val 1]
+    T.Unit -> return []
+  T.Var var -> case var of
+    T.NumVar n -> return [Var n]
+    T.BoolVar n -> do
+      modify' (IntSet.insert n) -- keep track of all boolean variables
+      return [Var n]
+  T.Add x y -> pure <$> (chainExprs Add <$> eraseExpr x <*> eraseExpr y)
+  T.Sub x y -> pure <$> (chainExprs Sub <$> eraseExpr x <*> eraseExpr y)
+  T.Mul x y -> pure <$> (chainExprs Mul <$> eraseExpr x <*> eraseExpr y)
+  T.Div x y -> pure <$> (chainExprs Div <$> eraseExpr x <*> eraseExpr y)
+  T.Eq x y -> pure <$> (chainExprs Eq <$> eraseExpr x <*> eraseExpr y)
+  T.And x y -> pure <$> (chainExprs And <$> eraseExpr x <*> eraseExpr y)
+  T.Or x y -> pure <$> (chainExprs Or <$> eraseExpr x <*> eraseExpr y)
+  T.Xor x y -> pure <$> (chainExprs Xor <$> eraseExpr x <*> eraseExpr y)
+  T.BEq x y -> pure <$> (chainExprs BEq <$> eraseExpr x <*> eraseExpr y)
+  T.If b x y -> pure <$> (If <$> eraseExpr b <*> eraseExpr x <*> eraseExpr y)
+  T.ToBool x -> eraseExprN x
+  T.ToNum x -> eraseExprN x
+
 eraseAssignment :: Num n => T.Assignment -> M (Assignment n)
 eraseAssignment (T.Assignment (T.NumVar n) expr) = Assignment n <$> eraseExpr expr
 eraseAssignment (T.Assignment (T.BoolVar n) expr) = do

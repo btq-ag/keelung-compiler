@@ -274,3 +274,9 @@ dupArray = do
   x <- input 
   xs <- toArray [x, x]
   access xs 1 
+
+returnArray :: Comp GF181 (Val ('Arr 'Num) GF181)
+returnArray = do
+  x <- input
+  y <- input
+  toArray [x, y]
