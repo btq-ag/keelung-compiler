@@ -180,7 +180,7 @@ checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 
 --------------------------------------------------------------------------------
 
-bench :: Compilable t => Comp GF181 (Val t GF181) -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
+bench :: Comp GF181 (Val t GF181) -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
 bench program settings dimension n = do
   let inputVal = genInputFromParam (makeParam dimension n 42 settings)
   cs <- comp program -- before optimisation (only constant propagation)
