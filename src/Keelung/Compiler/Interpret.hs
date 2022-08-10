@@ -58,6 +58,7 @@ instance GaloisField n => Interpret Expr n where
     Val val -> interp val
     Var (NumVar n) -> pure <$> lookupVar n
     Var (BoolVar n) -> pure <$> lookupVar n
+    Array xs -> concat <$> mapM interp xs 
     Add x y -> zipWith (+) <$> interp x <*> interp y
     Sub x y -> zipWith (-) <$> interp x <*> interp y
     Mul x y -> zipWith (*) <$> interp x <*> interp y

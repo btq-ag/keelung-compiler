@@ -179,19 +179,23 @@ eraseType (T.Elaborated expr comp) =
           erasedBooleanVars = booleanVars
         }
 
--- | Like `eraseExpr` but returns a list of `Expr n`
+eraseVal :: Num n => T.Val -> M [Expr n]
+eraseVal (T.Number n) = return [Val (fromInteger n)]
+eraseVal (T.Boolean False) = return [Val 0]
+eraseVal (T.Boolean True) = return [Val 1]
+eraseVal T.Unit = return []
+
 eraseExpr :: Num n => T.Expr -> M [Expr n]
 eraseExpr expr = case expr of
-  T.Val val -> case val of
-    (T.Number n) -> return [Val (fromInteger n)]
-    (T.Boolean False) -> return [Val 0]
-    (T.Boolean True) -> return [Val 1]
-    T.Unit -> return []
+  T.Val val -> eraseVal val
   T.Var var -> case var of
     T.NumVar n -> return [Var n]
     T.BoolVar n -> do
       modify' (IntSet.insert n) -- keep track of all boolean variables
       return [Var n]
+  T.Array exprs -> do
+    exprss <- mapM eraseExpr exprs
+    return $ concat exprss
   T.Add x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -237,15 +241,13 @@ eraseExpr expr = case expr of
   T.ToNum x -> eraseExpr x
 
 eraseAssignment :: Num n => T.Assignment -> M (Assignment n)
-eraseAssignment (T.Assignment (T.NumVar n) expr) = do 
+eraseAssignment (T.Assignment (T.NumVar n) expr) = do
   exprs <- eraseExpr expr
   return $ Assignment n (head exprs)
 eraseAssignment (T.Assignment (T.BoolVar n) expr) = do
   modify' (IntSet.insert n) -- keep track of all boolean variables
   exprs <- eraseExpr expr
   return $ Assignment n (head exprs)
-
--- eraseAssignment (T.Assignment (T.UnitVar n) expr) = Assignment n <$> eraseExpr expr
 
 -- Flatten and chain expressions together when possible
 chainExprs :: Op -> Expr n -> Expr n -> Expr n
