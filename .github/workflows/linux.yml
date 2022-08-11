@@ -15,7 +15,7 @@ jobs:
     # action 
     - uses: webfactory/ssh-agent@v0.5.4
       with:
-        ssh-private-key: ${{ secrets.CI }}
+        ssh-private-key: ${{ secrets.KEELUNG_CI }}
 
     # things to be cached/restored:
 
