@@ -74,10 +74,6 @@ jobs:
       run: |
         ./stack --no-terminal setup --install-ghc
 
-    - name: Install the icu library
-      run: |
-        ./stack exec -- pacman -S --noconfirm "mingw-w64-x86_64-icu"
-
     - name: 📸 Build Snapshot
       run: |
         ./stack build --no-terminal --only-snapshot -j1
