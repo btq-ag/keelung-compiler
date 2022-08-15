@@ -16,7 +16,17 @@ jobs:
       - uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.KEELUNG_CI }}
-
+      -
+        name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            banacorn/keelung
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=semver,pattern={{version}}
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -33,6 +43,8 @@ jobs:
         name: Build and push
         uses: docker/build-push-action@v3
         with:
-          push: true
-          tags: banacorn/keelung:ci
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           ssh: default
