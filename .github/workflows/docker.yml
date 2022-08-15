@@ -31,8 +31,6 @@ jobs:
             banacorn/keelung
           # generate Docker tags based on the following events/attributes
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
       -
