@@ -5,23 +5,10 @@ The compiler shall be distributed in the form of prebuilt binaries.
 
 # Docker
 
-To dockerize the executable `keelungc`, please clone the following repositories:
+To dockerize the executable `keelungc`, run the following command in the root of the repository:
 
-* `keelung/`: cloned from https://github.com/btq-ag/keelung
-* `compiler/`: cloned from https://github.com/btq-ag/keelung-compiler  
-
-And place them side by side like this:
-
-```
-.
-├── keelung/
-└── compiler/
-```
-
-Run the following command from the parent directory of the cloned repositories:
-
-```
-docker build -t keelung -f compiler/Dockerfile .
+```bash 
+DOCKER_BUILDKIT=1  docker build --ssh default -t keelung -f Dockerfile .
 ```
 
 (add `--platform linux/amd64` if you are using architectures like arm64)

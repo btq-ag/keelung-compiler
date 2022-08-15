@@ -28,3 +28,4 @@ jobs:
         with:
           push: true
           tags: banacorn/keelung:latest
+          ssh: default
