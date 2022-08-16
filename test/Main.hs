@@ -76,6 +76,9 @@ main = hspec $ do
     it "Basic.dupArray" $
       execute Basic.dupArray [1] `shouldBe` Right [1]
 
+    it "Basic.returnArray2" $
+      execute Basic.returnArray2 [2] `shouldBe` Right [2, 4]
+
   describe "Type Erasure" $ do
     describe "Boolean variables" $ do
       it "Basic.identity" $

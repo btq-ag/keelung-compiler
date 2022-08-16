@@ -280,3 +280,8 @@ returnArray = do
   x <- input
   y <- input
   toArray [x, y]
+
+returnArray2 :: Comp GF181 (Val ('Arr 'Num) GF181)
+returnArray2 = do
+  x <- input
+  toArray [x, x * 2]

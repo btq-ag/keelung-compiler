@@ -17,7 +17,7 @@ import Keelung.Compiler.Constraint
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Types (Var)
-import Control.Monad (forM_)
+import Control.Monad (forM)
 
 ----------------------------------------------------------------
 
@@ -217,12 +217,10 @@ encodeAssertion expr = do
 run :: (GaloisField n, Bounded n, Integral n) => TypeErased n -> ConstraintSystem n
 run (TypeErased untypedExprs assertions assignments numOfVars inputVars booleanVars) = runM numOfVars $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
-  -- there are `length untypedExprs` that many 'outputVars'
-  -- 'outputVars' are indexed from `[numOfVars .. numOfVars (length untypedExprs) - 1]`
-  -- Compile `untypedExprs'` to constraints with output wire 'outputVars'.
-  let outputVars = [numOfVars .. numOfVars + length untypedExprs - 1]
-  forM_ (zip outputVars untypedExprs) $ \(outputVar, expr) -> do
-    encode outputVar expr
+  outputVars <- forM untypedExprs $ \expr -> do
+    var <- freshVar
+    encode var expr
+    return var
 
   -- Compile assignments to constraints
   mapM_ encodeAssignment assignments
