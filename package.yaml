@@ -68,6 +68,7 @@ tests:
     dependencies:
     - keelung-compiler
     - hspec
+    - QuickCheck
 
 
     ghc-options:

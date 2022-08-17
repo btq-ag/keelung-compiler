@@ -106,6 +106,7 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Test.Expr
       AggregateSignature.Program
       AggregateSignature.Util
       Basic
@@ -115,7 +116,8 @@ test-suite keelung-test
       examples/
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      array
+      QuickCheck
+    , array
     , base >=4.7 && <5
     , bytestring
     , cereal

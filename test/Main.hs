@@ -5,22 +5,23 @@ module Main where
 import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import qualified Basic
+import Control.Arrow (left)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung
 import Keelung.Compiler
+import qualified Keelung.Compiler as Compiler
 import Keelung.Compiler.Constraint (cadd, cmul)
-import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Compiler.Interpret (InterpretError (..))
 import qualified Keelung.Compiler.Optimize as Optimse
-import qualified Keelung.Compiler as Compiler
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints as Optimize
 import qualified Keelung.Compiler.Optimize.Monad as Optimize
+import Keelung.Constraint.Polynomial (Poly)
+import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Syntax.Concrete as C
+import qualified Test.Expr as Expr
 import Test.Hspec
-import Control.Arrow (left)
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
@@ -37,6 +38,9 @@ runKeelungAggSig dimension numberOfSignatures =
 
 main :: IO ()
 main = hspec $ do
+  describe "Expressions" $ do
+    Expr.tests
+
   describe "Execution" $ do
     describe "Aggregate Signature" $ do
       it "dim:1 sig:1" $
@@ -97,17 +101,17 @@ main = hspec $ do
             result = IntSet.toList . erasedBooleanVars <$> erased
          in result `shouldBe` Right [0 .. 7]
 
-      -- it "Aggregate Signature" $
-      --   let settings =
-      --         Settings
-      --           { enableAggChecking = True,
-      --             enableSizeChecking = True,
-      --             enableLengthChecking = True
-      --           }
-      --       setup = makeParam 1 1 42 settings :: Param GF181
-      --       erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Val 'Unit GF181))
-      --       result = IntSet.toList . erasedBooleanVars <$> erased
-      --   in result `shouldBe` Right [3 .. 16]
+  -- it "Aggregate Signature" $
+  --   let settings =
+  --         Settings
+  --           { enableAggChecking = True,
+  --             enableSizeChecking = True,
+  --             enableLengthChecking = True
+  --           }
+  --       setup = makeParam 1 1 42 settings :: Param GF181
+  --       erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Val 'Unit GF181))
+  --       result = IntSet.toList . erasedBooleanVars <$> erased
+  --   in result `shouldBe` Right [3 .. 16]
 
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))
@@ -123,7 +127,7 @@ main = hspec $ do
                 csBooleanInputVars = mempty,
                 csVars = IntSet.fromList [0],
                 csInputVars = IntSet.fromList [0],
-                csOutputVars = IntSet.empty 
+                csOutputVars = IntSet.empty
               }
        in optimize Basic.assertToBe42 `shouldBe` Right cs
 
@@ -196,7 +200,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 17],
                   csInputVars = IntSet.fromList [0 .. 11],
-                  csOutputVars = IntSet.empty 
+                  csOutputVars = IntSet.empty
                 }
          in Optimse.optimize (cs :: ConstraintSystem GF181) `shouldNotBe` cs
 
@@ -211,7 +215,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 4],
                   csInputVars = IntSet.fromList [0 .. 3],
-                  csOutputVars = IntSet.empty 
+                  csOutputVars = IntSet.empty
                 }
             cs' =
               ConstraintSystem
@@ -221,7 +225,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 3],
-                  csOutputVars = IntSet.empty 
+                  csOutputVars = IntSet.empty
                 }
          in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -235,7 +239,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 2],
-                  csOutputVars = IntSet.empty 
+                  csOutputVars = IntSet.empty
                 }
             cs' =
               ConstraintSystem
@@ -244,7 +248,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 2],
                   csInputVars = IntSet.fromList [0 .. 2],
-                  csOutputVars = IntSet.empty 
+                  csOutputVars = IntSet.empty
                 }
          in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -258,7 +262,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 2],
-                  csOutputVars = IntSet.empty 
+                  csOutputVars = IntSet.empty
                 }
             cs' =
               ConstraintSystem
@@ -267,7 +271,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 2],
                   csInputVars = IntSet.fromList [0 .. 2],
-                  csOutputVars = IntSet.empty 
+                  csOutputVars = IntSet.empty
                 }
          in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -281,7 +285,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 4],
                   csInputVars = IntSet.fromList [0 .. 3],
-                  csOutputVars = IntSet.empty 
+                  csOutputVars = IntSet.empty
                 }
             cs' =
               ConstraintSystem
@@ -291,7 +295,7 @@ main = hspec $ do
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVars = IntSet.fromList [0 .. 3],
-                  csOutputVars = IntSet.empty 
+                  csOutputVars = IntSet.empty
                 }
          in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
