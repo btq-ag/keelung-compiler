@@ -9,7 +9,7 @@ import Data.Serialize (Serialize, encode)
 import Data.Typeable (Typeable)
 import Keelung (elaborate)
 import Keelung.Compiler
-import qualified Keelung.Compiler.Optimise.ConstantPropagation as ConstantPropagation
+import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
 import Keelung.Monad
 import Keelung.Syntax
 
@@ -32,14 +32,14 @@ benchPropogateConstant prog = show $ erase prog >>= return . ConstantPropagation
 benchCompile :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> String
 benchCompile prog = show $ comp prog
 
-benchOptimise :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> String
-benchOptimise prog = show $ optm prog
+benchOptimize :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> String
+benchOptimize prog = show $ optm prog
 
-benchOptimise2 :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> String
-benchOptimise2 prog = show $ optm2 prog
+benchOptimize2 :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> String
+benchOptimize2 prog = show $ optm2 prog
 
-benchOptimiseWithInput :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> [n] -> String
-benchOptimiseWithInput prog input = show $ optmWithInput prog input
+benchOptimizeWithInput :: (GaloisField n, Bounded n, Integral n, Show n, Typeable kind) => Comp n (Expr kind n) -> [n] -> String
+benchOptimizeWithInput prog input = show $ optimizeWithInput prog input
 
 -- -- This function "executes" the comp two ways, once by interpreting
 -- -- the resulting TExp and second by interpreting the resulting circuit

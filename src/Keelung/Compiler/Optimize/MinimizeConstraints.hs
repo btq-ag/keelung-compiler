@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 
-module Keelung.Compiler.Optimise.MinimiseConstraints (run, substConstraint) where
+module Keelung.Compiler.Optimize.MinimizeConstraints (run, substConstraint) where
 
 import Control.Monad
 import Data.Field.Galois (GaloisField)
@@ -10,7 +10,7 @@ import qualified Data.Set as Set
 import Keelung.Compiler.Constraint (Constraint (..), cadd)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Compiler.Optimise.Monad
+import Keelung.Compiler.Optimize.Monad
 import Keelung.Types (Var)
 
 run ::
@@ -69,7 +69,7 @@ goOverConstraints accum constraints = case Set.minView constraints of
     substitutionResult <- substConstraint picked
 
     case substitutionResult of
-      -- constaint got optimised away
+      -- constaint got optimized away
       Nothing -> goOverConstraints accum constraints'
       Just substituted -> do
         -- if the constraint is tautologous, remove it

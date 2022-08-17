@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
-module Keelung.Compiler.Optimise.Rewriting
+module Keelung.Compiler.Optimize.Rewriting
   ( run,
   )
 where

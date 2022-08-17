@@ -30,13 +30,13 @@ library
       Keelung.Compiler.Constraint
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Optimise
-      Keelung.Compiler.Optimise.ConstantPropagation
-      Keelung.Compiler.Optimise.MinimiseConstraints
-      Keelung.Compiler.Optimise.MinimiseConstraints2
-      Keelung.Compiler.Optimise.Monad
-      Keelung.Compiler.Optimise.Rewriting
-      Keelung.Compiler.Optimise.UnionFind
+      Keelung.Compiler.Optimize
+      Keelung.Compiler.Optimize.ConstantPropagation
+      Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints2
+      Keelung.Compiler.Optimize.Monad
+      Keelung.Compiler.Optimize.Rewriting
+      Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
@@ -68,13 +68,13 @@ executable keelungc
       Keelung.Compiler.Constraint
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Optimise
-      Keelung.Compiler.Optimise.ConstantPropagation
-      Keelung.Compiler.Optimise.MinimiseConstraints
-      Keelung.Compiler.Optimise.MinimiseConstraints2
-      Keelung.Compiler.Optimise.Monad
-      Keelung.Compiler.Optimise.Rewriting
-      Keelung.Compiler.Optimise.UnionFind
+      Keelung.Compiler.Optimize
+      Keelung.Compiler.Optimize.ConstantPropagation
+      Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints2
+      Keelung.Compiler.Optimize.Monad
+      Keelung.Compiler.Optimize.Rewriting
+      Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
@@ -139,13 +139,13 @@ benchmark keelung-bench
       Keelung.Compiler.Constraint
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Optimise
-      Keelung.Compiler.Optimise.ConstantPropagation
-      Keelung.Compiler.Optimise.MinimiseConstraints
-      Keelung.Compiler.Optimise.MinimiseConstraints2
-      Keelung.Compiler.Optimise.Monad
-      Keelung.Compiler.Optimise.Rewriting
-      Keelung.Compiler.Optimise.UnionFind
+      Keelung.Compiler.Optimize
+      Keelung.Compiler.Optimize.ConstantPropagation
+      Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints2
+      Keelung.Compiler.Optimize.Monad
+      Keelung.Compiler.Optimize.Rewriting
+      Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util

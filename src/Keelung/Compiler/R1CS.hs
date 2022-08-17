@@ -7,7 +7,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint hiding (numberOfConstraints)
-import Keelung.Compiler.Optimise (optimiseWithWitness)
+import Keelung.Compiler.Optimize (optimizeWithWitness)
 import Keelung.Compiler.Util
 import Keelung.Constraint.R1C (R1C (..))
 import qualified Keelung.Constraint.R1C as R1C
@@ -29,7 +29,7 @@ generateWitness ::
 generateWitness cs env =
   let cs' = renumberConstraints cs
       variables = [0 .. IntSet.size (csVars cs) - 1]
-      (witness, _) = optimiseWithWitness env cs'
+      (witness, _) = optimizeWithWitness env cs'
    in if all (isMapped witness) variables
         then Right witness
         else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness

@@ -14,9 +14,10 @@ import Keelung.Compiler.Constraint (cadd, cmul)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Compiler.Interpret (InterpretError (..))
-import qualified Keelung.Compiler.Optimise as Optimse
-import qualified Keelung.Compiler.Optimise.MinimiseConstraints as Optimise
-import qualified Keelung.Compiler.Optimise.Monad as Optimise
+import qualified Keelung.Compiler.Optimize as Optimse
+import qualified Keelung.Compiler as Compiler
+import qualified Keelung.Compiler.Optimize.MinimizeConstraints as Optimize
+import qualified Keelung.Compiler.Optimize.Monad as Optimize
 import qualified Keelung.Syntax.Concrete as C
 import Test.Hspec
 import Control.Arrow (left)
@@ -124,7 +125,7 @@ main = hspec $ do
                 csInputVars = IntSet.fromList [0],
                 csOutputVars = IntSet.empty 
               }
-       in optm Basic.assertToBe42 `shouldBe` Right cs
+       in optimize Basic.assertToBe42 `shouldBe` Right cs
 
   describe "Compilation" $ do
     it "identity (Num)" $
@@ -168,9 +169,9 @@ main = hspec $ do
         let constraint = head $ cadd 0 [(0, 1), (1, -1)]
             links = IntMap.fromList [(1, 0)]
             sizes = IntMap.fromList [(0, 2)]
-            run :: Optimise.OptiM GF181 a -> a
-            run = Optimise.runOptiM' links sizes mempty
-         in run (Optimise.substConstraint constraint)
+            run :: Optimize.OptiM GF181 a -> a
+            run = Optimize.runOptiM' links sizes mempty
+         in run (Optimize.substConstraint constraint)
               `shouldBe` Nothing
 
       it "should work 1" $
@@ -197,7 +198,7 @@ main = hspec $ do
                   csInputVars = IntSet.fromList [0 .. 11],
                   csOutputVars = IntSet.empty 
                 }
-         in Optimse.optimise (cs :: ConstraintSystem GF181) `shouldNotBe` cs
+         in Optimse.optimize (cs :: ConstraintSystem GF181) `shouldNotBe` cs
 
     describe "Constraint merging" $ do
       it "CAdd & CAdd" $
@@ -222,7 +223,7 @@ main = hspec $ do
                   csInputVars = IntSet.fromList [0 .. 3],
                   csOutputVars = IntSet.empty 
                 }
-         in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+         in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
       it "CAdd & CMul 1" $
         let cs =
@@ -245,7 +246,7 @@ main = hspec $ do
                   csInputVars = IntSet.fromList [0 .. 2],
                   csOutputVars = IntSet.empty 
                 }
-         in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+         in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
       it "CAdd & CMul 2" $
         let cs =
@@ -268,7 +269,7 @@ main = hspec $ do
                   csInputVars = IntSet.fromList [0 .. 2],
                   csOutputVars = IntSet.empty 
                 }
-         in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+         in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
       it "CAdd & CMul 3" $
         let cs =
@@ -292,26 +293,26 @@ main = hspec $ do
                   csInputVars = IntSet.fromList [0 .. 3],
                   csOutputVars = IntSet.empty 
                 }
-         in Optimse.optimise2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+         in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
   describe "Compile" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
-      let expected = left show (toR1CS <$> comp Basic.outOfBound)
+      let expected = left show (toR1CS <$> Compiler.compile Basic.outOfBound)
       actual <- left show <$> Keelung.compile Basic.outOfBound
       actual `shouldBe` expected
 
     it "Program that throws ElabError.EmptyArrayError" $ do
-      let expected = left show (toR1CS <$> comp Basic.emptyArray)
+      let expected = left show (toR1CS <$> Compiler.compile Basic.emptyArray)
       actual <- left show <$> Keelung.compile Basic.emptyArray
       actual `shouldBe` expected
 
   describe "Interpret" $ do
     it "Basic.eq1 1" $ do
-      let expected = left show (Keelung.Compiler.interpret Basic.eq1 [0])
+      let expected = left show (Compiler.interpret Basic.eq1 [0])
       actual <- left show <$> Keelung.interpret Basic.eq1 [0]
       actual `shouldBe` expected
 
     it "Basic.eq1 2" $ do
-      let expected = left show (Keelung.Compiler.interpret Basic.eq1 [3])
+      let expected = left show (Compiler.interpret Basic.eq1 [3])
       actual <- left show <$> Keelung.interpret Basic.eq1 [3]
       actual `shouldBe` expected

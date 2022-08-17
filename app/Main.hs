@@ -4,28 +4,27 @@ module Main where
 
 import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
+import Control.Arrow (left)
 import Control.Monad
 import Control.Monad.Except
-
 import qualified Data.ByteString.Char8 as BSC
 import Data.Serialize (decode, encode)
 import Keelung (elaborate)
 import Keelung.Compiler
   ( ConstraintSystem,
     Error (..),
-    comp,
-    convElab,
+    compile,
     interpElab,
     numberOfConstraints,
-    optimise,
-    optimise2,
-    optm
+    optimize,
+    optimizeElab,
+    toR1CS,
   )
+import qualified Keelung.Compiler.Optimize as Optimizer
+import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Field
 import Keelung.Syntax.Concrete hiding (elaborate)
 import Option
-import Keelung.Constraint.R1CS (R1CS)
-import Control.Arrow (left)
 
 main :: IO ()
 main = do
@@ -38,9 +37,9 @@ main = do
         Left err -> print err
         Right elaborated -> do
           case compFieldType (elabComp elaborated) of
-            B64 -> putStrLn $ BSC.unpack $ encode (left show (convElab elaborated) :: Either String (R1CS B64))
-            GF181 -> putStrLn $ BSC.unpack $ encode (left show (convElab elaborated) :: Either String (R1CS GF181))
-            BN128 -> putStrLn $ BSC.unpack $ encode (left show (convElab elaborated) :: Either String (R1CS BN128))
+            B64 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> optimizeElab elaborated) :: Either String (R1CS B64))
+            GF181 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> optimizeElab elaborated) :: Either String (R1CS GF181))
+            BN128 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> optimizeElab elaborated) :: Either String (R1CS BN128))
     Protocol Interpret -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (Elaborated, [Integer])
@@ -77,7 +76,7 @@ profile dimension numOfSigs = run $ do
           }
   let param = makeParam dimension numOfSigs 42 settings :: Param GF181
 
-  -- compile & optimise
+  -- compile & optimize
   -- erased <- liftEither $ erase (aggregateSignature setup)
   -- liftIO $ do
   --   print ("erasedExpr", Untyped.sizeOfExpr <$> erasedExpr erased)
@@ -95,8 +94,8 @@ profile dimension numOfSigs = run $ do
   -- print ("compBoolAsgns", length $ compBoolAsgns computed, sum $ map (\(Assignment _ expr) -> sizeOfExpr expr) (compBoolAsgns computed))
   -- print ("compAssertions", length $ compAssertions computed, sum $ map sizeOfExpr (compAssertions computed))
 
-  -- compile & optimise
-  aggSig <- liftEither $ optm (AggSig.aggregateSignature param)
+  -- compile & optimize
+  aggSig <- liftEither $ optimize (AggSig.aggregateSignature param)
   liftIO $
     print (numberOfConstraints aggSig)
 
@@ -110,40 +109,35 @@ keelungConstraints dimension numOfSigs = run $ do
             enableLengthChecking = True
           }
   let param = makeParam dimension numOfSigs 42 settings :: Param GF181
-  -- let input = genInputFromParam setup
 
   checkAgg <-
     liftEither $
-      comp $
+      compile $
         AggSig.checkAgg $
           makeParam dimension numOfSigs 42 (Settings True False False)
-  let checkAgg' = optimise2 $ optimise checkAgg :: ConstraintSystem GF181
-  -- let checkAgg'' = snd $ optimiseWithInput input checkAgg'
+  let checkAgg' = Optimizer.optimize2 $ Optimizer.optimize checkAgg :: ConstraintSystem GF181
 
   checkSize <-
     liftEither $
-      comp $
+      compile $
         AggSig.checkSize $
           makeParam dimension numOfSigs 42 (Settings False True False)
-  let checkSize' = optimise2 $ optimise checkSize :: ConstraintSystem GF181
-  -- let checkSize'' = snd $ optimiseWithInput input checkSize'
+  let checkSize' = Optimizer.optimize2 $ Optimizer.optimize checkSize :: ConstraintSystem GF181
 
   checkLength <-
     liftEither $
-      comp $
+      compile $
         AggSig.checkLength $
           makeParam dimension numOfSigs 42 (Settings False False True)
-  let checkLength' = optimise2 $ optimise checkLength :: ConstraintSystem GF181
-  -- let checkLength'' = snd $ optimiseWithInput input checkLength'
+  let checkLength' = Optimizer.optimize2 $ Optimizer.optimize checkLength :: ConstraintSystem GF181
 
-  aggSig <- liftEither $ comp (AggSig.aggregateSignature param)
-  let aggSig' = optimise2 $ optimise aggSig :: ConstraintSystem GF181
-  -- let aggSig'' = snd $ optimiseWithInput input aggSig'
+  aggSig <- liftEither $ compile (AggSig.aggregateSignature param)
+  let aggSig' = Optimizer.optimize2 $ Optimizer.optimize aggSig :: ConstraintSystem GF181
 
   liftIO $ putStrLn "  Keelung: "
   liftIO $
     putStrLn $
-      "    not optimised:      "
+      "    not optimized:      "
         ++ show (numberOfConstraints aggSig)
         ++ " ( "
         ++ show (numberOfConstraints checkAgg)
@@ -154,7 +148,7 @@ keelungConstraints dimension numOfSigs = run $ do
         ++ " )"
   liftIO $
     putStrLn $
-      "    optimised:          "
+      "    optimized:          "
         ++ show (numberOfConstraints aggSig')
         ++ " ( "
         ++ show (numberOfConstraints checkAgg')
@@ -180,7 +174,7 @@ keelungConstraints dimension numOfSigs = run $ do
 -- snarklConstraints :: Int -> Int -> IO ()
 -- snarklConstraints dimension numOfSigs = run $ do
 --   do
---     -- not optimised
+--     -- not optimized
 
 --     let count =
 --           show . Set.size . Snarkl.cs_constraints
@@ -190,7 +184,7 @@ keelungConstraints dimension numOfSigs = run $ do
 --     liftIO $ putStrLn "  Snarkl: "
 --     liftIO $
 --       putStrLn $
---         "    not optimised: "
+--         "    not optimized: "
 --           ++ count checkAgg
 --           ++ " / "
 --           ++ count checkSize
@@ -200,7 +194,7 @@ keelungConstraints dimension numOfSigs = run $ do
 --           ++ count aggSig
 
 --   do
---     -- optimised
+--     -- optimized
 --     let count =
 --           show . Set.size . Snarkl.cs_constraints . snd
 --             . Snarkl.simplifyConstrantSystem False mempty
@@ -209,7 +203,7 @@ keelungConstraints dimension numOfSigs = run $ do
 
 --     liftIO $
 --       putStrLn $
---         "    optimised: "
+--         "    optimized: "
 --           ++ count checkAgg
 --           ++ " / "
 --           ++ count checkSize

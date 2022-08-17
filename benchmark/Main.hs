@@ -32,13 +32,13 @@ benchmarks param =
           ],
         bgroup
           "Optimisation"
-          [ bench "Keelung" $ nf benchOptimise keelung,
-            bench "Keelung (partial evaluation)" $ nf (benchOptimiseWithInput keelung) input
+          [ bench "Keelung" $ nf benchOptimize keelung,
+            bench "Keelung (partial evaluation)" $ nf (benchOptimizeWithInput keelung) input
           ]
       ]
 
-compileAndOptimise :: Param GF181 -> [Benchmark]
-compileAndOptimise setup =
+compileAndOptimize :: Param GF181 -> [Benchmark]
+compileAndOptimize setup =
   let 
       -- snarkl = Snarkl.aggregateSignature setup
       keelung = AggSig.aggregateSignature setup
@@ -46,10 +46,10 @@ compileAndOptimise setup =
    in [ bgroup
           "Optimisation"
           [ 
-            -- bench "Snarkl" $ nf Snarkl.benchOptimise snarkl,
-            bench "Keelung" $ nf benchOptimise keelung
+            -- bench "Snarkl" $ nf Snarkl.benchOptimize snarkl,
+            bench "Keelung" $ nf benchOptimize keelung
             -- ,
-            -- bench "Keelung (partial evaluation)" $ nf (benchOptimiseWithInput keelung) input
+            -- bench "Keelung (partial evaluation)" $ nf (benchOptimizeWithInput keelung) input
           ]
       ]
 
@@ -64,9 +64,9 @@ keelungOnly setup =
         bench "Type Erasure" $ nf benchEraseType keelung,
         bench "Constant Propagation" $ nf benchPropogateConstant keelung,
         bench "Compilation" $ nf benchCompile keelung,
-        bench "Optimisation I" $ nf benchOptimise keelung,
-        bench "Optimisation II" $ nf benchOptimise2 keelung,
-        bench "Partial Evaluation" $ nf (benchOptimiseWithInput keelung) input
+        bench "Optimisation I" $ nf benchOptimize keelung,
+        bench "Optimisation II" $ nf benchOptimize2 keelung,
+        bench "Partial Evaluation" $ nf (benchOptimizeWithInput keelung) input
       ]
 
 complexityOfElaboration :: [Benchmark]
@@ -108,7 +108,7 @@ run = do
   -- defaultMain complexityOfElaboration
   defaultMain (keelungOnly setup)
   -- defaultMain (benchmarks setup)
-  -- defaultMain (compileAndOptimise setup)
+  -- defaultMain (compileAndOptimize setup)
 
 main :: IO ()
 main = run 

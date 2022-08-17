@@ -15,6 +15,7 @@ import Keelung.Compiler.Constraint (cadd)
 import Keelung.Monad
 import Keelung 
 import Control.Monad (forM_, foldM)
+import qualified Keelung.Compiler as Compiler
 
 --------------------------------------------------------------------------------
 
@@ -183,9 +184,9 @@ checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 bench :: Comp GF181 (Val t GF181) -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
 bench program settings dimension n = do
   let inputVal = genInputFromParam (makeParam dimension n 42 settings)
-  cs <- comp program -- before optimisation (only constant propagation)
-  cs' <- optm program -- after optimisation (constant propagation + constraint set reduction)
-  cs'' <- optmWithInput program inputVal -- after optimisation (constant propagation + constraint set reduction with input)
+  cs <- Compiler.compile program -- before optimisation (only constant propagation)
+  cs' <- optimize program -- after optimisation (constant propagation + constraint set reduction)
+  cs'' <- optimizeWithInput program inputVal -- after optimisation (constant propagation + constraint set reduction with input)
   return
     ( numberOfConstraints cs,
       numberOfConstraints cs',

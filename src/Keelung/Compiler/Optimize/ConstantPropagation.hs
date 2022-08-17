@@ -1,4 +1,4 @@
-module Keelung.Compiler.Optimise.ConstantPropagation (run) where
+module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
