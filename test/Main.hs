@@ -20,7 +20,9 @@ import qualified Keelung.Compiler.Optimize.Monad as Optimize
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Syntax.Concrete as C
-import qualified Test.Expr as Expr
+
+import qualified Test.Elaboration as Elaboration
+
 import Test.Hspec
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
@@ -38,10 +40,14 @@ runKeelungAggSig dimension numberOfSignatures =
 
 main :: IO ()
 main = hspec $ do
-  describe "Expressions" $ do
-    Expr.tests
 
+  describe "Elaboration " Elaboration.tests
+
+  
   describe "Execution" $ do
+    
+    
+
     describe "Aggregate Signature" $ do
       it "dim:1 sig:1" $
         runKeelungAggSig 1 1 `shouldBe` Right []

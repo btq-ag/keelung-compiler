@@ -30,6 +30,9 @@ library
       Keelung.Compiler.Constraint
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
+      Keelung.Compiler.Interpret.Kinded
+      Keelung.Compiler.Interpret.Typed
+      Keelung.Compiler.Interpret.Untyped
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
@@ -68,6 +71,9 @@ executable keelungc
       Keelung.Compiler.Constraint
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
+      Keelung.Compiler.Interpret.Kinded
+      Keelung.Compiler.Interpret.Typed
+      Keelung.Compiler.Interpret.Untyped
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
@@ -106,7 +112,7 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Test.Expr
+      Test.Elaboration
       AggregateSignature.Program
       AggregateSignature.Util
       Basic
@@ -141,6 +147,9 @@ benchmark keelung-bench
       Keelung.Compiler.Constraint
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
+      Keelung.Compiler.Interpret.Kinded
+      Keelung.Compiler.Interpret.Typed
+      Keelung.Compiler.Interpret.Untyped
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
