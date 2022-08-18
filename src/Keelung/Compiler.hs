@@ -60,6 +60,7 @@ import Keelung.Syntax.Concrete (Elaborated)
 erase :: (GaloisField n, Integral n, AcceptedField n) => Comp n (Val t n) -> Either (Error n) (TypeErased n)
 erase prog = left ElabError (elaborate prog) >>= eraseElab
 
+-- elaboration => interpretation 
 interpret :: (GaloisField n, Bounded n, Integral n, AcceptedField n) => Comp n (Val t n) -> [n] -> Either (Error n) [n]
 interpret prog ins = do
   elab <- left ElabError (elaborate prog)
