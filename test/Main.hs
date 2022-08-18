@@ -19,9 +19,9 @@ import qualified Keelung.Compiler.Optimize.MinimizeConstraints as Optimize
 import qualified Keelung.Compiler.Optimize.Monad as Optimize
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
-import qualified Keelung.Syntax.Concrete as C
+import qualified Keelung.Syntax.Typed as C
 
-import qualified Test.Elaboration as Elaboration
+import qualified Test.Interpreter as Interpreter
 
 import Test.Hspec
 
@@ -41,7 +41,7 @@ runKeelungAggSig dimension numberOfSignatures =
 main :: IO ()
 main = hspec $ do
 
-  describe "Elaboration " Elaboration.tests
+  describe "Interpreter " Interpreter.tests
 
   
   describe "Execution" $ do

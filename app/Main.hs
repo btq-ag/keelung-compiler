@@ -23,7 +23,7 @@ import Keelung.Compiler
 import qualified Keelung.Compiler.Optimize as Optimizer
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Field
-import Keelung.Syntax.Concrete hiding (elaborate)
+import Keelung.Syntax.Typed hiding (elaborate)
 import Option
 
 main :: IO ()

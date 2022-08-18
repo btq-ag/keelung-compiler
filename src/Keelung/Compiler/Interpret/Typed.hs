@@ -1,4 +1,4 @@
--- Interpreter for Keelung.Syntax.Concrete
+-- Interpreter for Keelung.Syntax.Typed
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -12,7 +12,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Field (N (..))
-import Keelung.Syntax.Concrete
+import Keelung.Syntax.Typed
 
 --------------------------------------------------------------------------------
 

@@ -52,7 +52,7 @@ import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (AcceptedField)
 import Keelung.Monad (Comp)
 import Keelung.Syntax (Val)
-import Keelung.Syntax.Concrete (Elaborated)
+import Keelung.Syntax.Typed (Elaborated)
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs

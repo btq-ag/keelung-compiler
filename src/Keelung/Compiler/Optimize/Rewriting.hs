@@ -5,7 +5,7 @@ module Keelung.Compiler.Optimize.Rewriting
   )
 where
 
-import Keelung.Syntax.Concrete
+import Keelung.Syntax.Typed
 import Control.Monad
 import Control.Monad.State
 import Keelung.Error (ElabError)

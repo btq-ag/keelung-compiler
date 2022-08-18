@@ -17,7 +17,7 @@ import Keelung.Syntax
 import Keelung (elaborate)
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
-import qualified Keelung.Syntax.Concrete as C
+import qualified Keelung.Syntax.Typed as C
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting2
 import Keelung.Field
 import Control.Arrow (left)

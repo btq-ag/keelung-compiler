@@ -14,7 +14,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Field (N (..))
-import Keelung.Syntax.Concrete
+import Keelung.Syntax.Typed
 
 --------------------------------------------------------------------------------
 

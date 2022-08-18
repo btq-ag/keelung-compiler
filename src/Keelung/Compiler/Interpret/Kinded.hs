@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Interpret.Kinded where
+module Keelung.Compiler.Interpret.Kinded (run) where
 
 import Control.Monad.Except
 import Control.Monad.State
