@@ -132,6 +132,7 @@ test-suite keelung-test
     , keelung-compiler
     , mtl
     , optparse-applicative
+    , quickcheck-transformer
     , random
     , semirings
   default-language: Haskell2010

@@ -1,9 +1,16 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Test.Interpreter (tests) where
 
 import Control.Arrow (left)
+-- import Test.QuickCheck.GenT
+import Control.Monad.Reader
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import qualified Keelung.Compiler.Interpret.Typed as Typed
 import Keelung.Field (GF181)
@@ -12,7 +19,10 @@ import qualified Keelung.Syntax.Kinded as Kinded
 import qualified Keelung.Syntax.Simplify as Kinded
 import qualified Keelung.Types as Kinded
 import Test.Hspec
-import Test.QuickCheck
+import Test.QuickCheck (chooseInt)
+import Test.QuickCheck.Arbitrary
+import Test.QuickCheck.GenT
+import Test.QuickCheck.Property
 
 -- import qualified Keelung.Syntax.Typed as Typed
 -- import Keelung.Syntax.Kinded
@@ -26,31 +36,68 @@ tests = do
          in left show (Typed.run (Kinded.simplify elab) inputs)
               `shouldBe` left show (Kinded.run elab inputs)
 
---------------------------------------------------------------------------------
+data Ctx = Ctx
+  { ctxNumVar :: Int,
+    ctxNumInputVar :: Int,
+    ctxBoolVars :: IntSet
+  }
+  deriving (Show)
 
 data Program t n = Program (Kinded.Elaborated t n) [n]
   deriving (Eq, Show)
 
+type M = Reader Ctx
+
+--------------------------------------------------------------------------------
+
+instance Arbitrary Ctx where
+  arbitrary = do
+    let range = (0, 10)
+    numVar <- chooseInt range
+    numInputVar <- chooseInt range `suchThat` (<= numVar)
+    numBoolVar <- chooseInt range `suchThat` (<= numVar)
+    boolVars <- IntSet.fromList <$> replicateM numInputVar arbitrary
+    return $ Ctx numVar numBoolVar boolVars
+
+--------------------------------------------------------------------------------
+
 instance Arbitrary n => Arbitrary (Program 'Kinded.Num n) where
   arbitrary = do
-    Program <$> arbitrary <*> return []
+    a <- runGenT arbitraryM
+    runReader a <$> liftGen arbitrary
 
-instance Arbitrary n => Arbitrary (Kinded.Elaborated 'Kinded.Num n) where
-  arbitrary = do
-    Kinded.Elaborated <$> arbitrary <*> arbitrary
+--------------------------------------------------------------------------------
 
-instance Arbitrary n => Arbitrary (Kinded.Val 'Kinded.Num n) where
-  arbitrary = Kinded.Number <$> arbitrary
+class ArbitraryM a where
+  arbitraryM :: GenT M a
 
-instance Arbitrary n => Arbitrary (Kinded.Computation n) where
-  arbitrary = return $ Kinded.Computation 0 0 mempty mempty mempty mempty mempty
+instance ArbitraryM a => Arbitrary (M a) where
+  arbitrary = runGenT arbitraryM
 
--- Kinded.Computation 0 0
--- <$> return mempty
--- <*> return mempty
--- <*> return mempty
--- <*> return mempty
--- <*> return mempty
+instance Arbitrary n => ArbitraryM (Program 'Kinded.Num n) where
+  arbitraryM = Program <$> arbitraryM <*> return []
+
+instance Arbitrary n => ArbitraryM (Kinded.Computation n) where
+  arbitraryM = return $ Kinded.Computation 0 0 mempty mempty mempty mempty mempty
+
+instance Arbitrary n => ArbitraryM (Kinded.Elaborated 'Kinded.Num n) where
+  arbitraryM = Kinded.Elaborated <$> arbitraryM <*> arbitraryM
+
+instance Arbitrary n => ArbitraryM (Kinded.Val 'Kinded.Num n) where
+  arbitraryM = do
+    oneof
+      [ Kinded.Number <$> liftGen arbitrary,
+        Kinded.Ref <$> arbitraryM
+      ]
+
+instance ArbitraryM (Kinded.Ref 'Kinded.Num) where
+  arbitraryM = do
+    n <- lift $ asks ctxNumVar
+    boolVars <- lift $ asks ctxBoolVars
+    Kinded.NumVar <$> liftGen (chooseInt (0, n - 1)) `suchThat` (\x -> not (IntSet.member x boolVars))
+
+-- instance Arbitrary n => Arbitrary (Kinded.Computation n) where
+--   arbitrary = return $ Kinded.Computation 0 0 mempty mempty mempty mempty mempty
 
 -- -- | Data structure for elaboration bookkeeping
 -- data Computation n = Computation
