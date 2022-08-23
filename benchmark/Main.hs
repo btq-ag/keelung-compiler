@@ -81,7 +81,7 @@ complexityOfElaboration =
       ]
 
   where 
-    makeKeelung :: Int -> Int -> Comp GF181 (Expr 'Unit GF181)
+    makeKeelung :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
     makeKeelung dimension numberOfSignatures = 
       let settings =
             Settings

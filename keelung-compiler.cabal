@@ -182,5 +182,4 @@ benchmark keelung-bench
     , optparse-applicative
     , random
     , semirings
-    , snarkl
   default-language: Haskell2010

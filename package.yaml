@@ -86,7 +86,6 @@ benchmarks:
       - examples/
     dependencies:
       - keelung-compiler
-      - snarkl
       - criterion 		>=1.0
 
     ghc-options:
