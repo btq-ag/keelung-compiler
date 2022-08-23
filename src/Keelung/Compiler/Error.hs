@@ -1,14 +1,20 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Keelung.Compiler.Error where
 
-import Keelung.Compiler.R1CS (ExecError)
+import Data.Serialize (Serialize)
+import GHC.Generics (Generic)
 import Keelung.Compiler.Interpret (InterpretError)
+import Keelung.Compiler.R1CS (ExecError)
 import Keelung.Error (ElabError)
 
 data Error n
   = ExecError (ExecError n)
   | InterpretError (InterpretError n)
   | ElabError ElabError
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance Serialize n => Serialize (Error n)
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (Error n) where
   show (ExecError e) = "Execution Error: " ++ show e

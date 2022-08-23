@@ -20,7 +20,7 @@ import qualified Keelung.Constraint.Polynomial as Poly
 --------------------------------------------------------------------------------
 
 run ::
-  (GaloisField n, Bounded n, Integral n) =>
+  GaloisField n => 
   IntSet ->
   Set (Constraint n) ->
   Set (Constraint n)
@@ -39,7 +39,7 @@ data Pool n = Pool
 
 -- | Iterate over all constraints and try to merge them with the given constraint.
 --   Stops on the first successful merge.
-dumpInsert :: (Ord n, Num n, Show n, Bounded n, Integral n, Fractional n) => Constraint n -> M n ()
+dumpInsert :: GaloisField n => Constraint n -> M n ()
 dumpInsert constraint = do
   constraints <- gets poolConstraints
   go (Set.toList constraints)
@@ -56,7 +56,7 @@ dumpInsert constraint = do
           return () -- abort the loop
 
 -- Returns `Just newConstraint` if the merge is successful.
-merge :: (Ord n, Num n, Eq n) => Constraint n -> Constraint n -> M n (Maybe (Constraint n))
+merge :: GaloisField n => Constraint n -> Constraint n -> M n (Maybe (Constraint n))
 merge (CAdd aX) (CAdd bX) = do
   pinned <- gets poolPinnedVars
   return $ case mergePoly pinned aX bX of
@@ -84,7 +84,7 @@ merge (CAdd aX) (CMul2 dX eX (Right fX)) = do
 merge a@CMul2 {} b@CAdd {} = merge b a
 merge _ _ = return Nothing
 
-mergePoly :: (Ord n, Num n, Eq n) => IntSet -> Poly.Poly n -> Poly.Poly n -> Maybe (Poly.Poly n)
+mergePoly :: GaloisField n => IntSet -> Poly.Poly n -> Poly.Poly n -> Maybe (Poly.Poly n)
 mergePoly pinned xs ys = do
   let vars = Poly.vars xs `IntSet.intersection` Poly.vars ys `IntSet.difference` pinned
   (var, _) <- IntSet.maxView vars

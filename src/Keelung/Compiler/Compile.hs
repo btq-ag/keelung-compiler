@@ -214,7 +214,7 @@ encodeAssertion expr = do
   add $ cadd 1 [(out, -1)] -- 1 = expr
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Bounded n, Integral n) => TypeErased n -> ConstraintSystem n
+run :: GaloisField n => TypeErased n -> ConstraintSystem n
 run (TypeErased untypedExprs assertions assignments numOfVars inputVars booleanVars) = runM numOfVars $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
   outputVars <- forM untypedExprs $ \expr -> do

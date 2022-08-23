@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Keelung.Compiler.R1CS where
 
 import Data.Either (lefts, rights)
@@ -14,6 +15,8 @@ import qualified Keelung.Constraint.R1C as R1C
 import Keelung.Field (N (..))
 import Keelung.Types (Var)
 import Keelung.Constraint.R1CS (R1CS (..))
+import Data.Serialize (Serialize)
+import GHC.Generics (Generic)
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -106,7 +109,9 @@ data ExecError n
   | ExecR1CUnsatisfiableError [R1C n] (IntMap n)
   | ExecInputUnmatchedError Int Int
   | ExecVarUnassignedError [Var] (IntMap n)
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance Serialize n => Serialize (ExecError n) where 
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (ExecError n) where
   show (ExecOutputVarsNotMappedError vars witness) =

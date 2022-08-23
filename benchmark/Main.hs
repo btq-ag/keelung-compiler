@@ -1,19 +1,18 @@
 {-# LANGUAGE DataKinds #-}
+
 module Main where
 
 import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
-import Criterion.Main
-import Keelung.Monad 
 import Benchmark.Keelung
-import Keelung
+import Criterion.Main
+import Keelung hiding (input)
 
 benchmarks :: Param GF181 -> [Benchmark]
 benchmarks param =
   let keelung = AggSig.aggregateSignature param
       input = genInputFromParam param
-   in [ 
-        bgroup
+   in [ bgroup
           "Elaboration"
           [ bench "Keelung" $ nf benchElaborate keelung
           ],
@@ -39,14 +38,12 @@ benchmarks param =
 
 compileAndOptimize :: Param GF181 -> [Benchmark]
 compileAndOptimize setup =
-  let 
-      -- snarkl = Snarkl.aggregateSignature setup
+  let -- snarkl = Snarkl.aggregateSignature setup
       keelung = AggSig.aggregateSignature setup
-      -- input = genInputFromParam setup
-   in [ bgroup
+   in -- input = genInputFromParam setup
+      [ bgroup
           "Optimisation"
-          [ 
-            -- bench "Snarkl" $ nf Snarkl.benchOptimize snarkl,
+          [ -- bench "Snarkl" $ nf Snarkl.benchOptimize snarkl,
             bench "Keelung" $ nf benchOptimize keelung
             -- ,
             -- bench "Keelung (partial evaluation)" $ nf (benchOptimizeWithInput keelung) input
@@ -57,8 +54,7 @@ keelungOnly :: Param GF181 -> [Benchmark]
 keelungOnly setup =
   let keelung = AggSig.aggregateSignature setup
       input = genInputFromParam setup
-   in [ 
-        bench "Elaboration" $ nf benchElaborate keelung,
+   in [ bench "Elaboration" $ nf benchElaborate keelung,
         bench "Rewriting" $ nf benchRewrite keelung,
         -- bench "Interpretation" $ nf (benchInterpret keelung) input,
         bench "Type Erasure" $ nf benchEraseType keelung,
@@ -71,18 +67,16 @@ keelungOnly setup =
 
 complexityOfElaboration :: [Benchmark]
 complexityOfElaboration =
-      [ 
-        bench "Elaboration" $ nf benchElaborate (makeKeelung 8 4),
-        bench "Elaboration" $ nf benchElaborate (makeKeelung 16 4),
-        bench "Elaboration" $ nf benchElaborate (makeKeelung 32 4),
-        bench "Elaboration" $ nf benchElaborate (makeKeelung 64 4),
-        bench "Elaboration" $ nf benchElaborate (makeKeelung 128 4),
-        bench "Elaboration" $ nf benchElaborate (makeKeelung 256 4)
-      ]
-
-  where 
+  [ bench "Elaboration" $ nf benchElaborate (makeKeelung 8 4),
+    bench "Elaboration" $ nf benchElaborate (makeKeelung 16 4),
+    bench "Elaboration" $ nf benchElaborate (makeKeelung 32 4),
+    bench "Elaboration" $ nf benchElaborate (makeKeelung 64 4),
+    bench "Elaboration" $ nf benchElaborate (makeKeelung 128 4),
+    bench "Elaboration" $ nf benchElaborate (makeKeelung 256 4)
+  ]
+  where
     makeKeelung :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
-    makeKeelung dimension numberOfSignatures = 
+    makeKeelung dimension numberOfSignatures =
       let settings =
             Settings
               { enableAggChecking = True,
@@ -90,13 +84,13 @@ complexityOfElaboration =
                 enableLengthChecking = True
               }
           setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
-          -- input = genInputFromParam setup
-      in  AggSig.aggregateSignature setup
+       in -- input = genInputFromParam setup
+          AggSig.aggregateSignature setup
 
 run :: IO ()
 run = do
-  let dimension = 512
-  let numberOfSignatures = 2
+  let dimension = 128
+  let numberOfSignatures = 4
   let settings =
         Settings
           { enableAggChecking = True,
@@ -107,8 +101,9 @@ run = do
 
   -- defaultMain complexityOfElaboration
   defaultMain (keelungOnly setup)
-  -- defaultMain (benchmarks setup)
-  -- defaultMain (compileAndOptimize setup)
+
+-- defaultMain (benchmarks setup)
+-- defaultMain (compileAndOptimize setup)
 
 main :: IO ()
-main = run 
+main = run

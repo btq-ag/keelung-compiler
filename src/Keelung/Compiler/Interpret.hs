@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Compiler.Interpret (InterpretError (..), run) where
 
@@ -15,6 +16,8 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Field (N (..))
 import Keelung.Syntax.Typed
+import GHC.Generics (Generic)
+import Data.Serialize (Serialize)
 
 --------------------------------------------------------------------------------
 
@@ -84,7 +87,7 @@ instance GaloisField n => Interpret Expr n where
 
 --------------------------------------------------------------------------------
 
-run :: (GaloisField n, Bounded n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) [n]
+run :: GaloisField n => Elaborated -> [n] -> Either (InterpretError n) [n]
 run (Elaborated expr comp) inputs = runM bindings $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
@@ -119,7 +122,9 @@ run (Elaborated expr comp) inputs = runM bindings $ do
 data InterpretError n
   = InterpretUnboundVarError Int (IntMap n)
   | InterpretAssertionError Expr (IntMap n)
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance Serialize n => Serialize (InterpretError n)
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (InterpretError n) where
   show (InterpretUnboundVarError var bindings) =
