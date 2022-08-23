@@ -59,9 +59,10 @@ freeVars expr = case expr of
   Number _ -> return mempty
   Boolean _ -> return mempty
   UnitVal -> return mempty
+  ArrayVal xs -> IntSet.unions <$> mapM freeVars xs
   Ref (NumVar n) -> return $ IntSet.singleton n
   Ref (BoolVar n) -> return $ IntSet.singleton n
-  Ref (Array _ _ addr) -> freeVarsOfArray addr
+  Ref (ArrayRef _ _ addr) -> freeVarsOfArray addr
   Add x y -> (<>) <$> freeVars x <*> freeVars y
   Sub x y -> (<>) <$> freeVars x <*> freeVars y
   Mul x y -> (<>) <$> freeVars x <*> freeVars y
@@ -102,13 +103,14 @@ instance GaloisField n => Interpret Bool n where
 instance GaloisField n => Interpret (Ref t) n where
   interpret (BoolVar var) = pure <$> lookupVar var
   interpret (NumVar var) = pure <$> lookupVar var
-  interpret (Array _ _ addr) = lookupAddr addr
+  interpret (ArrayRef _ _ addr) = lookupAddr addr
 
 instance GaloisField n => Interpret (Val t n) n where
   interpret val = case val of
     Number n -> interpret n
     Boolean b -> interpret b
     UnitVal -> return []
+    ArrayVal xs -> concat <$> mapM interpret xs
     Ref ref -> interpret ref
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
@@ -167,7 +169,7 @@ addBinding :: Ref t -> [n] -> M n ()
 addBinding _ [] = error "addBinding: empty list"
 addBinding (BoolVar var) [val] = modify (first (IntMap.insert var val))
 addBinding (NumVar var) [val] = modify (first (IntMap.insert var val))
-addBinding (Array _ _ addr) vals = do
+addBinding (ArrayRef _ _ addr) vals = do
   vars <- collectVarsFromAddr addr
   mapM_
     (modify . first . uncurry IntMap.insert)
