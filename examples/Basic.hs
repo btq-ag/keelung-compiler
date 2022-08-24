@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# HLINT ignore "Use <&>" #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RebindableSyntax #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Basic where
@@ -11,6 +10,11 @@ import AggregateSignature.Util
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung.Compiler
+    ( ConstraintSystem(..),
+      optimizeWithInput,
+      optimize,
+      numberOfConstraints,
+      Error )
 import Keelung.Compiler.Constraint (cadd)
 import Keelung.Monad
 import Keelung 

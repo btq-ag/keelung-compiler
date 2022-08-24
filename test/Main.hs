@@ -317,6 +317,16 @@ main = hspec $ do
       actual `shouldBe` expected
 
   describe "Interpret" $ do
+    it "Program that throws ElabError.IndexOutOfBoundsError" $ do
+      let expected = left show (Compiler.interpret Basic.outOfBound [])
+      actual <- left show <$> Keelung.interpret Basic.outOfBound []
+      actual `shouldBe` expected
+
+    it "Program that throws ElabError.EmptyArrayError" $ do
+      let expected = left show (Compiler.interpret Basic.emptyArray [])
+      actual <- left show <$> Keelung.interpret Basic.emptyArray []
+      actual `shouldBe` expected
+
     it "Basic.eq1 1" $ do
       let expected = left show (Compiler.interpret Basic.eq1 [0])
       actual <- left show <$> Keelung.interpret Basic.eq1 [0]
