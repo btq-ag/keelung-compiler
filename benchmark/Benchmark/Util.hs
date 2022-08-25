@@ -1,8 +1,9 @@
-{-# HLINT ignore "Use <&>" #-}
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Benchmark.Keelung where
+{-# HLINT ignore "Use <&>" #-}
+
+module Benchmark.Util where
 
 import Data.ByteString (ByteString)
 import Data.Serialize (Serialize, encode)
@@ -10,34 +11,34 @@ import Keelung (AcceptedField, elaborate)
 import Keelung.Compiler
 import Keelung.Compiler.Optimize (elaborateAndRewrite)
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
-import Keelung.Monad
-import Keelung.Syntax
+import Keelung.Monad (Comp)
+import Keelung.Syntax (Val)
 
-benchElaborate :: (AcceptedField n, Serialize n, Integral n) => Comp n (Val kind n) -> ByteString
+benchElaborate :: (AcceptedField n, Serialize n, Integral n) => Comp n (Val t n) -> ByteString
 benchElaborate = encode . elaborate
 
-benchRewrite :: (AcceptedField n, Integral n, Serialize n) => Comp n (Val kind n) -> ByteString
+benchRewrite :: (AcceptedField n, Integral n, Serialize n) => Comp n (Val t n) -> ByteString
 benchRewrite = encode . elaborateAndRewrite
 
-benchInterpret :: (AcceptedField n, Serialize n, GaloisField n, Integral n) => Comp n (Val kind n) -> [n] -> ByteString
+benchInterpret :: (AcceptedField n, Serialize n, GaloisField n, Integral n) => Comp n (Val t n) -> [n] -> ByteString
 benchInterpret prog = encode . interpret prog
 
-benchEraseType :: (AcceptedField n, GaloisField n, Bounded n, Integral n) => Comp n (Val kind n) -> String
+benchEraseType :: (AcceptedField n, GaloisField n, Bounded n, Integral n) => Comp n (Val t n) -> String
 benchEraseType prog = show $ erase prog
 
-benchPropogateConstant :: (AcceptedField n, GaloisField n, Bounded n, Integral n) => Comp n (Val kind n) -> String
+benchPropogateConstant :: (AcceptedField n, GaloisField n, Bounded n, Integral n) => Comp n (Val t n) -> String
 benchPropogateConstant prog = show $ erase prog >>= return . ConstantPropagation.run
 
-benchCompile :: (AcceptedField n, GaloisField n, Bounded n, Integral n, Show n) => Comp n (Val kind n) -> String
+benchCompile :: (AcceptedField n, GaloisField n, Bounded n, Integral n, Show n) => Comp n (Val t n) -> String
 benchCompile prog = show $ compile prog
 
-benchOptimize :: (AcceptedField n, GaloisField n, Bounded n, Integral n, Show n) => Comp n (Val kind n) -> String
+benchOptimize :: (AcceptedField n, GaloisField n, Bounded n, Integral n, Show n) => Comp n (Val t n) -> String
 benchOptimize prog = show $ optimize prog
 
-benchOptimize2 :: (AcceptedField n, GaloisField n, Bounded n, Integral n, Show n) => Comp n (Val kind n) -> String
+benchOptimize2 :: (AcceptedField n, GaloisField n, Bounded n, Integral n, Show n) => Comp n (Val t n) -> String
 benchOptimize2 prog = show $ optimize2 prog
 
-benchOptimizeWithInput :: (AcceptedField n, GaloisField n, Bounded n, Integral n, Show n) => Comp n (Val kind n) -> [n] -> String
+benchOptimizeWithInput :: (AcceptedField n, GaloisField n, Bounded n, Integral n, Show n) => Comp n (Val t n) -> [n] -> String
 benchOptimizeWithInput prog = show . optimizeWithInput prog
 
 -- -- This function "executes" the comp two ways, once by interpreting

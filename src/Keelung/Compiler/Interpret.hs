@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Keelung.Compiler.Interpret (InterpretError (..), run) where
 
@@ -18,6 +19,7 @@ import Keelung.Field (N (..))
 import Keelung.Syntax.Typed
 import GHC.Generics (Generic)
 import Data.Serialize (Serialize)
+import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
@@ -122,7 +124,7 @@ run (Elaborated expr comp) inputs = runM bindings $ do
 data InterpretError n
   = InterpretUnboundVarError Int (IntMap n)
   | InterpretAssertionError Expr (IntMap n)
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (InterpretError n)
 

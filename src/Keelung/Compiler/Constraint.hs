@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Keelung.Compiler.Constraint where
 
@@ -15,6 +17,8 @@ import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Field
 import Keelung.Types (Var)
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
@@ -26,6 +30,7 @@ data Constraint n
   = CAdd !(Poly n)
   | CMul2 !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNQZ Var Var -- x & m
+  deriving (Generic, NFData)
 
 instance (Eq n, Num n) => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -115,7 +120,7 @@ data ConstraintSystem n = ConstraintSystem
     csInputVars :: !IntSet,
     csOutputVars :: !IntSet
   }
-  deriving (Eq)
+  deriving (Eq, Generic, NFData)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int

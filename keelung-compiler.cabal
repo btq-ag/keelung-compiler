@@ -53,6 +53,7 @@ library
     , bytestring
     , cereal
     , containers
+    , deepseq
     , galois-field
     , keelung
     , mtl
@@ -97,6 +98,7 @@ executable keelungc
     , bytestring
     , cereal
     , containers
+    , deepseq
     , galois-field
     , keelung
     , keelung-compiler
@@ -126,6 +128,7 @@ test-suite keelung-test
     , bytestring
     , cereal
     , containers
+    , deepseq
     , galois-field
     , hspec
     , keelung
@@ -158,7 +161,9 @@ benchmark keelung-bench
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
-      Benchmark.Keelung
+      AggSig
+      Array
+      Benchmark.Util
       AggregateSignature.Program
       AggregateSignature.Util
       Basic
@@ -175,9 +180,11 @@ benchmark keelung-bench
     , cereal
     , containers
     , criterion >=1.0
+    , deepseq
     , galois-field
     , keelung
     , keelung-compiler
+    , keelung-examples
     , mtl
     , optparse-applicative
     , random

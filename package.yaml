@@ -20,17 +20,18 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/btq-ag/keelung-compiler#readme>
 
 dependencies:
-- base >= 4.7 && < 5
 - array 
+- base >= 4.7 && < 5
 - bytestring 
 - cereal
-- mtl
 - containers
-- semirings
+- deepseq
 - galois-field
-- random
 - keelung 
+- mtl
 - optparse-applicative
+- random
+- semirings
 
 library:
   source-dirs: src
@@ -86,6 +87,7 @@ benchmarks:
       - examples/
     dependencies:
       - keelung-compiler
+      - keelung-examples
       - criterion 		>=1.0
 
     ghc-options:
