@@ -43,7 +43,7 @@ data Ctx = Ctx
   }
   deriving (Show)
 
-data Program t n = Program (Kinded.Elaborated t n) [n]
+data Program t n = Program (Kinded.Elaborated t) [n]
   deriving (Eq, Show)
 
 type M = Reader Ctx
@@ -77,16 +77,16 @@ instance ArbitraryM a => Arbitrary (M a) where
 instance Arbitrary n => ArbitraryM (Program 'Kinded.Num n) where
   arbitraryM = Program <$> arbitraryM <*> return []
 
-instance Arbitrary n => ArbitraryM (Kinded.Computation n) where
+instance ArbitraryM Kinded.Computation where
   arbitraryM = return $ Kinded.Computation 0 0 mempty mempty mempty mempty mempty
 
-instance Arbitrary n => ArbitraryM (Kinded.Elaborated 'Kinded.Num n) where
+instance ArbitraryM (Kinded.Elaborated 'Kinded.Num) where
   arbitraryM = Kinded.Elaborated <$> arbitraryM <*> arbitraryM
 
-instance Arbitrary n => ArbitraryM (Kinded.Val 'Kinded.Num n) where
+instance ArbitraryM (Kinded.Val 'Kinded.Num) where
   arbitraryM = do
     oneof
-      [ Kinded.Number <$> liftGen arbitrary,
+      [ Kinded.Integer <$> liftGen arbitrary,
         Kinded.Ref <$> arbitraryM
       ]
 
@@ -113,7 +113,7 @@ instance ArbitraryM (Kinded.Ref 'Kinded.Num) where
 --     compNumAsgns :: [Assignment 'Num n],
 --     compBoolAsgns :: [Assignment 'Bool n],
 --     -- Assertions are expressions that are expected to be true
---     compAssertions :: [Val 'Bool n]
+--     compAssertions :: [Val 'Bool]
 --   }
 --   deriving (Eq)
 

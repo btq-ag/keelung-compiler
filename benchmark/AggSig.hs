@@ -61,7 +61,7 @@ _complexityOfElaboration =
     bench "Elaboration" $ nf benchElaborate (makeKeelung 256 4)
   ]
   where
-    makeKeelung :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
+    makeKeelung :: Int -> Int -> Comp (Val 'Unit)
     makeKeelung dimension numberOfSignatures =
       let settings =
             Settings

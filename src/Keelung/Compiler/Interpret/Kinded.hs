@@ -19,7 +19,7 @@ import Keelung.Types
 
 --------------------------------------------------------------------------------
 
-run :: (GaloisField n, Bounded n, Integral n) => Elaborated t n -> [n] -> Either (InterpretError n) [n]
+run :: (GaloisField n, Bounded n, Integral n) => Elaborated t -> [n] -> Either (InterpretError n) [n]
 run elab inputs = runM (bindings, heap) $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
@@ -54,7 +54,7 @@ run elab inputs = runM (bindings, heap) $ do
 --------------------------------------------------------------------------------
 
 -- collect free variables of an expression
-freeVars :: Val t n -> M n IntSet
+freeVars :: Val t -> M n IntSet
 freeVars expr = case expr of
   Integer _ -> return mempty
   Rational _ -> return mempty
@@ -109,7 +109,7 @@ instance GaloisField n => Interpret (Ref t) n where
   interpret (NumVar var) = pure <$> lookupVar var
   interpret (ArrayRef _ _ addr) = lookupAddr addr
 
-instance GaloisField n => Interpret (Val t n) n where
+instance GaloisField n => Interpret (Val t) n where
   interpret val = case val of
     Integer n -> interpret n
     Rational n -> interpret n
@@ -196,7 +196,7 @@ addBinding _ _ = error "addBinding: too many values"
 data InterpretError n
   = InterpretUnboundVarError Var (IntMap n)
   | InterpretUnboundAddrError Addr Heap
-  | InterpretAssertionError (Val 'Bool n) (IntMap n)
+  | InterpretAssertionError (Val 'Bool) (IntMap n)
   deriving (Eq)
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (InterpretError n) where

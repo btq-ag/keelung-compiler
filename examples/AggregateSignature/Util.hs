@@ -5,6 +5,7 @@ import Data.Bits (testBit)
 import Data.Field.Galois (GaloisField)
 import Data.Semiring (Semiring (..))
 import System.Random
+import Keelung (GF181)
 
 --------------------------------------------------------------------------------
 
@@ -69,7 +70,7 @@ data Settings = Settings
 
 --------------------------------------------------------------------------------
 
-makeParam :: (Random n, GaloisField n, Integral n, Num n) => Int -> Int -> Int -> Settings -> Param n
+makeParam :: Int -> Int -> Int -> Settings -> Param GF181
 makeParam dimension t seed settings =
   Param
     { paramDimension = dimension,

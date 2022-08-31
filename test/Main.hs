@@ -22,6 +22,7 @@ import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Syntax.Typed as C
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
+import Keelung.Constraint.R1CS (R1CS)
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
@@ -33,7 +34,7 @@ runKeelungAggSig dimension numberOfSignatures =
           }
       param = makeParam dimension numberOfSignatures 42 settings :: Param GF181
    in execute
-        (AggSig.aggregateSignature param :: Comp GF181 (Val 'Unit GF181))
+        (AggSig.aggregateSignature param :: Comp (Val 'Unit))
         (genInputFromParam param)
 
 main :: IO ()
@@ -52,51 +53,51 @@ main = hspec $ do
         runKeelungAggSig 10 10 `shouldBe` Right []
 
     it "Basic.identity" $
-      execute Basic.identity [42] `shouldBe` Right [42]
+      execute Basic.identity [42 :: GF181] `shouldBe` Right [42]
     it "Basic.summation" $
-      execute Basic.summation [0, 2, 4, 8] `shouldBe` Right [14]
+      execute Basic.summation [0, 2, 4, 8 :: GF181] `shouldBe` Right [14]
     it "Basic.summation2" $
-      execute Basic.summation2 [0, 2, 4, 8] `shouldBe` Right []
+      execute Basic.summation2 [0, 2, 4, 8 :: GF181] `shouldBe` Right []
     it "Basic.assertArraysEqual" $
-      execute Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right []
+      execute Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] `shouldBe` Right []
     it "Basic.assertArraysEqual2" $
-      execute Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8] `shouldBe` Right []
+      execute Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] `shouldBe` Right []
 
     it "Basic.array1D" $
-      execute (Basic.array1D 1) [2, 4] `shouldBe` Right []
+      execute (Basic.array1D 1) [2, 4 :: GF181] `shouldBe` Right []
 
     it "Basic.array2D 1" $
-      execute (Basic.array2D 1 1) [2, 4] `shouldBe` Right []
+      execute (Basic.array2D 1 1) [2, 4 :: GF181] `shouldBe` Right []
 
     it "Basic.array2D 2" $
-      execute (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9] `shouldBe` Right []
+      execute (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9 :: GF181] `shouldBe` Right []
 
     it "Basic.toArray1" $
-      execute Basic.toArray1 [0 .. 7] `shouldBe` Right []
+      execute Basic.toArray1 [0 .. 7 :: GF181] `shouldBe` Right []
 
     it "Basic.xorLists" $
-      execute Basic.xorLists [] `shouldBe` Right [1]
+      execute Basic.xorLists [] `shouldBe` Right [1 :: GF181]
 
     it "Basic.dupArray" $
-      execute Basic.dupArray [1] `shouldBe` Right [1]
+      execute Basic.dupArray [1] `shouldBe` Right [1 :: GF181]
 
     it "Basic.returnArray2" $
-      execute Basic.returnArray2 [2] `shouldBe` Right [2, 4]
+      execute Basic.returnArray2 [2] `shouldBe` Right [2, 4 :: GF181]
 
   describe "Type Erasure" $ do
     describe "Boolean variables" $ do
       it "Basic.identity" $
-        let erased = erase Basic.identity
+        let erased = erase Basic.identity :: Either (Error GF181) (TypeErased GF181)
             result = IntSet.toList . erasedBooleanVars <$> erased
          in result `shouldBe` Right []
 
       it "Basic.identityB" $
-        let erased = erase Basic.identityB
+        let erased = erase Basic.identityB :: Either (Error GF181) (TypeErased GF181)
             result = IntSet.toList . erasedBooleanVars <$> erased
          in result `shouldBe` Right [0]
 
       it "Basic.every" $
-        let erased = erase Basic.every
+        let erased = erase Basic.every :: Either (Error GF181) (TypeErased GF181)
             result = IntSet.toList . erasedBooleanVars <$> erased
          in result `shouldBe` Right [0 .. 3]
 
@@ -108,7 +109,7 @@ main = hspec $ do
   --             enableLengthChecking = True
   --           }
   --       setup = makeParam 1 1 42 settings :: Param GF181
-  --       erased = erase (AggSig.aggregateSignature setup :: Comp GF181 (Val 'Unit GF181))
+  --       erased = erase (AggSig.aggregateSignature setup :: Comp (Val 'Unit))
   --       result = IntSet.toList . erasedBooleanVars <$> erased
   --   in result `shouldBe` Right [3 .. 16]
 
@@ -122,7 +123,7 @@ main = hspec $ do
             ConstraintSystem
               { csConstraints =
                   Set.fromList $
-                    cadd (-42) [(0, 1)],
+                    cadd (-42 :: GF181) [(0, 1)],
                 csBooleanInputVars = mempty,
                 csVars = IntSet.fromList [0],
                 csInputVars = IntSet.fromList [0],
@@ -132,29 +133,29 @@ main = hspec $ do
 
   describe "Compilation" $ do
     it "identity (Num)" $
-      execute Basic.identity [42] `shouldBe` Right [42]
+      execute Basic.identity [42] `shouldBe` Right [42 :: GF181]
     it "identity (Bool)" $
-      execute Basic.identityB [1] `shouldBe` Right [1]
+      execute Basic.identityB [1] `shouldBe` Right [1 :: GF181]
     it "identity (Bool)" $
-      execute Basic.identityB [0] `shouldBe` Right [0]
+      execute Basic.identityB [0] `shouldBe` Right [0 :: GF181]
     it "add3" $
-      execute Basic.add3 [0] `shouldBe` Right [3]
+      execute Basic.add3 [0] `shouldBe` Right [3 :: GF181]
     it "eq1 1" $
-      execute Basic.eq1 [0] `shouldBe` Right [0]
+      execute Basic.eq1 [0] `shouldBe` Right [0 :: GF181]
     it "eq1 2" $
-      execute Basic.eq1 [3] `shouldBe` Right [1]
+      execute Basic.eq1 [3] `shouldBe` Right [1 :: GF181]
     it "cond 1" $
-      execute Basic.cond' [0] `shouldBe` Right [789]
+      execute Basic.cond' [0] `shouldBe` Right [789 :: GF181]
     it "assert fail" $
-      execute Basic.assert1 [0]
+      execute Basic.assert1 [0 :: GF181]
         `shouldBe` Left
           ( InterpretError $
               InterpretAssertionError
-                (C.Eq (C.Var (C.NumVar 0)) (C.Val (C.Number 3)))
+                (C.Eq (C.Var (C.NumVar 0)) (C.Val (C.Integer 3)))
                 (IntMap.fromList [(0, 0)])
           )
     it "assert success" $
-      execute Basic.assert1 [3] `shouldBe` Right [3]
+      execute Basic.assert1 [3] `shouldBe` Right [3 :: GF181]
 
   -- NOTE:
   --    some variables are of "don't care"
@@ -300,32 +301,32 @@ main = hspec $ do
 
   describe "Compile" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
-      let expected = left show (toR1CS <$> Compiler.compile Basic.outOfBound)
-      actual <- left show <$> Keelung.compile Basic.outOfBound
+      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.outOfBound)
+      actual <- left show <$> Keelung.compile GF181 Basic.outOfBound
       actual `shouldBe` expected
 
     it "Program that throws ElabError.EmptyArrayError" $ do
-      let expected = left show (toR1CS <$> Compiler.compile Basic.emptyArray)
-      actual <- left show <$> Keelung.compile Basic.emptyArray
+      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.emptyArray)
+      actual <- left show <$> Keelung.compile GF181 Basic.emptyArray
       actual `shouldBe` expected
 
   describe "Interpret" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
-      let expected = left show (Compiler.interpret Basic.outOfBound [])
-      actual <- left show <$> Keelung.interpret Basic.outOfBound []
+      let expected = left show (Compiler.interpret Basic.outOfBound ([] :: [GF181]))
+      actual <- left show <$> Keelung.interpret GF181 Basic.outOfBound []
       actual `shouldBe` expected
 
     it "Program that throws ElabError.EmptyArrayError" $ do
-      let expected = left show (Compiler.interpret Basic.emptyArray [])
-      actual <- left show <$> Keelung.interpret Basic.emptyArray []
+      let expected = left show (Compiler.interpret Basic.emptyArray ([] :: [GF181]))
+      actual <- left show <$> Keelung.interpret GF181 Basic.emptyArray []
       actual `shouldBe` expected
 
     it "Basic.eq1 1" $ do
-      let expected = left show (Compiler.interpret Basic.eq1 [0])
-      actual <- left show <$> Keelung.interpret Basic.eq1 [0]
+      let expected = left show (Compiler.interpret Basic.eq1 ([0] :: [GF181]))
+      actual <- left show <$> Keelung.interpret GF181 Basic.eq1 [0]
       actual `shouldBe` expected
 
     it "Basic.eq1 2" $ do
-      let expected = left show (Compiler.interpret Basic.eq1 [3])
-      actual <- left show <$> Keelung.interpret Basic.eq1 [3]
+      let expected = left show (Compiler.interpret Basic.eq1 ([3] :: [GF181]))
+      actual <- left show <$> Keelung.interpret GF181 Basic.eq1 [3]
       actual `shouldBe` expected

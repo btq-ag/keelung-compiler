@@ -56,37 +56,37 @@ import Keelung.Syntax.Typed (Elaborated)
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
 
-erase :: (GaloisField n, Integral n) => Comp n (Val t n) -> Either (Error n) (TypeErased n)
+erase :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (TypeErased n)
 erase prog = left ElabError (elaborate prog) >>= eraseElab
 
 -- elaboration => interpretation
-interpret :: (GaloisField n, Integral n) => Comp n (Val t n) -> [n] -> Either (Error n) [n]
+interpret :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
 interpret prog ins = do
   elab <- left ElabError (elaborate prog)
   left InterpretError (Interpret.run elab ins)
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
-compile :: (GaloisField n, Integral n) => Comp n (Val t n) -> Either (Error n) (ConstraintSystem n)
+compile :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (ConstraintSystem n)
 compile prog = erase prog >>= return . Compile.run . ConstantPropagation.run
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
 optimize ::
   (GaloisField n, Integral n) =>
-  Comp n (Val t n) ->
+  Comp (Val t) ->
   Either (Error n) (ConstraintSystem n)
 optimize prog = compile prog >>= return . Optimizer.optimize
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
 optimize2 ::
   (GaloisField n, Integral n) =>
-  Comp n (Val t n) ->
+  Comp (Val t) ->
   Either (Error n) (ConstraintSystem n)
 optimize2 prog = compile prog >>= return . Optimizer.optimize2 . Optimizer.optimize
 
 -- with optimisation + partial evaluation with inputs
 optimizeWithInput ::
   (GaloisField n, Integral n) =>
-  Comp n (Val t n) ->
+  Comp (Val t) ->
   [n] ->
   Either (Error n) (ConstraintSystem n)
 optimizeWithInput program ins = do
@@ -95,14 +95,14 @@ optimizeWithInput program ins = do
   return cs'
 
 -- computes witnesses
-computeWitness :: (GaloisField n, Integral n) => Comp n (Val t n) -> [n] -> Either (Error n) (Witness n)
+computeWitness :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) (Witness n)
 computeWitness prog ins = optimize prog >>= left ExecError . witnessOfR1CS ins . toR1CS
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
 --   (3) Check whether 'w' satisfies the constraint system produced in (1).
 --   (4) Check whether the R1CS result matches the interpreter result.
-execute :: (GaloisField n, Integral n) => Comp n (Val t n) -> [n] -> Either (Error n) [n]
+execute :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
 execute prog ins = do
   r1cs <- toR1CS <$> optimize prog
 

@@ -23,7 +23,7 @@ import Control.Arrow (left)
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: (Integral n) => Comp n (Val t n) -> Either String C.Elaborated
+elaborateAndRewrite :: Comp (Val t) -> Either String C.Elaborated
 elaborateAndRewrite prog = left show (elaborate prog >>= Rewriting2.run)
 
 optimizeWithWitness :: GaloisField n => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
