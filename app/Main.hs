@@ -32,21 +32,21 @@ main = do
   case options of
     Protocol ToR1CS -> do
       blob <- getContents
-      let decoded = decode (BSC.pack blob) :: Either String Elaborated
+      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
       case decoded of
         Left err -> print err
-        Right elaborated -> do
-          case compFieldType (elabComp elaborated) of
+        Right (fieldType, elaborated) -> do
+          case fieldType of
             B64 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> optimizeElab elaborated) :: Either String (R1CS B64))
             GF181 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> optimizeElab elaborated) :: Either String (R1CS GF181))
             BN128 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> optimizeElab elaborated) :: Either String (R1CS BN128))
     Protocol Interpret -> do
       blob <- getContents
-      let decoded = decode (BSC.pack blob) :: Either String (Elaborated, [Integer])
+      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer])
       case decoded of
         Left err -> print err
-        Right (elaborated, inputs) -> do
-          case compFieldType (elabComp elaborated) of
+        Right (fieldType, elaborated, inputs) -> do
+          case fieldType of
             B64 -> putStrLn $ BSC.unpack $ encode (interpElab elaborated (map fromInteger inputs) :: Either String [B64])
             GF181 -> putStrLn $ BSC.unpack $ encode (interpElab elaborated (map fromInteger inputs) :: Either String [GF181])
             BN128 -> putStrLn $ BSC.unpack $ encode (interpElab elaborated (map fromInteger inputs) :: Either String [BN128])

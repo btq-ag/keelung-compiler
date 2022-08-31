@@ -163,7 +163,7 @@ type M = State IntSet
 
 eraseType :: GaloisField n => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
-  let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions _fieldType = comp
+  let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions = comp
       ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
         expr' <- eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAsgns

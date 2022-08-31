@@ -19,12 +19,11 @@ import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import qualified Keelung.Syntax.Typed as C
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting2
-import Keelung.Field
 import Control.Arrow (left)
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: (Integral n, AcceptedField n) => Comp n (Val t n) -> Either String C.Elaborated
+elaborateAndRewrite :: (Integral n) => Comp n (Val t n) -> Either String C.Elaborated
 elaborateAndRewrite prog = left show (elaborate prog >>= Rewriting2.run)
 
 optimizeWithWitness :: GaloisField n => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
