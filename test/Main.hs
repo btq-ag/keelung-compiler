@@ -20,10 +20,8 @@ import qualified Keelung.Compiler.Optimize.Monad as Optimize
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Syntax.Typed as C
-
-import qualified Test.Interpreter as Interpreter
-
 import Test.Hspec
+import qualified Test.Interpreter as Interpreter
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
@@ -40,14 +38,9 @@ runKeelungAggSig dimension numberOfSignatures =
 
 main :: IO ()
 main = hspec $ do
-
   describe "Interpreter " Interpreter.tests
 
-  
   describe "Execution" $ do
-    
-    
-
     describe "Aggregate Signature" $ do
       it "dim:1 sig:1" $
         runKeelungAggSig 1 1 `shouldBe` Right []
@@ -105,7 +98,7 @@ main = hspec $ do
       it "Basic.every" $
         let erased = erase Basic.every
             result = IntSet.toList . erasedBooleanVars <$> erased
-         in result `shouldBe` Right [0 .. 7]
+         in result `shouldBe` Right [0 .. 3]
 
   -- it "Aggregate Signature" $
   --   let settings =

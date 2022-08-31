@@ -57,19 +57,19 @@ checkAgg (Param dimension numOfSigs setup _) = do
               if i < j
                 then q - pk
                 else pk
-        sig <- access2 sigs (t, j)
+        let sig = access2 sigs (t, j)
         return $ acc + (sig * fromIntegral pk')
-      remainder <- access2 expectedRemainders (t, i)
-      quotient <- access2 expectedQuotients (t, i)
+      let remainder = access2 expectedRemainders (t, i)
+      let quotient = access2 expectedQuotients (t, i)
 
       -- assert the relation between rowSum, remainder and quotient
       assert $ rowSum `Eq` (quotient * fromInteger q + remainder)
 
   forM_ [0 .. dimension - 1] $ \i -> do
     let expected = setupAggSig setup ! i
-    actual <- reduce 0 [0 .. numOfSigs - 1] $ \acc t -> do
-      remainder <- access2 expectedRemainders (t, i)
-      return $ acc + remainder
+    let actual = foldl (\acc t -> 
+                  let remainder = access2 expectedRemainders (t, i)
+                  in  acc + remainder) 0 [0 .. numOfSigs - 1] 
 
     -- assert that the sum of remainders forms a term of aggregate signature
     assert $ actual `Eq` fromIntegral expected
@@ -87,18 +87,18 @@ checkSize (Param dimension numOfSigs setup _) = do
       let coeff = signature ! j
 
       -- within the range of [0, 16384)
-      value <- reduce 0 [0 .. 13] $ \acc k -> do
-        bit <- access3 sigBitStrings (i, j, k)
-        let bitValue = fromIntegral (2 ^ k :: Integer)
-        let prod = fromBool bit * bitValue
-        return (acc + prod)
+      let value = foldl (\acc k ->
+                            let bit = access3 sigBitStrings (i, j, k)
+                                bitValue = fromIntegral (2 ^ k :: Integer)
+                                prod = fromBool bit * bitValue
+                            in  (acc + prod))  0 [0 .. 13]
       assert (fromIntegral coeff `Eq` value)
 
-      bit13 <- access3 sigBitStrings (i, j, 13)
-      bit12 <- access3 sigBitStrings (i, j, 12)
-      bit11to0 <- reduce 0 [0 .. 11] $ \acc k -> do
-        bit <- access3 sigBitStrings (i, j, k)
-        return (acc + fromBool bit)
+      let bit13 = access3 sigBitStrings (i, j, 13)
+      let bit12 = access3 sigBitStrings (i, j, 12)
+      let bit11to0 = foldl (\acc k ->
+                              let bit = access3 sigBitStrings (i, j, k)
+                              in  acc + fromBool bit) 0 [0 .. 11]
 
       let smallerThan12289 = fromBool bit13 * fromBool bit12 * bit11to0
       assert (smallerThan12289 `Eq` 0)
@@ -115,8 +115,8 @@ checkLength (Param dimension numOfSigs _ _) = do
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
     forM_ [0 .. dimension - 1] $ \i -> do
-      sig <- access2 sigs (t, i)
-      square <- access2 sigSquares (t, i)
+      let sig = access2 sigs (t, i)
+      let square = access2 sigSquares (t, i)
       assert (square `Eq` (sig * sig))
 
   -- expecting remainders of length of signatures as input
@@ -127,12 +127,12 @@ checkLength (Param dimension numOfSigs _ _) = do
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
-    actualLength <- reduce 0 [0 .. dimension - 1] $ \acc i -> do
-      square <- access2 sigSquares (t, i)
-      return (acc + square)
+    let actualLength = foldl (\acc i -> 
+                                  let square = access2 sigSquares (t, i)
+                                  in acc + square) 0 [0 .. dimension - 1] 
 
-    remainder <- access sigLengthRemainders t
-    quotient <- access sigLengthQuotients t
+    let remainder = access sigLengthRemainders t
+    let quotient = access sigLengthQuotients t
 
     -- assert the relation between actualLength, remainder and quotient
     assert $ actualLength `Eq` (quotient * fromInteger q + remainder)

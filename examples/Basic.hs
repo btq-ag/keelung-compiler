@@ -7,19 +7,19 @@ module Basic where
 
 import qualified AggregateSignature.Program
 import AggregateSignature.Util
+import Control.Monad (forM_)
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
+import Keelung
 import Keelung.Compiler
-    ( ConstraintSystem(..),
-      optimizeWithInput,
-      optimize,
-      numberOfConstraints,
-      Error )
-import Keelung.Compiler.Constraint (cadd)
-import Keelung.Monad
-import Keelung 
-import Control.Monad (forM_, foldM)
+  ( ConstraintSystem (..),
+    Error,
+    numberOfConstraints,
+    optimize,
+    optimizeWithInput,
+  )
 import qualified Keelung.Compiler as Compiler
+import Keelung.Compiler.Constraint (cadd)
 
 --------------------------------------------------------------------------------
 
@@ -59,47 +59,45 @@ summation :: Comp GF181 (Val 'Num GF181)
 summation = do
   arr <- inputs 4
   reduce 0 [0 .. 3] $ \accum i -> do
-    x <- access arr i
+    let x = access arr i
     return $ accum + x
 
 summation2 :: Comp GF181 (Val 'Unit GF181)
 summation2 = do
   arr <- inputs 4
   sumA <- reduce 0 [0 .. 3] $ \accum i -> do
-    x <- access arr i
+    let x = access arr i
     return $ accum + x
   sumB <- reduce 0 [3, 2, 1, 0] $ \accum i -> do
-    x <- access arr i
+    let x = access arr i
     return $ accum + x
   assert $ sumA `Eq` sumB
-  return unit 
+  return unit
 
 assertArraysEqual :: Comp GF181 (Val 'Unit GF181)
-assertArraysEqual = do 
+assertArraysEqual = do
   arrA <- inputs 4
   arrB <- inputs 4
   forM_ [0 .. 3] $ \i -> do
-    x <- access arrA i
-    y <- access arrB i
+    let x = access arrA i
+    let y = access arrB i
     assert $ x `Eq` y
-  return unit 
+  return unit
 
 assertArraysEqual2 :: Comp GF181 (Val 'Unit GF181)
-assertArraysEqual2 = do 
-  arr <- inputs2 2 4 
+assertArraysEqual2 = do
+  arr <- inputs2 2 4
   forM_ [0 .. 1] $ \i -> do
     forM_ [0 .. 3] $ \j -> do
-      x <- access2 arr (i, j)
-      y <- access2 arr (i, j)
+      let x = access2 arr (i, j)
+      let y = access2 arr (i, j)
       assert $ x `Eq` y
-  return unit 
+  return unit
 
 every :: Comp GF181 (Val 'Bool GF181)
 every = do
   arr <- inputs 4
-  reduce true [0 .. 3] $ \accum i -> do
-    x <- access arr i
-    return $ accum `And` x
+  return $ foldl And true (fromArray arr)
 
 assert1 :: Comp GF181 (Val 'Num GF181)
 assert1 = do
@@ -111,41 +109,35 @@ array1D :: Int -> Comp GF181 (Val 'Unit GF181)
 array1D n = do
   xs <- inputs n
   expected <- inputs n
-  forM_ [0 .. n - 1] $ \i -> do
-      x <- access xs i 
-      x' <- access expected i 
-      assert (x' `Eq` (x * x))
-  return unit 
+  mapM_ assert (zipWith Eq (fromArray xs) (fromArray expected))
+  return unit
 
 array2D :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
 array2D n m = do
   xs <- inputs2 n m
   expected <- inputs2 n m
+
   forM_ [0 .. n - 1] $ \i -> do
     forM_ [0 .. m - 1] $ \j -> do
-      x <- access2 xs (i, j)
-      x' <- access2 expected (i, j)
+      let x = access2 xs (i, j)
+      let x' = access2 expected (i, j)
       assert (x' `Eq` (x * x))
 
-  return unit 
-
+  return unit
 
 toArray1 :: Comp GF181 (Val 'Unit GF181)
-toArray1 = do 
-  xss <- inputs2 2 4 
-  yss <- do 
-    ys0 <- toArray [0, 1, 2, 3]
-    ys1 <- toArray [4, 5, 6, 7]
-    toArray [ys0, ys1]
+toArray1 = do
+  xss <- inputs2 2 4
+  let yss = toArray [toArray [0, 1, 2, 3], toArray [4, 5, 6, 7]]
 
   forM_ [0 .. 1] $ \i -> do
-    xs <- access xss i 
-    ys <- access yss i 
+    let xs = access xss i
+    let ys = access yss i
     forM_ [0 .. 3] $ \j -> do
-      x <- access xs j 
-      y <- access ys j 
+      let x = access xs j
+      let y = access ys j
       assert $ x `Eq` y
-  return unit 
+  return unit
 
 make :: (GaloisField n, Integral n) => Int -> Int -> Param n
 make dim n = makeParam dim n 42 $ Settings True True True
@@ -169,7 +161,7 @@ a3 :: Comp GF181 (Val 'Unit GF181)
 a3 = checkLength 1 1
 
 agg :: Comp GF181 (Val 'Unit GF181)
-agg = a1 >> a2 >> a3 
+agg = a1 >> a2 >> a3
 
 -- components of aggregate signature
 checkAgg :: Int -> Int -> Comp GF181 (Val 'Unit GF181)
@@ -225,68 +217,69 @@ cs1 :: ConstraintSystem GF181
 cs1 =
   ConstraintSystem
     { csConstraints =
-        Set.fromList $ concat 
-          [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
-            cadd 0 [(0, 10582), (1, 7317), (17, -1)],
-            cadd 0 [(2, 3853), (3, 4216), (15, -1)],
-            cadd 0 [(2, 8073), (3, 3853), (14, -1)],
-            cadd 0 [(4, 1), (8, 12289), (17, -1)],
-            cadd 0 [(5, 1), (9, 12289), (16, -1)],
-            cadd 0 [(6, 1), (10, 12289), (15, -1)],
-            cadd 0 [(7, 1), (11, 12289), (14, -1)],
-            cadd 0 [(4, 1), (6, 1), (13, -1)],
-            cadd 0 [(5, 1), (7, 1), (12, -1)],
-            cadd 10623 [(13, -1)],
-            cadd 11179 [(12, -1)]
-          ],
+        Set.fromList $
+          concat
+            [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
+              cadd 0 [(0, 10582), (1, 7317), (17, -1)],
+              cadd 0 [(2, 3853), (3, 4216), (15, -1)],
+              cadd 0 [(2, 8073), (3, 3853), (14, -1)],
+              cadd 0 [(4, 1), (8, 12289), (17, -1)],
+              cadd 0 [(5, 1), (9, 12289), (16, -1)],
+              cadd 0 [(6, 1), (10, 12289), (15, -1)],
+              cadd 0 [(7, 1), (11, 12289), (14, -1)],
+              cadd 0 [(4, 1), (6, 1), (13, -1)],
+              cadd 0 [(5, 1), (7, 1), (12, -1)],
+              cadd 10623 [(13, -1)],
+              cadd 11179 [(12, -1)]
+            ],
       csBooleanInputVars = mempty,
       csVars = IntSet.fromList [0 .. 17],
       csInputVars = IntSet.fromList [0 .. 11],
-      csOutputVars = IntSet.empty 
+      csOutputVars = IntSet.empty
     }
-
 
 xorLists :: Comp GF181 (Val 'Bool GF181)
 xorLists = do
-  xs <- toArray [false]
-  ys <- toArray [true]
-  x <- access xs 0 
-  y <- access ys 0 
-  actual <- toArray [x `Xor` y]
-  expected <- toArray [true]
-  foldM
-    ( \acc i -> do
-        a <- access actual i
-        b <- access expected i
-        return (acc `And` (a `BEq` b))
-    )
-    true
-    [0]
+  let xs = toArray [false]
+  let ys = toArray [true]
+  let x = access xs 0
+  let y = access ys 0
+  let actual = toArray [x `Xor` y]
+  let expected = toArray [true]
+  return $
+    foldl
+      ( \acc i ->
+          let a = access actual i
+              b = access expected i
+           in acc `And` (a `BEq` b)
+      )
+      true
+      [0]
 
 outOfBound :: Comp GF181 (Val 'Unit GF181)
 outOfBound = do
-  xs <- toArray [true]
-  _ <- access xs 2 
-  return unit 
+  let xs = toArray [true]
+  let _ = access xs 2
+  return unit
 
 emptyArray :: Comp GF181 (Val 'Unit GF181)
 emptyArray = do
-  _ <- toArray [] :: Comp GF181 (Val ('Arr 'Bool) GF181)
-  return unit 
+  let _ = toArray [] :: Val ('Arr 'Bool) GF181
+  return unit
 
 dupArray :: Comp GF181 (Val 'Num GF181)
 dupArray = do
-  x <- input 
-  xs <- toArray [x, x]
-  access xs 1 
+  x <- input
+  let xs = toArray [x, x]
+  return $ access xs 1
 
 returnArray :: Comp GF181 (Val ('Arr 'Num) GF181)
 returnArray = do
   x <- input
   y <- input
-  toArray [x, y]
+  return $ toArray [x, y]
 
 returnArray2 :: Comp GF181 (Val ('Arr 'Num) GF181)
 returnArray2 = do
   x <- input
-  toArray [x, x * 2]
+  return $ toArray [x, x * 2]
