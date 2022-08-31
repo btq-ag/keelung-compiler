@@ -56,7 +56,8 @@ run elab inputs = runM (bindings, heap) $ do
 -- collect free variables of an expression
 freeVars :: Val t n -> M n IntSet
 freeVars expr = case expr of
-  Number _ -> return mempty
+  Integer _ -> return mempty
+  Rational _ -> return mempty
   Boolean _ -> return mempty
   UnitVal -> return mempty
   ArrayVal xs -> IntSet.unions <$> mapM freeVars xs
@@ -93,8 +94,11 @@ freeVars expr = case expr of
 class Interpret a n where
   interpret :: a -> M n [n]
 
-instance GaloisField n => Interpret n n where
-  interpret x = return [x]
+instance GaloisField n => Interpret Integer n where
+  interpret x = return [fromIntegral x]
+
+instance GaloisField n => Interpret Rational n where
+  interpret x = return [fromRational x]
 
 instance GaloisField n => Interpret Bool n where
   interpret True = return [one]
@@ -107,7 +111,8 @@ instance GaloisField n => Interpret (Ref t) n where
 
 instance GaloisField n => Interpret (Val t n) n where
   interpret val = case val of
-    Number n -> interpret n
+    Integer n -> interpret n
+    Rational n -> interpret n
     Boolean b -> interpret b
     UnitVal -> return []
     ArrayVal xs -> concat <$> mapM interpret xs

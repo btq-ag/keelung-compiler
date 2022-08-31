@@ -57,7 +57,8 @@ instance GaloisField n => Interpret Bool n where
   interpret False = return [zero]
 
 instance GaloisField n => Interpret Val n where
-  interpret (Number n) = return [fromIntegral n]
+  interpret (Integer n) = return [fromIntegral n]
+  interpret (Rational n) = return [fromRational n]
   interpret (Boolean b) = interpret b
   interpret Unit = return []
 

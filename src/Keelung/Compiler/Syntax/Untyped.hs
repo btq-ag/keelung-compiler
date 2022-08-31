@@ -14,6 +14,7 @@ module Keelung.Compiler.Syntax.Untyped
 where
 
 import Control.Monad.State
+import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Sequence (Seq (..), (<|), (|>))
@@ -160,7 +161,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) wh
 -- monad for collecting boolean vars along the way
 type M = State IntSet
 
-eraseType :: Num n => T.Elaborated -> TypeErased n
+eraseType :: GaloisField n => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions _fieldType = comp
       ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
@@ -179,13 +180,14 @@ eraseType (T.Elaborated expr comp) =
           erasedBooleanVars = booleanVars
         }
 
-eraseVal :: Num n => T.Val -> M [Expr n]
-eraseVal (T.Number n) = return [Val (fromInteger n)]
+eraseVal :: GaloisField n => T.Val -> M [Expr n]
+eraseVal (T.Integer n) = return [Val (fromInteger n)]
+eraseVal (T.Rational n) = return [Val (fromRational n)]
 eraseVal (T.Boolean False) = return [Val 0]
 eraseVal (T.Boolean True) = return [Val 1]
 eraseVal T.Unit = return []
 
-eraseExpr :: Num n => T.Expr -> M [Expr n]
+eraseExpr :: GaloisField n => T.Expr -> M [Expr n]
 eraseExpr expr = case expr of
   T.Val val -> eraseVal val
   T.Var var -> case var of
@@ -240,7 +242,7 @@ eraseExpr expr = case expr of
   T.ToBool x -> eraseExpr x
   T.ToNum x -> eraseExpr x
 
-eraseAssignment :: Num n => T.Assignment -> M (Assignment n)
+eraseAssignment :: GaloisField n => T.Assignment -> M (Assignment n)
 eraseAssignment (T.Assignment (T.NumVar n) expr) = do
   exprs <- eraseExpr expr
   return $ Assignment n (head exprs)
