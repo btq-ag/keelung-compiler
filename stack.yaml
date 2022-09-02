@@ -46,7 +46,7 @@ extra-deps:
 - poly-0.4.0.0@sha256:75c243113712745dab5d2f4a52643705e146473770af212f9e0ce3d87a83f2ed,2123
 - protolude-0.2.4@sha256:ec6c01be631050f8c1b9153a782d329a52609d058cb4b461104222862f7792af,2292
 - git: git@github.com:btq-ag/keelung.git
-  commit: cedf1bfcbb994249b021d3e657fe65f01a987685
+  commit: bdae8187a4ff2fb1d11f0fabcb6dd0e3f5252377
 # - git: git@github.com:btq-ag/keelung-examples.git
 #   commit: 0480eb8522e3455f52415532fd548f91f0855a0a
 
