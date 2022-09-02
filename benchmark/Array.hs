@@ -1,11 +1,11 @@
 module Array where
 
 import Criterion
-import Keelung (Comp, GF181, Val, elaborate)
-import Keelung.Compiler (optimize)
-import qualified Keelung.Compiler as Compiler
-import qualified Keelung.Error as Language
-import Keelung.Syntax.Typed (Elaborated)
+-- import Keelung (Comp, GF181, Val, elaborate)
+-- import Keelung.Compiler (optimize)
+-- import qualified Keelung.Compiler as Compiler
+-- import qualified Keelung.Error as Language
+-- import Keelung.Syntax.Typed (Elaborated)
 -- import qualified Lib.W8
 
 benchmark :: Benchmark

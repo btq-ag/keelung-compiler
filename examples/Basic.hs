@@ -283,3 +283,6 @@ returnArray2 :: Comp (Val ('Arr 'Num))
 returnArray2 = do
   x <- input
   return $ toArray [x, x * 2]
+
+toArrayM1 :: Comp (Val ('ArrM 'Bool))
+toArrayM1 = toArrayM [false]

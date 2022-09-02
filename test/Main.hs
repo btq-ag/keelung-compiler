@@ -5,7 +5,7 @@ module Main where
 import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import qualified Basic
-import Control.Arrow (left)
+import Control.Arrow (left, ArrowChoice (right))
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
@@ -157,6 +157,9 @@ main = hspec $ do
     it "assert success" $
       execute Basic.assert1 [3] `shouldBe` Right [3 :: GF181]
 
+    it "toArrayM" $
+      execute Basic.toArrayM1 [] `shouldBe` Right ([0] :: [GF181])
+
   -- NOTE:
   --    some variables are of "don't care"
   --    they get thrown away and won't be in the witness
@@ -302,31 +305,31 @@ main = hspec $ do
   describe "Compile" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
       let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.outOfBound)
-      actual <- left show <$> Keelung.compile GF181 Basic.outOfBound
+      actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.outOfBound
       actual `shouldBe` expected
 
     it "Program that throws ElabError.EmptyArrayError" $ do
       let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.emptyArray)
-      actual <- left show <$> Keelung.compile GF181 Basic.emptyArray
+      actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.emptyArray
       actual `shouldBe` expected
 
   describe "Interpret" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
       let expected = left show (Compiler.interpret Basic.outOfBound ([] :: [GF181]))
-      actual <- left show <$> Keelung.interpret GF181 Basic.outOfBound []
+      actual <- left show <$> Keelung.interpret_ GF181 Basic.outOfBound []
       actual `shouldBe` expected
 
     it "Program that throws ElabError.EmptyArrayError" $ do
       let expected = left show (Compiler.interpret Basic.emptyArray ([] :: [GF181]))
-      actual <- left show <$> Keelung.interpret GF181 Basic.emptyArray []
+      actual <- left show <$> Keelung.interpret_ GF181 Basic.emptyArray []
       actual `shouldBe` expected
 
     it "Basic.eq1 1" $ do
       let expected = left show (Compiler.interpret Basic.eq1 ([0] :: [GF181]))
-      actual <- left show <$> Keelung.interpret GF181 Basic.eq1 [0]
+      actual <- left show <$> Keelung.interpret_ GF181 Basic.eq1 [0]
       actual `shouldBe` expected
 
     it "Basic.eq1 2" $ do
       let expected = left show (Compiler.interpret Basic.eq1 ([3] :: [GF181]))
-      actual <- left show <$> Keelung.interpret GF181 Basic.eq1 [3]
+      actual <- left show <$> Keelung.interpret_ GF181 Basic.eq1 [3]
       actual `shouldBe` expected

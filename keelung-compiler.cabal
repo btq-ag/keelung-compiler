@@ -184,7 +184,6 @@ benchmark keelung-bench
     , galois-field
     , keelung
     , keelung-compiler
-    , keelung-examples
     , mtl
     , optparse-applicative
     , random

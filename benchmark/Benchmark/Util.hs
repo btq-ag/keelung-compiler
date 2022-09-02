@@ -7,38 +7,38 @@ module Benchmark.Util where
 
 import Data.ByteString (ByteString)
 import Data.Serialize (Serialize, encode)
-import Keelung (elaborate)
+import Keelung (elaborate, GF181)
 import Keelung.Compiler
 import Keelung.Compiler.Optimize (elaborateAndRewrite)
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
 import Keelung.Monad (Comp)
 import Keelung.Syntax (Val)
 
-benchElaborate :: (Serialize n, Integral n) => Comp (Val t) -> ByteString
+benchElaborate :: Comp (Val t) -> ByteString
 benchElaborate = encode . elaborate
 
-benchRewrite :: (Integral n, Serialize n) => Comp (Val t) -> ByteString
+benchRewrite :: Comp (Val t) -> ByteString
 benchRewrite = encode . elaborateAndRewrite
 
-benchInterpret :: (Serialize n, GaloisField n, Integral n) => Comp (Val t) -> [n] -> ByteString
+benchInterpret :: (GaloisField n, Integral n, Serialize n) => Comp (Val t) -> [n] -> ByteString
 benchInterpret prog = encode . interpret prog
 
-benchEraseType :: (GaloisField n, Bounded n, Integral n) => Comp (Val t) -> String
-benchEraseType prog = show $ erase prog
+benchEraseType :: Comp (Val t) -> String
+benchEraseType prog = show (erase prog :: Either (Error GF181) (TypeErased GF181))
 
-benchPropogateConstant :: (GaloisField n, Bounded n, Integral n) => Comp (Val t) -> String
-benchPropogateConstant prog = show $ erase prog >>= return . ConstantPropagation.run
+benchPropogateConstant :: Comp (Val t) -> String
+benchPropogateConstant prog = show (erase prog >>= return . ConstantPropagation.run :: Either (Error GF181) (TypeErased GF181))
 
-benchCompile :: (GaloisField n, Bounded n, Integral n, Show n) => Comp (Val t) -> String
-benchCompile prog = show $ compile prog
+benchCompile :: Comp (Val t) -> String
+benchCompile prog = show (compile prog :: Either (Error GF181) (ConstraintSystem GF181))
 
-benchOptimize :: (GaloisField n, Bounded n, Integral n, Show n) => Comp (Val t) -> String
-benchOptimize prog = show $ optimize prog
+benchOptimize :: Comp (Val t) -> String
+benchOptimize prog = show (optimize prog :: Either (Error GF181) (ConstraintSystem GF181))
 
-benchOptimize2 :: (GaloisField n, Bounded n, Integral n, Show n) => Comp (Val t) -> String
-benchOptimize2 prog = show $ optimize2 prog
+benchOptimize2 :: Comp (Val t) -> String
+benchOptimize2 prog = show (optimize2 prog :: Either (Error GF181) (ConstraintSystem GF181))
 
-benchOptimizeWithInput :: (GaloisField n, Bounded n, Integral n, Show n) => Comp (Val t) -> [n] -> String
+benchOptimizeWithInput :: (GaloisField n, Bounded n, Integral n) => Comp (Val t) -> [n] -> String
 benchOptimizeWithInput prog = show . optimizeWithInput prog
 
 -- -- This function "executes" the comp two ways, once by interpreting
