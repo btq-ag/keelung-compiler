@@ -16,7 +16,6 @@ import Keelung.Compiler
     compile,
     interpElab,
     numberOfConstraints,
-    optimize,
     optimizeElab,
     toR1CS,
   )
@@ -95,7 +94,7 @@ profile dimension numOfSigs = run $ do
   -- print ("compAssertions", length $ compAssertions computed, sum $ map sizeOfExpr (compAssertions computed))
 
   -- compile & optimize
-  aggSig <- liftEither $ optimize (AggSig.aggregateSignature param)
+  aggSig <- liftEither $ compile (AggSig.aggregateSignature param)
   liftIO $
     print (numberOfConstraints (aggSig :: ConstraintSystem GF181))
 

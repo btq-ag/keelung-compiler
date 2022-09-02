@@ -30,10 +30,10 @@ benchPropogateConstant :: Comp (Val t) -> String
 benchPropogateConstant prog = show (erase prog >>= return . ConstantPropagation.run :: Either (Error GF181) (TypeErased GF181))
 
 benchCompile :: Comp (Val t) -> String
-benchCompile prog = show (compile prog :: Either (Error GF181) (ConstraintSystem GF181))
+benchCompile prog = show (compileOnly prog :: Either (Error GF181) (ConstraintSystem GF181))
 
 benchOptimize :: Comp (Val t) -> String
-benchOptimize prog = show (optimize prog :: Either (Error GF181) (ConstraintSystem GF181))
+benchOptimize prog = show (compile prog :: Either (Error GF181) (ConstraintSystem GF181))
 
 benchOptimize2 :: Comp (Val t) -> String
 benchOptimize2 prog = show (optimize2 prog :: Either (Error GF181) (ConstraintSystem GF181))

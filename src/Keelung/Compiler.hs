@@ -17,8 +17,8 @@ module Keelung.Compiler
     --
     erase,
     interpret,
+    compileOnly,
     compile,
-    optimize,
     optimize2,
     optimizeWithInput,
     computeWitness,
@@ -66,15 +66,15 @@ interpret prog ins = do
   left InterpretError (Interpret.run elab ins)
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
-compile :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (ConstraintSystem n)
-compile prog = erase prog >>= return . Compile.run . ConstantPropagation.run
+compileOnly :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (ConstraintSystem n)
+compileOnly prog = erase prog >>= return . Compile.run . ConstantPropagation.run
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
-optimize ::
+compile ::
   (GaloisField n, Integral n) =>
   Comp (Val t) ->
   Either (Error n) (ConstraintSystem n)
-optimize prog = compile prog >>= return . Optimizer.optimize
+compile prog = compileOnly prog >>= return . Optimizer.optimize
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
 optimize2 ::
@@ -90,13 +90,13 @@ optimizeWithInput ::
   [n] ->
   Either (Error n) (ConstraintSystem n)
 optimizeWithInput program ins = do
-  cs <- optimize program
+  cs <- compile program
   let (_, cs') = Optimizer.optimizeWithInput ins cs
   return cs'
 
 -- computes witnesses
 computeWitness :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) (Witness n)
-computeWitness prog ins = optimize prog >>= left ExecError . witnessOfR1CS ins . toR1CS
+computeWitness prog ins = compile prog >>= left ExecError . witnessOfR1CS ins . toR1CS
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
@@ -104,7 +104,7 @@ computeWitness prog ins = optimize prog >>= left ExecError . witnessOfR1CS ins .
 --   (4) Check whether the R1CS result matches the interpreter result.
 execute :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
 execute prog ins = do
-  r1cs <- toR1CS <$> optimize prog
+  r1cs <- toR1CS <$> compile prog
 
   actualWitness <- left ExecError $ witnessOfR1CS ins r1cs
 

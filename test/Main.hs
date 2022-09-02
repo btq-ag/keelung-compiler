@@ -21,7 +21,7 @@ import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Syntax.Typed as C
 import Test.Hspec
-import qualified Test.Interpreter as Interpreter
+-- import qualified Test.Interpreter as Interpreter
 import Keelung.Constraint.R1CS (R1CS)
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
@@ -39,7 +39,7 @@ runKeelungAggSig dimension numberOfSignatures =
 
 main :: IO ()
 main = hspec $ do
-  describe "Interpreter " Interpreter.tests
+  -- describe "Interpreter " Interpreter.tests
 
   describe "Execution" $ do
     describe "Aggregate Signature" $ do
@@ -129,7 +129,7 @@ main = hspec $ do
                 csInputVars = IntSet.fromList [0],
                 csOutputVars = IntSet.empty
               }
-       in optimize Basic.assertToBe42 `shouldBe` Right cs
+       in Compiler.compile Basic.assertToBe42 `shouldBe` Right cs
 
   describe "Compilation" $ do
     it "identity (Num)" $
@@ -311,6 +311,11 @@ main = hspec $ do
     it "Program that throws ElabError.EmptyArrayError" $ do
       let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.emptyArray)
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.emptyArray
+      actual `shouldBe` expected
+
+    it "Program that compiles successfully" $ do
+      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.identity)
+      actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.identity
       actual `shouldBe` expected
 
   describe "Interpret" $ do

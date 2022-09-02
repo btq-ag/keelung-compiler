@@ -15,7 +15,6 @@ import Keelung.Compiler
   ( ConstraintSystem (..),
     Error,
     numberOfConstraints,
-    optimize,
     optimizeWithInput,
   )
 import qualified Keelung.Compiler as Compiler
@@ -180,8 +179,8 @@ checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 bench :: Comp (Val t) -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
 bench program settings dimension n = do
   let inputVal = genInputFromParam (makeParam dimension n 42 settings)
-  cs <- Compiler.compile program -- before optimisation (only constant propagation)
-  cs' <- optimize program -- after optimisation (constant propagation + constraint set reduction)
+  cs <- Compiler.compileOnly program -- before optimisation (only constant propagation)
+  cs' <- Compiler.compile program -- after optimisation (constant propagation + constraint set reduction)
   cs'' <- optimizeWithInput program inputVal -- after optimisation (constant propagation + constraint set reduction with input)
   return
     ( numberOfConstraints cs,
