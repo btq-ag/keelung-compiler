@@ -1,35 +1,37 @@
 module Array where
 
 import Criterion
--- import Keelung (Comp, GF181, Val, elaborate)
--- import Keelung.Compiler (optimize)
--- import qualified Keelung.Compiler as Compiler
--- import qualified Keelung.Error as Language
--- import Keelung.Syntax.Typed (Elaborated)
--- import qualified Lib.W8
+
+import Keelung (Comp, GF181, Val, elaborate)
+import Keelung.Compiler (compile)
+import qualified Keelung.Compiler as Compiler
+import qualified Keelung.Error as Language
+import Keelung.Syntax.Typed (Elaborated)
+
+import qualified Array.Immutable as I 
+import qualified Array.Mutable as M 
 
 benchmark :: Benchmark
 benchmark =
   bgroup
     "Mutable vs Immutable array"
-    [ 
-      -- bgroup
-      --   "Elaboration"
-      --   [ bench "Mutable" $ nf elaborate' (Lib.W8.fromString input),
-      --     bench "Immutable" $ nf elaborate' (return $ Lib.W8.fromString' input)
-      --   ],
-      -- bgroup
-      --   "Complilation"
-      --   [ bench "Mutable" $ nf compile' (Lib.W8.fromString input),
-      --     bench "Immutable" $ nf compile' (return $ Lib.W8.fromString' input)
-      --   ]
+    [ bgroup
+        "Elaboration"
+        [ bench "Mutable" $ nf elaborate' (M.fromString input),
+          bench "Immutable" $ nf elaborate' (return $ I.fromString input)
+        ],
+      bgroup
+        "Complilation"
+        [ bench "Mutable" $ nf compile' (M.fromString input),
+          bench "Immutable" $ nf compile' (return $ I.fromString input)
+        ]
     ]
-  -- where
-  --   input :: String
-  --   input = concat $ replicate 100 "Hello world"
+    where
+      input :: String
+      input = concat $ replicate 100 "Hello world"
 
-  --   elaborate' :: Comp (Val t GF181) -> Either Language.ElabError Elaborated
-  --   elaborate' = elaborate
+      elaborate' :: Comp (Val t) -> Either Language.ElabError Elaborated
+      elaborate' = elaborate
 
-  --   compile' :: Comp (Val t GF181) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
-  --   compile' = optimize
+      compile' :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
+      compile' = compile

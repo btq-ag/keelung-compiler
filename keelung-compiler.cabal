@@ -163,6 +163,8 @@ benchmark keelung-bench
       Keelung.Compiler.Util
       AggSig
       Array
+      Array.Immutable
+      Array.Mutable
       Benchmark.Util
       AggregateSignature.Program
       AggregateSignature.Util
