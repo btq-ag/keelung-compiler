@@ -31,10 +31,11 @@ fullAdderN as bs =
       let (value', carry') = fullAdder a b carry
        in (acc ++ [value'], carry')
 
-multiply :: Int -> Comp (Val ('Arr 'Bool))
-multiply times = do
-  num <- inputs 32
-  let z = toArray $ replicate 32 false 
+multiply_ :: Int -> Int -> Comp (Val ('Arr 'Bool))
+multiply_ width times = do
+  num <- inputs width
+  let z = toArray $ replicate width false 
   return $ foldl fullAdderN z (replicate times num)
 
-  
+multiply :: Int -> Comp (Val ('Arr 'Bool))
+multiply = multiply_ 32 
