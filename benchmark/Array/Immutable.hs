@@ -1,9 +1,10 @@
 {-# LANGUAGE DataKinds #-}
+
 module Array.Immutable where
 
-import Keelung 
+import Data.Bits (Bits (testBit))
 import Data.Word (Word8)
-import Data.Bits (Bits(testBit))
+import Keelung
 
 fromWord8 :: Word8 -> Val ('Arr 'Bool)
 fromWord8 word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
@@ -11,31 +12,36 @@ fromWord8 word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
 fromChar :: Char -> Val ('Arr 'Bool)
 fromChar = fromWord8 . toEnum . fromEnum
 
-fromString :: String -> Val ('Arr ('Arr 'Bool)) 
+fromString :: String -> Val ('Arr ('Arr 'Bool))
 fromString = toArray . map fromChar
 
+------------------------------------------------------------------------------
 
-fullAdder :: Val 'Bool -> Val 'Bool -> Val 'Bool -> (Val 'Bool, Val 'Bool)
-fullAdder a b carry = (value, nextCarry)
-  where
-    value = a `Xor` b `Xor` carry
-    nextCarry = (a `Xor` b `And` carry) `Or` (a `And` b)
-
-fullAdderN :: Val ('Arr 'Bool) -> Val ('Arr 'Bool) -> Val ('Arr 'Bool)
-fullAdderN as bs =
+fullAdder :: Val ('Arr 'Bool) -> Val ('Arr 'Bool) -> Val ('Arr 'Bool)
+fullAdder as bs =
   let zipped = zip (fromArray as) (fromArray bs)
    in toArray $ fst $ foldl f ([], false) zipped
   where
     f :: ([Val 'Bool], Val 'Bool) -> (Val 'Bool, Val 'Bool) -> ([Val 'Bool], Val 'Bool)
     f (acc, carry) (a, b) =
-      let (value', carry') = fullAdder a b carry
-       in (acc ++ [value'], carry')
+      let value = a `Xor` b `Xor` carry 
+          nextCarry = (a `Xor` b `And` carry) `Or` (a `And` b)
+       in (acc ++ [value], nextCarry)
 
-multiply_ :: Int -> Int -> Comp (Val ('Arr 'Bool))
-multiply_ width times = do
-  num <- inputs width
-  let z = toArray $ replicate width false 
-  return $ foldl fullAdderN z (replicate times num)
+-- | "T" for top-level
+fullAdderT :: Int -> Comp (Val ('Arr 'Bool))
+fullAdderT width = do
+  xs <- inputs width
+  ys <- inputs width
+  return $ fullAdder xs ys
 
-multiply :: Int -> Comp (Val ('Arr 'Bool))
-multiply = multiply_ 32 
+--------------------------------------------------------------------------------
+
+multiplier :: Val ('Arr 'Bool) -> Int -> Val ('Arr 'Bool)
+multiplier xs times = foldl fullAdder xs (replicate times xs)
+
+-- | "T" for top-level
+multiplierT :: Int -> Int -> Comp (Val ('Arr 'Bool))
+multiplierT width times = do
+  xs <- inputs width
+  return $ multiplier xs times

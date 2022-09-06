@@ -26,8 +26,8 @@ benchmark = compilation
         "Mutable vs Immutable Array Complilation"
         [ bench "M.fromString" $ nf compile' (M.fromString input),
           bench "I.fromString" $ nf compile' (return $ I.fromString input),
-          bench "M.multiply" $ nf compile' (M.multiply 2),
-          bench "I.multiply" $ nf compile' (I.multiply 2)
+          bench "M.multiply" $ nf compile' (M.multiplyT 8 2),
+          bench "I.multiply" $ nf compile' (I.multiplierT 8 2)
         ]
 
     input :: String
