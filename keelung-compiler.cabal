@@ -62,6 +62,53 @@ library
     , semirings
   default-language: Haskell2010
 
+executable constraint
+  main-is: Main.hs
+  other-modules:
+      AggregateSignature.Program
+      AggregateSignature.Util
+      Array.Immutable
+      Array.Mutable
+      Basic
+      Keelung.Compiler
+      Keelung.Compiler.Compile
+      Keelung.Compiler.Constraint
+      Keelung.Compiler.Error
+      Keelung.Compiler.Interpret
+      Keelung.Compiler.Interpret.Kinded
+      Keelung.Compiler.Interpret.Typed
+      Keelung.Compiler.Optimize
+      Keelung.Compiler.Optimize.ConstantPropagation
+      Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints2
+      Keelung.Compiler.Optimize.Monad
+      Keelung.Compiler.Optimize.Rewriting
+      Keelung.Compiler.Optimize.UnionFind
+      Keelung.Compiler.R1CS
+      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Util
+      Paths_keelung_compiler
+  hs-source-dirs:
+      examples/
+      profiling/
+      src/
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
+  build-depends:
+      array
+    , base >=4.7 && <5
+    , bytestring
+    , cereal
+    , containers
+    , deepseq
+    , galois-field
+    , keelung
+    , keelung-compiler
+    , mtl
+    , optparse-applicative
+    , random
+    , semirings
+  default-language: Haskell2010
+
 executable keelungc
   main-is: Main.hs
   other-modules:
@@ -85,6 +132,8 @@ executable keelungc
       Keelung.Compiler.Util
       AggregateSignature.Program
       AggregateSignature.Util
+      Array.Immutable
+      Array.Mutable
       Basic
       Paths_keelung_compiler
   hs-source-dirs:
@@ -115,6 +164,8 @@ test-suite keelung-test
       Test.Interpreter
       AggregateSignature.Program
       AggregateSignature.Util
+      Array.Immutable
+      Array.Mutable
       Basic
       Paths_keelung_compiler
   hs-source-dirs:
@@ -163,11 +214,11 @@ benchmark keelung-bench
       Keelung.Compiler.Util
       AggSig
       Array
-      Array.Immutable
-      Array.Mutable
       Benchmark.Util
       AggregateSignature.Program
       AggregateSignature.Util
+      Array.Immutable
+      Array.Mutable
       Basic
       Paths_keelung_compiler
   hs-source-dirs:

@@ -58,6 +58,22 @@ executables:
       - -Werror=incomplete-patterns
       - -fno-warn-orphans
 
+  constraint:
+    main:                Main.hs
+    source-dirs:        
+      - examples/
+      - profiling/
+      - src/
+    dependencies:
+    - keelung-compiler
+
+    ghc-options:
+      - -Wall
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -Werror=incomplete-patterns
+      - -fno-warn-orphans
 
 
 tests:
