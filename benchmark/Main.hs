@@ -1,12 +1,23 @@
 module Main where
 
--- import qualified AggSig
-import qualified Array
-import Criterion.Main (defaultMain)
+import qualified AggSig
+-- import qualified Array
+import Criterion.Main
+import Criterion.Types
 
 main :: IO ()
 main =
-  defaultMain
-    [ -- AggSig.run
-      Array.benchmark
+  defaultMainWith
+    config
+    [ AggSig.run
+    -- Array.fromString,
+    -- Array.fullAdder
+    -- Array.multiplier
     ]
+  where
+    config :: Config
+    config =
+      defaultConfig
+        { reportFile = Just "profiling/benchmark.html",
+          csvFile = Just "profiling/benchmark.csv"
+        }

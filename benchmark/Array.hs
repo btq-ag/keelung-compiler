@@ -1,62 +1,125 @@
-module Array where
+{-# LANGUAGE DataKinds #-}
+
+module Array (fromString, fullAdder, multiplier) where
 
 import qualified Array.Immutable as I
-import qualified Array.Mutable as M
 import Criterion
-import Keelung (Comp, GF181, Val, elaborate)
-import qualified Keelung.Compiler as Compiler
-import qualified Keelung.Error as Language
-import Keelung.Syntax.Typed (Elaborated)
+import Benchmark.Util
+import Keelung (Comp, Kind (..), Val)
 
-benchmark :: Benchmark
-benchmark = fromStringOptimization1
+fromString :: Benchmark
+fromString =
+  bgroup
+    "fromString"
+    [ elaboration,
+      compilation,
+      constantPropagation,
+      optimization2
+    ]
   where
-    _elaboration :: Benchmark
-    _elaboration =
+    program :: Int -> Comp (Val ('Arr ('Arr 'Bool)))
+    program n = return $ I.fromString (concat $ replicate (n * 100) "Hello world")
+
+    elaboration :: Benchmark
+    elaboration =
       bgroup
-        "Mutable vs Immutable Array Elaboration"
-        [ bench "Mutable" $ nf elaborate' (M.fromString input),
-          bench "Immutable" $ nf elaborate' (return $ I.fromString input)
-        ]
+        "Elaboration"
+        $ map (\i -> bench (show (i * 1000)) $ nf elaborate $ program i) [1, 2, 4, 8]
 
-    _compilation :: Benchmark
-    _compilation =
+    compilation :: Benchmark
+    compilation =
       bgroup
-        "Mutable vs Immutable Array Complilation"
-        [ bench "M.fromString" $ nf compile (M.fromString input),
-          bench "I.fromString" $ nf compile (return $ I.fromString input),
-          bench "M.multiply" $ nf compile (M.multiplyT 8 2),
-          bench "I.multiply" $ nf compile (I.multiplierT 8 2)
-        ]
+        "Compilation"
+        $ map (\i -> bench (show (i * 1000)) $ nf compile $ program i) [1, 2, 4, 8]
 
-    _fromStringCompilation :: Benchmark
-    _fromStringCompilation =
+    constantPropagation :: Benchmark
+    constantPropagation =
       bgroup
-        "fromString: Complilation"
-        [ bench "I.fromString 100" $ nf compileOnly (return $ I.fromString (concat $ replicate 10 "Helloworld")),
-          bench "I.fromString 200" $ nf compileOnly (return $ I.fromString (concat $ replicate 20 "Helloworld")),
-          bench "I.fromString 400" $ nf compileOnly (return $ I.fromString (concat $ replicate 40 "Helloworld")),
-          bench "I.fromString 800" $ nf compileOnly (return $ I.fromString (concat $ replicate 80 "Helloworld"))
-        ]
+        "Constant Propagation"
+        $ map (\i -> bench (show (i * 1000)) $ nf optimize1 $ program i) [1, 2, 4, 8]
 
-    fromStringOptimization1 :: Benchmark
-    fromStringOptimization1 =
+    optimization2 :: Benchmark
+    optimization2 =
       bgroup
-        "fromString: Optimization 1"
-        [ bench "I.fromString 100" $ nf compile (return $ I.fromString (concat $ replicate 10 "Helloworld")),
-          bench "I.fromString 200" $ nf compile (return $ I.fromString (concat $ replicate 20 "Helloworld")),
-          bench "I.fromString 400" $ nf compile (return $ I.fromString (concat $ replicate 40 "Helloworld")),
-          bench "I.fromString 800" $ nf compile (return $ I.fromString (concat $ replicate 80 "Helloworld"))
-        ]
+        "Optimization I"
+        $ map (\i -> bench (show (i * 1000)) $ nf optimize2 $ program i) [1, 2, 4, 8]
 
-    input :: String
-    input = concat $ replicate 100 "Hello world"
+fullAdder :: Benchmark
+fullAdder =
+  bgroup
+    "fullAdder"
+    [ elaboration,
+      compilation,
+      constantPropagation,
+      optimization2
+    ]
+  where
+    program :: Int -> Comp (Val ('Arr 'Bool))
+    program n = I.fullAdderT (n * 10)
 
-    elaborate' :: Comp (Val t) -> Either Language.ElabError Elaborated
-    elaborate' = elaborate
+    elaboration :: Benchmark
+    elaboration =
+      bgroup
+        "Elaboration"
+        $ map (\i -> bench (show (i * 10)) $ nf elaborate $ program i) [1, 2, 4, 8]
 
-    compile :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
-    compile = Compiler.compile
+    compilation :: Benchmark
+    compilation =
+      bgroup
+        "Compilation"
+        $ map (\i -> bench (show (i * 10)) $ nf compile $ program i) [1, 2, 4, 8]
 
-    compileOnly :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
-    compileOnly = Compiler.compileOnly
+    constantPropagation :: Benchmark
+    constantPropagation =
+      bgroup
+        "Constant Propagation"
+        $ map (\i -> bench (show (i * 10)) $ nf optimize1 $ program i) [1, 2, 4, 8]
+
+    optimization2 :: Benchmark
+    optimization2 =
+      bgroup
+        "Optimization I"
+        $ map (\i -> bench (show (i * 10)) $ nf optimize2 $ program i) [1, 2, 4, 8]
+
+multiplier :: Benchmark
+multiplier =
+  bgroup
+    "multiplier"
+    [ elaboration,
+      compilation,
+      constantPropagation,
+      optimization2
+    ]
+  where
+    program :: Int -> Comp (Val ('Arr 'Bool))
+    program n = I.multiplierT n 4
+
+    elaboration :: Benchmark
+    elaboration =
+      bgroup
+        "Elaboration"
+        $ map (\i -> bench (show i) $ nf elaborate $ program i) [1, 2, 4, 8]
+
+    compilation :: Benchmark
+    compilation =
+      bgroup
+        "Compilation"
+        $ map (\i -> bench (show i) $ nf compile $ program i) [1, 2, 4, 8]
+
+    constantPropagation :: Benchmark
+    constantPropagation =
+      bgroup
+        "Constant Propagation"
+        $ map (\i -> bench (show i) $ nf optimize1 $ program i) [1, 2, 4, 8]
+
+    optimization2 :: Benchmark
+    optimization2 =
+      bgroup
+        "Optimization I"
+        $ map (\i -> bench (show i) $ nf optimize2 $ program i) [1, 2, 4, 8]
+
+-- optimization3 :: Benchmark
+-- optimization3 =
+--   bgroup
+--     "Optimization II"
+--     $ map (\i -> bench (show (i * 1000)) $ nf optimize3 $ program i) [1, 2, 4, 8]

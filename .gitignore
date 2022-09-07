@@ -8,4 +8,6 @@ dist-newstyle/
 # profiling 
 ._*
 profiling/exec.prof
+profiling/*.csv
+profiling/*.html
 profiling/*.svg

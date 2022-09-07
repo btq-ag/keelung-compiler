@@ -17,9 +17,10 @@ module Keelung.Compiler
     --
     erase,
     interpret,
-    compileOnly,
     compile,
+    optimize1,
     optimize2,
+    optimize3,
     optimizeWithInput,
     computeWitness,
     execute,
@@ -56,32 +57,37 @@ import Keelung.Syntax.Typed (Elaborated)
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
 
-erase :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (TypeErased n)
-erase prog = left ElabError (elaborate prog) >>= eraseElab
-
 -- elaboration => interpretation
 interpret :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
 interpret prog ins = do
   elab <- left ElabError (elaborate prog)
   left InterpretError (Interpret.run elab ins)
 
+-- elaboration => rewriting => type erasure
+erase :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (TypeErased n)
+erase prog = left ElabError (elaborate prog) >>= eraseElab
+
+-- elaboration => rewriting => type erasure => compilation
+compile :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (ConstraintSystem n)
+compile prog = erase prog >>= return . Compile.run
+
 -- elaboration => rewriting => type erasure => constant propagation => compilation
-compileOnly :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (ConstraintSystem n)
-compileOnly prog = erase prog >>= return . Compile.run . ConstantPropagation.run
+optimize1 :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (ConstraintSystem n)
+optimize1 prog = erase prog >>= return . Compile.run . ConstantPropagation.run
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
-compile ::
-  (GaloisField n, Integral n) =>
-  Comp (Val t) ->
-  Either (Error n) (ConstraintSystem n)
-compile prog = compileOnly prog >>= return . Optimizer.optimize
-
--- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
 optimize2 ::
   (GaloisField n, Integral n) =>
   Comp (Val t) ->
   Either (Error n) (ConstraintSystem n)
-optimize2 prog = compile prog >>= return . Optimizer.optimize2 . Optimizer.optimize
+optimize2 prog = optimize1 prog >>= return . Optimizer.optimize
+
+-- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
+optimize3 ::
+  (GaloisField n, Integral n) =>
+  Comp (Val t) ->
+  Either (Error n) (ConstraintSystem n)
+optimize3 prog = compile prog >>= return . Optimizer.optimize2 . Optimizer.optimize
 
 -- with optimisation + partial evaluation with inputs
 optimizeWithInput ::
