@@ -162,7 +162,8 @@ substConstraint !constraint = case constraint of
       (Right (a, aX), Right (b, bX), Right (c, cX)) -> do
         CMul2 <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
           <*> pure (Poly.buildEither c (IntMap.toList cX))
-  CNQZ _ _ -> return $ Just constraint
+  CNQZ {} -> return $ Just constraint
+  CXor {} -> return $ Just constraint
 
 -- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
@@ -190,6 +191,21 @@ isTautology constraint = case constraint of
       Value n -> do
         bindVar m (recip n)
         return True
+  CXor x y z -> do
+    x' <- lookupVar x
+    case x' of
+      Root _ -> return False
+      Value x'' -> do 
+        y' <- lookupVar y
+        case y' of
+          Root _ -> return False
+          Value y'' -> do 
+            z' <- lookupVar z
+            case z' of
+              Root _ -> return False
+              Value z'' -> 
+                return $ x'' + y'' - 2 * (x'' * y'') == z''
+    
 
 -- | Learn bindings and variable equalities from a constraint
 learn :: GaloisField n => Constraint n -> OptiM n ()

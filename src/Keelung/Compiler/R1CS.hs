@@ -1,24 +1,26 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Keelung.Compiler.R1CS where
 
+import Control.DeepSeq (NFData)
 import Data.Either (lefts, rights)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
+import Data.Serialize (Serialize)
 import qualified Data.Set as Set
+import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint hiding (numberOfConstraints)
 import Keelung.Compiler.Optimize (optimizeWithWitness)
 import Keelung.Compiler.Util
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import qualified Keelung.Constraint.R1C as R1C
+import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (N (..))
 import Keelung.Types (Var)
-import Keelung.Constraint.R1CS (R1CS (..))
-import Data.Serialize (Serialize)
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -76,6 +78,16 @@ toR1CS cs =
     toR1C (CMul2 aX bX cX) =
       Right $ R1C (Right aX) (Right bX) cX
     toR1C (CNQZ x m) = Left (x, m)
+    toR1C (CXor x y z) =
+      --     x  y  z  1
+      -- a [-2, 0, 0, 1]
+      -- b [0 , 1, 0, 1]
+      -- c [-3, 0, 1, 1]
+      Right $
+        R1C
+          (Poly.buildEither 1 [(x, -2), (y, 0), (z, 0)])
+          (Poly.buildEither 1 [(x, 0), (y, 1), (z, 0)])
+          (Poly.buildEither 1 [(x, -3), (y, 0), (z, 1)])
 
 fromR1CS :: GaloisField n => R1CS n -> ConstraintSystem n
 fromR1CS r1cs =
@@ -113,12 +125,12 @@ data ExecError n
   | ExecVarUnassignedError [Var] (IntMap n)
   deriving (Eq, Generic, NFData)
 
-instance Serialize n => Serialize (ExecError n) where 
+instance Serialize n => Serialize (ExecError n)
 
 instance (Show n, Bounded n, Integral n, Fractional n) => Show (ExecError n) where
   show (ExecOutputVarsNotMappedError vars witness) =
     "output variables "
-      ++ show vars 
+      ++ show vars
       ++ " are not mapped in\n  "
       ++ show witness
   show (ExecOutputError expected actual) =

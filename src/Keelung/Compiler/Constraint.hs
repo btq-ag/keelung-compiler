@@ -26,10 +26,12 @@ import Control.DeepSeq (NFData)
 --      CAdd: 0 = c + c₀x₀ + c₁x₁ ... cₙxₙ
 --      CMul: ax * by = c or ax * by = cz
 --      CNQZ: if x == 0 then m = 0 else m = recip x
+--      CXor: x ⊕ y = z
 data Constraint n
   = CAdd !(Poly n)
   | CMul2 !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNQZ Var Var -- x & m
+  | CXor Var Var Var
   deriving (Generic, NFData)
 
 instance (Eq n, Num n) => Eq (Constraint n) where
@@ -38,12 +40,14 @@ instance (Eq n, Num n) => Eq (Constraint n) where
     (CMul2 x y z, CMul2 u v w) ->
       ((x == u && y == v) || (x == v && y == u)) && z == w
     (CNQZ x y, CNQZ u v) -> x == u && y == v
+    (CXor x y z, CXor u v w) -> x == u && y == v && z == w
     _ -> False
 
 instance Functor Constraint where
   fmap f (CAdd x) = CAdd (fmap f x)
   fmap f (CMul2 x y (Left z)) = CMul2 (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul2 x y (Right z)) = CMul2 (fmap f x) (fmap f y) (Right (fmap f z))
+  fmap _ (CXor x y z) = CXor x y z 
   fmap _ (CNQZ x y) = CNQZ x y
 
 -- | Smart constructor for the CAdd constraint
@@ -76,22 +80,25 @@ instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Con
           then "(" <> show poly <> ")"
           else show poly
   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
+  show (CXor x y z) = "X $" <> show x <> " ⊕ $" <> show y <> " = $" <> show z
 
 instance (Ord n, Num n) => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
+
+
   compare (CMul2 aV bV cV) (CMul2 aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMul2 {} = LT -- CMul2 is always greater than anything
   compare CMul2 {} _ = GT
-  -- compare CMul {} CAdd {} = GT
-  -- compare CAdd {} CMul {} = LT
+
+
   compare (CAdd xs) (CAdd ys) =
     if xs == ys then EQ else compare xs ys
-  -- compare (CMul (a, x) (b, y) (c, z)) (CMul (a', x') (b', y') (c', z')) =
-  -- perform lexicographical comparison with tuples
-  -- compare (x, y, z, a, b, c) (x', y', z', a', b', c')
   compare CNQZ {} CNQZ {} = EQ
   compare CNQZ {} _ = LT
   compare _ CNQZ {} = GT
+  compare CXor {} CXor {} = EQ
+  compare CXor {} _ = LT
+  compare _ CXor {} = GT
 
 --------------------------------------------------------------------------------
 
@@ -103,6 +110,7 @@ varsInConstraint (CAdd xs) = Poly.vars xs
 varsInConstraint (CMul2 aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
 varsInConstraint (CMul2 aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
 varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
+varsInConstraint (CXor x y z) = IntSet.fromList [x, y, z]
 
 varsInConstraints :: Set (Constraint a) -> IntSet
 varsInConstraints = IntSet.unions . Set.map varsInConstraint
@@ -215,3 +223,7 @@ renumberConstraints cs =
         CMul2 (Poly.mapVars renumber aV) (Poly.mapVars renumber bV) (Poly.mapVars renumber <$> cV)
       CNQZ x y ->
         CNQZ (renumber x) (renumber y)
+      CXor x y z ->
+        CXor (renumber x) (renumber y) (renumber z)
+        
+
