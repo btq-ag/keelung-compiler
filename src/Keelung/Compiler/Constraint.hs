@@ -96,7 +96,7 @@ instance (Ord n, Num n) => Ord (Constraint n) where
   compare CNQZ {} CNQZ {} = EQ
   compare CNQZ {} _ = LT
   compare _ CNQZ {} = GT
-  compare CXor {} CXor {} = EQ
+  compare (CXor x y z)  (CXor u v w ) = compare (x, y, z) (u, v, w)
   compare CXor {} _ = LT
   compare _ CXor {} = GT
 

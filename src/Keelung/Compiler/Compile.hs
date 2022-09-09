@@ -155,19 +155,19 @@ encodeBinaryOp op out x y = case op of
     xy <- freshVar
     encode xy (Var x * Var y)
     encode xy (Var x + Var y - Var out)
-  Xor -> do
-    -- Constraint 'x xor y = out'.
-    -- The encoding is: x+y - out = 2(x*y); assumes x and y are boolean.
-    xy <- freshVar
-    encodeBinaryOp Mul xy x y
-    add $
-      cadd
-        0
-        [ (x, 1),
-          (y, 1),
-          (out, - 1),
-          (xy, -2)
-        ]
+  Xor -> add [CXor x y out]
+    -- -- Constraint 'x xor y = out'.
+    -- -- The encoding is: x+y - out = 2(x*y); assumes x and y are boolean.
+    -- xy <- freshVar
+    -- encodeBinaryOp Mul xy x y
+    -- add $
+    --   cadd
+    --     0
+    --     [ (x, 1),
+    --       (y, 1),
+    --       (out, - 1),
+    --       (xy, -2)
+    --     ]
   NEq -> do
     -- Constraint 'x != y = out'
     -- The encoding is, for some 'm':

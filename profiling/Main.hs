@@ -26,28 +26,28 @@ main = do
   --   asGF181 (compile (return $ fromString (replicate i 'A'))) >>= print . Set.size . csConstraints
 
   putStrLn "O0: fullAdder"
-  forM_ [1, 2] $ \i -> do
-    asGF181 (optimize1 (fullAdderT i)) >>= printCS True
+  forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
+    asGF181 (optimize1 (fullAdderT i)) >>= printCS False
 
-  -- putStrLn "O1: fullAdder"
-  -- forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-  --   asGF181 (optimize2 (fullAdderT i)) >>= printCS False
+  putStrLn "O1: fullAdder"
+  forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
+    asGF181 (optimize2 (fullAdderT i)) >>= printCS False
 
-  -- putStrLn "O2: fullAdder"
-  -- forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-  --   asGF181 (optimize3 (fullAdderT i)) >>= printCS False
+  putStrLn "O2: fullAdder"
+  forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
+    asGF181 (optimize3 (fullAdderT i)) >>= printCS False
 
-  -- putStrLn "O0: multiplier"
-  -- forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-  --   asGF181 (optimize1 (multiplierT n 3)) >>= printCS False
+  putStrLn "O0: multiplier"
+  forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
+    asGF181 (optimize1 (multiplierT n 3)) >>= printCS False
 
-  -- putStrLn "O1: multiplier"
-  -- forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-  --   asGF181 (optimize2 (multiplierT n 3)) >>= printCS False
+  putStrLn "O1: multiplier"
+  forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
+    asGF181 (optimize2 (multiplierT n 3)) >>= printCS False
 
-  -- putStrLn "O2: multiplier"
-  -- forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-  --   asGF181 (optimize3 (multiplierT n 3)) >>= printCS False
+  putStrLn "O2: multiplier"
+  forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
+    asGF181 (optimize3 (multiplierT n 3)) >>= printCS False
 
 -- fa :: IO ()
 -- fa = do
