@@ -84,21 +84,23 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
+  -- CXor is always greater than anything
+  compare (CXor x y z)  (CXor u v w ) = compare (x, y, z) (u, v, w)
+  compare _ CXor {} = LT
+  compare CXor {} _ = GT
 
-
+  -- CMul2 comes in the second
   compare (CMul2 aV bV cV) (CMul2 aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
-  compare _ CMul2 {} = LT -- CMul2 is always greater than anything
+  compare _ CMul2 {} = LT
   compare CMul2 {} _ = GT
 
-
+  -- CAdd comes in the third
   compare (CAdd xs) (CAdd ys) =
     if xs == ys then EQ else compare xs ys
+  
   compare CNQZ {} CNQZ {} = EQ
   compare CNQZ {} _ = LT
   compare _ CNQZ {} = GT
-  compare (CXor x y z)  (CXor u v w ) = compare (x, y, z) (u, v, w)
-  compare CXor {} _ = LT
-  compare _ CXor {} = GT
 
 --------------------------------------------------------------------------------
 
