@@ -132,7 +132,7 @@ data TypeErased n = TypeErased
     erasedBooleanVars :: !IntSet
   }
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (TypeErased n) where
+instance (GaloisField n, Integral n) => Show (TypeErased n) where
   show (TypeErased expr assertions assignments numOfVars inputVars boolVars) =
     "TypeErased {\n\
     \  expression: "

@@ -1,14 +1,15 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Compiler.Error where
 
+import Control.DeepSeq (NFData)
+import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Interpret (InterpretError)
 import Keelung.Compiler.R1CS (ExecError)
 import Keelung.Error (ElabError)
-import Control.DeepSeq (NFData)
 
 data Error n
   = ExecError (ExecError n)
@@ -18,7 +19,7 @@ data Error n
 
 instance Serialize n => Serialize (Error n)
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (Error n) where
+instance (GaloisField n, Integral n) => Show (Error n) where
   show (ExecError e) = "Execution Error: " ++ show e
   show (InterpretError e) = "Interpret Error: " ++ show e
   show (ElabError e) = "Elaboration Error: " ++ show e

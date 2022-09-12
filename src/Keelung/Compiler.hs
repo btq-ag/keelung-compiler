@@ -151,10 +151,10 @@ execute prog ins = do
 eraseElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (TypeErased n)
 eraseElab elab = left ElabError (Rewriting.run elab) >>= return . eraseType
 
-interpElab :: (Show n, GaloisField n, Integral n, Bounded n) => Elaborated -> [n] -> Either String [n]
+interpElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
 interpElab elab ins = left (show . InterpretError) (Interpret.run elab ins)
 
-optimizeElab :: (Show n, GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
+optimizeElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
 optimizeElab elab = do
   rewritten <- left ElabError (Rewriting.run elab)
   return $ Optimizer.optimize $ Compile.run $ ConstantPropagation.run $ eraseType rewritten

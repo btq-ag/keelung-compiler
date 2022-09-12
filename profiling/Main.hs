@@ -2,22 +2,27 @@ module Main where
 
 import Array.Immutable
 import Control.Monad
-import qualified Data.Set as Set
-import Keelung (GF181, N (N))
+import qualified Data.IntSet as IntSet
+import Keelung (GF181)
 import Keelung.Compiler
+import Keelung.Constraint.R1CS
 
 asGF181 :: Either (Error GF181) a -> IO a
 asGF181 (Left err) = error $ show err
 asGF181 (Right x) = return x
 
-printCS :: Bool -> ConstraintSystem GF181 -> IO ()
-printCS printConstraints cs = do
-  let constraints = csConstraints cs
-  print $ Set.size constraints
-  when printConstraints $ do
-    forM_ (Set.toList constraints) $ \constraint -> do
-      print $ fmap N constraint
-    putStrLn "========="
+printR1CS :: Bool -> R1CS GF181 -> IO ()
+printR1CS printConstraints r1cs = do
+  let constraints = r1csConstraints r1cs
+
+  if printConstraints
+    then do
+      -- forM_ constraints $ \constraint -> do
+      --   print $ fmap N constraint
+      print r1cs
+      putStrLn "========="
+    else do
+      print $ length constraints + IntSet.size (r1csBooleanInputVars r1cs)
 
 main :: IO ()
 main = do
@@ -26,28 +31,28 @@ main = do
   --   asGF181 (compile (return $ fromString (replicate i 'A'))) >>= print . Set.size . csConstraints
 
   putStrLn "O0: fullAdder"
-  forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-    asGF181 (optimize1 (fullAdderT i)) >>= printCS False
+  forM_ [1] $ \i -> do
+    asGF181 (optimize1 (fullAdderT i)) >>= printR1CS True . toR1CS
 
-  putStrLn "O1: fullAdder"
-  forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-    asGF181 (optimize2 (fullAdderT i)) >>= printCS False
+  -- putStrLn "O1: fullAdder"
+  -- forM_ [1] $ \i -> do
+  --   asGF181 (optimize2 (fullAdderT i)) >>= printR1CS True . toR1CS
 
-  putStrLn "O2: fullAdder"
-  forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-    asGF181 (optimize3 (fullAdderT i)) >>= printCS False
+  -- putStrLn "O2: fullAdder"
+  -- forM_ [1, 2] $ \i -> do
+  --   asGF181 (optimize3 (fullAdderT i)) >>= printR1CS True . toR1CS
 
-  putStrLn "O0: multiplier"
-  forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-    asGF181 (optimize1 (multiplierT n 3)) >>= printCS False
+-- putStrLn "O0: multiplier"
+-- forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
+--   asGF181 (optimize1 (multiplierT n 3)) >>= printR1CS False . toR1CS
 
-  putStrLn "O1: multiplier"
-  forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-    asGF181 (optimize2 (multiplierT n 3)) >>= printCS False
+-- putStrLn "O1: multiplier"
+-- forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
+--   asGF181 (optimize2 (multiplierT n 3)) >>= printR1CS False . toR1CS
 
-  putStrLn "O2: multiplier"
-  forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-    asGF181 (optimize3 (multiplierT n 3)) >>= printCS False
+-- putStrLn "O2: multiplier"
+-- forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
+--   asGF181 (optimize3 (multiplierT n 3)) >>= printR1CS False . toR1CS
 
 -- fa :: IO ()
 -- fa = do

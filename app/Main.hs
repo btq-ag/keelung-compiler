@@ -8,6 +8,7 @@ import Control.Arrow (left)
 import Control.Monad
 import Control.Monad.Except
 import qualified Data.ByteString.Char8 as BSC
+import Data.Field.Galois (GaloisField)
 import Data.Serialize (decode, encode)
 import Keelung (elaborate)
 import Keelung.Compiler
@@ -56,7 +57,7 @@ main = do
       -- keelung dimension numOfSigs
       keelungConstraints dimension numOfSigs
 
-run :: (Show n, Bounded n, Integral n, Fractional n) => ExceptT (Error n) IO () -> IO ()
+run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do
   res <- runExceptT f
   case res of

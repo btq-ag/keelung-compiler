@@ -127,7 +127,7 @@ data ExecError n
 
 instance Serialize n => Serialize (ExecError n)
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (ExecError n) where
+instance (GaloisField n, Integral n) => Show (ExecError n) where
   show (ExecOutputVarsNotMappedError vars witness) =
     "output variables "
       ++ show vars

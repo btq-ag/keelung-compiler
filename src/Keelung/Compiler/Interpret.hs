@@ -129,7 +129,7 @@ data InterpretError n
 
 instance Serialize n => Serialize (InterpretError n)
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (InterpretError n) where
+instance (GaloisField n, Integral n) => Show (InterpretError n) where
   show (InterpretUnboundVarError var bindings) =
     "unbound variable " ++ show var
       ++ " in bindings "

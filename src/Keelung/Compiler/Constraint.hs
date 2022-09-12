@@ -34,7 +34,7 @@ data Constraint n
   | CXor Var Var Var
   deriving (Generic, NFData)
 
-instance (Eq n, Num n) => Eq (Constraint n) where
+instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAdd x, CAdd y) -> x == y
     (CMul2 x y z, CMul2 u v w) ->
@@ -66,7 +66,7 @@ cmul !xs !ys (c, zs) = case ( do
   Left _ -> []
   Right result -> [result]
 
-instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Constraint n) where
+instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " ++ show xs ++ " = 0"
   show (CMul2 aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly' cV
     where
@@ -82,7 +82,7 @@ instance (Show n, Eq n, Num n, Bounded n, Integral n, Fractional n) => Show (Con
   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
   show (CXor x y z) = "X $" <> show x <> " ⊕ $" <> show y <> " = $" <> show z
 
-instance (Ord n, Num n) => Ord (Constraint n) where
+instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
 
 
@@ -134,7 +134,7 @@ data ConstraintSystem n = ConstraintSystem
 numberOfConstraints :: ConstraintSystem n -> Int
 numberOfConstraints (ConstraintSystem cs cs' _ _ _) = Set.size cs + IntSet.size cs'
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem n) where
+instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show (ConstraintSystem constraints boolInputVars vars inputVars outputVars) =
     "ConstraintSystem {\n\
     \  constraints ("
@@ -177,7 +177,7 @@ instance (Show n, Bounded n, Integral n, Fractional n) => Show (ConstraintSystem
 --   renumbered constraints, together with the total number of
 --   variables in the (renumbered) constraint set and the (possibly
 --   renumbered) in and out variables.
-renumberConstraints :: (Ord n, Num n) => ConstraintSystem n -> ConstraintSystem n
+renumberConstraints :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
 renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))

@@ -5,6 +5,7 @@
 
 module Keelung.Compiler.Compile (run) where
 
+import Control.Monad (forM)
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'))
@@ -14,10 +15,9 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint
-import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Compiler.Syntax.Untyped
+import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Types (Var)
-import Control.Monad (forM)
 
 ----------------------------------------------------------------
 
@@ -35,7 +35,7 @@ type M n = State (Env n)
 runM :: Var -> M n a -> a
 runM outVar program = evalState program (Env Set.empty (outVar + 1))
 
-add :: (Ord n, Num n) => [Constraint n] -> M n ()
+add :: GaloisField n => [Constraint n] -> M n ()
 add cs =
   modify (\env -> env {envConstraints = Set.union (Set.fromList cs) (envConstraints env)})
 
@@ -156,18 +156,18 @@ encodeBinaryOp op out x y = case op of
     encode xy (Var x * Var y)
     encode xy (Var x + Var y - Var out)
   Xor -> add [CXor x y out]
-    -- -- Constraint 'x xor y = out'.
-    -- -- The encoding is: x+y - out = 2(x*y); assumes x and y are boolean.
-    -- xy <- freshVar
-    -- encodeBinaryOp Mul xy x y
-    -- add $
-    --   cadd
-    --     0
-    --     [ (x, 1),
-    --       (y, 1),
-    --       (out, - 1),
-    --       (xy, -2)
-    --     ]
+  -- -- Constraint 'x xor y = out'.
+  -- -- The encoding is: x+y - out = 2(x*y); assumes x and y are boolean.
+  -- xy <- freshVar
+  -- encodeBinaryOp Mul xy x y
+  -- add $
+  --   cadd
+  --     0
+  --     [ (x, 1),
+  --       (y, 1),
+  --       (out, - 1),
+  --       (xy, -2)
+  --     ]
   NEq -> do
     -- Constraint 'x != y = out'
     -- The encoding is, for some 'm':
@@ -239,5 +239,5 @@ run (TypeErased untypedExprs assertions assignments numOfVars inputVars booleanV
         booleanInputVars
         vars
         inputVars
-        (IntSet.fromList outputVars) 
+        (IntSet.fromList outputVars)
     )

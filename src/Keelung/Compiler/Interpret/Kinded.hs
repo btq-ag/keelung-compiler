@@ -19,7 +19,7 @@ import Keelung.Types
 
 --------------------------------------------------------------------------------
 
-run :: (GaloisField n, Bounded n, Integral n) => Elaborated t -> [n] -> Either (InterpretError n) [n]
+run :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
 run elab inputs = runM (bindings, heap) $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
@@ -199,7 +199,7 @@ data InterpretError n
   | InterpretAssertionError (Val 'Bool) (IntMap n)
   deriving (Eq)
 
-instance (Show n, Bounded n, Integral n, Fractional n) => Show (InterpretError n) where
+instance (GaloisField n, Integral n) => Show (InterpretError n) where
   show (InterpretUnboundVarError var bindings) =
     "unbound variable " ++ show var
       ++ " in bindings "
