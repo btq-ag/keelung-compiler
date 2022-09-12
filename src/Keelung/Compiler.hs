@@ -110,7 +110,7 @@ computeWitness prog ins = compile prog >>= left ExecError . witnessOfR1CS ins . 
 --   (4) Check whether the R1CS result matches the interpreter result.
 execute :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
 execute prog ins = do
-  r1cs <- toR1CS <$> compile prog
+  r1cs <- toR1CS <$> optimize2 prog
 
   actualWitness <- left ExecError $ witnessOfR1CS ins r1cs
 

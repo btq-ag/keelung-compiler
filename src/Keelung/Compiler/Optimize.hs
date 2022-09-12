@@ -26,7 +26,7 @@ import Control.Arrow (left)
 elaborateAndRewrite :: Comp (Val t) -> Either String C.Elaborated
 elaborateAndRewrite prog = left show (elaborate prog >>= Rewriting2.run)
 
-optimizeWithWitness :: GaloisField n => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
+optimizeWithWitness :: (GaloisField n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimizeWithWitness witness cs =
   -- NOTE: Pinned vars include:
   --   - input vars
@@ -44,12 +44,12 @@ optimizeWithWitness witness cs =
 
         return (assignments, renumberConstraints $ cs {csConstraints = constraints})
 
-optimizeWithInput :: GaloisField n => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
+optimizeWithInput :: (GaloisField n, Integral n) => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimizeWithInput ins cs =
   let witness = IntMap.fromList (zip (IntSet.toList (csInputVars cs)) ins)
    in optimizeWithWitness witness cs
 
-optimize :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
+optimize :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 optimize = snd . optimizeWithInput mempty
 
 optimize2 :: GaloisField n => ConstraintSystem n -> ConstraintSystem n

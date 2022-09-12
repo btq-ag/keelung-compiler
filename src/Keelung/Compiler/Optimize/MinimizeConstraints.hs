@@ -8,13 +8,13 @@ import qualified Data.IntMap as IntMap
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint (Constraint (..), cadd)
+import Keelung.Compiler.Optimize.Monad
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Compiler.Optimize.Monad
 import Keelung.Types (Var)
 
 run ::
-  GaloisField n =>
+  (GaloisField n, Integral n) =>
   [Var] ->
   Set (Constraint n) ->
   OptiM n (Set (Constraint n))
@@ -24,7 +24,7 @@ run pinnedVars constraints = do
   return (Set.fromList pinned <> minimised)
 
 minimiseManyTimes ::
-  GaloisField n =>
+  (GaloisField n, Integral n) =>
   -- | Initial constraint set
   Set (Constraint n) ->
   -- | Resulting simplified constraint set
@@ -39,7 +39,7 @@ minimiseManyTimes constraints = do
     else return constraints' -- stop here
 
 minimiseOnce ::
-  GaloisField n =>
+  (GaloisField n, Integral n) =>
   -- | Initial constraint set
   Set (Constraint n) ->
   -- | Resulting simplified constraint set
@@ -56,7 +56,7 @@ minimiseOnce = goOverConstraints Set.empty
 
 --
 goOverConstraints ::
-  GaloisField n =>
+  (GaloisField n, Integral n) =>
   Set (Constraint n) ->
   Set (Constraint n) ->
   OptiM n (Set (Constraint n))
@@ -65,7 +65,6 @@ goOverConstraints accum constraints = case Set.minView constraints of
   Just (picked, constraints') -> do
     -- pick the "smallest" constraint
     -- and substitute roots/constants in constraints
-
     substitutionResult <- substConstraint picked
 
     case substitutionResult of
@@ -80,8 +79,6 @@ goOverConstraints accum constraints = case Set.minView constraints of
           else do
             learn substituted
             goOverConstraints (Set.insert substituted accum) constraints'
-
--- traceShow (show picked <> " => " <> show substituted) $
 
 --------------------------------------------------------------------------------
 
@@ -163,7 +160,35 @@ substConstraint !constraint = case constraint of
         CMul2 <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
           <*> pure (Poly.buildEither c (IntMap.toList cX))
   CNQZ {} -> return $ Just constraint
-  CXor {} -> return $ Just constraint
+  CXor x y z -> do
+    x' <- lookupVar x
+    y' <- lookupVar y
+    z' <- lookupVar z
+    case (x', y', z') of
+      (Value 0, Value 0, Value 0) -> return Nothing
+      (Value 0, Value _, Value _) -> return Nothing
+      (Value _, Value 0, Value _) -> return Nothing
+      (Value _, Value _, Value 0) -> return Nothing
+      (Value _, Value _, Value _) -> return Nothing
+      (Value 0, Value 0, Root c) -> bindVar c 0 >> return Nothing
+      (Value 0, Value _, Root c) -> bindVar c 1 >> return Nothing
+      (Value _, Value 0, Root c) -> bindVar c 1 >> return Nothing
+      (Value _, Value _, Root c) -> bindVar c 0 >> return Nothing
+      (Value 0, Root b, Value 0) -> bindVar b 0 >> return Nothing
+      (Value 0, Root b, Value _) -> bindVar b 1 >> return Nothing
+      (Value _, Root b, Value 0) -> bindVar b 1 >> return Nothing
+      (Value _, Root b, Value _) -> bindVar b 0 >> return Nothing
+      (Root a, Value 0, Value 0) -> bindVar a 0 >> return Nothing
+      (Root a, Value 0, Value _) -> bindVar a 1 >> return Nothing
+      (Root a, Value _, Value 0) -> bindVar a 1 >> return Nothing
+      (Root a, Value _, Value _) -> bindVar a 0 >> return Nothing
+      (Value 0, Root b, Root c) -> unifyVars b c >> return Nothing
+      (Value _, Root b, Root c) -> return $ Just $ CXor x b c -- TODO: learn about this case
+      (Root a, Value 0, Root c) -> unifyVars a c >> return Nothing
+      (Root a, Value _, Root c) -> return $ Just $ CXor a y c -- TODO: learn about this case
+      (Root a, Root b, Value 0) -> unifyVars a b >> return Nothing
+      (Root a, Root b, Value _) -> return $ Just $ CXor a b z -- TODO: learn about this case
+      (Root a, Root b, Root c) -> return $ Just $ CXor a b c
 
 -- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
@@ -195,20 +220,19 @@ isTautology constraint = case constraint of
     x' <- lookupVar x
     case x' of
       Root _ -> return False
-      Value x'' -> do 
+      Value x'' -> do
         y' <- lookupVar y
         case y' of
           Root _ -> return False
-          Value y'' -> do 
+          Value y'' -> do
             z' <- lookupVar z
             case z' of
               Root _ -> return False
-              Value z'' -> 
+              Value z'' ->
                 return $ x'' + y'' - 2 * (x'' * y'') == z''
-    
 
 -- | Learn bindings and variable equalities from a constraint
-learn :: GaloisField n => Constraint n -> OptiM n ()
+learn :: (GaloisField n, Integral n) => Constraint n -> OptiM n ()
 learn (CAdd xs) = case IntMap.toList (Poly.coeffs xs) of
   [(x, c)] ->
     if c == 0
@@ -223,6 +247,10 @@ learn (CAdd xs) = case IntMap.toList (Poly.coeffs xs) of
 --       else bindVar x (- a / c)
 --   [(x, c), (y, d)] -> when (a == 0 && c == - d) $ unifyVars x y
 --   _ -> return ()
+learn (CXor x y z)
+  | x == z = bindVar y 0 -- x ⊕ y = x => y = 0
+  | y == z = bindVar x 0 -- x ⊕ y = y => x = 0
+  | otherwise = return ()
 learn _ = return ()
 
 -- NOTE: We handle pinned variables 'var' as follows:

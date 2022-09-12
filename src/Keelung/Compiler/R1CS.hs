@@ -26,7 +26,7 @@ import Keelung.Types (Var)
 -- constraints and return the resulting complete assignment.
 -- Return `Left String` if the constraints are unsolvable.
 generateWitness ::
-  GaloisField n =>
+  (GaloisField n, Integral n) =>
   -- | Constraints to be solved
   ConstraintSystem n ->
   -- | Initial assignment
@@ -109,7 +109,7 @@ fromR1CS r1cs =
         _ -> error "fromR1C: invalid R1C"
 
 -- | Computes an assignment for a R1CS with given inputs
-witnessOfR1CS :: GaloisField n => [n] -> R1CS n -> Either (ExecError n) (Witness n)
+witnessOfR1CS :: (GaloisField n, Integral n) => [n] -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
   if r1csNumOfInputVars r1cs /= length inputs
     then Left $ ExecInputUnmatchedError (r1csNumOfInputVars r1cs) (length inputs)
