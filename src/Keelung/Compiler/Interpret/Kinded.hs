@@ -7,8 +7,8 @@
 module Keelung.Compiler.Interpret.Kinded (run) where
 
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.State
-import Data.Bifunctor (first)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
@@ -20,7 +20,7 @@ import Keelung.Types
 --------------------------------------------------------------------------------
 
 run :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
-run elab inputs = runM (bindings, heap) $ do
+run elab inputs = runM heap bindings $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
@@ -80,7 +80,7 @@ freeVars expr = case expr of
   where
     freeVarsOfArray :: Addr -> M n IntSet
     freeVarsOfArray addr = do
-      heap <- gets snd
+      heap <- ask
       case IntMap.lookup addr heap of
         Nothing -> throwError $ InterpretUnboundAddrError addr heap
         Just (elemType, array) -> case elemType of
@@ -148,21 +148,21 @@ instance GaloisField n => Interpret (Val t) n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = StateT (IntMap n, Heap) (Except (InterpretError n))
+type M n = ReaderT Heap (StateT (IntMap n) (Except (InterpretError n)))
 
-runM :: (IntMap n, Heap) -> M n a -> Either (InterpretError n) a
-runM st p = runExcept (evalStateT p st)
+runM :: Heap -> IntMap n -> M n a -> Either (InterpretError n) a
+runM heap bindings p = runExcept (evalStateT (runReaderT p heap) bindings)
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
-  bindings <- gets fst
+  bindings <- get
   case IntMap.lookup var bindings of
     Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val
 
 lookupAddr :: Show n => Int -> M n [n]
 lookupAddr addr = do
-  heap <- gets snd
+  heap <- ask
   case IntMap.lookup addr heap of
     Nothing -> throwError $ InterpretUnboundAddrError addr heap
     Just (elemType, array) -> case elemType of
@@ -172,17 +172,17 @@ lookupAddr addr = do
 
 addBinding :: Ref t -> [n] -> M n ()
 addBinding _ [] = error "addBinding: empty list"
-addBinding (BoolVar var) [val] = modify (first (IntMap.insert var val))
-addBinding (NumVar var) [val] = modify (first (IntMap.insert var val))
+addBinding (BoolVar var) [val] = modify (IntMap.insert var val)
+addBinding (NumVar var) [val] = modify (IntMap.insert var val)
 addBinding (ArrayRef _ _ addr) vals = do
   vars <- collectVarsFromAddr addr
   mapM_
-    (modify . first . uncurry IntMap.insert)
+    (modify . uncurry IntMap.insert)
     (zip vars vals)
   where
     collectVarsFromAddr :: Addr -> M n [Var]
     collectVarsFromAddr address = do
-      heap <- gets snd
+      heap <- ask
       case IntMap.lookup address heap of
         Nothing -> throwError $ InterpretUnboundAddrError addr heap
         Just (elemType, array) -> case elemType of
