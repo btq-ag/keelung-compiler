@@ -42,7 +42,6 @@ import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
 import qualified Keelung.Compiler.Interpret as Interpret
--- import Keelung.Compiler.Optimize hiding (optimize)
 import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting

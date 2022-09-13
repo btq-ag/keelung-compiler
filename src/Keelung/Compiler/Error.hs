@@ -7,7 +7,7 @@ import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Compiler.Interpret (InterpretError)
+import Keelung.Compiler.Interpret.Typed (InterpretError)
 import Keelung.Compiler.R1CS (ExecError)
 import Keelung.Error (ElabError)
 

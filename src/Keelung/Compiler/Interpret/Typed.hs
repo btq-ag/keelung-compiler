@@ -1,8 +1,11 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 -- Interpreter for Keelung.Syntax.Typed
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
-module Keelung.Compiler.Interpret.Typed (run) where 
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+
+module Keelung.Compiler.Interpret.Typed (InterpretError (..), run) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -13,6 +16,9 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Field (N (..))
 import Keelung.Syntax.Typed
+import Control.DeepSeq (NFData)
+import Data.Serialize (Serialize)
+import GHC.Generics (Generic)
 
 --------------------------------------------------------------------------------
 
@@ -67,7 +73,7 @@ instance GaloisField n => Interpret Expr n where
     Val val -> interpret val
     Var (NumVar n) -> pure <$> lookupVar n
     Var (BoolVar n) -> pure <$> lookupVar n
-    Array xs -> concat <$> mapM interpret xs 
+    Array xs -> concat <$> mapM interpret xs
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
     Mul x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -118,7 +124,9 @@ lookupVar var = do
 data InterpretError n
   = InterpretUnboundVarError Int (IntMap n)
   | InterpretAssertionError Expr (IntMap n)
-  deriving (Eq)
+  deriving (Eq, Generic, NFData)
+
+instance Serialize n => Serialize (InterpretError n)
 
 instance (GaloisField n, Integral n) => Show (InterpretError n) where
   show (InterpretUnboundVarError var bindings) =
