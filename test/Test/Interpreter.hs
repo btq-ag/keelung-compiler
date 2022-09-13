@@ -4,29 +4,45 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Test.Interpreter () where
+module Test.Interpreter (tests) where
 
--- import Control.Arrow (left)
--- -- import Test.QuickCheck.GenT
--- import Control.Monad.Reader
--- import Data.IntSet (IntSet)
--- import qualified Data.IntSet as IntSet
--- import qualified Keelung.Compiler.Interpret.Kinded as Kinded
--- import qualified Keelung.Compiler.Interpret.Typed as Typed
--- import Keelung.Field (GF181)
--- import qualified Keelung.Monad as Kinded
--- import qualified Keelung.Syntax.Kinded as Kinded
--- import qualified Keelung.Syntax.Simplify as Kinded
--- import qualified Keelung.Types as Kinded
--- import Test.Hspec
--- import Test.QuickCheck (chooseInt)
--- import Test.QuickCheck.Arbitrary
--- import Test.QuickCheck.GenT
--- import Test.QuickCheck.Property
+import qualified Basic
+import Keelung (GF181, Comp, Val (..), elaborate, elaborateOnly)
+import Test.Hspec
+import Control.Arrow (left)
+import Test.QuickCheck
+import qualified Keelung.Compiler.Interpret.Kinded as Kinded
+import Data.Field.Galois (GaloisField)
+import Keelung.Compiler (Error(..))
+import qualified Keelung.Compiler.Interpret.Typed as Typed
 
--- -- import qualified Keelung.Syntax.Typed as Typed
--- -- import Keelung.Syntax.Kinded
+kinded :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either String [n]
+kinded prog ins = do
+  elab <- left show (elaborateOnly prog) 
+  left show (Kinded.runAndCheck elab ins)
 
+typed :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
+typed prog ins = do
+  elab <- left ElabError (elaborate prog)
+  left InterpretError (Typed.run elab ins)
+
+tests :: SpecWith ()
+tests = do
+  describe "Interpreters of different syntaxes should computes the same result" $ do
+    it "Basic.identity" $
+      property $ \input -> do 
+        kinded Basic.identity [input :: GF181]
+          `shouldBe` return [input]
+        typed Basic.identity [input :: GF181]
+          `shouldBe` return [input]
+
+    it "Basic.add3" $
+      property $ \input -> do 
+        kinded Basic.add3 [input :: GF181]
+          `shouldBe` return [input + 3]
+        typed Basic.add3 [input :: GF181]
+          `shouldBe` return [input + 3]
+          
 -- tests :: SpecWith ()
 -- tests = do
 --   return ()

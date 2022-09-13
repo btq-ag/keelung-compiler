@@ -21,7 +21,7 @@ import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Syntax.Typed as C
 import Test.Hspec
--- import qualified Test.Interpreter as Interpreter
+import qualified Test.Interpreter as Interpreter
 import Keelung.Constraint.R1CS (R1CS)
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
@@ -39,7 +39,7 @@ runKeelungAggSig dimension numberOfSignatures =
 
 main :: IO ()
 main = hspec $ do
-  -- describe "Interpreter " Interpreter.tests
+  describe "Interpreter" Interpreter.tests
 
   describe "Execution" $ do
     describe "Aggregate Signature" $ do

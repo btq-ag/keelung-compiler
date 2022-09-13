@@ -4,23 +4,24 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Interpret.Kinded (run) where
+module Keelung.Compiler.Interpret.Kinded (run, runAndCheck) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung hiding (inputs, interpret)
+import Keelung.Compiler.Util (Witness)
 import Keelung.Types
 
 --------------------------------------------------------------------------------
 
-run :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
-run elab inputs = runM heap bindings $ do
+-- | Interpret a program with inputs.
+run' :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) ([n], Witness n)
+run' elab inputs = runM heap bindings $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
@@ -46,6 +47,27 @@ run elab inputs = runM heap bindings $ do
 
   -- lastly interpret the expression and return the result
   interpret (elabVal elab)
+  where
+    comp = elabComp elab
+    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
+    heap = compHeap comp
+
+-- | Interpret a program with inputs.
+run :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
+run elab inputs = fst <$> run' elab inputs
+
+-- check and see if the resulting witness of the interpretation covered all free variables
+runAndCheck :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
+runAndCheck elab inputs = do
+  (output, witness) <- run' elab inputs
+  variables <- fst <$> runM heap bindings (freeVarsOfElab elab)
+  let varsInWitness = IntMap.keysSet witness
+
+  when (variables /= varsInWitness) $ do
+    let diff = IntSet.difference variables varsInWitness
+    throwError $ InterpretVarUnassignedError diff witness
+
+  return output
   where
     comp = elabComp elab
     bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
@@ -87,6 +109,17 @@ freeVars expr = case expr of
           NumElem -> return $ IntSet.fromList (IntMap.elems array)
           BoolElem -> return $ IntSet.fromList (IntMap.elems array)
           (ArrElem _ _) -> IntSet.unions <$> mapM freeVarsOfArray (IntMap.elems array)
+
+freeVarsOfElab :: Elaborated t -> M n IntSet
+freeVarsOfElab (Elaborated value comp) = do
+  inOutputValue <- freeVars value
+  inNumBindings <- forM (compNumAsgns comp) $ \(Assignment (NumVar var) val) -> do
+    -- collect both the var and its value
+    IntSet.insert var <$> freeVars val
+  inBoolBindings <- forM (compBoolAsgns comp) $ \(Assignment (BoolVar var) val) -> do
+    -- collect both the var and its value
+    IntSet.insert var <$> freeVars val
+  return $ inOutputValue <> IntSet.unions inNumBindings <> IntSet.unions inBoolBindings
 
 --------------------------------------------------------------------------------
 
@@ -148,10 +181,10 @@ instance GaloisField n => Interpret (Val t) n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = ReaderT Heap (StateT (IntMap n) (Except (InterpretError n)))
+type M n = ReaderT Heap (StateT (Witness n) (Except (InterpretError n)))
 
-runM :: Heap -> IntMap n -> M n a -> Either (InterpretError n) a
-runM heap bindings p = runExcept (evalStateT (runReaderT p heap) bindings)
+runM :: Heap -> Witness n -> M n a -> Either (InterpretError n) (a, Witness n)
+runM heap bindings p = runExcept (runStateT (runReaderT p heap) bindings)
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
@@ -194,9 +227,10 @@ addBinding _ _ = error "addBinding: too many values"
 --------------------------------------------------------------------------------
 
 data InterpretError n
-  = InterpretUnboundVarError Var (IntMap n)
+  = InterpretUnboundVarError Var (Witness n)
   | InterpretUnboundAddrError Addr Heap
-  | InterpretAssertionError (Val 'Bool) (IntMap n)
+  | InterpretAssertionError (Val 'Bool) (Witness n)
+  | InterpretVarUnassignedError IntSet (Witness n)
   deriving (Eq)
 
 instance (GaloisField n, Integral n) => Show (InterpretError n) where
@@ -212,3 +246,7 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
     "assertion failed: " ++ show val
       ++ "\nbindings of variables: "
       ++ show (fmap N bindings)
+  show (InterpretVarUnassignedError vars witness) =
+    "these variables:\n " ++ show (IntSet.toList vars)
+      ++ "\n are not assigned in: \n"
+      ++ show (fmap N witness)
