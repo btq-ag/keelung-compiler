@@ -21,7 +21,8 @@ import Keelung.Types
 
 -- | Interpret a program with inputs.
 run' :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) ([n], Witness n)
-run' elab inputs = runM heap bindings $ do
+run' elab inputs = runMWithInputs elab inputs $ do
+  let comp = elabComp elab
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
@@ -47,31 +48,26 @@ run' elab inputs = runM heap bindings $ do
 
   -- lastly interpret the expression and return the result
   interpret (elabVal elab)
-  where
-    comp = elabComp elab
-    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
-    heap = compHeap comp
 
 -- | Interpret a program with inputs.
 run :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
 run elab inputs = fst <$> run' elab inputs
 
--- check and see if the resulting witness of the interpretation covered all free variables
+-- | Check and see if the resulting witness of the interpretation covered all free variables
 runAndCheck :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
 runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
-  variables <- fst <$> runM heap bindings (freeVarsOfElab elab)
+  -- collect all free variables of the program
+  variables <- fst <$> runMWithInputs elab inputs (freeVarsOfElab elab)
+  -- collect all variables of the witness
   let varsInWitness = IntMap.keysSet witness
-
+  -- see if they are the same
   when (variables /= varsInWitness) $ do
-    let diff = IntSet.difference variables varsInWitness
-    throwError $ InterpretVarUnassignedError diff witness
+    let missingInWitness = variables IntSet.\\ varsInWitness
+    let missingInProgram = IntMap.withoutKeys witness variables
+    throwError $ InterpretVarUnassignedError missingInWitness missingInProgram
 
   return output
-  where
-    comp = elabComp elab
-    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
-    heap = compHeap comp
 
 --------------------------------------------------------------------------------
 
@@ -186,6 +182,13 @@ type M n = ReaderT Heap (StateT (Witness n) (Except (InterpretError n)))
 runM :: Heap -> Witness n -> M n a -> Either (InterpretError n) (a, Witness n)
 runM heap bindings p = runExcept (runStateT (runReaderT p heap) bindings)
 
+runMWithInputs :: Elaborated t -> [n] -> M n a -> Either (InterpretError n) (a, Witness n)
+runMWithInputs elab inputs = runM heap bindings
+  where
+    comp = elabComp elab
+    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
+    heap = compHeap comp
+
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
   bindings <- get
@@ -246,7 +249,15 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
     "assertion failed: " ++ show val
       ++ "\nbindings of variables: "
       ++ show (fmap N bindings)
-  show (InterpretVarUnassignedError vars witness) =
-    "these variables:\n " ++ show (IntSet.toList vars)
-      ++ "\n are not assigned in: \n"
-      ++ show (fmap N witness)
+  show (InterpretVarUnassignedError missingInWitness missingInProgram) =
+    ( if IntSet.null missingInWitness
+        then ""
+        else
+          "these variables have no bindings:\n  "
+            ++ show (IntSet.toList missingInWitness)
+    )
+      <> if IntMap.null missingInProgram
+        then ""
+        else
+          "these bindings are not in program:\n  "
+            ++ show (IntMap.toList missingInProgram)
