@@ -1,29 +1,32 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 -- Interpreter for Keelung.Syntax.Typed
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Compiler.Interpret.Typed (InterpretError (..), run) where
+module Keelung.Compiler.Interpret.Typed (InterpretError (..), run, runAndCheck) where
 
+import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung.Field (N (..))
-import Keelung.Syntax.Typed
-import Control.DeepSeq (NFData)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung.Compiler.Util
+import Keelung.Syntax.Typed
+import Keelung.Types (Addr, Heap, Var)
 
 --------------------------------------------------------------------------------
 
-run :: GaloisField n => Elaborated -> [n] -> Either (InterpretError n) [n]
-run (Elaborated expr comp) inputs = runM bindings $ do
+-- | Interpret a program with inputs and return outputs along with the witness
+run' :: GaloisField n => Elaborated -> [n] -> Either (InterpretError n) ([n], Witness n)
+run' (Elaborated expr comp) inputs = runMWithInputs comp inputs $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
@@ -49,8 +52,31 @@ run (Elaborated expr comp) inputs = runM bindings $ do
 
   -- lastly interpret the expression and return the result
   interpret expr
-  where
-    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
+
+-- | Interpret a program with inputs.
+run :: GaloisField n => Elaborated -> [n] -> Either (InterpretError n) [n]
+run (Elaborated expr comp) inputs = fst <$> run' (Elaborated expr comp) inputs
+
+-- | Interpret a program with inputs and run some additional checks.
+runAndCheck :: GaloisField n => Elaborated -> [n] -> Either (InterpretError n) [n]
+runAndCheck elab inputs = do
+  (output, witness) <- run' elab inputs
+
+  -- See if input size is valid
+  let expectedInputSize = IntSet.size (compInputVars (elabComp elab))
+  let actualInputSize = length inputs
+  when (expectedInputSize /= actualInputSize) $ do
+    throwError $ InterpretInputSizeError expectedInputSize actualInputSize
+
+  -- See if free variables of the program and the witness are the same
+  let variables = freeVarsOfElab elab
+  let varsInWitness = IntMap.keysSet witness
+  when (variables /= varsInWitness) $ do
+    let missingInWitness = variables IntSet.\\ varsInWitness
+    let missingInProgram = IntMap.withoutKeys witness variables
+    throwError $ InterpretVarUnassignedError missingInWitness missingInProgram
+
+  return output
 
 --------------------------------------------------------------------------------
 
@@ -102,8 +128,13 @@ instance GaloisField n => Interpret Expr n where
 -- | The interpreter monad
 type M n = StateT (IntMap n) (Except (InterpretError n))
 
-runM :: IntMap n -> M n a -> Either (InterpretError n) a
-runM st p = runExcept (evalStateT p st)
+runM :: IntMap n -> M n a -> Either (InterpretError n) (a, Witness n)
+runM bindings p = runExcept (runStateT p bindings)
+
+runMWithInputs :: Computation -> [n] -> M n a -> Either (InterpretError n) (a, Witness n)
+runMWithInputs comp inputs = runM bindings
+  where
+    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
 
 -- | A `Ref` is given a list of numbers
 -- but in reality it should be just a single number.
@@ -121,9 +152,32 @@ lookupVar var = do
 
 --------------------------------------------------------------------------------
 
+-- | Collect free variables of an elaborated program (that should also be present in the witness)
+freeVarsOfElab :: Elaborated -> IntSet
+freeVarsOfElab (Elaborated value context) =
+  let inOutputValue = freeVars value
+      inputBindings = compInputVars context
+      inNumBindings =
+        map
+          (\(Assignment (NumVar var) val) -> IntSet.insert var (freeVars val)) -- collect both the var and its value
+          (compNumAsgns context)
+      inBoolBindings =
+        map
+          (\(Assignment (BoolVar var) val) -> IntSet.insert var (freeVars val)) -- collect both the var and its value
+          (compBoolAsgns context)
+   in inputBindings
+        <> inOutputValue
+        <> IntSet.unions inNumBindings
+        <> IntSet.unions inBoolBindings
+
+--------------------------------------------------------------------------------
+
 data InterpretError n
-  = InterpretUnboundVarError Int (IntMap n)
-  | InterpretAssertionError Expr (IntMap n)
+  = InterpretUnboundVarError Var (Witness n)
+  | InterpretUnboundAddrError Addr Heap
+  | InterpretAssertionError Expr (Witness n)
+  | InterpretVarUnassignedError IntSet (Witness n)
+  | InterpretInputSizeError Int Int
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (InterpretError n)
@@ -132,8 +186,27 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
   show (InterpretUnboundVarError var bindings) =
     "unbound variable " ++ show var
       ++ " in bindings "
-      ++ show (fmap N bindings)
-  show (InterpretAssertionError expr bindings) =
-    "assertion failed: " ++ show expr
+      ++ showWitness bindings
+  show (InterpretUnboundAddrError var heap) =
+    "unbound address " ++ show var
+      ++ " in heap "
+      ++ show heap
+  show (InterpretAssertionError val bindings) =
+    "assertion failed: " ++ show val
       ++ "\nbindings of variables: "
-      ++ show (fmap N bindings)
+      ++ showWitness bindings
+  show (InterpretVarUnassignedError missingInWitness missingInProgram) =
+    ( if IntSet.null missingInWitness
+        then ""
+        else
+          "these variables have no bindings:\n  "
+            ++ show (IntSet.toList missingInWitness)
+    )
+      <> if IntMap.null missingInProgram
+        then ""
+        else
+          "these bindings are not in the program:\n  "
+            ++ showWitness missingInProgram
+  show (InterpretInputSizeError expected actual) =
+    "expecting " ++ show expected ++ " inputs but got " ++ show actual
+      ++ " inputs"

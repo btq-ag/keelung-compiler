@@ -24,7 +24,7 @@ kinded prog ins = do
 typed :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
 typed prog ins = do
   elab <- left ElabError (elaborate prog)
-  left InterpretError (Typed.run elab ins)
+  left InterpretError (Typed.runAndCheck elab ins)
 
 tests :: SpecWith ()
 tests = do
