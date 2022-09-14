@@ -53,15 +53,20 @@ run' elab inputs = runMWithInputs elab inputs $ do
 run :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
 run elab inputs = fst <$> run' elab inputs
 
--- | Check and see if the resulting witness of the interpretation covered all free variables
+-- | Interpret a program with inputs and run some additional checks.
 runAndCheck :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
 runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
-  -- collect all free variables of the program
+
+  -- See if input size is valid 
+  let expectedInputSize = IntSet.size (compInputVars (elabComp elab))
+  let actualInputSize = length inputs
+  when (expectedInputSize /= actualInputSize) $ do
+    throwError $ InterpretInputSizeError expectedInputSize actualInputSize
+
+  -- See if free variables of the program and the witness are the same
   variables <- fst <$> runMWithInputs elab inputs (freeVarsOfElab elab)
-  -- collect all variables of the witness
   let varsInWitness = IntMap.keysSet witness
-  -- see if they are the same
   when (variables /= varsInWitness) $ do
     let missingInWitness = variables IntSet.\\ varsInWitness
     let missingInProgram = IntMap.withoutKeys witness variables
@@ -234,6 +239,7 @@ data InterpretError n
   | InterpretUnboundAddrError Addr Heap
   | InterpretAssertionError (Val 'Bool) (Witness n)
   | InterpretVarUnassignedError IntSet (Witness n)
+  | InterpretInputSizeError Int Int 
   deriving (Eq)
 
 instance (GaloisField n, Integral n) => Show (InterpretError n) where
@@ -261,3 +267,6 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
         else
           "these bindings are not in program:\n  "
             ++ show (IntMap.toList missingInProgram)
+  show (InterpretInputSizeError expected actual) =
+    "expecting " ++ show expected ++ " inputs but got " ++ show actual
+      ++ " inputs"
