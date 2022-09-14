@@ -14,7 +14,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung hiding (inputs, interpret)
-import Keelung.Compiler.Util (Witness)
+import Keelung.Compiler.Util
 import Keelung.Types
 
 --------------------------------------------------------------------------------
@@ -58,7 +58,7 @@ runAndCheck :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n)
 runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
 
-  -- See if input size is valid 
+  -- See if input size is valid
   let expectedInputSize = IntSet.size (compInputVars (elabComp elab))
   let actualInputSize = length inputs
   when (expectedInputSize /= actualInputSize) $ do
@@ -111,16 +111,24 @@ freeVars expr = case expr of
           BoolElem -> return $ IntSet.fromList (IntMap.elems array)
           (ArrElem _ _) -> IntSet.unions <$> mapM freeVarsOfArray (IntMap.elems array)
 
+-- | Collect free variables of an elaborated program (that should also be present in the witness)
 freeVarsOfElab :: Elaborated t -> M n IntSet
 freeVarsOfElab (Elaborated value comp) = do
   inOutputValue <- freeVars value
+
+  let inputBindings = compInputVars comp
+
   inNumBindings <- forM (compNumAsgns comp) $ \(Assignment (NumVar var) val) -> do
     -- collect both the var and its value
     IntSet.insert var <$> freeVars val
   inBoolBindings <- forM (compBoolAsgns comp) $ \(Assignment (BoolVar var) val) -> do
     -- collect both the var and its value
     IntSet.insert var <$> freeVars val
-  return $ inOutputValue <> IntSet.unions inNumBindings <> IntSet.unions inBoolBindings
+  return $
+    inputBindings
+      <> inOutputValue
+      <> IntSet.unions inNumBindings
+      <> IntSet.unions inBoolBindings
 
 --------------------------------------------------------------------------------
 
@@ -239,14 +247,14 @@ data InterpretError n
   | InterpretUnboundAddrError Addr Heap
   | InterpretAssertionError (Val 'Bool) (Witness n)
   | InterpretVarUnassignedError IntSet (Witness n)
-  | InterpretInputSizeError Int Int 
+  | InterpretInputSizeError Int Int
   deriving (Eq)
 
 instance (GaloisField n, Integral n) => Show (InterpretError n) where
   show (InterpretUnboundVarError var bindings) =
     "unbound variable " ++ show var
       ++ " in bindings "
-      ++ show (fmap N bindings)
+      ++ showWitness bindings
   show (InterpretUnboundAddrError var heap) =
     "unbound address " ++ show var
       ++ " in heap "
@@ -254,7 +262,7 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
   show (InterpretAssertionError val bindings) =
     "assertion failed: " ++ show val
       ++ "\nbindings of variables: "
-      ++ show (fmap N bindings)
+      ++ showWitness bindings
   show (InterpretVarUnassignedError missingInWitness missingInProgram) =
     ( if IntSet.null missingInWitness
         then ""
@@ -265,8 +273,8 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
       <> if IntMap.null missingInProgram
         then ""
         else
-          "these bindings are not in program:\n  "
-            ++ show (IntMap.toList missingInProgram)
+          "these bindings are not in the program:\n  "
+            ++ showWitness missingInProgram
   show (InterpretInputSizeError expected actual) =
     "expecting " ++ show expected ++ " inputs but got " ++ show actual
       ++ " inputs"

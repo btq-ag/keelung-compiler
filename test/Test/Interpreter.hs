@@ -7,18 +7,18 @@
 module Test.Interpreter (tests) where
 
 import qualified Basic
-import Keelung (GF181, Comp, Val (..), elaborate, elaborateOnly)
-import Test.Hspec
 import Control.Arrow (left)
-import Test.QuickCheck
-import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import Data.Field.Galois (GaloisField)
-import Keelung.Compiler (Error(..))
+import Keelung (Comp, GF181, Val (..), elaborate, elaborateOnly)
+import Keelung.Compiler (Error (..))
+import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import qualified Keelung.Compiler.Interpret.Typed as Typed
+import Test.Hspec
+import Test.QuickCheck
 
 kinded :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either String [n]
 kinded prog ins = do
-  elab <- left show (elaborateOnly prog) 
+  elab <- left show (elaborateOnly prog)
   left show (Kinded.runAndCheck elab ins)
 
 typed :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
@@ -30,19 +30,51 @@ tests :: SpecWith ()
 tests = do
   describe "Interpreters of different syntaxes should computes the same result" $ do
     it "Basic.identity" $
-      property $ \input -> do 
+      property $ \input -> do
         kinded Basic.identity [input :: GF181]
-          `shouldBe` return [input]
+          `shouldBe` Right [input]
         typed Basic.identity [input :: GF181]
-          `shouldBe` return [input]
+          `shouldBe` Right [input]
 
     it "Basic.add3" $
-      property $ \input -> do 
+      property $ \input -> do
         kinded Basic.add3 [input :: GF181]
-          `shouldBe` return [input + 3]
+          `shouldBe` Right [input + 3]
         typed Basic.add3 [input :: GF181]
-          `shouldBe` return [input + 3]
-          
+          `shouldBe` Right [input + 3]
+
+    it "Basic.eq1" $
+      property $ \input -> do
+        let expectedOutput = if input == 3 then [1] else [0]
+        kinded Basic.eq1 [input :: GF181]
+          `shouldBe` Right expectedOutput
+        typed Basic.eq1 [input :: GF181]
+          `shouldBe` Right expectedOutput
+
+    it "Basic.cond'" $
+      property $ \input -> do
+        let expectedOutput = if input == 3 then [12] else [789]
+        kinded Basic.cond' [input :: GF181]
+          `shouldBe` Right expectedOutput
+        typed Basic.cond' [input :: GF181]
+          `shouldBe` Right expectedOutput
+
+    it "Basic.summation" $
+      forAll (vector 4) $ \input -> do
+        let expectedOutput = [sum input]
+        kinded Basic.summation (input :: [GF181])
+          `shouldBe` Right expectedOutput
+        typed Basic.summation input
+          `shouldBe` Right expectedOutput
+
+    it "Basic.summation2" $
+      forAll (vector 4) $ \input -> do
+        let expectedOutput = []
+        kinded Basic.summation2 (input :: [GF181])
+          `shouldBe` Right expectedOutput
+        typed Basic.summation2 input
+          `shouldBe` Right expectedOutput
+
 -- tests :: SpecWith ()
 -- tests = do
 --   return ()
