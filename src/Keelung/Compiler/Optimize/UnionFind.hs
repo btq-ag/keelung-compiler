@@ -11,6 +11,7 @@ where
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import qualified Data.List as List
 import Data.Maybe (fromMaybe)
 import Keelung.Field (N (..))
 import Keelung.Types (Var)
@@ -25,15 +26,17 @@ instance (GaloisField n, Integral n) => Show (UnionFind n) where
   show xs =
     "UnionFind {\n"
       ++ "  links = "
-      ++ show (IntMap.toList $links xs)
+      ++ showList' (map (\(x, y) -> "$" <> show x <> " -> $" <> show y) (IntMap.toList $ links xs))
       ++ "\n"
       ++ "  sizes = "
-      ++ show (IntMap.toList $sizes xs)
+      ++ showList' (map (\(x, y) -> "$" <> show x <> ": " <> show y) (IntMap.toList $ sizes xs))
       ++ "\n"
       ++ "  values = "
-      ++ show (IntMap.toList $ fmap (fmap N) values xs)
+      ++ showList' (map (\(x, y) -> "$" <> show x <> " = " <> show (N y)) (IntMap.toList $ values xs))
       ++ "\n"
       ++ "}"
+      where 
+        showList' ys = "[" <> List.intercalate ", " ys <> "]"
 
 new :: IntMap n -> UnionFind n
 new = UnionFind mempty mempty
