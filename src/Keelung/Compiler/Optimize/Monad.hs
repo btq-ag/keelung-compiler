@@ -31,7 +31,7 @@ import Keelung.Compiler.Util (Witness)
 type OptiM n = State (UnionFind n)
 
 runOptiM :: IntMap n -> OptiM n a -> a
-runOptiM xs f = evalState f (UnionFind.new xs)
+runOptiM values f = evalState f (UnionFind.new values)
 
 runOptiM' :: IntMap Var -> IntMap Int -> IntMap f -> State (UnionFind f) a -> a
 runOptiM' xs ys zs f = evalState f (UnionFind xs ys zs)

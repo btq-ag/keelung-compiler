@@ -49,6 +49,7 @@ bindVar xs var x = xs {values = IntMap.insert var x (values xs)}
 lookupVar :: UnionFind n -> Var -> Maybe n
 lookupVar xs x = IntMap.lookup x (values xs)
 
+-- | Find the root of a variable
 find :: GaloisField n => UnionFind n -> Var -> (Var, UnionFind n)
 find xs var =
   let parent = parentOf xs var
@@ -65,7 +66,7 @@ find xs var =
                 )
                 parent
 
--- Root returns itself has its parent
+-- If a variable has no parent, it is its own parent.
 parentOf :: UnionFind n -> Var -> Var
 parentOf xs var = fromMaybe var $ IntMap.lookup var (links xs)
 
@@ -93,28 +94,30 @@ mergeValues xs x y = case (IntMap.lookup x xs, IntMap.lookup y xs) of
 union :: GaloisField n => UnionFind n -> Var -> Var -> UnionFind n
 union xs x y
   | x < y =
-    go x y
+    union' xs x y
   | x > y =
-    go y x
+    union' xs y x
   | otherwise =
     xs
-  where
-    -- Left-biased: if size x == size y, prefer x as root.
-    go x0 y0 =
-      let (rx, xs2) = find xs x0
-          (ry, xs3) = find xs2 y0
-          sizeOfRootX = size xs3 rx
-          sizeOfRootY = size xs3 ry
+
+-- | Choose the first argument as root on ties.
+-- Left-biased: if size x == size y, prefer x as root.
+union' :: GaloisField n => UnionFind n -> Var -> Var -> UnionFind n
+union' xs x y =
+      let (rootOfX, xs2) = find xs x
+          (rootOfY, xs3) = find xs2 y
+          sizeOfRootX = size xs3 rootOfX
+          sizeOfRootY = size xs3 rootOfY
        in if sizeOfRootX >= sizeOfRootY
             then
               xs3
-                { links = IntMap.insert y0 rx (links xs3),
-                  sizes = IntMap.insert x0 (sizeOfRootX + sizeOfRootY) (sizes xs3)
+                { links = IntMap.insert y rootOfX (links xs3),
+                  sizes = IntMap.insert x (sizeOfRootX + sizeOfRootY) (sizes xs3)
                 }
             else
               xs3
-                { links = IntMap.insert x0 ry (links xs3),
-                  sizes = IntMap.insert y0 (sizeOfRootX + sizeOfRootY) (sizes xs3)
+                { links = IntMap.insert x rootOfY (links xs3),
+                  sizes = IntMap.insert y (sizeOfRootX + sizeOfRootY) (sizes xs3)
                 }
 
 size :: UnionFind n -> Var -> Int
