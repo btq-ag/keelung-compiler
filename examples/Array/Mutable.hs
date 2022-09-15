@@ -48,7 +48,7 @@ fullAdderT width = do
 multiplier :: Val ('ArrM 'Bool) -> Int -> Comp (Val ('ArrM 'Bool))
 multiplier xs times = foldM fullAdder xs (replicate times xs)
 
-multiplyT :: Int -> Int -> Comp (Val ('ArrM 'Bool))
-multiplyT width times = do
+multiplierT :: Int -> Int -> Comp (Val ('ArrM 'Bool))
+multiplierT width times = do
   xs <- inputs width >>= thaw
   multiplier xs times

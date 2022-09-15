@@ -1,6 +1,7 @@
 module Main where
 
-import Array.Immutable
+-- import qualified Array.Immutable as I
+import qualified Array.Mutable as M
 import Control.Monad
 import qualified Data.IntSet as IntSet
 import Keelung (GF181)
@@ -31,28 +32,28 @@ main = do
   --   asGF181 (compile (return $ fromString (replicate i 'A'))) >>= print . Set.size . csConstraints
 
   putStrLn "O0: fullAdder"
-  forM_ [1] $ \i -> do
-    asGF181 (optimize1 (fullAdderT i)) >>= printR1CS True . toR1CS
+  forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
+    asGF181 (optimize1 (M.fullAdderT i)) >>= printR1CS False . toR1CS
 
-  -- putStrLn "O1: fullAdder"
-  -- forM_ [1] $ \i -> do
-  --   asGF181 (optimize2 (fullAdderT i)) >>= printR1CS True . toR1CS
+  putStrLn "O1: fullAdder"
+  forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
+    asGF181 (optimize2 (M.fullAdderT i)) >>= printR1CS False . toR1CS
 
-  -- putStrLn "O2: fullAdder"
-  -- forM_ [1, 2] $ \i -> do
-  --   asGF181 (optimize3 (fullAdderT i)) >>= printR1CS True . toR1CS
+  putStrLn "O2: fullAdder"
+  forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
+    asGF181 (optimize3 (M.fullAdderT i)) >>= printR1CS False . toR1CS
 
--- putStrLn "O0: multiplier"
--- forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
---   asGF181 (optimize1 (multiplierT n 3)) >>= printR1CS False . toR1CS
+  putStrLn "O0: multiplier"
+  forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
+    asGF181 (optimize1 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
 
--- putStrLn "O1: multiplier"
--- forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
---   asGF181 (optimize2 (multiplierT n 3)) >>= printR1CS False . toR1CS
+  putStrLn "O1: multiplier"
+  forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
+    asGF181 (optimize2 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
 
--- putStrLn "O2: multiplier"
--- forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
---   asGF181 (optimize3 (multiplierT n 3)) >>= printR1CS False . toR1CS
+  putStrLn "O2: multiplier"
+  forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
+    asGF181 (optimize3 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
 
 -- fa :: IO ()
 -- fa = do
