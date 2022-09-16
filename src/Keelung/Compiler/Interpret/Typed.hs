@@ -21,12 +21,13 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Util
 import Keelung.Syntax.Typed
 import Keelung.Types (Addr, Heap, Var)
+import Control.Monad.Reader
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
 run' :: GaloisField n => Elaborated -> [n] -> Either (InterpretError n) ([n], Witness n)
-run' (Elaborated expr comp) inputs = runMWithInputs comp inputs $ do
+run' (Elaborated expr comp) inputs = runM inputs $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
@@ -63,7 +64,7 @@ runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
 
   -- See if input size is valid
-  let expectedInputSize = IntSet.size (compInputVars (elabComp elab))
+  let expectedInputSize = compNextInputVar (elabComp elab) - 1
   let actualInputSize = length inputs
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
@@ -98,7 +99,9 @@ instance GaloisField n => Interpret Expr n where
   interpret expr = case expr of
     Val val -> interpret val
     Var (NumVar n) -> pure <$> lookupVar n
+    Var (NumInputVar n) -> pure <$> lookupInputVar n
     Var (BoolVar n) -> pure <$> lookupVar n
+    Var (BoolInputVar n) -> pure <$> lookupInputVar n
     Array xs -> concat <$> mapM interpret xs
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
@@ -126,15 +129,12 @@ instance GaloisField n => Interpret Expr n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = StateT (IntMap n) (Except (InterpretError n))
+type M n = ReaderT (IntMap n) (StateT (IntMap n) (Except (InterpretError n)))
 
-runM :: IntMap n -> M n a -> Either (InterpretError n) (a, Witness n)
-runM bindings p = runExcept (runStateT p bindings)
-
-runMWithInputs :: Computation -> [n] -> M n a -> Either (InterpretError n) (a, Witness n)
-runMWithInputs comp inputs = runM bindings
-  where
-    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
+runM :: [n] -> M n a -> Either (InterpretError n) (a, Witness n)
+runM inputs p = runExcept (runStateT (runReaderT p inputBindings) mempty)
+  where 
+    inputBindings = IntMap.fromDistinctAscList $ zip [0..] inputs
 
 -- | A `Ref` is given a list of numbers
 -- but in reality it should be just a single number.
@@ -142,10 +142,18 @@ addBinding :: Ref -> [n] -> M n ()
 addBinding _ [] = error "addBinding: empty list"
 addBinding (NumVar var) val = modify (IntMap.insert var (head val))
 addBinding (BoolVar var) val = modify (IntMap.insert var (head val))
+addBinding _ _ = error "addBinding: not NumVar or BoolVar"
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
   bindings <- get
+  case IntMap.lookup var bindings of
+    Nothing -> throwError $ InterpretUnboundVarError var bindings
+    Just val -> return val
+
+lookupInputVar :: Show n => Int -> M n n
+lookupInputVar var = do
+  bindings <- ask
   case IntMap.lookup var bindings of
     Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val
@@ -156,7 +164,7 @@ lookupVar var = do
 freeVarsOfElab :: Elaborated -> IntSet
 freeVarsOfElab (Elaborated value context) =
   let inOutputValue = freeVars value
-      inputBindings = compInputVars context
+      inputBindings = IntSet.fromDistinctAscList [0 .. compNextInputVar context - 1]
       inNumBindings =
         map
           (\(Assignment (NumVar var) val) -> IntSet.insert var (freeVars val)) -- collect both the var and its value

@@ -16,12 +16,13 @@ import Data.Semiring (Semiring (..))
 import Keelung hiding (inputs, interpret)
 import Keelung.Compiler.Util
 import Keelung.Types
+import Data.IntMap (IntMap)
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs.
 run' :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) ([n], Witness n)
-run' elab inputs = runMWithInputs elab inputs $ do
+run' elab inputs = runM elab inputs $ do
   let comp = elabComp elab
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
@@ -59,13 +60,13 @@ runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
 
   -- See if input size is valid
-  let expectedInputSize = IntSet.size (compInputVars (elabComp elab))
+  let expectedInputSize = compNextInputVar (elabComp elab)
   let actualInputSize = length inputs
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
   -- See if free variables of the program and the witness are the same
-  variables <- fst <$> runMWithInputs elab inputs (freeVarsOfElab elab)
+  variables <- fst <$> runM elab inputs (freeVarsOfElab elab)
   let varsInWitness = IntMap.keysSet witness
   when (variables /= varsInWitness) $ do
     let missingInWitness = variables IntSet.\\ varsInWitness
@@ -76,7 +77,7 @@ runAndCheck elab inputs = do
 
 --------------------------------------------------------------------------------
 
--- collect free variables of an expression
+-- | Free variables in an expression (excluding input variables).
 freeVars :: Val t -> M n IntSet
 freeVars expr = case expr of
   Integer _ -> return mempty
@@ -85,7 +86,9 @@ freeVars expr = case expr of
   UnitVal -> return mempty
   ArrayVal xs -> IntSet.unions <$> mapM freeVars xs
   Ref (NumVar n) -> return $ IntSet.singleton n
+  Ref (NumInputVar _) -> return mempty
   Ref (BoolVar n) -> return $ IntSet.singleton n
+  Ref (BoolInputVar _) -> return mempty
   Ref (ArrayRef _ _ addr) -> freeVarsOfArray addr
   Add x y -> (<>) <$> freeVars x <*> freeVars y
   Sub x y -> (<>) <$> freeVars x <*> freeVars y
@@ -103,7 +106,7 @@ freeVars expr = case expr of
   where
     freeVarsOfArray :: Addr -> M n IntSet
     freeVarsOfArray addr = do
-      heap <- ask
+      heap <- asks snd
       case IntMap.lookup addr heap of
         Nothing -> throwError $ InterpretUnboundAddrError addr heap
         Just (elemType, array) -> case elemType of
@@ -111,13 +114,10 @@ freeVars expr = case expr of
           BoolElem -> return $ IntSet.fromList (IntMap.elems array)
           (ArrElem _ _) -> IntSet.unions <$> mapM freeVarsOfArray (IntMap.elems array)
 
--- | Collect free variables of an elaborated program (that should also be present in the witness)
+-- | Collect free variables of an elaborated program (excluding input variables).
 freeVarsOfElab :: Elaborated t -> M n IntSet
 freeVarsOfElab (Elaborated value comp) = do
   inOutputValue <- freeVars value
-
-  let inputBindings = compInputVars comp
-
   inNumBindings <- forM (compNumAsgns comp) $ \(Assignment (NumVar var) val) -> do
     -- collect both the var and its value
     IntSet.insert var <$> freeVars val
@@ -125,8 +125,7 @@ freeVarsOfElab (Elaborated value comp) = do
     -- collect both the var and its value
     IntSet.insert var <$> freeVars val
   return $
-    inputBindings
-      <> inOutputValue
+    inOutputValue
       <> IntSet.unions inNumBindings
       <> IntSet.unions inBoolBindings
 
@@ -148,7 +147,9 @@ instance GaloisField n => Interpret Bool n where
 
 instance GaloisField n => Interpret (Ref t) n where
   interpret (BoolVar var) = pure <$> lookupVar var
+  interpret (BoolInputVar var) = pure <$> lookupInputVar var
   interpret (NumVar var) = pure <$> lookupVar var
+  interpret (NumInputVar var) = pure <$> lookupInputVar var
   interpret (ArrayRef _ _ addr) = lookupAddr addr
 
 instance GaloisField n => Interpret (Val t) n where
@@ -190,17 +191,14 @@ instance GaloisField n => Interpret (Val t) n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = ReaderT Heap (StateT (Witness n) (Except (InterpretError n)))
+type M n = ReaderT (IntMap n, Heap) (StateT (Witness n) (Except (InterpretError n)))
 
-runM :: Heap -> Witness n -> M n a -> Either (InterpretError n) (a, Witness n)
-runM heap bindings p = runExcept (runStateT (runReaderT p heap) bindings)
-
-runMWithInputs :: Elaborated t -> [n] -> M n a -> Either (InterpretError n) (a, Witness n)
-runMWithInputs elab inputs = runM heap bindings
-  where
+runM :: Elaborated t -> [n] -> M n a -> Either (InterpretError n) (a, Witness n)
+runM elab inputs p = runExcept (runStateT (runReaderT p (inputBindings, heap)) mempty)
+  where 
     comp = elabComp elab
-    bindings = IntMap.fromAscList $ zip (IntSet.toAscList (compInputVars comp)) inputs
     heap = compHeap comp
+    inputBindings = IntMap.fromDistinctAscList $ zip [0 ..] inputs
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
@@ -209,9 +207,16 @@ lookupVar var = do
     Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val
 
+lookupInputVar :: Show n => Int -> M n n
+lookupInputVar var = do
+  bindings <- asks fst
+  case IntMap.lookup var bindings of
+    Nothing -> throwError $ InterpretUnboundVarError var bindings
+    Just val -> return val
+
 lookupAddr :: Show n => Int -> M n [n]
 lookupAddr addr = do
-  heap <- ask
+  heap <- asks snd
   case IntMap.lookup addr heap of
     Nothing -> throwError $ InterpretUnboundAddrError addr heap
     Just (elemType, array) -> case elemType of
@@ -231,7 +236,7 @@ addBinding (ArrayRef _ _ addr) vals = do
   where
     collectVarsFromAddr :: Addr -> M n [Var]
     collectVarsFromAddr address = do
-      heap <- ask
+      heap <- asks snd 
       case IntMap.lookup address heap of
         Nothing -> throwError $ InterpretUnboundAddrError addr heap
         Just (elemType, array) -> case elemType of

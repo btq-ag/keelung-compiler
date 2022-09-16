@@ -22,6 +22,7 @@ import qualified Data.Sequence as Seq
 import Keelung.Field (N (..))
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Types (Var)
+import Control.Monad.Reader
 
 --------------------------------------------------------------------------------
 
@@ -159,12 +160,15 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
 --------------------------------------------------------------------------------
 
 -- monad for collecting boolean vars along the way
-type M = State IntSet
+type M = ReaderT Int (State IntSet)
+
+runM :: Int -> M a -> (a, IntSet)
+runM inputSize = flip runState IntSet.empty . flip runReaderT inputSize
 
 eraseType :: GaloisField n => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
-  let T.Computation nextVar _nextAddr inputVars _heap numAsgns boolAsgns assertions = comp
-      ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = flip runState mempty $ do
+  let T.Computation nextVar nextInputVar _nextAddr _heap numAsgns boolAsgns assertions = comp
+      ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = runM nextInputVar $ do
         expr' <- eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAsgns
         boolAssignments' <- mapM eraseAssignment boolAsgns
@@ -176,7 +180,7 @@ eraseType (T.Elaborated expr comp) =
           erasedAssertions = erasedAssertions',
           erasedAssignments = erasedAssignments',
           erasedNumOfVars = nextVar,
-          erasedInputVars = inputVars,
+          erasedInputVars = IntSet.fromDistinctAscList [0 .. nextInputVar - 1],
           erasedBooleanVars = booleanVars
         }
 
@@ -187,14 +191,29 @@ eraseVal (T.Boolean False) = return [Val 0]
 eraseVal (T.Boolean True) = return [Val 1]
 eraseVal T.Unit = return []
 
+eraseRef :: GaloisField n => T.Ref -> M [Expr n]
+eraseRef ref = do 
+  inputSize <- ask
+  case ref of
+    T.NumVar n -> return [Var (inputSize + n)]
+    T.NumInputVar n -> return [Var n]
+    T.BoolVar n -> do 
+      modify' (IntSet.insert n) -- keep track of all boolean variables
+      return [Var (inputSize + n)]
+    T.BoolInputVar n -> do 
+      modify' (IntSet.insert n) -- keep track of all boolean variables
+      return [Var n]
+
+-- eraseVal (T.Integer n) = return [Val (fromInteger n)]
+-- eraseVal (T.Rational n) = return [Val (fromRational n)]
+-- eraseVal (T.Boolean False) = return [Val 0]
+-- eraseVal (T.Boolean True) = return [Val 1]
+-- eraseVal T.Unit = return []
+
 eraseExpr :: GaloisField n => T.Expr -> M [Expr n]
 eraseExpr expr = case expr of
   T.Val val -> eraseVal val
-  T.Var var -> case var of
-    T.NumVar n -> return [Var n]
-    T.BoolVar n -> do
-      modify' (IntSet.insert n) -- keep track of all boolean variables
-      return [Var n]
+  T.Var ref -> eraseRef ref
   T.Array exprs -> do
     exprss <- mapM eraseExpr exprs
     return $ concat exprss
@@ -250,6 +269,7 @@ eraseAssignment (T.Assignment (T.BoolVar n) expr) = do
   modify' (IntSet.insert n) -- keep track of all boolean variables
   exprs <- eraseExpr expr
   return $ Assignment n (head exprs)
+eraseAssignment (T.Assignment _ _) = error "eraseAssignment: assignments on input variables"
 
 -- Flatten and chain expressions together when possible
 chainExprs :: Op -> Expr n -> Expr n -> Expr n
