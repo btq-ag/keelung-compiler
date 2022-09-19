@@ -27,6 +27,8 @@ module Keelung.Compiler
     --
     optimizeElab,
     interpElab,
+    -- 
+    asGF181
   )
 where
 
@@ -49,6 +51,7 @@ import Keelung.Compiler.R1CS
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1CS (R1CS (..))
+import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
 import Keelung.Syntax (Val)
 import Keelung.Syntax.Typed (Elaborated)
@@ -157,3 +160,8 @@ optimizeElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (C
 optimizeElab elab = do
   rewritten <- left ElabError (Rewriting.run elab)
   return $ Optimizer.optimize $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
+
+--------------------------------------------------------------------------------
+
+asGF181 :: Either (Error GF181) a -> Either (Error GF181) a
+asGF181 = id

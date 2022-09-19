@@ -8,9 +8,9 @@ import Keelung (GF181)
 import Keelung.Compiler
 import Keelung.Constraint.R1CS
 
-asGF181 :: Either (Error GF181) a -> IO a
-asGF181 (Left err) = error $ show err
-asGF181 (Right x) = return x
+asGF181' :: Either (Error GF181) a -> IO a
+asGF181' (Left err) = error $ show err
+asGF181' (Right x) = return x
 
 printR1CS :: Bool -> R1CS GF181 -> IO ()
 printR1CS printConstraints r1cs = do
@@ -29,36 +29,36 @@ main :: IO ()
 main = do
   -- putStrLn "Number of constriants: fromString"
   -- forM_ [1, 2, 4, 8] $ \i -> do
-  --   asGF181 (compile (return $ fromString (replicate i 'A'))) >>= print . Set.size . csConstraints
+  --   asGF181' (compile (return $ fromString (replicate i 'A'))) >>= print . Set.size . csConstraints
 
   putStrLn "O0: fullAdder"
   forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-    asGF181 (optimize1 (M.fullAdderT i)) >>= printR1CS False . toR1CS
+    asGF181' (optimize1 (M.fullAdderT i)) >>= printR1CS False . toR1CS
 
   putStrLn "O1: fullAdder"
   forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-    asGF181 (optimize2 (M.fullAdderT i)) >>= printR1CS False . toR1CS
+    asGF181' (optimize2 (M.fullAdderT i)) >>= printR1CS False . toR1CS
 
   putStrLn "O2: fullAdder"
   forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-    asGF181 (optimize3 (M.fullAdderT i)) >>= printR1CS False . toR1CS
+    asGF181' (optimize3 (M.fullAdderT i)) >>= printR1CS False . toR1CS
 
   putStrLn "O0: multiplier"
   forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-    asGF181 (optimize1 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
+    asGF181' (optimize1 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
 
   putStrLn "O1: multiplier"
   forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-    asGF181 (optimize2 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
+    asGF181' (optimize2 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
 
   putStrLn "O2: multiplier"
   forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-    asGF181 (optimize3 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
+    asGF181' (optimize3 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
 
 -- fa :: IO ()
 -- fa = do
 --   putStrLn "fullAdder"
---   cs <- asGF181 (optimize2 (fullAdderT 2))
+--   cs <- asGF181' (optimize2 (fullAdderT 2))
 --   let constraints = csConstraints cs
 
 --   putStrLn "before"

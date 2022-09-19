@@ -64,7 +64,7 @@ runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
 
   -- See if input size is valid
-  let expectedInputSize = compNextInputVar (elabComp elab) - 1
+  let expectedInputSize = compNextInputVar (elabComp elab)
   let actualInputSize = length inputs
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
@@ -163,8 +163,7 @@ lookupInputVar var = do
 -- | Collect free variables of an elaborated program (that should also be present in the witness)
 freeVarsOfElab :: Elaborated -> IntSet
 freeVarsOfElab (Elaborated value context) =
-  let inOutputValue = freeVars value
-      inputBindings = IntSet.fromDistinctAscList [0 .. compNextInputVar context - 1]
+  let inOutputValue = excludeInputVars (freeVars value)
       inNumBindings =
         map
           (\(Assignment (NumVar var) val) -> IntSet.insert var (freeVars val)) -- collect both the var and its value
@@ -173,10 +172,12 @@ freeVarsOfElab (Elaborated value context) =
         map
           (\(Assignment (BoolVar var) val) -> IntSet.insert var (freeVars val)) -- collect both the var and its value
           (compBoolAsgns context)
-   in inputBindings
-        <> inOutputValue
+   in inOutputValue
         <> IntSet.unions inNumBindings
         <> IntSet.unions inBoolBindings
+
+    where 
+      excludeInputVars = IntSet.filter (\var -> var >= compNextInputVar context)
 
 --------------------------------------------------------------------------------
 

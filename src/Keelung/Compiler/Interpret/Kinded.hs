@@ -117,7 +117,7 @@ freeVars expr = case expr of
 -- | Collect free variables of an elaborated program (excluding input variables).
 freeVarsOfElab :: Elaborated t -> M n IntSet
 freeVarsOfElab (Elaborated value comp) = do
-  inOutputValue <- freeVars value
+  inOutputValue <- excludeInputVars <$> freeVars value
   inNumBindings <- forM (compNumAsgns comp) $ \(Assignment (NumVar var) val) -> do
     -- collect both the var and its value
     IntSet.insert var <$> freeVars val
@@ -128,6 +128,8 @@ freeVarsOfElab (Elaborated value comp) = do
     inOutputValue
       <> IntSet.unions inNumBindings
       <> IntSet.unions inBoolBindings
+    where 
+      excludeInputVars = IntSet.filter (\var -> var < compNextInputVar comp)
 
 --------------------------------------------------------------------------------
 

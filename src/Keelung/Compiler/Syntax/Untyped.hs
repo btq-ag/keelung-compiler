@@ -13,6 +13,7 @@ module Keelung.Compiler.Syntax.Untyped
   )
 where
 
+import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
@@ -22,7 +23,6 @@ import qualified Data.Sequence as Seq
 import Keelung.Field (N (..))
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Types (Var)
-import Control.Monad.Reader
 
 --------------------------------------------------------------------------------
 
@@ -179,7 +179,7 @@ eraseType (T.Elaborated expr comp) =
         { erasedExpr = erasedExpr',
           erasedAssertions = erasedAssertions',
           erasedAssignments = erasedAssignments',
-          erasedNumOfVars = nextVar,
+          erasedNumOfVars = nextInputVar + nextVar,
           erasedInputVars = IntSet.fromDistinctAscList [0 .. nextInputVar - 1],
           erasedBooleanVars = booleanVars
         }
@@ -192,15 +192,15 @@ eraseVal (T.Boolean True) = return [Val 1]
 eraseVal T.Unit = return []
 
 eraseRef :: GaloisField n => T.Ref -> M [Expr n]
-eraseRef ref = do 
+eraseRef ref = do
   inputSize <- ask
   case ref of
     T.NumVar n -> return [Var (inputSize + n)]
     T.NumInputVar n -> return [Var n]
-    T.BoolVar n -> do 
-      modify' (IntSet.insert n) -- keep track of all boolean variables
+    T.BoolVar n -> do
+      modify' (IntSet.insert (inputSize + n)) -- keep track of all boolean variables
       return [Var (inputSize + n)]
-    T.BoolInputVar n -> do 
+    T.BoolInputVar n -> do
       modify' (IntSet.insert n) -- keep track of all boolean variables
       return [Var n]
 
@@ -265,11 +265,17 @@ eraseAssignment :: GaloisField n => T.Assignment -> M (Assignment n)
 eraseAssignment (T.Assignment (T.NumVar n) expr) = do
   exprs <- eraseExpr expr
   return $ Assignment n (head exprs)
+eraseAssignment (T.Assignment (T.NumInputVar n) expr) = do
+  exprs <- eraseExpr expr
+  return $ Assignment n (head exprs)
 eraseAssignment (T.Assignment (T.BoolVar n) expr) = do
   modify' (IntSet.insert n) -- keep track of all boolean variables
   exprs <- eraseExpr expr
   return $ Assignment n (head exprs)
-eraseAssignment (T.Assignment _ _) = error "eraseAssignment: assignments on input variables"
+eraseAssignment (T.Assignment (T.BoolInputVar n) expr) = do
+  modify' (IntSet.insert n) -- keep track of all boolean variables
+  exprs <- eraseExpr expr
+  return $ Assignment n (head exprs)
 
 -- Flatten and chain expressions together when possible
 chainExprs :: Op -> Expr n -> Expr n -> Expr n
