@@ -52,12 +52,12 @@ main = hspec $ do
       it "dim:10 sig:10" $
         runKeelungAggSig 10 10 `shouldBe` Right []
 
-      it "Basic.identity" $
-        execute Basic.identity [42 :: GF181] `shouldBe` Right [42]
-      it "Basic.summation" $
-        execute Basic.summation [0, 2, 4, 8 :: GF181] `shouldBe` Right [14]
-      it "Basic.summation2" $
-        execute Basic.summation2 [0, 2, 4, 8 :: GF181] `shouldBe` Right []
+    it "Basic.identity" $
+      execute Basic.identity [42 :: GF181] `shouldBe` Right [42]
+    it "Basic.summation" $
+      execute Basic.summation [0, 2, 4, 8 :: GF181] `shouldBe` Right [14]
+    it "Basic.summation2" $
+      execute Basic.summation2 [0, 2, 4, 8 :: GF181] `shouldBe` Right []
     it "Basic.assertArraysEqual" $
       execute Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] `shouldBe` Right []
     it "Basic.assertArraysEqual2" $
@@ -114,7 +114,7 @@ main = hspec $ do
                     cadd (-42 :: GF181) [(0, 1)],
                 csBooleanInputVars = mempty,
                 csVars = IntSet.fromList [0],
-                csInputVars = IntSet.fromList [0],
+                csNumOfInputVars = 1,
                 csOutputVars = IntSet.empty
               }
        in Compiler.compile Basic.assertToBe42 `shouldBe` Right cs
@@ -191,7 +191,7 @@ main = hspec $ do
                         ],
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 17],
-                  csInputVars = IntSet.fromList [0 .. 11],
+                  csNumOfInputVars = 12,
                   csOutputVars = IntSet.empty
                 }
          in Optimse.optimize (cs :: ConstraintSystem GF181) `shouldNotBe` cs
@@ -206,7 +206,7 @@ main = hspec $ do
                         ++ cadd 0 [(2, 1), (3, 1), (4, 1)],
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 4],
-                  csInputVars = IntSet.fromList [0 .. 3],
+                  csNumOfInputVars = 4,
                   csOutputVars = IntSet.empty
                 }
             cs' =
@@ -216,7 +216,7 @@ main = hspec $ do
                       cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)],
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
-                  csInputVars = IntSet.fromList [0 .. 3],
+                  csNumOfInputVars = 4,
                   csOutputVars = IntSet.empty
                 }
          in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
@@ -230,7 +230,7 @@ main = hspec $ do
                         ++ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
-                  csInputVars = IntSet.fromList [0 .. 2],
+                  csNumOfInputVars = 3,
                   csOutputVars = IntSet.empty
                 }
             cs' =
@@ -239,7 +239,7 @@ main = hspec $ do
                     Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 2],
-                  csInputVars = IntSet.fromList [0 .. 2],
+                  csNumOfInputVars = 3,
                   csOutputVars = IntSet.empty
                 }
          in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
@@ -253,7 +253,7 @@ main = hspec $ do
                         ++ cmul [(2, 1)] [(3, 1)] (42, []), --- $2 * $3 = 42
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
-                  csInputVars = IntSet.fromList [0 .. 2],
+                  csNumOfInputVars = 3,
                   csOutputVars = IntSet.empty
                 }
             cs' =
@@ -262,7 +262,7 @@ main = hspec $ do
                     Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 2],
-                  csInputVars = IntSet.fromList [0 .. 2],
+                  csNumOfInputVars = 3,
                   csOutputVars = IntSet.empty
                 }
          in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
@@ -276,7 +276,7 @@ main = hspec $ do
                         ++ cmul [(2, 1)] [(3, 1)] (0, [(4, 1)]), --- $2 * $3 = $4
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 4],
-                  csInputVars = IntSet.fromList [0 .. 3],
+                  csNumOfInputVars = 4,
                   csOutputVars = IntSet.empty
                 }
             cs' =
@@ -286,7 +286,7 @@ main = hspec $ do
                       cmul [(2, 1)] [(3, 1)] (0, [(0, -1), (1, -1)]), --- $2 * $3 = - $0 - $1
                   csBooleanInputVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
-                  csInputVars = IntSet.fromList [0 .. 3],
+                  csNumOfInputVars = 4,
                   csOutputVars = IntSet.empty
                 }
          in Optimse.optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'

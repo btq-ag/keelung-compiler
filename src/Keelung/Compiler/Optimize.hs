@@ -5,21 +5,21 @@
 
 module Keelung.Compiler.Optimize where
 
+import Control.Arrow (left)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
+import Keelung (elaborate)
 import Keelung.Compiler.Constraint
-import Keelung.Monad
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints2 as MinimizeConstraints2
 import Keelung.Compiler.Optimize.Monad
-import Keelung.Syntax
-import Keelung (elaborate)
+import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting2
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
+import Keelung.Monad
+import Keelung.Syntax
 import qualified Keelung.Syntax.Typed as C
-import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting2
-import Control.Arrow (left)
 
 --------------------------------------------------------------------------------
 
@@ -33,7 +33,8 @@ optimizeWithWitness witness cs =
   --   - output vars
   -- Pinned vars are never optimized away.
 
-  let pinnedVars = IntSet.union (csOutputVars cs) (csInputVars cs)
+  let inputVars = IntSet.fromDistinctAscList [0 .. csNumOfInputVars cs]
+      pinnedVars = IntSet.union (csOutputVars cs) inputVars
    in runOptiM witness $ do
         constraints <- MinimizeConstraints.run (IntSet.toList pinnedVars) (csConstraints cs)
         -- NOTE: In the next line, it's OK that 'pinnedVars'
@@ -46,7 +47,7 @@ optimizeWithWitness witness cs =
 
 optimizeWithInput :: (GaloisField n, Integral n) => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimizeWithInput ins cs =
-  let witness = IntMap.fromList (zip (IntSet.toList (csInputVars cs)) ins)
+  let witness = IntMap.fromList (zip [0 .. csNumOfInputVars cs - 1] ins)
    in optimizeWithWitness witness cs
 
 optimize :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
@@ -58,8 +59,8 @@ optimize2 cs =
   --   - input vars
   --   - output vars
   -- Pinned vars are never optimized away.
-  let pinnedVars = IntSet.union (csOutputVars cs) (csInputVars cs)
-
+  let inputVars = IntSet.fromDistinctAscList [0 .. csNumOfInputVars cs - 1]
+      pinnedVars = IntSet.union (csOutputVars cs) inputVars
       constraints = MinimizeConstraints2.run pinnedVars (csConstraints cs)
    in renumberConstraints $ cs {csConstraints = constraints}
 

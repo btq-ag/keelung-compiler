@@ -1,10 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -Wno-type-defaults #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 
 module Keelung.Compiler.Constraint where
 
+import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import qualified Data.IntMap as IntMap
@@ -13,12 +14,11 @@ import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import GHC.Generics (Generic)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Field
 import Keelung.Types (Var)
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
@@ -47,7 +47,7 @@ instance Functor Constraint where
   fmap f (CAdd x) = CAdd (fmap f x)
   fmap f (CMul2 x y (Left z)) = CMul2 (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul2 x y (Right z)) = CMul2 (fmap f x) (fmap f y) (Right (fmap f z))
-  fmap _ (CXor x y z) = CXor x y z 
+  fmap _ (CXor x y z) = CXor x y z
   fmap _ (CNQZ x y) = CNQZ x y
 
 -- | Smart constructor for the CAdd constraint
@@ -84,20 +84,18 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
+
   -- CXor is always greater than anything
-  compare (CXor x y z)  (CXor u v w ) = compare (x, y, z) (u, v, w)
+  compare (CXor x y z) (CXor u v w) = compare (x, y, z) (u, v, w)
   compare _ CXor {} = LT
   compare CXor {} _ = GT
-
   -- CMul2 comes in the second
   compare (CMul2 aV bV cV) (CMul2 aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMul2 {} = LT
   compare CMul2 {} _ = GT
-
   -- CAdd comes in the third
   compare (CAdd xs) (CAdd ys) =
     if xs == ys then EQ else compare xs ys
-  
   compare CNQZ {} CNQZ {} = EQ
   compare CNQZ {} _ = LT
   compare _ CNQZ {} = GT
@@ -107,8 +105,6 @@ instance GaloisField n => Ord (Constraint n) where
 -- | Return the list of variables occurring in constraints
 varsInConstraint :: Constraint a -> IntSet
 varsInConstraint (CAdd xs) = Poly.vars xs
--- varsInConstraint (CMul (_, x) (_, y) (_, Nothing)) = IntSet.fromList [x, y]
--- varsInConstraint (CMul (_, x) (_, y) (_, Just z)) = IntSet.fromList [x, y, z]
 varsInConstraint (CMul2 aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
 varsInConstraint (CMul2 aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
 varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
@@ -127,7 +123,9 @@ data ConstraintSystem n = ConstraintSystem
     -- should generate constraints like $A * $A = $A for each Boolean variables
     csBooleanInputVars :: !IntSet,
     csVars :: !IntSet,
-    csInputVars :: !IntSet,
+    -- | Invariant: all input variables are placed in the front of the variable list
+    --              so that we only need to remember how many are there
+    csNumOfInputVars :: !Int,
     csOutputVars :: !IntSet
   }
   deriving (Eq, Generic, NFData)
@@ -137,7 +135,7 @@ numberOfConstraints :: ConstraintSystem n -> Int
 numberOfConstraints (ConstraintSystem cs cs' _ _ _) = Set.size cs + IntSet.size cs'
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints boolInputVars vars inputVars outputVars) =
+  show (ConstraintSystem constraints boolInputVars vars numOfInputVars outputVars) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
@@ -165,9 +163,12 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
           <> "\n"
 
       printInputVars =
-        "  input variables (" <> show (IntSet.size inputVars) <> "):\n"
-          <> "    "
-          <> show (IntSet.toList inputVars)
+        "  input variables (" <> show numOfInputVars <> "):"
+          <> ( case numOfInputVars of
+                 0 -> "none"
+                 1 -> "$0"
+                 _ -> "[ $0 .. $" <> show numOfInputVars <> " ]"
+             )
           <> "\n"
 
       printOutputVars =
@@ -185,39 +186,38 @@ renumberConstraints cs =
     (Set.map renumberConstraint (csConstraints cs))
     (IntSet.map renumber (csBooleanInputVars cs))
     (IntSet.fromList renumberedVars)
-    (IntSet.map renumber (csInputVars cs))
+    (csNumOfInputVars cs)
     (IntSet.map renumber (csOutputVars cs))
   where
     -- variables in constraints (that should be kept after renumbering!)
     vars = varsInConstraints (csConstraints cs)
+    -- variables in constraints excluding input variables
+    otherVars = IntSet.filter (>= csNumOfInputVars cs) vars
+    -- new variables after renumbering (excluding input variables)
+    -- we start counting these variables from `csNumOfInputVars cs`
+    -- because we want to keep the input variables intact
+    renumberedOtherVars = [csNumOfInputVars cs .. csNumOfInputVars cs + IntSet.size otherVars - 1]
 
-    -- new variables after renumbering
-    -- invariant: size == |vars in constraints| `union` |input vars|
-    renumberedVars = [0 .. IntSet.size (vars `IntSet.union` csInputVars cs) - 1]
+    -- all variables after renumbering
+    renumberedVars = [0 .. csNumOfInputVars cs + IntSet.size otherVars - 1]
 
     -- mapping of old variables to new variables
     -- input variables are placed in the front
-    variableMap = Map.fromList $ zip oldVars renumberedVars
-      where
-        otherVars = IntSet.difference vars (csInputVars cs)
-        oldVars = IntSet.toList (csInputVars cs) ++ IntSet.toList otherVars
+    variableMap = Map.fromList $ zip (IntSet.toList otherVars) renumberedOtherVars
 
-    renumber var = case Map.lookup var variableMap of
-      Nothing ->
-        error
-          ( "can't find a binding for variable " ++ show var
-              ++ " in map "
-              ++ show variableMap
-              ++ " test:\n"
-              ++ show
-                ( length $ csConstraints cs,
-                  IntSet.toList vars,
-                  IntSet.toList (csInputVars cs),
-                  renumberedVars
-                )
-          )
-      Just var' -> var'
-
+    renumber var =
+      if var >= csNumOfInputVars cs
+        then case Map.lookup var variableMap of
+          Nothing ->
+            error
+              ( "can't find a mapping for variable " ++ show var
+                  ++ " \nmapping: "
+                  ++ show variableMap
+                  ++ " \nrenumbered vars: "
+                  ++ show renumberedVars
+              )
+          Just var' -> var'
+        else var -- this is an input variable
     renumberConstraint constraint = case constraint of
       CAdd xs ->
         CAdd $ Poly.mapVars renumber xs
@@ -227,5 +227,3 @@ renumberConstraints cs =
         CNQZ (renumber x) (renumber y)
       CXor x y z ->
         CXor (renumber x) (renumber y) (renumber z)
-        
-

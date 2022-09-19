@@ -61,7 +61,7 @@ toR1CS cs =
   R1CS
     (rights convertedConstratins)
     (IntSet.size (csVars cs))
-    (IntSet.size (csInputVars cs))
+    (csNumOfInputVars cs)
     (csBooleanInputVars cs)
     (csOutputVars cs)
     (lefts convertedConstratins)
@@ -97,7 +97,7 @@ fromR1CS r1cs =
           <> Set.fromList (map (uncurry CNQZ) (r1csCNQZPairs r1cs)),
       csBooleanInputVars = r1csBooleanInputVars r1cs,
       csVars = IntSet.fromDistinctAscList [0 .. r1csNumOfVars r1cs - 1],
-      csInputVars = IntSet.fromDistinctAscList [0 .. r1csNumOfInputVars r1cs - 1],
+      csNumOfInputVars = r1csNumOfInputVars r1cs,
       csOutputVars = r1csOutputVars r1cs
     }
   where

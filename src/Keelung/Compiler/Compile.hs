@@ -235,6 +235,6 @@ run (TypeErased untypedExprs assertions assignments numOfVars numOfInputVars boo
         constraints
         boolInputVars
         vars
-        (IntSet.fromDistinctAscList [0 .. numOfInputVars - 1])
+        numOfInputVars
         (IntSet.fromList outputVars)
     )
