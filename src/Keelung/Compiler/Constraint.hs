@@ -135,7 +135,7 @@ numberOfConstraints :: ConstraintSystem n -> Int
 numberOfConstraints (ConstraintSystem cs cs' _ _ _) = Set.size cs + IntSet.size cs'
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints boolInputVars vars numOfInputVars outputVars) =
+  show (ConstraintSystem constraints boolInputVars vars inputVarSize outputVars) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
@@ -163,18 +163,23 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
           <> "\n"
 
       printInputVars =
-        "  input variables (" <> show numOfInputVars <> "):"
-          <> ( case numOfInputVars of
+        "  input  variables (" <> show inputVarSize <> "): "
+          <> ( case inputVarSize of
                  0 -> "none"
                  1 -> "$0"
-                 _ -> "[ $0 .. $" <> show numOfInputVars <> " ]"
+                 _ -> "$0 .. $" <> show (inputVarSize - 1)
              )
           <> "\n"
 
       printOutputVars =
-        if IntSet.null outputVars
-          then "  no output variable"
-          else "  output variables: $" <> show (IntSet.toList outputVars) <> "\n"
+        "  output variables (" <> show (IntSet.size outputVars) <> "): "
+          <> ( case IntSet.size outputVars of
+                 0 -> "none"
+                 1 -> "$" <> show inputVarSize
+                 _ -> "$" <> show inputVarSize <>
+                      " .. $" <> show (inputVarSize + IntSet.size outputVars - 1)
+             )
+          <> "\n"
 
 -- | Sequentially renumber term variables '0..max_var'.  Return
 --   renumbered constraints, together with the total number of

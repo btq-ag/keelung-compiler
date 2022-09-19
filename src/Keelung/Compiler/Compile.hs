@@ -5,7 +5,7 @@
 
 module Keelung.Compiler.Compile (run) where
 
-import Control.Monad (forM)
+import Control.Monad
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'))
@@ -214,12 +214,11 @@ encodeAssertion expr = do
 
 -- | Compile an untyped expression to a constraint system
 run :: GaloisField n => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs assertions assignments allVarSize inputVarSize _outputVarSize boolInputVars) = runM allVarSize $ do
+run (TypeErased untypedExprs assertions assignments allVarSize inputVarSize outputVarSize boolInputVars) = runM allVarSize $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
-  outputVars <- forM untypedExprs $ \expr -> do
-    var <- freshVar
+  let outputVars = [inputVarSize .. inputVarSize + outputVarSize - 1]
+  forM_ (zip outputVars untypedExprs) $ \(var, expr) -> do
     encode var expr
-    return var
 
   -- Compile assignments to constraints
   mapM_ encodeAssignment assignments

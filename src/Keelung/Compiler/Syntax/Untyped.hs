@@ -110,6 +110,7 @@ sizeOfExpr expr = case expr of
 lengthOfExpr :: T.Expr -> Int
 lengthOfExpr expr = case expr of
   T.Array xs -> length xs
+  (T.Val T.Unit) -> 0
   _ -> 1
 
 --------------------------------------------------------------------------------
@@ -149,11 +150,11 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
       <> show (fmap (fmap N) expr)
       <> "\n"
       <> ( if length assignments < 20
-             then "  assignments:\n" <> show (map (fmap N) assignments) <> "\n"
+             then "  assignments:\n    " <> show (map (fmap N) assignments) <> "\n"
              else ""
          )
       <> ( if length assertions < 20
-             then "  assertions:\n" <> show assertions <> "\n"
+             then "  assertions:\n    " <> show assertions <> "\n"
              else ""
          )
       <> "  number of all variables: "
@@ -163,7 +164,7 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
       <> "\n  number of output variables: "
       <> show outputVarSize
       <> "\n  Boolean input variables: "
-      <> show boolInputVars
+      <> show (IntSet.toList boolInputVars)
       <> "\n\
          \}"
 
