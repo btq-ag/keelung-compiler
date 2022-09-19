@@ -26,14 +26,13 @@ import Keelung.Types (Var)
 -- | Monad for compilation
 data Env n = Env
   { envConstraints :: Set (Constraint n),
-    -- envBooleanVars :: IntSet,
     envNextVar :: Var
   }
 
 type M n = State (Env n)
 
 runM :: Var -> M n a -> a
-runM outVar program = evalState program (Env Set.empty (outVar + 1))
+runM allVarSize program = evalState program (Env Set.empty (allVarSize + 1))
 
 add :: GaloisField n => [Constraint n] -> M n ()
 add cs =
@@ -215,7 +214,7 @@ encodeAssertion expr = do
 
 -- | Compile an untyped expression to a constraint system
 run :: GaloisField n => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs assertions assignments numOfVars numOfInputVars boolInputVars) = runM numOfVars $ do
+run (TypeErased untypedExprs assertions assignments allVarSize inputVarSize _outputVarSize boolInputVars) = runM allVarSize $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
   outputVars <- forM untypedExprs $ \expr -> do
     var <- freshVar
@@ -235,6 +234,6 @@ run (TypeErased untypedExprs assertions assignments numOfVars numOfInputVars boo
         constraints
         boolInputVars
         vars
-        numOfInputVars
+        inputVarSize
         (IntSet.fromList outputVars)
     )

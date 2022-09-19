@@ -97,13 +97,20 @@ instance Show n => Show (Expr n) where
         go delim n (x :<| xs) = showsPrec (succ n) x . showString delim . go delim n xs
     If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
--- calculate the "size" of an expression
+-- | Calculate the "size" of an expression for benchmarking
 sizeOfExpr :: Expr n -> Int
 sizeOfExpr expr = case expr of
   Val _ -> 1
   Var _ -> 1
   BinOp _ operands -> sum (fmap sizeOfExpr operands) + (length operands - 1)
   If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+
+-- | Calculate the "length" of an expression
+--    so that we can reserve output variables for the expressions within
+lengthOfExpr :: T.Expr -> Int
+lengthOfExpr expr = case expr of
+  T.Array xs -> length xs
+  _ -> 1
 
 --------------------------------------------------------------------------------
 
@@ -127,14 +134,16 @@ data TypeErased n = TypeErased
     erasedAssignments :: ![Assignment n],
     -- | Number of variables
     erasedNumOfVars :: !Int,
-    -- | Number of input variables (they are placed at the beginning of the variable list)
+    -- | Number of input variables (they are placed before all variables)
     erasedNumOfInputVars :: !Int,
+    -- | Number of output variables (they are placed after input variables)
+    erasedOutputVarSize :: !Int,
     -- | Input variables that are boolean
     erasedBoolInputVars :: !IntSet
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr assertions assignments numOfVars numOfInputVars boolVars) =
+  show (TypeErased expr assertions assignments allVarsSize inputVarSize outputVarSize boolInputVars) =
     "TypeErased {\n\
     \  expression: "
       <> show (fmap (fmap N) expr)
@@ -147,29 +156,31 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
              then "  assertions:\n" <> show assertions <> "\n"
              else ""
          )
-      <> "  number of variables: "
-      <> show numOfVars
-      <> "\n\
-         \  number of input variables: "
-      <> show numOfInputVars
-      <> "\n  boolean variable: "
-      <> show boolVars
+      <> "  number of all variables: "
+      <> show allVarsSize
+      <> "\n  number of input variables: "
+      <> show inputVarSize
+      <> "\n  number of output variables: "
+      <> show outputVarSize
+      <> "\n  Boolean input variables: "
+      <> show boolInputVars
       <> "\n\
          \}"
 
 --------------------------------------------------------------------------------
 
 -- monad for collecting boolean vars along the way
-type M = ReaderT Int (State IntSet)
+type M = ReaderT (Int, Int) (State IntSet)
 
-runM :: Int -> M a -> (a, IntSet)
-runM inputSize = flip runState IntSet.empty . flip runReaderT inputSize
+runM :: Int -> Int -> M a -> (a, IntSet)
+runM inputVarSize outputVarSize = flip runState IntSet.empty . flip runReaderT (inputVarSize, outputVarSize)
 
 eraseType :: GaloisField n => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
-  let T.Computation nextVar nextInputVar _nextAddr _heap numAsgns boolAsgns assertions = comp
+  let outputVarSize = lengthOfExpr expr
+      T.Computation nextVar inputVarSize _nextAddr _heap numAsgns boolAsgns assertions = comp
       ((erasedExpr', erasedAssignments', erasedAssertions'), boolInputVars) =
-        runM nextInputVar $ do
+        runM inputVarSize outputVarSize $ do
           expr' <- eraseExpr expr
           numAssignments' <- mapM eraseAssignment numAsgns
           boolAssignments' <- mapM eraseAssignment boolAsgns
@@ -180,8 +191,9 @@ eraseType (T.Elaborated expr comp) =
         { erasedExpr = erasedExpr',
           erasedAssertions = erasedAssertions',
           erasedAssignments = erasedAssignments',
-          erasedNumOfVars = nextInputVar + nextVar,
-          erasedNumOfInputVars = nextInputVar,
+          erasedNumOfVars = inputVarSize + outputVarSize + nextVar,
+          erasedNumOfInputVars = inputVarSize,
+          erasedOutputVarSize = outputVarSize,
           erasedBoolInputVars = boolInputVars
         }
 
@@ -193,17 +205,22 @@ eraseVal (T.Boolean True) = return [Val 1]
 eraseVal T.Unit = return []
 
 eraseRef' :: T.Ref -> M Int
-eraseRef' ref = do
-  inputSize <- ask
-  case ref of
-    T.NumVar n -> return (inputSize + n)
-    T.NumInputVar n -> return n
-    T.BoolVar n -> return (inputSize + n)
-    T.BoolInputVar n -> do
-      -- keep track of all boolean input variables
-      -- so that we can later impose constraints on them (e.g. $A * $A = $A)
-      modify' (IntSet.insert n) 
-      return n
+eraseRef' ref = case ref of
+  T.NumVar n -> relocateOrdinaryVar n
+  T.NumInputVar n -> return n
+  T.BoolVar n -> relocateOrdinaryVar n
+  T.BoolInputVar n -> do
+    -- keep track of all boolean input variables
+    -- so that we can later impose constraints on them (e.g. $A * $A = $A)
+    modify' (IntSet.insert n)
+    return n
+  where
+    -- we need to relocate ordinary variables 
+    -- so that we can place input variables and output variables in front of them
+    relocateOrdinaryVar :: Int -> M Int
+    relocateOrdinaryVar n = do
+      (inputVarSize, outputVarSize) <- ask
+      return (inputVarSize + outputVarSize + n)
 
 eraseRef :: GaloisField n => T.Ref -> M (Expr n)
 eraseRef ref = Var <$> eraseRef' ref
