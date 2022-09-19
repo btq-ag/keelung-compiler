@@ -5,7 +5,6 @@ import Control.Monad (unless)
 import qualified Data.Either as Either
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
-import qualified Data.IntSet as IntSet
 import Keelung.Compiler.R1CS (ExecError (..), witnessOfR1CS)
 import Keelung.Constraint.R1CS (R1CS (..))
 
@@ -13,7 +12,7 @@ run :: (GaloisField n, Integral n) => R1CS n -> [n] -> Either (ExecError n) [n]
 run r1cs inputs = do
   witness <- witnessOfR1CS inputs r1cs
   -- extract output values from the witness
-  let outputVars = IntSet.toList (r1csOutputVars r1cs)
+  let outputVars = [ r1csInputVarSize r1cs .. r1csInputVarSize r1cs + r1csOutputVarSize r1cs - 1]
 
   let (execErrors, outputs) =
         Either.partitionEithers $

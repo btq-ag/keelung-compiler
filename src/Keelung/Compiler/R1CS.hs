@@ -63,7 +63,7 @@ toR1CS cs =
     (IntSet.size (csVars cs))
     (csInputVarSize cs)
     (csBooleanInputVars cs)
-    (IntSet.fromDistinctAscList [csInputVarSize cs .. csInputVarSize cs + csOutputVarSize cs - 1])
+    (csOutputVarSize cs)
     (lefts convertedConstratins)
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
@@ -96,9 +96,9 @@ fromR1CS r1cs =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map (uncurry CNQZ) (r1csCNQZPairs r1cs)),
       csBooleanInputVars = r1csBooleanInputVars r1cs,
-      csVars = IntSet.fromDistinctAscList [0 .. r1csNumOfVars r1cs - 1],
-      csInputVarSize = r1csNumOfInputVars r1cs,
-      csOutputVarSize = IntSet.size (r1csOutputVars r1cs)
+      csVars = IntSet.fromDistinctAscList [0 .. r1csVarSize r1cs - 1],
+      csInputVarSize = r1csInputVarSize r1cs,
+      csOutputVarSize = r1csOutputVarSize r1cs
     }
   where
     fromR1C (R1C aX bX cX) =
@@ -111,8 +111,8 @@ fromR1CS r1cs =
 -- | Computes an assignment for a R1CS with given inputs
 witnessOfR1CS :: (GaloisField n, Integral n) => [n] -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
-  if r1csNumOfInputVars r1cs /= length inputs
-    then Left $ ExecInputUnmatchedError (r1csNumOfInputVars r1cs) (length inputs)
+  if r1csInputVarSize r1cs /= length inputs
+    then Left $ ExecInputUnmatchedError (r1csInputVarSize r1cs) (length inputs)
     else generateWitness (fromR1CS r1cs) $ IntMap.fromDistinctAscList (zip [0 ..] inputs)
 
 --------------------------------------------------------------------------------

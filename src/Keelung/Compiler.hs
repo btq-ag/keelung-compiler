@@ -37,7 +37,6 @@ import Control.Monad (unless, when)
 import qualified Data.Either as Either
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
-import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (one, zero))
 import Keelung (elaborate)
 import qualified Keelung.Compiler.Compile as Compile
@@ -118,7 +117,7 @@ execute prog ins = do
 
   -- extract the output value from the witness
 
-  let outputVars = IntSet.toList (r1csOutputVars r1cs)
+  let outputVars = [ r1csInputVarSize r1cs .. r1csInputVarSize r1cs + r1csOutputVarSize r1cs - 1]
   let (execErrors, actualOutputs) =
         Either.partitionEithers $
           map
