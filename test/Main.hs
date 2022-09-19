@@ -5,7 +5,7 @@ module Main where
 import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import qualified Basic
-import Control.Arrow (left, ArrowChoice (right))
+import Control.Arrow (ArrowChoice (right), left)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
@@ -19,10 +19,10 @@ import qualified Keelung.Compiler.Optimize.MinimizeConstraints as Optimize
 import qualified Keelung.Compiler.Optimize.Monad as Optimize
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Constraint.R1CS (R1CS)
 import qualified Keelung.Syntax.Typed as C
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
-import Keelung.Constraint.R1CS (R1CS)
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
@@ -52,12 +52,12 @@ main = hspec $ do
       it "dim:10 sig:10" $
         runKeelungAggSig 10 10 `shouldBe` Right []
 
-    it "Basic.identity" $
-      execute Basic.identity [42 :: GF181] `shouldBe` Right [42]
-    it "Basic.summation" $
-      execute Basic.summation [0, 2, 4, 8 :: GF181] `shouldBe` Right [14]
-    it "Basic.summation2" $
-      execute Basic.summation2 [0, 2, 4, 8 :: GF181] `shouldBe` Right []
+      it "Basic.identity" $
+        execute Basic.identity [42 :: GF181] `shouldBe` Right [42]
+      it "Basic.summation" $
+        execute Basic.summation [0, 2, 4, 8 :: GF181] `shouldBe` Right [14]
+      it "Basic.summation2" $
+        execute Basic.summation2 [0, 2, 4, 8 :: GF181] `shouldBe` Right []
     it "Basic.assertArraysEqual" $
       execute Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] `shouldBe` Right []
     it "Basic.assertArraysEqual2" $
@@ -101,18 +101,6 @@ main = hspec $ do
             result = IntSet.toList . erasedBooleanVars <$> erased
          in result `shouldBe` Right [0 .. 3]
 
-  -- it "Aggregate Signature" $
-  --   let settings =
-  --         Settings
-  --           { enableAggChecking = True,
-  --             enableSizeChecking = True,
-  --             enableLengthChecking = True
-  --           }
-  --       setup = makeParam 1 1 42 settings :: Param GF181
-  --       erased = erase (AggSig.aggregateSignature setup :: Comp (Val 'Unit))
-  --       result = IntSet.toList . erasedBooleanVars <$> erased
-  --   in result `shouldBe` Right [3 .. 16]
-
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))
     it "instance Eq 2" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither (-42) [(1, -1)] :: Either GF181 (Poly GF181))
@@ -151,8 +139,9 @@ main = hspec $ do
         `shouldBe` Left
           ( InterpretError $
               InterpretAssertionError
-                (C.Eq (C.Var (C.NumVar 0)) (C.Val (C.Integer 3)))
-                (IntMap.fromList [(0, 0)])
+                (C.Eq (C.Var (C.NumInputVar 0)) (C.Val (C.Integer 3)))
+                mempty
+                [0]
           )
     it "assert success" $
       execute Basic.assert1 [3] `shouldBe` Right [3 :: GF181]

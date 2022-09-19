@@ -117,7 +117,7 @@ freeVars expr = case expr of
 -- | Collect free variables of an elaborated program (excluding input variables).
 freeVarsOfElab :: Elaborated t -> M n IntSet
 freeVarsOfElab (Elaborated value comp) = do
-  inOutputValue <- excludeInputVars <$> freeVars value
+  inOutputValue <- freeVars value
   inNumBindings <- forM (compNumAsgns comp) $ \(Assignment (NumVar var) val) -> do
     -- collect both the var and its value
     IntSet.insert var <$> freeVars val
@@ -128,8 +128,6 @@ freeVarsOfElab (Elaborated value comp) = do
     inOutputValue
       <> IntSet.unions inNumBindings
       <> IntSet.unions inBoolBindings
-    where 
-      excludeInputVars = IntSet.filter (\var -> var < compNextInputVar comp)
 
 --------------------------------------------------------------------------------
 
@@ -213,7 +211,7 @@ lookupInputVar :: Show n => Int -> M n n
 lookupInputVar var = do
   bindings <- asks fst
   case IntMap.lookup var bindings of
-    Nothing -> throwError $ InterpretUnboundVarError var bindings
+    Nothing -> throwError $ InterpretUnboundInputVarError var bindings
     Just val -> return val
 
 lookupAddr :: Show n => Int -> M n [n]
@@ -251,6 +249,7 @@ addBinding _ _ = error "addBinding: too many values"
 
 data InterpretError n
   = InterpretUnboundVarError Var (Witness n)
+  | InterpretUnboundInputVarError Var (IntMap n)
   | InterpretUnboundAddrError Addr Heap
   | InterpretAssertionError (Val 'Bool) (Witness n)
   | InterpretVarUnassignedError IntSet (Witness n)
@@ -262,6 +261,10 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
     "unbound variable " ++ show var
       ++ " in bindings "
       ++ showWitness bindings
+  show (InterpretUnboundInputVarError var inputs) =
+    "unbound input variable " ++ show var
+      ++ " in inputs "
+      ++ showWitness inputs
   show (InterpretUnboundAddrError var heap) =
     "unbound address " ++ show var
       ++ " in heap "

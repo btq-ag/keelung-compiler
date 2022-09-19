@@ -49,7 +49,7 @@ run' (Elaborated expr comp) inputs = runM inputs $ do
       -- collect variables and their bindings in the expression
       let vars = freeVars e
       bindings' <- mapM (\var -> (var,) <$> lookupVar var) $ IntSet.toList vars
-      throwError $ InterpretAssertionError e (IntMap.fromList bindings')
+      throwError $ InterpretAssertionError e (IntMap.fromList bindings') inputs 
 
   -- lastly interpret the expression and return the result
   interpret expr
@@ -163,7 +163,7 @@ lookupInputVar var = do
 -- | Collect free variables of an elaborated program (that should also be present in the witness)
 freeVarsOfElab :: Elaborated -> IntSet
 freeVarsOfElab (Elaborated value context) =
-  let inOutputValue = excludeInputVars (freeVars value)
+  let inOutputValue = freeVars value
       inNumBindings =
         map
           (\(Assignment (NumVar var) val) -> IntSet.insert var (freeVars val)) -- collect both the var and its value
@@ -176,15 +176,12 @@ freeVarsOfElab (Elaborated value context) =
         <> IntSet.unions inNumBindings
         <> IntSet.unions inBoolBindings
 
-    where 
-      excludeInputVars = IntSet.filter (\var -> var >= compNextInputVar context)
-
 --------------------------------------------------------------------------------
 
 data InterpretError n
   = InterpretUnboundVarError Var (Witness n)
   | InterpretUnboundAddrError Addr Heap
-  | InterpretAssertionError Expr (Witness n)
+  | InterpretAssertionError Expr (Witness n) [n]
   | InterpretVarUnassignedError IntSet (Witness n)
   | InterpretInputSizeError Int Int
   deriving (Eq, Generic, NFData)
@@ -192,18 +189,20 @@ data InterpretError n
 instance Serialize n => Serialize (InterpretError n)
 
 instance (GaloisField n, Integral n) => Show (InterpretError n) where
-  show (InterpretUnboundVarError var bindings) =
+  show (InterpretUnboundVarError var witness) =
     "unbound variable " ++ show var
-      ++ " in bindings "
-      ++ showWitness bindings
+      ++ " in witness "
+      ++ showWitness witness
   show (InterpretUnboundAddrError var heap) =
     "unbound address " ++ show var
       ++ " in heap "
       ++ show heap
-  show (InterpretAssertionError val bindings) =
+  show (InterpretAssertionError val witness inputs) =
     "assertion failed: " ++ show val
-      ++ "\nbindings of variables: "
-      ++ showWitness bindings
+      ++ "\n  witness of variables: "
+      ++ showWitness witness
+      ++ "\n  inputs variables: "
+      ++ show inputs
   show (InterpretVarUnassignedError missingInWitness missingInProgram) =
     ( if IntSet.null missingInWitness
         then ""

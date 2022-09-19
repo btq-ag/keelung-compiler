@@ -168,13 +168,14 @@ runM inputSize = flip runState IntSet.empty . flip runReaderT inputSize
 eraseType :: GaloisField n => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let T.Computation nextVar nextInputVar _nextAddr _heap numAsgns boolAsgns assertions = comp
-      ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) = runM nextInputVar $ do
-        expr' <- eraseExpr expr
-        numAssignments' <- mapM eraseAssignment numAsgns
-        boolAssignments' <- mapM eraseAssignment boolAsgns
-        let assignments = numAssignments' <> boolAssignments'
-        assertions' <- concat <$> mapM eraseExpr assertions
-        return (expr', assignments, assertions')
+      ((erasedExpr', erasedAssignments', erasedAssertions'), booleanVars) =
+        runM nextInputVar $ do
+          expr' <- eraseExpr expr
+          numAssignments' <- mapM eraseAssignment numAsgns
+          boolAssignments' <- mapM eraseAssignment boolAsgns
+          let assignments = numAssignments' <> boolAssignments'
+          assertions' <- concat <$> mapM eraseExpr assertions
+          return (expr', assignments, assertions')
    in TypeErased
         { erasedExpr = erasedExpr',
           erasedAssertions = erasedAssertions',
@@ -191,18 +192,21 @@ eraseVal (T.Boolean False) = return [Val 0]
 eraseVal (T.Boolean True) = return [Val 1]
 eraseVal T.Unit = return []
 
-eraseRef :: GaloisField n => T.Ref -> M [Expr n]
-eraseRef ref = do
+eraseRef' :: T.Ref -> M Int
+eraseRef' ref = do
   inputSize <- ask
   case ref of
-    T.NumVar n -> return [Var (inputSize + n)]
-    T.NumInputVar n -> return [Var n]
+    T.NumVar n -> return (inputSize + n)
+    T.NumInputVar n -> return n
     T.BoolVar n -> do
       modify' (IntSet.insert (inputSize + n)) -- keep track of all boolean variables
-      return [Var (inputSize + n)]
+      return (inputSize + n)
     T.BoolInputVar n -> do
       modify' (IntSet.insert n) -- keep track of all boolean variables
-      return [Var n]
+      return n
+
+eraseRef :: GaloisField n => T.Ref -> M (Expr n)
+eraseRef ref = Var <$> eraseRef' ref
 
 -- eraseVal (T.Integer n) = return [Val (fromInteger n)]
 -- eraseVal (T.Rational n) = return [Val (fromRational n)]
@@ -213,7 +217,7 @@ eraseRef ref = do
 eraseExpr :: GaloisField n => T.Expr -> M [Expr n]
 eraseExpr expr = case expr of
   T.Val val -> eraseVal val
-  T.Var ref -> eraseRef ref
+  T.Var ref -> pure <$> eraseRef ref
   T.Array exprs -> do
     exprss <- mapM eraseExpr exprs
     return $ concat exprss
@@ -262,20 +266,10 @@ eraseExpr expr = case expr of
   T.ToNum x -> eraseExpr x
 
 eraseAssignment :: GaloisField n => T.Assignment -> M (Assignment n)
-eraseAssignment (T.Assignment (T.NumVar n) expr) = do
+eraseAssignment (T.Assignment ref expr) = do
+  var <- eraseRef' ref
   exprs <- eraseExpr expr
-  return $ Assignment n (head exprs)
-eraseAssignment (T.Assignment (T.NumInputVar n) expr) = do
-  exprs <- eraseExpr expr
-  return $ Assignment n (head exprs)
-eraseAssignment (T.Assignment (T.BoolVar n) expr) = do
-  modify' (IntSet.insert n) -- keep track of all boolean variables
-  exprs <- eraseExpr expr
-  return $ Assignment n (head exprs)
-eraseAssignment (T.Assignment (T.BoolInputVar n) expr) = do
-  modify' (IntSet.insert n) -- keep track of all boolean variables
-  exprs <- eraseExpr expr
-  return $ Assignment n (head exprs)
+  return $ Assignment var (head exprs)
 
 -- Flatten and chain expressions together when possible
 chainExprs :: Op -> Expr n -> Expr n -> Expr n
