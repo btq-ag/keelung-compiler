@@ -233,8 +233,8 @@ cs1 =
             ],
       csBooleanInputVars = mempty,
       csVars = IntSet.fromList [0 .. 17],
-      csNumOfInputVars = 12,
-      csOutputVars = IntSet.empty
+      csInputVarSize = 12,
+      csOutputVarSize = 0
     }
 
 xorLists :: Comp (Val 'Bool)

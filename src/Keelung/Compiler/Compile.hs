@@ -9,7 +9,6 @@ import Control.Monad
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'))
-import qualified Data.IntSet as IntSet
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
@@ -234,5 +233,5 @@ run (TypeErased untypedExprs assertions assignments allVarSize inputVarSize outp
         boolInputVars
         vars
         inputVarSize
-        (IntSet.fromList outputVars)
+        outputVarSize
     )

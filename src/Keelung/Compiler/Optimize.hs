@@ -33,8 +33,7 @@ optimizeWithWitness witness cs =
   --   - output vars
   -- Pinned vars are never optimized away.
 
-  let inputVars = IntSet.fromDistinctAscList [0 .. csNumOfInputVars cs]
-      pinnedVars = IntSet.union (csOutputVars cs) inputVars
+  let pinnedVars = IntSet.fromDistinctAscList [0 .. csInputVarSize cs + csOutputVarSize cs - 1]
    in runOptiM witness $ do
         constraints <- MinimizeConstraints.run (IntSet.toList pinnedVars) (csConstraints cs)
         -- NOTE: In the next line, it's OK that 'pinnedVars'
@@ -47,7 +46,7 @@ optimizeWithWitness witness cs =
 
 optimizeWithInput :: (GaloisField n, Integral n) => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimizeWithInput ins cs =
-  let witness = IntMap.fromList (zip [0 .. csNumOfInputVars cs - 1] ins)
+  let witness = IntMap.fromList (zip [0 .. csInputVarSize cs - 1] ins)
    in optimizeWithWitness witness cs
 
 optimize :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
@@ -59,8 +58,7 @@ optimize2 cs =
   --   - input vars
   --   - output vars
   -- Pinned vars are never optimized away.
-  let inputVars = IntSet.fromDistinctAscList [0 .. csNumOfInputVars cs - 1]
-      pinnedVars = IntSet.union (csOutputVars cs) inputVars
+  let pinnedVars = IntSet.fromDistinctAscList [0 .. csInputVarSize cs + csOutputVarSize cs - 1]
       constraints = MinimizeConstraints2.run pinnedVars (csConstraints cs)
    in renumberConstraints $ cs {csConstraints = constraints}
 
