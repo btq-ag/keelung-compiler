@@ -215,7 +215,7 @@ encodeAssertion expr = do
 
 -- | Compile an untyped expression to a constraint system
 run :: GaloisField n => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs assertions assignments numOfVars inputVars booleanVars) = runM numOfVars $ do
+run (TypeErased untypedExprs assertions assignments numOfVars numOfInputVars boolInputVars) = runM numOfVars $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
   outputVars <- forM untypedExprs $ \expr -> do
     var <- freshVar
@@ -228,16 +228,13 @@ run (TypeErased untypedExprs assertions assignments numOfVars inputVars booleanV
   -- Compile assertions to constraints
   mapM_ encodeAssertion assertions
 
-  -- ensure that boolean input variables are boolean
-  let booleanInputVars = booleanVars `IntSet.intersection` inputVars
-
   constraints <- gets envConstraints
   let vars = varsInConstraints constraints
   return
     ( ConstraintSystem
         constraints
-        booleanInputVars
+        boolInputVars
         vars
-        inputVars
+        (IntSet.fromDistinctAscList [0 .. numOfInputVars - 1])
         (IntSet.fromList outputVars)
     )

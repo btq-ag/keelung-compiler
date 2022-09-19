@@ -85,20 +85,20 @@ main = hspec $ do
       execute Basic.returnArray2 [2] `shouldBe` Right [2, 4 :: GF181]
 
   describe "Type Erasure" $ do
-    describe "Boolean variables" $ do
+    describe "Boolean input variables" $ do
       it "Basic.identity" $
         let erased = erase Basic.identity :: Either (Error GF181) (TypeErased GF181)
-            result = IntSet.toList . erasedBooleanVars <$> erased
+            result = IntSet.toList . erasedBoolInputVars <$> erased
          in result `shouldBe` Right []
 
       it "Basic.identityB" $
         let erased = erase Basic.identityB :: Either (Error GF181) (TypeErased GF181)
-            result = IntSet.toList . erasedBooleanVars <$> erased
+            result = IntSet.toList . erasedBoolInputVars <$> erased
          in result `shouldBe` Right [0]
 
       it "Basic.every" $
         let erased = erase Basic.every :: Either (Error GF181) (TypeErased GF181)
-            result = IntSet.toList . erasedBooleanVars <$> erased
+            result = IntSet.toList . erasedBoolInputVars <$> erased
          in result `shouldBe` Right [0 .. 3]
 
   describe "Poly" $ do
