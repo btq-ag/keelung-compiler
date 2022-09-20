@@ -289,7 +289,7 @@ toArrayM1 = toArrayM [false]
 birthday :: Comp (Val 'Bool)
 birthday = do 
   -- these inputs are private witnesses
-  hiddenYear <- inputNum
+  _hiddenYear <- inputNum
   hiddenMonth <- input
   hiddenDate <- input
   -- these inputs are public inputs
