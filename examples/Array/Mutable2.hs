@@ -2,7 +2,7 @@
 
 module Array.Mutable2 where
 
-import Control.Monad (foldM, foldM_)
+import Control.Monad 
 import Data.Bits (Bits (testBit))
 import Data.Word (Word8)
 import Keelung
@@ -18,25 +18,33 @@ fromString xs = toArrayM =<< mapM fromChar xs
 
 ------------------------------------------------------------------------------
 
+alloc :: Comp (Val ('ArrM 'Bool))
+alloc = toArrayM [false]
+
+set :: Val ('ArrM 'Bool) -> Val 'Bool -> Comp ()
+set ref = updateM ref 0
+
+get :: Val ('ArrM 'Bool) -> Comp (Val 'Bool)
+get ref = accessM ref 0
+
 fullAdder :: Val ('ArrM 'Bool) -> Val ('ArrM 'Bool) -> Comp (Val ('ArrM 'Bool))
 fullAdder as bs = do
-  temp <- toArrayM [false]
+  xor <- alloc
+  carryRef <- alloc
   -- allocate a new array of 64 bits for the result of the addition
   result <- toArrayM $ replicate (lengthOfM as) false
   -- 1-bit full adder
-  foldM_
-    ( \carry i -> do
-        a <- accessM as i
-        b <- accessM bs i
-        updateM temp 0 (a `Xor` b)
-        x <- accessM temp 0
-        let value = x `Xor` carry
-        let nextCarry = (x `And` carry) `Or` (a `And` b)
-        updateM result i value
-        return nextCarry
-    )
-    false
-    [0 .. lengthOfM as - 1]
+  forM_ [0 .. lengthOfM as - 1] $ \i -> do
+    a <- accessM as i
+    b <- accessM bs i
+    set xor (a `Xor` b)
+    x <- get xor
+    carry <- get carryRef
+    let value = x `Xor` carry
+    set carryRef $ (x `And` carry) `Or` (a `And` b)
+    updateM result i value
+    return ()
+
   return result
 
 -- | "T" for top-level
