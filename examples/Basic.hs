@@ -285,3 +285,15 @@ returnArray2 = do
 
 toArrayM1 :: Comp (Val ('ArrM 'Bool))
 toArrayM1 = toArrayM [false]
+
+birthday :: Comp (Val 'Bool)
+birthday = do 
+  -- these inputs are private witnesses
+  hiddenYear <- inputNum
+  hiddenMonth <- input
+  hiddenDate <- input
+  -- these inputs are public inputs
+  month <- input 
+  date <- input
+
+  return $ (hiddenMonth `Eq` month) `And` (hiddenDate `Eq` date)
