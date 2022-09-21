@@ -26,8 +26,10 @@ import Keelung.Field
 import Keelung.Syntax.Typed hiding (elaborate)
 import Option
 
+import Main.Utf8 (withUtf8)
+
 main :: IO ()
-main = do
+main = withUtf8 $ do
   options <- getOptions
   case options of
     Protocol ToR1CS -> do

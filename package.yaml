@@ -49,6 +49,7 @@ executables:
       - examples/
     dependencies:
     - keelung-compiler
+    - with-utf8
 
     ghc-options:
       - -Wall
