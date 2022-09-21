@@ -38,7 +38,7 @@ import qualified Data.Either as Either
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (one, zero))
-import Keelung (elaborate)
+import Keelung (elaborate, N(..))
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
@@ -162,5 +162,5 @@ optimizeElab elab = do
 
 --------------------------------------------------------------------------------
 
-asGF181 :: Either (Error GF181) a -> Either (Error GF181) a
+asGF181 :: Either (Error (N GF181)) a -> Either (Error (N GF181)) a
 asGF181 = id

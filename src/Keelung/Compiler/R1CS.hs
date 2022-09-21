@@ -95,7 +95,7 @@ fromR1CS r1cs =
     { csConstraints =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map (uncurry CNQZ) (r1csCNQZPairs r1cs)),
-      csBooleanInputVars = r1csBooleanInputVars r1cs,
+      csBooleanInputVars = r1csBoolInputVars r1cs,
       csVars = IntSet.fromDistinctAscList [0 .. r1csVarSize r1cs - 1],
       csInputVarSize = r1csInputVarSize r1cs,
       csOutputVarSize = r1csOutputVarSize r1cs
