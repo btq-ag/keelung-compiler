@@ -70,6 +70,7 @@ executable constraint
       AggregateSignature.Util
       Array
       Array.Immutable
+      Array.Immutable2
       Array.Mutable
       Array.Mutable2
       Basic
@@ -139,6 +140,7 @@ executable keelungc
       AggregateSignature.Util
       Array
       Array.Immutable
+      Array.Immutable2
       Array.Mutable
       Array.Mutable2
       Basic
@@ -174,6 +176,7 @@ test-suite keelung-test
       AggregateSignature.Util
       Array
       Array.Immutable
+      Array.Immutable2
       Array.Mutable
       Array.Mutable2
       Basic
@@ -230,6 +233,7 @@ benchmark keelung-bench
       AggregateSignature.Util
       Array
       Array.Immutable
+      Array.Immutable2
       Array.Mutable
       Array.Mutable2
       Basic
