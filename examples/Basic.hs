@@ -180,7 +180,7 @@ bench :: Comp (Val t) -> Settings -> Int -> Int -> Either (Error GF181) (Int, In
 bench program settings dimension n = do
   let inputVal = genInputFromParam (makeParam dimension n 42 settings)
   cs <- Compiler.compile program -- before optimisation (only constant propagation)
-  cs' <- Compiler.optimize2 program -- after optimisation (constant propagation + constraint set reduction)
+  cs' <- Compiler.optimize1 program -- after optimisation (constant propagation + constraint set reduction)
   cs'' <- optimizeWithInput program inputVal -- after optimisation (constant propagation + constraint set reduction with input)
   return
     ( numberOfConstraints cs,

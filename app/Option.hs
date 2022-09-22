@@ -12,36 +12,26 @@ getOptions =
           <> header "Keelung - a R1CS compiler"
       )
 
-data Options
+newtype Options
   = Protocol ProtocolOptions
-  | Profile Int Int
-  | Count Int Int
   deriving (Show)
 
 options :: Parser Options
 options =
   hsubparser
     ( command
-        "count"
-        (info count (fullDesc <> progDesc "Computes constraint count"))
-        <> command
-          "profile"
-          (info profile (fullDesc <> progDesc "Generates Flamegraphs for profiling"))
-        <> commandGroup "Internal Debugging commands:"
-        <> metavar "DEBUG"
+        "protocol"
+        (info (Protocol <$> protocol) (fullDesc <> progDesc "Interal protocol for functions like 'compile' in Keelung"))
+        <> commandGroup "Internal binary protocol:"
+        <> metavar "PROTOCOL"
     )
-    <|> hsubparser
-      ( command
-          "protocol"
-          (info (Protocol <$> protocol) (fullDesc <> progDesc "Interal protocol for functions like 'compile' in Keelung"))
-          <> commandGroup "Internal binary protocol:"
-          <> metavar "PROTOCOL"
-      )
 
 --------------------------------------------------------------------------------
 
 data ProtocolOptions
-  = ToR1CS
+  = CompileO0
+  | CompileO1
+  | CompileO2
   | Interpret
   deriving (Show)
 
@@ -49,11 +39,27 @@ protocol :: Parser ProtocolOptions
 protocol =
   hsubparser
     ( command
-          "toR1CS"
+        "O0"
+        ( info
+            (pure CompileO0 <**> helper)
+            ( fullDesc
+                <> progDesc "Compile a Keelung program to R1CS (-O0)"
+            )
+        )
+        <> command
+          "O1"
           ( info
-              (pure ToR1CS <**> helper)
+              (pure CompileO1 <**> helper)
               ( fullDesc
-                  <> progDesc "Compile a Keelung program to R1CS"
+                  <> progDesc "Compile a Keelung program to R1CS (-O1)"
+              )
+          )
+        <> command
+          "O2"
+          ( info
+              (pure CompileO2 <**> helper)
+              ( fullDesc
+                  <> progDesc "Compile a Keelung program to R1CS (-O2)"
               )
           )
         <> command
@@ -65,17 +71,3 @@ protocol =
               )
           )
     )
-
---------------------------------------------------------------------------------
-
-profile :: Parser Options
-profile =
-  Profile
-    <$> argument auto (metavar "DIM" <> help "Dimension of Falcon")
-    <*> argument auto (metavar "SIG" <> help "Number of signatures")
-
-count :: Parser Options
-count =
-  Count
-    <$> argument auto (metavar "DIM" <> help "Dimension of Falcon")
-    <*> argument auto (metavar "SIG" <> help "Number of signatures")

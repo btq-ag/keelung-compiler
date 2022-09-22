@@ -15,7 +15,7 @@ run =
     [ elaboration,
       compilation,
       constantPropagation,
-      optimization2
+      optimization1
     ]
   where
     program :: Int -> Comp (Val 'Unit)
@@ -47,10 +47,10 @@ run =
     constantPropagation =
       bgroup
         "Constant Propagation"
-        $ map (\i -> bench (show i) $ nf optimize1 $ program i) [1, 2, 4, 8]
+        $ map (\i -> bench (show i) $ nf optimize0 $ program i) [1, 2, 4, 8]
 
-    optimization2 :: Benchmark
-    optimization2 =
+    optimization1 :: Benchmark
+    optimization1 =
       bgroup
         "Optimization I"
-        $ map (\i -> bench (show i) $ nf optimize2 $ program i) [1, 2, 4, 8]
+        $ map (\i -> bench (show i) $ nf optimize1 $ program i) [1, 2, 4, 8]

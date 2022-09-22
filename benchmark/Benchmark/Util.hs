@@ -3,9 +3,9 @@
 module Benchmark.Util
   ( elaborate,
     compile,
+    optimize0,
     optimize1,
     optimize2,
-    optimize3,
   )
 where
 
@@ -32,16 +32,16 @@ compile :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSys
 compile = Compiler.compile
 
 -- | Compile + constant propagation
+optimize0 :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
+optimize0 = Compiler.optimize0
+
+-- | Compile + constant propagation + optimization I
 optimize1 :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
 optimize1 = Compiler.optimize1
 
--- | Compile + constant propagation + optimization I
+-- | Compile + constant propagation + optimization I + optimization II
 optimize2 :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
 optimize2 = Compiler.optimize2
-
--- | Compile + constant propagation + optimization I + optimization II
-optimize3 :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
-optimize3 = Compiler.optimize3
 
 -- benchElaborate :: Comp (Val t) -> ByteString
 -- benchElaborate = encode . elaborate
@@ -59,7 +59,7 @@ optimize3 = Compiler.optimize3
 -- benchCompile prog = show (compile prog :: Either (Error GF181) (ConstraintSystem GF181))
 
 -- benchPropogateConstant :: Comp (Val t) -> String
--- benchPropogateConstant prog = show (optimize1 prog :: Either (Error GF181) (ConstraintSystem GF181))
+-- benchPropogateConstant prog = show (optimize0 prog :: Either (Error GF181) (ConstraintSystem GF181))
 
 -- benchOptimize2 :: Comp (Val t) -> String
 -- benchOptimize2 prog = show (optimize2 prog :: Either (Error GF181) (ConstraintSystem GF181))

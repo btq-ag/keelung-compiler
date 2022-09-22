@@ -49,8 +49,8 @@ optimizeWithInput ins cs =
   let witness = IntMap.fromList (zip [0 .. csInputVarSize cs - 1] ins)
    in optimizeWithWitness witness cs
 
-optimize :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
-optimize = snd . optimizeWithInput mempty
+optimize1 :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
+optimize1 = snd . optimizeWithInput mempty
 
 optimize2 :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
 optimize2 cs =

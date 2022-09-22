@@ -18,15 +18,6 @@ fromString xs = toArrayM =<< mapM fromChar xs
 
 ------------------------------------------------------------------------------
 
-alloc :: Comp (Val ('ArrM 'Bool))
-alloc = toArrayM [false]
-
-set :: Val ('ArrM 'Bool) -> Val 'Bool -> Comp ()
-set ref = updateM ref 0
-
-get :: Val ('ArrM 'Bool) -> Comp (Val 'Bool)
-get ref = accessM ref 0
-
 fullAdder :: Val ('ArrM 'Bool) -> Val ('ArrM 'Bool) -> Comp (Val ('ArrM 'Bool))
 fullAdder as bs = do
   -- allocate a new array of 64 bits for the result of the addition

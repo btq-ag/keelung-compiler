@@ -18,17 +18,19 @@ module Keelung.Compiler
     erase,
     interpret,
     compile,
+    optimize0,
     optimize1,
     optimize2,
-    optimize3,
     optimizeWithInput,
     computeWitness,
     execute,
     --
-    optimizeElab,
-    interpElab,
-    -- 
-    asGF181
+    compileO0Elab,
+    compileO1Elab,
+    compileO2Elab,
+    interpretElab,
+    --
+    asGF181,
   )
 where
 
@@ -38,7 +40,7 @@ import qualified Data.Either as Either
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (one, zero))
-import Keelung (elaborate, N(..))
+import Keelung (N (..), elaborate)
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
@@ -73,22 +75,22 @@ compile :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (Cons
 compile prog = erase prog >>= return . Compile.run
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
-optimize1 :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (ConstraintSystem n)
-optimize1 prog = erase prog >>= return . Compile.run . ConstantPropagation.run
+optimize0 :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (ConstraintSystem n)
+optimize0 prog = erase prog >>= return . Compile.run . ConstantPropagation.run
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
+optimize1 ::
+  (GaloisField n, Integral n) =>
+  Comp (Val t) ->
+  Either (Error n) (ConstraintSystem n)
+optimize1 prog = optimize0 prog >>= return . Optimizer.optimize1
+
+-- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
 optimize2 ::
   (GaloisField n, Integral n) =>
   Comp (Val t) ->
   Either (Error n) (ConstraintSystem n)
-optimize2 prog = optimize1 prog >>= return . Optimizer.optimize
-
--- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
-optimize3 ::
-  (GaloisField n, Integral n) =>
-  Comp (Val t) ->
-  Either (Error n) (ConstraintSystem n)
-optimize3 prog = compile prog >>= return . Optimizer.optimize2 . Optimizer.optimize
+optimize2 prog = compile prog >>= return . Optimizer.optimize2 . Optimizer.optimize1
 
 -- with optimisation + partial evaluation with inputs
 optimizeWithInput ::
@@ -111,13 +113,13 @@ computeWitness prog ins = compile prog >>= left ExecError . witnessOfR1CS ins . 
 --   (4) Check whether the R1CS result matches the interpreter result.
 execute :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
 execute prog ins = do
-  r1cs <- toR1CS <$> optimize2 prog
+  r1cs <- toR1CS <$> optimize1 prog
 
   actualWitness <- left ExecError $ witnessOfR1CS ins r1cs
 
   -- extract the output value from the witness
 
-  let outputVars = [ r1csInputVarSize r1cs .. r1csInputVarSize r1cs + r1csOutputVarSize r1cs - 1]
+  let outputVars = [r1csInputVarSize r1cs .. r1csInputVarSize r1cs + r1csOutputVarSize r1cs - 1]
   let (execErrors, actualOutputs) =
         Either.partitionEithers $
           map
@@ -152,13 +154,23 @@ execute prog ins = do
 eraseElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (TypeErased n)
 eraseElab elab = left ElabError (Rewriting.run elab) >>= return . eraseType
 
-interpElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
-interpElab elab ins = left (show . InterpretError) (Interpret.run elab ins)
+interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
+interpretElab elab ins = left (show . InterpretError) (Interpret.run elab ins)
 
-optimizeElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
-optimizeElab elab = do
+compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO0Elab elab = do
   rewritten <- left ElabError (Rewriting.run elab)
-  return $ Optimizer.optimize $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
+  return $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
+
+compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO1Elab elab = do
+  rewritten <- left ElabError (Rewriting.run elab)
+  return $ Optimizer.optimize1 $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
+
+compileO2Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO2Elab elab = do
+  rewritten <- left ElabError (Rewriting.run elab)
+  return $ Optimizer.optimize2 $ Optimizer.optimize1 $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
 
 --------------------------------------------------------------------------------
 

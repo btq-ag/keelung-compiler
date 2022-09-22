@@ -194,7 +194,7 @@ main = hspec $ do
                   csInputVarSize = 12,
                   csOutputVarSize = 0
                 }
-         in Optimse.optimize (cs :: ConstraintSystem GF181) `shouldNotBe` cs
+         in Optimse.optimize1 (cs :: ConstraintSystem GF181) `shouldNotBe` cs
 
     describe "Constraint merging" $ do
       it "CAdd & CAdd" $
@@ -293,17 +293,17 @@ main = hspec $ do
 
   describe "Compile" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
-      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.optimize2 Basic.outOfBound)
+      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.optimize1 Basic.outOfBound)
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.outOfBound
       actual `shouldBe` expected
 
     it "Program that throws ElabError.EmptyArrayError" $ do
-      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.optimize2 Basic.emptyArray)
+      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.optimize1 Basic.emptyArray)
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.emptyArray
       actual `shouldBe` expected
 
     it "Program that compiles successfully" $ do
-      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.optimize2 Basic.identity)
+      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.optimize1 Basic.identity)
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.identity
       actual `shouldBe` expected
 
