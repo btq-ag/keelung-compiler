@@ -9,7 +9,7 @@ module Benchmark.Util
   )
 where
 
-import Keelung (Comp, GF181, Val)
+import Keelung (Comp, GF181)
 import qualified Keelung as Language
 import qualified Keelung.Compiler as Compiler
 import qualified Keelung.Error as Language
@@ -24,48 +24,48 @@ import Keelung.Syntax.Typed (Elaborated)
 -- import Keelung.Syntax (Val)
 
 -- | Elaborate
-elaborate :: Comp (Val t) -> Either Language.ElabError Elaborated
+elaborate :: (Language.Elaborable t, Language.Simplify t) => Comp t -> Either Language.ElabError Elaborated
 elaborate = Language.elaborate
 
 -- | Compile only (without constant propagation or any other optimizations)
-compile :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
+compile :: (Language.Elaborable t, Language.Simplify t) => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
 compile = Compiler.compile
 
 -- | Compile + constant propagation
-optimize0 :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
+optimize0 :: (Language.Elaborable t, Language.Simplify t) => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
 optimize0 = Compiler.optimize0
 
 -- | Compile + constant propagation + optimization I
-optimize1 :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
+optimize1 :: (Language.Elaborable t, Language.Simplify t) => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
 optimize1 = Compiler.optimize1
 
 -- | Compile + constant propagation + optimization I + optimization II
-optimize2 :: Comp (Val t) -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
+optimize2 :: (Language.Elaborable t, Language.Simplify t) => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
 optimize2 = Compiler.optimize2
 
--- benchElaborate :: Comp (Val t) -> ByteString
+-- benchElaborate :: Comp t -> ByteString
 -- benchElaborate = encode . elaborate
 
--- benchRewrite :: Comp (Val t) -> ByteString
+-- benchRewrite :: Comp t -> ByteString
 -- benchRewrite = encode . elaborateAndRewrite
 
--- benchInterpret :: (GaloisField n, Integral n, Serialize n) => Comp (Val t) -> [n] -> ByteString
+-- benchInterpret :: (GaloisField n, Integral n, Serialize n) => Comp t -> [n] -> ByteString
 -- benchInterpret prog = encode . interpret prog
 
--- benchEraseType :: Comp (Val t) -> String
+-- benchEraseType :: Comp t -> String
 -- benchEraseType prog = show (erase prog :: Either (Error GF181) (TypeErased GF181))
 
--- benchCompile :: Comp (Val t) -> String
+-- benchCompile :: Comp t -> String
 -- benchCompile prog = show (compile prog :: Either (Error GF181) (ConstraintSystem GF181))
 
--- benchPropogateConstant :: Comp (Val t) -> String
+-- benchPropogateConstant :: Comp t -> String
 -- benchPropogateConstant prog = show (optimize0 prog :: Either (Error GF181) (ConstraintSystem GF181))
 
--- benchOptimize2 :: Comp (Val t) -> String
+-- benchOptimize2 :: Comp t -> String
 -- benchOptimize2 prog = show (optimize2 prog :: Either (Error GF181) (ConstraintSystem GF181))
 
--- benchOptimize3 :: Comp (Val t) -> String
+-- benchOptimize3 :: Comp t -> String
 -- benchOptimize3 prog = show (optimize3 prog :: Either (Error GF181) (ConstraintSystem GF181))
 
--- benchOptimizeWithInput :: (GaloisField n, Bounded n, Integral n) => Comp (Val t) -> [n] -> String
+-- benchOptimizeWithInput :: (GaloisField n, Bounded n, Integral n) => Comp t -> [n] -> String
 -- benchOptimizeWithInput prog = show . optimizeWithInput prog

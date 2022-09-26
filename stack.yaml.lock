@@ -25,17 +25,6 @@ packages:
       sha256: f16b5dec82649b23d3530f1bbc8e4c9e7618d70706052fe8c8ac9c8d19970126
   original:
     hackage: protolude-0.2.4@sha256:ec6c01be631050f8c1b9153a782d329a52609d058cb4b461104222862f7792af,2292
-- completed:
-    name: keelung
-    version: 0.1.0.0
-    git: git@github.com:btq-ag/keelung.git
-    pantry-tree:
-      size: 1526
-      sha256: 3181e16f2a236ed9dae5a108e2d1c73426b4747ec1a78483e93cd1deec9481c2
-    commit: 9227d8bb6491f80a1a10695b97156cabe5e7e14a
-  original:
-    git: git@github.com:btq-ag/keelung.git
-    commit: 9227d8bb6491f80a1a10695b97156cabe5e7e14a
 snapshots:
 - completed:
     size: 590100

@@ -5,10 +5,10 @@ module Array where
 import Control.Monad
 import Keelung
 
-echo :: Comp (Val ('Arr 'Num))
+echo :: Comp (Arr Number)
 echo = inputs 4
 
-modify :: Comp (Val ('Arr 'Num))
+modify :: Comp (Arr Number)
 modify = do
   xs <- inputs 4 >>= thaw
 
@@ -17,32 +17,32 @@ modify = do
 
   freeze xs
 
-init :: Comp (Val ('Arr 'Bool))
+init :: Comp (Arr Boolean)
 init = do
   let xs = toArray $ replicate 4 false
   return xs
 
-initM :: Comp (Val ('ArrM 'Bool))
+initM :: Comp (ArrM Boolean)
 initM = toArrayM $ replicate 4 false
 
-initM2 :: Comp (Val ('Arr 'Bool))
+initM2 :: Comp (Arr Boolean)
 initM2 = do
   xs <- toArrayM $ replicate 4 false
   freeze xs
 
-sharing :: Comp (Val ('Arr 'Num))
+sharing :: Comp (Arr Number)
 sharing = do
   x <- input
   let y = x * x * x * x
   return $ toArray [y, y]
 
-sharing' :: Comp (Val ('Arr 'Num))
+sharing' :: Comp (Arr Number)
 sharing' = do
   x <- input
   y <- reuse $ x * x * x * x
   return $ toArray [y, y]
 
-fold :: Comp (Val ('Arr 'Num))
+fold :: Comp (Arr Number)
 fold = do
   x <- input
   (xs, _) <-
@@ -54,7 +54,7 @@ fold = do
       ([0 .. 10] :: [Int])
   return $ toArray xs
 
-fold' :: Comp (Val ('Arr 'Num))
+fold' :: Comp (Arr Number)
 fold' = do
   x <- input
   (xs, _) <-

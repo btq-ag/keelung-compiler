@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Interpret.Kinded (run, runAndCheck) where
+module Keelung.Compiler.Interpret.Kinded (run, runAndCheck, FreeVar, Interpret) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -21,19 +21,19 @@ import Data.IntMap (IntMap)
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs.
-run' :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) ([n], Witness n)
+run' :: (FreeVar t, Interpret t n, GaloisField n) => Elaborated t -> [n] -> Either (InterpretError n) ([n], Witness n)
 run' elab inputs = runM elab inputs $ do
-  let comp = elabComp elab
+  let (Elaborated expr comp) = elab
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
   let numAssignments = reverse (compNumAsgns comp)
-  forM_ numAssignments $ \(Assignment var e) -> do
+  forM_ numAssignments $ \(NumAssignment var e) -> do
     values <- interpret e
     addBinding var values
 
   let boolAssignments = reverse (compBoolAsgns comp)
-  forM_ boolAssignments $ \(Assignment var e) -> do
+  forM_ boolAssignments $ \(BoolAssignment var e) -> do
     values <- interpret e
     addBinding var values
 
@@ -48,25 +48,26 @@ run' elab inputs = runM elab inputs $ do
       throwError $ InterpretAssertionError e (IntMap.fromList bindings')
 
   -- lastly interpret the expression and return the result
-  interpret (elabVal elab)
+  interpret expr
 
 -- | Interpret a program with inputs.
-run :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
+run :: (FreeVar t, Interpret t n, GaloisField n) => Elaborated t -> [n] -> Either (InterpretError n) [n]
 run elab inputs = fst <$> run' elab inputs
 
 -- | Interpret a program with inputs and run some additional checks.
-runAndCheck :: GaloisField n => Elaborated t -> [n] -> Either (InterpretError n) [n]
+runAndCheck :: (FreeVar t, Interpret t n, GaloisField n) => Elaborated t -> [n] -> Either (InterpretError n) [n]
 runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
 
   -- See if input size is valid
-  let expectedInputSize = compNextInputVar (elabComp elab)
+  let (Elaborated _ comp) = elab
+  let expectedInputSize = compNextInputVar comp
   let actualInputSize = length inputs
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
   -- See if free variables of the program and the witness are the same
-  variables <- fst <$> runM elab inputs (freeVarsOfElab elab)
+  variables <- fst <$> runM elab inputs (freeVars elab)
   let varsInWitness = IntMap.keysSet witness
   when (variables /= varsInWitness) $ do
     let missingInWitness = variables IntSet.\\ varsInWitness
@@ -77,57 +78,72 @@ runAndCheck elab inputs = do
 
 --------------------------------------------------------------------------------
 
--- | Free variables in an expression (excluding input variables).
-freeVars :: Val t -> M n IntSet
-freeVars expr = case expr of
-  Integer _ -> return mempty
-  Rational _ -> return mempty
-  Boolean _ -> return mempty
-  UnitVal -> return mempty
-  ArrayVal xs -> IntSet.unions <$> mapM freeVars xs
-  Ref (NumVar n) -> return $ IntSet.singleton n
-  Ref (NumInputVar _) -> return mempty
-  Ref (BoolVar n) -> return $ IntSet.singleton n
-  Ref (BoolInputVar _) -> return mempty
-  Ref (ArrayRef _ _ addr) -> freeVarsOfArray addr
-  Add x y -> (<>) <$> freeVars x <*> freeVars y
-  Sub x y -> (<>) <$> freeVars x <*> freeVars y
-  Mul x y -> (<>) <$> freeVars x <*> freeVars y
-  Div x y -> (<>) <$> freeVars x <*> freeVars y
-  Eq x y -> (<>) <$> freeVars x <*> freeVars y
-  And x y -> (<>) <$> freeVars x <*> freeVars y
-  Or x y -> (<>) <$> freeVars x <*> freeVars y
-  Xor x y -> (<>) <$> freeVars x <*> freeVars y
-  BEq x y -> (<>) <$> freeVars x <*> freeVars y
-  IfNum x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
-  IfBool x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
-  ToBool x -> freeVars x
-  ToNum x -> freeVars x
-  where
-    freeVarsOfArray :: Addr -> M n IntSet
-    freeVarsOfArray addr = do
-      heap <- asks snd
-      case IntMap.lookup addr heap of
-        Nothing -> throwError $ InterpretUnboundAddrError addr heap
-        Just (elemType, array) -> case elemType of
-          NumElem -> return $ IntSet.fromList (IntMap.elems array)
-          BoolElem -> return $ IntSet.fromList (IntMap.elems array)
-          (ArrElem _ _) -> IntSet.unions <$> mapM freeVarsOfArray (IntMap.elems array)
+-- | For collecting free variables (excluding input variables).
+class FreeVar a where
+  freeVars :: a -> M n IntSet
+
+instance FreeVar Number where
+  freeVars expr = case expr of
+    Integer _ -> return mempty
+    Rational _ -> return mempty
+    NumberRef var -> return $ IntSet.singleton var
+    NumberInputRef var -> return $ IntSet.singleton var
+    Add x y -> (<>) <$> freeVars x <*> freeVars y
+    Sub x y -> (<>) <$> freeVars x <*> freeVars y
+    Mul x y -> (<>) <$> freeVars x <*> freeVars y
+    Div x y -> (<>) <$> freeVars x <*> freeVars y
+    IfNum x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
+    ToNum x -> freeVars x
+
+instance FreeVar Boolean where
+  freeVars expr = case expr of
+    Boolean _ -> return mempty
+    BooleanRef var -> return $ IntSet.singleton var
+    BooleanInputRef var -> return $ IntSet.singleton var
+    Eq x y -> (<>) <$> freeVars x <*> freeVars y
+    And x y -> (<>) <$> freeVars x <*> freeVars y
+    Or x y -> (<>) <$> freeVars x <*> freeVars y
+    Xor x y -> (<>) <$> freeVars x <*> freeVars y
+    BEq x y -> (<>) <$> freeVars x <*> freeVars y
+    IfBool x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
+    ToBool x -> freeVars x
+
+instance FreeVar Unit where
+  freeVars expr = case expr of
+    Unit -> return mempty
+
+instance FreeVar t => FreeVar (Arr t) where
+  freeVars expr = case expr of
+    Arr xs -> IntSet.unions <$> mapM freeVars xs
+
+instance FreeVar t => FreeVar (ArrM t) where
+  freeVars expr = case expr of
+    ArrayRef _ _ addr -> freeVarsOfArray addr
+    where
+      freeVarsOfArray :: Addr -> M n IntSet
+      freeVarsOfArray addr = do
+        heap <- asks snd
+        case IntMap.lookup addr heap of
+          Nothing -> throwError $ InterpretUnboundAddrError addr heap
+          Just (elemType, array) -> case elemType of
+            NumElem -> return $ IntSet.fromList (IntMap.elems array)
+            BoolElem -> return $ IntSet.fromList (IntMap.elems array)
+            (ArrElem _ _) -> IntSet.unions <$> mapM freeVarsOfArray (IntMap.elems array)
 
 -- | Collect free variables of an elaborated program (excluding input variables).
-freeVarsOfElab :: Elaborated t -> M n IntSet
-freeVarsOfElab (Elaborated value comp) = do
-  inOutputValue <- freeVars value
-  inNumBindings <- forM (compNumAsgns comp) $ \(Assignment (NumVar var) val) -> do
-    -- collect both the var and its value
-    IntSet.insert var <$> freeVars val
-  inBoolBindings <- forM (compBoolAsgns comp) $ \(Assignment (BoolVar var) val) -> do
-    -- collect both the var and its value
-    IntSet.insert var <$> freeVars val
-  return $
-    inOutputValue
-      <> IntSet.unions inNumBindings
-      <> IntSet.unions inBoolBindings
+instance FreeVar t => FreeVar (Elaborated t) where
+  freeVars (Elaborated value comp) = do
+    inOutputValue <- freeVars value
+    inNumBindings <- forM (compNumAsgns comp) $ \(NumAssignment var val) -> do
+      -- collect both the var and its value
+      IntSet.insert var <$> freeVars val
+    inBoolBindings <- forM (compBoolAsgns comp) $ \(BoolAssignment var val) -> do
+      -- collect both the var and its value
+      IntSet.insert var <$> freeVars val
+    return $
+      inOutputValue
+        <> IntSet.unions inNumBindings
+        <> IntSet.unions inBoolBindings
 
 --------------------------------------------------------------------------------
 
@@ -145,25 +161,35 @@ instance GaloisField n => Interpret Bool n where
   interpret True = return [one]
   interpret False = return [zero]
 
-instance GaloisField n => Interpret (Ref t) n where
-  interpret (BoolVar var) = pure <$> lookupVar var
-  interpret (BoolInputVar var) = pure <$> lookupInputVar var
-  interpret (NumVar var) = pure <$> lookupVar var
-  interpret (NumInputVar var) = pure <$> lookupInputVar var
-  interpret (ArrayRef _ _ addr) = lookupAddr addr
+-- instance GaloisField n => Interpret (Ref t) n where
+--   interpret (BoolVar var) = pure <$> lookupVar var
+--   interpret (BoolInputVar var) = pure <$> lookupInputVar var
+--   interpret (NumVar var) = pure <$> lookupVar var
+--   interpret (NumInputVar var) = pure <$> lookupInputVar var
+--   interpret (ArrayRef _ _ addr) = lookupAddr addr
 
-instance GaloisField n => Interpret (Val t) n where
+instance GaloisField n => Interpret Number n where
   interpret val = case val of
     Integer n -> interpret n
     Rational n -> interpret n
-    Boolean b -> interpret b
-    UnitVal -> return []
-    ArrayVal xs -> concat <$> mapM interpret xs
-    Ref ref -> interpret ref
+    NumberRef var -> pure <$> lookupVar var
+    NumberInputRef var -> pure <$> lookupInputVar var
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
     Mul x y -> zipWith (*) <$> interpret x <*> interpret y
     Div x y -> zipWith (/) <$> interpret x <*> interpret y
+    IfNum p x y -> do
+      p' <- interpret p
+      case p' of
+        [0] -> interpret y
+        _ -> interpret x
+    ToNum x -> interpret x
+
+instance GaloisField n => Interpret Boolean n where
+  interpret val = case val of
+    Boolean b -> interpret b
+    BooleanRef var -> pure <$> lookupVar var
+    BooleanInputRef var -> pure <$> lookupInputVar var
     Eq x y -> do
       x' <- interpret x
       y' <- interpret y
@@ -175,18 +201,24 @@ instance GaloisField n => Interpret (Val t) n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
-    IfNum p x y -> do
-      p' <- interpret p
-      case p' of
-        [0] -> interpret y
-        _ -> interpret x
     IfBool p x y -> do
       p' <- interpret p
       case p' of
         [0] -> interpret y
         _ -> interpret x
     ToBool x -> interpret x
-    ToNum x -> interpret x
+
+instance GaloisField n => Interpret Unit n where
+  interpret val = case val of
+    Unit -> return []
+
+instance (Interpret t n, GaloisField n) => Interpret (Arr t) n where
+  interpret val = case val of
+    Arr xs -> concat <$> mapM interpret xs
+
+instance (Interpret t n, GaloisField n) => Interpret (ArrM t) n where
+  interpret val = case val of
+    ArrayRef _ _ addr -> lookupAddr addr
 
 --------------------------------------------------------------------------------
 
@@ -195,8 +227,8 @@ type M n = ReaderT (IntMap n, Heap) (StateT (Witness n) (Except (InterpretError 
 
 runM :: Elaborated t -> [n] -> M n a -> Either (InterpretError n) (a, Witness n)
 runM elab inputs p = runExcept (runStateT (runReaderT p (inputBindings, heap)) mempty)
-  where 
-    comp = elabComp elab
+  where
+    (Elaborated _ comp) = elab
     heap = compHeap comp
     inputBindings = IntMap.fromDistinctAscList $ zip [0 ..] inputs
 
@@ -224,26 +256,26 @@ lookupAddr addr = do
       BoolElem -> mapM lookupVar (IntMap.elems array)
       (ArrElem _ _) -> concat <$> mapM lookupAddr (IntMap.elems array)
 
-addBinding :: Ref t -> [n] -> M n ()
-addBinding _ [] = error "addBinding: empty list"
-addBinding (BoolVar var) [val] = modify (IntMap.insert var val)
-addBinding (NumVar var) [val] = modify (IntMap.insert var val)
-addBinding (ArrayRef _ _ addr) vals = do
-  vars <- collectVarsFromAddr addr
-  mapM_
-    (modify . uncurry IntMap.insert)
-    (zip vars vals)
-  where
-    collectVarsFromAddr :: Addr -> M n [Var]
-    collectVarsFromAddr address = do
-      heap <- asks snd 
-      case IntMap.lookup address heap of
-        Nothing -> throwError $ InterpretUnboundAddrError addr heap
-        Just (elemType, array) -> case elemType of
-          NumElem -> return $ IntMap.elems array
-          BoolElem -> return $ IntMap.elems array
-          (ArrElem _ _) -> concat <$> mapM collectVarsFromAddr (IntMap.elems array)
-addBinding _ _ = error "addBinding: too many values"
+addBinding :: Var -> [n] -> M n ()
+addBinding var [val] = modify (IntMap.insert var val)
+addBinding _ _ = error "addBinding: expected a single value"
+-- addBinding (NumVar var) [val] = modify (IntMap.insert var val)
+-- addBinding (ArrayRef _ _ addr) vals = do
+--   vars <- collectVarsFromAddr addr
+--   mapM_
+--     (modify . uncurry IntMap.insert)
+--     (zip vars vals)
+--   where
+--     collectVarsFromAddr :: Addr -> M n [Var]
+--     collectVarsFromAddr address = do
+--       heap <- asks snd 
+--       case IntMap.lookup address heap of
+--         Nothing -> throwError $ InterpretUnboundAddrError addr heap
+--         Just (elemType, array) -> case elemType of
+--           NumElem -> return $ IntMap.elems array
+--           BoolElem -> return $ IntMap.elems array
+--           (ArrElem _ _) -> concat <$> mapM collectVarsFromAddr (IntMap.elems array)
+-- addBinding _ _ = error "addBinding: too many values"
 
 --------------------------------------------------------------------------------
 
@@ -251,7 +283,7 @@ data InterpretError n
   = InterpretUnboundVarError Var (Witness n)
   | InterpretUnboundInputVarError Var (IntMap n)
   | InterpretUnboundAddrError Addr Heap
-  | InterpretAssertionError (Val 'Bool) (Witness n)
+  | InterpretAssertionError Boolean (Witness n)
   | InterpretVarUnassignedError IntSet (Witness n)
   | InterpretInputSizeError Int Int
   deriving (Eq)

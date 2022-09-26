@@ -9,19 +9,19 @@ module Test.Interpreter (tests) where
 import qualified Basic
 import Control.Arrow (left)
 import Data.Field.Galois (GaloisField)
-import Keelung (Comp, GF181, Val (..), elaborate, elaborateOnly)
+import Keelung (Comp, GF181, elaborate, Elaborable(..), Simplify)
 import Keelung.Compiler (Error (..))
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import qualified Keelung.Compiler.Interpret.Typed as Typed
 import Test.Hspec
 import Test.QuickCheck
 
-kinded :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either String [n]
+kinded :: (GaloisField n, Integral n, Elaborable t, Simplify t, Kinded.FreeVar t, Kinded.Interpret t n) => Comp t -> [n] -> Either String [n]
 kinded prog ins = do
-  elab <- left show (elaborateOnly prog)
+  elab <- left show (elaborate' prog)
   left show (Kinded.runAndCheck elab ins)
 
-typed :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
+typed :: (GaloisField n, Integral n, Elaborable t, Simplify t) => Comp t -> [n] -> Either (Error n) [n]
 typed prog ins = do
   elab <- left ElabError (elaborate prog)
   left InterpretError (Typed.runAndCheck elab ins)
@@ -162,7 +162,7 @@ tests = do
 -- --     compNumAsgns :: [Assignment 'Num n],
 -- --     compBoolAsgns :: [Assignment 'Bool n],
 -- --     -- Assertions are expressions that are expected to be true
--- --     compAssertions :: [Val 'Bool]
+-- --     compAssertions :: [Boolean]
 -- --   }
 -- --   deriving (Eq)
 

@@ -40,7 +40,7 @@ import qualified Data.Either as Either
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (one, zero))
-import Keelung (N (..), elaborate)
+import Keelung (N (..), elaborate, Elaborable, Simplify)
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
@@ -54,48 +54,47 @@ import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
-import Keelung.Syntax (Val)
 import Keelung.Syntax.Typed (Elaborated)
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
 
 -- elaboration => interpretation
-interpret :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
+interpret :: (GaloisField n, Integral n, Elaborable t, Simplify t) => Comp t -> [n] -> Either (Error n) [n]
 interpret prog ins = do
   elab <- left ElabError (elaborate prog)
   left InterpretError (Interpret.run elab ins)
 
 -- elaboration => rewriting => type erasure
-erase :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (TypeErased n)
+erase :: (GaloisField n, Integral n, Elaborable t, Simplify t) => Comp t -> Either (Error n) (TypeErased n)
 erase prog = left ElabError (elaborate prog) >>= eraseElab
 
 -- elaboration => rewriting => type erasure => compilation
-compile :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (ConstraintSystem n)
+compile :: (GaloisField n, Integral n, Elaborable t, Simplify t) => Comp t -> Either (Error n) (ConstraintSystem n)
 compile prog = erase prog >>= return . Compile.run
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation
-optimize0 :: (GaloisField n, Integral n) => Comp (Val t) -> Either (Error n) (ConstraintSystem n)
+optimize0 :: (GaloisField n, Integral n, Elaborable t, Simplify t) => Comp t -> Either (Error n) (ConstraintSystem n)
 optimize0 prog = erase prog >>= return . Compile.run . ConstantPropagation.run
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
 optimize1 ::
-  (GaloisField n, Integral n) =>
-  Comp (Val t) ->
+  (GaloisField n, Integral n, Elaborable t, Simplify t) =>
+  Comp t ->
   Either (Error n) (ConstraintSystem n)
 optimize1 prog = optimize0 prog >>= return . Optimizer.optimize1
 
 -- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
 optimize2 ::
-  (GaloisField n, Integral n) =>
-  Comp (Val t) ->
+  (GaloisField n, Integral n, Elaborable t, Simplify t) =>
+  Comp t ->
   Either (Error n) (ConstraintSystem n)
 optimize2 prog = compile prog >>= return . Optimizer.optimize2 . Optimizer.optimize1
 
 -- with optimisation + partial evaluation with inputs
 optimizeWithInput ::
-  (GaloisField n, Integral n) =>
-  Comp (Val t) ->
+  (GaloisField n, Integral n, Elaborable t, Simplify t) =>
+  Comp t ->
   [n] ->
   Either (Error n) (ConstraintSystem n)
 optimizeWithInput program ins = do
@@ -104,14 +103,14 @@ optimizeWithInput program ins = do
   return cs'
 
 -- computes witnesses
-computeWitness :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) (Witness n)
+computeWitness :: (GaloisField n, Integral n, Elaborable t, Simplify t) => Comp t -> [n] -> Either (Error n) (Witness n)
 computeWitness prog ins = compile prog >>= left ExecError . witnessOfR1CS ins . toR1CS
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
 --   (3) Check whether 'w' satisfies the constraint system produced in (1).
 --   (4) Check whether the R1CS result matches the interpreter result.
-execute :: (GaloisField n, Integral n) => Comp (Val t) -> [n] -> Either (Error n) [n]
+execute :: (GaloisField n, Integral n, Elaborable t, Simplify t) => Comp t -> [n] -> Either (Error n) [n]
 execute prog ins = do
   r1cs <- toR1CS <$> optimize1 prog
 

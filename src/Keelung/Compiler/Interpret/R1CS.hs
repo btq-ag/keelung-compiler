@@ -34,7 +34,7 @@ run r1cs inputs = do
 -- data InterpretError n
 --   = InterpretUnboundVarError Var (IntMap n)
 --   | InterpretUnboundAddrError Addr Heap
---   | InterpretAssertionError (Val 'Bool) (IntMap n)
+--   | InterpretAssertionError (Boolean) (IntMap n)
 --   deriving (Eq)
 
 -- instance (GaloisField n, Integral n) => Show (InterpretError n) where

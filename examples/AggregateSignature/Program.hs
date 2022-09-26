@@ -35,7 +35,7 @@ import Keelung
 --        │                                                     │
 --        └──────────────────────────  ...  ────────────────────┘
 
-checkAgg :: (Integral n, GaloisField n) => Param n -> Comp (Val 'Unit)
+checkAgg :: (Integral n, GaloisField n) => Param n -> Comp Unit
 checkAgg (Param dimension numOfSigs setup _) = do
   -- allocation of inputs:
   --    nT: coefficients of terms of signatures as input
@@ -76,7 +76,7 @@ checkAgg (Param dimension numOfSigs setup _) = do
 
   return unit
 
-checkSize :: (GaloisField n, Integral n) => Param n -> Comp (Val 'Unit)
+checkSize :: (GaloisField n, Integral n) => Param n -> Comp Unit
 checkSize (Param dimension numOfSigs setup _) = do
   let signatures = setupSignatures setup
 
@@ -105,7 +105,7 @@ checkSize (Param dimension numOfSigs setup _) = do
 
   return unit
 
-checkLength :: (Integral n, GaloisField n) => Param n -> Comp (Val 'Unit)
+checkLength :: (Integral n, GaloisField n) => Param n -> Comp Unit
 checkLength (Param dimension numOfSigs _ _) = do
   sigs <- inputs2 numOfSigs dimension
 
@@ -139,7 +139,7 @@ checkLength (Param dimension numOfSigs _ _) = do
 
   return unit
 
-aggregateSignature :: (Integral n, GaloisField n) => Param n -> Comp (Val 'Unit)
+aggregateSignature :: (Integral n, GaloisField n) => Param n -> Comp Unit
 aggregateSignature param = do
   let settings = paramSettings param
   -- check aggregate signature

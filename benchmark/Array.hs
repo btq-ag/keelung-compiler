@@ -5,7 +5,7 @@ module Array (fromString, fullAdder, multiplier) where
 import qualified Array.Immutable as I
 import Criterion
 import Benchmark.Util
-import Keelung (Comp, Kind (..), Val)
+import Keelung (Comp, Arr, Boolean)
 
 fromString :: Benchmark
 fromString =
@@ -17,7 +17,7 @@ fromString =
       optimization1
     ]
   where
-    program :: Int -> Comp (Val ('Arr ('Arr 'Bool)))
+    program :: Int -> Comp (Arr (Arr Boolean))
     program n = return $ I.fromString (concat $ replicate (n * 100) "Hello world")
 
     elaboration :: Benchmark
@@ -54,7 +54,7 @@ fullAdder =
       optimization1
     ]
   where
-    program :: Int -> Comp (Val ('Arr 'Bool))
+    program :: Int -> Comp (Arr Boolean)
     program n = I.fullAdderT (n * 10)
 
     elaboration :: Benchmark
@@ -91,7 +91,7 @@ multiplier =
       optimization1
     ]
   where
-    program :: Int -> Comp (Val ('Arr 'Bool))
+    program :: Int -> Comp (Arr Boolean)
     program n = I.multiplierT n 4
 
     elaboration :: Benchmark
