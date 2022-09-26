@@ -87,7 +87,7 @@ instance FreeVar Number where
     Integer _ -> return mempty
     Rational _ -> return mempty
     NumberRef var -> return $ IntSet.singleton var
-    NumberInputRef var -> return $ IntSet.singleton var
+    NumberInputRef _ -> return mempty
     Add x y -> (<>) <$> freeVars x <*> freeVars y
     Sub x y -> (<>) <$> freeVars x <*> freeVars y
     Mul x y -> (<>) <$> freeVars x <*> freeVars y
@@ -99,7 +99,7 @@ instance FreeVar Boolean where
   freeVars expr = case expr of
     Boolean _ -> return mempty
     BooleanRef var -> return $ IntSet.singleton var
-    BooleanInputRef var -> return $ IntSet.singleton var
+    BooleanInputRef _ -> return mempty
     Eq x y -> (<>) <$> freeVars x <*> freeVars y
     And x y -> (<>) <$> freeVars x <*> freeVars y
     Or x y -> (<>) <$> freeVars x <*> freeVars y
