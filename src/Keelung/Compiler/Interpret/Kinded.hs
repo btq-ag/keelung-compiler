@@ -9,6 +9,7 @@ module Keelung.Compiler.Interpret.Kinded (run, runAndCheck, FreeVar, Interpret) 
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
@@ -16,7 +17,6 @@ import Data.Semiring (Semiring (..))
 import Keelung hiding (inputs, interpret)
 import Keelung.Compiler.Util
 import Keelung.Types
-import Data.IntMap (IntMap)
 
 --------------------------------------------------------------------------------
 
@@ -86,8 +86,8 @@ instance FreeVar Number where
   freeVars expr = case expr of
     Integer _ -> return mempty
     Rational _ -> return mempty
-    NumberRef var -> return $ IntSet.singleton var
-    NumberInputRef _ -> return mempty
+    NumVar var -> return $ IntSet.singleton var
+    NumInputVar _ -> return mempty
     Add x y -> (<>) <$> freeVars x <*> freeVars y
     Sub x y -> (<>) <$> freeVars x <*> freeVars y
     Mul x y -> (<>) <$> freeVars x <*> freeVars y
@@ -98,8 +98,8 @@ instance FreeVar Number where
 instance FreeVar Boolean where
   freeVars expr = case expr of
     Boolean _ -> return mempty
-    BooleanRef var -> return $ IntSet.singleton var
-    BooleanInputRef _ -> return mempty
+    BoolVar var -> return $ IntSet.singleton var
+    BoolInputVar _ -> return mempty
     Eq x y -> (<>) <$> freeVars x <*> freeVars y
     And x y -> (<>) <$> freeVars x <*> freeVars y
     Or x y -> (<>) <$> freeVars x <*> freeVars y
@@ -161,19 +161,12 @@ instance GaloisField n => Interpret Bool n where
   interpret True = return [one]
   interpret False = return [zero]
 
--- instance GaloisField n => Interpret (Ref t) n where
---   interpret (BoolVar var) = pure <$> lookupVar var
---   interpret (BoolInputVar var) = pure <$> lookupInputVar var
---   interpret (NumVar var) = pure <$> lookupVar var
---   interpret (NumInputVar var) = pure <$> lookupInputVar var
---   interpret (ArrayRef _ _ addr) = lookupAddr addr
-
 instance GaloisField n => Interpret Number n where
   interpret val = case val of
     Integer n -> interpret n
     Rational n -> interpret n
-    NumberRef var -> pure <$> lookupVar var
-    NumberInputRef var -> pure <$> lookupInputVar var
+    NumVar var -> pure <$> lookupVar var
+    NumInputVar var -> pure <$> lookupInputVar var
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
     Mul x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -188,8 +181,8 @@ instance GaloisField n => Interpret Number n where
 instance GaloisField n => Interpret Boolean n where
   interpret val = case val of
     Boolean b -> interpret b
-    BooleanRef var -> pure <$> lookupVar var
-    BooleanInputRef var -> pure <$> lookupInputVar var
+    BoolVar var -> pure <$> lookupVar var
+    BoolInputVar var -> pure <$> lookupInputVar var
     Eq x y -> do
       x' <- interpret x
       y' <- interpret y
@@ -259,6 +252,7 @@ lookupAddr addr = do
 addBinding :: Var -> [n] -> M n ()
 addBinding var [val] = modify (IntMap.insert var val)
 addBinding _ _ = error "addBinding: expected a single value"
+
 -- addBinding (NumVar var) [val] = modify (IntMap.insert var val)
 -- addBinding (ArrayRef _ _ addr) vals = do
 --   vars <- collectVarsFromAddr addr
@@ -268,7 +262,7 @@ addBinding _ _ = error "addBinding: expected a single value"
 --   where
 --     collectVarsFromAddr :: Addr -> M n [Var]
 --     collectVarsFromAddr address = do
---       heap <- asks snd 
+--       heap <- asks snd
 --       case IntMap.lookup address heap of
 --         Nothing -> throwError $ InterpretUnboundAddrError addr heap
 --         Just (elemType, array) -> case elemType of

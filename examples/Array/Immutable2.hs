@@ -19,7 +19,7 @@ fromString = toArray . map fromChar
 ------------------------------------------------------------------------------
 
 fullAdder :: Arr Boolean -> Arr Boolean -> Comp (Arr Boolean)
-fullAdder as bs = do 
+fullAdder as bs = do
   let zipped = zip (fromArray as) (fromArray bs)
   (result, _) <- foldM f ([], false) zipped
   return (toArray result)
@@ -42,10 +42,10 @@ fullAdderT width = do
 --------------------------------------------------------------------------------
 
 multiplier :: Arr Boolean -> Int -> Comp (Arr Boolean)
-multiplier xs times = 
-  foldM 
-    fullAdder 
-    (toArray (replicate (lengthOf xs) false)) 
+multiplier xs times =
+  foldM
+    fullAdder
+    (toArray (replicate (length xs) false))
     (replicate times xs)
 
 -- | "T" for top-level

@@ -21,7 +21,7 @@ fromString xs = toArrayM =<< mapM fromChar xs
 fullAdder :: ArrM Boolean -> ArrM Boolean -> Comp (ArrM Boolean)
 fullAdder as bs = do
   -- allocate a new array of 64 bits for the result of the addition
-  result <- toArrayM $ replicate (lengthOfM as) false
+  result <- toArrayM $ replicate (lengthOf as) false
   -- 1-bit full adder
   foldM_
     ( \carry i -> do
@@ -33,7 +33,7 @@ fullAdder as bs = do
         return nextCarry
     )
     false
-    [0 .. lengthOfM as - 1]
+    [0 .. lengthOf as - 1]
   return result
 
 -- | "T" for top-level

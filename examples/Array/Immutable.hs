@@ -38,7 +38,7 @@ fullAdderT width = do
 --------------------------------------------------------------------------------
 
 multiplier :: Arr Boolean -> Int -> Arr Boolean
-multiplier xs times = foldl fullAdder (toArray (replicate (lengthOf xs) false)) (replicate times xs)
+multiplier xs times = foldl fullAdder (toArray (replicate (length xs) false)) (replicate times xs)
 
 -- | "T" for top-level
 multiplierT :: Int -> Int -> Comp (Arr Boolean)
