@@ -27,11 +27,13 @@ import Keelung.Types (Var)
 --      CMul: ax * by = c or ax * by = cz
 --      CNQZ: if x == 0 then m = 0 else m = recip x
 --      CXor: x ⊕ y = z
+--      COr: x ∨ y = z
 data Constraint n
   = CAdd !(Poly n)
   | CMul2 !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNQZ Var Var -- x & m
   | CXor Var Var Var
+  | COr Var Var Var
   deriving (Generic, NFData)
 
 instance GaloisField n => Eq (Constraint n) where
@@ -41,6 +43,7 @@ instance GaloisField n => Eq (Constraint n) where
       ((x == u && y == v) || (x == v && y == u)) && z == w
     (CNQZ x y, CNQZ u v) -> x == u && y == v
     (CXor x y z, CXor u v w) -> x == u && y == v && z == w
+    (COr x y z, COr u v w) -> x == u && y == v && z == w
     _ -> False
 
 instance Functor Constraint where
@@ -48,6 +51,7 @@ instance Functor Constraint where
   fmap f (CMul2 x y (Left z)) = CMul2 (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul2 x y (Right z)) = CMul2 (fmap f x) (fmap f y) (Right (fmap f z))
   fmap _ (CXor x y z) = CXor x y z
+  fmap _ (COr x y z) = COr x y z
   fmap _ (CNQZ x y) = CNQZ x y
 
 -- | Smart constructor for the CAdd constraint
@@ -81,21 +85,27 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
           else show poly
   show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
   show (CXor x y z) = "X $" <> show x <> " ⊕ $" <> show y <> " = $" <> show z
+  show (COr x y z) = "O $" <> show x <> " ∨ $" <> show y <> " = $" <> show z
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
 
   -- CXor is always greater than anything
+  compare (COr x y z) (COr u v w) = compare (x, y, z) (u, v, w)
+  compare _ COr {} = LT
+  compare COr {} _ = GT
+  -- CXor
   compare (CXor x y z) (CXor u v w) = compare (x, y, z) (u, v, w)
   compare _ CXor {} = LT
   compare CXor {} _ = GT
-  -- CMul2 comes in the second
+  -- CMul2
   compare (CMul2 aV bV cV) (CMul2 aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMul2 {} = LT
   compare CMul2 {} _ = GT
-  -- CAdd comes in the third
+  -- CAdd
   compare (CAdd xs) (CAdd ys) =
     if xs == ys then EQ else compare xs ys
+  -- CNQZ
   compare CNQZ {} CNQZ {} = EQ
   compare CNQZ {} _ = LT
   compare _ CNQZ {} = GT
@@ -109,6 +119,7 @@ varsInConstraint (CMul2 aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
 varsInConstraint (CMul2 aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
 varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
 varsInConstraint (CXor x y z) = IntSet.fromList [x, y, z]
+varsInConstraint (COr x y z) = IntSet.fromList [x, y, z]
 
 varsInConstraints :: Set (Constraint a) -> IntSet
 varsInConstraints = IntSet.unions . Set.map varsInConstraint
@@ -236,3 +247,6 @@ renumberConstraints cs =
         CNQZ (renumber x) (renumber y)
       CXor x y z ->
         CXor (renumber x) (renumber y) (renumber z)
+      COr x y z ->
+        COr (renumber x) (renumber y) (renumber z)
+

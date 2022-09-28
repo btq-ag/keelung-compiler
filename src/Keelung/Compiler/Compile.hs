@@ -147,12 +147,12 @@ encodeBinaryOp op out x y = case op of
   Mul -> add [CMul2 (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
   Div -> add [CMul2 (Poly.singleVar y) (Poly.singleVar out) (Right $ Poly.singleVar x)]
   And -> encodeBinaryOp Mul out x y
-  Or -> do
-    -- Constraint 'x \/ y = out'.
-    -- The encoding is: x+y - out = x*y; assumes x and y are boolean.
-    xy <- freshVar
-    encode xy (Var x * Var y)
-    encode xy (Var x + Var y - Var out)
+  Or -> add [COr x y out]
+    -- -- Constraint 'x ∨ y = out'.
+    -- -- The encoding is: x+y - out = x*y; assumes x and y are boolean.
+    -- xy <- freshVar
+    -- encode xy (Var x * Var y)
+    -- encode xy (Var x + Var y - Var out)
   Xor -> add [CXor x y out]
   -- -- Constraint 'x xor y = out'.
   -- -- The encoding is: x+y - out = 2(x*y); assumes x and y are boolean.
