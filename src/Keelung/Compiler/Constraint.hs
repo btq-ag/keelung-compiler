@@ -30,7 +30,7 @@ import Keelung.Types (Var)
 --      COr: x ∨ y = z
 data Constraint n
   = CAdd !(Poly n)
-  | CMul2 !(Poly n) !(Poly n) !(Either n (Poly n))
+  | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNQZ Var Var -- x & m
   | CXor Var Var Var
   | COr Var Var Var
@@ -39,7 +39,7 @@ data Constraint n
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAdd x, CAdd y) -> x == y
-    (CMul2 x y z, CMul2 u v w) ->
+    (CMul x y z, CMul u v w) ->
       ((x == u && y == v) || (x == v && y == u)) && z == w
     (CNQZ x y, CNQZ u v) -> x == u && y == v
     (CXor x y z, CXor u v w) -> x == u && y == v && z == w
@@ -48,8 +48,8 @@ instance GaloisField n => Eq (Constraint n) where
 
 instance Functor Constraint where
   fmap f (CAdd x) = CAdd (fmap f x)
-  fmap f (CMul2 x y (Left z)) = CMul2 (fmap f x) (fmap f y) (Left (f z))
-  fmap f (CMul2 x y (Right z)) = CMul2 (fmap f x) (fmap f y) (Right (fmap f z))
+  fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
+  fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
   fmap _ (CXor x y z) = CXor x y z
   fmap _ (COr x y z) = COr x y z
   fmap _ (CNQZ x y) = CNQZ x y
@@ -65,14 +65,14 @@ cmul :: GaloisField n => [(Var, n)] -> [(Var, n)] -> (n, [(Var, n)]) -> [Constra
 cmul !xs !ys (c, zs) = case ( do
                                 xs' <- Poly.buildEither 0 xs
                                 ys' <- Poly.buildEither 0 ys
-                                return $ CMul2 xs' ys' (Poly.buildEither c zs)
+                                return $ CMul xs' ys' (Poly.buildEither c zs)
                             ) of
   Left _ -> []
   Right result -> [result]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " ++ show xs ++ " = 0"
-  show (CMul2 aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly' cV
+  show (CMul aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly' cV
     where
       showPoly poly =
         if IntMap.size (Poly.coeffs poly) > 1
@@ -98,10 +98,10 @@ instance GaloisField n => Ord (Constraint n) where
   compare (CXor x y z) (CXor u v w) = compare (x, y, z) (u, v, w)
   compare _ CXor {} = LT
   compare CXor {} _ = GT
-  -- CMul2
-  compare (CMul2 aV bV cV) (CMul2 aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
-  compare _ CMul2 {} = LT
-  compare CMul2 {} _ = GT
+  -- CMul
+  compare (CMul aV bV cV) (CMul aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
+  compare _ CMul {} = LT
+  compare CMul {} _ = GT
   -- CAdd
   compare (CAdd xs) (CAdd ys) =
     if xs == ys then EQ else compare xs ys
@@ -115,8 +115,8 @@ instance GaloisField n => Ord (Constraint n) where
 -- | Return the list of variables occurring in constraints
 varsInConstraint :: Constraint a -> IntSet
 varsInConstraint (CAdd xs) = Poly.vars xs
-varsInConstraint (CMul2 aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
-varsInConstraint (CMul2 aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
+varsInConstraint (CMul aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
+varsInConstraint (CMul aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
 varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
 varsInConstraint (CXor x y z) = IntSet.fromList [x, y, z]
 varsInConstraint (COr x y z) = IntSet.fromList [x, y, z]
@@ -241,8 +241,8 @@ renumberConstraints cs =
     renumberConstraint constraint = case constraint of
       CAdd xs ->
         CAdd $ Poly.mapVars renumber xs
-      CMul2 aV bV cV ->
-        CMul2 (Poly.mapVars renumber aV) (Poly.mapVars renumber bV) (Poly.mapVars renumber <$> cV)
+      CMul aV bV cV ->
+        CMul (Poly.mapVars renumber aV) (Poly.mapVars renumber bV) (Poly.mapVars renumber <$> cV)
       CNQZ x y ->
         CNQZ (renumber x) (renumber y)
       CXor x y z ->

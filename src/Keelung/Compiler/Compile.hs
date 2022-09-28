@@ -144,8 +144,8 @@ encodeBinaryOp :: GaloisField n => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
   Add -> add $ cadd 0 [(x, 1), (y, 1), (out, -1)]
   Sub -> add $ cadd 0 [(x, 1), (y, negate 1), (out, negate 1)]
-  Mul -> add [CMul2 (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
-  Div -> add [CMul2 (Poly.singleVar y) (Poly.singleVar out) (Right $ Poly.singleVar x)]
+  Mul -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
+  Div -> add [CMul (Poly.singleVar y) (Poly.singleVar out) (Right $ Poly.singleVar x)]
   And -> encodeBinaryOp Mul out x y
   Or -> add [COr x y out]
     -- -- Constraint 'x ∨ y = out'.
@@ -185,7 +185,7 @@ encodeBinaryOp op out x y = case op of
     -- notOut = 1 - out
     notOut <- freshVar
     encode notOut (1 - Var out)
-    add [CMul2 (Poly.singleVar diff) (Poly.singleVar notOut) (Left 0)]
+    add [CMul (Poly.singleVar diff) (Poly.singleVar notOut) (Left 0)]
   Eq -> do
     -- Constraint 'x == y = out'.
     -- The encoding is: out = 1 - (x-y != 0).
@@ -201,7 +201,7 @@ encodeBinaryOp op out x y = case op of
 -- | Ensure that boolean variables have constraint 'b^2 = b'
 -- convertBooleanVars :: GaloisField n => IntSet -> [Constraint n]
 -- convertBooleanVars booleanInputVars =
---   map (\b -> CMul2 (Poly.singleVar b) (Poly.singleVar b) (Right $ Poly.singleVar b)) $
+--   map (\b -> CMul (Poly.singleVar b) (Poly.singleVar b) (Right $ Poly.singleVar b)) $
 --     IntSet.toList booleanInputVars
 
 -- | Encode the constraint 'x = out'.

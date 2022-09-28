@@ -62,26 +62,26 @@ merge (CAdd aX) (CAdd bX) = do
   return $ case mergePoly pinned aX bX of
     Just bX' -> Just (CAdd bX')
     Nothing -> Nothing
-merge (CAdd aX) (CMul2 dX eX (Left f)) = do
+merge (CAdd aX) (CMul dX eX (Left f)) = do
   pinned <- gets poolPinnedVars
   return $ case mergePoly pinned aX dX of
-    Just dX' -> Just (CMul2 dX' eX (Left f))
+    Just dX' -> Just (CMul dX' eX (Left f))
     Nothing -> do
       case mergePoly pinned aX eX of
-        Just eX' -> Just (CMul2 dX eX' (Left f))
+        Just eX' -> Just (CMul dX eX' (Left f))
         Nothing -> Nothing
-merge (CAdd aX) (CMul2 dX eX (Right fX)) = do
+merge (CAdd aX) (CMul dX eX (Right fX)) = do
   pinned <- gets poolPinnedVars
   return $ case mergePoly pinned aX dX of
-    Just dX' -> Just (CMul2 dX' eX (Right fX))
+    Just dX' -> Just (CMul dX' eX (Right fX))
     Nothing -> do
       case mergePoly pinned aX eX of
-        Just eX' -> Just (CMul2 dX eX' (Right fX))
+        Just eX' -> Just (CMul dX eX' (Right fX))
         Nothing -> do
           case mergePoly pinned aX fX of
-            Just fX' -> Just (CMul2 dX eX (Right fX'))
+            Just fX' -> Just (CMul dX eX (Right fX'))
             Nothing -> Nothing
-merge a@CMul2 {} b@CAdd {} = merge b a
+merge a@CMul {} b@CAdd {} = merge b a
 merge _ _ = return Nothing
 
 mergePoly :: GaloisField n => IntSet -> Poly.Poly n -> Poly.Poly n -> Maybe (Poly.Poly n)
@@ -131,21 +131,21 @@ mergePoly pinned xs ys = do
 
 -- findLocks :: Constraint n -> [Lock]
 -- findLocks (CAdd aX) = map LockDeg1or2 $ IntSet.toList $ Poly.vars aX
--- findLocks (CMul2 aX bX (Left _)) = map LockDeg1 (IntSet.toList (Poly.vars aX <> Poly.vars bX))
--- findLocks (CMul2 aX bX (Right cX)) = map LockDeg1 (IntSet.toList (Poly.vars aX <> Poly.vars bX <> Poly.vars cX))
+-- findLocks (CMul aX bX (Left _)) = map LockDeg1 (IntSet.toList (Poly.vars aX <> Poly.vars bX))
+-- findLocks (CMul aX bX (Right cX)) = map LockDeg1 (IntSet.toList (Poly.vars aX <> Poly.vars bX <> Poly.vars cX))
 -- findLocks (CNQZ _ _) = []
 
 -- findKeys :: Constraint n -> [Key]
 -- findKeys (CAdd aX) = map KeyDeg1 $ IntSet.toList $ Poly.vars aX
--- findKeys (CMul2 _ _ (Left _)) = []
--- findKeys (CMul2 _ _ (Right cX)) = map KeyDeg2 (IntSet.toList $ Poly.vars cX)
+-- findKeys (CMul _ _ (Left _)) = []
+-- findKeys (CMul _ _ (Right cX)) = map KeyDeg2 (IntSet.toList $ Poly.vars cX)
 -- findKeys (CNQZ _ _) = []
 
 -- -- -- | Given a constraint, find all binding sites.
 -- -- findBindingSites :: Constraint n -> [BindingSite]
 -- -- findBindingSites (CAdd xs) = map Degree1Or2 $ IntSet.toList $ Poly.vars xs
--- -- findBindingSites (CMul2 aX bX (Left _)) = map Degree1 (IntSet.toList (Poly.vars aX <> Poly.vars bX))
--- -- findBindingSites (CMul2 aX bX (Right cX)) =
+-- -- findBindingSites (CMul aX bX (Left _)) = map Degree1 (IntSet.toList (Poly.vars aX <> Poly.vars bX))
+-- -- findBindingSites (CMul aX bX (Right cX)) =
 -- --   map Degree1 (IntSet.toList (Poly.vars aX <> Poly.vars bX))
 -- --     <> map Degree1Or2 (IntSet.toList $ Poly.vars cX)
 -- -- findBindingSites (CNQZ _ _) = []
@@ -193,5 +193,5 @@ mergePoly pinned xs ys = do
 
 -- insert :: Soup n -> Constraint n -> Soup n
 -- insert soup (CAdd aX) = Poly.vars aX
--- insert soup (CMul2 po po' e) = _wh
+-- insert soup (CMul po po' e) = _wh
 -- insert soup (CNQZ n i) = _wi

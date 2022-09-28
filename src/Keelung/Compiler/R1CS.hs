@@ -75,7 +75,7 @@ toR1CS cs =
           (Left 1)
           (Right xs)
           (Left 0)
-    toR1C (CMul2 aX bX cX) =
+    toR1C (CMul aX bX cX) =
       Right $ R1C (Right aX) (Right bX) cX
     toR1C (CNQZ x m) = Left (x, m)
     toR1C (CXor x y z) =
@@ -115,7 +115,7 @@ fromR1CS r1cs =
       case (aX, bX, cX) of
         (Left 1, Right xs, Left 0) -> CAdd xs
         (Right xs, Left 1, Left 0) -> CAdd xs
-        (Right xs, Right ys, _) -> CMul2 xs ys cX
+        (Right xs, Right ys, _) -> CMul xs ys cX
         _ -> error "fromR1C: invalid R1C"
 
 -- | Computes an assignment for a R1CS with given inputs

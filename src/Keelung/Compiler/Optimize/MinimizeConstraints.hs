@@ -118,7 +118,7 @@ substConstraint !constraint = case constraint of
     case result of
       Left _ -> return Nothing
       Right poly' -> return $ Just $ CAdd poly'
-  CMul2 aV bV cV -> do
+  CMul aV bV cV -> do
     aV' <- substPoly aV
     bV' <- substPoly bV
     cV' <- join <$> mapM substPoly cV
@@ -154,10 +154,10 @@ substConstraint !constraint = case constraint of
       -- (a + ax) * (b + bx) = c
       -- (a + ax) * (b + bx) = c + cx
       (Right (a, aX), Right (b, bX), Left c) -> do
-        CMul2 <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
+        CMul <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
           <*> pure (Left c)
       (Right (a, aX), Right (b, bX), Right (c, cX)) -> do
-        CMul2 <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
+        CMul <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
           <*> pure (Poly.buildEither c (IntMap.toList cX))
   CNQZ {} -> return $ Just constraint
   CXor x y z -> do
@@ -215,8 +215,8 @@ substConstraint !constraint = case constraint of
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
   CAdd _ -> return False
-  CMul2 {} -> return False
-  -- CMul2 aV bV cV -> case (Poly.view aV, Poly.view bV, Poly.view cV) of
+  CMul {} -> return False
+  -- CMul aV bV cV -> case (Poly.view aV, Poly.view bV, Poly.view cV) of
   --   (Left a, Right (b, bX), Right (c, cX)) ->
   --     return $
   --       a * b == c && fmap (a *) bX == cX
