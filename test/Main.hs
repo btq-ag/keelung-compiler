@@ -34,7 +34,7 @@ runKeelungAggSig dimension numberOfSignatures =
           }
       param = makeParam dimension numberOfSignatures 42 settings :: Param GF181
    in execute
-        (AggSig.aggregateSignature param :: Comp Unit)
+        (AggSig.aggregateSignature param :: Comp ())
         (genInputFromParam param)
 
 main :: IO ()

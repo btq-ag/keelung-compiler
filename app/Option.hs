@@ -12,8 +12,9 @@ getOptions =
           <> header "Keelung - a R1CS compiler"
       )
 
-newtype Options
+data Options
   = Protocol ProtocolOptions
+  | Version
   deriving (Show)
 
 options :: Parser Options
@@ -25,6 +26,7 @@ options =
         <> commandGroup "Internal binary protocol:"
         <> metavar "PROTOCOL"
     )
+    <|> flag' Version (long "version" <> short 'v' <> help "Show version")
 
 --------------------------------------------------------------------------------
 

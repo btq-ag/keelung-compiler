@@ -14,7 +14,7 @@ import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung hiding (inputs, interpret)
+import Keelung hiding (inputs, interpret, run)
 import Keelung.Compiler.Util
 import Keelung.Types
 
@@ -108,9 +108,9 @@ instance FreeVar Boolean where
     IfBool x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
     ToBool x -> freeVars x
 
-instance FreeVar Unit where
+instance FreeVar () where
   freeVars expr = case expr of
-    Unit -> return mempty
+    () -> return mempty
 
 instance FreeVar t => FreeVar (Arr t) where
   freeVars expr = case expr of
@@ -201,9 +201,9 @@ instance GaloisField n => Interpret Boolean n where
         _ -> interpret x
     ToBool x -> interpret x
 
-instance GaloisField n => Interpret Unit n where
+instance GaloisField n => Interpret () n where
   interpret val = case val of
-    Unit -> return []
+    () -> return []
 
 instance (Interpret t n, GaloisField n) => Interpret (Arr t) n where
   interpret val = case val of

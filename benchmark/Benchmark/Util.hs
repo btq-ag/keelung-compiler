@@ -24,23 +24,23 @@ import Keelung.Syntax.Typed (Elaborated)
 -- import Keelung.Syntax (Val)
 
 -- | Elaborate
-elaborate :: (Language.Elaborable t, Language.Simplify t) => Comp t -> Either Language.ElabError Elaborated
+elaborate :: Language.Elaborable t => Comp t -> Either Language.ElabError Elaborated
 elaborate = Language.elaborate
 
 -- | Compile only (without constant propagation or any other optimizations)
-compile :: (Language.Elaborable t, Language.Simplify t) => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
+compile :: Language.Elaborable t => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
 compile = Compiler.compile
 
 -- | Compile + constant propagation
-optimize0 :: (Language.Elaborable t, Language.Simplify t) => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
+optimize0 :: Language.Elaborable t => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
 optimize0 = Compiler.optimize0
 
 -- | Compile + constant propagation + optimization I
-optimize1 :: (Language.Elaborable t, Language.Simplify t) => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
+optimize1 :: Language.Elaborable t => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
 optimize1 = Compiler.optimize1
 
 -- | Compile + constant propagation + optimization I + optimization II
-optimize2 :: (Language.Elaborable t, Language.Simplify t) => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
+optimize2 :: Language.Elaborable t => Comp t -> Either (Compiler.Error GF181) (Compiler.ConstraintSystem GF181)
 optimize2 = Compiler.optimize2
 
 -- benchElaborate :: Comp t -> ByteString

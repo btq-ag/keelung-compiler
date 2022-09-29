@@ -35,7 +35,7 @@ import Keelung
 --        │                                                     │
 --        └──────────────────────────  ...  ────────────────────┘
 
-checkAgg :: (Integral n, GaloisField n) => Param n -> Comp Unit
+checkAgg :: (Integral n, GaloisField n) => Param n -> Comp ()
 checkAgg (Param dimension numOfSigs setup _) = do
   -- allocation of inputs:
   --    nT: coefficients of terms of signatures as input
@@ -74,9 +74,7 @@ checkAgg (Param dimension numOfSigs setup _) = do
     -- assert that the sum of remainders forms a term of aggregate signature
     assert $ actual `Eq` fromIntegral expected
 
-  return unit
-
-checkSize :: (GaloisField n, Integral n) => Param n -> Comp Unit
+checkSize :: (GaloisField n, Integral n) => Param n -> Comp ()
 checkSize (Param dimension numOfSigs setup _) = do
   let signatures = setupSignatures setup
 
@@ -103,9 +101,7 @@ checkSize (Param dimension numOfSigs setup _) = do
       let smallerThan12289 = fromBool bit13 * fromBool bit12 * bit11to0
       assert (smallerThan12289 `Eq` 0)
 
-  return unit
-
-checkLength :: (Integral n, GaloisField n) => Param n -> Comp Unit
+checkLength :: (Integral n, GaloisField n) => Param n -> Comp ()
 checkLength (Param dimension numOfSigs _ _) = do
   sigs <- inputs2 numOfSigs dimension
 
@@ -137,22 +133,20 @@ checkLength (Param dimension numOfSigs _ _) = do
     -- assert the relation between actualLength, remainder and quotient
     assert $ actualLength `Eq` (quotient * fromInteger q + remainder)
 
-  return unit
-
-aggregateSignature :: (Integral n, GaloisField n) => Param n -> Comp Unit
+aggregateSignature :: (Integral n, GaloisField n) => Param n -> Comp ()
 aggregateSignature param = do
   let settings = paramSettings param
   -- check aggregate signature
   void $ case enableAggChecking settings of
-    False -> return unit
+    False -> return ()
     True -> checkAgg param
 
   -- check signature size
   void $ case enableSizeChecking settings of
-    False -> return unit
+    False -> return ()
     True -> checkSize param
 
   -- check squares & length of signatures
   case enableLengthChecking settings of
-    False -> return unit
+    False -> return ()
     True -> checkLength param

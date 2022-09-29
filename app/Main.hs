@@ -72,6 +72,7 @@ main = withUtf8 $ do
             B64 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [B64])
             GF181 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [GF181])
             BN128 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [BN128])
+    Version -> putStrLn "Keelung v0.5.0"
 
 -- Profile dimension numOfSigs -> profile dimension numOfSigs
 -- Count dimension numOfSigs -> do

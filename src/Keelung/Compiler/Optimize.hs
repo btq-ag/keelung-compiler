@@ -9,7 +9,7 @@ import Control.Arrow (left)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
-import Keelung (elaborate, Elaborable, Simplify)
+import Keelung (elaborate, Elaborable)
 import Keelung.Compiler.Constraint
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints2 as MinimizeConstraints2
@@ -22,7 +22,7 @@ import qualified Keelung.Syntax.Typed as C
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: (Elaborable t, Simplify t) => Comp t -> Either String C.Elaborated
+elaborateAndRewrite :: Elaborable t => Comp t -> Either String C.Elaborated
 elaborateAndRewrite prog = left show (elaborate prog >>= Rewriting2.run)
 
 optimizeWithWitness :: (GaloisField n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)

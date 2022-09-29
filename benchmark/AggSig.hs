@@ -6,7 +6,7 @@ import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import Benchmark.Util
 import Criterion
-import Keelung (GF181, Comp, Unit)
+import Keelung (GF181, Comp)
 
 run :: Benchmark
 run =
@@ -18,7 +18,7 @@ run =
       optimization1
     ]
   where
-    program :: Int -> Comp Unit
+    program :: Int -> Comp ()
     program n = 
         let dimension = 128
             numberOfSignatures = n 

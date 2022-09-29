@@ -22,11 +22,10 @@ import Keelung.Compiler.Constraint (cadd)
 
 --------------------------------------------------------------------------------
 
-assertToBe42 :: Comp Unit
+assertToBe42 :: Comp ()
 assertToBe42 = do
   x <- input
   assert $ x `Eq` 42
-  return unit
 
 constant1 :: Comp Number
 constant1 =
@@ -61,7 +60,7 @@ summation = do
     let x = access arr i
     return $ accum + x
 
-summation2 :: Comp Unit
+summation2 :: Comp ()
 summation2 = do
   arr <- inputs 4
   sumA <- reduce 0 [0 .. 3] $ \accum i -> do
@@ -71,9 +70,8 @@ summation2 = do
     let x = access arr i
     return $ accum + x
   assert $ sumA `Eq` sumB
-  return unit
 
-assertArraysEqual :: Comp Unit
+assertArraysEqual :: Comp ()
 assertArraysEqual = do
   arrA <- inputs 4
   arrB <- inputs 4
@@ -81,9 +79,8 @@ assertArraysEqual = do
     let x = access arrA i
     let y = access arrB i
     assert $ x `Eq` y
-  return unit
 
-assertArraysEqual2 :: Comp Unit
+assertArraysEqual2 :: Comp ()
 assertArraysEqual2 = do
   arr <- inputs2 2 4
   forM_ [0 .. 1] $ \i -> 
@@ -91,7 +88,6 @@ assertArraysEqual2 = do
     let x = access2 arr (i, j)
     let y = access2 arr (i, j)
     assert $ x `Eq` y
-  return unit
 
 every :: Comp Boolean
 every = do
@@ -104,14 +100,13 @@ assert1 = do
   assert (x `Eq` 3)
   return x
 
-array1D :: Int -> Comp Unit
+array1D :: Int -> Comp ()
 array1D n = do
   xs <- inputs n
   expected <- inputs n
   mapM_ assert (zipWith Eq (map (\x -> x * x) $ fromArray xs) (fromArray expected))
-  return unit
 
-array2D :: Int -> Int -> Comp Unit
+array2D :: Int -> Int -> Comp ()
 array2D n m = do
   xs <- inputs2 n m
   expected <- inputs2 n m
@@ -122,9 +117,7 @@ array2D n m = do
     let x' = access2 expected (i, j)
     assert (x' `Eq` (x * x))
 
-  return unit
-
-toArray1 :: Comp Unit
+toArray1 :: Comp ()
 toArray1 = do
   xss <- inputs2 2 4
   let yss = toArray [toArray [0, 1, 2, 3], toArray [4, 5, 6, 7]]
@@ -136,12 +129,11 @@ toArray1 = do
       let x = access xs j
       let y = access ys j
       assert $ x `Eq` y
-  return unit
 
 make :: Int -> Int -> Param GF181
 make dim n = makeParam dim n 42 $ Settings True True True
 
-aggSig :: Int -> Int -> Comp Unit
+aggSig :: Int -> Int -> Comp ()
 aggSig dim n = AggregateSignature.Program.aggregateSignature (make dim n)
 
 p :: Param GF181
@@ -150,33 +142,33 @@ p = makeParam 1 1 42 $ Settings False True False
 -- inputs :: [GF181]
 -- inputs = genInputFromParam p
 
-a1 :: Comp Unit
+a1 :: Comp ()
 a1 = checkAgg 1 1
 
-a2 :: Comp Unit
+a2 :: Comp ()
 a2 = checkSize 1 1
 
-a3 :: Comp Unit
+a3 :: Comp ()
 a3 = checkLength 1 1
 
-agg :: Comp Unit
+agg :: Comp ()
 agg = a1 >> a2 >> a3
 
 -- components of aggregate signature
-checkAgg :: Int -> Int -> Comp Unit
+checkAgg :: Int -> Int -> Comp ()
 checkAgg dim n = AggregateSignature.Program.checkAgg (make dim n)
 
 -- -- #2
-checkSize :: Int -> Int -> Comp Unit
+checkSize :: Int -> Int -> Comp ()
 checkSize dim n = AggregateSignature.Program.checkSize (make dim n)
 
 -- -- #3
-checkLength :: Int -> Int -> Comp Unit
+checkLength :: Int -> Int -> Comp ()
 checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 
 --------------------------------------------------------------------------------
 
-bench :: (Elaborable t, Simplify t) => Comp t -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
+bench :: Elaborable t => Comp t -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
 bench program settings dimension n = do
   let inputVal = genInputFromParam (makeParam dimension n 42 settings)
   cs <- Compiler.compile program -- before optimisation (only constant propagation)
@@ -255,16 +247,16 @@ xorLists = do
       true
       [0]
 
-outOfBound :: Comp Unit
+outOfBound :: Comp ()
 outOfBound = do
   let xs = toArray [true]
   let _ = access xs 2
-  return unit
+  return ()
 
-emptyArray :: Comp Unit
+emptyArray :: Comp ()
 emptyArray = do
   let _ = toArray [] :: Arr Boolean
-  return unit
+  return ()
 
 dupArray :: Comp Number
 dupArray = do
