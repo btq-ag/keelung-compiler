@@ -58,20 +58,29 @@ encode out expr = case expr of
       terms <- mapM toTerm operands
       encodeTerms out (negateTailTerms terms)
     And -> do
-      -- the number of operands
-      let n = fromIntegral (length operands)
-      vars <- mapM wireAsVar (toList operands)
-      -- polynomial = n - sum of operands
-      let polynomial = case Poly.buildMaybe n (IntMap.fromList [(v, -1) | v <- vars]) of
-            Just p -> p
-            Nothing -> error "encode: And: impossible"
-      -- if the answer is 1 then all operands must be 1
-      --    (n - sum of operands) * out = 0
-      add [CMul polynomial (Poly.singleVar out) (Left 0)]
-      -- if the answer is 0 then not all operands must be 1:
-      --    (n - sum of operands) * inv = 1 - out
-      inv <- freshVar
-      add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
+      vars <- mapM wireAsVar operands
+      case vars of
+        Empty -> add $ cadd 1 [(out, -1)] -- out = 1
+        (a :<| Empty) -> add $ cadd 0 [(out, -1), (a, 1)] -- out = a
+        (a :<| b :<| Empty) -> add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar out))] -- out = a * b
+        (a :<| b :<| c :<| Empty) -> do
+          x <- freshVar
+          add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar x))] -- x = a * b
+          add [CMul (Poly.singleVar x) (Poly.singleVar c) (Right (Poly.singleVar out))] -- out = x * c
+        _ -> do
+          -- the number of operands
+          let n = fromIntegral (length operands)
+          -- polynomial = n - sum of operands
+          let polynomial = case Poly.buildMaybe n (IntMap.fromList [(v, -1) | v <- toList vars]) of
+                Just p -> p
+                Nothing -> error "encode: And: impossible"
+          -- if the answer is 1 then all operands must be 1
+          --    (n - sum of operands) * out = 0
+          add [CMul polynomial (Poly.singleVar out) (Left 0)]
+          -- if the answer is 0 then not all operands must be 1:
+          --    (n - sum of operands) * inv = 1 - out
+          inv <- freshVar
+          add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
     _ -> encodeOtherBinOp op out operands
   If b x y -> encode out e -- out = b * x + (1-b) * y
     where

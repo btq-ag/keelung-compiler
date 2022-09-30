@@ -23,6 +23,7 @@ import Keelung.Constraint.R1CS (R1CS)
 import qualified Keelung.Syntax.Typed as C
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
+import qualified Test.Optimization as Optimization
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
@@ -40,6 +41,8 @@ runKeelungAggSig dimension numberOfSignatures =
 main :: IO ()
 main = hspec $ do
   describe "Interpreter" Interpreter.tests
+
+  describe "Optimization" Optimization.tests 
 
   describe "Execution" $ do
     describe "Aggregate Signature" $ do
@@ -165,9 +168,9 @@ main = hspec $ do
         let constraint = head $ cadd 0 [(0, 1), (1, -1)]
             links = IntMap.fromList [(1, 0)]
             sizes = IntMap.fromList [(0, 2)]
-            run :: Optimize.OptiM GF181 a -> a
-            run = Optimize.runOptiM' links sizes mempty
-         in run (Optimize.substConstraint constraint)
+            go :: Optimize.OptiM GF181 a -> a
+            go = Optimize.runOptiM' links sizes mempty
+         in go (Optimize.substConstraint constraint)
               `shouldBe` Nothing
 
       it "should work 1" $
