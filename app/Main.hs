@@ -72,6 +72,16 @@ main = withUtf8 $ do
             B64 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [B64])
             GF181 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [GF181])
             BN128 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [BN128])
+    Protocol ToJSON -> do
+      blob <- getContents
+      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
+      case decoded of
+        Left err -> print err
+        Right (fieldType, elaborated) -> do
+          case fieldType of
+            B64 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO1Elab elaborated) :: Either String (R1CS B64))
+            GF181 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO1Elab elaborated) :: Either String (R1CS GF181))
+            BN128 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO1Elab elaborated) :: Either String (R1CS BN128))
     Version -> putStrLn "Keelung v0.5.0"
 
 -- Profile dimension numOfSigs -> profile dimension numOfSigs

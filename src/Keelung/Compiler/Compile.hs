@@ -8,7 +8,8 @@ module Keelung.Compiler.Compile (run) where
 import Control.Monad
 import Control.Monad.State (State, evalState, gets, modify)
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (Foldable (foldl'))
+import Data.Foldable (Foldable (foldl'), toList)
+import qualified Data.IntMap as IntMap
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
@@ -56,6 +57,36 @@ encode out expr = case expr of
     Sub -> do
       terms <- mapM toTerm operands
       encodeTerms out (negateTailTerms terms)
+    And -> do
+      vars <- mapM wireAsVar operands
+      case vars of
+        Empty -> add $ cadd 1 [(out, -1)] -- out = 1
+        (a :<| Empty) -> add $ cadd 0 [(out, -1), (a, 1)] -- out = a
+        (a :<| b :<| Empty) -> add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar out))] -- out = a * b
+        (a :<| b :<| c :<| Empty) -> do
+          x <- freshVar
+          add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar x))] -- x = a * b
+          add [CMul (Poly.singleVar x) (Poly.singleVar c) (Right (Poly.singleVar out))] -- out = x * c
+        _ -> do
+          -- the number of operands
+          let n = fromIntegral (length operands)
+          -- polynomial = n - sum of operands
+          let polynomial = case Poly.buildMaybe n (IntMap.fromList [(v, -1) | v <- toList vars]) of
+                Just p -> p
+                Nothing -> error "encode: And: impossible"
+          -- if the answer is 1 then all operands must be 1
+          --    (n - sum of operands) * out = 0
+          add [CMul polynomial (Poly.singleVar out) (Left 0)]
+          -- if the answer is 0 then not all operands must be 1:
+          --    (n - sum of operands) * inv = 1 - out
+          inv <- freshVar
+          add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
+    Or -> do
+      --      if all operands are 0           then 0 else 1
+      --  =>  if the sum of operands is 0     then 0 else 1
+      --  =>  if the sum of operands is not 0 then 1 else 0 
+      --  =>  the sum of operands is not 0
+      encode out (BinOp NEq (0 :<| BinOp Add operands :<| Empty))
     _ -> encodeOtherBinOp op out operands
   If b x y -> encode out e -- out = b * x + (1-b) * y
     where
@@ -122,13 +153,6 @@ encodeOtherBinOp op out exprs = do
   vars <- mapM wireAsVar exprs
   encodeVars vars
   where
-    wireAsVar :: GaloisField n => Expr n -> M n Var
-    wireAsVar (Var var) = return var
-    wireAsVar expr = do
-      out' <- freshVar
-      encode out' expr
-      return out'
-
     encodeVars :: GaloisField n => Seq Var -> M n ()
     encodeVars vars = case vars of
       Empty -> return ()
@@ -139,20 +163,29 @@ encodeOtherBinOp op out exprs = do
         encodeVars (out' :<| xs)
         encodeBinaryOp op out' x y
 
+-- | If the expression is not already a variable, create a new variable
+wireAsVar :: GaloisField n => Expr n -> M n Var
+wireAsVar (Var var) = return var
+wireAsVar expr = do
+  out <- freshVar
+  encode out expr
+  return out
+
 -- | Encode the constraint 'x op y = out'.
 encodeBinaryOp :: GaloisField n => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
-  Add -> add $ cadd 0 [(x, 1), (y, 1), (out, -1)]
+  Add -> error "encodeBinaryOp: Add"
+  -- add $ cadd 0 [(x, 1), (y, 1), (out, -1)]
   Sub -> add $ cadd 0 [(x, 1), (y, negate 1), (out, negate 1)]
   Mul -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
   Div -> add [CMul (Poly.singleVar y) (Poly.singleVar out) (Right $ Poly.singleVar x)]
   And -> encodeBinaryOp Mul out x y
   Or -> add [COr x y out]
-    -- -- Constraint 'x ∨ y = out'.
-    -- -- The encoding is: x+y - out = x*y; assumes x and y are boolean.
-    -- xy <- freshVar
-    -- encode xy (Var x * Var y)
-    -- encode xy (Var x + Var y - Var out)
+  -- -- Constraint 'x ∨ y = out'.
+  -- -- The encoding is: x+y - out = x*y; assumes x and y are boolean.
+  -- xy <- freshVar
+  -- encode xy (Var x * Var y)
+  -- encode xy (Var x + Var y - Var out)
   Xor -> add [CXor x y out]
   -- -- Constraint 'x xor y = out'.
   -- -- The encoding is: x+y - out = 2(x*y); assumes x and y are boolean.

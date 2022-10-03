@@ -48,6 +48,7 @@ executables:
       - src/
       - examples/
     dependencies:
+    - aeson
     - keelung-compiler
     - with-utf8
 
