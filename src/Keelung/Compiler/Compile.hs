@@ -81,6 +81,12 @@ encode out expr = case expr of
           --    (n - sum of operands) * inv = 1 - out
           inv <- freshVar
           add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
+    Or -> do
+      --      if all operands are 0           then 0 else 1
+      --  =>  if the sum of operands is 0     then 0 else 1
+      --  =>  if the sum of operands is not 0 then 1 else 0 
+      --  =>  the sum of operands is not 0
+      encode out (BinOp NEq (0 :<| BinOp Add operands :<| Empty))
     _ -> encodeOtherBinOp op out operands
   If b x y -> encode out e -- out = b * x + (1-b) * y
     where
