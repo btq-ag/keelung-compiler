@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Encode where
@@ -6,12 +7,9 @@ module Encode where
 import Data.Aeson
 import Data.Aeson.Encoding
 import qualified Data.Bifunctor as Bifunctor
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.Either as Either
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
-import Keelung.Constraint.Polynomial (Poly (..))
+import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..))
@@ -36,15 +34,31 @@ import Keelung.Types (Var)
 -- -- instance ToJSON n => ToJSON (R1C n) where
 -- --   toEncoding = undefined
 
+-- | How to encode a R1C
+instance (ToJSON n, Num n, Eq n, Show n) => ToJSON (R1C n) where
+  toEncoding (R1C a b c) =
+    pairs $
+      pairStr "A" (encodeEitherConstPoly a)
+        <> pairStr "B" (encodeEitherConstPoly b)
+        <> pairStr "C" (encodeEitherConstPoly c)
+
+-- | How to encode `Either n (Poly n)`
+encodeEitherConstPoly :: (ToJSON n, Num n, Eq n, Show n) => Either n (Poly n) -> Encoding
+encodeEitherConstPoly (Left constant) = list encodeVarCoeff [(0, constant)]
+encodeEitherConstPoly (Right poly) = toEncoding poly
+
 -- | How to encode a Polynomial
 instance (ToJSON n, Num n, Eq n, Show n) => ToJSON (Poly n) where
   toEncoding poly = case Poly.constant poly of
-    0 -> list f (IntMap.toList (Poly.coeffs poly))
-    n -> list f ((0, n) : IntMap.toList (Poly.coeffs poly))
-    where
-      f (var, coeff) = list g [Left var, Right coeff]
-      g (Left var) = int var
-      g (Right coeff) = string (show coeff)
+    0 -> list encodeVarCoeff (IntMap.toList (Poly.coeffs poly))
+    n -> list encodeVarCoeff ((0, n) : IntMap.toList (Poly.coeffs poly))
+
+-- | How to encode a variable-coefficient pair
+encodeVarCoeff :: (ToJSON n, Num n, Eq n, Show n) => (Var, n) -> Encoding
+encodeVarCoeff (v, c) = list f [Left v, Right c]
+  where
+    f (Left var) = int var
+    f (Right coeff) = string (show coeff)
 
 --------------------------------------------------------------------------------
 
