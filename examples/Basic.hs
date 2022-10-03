@@ -289,3 +289,9 @@ birthday = do
   date <- input
 
   return $ (hiddenMonth `Eq` month) `And` (hiddenDate `Eq` date)
+
+chainingAND :: Int -> Comp Boolean 
+chainingAND n = foldl And true <$> inputs n
+
+chainingOR :: Int -> Comp Boolean 
+chainingOR n = foldl Or false <$> inputs n

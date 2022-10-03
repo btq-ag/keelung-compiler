@@ -35,6 +35,7 @@ data ProtocolOptions
   | CompileO1
   | CompileO2
   | Interpret
+  | ToJSON
   deriving (Show)
 
 protocol :: Parser ProtocolOptions
@@ -70,6 +71,14 @@ protocol =
               (pure Interpret <**> helper)
               ( fullDesc
                   <> progDesc "Interpret a Keelung program with given inputs"
+              )
+          )
+        <> command
+          "toJSON"
+          ( info
+              (pure ToJSON <**> helper)
+              ( fullDesc
+                  <> progDesc "Compile (-O1) a Keelung program to R1CS and write it to \"output.jsonl\" in the JSON Lines format"
               )
           )
     )

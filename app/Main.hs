@@ -8,8 +8,10 @@ import Control.Arrow (left)
 import Control.Monad
 import Control.Monad.Except
 import qualified Data.ByteString.Char8 as BSC
+import qualified Data.ByteString.Lazy as BS
 import Data.Field.Galois (GaloisField)
-import Data.Serialize (decode, encode)
+import Data.Serialize (Serialize, decode, encode)
+import Encode (asJSONLines)
 import Keelung (elaborate)
 import Keelung.Compiler
   ( ConstraintSystem,
@@ -39,9 +41,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO0Elab elaborated) :: Either String (R1CS B64))
-            GF181 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO0Elab elaborated) :: Either String (R1CS GF181))
-            BN128 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO0Elab elaborated) :: Either String (R1CS BN128))
+            B64 -> output (asB64 $ compileO0Elab elaborated)
+            GF181 -> output (asGF181 $ compileO0Elab elaborated)
+            BN128 -> output (asBN128 $ compileO0Elab elaborated)
     Protocol CompileO1 -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -49,9 +51,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO1Elab elaborated) :: Either String (R1CS B64))
-            GF181 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO1Elab elaborated) :: Either String (R1CS GF181))
-            BN128 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO1Elab elaborated) :: Either String (R1CS BN128))
+            B64 -> output (asB64 $ compileO1Elab elaborated)
+            GF181 -> output (asGF181 $ compileO1Elab elaborated)
+            BN128 -> output (asBN128 $ compileO1Elab elaborated)
     Protocol CompileO2 -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -59,9 +61,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO2Elab elaborated) :: Either String (R1CS B64))
-            GF181 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO2Elab elaborated) :: Either String (R1CS GF181))
-            BN128 -> putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> compileO2Elab elaborated) :: Either String (R1CS BN128))
+            B64 -> output (asB64 $ compileO2Elab elaborated)
+            GF181 -> output (asGF181 $ compileO2Elab elaborated)
+            BN128 -> output (asBN128 $ compileO2Elab elaborated)
     Protocol Interpret -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer])
@@ -72,7 +74,40 @@ main = withUtf8 $ do
             B64 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [B64])
             GF181 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [GF181])
             BN128 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [BN128])
-    Version -> putStrLn "Keelung v0.5.0"
+    Protocol ToJSON -> do
+      blob <- getContents
+      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
+      case decoded of
+        Left err -> print err
+        Right (fieldType, elaborated) -> do
+          case fieldType of
+            B64 -> outputAndwriteJSONLines (asB64 $ compileO1Elab elaborated)
+            GF181 -> outputAndwriteJSONLines (asGF181 $ compileO1Elab elaborated)
+            BN128 -> outputAndwriteJSONLines (asBN128 $ compileO1Elab elaborated)
+    Version -> putStrLn "Keelung v0.5.1"
+  where
+    asB64 :: Either (Error B64) (ConstraintSystem B64) -> Either (Error B64) (ConstraintSystem B64)
+    asB64 = id 
+
+    asGF181 :: Either (Error GF181) (ConstraintSystem GF181) -> Either (Error GF181) (ConstraintSystem GF181)
+    asGF181 = id
+
+    asBN128 :: Either (Error BN128) (ConstraintSystem BN128) -> Either (Error BN128) (ConstraintSystem BN128)
+    asBN128 = id
+
+    output :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (ConstraintSystem n) -> IO ()
+    output cs = putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> cs))
+
+    outputAndwriteJSONLines :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (ConstraintSystem n) -> IO ()
+    outputAndwriteJSONLines cs = do 
+      output cs 
+      case cs of 
+        Left err -> print err 
+        Right cs' -> do
+          let r1cs = toR1CS cs'
+          BS.writeFile "out.jsonl" (asJSONLines r1cs)
+
+-- putStrLn $ BSC.unpack $ encode (left show (toR1CS
 
 -- Profile dimension numOfSigs -> profile dimension numOfSigs
 -- Count dimension numOfSigs -> do

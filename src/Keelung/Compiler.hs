@@ -30,6 +30,7 @@ module Keelung.Compiler
     compileO2Elab,
     interpretElab,
     --
+    asGF181N,
     asGF181,
   )
 where
@@ -40,7 +41,7 @@ import qualified Data.Either as Either
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (one, zero))
-import Keelung (N (..), elaborate, Elaborable)
+import Keelung (Elaborable, N (..), elaborate)
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
@@ -173,5 +174,8 @@ compileO2Elab elab = do
 
 --------------------------------------------------------------------------------
 
-asGF181 :: Either (Error (N GF181)) a -> Either (Error (N GF181)) a
+asGF181N :: Either (Error (N GF181)) a -> Either (Error (N GF181)) a
+asGF181N = id
+
+asGF181 :: Either (Error GF181) a -> Either (Error GF181) a
 asGF181 = id
