@@ -117,6 +117,7 @@ executable constraint
 executable keelungc
   main-is: Main.hs
   other-modules:
+      Encode
       Option
       Keelung.Compiler
       Keelung.Compiler.Compile
@@ -151,7 +152,8 @@ executable keelungc
       examples/
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      array
+      aeson
+    , array
     , base >=4.7 && <5
     , bytestring
     , cereal
