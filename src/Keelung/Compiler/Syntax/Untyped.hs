@@ -139,12 +139,12 @@ data TypeErased n = TypeErased
     erasedNumOfInputVars :: !Int,
     -- | Number of output variables (they are placed after input variables)
     erasedOutputVarSize :: !Int,
-    -- | Input variables that are boolean
-    erasedBoolInputVars :: !IntSet
+    -- | Variables that are boolean (so that we can impose the Boolean constraint on them)
+    erasedBoolVars :: !IntSet
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr assertions assignments allVarsSize inputVarSize outputVarSize boolInputVars) =
+  show (TypeErased expr assertions assignments allVarsSize inputVarSize outputVarSize boolVars) =
     "TypeErased {\n\
     \  expression: "
       <> show (fmap (fmap N) expr)
@@ -163,8 +163,8 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
       <> show inputVarSize
       <> "\n  number of output variables: "
       <> show outputVarSize
-      <> "\n  Boolean input variables: "
-      <> show (IntSet.toList boolInputVars)
+      <> "\n  Boolean variables: "
+      <> show (IntSet.toList boolVars)
       <> "\n\
          \}"
 
@@ -231,7 +231,7 @@ eraseType (T.Elaborated expr comp) =
           let assignments = numAssignments' <> boolAssignments'
           assertions' <- concat <$> mapM eraseExpr assertions
           return (expr', assignments, assertions')
-      Context nextVar' boolInputVars extraAssignments = context
+      Context nextVar' boolVars extraAssignments = context
    in TypeErased
         { erasedExpr = erasedExpr',
           erasedAssertions = erasedAssertions',
@@ -239,7 +239,7 @@ eraseType (T.Elaborated expr comp) =
           erasedNumOfVars = inputVarSize + outputVarSize + nextVar',
           erasedNumOfInputVars = inputVarSize,
           erasedOutputVarSize = outputVarSize,
-          erasedBoolInputVars = boolInputVars
+          erasedBoolVars = boolVars
         }
 
 eraseVal :: GaloisField n => T.Val -> M n [Expr n]

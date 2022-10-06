@@ -246,7 +246,7 @@ encodeAssertion expr = do
 
 -- | Compile an untyped expression to a constraint system
 run :: GaloisField n => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs assertions assignments allVarSize inputVarSize outputVarSize boolInputVars) = runM allVarSize $ do
+run (TypeErased untypedExprs assertions assignments allVarSize inputVarSize outputVarSize boolVars) = runM allVarSize $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
   let outputVars = [inputVarSize .. inputVarSize + outputVarSize - 1]
   forM_ (zip outputVars untypedExprs) $ \(var, expr) -> do
@@ -263,7 +263,7 @@ run (TypeErased untypedExprs assertions assignments allVarSize inputVarSize outp
   return
     ( ConstraintSystem
         constraints
-        boolInputVars
+        boolVars
         vars
         inputVarSize
         outputVarSize

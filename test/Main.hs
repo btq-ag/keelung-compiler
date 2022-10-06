@@ -91,18 +91,23 @@ main = hspec $ do
     describe "Boolean input variables" $ do
       it "Basic.identity" $
         let erased = erase Basic.identity :: Either (Error GF181) (TypeErased GF181)
-            result = IntSet.toList . erasedBoolInputVars <$> erased
+            result = IntSet.toList . erasedBoolVars <$> erased
          in result `shouldBe` Right []
 
       it "Basic.identityB" $
         let erased = erase Basic.identityB :: Either (Error GF181) (TypeErased GF181)
-            result = IntSet.toList . erasedBoolInputVars <$> erased
+            result = IntSet.toList . erasedBoolVars <$> erased
          in result `shouldBe` Right [0]
 
       it "Basic.every" $
         let erased = erase Basic.every :: Either (Error GF181) (TypeErased GF181)
-            result = IntSet.toList . erasedBoolInputVars <$> erased
+            result = IntSet.toList . erasedBoolVars <$> erased
          in result `shouldBe` Right [0 .. 3]
+
+      it "Basic.toBool" $
+        let erased = erase Basic.toBool :: Either (Error GF181) (TypeErased GF181)
+            result = IntSet.toList . erasedBoolVars <$> erased
+         in result `shouldBe` Right [0]
 
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))
@@ -115,7 +120,7 @@ main = hspec $ do
               { csConstraints =
                   Set.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
-                csBooleanInputVars = mempty,
+                csBoolVars = mempty,
                 csVars = IntSet.fromList [0],
                 csInputVarSize = 1,
                 csOutputVarSize = 0
@@ -192,7 +197,7 @@ main = hspec $ do
                           cadd 10623 [(13, -1)],
                           cadd 11179 [(12, -1)]
                         ],
-                  csBooleanInputVars = mempty,
+                  csBoolVars = mempty,
                   csVars = IntSet.fromList [0 .. 17],
                   csInputVarSize = 12,
                   csOutputVarSize = 0
@@ -207,7 +212,7 @@ main = hspec $ do
                     Set.fromList $
                       cadd 0 [(0, 1), (1, 1), (4, 1)]
                         ++ cadd 0 [(2, 1), (3, 1), (4, 1)],
-                  csBooleanInputVars = mempty,
+                  csBoolVars = mempty,
                   csVars = IntSet.fromList [0 .. 4],
                   csInputVarSize = 4,
                   csOutputVarSize = 0
@@ -217,7 +222,7 @@ main = hspec $ do
                 { csConstraints =
                     Set.fromList $
                       cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)],
-                  csBooleanInputVars = mempty,
+                  csBoolVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVarSize = 4,
                   csOutputVarSize = 0
@@ -231,7 +236,7 @@ main = hspec $ do
                     Set.fromList $
                       cmul [(3, 1)] [(2, 1)] (42, []) --- $3 * $2 = 42
                         ++ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
-                  csBooleanInputVars = mempty,
+                  csBoolVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVarSize = 3,
                   csOutputVarSize = 0
@@ -240,7 +245,7 @@ main = hspec $ do
               ConstraintSystem
                 { csConstraints =
                     Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
-                  csBooleanInputVars = mempty,
+                  csBoolVars = mempty,
                   csVars = IntSet.fromList [0 .. 2],
                   csInputVarSize = 3,
                   csOutputVarSize = 0
@@ -254,7 +259,7 @@ main = hspec $ do
                     Set.fromList $
                       cadd 0 [(3, 1), (0, 1), (1, 1)] --- 0 = $3 + $0 + $1
                         ++ cmul [(2, 1)] [(3, 1)] (42, []), --- $2 * $3 = 42
-                  csBooleanInputVars = mempty,
+                  csBoolVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVarSize = 3,
                   csOutputVarSize = 0
@@ -263,7 +268,7 @@ main = hspec $ do
               ConstraintSystem
                 { csConstraints =
                     Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
-                  csBooleanInputVars = mempty,
+                  csBoolVars = mempty,
                   csVars = IntSet.fromList [0 .. 2],
                   csInputVarSize = 3,
                   csOutputVarSize = 0
@@ -277,7 +282,7 @@ main = hspec $ do
                     Set.fromList $
                       cadd 0 [(4, 1), (0, 1), (1, 1)] --- 0 = $4 + $0 + $1
                         ++ cmul [(2, 1)] [(3, 1)] (0, [(4, 1)]), --- $2 * $3 = $4
-                  csBooleanInputVars = mempty,
+                  csBoolVars = mempty,
                   csVars = IntSet.fromList [0 .. 4],
                   csInputVarSize = 4,
                   csOutputVarSize = 0
@@ -287,7 +292,7 @@ main = hspec $ do
                 { csConstraints =
                     Set.fromList $
                       cmul [(2, 1)] [(3, 1)] (0, [(0, -1), (1, -1)]), --- $2 * $3 = - $0 - $1
-                  csBooleanInputVars = mempty,
+                  csBoolVars = mempty,
                   csVars = IntSet.fromList [0 .. 3],
                   csInputVarSize = 4,
                   csOutputVarSize = 0

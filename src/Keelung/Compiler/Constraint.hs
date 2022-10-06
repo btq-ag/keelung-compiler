@@ -130,9 +130,9 @@ varsInConstraints = IntSet.unions . Set.map varsInConstraint
 data ConstraintSystem n = ConstraintSystem
   { -- | Constraints
     csConstraints :: !(Set (Constraint n)),
-    -- | Input variables that are Booleans
+    -- | Variables that are Booleans
     -- should generate constraints like $A * $A = $A for each Boolean variables
-    csBooleanInputVars :: !IntSet,
+    csBoolVars :: !IntSet,
     csVars :: !IntSet,
     -- | Invariant: input variables are placed in the front of everything
     --              so that we only need to remember how many are there
@@ -148,7 +148,7 @@ numberOfConstraints :: ConstraintSystem n -> Int
 numberOfConstraints (ConstraintSystem cs cs' _ _ _) = Set.size cs + IntSet.size cs'
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints boolInputVars vars inputVarSize outputVarSize) =
+  show (ConstraintSystem constraints boolVars vars inputVarSize outputVarSize) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
@@ -164,10 +164,10 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       printConstraints = unlines . map (\c -> "    " <> show c)
 
       printBooleanVars =
-        if IntSet.null boolInputVars
+        if IntSet.null boolVars
           then ""
           else
-            "  boolean input variables (" <> show (IntSet.size boolInputVars)
+            "  boolean variables (" <> show (IntSet.size boolVars)
               <> ")\n\n"
 
       printNumOfVars =
@@ -204,7 +204,7 @@ renumberConstraints :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
 renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))
-    (IntSet.map renumber (csBooleanInputVars cs))
+    (IntSet.map renumber (csBoolVars cs))
     (IntSet.fromList renumberedVars)
     (csInputVarSize cs)
     (csOutputVarSize cs)

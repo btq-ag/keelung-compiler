@@ -223,7 +223,7 @@ cs1 =
               cadd 10623 [(13, -1)],
               cadd 11179 [(12, -1)]
             ],
-      csBooleanInputVars = mempty,
+      csBoolVars = mempty,
       csVars = IntSet.fromList [0 .. 17],
       csInputVarSize = 12,
       csOutputVarSize = 0
