@@ -295,3 +295,6 @@ chainingAND n = foldl And true <$> inputs n
 
 chainingOR :: Int -> Comp Boolean 
 chainingOR n = foldl Or false <$> inputs n
+
+toBool :: Comp Boolean
+toBool = ToBool <$> input

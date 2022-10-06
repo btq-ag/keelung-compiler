@@ -91,7 +91,7 @@ reindexR1CS :: R1CS n -> R1CS n
 reindexR1CS r1cs =
   r1cs
     { r1csConstraints = map reindexR1C (r1csConstraints r1cs),
-      r1csBoolInputVars = IntSet.map reindex (r1csBoolInputVars r1cs),
+      r1csBoolVars = IntSet.map reindex (r1csBoolVars r1cs),
       r1csCNQZPairs = map (Bifunctor.bimap reindex reindex) (r1csCNQZPairs r1cs)
     }
   where

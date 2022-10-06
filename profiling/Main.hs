@@ -23,7 +23,7 @@ printR1CS printConstraints r1cs = do
       print r1cs
       putStrLn "========="
     else do
-      print $ length constraints + IntSet.size (r1csBoolInputVars r1cs)
+      print $ length constraints + IntSet.size (r1csBoolVars r1cs)
 
 main :: IO ()
 main = do

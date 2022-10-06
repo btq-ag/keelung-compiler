@@ -171,68 +171,107 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
 --------------------------------------------------------------------------------
 
 -- monad for collecting boolean vars along the way
-type M = ReaderT (Int, Int) (State IntSet)
+type M n = ReaderT (Int, Int) (State (Context n))
 
-runM :: Int -> Int -> M a -> (a, IntSet)
-runM inputVarSize outputVarSize = flip runState IntSet.empty . flip runReaderT (inputVarSize, outputVarSize)
+runM :: Int -> Int -> Int -> M n a -> (a, Context n)
+runM inputVarSize outputVarSize nextVar =
+  flip runState (initContext nextVar) . flip runReaderT (inputVarSize, outputVarSize)
+
+-- | Context for type erasure
+data Context n = Context
+  { -- | Number of variables
+    ctxNumOfVars :: !Int,
+    -- | Set of Boolean variables (so that we can impose constraints like `$A * $A = $A` on them)
+    ctxBoolVars :: !IntSet,
+    -- | Assignments ($A = ...)
+    ctxAssigments :: [Assignment n]
+  }
+  deriving (Show)
+
+-- | Initial Context for type erasure
+initContext :: Int -> Context n
+initContext nextVar = Context nextVar IntSet.empty []
+
+-- | Mark a variable as Boolean
+-- so that we can later impose constraints on them (e.g. $A * $A = $A)
+markAsBoolVar :: Var -> M n ()
+markAsBoolVar var = modify' (\ctx -> ctx {ctxBoolVars = IntSet.insert var (ctxBoolVars ctx)})
+
+-- | Generate a fresh new variable
+freshVar :: M n Var
+freshVar = do
+  numberOfVars <- gets ctxNumOfVars
+  modify' (\ctx -> ctx {ctxNumOfVars = succ (ctxNumOfVars ctx)})
+  return numberOfVars
+
+-- | Make a new assignment
+makeAssignment :: Var -> Expr n -> M n ()
+makeAssignment var expr = modify' (\ctx -> ctx {ctxAssigments = Assignment var expr : ctxAssigments ctx})
+
+-- | Wire an expression with some variable
+--   If the expression is already a variable, then we just return it
+wireAsVar :: Expr n -> M n Var
+wireAsVar (Var var) = return var
+wireAsVar others = do
+  var <- freshVar
+  makeAssignment var others
+  return var
+
+--------------------------------------------------------------------------------
 
 eraseType :: GaloisField n => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let outputVarSize = lengthOfExpr expr
       T.Computation nextVar inputVarSize _nextAddr _heap numAsgns boolAsgns assertions = comp
-      ((erasedExpr', erasedAssignments', erasedAssertions'), boolInputVars) =
-        runM inputVarSize outputVarSize $ do
+      ((erasedExpr', erasedAssignments', erasedAssertions'), context) =
+        runM inputVarSize outputVarSize nextVar $ do
           expr' <- eraseExpr expr
           numAssignments' <- mapM eraseAssignment numAsgns
           boolAssignments' <- mapM eraseAssignment boolAsgns
           let assignments = numAssignments' <> boolAssignments'
           assertions' <- concat <$> mapM eraseExpr assertions
           return (expr', assignments, assertions')
+      Context nextVar' boolInputVars extraAssignments = context
    in TypeErased
         { erasedExpr = erasedExpr',
           erasedAssertions = erasedAssertions',
-          erasedAssignments = erasedAssignments',
-          erasedNumOfVars = inputVarSize + outputVarSize + nextVar,
+          erasedAssignments = erasedAssignments' <> extraAssignments,
+          erasedNumOfVars = inputVarSize + outputVarSize + nextVar',
           erasedNumOfInputVars = inputVarSize,
           erasedOutputVarSize = outputVarSize,
           erasedBoolInputVars = boolInputVars
         }
 
-eraseVal :: GaloisField n => T.Val -> M [Expr n]
+eraseVal :: GaloisField n => T.Val -> M n [Expr n]
 eraseVal (T.Integer n) = return [Val (fromInteger n)]
 eraseVal (T.Rational n) = return [Val (fromRational n)]
 eraseVal (T.Boolean False) = return [Val 0]
 eraseVal (T.Boolean True) = return [Val 1]
 eraseVal T.Unit = return []
 
-eraseRef' :: T.Ref -> M Int
+eraseRef' :: T.Ref -> M n Int
 eraseRef' ref = case ref of
   T.NumVar n -> relocateOrdinaryVar n
   T.NumInputVar n -> return n
+  -- we don't need to mark intermediate Boolean variables
+  -- and impose the Boolean constraint on them ($A * $A = $A)
+  -- because this property should be guaranteed by the source of its value
   T.BoolVar n -> relocateOrdinaryVar n
   T.BoolInputVar n -> do
-    -- keep track of all boolean input variables
-    -- so that we can later impose constraints on them (e.g. $A * $A = $A)
-    modify' (IntSet.insert n)
+    markAsBoolVar n
     return n
   where
-    -- we need to relocate ordinary variables 
+    -- we need to relocate ordinary variables
     -- so that we can place input variables and output variables in front of them
-    relocateOrdinaryVar :: Int -> M Int
+    relocateOrdinaryVar :: Int -> M n Int
     relocateOrdinaryVar n = do
       (inputVarSize, outputVarSize) <- ask
       return (inputVarSize + outputVarSize + n)
 
-eraseRef :: GaloisField n => T.Ref -> M (Expr n)
+eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
 eraseRef ref = Var <$> eraseRef' ref
 
--- eraseVal (T.Integer n) = return [Val (fromInteger n)]
--- eraseVal (T.Rational n) = return [Val (fromRational n)]
--- eraseVal (T.Boolean False) = return [Val 0]
--- eraseVal (T.Boolean True) = return [Val 1]
--- eraseVal T.Unit = return []
-
-eraseExpr :: GaloisField n => T.Expr -> M [Expr n]
+eraseExpr :: GaloisField n => T.Expr -> M n [Expr n]
 eraseExpr expr = case expr of
   T.Val val -> eraseVal val
   T.Var ref -> pure <$> eraseRef ref
@@ -280,10 +319,16 @@ eraseExpr expr = case expr of
     xs <- eraseExpr x
     ys <- eraseExpr y
     return [If (head bs) (head xs) (head ys)]
-  T.ToBool x -> eraseExpr x
+  T.ToBool x -> do
+    -- we need to wire the erased expression as variable and mark it as Boolean
+    -- because there's no guarantee that the erased expression
+    -- would behave like a Boolean (i.e. $A * $A = $A)
+    vars <- eraseExpr x >>= mapM wireAsVar
+    mapM_ markAsBoolVar vars
+    return $ map Var vars
   T.ToNum x -> eraseExpr x
 
-eraseAssignment :: GaloisField n => T.Assignment -> M (Assignment n)
+eraseAssignment :: GaloisField n => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.Assignment ref expr) = do
   var <- eraseRef' ref
   exprs <- eraseExpr expr
