@@ -109,7 +109,7 @@ sizeOfExpr expr = case expr of
 --    so that we can reserve output variables for the expressions within
 lengthOfExpr :: T.Expr -> Int
 lengthOfExpr expr = case expr of
-  T.Array xs -> length xs
+  T.Array xs -> sum $ fmap lengthOfExpr xs
   (T.Val T.Unit) -> 0
   _ -> 1
 

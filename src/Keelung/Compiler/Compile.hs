@@ -19,9 +19,7 @@ import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Types (Var)
 
-----------------------------------------------------------------
-
-----------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 -- | Monad for compilation
 data Env n = Env
