@@ -9,7 +9,6 @@ module Keelung.Compiler.Syntax.Untyped
     Assignment (..),
     eraseType,
     sizeOfExpr,
-    isAssoc,
   )
 where
 
@@ -38,20 +37,6 @@ data Op
   | Eq
   | BEq
   deriving (Eq, Show)
-
--- See if an operator is associative, so that we can chain them together
-isAssoc :: Op -> Bool
-isAssoc op = case op of
-  Add -> True
-  Sub -> False
-  Mul -> True
-  Div -> False
-  And -> True
-  Or -> True
-  Xor -> True
-  NEq -> True
-  Eq -> True
-  BEq -> True
 
 --------------------------------------------------------------------------------
 
@@ -282,39 +267,39 @@ eraseExpr expr = case expr of
   T.Add x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprs Add (head xs) (head ys)]
+    return [chainExprsOfAssocOp Add (head xs) (head ys)]
   T.Sub x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprs Sub (head xs) (head ys)]
+    return [BinOp Sub (head xs) (head ys) mempty]
   T.Mul x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprs Mul (head xs) (head ys)]
+    return [chainExprsOfAssocOp Mul (head xs) (head ys)]
   T.Div x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprs Div (head xs) (head ys)]
+    return [BinOp Div (head xs) (head ys) mempty]
   T.Eq x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprs Eq (head xs) (head ys)]
+    return [chainExprsOfAssocOp Eq (head xs) (head ys)]
   T.And x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprs And (head xs) (head ys)]
+    return [chainExprsOfAssocOp And (head xs) (head ys)]
   T.Or x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprs Or (head xs) (head ys)]
+    return [chainExprsOfAssocOp Or (head xs) (head ys)]
   T.Xor x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprs Xor (head xs) (head ys)]
+    return [chainExprsOfAssocOp Xor (head xs) (head ys)]
   T.BEq x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprs BEq (head xs) (head ys)]
+    return [chainExprsOfAssocOp BEq (head xs) (head ys)]
   T.If b x y -> do
     bs <- eraseExpr b
     xs <- eraseExpr x
@@ -335,19 +320,19 @@ eraseAssignment (T.Assignment ref expr) = do
   exprs <- eraseExpr expr
   return $ Assignment var (head exprs)
 
--- Flatten and chain expressions together when possible
-chainExprs :: Op -> Expr n -> Expr n -> Expr n
-chainExprs op x y = case (x, y) of
+-- Flatten and chain expressions with associative operator together when possible
+chainExprsOfAssocOp :: Op -> Expr n -> Expr n -> Expr n
+chainExprsOfAssocOp op x y = case (x, y) of
   (BinOp op1 x0 x1 xs, BinOp op2 y0 y1 ys)
-    | op1 == op2 && op2 == op && isAssoc op ->
+    | op1 == op2 && op2 == op ->
       -- chaining `op`, `op1`, and `op2`
       BinOp op x0 x1 (xs <> (y0 :<| y1 :<| ys))
   (BinOp op1 x0 x1 xs, _)
-    | op1 == op && isAssoc op ->
+    | op1 == op ->
       -- chaining `op` and `op1`
       BinOp op x0 x1 (xs |> y)
   (_, BinOp op2 y0 y1 ys)
-    | op2 == op && isAssoc op ->
+    | op2 == op ->
       -- chaining `op` and `op2`
       BinOp op x y0 (y1 :<| ys)
   -- there's nothing left we can do
