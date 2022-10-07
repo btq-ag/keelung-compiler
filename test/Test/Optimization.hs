@@ -157,8 +157,8 @@ tests = do
       it "5 variables" $ count (Basic.chainingAND 5) `shouldBe` Right (5 + 2)
 
     describe "OR Chaining" $ do
-      it "1 variable" $ count (Basic.chainingOR 1) `shouldBe` Right 5
-      it "2 variables" $ count (Basic.chainingOR 2) `shouldBe` Right (2 + 5)
+      it "1 variable" $ count (Basic.chainingOR 1) `shouldBe` Right 2
+      it "2 variables" $ count (Basic.chainingOR 2) `shouldBe` Right 3
       it "3 variables" $ count (Basic.chainingOR 3) `shouldBe` Right (3 + 5)
       it "4 variables" $ count (Basic.chainingOR 4) `shouldBe` Right (4 + 5)
       it "5 variables" $ count (Basic.chainingOR 5) `shouldBe` Right (5 + 5)

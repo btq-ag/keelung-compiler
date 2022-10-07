@@ -2,7 +2,7 @@
 
 module Array.Mutable where
 
-import Control.Monad (foldM, foldM_)
+import Control.Monad
 import Data.Bits (Bits (testBit))
 import Data.Word (Word8)
 import Keelung
@@ -27,13 +27,16 @@ fullAdder as bs = do
     ( \carry i -> do
         a <- accessM as i
         b <- accessM bs i
-        let value = a `Xor` b `Xor` carry
-        let nextCarry = (a `Xor` b `And` carry) `Or` (a `And` b)
+        x <- reuse (a `Xor` b)
+        carry' <- reuse carry
+        let value = x `Xor` carry'
+        let nextCarry = (x `And` carry') `Or` (a `And` b)
         updateM result i value
         return nextCarry
     )
     false
     [0 .. lengthOf as - 1]
+
   return result
 
 -- | "T" for top-level

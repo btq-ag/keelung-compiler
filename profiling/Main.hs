@@ -1,7 +1,7 @@
 module Main where
 
-import qualified Array.Immutable2 as M
--- import qualified Array.Mutable2 as M
+import qualified Array.Immutable as M
+-- import qualified Array.Mutable as M
 import Control.Monad
 import qualified Data.IntSet as IntSet
 import Keelung (GF181)

@@ -70,9 +70,7 @@ executable constraint
       AggregateSignature.Util
       Array
       Array.Immutable
-      Array.Immutable2
       Array.Mutable
-      Array.Mutable2
       Basic
       Keelung.Compiler
       Keelung.Compiler.Compile
@@ -141,9 +139,7 @@ executable keelungc
       AggregateSignature.Util
       Array
       Array.Immutable
-      Array.Immutable2
       Array.Mutable
-      Array.Mutable2
       Basic
       Paths_keelung_compiler
   hs-source-dirs:
@@ -179,9 +175,7 @@ test-suite keelung-test
       AggregateSignature.Util
       Array
       Array.Immutable
-      Array.Immutable2
       Array.Mutable
-      Array.Mutable2
       Basic
       Paths_keelung_compiler
   hs-source-dirs:
@@ -236,9 +230,7 @@ benchmark keelung-bench
       AggregateSignature.Util
       Array
       Array.Immutable
-      Array.Immutable2
       Array.Mutable
-      Array.Mutable2
       Basic
       Paths_keelung_compiler
   hs-source-dirs:

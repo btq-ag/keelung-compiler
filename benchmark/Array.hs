@@ -2,7 +2,7 @@
 
 module Array (fromString, fullAdder, multiplier) where
 
-import qualified Array.Immutable2 as I
+import qualified Array.Immutable as I
 import Criterion
 import Benchmark.Util
 import Keelung (Comp, Arr, Boolean)

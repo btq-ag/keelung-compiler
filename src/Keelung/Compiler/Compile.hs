@@ -80,11 +80,21 @@ encode out expr = case expr of
           inv <- freshVar
           add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
     Or -> do
-      --      if all operands are 0           then 0 else 1
-      --  =>  if the sum of operands is 0     then 0 else 1
-      --  =>  if the sum of operands is not 0 then 1 else 0 
-      --  =>  the sum of operands is not 0
-      encode out (BinOp NEq (0 :<| BinOp Add operands :<| Empty))
+      vars <- mapM wireAsVar operands
+      case vars of
+        Empty -> add $ cadd 1 [(out, -1)] -- out = 1
+        (a :<| Empty) -> add $ cadd 0 [(out, -1), (a, 1)] -- out = a
+        (a :<| b :<| Empty) -> add [COr a b out]
+        (a :<| b :<| c :<| Empty) -> do
+          x <- freshVar
+          add [COr a b x]
+          add [COr x c out]
+        _ -> do
+          --      if all operands are 0           then 0 else 1
+          --  =>  if the sum of operands is 0     then 0 else 1
+          --  =>  if the sum of operands is not 0 then 1 else 0
+          --  =>  the sum of operands is not 0
+          encode out (BinOp NEq (0 :<| BinOp Add operands :<| Empty))
     _ -> encodeOtherBinOp op out operands
   If b x y -> encode out e -- out = b * x + (1-b) * y
     where
@@ -173,11 +183,10 @@ wireAsVar expr = do
 encodeBinaryOp :: GaloisField n => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
   Add -> error "encodeBinaryOp: Add"
-  -- add $ cadd 0 [(x, 1), (y, 1), (out, -1)]
-  Sub -> add $ cadd 0 [(x, 1), (y, negate 1), (out, negate 1)]
+  Sub -> error "encodeBinaryOp: Sub"
   Mul -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
   Div -> add [CMul (Poly.singleVar y) (Poly.singleVar out) (Right $ Poly.singleVar x)]
-  And -> encodeBinaryOp Mul out x y
+  And -> error "encodeBinaryOp: And"
   Or -> add [COr x y out]
   -- -- Constraint 'x ∨ y = out'.
   -- -- The encoding is: x+y - out = x*y; assumes x and y are boolean.
