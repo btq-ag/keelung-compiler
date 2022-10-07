@@ -48,55 +48,57 @@ encode out expr = case expr of
   Val val -> add $ cadd val [(out, -1)] -- out = val
   Var var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   BinOp op x y rest ->
-    let operands = x :<| y :<| rest
-     in case op of
-          Add -> do
-            terms <- {-# SCC "mapMtoTerm" #-} mapM toTerm operands
-            {-# SCC "encodeTerms" #-} encodeTerms out terms
-          Sub -> do
-            terms <- mapM toTerm operands
-            encodeTerms out (negateTailTerms terms)
-          And -> do
-            vars <- mapM wireAsVar operands
-            case vars of
-              Empty -> add $ cadd 1 [(out, -1)] -- out = 1
-              (a :<| Empty) -> add $ cadd 0 [(out, -1), (a, 1)] -- out = a
-              (a :<| b :<| Empty) -> add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar out))] -- out = a * b
-              (a :<| b :<| c :<| Empty) -> do
-                aAndb <- freshVar
-                add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar aAndb))] -- x = a * b
-                add [CMul (Poly.singleVar aAndb) (Poly.singleVar c) (Right (Poly.singleVar out))] -- out = x * c
-              _ -> do
-                -- the number of operands
-                let n = fromIntegral (length operands)
-                -- polynomial = n - sum of operands
-                let polynomial = case Poly.buildMaybe n (IntMap.fromList [(v, -1) | v <- toList vars]) of
-                      Just p -> p
-                      Nothing -> error "encode: And: impossible"
-                -- if the answer is 1 then all operands must be 1
-                --    (n - sum of operands) * out = 0
-                add [CMul polynomial (Poly.singleVar out) (Left 0)]
-                -- if the answer is 0 then not all operands must be 1:
-                --    (n - sum of operands) * inv = 1 - out
-                inv <- freshVar
-                add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
-          Or -> do
-            vars <- mapM wireAsVar operands
-            case vars of
-              Empty -> add $ cadd 1 [(out, -1)] -- out = 1
-              (a :<| Empty) -> add $ cadd 0 [(out, -1), (a, 1)] -- out = a
-              (a :<| b :<| Empty) -> add [COr a b out]
-              (a :<| b :<| c :<| Empty) -> do
-                aOrb <- freshVar
-                add [COr a b aOrb]
-                add [COr aOrb c out]
-              _ -> do
-                --      if all operands are 0           then 0 else 1
-                --  =>  if the sum of operands is 0     then 0 else 1
-                --  =>  if the sum of operands is not 0 then 1 else 0
-                --  =>  the sum of operands is not 0
-                encode out (BinOp NEq 0 (BinOp Add x y rest) Empty)
-          _ -> encodeOtherBinOp op out operands
+    case op of
+      Add -> do
+        terms <- {-# SCC "mapMtoTerm" #-} mapM toTerm (x :<| y :<| rest)
+        {-# SCC "encodeTerms" #-} encodeTerms out terms
+      Sub -> do
+        x' <- toTerm x
+        y' <- toTerm y
+        rest' <- mapM toTerm rest
+        -- regate the rest of the terms 
+        encodeTerms out (x' :<| negateTerm y' :<| fmap negateTerm rest')
+      And -> do
+        a <- wireAsVar x
+        b <- wireAsVar y
+        vars <- mapM wireAsVar rest
+        case vars of
+          Empty -> add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar out))] -- out = a * b
+          (c :<| Empty) -> do
+            aAndb <- freshVar
+            add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar aAndb))] -- x = a * b
+            add [CMul (Poly.singleVar aAndb) (Poly.singleVar c) (Right (Poly.singleVar out))] -- out = x * c
+          _ -> do
+            -- the number of operands
+            let n = 2 + fromIntegral (length vars)
+            -- polynomial = n - sum of operands
+            let polynomial = case Poly.buildMaybe n (IntMap.fromList ((a, -1) : (b, -1) : [(v, -1) | v <- toList vars])) of
+                  Just p -> p
+                  Nothing -> error "encode: And: impossible"
+            -- if the answer is 1 then all operands must be 1
+            --    (n - sum of operands) * out = 0
+            add [CMul polynomial (Poly.singleVar out) (Left 0)]
+            -- if the answer is 0 then not all operands must be 1:
+            --    (n - sum of operands) * inv = 1 - out
+            inv <- freshVar
+            add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
+      Or -> do
+        a <- wireAsVar x
+        b <- wireAsVar y
+        vars <- mapM wireAsVar rest
+        case vars of
+          Empty -> add [COr a b out]
+          (c :<| Empty) -> do
+            aOrb <- freshVar
+            add [COr a b aOrb]
+            add [COr aOrb c out]
+          _ -> do
+            --      if all operands are 0           then 0 else 1
+            --  =>  if the sum of operands is 0     then 0 else 1
+            --  =>  if the sum of operands is not 0 then 1 else 0
+            --  =>  the sum of operands is not 0
+            encode out (BinOp NEq 0 (BinOp Add x y rest) Empty)
+      _ -> encodeOtherBinOp op out x y rest
   If b x y -> encode out ((b * x) + ((1 - b) * y))
 
 encodeAssignment :: GaloisField n => Assignment n -> M n ()
@@ -132,12 +134,10 @@ toTerm expr = do
   encode out expr
   return $ WithVars out 1
 
-negateTailTerms :: Num n => Seq (Term n) -> Seq (Term n)
-negateTailTerms Empty = Empty
-negateTailTerms (x :<| xs) = x :<| fmap negateConstant xs -- don't negate the first element
-  where
-    negateConstant (WithVars var c) = WithVars var (negate c)
-    negateConstant (Constant c) = Constant (negate c)
+-- | Negate a Term
+negateTerm :: Num n => Term n -> Term n
+negateTerm (WithVars var c) = WithVars var (negate c)
+negateTerm (Constant c) = Constant (negate c)
 
 encodeTerms :: GaloisField n => Var -> Seq (Term n) -> M n ()
 encodeTerms out terms =
@@ -148,20 +148,19 @@ encodeTerms out terms =
     go (constant, pairs) (Constant n) = (constant + n, pairs)
     go (constant, pairs) (WithVars var coeff) = (constant, (var, coeff) : pairs)
 
-encodeOtherBinOp :: GaloisField n => Op -> Var -> Seq (Expr n) -> M n ()
-encodeOtherBinOp op out exprs = do
-  vars <- mapM wireAsVar exprs
-  encodeVars vars
+encodeOtherBinOp :: GaloisField n => Op -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
+encodeOtherBinOp op out x0 x1 xs = do
+  x0' <- wireAsVar x0
+  x1' <- wireAsVar x1
+  vars <- mapM wireAsVar xs
+  encodeVars x0' x1' vars
   where
-    encodeVars :: GaloisField n => Seq Var -> M n ()
-    encodeVars vars = case vars of
-      Empty -> return ()
-      _ :<| Empty -> return ()
-      x :<| y :<| Empty -> encodeBinaryOp op out x y
-      x :<| y :<| xs -> do
-        out' <- freshVar
-        encodeVars (out' :<| xs)
-        encodeBinaryOp op out' x y
+    encodeVars :: GaloisField n => Var -> Var -> Seq Var -> M n ()
+    encodeVars x y Empty = encodeBinaryOp op out x y
+    encodeVars x y (v :<| vs) = do
+      out' <- freshVar
+      encodeVars out' v vs
+      encodeBinaryOp op out' x y
 
 -- | If the expression is not already a variable, create a new variable
 wireAsVar :: GaloisField n => Expr n -> M n Var
