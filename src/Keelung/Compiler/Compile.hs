@@ -11,7 +11,6 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
 import qualified Data.IntMap as IntMap
 import Data.Sequence (Seq (..))
-import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint
@@ -48,64 +47,57 @@ encode :: GaloisField n => Var -> Expr n -> M n ()
 encode out expr = case expr of
   Val val -> add $ cadd val [(out, -1)] -- out = val
   Var var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
-  BinOp op operands -> case op of
-    Add -> do
-      terms <- {-# SCC "mapMtoTerm" #-} mapM toTerm operands
-      {-# SCC "encodeTerms" #-} encodeTerms out terms
-    Sub -> do
-      terms <- mapM toTerm operands
-      encodeTerms out (negateTailTerms terms)
-    And -> do
-      vars <- mapM wireAsVar operands
-      case vars of
-        Empty -> add $ cadd 1 [(out, -1)] -- out = 1
-        (a :<| Empty) -> add $ cadd 0 [(out, -1), (a, 1)] -- out = a
-        (a :<| b :<| Empty) -> add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar out))] -- out = a * b
-        (a :<| b :<| c :<| Empty) -> do
-          x <- freshVar
-          add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar x))] -- x = a * b
-          add [CMul (Poly.singleVar x) (Poly.singleVar c) (Right (Poly.singleVar out))] -- out = x * c
-        _ -> do
-          -- the number of operands
-          let n = fromIntegral (length operands)
-          -- polynomial = n - sum of operands
-          let polynomial = case Poly.buildMaybe n (IntMap.fromList [(v, -1) | v <- toList vars]) of
-                Just p -> p
-                Nothing -> error "encode: And: impossible"
-          -- if the answer is 1 then all operands must be 1
-          --    (n - sum of operands) * out = 0
-          add [CMul polynomial (Poly.singleVar out) (Left 0)]
-          -- if the answer is 0 then not all operands must be 1:
-          --    (n - sum of operands) * inv = 1 - out
-          inv <- freshVar
-          add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
-    Or -> do
-      vars <- mapM wireAsVar operands
-      case vars of
-        Empty -> add $ cadd 1 [(out, -1)] -- out = 1
-        (a :<| Empty) -> add $ cadd 0 [(out, -1), (a, 1)] -- out = a
-        (a :<| b :<| Empty) -> add [COr a b out]
-        (a :<| b :<| c :<| Empty) -> do
-          x <- freshVar
-          add [COr a b x]
-          add [COr x c out]
-        _ -> do
-          --      if all operands are 0           then 0 else 1
-          --  =>  if the sum of operands is 0     then 0 else 1
-          --  =>  if the sum of operands is not 0 then 1 else 0
-          --  =>  the sum of operands is not 0
-          encode out (BinOp NEq (0 :<| BinOp Add operands :<| Empty))
-    _ -> encodeOtherBinOp op out operands
-  If b x y -> encode out e -- out = b * x + (1-b) * y
-    where
-      e =
-        BinOp
-          Add
-          ( Seq.fromList
-              [ BinOp Mul (Seq.fromList [b, x]),
-                BinOp Mul (Seq.fromList [BinOp Sub (Seq.fromList [Val 1, b]), y])
-              ]
-          )
+  BinOp op x y rest ->
+    let operands = x :<| y :<| rest
+     in case op of
+          Add -> do
+            terms <- {-# SCC "mapMtoTerm" #-} mapM toTerm operands
+            {-# SCC "encodeTerms" #-} encodeTerms out terms
+          Sub -> do
+            terms <- mapM toTerm operands
+            encodeTerms out (negateTailTerms terms)
+          And -> do
+            vars <- mapM wireAsVar operands
+            case vars of
+              Empty -> add $ cadd 1 [(out, -1)] -- out = 1
+              (a :<| Empty) -> add $ cadd 0 [(out, -1), (a, 1)] -- out = a
+              (a :<| b :<| Empty) -> add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar out))] -- out = a * b
+              (a :<| b :<| c :<| Empty) -> do
+                aAndb <- freshVar
+                add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar aAndb))] -- x = a * b
+                add [CMul (Poly.singleVar aAndb) (Poly.singleVar c) (Right (Poly.singleVar out))] -- out = x * c
+              _ -> do
+                -- the number of operands
+                let n = fromIntegral (length operands)
+                -- polynomial = n - sum of operands
+                let polynomial = case Poly.buildMaybe n (IntMap.fromList [(v, -1) | v <- toList vars]) of
+                      Just p -> p
+                      Nothing -> error "encode: And: impossible"
+                -- if the answer is 1 then all operands must be 1
+                --    (n - sum of operands) * out = 0
+                add [CMul polynomial (Poly.singleVar out) (Left 0)]
+                -- if the answer is 0 then not all operands must be 1:
+                --    (n - sum of operands) * inv = 1 - out
+                inv <- freshVar
+                add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
+          Or -> do
+            vars <- mapM wireAsVar operands
+            case vars of
+              Empty -> add $ cadd 1 [(out, -1)] -- out = 1
+              (a :<| Empty) -> add $ cadd 0 [(out, -1), (a, 1)] -- out = a
+              (a :<| b :<| Empty) -> add [COr a b out]
+              (a :<| b :<| c :<| Empty) -> do
+                aOrb <- freshVar
+                add [COr a b aOrb]
+                add [COr aOrb c out]
+              _ -> do
+                --      if all operands are 0           then 0 else 1
+                --  =>  if the sum of operands is 0     then 0 else 1
+                --  =>  if the sum of operands is not 0 then 1 else 0
+                --  =>  the sum of operands is not 0
+                encode out (BinOp NEq 0 (BinOp Add x y rest) Empty)
+          _ -> encodeOtherBinOp op out operands
+  If b x y -> encode out ((b * x) + ((1 - b) * y))
 
 encodeAssignment :: GaloisField n => Assignment n -> M n ()
 encodeAssignment (Assignment var expr) = encode var expr
@@ -119,15 +111,15 @@ data Term n
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
 toTerm :: GaloisField n => Expr n -> M n (Term n)
-toTerm (BinOp Mul (Var var :<| Val n :<| Empty)) =
+toTerm (BinOp Mul (Var var) (Val n) Empty) =
   return $ WithVars var n
-toTerm (BinOp Mul (Val n :<| Var var :<| Empty)) =
+toTerm (BinOp Mul (Val n) (Var var) Empty) =
   return $ WithVars var n
-toTerm (BinOp Mul (expr :<| Val n :<| Empty)) = do
+toTerm (BinOp Mul expr (Val n) Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (BinOp Mul (Val n :<| expr :<| Empty)) = do
+toTerm (BinOp Mul (Val n) expr Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
@@ -187,12 +179,7 @@ encodeBinaryOp op out x y = case op of
   Mul -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
   Div -> add [CMul (Poly.singleVar y) (Poly.singleVar out) (Right $ Poly.singleVar x)]
   And -> error "encodeBinaryOp: And"
-  Or -> add [COr x y out]
-  -- -- Constraint 'x ∨ y = out'.
-  -- -- The encoding is: x+y - out = x*y; assumes x and y are boolean.
-  -- xy <- freshVar
-  -- encode xy (Var x * Var y)
-  -- encode xy (Var x + Var y - Var out)
+  Or -> error "encodeBinaryOp: Or"
   Xor -> add [CXor x y out]
   -- -- Constraint 'x xor y = out'.
   -- -- The encoding is: x+y - out = 2(x*y); assumes x and y are boolean.
@@ -231,7 +218,7 @@ encodeBinaryOp op out x y = case op of
     -- The encoding is: out = 1 - (x-y != 0).
     result <- freshVar
     encodeBinaryOp NEq result x y
-    encode out (BinOp Sub (1 :<| Var result :<| Empty))
+    encode out (1 - Var result)
   BEq -> do
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.
     -- The encoding is: x*y + (1-x)*(1-y) = out.

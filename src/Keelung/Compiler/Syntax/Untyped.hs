@@ -18,8 +18,7 @@ import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import Data.Sequence (Seq (..), (<|), (|>))
-import qualified Data.Sequence as Seq
+import Data.Sequence (Seq (..), (|>))
 import Keelung.Field (N (..))
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Types (Var)
@@ -60,14 +59,14 @@ isAssoc op = case op of
 data Expr n
   = Var Var
   | Val n
-  | BinOp Op (Seq (Expr n))
+  | BinOp Op (Expr n) (Expr n) (Seq (Expr n))
   | If (Expr n) (Expr n) (Expr n)
   deriving (Eq, Functor)
 
 instance Num n => Num (Expr n) where
-  x + y = BinOp Add (Seq.fromList [x, y])
-  x - y = BinOp Sub (Seq.fromList [x, y])
-  x * y = BinOp Mul (Seq.fromList [x, y])
+  x + y = BinOp Add x y Empty
+  x - y = BinOp Sub x y Empty
+  x * y = BinOp Mul x y Empty
   abs = id
   signum = const 1
   fromInteger = Val . fromInteger
@@ -76,25 +75,25 @@ instance Show n => Show (Expr n) where
   showsPrec prec expr = case expr of
     Val val -> shows val
     Var var -> showString "$" . shows var
-    BinOp op operands -> case op of
-      Add -> chain " + " 6 operands
-      Sub -> chain " - " 6 operands
-      Mul -> chain " * " 7 operands
-      Div -> chain " / " 7 operands
-      And -> chain " ∧ " 3 operands
-      Or -> chain " ∨ " 2 operands
-      Xor -> chain " ⊕ " 4 operands
-      NEq -> chain " != " 5 operands
-      Eq -> chain " == " 5 operands
-      BEq -> chain " == " 5 operands
+    BinOp op x0 x1 xs -> case op of
+      Add -> chain " + " 6 $ x0 :<| x1 :<| xs
+      Sub -> chain " - " 6 $ x0 :<| x1 :<| xs
+      Mul -> chain " * " 7 $ x0 :<| x1 :<| xs
+      Div -> chain " / " 7 $ x0 :<| x1 :<| xs
+      And -> chain " ∧ " 3 $ x0 :<| x1 :<| xs
+      Or -> chain " ∨ " 2 $ x0 :<| x1 :<| xs
+      Xor -> chain " ⊕ " 4 $ x0 :<| x1 :<| xs
+      NEq -> chain " != " 5 $ x0 :<| x1 :<| xs
+      Eq -> chain " == " 5 $ x0 :<| x1 :<| xs
+      BEq -> chain " == " 5 $ x0 :<| x1 :<| xs
       where
         chain :: Show n => String -> Int -> Seq (Expr n) -> String -> String
-        chain delim n xs = showParen (prec > n) $ go delim n xs
+        chain delim n = showParen (prec > n) . go delim n
 
         go :: Show n => String -> Int -> Seq (Expr n) -> String -> String
         go _ _ Empty = showString ""
         go _ n (x :<| Empty) = showsPrec (succ n) x
-        go delim n (x :<| xs) = showsPrec (succ n) x . showString delim . go delim n xs
+        go delim n (x :<| xs') = showsPrec (succ n) x . showString delim . go delim n xs'
     If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 -- | Calculate the "size" of an expression for benchmarking
@@ -102,7 +101,9 @@ sizeOfExpr :: Expr n -> Int
 sizeOfExpr expr = case expr of
   Val _ -> 1
   Var _ -> 1
-  BinOp _ operands -> sum (fmap sizeOfExpr operands) + (length operands - 1)
+  BinOp _ x0 x1 xs ->
+    let operands = x0 :<| x1 :<| xs
+     in sum (fmap sizeOfExpr operands) + (length operands - 1)
   If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
 
 -- | Calculate the "length" of an expression
@@ -337,17 +338,17 @@ eraseAssignment (T.Assignment ref expr) = do
 -- Flatten and chain expressions together when possible
 chainExprs :: Op -> Expr n -> Expr n -> Expr n
 chainExprs op x y = case (x, y) of
-  (BinOp op1 xs, BinOp op2 ys)
+  (BinOp op1 x0 x1 xs, BinOp op2 y0 y1 ys)
     | op1 == op2 && op2 == op && isAssoc op ->
       -- chaining `op`, `op1`, and `op2`
-      BinOp op (xs <> ys)
-  (BinOp op1 xs, _)
+      BinOp op x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (BinOp op1 x0 x1 xs, _)
     | op1 == op && isAssoc op ->
       -- chaining `op` and `op1`
-      BinOp op (xs |> y)
-  (_, BinOp op2 ys)
+      BinOp op x0 x1 (xs |> y)
+  (_, BinOp op2 y0 y1 ys)
     | op2 == op && isAssoc op ->
       -- chaining `op` and `op2`
-      BinOp op (x <| ys)
+      BinOp op x y0 (y1 :<| ys)
   -- there's nothing left we can do
-  _ -> BinOp op (Seq.fromList [x, y])
+  _ -> BinOp op x y mempty
