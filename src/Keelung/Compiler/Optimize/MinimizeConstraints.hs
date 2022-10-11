@@ -185,7 +185,6 @@ substConstraint !constraint = case constraint of
       (Root a, Root b, Value 0) -> unifyVars a b >> return Nothing
       (Root a, Root b, Value _) -> return $ Just $ CXor a b z -- TODO: learn about this case
       (Root a, Root b, Root c) -> return $ Just $ CXor a b c
-
   COr x y z -> do
     x' <- lookupVar x
     y' <- lookupVar y
@@ -227,16 +226,23 @@ isTautology constraint = case constraint of
   --     return $
   --       a * b == c
   --   _ -> return False
-  CNQZ var m -> do
-    result <- lookupVar var
-    case result of
+  CNQZ x y m -> do
+    x' <- lookupVar x
+    case x' of
       Root _ -> return False
-      Value 0 -> do
-        bindVar m 0
-        return True
-      Value n -> do
-        bindVar m (recip n)
-        return True
+      Value xVal -> do
+        y' <- lookupVar y
+        case y' of
+          Root _ -> return False
+          Value yVal -> do
+            let diff = xVal - yVal
+            if diff == 0
+              then do
+                bindVar m 0
+                return True
+              else do
+                bindVar m (recip diff)
+                return True
   CXor x y z -> do
     x' <- lookupVar x
     case x' of
@@ -251,7 +257,6 @@ isTautology constraint = case constraint of
               Root _ -> return False
               Value z'' ->
                 return $ x'' + y'' - 2 * (x'' * y'') == z''
-
   COr x y z -> do
     x' <- lookupVar x
     case x' of

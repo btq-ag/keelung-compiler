@@ -83,7 +83,7 @@ encode out expr = case expr of
         case vars of
           Empty -> do
             -- only 2 operands
-            add [COr a b out] 
+            add [COr a b out]
           (c :<| Empty) -> do
             -- only 3 operands
             aOrb <- freshVar
@@ -190,20 +190,25 @@ encodeBinaryOp op out x y = case op of
     --  1. (x - y) * m = out
     --  2. (x - y) * (1 - out) = 0
 
-    -- diff = (x - y)
-    diff <- freshVar
-    encode diff (Var x - Var y)
+    -- lets build the polynomial for (x - y) first:
+    case Poly.buildMaybe 0 (IntMap.fromList [(x, 1), (y, -1)]) of
+      Nothing -> do
+        -- in this case, the variable x and y happend to be the same
+        encode out (Val 0)
+      Just diff -> do
+        -- introduce a new variable m
+        -- if diff = 0 then m = 0 else m = recip diff
+        m <- freshVar
 
-    -- introduce a new variable m
-    -- if diff = 0 then m = 0 else m = recip diff
-    m <- freshVar
-    encode out (Var diff * Var m)
-    add [CNQZ diff m]
-
-    -- notOut = 1 - out
-    notOut <- freshVar
-    encode notOut (1 - Var out)
-    add [CMul (Poly.singleVar diff) (Poly.singleVar notOut) (Left 0)]
+        --  1. (x - y) * m = out
+        add [CMul diff (Poly.singleVar m) (Right (Poly.singleVar out))]
+        --  2. (x - y) * (1 - out) = 0
+        let notOut = case Poly.buildMaybe 1 (IntMap.fromList [(out, -1)]) of
+              Nothing -> error "encodeBinaryOp: NEq: impossible"
+              Just p -> p
+        add [CMul diff notOut (Left 0)]
+        --  keep track of the relation between (x - y) and m
+        add [CNQZ x y m]
   Eq -> do
     -- Constraint 'x == y = out'.
     -- The encoding is: out = 1 - (x-y != 0).

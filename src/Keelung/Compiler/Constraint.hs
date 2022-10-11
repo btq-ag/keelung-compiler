@@ -25,13 +25,13 @@ import Keelung.Types (Var)
 -- | Constraint
 --      CAdd: 0 = c + c₀x₀ + c₁x₁ ... cₙxₙ
 --      CMul: ax * by = c or ax * by = cz
---      CNQZ: if x == 0 then m = 0 else m = recip x
+--      CNQZ: if (x - y) == 0 then m = 0 else m = recip (x - y)
 --      CXor: x ⊕ y = z
 --      COr: x ∨ y = z
 data Constraint n
   = CAdd !(Poly n)
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
-  | CNQZ Var Var -- x & m
+  | CNQZ Var Var Var -- x y m
   | CXor Var Var Var
   | COr Var Var Var
   deriving (Generic, NFData)
@@ -41,7 +41,7 @@ instance GaloisField n => Eq (Constraint n) where
     (CAdd x, CAdd y) -> x == y
     (CMul x y z, CMul u v w) ->
       ((x == u && y == v) || (x == v && y == u)) && z == w
-    (CNQZ x y, CNQZ u v) -> x == u && y == v
+    (CNQZ x y z, CNQZ w u v) -> x == w && y == u && z == v
     (CXor x y z, CXor u v w) -> x == u && y == v && z == w
     (COr x y z, COr u v w) -> x == u && y == v && z == w
     _ -> False
@@ -50,9 +50,9 @@ instance Functor Constraint where
   fmap f (CAdd x) = CAdd (fmap f x)
   fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
+  fmap _ (CNQZ x y m) = CNQZ x y m
   fmap _ (CXor x y z) = CXor x y z
   fmap _ (COr x y z) = COr x y z
-  fmap _ (CNQZ x y) = CNQZ x y
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
@@ -83,7 +83,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
         if IntMap.size (Poly.coeffs poly) > 1
           then "(" <> show poly <> ")"
           else show poly
-  show (CNQZ x m) = "Q $" <> show x <> " $" <> show m
+  show (CNQZ x y m) = "Q $" <> show x <> " $" <> show y <> " $" <> show m
   show (CXor x y z) = "X $" <> show x <> " ⊕ $" <> show y <> " = $" <> show z
   show (COr x y z) = "O $" <> show x <> " ∨ $" <> show y <> " = $" <> show z
 
@@ -117,7 +117,7 @@ varsInConstraint :: Constraint a -> IntSet
 varsInConstraint (CAdd xs) = Poly.vars xs
 varsInConstraint (CMul aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
 varsInConstraint (CMul aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
-varsInConstraint (CNQZ x y) = IntSet.fromList [x, y]
+varsInConstraint (CNQZ x y m) = IntSet.fromList [x, y, m]
 varsInConstraint (CXor x y z) = IntSet.fromList [x, y, z]
 varsInConstraint (COr x y z) = IntSet.fromList [x, y, z]
 
@@ -243,8 +243,8 @@ renumberConstraints cs =
         CAdd $ Poly.mapVars renumber xs
       CMul aV bV cV ->
         CMul (Poly.mapVars renumber aV) (Poly.mapVars renumber bV) (Poly.mapVars renumber <$> cV)
-      CNQZ x y ->
-        CNQZ (renumber x) (renumber y)
+      CNQZ x y m ->
+        CNQZ (renumber x) (renumber y) (renumber m)
       CXor x y z ->
         CXor (renumber x) (renumber y) (renumber z)
       COr x y z ->

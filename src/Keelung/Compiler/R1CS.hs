@@ -68,7 +68,7 @@ toR1CS cs =
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
 
-    toR1C :: GaloisField n => Constraint n -> Either (Var, Var) (R1C n)
+    toR1C :: GaloisField n => Constraint n -> Either (Var, Var, Var) (R1C n)
     toR1C (CAdd xs) =
       Right $
         R1C
@@ -77,7 +77,7 @@ toR1CS cs =
           (Left 0)
     toR1C (CMul aX bX cX) =
       Right $ R1C (Right aX) (Right bX) cX
-    toR1C (CNQZ x m) = Left (x, m)
+    toR1C (CNQZ x y m) = Left (x, y, m)
     toR1C (CXor x y z) =
       --     x  y  z  1
       -- a [-2, 0, 0, 1]
@@ -104,7 +104,7 @@ fromR1CS r1cs =
   ConstraintSystem
     { csConstraints =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
-          <> Set.fromList (map (uncurry CNQZ) (r1csCNQZPairs r1cs)),
+          <> Set.fromList (map (\(x, y, m) -> CNQZ x y m) (r1csCNQZ r1cs)),
       csBoolVars = r1csBoolVars r1cs,
       csVars = IntSet.fromDistinctAscList [0 .. r1csVarSize r1cs - 1],
       csInputVarSize = r1csInputVarSize r1cs,

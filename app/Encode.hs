@@ -6,7 +6,6 @@ module Encode (asJSONLines) where
 -- import Data.Aeson.Encoding
 import Data.Aeson
 import Data.Aeson.Encoding
-import qualified Data.Bifunctor as Bifunctor
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import Data.Field.Galois (GaloisField (char, deg))
@@ -92,7 +91,7 @@ reindexR1CS r1cs =
   r1cs
     { r1csConstraints = map reindexR1C (r1csConstraints r1cs),
       r1csBoolVars = IntSet.map reindex (r1csBoolVars r1cs),
-      r1csCNQZPairs = map (Bifunctor.bimap reindex reindex) (r1csCNQZPairs r1cs)
+      r1csCNQZ = map (\(x, y, m) -> (reindex x, reindex y, reindex m)) (r1csCNQZ r1cs)
     }
   where
     reindexR1C :: R1C n -> R1C n
