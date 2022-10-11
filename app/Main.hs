@@ -77,7 +77,7 @@ main = withUtf8 $ do
             B64 -> outputAndwriteJSONLines (asB64 $ compileO1Elab elaborated)
             GF181 -> outputAndwriteJSONLines (asGF181 $ compileO1Elab elaborated)
             BN128 -> outputAndwriteJSONLines (asBN128 $ compileO1Elab elaborated)
-    Version -> putStrLn "Keelung v0.5.2"
+    Version -> putStrLn "Keelung v0.5.3"
   where
     asB64 :: Either (Error B64) (ConstraintSystem B64) -> Either (Error B64) (ConstraintSystem B64)
     asB64 = id 

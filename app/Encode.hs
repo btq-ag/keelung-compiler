@@ -48,7 +48,7 @@ asJSONLines_ fieldNumber r1cs =
       pairs $
         pairStr "r1cs" $
           pairs $
-            pairStr "version" (string "0.5.0")
+            pairStr "version" (string "0.5.3")
               <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
               <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
               <> pairStr "instances" (int inputAndOutputSize) -- inputs & outputs
