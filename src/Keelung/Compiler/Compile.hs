@@ -16,8 +16,46 @@ import qualified Data.Set as Set
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Types (Var)
-import Keelung.Constraint.R1CS (CNEQ(..))
+
+--------------------------------------------------------------------------------
+
+-- | Compile an untyped expression to a constraint system
+run :: GaloisField n => TypeErased n -> ConstraintSystem n
+run (TypeErased untypedExprs assertions assignments allVarSize inputVarSize outputVarSize boolVars) = runM allVarSize $ do
+  -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
+  let outputVars = [inputVarSize .. inputVarSize + outputVarSize - 1]
+  forM_ (zip outputVars untypedExprs) $ \(var, expr) -> do
+    encode var expr
+
+  -- Compile assignments to constraints
+  mapM_ encodeAssignment assignments
+
+  -- Compile assertions to constraints
+  mapM_ encodeAssertion assertions
+
+  constraints <- gets envConstraints
+  let vars = varsInConstraints constraints
+  return
+    ( ConstraintSystem
+        constraints
+        boolVars
+        vars
+        inputVarSize
+        outputVarSize
+    )
+
+-- | Encode the constraint 'out = x'.
+encodeAssertion :: GaloisField n => Expr n -> M n ()
+encodeAssertion expr = do
+  out <- freshVar
+  encode out expr
+  add $ cadd 1 [(out, -1)] -- 1 = expr
+
+-- | Encode the constraint 'out = expr'.
+encodeAssignment :: GaloisField n => Assignment n -> M n ()
+encodeAssignment (Assignment var expr) = encode var expr
 
 --------------------------------------------------------------------------------
 
@@ -108,10 +146,7 @@ encode out expr = case expr of
     add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
   If b x y -> encode out ((b * x) + ((1 - b) * y))
 
-encodeAssignment :: GaloisField n => Assignment n -> M n ()
-encodeAssignment (Assignment var expr) = encode var expr
-
-----------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 data Term n
   = Constant n -- c
@@ -210,52 +245,49 @@ encodeBinaryOp op out x y = case op of
         add [CMul diff notOut (Left 0)]
         --  keep track of the relation between (x - y) and m
         add [CNEq (CNEQ (Left x) (Left y) m)]
-  Eq -> do
-    -- Constraint 'x == y = out'.
-    -- The encoding is: out = 1 - (x-y != 0).
-    result <- freshVar
-    encodeBinaryOp NEq result x y
-    encode out (1 - Var result)
+  Eq -> encodeEquality True out x y 
   BEq -> do
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.
     -- The encoding is: x*y + (1-x)*(1-y) = out.
     encode out $
       Var x * Var y + ((1 - Var x) * (1 - Var y))
 
--- | Ensure that boolean variables have constraint 'b^2 = b'
--- convertBooleanVars :: GaloisField n => IntSet -> [Constraint n]
--- convertBooleanVars booleanInputVars =
---   map (\b -> CMul (Poly.singleVar b) (Poly.singleVar b) (Right $ Poly.singleVar b)) $
---     IntSet.toList booleanInputVars
+--------------------------------------------------------------------------------
 
--- | Encode the constraint 'x = out'.
-encodeAssertion :: GaloisField n => Expr n -> M n ()
-encodeAssertion expr = do
-  out <- freshVar
-  encode out expr
-  add $ cadd 1 [(out, -1)] -- 1 = expr
+-- | Equalities are encoded with inequalities and inequalities with CNEQ constraints.
+--    Constraint 'x != y = out'
+--    The encoding is, for some 'm':
+--        1. (x - y) * m = out
+--        2. (x - y) * (1 - out) = 0
+encodeEquality :: GaloisField n => Bool -> Var -> Var -> Var -> M n ()
+encodeEquality isEq out x y = do
+  -- lets build the polynomial for (x - y) first:
+  case Poly.buildMaybe 0 (IntMap.fromList [(x, 1), (y, -1)]) of
+    Nothing -> do
+      -- in this case, the variable x and y happend to be the same
+      if isEq
+        then encode out (Val 1)
+        else encode out (Val 0)
+    Just diff -> do
+      -- introduce a new variable m
+      -- if diff = 0 then m = 0 else m = recip diff
+      m <- freshVar
 
--- | Compile an untyped expression to a constraint system
-run :: GaloisField n => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs assertions assignments allVarSize inputVarSize outputVarSize boolVars) = runM allVarSize $ do
-  -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
-  let outputVars = [inputVarSize .. inputVarSize + outputVarSize - 1]
-  forM_ (zip outputVars untypedExprs) $ \(var, expr) -> do
-    encode var expr
+      let notOut = case Poly.buildMaybe 1 (IntMap.fromList [(out, -1)]) of
+            Nothing -> error "encodeBinaryOp: NEq: impossible"
+            Just p -> p
 
-  -- Compile assignments to constraints
-  mapM_ encodeAssignment assignments
+      if isEq
+        then do
+          --  1. (x - y) * m = 1 - out
+          --  2. (x - y) * out = 0
+          add [CMul diff (Poly.singleVar m) (Right notOut)]
+          add [CMul diff (Poly.singleVar out) (Left 0)]
+        else do
+          --  1. (x - y) * m = out
+          --  2. (x - y) * (1 - out) = 0
+          add [CMul diff (Poly.singleVar m) (Right (Poly.singleVar out))]
+          add [CMul diff notOut (Left 0)]
 
-  -- Compile assertions to constraints
-  mapM_ encodeAssertion assertions
-
-  constraints <- gets envConstraints
-  let vars = varsInConstraints constraints
-  return
-    ( ConstraintSystem
-        constraints
-        boolVars
-        vars
-        inputVarSize
-        outputVarSize
-    )
+      --  keep track of the relation between (x - y) and m
+      add [CNEq (CNEQ (Left x) (Left y) m)]
