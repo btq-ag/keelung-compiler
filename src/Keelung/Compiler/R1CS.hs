@@ -11,6 +11,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
 import qualified Data.Set as Set
+import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint hiding (numberOfConstraints)
 import Keelung.Compiler.Optimize (optimizeWithWitness)
@@ -18,7 +19,7 @@ import Keelung.Compiler.Util
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import qualified Keelung.Constraint.R1C as R1C
-import Keelung.Constraint.R1CS (R1CS (..))
+import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
 import Keelung.Field (N (..))
 import Keelung.Types (Var)
 
@@ -39,7 +40,7 @@ generateWitness cs env =
       (witness, _) = optimizeWithWitness env cs'
    in if all (isMapped witness) variables
         then Right witness
-        else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
+        else traceShow (cs, cs') $ Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
   where
     isMapped witness var = IntMap.member var witness
 
@@ -68,7 +69,7 @@ toR1CS cs =
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
 
-    toR1C :: GaloisField n => Constraint n -> Either (Var, Var, Var) (R1C n)
+    toR1C :: GaloisField n => Constraint n -> Either (CNEQ n) (R1C n)
     toR1C (CAdd xs) =
       Right $
         R1C
@@ -77,7 +78,7 @@ toR1CS cs =
           (Left 0)
     toR1C (CMul aX bX cX) =
       Right $ R1C (Right aX) (Right bX) cX
-    toR1C (CNQZ x y m) = Left (x, y, m)
+    toR1C (CNEq x) = Left x
     toR1C (CXor x y z) =
       --     x  y  z  1
       -- a [-2, 0, 0, 1]
@@ -104,7 +105,7 @@ fromR1CS r1cs =
   ConstraintSystem
     { csConstraints =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
-          <> Set.fromList (map (\(x, y, m) -> CNQZ x y m) (r1csCNQZ r1cs)),
+          <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
       csBoolVars = r1csBoolVars r1cs,
       csVars = IntSet.fromDistinctAscList [0 .. r1csVarSize r1cs - 1],
       csInputVarSize = r1csInputVarSize r1cs,

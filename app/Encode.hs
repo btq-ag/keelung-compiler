@@ -4,6 +4,8 @@
 module Encode (asJSONLines) where
 
 -- import Data.Aeson.Encoding
+
+import Control.Arrow (left)
 import Data.Aeson
 import Data.Aeson.Encoding
 import Data.ByteString.Lazy (ByteString)
@@ -15,7 +17,7 @@ import Data.Proxy
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
-import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
+import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
 import Keelung.Types (Var)
 
 -- | J-R1CS – a JSON Lines format for R1CS
@@ -91,7 +93,7 @@ reindexR1CS r1cs =
   r1cs
     { r1csConstraints = map reindexR1C (r1csConstraints r1cs),
       r1csBoolVars = IntSet.map reindex (r1csBoolVars r1cs),
-      r1csCNQZ = map (\(x, y, m) -> (reindex x, reindex y, reindex m)) (r1csCNQZ r1cs)
+      r1csCNEQs = map (\(CNEQ x y m) -> CNEQ (left reindex x) (left reindex y) (reindex m)) (r1csCNEQs r1cs)
     }
   where
     reindexR1C :: R1C n -> R1C n

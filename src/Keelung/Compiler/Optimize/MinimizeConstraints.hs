@@ -11,6 +11,7 @@ import Keelung.Compiler.Constraint (Constraint (..), cadd)
 import Keelung.Compiler.Optimize.Monad
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Types (Var)
 
 run ::
@@ -159,7 +160,26 @@ substConstraint !constraint = case constraint of
       (Right (a, aX), Right (b, bX), Right (c, cX)) -> do
         CMul <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
           <*> pure (Poly.buildEither c (IntMap.toList cX))
-  CNQZ {} -> return $ Just constraint
+  CNEq (CNEQ x y m) -> do
+    x' <- case x of
+      Left var -> lookupVar var
+      Right val -> return $ Value val
+    y' <- case y of
+      Left var -> lookupVar var
+      Right val -> return $ Value val
+    case (x', y') of
+      (Root xR, Root yR) -> return $ Just $ CNEq $ CNEQ (Left xR) (Left yR) m
+      (Value xV, Root yR) -> return $ Just $ CNEq $ CNEQ (Right xV) (Left yR) m
+      (Root xR, Value yV) -> return $ Just $ CNEq $ CNEQ (Left xR) (Right yV) m
+      (Value xV, Value yV) -> do
+        let diff = xV - yV
+        if diff == 0
+          then do
+            bindVar m 0
+            return Nothing
+          else do
+            bindVar m (recip diff)
+            return Nothing
   CXor x y z -> do
     x' <- lookupVar x
     y' <- lookupVar y
@@ -215,34 +235,9 @@ isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
   CAdd _ -> return False
   CMul {} -> return False
-  -- CMul aV bV cV -> case (Poly.view aV, Poly.view bV, Poly.view cV) of
-  --   (Left a, Right (b, bX), Right (c, cX)) ->
-  --     return $
-  --       a * b == c && fmap (a *) bX == cX
-  --   (Right (a, aX), Left b, Right (c, cX)) ->
-  --     return $
-  --       a * b == c && fmap (* b) aX == cX
-  --   (Left a, Left b, Left c) ->
-  --     return $
-  --       a * b == c
-  --   _ -> return False
-  CNQZ x y m -> do
-    x' <- lookupVar x
-    case x' of
-      Root _ -> return False
-      Value xVal -> do
-        y' <- lookupVar y
-        case y' of
-          Root _ -> return False
-          Value yVal -> do
-            let diff = xVal - yVal
-            if diff == 0
-              then do
-                bindVar m 0
-                return True
-              else do
-                bindVar m (recip diff)
-                return True
+  -- we assume that the variables in CNEQ has all been substituted with values when possible
+  -- so that we can just check if the values are equal
+  CNEq {} -> return False
   CXor x y z -> do
     x' <- lookupVar x
     case x' of

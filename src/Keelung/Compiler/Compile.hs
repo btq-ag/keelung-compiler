@@ -17,6 +17,7 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Types (Var)
+import Keelung.Constraint.R1CS (CNEQ(..))
 
 --------------------------------------------------------------------------------
 
@@ -208,7 +209,7 @@ encodeBinaryOp op out x y = case op of
               Just p -> p
         add [CMul diff notOut (Left 0)]
         --  keep track of the relation between (x - y) and m
-        add [CNQZ x y m]
+        add [CNEq (CNEQ (Left x) (Left y) m)]
   Eq -> do
     -- Constraint 'x == y = out'.
     -- The encoding is: out = 1 - (x-y != 0).

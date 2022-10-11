@@ -133,13 +133,13 @@ mergePoly pinned xs ys = do
 -- findLocks (CAdd aX) = map LockDeg1or2 $ IntSet.toList $ Poly.vars aX
 -- findLocks (CMul aX bX (Left _)) = map LockDeg1 (IntSet.toList (Poly.vars aX <> Poly.vars bX))
 -- findLocks (CMul aX bX (Right cX)) = map LockDeg1 (IntSet.toList (Poly.vars aX <> Poly.vars bX <> Poly.vars cX))
--- findLocks (CNQZ _ _) = []
+-- findLocks (CNEq _ _) = []
 
 -- findKeys :: Constraint n -> [Key]
 -- findKeys (CAdd aX) = map KeyDeg1 $ IntSet.toList $ Poly.vars aX
 -- findKeys (CMul _ _ (Left _)) = []
 -- findKeys (CMul _ _ (Right cX)) = map KeyDeg2 (IntSet.toList $ Poly.vars cX)
--- findKeys (CNQZ _ _) = []
+-- findKeys (CNEq _ _) = []
 
 -- -- -- | Given a constraint, find all binding sites.
 -- -- findBindingSites :: Constraint n -> [BindingSite]
@@ -148,7 +148,7 @@ mergePoly pinned xs ys = do
 -- -- findBindingSites (CMul aX bX (Right cX)) =
 -- --   map Degree1 (IntSet.toList (Poly.vars aX <> Poly.vars bX))
 -- --     <> map Degree1Or2 (IntSet.toList $ Poly.vars cX)
--- -- findBindingSites (CNQZ _ _) = []
+-- -- findBindingSites (CNEq _ _) = []
 
 -- --------------------------------------------------------------------------------
 
@@ -194,4 +194,4 @@ mergePoly pinned xs ys = do
 -- insert :: Soup n -> Constraint n -> Soup n
 -- insert soup (CAdd aX) = Poly.vars aX
 -- insert soup (CMul po po' e) = _wh
--- insert soup (CNQZ n i) = _wi
+-- insert soup (CNEq n i) = _wi

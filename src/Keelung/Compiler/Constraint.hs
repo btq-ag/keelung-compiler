@@ -17,6 +17,7 @@ import qualified Data.Set as Set
 import GHC.Generics (Generic)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Field
 import Keelung.Types (Var)
 
@@ -25,13 +26,13 @@ import Keelung.Types (Var)
 -- | Constraint
 --      CAdd: 0 = c + c₀x₀ + c₁x₁ ... cₙxₙ
 --      CMul: ax * by = c or ax * by = cz
---      CNQZ: if (x - y) == 0 then m = 0 else m = recip (x - y)
+--      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 --      CXor: x ⊕ y = z
 --      COr: x ∨ y = z
 data Constraint n
   = CAdd !(Poly n)
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
-  | CNQZ Var Var Var -- x y m
+  | CNEq (CNEQ n) -- x y m
   | CXor Var Var Var
   | COr Var Var Var
   deriving (Generic, NFData)
@@ -40,8 +41,8 @@ instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAdd x, CAdd y) -> x == y
     (CMul x y z, CMul u v w) ->
-      ((x == u && y == v) || (x == v && y == u)) && z == w
-    (CNQZ x y z, CNQZ w u v) -> x == w && y == u && z == v
+      (x == u && y == v || x == v && y == u) && z == w
+    (CNEq x, CNEq y) -> x == y
     (CXor x y z, CXor u v w) -> x == u && y == v && z == w
     (COr x y z, COr u v w) -> x == u && y == v && z == w
     _ -> False
@@ -50,7 +51,7 @@ instance Functor Constraint where
   fmap f (CAdd x) = CAdd (fmap f x)
   fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
-  fmap _ (CNQZ x y m) = CNQZ x y m
+  fmap f (CNEq x) = CNEq (fmap f x)
   fmap _ (CXor x y z) = CXor x y z
   fmap _ (COr x y z) = COr x y z
 
@@ -83,7 +84,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
         if IntMap.size (Poly.coeffs poly) > 1
           then "(" <> show poly <> ")"
           else show poly
-  show (CNQZ x y m) = "Q $" <> show x <> " $" <> show y <> " $" <> show m
+  show (CNEq x) = show x
   show (CXor x y z) = "X $" <> show x <> " ⊕ $" <> show y <> " = $" <> show z
   show (COr x y z) = "O $" <> show x <> " ∨ $" <> show y <> " = $" <> show z
 
@@ -105,10 +106,10 @@ instance GaloisField n => Ord (Constraint n) where
   -- CAdd
   compare (CAdd xs) (CAdd ys) =
     if xs == ys then EQ else compare xs ys
-  -- CNQZ
-  compare CNQZ {} CNQZ {} = EQ
-  compare CNQZ {} _ = LT
-  compare _ CNQZ {} = GT
+  -- CNEq
+  compare CNEq {} CNEq {} = EQ
+  compare CNEq {} _ = LT
+  compare _ CNEq {} = GT
 
 --------------------------------------------------------------------------------
 
@@ -117,7 +118,10 @@ varsInConstraint :: Constraint a -> IntSet
 varsInConstraint (CAdd xs) = Poly.vars xs
 varsInConstraint (CMul aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
 varsInConstraint (CMul aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
-varsInConstraint (CNQZ x y m) = IntSet.fromList [x, y, m]
+varsInConstraint (CNEq (CNEQ (Left x) (Left y) m)) = IntSet.fromList [x, y, m]
+varsInConstraint (CNEq (CNEQ (Left x) _ m)) = IntSet.fromList [x, m]
+varsInConstraint (CNEq (CNEQ _ (Left y) m)) = IntSet.fromList [y, m]
+varsInConstraint (CNEq (CNEQ _ _ m)) = IntSet.fromList [m]
 varsInConstraint (CXor x y z) = IntSet.fromList [x, y, z]
 varsInConstraint (COr x y z) = IntSet.fromList [x, y, z]
 
@@ -243,10 +247,15 @@ renumberConstraints cs =
         CAdd $ Poly.mapVars renumber xs
       CMul aV bV cV ->
         CMul (Poly.mapVars renumber aV) (Poly.mapVars renumber bV) (Poly.mapVars renumber <$> cV)
-      CNQZ x y m ->
-        CNQZ (renumber x) (renumber y) (renumber m)
+      CNEq (CNEQ (Left x) (Left y) m) ->
+        CNEq (CNEQ (Left (renumber x)) (Left (renumber y)) (renumber m))
+      CNEq (CNEQ (Left x) (Right y) m) ->
+        CNEq (CNEQ (Left (renumber x)) (Right y) (renumber m))
+      CNEq (CNEQ (Right x) (Left y) m) ->
+        CNEq (CNEQ (Right x) (Left (renumber y)) (renumber m))
+      CNEq (CNEQ (Right x) (Right y) m) ->
+        CNEq (CNEQ (Right x) (Right y) (renumber m))
       CXor x y z ->
         CXor (renumber x) (renumber y) (renumber z)
       COr x y z ->
         COr (renumber x) (renumber y) (renumber z)
-

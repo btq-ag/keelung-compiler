@@ -159,11 +159,11 @@ tests = do
     describe "OR Chaining" $ do
       it "1 variable" $ count (Basic.chainingOR 1) `shouldBe` Right 2
       it "2 variables" $ count (Basic.chainingOR 2) `shouldBe` Right 3
-      it "3 variables" $ count (Basic.chainingOR 3) `shouldBe` Right (3 + 5)
-      it "4 variables" $ count (Basic.chainingOR 4) `shouldBe` Right (4 + 5)
-      it "5 variables" $ count (Basic.chainingOR 5) `shouldBe` Right (5 + 5)
-      it "6 variables" $ count (Basic.chainingOR 6) `shouldBe` Right (6 + 5)
-      it "7 variables" $ count (Basic.chainingOR 7) `shouldBe` Right (7 + 5)
+      it "3 variables" $ count (Basic.chainingOR 3) `shouldBe` Right (3 + 3)
+      it "4 variables" $ count (Basic.chainingOR 4) `shouldBe` Right (4 + 3)
+      it "5 variables" $ count (Basic.chainingOR 5) `shouldBe` Right (5 + 3)
+      it "6 variables" $ count (Basic.chainingOR 6) `shouldBe` Right (6 + 3)
+      it "7 variables" $ count (Basic.chainingOR 7) `shouldBe` Right (7 + 3)
   where
     count :: Elaborable t => Comp t -> Either (Error GF181) Int
     count program = do
