@@ -4,6 +4,7 @@
 
 module Keelung.Compiler.Syntax.Untyped
   ( Op (..),
+    BinaryOp (..),
     Expr (..),
     TypeErased (..),
     Assignment (..),
@@ -24,12 +25,10 @@ import Keelung.Types (Var)
 
 --------------------------------------------------------------------------------
 
--- Binary operators
+-- N-ary operators
 data Op
   = Add
-  | Sub
   | Mul
-  | Div
   | And
   | Or
   | Xor
@@ -38,57 +37,65 @@ data Op
   | BEq
   deriving (Eq, Show)
 
+-- Binary operators
+data BinaryOp = Sub | Div
+  deriving (Eq, Show)
+
 --------------------------------------------------------------------------------
 
 -- | Untyped expression
 data Expr n
   = Var Var
   | Val n
-  | BinOp Op (Expr n) (Expr n) (Seq (Expr n))
+  -- Binary operators with only 2 operands
+  | BinaryOp BinaryOp (Expr n) (Expr n)
+  -- N-Ary operators with >= 2 operands
+  | NAryOp Op (Expr n) (Expr n) (Seq (Expr n))
   | If (Expr n) (Expr n) (Expr n)
   deriving (Eq, Functor)
 
 instance Num n => Num (Expr n) where
-  x + y = BinOp Add x y Empty
-  x - y = BinOp Sub x y Empty
-  x * y = BinOp Mul x y Empty
+  x + y = NAryOp Add x y Empty
+  x - y = BinaryOp Sub x y
+  x * y = NAryOp Mul x y Empty
   abs = id
   signum = const 1
   fromInteger = Val . fromInteger
 
 instance Show n => Show (Expr n) where
-  showsPrec prec expr = case expr of
-    Val val -> shows val
-    Var var -> showString "$" . shows var
-    BinOp op x0 x1 xs -> case op of
-      Add -> chain " + " 6 $ x0 :<| x1 :<| xs
-      Sub -> chain " - " 6 $ x0 :<| x1 :<| xs
-      Mul -> chain " * " 7 $ x0 :<| x1 :<| xs
-      Div -> chain " / " 7 $ x0 :<| x1 :<| xs
-      And -> chain " ∧ " 3 $ x0 :<| x1 :<| xs
-      Or -> chain " ∨ " 2 $ x0 :<| x1 :<| xs
-      Xor -> chain " ⊕ " 4 $ x0 :<| x1 :<| xs
-      NEq -> chain " != " 5 $ x0 :<| x1 :<| xs
-      Eq -> chain " == " 5 $ x0 :<| x1 :<| xs
-      BEq -> chain " == " 5 $ x0 :<| x1 :<| xs
-      where
-        chain :: Show n => String -> Int -> Seq (Expr n) -> String -> String
+  showsPrec prec expr =
+    let chain :: Show n => String -> Int -> Seq (Expr n) -> String -> String
         chain delim n = showParen (prec > n) . go delim n
-
         go :: Show n => String -> Int -> Seq (Expr n) -> String -> String
         go _ _ Empty = showString ""
         go _ n (x :<| Empty) = showsPrec (succ n) x
         go delim n (x :<| xs') = showsPrec (succ n) x . showString delim . go delim n xs'
-    If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+     in case expr of
+          Val val -> shows val
+          Var var -> showString "$" . shows var
+          NAryOp op x0 x1 xs -> case op of
+            Add -> chain " + " 6 $ x0 :<| x1 :<| xs
+            Mul -> chain " * " 7 $ x0 :<| x1 :<| xs
+            And -> chain " ∧ " 3 $ x0 :<| x1 :<| xs
+            Or -> chain " ∨ " 2 $ x0 :<| x1 :<| xs
+            Xor -> chain " ⊕ " 4 $ x0 :<| x1 :<| xs
+            NEq -> chain " != " 5 $ x0 :<| x1 :<| xs
+            Eq -> chain " == " 5 $ x0 :<| x1 :<| xs
+            BEq -> chain " == " 5 $ x0 :<| x1 :<| xs
+          BinaryOp op x0 x1 -> case op of
+            Sub -> chain " - " 6 $ x0 :<| x1 :<| Empty
+            Div -> chain " / " 7 $ x0 :<| x1 :<| Empty
+          If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 -- | Calculate the "size" of an expression for benchmarking
 sizeOfExpr :: Expr n -> Int
 sizeOfExpr expr = case expr of
   Val _ -> 1
   Var _ -> 1
-  BinOp _ x0 x1 xs ->
+  NAryOp _ x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
      in sum (fmap sizeOfExpr operands) + (length operands - 1)
+  BinaryOp _ x0 x1 -> sizeOfExpr x0 + sizeOfExpr x1 + 1
   If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
 
 -- | Calculate the "length" of an expression
@@ -271,7 +278,7 @@ eraseExpr expr = case expr of
   T.Sub x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [BinOp Sub (head xs) (head ys) mempty]
+    return [BinaryOp Sub (head xs) (head ys)]
   T.Mul x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -279,7 +286,7 @@ eraseExpr expr = case expr of
   T.Div x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [BinOp Div (head xs) (head ys) mempty]
+    return [BinaryOp Div (head xs) (head ys)]
   T.Eq x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -323,17 +330,17 @@ eraseAssignment (T.Assignment ref expr) = do
 -- Flatten and chain expressions with associative operator together when possible
 chainExprsOfAssocOp :: Op -> Expr n -> Expr n -> Expr n
 chainExprsOfAssocOp op x y = case (x, y) of
-  (BinOp op1 x0 x1 xs, BinOp op2 y0 y1 ys)
+  (NAryOp op1 x0 x1 xs, NAryOp op2 y0 y1 ys)
     | op1 == op2 && op2 == op ->
       -- chaining `op`, `op1`, and `op2`
-      BinOp op x0 x1 (xs <> (y0 :<| y1 :<| ys))
-  (BinOp op1 x0 x1 xs, _)
+      NAryOp op x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (NAryOp op1 x0 x1 xs, _)
     | op1 == op ->
       -- chaining `op` and `op1`
-      BinOp op x0 x1 (xs |> y)
-  (_, BinOp op2 y0 y1 ys)
+      NAryOp op x0 x1 (xs |> y)
+  (_, NAryOp op2 y0 y1 ys)
     | op2 == op ->
       -- chaining `op` and `op2`
-      BinOp op x y0 (y1 :<| ys)
+      NAryOp op x y0 (y1 :<| ys)
   -- there's nothing left we can do
-  _ -> BinOp op x y mempty
+  _ -> NAryOp op x y mempty

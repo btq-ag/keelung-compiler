@@ -47,17 +47,11 @@ encode :: GaloisField n => Var -> Expr n -> M n ()
 encode out expr = case expr of
   Val val -> add $ cadd val [(out, -1)] -- out = val
   Var var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
-  BinOp op x y rest ->
+  NAryOp op x y rest ->
     case op of
       Add -> do
-        terms <- {-# SCC "mapMtoTerm" #-} mapM toTerm (x :<| y :<| rest)
-        {-# SCC "encodeTerms" #-} encodeTerms out terms
-      Sub -> do
-        x' <- toTerm x
-        y' <- toTerm y
-        rest' <- mapM toTerm rest
-        -- regate the rest of the terms 
-        encodeTerms out (x' :<| negateTerm y' :<| fmap negateTerm rest')
+        terms <- mapM toTerm (x :<| y :<| rest)
+        encodeTerms out terms
       And -> do
         a <- wireAsVar x
         b <- wireAsVar y
@@ -87,18 +81,30 @@ encode out expr = case expr of
         b <- wireAsVar y
         vars <- mapM wireAsVar rest
         case vars of
-          Empty -> add [COr a b out]
+          Empty -> do
+            -- only 2 operands
+            add [COr a b out] 
           (c :<| Empty) -> do
+            -- only 3 operands
             aOrb <- freshVar
             add [COr a b aOrb]
             add [COr aOrb c out]
           _ -> do
+            -- more than 3 operands, rewrite it as an inequality instead:
             --      if all operands are 0           then 0 else 1
             --  =>  if the sum of operands is 0     then 0 else 1
             --  =>  if the sum of operands is not 0 then 1 else 0
             --  =>  the sum of operands is not 0
-            encode out (BinOp NEq 0 (BinOp Add x y rest) Empty)
-      _ -> encodeOtherBinOp op out x y rest
+            encode out (NAryOp NEq 0 (NAryOp Add x y rest) Empty)
+      _ -> encodeOtherNAryOp op out x y rest
+  BinaryOp Sub x y -> do
+    x' <- toTerm x
+    y' <- toTerm y
+    encodeTerms out (x' :<| negateTerm y' :<| Empty)
+  BinaryOp Div x y -> do
+    x' <- wireAsVar x
+    y' <- wireAsVar y
+    add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
   If b x y -> encode out ((b * x) + ((1 - b) * y))
 
 encodeAssignment :: GaloisField n => Assignment n -> M n ()
@@ -113,15 +119,15 @@ data Term n
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
 toTerm :: GaloisField n => Expr n -> M n (Term n)
-toTerm (BinOp Mul (Var var) (Val n) Empty) =
+toTerm (NAryOp Mul (Var var) (Val n) Empty) =
   return $ WithVars var n
-toTerm (BinOp Mul (Val n) (Var var) Empty) =
+toTerm (NAryOp Mul (Val n) (Var var) Empty) =
   return $ WithVars var n
-toTerm (BinOp Mul expr (Val n) Empty) = do
+toTerm (NAryOp Mul expr (Val n) Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (BinOp Mul (Val n) expr Empty) = do
+toTerm (NAryOp Mul (Val n) expr Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
@@ -148,8 +154,8 @@ encodeTerms out terms =
     go (constant, pairs) (Constant n) = (constant + n, pairs)
     go (constant, pairs) (WithVars var coeff) = (constant, (var, coeff) : pairs)
 
-encodeOtherBinOp :: GaloisField n => Op -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
-encodeOtherBinOp op out x0 x1 xs = do
+encodeOtherNAryOp :: GaloisField n => Op -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
+encodeOtherNAryOp op out x0 x1 xs = do
   x0' <- wireAsVar x0
   x1' <- wireAsVar x1
   vars <- mapM wireAsVar xs
@@ -174,24 +180,10 @@ wireAsVar expr = do
 encodeBinaryOp :: GaloisField n => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
   Add -> error "encodeBinaryOp: Add"
-  Sub -> error "encodeBinaryOp: Sub"
   Mul -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
-  Div -> add [CMul (Poly.singleVar y) (Poly.singleVar out) (Right $ Poly.singleVar x)]
   And -> error "encodeBinaryOp: And"
   Or -> error "encodeBinaryOp: Or"
   Xor -> add [CXor x y out]
-  -- -- Constraint 'x xor y = out'.
-  -- -- The encoding is: x+y - out = 2(x*y); assumes x and y are boolean.
-  -- xy <- freshVar
-  -- encodeBinaryOp Mul xy x y
-  -- add $
-  --   cadd
-  --     0
-  --     [ (x, 1),
-  --       (y, 1),
-  --       (out, - 1),
-  --       (xy, -2)
-  --     ]
   NEq -> do
     -- Constraint 'x != y = out'
     -- The encoding is, for some 'm':
