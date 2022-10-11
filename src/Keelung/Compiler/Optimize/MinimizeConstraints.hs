@@ -131,7 +131,7 @@ substConstraint !constraint = case constraint of
       (Left _, Left _, Left _) -> Nothing
       -- a * b = c + cx => a * b - c - cx = 0
       (Left a, Left b, Right (c, cX)) ->
-        CAdd <$> Poly.buildMaybe (a * b - c) cX
+        CAdd <$> Poly.buildMaybe (a * b - c) (fmap negate cX)
       -- a * (b + bx) = c => a * bx + a * b - c = 0
       (Left a, Right (b, bX), Left c) -> do
         let constant = a * b - c
@@ -142,7 +142,7 @@ substConstraint !constraint = case constraint of
         let constant = a * b - c
         let coeffs = Poly.mergeCoeffs (fmap (a *) bX) (fmap negate cX)
         CAdd <$> Poly.buildMaybe constant coeffs
-      -- (a + ax) * b = c => ax * b + a * b - c= 0
+      -- (a + ax) * b = c => ax * b + a * b - c = 0
       (Right (a, aX), Left b, Left c) -> do
         let constant = a * b - c
         let coeffs = fmap (* b) aX
