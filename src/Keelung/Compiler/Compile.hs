@@ -144,7 +144,9 @@ encode out expr = case expr of
     x' <- wireAsVar x
     y' <- wireAsVar y
     add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
-  If b x y -> encode out ((b * x) + ((1 - b) * y))
+  If b x y -> do
+    b' <- wireAsVar b
+    encode out ((Var b' * x) + ((1 - Var b') * y))
 
 --------------------------------------------------------------------------------
 
@@ -220,31 +222,7 @@ encodeBinaryOp op out x y = case op of
   And -> error "encodeBinaryOp: And"
   Or -> error "encodeBinaryOp: Or"
   Xor -> add [CXor x y out]
-  NEq -> do
-    -- Constraint 'x != y = out'
-    -- The encoding is, for some 'm':
-    --  1. (x - y) * m = out
-    --  2. (x - y) * (1 - out) = 0
-
-    -- lets build the polynomial for (x - y) first:
-    case Poly.buildMaybe 0 (IntMap.fromList [(x, 1), (y, -1)]) of
-      Nothing -> do
-        -- in this case, the variable x and y happend to be the same
-        encode out (Val 0)
-      Just diff -> do
-        -- introduce a new variable m
-        -- if diff = 0 then m = 0 else m = recip diff
-        m <- freshVar
-
-        --  1. (x - y) * m = out
-        add [CMul diff (Poly.singleVar m) (Right (Poly.singleVar out))]
-        --  2. (x - y) * (1 - out) = 0
-        let notOut = case Poly.buildMaybe 1 (IntMap.fromList [(out, -1)]) of
-              Nothing -> error "encodeBinaryOp: NEq: impossible"
-              Just p -> p
-        add [CMul diff notOut (Left 0)]
-        --  keep track of the relation between (x - y) and m
-        add [CNEq (CNEQ (Left x) (Left y) m)]
+  NEq -> encodeEquality False out x y 
   Eq -> encodeEquality True out x y 
   BEq -> do
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.
