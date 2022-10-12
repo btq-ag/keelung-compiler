@@ -18,6 +18,6 @@ main =
     config :: Config
     config =
       defaultConfig
-        { reportFile = Just "profiling/benchmark.html",
-          csvFile = Just "profiling/benchmark.csv"
+        { reportFile = Just "benchmark/Criterion reports/benchmark.html",
+          csvFile = Just "benchmark/Criterion reports/benchmark.csv"
         }

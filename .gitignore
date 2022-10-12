@@ -9,7 +9,5 @@ dist-newstyle/
 ._*
 *.svg
 *.prof
-profiling/exec.prof
-profiling/*.csv
-profiling/*.html
-profiling/*.svg
+benchmark/Criterion reports/benchmark.csv
+benchmark/Criterion reports/benchmark.html
