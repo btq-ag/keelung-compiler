@@ -222,8 +222,8 @@ encodeBinaryOp op out x y = case op of
   And -> error "encodeBinaryOp: And"
   Or -> error "encodeBinaryOp: Or"
   Xor -> add [CXor x y out]
-  NEq -> encodeEquality False out x y 
-  Eq -> encodeEquality True out x y 
+  NEq -> encodeEquality False out x y
+  Eq -> encodeEquality True out x y
   BEq -> do
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.
     -- The encoding is: x*y + (1-x)*(1-y) = out.

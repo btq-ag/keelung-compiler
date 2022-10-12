@@ -8,7 +8,6 @@ module Keelung.Compiler.Constraint where
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
-import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
@@ -17,6 +16,7 @@ import qualified Data.Set as Set
 import GHC.Generics (Generic)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Field
 import Keelung.Types (Var)
@@ -73,17 +73,7 @@ cmul !xs !ys (c, zs) = case ( do
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " ++ show xs ++ " = 0"
-  show (CMul aV bV cV) = "M " ++ showPoly aV <> " * " <> showPoly bV <> " = " <> showPoly' cV
-    where
-      showPoly poly =
-        if IntMap.size (Poly.coeffs poly) > 1
-          then "(" <> show poly <> ")"
-          else show poly
-      showPoly' (Left x) = show (N x)
-      showPoly' (Right poly) =
-        if IntMap.size (Poly.coeffs poly) > 1
-          then "(" <> show poly <> ")"
-          else show poly
+  show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
   show (CNEq x) = show x
   show (CXor x y z) = "X $" <> show x <> " ⊕ $" <> show y <> " = $" <> show z
   show (COr x y z) = "O $" <> show x <> " ∨ $" <> show y <> " = $" <> show z

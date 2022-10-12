@@ -9,7 +9,7 @@ import Control.Arrow (left)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
-import Keelung (elaborate, Elaborable)
+import Keelung (Elaborable, elaborate)
 import Keelung.Compiler.Constraint
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints2 as MinimizeConstraints2

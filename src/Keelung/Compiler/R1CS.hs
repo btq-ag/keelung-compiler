@@ -11,7 +11,6 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
 import qualified Data.Set as Set
-import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint hiding (numberOfConstraints)
 import Keelung.Compiler.Optimize (optimizeWithWitness)
@@ -40,7 +39,7 @@ generateWitness cs env =
       (witness, _) = optimizeWithWitness env cs'
    in if all (isMapped witness) variables
         then Right witness
-        else traceShow (cs, cs') $ Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
+        else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
   where
     isMapped witness var = IntMap.member var witness
 
