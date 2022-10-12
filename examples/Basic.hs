@@ -83,11 +83,11 @@ assertArraysEqual = do
 assertArraysEqual2 :: Comp ()
 assertArraysEqual2 = do
   arr <- inputs2 2 4
-  forM_ [0 .. 1] $ \i -> 
+  forM_ [0 .. 1] $ \i ->
     forM_ [0 .. 3] $ \j -> do
-    let x = access2 arr (i, j)
-    let y = access2 arr (i, j)
-    assert $ x `Eq` y
+      let x = access2 arr (i, j)
+      let y = access2 arr (i, j)
+      assert $ x `Eq` y
 
 every :: Comp Boolean
 every = do
@@ -111,11 +111,11 @@ array2D n m = do
   xs <- inputs2 n m
   expected <- inputs2 n m
 
-  forM_ [0 .. n - 1] $ \i -> 
+  forM_ [0 .. n - 1] $ \i ->
     forM_ [0 .. m - 1] $ \j -> do
-    let x = access2 xs (i, j)
-    let x' = access2 expected (i, j)
-    assert (x' `Eq` (x * x))
+      let x = access2 xs (i, j)
+      let x' = access2 expected (i, j)
+      assert (x' `Eq` (x * x))
 
 toArray1 :: Comp ()
 toArray1 = do
@@ -171,8 +171,8 @@ checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
 bench :: Elaborable t => Comp t -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
 bench program settings dimension n = do
   let inputVal = genInputFromParam (makeParam dimension n 42 settings)
-  cs <- Compiler.compile program -- before optimisation (only constant propagation)
-  cs' <- Compiler.optimize1 program -- after optimisation (constant propagation + constraint set reduction)
+  cs <- Compiler.compileO0 program -- before optimisation (only constant propagation)
+  cs' <- Compiler.compileO1 program -- after optimisation (constant propagation + constraint set reduction)
   cs'' <- optimizeWithInput program inputVal -- after optimisation (constant propagation + constraint set reduction with input)
   return
     ( numberOfConstraints cs,
@@ -290,10 +290,10 @@ birthday = do
 
   return $ (hiddenMonth `Eq` month) `And` (hiddenDate `Eq` date)
 
-chainingAND :: Int -> Comp Boolean 
+chainingAND :: Int -> Comp Boolean
 chainingAND n = foldl And true <$> inputs n
 
-chainingOR :: Int -> Comp Boolean 
+chainingOR :: Int -> Comp Boolean
 chainingOR n = foldl Or false <$> inputs n
 
 toBool :: Comp Boolean

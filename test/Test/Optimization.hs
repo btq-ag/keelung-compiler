@@ -167,5 +167,5 @@ tests = do
   where
     count :: Elaborable t => Comp t -> Either (Error GF181) Int
     count program = do
-      cs <- asGF181 (Compiler.optimize1 program)
+      cs <- asGF181 (Compiler.compile program)
       return $ length $ toR1Cs $ toR1CS cs

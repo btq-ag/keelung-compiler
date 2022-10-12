@@ -33,27 +33,27 @@ main = do
 
   putStrLn "O0: fullAdder"
   forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-    asGF181' (optimize0 (M.fullAdderT i)) >>= printR1CS False . toR1CS
+    asGF181' (compileO0 (M.fullAdderT i)) >>= printR1CS False . toR1CS
 
   putStrLn "O1: fullAdder"
   forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-    asGF181' (optimize1 (M.fullAdderT i)) >>= printR1CS False . toR1CS
+    asGF181' (compileO1 (M.fullAdderT i)) >>= printR1CS False . toR1CS
 
   putStrLn "O2: fullAdder"
   forM_ [1, 2, 4, 8, 16, 32] $ \i -> do
-    asGF181' (optimize2 (M.fullAdderT i)) >>= printR1CS False . toR1CS
+    asGF181' (compileO2 (M.fullAdderT i)) >>= printR1CS False . toR1CS
 
   putStrLn "O0: multiplier"
   forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-    asGF181' (optimize0 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
+    asGF181' (compileO0 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
 
   putStrLn "O1: multiplier"
   forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-    asGF181' (optimize1 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
+    asGF181' (compileO1 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
 
   putStrLn "O2: multiplier"
   forM_ [1, 2, 4, 8, 16, 32] $ \n -> do
-    asGF181' (optimize2 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
+    asGF181' (compileO2 (M.multiplierT n 3)) >>= printR1CS False . toR1CS
 
 -- fa :: IO ()
 -- fa = do

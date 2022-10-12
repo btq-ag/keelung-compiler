@@ -17,10 +17,11 @@ module Keelung.Compiler
     --
     erase,
     interpret,
+    compileOnly,
     compile,
-    optimize0,
-    optimize1,
-    optimize2,
+    compileO0,
+    compileO1,
+    compileO2,
     optimizeWithInput,
     computeWitness,
     execute,
@@ -71,26 +72,33 @@ erase :: (GaloisField n, Integral n, Elaborable t) => Comp t -> Either (Error n)
 erase prog = left ElabError (elaborate prog) >>= eraseElab
 
 -- elaboration => rewriting => type erasure => compilation
-compile :: (GaloisField n, Integral n, Elaborable t) => Comp t -> Either (Error n) (ConstraintSystem n)
-compile prog = erase prog >>= return . Compile.run
+compileOnly :: (GaloisField n, Integral n, Elaborable t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileOnly prog = erase prog >>= return . Compile.run
 
--- elaboration => rewriting => type erasure => constant propagation => compilation
-optimize0 :: (GaloisField n, Integral n, Elaborable t) => Comp t -> Either (Error n) (ConstraintSystem n)
-optimize0 prog = erase prog >>= return . Compile.run . ConstantPropagation.run
+-- | elaboration => rewriting => type erasure => constant propagation => compilation
+compileO0 :: (GaloisField n, Integral n, Elaborable t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0 prog = erase prog >>= return . Compile.run . ConstantPropagation.run
 
--- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
-optimize1 ::
+-- | elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
+compileO1 ::
   (GaloisField n, Integral n, Elaborable t) =>
   Comp t ->
   Either (Error n) (ConstraintSystem n)
-optimize1 prog = optimize0 prog >>= return . Optimizer.optimize1
+compileO1 prog = compileO0 prog >>= return . Optimizer.optimize1
 
--- elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
-optimize2 ::
+-- | 'compile' defaults to 'compileO1'
+compile ::
   (GaloisField n, Integral n, Elaborable t) =>
   Comp t ->
   Either (Error n) (ConstraintSystem n)
-optimize2 prog = compile prog >>= return . Optimizer.optimize2 . Optimizer.optimize1
+compile = compileO1
+
+-- | elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
+compileO2 ::
+  (GaloisField n, Integral n, Elaborable t) =>
+  Comp t ->
+  Either (Error n) (ConstraintSystem n)
+compileO2 prog = compileO1 prog >>= return . Optimizer.optimize2
 
 -- with optimisation + partial evaluation with inputs
 optimizeWithInput ::
@@ -113,7 +121,7 @@ computeWitness prog ins = compile prog >>= left ExecError . witnessOfR1CS ins . 
 --   (4) Check whether the R1CS result matches the interpreter result.
 execute :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
 execute prog ins = do
-  r1cs <- toR1CS <$> optimize1 prog
+  r1cs <- toR1CS <$> compile prog
 
   actualWitness <- left ExecError $ witnessOfR1CS ins r1cs
 
