@@ -60,7 +60,7 @@ executables:
       - -Werror=incomplete-patterns
       - -fno-warn-orphans
 
-  constraint:
+  profile:
     main:                Main.hs
     source-dirs:        
       - examples/

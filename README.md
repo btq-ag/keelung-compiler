@@ -22,3 +22,30 @@ docker run banacorn/keelung
 ```
 
 (add `--platform linux/amd64` if you are using architectures like arm64)
+
+# How to profile the compiler and generate flamegraphs
+
+1. Install [ghc-prof-flamegraph](https://hackage.haskell.org/package/ghc-prof-flamegraph) on your machine: 
+
+```bash
+stack install ghc-prof-flamegraph
+```
+
+2. Prepare an executable like `profile` in `profiling/Main.hs` with the program you want to profile.
+3. Build and install the executable with profiling enabled:
+
+```bash
+stack install keelung-compiler:exe:profile --profile
+``` 
+
+4. Generate a profiling report:
+
+```bash
+stack exec --profile -- profile +RTS -p
+```
+
+5. Generate a flamegraph:
+
+```bash
+ghc-prof-flamegraph profile.prof
+``` 
