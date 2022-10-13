@@ -22,6 +22,7 @@ import Data.Sequence (Seq (..), (|>))
 import Keelung.Field (N (..))
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Types (Var)
+import Keelung.Compiler.Syntax.Bits (Bits(..))
 
 --------------------------------------------------------------------------------
 
@@ -212,7 +213,7 @@ wireAsVar others = do
 
 --------------------------------------------------------------------------------
 
-eraseType :: GaloisField n => T.Elaborated -> TypeErased n
+eraseType :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let outputVarSize = lengthOfExpr expr
       T.Computation nextVar inputVarSize _nextAddr _heap numAsgns boolAsgns assertions = comp
@@ -264,7 +265,7 @@ eraseRef' ref = case ref of
 eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
 eraseRef ref = Var <$> eraseRef' ref
 
-eraseExpr :: GaloisField n => T.Expr -> M n [Expr n]
+eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [Expr n]
 eraseExpr expr = case expr of
   T.Val val -> eraseVal val
   T.Var ref -> pure <$> eraseRef ref
@@ -320,8 +321,21 @@ eraseExpr expr = case expr of
     mapM_ markAsBoolVar vars
     return $ map Var vars
   T.ToNum x -> eraseExpr x
+  T.Bit x i -> do 
+    x' <- head <$> eraseExpr x
+    bit <- bitValue x' i 
+    return [Val bit]
+  where 
+    bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n n 
+    bitValue expr i = case expr of
+      Var v -> error "dunno how to erase Typed.Bit" 
+      Val n -> return $ testBit n i 
+      BinaryOp bo ex ex' -> error "dunno how to erase Typed.Bit" 
+      NAryOp op ex ex' seq -> error "dunno how to erase Typed.Bit" 
+      If ex ex' ex_n -> error "dunno how to erase Typed.Bit" 
 
-eraseAssignment :: GaloisField n => T.Assignment -> M n (Assignment n)
+
+eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.Assignment ref expr) = do
   var <- eraseRef' ref
   exprs <- eraseExpr expr
@@ -344,3 +358,22 @@ chainExprsOfAssocOp op x y = case (x, y) of
       NAryOp op x y0 (y1 :<| ys)
   -- there's nothing left we can do
   _ -> NAryOp op x y mempty
+
+-------------------------------------------------------------------------------
+
+-- instance KnownNat n => Bits (Binary n) where
+--   x .&. y = fromInteger (toInteger x .&. toInteger y)
+--   x .|. y = fromInteger (toInteger x .|. toInteger y)
+--   xor x y = fromInteger (toInteger x `xor` toInteger y)
+--   complement = fromInteger . complement . toInteger
+--   shift x i = fromInteger (shift (toInteger x) i)
+--   rotate x i = fromInteger (rotate (toInteger x) i)
+--   bitSize x = fromIntegral $ natVal x 
+--   bitSizeMaybe x = Just $ fromIntegral $ natVal x 
+--   isSigned _ = False
+--   testBit x i = _
+--   bit = _
+--   popCount = _
+
+-- bitValueGF181 :: Expr n -> Int -> M n n 
+-- bitValueGF181 expr i = case expr of

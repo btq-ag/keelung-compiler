@@ -41,6 +41,7 @@ library
       Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
   other-modules:
@@ -84,6 +85,7 @@ executable keelungc
       Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       AggregateSignature.Program
@@ -141,6 +143,7 @@ executable profile
       Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Paths_keelung_compiler
@@ -221,6 +224,7 @@ benchmark keelung-bench
       Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       AggSig

@@ -22,11 +22,12 @@ import Keelung.Compiler.Util
 import Keelung.Syntax.Typed
 import Keelung.Types (Addr, Heap, Var)
 import Control.Monad.Reader
+import Data.Bits (Bits(..))
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
-run' :: GaloisField n => Elaborated -> [n] -> Either (InterpretError n) ([n], Witness n)
+run' :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) ([n], Witness n)
 run' (Elaborated expr comp) inputs = runM inputs $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
@@ -55,11 +56,11 @@ run' (Elaborated expr comp) inputs = runM inputs $ do
   interpret expr
 
 -- | Interpret a program with inputs.
-run :: GaloisField n => Elaborated -> [n] -> Either (InterpretError n) [n]
+run :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) [n]
 run (Elaborated expr comp) inputs = fst <$> run' (Elaborated expr comp) inputs
 
 -- | Interpret a program with inputs and run some additional checks.
-runAndCheck :: GaloisField n => Elaborated -> [n] -> Either (InterpretError n) [n]
+runAndCheck :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) [n]
 runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
 
@@ -95,7 +96,7 @@ instance GaloisField n => Interpret Val n where
   interpret (Boolean b) = interpret b
   interpret Unit = return []
 
-instance GaloisField n => Interpret Expr n where
+instance (GaloisField n, Integral n) => Interpret Expr n where
   interpret expr = case expr of
     Val val -> interpret val
     Var (NumVar n) -> pure <$> lookupVar n
@@ -125,6 +126,11 @@ instance GaloisField n => Interpret Expr n where
         _ -> interpret x
     ToBool x -> interpret x
     ToNum x -> interpret x
+    Bit x i -> do
+      xs <- interpret x 
+      if testBit (toInteger (head xs)) i
+        then return [one]
+        else return [zero] 
 
 --------------------------------------------------------------------------------
 

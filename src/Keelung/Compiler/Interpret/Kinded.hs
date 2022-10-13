@@ -17,11 +17,12 @@ import Data.Semiring (Semiring (..))
 import Keelung hiding (inputs, interpret, run)
 import Keelung.Compiler.Util
 import Keelung.Types
+import Data.Bits (Bits(..))
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs.
-run' :: (FreeVar t, Interpret t n, GaloisField n) => Elaborated t -> [n] -> Either (InterpretError n) ([n], Witness n)
+run' :: (FreeVar t, Interpret t n, GaloisField n, Integral n) => Elaborated t -> [n] -> Either (InterpretError n) ([n], Witness n)
 run' elab inputs = runM elab inputs $ do
   let (Elaborated expr comp) = elab
   -- interpret the assignments first
@@ -51,11 +52,11 @@ run' elab inputs = runM elab inputs $ do
   interpret expr
 
 -- | Interpret a program with inputs.
-run :: (FreeVar t, Interpret t n, GaloisField n) => Elaborated t -> [n] -> Either (InterpretError n) [n]
+run :: (FreeVar t, Interpret t n, GaloisField n, Integral n) => Elaborated t -> [n] -> Either (InterpretError n) [n]
 run elab inputs = fst <$> run' elab inputs
 
 -- | Interpret a program with inputs and run some additional checks.
-runAndCheck :: (FreeVar t, Interpret t n, GaloisField n) => Elaborated t -> [n] -> Either (InterpretError n) [n]
+runAndCheck :: (FreeVar t, Interpret t n, GaloisField n, Integral n) => Elaborated t -> [n] -> Either (InterpretError n) [n]
 runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
 
@@ -100,6 +101,7 @@ instance FreeVar Boolean where
     Boolean _ -> return mempty
     BoolVar var -> return $ IntSet.singleton var
     BoolInputVar _ -> return mempty
+    NumBit x _ -> freeVars x
     Eq x y -> (<>) <$> freeVars x <*> freeVars y
     And x y -> (<>) <$> freeVars x <*> freeVars y
     Or x y -> (<>) <$> freeVars x <*> freeVars y
@@ -161,7 +163,7 @@ instance GaloisField n => Interpret Bool n where
   interpret True = return [one]
   interpret False = return [zero]
 
-instance GaloisField n => Interpret Number n where
+instance (GaloisField n, Integral n) => Interpret Number n where
   interpret val = case val of
     Integer n -> interpret n
     Rational n -> interpret n
@@ -178,11 +180,16 @@ instance GaloisField n => Interpret Number n where
         _ -> interpret x
     ToNum x -> interpret x
 
-instance GaloisField n => Interpret Boolean n where
+instance (GaloisField n, Integral n) => Interpret Boolean n where
   interpret val = case val of
     Boolean b -> interpret b
     BoolVar var -> pure <$> lookupVar var
     BoolInputVar var -> pure <$> lookupInputVar var
+    NumBit x i -> do
+      xs <- interpret x 
+      if testBit (toInteger (head xs)) i
+        then return [one]
+        else return [zero]
     Eq x y -> do
       x' <- interpret x
       y' <- interpret y

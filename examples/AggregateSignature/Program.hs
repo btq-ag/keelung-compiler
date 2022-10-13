@@ -52,7 +52,7 @@ checkAgg (Param dimension numOfSigs setup _) = do
     forM_ [0 .. dimension - 1] $ \i -> do
       rowSum <- reduce 0 [0 .. dimension - 1] $ \acc j -> do
         let indexForPublicKey = (i - j) `mod` dimension
-        let pk = publicKey ! indexForPublicKey
+        let pk = publicKey Data.Array.! indexForPublicKey
         let pk' =
               if i < j
                 then q - pk
@@ -66,7 +66,7 @@ checkAgg (Param dimension numOfSigs setup _) = do
       assert $ rowSum `Eq` (quotient * fromInteger q + remainder)
 
   forM_ [0 .. dimension - 1] $ \i -> do
-    let expected = setupAggSig setup ! i
+    let expected = setupAggSig setup Data.Array.! i
     let actual = foldl (\acc t -> 
                   let remainder = access2 expectedRemainders (t, i)
                   in  acc + remainder) 0 [0 .. numOfSigs - 1] 
@@ -82,7 +82,7 @@ checkSize (Param dimension numOfSigs setup _) = do
   forM_ [0 .. numOfSigs - 1] $ \i -> do
     let signature = signatures !! i
     forM_ [0 .. dimension - 1] $ \j -> do
-      let coeff = signature ! j
+      let coeff = signature Data.Array.! j
 
       -- within the range of [0, 16384)
       let value = foldl (\acc k ->
