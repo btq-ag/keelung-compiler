@@ -10,6 +10,7 @@ module Keelung.Compiler.Syntax.Untyped
     Assignment (..),
     eraseType,
     sizeOfExpr,
+    bitValue,
   )
 where
 
@@ -19,10 +20,10 @@ import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Sequence (Seq (..), (|>))
+import Keelung.Compiler.Syntax.Bits (Bits (..))
 import Keelung.Field (N (..))
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Types (Var)
-import Keelung.Compiler.Syntax.Bits (Bits(..))
 
 --------------------------------------------------------------------------------
 
@@ -46,12 +47,13 @@ data BinaryOp = Sub | Div
 
 -- | Untyped expression
 data Expr n
-  = Var Var
-  | Val n
+  = Val n
+  | Var Var
+  | VarBit Var Int -- Bit of a variable
   -- Binary operators with only 2 operands
   | BinaryOp BinaryOp (Expr n) (Expr n)
-  -- N-Ary operators with >= 2 operands
-  | NAryOp Op (Expr n) (Expr n) (Seq (Expr n))
+  | -- N-Ary operators with >= 2 operands
+    NAryOp Op (Expr n) (Expr n) (Seq (Expr n))
   | If (Expr n) (Expr n) (Expr n)
   deriving (Eq, Functor)
 
@@ -72,8 +74,9 @@ instance Show n => Show (Expr n) where
         go _ n (x :<| Empty) = showsPrec (succ n) x
         go delim n (x :<| xs') = showsPrec (succ n) x . showString delim . go delim n xs'
      in case expr of
-          Val val -> shows val
           Var var -> showString "$" . shows var
+          VarBit var i -> showString "$" . shows var . showString "[" . shows i . showString "]"
+          Val val -> shows val
           NAryOp op x0 x1 xs -> case op of
             Add -> chain " + " 6 $ x0 :<| x1 :<| xs
             Mul -> chain " * " 7 $ x0 :<| x1 :<| xs
@@ -93,6 +96,7 @@ sizeOfExpr :: Expr n -> Int
 sizeOfExpr expr = case expr of
   Val _ -> 1
   Var _ -> 1
+  VarBit _ _ -> 1
   NAryOp _ x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
      in sum (fmap sizeOfExpr operands) + (length operands - 1)
@@ -321,19 +325,18 @@ eraseExpr expr = case expr of
     mapM_ markAsBoolVar vars
     return $ map Var vars
   T.ToNum x -> eraseExpr x
-  T.Bit x i -> do 
+  T.Bit x i -> do
     x' <- head <$> eraseExpr x
-    bit <- bitValue x' i 
-    return [Val bit]
-  where 
-    bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n n 
-    bitValue expr i = case expr of
-      Var v -> error "dunno how to erase Typed.Bit" 
-      Val n -> return $ testBit n i 
-      BinaryOp bo ex ex' -> error "dunno how to erase Typed.Bit" 
-      NAryOp op ex ex' seq -> error "dunno how to erase Typed.Bit" 
-      If ex ex' ex_n -> error "dunno how to erase Typed.Bit" 
+    return [bitValue x' i]
 
+bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> Expr n
+bitValue expr i = case expr of
+  Val n -> Val (testBit n i)
+  Var v -> VarBit v i
+  VarBit {} -> error "Panic: trying to access the bit value of another bit value"
+  BinaryOp {} -> error "Panic: trying to access the bit value of a compound expression"
+  NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
+  If p a b -> If p (bitValue a i) (bitValue b i)
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.Assignment ref expr) = do
@@ -368,12 +371,12 @@ chainExprsOfAssocOp op x y = case (x, y) of
 --   complement = fromInteger . complement . toInteger
 --   shift x i = fromInteger (shift (toInteger x) i)
 --   rotate x i = fromInteger (rotate (toInteger x) i)
---   bitSize x = fromIntegral $ natVal x 
---   bitSizeMaybe x = Just $ fromIntegral $ natVal x 
+--   bitSize x = fromIntegral $ natVal x
+--   bitSizeMaybe x = Just $ fromIntegral $ natVal x
 --   isSigned _ = False
 --   testBit x i = _
 --   bit = _
 --   popCount = _
 
--- bitValueGF181 :: Expr n -> Int -> M n n 
+-- bitValueGF181 :: Expr n -> Int -> M n n
 -- bitValueGF181 expr i = case expr of

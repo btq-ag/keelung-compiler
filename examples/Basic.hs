@@ -298,3 +298,9 @@ chainingOR n = foldl Or false <$> inputs n
 
 toBool :: Comp Boolean
 toBool = ToBool <$> input
+
+bitsVal :: Comp (Arr Boolean)
+bitsVal = do 
+  x <- input
+  let c = 3
+  return $ toArray [x ! 0, c ! 1, c ! 2]

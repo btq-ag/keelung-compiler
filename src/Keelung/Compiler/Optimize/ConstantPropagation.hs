@@ -3,12 +3,13 @@ module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Keelung.Compiler.Syntax.Untyped
+import Data.Field.Galois (GaloisField)
 
 --------------------------------------------------------------------------------
 
 -- 1. Propagate constant in assignments
 -- 2. Propagate constant in the expression and assertions
-run :: TypeErased n -> TypeErased n
+run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
 run (TypeErased expr assertions assignments allVarSize inputVarSize outputVarSize boolVars) =
   let (bindings, assignments') = propagateInAssignments assignments
       expr' = propagateConstant bindings <$> expr
@@ -18,7 +19,7 @@ run (TypeErased expr assertions assignments allVarSize inputVarSize outputVarSiz
    in TypeErased expr' assertions' assignments'' allVarSize inputVarSize outputVarSize boolVars
 
 -- Propagate constant in assignments and return the bindings for later use
-propagateInAssignments :: [Assignment n] -> (IntMap n, [Assignment n])
+propagateInAssignments :: (Integral n, GaloisField n) => [Assignment n] -> (IntMap n, [Assignment n])
 propagateInAssignments xs =
   let (bindings, assignments) = extractBindings xs
       assignments' =
@@ -41,12 +42,13 @@ extractBindings = go IntMap.empty []
     go bindings rest (others : xs) = go bindings (others : rest) xs
 
 -- constant propogation
-propagateConstant :: IntMap a -> Expr a -> Expr a
+propagateConstant :: (GaloisField a, Integral a) => IntMap a -> Expr a -> Expr a
 propagateConstant bindings = propogate
   where
     propogate e = case e of
-      Var var -> lookupVar var
       Val _ -> e
+      Var var -> lookupVar var
+      VarBit var i -> lookupVarBit var i
       NAryOp op x y es -> NAryOp op (propogate x) (propogate y) (fmap propogate es)
       BinaryOp op x y -> BinaryOp op (propogate x) (propogate y)
       If p x y -> If (propogate p) (propogate x) (propogate y)
@@ -54,3 +56,7 @@ propagateConstant bindings = propogate
     lookupVar var = case IntMap.lookup var bindings of
       Nothing -> Var var
       Just val -> Val val
+
+    lookupVarBit var i = case IntMap.lookup var bindings of
+      Nothing -> VarBit var i
+      Just val -> bitValue (Val val) i

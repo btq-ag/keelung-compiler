@@ -86,6 +86,7 @@ encode :: GaloisField n => Var -> Expr n -> M n ()
 encode out expr = case expr of
   Val val -> add $ cadd val [(out, -1)] -- out = val
   Var var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  VarBit {} -> error "dunno how to encode VarBit"
   NAryOp op x y rest ->
     case op of
       Add -> do
