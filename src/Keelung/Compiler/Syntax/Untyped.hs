@@ -23,7 +23,7 @@ import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.Bits (Bits (..))
 import Keelung.Field (N (..))
 import qualified Keelung.Syntax.Typed as T
-import Keelung.Types (Var)
+import Keelung.Types (Var, VarCounters (..))
 
 --------------------------------------------------------------------------------
 
@@ -171,9 +171,9 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
 -- monad for collecting boolean vars along the way
 type M n = ReaderT (Int, Int) (State (Context n))
 
-runM :: Int -> Int -> Int -> M n a -> (a, Context n)
+runM :: Int -> Int -> Int -> M n a -> a
 runM inputVarSize outputVarSize nextVar =
-  flip runState (initContext nextVar) . flip runReaderT (inputVarSize, outputVarSize)
+  flip evalState (initContext nextVar) . flip runReaderT (inputVarSize, outputVarSize)
 
 -- | Context for type erasure
 data Context n = Context
@@ -220,25 +220,25 @@ wireAsVar others = do
 eraseType :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let outputVarSize = lengthOfExpr expr
-      T.Computation nextVar inputVarSize _nextAddr _heap numAsgns boolAsgns assertions = comp
-      ((erasedExpr', erasedAssignments', erasedAssertions'), context) =
-        runM inputVarSize outputVarSize nextVar $ do
-          expr' <- eraseExpr expr
-          numAssignments' <- mapM eraseAssignment numAsgns
-          boolAssignments' <- mapM eraseAssignment boolAsgns
-          let assignments = numAssignments' <> boolAssignments'
-          assertions' <- concat <$> mapM eraseExpr assertions
-          return (expr', assignments, assertions')
-      Context nextVar' boolVars extraAssignments = context
-   in TypeErased
-        { erasedExpr = erasedExpr',
-          erasedAssertions = erasedAssertions',
-          erasedAssignments = erasedAssignments' <> extraAssignments,
-          erasedNumOfVars = inputVarSize + outputVarSize + nextVar',
-          erasedNumOfInputVars = inputVarSize,
-          erasedOutputVarSize = outputVarSize,
-          erasedBoolVars = boolVars
-        }
+      T.Computation counters numAsgns boolAsgns assertions = comp
+   in runM (varInput counters) outputVarSize (varOrdinary counters) $ do
+        expr' <- eraseExpr expr
+        numAssignments' <- mapM eraseAssignment numAsgns
+        boolAssignments' <- mapM eraseAssignment boolAsgns
+        let assignments = numAssignments' <> boolAssignments'
+        assertions' <- concat <$> mapM eraseExpr assertions
+        context <- get
+        let Context nextVar' boolVars extraAssignments = context
+        return $
+          TypeErased
+            { erasedExpr = expr',
+              erasedAssertions = assertions',
+              erasedAssignments = assignments <> extraAssignments,
+              erasedNumOfVars = varInput counters + outputVarSize + nextVar',
+              erasedNumOfInputVars = varInput counters,
+              erasedOutputVarSize = outputVarSize,
+              erasedBoolVars = boolVars
+            }
 
 eraseVal :: GaloisField n => T.Val -> M n [Expr n]
 eraseVal (T.Integer n) = return [Val (fromInteger n)]

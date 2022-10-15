@@ -20,7 +20,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Util
 import Keelung.Syntax.Typed
-import Keelung.Types (Addr, Heap, Var)
+import Keelung.Types (Addr, Heap, Var, VarCounters (varInput))
 import Control.Monad.Reader
 import Data.Bits (Bits(..))
 
@@ -65,7 +65,7 @@ runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
 
   -- See if input size is valid
-  let expectedInputSize = compNextInputVar (elabComp elab)
+  let expectedInputSize = varInput (compVarCounters (elabComp elab))
   let actualInputSize = length inputs
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
