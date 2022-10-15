@@ -1,22 +1,22 @@
 module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 
+import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Keelung.Compiler.Syntax.Untyped
-import Data.Field.Galois (GaloisField)
 
 --------------------------------------------------------------------------------
 
 -- 1. Propagate constant in assignments
 -- 2. Propagate constant in the expression and assertions
 run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
-run (TypeErased expr assertions assignments allVarSize inputVarSize outputVarSize boolVars) =
+run (TypeErased expr counters assertions assignments boolVars) =
   let (bindings, assignments') = propagateInAssignments assignments
       expr' = propagateConstant bindings <$> expr
       assertions' = map (propagateConstant bindings) assertions
 
       assignments'' = assignments' <> map (\(var, val) -> Assignment var (Val val)) (IntMap.toList bindings)
-   in TypeErased expr' assertions' assignments'' allVarSize inputVarSize outputVarSize boolVars
+   in TypeErased expr' counters assertions' assignments'' boolVars
 
 -- Propagate constant in assignments and return the bindings for later use
 propagateInAssignments :: (Integral n, GaloisField n) => [Assignment n] -> (IntMap n, [Assignment n])

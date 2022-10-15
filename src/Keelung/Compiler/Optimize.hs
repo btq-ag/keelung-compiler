@@ -19,6 +19,7 @@ import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import Keelung.Monad
 import qualified Keelung.Syntax.Typed as C
+import Keelung.Types (totalVarSize)
 
 --------------------------------------------------------------------------------
 
@@ -78,6 +79,6 @@ compareTypeErased :: TypeErased n -> TypeErased n -> Result
 compareTypeErased x y =
   Result
     { resultConstraintReduction = 0,
-      resultVariableReduction = erasedNumOfVars x - erasedNumOfVars y,
+      resultVariableReduction = totalVarSize (erasedVarCounters x) - totalVarSize (erasedVarCounters y),
       resultAssignmentReduction = length (erasedAssignments x) - length (erasedAssignments y)
     }

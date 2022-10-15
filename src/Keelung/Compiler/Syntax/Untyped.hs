@@ -14,7 +14,6 @@ module Keelung.Compiler.Syntax.Untyped
   )
 where
 
-import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
@@ -23,7 +22,7 @@ import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.Bits (Bits (..))
 import Keelung.Field (N (..))
 import qualified Keelung.Syntax.Typed as T
-import Keelung.Types (Var, VarCounters (..))
+import Keelung.Types
 
 --------------------------------------------------------------------------------
 
@@ -127,22 +126,18 @@ instance Functor Assignment where
 data TypeErased n = TypeErased
   { -- | The expression after type erasure
     erasedExpr :: ![Expr n],
+    -- | Variable bookkeepung
+    erasedVarCounters :: VarCounters,
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
     -- | Assignments after type erasure
     erasedAssignments :: ![Assignment n],
-    -- | Number of variables
-    erasedNumOfVars :: !Int,
-    -- | Number of input variables (they are placed before all variables)
-    erasedNumOfInputVars :: !Int,
-    -- | Number of output variables (they are placed after input variables)
-    erasedOutputVarSize :: !Int,
     -- | Variables that are boolean (so that we can impose the Boolean constraint on them)
     erasedBoolVars :: !IntSet
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr assertions assignments allVarsSize inputVarSize outputVarSize boolVars) =
+  show (TypeErased expr counters assertions assignments boolVars) =
     "TypeErased {\n\
     \  expression: "
       <> show (fmap (fmap N) expr)
@@ -155,12 +150,7 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
              then "  assertions:\n    " <> show assertions <> "\n"
              else ""
          )
-      <> "  number of all variables: "
-      <> show allVarsSize
-      <> "\n  number of input variables: "
-      <> show inputVarSize
-      <> "\n  number of output variables: "
-      <> show outputVarSize
+      <> indent (show counters)
       <> "\n  Boolean variables: "
       <> show (IntSet.toList boolVars)
       <> "\n\
@@ -169,16 +159,15 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
 --------------------------------------------------------------------------------
 
 -- monad for collecting boolean vars along the way
-type M n = ReaderT (Int, Int) (State (Context n))
+type M n = State (Context n)
 
-runM :: Int -> Int -> Int -> M n a -> a
-runM inputVarSize outputVarSize nextVar =
-  flip evalState (initContext nextVar) . flip runReaderT (inputVarSize, outputVarSize)
+runM :: VarCounters -> M n a -> a
+runM counters = flip evalState (initContext counters)
 
 -- | Context for type erasure
 data Context n = Context
-  { -- | Number of variables
-    ctxNumOfVars :: !Int,
+  { -- | Variable bookkeeping
+    ctxVarCounters :: VarCounters,
     -- | Set of Boolean variables (so that we can impose constraints like `$A * $A = $A` on them)
     ctxBoolVars :: !IntSet,
     -- | Assignments ($A = ...)
@@ -187,8 +176,8 @@ data Context n = Context
   deriving (Show)
 
 -- | Initial Context for type erasure
-initContext :: Int -> Context n
-initContext nextVar = Context nextVar IntSet.empty []
+initContext :: VarCounters -> Context n
+initContext counters = Context counters IntSet.empty []
 
 -- | Mark a variable as Boolean
 -- so that we can later impose constraints on them (e.g. $A * $A = $A)
@@ -198,9 +187,9 @@ markAsBoolVar var = modify' (\ctx -> ctx {ctxBoolVars = IntSet.insert var (ctxBo
 -- | Generate a fresh new variable
 freshVar :: M n Var
 freshVar = do
-  numberOfVars <- gets ctxNumOfVars
-  modify' (\ctx -> ctx {ctxNumOfVars = succ (ctxNumOfVars ctx)})
-  return numberOfVars
+  n <- gets (totalVarSize . ctxVarCounters)
+  modify' (\ctx -> ctx {ctxVarCounters = bumpOrdinaryVar (ctxVarCounters ctx)})
+  return n
 
 -- | Make a new assignment
 makeAssignment :: Var -> Expr n -> M n ()
@@ -221,22 +210,20 @@ eraseType :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let outputVarSize = lengthOfExpr expr
       T.Computation counters numAsgns boolAsgns assertions = comp
-   in runM (varInput counters) outputVarSize (varOrdinary counters) $ do
+   in runM counters $ do
         expr' <- eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAsgns
         boolAssignments' <- mapM eraseAssignment boolAsgns
         let assignments = numAssignments' <> boolAssignments'
         assertions' <- concat <$> mapM eraseExpr assertions
         context <- get
-        let Context nextVar' boolVars extraAssignments = context
+        let Context counters' boolVars extraAssignments = context
         return $
           TypeErased
             { erasedExpr = expr',
+              erasedVarCounters = counters' {varOutput = outputVarSize},
               erasedAssertions = assertions',
               erasedAssignments = assignments <> extraAssignments,
-              erasedNumOfVars = varInput counters + outputVarSize + nextVar',
-              erasedNumOfInputVars = varInput counters,
-              erasedOutputVarSize = outputVarSize,
               erasedBoolVars = boolVars
             }
 
@@ -263,7 +250,8 @@ eraseRef' ref = case ref of
     -- so that we can place input variables and output variables in front of them
     relocateOrdinaryVar :: Int -> M n Int
     relocateOrdinaryVar n = do
-      (inputVarSize, outputVarSize) <- ask
+      inputVarSize <- gets (varInput . ctxVarCounters)
+      outputVarSize <- gets (varOutput . ctxVarCounters)
       return (inputVarSize + outputVarSize + n)
 
 eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
