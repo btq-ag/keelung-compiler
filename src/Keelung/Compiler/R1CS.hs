@@ -8,7 +8,6 @@ import Data.Either (lefts, rights)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
@@ -35,7 +34,7 @@ generateWitness ::
   Either (ExecError n) (Witness n)
 generateWitness cs env =
   let cs' = renumberConstraints cs
-      variables = [0 .. IntSet.size (csVars cs) - 1]
+      variables = [0 .. totalVarSize (csVarCounters cs) - 1]
       (witness, _) = optimizeWithWitness env cs'
    in if all (isMapped witness) variables
         then Right witness
@@ -104,7 +103,6 @@ fromR1CS r1cs =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
       csBoolVars = r1csBoolVars r1cs,
-      csVars = IntSet.fromDistinctAscList [0 .. totalVarSize (r1csVarCounters r1cs) - 1],
       csVarCounters = r1csVarCounters r1cs
     }
   where

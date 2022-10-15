@@ -127,17 +127,16 @@ data ConstraintSystem n = ConstraintSystem
     -- | Variables that are Booleans
     -- should generate constraints like $A * $A = $A for each Boolean variables
     csBoolVars :: !IntSet,
-    csVars :: !IntSet,
     csVarCounters :: !VarCounters
   }
   deriving (Eq, Generic, NFData)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem cs bs _ _) = Set.size cs + IntSet.size bs
+numberOfConstraints (ConstraintSystem cs bs _) = Set.size cs + IntSet.size bs
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints boolVars _vars counters) =
+  show (ConstraintSystem constraints boolVars counters) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
@@ -166,7 +165,6 @@ renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))
     (IntSet.map renumber (csBoolVars cs))
-    (IntSet.fromList renumberedVars)
     counters {varOrdinary = IntSet.size newOrdinaryVars}
   where
     counters = csVarCounters cs

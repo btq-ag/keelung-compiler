@@ -36,12 +36,10 @@ run (TypeErased untypedExprs counters assertions assignments boolVars) = runM (t
   mapM_ encodeAssertion assertions
 
   constraints <- gets envConstraints
-  let vars = varsInConstraints constraints
   return
     ( ConstraintSystem
         constraints
         boolVars
-        vars
         counters
     )
 

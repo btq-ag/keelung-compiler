@@ -8,7 +8,6 @@ module Basic where
 import qualified AggregateSignature.Program
 import AggregateSignature.Util
 import Control.Monad (forM_)
-import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung
 import Keelung.Compiler
@@ -225,7 +224,6 @@ cs1 =
               cadd 11179 [(12, -1)]
             ],
       csBoolVars = mempty,
-      csVars = IntSet.fromList [0 .. 17],
       csVarCounters = VarCounters 12 0 5
     }
 

@@ -36,7 +36,7 @@ optimizeWithWitness witness cs =
   let pinnedVars = IntSet.fromDistinctAscList [0 .. varInput (csVarCounters cs) + varOutput (csVarCounters cs) - 1]
    in runOptiM witness $ do
         constraints <- MinimizeConstraints.run (IntSet.toList pinnedVars) (csConstraints cs)
-        witness' <- witnessOfVars $ IntSet.toList $ pinnedVars <> csVars cs
+        witness' <- witnessOfVars [0 .. totalVarSize (csVarCounters cs) - 1]
 
         return (witness', renumberConstraints $ cs {csConstraints = constraints})
 
