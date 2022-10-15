@@ -127,7 +127,7 @@ data TypeErased n = TypeErased
   { -- | The expression after type erasure
     erasedExpr :: ![Expr n],
     -- | Variable bookkeepung
-    erasedVarCounters :: VarCounters,
+    erasedVarCounters :: !VarCounters,
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
     -- | Assignments after type erasure

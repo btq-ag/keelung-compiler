@@ -128,7 +128,7 @@ data ConstraintSystem n = ConstraintSystem
     -- should generate constraints like $A * $A = $A for each Boolean variables
     csBoolVars :: !IntSet,
     csVars :: !IntSet,
-    csVarCounters :: VarCounters
+    csVarCounters :: !VarCounters
   }
   deriving (Eq, Generic, NFData)
 
