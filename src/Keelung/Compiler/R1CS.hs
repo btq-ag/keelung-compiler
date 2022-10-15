@@ -20,7 +20,7 @@ import Keelung.Constraint.R1C (R1C (..))
 import qualified Keelung.Constraint.R1C as R1C
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
 import Keelung.Field (N (..))
-import Keelung.Types (Var, VarCounters (..))
+import Keelung.Types
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -60,10 +60,8 @@ toR1CS :: GaloisField n => ConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
     (rights convertedConstratins)
-    (IntSet.size (csVars cs))
-    (varInput (csVarCounters cs))
+    (csVarCounters cs)
     (csBoolVars cs)
-    (varOutput (csVarCounters cs))
     (lefts convertedConstratins)
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
@@ -106,12 +104,8 @@ fromR1CS r1cs =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
       csBoolVars = r1csBoolVars r1cs,
-      csVars = IntSet.fromDistinctAscList [0 .. r1csVarSize r1cs - 1],
-      csVarCounters = VarCounters {
-        varInput = r1csInputVarSize r1cs,
-        varOutput = r1csOutputVarSize r1cs,
-        varOrdinary = r1csVarSize r1cs - r1csInputVarSize r1cs - r1csOutputVarSize r1cs
-      }
+      csVars = IntSet.fromDistinctAscList [0 .. totalVarSize (r1csVarCounters r1cs) - 1],
+      csVarCounters = r1csVarCounters r1cs
     }
   where
     fromR1C (R1C aX bX cX) =
@@ -124,9 +118,10 @@ fromR1CS r1cs =
 -- | Computes an assignment for a R1CS with given inputs
 witnessOfR1CS :: (GaloisField n, Integral n) => [n] -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
-  if r1csInputVarSize r1cs /= length inputs
-    then Left $ ExecInputUnmatchedError (r1csInputVarSize r1cs) (length inputs)
-    else generateWitness (fromR1CS r1cs) $ IntMap.fromDistinctAscList (zip [0 ..] inputs)
+  let inputSize = varInput (r1csVarCounters r1cs)
+   in if inputSize /= length inputs
+        then Left $ ExecInputUnmatchedError inputSize (length inputs)
+        else generateWitness (fromR1CS r1cs) $ IntMap.fromDistinctAscList (zip [0 ..] inputs)
 
 --------------------------------------------------------------------------------
 

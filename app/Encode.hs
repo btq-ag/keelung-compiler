@@ -18,7 +18,7 @@ import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
-import Keelung.Types (Var)
+import Keelung.Types
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
@@ -40,8 +40,7 @@ asJSONLines_ fieldNumber r1cs =
   where
     r1cConstraints = toR1Cs r1cs
 
-    inputAndOutputSize :: Int
-    inputAndOutputSize = r1csInputVarSize r1cs + r1csOutputVarSize r1cs
+    varCounters = r1csVarCounters r1cs
 
     header :: Encoding
     header =
@@ -51,8 +50,8 @@ asJSONLines_ fieldNumber r1cs =
             pairStr "version" (string "0.5.3")
               <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
               <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
-              <> pairStr "instances" (int inputAndOutputSize) -- inputs & outputs
-              <> pairStr "witness" (int (r1csVarSize r1cs - inputAndOutputSize)) -- other variables
+              <> pairStr "instances" (int (pinnedVarSize varCounters)) -- inputs & outputs
+              <> pairStr "witness" (int (totalVarSize varCounters - pinnedVarSize varCounters)) -- other ordinary variables
               <> pairStr "constraints" (int (length r1cConstraints))
 
 --------------------------------------------------------------------------------
@@ -109,4 +108,4 @@ reindexR1CS r1cs =
       | otherwise = var
 
     isInputOrOutputVar :: Var -> Bool
-    isInputOrOutputVar var = var < r1csInputVarSize r1cs + r1csOutputVarSize r1cs
+    isInputOrOutputVar var = var < pinnedVarSize (r1csVarCounters r1cs)

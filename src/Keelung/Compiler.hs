@@ -57,6 +57,7 @@ import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Typed (Elaborated)
+import Keelung.Types
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
@@ -126,8 +127,8 @@ execute prog ins = do
   actualWitness <- left ExecError $ witnessOfR1CS ins r1cs
 
   -- extract the output value from the witness
-
-  let outputVars = [r1csInputVarSize r1cs .. r1csInputVarSize r1cs + r1csOutputVarSize r1cs - 1]
+  let varCounters = r1csVarCounters r1cs
+  let outputVars = [varInput varCounters .. varInput varCounters + varOutput varCounters - 1]
   let (execErrors, actualOutputs) =
         Either.partitionEithers $
           map

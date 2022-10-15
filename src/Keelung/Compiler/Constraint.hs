@@ -167,29 +167,26 @@ renumberConstraints cs =
     (Set.map renumberConstraint (csConstraints cs))
     (IntSet.map renumber (csBoolVars cs))
     (IntSet.fromList renumberedVars)
-    counters {varOrdinary = IntSet.size ordinaryVars}
+    counters {varOrdinary = IntSet.size newOrdinaryVars}
   where
     counters = csVarCounters cs
-    inputVarSize = varInput counters
-    outputVarSize = varOutput counters
-    protectedVarSize = inputVarSize + outputVarSize
 
     -- variables in constraints (that should be kept after renumbering!)
     vars = varsInConstraints (csConstraints cs)
     -- variables in constraints excluding input & output variables
-    ordinaryVars = IntSet.filter (>= protectedVarSize) vars
+    newOrdinaryVars = IntSet.filter (>= pinnedVarSize counters) vars
     -- new variables after renumbering (excluding input & output variables)
-    renumberedOrdinaryVars = [protectedVarSize .. protectedVarSize + IntSet.size ordinaryVars - 1]
+    renumberedOrdinaryVars = [pinnedVarSize counters .. pinnedVarSize counters + IntSet.size newOrdinaryVars - 1]
 
     -- all variables after renumbering
-    renumberedVars = [0 .. protectedVarSize + IntSet.size ordinaryVars - 1]
+    renumberedVars = [0 .. pinnedVarSize counters + IntSet.size newOrdinaryVars - 1]
 
     -- mapping of old variables to new variables
     -- input variables are placed in the front
-    variableMap = Map.fromList $ zip (IntSet.toList ordinaryVars) renumberedOrdinaryVars
+    variableMap = Map.fromList $ zip (IntSet.toList newOrdinaryVars) renumberedOrdinaryVars
 
     renumber var =
-      if var >= protectedVarSize
+      if var >= pinnedVarSize counters
         then case Map.lookup var variableMap of
           Nothing ->
             error
