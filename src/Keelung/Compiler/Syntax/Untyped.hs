@@ -151,7 +151,7 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
              else ""
          )
       <> indent (show counters)
-      <> "\n  Boolean variables: "
+      <> "  Boolean variables: "
       <> show (IntSet.toList boolVars)
       <> "\n\
          \}"

@@ -42,8 +42,7 @@ run (TypeErased untypedExprs counters assertions assignments boolVars) = runM (t
         constraints
         boolVars
         vars
-        (varInput counters)
-        (varOutput counters)
+        counters
     )
 
 -- | Encode the constraint 'out = x'.

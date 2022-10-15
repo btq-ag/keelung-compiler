@@ -20,7 +20,7 @@ import Keelung.Constraint.R1C (R1C (..))
 import qualified Keelung.Constraint.R1C as R1C
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
 import Keelung.Field (N (..))
-import Keelung.Types (Var)
+import Keelung.Types (Var, VarCounters (..))
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -61,9 +61,9 @@ toR1CS cs =
   R1CS
     (rights convertedConstratins)
     (IntSet.size (csVars cs))
-    (csInputVarSize cs)
+    (varInput (csVarCounters cs))
     (csBoolVars cs)
-    (csOutputVarSize cs)
+    (varOutput (csVarCounters cs))
     (lefts convertedConstratins)
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
@@ -107,8 +107,11 @@ fromR1CS r1cs =
           <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
       csBoolVars = r1csBoolVars r1cs,
       csVars = IntSet.fromDistinctAscList [0 .. r1csVarSize r1cs - 1],
-      csInputVarSize = r1csInputVarSize r1cs,
-      csOutputVarSize = r1csOutputVarSize r1cs
+      csVarCounters = VarCounters {
+        varInput = r1csInputVarSize r1cs,
+        varOutput = r1csOutputVarSize r1cs,
+        varOrdinary = r1csVarSize r1cs - r1csInputVarSize r1cs - r1csOutputVarSize r1cs
+      }
     }
   where
     fromR1C (R1C aX bX cX) =

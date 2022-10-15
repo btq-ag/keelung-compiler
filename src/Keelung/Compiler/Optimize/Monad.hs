@@ -3,7 +3,7 @@ module Keelung.Compiler.Optimize.Monad
     bindVar,
     rootOfVar,
     lookupVar,
-    assignmentOfVars,
+    witnessOfVars,
     OptiM,
     Lookup (..),
     runOptiM,
@@ -67,8 +67,8 @@ lookupVar x = do
     Just c -> return $ Value c
 
 -- | Construct a partial assignment from 'vars' to field elements.
-assignmentOfVars :: GaloisField n => [Var] -> OptiM n (Witness n)
-assignmentOfVars vars = do
+witnessOfVars :: GaloisField n => [Var] -> OptiM n (Witness n)
+witnessOfVars vars = do
   bindings <- mapM lookupVar vars
   return $
     Map.fromList $

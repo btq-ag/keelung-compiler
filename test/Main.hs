@@ -9,6 +9,7 @@ import Control.Arrow (ArrowChoice (right), left)
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung
+import Keelung.Types (VarCounters (..))
 import Keelung.Compiler
 import qualified Keelung.Compiler as Compiler
 import Keelung.Compiler.Constraint (cadd)
@@ -141,8 +142,7 @@ main = hspec $ do
                     cadd (-42 :: GF181) [(0, 1)],
                 csBoolVars = mempty,
                 csVars = IntSet.fromList [0],
-                csInputVarSize = 1,
-                csOutputVarSize = 0
+                csVarCounters = VarCounters 1 0 0 
               }
        in Compiler.compile Basic.assertToBe42 `shouldBe` Right cs
 

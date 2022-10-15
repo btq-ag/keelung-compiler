@@ -19,7 +19,7 @@ import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Field
-import Keelung.Types (Var)
+import Keelung.Types
 
 --------------------------------------------------------------------------------
 
@@ -128,21 +128,16 @@ data ConstraintSystem n = ConstraintSystem
     -- should generate constraints like $A * $A = $A for each Boolean variables
     csBoolVars :: !IntSet,
     csVars :: !IntSet,
-    -- | Invariant: input variables are placed in the front of everything
-    --              so that we only need to remember how many are there
-    csInputVarSize :: !Int,
-    -- | Invariant: output variables are placed after input variables
-    --              so that we only need to remember how many are there
-    csOutputVarSize :: !Int
+    csVarCounters :: VarCounters
   }
   deriving (Eq, Generic, NFData)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem cs cs' _ _ _) = Set.size cs + IntSet.size cs'
+numberOfConstraints (ConstraintSystem cs bs _ _) = Set.size cs + IntSet.size bs
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints boolVars vars inputVarSize outputVarSize) =
+  show (ConstraintSystem constraints boolVars _vars counters) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
@@ -150,9 +145,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> printConstraints (toList constraints)
       <> "\n"
       <> printBooleanVars
-      <> printNumOfVars
-      <> printInputVars
-      <> printOutputVars
+      <> indent (show counters)
       <> "\n}"
     where
       printConstraints = unlines . map (\c -> "    " <> show c)
@@ -162,33 +155,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
           then ""
           else
             "  boolean variables (" <> show (IntSet.size boolVars)
-              <> ")\n\n"
-
-      printNumOfVars =
-        "  number of variables: "
-          <> show (IntSet.size vars)
-          <> "\n"
-
-      printInputVars =
-        "  input  variables (" <> show inputVarSize <> "): "
-          <> ( case inputVarSize of
-                 0 -> "none"
-                 1 -> "$0"
-                 _ -> "$0 .. $" <> show (inputVarSize - 1)
-             )
-          <> "\n"
-
-      printOutputVars =
-        "  output variables (" <> show outputVarSize <> "): "
-          <> ( case outputVarSize of
-                 0 -> "none"
-                 1 -> "$" <> show inputVarSize
-                 _ ->
-                   "$" <> show inputVarSize
-                     <> " .. $"
-                     <> show (inputVarSize + outputVarSize - 1)
-             )
-          <> "\n"
+              <> ")\n"
 
 -- | Sequentially renumber term variables '0..max_var'.  Return
 --   renumbered constraints, together with the total number of
@@ -200,27 +167,29 @@ renumberConstraints cs =
     (Set.map renumberConstraint (csConstraints cs))
     (IntSet.map renumber (csBoolVars cs))
     (IntSet.fromList renumberedVars)
-    (csInputVarSize cs)
-    (csOutputVarSize cs)
+    counters {varOrdinary = IntSet.size ordinaryVars}
   where
+    counters = csVarCounters cs
+    inputVarSize = varInput counters
+    outputVarSize = varOutput counters
+    protectedVarSize = inputVarSize + outputVarSize
+
     -- variables in constraints (that should be kept after renumbering!)
     vars = varsInConstraints (csConstraints cs)
-    -- variables in constraints excluding input variables
-    otherVars = IntSet.filter (>= csInputVarSize cs) vars
-    -- new variables after renumbering (excluding input variables)
-    -- we start counting these variables from `csInputVarSize cs`
-    -- because we want to keep the input variables intact
-    renumberedOtherVars = [csInputVarSize cs .. csInputVarSize cs + IntSet.size otherVars - 1]
+    -- variables in constraints excluding input & output variables
+    ordinaryVars = IntSet.filter (>= protectedVarSize) vars
+    -- new variables after renumbering (excluding input & output variables)
+    renumberedOrdinaryVars = [protectedVarSize .. protectedVarSize + IntSet.size ordinaryVars - 1]
 
     -- all variables after renumbering
-    renumberedVars = [0 .. csInputVarSize cs + IntSet.size otherVars - 1]
+    renumberedVars = [0 .. protectedVarSize + IntSet.size ordinaryVars - 1]
 
     -- mapping of old variables to new variables
     -- input variables are placed in the front
-    variableMap = Map.fromList $ zip (IntSet.toList otherVars) renumberedOtherVars
+    variableMap = Map.fromList $ zip (IntSet.toList ordinaryVars) renumberedOrdinaryVars
 
     renumber var =
-      if var >= csInputVarSize cs
+      if var >= protectedVarSize
         then case Map.lookup var variableMap of
           Nothing ->
             error
