@@ -168,7 +168,11 @@ interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either Stri
 interpretElab elab ins = left (show . InterpretError) (Interpret.run elab ins)
 
 interpretAndOutputWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String ([n], Witness n)
-interpretAndOutputWitnessesElab elab ins = left (show . InterpretError) (Interpret.runAndOutputWitnesses elab ins)
+interpretAndOutputWitnessesElab elab inputs = do
+  outputs <- left (show . InterpretError) (Interpret.run elab inputs)
+  r1cs <- toR1CS <$> left show (compileO1Elab elab)
+  witness <- left (show . ExecError) (witnessOfR1CS inputs r1cs)
+  return (outputs, witness)
 
 compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
 compileO0Elab elab = do

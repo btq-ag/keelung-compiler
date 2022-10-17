@@ -130,6 +130,7 @@ main = withUtf8 $ do
       case result of
         Left _ -> return ()
         Right (_, witness) -> do
+          -- 'witness' contains assignements of all variables
           BS.writeFile "witness.jsonl" (serializeInputAndWitness inputs witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
