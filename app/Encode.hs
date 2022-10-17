@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Encode (asJSONLines) where
+module Encode (serializeR1CS, serializeInputAndWitness) where
 
 -- import Data.Aeson.Encoding
 
@@ -14,6 +14,7 @@ import Data.Field.Galois (GaloisField (char, deg))
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Proxy
+import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
@@ -24,16 +25,24 @@ import Keelung.Types
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
 
 -- | Encodes a R1CS in the JSON Lines text file format
-asJSONLines :: (GaloisField n, Integral n) => R1CS n -> ByteString
-asJSONLines r1cs = asJSONLines_ (fieldNumberProxy r1cs) (fmap toInteger (reindexR1CS r1cs))
+serializeR1CS :: (GaloisField n, Integral n) => R1CS n -> ByteString
+serializeR1CS r1cs = serializeR1CS_ (fieldNumberProxy r1cs) (fmap toInteger (reindexR1CS r1cs))
   where
     fieldNumberProxy :: GaloisField n => R1CS n -> n
     fieldNumberProxy _ = asProxyTypeOf 0 Proxy
 
+-- | Encodes inputs and witnesses in the JSON Lines text file format
+serializeInputAndWitness :: Integral n => [n] -> Witness n -> ByteString
+serializeInputAndWitness inputs witnesses =
+  encodingToLazyByteString $
+    pairs $
+      pairStr "inputs" (list (integerText . toInteger) inputs)
+        <> pairStr "witnesses" (list (integerText . toInteger) (IntMap.elems witnesses))
+
 --------------------------------------------------------------------------------
 
-asJSONLines_ :: GaloisField n => n -> R1CS Integer -> ByteString
-asJSONLines_ fieldNumber r1cs =
+serializeR1CS_ :: GaloisField n => n -> R1CS Integer -> ByteString
+serializeR1CS_ fieldNumber r1cs =
   BS.intercalate "\n" $
     map encodingToLazyByteString $
       header : map toEncoding r1cConstraints

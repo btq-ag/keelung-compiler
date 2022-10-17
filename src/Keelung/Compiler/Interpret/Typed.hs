@@ -5,11 +5,13 @@
 -- Interpreter for Keelung.Syntax.Typed
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Interpret.Typed (InterpretError (..), run, runAndCheck) where
+module Keelung.Compiler.Interpret.Typed (InterpretError (..), runAndOutputWitnesses, run, runAndCheck) where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.State
+import Data.Bits (Bits (..))
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -21,14 +23,12 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Util
 import Keelung.Syntax.Typed
 import Keelung.Types (Addr, Heap, Var, VarCounters (varInput))
-import Control.Monad.Reader
-import Data.Bits (Bits(..))
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
-run' :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) ([n], Witness n)
-run' (Elaborated expr comp) inputs = runM inputs $ do
+runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) ([n], Witness n)
+runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
@@ -50,19 +50,19 @@ run' (Elaborated expr comp) inputs = runM inputs $ do
       -- collect variables and their bindings in the expression
       let vars = freeVars e
       bindings' <- mapM (\var -> (var,) <$> lookupVar var) $ IntSet.toList vars
-      throwError $ InterpretAssertionError e (IntMap.fromList bindings') inputs 
+      throwError $ InterpretAssertionError e (IntMap.fromList bindings') inputs
 
   -- lastly interpret the expression and return the result
   interpret expr
 
 -- | Interpret a program with inputs.
 run :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) [n]
-run (Elaborated expr comp) inputs = fst <$> run' (Elaborated expr comp) inputs
+run elab inputs = fst <$> runAndOutputWitnesses elab inputs
 
 -- | Interpret a program with inputs and run some additional checks.
 runAndCheck :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) [n]
 runAndCheck elab inputs = do
-  (output, witness) <- run' elab inputs
+  (output, witness) <- runAndOutputWitnesses elab inputs
 
   -- See if input size is valid
   let expectedInputSize = varInput (compVarCounters (elabComp elab))
@@ -127,10 +127,10 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     ToBool x -> interpret x
     ToNum x -> interpret x
     Bit x i -> do
-      xs <- interpret x 
+      xs <- interpret x
       if testBit (toInteger (head xs)) i
         then return [one]
-        else return [zero] 
+        else return [zero]
 
 --------------------------------------------------------------------------------
 
@@ -139,8 +139,8 @@ type M n = ReaderT (IntMap n) (StateT (IntMap n) (Except (InterpretError n)))
 
 runM :: [n] -> M n a -> Either (InterpretError n) (a, Witness n)
 runM inputs p = runExcept (runStateT (runReaderT p inputBindings) mempty)
-  where 
-    inputBindings = IntMap.fromDistinctAscList $ zip [0..] inputs
+  where
+    inputBindings = IntMap.fromDistinctAscList $ zip [0 ..] inputs
 
 -- | A `Ref` is given a list of numbers
 -- but in reality it should be just a single number.

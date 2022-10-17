@@ -30,6 +30,7 @@ module Keelung.Compiler
     compileO1Elab,
     compileO2Elab,
     interpretElab,
+    interpretAndOutputWitnessesElab,
     --
     asGF181N,
     asGF181,
@@ -165,6 +166,9 @@ eraseElab elab = left ElabError (Rewriting.run elab) >>= return . eraseType
 
 interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
 interpretElab elab ins = left (show . InterpretError) (Interpret.run elab ins)
+
+interpretAndOutputWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String ([n], Witness n)
+interpretAndOutputWitnessesElab elab ins = left (show . InterpretError) (Interpret.runAndOutputWitnesses elab ins)
 
 compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
 compileO0Elab elab = do
