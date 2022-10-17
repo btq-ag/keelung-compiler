@@ -35,8 +35,9 @@ data ProtocolOptions
   | CompileO1
   | CompileO2
   | Interpret
-  | ToJSON
+  | GenCircuit
   deriving (Show)
+  --  GenWitness
 
 protocol :: Parser ProtocolOptions
 protocol =
@@ -76,9 +77,25 @@ protocol =
         <> command
           "toJSON"
           ( info
-              (pure ToJSON <**> helper)
+              (pure GenCircuit <**> helper)
               ( fullDesc
-                  <> progDesc "Compile (-O1) a Keelung program to R1CS and write it to \"output.jsonl\" in the JSON Lines format"
+                  <> progDesc "Compile (-O1) a Keelung program to R1CS and output it as \"circuit.jsonl\""
               )
           )
+        <> command
+          "genCircuit"
+          ( info
+              (pure GenCircuit <**> helper)
+              ( fullDesc
+                  <> progDesc "Compile (-O1) a Keelung program to R1CS and output it as \"circuit.jsonl\""
+              )
+          )
+        -- <> command
+        --   "genWitness"
+        --   ( info
+        --       (pure GenWitness <**> helper)
+        --       ( fullDesc
+        --           <> progDesc "Interpret (-O1) a Keelung program with inputs and output the witnesses it as \"witness.jsonl\""
+        --       )
+        --   )
     )

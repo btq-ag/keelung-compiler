@@ -67,7 +67,7 @@ main = withUtf8 $ do
             B64 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [B64])
             GF181 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [GF181])
             BN128 -> putStrLn $ BSC.unpack $ encode (interpretElab elaborated (map fromInteger inputs) :: Either String [BN128])
-    Protocol ToJSON -> do
+    Protocol GenCircuit -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
       case decoded of
