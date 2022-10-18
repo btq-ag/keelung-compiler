@@ -13,6 +13,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bits (Bits (..))
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
@@ -20,8 +21,9 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung (N (N))
 import Keelung.Compiler.Util
-import Keelung.Syntax.Typed
+import Keelung.Syntax.Typed hiding (freeVars)
 import Keelung.Types (Addr, Heap, Var, VarCounters (varInput))
 
 --------------------------------------------------------------------------------
@@ -47,10 +49,11 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   forM_ (compAssertions comp) $ \e -> do
     values <- interpret e
     when (values /= [1]) $ do
-      -- collect variables and their bindings in the expression
-      let vars = freeVars e
-      bindings' <- mapM (\var -> (var,) <$> lookupVar var) $ IntSet.toList vars
-      throwError $ InterpretAssertionError e (IntMap.fromList bindings') inputs
+      let (inputVars, ordinaryVars) = freeVars e
+      inputBindings <- mapM (\var -> ("$I" <> show var,) <$> lookupInputVar var) $ IntSet.toList inputVars
+      ordinaryBindings <- mapM (\var -> ("$" <> show var,) <$> lookupVar var) $ IntSet.toList ordinaryVars
+      -- collect variables and their bindings in the expression and report them
+      throwError $ InterpretAssertionError e (inputBindings <> ordinaryBindings)
 
   -- lastly interpret the expression and return the result
   interpret expr
@@ -71,7 +74,7 @@ runAndCheck elab inputs = do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
   -- See if free variables of the program and the witness are the same
-  let variables = freeVarsOfElab elab
+  let variables = freeOrdinaryVarsOfElab elab
   let varsInWitness = IntMap.keysSet witness
   when (variables /= varsInWitness) $ do
     let missingInWitness = variables IntSet.\\ varsInWitness
@@ -167,27 +170,54 @@ lookupInputVar var = do
 --------------------------------------------------------------------------------
 
 -- | Collect free variables of an elaborated program (that should also be present in the witness)
-freeVarsOfElab :: Elaborated -> IntSet
-freeVarsOfElab (Elaborated value context) =
-  let inOutputValue = freeVars value
+freeOrdinaryVarsOfElab :: Elaborated -> IntSet
+freeOrdinaryVarsOfElab (Elaborated value context) =
+  let (_, inOutputValue) = freeVars value
       inNumBindings =
         map
-          (\(Assignment (NumVar var) val) -> IntSet.insert var (freeVars val)) -- collect both the var and its value
+          (\(Assignment (NumVar var) val) -> let (_, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
           (compNumAsgns context)
       inBoolBindings =
         map
-          (\(Assignment (BoolVar var) val) -> IntSet.insert var (freeVars val)) -- collect both the var and its value
+          (\(Assignment (BoolVar var) val) -> let (_, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
           (compBoolAsgns context)
    in inOutputValue
         <> IntSet.unions inNumBindings
         <> IntSet.unions inBoolBindings
+
+-- | Collect variables of an expression and group them into sets of:
+--    1. Number input variables
+--    2. Boolean input variables
+--    3. ordinary variables
+freeVars :: Expr -> (IntSet, IntSet)
+freeVars expr = case expr of
+  Val _ -> mempty
+  Var (NumVar n) -> (mempty, IntSet.singleton n)
+  Var (NumInputVar n) -> (IntSet.singleton n, mempty)
+  Var (BoolVar n) -> (mempty, IntSet.singleton n)
+  Var (BoolInputVar n) -> (IntSet.singleton n, mempty)
+  Array xs ->
+    let (is, os) = unzip $ toList $ fmap freeVars xs in (IntSet.unions is, IntSet.unions os)
+  Add x y -> freeVars x <> freeVars y
+  Sub x y -> freeVars x <> freeVars y
+  Mul x y -> freeVars x <> freeVars y
+  Div x y -> freeVars x <> freeVars y
+  Eq x y -> freeVars x <> freeVars y
+  And x y -> freeVars x <> freeVars y
+  Or x y -> freeVars x <> freeVars y
+  Xor x y -> freeVars x <> freeVars y
+  BEq x y -> freeVars x <> freeVars y
+  If x y z -> freeVars x <> freeVars y <> freeVars z
+  ToBool x -> freeVars x
+  ToNum x -> freeVars x
+  Bit x _ -> freeVars x
 
 --------------------------------------------------------------------------------
 
 data InterpretError n
   = InterpretUnboundVarError Var (Witness n)
   | InterpretUnboundAddrError Addr Heap
-  | InterpretAssertionError Expr (Witness n) [n]
+  | InterpretAssertionError Expr [(String, n)]
   | InterpretVarUnassignedError IntSet (Witness n)
   | InterpretInputSizeError Int Int
   deriving (Eq, Generic, NFData)
@@ -203,12 +233,10 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
     "unbound address " ++ show var
       ++ " in heap "
       ++ show heap
-  show (InterpretAssertionError val witness inputs) =
-    "assertion failed: " ++ show val
-      ++ "\n  witness of variables: "
-      ++ showWitness witness
-      ++ "\n  inputs variables: "
-      ++ show inputs
+  show (InterpretAssertionError expr assignments) =
+    "assertion failed: " <> show expr
+      <> "\nassignment of variables:\n"
+      <> unlines (map (\(var, val) -> "  " <> var <> " := " <> show (N val)) assignments)
   show (InterpretVarUnassignedError missingInWitness missingInProgram) =
     ( if IntSet.null missingInWitness
         then ""

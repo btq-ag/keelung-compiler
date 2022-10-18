@@ -71,8 +71,7 @@ main = hspec $ do
           ( InterpretError $
               InterpretAssertionError
                 (C.Eq (C.Var (C.NumInputVar 0)) (C.Val (C.Integer 3)))
-                mempty
-                [0]
+                [("$I0", 0)]
           )
     it "assert success" $
       execute Basic.assert1 [3] `shouldBe` Right [3 :: GF181]
