@@ -32,11 +32,14 @@ serializeR1CS r1cs = serializeR1CS_ (fieldNumberProxy r1cs) (fmap toInteger (rei
     fieldNumberProxy _ = asProxyTypeOf 0 Proxy
 
 -- | Encodes inputs and witnesses in the JSON Lines text file format
+--   NOTE: the "inputs" field should contain both inputs and outputs
+--         but are deliberately kept empty
+--         and let the "witnesses" field carry all of the values instead
 serializeInputAndWitness :: Integral n => [n] -> Witness n -> ByteString
-serializeInputAndWitness inputs witnesses =
+serializeInputAndWitness _inputs witnesses =
   encodingToLazyByteString $
     pairs $
-      pairStr "inputs" (list (integerText . toInteger) inputs)
+      pairStr "inputs" emptyArray_
         <> pairStr "witnesses" (list (integerText . toInteger) (IntMap.elems witnesses))
 
 --------------------------------------------------------------------------------
