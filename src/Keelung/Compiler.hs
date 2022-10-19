@@ -129,7 +129,7 @@ execute prog ins = do
 
   -- extract the output value from the witness
   let varCounters = r1csVarCounters r1cs
-  let outputVars = [varInput varCounters .. varInput varCounters + varOutput varCounters - 1]
+  let outputVars = [inputVarSize varCounters .. inputVarSize varCounters + outputVarSize varCounters - 1]
   let (execErrors, actualOutputs) =
         Either.partitionEithers $
           map

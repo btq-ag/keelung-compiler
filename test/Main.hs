@@ -140,7 +140,7 @@ main = hspec $ do
                   Set.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 1 0 0 
+                csVarCounters = VarCounters 1 1 0 0 0 
               }
        in Compiler.compile Basic.assertToBe42 `shouldBe` Right cs
 

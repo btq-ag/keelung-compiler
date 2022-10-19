@@ -165,7 +165,7 @@ renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))
     (IntSet.map renumber (csBoolVars cs))
-    counters {varOrdinary = IntSet.size newOrdinaryVars}
+    (setOrdinaryVarSize (IntSet.size newOrdinaryVars) counters)
   where
     counters = csVarCounters cs
 

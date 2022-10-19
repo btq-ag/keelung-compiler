@@ -19,7 +19,7 @@ import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import Keelung.Monad
 import qualified Keelung.Syntax.Typed as C
-import Keelung.Types (VarCounters (..), totalVarSize)
+import Keelung.Types
 
 --------------------------------------------------------------------------------
 
@@ -33,7 +33,7 @@ optimizeWithWitness witness cs =
   --   - output vars
   -- Pinned vars are never optimized away.
 
-  let pinnedVars = IntSet.fromDistinctAscList [0 .. varInput (csVarCounters cs) + varOutput (csVarCounters cs) - 1]
+  let pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize (csVarCounters cs) - 1]
    in runOptiM witness $ do
         constraints <- MinimizeConstraints.run (IntSet.toList pinnedVars) (csConstraints cs)
         witness' <- witnessOfVars [0 .. totalVarSize (csVarCounters cs) - 1]
@@ -42,7 +42,7 @@ optimizeWithWitness witness cs =
 
 optimizeWithInput :: (GaloisField n, Integral n) => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimizeWithInput ins cs =
-  let witness = IntMap.fromList (zip [0 .. varInput (csVarCounters cs) - 1] ins)
+  let witness = IntMap.fromList (zip [0 .. inputVarSize (csVarCounters cs) - 1] ins)
    in optimizeWithWitness witness cs
 
 optimize1 :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
@@ -54,7 +54,7 @@ optimize2 cs =
   --   - input vars
   --   - output vars
   -- Pinned vars are never optimized away.
-  let pinnedVars = IntSet.fromDistinctAscList [0 .. varInput (csVarCounters cs) + varOutput (csVarCounters cs) - 1]
+  let pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize (csVarCounters cs) - 1]
       constraints = MinimizeConstraints2.run pinnedVars (csConstraints cs)
    in renumberConstraints $ cs {csConstraints = constraints}
 

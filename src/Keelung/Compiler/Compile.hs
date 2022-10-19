@@ -25,7 +25,7 @@ import Keelung.Types
 run :: GaloisField n => TypeErased n -> ConstraintSystem n
 run (TypeErased untypedExprs counters assertions assignments boolVars) = runM (totalVarSize counters) $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
-  let outputVars = [varInput counters .. varInput counters + varOutput counters - 1]
+  let outputVars = [inputVarSize counters .. inputVarSize counters + outputVarSize counters - 1]
   forM_ (zip outputVars untypedExprs) $ \(var, expr) -> do
     encode var expr
 

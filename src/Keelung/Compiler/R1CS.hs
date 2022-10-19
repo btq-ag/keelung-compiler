@@ -116,7 +116,7 @@ fromR1CS r1cs =
 -- | Computes an assignment for a R1CS with given inputs
 witnessOfR1CS :: (GaloisField n, Integral n) => [n] -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
-  let inputSize = varInput (r1csVarCounters r1cs)
+  let inputSize = inputVarSize (r1csVarCounters r1cs)
    in if inputSize /= length inputs
         then Left $ ExecInputUnmatchedError inputSize (length inputs)
         else generateWitness (fromR1CS r1cs) $ IntMap.fromDistinctAscList (zip [0 ..] inputs)

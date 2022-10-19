@@ -24,7 +24,7 @@ import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Util
 import Keelung.Syntax.Typed hiding (freeVars)
-import Keelung.Types (Addr, Heap, Var, VarCounters (varInput))
+import Keelung.Types
 
 --------------------------------------------------------------------------------
 
@@ -68,7 +68,7 @@ runAndCheck elab inputs = do
   (output, witness) <- runAndOutputWitnesses elab inputs
 
   -- See if input size is valid
-  let expectedInputSize = varInput (compVarCounters (elabComp elab))
+  let expectedInputSize = inputVarSize (compVarCounters (elabComp elab))
   let actualInputSize = length inputs
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize

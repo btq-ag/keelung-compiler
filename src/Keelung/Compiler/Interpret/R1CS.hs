@@ -14,7 +14,7 @@ run r1cs inputs = do
   witness <- witnessOfR1CS inputs r1cs
   let varCounters = r1csVarCounters r1cs
   -- extract output values from the witness
-  let outputVars = [varInput varCounters .. varInput varCounters + varOutput varCounters - 1]
+  let outputVars = [inputVarSize varCounters .. inputVarSize varCounters + outputVarSize varCounters - 1]
 
   let (execErrors, outputs) =
         Either.partitionEithers $

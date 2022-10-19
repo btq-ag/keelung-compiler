@@ -208,8 +208,7 @@ wireAsVar others = do
 
 eraseType :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
-  let outputVarSize = lengthOfExpr expr
-      T.Computation counters numAsgns boolAsgns assertions = comp
+  let T.Computation counters numAsgns boolAsgns assertions = comp
    in runM counters $ do
         expr' <- eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAsgns
@@ -221,7 +220,8 @@ eraseType (T.Elaborated expr comp) =
         return $
           TypeErased
             { erasedExpr = expr',
-              erasedVarCounters = counters' {varOutput = outputVarSize},
+              -- determine the size of output vars by looking at the length of the expression
+              erasedVarCounters = setOutputVarSize (lengthOfExpr expr) counters',
               erasedAssertions = assertions',
               erasedAssignments = assignments <> extraAssignments,
               erasedBoolVars = boolVars
@@ -250,9 +250,8 @@ eraseRef' ref = case ref of
     -- so that we can place input variables and output variables in front of them
     relocateOrdinaryVar :: Int -> M n Int
     relocateOrdinaryVar n = do
-      inputVarSize <- gets (varInput . ctxVarCounters)
-      outputVarSize <- gets (varOutput . ctxVarCounters)
-      return (inputVarSize + outputVarSize + n)
+      offset <- gets (pinnedVarSize . ctxVarCounters)
+      return (offset + n)
 
 eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
 eraseRef ref = Var <$> eraseRef' ref
