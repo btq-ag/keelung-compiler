@@ -151,7 +151,7 @@ instance (GaloisField n, Integral n) => Show (ExecError n) where
     "these R1C constraints cannot be satisfied:\n"
       ++ show (map (fmap N) r1c's)
       ++ "\nby the witness:\n"
-      ++ show (IntMap.restrictKeys (fmap N witness) (freeVarsOfR1Cs r1c's))
+      ++ showWitness (IntMap.restrictKeys witness (freeVarsOfR1Cs r1c's))
     where
       freeVarsOfR1Cs :: [R1C n] -> IntSet
       freeVarsOfR1Cs = IntSet.unions . map R1C.freeVars
@@ -161,4 +161,4 @@ instance (GaloisField n, Integral n) => Show (ExecError n) where
   show (ExecVarUnassignedError vars witness) =
     "these variables:\n " ++ show vars
       ++ "\n are not assigned in: \n"
-      ++ show (fmap N witness)
+      ++ showWitness (IntMap.restrictKeys witness (IntSet.fromList vars))

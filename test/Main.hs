@@ -21,6 +21,7 @@ import Keelung.Syntax.VarCounters (VarCounters (..))
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
+import Debug.Trace
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
@@ -33,7 +34,7 @@ runKeelungAggSig dimension numberOfSignatures =
       param = makeParam dimension numberOfSignatures 42 settings :: Param GF181
    in execute
         (AggSig.aggregateSignature param :: Comp ())
-        (genInputFromParam param)
+        (traceShowId $ genInputFromParam param)
 
 main :: IO ()
 main = hspec $ do

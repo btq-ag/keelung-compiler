@@ -24,7 +24,7 @@ import Keelung.Compiler.Syntax.Bits (Bits (..))
 import Keelung.Field (N (..))
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Syntax.VarCounters
-import Keelung.Types ( Var )
+import Keelung.Types (Var)
 
 --------------------------------------------------------------------------------
 
@@ -242,7 +242,7 @@ eraseVal T.Unit = return []
 eraseRef' :: T.Ref -> M n Int
 eraseRef' ref = case ref of
   T.NumVar n -> relocateOrdinaryVar n
-  T.NumInputVar n -> relocateNumInputVar n
+  T.NumInputVar n -> return n
   -- we don't need to mark intermediate Boolean variables
   -- and impose the Boolean constraint on them ($A * $A = $A)
   -- because this property should be guaranteed by the source of its value
@@ -256,11 +256,6 @@ eraseRef' ref = case ref of
     relocateOrdinaryVar :: Int -> M n Int
     relocateOrdinaryVar n = do
       offset <- gets (pinnedVarSize . ctxVarCounters)
-      return (offset + n)
-
-    relocateNumInputVar :: Int -> M n Int
-    relocateNumInputVar n = do
-      offset <- gets (boolInputVarSize . ctxVarCounters)
       return (offset + n)
 
 eraseRef :: GaloisField n => T.Ref -> M n (Expr n)

@@ -17,9 +17,9 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (CNEQ (..))
-import Keelung.Types
 import Keelung.Syntax.VarCounters
-import Debug.Trace
+import Keelung.Types
+
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
@@ -246,8 +246,6 @@ encodeEquality isEq out x y = do
         then encode out (Val 1)
         else encode out (Val 0)
     Right diff -> do
-      traceShowM ("Fidd", x, y)
-      traceShowM ("Fidd", diff)
       -- introduce a new variable m
       -- if diff = 0 then m = 0 else m = recip diff
       m <- freshVar
