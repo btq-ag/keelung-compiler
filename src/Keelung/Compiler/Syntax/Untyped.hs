@@ -24,8 +24,7 @@ import Keelung.Compiler.Syntax.Bits (Bits (..))
 import Keelung.Field (N (..))
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Syntax.VarCounters
-import Keelung.Types
-import Debug.Trace
+import Keelung.Types ( Var )
 
 --------------------------------------------------------------------------------
 
@@ -231,7 +230,7 @@ eraseType (T.Elaborated expr comp) =
             }
   where
     getNumWidth :: Bits n => Context n -> Int
-    getNumWidth proxy = traceShowId $ bitSize $ asProxyTypeOf 0 proxy
+    getNumWidth proxy = bitSize $ asProxyTypeOf 0 proxy
 
 eraseVal :: GaloisField n => T.Val -> M n [Expr n]
 eraseVal (T.Integer n) = return [Val (fromInteger n)]

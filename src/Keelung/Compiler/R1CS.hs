@@ -21,6 +21,8 @@ import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
 import Keelung.Field (N (..))
 import Keelung.Types
 import Keelung.Syntax.VarCounters
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -147,9 +149,12 @@ instance (GaloisField n, Integral n) => Show (ExecError n) where
       ++ show (fmap N actual)
   show (ExecR1CUnsatisfiableError r1c's witness) =
     "these R1C constraints cannot be satisfied:\n"
-      ++ show r1c's
+      ++ show (map (fmap N) r1c's)
       ++ "\nby the witness:\n"
-      ++ show (fmap N witness)
+      ++ show (IntMap.restrictKeys (fmap N witness) (freeVarsOfR1Cs r1c's))
+      where 
+        freeVarsOfR1Cs :: [R1C n] -> IntSet 
+        freeVarsOfR1Cs = IntSet.unions . map R1C.freeVars 
   show (ExecInputUnmatchedError expected actual) =
     "expecting " ++ show expected ++ " input(s) but got " ++ show actual
       ++ " input(s)"
