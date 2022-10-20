@@ -19,6 +19,7 @@ import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Types
 import Keelung.Syntax.VarCounters
+import Debug.Trace
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
@@ -238,13 +239,15 @@ encodeBinaryOp op out x y = case op of
 encodeEquality :: GaloisField n => Bool -> Var -> Var -> Var -> M n ()
 encodeEquality isEq out x y = do
   -- lets build the polynomial for (x - y) first:
-  case Poly.buildMaybe 0 (IntMap.fromList [(x, 1), (y, -1)]) of
-    Nothing -> do
+  case Poly.buildEither 0 [(x, 1), (y, -1)] of
+    Left _ -> do
       -- in this case, the variable x and y happend to be the same
       if isEq
         then encode out (Val 1)
         else encode out (Val 0)
-    Just diff -> do
+    Right diff -> do
+      traceShowM ("Fidd", x, y)
+      traceShowM ("Fidd", diff)
       -- introduce a new variable m
       -- if diff = 0 then m = 0 else m = recip diff
       m <- freshVar

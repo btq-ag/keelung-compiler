@@ -8,6 +8,8 @@ import Data.Either (lefts, rights)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
@@ -19,10 +21,8 @@ import Keelung.Constraint.R1C (R1C (..))
 import qualified Keelung.Constraint.R1C as R1C
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
 import Keelung.Field (N (..))
-import Keelung.Types
 import Keelung.Syntax.VarCounters
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
+import Keelung.Types
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -35,10 +35,10 @@ generateWitness ::
   Witness n ->
   -- | Resulting assignment
   Either (ExecError n) (Witness n)
-generateWitness cs env =
+generateWitness cs witnesses =
   let cs' = renumberConstraints cs
       variables = [0 .. totalVarSize (csVarCounters cs) - 1]
-      (witness, _) = optimizeWithWitness env cs'
+      (witness, _) = optimizeWithWitness witnesses cs'
    in if all (isMapped witness) variables
         then Right witness
         else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
@@ -152,9 +152,9 @@ instance (GaloisField n, Integral n) => Show (ExecError n) where
       ++ show (map (fmap N) r1c's)
       ++ "\nby the witness:\n"
       ++ show (IntMap.restrictKeys (fmap N witness) (freeVarsOfR1Cs r1c's))
-      where 
-        freeVarsOfR1Cs :: [R1C n] -> IntSet 
-        freeVarsOfR1Cs = IntSet.unions . map R1C.freeVars 
+    where
+      freeVarsOfR1Cs :: [R1C n] -> IntSet
+      freeVarsOfR1Cs = IntSet.unions . map R1C.freeVars
   show (ExecInputUnmatchedError expected actual) =
     "expecting " ++ show expected ++ " input(s) but got " ++ show actual
       ++ " input(s)"

@@ -14,7 +14,7 @@ import Keelung.Compiler.Constraint
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints2 as MinimizeConstraints2
 import Keelung.Compiler.Optimize.Monad
-import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting2
+import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import Keelung.Monad
@@ -24,7 +24,7 @@ import Keelung.Syntax.VarCounters
 --------------------------------------------------------------------------------
 
 elaborateAndRewrite :: Elaborable t => Comp t -> Either String C.Elaborated
-elaborateAndRewrite prog = left show (elaborate prog >>= Rewriting2.run)
+elaborateAndRewrite prog = left show (elaborate prog >>= Rewriting.run)
 
 optimizeWithWitness :: (GaloisField n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimizeWithWitness witness cs =
