@@ -144,6 +144,24 @@ main = hspec $ do
               }
        in Compiler.compile Basic.assertToBe42 `shouldBe` Right cs
 
+    it "Bit value query" $
+      let cs =
+            ConstraintSystem
+              { csConstraints =
+                  Set.fromList $
+                    concat
+                      [ cadd (0 :: GF181) [(182, 1), (1, -1)],
+                        cadd 0 [(183, 1), (2, -1)],
+                        cadd 0 [(184, 1), (3, -1)],
+                        cadd (-1) [(185, 1)],
+                        cadd (-1) [(186, 1)],
+                        cadd 0 [(187, 1)]
+                      ],
+                csBoolVars = mempty,
+                csVarCounters = VarCounters 0 1 mempty 181 6 0
+              }
+       in Compiler.compile Basic.bits0 `shouldBe` Right cs
+
   describe "Keelung `compile`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
       let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.outOfBound)
