@@ -18,7 +18,7 @@ import Keelung.Compiler
   )
 import qualified Keelung.Compiler as Compiler
 import Keelung.Compiler.Constraint (cadd)
-import Keelung.Types (VarCounters(..))
+import Keelung.Syntax.VarCounters
 
 --------------------------------------------------------------------------------
 
@@ -224,7 +224,7 @@ cs1 =
               cadd 11179 [(12, -1)]
             ],
       csBoolVars = mempty,
-      csVarCounters = VarCounters 12 0 0 0 5
+      csVarCounters = VarCounters 12 0 mempty 0 0 5
     }
 
 xorLists :: Comp Boolean

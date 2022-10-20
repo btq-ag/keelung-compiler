@@ -20,6 +20,7 @@ import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Field
 import Keelung.Types
+import Keelung.Syntax.VarCounters
 
 --------------------------------------------------------------------------------
 

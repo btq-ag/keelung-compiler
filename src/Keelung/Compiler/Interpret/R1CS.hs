@@ -7,7 +7,7 @@ import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import Keelung.Compiler.R1CS (ExecError (..), witnessOfR1CS)
 import Keelung.Constraint.R1CS (R1CS (..))
-import Keelung.Types
+import Keelung.Syntax.VarCounters
 
 run :: (GaloisField n, Integral n) => R1CS n -> [n] -> Either (ExecError n) [n]
 run r1cs inputs = do

@@ -9,7 +9,6 @@ import Control.Arrow (ArrowChoice (right), left)
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung
-import Keelung.Types (VarCounters (..))
 import Keelung.Compiler
 import qualified Keelung.Compiler as Compiler
 import Keelung.Compiler.Constraint (cadd)
@@ -18,6 +17,7 @@ import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (R1CS)
 import qualified Keelung.Syntax.Typed as C
+import Keelung.Syntax.VarCounters (VarCounters (..))
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
@@ -140,7 +140,7 @@ main = hspec $ do
                   Set.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 1 1 0 0 0 
+                csVarCounters = VarCounters 0 1 mempty 181 0 0
               }
        in Compiler.compile Basic.assertToBe42 `shouldBe` Right cs
 

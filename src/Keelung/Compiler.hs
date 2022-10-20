@@ -52,22 +52,23 @@ import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
 import Keelung.Compiler.R1CS
+import Keelung.Compiler.Syntax.Bits (toBits)
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Typed (Elaborated)
-import Keelung.Types
+import Keelung.Syntax.VarCounters
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
 
 -- elaboration => interpretation
 interpret :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
-interpret prog ins = do
+interpret prog inputs = do
   elab <- left ElabError (elaborate prog)
-  left InterpretError (Interpret.run elab ins)
+  left InterpretError (Interpret.run elab inputs)
 
 -- elaboration => rewriting => type erasure
 erase :: (GaloisField n, Integral n, Elaborable t) => Comp t -> Either (Error n) (TypeErased n)
@@ -108,24 +109,26 @@ optimizeWithInput ::
   Comp t ->
   [n] ->
   Either (Error n) (ConstraintSystem n)
-optimizeWithInput program ins = do
+optimizeWithInput program inputs = do
   cs <- compile program
-  let (_, cs') = Optimizer.optimizeWithInput ins cs
+  let (_, cs') = Optimizer.optimizeWithInput inputs cs
   return cs'
 
 -- computes witnesses
 computeWitness :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) (Witness n)
-computeWitness prog ins = compile prog >>= left ExecError . witnessOfR1CS ins . toR1CS
+computeWitness prog inputs = compile prog >>= left ExecError . witnessOfR1CS inputs . toR1CS
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
 --   (3) Check whether 'w' satisfies the constraint system produced in (1).
 --   (4) Check whether the R1CS result matches the interpreter result.
 execute :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
-execute prog ins = do
+execute prog rawInputs = do
+  inputs <- populateBitsOfInputs prog rawInputs
+
   r1cs <- toR1CS <$> compile prog
 
-  actualWitness <- left ExecError $ witnessOfR1CS ins r1cs
+  actualWitness <- left ExecError $ witnessOfR1CS inputs r1cs
 
   -- extract the output value from the witness
   let varCounters = r1csVarCounters r1cs
@@ -144,7 +147,7 @@ execute prog ins = do
     Left $ ExecError $ ExecOutputVarsNotMappedError outputVars actualWitness
 
   -- interpret the program to see if the output value is correct
-  expectedOutputs <- interpret prog ins
+  expectedOutputs <- interpret prog inputs
 
   when (actualOutputs /= expectedOutputs) $ do
     Left $ ExecError $ ExecOutputError expectedOutputs actualOutputs
@@ -158,6 +161,23 @@ execute prog ins = do
 
   return actualOutputs
 
+populateBitsOfInputs :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
+populateBitsOfInputs comp raw = do
+  erased <- erase comp
+  let counters = erasedVarCounters erased
+
+  let bitArrays =
+        foldl
+          ( \acc (i, input) -> do
+              case distinguishInputVar counters i of
+                Left _ -> acc
+                Right _ -> toBits input <> acc
+          )
+          []
+          (reverse (zip [0 ..] raw))
+
+  return (raw ++ bitArrays)
+
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
 
@@ -165,7 +185,7 @@ eraseElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (Type
 eraseElab elab = left ElabError (Rewriting.run elab) >>= return . eraseType
 
 interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
-interpretElab elab ins = left (show . InterpretError) (Interpret.run elab ins)
+interpretElab elab inputs = left (show . InterpretError) (Interpret.run elab inputs)
 
 interpretAndOutputWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String ([n], Witness n)
 interpretAndOutputWitnessesElab elab inputs = do

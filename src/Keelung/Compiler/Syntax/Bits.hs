@@ -34,3 +34,8 @@ instance {-# INCOHERENT #-} Bits GF181 where
 -- | Specialized instance for `BN128`
 instance {-# INCOHERENT #-} Bits BN128 where
   bitSize = const 254
+
+--------------------------------------------------------------------------------
+
+toBits :: (GaloisField a, Integral a) => a -> [a]
+toBits x = map (testBit x) [0 .. bitSize x - 1]

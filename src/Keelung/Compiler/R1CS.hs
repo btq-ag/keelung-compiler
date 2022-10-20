@@ -20,6 +20,7 @@ import qualified Keelung.Constraint.R1C as R1C
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
 import Keelung.Field (N (..))
 import Keelung.Types
+import Keelung.Syntax.VarCounters
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.

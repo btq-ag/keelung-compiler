@@ -17,6 +17,7 @@ import Data.Semiring (Semiring (..))
 import Keelung hiding (inputs, interpret, run)
 import Keelung.Compiler.Util
 import Keelung.Types
+import Keelung.Syntax.VarCounters
 import Data.Bits (Bits(..))
 
 --------------------------------------------------------------------------------

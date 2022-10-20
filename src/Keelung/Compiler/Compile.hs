@@ -18,7 +18,7 @@ import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Types
-
+import Keelung.Syntax.VarCounters
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system

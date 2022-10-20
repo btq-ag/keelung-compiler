@@ -20,6 +20,7 @@ import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
 import Keelung.Types
+import Keelung.Syntax.VarCounters
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf

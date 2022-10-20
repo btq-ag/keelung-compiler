@@ -25,7 +25,7 @@ import Keelung (N (N))
 import Keelung.Compiler.Util
 import Keelung.Syntax.Typed hiding (freeVars)
 import Keelung.Types
-
+import Keelung.Syntax.VarCounters
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness

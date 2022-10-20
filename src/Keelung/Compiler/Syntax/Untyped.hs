@@ -18,11 +18,14 @@ import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Proxy (asProxyTypeOf)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.Bits (Bits (..))
 import Keelung.Field (N (..))
 import qualified Keelung.Syntax.Typed as T
+import Keelung.Syntax.VarCounters
 import Keelung.Types
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -221,11 +224,14 @@ eraseType (T.Elaborated expr comp) =
           TypeErased
             { erasedExpr = expr',
               -- determine the size of output vars by looking at the length of the expression
-              erasedVarCounters = setOutputVarSize (lengthOfExpr expr) counters',
+              erasedVarCounters = setNumWidth (getNumWidth context) $ setOutputVarSize (lengthOfExpr expr) counters',
               erasedAssertions = assertions',
               erasedAssignments = assignments <> extraAssignments,
               erasedBoolVars = boolVars
             }
+  where
+    getNumWidth :: Bits n => Context n -> Int
+    getNumWidth proxy = traceShowId $ bitSize $ asProxyTypeOf 0 proxy
 
 eraseVal :: GaloisField n => T.Val -> M n [Expr n]
 eraseVal (T.Integer n) = return [Val (fromInteger n)]

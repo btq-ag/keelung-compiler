@@ -19,8 +19,8 @@ import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import Keelung.Monad
 import qualified Keelung.Syntax.Typed as C
-import Keelung.Types
 
+import Keelung.Syntax.VarCounters
 --------------------------------------------------------------------------------
 
 elaborateAndRewrite :: Elaborable t => Comp t -> Either String C.Elaborated
