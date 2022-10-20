@@ -112,7 +112,7 @@ substPoly poly = do
 -- for the variables that appear in the constraint. Note that, when
 -- normalizing a multiplicative constraint, it may be necessary to
 -- convert it into an additive constraint.
-substConstraint :: GaloisField n => Constraint n -> OptiM n (Maybe (Constraint n))
+substConstraint :: (GaloisField n, Integral n) => Constraint n -> OptiM n (Maybe (Constraint n))
 substConstraint !constraint = case constraint of
   CAdd poly -> do
     result <- substPoly poly

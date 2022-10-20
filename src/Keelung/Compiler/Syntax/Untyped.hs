@@ -212,18 +212,23 @@ eraseType :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 eraseType (T.Elaborated expr comp) =
   let T.Computation counters numAsgns boolAsgns assertions = comp
    in runM counters $ do
+        -- update VarCounters.varNumWidth before type erasure
+        context <- get
+        put (context {ctxVarCounters = setNumWidth (getNumWidth context) $ setOutputVarSize (lengthOfExpr expr) counters})
+        -- start type erasure
         expr' <- eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAsgns
         boolAssignments' <- mapM eraseAssignment boolAsgns
         let assignments = numAssignments' <> boolAssignments'
         assertions' <- concat <$> mapM eraseExpr assertions
-        context <- get
-        let Context counters' boolVars extraAssignments = context
+        -- retrieve updated Context and return it
+        context' <- get
+        let Context counters' boolVars extraAssignments = context'
         return $
           TypeErased
             { erasedExpr = expr',
               -- determine the size of output vars by looking at the length of the expression
-              erasedVarCounters = setNumWidth (getNumWidth context) $ setOutputVarSize (lengthOfExpr expr) counters',
+              erasedVarCounters = counters',
               erasedAssertions = assertions',
               erasedAssignments = assignments <> extraAssignments,
               erasedBoolVars = boolVars
