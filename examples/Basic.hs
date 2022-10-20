@@ -301,4 +301,4 @@ bits0 :: Comp (Arr Boolean)
 bits0 = do 
   x <- input
   let c = 3
-  return $ toArray [x ! 0, x ! 1, x ! 2, c ! 0, c ! 1, c ! 2]
+  return $ toArray [x !!! 0, x !!! 1, x !!! 2, c !!! 0, c !!! 1, c !!! 2]
