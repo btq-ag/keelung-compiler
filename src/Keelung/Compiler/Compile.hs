@@ -6,7 +6,7 @@
 module Keelung.Compiler.Compile (run) where
 
 import Control.Monad
-import Control.Monad.State (State, evalState, gets, modify)
+import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
 import qualified Data.IntMap as IntMap
@@ -24,7 +24,7 @@ import Keelung.Types
 
 -- | Compile an untyped expression to a constraint system
 run :: GaloisField n => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs counters assertions assignments boolVars) = runM (totalVarSize counters) $ do
+run (TypeErased untypedExprs counters assertions assignments boolVars) = runM counters $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
   let outputVars = [inputVarSize counters .. inputVarSize counters + outputVarSize counters - 1]
   forM_ (zip outputVars untypedExprs) $ \(var, expr) -> do
@@ -59,14 +59,14 @@ encodeAssignment (Assignment var expr) = encode var expr
 
 -- | Monad for compilation
 data Env n = Env
-  { envConstraints :: Set (Constraint n),
-    envNextVar :: Var
+  { envVarCounters :: VarCounters,
+    envConstraints :: Set (Constraint n)
   }
 
 type M n = State (Env n)
 
-runM :: Var -> M n a -> a
-runM allVarSize program = evalState program (Env Set.empty (allVarSize + 1))
+runM :: GaloisField n => VarCounters -> M n a -> a
+runM varCounters program = evalState program (Env varCounters mempty)
 
 add :: GaloisField n => [Constraint n] -> M n ()
 add cs =
@@ -74,9 +74,9 @@ add cs =
 
 freshVar :: M n Var
 freshVar = do
-  next <- gets envNextVar
-  modify (\st -> st {envNextVar = next + 1})
-  return next
+  n <- gets (totalVarSize . envVarCounters)
+  modify' (\ctx -> ctx {envVarCounters = bumpOrdinaryVar (envVarCounters ctx)})
+  return n
 
 ----------------------------------------------------------------
 
@@ -84,7 +84,15 @@ encode :: GaloisField n => Var -> Expr n -> M n ()
 encode out expr = case expr of
   Val val -> add $ cadd val [(out, -1)] -- out = val
   Var var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
-  VarBit {} -> error "dunno how to encode VarBit"
+  VarBit var i -> do
+    counters <- gets envVarCounters
+    -- if the index 'i' overflows or underflows, wrap it around
+    let numWidth = getNumWidth counters
+    let i' = i `mod` numWidth
+    -- bit variable corresponding to the variable 'var' and the index 'i''
+    case getBitVar counters var i' of
+      Nothing -> return ()
+      Just bitVar -> add $ cadd 0 [(out, 1), (bitVar, -1)] -- out = bitVar
   NAryOp op x y rest ->
     case op of
       Add -> do

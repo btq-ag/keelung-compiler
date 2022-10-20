@@ -214,7 +214,7 @@ eraseType (T.Elaborated expr comp) =
    in runM counters $ do
         -- update VarCounters.varNumWidth before type erasure
         context <- get
-        put (context {ctxVarCounters = setNumWidth (getNumWidth context) $ setOutputVarSize (lengthOfExpr expr) counters})
+        put (context {ctxVarCounters = setNumWidth (deviseNumWidth context) $ setOutputVarSize (lengthOfExpr expr) counters})
         -- start type erasure
         expr' <- eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAsgns
@@ -234,8 +234,9 @@ eraseType (T.Elaborated expr comp) =
               erasedBoolVars = boolVars
             }
   where
-    getNumWidth :: Bits n => Context n -> Int
-    getNumWidth proxy = bitSize $ asProxyTypeOf 0 proxy
+    -- | Get the number of bits needed to represent a Number under the field 'n
+    deviseNumWidth :: Bits n => Context n -> Int
+    deviseNumWidth proxy = bitSize $ asProxyTypeOf 0 proxy
 
 eraseVal :: GaloisField n => T.Val -> M n [Expr n]
 eraseVal (T.Integer n) = return [Val (fromInteger n)]
