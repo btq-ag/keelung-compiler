@@ -214,27 +214,37 @@ eraseType (T.Elaborated expr comp) =
    in runM counters $ do
         -- update VarCounters.varNumWidth before type erasure
         context <- get
-        put (context {ctxVarCounters = setNumWidth (deviseNumWidth context) $ setOutputVarSize (lengthOfExpr expr) counters})
+        let counters' = setNumWidth (deviseNumWidth context) $ setOutputVarSize (lengthOfExpr expr) counters
+        let context' = context {ctxVarCounters = counters'}
+        put context'
         -- start type erasure
         expr' <- eraseExpr expr
         numAssignments' <- mapM eraseAssignment numAsgns
         boolAssignments' <- mapM eraseAssignment boolAsgns
         let assignments = numAssignments' <> boolAssignments'
         assertions' <- concat <$> mapM eraseExpr assertions
+
+        -- for the moment, each Number input variable
+        -- incurs N additional Boolean input variables
+        -- where N is the bit-length of the field
+        let boolVarsFromNumInputs =
+              IntSet.fromList
+                [ boolInputVarSize counters' + numInputVarSize counters'
+                  .. inputVarSize counters' - 1
+                ]
+
         -- retrieve updated Context and return it
-        context' <- get
-        let Context counters' boolVars extraAssignments = context'
+        Context counters'' boolVars extraAssignments <- get
         return $
           TypeErased
             { erasedExpr = expr',
               -- determine the size of output vars by looking at the length of the expression
-              erasedVarCounters = counters',
+              erasedVarCounters = counters'',
               erasedAssertions = assertions',
               erasedAssignments = assignments <> extraAssignments,
-              erasedBoolVars = boolVars
+              erasedBoolVars = boolVars <> boolVarsFromNumInputs
             }
   where
-    -- | Get the number of bits needed to represent a Number under the field 'n
     deviseNumWidth :: Bits n => Context n -> Int
     deviseNumWidth proxy = bitSize $ asProxyTypeOf 0 proxy
 

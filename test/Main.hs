@@ -111,7 +111,7 @@ main = hspec $ do
       it "Basic.identity" $
         let erased = erase Basic.identity :: Either (Error GF181) (TypeErased GF181)
             result = IntSet.toList . erasedBoolVars <$> erased
-         in result `shouldBe` Right []
+         in result `shouldBe` Right [1 .. 181]
 
       it "Basic.identityB" $
         let erased = erase Basic.identityB :: Either (Error GF181) (TypeErased GF181)
@@ -126,7 +126,7 @@ main = hspec $ do
       it "Basic.toBool" $
         let erased = erase Basic.toBool :: Either (Error GF181) (TypeErased GF181)
             result = IntSet.toList . erasedBoolVars <$> erased
-         in result `shouldBe` Right [0]
+         in result `shouldBe` Right [0 .. 181]
 
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))
@@ -139,7 +139,7 @@ main = hspec $ do
               { csConstraints =
                   Set.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
-                csBoolVars = mempty,
+                csBoolVars = IntSet.fromList [1 .. 181],
                 csVarCounters = VarCounters 0 1 mempty 181 0 0
               }
        in Compiler.compile Basic.assertToBe42 `shouldBe` Right cs
@@ -150,14 +150,17 @@ main = hspec $ do
               { csConstraints =
                   Set.fromList $
                     concat
-                      [ cadd (0 :: GF181) [(182, 1), (1, -1)],
+                      [ -- value of outputs
+                        cadd (0 :: GF181) [(182, 1), (1, -1)],
                         cadd 0 [(183, 1), (2, -1)],
                         cadd 0 [(184, 1), (3, -1)],
                         cadd (-1) [(185, 1)],
                         cadd (-1) [(186, 1)],
                         cadd 0 [(187, 1)]
+                        -- -- constraint between bit values & number
+                        -- cadd 0 ((0, 1) : [])
                       ],
-                csBoolVars = mempty,
+                csBoolVars = IntSet.fromList [1 .. 181],
                 csVarCounters = VarCounters 0 1 mempty 181 6 0
               }
        in Compiler.compile Basic.bits0 `shouldBe` Right cs
