@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 import Keelung
 import Keelung.Compiler
 import qualified Keelung.Compiler as Compiler
-import Keelung.Compiler.Constraint (cadd)
+import Keelung.Compiler.Constraint (cadd, cmul)
 import Keelung.Compiler.Interpret (InterpretError (..))
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
@@ -144,7 +144,7 @@ main = hspec $ do
               }
        in Compiler.compile Basic.assertToBe42 `shouldBe` Right cs
 
-    it "Bit value query" $
+    it "Bit value query 0" $
       let cs =
             ConstraintSystem
               { csConstraints =
@@ -155,7 +155,7 @@ main = hspec $ do
                         cadd 0 [(183, 1), (2, -1)],
                         cadd 0 [(184, 1), (3, -1)],
                         cadd (-1) [(185, 1)],
-                        cadd (-1) [(186, 1)],
+                        cadd 1 [(186, -1)],
                         cadd 0 [(187, 1)]
                         -- constraint between bit values & number
                         -- cadd 0 ((0, 1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]])
@@ -164,6 +164,17 @@ main = hspec $ do
                 csVarCounters = VarCounters 0 1 mempty 181 6 0
               }
        in Compiler.compile Basic.bits0 `shouldBe` Right cs
+
+    it "Bit value query 1" $
+      let cs =
+            ConstraintSystem
+              { csConstraints =
+                  Set.fromList $ -- value of outputs
+                        cmul [(363, 1)] [(2, 1)] (0 :: GF181, [(364, 1)]),
+                csBoolVars = IntSet.fromList [2 .. 363],
+                csVarCounters = VarCounters 0 2 mempty 181 1 0
+              }
+       in Compiler.compile Basic.bits1 `shouldBe` Right cs
 
   describe "Keelung `compile`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do

@@ -298,7 +298,13 @@ toBool :: Comp Boolean
 toBool = ToBool <$> input
 
 bits0 :: Comp (Arr Boolean)
-bits0 = do 
+bits0 = do
   x <- input
   let c = 3
   return $ toArray [x !!! 0, x !!! 1, x !!! 2, c !!! 0, c !!! 1, c !!! 2]
+
+bits1 :: Comp (Arr Boolean)
+bits1 = do
+  x <- input
+  y <- input
+  return $ toArray [(x !!! 0) `And` (y !!! (-1))]
