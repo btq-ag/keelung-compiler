@@ -69,6 +69,7 @@ serializeR1CS_ fieldNumber r1cs =
               <> pairStr "instances" (int (pinnedVarSize varCounters)) -- inputs & outputs
               <> pairStr "witness" (int (totalVarSize varCounters - pinnedVarSize varCounters)) -- other ordinary variables
               <> pairStr "constraints" (int (length r1cConstraints))
+              <> pairStr "optimized" (bool True)
 
 --------------------------------------------------------------------------------
 
@@ -85,10 +86,18 @@ instance ToJSON (R1C Integer) where
       encodeEitherConstPoly (Right poly) = toEncoding poly
 
 -- | How to encode a Polynomial
+--   The indices of variables are ordered as follows:
+--    1. first index 0
+--    2. then the negative indices (in decreasing order: -1, -2, ...)
+--    3. finally the positive indices (in increasing order)
 instance ToJSON (Poly Integer) where
   toEncoding poly = case Poly.constant poly of
-    0 -> list encodeVarCoeff (IntMap.toList (Poly.coeffs poly))
-    n -> list encodeVarCoeff ((0, n) : IntMap.toList (Poly.coeffs poly))
+    0 -> list encodeVarCoeff (negativeIndices ++ positiveIndices)
+    n -> list encodeVarCoeff ((0, n) : negativeIndices ++ positiveIndices)
+    where
+      coeffs = Poly.coeffs poly
+      negativeIndices = IntMap.toDescList $ IntMap.filterWithKey (\k _ -> k < 0) coeffs
+      positiveIndices = IntMap.toAscList $ IntMap.filterWithKey (\k _ -> k > 0) coeffs
 
 -- | How to encode a variable-coefficient pair
 encodeVarCoeff :: (Var, Integer) -> Encoding
