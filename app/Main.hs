@@ -15,7 +15,7 @@ import Keelung.Compiler
     compileO0Elab,
     compileO1Elab,
     compileO2Elab,
-    interpretAndOutputWitnessesElab,
+    genInputsOutputsWitnessesElab,
     interpretElab,
     toR1CS,
   )
@@ -88,16 +88,13 @@ main = withUtf8 $ do
           case fieldType of
             B64 ->
               outputInterpretedResultAndWriteFile
-                (map fromInteger inputs :: [B64])
-                (interpretAndOutputWitnessesElab elaborated (map fromInteger inputs :: [B64]))
+                (genInputsOutputsWitnessesElab elaborated (map fromInteger inputs :: [B64]))
             GF181 ->
               outputInterpretedResultAndWriteFile
-                (map fromInteger inputs :: [GF181])
-                (interpretAndOutputWitnessesElab elaborated (map fromInteger inputs :: [GF181]))
+                (genInputsOutputsWitnessesElab elaborated (map fromInteger inputs :: [GF181]))
             BN128 ->
               outputInterpretedResultAndWriteFile
-                (map fromInteger inputs :: [BN128])
-                (interpretAndOutputWitnessesElab elaborated (map fromInteger inputs :: [BN128]))
+                (genInputsOutputsWitnessesElab elaborated (map fromInteger inputs :: [BN128]))
     Version -> putStrLn "Keelung v0.6.0"
   where
     asB64 :: Either (Error B64) (ConstraintSystem B64) -> Either (Error B64) (ConstraintSystem B64)
@@ -124,14 +121,15 @@ main = withUtf8 $ do
     outputInterpretedResult :: Serialize n => Either String [n] -> IO ()
     outputInterpretedResult = putStrLn . BSC.unpack . encode
 
-    outputInterpretedResultAndWriteFile :: (Serialize n, Integral n) => [n] -> Either String ([n], Witness n) -> IO ()
-    outputInterpretedResultAndWriteFile inputs result = do
-      outputInterpretedResult (fmap fst result)
+    outputInterpretedResultAndWriteFile :: (Serialize n, Integral n) => Either String ([n], [n], Witness n) -> IO ()
+    outputInterpretedResultAndWriteFile result = do
+      -- print outputs 
+      outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
+
       case result of
         Left _ -> return ()
-        Right (_, witness) -> do
-          -- 'witness' contains assignements of all variables
-          BS.writeFile "witness.jsonl" (serializeInputAndWitness inputs witness)
+        Right (inputs, outputs, witness) -> do
+          BS.writeFile "witness.jsonl" (serializeInputAndWitness inputs outputs witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do

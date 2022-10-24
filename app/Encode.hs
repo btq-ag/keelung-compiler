@@ -19,8 +19,8 @@ import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
-import Keelung.Types
 import Keelung.Syntax.VarCounters
+import Keelung.Types
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
@@ -33,15 +33,18 @@ serializeR1CS r1cs = serializeR1CS_ (fieldNumberProxy r1cs) (fmap toInteger (rei
     fieldNumberProxy _ = asProxyTypeOf 0 Proxy
 
 -- | Encodes inputs and witnesses in the JSON Lines text file format
---   NOTE: the "inputs" field should contain both inputs and outputs
---         but are deliberately kept empty
---         and let the "witnesses" field carry all of the values instead
-serializeInputAndWitness :: Integral n => [n] -> Witness n -> ByteString
-serializeInputAndWitness _inputs witnesses =
-  encodingToLazyByteString $
-    pairs $
-      pairStr "inputs" emptyArray_
-        <> pairStr "witnesses" (list (integerText . toInteger) (IntMap.elems witnesses))
+--   the "inputs" field should contain both inputs and outputs
+--   the "witnesses" field should contain rest of the witnesses
+serializeInputAndWitness :: Integral n => [n] -> [n] -> Witness n -> ByteString
+serializeInputAndWitness inputs outputs witnesses =
+  let instances = inputs <> outputs
+      instancesSize = length instances
+      -- remove the inputs and outputs from the witnesses
+      trimmedWitnesses = IntMap.elems $ IntMap.filterWithKey (\k _ -> k >= instancesSize) witnesses
+   in encodingToLazyByteString $
+        pairs $
+          pairStr "inputs" (list (integerText . toInteger) instances)
+            <> pairStr "witnesses" (list (integerText . toInteger) trimmedWitnesses)
 
 --------------------------------------------------------------------------------
 

@@ -17,6 +17,7 @@ module Keelung.Compiler
     --
     erase,
     interpret,
+    genInputsOutputsWitnesses,
     compileOnly,
     compile,
     compileO0,
@@ -30,7 +31,7 @@ module Keelung.Compiler
     compileO1Elab,
     compileO2Elab,
     interpretElab,
-    interpretAndOutputWitnessesElab,
+    genInputsOutputsWitnessesElab,
     --
     asGF181N,
     asGF181,
@@ -69,6 +70,17 @@ interpret :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Eithe
 interpret prog inputs = do
   elab <- left ElabError (elaborate prog)
   left InterpretError (Interpret.run elab inputs)
+
+-- | Given a Keelung program and a list of raw inputs
+--   (that are not populated with binary representation of numbers),
+--   Generate (populated inputs, outputs, witness)
+genInputsOutputsWitnesses :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) ([n], [n], Witness n)
+genInputsOutputsWitnesses prog rawInputs = do
+  inputs <- populateBitsOfInputs prog rawInputs
+  outputs <- interpret prog inputs
+  r1cs <- toR1CS <$> compileO1 prog
+  witness <- left ExecError (witnessOfR1CS inputs r1cs)
+  return (inputs, outputs, witness)
 
 -- elaboration => rewriting => type erasure
 erase :: (GaloisField n, Integral n, Elaborable t) => Comp t -> Either (Error n) (TypeErased n)
@@ -162,8 +174,13 @@ execute prog rawInputs = do
   return actualOutputs
 
 populateBitsOfInputs :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
-populateBitsOfInputs comp raw = do
-  erased <- erase comp
+populateBitsOfInputs prog rawInputs = do
+  elab <- left ElabError (elaborate prog)
+  populateBitsOfInputsElab elab rawInputs
+
+populateBitsOfInputsElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (Error n) [n]
+populateBitsOfInputsElab elab rawInputs = do
+  erased <- eraseElab elab
   let counters = erasedVarCounters erased
 
   let bitArrays =
@@ -174,9 +191,9 @@ populateBitsOfInputs comp raw = do
                 Right _ -> toBits input <> acc
           )
           []
-          (reverse (zip [0 ..] raw))
+          (reverse (zip [0 ..] rawInputs))
 
-  return (raw ++ bitArrays)
+  return (rawInputs ++ bitArrays)
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
@@ -187,12 +204,13 @@ eraseElab elab = left ElabError (Rewriting.run elab) >>= return . eraseType
 interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
 interpretElab elab inputs = left (show . InterpretError) (Interpret.run elab inputs)
 
-interpretAndOutputWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String ([n], Witness n)
-interpretAndOutputWitnessesElab elab inputs = do
+genInputsOutputsWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String ([n], [n], Witness n)
+genInputsOutputsWitnessesElab elab rawInputs = do
+  inputs <- left show $ populateBitsOfInputsElab elab rawInputs
   outputs <- left (show . InterpretError) (Interpret.run elab inputs)
   r1cs <- toR1CS <$> left show (compileO1Elab elab)
   witness <- left (show . ExecError) (witnessOfR1CS inputs r1cs)
-  return (outputs, witness)
+  return (inputs, outputs, witness)
 
 compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
 compileO0Elab elab = do
