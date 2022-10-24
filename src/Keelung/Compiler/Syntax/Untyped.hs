@@ -50,9 +50,8 @@ data BinaryOp = Sub | Div
 data Expr n
   = Val n
   | Var Var
-  | VarBit Var Int -- Bit of a variable
-  -- Binary operators with only 2 operands
-  | BinaryOp BinaryOp (Expr n) (Expr n)
+  | -- Binary operators with only 2 operands
+    BinaryOp BinaryOp (Expr n) (Expr n)
   | -- N-Ary operators with >= 2 operands
     NAryOp Op (Expr n) (Expr n) (Seq (Expr n))
   | If (Expr n) (Expr n) (Expr n)
@@ -76,7 +75,6 @@ instance Show n => Show (Expr n) where
         go delim n (x :<| xs') = showsPrec (succ n) x . showString delim . go delim n xs'
      in case expr of
           Var var -> showString "$" . shows var
-          VarBit var i -> showString "$" . shows var . showString "[" . shows i . showString "]"
           Val val -> shows val
           NAryOp op x0 x1 xs -> case op of
             Add -> chain " + " 6 $ x0 :<| x1 :<| xs
@@ -97,7 +95,6 @@ sizeOfExpr :: Expr n -> Int
 sizeOfExpr expr = case expr of
   Val _ -> 1
   Var _ -> 1
-  VarBit _ _ -> 1
   NAryOp _ x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
      in sum (fmap sizeOfExpr operands) + (length operands - 1)
@@ -335,16 +332,24 @@ eraseExpr expr = case expr of
   T.ToNum x -> eraseExpr x
   T.Bit x i -> do
     x' <- head <$> eraseExpr x
-    return [bitValue x' i]
+    value <- bitValue x' i
+    return [value]
 
-bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> Expr n
+bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (Expr n)
 bitValue expr i = case expr of
-  Val n -> Val (testBit n i)
-  Var v -> VarBit v i
-  VarBit {} -> error "Panic: trying to access the bit value of another bit value"
+  Val n -> return $ Val (testBit n i)
+  Var var -> do
+    counters <- gets ctxVarCounters
+    -- if the index 'i' overflows or underflows, wrap it around
+    let numWidth = getNumWidth counters
+    let i' = i `mod` numWidth
+    -- bit variable corresponding to the variable 'var' and the index 'i''
+    case getBitVar counters var i' of
+      Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
+      Just bitVar -> return $ Var bitVar
   BinaryOp {} -> error "Panic: trying to access the bit value of a compound expression"
   NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
-  If p a b -> If p (bitValue a i) (bitValue b i)
+  If p a b -> If p <$> bitValue a i <*> bitValue b i
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.Assignment ref expr) = do

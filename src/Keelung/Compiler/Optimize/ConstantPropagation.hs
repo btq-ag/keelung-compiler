@@ -48,7 +48,6 @@ propagateConstant bindings = propogate
     propogate e = case e of
       Val _ -> e
       Var var -> lookupVar var
-      VarBit var i -> lookupVarBit var i
       NAryOp op x y es -> NAryOp op (propogate x) (propogate y) (fmap propogate es)
       BinaryOp op x y -> BinaryOp op (propogate x) (propogate y)
       If p x y -> If (propogate p) (propogate x) (propogate y)
@@ -56,7 +55,3 @@ propagateConstant bindings = propogate
     lookupVar var = case IntMap.lookup var bindings of
       Nothing -> Var var
       Just val -> Val val
-
-    lookupVarBit var i = case IntMap.lookup var bindings of
-      Nothing -> VarBit var i
-      Just val -> bitValue (Val val) i

@@ -84,15 +84,6 @@ encode :: GaloisField n => Var -> Expr n -> M n ()
 encode out expr = case expr of
   Val val -> add $ cadd val [(out, -1)] -- out = val
   Var var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
-  VarBit var i -> do
-    counters <- gets envVarCounters
-    -- if the index 'i' overflows or underflows, wrap it around
-    let numWidth = getNumWidth counters
-    let i' = i `mod` numWidth
-    -- bit variable corresponding to the variable 'var' and the index 'i''
-    case getBitVar counters var i' of
-      Nothing -> return ()
-      Just bitVar -> add $ cadd 0 [(out, 1), (bitVar, -1)] -- out = bitVar
   NAryOp op x y rest ->
     case op of
       Add -> do
