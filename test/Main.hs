@@ -138,11 +138,13 @@ main = hspec $ do
             ConstraintSystem
               { csConstraints =
                   Set.fromList $
-                    cadd (-42 :: GF181) [(0, 1)],
+                    cadd (-42 :: GF181) [(0, 1)] ++
+                        -- constraint between bit values & number
+                        cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]]),
                 csBoolVars = IntSet.fromList [1 .. 181],
                 csVarCounters = VarCounters 0 1 mempty 181 0 0
               }
-       in Compiler.compile Basic.assertToBe42 `shouldBe` Right cs
+       in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
 
     it "Bit value query 0" $
       let cs =
@@ -156,25 +158,30 @@ main = hspec $ do
                         cadd 0 [(184, 1), (3, -1)],
                         cadd (-1) [(185, 1)],
                         cadd 1 [(186, -1)],
-                        cadd 0 [(187, 1)]
-                        -- -- constraint between bit values & number
-                        -- cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]])
+                        cadd 0 [(187, 1)],
+                        -- constraint between bit values & number
+                        cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]])
                       ],
                 csBoolVars = IntSet.fromList [1 .. 181],
                 csVarCounters = VarCounters 0 1 mempty 181 6 0
               }
-       in Compiler.compile Basic.bits0 `shouldBe` Right cs
+       in Compiler.compileOnly Basic.bits0 `shouldBe` Right cs
 
     it "Bit value query 1" $
       let cs =
             ConstraintSystem
               { csConstraints =
                   Set.fromList $ -- value of outputs
-                    cmul [(363, 1)] [(2, 1)] (0 :: GF181, [(364, 1)]),
+                    concat
+                      [ cmul [(363, 1)] [(2, 1)] (0 :: GF181, [(364, 1)]),
+                        -- constraint between bit values & number
+                        cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [2 .. 182] [0 :: Int .. 180]]),
+                        cadd 0 ((1, -1) : [(var, 2 ^ i) | (var, i) <- zip [183 .. 363] [0 :: Int .. 180]])
+                      ],
                 csBoolVars = IntSet.fromList [2 .. 363],
                 csVarCounters = VarCounters 0 2 mempty 181 1 0
               }
-       in Compiler.compile Basic.bits1 `shouldBe` Right cs
+       in Compiler.compileOnly Basic.bits1 `shouldBe` Right cs
 
   describe "Keelung `compile`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do

@@ -49,7 +49,7 @@ generateWitness cs initWit =
 
 -- | Returns `Nothing`    if all constraints are satisfiable,
 --   returns `Just [R1C]` if at least one constraint is unsatisfiable
-satisfyR1CS :: GaloisField n => Witness n -> R1CS n -> Maybe [R1C n]
+satisfyR1CS :: (GaloisField n, Integral n) => Witness n -> R1CS n -> Maybe [R1C n]
 satisfyR1CS witness r1cs =
   let constraints = r1csConstraints r1cs
       unsatisfiable = filter (not . flip R1C.satisfy witness) constraints

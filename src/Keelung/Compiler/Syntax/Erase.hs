@@ -39,9 +39,9 @@ run (T.Elaborated expr comp) =
                 ]
 
         -- retrieve updated Context and return it
-        Context counters'' boolVars numInputVars extraAssignments <- get
+        Context counters'' boolVars extraAssignments <- get
 
-        let numBinRepAssignments = map (makeNumBinRepAssignment counters'') (IntSet.toList numInputVars)
+        let numBinRepAssignments = map (makeNumBinRepAssignment counters'') (numInputVars counters'')
 
         return $
           TypeErased
@@ -71,9 +71,9 @@ run (T.Elaborated expr comp) =
                 var
                 $ NAryOp
                   Add
-                  (getBitVar' 0)
-                  (getBitVar' 1)
-                  (Seq.fromList [ (2 ^ i) * getBitVar' i | i <- [2 .. n - 1]])
+                  (1 * getBitVar' 0)
+                  (2 * getBitVar' 1)
+                  (Seq.fromList [  fromInteger (2 ^ i) * getBitVar' i | i <- [2 .. n - 1]])
 
 --   (foldr1 (:+:) (map (maybe (Val 0) Var) (map (getBitVar counters var) [0 .. n -1])))
 
@@ -91,8 +91,6 @@ data Context n = Context
     ctxVarCounters :: VarCounters,
     -- | Set of Boolean variables (so that we can impose constraints like `$A * $A = $A` on them)
     ctxBoolVars :: !IntSet,
-    -- | Set of Number input variables (for imposing constraints)
-    ctxNumInputVars :: !IntSet,
     -- | Assignments ($A = ...)
     ctxAssigments :: [Assignment n]
   }
@@ -100,7 +98,7 @@ data Context n = Context
 
 -- | Initial Context for type erasure
 initContext :: VarCounters -> Context n
-initContext counters = Context counters mempty mempty mempty
+initContext counters = Context counters mempty mempty
 
 -- | Mark a variable as Boolean
 -- so that we can later impose constraints on them (e.g. $A * $A = $A)
