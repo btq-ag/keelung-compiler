@@ -78,6 +78,12 @@ toR1CS cs =
     toR1C (CMul aX bX cX) =
       Right $ R1C (Right aX) (Right bX) cX
     toR1C (CNEq x) = Left x
+    toR1C (CBin x b n) =
+      Right $
+        R1C
+          (Left 1)
+          (Poly.buildEither 0 [(x, 1)])
+          (Poly.buildEither 0 [(b + i, fromInteger (toInteger i ^ (2 :: Integer))) | i <- [0 .. n - 1]])
     toR1C (CXor x y z) =
       --     x  y  z  1
       -- a [-2, 0, 0, 1]
