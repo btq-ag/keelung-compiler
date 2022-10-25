@@ -144,7 +144,6 @@ execute prog rawInputs = do
 
   -- extract the output value from the witness
   let varCounters = r1csVarCounters r1cs
-  let outputVars = [inputVarSize varCounters .. inputVarSize varCounters + outputVarSize varCounters - 1]
   let (execErrors, actualOutputs) =
         Either.partitionEithers $
           map
@@ -153,10 +152,10 @@ execute prog rawInputs = do
                   Nothing -> Left var
                   Just value -> Right value
             )
-            outputVars
+            (outputVars varCounters)
 
   unless (null execErrors) $ do
-    Left $ ExecError $ ExecOutputVarsNotMappedError outputVars actualWitness
+    Left $ ExecError $ ExecOutputVarsNotMappedError (outputVars varCounters) actualWitness
 
   -- interpret the program to see if the output value is correct
   expectedOutputs <- interpret prog inputs

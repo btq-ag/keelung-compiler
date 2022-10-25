@@ -14,8 +14,6 @@ run r1cs inputs = do
   witness <- witnessOfR1CS inputs r1cs
   let varCounters = r1csVarCounters r1cs
   -- extract output values from the witness
-  let outputVars = [inputVarSize varCounters .. inputVarSize varCounters + outputVarSize varCounters - 1]
-
   let (execErrors, outputs) =
         Either.partitionEithers $
           map
@@ -24,9 +22,9 @@ run r1cs inputs = do
                   Nothing -> Left var
                   Just value -> Right value
             )
-            outputVars
+            (outputVars varCounters)
 
   unless (null execErrors) $ do
-    Left $ ExecOutputVarsNotMappedError outputVars witness
+    Left $ ExecOutputVarsNotMappedError (outputVars varCounters) witness
 
   return outputs
