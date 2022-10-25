@@ -157,7 +157,7 @@ main = hspec $ do
                         cadd (-1) [(185, 1)],
                         cadd 1 [(186, -1)],
                         cadd 0 [(187, 1)]
-                        -- constraint between bit values & number
+                        -- -- constraint between bit values & number
                         -- cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]])
                       ],
                 csBoolVars = IntSet.fromList [1 .. 181],

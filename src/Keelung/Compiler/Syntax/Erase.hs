@@ -6,6 +6,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Proxy (asProxyTypeOf)
 import Data.Sequence (Seq (..), (|>))
+import qualified Data.Sequence as Seq
 import Keelung.Compiler.Syntax.Bits (Bits (..))
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Syntax.Typed as T
@@ -38,14 +39,17 @@ run (T.Elaborated expr comp) =
                 ]
 
         -- retrieve updated Context and return it
-        Context counters'' boolVars extraAssignments <- get
+        Context counters'' boolVars numInputVars extraAssignments <- get
+
+        let numBinRepAssignments = map (makeNumBinRepAssignment counters'') (IntSet.toList numInputVars)
+
         return $
           TypeErased
             { erasedExpr = expr',
               -- determine the size of output vars by looking at the length of the expression
               erasedVarCounters = counters'',
               erasedAssertions = assertions',
-              erasedAssignments = assignments <> extraAssignments,
+              erasedAssignments = numBinRepAssignments <> assignments <> extraAssignments,
               erasedBoolVars = boolVars <> boolVarsFromNumInputs
             }
   where
@@ -55,6 +59,23 @@ run (T.Elaborated expr comp) =
     lengthOfExpr (T.Array xs) = sum $ fmap lengthOfExpr xs
     lengthOfExpr (T.Val T.Unit) = 0
     lengthOfExpr _ = 1
+
+    makeNumBinRepAssignment :: (GaloisField n, Integral n) => VarCounters -> Var -> Assignment n
+    makeNumBinRepAssignment counters var =
+      let getBitVar' i = maybe (Val 0) Var (getBitVar counters var i)
+       in case getNumWidth counters of
+            0 -> Assignment var (Val 0)
+            1 -> Assignment var (getBitVar' 0)
+            n ->
+              Assignment
+                var
+                $ NAryOp
+                  Add
+                  (getBitVar' 0)
+                  (getBitVar' 1)
+                  (Seq.fromList [ (2 ^ i) * getBitVar' i | i <- [2 .. n - 1]])
+
+--   (foldr1 (:+:) (map (maybe (Val 0) Var) (map (getBitVar counters var) [0 .. n -1])))
 
 --------------------------------------------------------------------------------
 
@@ -70,6 +91,8 @@ data Context n = Context
     ctxVarCounters :: VarCounters,
     -- | Set of Boolean variables (so that we can impose constraints like `$A * $A = $A` on them)
     ctxBoolVars :: !IntSet,
+    -- | Set of Number input variables (for imposing constraints)
+    ctxNumInputVars :: !IntSet,
     -- | Assignments ($A = ...)
     ctxAssigments :: [Assignment n]
   }
@@ -77,7 +100,7 @@ data Context n = Context
 
 -- | Initial Context for type erasure
 initContext :: VarCounters -> Context n
-initContext counters = Context counters IntSet.empty []
+initContext counters = Context counters mempty mempty mempty
 
 -- | Mark a variable as Boolean
 -- so that we can later impose constraints on them (e.g. $A * $A = $A)
