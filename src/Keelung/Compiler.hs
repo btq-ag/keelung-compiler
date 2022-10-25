@@ -11,7 +11,6 @@ module Keelung.Compiler
     module Prelude,
     ConstraintSystem (..),
     numberOfConstraints,
-    eraseType,
     TypeErased (..),
     module Keelung.Compiler.R1CS,
     --
@@ -54,7 +53,8 @@ import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropag
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
 import Keelung.Compiler.R1CS
 import Keelung.Compiler.Syntax.Bits (toBits)
-import Keelung.Compiler.Syntax.Untyped
+import Keelung.Compiler.Syntax.Erase as Erase
+import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
@@ -199,7 +199,7 @@ populateBitsOfInputsElab elab rawInputs = do
 -- Top-level functions that accepts elaborated programs
 
 eraseElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (TypeErased n)
-eraseElab elab = left ElabError (Rewriting.run elab) >>= return . eraseType
+eraseElab elab = left ElabError (Rewriting.run elab) >>= return . Erase.run
 
 interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
 interpretElab elab inputs = left (show . InterpretError) (Interpret.run elab inputs)
@@ -215,17 +215,17 @@ genInputsOutputsWitnessesElab elab rawInputs = do
 compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
 compileO0Elab elab = do
   rewritten <- left ElabError (Rewriting.run elab)
-  return $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
+  return $ Compile.run $ ConstantPropagation.run $ Erase.run rewritten
 
 compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
 compileO1Elab elab = do
   rewritten <- left ElabError (Rewriting.run elab)
-  return $ Optimizer.optimize1 $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
+  return $ Optimizer.optimize1 $ Compile.run $ ConstantPropagation.run $ Erase.run rewritten
 
 compileO2Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
 compileO2Elab elab = do
   rewritten <- left ElabError (Rewriting.run elab)
-  return $ Optimizer.optimize2 $ Optimizer.optimize1 $ Compile.run $ ConstantPropagation.run $ eraseType rewritten
+  return $ Optimizer.optimize2 $ Optimizer.optimize1 $ Compile.run $ ConstantPropagation.run $ Erase.run rewritten
 
 --------------------------------------------------------------------------------
 

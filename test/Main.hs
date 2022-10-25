@@ -158,7 +158,7 @@ main = hspec $ do
                         cadd 1 [(186, -1)],
                         cadd 0 [(187, 1)]
                         -- constraint between bit values & number
-                        -- cadd 0 ((0, 1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]])
+                        -- cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]])
                       ],
                 csBoolVars = IntSet.fromList [1 .. 181],
                 csVarCounters = VarCounters 0 1 mempty 181 6 0
@@ -170,7 +170,7 @@ main = hspec $ do
             ConstraintSystem
               { csConstraints =
                   Set.fromList $ -- value of outputs
-                        cmul [(363, 1)] [(2, 1)] (0 :: GF181, [(364, 1)]),
+                    cmul [(363, 1)] [(2, 1)] (0 :: GF181, [(364, 1)]),
                 csBoolVars = IntSet.fromList [2 .. 363],
                 csVarCounters = VarCounters 0 2 mempty 181 1 0
               }
