@@ -6,6 +6,7 @@ import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import qualified Basic
 import Control.Arrow (ArrowChoice (right), left)
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import Keelung
@@ -138,11 +139,13 @@ main = hspec $ do
             ConstraintSystem
               { csConstraints =
                   Set.fromList $
-                    cadd (-42 :: GF181) [(0, 1)] ++
-                        -- constraint between bit values & number
-                        cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]]),
+                    cadd (-42 :: GF181) [(0, 1)],
+                -- ++
+                -- constraint between bit values & number
+                -- cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]]),
                 csBoolVars = IntSet.fromList [1 .. 181],
-                csVarCounters = VarCounters 0 1 mempty 181 0 0
+                csVarCounters = VarCounters 0 1 mempty 181 0 0,
+                csBinReps = IntMap.fromList [(0, (1, 181))]
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
 
@@ -158,12 +161,11 @@ main = hspec $ do
                         cadd 0 [(184, 1), (3, -1)],
                         cadd (-1) [(185, 1)],
                         cadd 1 [(186, -1)],
-                        cadd 0 [(187, 1)],
-                        -- constraint between bit values & number
-                        cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]])
+                        cadd 0 [(187, 1)]
                       ],
                 csBoolVars = IntSet.fromList [1 .. 181],
-                csVarCounters = VarCounters 0 1 mempty 181 6 0
+                csVarCounters = VarCounters 0 1 mempty 181 6 0,
+                csBinReps = IntMap.fromList [(0, (1, 181))]
               }
        in Compiler.compileOnly Basic.bits0 `shouldBe` Right cs
 
@@ -172,14 +174,10 @@ main = hspec $ do
             ConstraintSystem
               { csConstraints =
                   Set.fromList $ -- value of outputs
-                    concat
-                      [ cmul [(363, 1)] [(2, 1)] (0 :: GF181, [(364, 1)]),
-                        -- constraint between bit values & number
-                        cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [2 .. 182] [0 :: Int .. 180]]),
-                        cadd 0 ((1, -1) : [(var, 2 ^ i) | (var, i) <- zip [183 .. 363] [0 :: Int .. 180]])
-                      ],
+                    cmul [(363, 1)] [(2, 1)] (0 :: GF181, [(364, 1)]),
                 csBoolVars = IntSet.fromList [2 .. 363],
-                csVarCounters = VarCounters 0 2 mempty 181 1 0
+                csVarCounters = VarCounters 0 2 mempty 181 1 0,
+                csBinReps = IntMap.fromList [(0, (2, 181)), (1, (183, 181))]
               }
        in Compiler.compileOnly Basic.bits1 `shouldBe` Right cs
 

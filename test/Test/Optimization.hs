@@ -4,7 +4,6 @@ import qualified Basic
 import qualified Data.IntMap as IntMap
 import qualified Data.Set as Set
 import Keelung (Comp, Elaborable, GF181)
-import Keelung.Syntax.VarCounters
 import Keelung.Compiler (asGF181, toR1CS)
 import qualified Keelung.Compiler as Compiler
 import Keelung.Compiler.Constraint
@@ -13,6 +12,7 @@ import Keelung.Compiler.Optimize
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints as O1
 import Keelung.Compiler.Optimize.Monad
 import Keelung.Constraint.R1CS (toR1Cs)
+import Keelung.Syntax.VarCounters
 import Test.Hspec
 
 tests :: SpecWith ()
@@ -47,7 +47,8 @@ tests = do
                         cadd 11179 [(12, -1)]
                       ],
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 0 12 mempty 0 0 5
+                csVarCounters = VarCounters 0 12 mempty 0 0 5,
+                csBinReps = mempty
               }
        in optimize1 (cs :: ConstraintSystem GF181) `shouldNotBe` cs
 
@@ -60,7 +61,8 @@ tests = do
                     cadd 0 [(0, 1), (1, 1), (4, 1)]
                       ++ cadd 0 [(2, 1), (3, 1), (4, 1)],
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 0 4 mempty 0 0 1
+                csVarCounters = VarCounters 0 4 mempty 0 0 1,
+                csBinReps = mempty
               }
           cs' =
             ConstraintSystem
@@ -68,7 +70,8 @@ tests = do
                   Set.fromList $
                     cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)],
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 0 4 mempty 0 0 0
+                csVarCounters = VarCounters 0 4 mempty 0 0 0,
+                csBinReps = mempty
               }
        in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -80,14 +83,16 @@ tests = do
                     cmul [(3, 1)] [(2, 1)] (42, []) --- $3 * $2 = 42
                       ++ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 0 3 mempty 0 0 1
+                csVarCounters = VarCounters 0 3 mempty 0 0 1,
+                csBinReps = mempty
               }
           cs' =
             ConstraintSystem
               { csConstraints =
                   Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 0 3 mempty 0 0 0
+                csVarCounters = VarCounters 0 3 mempty 0 0 0,
+                csBinReps = mempty
               }
        in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -99,15 +104,16 @@ tests = do
                     cadd 0 [(3, 1), (0, 1), (1, 1)] --- 0 = $3 + $0 + $1
                       ++ cmul [(2, 1)] [(3, 1)] (42, []), --- $2 * $3 = 42
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 0 3 mempty 0 0 1
+                csVarCounters = VarCounters 0 3 mempty 0 0 1,
+                csBinReps = mempty
               }
           cs' =
             ConstraintSystem
               { csConstraints =
                   Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 0 3 mempty 0 0 0
-
+                csVarCounters = VarCounters 0 3 mempty 0 0 0,
+                csBinReps = mempty
               }
        in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -119,7 +125,8 @@ tests = do
                     cadd 0 [(4, 1), (0, 1), (1, 1)] --- 0 = $4 + $0 + $1
                       ++ cmul [(2, 1)] [(3, 1)] (0, [(4, 1)]), --- $2 * $3 = $4
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 0 4 mempty 0 0 1
+                csVarCounters = VarCounters 0 4 mempty 0 0 1,
+                csBinReps = mempty
               }
           cs' =
             ConstraintSystem
@@ -127,7 +134,8 @@ tests = do
                   Set.fromList $
                     cmul [(2, 1)] [(3, 1)] (0, [(0, -1), (1, -1)]), --- $2 * $3 = - $0 - $1
                 csBoolVars = mempty,
-                csVarCounters = VarCounters 0 4 mempty 0 0 0
+                csVarCounters = VarCounters 0 4 mempty 0 0 0,
+                csBinReps = mempty
               }
        in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 

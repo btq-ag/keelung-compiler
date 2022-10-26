@@ -8,8 +8,11 @@ module Keelung.Compiler.Constraint where
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified Data.List as List
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -138,34 +141,53 @@ data ConstraintSystem n = ConstraintSystem
     -- | Variables that are Booleans
     -- should generate constraints like $A * $A = $A for each Boolean variables
     csBoolVars :: !IntSet,
+    -- | Binary representation of input variables
+    csBinReps :: IntMap (Var, Int),
     csVarCounters :: !VarCounters
   }
   deriving (Eq, Generic, NFData)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem cs bs _) = Set.size cs + IntSet.size bs
+numberOfConstraints (ConstraintSystem cs bs binReps _) =
+  Set.size cs + IntSet.size bs + IntMap.size binReps
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints boolVars counters) =
+  show (ConstraintSystem constraints boolVars binReps counters) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
       <> "):\n\n"
-      <> printConstraints (toList constraints)
+      <> showConstraints (toList constraints)
       <> "\n"
-      <> printBooleanVars
       <> indent (show counters)
+      <> showBooleanVars
+      <> showBinReps
       <> "\n}"
     where
-      printConstraints = unlines . map (\c -> "    " <> show c)
+      showConstraints = unlines . map (\c -> "    " <> show c)
 
-      printBooleanVars =
+      showBooleanVars =
         if IntSet.null boolVars
           then ""
           else
             "  boolean variables (" <> show (IntSet.size boolVars)
               <> ")\n"
+
+      showBinReps =
+        if IntMap.null binReps
+          then ""
+          else
+            "  Binary representation of input variables: "
+              <> showList'
+                ( map
+                    ( \(v, (b, n)) ->
+                        "$" <> show v <> " = $" <> show b <> " + 2$" <> show (b + 1) <> " + ... + 2^" <> show (n - 1) <> "$" <> show (b + n - 1)
+                    )
+                    (IntMap.toList binReps)
+                )
+              <> "\n"
+      showList' ys = "[" <> List.intercalate ", " ys <> "]"
 
 -- | Sequentially renumber term variables '0..max_var'.  Return
 --   renumbered constraints, together with the total number of
@@ -176,6 +198,7 @@ renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))
     (IntSet.map renumber (csBoolVars cs))
+    (csBinReps cs) -- no need to renumber binary representations
     (setOrdinaryVarSize (IntSet.size newOrdinaryVars) counters)
   where
     counters = csVarCounters cs

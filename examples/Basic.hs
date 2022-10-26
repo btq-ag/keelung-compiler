@@ -8,17 +8,13 @@ module Basic where
 import qualified AggregateSignature.Program
 import AggregateSignature.Util
 import Control.Monad (forM_)
-import qualified Data.Set as Set
 import Keelung
 import Keelung.Compiler
-  ( ConstraintSystem (..),
-    Error,
+  ( Error,
     numberOfConstraints,
     optimizeWithInput,
   )
 import qualified Keelung.Compiler as Compiler
-import Keelung.Compiler.Constraint (cadd)
-import Keelung.Syntax.VarCounters
 
 --------------------------------------------------------------------------------
 
@@ -204,28 +200,29 @@ runAggSig dimension n = do
 --   let settings = Settings False False True
 --   bench (checkSigLength dimension n) settings dimension n
 
-cs1 :: ConstraintSystem GF181
-cs1 =
-  ConstraintSystem
-    { csConstraints =
-        Set.fromList $
-          concat
-            [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
-              cadd 0 [(0, 10582), (1, 7317), (17, -1)],
-              cadd 0 [(2, 3853), (3, 4216), (15, -1)],
-              cadd 0 [(2, 8073), (3, 3853), (14, -1)],
-              cadd 0 [(4, 1), (8, 12289), (17, -1)],
-              cadd 0 [(5, 1), (9, 12289), (16, -1)],
-              cadd 0 [(6, 1), (10, 12289), (15, -1)],
-              cadd 0 [(7, 1), (11, 12289), (14, -1)],
-              cadd 0 [(4, 1), (6, 1), (13, -1)],
-              cadd 0 [(5, 1), (7, 1), (12, -1)],
-              cadd 10623 [(13, -1)],
-              cadd 11179 [(12, -1)]
-            ],
-      csBoolVars = mempty,
-      csVarCounters = VarCounters 0 12 mempty 0 0 5
-    }
+-- cs1 :: ConstraintSystem GF181
+-- cs1 =
+--   ConstraintSystem
+--     { csConstraints =
+--         Set.fromList $
+--           concat
+--             [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
+--               cadd 0 [(0, 10582), (1, 7317), (17, -1)],
+--               cadd 0 [(2, 3853), (3, 4216), (15, -1)],
+--               cadd 0 [(2, 8073), (3, 3853), (14, -1)],
+--               cadd 0 [(4, 1), (8, 12289), (17, -1)],
+--               cadd 0 [(5, 1), (9, 12289), (16, -1)],
+--               cadd 0 [(6, 1), (10, 12289), (15, -1)],
+--               cadd 0 [(7, 1), (11, 12289), (14, -1)],
+--               cadd 0 [(4, 1), (6, 1), (13, -1)],
+--               cadd 0 [(5, 1), (7, 1), (12, -1)],
+--               cadd 10623 [(13, -1)],
+--               cadd 11179 [(12, -1)]
+--             ],
+--       csBoolVars = mempty,
+--       csVarCounters = VarCounters 0 12 mempty 0 0 5,
+--       csBinReps = mempty
+--     }
 
 xorLists :: Comp Boolean
 xorLists = do

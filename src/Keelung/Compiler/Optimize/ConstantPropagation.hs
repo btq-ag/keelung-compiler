@@ -10,13 +10,13 @@ import Keelung.Compiler.Syntax.Untyped
 -- 1. Propagate constant in assignments
 -- 2. Propagate constant in the expression and assertions
 run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
-run (TypeErased expr counters assertions assignments boolVars) =
+run (TypeErased expr counters assertions assignments boolVars binReps) =
   let (bindings, assignments') = propagateInAssignments assignments
       expr' = propagateConstant bindings <$> expr
       assertions' = map (propagateConstant bindings) assertions
 
       assignments'' = assignments' <> map (\(var, val) -> Assignment var (Val val)) (IntMap.toList bindings)
-   in TypeErased expr' counters assertions' assignments'' boolVars
+   in TypeErased expr' counters assertions' assignments'' boolVars binReps
 
 -- Propagate constant in assignments and return the bindings for later use
 propagateInAssignments :: (Integral n, GaloisField n) => [Assignment n] -> (IntMap n, [Assignment n])

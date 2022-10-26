@@ -65,6 +65,7 @@ toR1CS cs =
     (csVarCounters cs)
     (csBoolVars cs)
     (lefts convertedConstratins)
+    (csBinReps cs)
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
 
@@ -112,7 +113,8 @@ fromR1CS r1cs =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
       csBoolVars = r1csBoolVars r1cs,
-      csVarCounters = r1csVarCounters r1cs
+      csVarCounters = r1csVarCounters r1cs,
+      csBinReps = r1csBinReps r1cs
     }
   where
     fromR1C (R1C aX bX cX) =

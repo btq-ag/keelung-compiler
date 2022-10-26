@@ -2,11 +2,12 @@ module Keelung.Compiler.Syntax.Erase (run) where
 
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
+import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Maybe (fromMaybe)
 import Data.Proxy (asProxyTypeOf)
 import Data.Sequence (Seq (..), (|>))
-import qualified Data.Sequence as Seq
 import Keelung.Compiler.Syntax.Bits (Bits (..))
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Syntax.Typed as T
@@ -41,7 +42,14 @@ run (T.Elaborated expr comp) =
         -- retrieve updated Context and return it
         Context counters'' boolVars extraAssignments <- get
 
-        let numBinRepAssignments = map (makeNumBinRepAssignment counters'') (numInputVars counters'')
+        let numWidth = getNumWidth counters''
+        let binReps =
+              IntMap.fromList $
+                map
+                  ( \v ->
+                      (v, (fromMaybe (error "cannot get bit var") (getBitVar counters'' v 0), numWidth))
+                  )
+                  (numInputVars counters'')
 
         return $
           TypeErased
@@ -49,8 +57,9 @@ run (T.Elaborated expr comp) =
               -- determine the size of output vars by looking at the length of the expression
               erasedVarCounters = counters'',
               erasedAssertions = assertions',
-              erasedAssignments = numBinRepAssignments <> assignments <> extraAssignments,
-              erasedBoolVars = boolVars <> boolVarsFromNumInputs
+              erasedAssignments = assignments <> extraAssignments,
+              erasedBoolVars = boolVars <> boolVarsFromNumInputs,
+              erasedBinReps = binReps
             }
   where
     deviseNumWidth :: (GaloisField n, Integral n) => Context n -> Int
@@ -59,23 +68,6 @@ run (T.Elaborated expr comp) =
     lengthOfExpr (T.Array xs) = sum $ fmap lengthOfExpr xs
     lengthOfExpr (T.Val T.Unit) = 0
     lengthOfExpr _ = 1
-
-    makeNumBinRepAssignment :: (GaloisField n, Integral n) => VarCounters -> Var -> Assignment n
-    makeNumBinRepAssignment counters var =
-      let getBitVar' i = maybe (Val 0) Var (getBitVar counters var i)
-       in case getNumWidth counters of
-            0 -> Assignment var (Val 0)
-            1 -> Assignment var (getBitVar' 0)
-            n ->
-              Assignment
-                var
-                $ NAryOp
-                  Add
-                  (1 * getBitVar' 0)
-                  (2 * getBitVar' 1)
-                  (Seq.fromList [  fromInteger (2 ^ i) * getBitVar' i | i <- [2 .. n - 1]])
-
---   (foldr1 (:+:) (map (maybe (Val 0) Var) (map (getBitVar counters var) [0 .. n -1])))
 
 --------------------------------------------------------------------------------
 

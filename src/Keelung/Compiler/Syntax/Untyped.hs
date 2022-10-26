@@ -13,8 +13,11 @@ module Keelung.Compiler.Syntax.Untyped
 where
 
 import Data.Field.Galois (GaloisField)
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified Data.List as List
 import Data.Sequence (Seq (..))
 import Keelung.Field (N (..))
 import Keelung.Syntax.VarCounters
@@ -118,11 +121,13 @@ data TypeErased n = TypeErased
     -- | Assignments after type erasure
     erasedAssignments :: ![Assignment n],
     -- | Variables that are boolean (so that we can impose the Boolean constraint on them)
-    erasedBoolVars :: !IntSet
+    erasedBoolVars :: !IntSet,
+    -- | Pairs of Number input variables and their binary representation
+    erasedBinReps :: IntMap (Var, Int)
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr counters assertions assignments boolVars) =
+  show (TypeErased expr counters assertions assignments boolVars binReps) =
     "TypeErased {\n\
     \  expression: "
       <> show (fmap (fmap N) expr)
@@ -138,5 +143,22 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
       <> indent (show counters)
       <> "  Boolean variables: "
       <> show (IntSet.toList boolVars)
+      <> showBinReps
       <> "\n\
          \}"
+    where
+      showBinReps =
+        if IntMap.null binReps
+          then ""
+          else
+            "  Binary representation of input variables: "
+              <> showList'
+                ( map
+                    ( \(v, (b, n)) ->
+                        "$" <> show v <> " = $" <> show b <> " + 2$" <> show (b + 1) <> " + ... + 2^" <> show (n - 1) <> "$" <> show (b + n - 1)
+                    )
+                    (IntMap.toList binReps)
+                )
+              <> "\n"
+
+      showList' ys = "[" <> List.intercalate ", " ys <> "]"
