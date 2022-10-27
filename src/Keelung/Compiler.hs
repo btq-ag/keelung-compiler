@@ -40,7 +40,9 @@ where
 import Control.Arrow (left)
 import Control.Monad (when)
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.Semiring (Semiring (one, zero))
+import qualified Data.Sequence as Seq
 import Keelung (Elaborable, N (..), elaborate)
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
@@ -165,17 +167,19 @@ populateBitsOfInputsElab elab rawInputs = do
   erased <- eraseElab elab
   let counters = erasedVarCounters erased
 
+  -- go through all raw inputs
+  -- and populate them with binary representation if it's a Number input
   let bitArrays =
         foldl
-          ( \acc (i, input) -> do
-              case distinguishInputVar counters i of
-                Left _ -> acc
-                Right _ -> toBits input <> acc
+          ( \acc (inputType, rawInput) ->
+              case inputType of
+                NumInput _ -> acc <> Seq.fromList (toBits rawInput)
+                _ -> acc
           )
-          []
-          (reverse (zip [0 ..] rawInputs))
+          mempty
+          (Seq.zip (getInputSequence counters) (Seq.fromList rawInputs))
 
-  return (rawInputs ++ bitArrays)
+  return (rawInputs ++ toList bitArrays)
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs

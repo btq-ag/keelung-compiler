@@ -144,7 +144,7 @@ main = hspec $ do
                 -- constraint between bit values & number
                 -- cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]]),
                 csBoolVars = IntSet.fromList [1 .. 181],
-                csVarCounters = makeVarCounters 181 0 1 0 0,
+                csVarCounters = makeVarCounters 181 0 1 0 0 [NumInput 0],
                 csBinReps = IntMap.fromList [(0, (1, 181))]
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
@@ -164,7 +164,7 @@ main = hspec $ do
                         cadd 0 [(187, 1)]
                       ],
                 csBoolVars = IntSet.fromList [1 .. 181],
-                csVarCounters = makeVarCounters 181 6 1 0 0,
+                csVarCounters = makeVarCounters 181 6 1 0 0 [NumInput 0],
                 csBinReps = IntMap.fromList [(0, (1, 181))]
               }
        in Compiler.compileOnly Basic.bits0 `shouldBe` Right cs
@@ -176,7 +176,7 @@ main = hspec $ do
                   Set.fromList $ -- value of outputs
                     cmul [(363, 1)] [(2, 1)] (0 :: GF181, [(364, 1)]),
                 csBoolVars = IntSet.fromList [2 .. 363],
-                csVarCounters = makeVarCounters 181 1 2 0 0,
+                csVarCounters = makeVarCounters 181 1 2 0 0 [NumInput 0, NumInput 1],
                 csBinReps = IntMap.fromList [(0, (2, 181)), (1, (183, 181))]
               }
        in Compiler.compileOnly Basic.bits1 `shouldBe` Right cs
