@@ -5,20 +5,18 @@ module Encode (serializeR1CS, serializeInputAndWitness) where
 
 -- import Data.Aeson.Encoding
 
-import Control.Arrow (left)
 import Data.Aeson
 import Data.Aeson.Encoding
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import Data.Field.Galois (GaloisField (char, deg))
 import qualified Data.IntMap as IntMap
-import qualified Data.IntSet as IntSet
 import Data.Proxy
 import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
-import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
+import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
@@ -27,10 +25,7 @@ import Keelung.Types
 
 -- | Encodes a R1CS in the JSON Lines text file format
 serializeR1CS :: (GaloisField n, Integral n) => R1CS n -> ByteString
-serializeR1CS r1cs = serializeR1CS_ (fieldNumberProxy r1cs) (fmap toInteger (reindexR1CS r1cs))
-  where
-    fieldNumberProxy :: GaloisField n => R1CS n -> n
-    fieldNumberProxy _ = asProxyTypeOf 0 Proxy
+serializeR1CS = serializeR1CS2
 
 -- | Encodes inputs and witnesses in the JSON Lines text file format
 --   the "inputs" field should contain both inputs and outputs
@@ -48,13 +43,19 @@ serializeInputAndWitness inputs outputs witnesses =
 
 --------------------------------------------------------------------------------
 
-serializeR1CS_ :: GaloisField n => n -> R1CS Integer -> ByteString
-serializeR1CS_ fieldNumber r1cs =
+serializeR1CS2 :: (GaloisField n, Integral n) => R1CS n -> ByteString
+serializeR1CS2 r1cs =
   BS.intercalate "\n" $
     map encodingToLazyByteString $
       header : map toEncoding r1cConstraints
   where
-    r1cConstraints = toR1Cs r1cs
+    fieldNumberProxy :: GaloisField n => R1CS n -> n
+    fieldNumberProxy _ = asProxyTypeOf 0 Proxy
+
+    fieldNumber = fieldNumberProxy r1cs
+
+    -- the constraints are reindexed and all field numbers are converted to Integer
+    r1cConstraints = map (fmap toInteger . reindexR1C r1cs) (toR1Cs r1cs)
 
     varCounters = r1csVarCounters r1cs
 
@@ -112,25 +113,17 @@ encodeVarCoeff (v, c) = list f [Left v, Right c]
 --   index = 0:  reserved for the constant 1
 --   index < 0:  reserved for the input & output variables
 --   index > 0:  reserved for the all the other variables (witnesses)
-reindexR1CS :: R1CS n -> R1CS n
-reindexR1CS r1cs =
-  r1cs
-    { r1csConstraints = map reindexR1C (r1csConstraints r1cs),
-      r1csBoolVars = IntSet.map reindex (r1csBoolVars r1cs),
-      r1csCNEQs = map (\(CNEQ x y m) -> CNEQ (left reindex x) (left reindex y) (reindex m)) (r1csCNEQs r1cs)
-    }
+reindexR1C :: R1CS n -> R1C n -> R1C n
+reindexR1C r1cs (R1C a b c) =
+  R1C
+    (fmap (Poly.mapVars reindex) a)
+    (fmap (Poly.mapVars reindex) b)
+    (fmap (Poly.mapVars reindex) c)
   where
-    reindexR1C :: R1C n -> R1C n
-    reindexR1C (R1C a b c) =
-      R1C
-        (fmap (Poly.mapVars reindex) a)
-        (fmap (Poly.mapVars reindex) b)
-        (fmap (Poly.mapVars reindex) c)
-
     reindex :: Var -> Var
     reindex var
-      | isInputOrOutputVar var = - var
-      | otherwise = var
+      | isInputOrOutputVar var = - (var + 1) -- + 1 to avoid $0 the constant 1
+      | otherwise = var + 1 -- + 1 to avoid $0 the constant 1 
 
     isInputOrOutputVar :: Var -> Bool
     isInputOrOutputVar var = var < pinnedVarSize (r1csVarCounters r1cs)

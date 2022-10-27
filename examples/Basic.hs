@@ -23,6 +23,14 @@ assertToBe42 = do
   x <- input
   assert $ x `Eq` 42
 
+-- | A program that expects the second input to be the square of the first input
+-- This program returns no output
+assertSquare :: Comp ()
+assertSquare = do
+  x <- input
+  y <- input
+  assert ((x * x) `Eq` y)
+
 constant1 :: Comp Number
 constant1 =
   return $ 1 + 1
@@ -131,6 +139,9 @@ make dim n = makeParam dim n 42 $ Settings True True True
 
 aggSig :: Int -> Int -> Comp ()
 aggSig dim n = AggregateSignature.Program.aggregateSignature (make dim n)
+
+aggSigInput :: Int -> Int -> [Integer]
+aggSigInput dim n = map toInteger $ genInputFromParam (makeParam dim n 42 $ Settings True True True)
 
 p :: Param GF181
 p = makeParam 1 1 42 $ Settings False True False
@@ -305,3 +316,14 @@ bits1 = do
   x <- input
   y <- input
   return $ toArray [(x !!! 0) `And` (y !!! (-1))]
+
+-- Formula: (0°C × 9/5) + 32 = 32°F
+tempConvert :: Comp Number
+tempConvert = do
+  toFahrenheit <- input
+  degree <- input
+  return $
+    cond
+      toFahrenheit
+      (degree * 9 / 5 + 32)
+      (degree - 32 * 5 / 9)
