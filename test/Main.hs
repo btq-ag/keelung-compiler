@@ -18,7 +18,7 @@ import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (R1CS)
 import qualified Keelung.Syntax.Typed as C
-import Keelung.Syntax.VarCounters (VarCounters (..))
+import Keelung.Syntax.VarCounters
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
@@ -144,7 +144,7 @@ main = hspec $ do
                 -- constraint between bit values & number
                 -- cadd 0 ((0, -1) : [(var, 2 ^ i) | (var, i) <- zip [1 .. 181] [0 :: Int .. 180]]),
                 csBoolVars = IntSet.fromList [1 .. 181],
-                csVarCounters = VarCounters 0 1 mempty 181 0 0,
+                csVarCounters = makeVarCounters 181 0 1 0 0,
                 csBinReps = IntMap.fromList [(0, (1, 181))]
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
@@ -164,7 +164,7 @@ main = hspec $ do
                         cadd 0 [(187, 1)]
                       ],
                 csBoolVars = IntSet.fromList [1 .. 181],
-                csVarCounters = VarCounters 0 1 mempty 181 6 0,
+                csVarCounters = makeVarCounters 181 6 1 0 0,
                 csBinReps = IntMap.fromList [(0, (1, 181))]
               }
        in Compiler.compileOnly Basic.bits0 `shouldBe` Right cs
@@ -176,7 +176,7 @@ main = hspec $ do
                   Set.fromList $ -- value of outputs
                     cmul [(363, 1)] [(2, 1)] (0 :: GF181, [(364, 1)]),
                 csBoolVars = IntSet.fromList [2 .. 363],
-                csVarCounters = VarCounters 0 2 mempty 181 1 0,
+                csVarCounters = makeVarCounters 181 1 2 0 0,
                 csBinReps = IntMap.fromList [(0, (2, 181)), (1, (183, 181))]
               }
        in Compiler.compileOnly Basic.bits1 `shouldBe` Right cs

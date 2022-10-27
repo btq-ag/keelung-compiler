@@ -75,7 +75,7 @@ add cs =
 freshVar :: M n Var
 freshVar = do
   n <- gets (totalVarSize . envVarCounters)
-  modify' (\ctx -> ctx {envVarCounters = bumpOrdinaryVar (envVarCounters ctx)})
+  modify' (\ctx -> ctx {envVarCounters = bumpIntermediateVar (envVarCounters ctx)})
   return n
 
 ----------------------------------------------------------------

@@ -74,7 +74,7 @@ runAndCheck elab inputs = do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
   -- See if free variables of the program and the witness are the same
-  let variables = freeOrdinaryVarsOfElab elab
+  let variables = freeIntermediateVarsOfElab elab
   let varsInWitness = IntMap.keysSet witness
   when (variables /= varsInWitness) $ do
     let missingInWitness = variables IntSet.\\ varsInWitness
@@ -170,8 +170,8 @@ lookupInputVar var = do
 --------------------------------------------------------------------------------
 
 -- | Collect free variables of an elaborated program (that should also be present in the witness)
-freeOrdinaryVarsOfElab :: Elaborated -> IntSet
-freeOrdinaryVarsOfElab (Elaborated value context) =
+freeIntermediateVarsOfElab :: Elaborated -> IntSet
+freeIntermediateVarsOfElab (Elaborated value context) =
   let (_, inOutputValue) = freeVars value
       inNumBindings =
         map

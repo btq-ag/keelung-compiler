@@ -101,7 +101,7 @@ markAsBoolVar var = modify' (\ctx -> ctx {ctxBoolVars = IntSet.insert var (ctxBo
 freshVar :: M n Var
 freshVar = do
   n <- gets (totalVarSize . ctxVarCounters)
-  modify' (\ctx -> ctx {ctxVarCounters = bumpOrdinaryVar (ctxVarCounters ctx)})
+  modify' (\ctx -> ctx {ctxVarCounters = bumpIntermediateVar (ctxVarCounters ctx)})
   return n
 
 -- | Make a new assignment
@@ -128,20 +128,20 @@ eraseVal T.Unit = return []
 
 eraseRef' :: T.Ref -> M n Int
 eraseRef' ref = case ref of
-  T.NumVar n -> relocateOrdinaryVar n
+  T.NumVar n -> relocateIntermediateVar n
   T.NumInputVar n -> return n
   -- we don't need to mark intermediate Boolean variables
   -- and impose the Boolean constraint on them ($A * $A = $A)
   -- because this property should be guaranteed by the source of its value
-  T.BoolVar n -> relocateOrdinaryVar n
+  T.BoolVar n -> relocateIntermediateVar n
   T.BoolInputVar n -> do
     markAsBoolVar n
     return n
   where
     -- we need to relocate ordinary variables
     -- so that we can place input variables and output variables in front of them
-    relocateOrdinaryVar :: Int -> M n Int
-    relocateOrdinaryVar n = do
+    relocateIntermediateVar :: Int -> M n Int
+    relocateIntermediateVar n = do
       offset <- gets (pinnedVarSize . ctxVarCounters)
       return (offset + n)
 

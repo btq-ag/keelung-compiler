@@ -33,13 +33,13 @@ module Keelung.Compiler.Syntax.VarLayout where
 -- bumpIntermediateVar :: VarLayout -> (VarLayout, Var)
 -- bumpIntermediateVar (VarLayout counters numWidth) =
 --   let var = ordinaryVarSize counters
---    in ( VarLayout (bumpOrdinaryVar counters) numWidth,
+--    in ( VarLayout (bumpIntermediateVar counters) numWidth,
 --         var
 --       )
 
 -- updateIntermediateVarSize :: VarLayout -> Int -> VarLayout
 -- updateIntermediateVarSize (VarLayout counters numWidth) size =
---   VarLayout (setOrdinaryVarSize size counters) numWidth
+--   VarLayout (setIntermediateVarSize size counters) numWidth
 
 -- -- | Range of output variables
 -- outputVarsRange :: VarLayout -> (Int, Int)

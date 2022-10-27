@@ -189,23 +189,23 @@ renumberConstraints cs =
     (Set.map renumberConstraint (csConstraints cs))
     (IntSet.map renumber (csBoolVars cs))
     (csBinReps cs) -- no need to renumber binary representations
-    (setOrdinaryVarSize (IntSet.size newOrdinaryVars) counters)
+    (setIntermediateVarSize (IntSet.size newIntermediateVars) counters)
   where
     counters = csVarCounters cs
 
     -- variables in constraints (that should be kept after renumbering!)
     vars = varsInConstraints (csConstraints cs)
     -- variables in constraints excluding input & output variables
-    newOrdinaryVars = IntSet.filter (>= pinnedVarSize counters) vars
+    newIntermediateVars = IntSet.filter (>= pinnedVarSize counters) vars
     -- new variables after renumbering (excluding input & output variables)
-    renumberedOrdinaryVars = [pinnedVarSize counters .. pinnedVarSize counters + IntSet.size newOrdinaryVars - 1]
+    renumberedIntermediateVars = [pinnedVarSize counters .. pinnedVarSize counters + IntSet.size newIntermediateVars - 1]
 
     -- all variables after renumbering
-    renumberedVars = [0 .. pinnedVarSize counters + IntSet.size newOrdinaryVars - 1]
+    renumberedVars = [0 .. pinnedVarSize counters + IntSet.size newIntermediateVars - 1]
 
     -- mapping of old variables to new variables
     -- input variables are placed in the front
-    variableMap = Map.fromList $ zip (IntSet.toList newOrdinaryVars) renumberedOrdinaryVars
+    variableMap = Map.fromList $ zip (IntSet.toList newIntermediateVars) renumberedIntermediateVars
 
     renumber var =
       if var >= pinnedVarSize counters
