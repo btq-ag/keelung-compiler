@@ -1,7 +1,7 @@
 -- {-# LANGUAGE DeriveAnyClass #-}
 -- {-# LANGUAGE DeriveGeneric #-}
 
--- module Keelung.Compiler.Syntax.VarLayout
+module Keelung.Compiler.Syntax.VarLayout where 
 --   ( VarLayout,
 --     layoutVarCounters,
 --     makeVarLayout,
@@ -12,7 +12,6 @@
 --     outputVarsRange,
 --     totalVarSize
 --   )
--- where
 
 -- import Control.DeepSeq (NFData)
 -- import GHC.Generics (Generic)

@@ -44,6 +44,7 @@ library
       Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
   other-modules:
       Paths_keelung_compiler
@@ -89,6 +90,7 @@ executable keelungc
       Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
       AggregateSignature.Program
       AggregateSignature.Util
@@ -148,6 +150,7 @@ executable profile
       Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
       Paths_keelung_compiler
   hs-source-dirs:
@@ -230,6 +233,7 @@ benchmark keelung-bench
       Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
       AggSig
       Array

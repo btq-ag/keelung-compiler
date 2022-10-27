@@ -91,7 +91,7 @@ mergePoly pinned xs ys = do
   -- single out `var` and move it to one side of the equation
   xs' <- Poly.negate <$> Poly.delete var xs
   -- substitute `var` with `xs'`
-  Poly.substitute ys var xs'
+  Poly.substWithPoly ys var xs'
 
 --------------------------------------------------------------------------------
 --
