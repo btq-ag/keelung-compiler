@@ -38,16 +38,15 @@ module Keelung.Compiler
 where
 
 import Control.Arrow (left)
-import Control.Monad (unless, when)
-import qualified Data.Either as Either
+import Control.Monad (when)
 import Data.Field.Galois (GaloisField)
-import qualified Data.IntMap as IntMap
 import Data.Semiring (Semiring (one, zero))
 import Keelung (Elaborable, N (..), elaborate)
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
 import qualified Keelung.Compiler.Interpret as Interpret
+import qualified Keelung.Compiler.Interpret.R1CS as Interpret.R1CS
 import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
@@ -56,7 +55,6 @@ import Keelung.Compiler.Syntax.Bits (toBits)
 import Keelung.Compiler.Syntax.Erase as Erase
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
-import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Typed (Elaborated)
@@ -140,22 +138,7 @@ execute prog rawInputs = do
 
   r1cs <- toR1CS <$> compile prog
 
-  actualWitness <- left ExecError $ witnessOfR1CS inputs r1cs
-
-  -- extract the output value from the witness
-  let varCounters = r1csVarCounters r1cs
-  let (execErrors, actualOutputs) =
-        Either.partitionEithers $
-          map
-            ( \var ->
-                case IntMap.lookup var actualWitness of
-                  Nothing -> Left var
-                  Just value -> Right value
-            )
-            (outputVars varCounters)
-
-  unless (null execErrors) $ do
-    Left $ ExecError $ ExecOutputVarsNotMappedError (outputVars varCounters) actualWitness
+  (actualOutputs, actualWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputs)
 
   -- interpret the program to see if the output value is correct
   expectedOutputs <- interpret prog inputs

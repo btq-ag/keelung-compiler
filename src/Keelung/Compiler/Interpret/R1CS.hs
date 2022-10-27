@@ -1,16 +1,21 @@
 -- Interpreter for Keelung.Compiler.R1CS
-module Keelung.Compiler.Interpret.R1CS (run) where
+module Keelung.Compiler.Interpret.R1CS (run, run') where
 
 import Control.Monad (unless)
 import qualified Data.Either as Either
 import Data.Field.Galois (GaloisField)
+import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Keelung.Compiler.R1CS (ExecError (..), witnessOfR1CS)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Syntax.VarCounters
 
 run :: (GaloisField n, Integral n) => R1CS n -> [n] -> Either (ExecError n) [n]
-run r1cs inputs = do
+run r1cs inputs = fst <$> run' r1cs inputs
+
+-- | Return interpreted outputs along with the witnesses
+run' :: (GaloisField n, Integral n) => R1CS n -> [n] -> Either (ExecError n) ([n], IntMap n)
+run' r1cs inputs = do
   witness <- witnessOfR1CS inputs r1cs
   let varCounters = r1csVarCounters r1cs
   -- extract output values from the witness
@@ -27,4 +32,4 @@ run r1cs inputs = do
   unless (null execErrors) $ do
     Left $ ExecOutputVarsNotMappedError (outputVars varCounters) witness
 
-  return outputs
+  return (outputs, witness)
