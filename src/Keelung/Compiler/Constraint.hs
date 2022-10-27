@@ -31,14 +31,12 @@ import Keelung.Types
 --      CAdd: 0 = c + c₀x₀ + c₁x₁ ... cₙxₙ
 --      CMul: ax * by = c or ax * by = cz
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
---      CBin: x = b₀ + 2b₁ ... 2⁽ⁿ⁻¹⁾b₍ₙ₋₁₎
 --      CXor: x ⊕ y = z
 --      COr: x ∨ y = z
 data Constraint n
   = CAdd !(Poly n)
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNEq (CNEQ n) -- x y m
-  | CBin Var Var Int -- x b₀ n
   | CXor Var Var Var
   | COr Var Var Var
   deriving (Generic, NFData)
@@ -49,7 +47,6 @@ instance GaloisField n => Eq (Constraint n) where
     (CMul x y z, CMul u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CNEq x, CNEq y) -> x == y
-    (CBin x y z, CBin u v w) -> x == u && y == v && z == w
     (CXor x y z, CXor u v w) -> x == u && y == v && z == w
     (COr x y z, COr u v w) -> x == u && y == v && z == w
     _ -> False
@@ -59,7 +56,6 @@ instance Functor Constraint where
   fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
   fmap f (CNEq x) = CNEq (fmap f x)
-  fmap _ (CBin x y z) = CBin x y z
   fmap _ (CXor x y z) = CXor x y z
   fmap _ (COr x y z) = COr x y z
 
@@ -83,7 +79,6 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"
   show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
   show (CNEq x) = show x
-  show (CBin x b n) = "B $" <> show x <> " = $" <> show b <> " + 2$" <> show (b + 1) <> " + ... + 2^" <> show (n - 1) <> "$" <> show (b + n - 1)
   show (CXor x y z) = "X $" <> show x <> " ⊕ $" <> show y <> " = $" <> show z
   show (COr x y z) = "O $" <> show x <> " ∨ $" <> show y <> " = $" <> show z
 
@@ -98,10 +93,6 @@ instance GaloisField n => Ord (Constraint n) where
   compare (CXor x y z) (CXor u v w) = compare (x, y, z) (u, v, w)
   compare _ CXor {} = LT
   compare CXor {} _ = GT
-  -- CBin
-  compare CBin {} CBin {} = EQ
-  compare _ CBin {} = LT
-  compare CBin {} _ = GT
   -- CMul
   compare (CMul aV bV cV) (CMul aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMul {} = LT
@@ -125,7 +116,6 @@ varsInConstraint (CNEq (CNEQ (Left x) (Left y) m)) = IntSet.fromList [x, y, m]
 varsInConstraint (CNEq (CNEQ (Left x) _ m)) = IntSet.fromList [x, m]
 varsInConstraint (CNEq (CNEQ _ (Left y) m)) = IntSet.fromList [y, m]
 varsInConstraint (CNEq (CNEQ _ _ m)) = IntSet.fromList [m]
-varsInConstraint (CBin x b n) = IntSet.fromList $ x : [b .. b + n - 1]
 varsInConstraint (CXor x y z) = IntSet.fromList [x, y, z]
 varsInConstraint (COr x y z) = IntSet.fromList [x, y, z]
 
@@ -243,7 +233,6 @@ renumberConstraints cs =
         CNEq (CNEQ (Right x) (Left (renumber y)) (renumber m))
       CNEq (CNEQ (Right x) (Right y) m) ->
         CNEq (CNEQ (Right x) (Right y) (renumber m))
-      CBin x b n -> CBin (renumber x) (renumber b) n
       CXor x y z ->
         CXor (renumber x) (renumber y) (renumber z)
       COr x y z ->

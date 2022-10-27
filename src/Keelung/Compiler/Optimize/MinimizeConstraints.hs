@@ -180,7 +180,6 @@ substConstraint !constraint = case constraint of
           else do
             bindVar m (recip diff)
             return Nothing
-  CBin x b n -> return $ Just $ CBin x b n -- no substitution for CBin at the moment
   CXor x y z -> do
     x' <- lookupVar x
     y' <- lookupVar y
@@ -239,7 +238,6 @@ isTautology constraint = case constraint of
   -- we assume that the variables in CNEQ has all been substituted with values when possible
   -- so that we can just check if the values are equal
   CNEq {} -> return False
-  CBin {} -> return False
   CXor x y z -> do
     x' <- lookupVar x
     case x' of
