@@ -109,7 +109,6 @@ instance FreeVar Boolean where
     Xor x y -> (<>) <$> freeVars x <*> freeVars y
     BEq x y -> (<>) <$> freeVars x <*> freeVars y
     IfBool x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
-    ToBool x -> freeVars x
 
 instance FreeVar () where
   freeVars expr = case expr of
@@ -207,8 +206,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       case p' of
         [0] -> interpret y
         _ -> interpret x
-    ToBool x -> interpret x
-
+   
 instance GaloisField n => Interpret () n where
   interpret val = case val of
     () -> return []

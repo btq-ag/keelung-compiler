@@ -40,7 +40,7 @@ run (T.Elaborated expr comp) =
                 ]
 
         -- retrieve updated Context and return it
-        Context counters'' boolVars extraAssignments <- get
+        Context counters'' boolVars <- get
 
         let numWidth = getNumWidth counters''
         let binReps =
@@ -57,7 +57,7 @@ run (T.Elaborated expr comp) =
               -- determine the size of output vars by looking at the length of the expression
               erasedVarCounters = counters'',
               erasedAssertions = assertions',
-              erasedAssignments = assignments <> extraAssignments,
+              erasedAssignments = assignments,
               erasedBoolVars = boolVars <> boolVarsFromNumInputs,
               erasedBinReps = binReps
             }
@@ -82,40 +82,18 @@ data Context n = Context
   { -- | Variable bookkeeping
     ctxVarCounters :: VarCounters,
     -- | Set of Boolean variables (so that we can impose constraints like `$A * $A = $A` on them)
-    ctxBoolVars :: !IntSet,
-    -- | Assignments ($A = ...)
-    ctxAssigments :: [Assignment n]
+    ctxBoolVars :: !IntSet
   }
   deriving (Show)
 
 -- | Initial Context for type erasure
 initContext :: VarCounters -> Context n
-initContext counters = Context counters mempty mempty
+initContext counters = Context counters mempty
 
 -- | Mark a variable as Boolean
 -- so that we can later impose constraints on them (e.g. $A * $A = $A)
 markAsBoolVar :: Var -> M n ()
 markAsBoolVar var = modify' (\ctx -> ctx {ctxBoolVars = IntSet.insert var (ctxBoolVars ctx)})
-
--- | Generate a fresh new variable
-freshVar :: M n Var
-freshVar = do
-  n <- gets (totalVarSize . ctxVarCounters)
-  modify' (\ctx -> ctx {ctxVarCounters = bumpIntermediateVar (ctxVarCounters ctx)})
-  return n
-
--- | Make a new assignment
-makeAssignment :: Var -> Expr n -> M n ()
-makeAssignment var expr = modify' (\ctx -> ctx {ctxAssigments = Assignment var expr : ctxAssigments ctx})
-
--- | Wire an expression with some variable
---   If the expression is already a variable, then we just return it
-wireAsVar :: Expr n -> M n Var
-wireAsVar (Var var) = return var
-wireAsVar others = do
-  var <- freshVar
-  makeAssignment var others
-  return var
 
 --------------------------------------------------------------------------------
 
@@ -196,13 +174,6 @@ eraseExpr expr = case expr of
     xs <- eraseExpr x
     ys <- eraseExpr y
     return [If (head bs) (head xs) (head ys)]
-  T.ToBool x -> do
-    -- we need to wire the erased expression as variable and mark it as Boolean
-    -- because there's no guarantee that the erased expression
-    -- would behave like a Boolean (i.e. $A * $A = $A)
-    vars <- eraseExpr x >>= mapM wireAsVar
-    mapM_ markAsBoolVar vars
-    return $ map Var vars
   T.ToNum x -> eraseExpr x
   T.Bit x i -> do
     x' <- head <$> eraseExpr x

@@ -127,7 +127,6 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
       case b' of
         [0] -> interpret y
         _ -> interpret x
-    ToBool x -> interpret x
     ToNum x -> interpret x
     Bit x i -> do
       xs <- interpret x
@@ -208,7 +207,6 @@ freeVars expr = case expr of
   Xor x y -> freeVars x <> freeVars y
   BEq x y -> freeVars x <> freeVars y
   If x y z -> freeVars x <> freeVars y <> freeVars z
-  ToBool x -> freeVars x
   ToNum x -> freeVars x
   Bit x _ -> freeVars x
 
