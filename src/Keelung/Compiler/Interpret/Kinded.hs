@@ -292,11 +292,11 @@ data InterpretError n
 
 instance (GaloisField n, Integral n) => Show (InterpretError n) where
   show (InterpretUnboundVarError var bindings) =
-    "unbound variable " ++ show var
+    "unbound variable $" ++ show var
       ++ " in bindings "
       ++ showWitness bindings
   show (InterpretUnboundInputVarError var inputs) =
-    "unbound input variable " ++ show var
+    "unbound input variable $" ++ show var
       ++ " in inputs "
       ++ showWitness inputs
   show (InterpretUnboundAddrError var heap) =

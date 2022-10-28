@@ -40,10 +40,7 @@ where
 import Control.Arrow (left)
 import Control.Monad (when)
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
-import qualified Data.IntMap.Strict as IntMap
 import Data.Semiring (Semiring (one, zero))
-import qualified Data.Sequence as Seq
 import Keelung (Elaborable, N (..), elaborate)
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
@@ -54,17 +51,15 @@ import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
 import Keelung.Compiler.R1CS
-import Keelung.Compiler.Syntax.Bits (toBits)
 import Keelung.Compiler.Syntax.Erase as Erase
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
-import Keelung.Constraint.R1CS (R1CS (r1csVarCounters))
 import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Typed (Elaborated)
-import Keelung.Syntax.VarCounters
+import Keelung.Constraint.R1CS (R1CS(..))
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
@@ -142,9 +137,9 @@ optimizeWithInput program inputs = do
 execute :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
 execute prog rawInputs = do
   elab <- left ElabError (elaborate prog)
-  let inputs = Inputs.deserializeElab elab rawInputs
 
   r1cs <- toR1CS <$> compile prog
+  let inputs = Inputs.deserialize (r1csVarCounters r1cs) rawInputs
   (actualOutputs, actualWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputs)
 
   -- interpret the program to see if the output value is correct

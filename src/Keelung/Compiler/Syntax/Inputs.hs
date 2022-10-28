@@ -2,12 +2,12 @@ module Keelung.Compiler.Syntax.Inputs where
 
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
+import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Sequence as Seq
 import Keelung.Compiler.Syntax.Bits (toBits)
 import Keelung.Syntax.Typed (Computation (compVarCounters), Elaborated (elabComp))
 import Keelung.Syntax.VarCounters
-import Data.IntMap.Strict (IntMap)
 
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs
@@ -52,5 +52,6 @@ size :: Inputs n -> Int
 size = length . flatten
 
 toIntMap :: Inputs n -> IntMap n
-toIntMap inputs = let (start, end) = inputVarsRange (varCounters inputs) in 
-  IntMap.fromDistinctAscList (zip [start .. end - 1] (flatten inputs))
+toIntMap inputs =
+  let (start, _) = inputVarsRange (varCounters inputs)
+   in IntMap.fromDistinctAscList (zip [start ..] (flatten inputs))

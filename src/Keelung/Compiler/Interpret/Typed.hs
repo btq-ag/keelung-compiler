@@ -237,7 +237,7 @@ instance Serialize n => Serialize (InterpretError n)
 
 instance (GaloisField n, Integral n) => Show (InterpretError n) where
   show (InterpretUnboundVarError var witness) =
-    "unbound variable " ++ show var
+    "unbound variable $" ++ show var
       ++ " in witness "
       ++ showWitness witness
   show (InterpretUnboundAddrError var heap) =
