@@ -17,7 +17,7 @@ import Keelung.Compiler.Optimize.Monad
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
-import Keelung.Monad
+import Keelung.Monad (Comp)
 import qualified Keelung.Syntax.Typed as C
 import Keelung.Syntax.VarCounters
 
@@ -41,8 +41,8 @@ optimizeWithWitness witness cs =
         return (witness', renumberConstraints $ cs {csConstraints = constraints})
 
 optimizeWithInput :: (GaloisField n, Integral n) => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
-optimizeWithInput ins cs =
-  let witness = IntMap.fromList (zip [0 .. inputVarSize (csVarCounters cs) - 1] ins)
+optimizeWithInput inputs cs =
+  let witness = IntMap.fromList (zip (inputVars (csVarCounters cs)) inputs)
    in optimizeWithWitness witness cs
 
 optimize1 :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n

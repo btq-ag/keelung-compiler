@@ -68,7 +68,7 @@ serializeR1CS2 r1cs =
               <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
               <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
               <> pairStr "instances" (int (pinnedVarSize varCounters)) -- inputs & outputs
-              <> pairStr "witness" (int (totalVarSize varCounters - pinnedVarSize varCounters)) -- other ordinary variables
+              <> pairStr "witness" (int (totalVarSize varCounters - pinnedVarSize varCounters)) -- other intermediate variables
               <> pairStr "constraints" (int (length r1cConstraints))
               <> pairStr "optimized" (bool True)
 
@@ -123,7 +123,6 @@ reindexR1C r1cs (R1C a b c) =
     reindex :: Var -> Var
     reindex var
       | isInputOrOutputVar var = - (var + 1) -- + 1 to avoid $0 the constant 1
-      | otherwise = var + 1 -- + 1 to avoid $0 the constant 1 
-
+      | otherwise = var + 1 -- + 1 to avoid $0 the constant 1
     isInputOrOutputVar :: Var -> Bool
     isInputOrOutputVar var = var < pinnedVarSize (r1csVarCounters r1cs)

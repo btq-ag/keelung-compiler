@@ -128,9 +128,6 @@ varsInConstraints = IntSet.unions . Set.map varsInConstraint
 data ConstraintSystem n = ConstraintSystem
   { -- | Constraints
     csConstraints :: !(Set (Constraint n)),
-    -- | Variables that are Booleans
-    -- should generate constraints like $A * $A = $A for each Boolean variables
-    csBoolVars :: !IntSet,
     -- | Binary representation of input variables
     csBinReps :: IntMap (Var, Int),
     csVarCounters :: !VarCounters
@@ -139,11 +136,11 @@ data ConstraintSystem n = ConstraintSystem
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem cs bs binReps _) =
-  Set.size cs + IntSet.size bs + IntMap.size binReps
+numberOfConstraints (ConstraintSystem cs binReps counters) =
+  Set.size cs + boolVarSize counters + IntMap.size binReps
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints boolVars binReps counters) =
+  show (ConstraintSystem constraints binReps counters) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
@@ -158,11 +155,10 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       showConstraints = unlines . map (\c -> "    " <> show c)
 
       showBooleanVars =
-        if IntSet.null boolVars
-          then ""
-          else
-            "  boolean variables (" <> show (IntSet.size boolVars)
-              <> ")\n"
+        let (start, end) = boolVarsRange counters
+         in if end - start == 0
+              then ""
+              else "  boolean variables: $" <> show start <> " .. $" <> show (end - 1) <> "\n"
 
       showBinReps =
         if IntMap.null binReps
@@ -187,7 +183,6 @@ renumberConstraints :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
 renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))
-    (IntSet.map renumber (csBoolVars cs))
     (csBinReps cs) -- no need to renumber binary representations
     (setIntermediateVarSize (IntSet.size newIntermediateVars) counters)
   where

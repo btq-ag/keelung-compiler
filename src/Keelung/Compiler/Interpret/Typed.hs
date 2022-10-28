@@ -24,13 +24,14 @@ import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Util
 import Keelung.Syntax.Typed hiding (freeVars)
-import Keelung.Types
 import Keelung.Syntax.VarCounters
+import Keelung.Types
+
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
 runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) ([n], Witness n)
-runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
+runAndOutputWitnesses (Elaborated expr comp) inputs = runM (compVarCounters comp) inputs $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
@@ -49,11 +50,11 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   forM_ (compAssertions comp) $ \e -> do
     values <- interpret e
     when (values /= [1]) $ do
-      let (inputVars, ordinaryVars) = freeVars e
-      inputBindings <- mapM (\var -> ("$I" <> show var,) <$> lookupInputVar var) $ IntSet.toList inputVars
-      ordinaryBindings <- mapM (\var -> ("$" <> show var,) <$> lookupVar var) $ IntSet.toList ordinaryVars
+      let (freeInputVars, freeIntermediateVars) = freeVars e
+      inputBindings <- mapM (\var -> ("$I" <> show var,) <$> lookupInputVar var) $ IntSet.toList freeInputVars
+      intermediateBindings <- mapM (\var -> ("$" <> show var,) <$> lookupVar var) $ IntSet.toList freeIntermediateVars
       -- collect variables and their bindings in the expression and report them
-      throwError $ InterpretAssertionError e (inputBindings <> ordinaryBindings)
+      throwError $ InterpretAssertionError e (inputBindings <> intermediateBindings)
 
   -- lastly interpret the expression and return the result
   interpret expr
@@ -139,10 +140,10 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
 -- | The interpreter monad
 type M n = ReaderT (IntMap n) (StateT (IntMap n) (Except (InterpretError n)))
 
-runM :: [n] -> M n a -> Either (InterpretError n) (a, Witness n)
-runM inputs p = runExcept (runStateT (runReaderT p inputBindings) mempty)
+runM :: VarCounters -> [n] -> M n a -> Either (InterpretError n) (a, Witness n)
+runM counters inputs p = runExcept (runStateT (runReaderT p inputBindings) mempty)
   where
-    inputBindings = IntMap.fromDistinctAscList $ zip [0 ..] inputs
+    inputBindings = IntMap.fromDistinctAscList $ zip (inputVars counters) inputs
 
 -- | A `Ref` is given a list of numbers
 -- but in reality it should be just a single number.
@@ -185,9 +186,8 @@ freeIntermediateVarsOfElab (Elaborated value context) =
         <> IntSet.unions inBoolBindings
 
 -- | Collect variables of an expression and group them into sets of:
---    1. Number input variables
---    2. Boolean input variables
---    3. ordinary variables
+--    1. input variables
+--    2. intermediate variables
 freeVars :: Expr -> (IntSet, IntSet)
 freeVars expr = case expr of
   Val _ -> mempty

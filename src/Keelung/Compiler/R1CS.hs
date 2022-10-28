@@ -63,7 +63,6 @@ toR1CS cs =
   R1CS
     (rights convertedConstratins)
     (csVarCounters cs)
-    (csBoolVars cs)
     (lefts convertedConstratins)
     (csBinReps cs)
   where
@@ -106,7 +105,6 @@ fromR1CS r1cs =
     { csConstraints =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
-      csBoolVars = r1csBoolVars r1cs,
       csVarCounters = r1csVarCounters r1cs,
       csBinReps = r1csBinReps r1cs
     }
@@ -124,7 +122,7 @@ witnessOfR1CS inputs r1cs =
   let inputSize = inputVarSize (r1csVarCounters r1cs)
    in if inputSize /= length inputs
         then Left $ ExecInputUnmatchedError inputSize (length inputs)
-        else generateWitness (fromR1CS r1cs) $ IntMap.fromDistinctAscList (zip [0 ..] inputs)
+        else generateWitness (fromR1CS r1cs) $ IntMap.fromDistinctAscList (zip (inputVars (r1csVarCounters r1cs)) inputs)
 
 --------------------------------------------------------------------------------
 

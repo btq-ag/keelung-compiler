@@ -7,7 +7,7 @@ module Keelung.Compiler.Syntax.VarLayout where
 --     makeVarLayout,
 --     bumpIntermediateVar,
 --     updateIntermediateVarSize,
---     booleanVarsRange,
+--     boolVarsRange,
 --     pinnedVarsRange,
 --     outputVarsRange,
 --     totalVarSize
@@ -32,7 +32,7 @@ module Keelung.Compiler.Syntax.VarLayout where
 
 -- bumpIntermediateVar :: VarLayout -> (VarLayout, Var)
 -- bumpIntermediateVar (VarLayout counters numWidth) =
---   let var = ordinaryVarSize counters
+--   let var = intermediateVarSize counters
 --    in ( VarLayout (bumpIntermediateVar counters) numWidth,
 --         var
 --       )
@@ -56,8 +56,8 @@ module Keelung.Compiler.Syntax.VarLayout where
 --    in (0, end)
 
 -- -- | Range of Boolean variables
--- booleanVarsRange :: VarLayout -> (Int, Int)
--- booleanVarsRange (VarLayout counters numWidth) =
+-- boolVarsRange :: VarLayout -> (Int, Int)
+-- boolVarsRange (VarLayout counters numWidth) =
 --   let start =
 --         outputVarSize counters
 --           + numInputVarSize counters
@@ -73,4 +73,4 @@ module Keelung.Compiler.Syntax.VarLayout where
 --     + numInputVarSize counters
 --     + boolInputVarSize counters
 --     + numWidth * numInputVarSize counters
---     + ordinaryVarSize counters
+--     + intermediateVarSize counters

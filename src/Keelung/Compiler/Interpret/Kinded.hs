@@ -9,6 +9,7 @@ module Keelung.Compiler.Interpret.Kinded (run, runAndCheck, FreeVar, Interpret) 
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Bits (Bits (..))
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
@@ -16,9 +17,8 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung hiding (inputs, interpret, run)
 import Keelung.Compiler.Util
-import Keelung.Types
 import Keelung.Syntax.VarCounters
-import Data.Bits (Bits(..))
+import Keelung.Types
 
 --------------------------------------------------------------------------------
 
@@ -186,7 +186,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
     BoolVar var -> pure <$> lookupVar var
     BoolInputVar var -> pure <$> lookupInputVar var
     NumBit x i -> do
-      xs <- interpret x 
+      xs <- interpret x
       if testBit (toInteger (head xs)) i
         then return [one]
         else return [zero]
@@ -206,7 +206,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       case p' of
         [0] -> interpret y
         _ -> interpret x
-   
+
 instance GaloisField n => Interpret () n where
   interpret val = case val of
     () -> return []
@@ -229,7 +229,7 @@ runM elab inputs p = runExcept (runStateT (runReaderT p (inputBindings, heap)) m
   where
     (Elaborated _ comp) = elab
     heap = compHeap comp
-    inputBindings = IntMap.fromDistinctAscList $ zip [0 ..] inputs
+    inputBindings = IntMap.fromDistinctAscList $ zip (inputVars (compVarCounters comp)) inputs
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do

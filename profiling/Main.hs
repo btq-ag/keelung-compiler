@@ -56,4 +56,4 @@ calculateConstraintsOfAdders = do
           print r1cs
           putStrLn "========="
         else do
-          print $ length constraints + IntSet.size (r1csBoolVars r1cs)
+          print $ length constraints

@@ -46,7 +46,6 @@ tests = do
                         cadd 10623 [(13, -1)],
                         cadd 11179 [(12, -1)]
                       ],
-                csBoolVars = mempty,
                 csVarCounters = makeVarCounters 0 0 12 0 5 mempty,
                 csBinReps = mempty
               }
@@ -60,7 +59,6 @@ tests = do
                   Set.fromList $
                     cadd 0 [(0, 1), (1, 1), (4, 1)]
                       ++ cadd 0 [(2, 1), (3, 1), (4, 1)],
-                csBoolVars = mempty,
                 csVarCounters = makeVarCounters 0 0 4 0 1 mempty,
                 csBinReps = mempty
               }
@@ -69,7 +67,6 @@ tests = do
               { csConstraints =
                   Set.fromList $
                     cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)],
-                csBoolVars = mempty,
                 csVarCounters = makeVarCounters 0 0 4 0 0 mempty,
                 csBinReps = mempty
               }
@@ -82,7 +79,6 @@ tests = do
                   Set.fromList $
                     cmul [(3, 1)] [(2, 1)] (42, []) --- $3 * $2 = 42
                       ++ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
-                csBoolVars = mempty,
                 csVarCounters = makeVarCounters 0 0 3 0 1 mempty,
                 csBinReps = mempty
               }
@@ -90,7 +86,6 @@ tests = do
             ConstraintSystem
               { csConstraints =
                   Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
-                csBoolVars = mempty,
                 csVarCounters = makeVarCounters 0 0 3 0 0 mempty,
                 csBinReps = mempty
               }
@@ -103,7 +98,6 @@ tests = do
                   Set.fromList $
                     cadd 0 [(3, 1), (0, 1), (1, 1)] --- 0 = $3 + $0 + $1
                       ++ cmul [(2, 1)] [(3, 1)] (42, []), --- $2 * $3 = 42
-                csBoolVars = mempty,
                 csVarCounters = makeVarCounters 0 0 3 0 1 mempty,
                 csBinReps = mempty
               }
@@ -111,7 +105,6 @@ tests = do
             ConstraintSystem
               { csConstraints =
                   Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
-                csBoolVars = mempty,
                 csVarCounters = makeVarCounters 0 0 3 0 0 mempty,
                 csBinReps = mempty
               }
@@ -124,7 +117,6 @@ tests = do
                   Set.fromList $
                     cadd 0 [(4, 1), (0, 1), (1, 1)] --- 0 = $4 + $0 + $1
                       ++ cmul [(2, 1)] [(3, 1)] (0, [(4, 1)]), --- $2 * $3 = $4
-                csBoolVars = mempty,
                 csVarCounters = makeVarCounters 0 0 4 0 1 mempty,
                 csBinReps = mempty
               }
@@ -133,7 +125,6 @@ tests = do
               { csConstraints =
                   Set.fromList $
                     cmul [(2, 1)] [(3, 1)] (0, [(0, -1), (1, -1)]), --- $2 * $3 = - $0 - $1
-                csBoolVars = mempty,
                 csVarCounters = makeVarCounters 0 0 4 0 0 mempty,
                 csBinReps = mempty
               }
