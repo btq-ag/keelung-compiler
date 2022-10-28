@@ -73,7 +73,7 @@ runAndCheck elab inputs = do
 
   -- See if input size is valid
   let expectedInputSize = inputVarSize (compVarCounters (elabComp elab))
-  let actualInputSize = Inputs.size inputs
+  let actualInputSize = length (Inputs.numInputs inputs <> Inputs.boolInputs inputs)
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
@@ -173,7 +173,7 @@ lookupNumInputVar var = do
 
 lookupBoolInputVar :: Show n => Var -> M n n
 lookupBoolInputVar var = do
-  bindings <- asks snd 
+  bindings <- asks snd
   case IntMap.lookup var bindings of
     Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val

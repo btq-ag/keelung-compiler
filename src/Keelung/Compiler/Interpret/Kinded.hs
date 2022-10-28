@@ -66,7 +66,7 @@ runAndCheck elab inputs = do
   -- See if input size is valid
   let (Elaborated _ comp) = elab
   let expectedInputSize = inputVarSize (compVarCounters comp)
-  let actualInputSize = Inputs.size inputs
+  let actualInputSize = length (Inputs.numInputs inputs <> Inputs.boolInputs inputs)
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
@@ -170,7 +170,7 @@ instance (GaloisField n, Integral n) => Interpret Number n where
     Integer n -> interpret n
     Rational n -> interpret n
     NumVar var -> pure <$> lookupVar var
-    NumInputVar var -> pure <$> lookupInputVar var
+    NumInputVar var -> pure <$> lookupNumInputVar var
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
     Mul x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -186,7 +186,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
   interpret val = case val of
     Boolean b -> interpret b
     BoolVar var -> pure <$> lookupVar var
-    BoolInputVar var -> pure <$> lookupInputVar var
+    BoolInputVar var -> pure <$> lookupBoolInputVar var
     NumBit x i -> do
       xs <- interpret x
       if testBit (toInteger (head xs)) i
@@ -224,14 +224,16 @@ instance (Interpret t n, GaloisField n) => Interpret (ArrM t) n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = ReaderT (IntMap n, Heap) (StateT (Witness n) (Except (InterpretError n)))
+type M n = ReaderT ((IntMap n, IntMap n), Heap) (StateT (Witness n) (Except (InterpretError n)))
 
 runM :: Elaborated t -> Inputs n -> M n a -> Either (InterpretError n) (a, Witness n)
 runM elab inputs p =
-  runExcept (runStateT (runReaderT p (Inputs.toIntMap inputs, heap)) mempty)
+  runExcept (runStateT (runReaderT p ((numInputBindings, boolInputBindings), heap)) mempty)
   where
     (Elaborated _ comp) = elab
     heap = compHeap comp
+    numInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (Inputs.numInputs inputs)
+    boolInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (Inputs.boolInputs inputs)
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
@@ -240,11 +242,18 @@ lookupVar var = do
     Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val
 
-lookupInputVar :: Show n => Int -> M n n
-lookupInputVar var = do
-  bindings <- asks fst
+lookupNumInputVar :: Show n => Var -> M n n
+lookupNumInputVar var = do
+  bindings <- asks (fst . fst)
   case IntMap.lookup var bindings of
-    Nothing -> throwError $ InterpretUnboundInputVarError var bindings
+    Nothing -> throwError $ InterpretUnboundVarError var bindings
+    Just val -> return val
+
+lookupBoolInputVar :: Show n => Var -> M n n
+lookupBoolInputVar var = do
+  bindings <- asks (fst . fst)
+  case IntMap.lookup var bindings of
+    Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val
 
 lookupAddr :: Show n => Int -> M n [n]
