@@ -23,6 +23,8 @@ import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
 import Keelung.Field (N (..))
 import Keelung.Syntax.VarCounters
 import Keelung.Types
+import Keelung.Compiler.Syntax.Inputs (Inputs)
+import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -117,12 +119,12 @@ fromR1CS r1cs =
         _ -> error "fromR1C: invalid R1C"
 
 -- | Computes an assignment for a R1CS with given inputs
-witnessOfR1CS :: (GaloisField n, Integral n) => [n] -> R1CS n -> Either (ExecError n) (Witness n)
+witnessOfR1CS :: (GaloisField n, Integral n) => Inputs n -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
   let inputSize = inputVarSize (r1csVarCounters r1cs)
-   in if inputSize /= length inputs
-        then Left $ ExecInputUnmatchedError inputSize (length inputs)
-        else generateWitness (fromR1CS r1cs) $ IntMap.fromDistinctAscList (zip (inputVars (r1csVarCounters r1cs)) inputs)
+   in if inputSize /= Inputs.size inputs
+        then Left $ ExecInputUnmatchedError inputSize (Inputs.size inputs)
+        else generateWitness (fromR1CS r1cs) (Inputs.toIntMap inputs)
 
 --------------------------------------------------------------------------------
 

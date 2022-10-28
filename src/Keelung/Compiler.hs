@@ -23,7 +23,7 @@ module Keelung.Compiler
     compileO1,
     compileO2,
     optimizeWithInput,
-    computeWitness,
+    -- computeWitness,
     execute,
     --
     compileO0Elab,
@@ -56,8 +56,11 @@ import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
 import Keelung.Compiler.R1CS
 import Keelung.Compiler.Syntax.Bits (toBits)
 import Keelung.Compiler.Syntax.Erase as Erase
+import Keelung.Compiler.Syntax.Inputs (Inputs)
+import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
+import Keelung.Constraint.R1CS (R1CS (r1csVarCounters))
 import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Typed (Elaborated)
@@ -68,17 +71,18 @@ import Keelung.Syntax.VarCounters
 
 -- elaboration => interpretation
 interpret :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
-interpret prog inputs = do
+interpret prog rawInputs = do
   elab <- left ElabError (elaborate prog)
+  let inputs = Inputs.deserializeElab elab rawInputs
   left InterpretError (Interpret.run elab inputs)
 
 -- | Given a Keelung program and a list of raw inputs
---   (that are not populated with binary representation of numbers),
---   Generate (populated inputs, outputs, witness)
-genInputsOutputsWitnesses :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) ([n], [n], Witness n)
+--   Generate (structured inputs, outputs, witness)
+genInputsOutputsWitnesses :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) (Inputs n, [n], Witness n)
 genInputsOutputsWitnesses prog rawInputs = do
-  inputs <- populateBitsOfInputs prog rawInputs
-  outputs <- interpret prog inputs
+  elab <- left ElabError (elaborate prog)
+  let inputs = Inputs.deserializeElab elab rawInputs
+  outputs <- left InterpretError (Interpret.run elab inputs)
   r1cs <- toR1CS <$> compileO1 prog
   witness <- left ExecError (witnessOfR1CS inputs r1cs)
   return (inputs, outputs, witness)
@@ -128,8 +132,8 @@ optimizeWithInput program inputs = do
   return cs'
 
 -- computes witnesses
-computeWitness :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) (Witness n)
-computeWitness prog inputs = compile prog >>= left ExecError . witnessOfR1CS inputs . toR1CS
+-- computeWitness :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) (Witness n)
+-- computeWitness prog inputs = compile prog >>= left ExecError . witnessOfR1CS inputs . toR1CS
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
@@ -137,14 +141,14 @@ computeWitness prog inputs = compile prog >>= left ExecError . witnessOfR1CS inp
 --   (4) Check whether the R1CS result matches the interpreter result.
 execute :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
 execute prog rawInputs = do
-  inputs <- populateBitsOfInputs prog rawInputs
+  elab <- left ElabError (elaborate prog)
+  let inputs = Inputs.deserializeElab elab rawInputs
 
   r1cs <- toR1CS <$> compile prog
-
   (actualOutputs, actualWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputs)
 
   -- interpret the program to see if the output value is correct
-  expectedOutputs <- interpret prog inputs
+  expectedOutputs <- left InterpretError (Interpret.run elab inputs)
 
   when (actualOutputs /= expectedOutputs) $ do
     Left $ ExecError $ ExecOutputError expectedOutputs actualOutputs
@@ -158,29 +162,16 @@ execute prog rawInputs = do
 
   return actualOutputs
 
-populateBitsOfInputs :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
-populateBitsOfInputs prog rawInputs = do
-  elab <- left ElabError (elaborate prog)
-  populateBitsOfInputsElab elab rawInputs
+-- populateBitsOfInputs :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
+-- populateBitsOfInputs prog rawInputs = do
+--   elab <- left ElabError (elaborate prog)
+--   populateBitsOfInputsElab elab rawInputs
 
-populateBitsOfInputsElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (Error n) [n]
-populateBitsOfInputsElab elab rawInputs = do
-  erased <- eraseElab elab
-  let counters = erasedVarCounters erased
-
-  -- go through all raw inputs
-  -- sort and populate them with binary representation if it's a Number input
-  let (numInputs, boolInputs, bitArrays) =
-        foldl
-          ( \(ns, bs, arrays) (inputType, rawInput) ->
-              case inputType of
-                NumInput key -> (IntMap.insert key rawInput ns, bs, arrays <> Seq.fromList (toBits rawInput))
-                BoolInput key -> (ns, IntMap.insert key rawInput bs, arrays)
-          )
-          (mempty, mempty, mempty)
-          (Seq.zip (getInputSequence counters) (Seq.fromList rawInputs))
-
-  return (IntMap.elems numInputs <> IntMap.elems boolInputs <> toList bitArrays)
+-- populateBitsOfInputsElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (Error n) [n]
+-- populateBitsOfInputsElab elab rawInputs = do
+--   erased <- eraseElab elab
+--   let counters = erasedVarCounters erased
+--   return $ Inputs.flatten $ Inputs.deserialize counters rawInputs
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
@@ -189,11 +180,13 @@ eraseElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (Type
 eraseElab elab = left ElabError (Rewriting.run elab) >>= return . Erase.run
 
 interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
-interpretElab elab inputs = left (show . InterpretError) (Interpret.run elab inputs)
+interpretElab elab rawInputs =
+  let inputs = Inputs.deserializeElab elab rawInputs
+   in left (show . InterpretError) (Interpret.run elab inputs)
 
-genInputsOutputsWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String ([n], [n], Witness n)
+genInputsOutputsWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String (Inputs n, [n], Witness n)
 genInputsOutputsWitnessesElab elab rawInputs = do
-  inputs <- left show $ populateBitsOfInputsElab elab rawInputs
+  let inputs = Inputs.deserializeElab elab rawInputs
   outputs <- left (show . InterpretError) (Interpret.run elab inputs)
   r1cs <- toR1CS <$> left show (compileO1Elab elab)
   witness <- left (show . ExecError) (witnessOfR1CS inputs r1cs)

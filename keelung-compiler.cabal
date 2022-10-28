@@ -43,6 +43,7 @@ library
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Erase
+      Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
@@ -89,6 +90,7 @@ executable keelungc
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Erase
+      Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
@@ -149,6 +151,7 @@ executable profile
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Erase
+      Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
@@ -232,6 +235,7 @@ benchmark keelung-bench
       Keelung.Compiler.R1CS
       Keelung.Compiler.Syntax.Bits
       Keelung.Compiler.Syntax.Erase
+      Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util

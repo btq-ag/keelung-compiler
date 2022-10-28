@@ -22,6 +22,8 @@ import Data.Semiring (Semiring (..))
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (N (N))
+import Keelung.Compiler.Syntax.Inputs (Inputs)
+import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
 import Keelung.Syntax.Typed hiding (freeVars)
 import Keelung.Syntax.VarCounters
@@ -30,8 +32,8 @@ import Keelung.Types
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
-runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) ([n], Witness n)
-runAndOutputWitnesses (Elaborated expr comp) inputs = runM (compVarCounters comp) inputs $ do
+runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) ([n], Witness n)
+runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
@@ -50,27 +52,28 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM (compVarCounters comp
   forM_ (compAssertions comp) $ \e -> do
     values <- interpret e
     when (values /= [1]) $ do
-      let (freeInputVars, freeIntermediateVars) = freeVars e
-      inputBindings <- mapM (\var -> ("$I" <> show var,) <$> lookupInputVar var) $ IntSet.toList freeInputVars
+      let (freeNumInputVars, freeBoolInputVars, freeIntermediateVars) = freeVars e
+      numInputBindings <- mapM (\var -> ("$N" <> show var,) <$> lookupNumInputVar var) $ IntSet.toList freeNumInputVars
+      boolInputBindings <- mapM (\var -> ("$B" <> show var,) <$> lookupBoolInputVar var) $ IntSet.toList freeBoolInputVars
       intermediateBindings <- mapM (\var -> ("$" <> show var,) <$> lookupVar var) $ IntSet.toList freeIntermediateVars
       -- collect variables and their bindings in the expression and report them
-      throwError $ InterpretAssertionError e (inputBindings <> intermediateBindings)
+      throwError $ InterpretAssertionError e (numInputBindings <> boolInputBindings <> intermediateBindings)
 
   -- lastly interpret the expression and return the result
   interpret expr
 
 -- | Interpret a program with inputs.
-run :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) [n]
+run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) [n]
 run elab inputs = fst <$> runAndOutputWitnesses elab inputs
 
 -- | Interpret a program with inputs and run some additional checks.
-runAndCheck :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (InterpretError n) [n]
+runAndCheck :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) [n]
 runAndCheck elab inputs = do
   (output, witness) <- runAndOutputWitnesses elab inputs
 
   -- See if input size is valid
   let expectedInputSize = inputVarSize (compVarCounters (elabComp elab))
-  let actualInputSize = length inputs
+  let actualInputSize = Inputs.size inputs
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
@@ -104,9 +107,9 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
   interpret expr = case expr of
     Val val -> interpret val
     Var (NumVar n) -> pure <$> lookupVar n
-    Var (NumInputVar n) -> pure <$> lookupInputVar n
+    Var (NumInputVar n) -> pure <$> lookupNumInputVar n
     Var (BoolVar n) -> pure <$> lookupVar n
-    Var (BoolInputVar n) -> pure <$> lookupInputVar n
+    Var (BoolInputVar n) -> pure <$> lookupBoolInputVar n
     Array xs -> concat <$> mapM interpret xs
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
@@ -138,12 +141,13 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = ReaderT (IntMap n) (StateT (IntMap n) (Except (InterpretError n)))
+type M n = ReaderT (IntMap n, IntMap n) (StateT (IntMap n) (Except (InterpretError n)))
 
-runM :: VarCounters -> [n] -> M n a -> Either (InterpretError n) (a, Witness n)
-runM counters inputs p = runExcept (runStateT (runReaderT p inputBindings) mempty)
+runM :: Inputs n -> M n a -> Either (InterpretError n) (a, Witness n)
+runM inputs p = runExcept (runStateT (runReaderT p (numInputBindings, boolInputBindings)) mempty)
   where
-    inputBindings = IntMap.fromDistinctAscList $ zip (inputVars counters) inputs
+    numInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (Inputs.numInputs inputs)
+    boolInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (Inputs.boolInputs inputs)
 
 -- | A `Ref` is given a list of numbers
 -- but in reality it should be just a single number.
@@ -153,16 +157,23 @@ addBinding (NumVar var) val = modify (IntMap.insert var (head val))
 addBinding (BoolVar var) val = modify (IntMap.insert var (head val))
 addBinding _ _ = error "addBinding: not NumVar or BoolVar"
 
-lookupVar :: Show n => Int -> M n n
+lookupVar :: Show n => Var -> M n n
 lookupVar var = do
   bindings <- get
   case IntMap.lookup var bindings of
     Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val
 
-lookupInputVar :: Show n => Int -> M n n
-lookupInputVar var = do
-  bindings <- ask
+lookupNumInputVar :: Show n => Var -> M n n
+lookupNumInputVar var = do
+  bindings <- asks fst
+  case IntMap.lookup var bindings of
+    Nothing -> throwError $ InterpretUnboundVarError var bindings
+    Just val -> return val
+
+lookupBoolInputVar :: Show n => Var -> M n n
+lookupBoolInputVar var = do
+  bindings <- asks snd 
   case IntMap.lookup var bindings of
     Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val
@@ -172,31 +183,33 @@ lookupInputVar var = do
 -- | Collect free variables of an elaborated program (that should also be present in the witness)
 freeIntermediateVarsOfElab :: Elaborated -> IntSet
 freeIntermediateVarsOfElab (Elaborated value context) =
-  let (_, inOutputValue) = freeVars value
+  let (_, _, inOutputValue) = freeVars value
       inNumBindings =
         map
-          (\(Assignment (NumVar var) val) -> let (_, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
+          (\(Assignment (NumVar var) val) -> let (_, _, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
           (compNumAsgns context)
       inBoolBindings =
         map
-          (\(Assignment (BoolVar var) val) -> let (_, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
+          (\(Assignment (BoolVar var) val) -> let (_, _, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
           (compBoolAsgns context)
    in inOutputValue
         <> IntSet.unions inNumBindings
         <> IntSet.unions inBoolBindings
 
 -- | Collect variables of an expression and group them into sets of:
---    1. input variables
---    2. intermediate variables
-freeVars :: Expr -> (IntSet, IntSet)
+--    1. Number input variables
+--    2. Boolean input variables
+--    3. intermediate variables
+freeVars :: Expr -> (IntSet, IntSet, IntSet)
 freeVars expr = case expr of
   Val _ -> mempty
-  Var (NumVar n) -> (mempty, IntSet.singleton n)
-  Var (NumInputVar n) -> (IntSet.singleton n, mempty)
-  Var (BoolVar n) -> (mempty, IntSet.singleton n)
-  Var (BoolInputVar n) -> (IntSet.singleton n, mempty)
+  Var (NumVar n) -> (mempty, mempty, IntSet.singleton n)
+  Var (NumInputVar n) -> (IntSet.singleton n, mempty, mempty)
+  Var (BoolVar n) -> (mempty, mempty, IntSet.singleton n)
+  Var (BoolInputVar n) -> (mempty, IntSet.singleton n, mempty)
   Array xs ->
-    let (is, os) = unzip $ toList $ fmap freeVars xs in (IntSet.unions is, IntSet.unions os)
+    let (ns, bs, os) = unzip3 $ toList $ fmap freeVars xs
+     in (IntSet.unions ns, IntSet.unions bs, IntSet.unions os)
   Add x y -> freeVars x <> freeVars y
   Sub x y -> freeVars x <> freeVars y
   Mul x y -> freeVars x <> freeVars y

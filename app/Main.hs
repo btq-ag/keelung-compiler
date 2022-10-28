@@ -19,11 +19,13 @@ import Keelung.Compiler
     interpretElab,
     toR1CS,
   )
+import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Util (Witness)
 import Keelung.Field
 import Keelung.Syntax.Typed hiding (elaborate)
 import Main.Utf8 (withUtf8)
 import Option
+import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 
 main :: IO ()
 main = withUtf8 $ do
@@ -121,15 +123,15 @@ main = withUtf8 $ do
     outputInterpretedResult :: Serialize n => Either String [n] -> IO ()
     outputInterpretedResult = putStrLn . BSC.unpack . encode
 
-    outputInterpretedResultAndWriteFile :: (Serialize n, Integral n) => Either String ([n], [n], Witness n) -> IO ()
+    outputInterpretedResultAndWriteFile :: (Serialize n, Integral n) => Either String (Inputs n, [n], Witness n) -> IO ()
     outputInterpretedResultAndWriteFile result = do
-      -- print outputs 
+      -- print outputs
       outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
 
       case result of
         Left _ -> return ()
         Right (inputs, outputs, witness) -> do
-          BS.writeFile "witness.jsonl" (serializeInputAndWitness inputs outputs witness)
+          BS.writeFile "witness.jsonl" (serializeInputAndWitness (Inputs.flatten inputs) outputs witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do

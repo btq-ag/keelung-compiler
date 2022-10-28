@@ -7,14 +7,15 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Keelung.Compiler.R1CS (ExecError (..), witnessOfR1CS)
+import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1CS
 import Keelung.Syntax.VarCounters
 
-run :: (GaloisField n, Integral n) => R1CS n -> [n] -> Either (ExecError n) [n]
+run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (ExecError n) [n]
 run r1cs inputs = fst <$> run' r1cs inputs
 
 -- | Return interpreted outputs along with the witnesses
-run' :: (GaloisField n, Integral n) => R1CS n -> [n] -> Either (ExecError n) ([n], IntMap n)
+run' :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (ExecError n) ([n], IntMap n)
 run' r1cs inputs = do
   witness <- witnessOfR1CS inputs r1cs
   let varCounters = r1csVarCounters r1cs

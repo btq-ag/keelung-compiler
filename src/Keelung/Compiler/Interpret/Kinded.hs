@@ -16,6 +16,8 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung hiding (inputs, interpret, run)
+import Keelung.Compiler.Syntax.Inputs (Inputs)
+import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
 import Keelung.Syntax.VarCounters
 import Keelung.Types
@@ -23,7 +25,7 @@ import Keelung.Types
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs.
-run' :: (FreeVar t, Interpret t n, GaloisField n, Integral n) => Elaborated t -> [n] -> Either (InterpretError n) ([n], Witness n)
+run' :: (FreeVar t, Interpret t n, GaloisField n, Integral n) => Elaborated t -> Inputs n -> Either (InterpretError n) ([n], Witness n)
 run' elab inputs = runM elab inputs $ do
   let (Elaborated expr comp) = elab
   -- interpret the assignments first
@@ -53,18 +55,18 @@ run' elab inputs = runM elab inputs $ do
   interpret expr
 
 -- | Interpret a program with inputs.
-run :: (FreeVar t, Interpret t n, GaloisField n, Integral n) => Elaborated t -> [n] -> Either (InterpretError n) [n]
+run :: (FreeVar t, Interpret t n, GaloisField n, Integral n) => Elaborated t -> Inputs n -> Either (InterpretError n) [n]
 run elab inputs = fst <$> run' elab inputs
 
 -- | Interpret a program with inputs and run some additional checks.
-runAndCheck :: (FreeVar t, Interpret t n, GaloisField n, Integral n) => Elaborated t -> [n] -> Either (InterpretError n) [n]
+runAndCheck :: (FreeVar t, Interpret t n, GaloisField n, Integral n) => Elaborated t -> Inputs n -> Either (InterpretError n) [n]
 runAndCheck elab inputs = do
   (output, witness) <- run' elab inputs
 
   -- See if input size is valid
   let (Elaborated _ comp) = elab
   let expectedInputSize = inputVarSize (compVarCounters comp)
-  let actualInputSize = length inputs
+  let actualInputSize = Inputs.size inputs
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
@@ -224,12 +226,12 @@ instance (Interpret t n, GaloisField n) => Interpret (ArrM t) n where
 -- | The interpreter monad
 type M n = ReaderT (IntMap n, Heap) (StateT (Witness n) (Except (InterpretError n)))
 
-runM :: Elaborated t -> [n] -> M n a -> Either (InterpretError n) (a, Witness n)
-runM elab inputs p = runExcept (runStateT (runReaderT p (inputBindings, heap)) mempty)
+runM :: Elaborated t -> Inputs n -> M n a -> Either (InterpretError n) (a, Witness n)
+runM elab inputs p =
+  runExcept (runStateT (runReaderT p (Inputs.toIntMap inputs, heap)) mempty)
   where
     (Elaborated _ comp) = elab
     heap = compHeap comp
-    inputBindings = IntMap.fromDistinctAscList $ zip (inputVars (compVarCounters comp)) inputs
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do
