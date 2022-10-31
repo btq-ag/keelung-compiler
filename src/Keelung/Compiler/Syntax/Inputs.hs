@@ -29,6 +29,7 @@ deserialize counters rawInputs = do
               case inputType of
                 NumInput key -> (IntMap.insert key rawInput ns, bs, arrays <> Seq.fromList (toBits rawInput))
                 BoolInput key -> (ns, IntMap.insert key rawInput bs, arrays)
+                CustomInput width key -> (ns, bs, arrays)
           )
           (mempty, mempty, mempty)
           (Seq.zip (getInputSequence counters) (Seq.fromList rawInputs))

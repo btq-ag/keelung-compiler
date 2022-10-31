@@ -21,6 +21,7 @@ import Keelung.Syntax.VarCounters
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
+import qualified Test.VarLayout as VarBookkeep
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
@@ -40,6 +41,8 @@ main = hspec $ do
   describe "Interpreter" Interpreter.tests
 
   describe "Optimization" Optimization.tests
+
+  describe "Variable Bookkeeping" VarBookkeep.tests
 
   describe "Execution" $ do
     describe "Aggregate Signature" $ do
@@ -117,7 +120,7 @@ main = hspec $ do
               { csConstraints =
                   Set.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
-                csVarCounters = makeVarCounters 181 0 1 0 0 [NumInput 0],
+                csVarCounters = makeVarCounters 181 0 1 0 0 [NumInput 0] [],
                 csBinReps = IntMap.fromList [(0, (1, 181))]
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
@@ -136,7 +139,7 @@ main = hspec $ do
                         cadd 1 [(4, -1)],
                         cadd 0 [(5, 1)]
                       ],
-                csVarCounters = makeVarCounters 181 6 1 0 0 [NumInput 0],
+                csVarCounters = makeVarCounters 181 6 1 0 0 [NumInput 0] [],
                 csBinReps = IntMap.fromList [(6, (7, 181))]
               }
        in Compiler.compileOnly Basic.bits0 `shouldBe` Right cs
@@ -147,7 +150,7 @@ main = hspec $ do
               { csConstraints =
                   Set.fromList $ -- value of outputs
                     cmul [(364, 1)] [(3, 1)] (0 :: GF181, [(0, 1)]),
-                csVarCounters = makeVarCounters 181 1 2 0 0 [NumInput 0, NumInput 1],
+                csVarCounters = makeVarCounters 181 1 2 0 0 [NumInput 0, NumInput 1] [],
                 csBinReps = IntMap.fromList [(1, (3, 181)), (2, (184, 181))]
               }
        in Compiler.compileOnly Basic.bits1 `shouldBe` Right cs

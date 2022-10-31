@@ -183,6 +183,7 @@ test-suite keelung-test
   other-modules:
       Test.Interpreter
       Test.Optimization
+      Test.VarLayout
       AggregateSignature.Program
       AggregateSignature.Util
       Array
