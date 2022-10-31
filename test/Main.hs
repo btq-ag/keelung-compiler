@@ -39,7 +39,7 @@ main :: IO ()
 main = hspec $ do
   describe "Interpreter" Interpreter.tests
 
-  -- describe "Optimization" Optimization.tests
+  describe "Optimization" Optimization.tests
 
   describe "Execution" $ do
     describe "Aggregate Signature" $ do
