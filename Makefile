@@ -9,3 +9,6 @@ prof:
 	# generate Flamegraph 
 	cat profiling/exec.prof | ghc-prof-flamegraph > profiling/time.svg
 	cat profiling/exec.prof | ghc-prof-flamegraph --alloc > profiling/space.svg
+
+repl test: 
+	stack repl keelung-compiler:test:keelung-test
