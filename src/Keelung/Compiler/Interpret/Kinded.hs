@@ -10,20 +10,19 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bits (Bits (..))
+import Data.Foldable (toList)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
+import qualified Data.Sequence as Seq
 import Keelung hiding (inputs, interpret, run)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
 import Keelung.Syntax.VarCounters
 import Keelung.Types
-import Data.Foldable (toList)
-import qualified Data.Sequence as Seq
-
 
 --------------------------------------------------------------------------------
 
@@ -118,19 +117,17 @@ instance FreeVar Boolean where
     UEq x y -> (<>) <$> freeVars x <*> freeVars y
     IfBool x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
 
-instance FreeVar (UInt w) where 
-  freeVars val = case val of 
-    UInt _ n -> return mempty 
+instance FreeVar (UInt w) where
+  freeVars val = case val of
+    UInt _ _ -> return mempty
     UIntVar _ var -> return $ IntSet.singleton var
-    UIntInputVar _ _ -> return mempty 
+    UIntInputVar _ _ -> return mempty
     UIntAdd x y -> (<>) <$> freeVars x <*> freeVars y
     UIntSub x y -> (<>) <$> freeVars x <*> freeVars y
     UIntMul x y -> (<>) <$> freeVars x <*> freeVars y
     UIntDiv x y -> (<>) <$> freeVars x <*> freeVars y
     IfUInt p x y -> (<>) <$> freeVars p <*> ((<>) <$> freeVars x <*> freeVars y)
     ToUInt x -> freeVars x
-
-
 
 instance FreeVar () where
   freeVars expr = case expr of
@@ -239,10 +236,9 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
         [0] -> interpret y
         _ -> interpret x
 
-
 instance (GaloisField n, Integral n) => Interpret (UInt w) n where
   interpret val = case val of
-    UInt _ n -> interpret n 
+    UInt _ n -> interpret n
     UIntVar _ var -> pure <$> lookupVar var
     UIntInputVar width var -> pure <$> lookupUIntInputVar width var
     UIntAdd x y -> zipWith (+) <$> interpret x <*> interpret y
@@ -279,8 +275,6 @@ runM elab inputs p =
   where
     (Elaborated _ comp) = elab
     heap = compHeap comp
-    numInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (toList $ Inputs.numInputs inputs)
-    boolInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (toList $ Inputs.boolInputs inputs)
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do

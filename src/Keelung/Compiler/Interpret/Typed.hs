@@ -56,13 +56,14 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
       let (freeNumInputVars, freeBoolInputVars, freeCustomInputVars, freeIntermediateVars) = freeVars e
       numInputBindings <- mapM (\var -> ("$N" <> show var,) <$> lookupNumInputVar var) $ IntSet.toList freeNumInputVars
       boolInputBindings <- mapM (\var -> ("$B" <> show var,) <$> lookupBoolInputVar var) $ IntSet.toList freeBoolInputVars
-      -- let customInputBindings = 
-      --       map 
-      --         (\(width, vars) -> map (\var -> ("$U" <> show var,) <$> lookupUIntInputVar width var) (IntSet.toList vars))
-      --         (IntMap.toList freeCustomInputVars)
+      customInputBindings <-
+        concat
+          <$> mapM
+            (\(width, vars) -> mapM (\var -> ("$U" <> show var,) <$> lookupUIntInputVar width var) (IntSet.toList vars))
+            (IntMap.toList freeCustomInputVars)
       intermediateBindings <- mapM (\var -> ("$" <> show var,) <$> lookupVar var) $ IntSet.toList freeIntermediateVars
       -- collect variables and their bindings in the expression and report them
-      throwError $ InterpretAssertionError e (numInputBindings <> boolInputBindings <> intermediateBindings)
+      throwError $ InterpretAssertionError e (numInputBindings <> boolInputBindings <> customInputBindings <> intermediateBindings)
 
   -- lastly interpret the expression and return the result
   interpret expr

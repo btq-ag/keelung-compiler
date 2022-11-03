@@ -67,7 +67,7 @@ toR1CS cs =
     (csVarCounters cs)
     (lefts convertedConstratins)
     (csNumBinReps cs)
-    mempty
+    (csCustomBinReps cs)
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
 
