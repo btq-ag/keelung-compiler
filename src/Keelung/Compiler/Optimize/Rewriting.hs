@@ -6,22 +6,21 @@ module Keelung.Compiler.Optimize.Rewriting
   )
 where
 
+import Control.Arrow (left)
 import Control.Monad
 import Control.Monad.State
-import Keelung.Error (ElabError)
+import Keelung.Error (Error (ElabError))
 import Keelung.Syntax.Typed
-
--- run :: Elaborated -> Either ElabError Elaborated
--- run = return
 
 --------------------------------------------------------------------------------
 
-run :: Elaborated -> Either ElabError Elaborated
+run :: Elaborated -> Either Error Elaborated
 run (Elaborated expr comp) = do
-  ((), comp') <- runComp comp $ do
-    let assertions = compAssertions comp
-    assertions' <- filterM rewriteAssertEq assertions
-    modify' $ \st -> st {compAssertions = assertions'}
+  ((), comp') <- left ElabError $
+    runComp comp $ do
+      let assertions = compAssertions comp
+      assertions' <- filterM rewriteAssertEq assertions
+      modify' $ \st -> st {compAssertions = assertions'}
   return $ Elaborated expr comp'
 
 -- assert X `Eq` Y => X = Y

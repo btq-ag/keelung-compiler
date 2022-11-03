@@ -9,7 +9,6 @@ import Keelung.Compiler.Syntax.Bits (Bits (..))
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Syntax.VarCounters
-import Keelung.Types (Var)
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
@@ -37,7 +36,7 @@ run (T.Elaborated expr comp) =
                   ( \v ->
                       (v, (fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (getBitVar counters'' v 0), numWidth))
                   )
-                  (numInputVars counters'')
+                  (blendedNumInputVars counters'')
 
         return $
           TypeErased
@@ -81,41 +80,31 @@ eraseVal T.Unit = return []
 -- ┃         Output  ┃
 -- ┣─────────────────┫
 -- ┃   Number Input  ┃
+-- ┣─────────────────┫
+-- ┃   Custom Input  ┃
 -- ┣─────────────────┫─ ─ ─ ─ ─ ─ ─ ─
 -- ┃  Boolean Input  ┃               │
--- ┣─────────────────┫   Contiguous chunk of bits
+-- ┣─────────────────┫
 -- ┃  Binary Rep of  ┃
--- ┃   Number Input  ┃               │
+-- ┃   Number Input  ┃   Contiguous chunk of bits
+-- ┣─────────────────┫
+-- ┃  Binary Rep of  ┃
+-- ┃   Custom Input  ┃               │
 -- ┣─────────────────┫─ ─ ─ ─ ─ ─ ─ ─
 -- ┃   Intermediate  ┃
 -- ┗━━━━━━━━━━━━━━━━━┛
 --
 eraseRef' :: T.Ref -> M n Int
-eraseRef' ref = case ref of
-  T.NumVar n -> relocateIntermediateVar n
-  T.NumInputVar n -> relocateNumberInputVar n
-  -- we don't need to mark intermediate Boolean variables
-  -- and impose the Boolean constraint on them ($A * $A = $A)
-  -- because this property should be guaranteed by the source of its value
-  T.BoolVar n -> relocateIntermediateVar n
-  T.BoolInputVar n -> relocateBooleanInputVar n
-  where
-    relocateNumberInputVar :: Var -> M n Var
-    relocateNumberInputVar var = do
-      offset <- gets outputVarSize
-      return $ var + offset
-
-    relocateBooleanInputVar :: Var -> M n Var
-    relocateBooleanInputVar var = do
-      counters <- get
-      return $ var + outputVarSize counters + numInputVarSize counters
-
-    -- we need to relocate intermediate variables
-    -- so that we can place input variables and output variables in front of them
-    relocateIntermediateVar :: Int -> M n Int
-    relocateIntermediateVar n = do
-      offset <- gets pinnedVarSize
-      return (offset + n)
+eraseRef' ref = do 
+  counters <- get
+  return $ case ref of
+    T.NumVar n -> blendIntermediateVar counters n
+    T.NumInputVar n -> blendNumInputVar counters n
+    -- we don't need to mark intermediate Boolean variables
+    -- and impose the Boolean constraint on them ($A * $A = $A)
+    -- because this property should be guaranteed by the source of its value
+    T.BoolVar n -> blendIntermediateVar counters n
+    T.BoolInputVar n -> blendBoolInputVar counters n
 
 eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
 eraseRef ref = Var <$> eraseRef' ref

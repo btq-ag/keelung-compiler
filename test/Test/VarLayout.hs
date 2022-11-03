@@ -38,7 +38,7 @@ tests = do
           inputVars counters `shouldBe` [4 .. 182 * 5 + 1 * 4 + 4 - 1]
           inputVarsRange counters `shouldBe` (4, 182 * 5 + 1 * 4 + 4)
           boolVarsRange counters `shouldBe` (9, 9 + 4 + 181 * 5)
-          numInputVars counters `shouldBe` [4, 8, 9, 10, 11]
+          blendedNumInputVars counters `shouldBe` [4, 8, 9, 10, 11]
         it "Input sequence" $ do
           getInputSequence counters
             `shouldBe` Seq.fromList

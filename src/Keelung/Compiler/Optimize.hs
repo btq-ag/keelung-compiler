@@ -5,7 +5,6 @@
 
 module Keelung.Compiler.Optimize where
 
-import Control.Arrow (left)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
@@ -17,14 +16,15 @@ import Keelung.Compiler.Optimize.Monad
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
+import Keelung.Error (Error)
 import Keelung.Monad (Comp)
 import qualified Keelung.Syntax.Typed as C
 import Keelung.Syntax.VarCounters
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: Elaborable t => Comp t -> Either String C.Elaborated
-elaborateAndRewrite prog = left show (elaborate prog >>= Rewriting.run)
+elaborateAndRewrite :: Elaborable t => Comp t -> Either Error C.Elaborated
+elaborateAndRewrite prog = elaborate prog >>= Rewriting.run
 
 optimizeWithWitness :: (GaloisField n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimizeWithWitness witness cs =

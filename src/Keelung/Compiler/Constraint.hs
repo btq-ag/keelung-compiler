@@ -137,7 +137,7 @@ data ConstraintSystem n = ConstraintSystem
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
 numberOfConstraints (ConstraintSystem cs binReps counters) =
-  Set.size cs + boolVarSize counters + IntMap.size binReps
+  Set.size cs + totalBoolVarSize counters + IntMap.size binReps
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show (ConstraintSystem constraints binReps counters) =

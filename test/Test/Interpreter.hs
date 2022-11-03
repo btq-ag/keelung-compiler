@@ -25,7 +25,7 @@ kinded prog rawInputs = do
 
 typed :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
 typed prog rawInputs = do
-  elab <- left ElabError (elaborate prog)
+  elab <- left LangError (elaborate prog)
   let inputs = Inputs.deserializeElab elab rawInputs
   left InterpretError (Typed.runAndCheck elab inputs)
 
