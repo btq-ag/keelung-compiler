@@ -13,7 +13,7 @@ import Keelung.Syntax.VarCounters
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation counters numAsgns boolAsgns assertions = comp
+  let T.Computation counters numAsgns boolAsgns _ assertions = comp
       proxy = 0
    in runM counters $ do
         -- update VarCounters.varNumWidth before type erasure
@@ -83,6 +83,7 @@ runM = flip evalState
 eraseVal :: GaloisField n => T.Val -> M n [Expr n]
 eraseVal (T.Integer n) = return [Val (fromInteger n)]
 eraseVal (T.Rational n) = return [Val (fromRational n)]
+-- eraseVal (T.Unsigned _ n) = return [Val (fromInteger n)]
 eraseVal (T.Boolean False) = return [Val 0]
 eraseVal (T.Boolean True) = return [Val 1]
 eraseVal T.Unit = return []

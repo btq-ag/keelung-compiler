@@ -21,6 +21,7 @@ import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
 import Keelung.Syntax.VarCounters
 import Keelung.Types
+import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
@@ -232,8 +233,8 @@ runM elab inputs p =
   where
     (Elaborated _ comp) = elab
     heap = compHeap comp
-    numInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (Inputs.numInputs inputs)
-    boolInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (Inputs.boolInputs inputs)
+    numInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (toList $ Inputs.numInputs inputs)
+    boolInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (toList $ Inputs.boolInputs inputs)
 
 lookupVar :: Show n => Int -> M n n
 lookupVar var = do

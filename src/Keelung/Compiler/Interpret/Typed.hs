@@ -19,13 +19,14 @@ import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
+import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
-import Keelung.Syntax.Typed hiding (freeVars)
+import Keelung.Syntax.Typed
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
@@ -100,6 +101,7 @@ instance GaloisField n => Interpret Bool n where
 instance GaloisField n => Interpret Val n where
   interpret (Integer n) = return [fromIntegral n]
   interpret (Rational n) = return [fromRational n]
+  -- interpret (Unsigned _ n) = return [fromIntegral n]
   interpret (Boolean b) = interpret b
   interpret Unit = return []
 
@@ -110,6 +112,8 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     Var (NumInputVar n) -> pure <$> lookupNumInputVar n
     Var (BoolVar n) -> pure <$> lookupVar n
     Var (BoolInputVar n) -> pure <$> lookupBoolInputVar n
+    -- Var (UIntVar _ n) -> pure <$> lookupVar n
+    -- Var (UIntInputVar width n) -> pure <$> lookupUIntInputVar width n
     Array xs -> concat <$> mapM interpret xs
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
@@ -141,13 +145,10 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = ReaderT (IntMap n, IntMap n) (StateT (IntMap n) (Except (InterpretError n)))
+type M n = ReaderT (Inputs n) (StateT (IntMap n) (Except (InterpretError n)))
 
 runM :: Inputs n -> M n a -> Either (InterpretError n) (a, Witness n)
-runM inputs p = runExcept (runStateT (runReaderT p (numInputBindings, boolInputBindings)) mempty)
-  where
-    numInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (Inputs.numInputs inputs)
-    boolInputBindings = IntMap.fromDistinctAscList $ zip [0 ..] (Inputs.boolInputs inputs)
+runM inputs p = runExcept (runStateT (runReaderT p inputs) mempty)
 
 -- | A `Ref` is given a list of numbers
 -- but in reality it should be just a single number.
@@ -166,17 +167,27 @@ lookupVar var = do
 
 lookupNumInputVar :: Show n => Var -> M n n
 lookupNumInputVar var = do
-  bindings <- asks fst
-  case IntMap.lookup var bindings of
-    Nothing -> throwError $ InterpretUnboundVarError var bindings
+  inputs <- asks Inputs.numInputs
+  case inputs Seq.!? var of
+    Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
     Just val -> return val
 
 lookupBoolInputVar :: Show n => Var -> M n n
 lookupBoolInputVar var = do
-  bindings <- asks snd
-  case IntMap.lookup var bindings of
-    Nothing -> throwError $ InterpretUnboundVarError var bindings
+  inputs <- asks Inputs.boolInputs
+  case inputs Seq.!? var of
+    Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
     Just val -> return val
+
+lookupUIntInputVar :: Show n => Int -> Var -> M n n
+lookupUIntInputVar width var = do
+  inputss <- asks Inputs.uintInputs
+  case IntMap.lookup width inputss of
+    Nothing -> error ("lookupUIntInputVar: no UInt of such bit width: " <> show width)
+    Just inputs ->
+      case inputs Seq.!? var of
+        Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
+        Just val -> return val
 
 --------------------------------------------------------------------------------
 
