@@ -3,6 +3,7 @@ module Keelung.Compiler.Syntax.Erase (run) where
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
 import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.Bits (Bits (..))
@@ -29,7 +30,7 @@ run (T.Elaborated expr comp) =
         -- retrieve updated Context and return it
         counters'' <- get
 
-        -- associate input variables with their corresponding binary representation 
+        -- associate input variables with their corresponding binary representation
         let numBinReps =
               IntMap.fromList $
                 map
@@ -38,14 +39,16 @@ run (T.Elaborated expr comp) =
                   )
                   (blendedNumInputVars counters'')
 
-        -- let customBinReps = 
-        --       IntMap.mapWithKey 
-        --         ( \v ->
-        --             (v, (fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (getBitVar counters'' v 0), numWidth))
-        --         )
-        --         (blendedCustomInputVars counters'')
-
-
+        let customBinReps =
+              fmap
+                ( IntMap.fromList
+                    . map
+                      ( \var ->
+                          (var, fromMaybe (error ("Panic: cannot query bits of var $" <> show var)) (getBitVar counters'' var 0))
+                      )
+                    . IntSet.toList
+                )
+                (blendedCustomInputVars counters'')
 
         return $
           TypeErased
@@ -54,7 +57,8 @@ run (T.Elaborated expr comp) =
               erasedVarCounters = counters'',
               erasedAssertions = assertions',
               erasedAssignments = assignments,
-              erasedBinReps = numBinReps
+              erasedBinReps = numBinReps,
+              erasedCustomBinReps = customBinReps
             }
   where
     -- proxy trick for devising the bit width of field elements

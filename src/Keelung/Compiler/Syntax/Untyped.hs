@@ -119,11 +119,14 @@ data TypeErased n = TypeErased
     erasedAssignments :: ![Assignment n],
     -- | Pairs of Number input variables and start index of binary representation
     --    [(inputIndex, binRepIndex)]
-    erasedBinReps :: IntMap Var
+    erasedBinReps :: IntMap Var,
+    -- | Pairs of custom input variables and start index of binary representation
+    --    [(bitWidth,[(inputIndex, binRepIndex)])]
+    erasedCustomBinReps :: IntMap (IntMap Var)
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr counters assertions assignments numBinReps) =
+  show (TypeErased expr counters assertions assignments numBinReps customBinReps) =
     "TypeErased {\n\
     \  expression: "
       <> show (fmap (fmap N) expr)
@@ -163,7 +166,7 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
                             (uncurry (showBinRepConstraint bitWidth))
                             (IntMap.toList pairs)
                       )
-                      (IntMap.toList mempty)
+                      (IntMap.toList customBinReps)
                 )
         where
           showBinRepConstraint 2 var binRep =
@@ -193,4 +196,3 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
               <> show (width - 1)
               <> "$"
               <> show (binRep + width - 1)
-
