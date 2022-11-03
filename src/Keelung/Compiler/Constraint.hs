@@ -12,7 +12,6 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import qualified Data.List as List
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -128,19 +127,23 @@ varsInConstraints = IntSet.unions . Set.map varsInConstraint
 data ConstraintSystem n = ConstraintSystem
   { -- | Constraints
     csConstraints :: !(Set (Constraint n)),
-    -- | Binary representation of input variables
-    csBinReps :: IntMap (Var, Int),
+    -- | Binary representation of Number input variables
+    --   [(inputIndex, binRepIndex)]
+    csNumBinReps :: IntMap Var,
+    -- | Binary representation of custom output variables
+    --   [(bitWidth, [(inputIndex, binRepIndex)])]
+    csCustomBinReps :: IntMap (IntMap Var),
     csVarCounters :: !VarCounters
   }
   deriving (Eq, Generic, NFData)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem cs binReps counters) =
-  Set.size cs + totalBoolVarSize counters + IntMap.size binReps
+numberOfConstraints (ConstraintSystem cs _ _ counters) =
+  Set.size cs + totalBoolVarSize counters + numInputVarSize counters + totalCustomInputSize counters
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints binReps counters) =
+  show (ConstraintSystem constraints numBinReps customBinReps counters) =
     "ConstraintSystem {\n\
     \  constraints ("
       <> show (length constraints)
@@ -149,7 +152,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> "\n"
       <> indent (show counters)
       <> showBooleanVars
-      <> showBinReps
+      <> showBinRepConstraints
       <> "\n}"
     where
       showConstraints = unlines . map (\c -> "    " <> show c)
@@ -160,20 +163,54 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               then ""
               else "  boolean variables: $" <> show start <> " .. $" <> show (end - 1) <> "\n"
 
-      showBinReps =
-        if IntMap.null binReps
+      totalBinRepConstraintSize = numInputVarSize counters + totalCustomInputSize counters
+      numBitWidth = getNumBitWidth counters
+
+      showBinRepConstraints =
+        if totalBinRepConstraintSize == 0
           then ""
           else
-            "  Binary representation of input variables: "
-              <> showList'
+            "  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n"
+              <> unlines
                 ( map
-                    ( \(v, (b, n)) ->
-                        "$" <> show v <> " = $" <> show b <> " + 2$" <> show (b + 1) <> " + ... + 2^" <> show (n - 1) <> "$" <> show (b + n - 1)
-                    )
-                    (IntMap.toList binReps)
+                    (uncurry (showBinRepConstraint numBitWidth))
+                    (IntMap.toList numBinReps)
+                    ++ concatMap
+                      ( \(bitWidth, pairs) ->
+                          map
+                            (uncurry (showBinRepConstraint bitWidth))
+                            (IntMap.toList pairs)
+                      )
+                      (IntMap.toList customBinReps)
                 )
-              <> "\n"
-      showList' ys = "[" <> List.intercalate ", " ys <> "]"
+        where
+          showBinRepConstraint 2 var binRep =
+            "    $"
+              <> show var
+              <> " = $"
+              <> show binRep
+              <> " + 2$"
+              <> show (binRep + 1)
+          showBinRepConstraint 3 var binRep =
+            "    $"
+              <> show var
+              <> " = $"
+              <> show binRep
+              <> " + 2$"
+              <> show (binRep + 1)
+              <> " + 4$"
+              <> show (binRep + 2)
+          showBinRepConstraint width var binRep =
+            "    $"
+              <> show var
+              <> " = $"
+              <> show binRep
+              <> " + 2$"
+              <> show (binRep + 1)
+              <> " + ... + 2^"
+              <> show (width - 1)
+              <> "$"
+              <> show (binRep + width - 1)
 
 -- | Sequentially renumber term variables '0..max_var'.  Return
 --   renumbered constraints, together with the total number of
@@ -183,7 +220,8 @@ renumberConstraints :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
 renumberConstraints cs =
   ConstraintSystem
     (Set.map renumberConstraint (csConstraints cs))
-    (csBinReps cs) -- no need to renumber binary representations
+    (csNumBinReps cs) -- pinned, no need to renumber
+    (csCustomBinReps cs) -- pinned, no need to renumber
     (setIntermediateVarSize (IntSet.size newIntermediateVars) counters)
   where
     counters = csVarCounters cs

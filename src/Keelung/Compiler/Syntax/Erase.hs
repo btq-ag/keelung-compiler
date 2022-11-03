@@ -16,7 +16,7 @@ run (T.Elaborated expr comp) =
       proxy = 0
    in runM counters $ do
         -- update VarCounters.varNumWidth before type erasure
-        let counters' = setNumWidth (bitSize proxy) $ setOutputVarSize (lengthOfExpr expr) counters
+        let counters' = setNumBitWidth (bitSize proxy) $ setOutputVarSize (lengthOfExpr expr) counters
         put counters'
         -- start type erasure
         expr' <- eraseExpr expr
@@ -29,14 +29,23 @@ run (T.Elaborated expr comp) =
         -- retrieve updated Context and return it
         counters'' <- get
 
-        let numWidth = getNumWidth counters''
-        let binReps =
+        -- associate input variables with their corresponding binary representation 
+        let numBinReps =
               IntMap.fromList $
                 map
                   ( \v ->
-                      (v, (fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (getBitVar counters'' v 0), numWidth))
+                      (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (getBitVar counters'' v 0))
                   )
                   (blendedNumInputVars counters'')
+
+        -- let customBinReps = 
+        --       IntMap.mapWithKey 
+        --         ( \v ->
+        --             (v, (fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (getBitVar counters'' v 0), numWidth))
+        --         )
+        --         (blendedCustomInputVars counters'')
+
+
 
         return $
           TypeErased
@@ -45,7 +54,7 @@ run (T.Elaborated expr comp) =
               erasedVarCounters = counters'',
               erasedAssertions = assertions',
               erasedAssignments = assignments,
-              erasedBinReps = binReps
+              erasedBinReps = numBinReps
             }
   where
     -- proxy trick for devising the bit width of field elements
@@ -95,7 +104,7 @@ eraseVal T.Unit = return []
 -- ┗━━━━━━━━━━━━━━━━━┛
 --
 eraseRef' :: T.Ref -> M n Int
-eraseRef' ref = do 
+eraseRef' ref = do
   counters <- get
   return $ case ref of
     T.NumVar n -> blendIntermediateVar counters n
@@ -169,7 +178,7 @@ bitValue expr i = case expr of
   Var var -> do
     counters <- get
     -- if the index 'i' overflows or underflows, wrap it around
-    let numWidth = getNumWidth counters
+    let numWidth = getNumBitWidth counters
     let i' = i `mod` numWidth
     -- bit variable corresponding to the variable 'var' and the index 'i''
     case getBitVar counters var i' of

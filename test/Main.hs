@@ -121,7 +121,8 @@ main = hspec $ do
                   Set.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
                 csVarCounters = makeVarCounters 181 0 1 0 0 [NumInput 0] [],
-                csBinReps = IntMap.fromList [(0, (1, 181))]
+                csNumBinReps = IntMap.fromList [(0, 1)],
+                csCustomBinReps = mempty
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
 
@@ -140,7 +141,8 @@ main = hspec $ do
                         cadd 0 [(5, 1)]
                       ],
                 csVarCounters = makeVarCounters 181 6 1 0 0 [NumInput 0] [],
-                csBinReps = IntMap.fromList [(6, (7, 181))]
+                csNumBinReps = IntMap.fromList [(6, 7)],
+                csCustomBinReps = mempty
               }
        in Compiler.compileOnly Basic.bits0 `shouldBe` Right cs
 
@@ -151,7 +153,8 @@ main = hspec $ do
                   Set.fromList $ -- value of outputs
                     cmul [(364, 1)] [(3, 1)] (0 :: GF181, [(0, 1)]),
                 csVarCounters = makeVarCounters 181 1 2 0 0 [NumInput 0, NumInput 1] [],
-                csBinReps = IntMap.fromList [(1, (3, 181)), (2, (184, 181))]
+                csNumBinReps = IntMap.fromList [(1, 3), (2, 184)],
+                csCustomBinReps = mempty
               }
        in Compiler.compileOnly Basic.bits1 `shouldBe` Right cs
 

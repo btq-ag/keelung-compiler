@@ -47,7 +47,8 @@ tests = do
                         cadd 11179 [(12, -1)]
                       ],
                 csVarCounters = makeVarCounters 0 0 12 0 5 [] [],
-                csBinReps = mempty
+                csNumBinReps = mempty,
+                csCustomBinReps = mempty
               }
        in optimize1 (cs :: ConstraintSystem GF181) `shouldNotBe` cs
 
@@ -60,7 +61,8 @@ tests = do
                     cadd 0 [(0, 1), (1, 1), (4, 1)]
                       ++ cadd 0 [(2, 1), (3, 1), (4, 1)],
                 csVarCounters = makeVarCounters 0 0 4 0 1 [] [],
-                csBinReps = mempty
+                csNumBinReps = mempty,
+                csCustomBinReps = mempty
               }
           cs' =
             ConstraintSystem
@@ -68,7 +70,8 @@ tests = do
                   Set.fromList $
                     cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)],
                 csVarCounters = makeVarCounters 0 0 4 0 0 [] [],
-                csBinReps = mempty
+                csNumBinReps = mempty,
+                csCustomBinReps = mempty
               }
        in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -80,14 +83,16 @@ tests = do
                     cmul [(3, 1)] [(2, 1)] (42, []) --- $3 * $2 = 42
                       ++ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
                 csVarCounters = makeVarCounters 0 0 3 0 1 [] [],
-                csBinReps = mempty
+                csNumBinReps = mempty,
+                csCustomBinReps = mempty
               }
           cs' =
             ConstraintSystem
               { csConstraints =
                   Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
                 csVarCounters = makeVarCounters 0 0 3 0 0 [] [],
-                csBinReps = mempty
+                csNumBinReps = mempty,
+                csCustomBinReps = mempty
               }
        in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -99,14 +104,16 @@ tests = do
                     cadd 0 [(3, 1), (0, 1), (1, 1)] --- 0 = $3 + $0 + $1
                       ++ cmul [(2, 1)] [(3, 1)] (42, []), --- $2 * $3 = 42
                 csVarCounters = makeVarCounters 0 0 3 0 1 [] [],
-                csBinReps = mempty
+                csNumBinReps = mempty,
+                csCustomBinReps = mempty
               }
           cs' =
             ConstraintSystem
               { csConstraints =
                   Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
                 csVarCounters = makeVarCounters 0 0 3 0 0 [] [],
-                csBinReps = mempty
+                csNumBinReps = mempty,
+                csCustomBinReps = mempty
               }
        in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
@@ -118,7 +125,8 @@ tests = do
                     cadd 0 [(4, 1), (0, 1), (1, 1)] --- 0 = $4 + $0 + $1
                       ++ cmul [(2, 1)] [(3, 1)] (0, [(4, 1)]), --- $2 * $3 = $4
                 csVarCounters = makeVarCounters 0 0 4 0 1 [] [],
-                csBinReps = mempty
+                csNumBinReps = mempty,
+                csCustomBinReps = mempty
               }
           cs' =
             ConstraintSystem
@@ -126,7 +134,8 @@ tests = do
                   Set.fromList $
                     cmul [(2, 1)] [(3, 1)] (0, [(0, -1), (1, -1)]), --- $2 * $3 = - $0 - $1
                 csVarCounters = makeVarCounters 0 0 4 0 0 [] [],
-                csBinReps = mempty
+                csNumBinReps = mempty,
+                csCustomBinReps = mempty
               }
        in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 

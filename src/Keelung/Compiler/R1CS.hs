@@ -15,6 +15,8 @@ import qualified Data.Set as Set
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint hiding (numberOfConstraints)
 import Keelung.Compiler.Optimize (optimizeWithWitness)
+import Keelung.Compiler.Syntax.Inputs (Inputs)
+import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
@@ -23,8 +25,6 @@ import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
 import Keelung.Field (N (..))
 import Keelung.Syntax.VarCounters
 import Keelung.Types
-import Keelung.Compiler.Syntax.Inputs (Inputs)
-import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -66,7 +66,8 @@ toR1CS cs =
     (rights convertedConstratins)
     (csVarCounters cs)
     (lefts convertedConstratins)
-    (csBinReps cs)
+    (csNumBinReps cs)
+    mempty
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
 
@@ -108,7 +109,8 @@ fromR1CS r1cs =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
       csVarCounters = r1csVarCounters r1cs,
-      csBinReps = r1csBinReps r1cs
+      csNumBinReps = r1csNumBinReps r1cs,
+      csCustomBinReps = r1csCustomBinReps r1cs
     }
   where
     fromR1C (R1C aX bX cX) =

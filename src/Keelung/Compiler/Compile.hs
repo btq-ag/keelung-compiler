@@ -24,7 +24,7 @@ import Keelung.Types
 
 -- | Compile an untyped expression to a constraint system
 run :: GaloisField n => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs counters assertions assignments binReps) = runM counters $ do
+run (TypeErased untypedExprs counters assertions assignments numBinReps) = runM counters $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
   forM_ (zip (outputVars counters) untypedExprs) $ \(var, expr) -> do
     encode var expr
@@ -39,7 +39,8 @@ run (TypeErased untypedExprs counters assertions assignments binReps) = runM cou
   return
     ( ConstraintSystem
         constraints
-        binReps
+        numBinReps
+        mempty
         counters
     )
 

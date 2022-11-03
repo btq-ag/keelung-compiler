@@ -15,7 +15,6 @@ where
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.List as List
 import Data.Sequence (Seq (..))
 import Keelung.Field (N (..))
 import Keelung.Syntax.VarCounters
@@ -118,12 +117,13 @@ data TypeErased n = TypeErased
     erasedAssertions :: ![Expr n],
     -- | Assignments after type erasure
     erasedAssignments :: ![Assignment n],
-    -- | Pairs of Number input variables and their binary representation
-    erasedBinReps :: IntMap (Var, Int)
+    -- | Pairs of Number input variables and start index of binary representation
+    --    [(inputIndex, binRepIndex)]
+    erasedBinReps :: IntMap Var
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr counters assertions assignments binReps) =
+  show (TypeErased expr counters assertions assignments numBinReps) =
     "TypeErased {\n\
     \  expression: "
       <> show (fmap (fmap N) expr)
@@ -142,22 +142,55 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
       <> " .. $"
       <> show (snd (boolVarsRange counters) - 1)
       <> "\n"
-      <> showBinReps
+      <> showBinRepConstraints
       <> "\n\
          \}"
     where
-      showBinReps =
-        if IntMap.null binReps
+      numBitWidth = getNumBitWidth counters
+      totalBinRepConstraintSize = numInputVarSize counters + totalCustomInputSize counters
+      showBinRepConstraints =
+        if totalBinRepConstraintSize == 0
           then ""
           else
-            "  Binary representation of input variables: "
-              <> showList'
+            "  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n"
+              <> unlines
                 ( map
-                    ( \(v, (b, n)) ->
-                        "$" <> show v <> " = $" <> show b <> " + 2$" <> show (b + 1) <> " + ... + 2^" <> show (n - 1) <> "$" <> show (b + n - 1)
-                    )
-                    (IntMap.toList binReps)
+                    (uncurry (showBinRepConstraint numBitWidth))
+                    (IntMap.toList numBinReps)
+                    ++ concatMap
+                      ( \(bitWidth, pairs) ->
+                          map
+                            (uncurry (showBinRepConstraint bitWidth))
+                            (IntMap.toList pairs)
+                      )
+                      (IntMap.toList mempty)
                 )
-              <> "\n"
+        where
+          showBinRepConstraint 2 var binRep =
+            "    $"
+              <> show var
+              <> " = $"
+              <> show binRep
+              <> " + 2$"
+              <> show (binRep + 1)
+          showBinRepConstraint 3 var binRep =
+            "    $"
+              <> show var
+              <> " = $"
+              <> show binRep
+              <> " + 2$"
+              <> show (binRep + 1)
+              <> " + 4$"
+              <> show (binRep + 2)
+          showBinRepConstraint width var binRep =
+            "    $"
+              <> show var
+              <> " = $"
+              <> show binRep
+              <> " + 2$"
+              <> show (binRep + 1)
+              <> " + ... + 2^"
+              <> show (width - 1)
+              <> "$"
+              <> show (binRep + width - 1)
 
-      showList' ys = "[" <> List.intercalate ", " ys <> "]"
