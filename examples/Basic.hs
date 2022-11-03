@@ -262,14 +262,14 @@ chainingOR n = foldl Or false <$> inputs n
 
 bits0 :: Comp (Arr Boolean)
 bits0 = do
-  x <- input
-  let c = 3
+  x <- inputNum
+  let c = 3 :: Number
   return $ toArray [x !!! 0, x !!! 1, x !!! 2, c !!! 0, c !!! 1, c !!! 2]
 
 bits1 :: Comp (Arr Boolean)
 bits1 = do
-  x <- input
-  y <- input
+  x <- inputNum
+  y <- inputNum
   return $ toArray [(x !!! 0) `And` (y !!! (-1))]
 
 -- Formula: (0°C × 9/5) + 32 = 32°F

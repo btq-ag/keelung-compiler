@@ -53,9 +53,13 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   forM_ (compAssertions comp) $ \e -> do
     values <- interpret e
     when (values /= [1]) $ do
-      let (freeNumInputVars, freeBoolInputVars, freeIntermediateVars) = freeVars e
+      let (freeNumInputVars, freeBoolInputVars, freeCustomInputVars, freeIntermediateVars) = freeVars e
       numInputBindings <- mapM (\var -> ("$N" <> show var,) <$> lookupNumInputVar var) $ IntSet.toList freeNumInputVars
       boolInputBindings <- mapM (\var -> ("$B" <> show var,) <$> lookupBoolInputVar var) $ IntSet.toList freeBoolInputVars
+      -- let customInputBindings = 
+      --       map 
+      --         (\(width, vars) -> map (\var -> ("$U" <> show var,) <$> lookupUIntInputVar width var) (IntSet.toList vars))
+      --         (IntMap.toList freeCustomInputVars)
       intermediateBindings <- mapM (\var -> ("$" <> show var,) <$> lookupVar var) $ IntSet.toList freeIntermediateVars
       -- collect variables and their bindings in the expression and report them
       throwError $ InterpretAssertionError e (numInputBindings <> boolInputBindings <> intermediateBindings)
@@ -101,7 +105,7 @@ instance GaloisField n => Interpret Bool n where
 instance GaloisField n => Interpret Val n where
   interpret (Integer n) = return [fromIntegral n]
   interpret (Rational n) = return [fromRational n]
-  -- interpret (Unsigned _ n) = return [fromIntegral n]
+  interpret (Unsigned _ n) = return [fromIntegral n]
   interpret (Boolean b) = interpret b
   interpret Unit = return []
 
@@ -112,8 +116,8 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     Var (NumInputVar n) -> pure <$> lookupNumInputVar n
     Var (BoolVar n) -> pure <$> lookupVar n
     Var (BoolInputVar n) -> pure <$> lookupBoolInputVar n
-    -- Var (UIntVar _ n) -> pure <$> lookupVar n
-    -- Var (UIntInputVar width n) -> pure <$> lookupUIntInputVar width n
+    Var (UIntVar _ n) -> pure <$> lookupVar n
+    Var (UIntInputVar width n) -> pure <$> lookupUIntInputVar width n
     Array xs -> concat <$> mapM interpret xs
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
@@ -194,14 +198,14 @@ lookupUIntInputVar width var = do
 -- | Collect free variables of an elaborated program (that should also be present in the witness)
 freeIntermediateVarsOfElab :: Elaborated -> IntSet
 freeIntermediateVarsOfElab (Elaborated value context) =
-  let (_, _, inOutputValue) = freeVars value
+  let (_, _, _, inOutputValue) = freeVars value
       inNumBindings =
         map
-          (\(Assignment (NumVar var) val) -> let (_, _, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
+          (\(Assignment (NumVar var) val) -> let (_, _, _, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
           (compNumAsgns context)
       inBoolBindings =
         map
-          (\(Assignment (BoolVar var) val) -> let (_, _, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
+          (\(Assignment (BoolVar var) val) -> let (_, _, _, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
           (compBoolAsgns context)
    in inOutputValue
         <> IntSet.unions inNumBindings
@@ -210,17 +214,21 @@ freeIntermediateVarsOfElab (Elaborated value context) =
 -- | Collect variables of an expression and group them into sets of:
 --    1. Number input variables
 --    2. Boolean input variables
---    3. intermediate variables
-freeVars :: Expr -> (IntSet, IntSet, IntSet)
+--    3. Custom input variables
+--    4. intermediate variables
+freeVars :: Expr -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVars expr = case expr of
   Val _ -> mempty
-  Var (NumVar n) -> (mempty, mempty, IntSet.singleton n)
-  Var (NumInputVar n) -> (IntSet.singleton n, mempty, mempty)
-  Var (BoolVar n) -> (mempty, mempty, IntSet.singleton n)
-  Var (BoolInputVar n) -> (mempty, IntSet.singleton n, mempty)
+  Var (NumVar n) -> (mempty, mempty, mempty, IntSet.singleton n)
+  Var (NumInputVar n) -> (IntSet.singleton n, mempty, mempty, mempty)
+  Var (BoolVar n) -> (mempty, mempty, mempty, IntSet.singleton n)
+  Var (BoolInputVar n) -> (mempty, IntSet.singleton n, mempty, mempty)
+  Var (UIntVar _ n) -> (mempty, mempty, mempty, IntSet.singleton n)
+  Var (UIntInputVar w n) -> (mempty, mempty, IntMap.singleton w (IntSet.singleton n), mempty)
   Array xs ->
-    let (ns, bs, os) = unzip3 $ toList $ fmap freeVars xs
-     in (IntSet.unions ns, IntSet.unions bs, IntSet.unions os)
+    let unzip4 = foldr (\(u, y, z, w) (us, ys, zs, ws) -> (u : us, y : ys, z : zs, w : ws)) mempty
+        (ns, bs, cs, os) = unzip4 $ toList $ fmap freeVars xs
+     in (IntSet.unions ns, IntSet.unions bs, IntMap.unionsWith (<>) cs, IntSet.unions os)
   Add x y -> freeVars x <> freeVars y
   Sub x y -> freeVars x <> freeVars y
   Mul x y -> freeVars x <> freeVars y

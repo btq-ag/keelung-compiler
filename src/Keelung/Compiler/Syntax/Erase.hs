@@ -83,7 +83,7 @@ runM = flip evalState
 eraseVal :: GaloisField n => T.Val -> M n [Expr n]
 eraseVal (T.Integer n) = return [Val (fromInteger n)]
 eraseVal (T.Rational n) = return [Val (fromRational n)]
--- eraseVal (T.Unsigned _ n) = return [Val (fromInteger n)]
+eraseVal (T.Unsigned _ n) = return [Val (fromInteger n)]
 eraseVal (T.Boolean False) = return [Val 0]
 eraseVal (T.Boolean True) = return [Val 1]
 eraseVal T.Unit = return []
@@ -119,6 +119,8 @@ eraseRef' ref = do
     -- because this property should be guaranteed by the source of its value
     T.BoolVar n -> blendIntermediateVar counters n
     T.BoolInputVar n -> blendBoolInputVar counters n
+    T.UIntVar _ n -> blendIntermediateVar counters n
+    T.UIntInputVar _ n -> blendCustomInputVar counters n
 
 eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
 eraseRef ref = Var <$> eraseRef' ref

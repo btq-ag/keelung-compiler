@@ -22,6 +22,8 @@ import Keelung.Compiler.Util
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 import Data.Foldable (toList)
+import qualified Data.Sequence as Seq
+
 
 --------------------------------------------------------------------------------
 
@@ -98,7 +100,8 @@ instance FreeVar Number where
     Mul x y -> (<>) <$> freeVars x <*> freeVars y
     Div x y -> (<>) <$> freeVars x <*> freeVars y
     IfNum x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
-    ToNum x -> freeVars x
+    FromBool x -> freeVars x
+    FromUInt x -> freeVars x
 
 instance FreeVar Boolean where
   freeVars expr = case expr of
@@ -106,12 +109,28 @@ instance FreeVar Boolean where
     BoolVar var -> return $ IntSet.singleton var
     BoolInputVar _ -> return mempty
     NumBit x _ -> freeVars x
+    UIntBit x _ -> freeVars x
     Eq x y -> (<>) <$> freeVars x <*> freeVars y
     And x y -> (<>) <$> freeVars x <*> freeVars y
     Or x y -> (<>) <$> freeVars x <*> freeVars y
     Xor x y -> (<>) <$> freeVars x <*> freeVars y
     BEq x y -> (<>) <$> freeVars x <*> freeVars y
+    UEq x y -> (<>) <$> freeVars x <*> freeVars y
     IfBool x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
+
+instance FreeVar (UInt w) where 
+  freeVars val = case val of 
+    UInt _ n -> return mempty 
+    UIntVar _ var -> return $ IntSet.singleton var
+    UIntInputVar _ _ -> return mempty 
+    UIntAdd x y -> (<>) <$> freeVars x <*> freeVars y
+    UIntSub x y -> (<>) <$> freeVars x <*> freeVars y
+    UIntMul x y -> (<>) <$> freeVars x <*> freeVars y
+    UIntDiv x y -> (<>) <$> freeVars x <*> freeVars y
+    IfUInt p x y -> (<>) <$> freeVars p <*> ((<>) <$> freeVars x <*> freeVars y)
+    ToUInt x -> freeVars x
+
+
 
 instance FreeVar () where
   freeVars expr = case expr of
@@ -181,7 +200,8 @@ instance (GaloisField n, Integral n) => Interpret Number n where
       case p' of
         [0] -> interpret y
         _ -> interpret x
-    ToNum x -> interpret x
+    FromBool x -> interpret x
+    FromUInt x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret Boolean n where
   interpret val = case val of
@@ -189,6 +209,11 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
     BoolVar var -> pure <$> lookupVar var
     BoolInputVar var -> pure <$> lookupBoolInputVar var
     NumBit x i -> do
+      xs <- interpret x
+      if testBit (toInteger (head xs)) i
+        then return [one]
+        else return [zero]
+    UIntBit x i -> do
       xs <- interpret x
       if testBit (toInteger (head xs)) i
         then return [one]
@@ -204,11 +229,32 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
+    UEq x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' == y')
     IfBool p x y -> do
       p' <- interpret p
       case p' of
         [0] -> interpret y
         _ -> interpret x
+
+
+instance (GaloisField n, Integral n) => Interpret (UInt w) n where
+  interpret val = case val of
+    UInt _ n -> interpret n 
+    UIntVar _ var -> pure <$> lookupVar var
+    UIntInputVar width var -> pure <$> lookupUIntInputVar width var
+    UIntAdd x y -> zipWith (+) <$> interpret x <*> interpret y
+    UIntSub x y -> zipWith (-) <$> interpret x <*> interpret y
+    UIntMul x y -> zipWith (*) <$> interpret x <*> interpret y
+    UIntDiv x y -> zipWith (/) <$> interpret x <*> interpret y
+    IfUInt p x y -> do
+      p' <- interpret p
+      case p' of
+        [0] -> interpret y
+        _ -> interpret x
+    ToUInt x -> interpret x
 
 instance GaloisField n => Interpret () n where
   interpret val = case val of
@@ -225,11 +271,11 @@ instance (Interpret t n, GaloisField n) => Interpret (ArrM t) n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = ReaderT ((IntMap n, IntMap n), Heap) (StateT (Witness n) (Except (InterpretError n)))
+type M n = ReaderT (Inputs n, Heap) (StateT (Witness n) (Except (InterpretError n)))
 
 runM :: Elaborated t -> Inputs n -> M n a -> Either (InterpretError n) (a, Witness n)
 runM elab inputs p =
-  runExcept (runStateT (runReaderT p ((numInputBindings, boolInputBindings), heap)) mempty)
+  runExcept (runStateT (runReaderT p (inputs, heap)) mempty)
   where
     (Elaborated _ comp) = elab
     heap = compHeap comp
@@ -245,17 +291,27 @@ lookupVar var = do
 
 lookupNumInputVar :: Show n => Var -> M n n
 lookupNumInputVar var = do
-  bindings <- asks (fst . fst)
-  case IntMap.lookup var bindings of
-    Nothing -> throwError $ InterpretUnboundVarError var bindings
+  inputs <- asks (Inputs.numInputs . fst)
+  case inputs Seq.!? var of
+    Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
     Just val -> return val
 
 lookupBoolInputVar :: Show n => Var -> M n n
 lookupBoolInputVar var = do
-  bindings <- asks (fst . fst)
-  case IntMap.lookup var bindings of
-    Nothing -> throwError $ InterpretUnboundVarError var bindings
+  inputs <- asks (Inputs.boolInputs . fst)
+  case inputs Seq.!? var of
+    Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
     Just val -> return val
+
+lookupUIntInputVar :: Show n => Int -> Var -> M n n
+lookupUIntInputVar width var = do
+  inputss <- asks (Inputs.uintInputs . fst)
+  case IntMap.lookup width inputss of
+    Nothing -> error ("lookupUIntInputVar: no UInt of such bit width: " <> show width)
+    Just inputs ->
+      case inputs Seq.!? var of
+        Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
+        Just val -> return val
 
 lookupAddr :: Show n => Int -> M n [n]
 lookupAddr addr = do
