@@ -3,7 +3,6 @@ module Keelung.Compiler.Syntax.Erase (run) where
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.IntSet as IntSet
 import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.Bits (Bits (..))
@@ -32,23 +31,25 @@ run (T.Elaborated expr comp) =
 
         -- associate input variables with their corresponding binary representation
         let numBinReps =
-              IntMap.fromList $
-                map
-                  ( \v ->
-                      (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (getBitVar counters'' v 0))
-                  )
-                  (blendedNumInputVars counters'')
+              let (start, end) = numInputVarsRange counters''
+               in IntMap.fromList $
+                    map
+                      ( \v ->
+                          (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters'' v))
+                      )
+                      [start .. end - 1]
 
         let customBinReps =
               fmap
-                ( IntMap.fromList
-                    . map
-                      ( \var ->
-                          (var, fromMaybe (error ("Panic: cannot query bits of var $" <> show var)) (getBitVar counters'' var 0))
-                      )
-                    . IntSet.toList
+                ( \(start, end) ->
+                    IntMap.fromList $
+                      map
+                        ( \var ->
+                            (var, fromMaybe (error ("Panic: cannot query bits of var $" <> show var)) (lookupBinRepStart counters'' var))
+                        )
+                        [start .. end - 1]
                 )
-                (blendedCustomInputVars counters'')
+                (customInputVarsRanges counters'')
 
         return $
           TypeErased
@@ -188,9 +189,9 @@ bitValue expr i = case expr of
     let numWidth = getNumBitWidth counters
     let i' = i `mod` numWidth
     -- bit variable corresponding to the variable 'var' and the index 'i''
-    case getBitVar counters var i' of
+    case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
-      Just bitVar -> return $ Var bitVar
+      Just start -> return $ Var (start + i')
   BinaryOp {} -> error "Panic: trying to access the bit value of a compound expression"
   NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
   If p a b -> If p <$> bitValue a i <*> bitValue b i

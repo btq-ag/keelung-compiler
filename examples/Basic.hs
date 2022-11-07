@@ -1,8 +1,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# HLINT ignore "Use <&>" #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Basic where
 
@@ -288,3 +288,9 @@ tempConvert = do
       toFahrenheit
       (degree * 9 / 5 + 32)
       (degree - 32 * 5 / 9)
+
+mixed :: Comp Number
+mixed = do
+  boolean <- input
+  number <- input
+  return $ fromBool boolean + number * 2

@@ -41,7 +41,7 @@ tests = do
           inputVars counters `shouldBe` [4 .. 182 * 5 + 1 * 4 + 4 - 1]
           inputVarsRange counters `shouldBe` (4, 182 * 5 + 1 * 4 + 4)
           boolVarsRange counters `shouldBe` (9, 9 + 4 + 181 * 5)
-          blendedNumInputVars counters `shouldBe` [4, 8, 9, 10, 11]
+          numInputVarsRange counters `shouldBe` (4, 9)
         it "Input sequence" $ do
           getInputSequence counters
             `shouldBe` Seq.fromList
@@ -57,15 +57,15 @@ tests = do
               ]
 
         it "Bit tests" $ do
-          getBitVar counters 3 0 `shouldBe` Nothing
+          lookupBinRepStart counters 3 `shouldBe` Nothing
           -- number
-          map (getBitVar counters 4) [0 .. 180] `shouldBe` map Just [13 .. 193]
+          lookupBinRepStart counters 4 `shouldBe` Just 13
+          lookupBinRepStart counters 5 `shouldBe` Just 194
+          lookupBinRepStart counters 6 `shouldBe` Just 375
+          lookupBinRepStart counters 7 `shouldBe` Just 556
+          lookupBinRepStart counters 8 `shouldBe` Just 737
           -- booleans
-          getBitVar counters 5 0 `shouldBe` Nothing
-          getBitVar counters 6 0 `shouldBe` Nothing
-          getBitVar counters 7 0 `shouldBe` Nothing
-          -- numbers
-          map (getBitVar counters 8) [0 .. 180] `shouldBe` map Just [194 .. 374]
+          lookupBinRepStart counters 9 `shouldBe` Nothing
 
     case asGF181N $ erasedVarCounters <$> erase example2 of
         Left err -> it "Erasure of example2" $ expectationFailure (show err)
@@ -91,12 +91,11 @@ tests = do
             totalBoolVarSize counters `shouldBe` 186
 
           it "Bit tests" $ do
-            getBitVar counters 2 0 `shouldBe` Nothing
+            lookupBinRepStart counters 2 `shouldBe` Nothing
             -- number
-            map (getBitVar counters 3) [0 .. 180] `shouldBe` map Just [6 .. 186]
+            lookupBinRepStart counters 3 `shouldBe` Just 6
             -- 4-bit unsigned integer 
-            map (getBitVar counters 4) [0 .. 3] `shouldBe` map Just [187 .. 190]
-            -- getBitVar counters 4 4  `shouldBe` Nothing
+            lookupBinRepStart counters 4 `shouldBe` Just 187
 
 
     case asGF181N $ erasedVarCounters <$> erase example3 of
@@ -121,6 +120,31 @@ tests = do
             totalBoolVarSize counters `shouldBe` 4
             boolVarsRange counters `shouldBe` (5, 9)
 
+    case asGF181N $ erasedVarCounters <$> erase example4 of
+        Left err -> it "Erasure of example4" $ expectationFailure (show err)
+        Right counters -> do
+          it "VarCounters constuction" $ do
+            -- check the formation of VarCounters
+            counters
+              `shouldBe` makeVarCounters
+                181 -- width of GF(181)
+                1 -- output
+                1 -- Number
+                1 -- Boolean
+                0 -- intermediate
+                [ BoolInput 0, NumInput 0]
+                [] -- custom
+          it "Size of variable groups" $ do
+            inputVarSize counters `shouldBe` 183
+            totalBoolVarSize counters `shouldBe` 182
+            boolVarsRange counters `shouldBe` (2, 184)
+            numInputVarsRange counters `shouldBe` (1, 2)
+
+          it "Bit tests" $ do
+            lookupBinRepStart counters 0 `shouldBe` Nothing
+            lookupBinRepStart counters 1 `shouldBe` Just 3
+            lookupBinRepStart counters 2 `shouldBe` Nothing
+
 example1 :: Comp (Arr Number)
 example1 = do
   num0 <- inputNum
@@ -140,3 +164,9 @@ example3 :: Comp (Arr Boolean)
 example3 = do
   x <- inputUInt @4
   return $ toArray [x !!! 0, x !!! 1, x !!! 2, x !!! 3]
+
+example4 :: Comp Number
+example4 = do
+  boolean <- input
+  number <- input
+  return $ fromBool boolean + number * 2
