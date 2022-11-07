@@ -32,7 +32,7 @@ serializeR1CS = serializeR1CS2
 --   the "witnesses" field should contain rest of the witnesses
 serializeInputAndWitness :: Integral n => [n] -> [n] -> Witness n -> ByteString
 serializeInputAndWitness inputs outputs witnesses =
-  let instances = inputs <> outputs
+  let instances = outputs <> inputs
       instancesSize = length instances
       -- remove the inputs and outputs from the witnesses
       trimmedWitnesses = IntMap.elems $ IntMap.filterWithKey (\k _ -> k >= instancesSize) witnesses
@@ -64,7 +64,7 @@ serializeR1CS2 r1cs =
       pairs $
         pairStr "r1cs" $
           pairs $
-            pairStr "version" (string "0.6.1")
+            pairStr "version" (string "0.7.0")
               <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
               <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
               <> pairStr "instances" (int (pinnedVarSize varCounters)) -- inputs & outputs

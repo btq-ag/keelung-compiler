@@ -161,17 +161,6 @@ execute prog rawInputs = do
 
   return actualOutputs
 
--- populateBitsOfInputs :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
--- populateBitsOfInputs prog rawInputs = do
---   elab <- left ElabError (elaborate prog)
---   populateBitsOfInputsElab elab rawInputs
-
--- populateBitsOfInputsElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either (Error n) [n]
--- populateBitsOfInputsElab elab rawInputs = do
---   erased <- eraseElab elab
---   let counters = erasedVarCounters erased
---   return $ Inputs.flatten $ Inputs.deserialize counters rawInputs
-
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
 

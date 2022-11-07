@@ -47,7 +47,7 @@ extra-deps:
 - protolude-0.2.4@sha256:ec6c01be631050f8c1b9153a782d329a52609d058cb4b461104222862f7792af,2292
 # - ../keelung
 - git: git@github.com:btq-ag/keelung.git
-  commit: 2fd0b08233ef25c5d4f3676508b6809c6a79e327
+  commit: 1a8b6f338c50584fea8f0df55c66d0eb0dbac591
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
