@@ -3,7 +3,7 @@
 This repository contains proprietary stuff.
 The compiler shall be distributed in the form of prebuilt binaries.
 
-# Docker
+# How to dockerize `keelungc`
 
 To dockerize the executable `keelungc`, run the following command in the root of the repository:
 
