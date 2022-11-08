@@ -15,11 +15,11 @@ run (TypeErased expr counters assertions assignments numBinReps customBinReps) =
       expr' = propagateConstant bindings <$> expr
       assertions' = map (propagateConstant bindings) assertions
 
-      assignments'' = assignments' <> map (\(var, val) -> Assignment var (Val val)) (IntMap.toList bindings)
+      assignments'' = assignments' <> map (\(var, (w, val)) -> Assignment var (Val w val)) (IntMap.toList bindings)
    in TypeErased expr' counters assertions' assignments'' numBinReps customBinReps
 
 -- Propagate constant in assignments and return the bindings for later use
-propagateInAssignments :: (Integral n, GaloisField n) => [Assignment n] -> (IntMap n, [Assignment n])
+propagateInAssignments :: (Integral n, GaloisField n) => [Assignment n] -> (IntMap (BitWidth, n), [Assignment n])
 propagateInAssignments xs =
   let (bindings, assignments) = extractBindings xs
       assignments' =
@@ -32,26 +32,24 @@ propagateInAssignments xs =
 
 -- Extract bindings of constant values and collect them as an IntMap
 -- and returns the rest of the assignments
-extractBindings :: [Assignment n] -> (IntMap n, [Assignment n])
+extractBindings :: [Assignment n] -> (IntMap (BitWidth, n), [Assignment n])
 extractBindings = go IntMap.empty []
   where
-    go :: IntMap n -> [Assignment n] -> [Assignment n] -> (IntMap n, [Assignment n])
+    go :: IntMap (BitWidth, n) -> [Assignment n] -> [Assignment n] -> (IntMap (BitWidth, n), [Assignment n])
     go bindings rest [] = (bindings, rest)
-    go bindings rest (Assignment var (Val val) : xs) =
-      go (IntMap.insert var val bindings) rest xs
+    go bindings rest (Assignment var (Val w val) : xs) =
+      go (IntMap.insert var (w, val) bindings) rest xs
     go bindings rest (others : xs) = go bindings (others : rest) xs
 
 -- constant propogation
-propagateConstant :: (GaloisField a, Integral a) => IntMap a -> Expr a -> Expr a
+propagateConstant :: (GaloisField n, Integral n) => IntMap (BitWidth, n) -> Expr n -> Expr n
 propagateConstant bindings = propogate
   where
     propogate e = case e of
-      Val _ -> e
-      Var var -> lookupVar var
-      NAryOp op x y es -> NAryOp op (propogate x) (propogate y) (fmap propogate es)
-      BinaryOp op x y -> BinaryOp op (propogate x) (propogate y)
-      If p x y -> If (propogate p) (propogate x) (propogate y)
-
-    lookupVar var = case IntMap.lookup var bindings of
-      Nothing -> Var var
-      Just val -> Val val
+      Val _ _ -> e
+      Var w var -> case IntMap.lookup var bindings of
+        Nothing -> Var w var
+        Just (_, val) -> Val w val
+      NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
+      BinaryOp w op x y -> BinaryOp w op (propogate x) (propogate y)
+      If w p x y -> If w (propogate p) (propogate x) (propogate y)

@@ -82,11 +82,11 @@ runM = flip evalState
 --------------------------------------------------------------------------------
 
 eraseVal :: GaloisField n => T.Val -> M n [Expr n]
-eraseVal (T.Integer n) = return [Val (fromInteger n)]
-eraseVal (T.Rational n) = return [Val (fromRational n)]
-eraseVal (T.Unsigned _ n) = return [Val (fromInteger n)]
-eraseVal (T.Boolean False) = return [Val 0]
-eraseVal (T.Boolean True) = return [Val 1]
+eraseVal (T.Integer n) = return [Val Number (fromInteger n)]
+eraseVal (T.Rational n) = return [Val Number (fromRational n)]
+eraseVal (T.Unsigned w n) = return [Val (UInt w) (fromInteger n)]
+eraseVal (T.Boolean False) = return [Val Boolean 0]
+eraseVal (T.Boolean True) = return [Val Boolean 1]
 eraseVal T.Unit = return []
 
 -- Current layout of variables
@@ -109,22 +109,22 @@ eraseVal T.Unit = return []
 -- ┃   Intermediate  ┃
 -- ┗━━━━━━━━━━━━━━━━━┛
 --
-eraseRef' :: T.Ref -> M n Int
+eraseRef' :: T.Ref -> M n (BitWidth, Int)
 eraseRef' ref = do
   counters <- get
   return $ case ref of
-    T.NumVar n -> blendIntermediateVar counters n
-    T.NumInputVar n -> blendNumInputVar counters n
+    T.NumVar n -> (Number, blendIntermediateVar counters n)
+    T.NumInputVar n -> (Number, blendNumInputVar counters n)
     -- we don't need to mark intermediate Boolean variables
     -- and impose the Boolean constraint on them ($A * $A = $A)
     -- because this property should be guaranteed by the source of its value
-    T.BoolVar n -> blendIntermediateVar counters n
-    T.BoolInputVar n -> blendBoolInputVar counters n
-    T.UIntVar _ n -> blendIntermediateVar counters n
-    T.UIntInputVar _ n -> blendCustomInputVar counters n
+    T.BoolVar n -> (Boolean, blendIntermediateVar counters n)
+    T.BoolInputVar n -> (Boolean, blendBoolInputVar counters n)
+    T.UIntVar w n -> (UInt w, blendIntermediateVar counters n)
+    T.UIntInputVar w n -> (UInt w, blendCustomInputVar counters n)
 
 eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
-eraseRef ref = Var <$> eraseRef' ref
+eraseRef ref = uncurry Var <$> eraseRef' ref
 
 eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [Expr n]
 eraseExpr expr = case expr of
@@ -140,7 +140,7 @@ eraseExpr expr = case expr of
   T.Sub x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [BinaryOp Sub (head xs) (head ys)]
+    return [BinaryOp (bitWidthOf (head xs)) Sub (head xs) (head ys)]
   T.Mul x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -148,7 +148,7 @@ eraseExpr expr = case expr of
   T.Div x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [BinaryOp Div (head xs) (head ys)]
+    return [BinaryOp (bitWidthOf (head xs)) Div (head xs) (head ys)]
   T.Eq x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -173,7 +173,7 @@ eraseExpr expr = case expr of
     bs <- eraseExpr b
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [If (head bs) (head xs) (head ys)]
+    return [If (bitWidthOf (head xs)) (head bs) (head xs) (head ys)]
   T.ToNum x -> eraseExpr x
   T.Bit x i -> do
     x' <- head <$> eraseExpr x
@@ -182,40 +182,43 @@ eraseExpr expr = case expr of
 
 bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (Expr n)
 bitValue expr i = case expr of
-  Val n -> return $ Val (testBit n i)
-  Var var -> do
+  Val w n -> return $ Val w (testBit n i)
+  Var w var -> do
     counters <- get
     -- if the index 'i' overflows or underflows, wrap it around
-    let numWidth = getNumBitWidth counters
-    let i' = i `mod` numWidth
+
+    let i' = case w of
+          Boolean -> 0
+          Number -> i `mod` getNumBitWidth counters
+          UInt n -> i `mod` n
     -- bit variable corresponding to the variable 'var' and the index 'i''
     case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
-      Just start -> return $ Var (start + i')
+      Just start -> return $ Var Boolean (start + i')
   BinaryOp {} -> error "Panic: trying to access the bit value of a compound expression"
   NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
-  If p a b -> If p <$> bitValue a i <*> bitValue b i
+  If w p a b -> If w p <$> bitValue a i <*> bitValue b i
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.Assignment ref expr) = do
-  var <- eraseRef' ref
+  (_, var) <- eraseRef' ref
   exprs <- eraseExpr expr
   return $ Assignment var (head exprs)
 
 -- Flatten and chain expressions with associative operator together when possible
 chainExprsOfAssocOp :: Op -> Expr n -> Expr n -> Expr n
 chainExprsOfAssocOp op x y = case (x, y) of
-  (NAryOp op1 x0 x1 xs, NAryOp op2 y0 y1 ys)
+  (NAryOp w op1 x0 x1 xs, NAryOp _ op2 y0 y1 ys)
     | op1 == op2 && op2 == op ->
       -- chaining `op`, `op1`, and `op2`
-      NAryOp op x0 x1 (xs <> (y0 :<| y1 :<| ys))
-  (NAryOp op1 x0 x1 xs, _)
+      NAryOp w op x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (NAryOp w op1 x0 x1 xs, _)
     | op1 == op ->
       -- chaining `op` and `op1`
-      NAryOp op x0 x1 (xs |> y)
-  (_, NAryOp op2 y0 y1 ys)
+      NAryOp w op x0 x1 (xs |> y)
+  (_, NAryOp w op2 y0 y1 ys)
     | op2 == op ->
       -- chaining `op` and `op2`
-      NAryOp op x y0 (y1 :<| ys)
+      NAryOp w op x y0 (y1 :<| ys)
   -- there's nothing left we can do
-  _ -> NAryOp op x y mempty
+  _ -> NAryOp (bitWidthOf x) op x y mempty

@@ -82,9 +82,9 @@ freshVar = do
 
 encode :: GaloisField n => Var -> Expr n -> M n ()
 encode out expr = case expr of
-  Val val -> add $ cadd val [(out, -1)] -- out = val
-  Var var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
-  NAryOp op x y rest ->
+  Val _ val -> add $ cadd val [(out, -1)] -- out = val
+  Var _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  NAryOp _ op x y rest ->
     case op of
       Add -> do
         terms <- mapM toTerm (x :<| y :<| rest)
@@ -132,19 +132,19 @@ encode out expr = case expr of
             --  =>  if the sum of operands is 0     then 0 else 1
             --  =>  if the sum of operands is not 0 then 1 else 0
             --  =>  the sum of operands is not 0
-            encode out (NAryOp NEq 0 (NAryOp Add x y rest) Empty)
+            encode out (NAryOp Boolean NEq 0 (NAryOp Boolean Add x y rest) Empty)
       _ -> encodeOtherNAryOp op out x y rest
-  BinaryOp Sub x y -> do
+  BinaryOp _ Sub x y -> do
     x' <- toTerm x
     y' <- toTerm y
     encodeTerms out (x' :<| negateTerm y' :<| Empty)
-  BinaryOp Div x y -> do
+  BinaryOp _ Div x y -> do
     x' <- wireAsVar x
     y' <- wireAsVar y
     add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
-  If b x y -> do
+  If _ b x y -> do
     b' <- wireAsVar b
-    encode out ((Var b' * x) + ((1 - Var b') * y))
+    encode out ((Var Boolean b' * x) + ((1 - Var Boolean b') * y))
 
 --------------------------------------------------------------------------------
 
@@ -155,21 +155,21 @@ data Term n
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
 toTerm :: GaloisField n => Expr n -> M n (Term n)
-toTerm (NAryOp Mul (Var var) (Val n) Empty) =
+toTerm (NAryOp _ Mul (Var _ var) (Val _  n) Empty) =
   return $ WithVars var n
-toTerm (NAryOp Mul (Val n) (Var var) Empty) =
+toTerm (NAryOp _ Mul (Val _  n) (Var _  var) Empty) =
   return $ WithVars var n
-toTerm (NAryOp Mul expr (Val n) Empty) = do
+toTerm (NAryOp _ Mul expr (Val _  n) Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (NAryOp Mul (Val n) expr Empty) = do
+toTerm (NAryOp _ Mul (Val _  n) expr Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (Val n) =
+toTerm (Val _  n) =
   return $ Constant n
-toTerm (Var var) =
+toTerm (Var _  var) =
   return $ WithVars var 1
 toTerm expr = do
   out <- freshVar
@@ -206,7 +206,7 @@ encodeOtherNAryOp op out x0 x1 xs = do
 
 -- | If the expression is not already a variable, create a new variable
 wireAsVar :: GaloisField n => Expr n -> M n Var
-wireAsVar (Var var) = return var
+wireAsVar (Var _  var) = return var
 wireAsVar expr = do
   out <- freshVar
   encode out expr
@@ -226,7 +226,7 @@ encodeBinaryOp op out x y = case op of
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.
     -- The encoding is: x*y + (1-x)*(1-y) = out.
     encode out $
-      Var x * Var y + ((1 - Var x) * (1 - Var y))
+      Var Boolean x * Var Boolean y + ((1 - Var Boolean x) * (1 - Var Boolean y))
 
 --------------------------------------------------------------------------------
 
@@ -242,8 +242,8 @@ encodeEquality isEq out x y = do
     Left _ -> do
       -- in this case, the variable x and y happend to be the same
       if isEq
-        then encode out (Val 1)
-        else encode out (Val 0)
+        then encode out (Val Boolean 1)
+        else encode out (Val Boolean 0)
     Right diff -> do
       -- introduce a new variable m
       -- if diff = 0 then m = 0 else m = recip diff

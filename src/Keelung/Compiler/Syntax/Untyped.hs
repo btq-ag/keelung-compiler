@@ -4,6 +4,8 @@
 
 module Keelung.Compiler.Syntax.Untyped
   ( Op (..),
+    BitWidth (..),
+    bitWidthOf,
     BinaryOp (..),
     Expr (..),
     TypeErased (..),
@@ -40,24 +42,27 @@ data BinaryOp = Sub | Div
 
 --------------------------------------------------------------------------------
 
+data BitWidth = Number | Boolean | UInt Int
+  deriving (Eq, Show)
+
 -- | Untyped expression
 data Expr n
-  = Val n
-  | Var Var
+  = Val BitWidth n
+  | Var BitWidth Var
   | -- Binary operators with only 2 operands
-    BinaryOp BinaryOp (Expr n) (Expr n)
+    BinaryOp BitWidth BinaryOp (Expr n) (Expr n)
   | -- N-Ary operators with >= 2 operands
-    NAryOp Op (Expr n) (Expr n) (Seq (Expr n))
-  | If (Expr n) (Expr n) (Expr n)
+    NAryOp BitWidth Op (Expr n) (Expr n) (Seq (Expr n))
+  | If BitWidth (Expr n) (Expr n) (Expr n)
   deriving (Eq, Functor)
 
 instance Num n => Num (Expr n) where
-  x + y = NAryOp Add x y Empty
-  x - y = BinaryOp Sub x y
-  x * y = NAryOp Mul x y Empty
+  x + y = NAryOp (bitWidthOf x) Add x y Empty
+  x - y = BinaryOp (bitWidthOf x) Sub x y
+  x * y = NAryOp (bitWidthOf x) Mul x y Empty
   abs = id
   signum = const 1
-  fromInteger = Val . fromInteger
+  fromInteger = Val Number . fromInteger -- NOTE: this "Number" is probably wrong
 
 instance Show n => Show (Expr n) where
   showsPrec prec expr =
@@ -68,9 +73,9 @@ instance Show n => Show (Expr n) where
         go _ n (x :<| Empty) = showsPrec (succ n) x
         go delim n (x :<| xs') = showsPrec (succ n) x . showString delim . go delim n xs'
      in case expr of
-          Var var -> showString "$" . shows var
-          Val val -> shows val
-          NAryOp op x0 x1 xs -> case op of
+          Var _ var -> showString "$" . shows var
+          Val _ val -> shows val
+          NAryOp _ op x0 x1 xs -> case op of
             Add -> chain " + " 6 $ x0 :<| x1 :<| xs
             Mul -> chain " * " 7 $ x0 :<| x1 :<| xs
             And -> chain " ∧ " 3 $ x0 :<| x1 :<| xs
@@ -79,21 +84,29 @@ instance Show n => Show (Expr n) where
             NEq -> chain " != " 5 $ x0 :<| x1 :<| xs
             Eq -> chain " == " 5 $ x0 :<| x1 :<| xs
             BEq -> chain " == " 5 $ x0 :<| x1 :<| xs
-          BinaryOp op x0 x1 -> case op of
+          BinaryOp _ op x0 x1 -> case op of
             Sub -> chain " - " 6 $ x0 :<| x1 :<| Empty
             Div -> chain " / " 7 $ x0 :<| x1 :<| Empty
-          If p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+          If _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 -- | Calculate the "size" of an expression for benchmarking
 sizeOfExpr :: Expr n -> Int
 sizeOfExpr expr = case expr of
-  Val _ -> 1
-  Var _ -> 1
-  NAryOp _ x0 x1 xs ->
+  Val _ _ -> 1
+  Var _ _ -> 1
+  NAryOp _ _ x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
      in sum (fmap sizeOfExpr operands) + (length operands - 1)
-  BinaryOp _ x0 x1 -> sizeOfExpr x0 + sizeOfExpr x1 + 1
-  If x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+  BinaryOp _ _ x0 x1 -> sizeOfExpr x0 + sizeOfExpr x1 + 1
+  If _ x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+
+bitWidthOf :: Expr n -> BitWidth
+bitWidthOf expr = case expr of
+  Val bw _ -> bw
+  Var bw _ -> bw
+  NAryOp bw _ _ _ _ -> bw
+  BinaryOp bw _ _ _ -> bw
+  If bw _ _ _ -> bw
 
 --------------------------------------------------------------------------------
 

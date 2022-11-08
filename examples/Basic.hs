@@ -276,7 +276,7 @@ bits1 = do
 bits2 :: Comp (Arr Boolean)
 bits2 = do
   x <- inputUInt @4
-  return $ toArray [x !!! 0, x !!! 1, x !!! 2, x !!! 3]
+  return $ toArray [x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4, x !!! 5, x !!! 6, x !!! 7]
 
 -- Formula: (0°C × 9/5) + 32 = 32°F
 tempConvert :: Comp Number

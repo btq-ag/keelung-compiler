@@ -56,7 +56,7 @@ tests = do
                 BoolInput 3
               ]
 
-        it "Bit tests" $ do
+        it "Index of binary representation" $ do
           lookupBinRepStart counters 3 `shouldBe` Nothing
           -- number
           lookupBinRepStart counters 4 `shouldBe` Just 13
@@ -90,7 +90,7 @@ tests = do
             customBinRepVarSize counters `shouldBe` 4 
             totalBoolVarSize counters `shouldBe` 186
 
-          it "Bit tests" $ do
+          it "Index of binary representation" $ do
             lookupBinRepStart counters 2 `shouldBe` Nothing
             -- number
             lookupBinRepStart counters 3 `shouldBe` Just 6
@@ -140,7 +140,7 @@ tests = do
             boolVarsRange counters `shouldBe` (2, 184)
             numInputVarsRange counters `shouldBe` (1, 2)
 
-          it "Bit tests" $ do
+          it "Index of binary representation" $ do
             lookupBinRepStart counters 0 `shouldBe` Nothing
             lookupBinRepStart counters 1 `shouldBe` Just 3
             lookupBinRepStart counters 2 `shouldBe` Nothing
