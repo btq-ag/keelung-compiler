@@ -5,7 +5,7 @@ import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq (..), (|>))
-import Keelung.Compiler.Syntax.Bits (Bits (..))
+import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Syntax.VarCounters
@@ -196,6 +196,11 @@ bitValue expr i = case expr of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
       Just start -> return $ Var Boolean (start + i')
   BinaryOp {} -> error "Panic: trying to access the bit value of a compound expression"
+  NAryOp _ And x y rest -> NAryOp Boolean And 
+    <$> bitValue x i
+    <*> bitValue y i
+    <*> mapM (`bitValue` i) rest
+    
   NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
   If w p a b -> If w p <$> bitValue a i <*> bitValue b i
 

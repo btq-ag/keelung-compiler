@@ -68,82 +68,83 @@ tests = do
           lookupBinRepStart counters 9 `shouldBe` Nothing
 
     case asGF181N $ erasedVarCounters <$> erase example2 of
-        Left err -> it "Erasure of example2" $ expectationFailure (show err)
-        Right counters -> do
-          it "VarCounters constuction" $ do
-            -- check the formation of VarCounters
-            counters
-              `shouldBe` makeVarCounters
-                181 -- width of GF(181)
-                3 -- output
-                1 -- Number
-                1 -- Boolean
-                0 -- intermediate
-                [ NumInput 0,
-                  CustomInput 4 0,
-                  BoolInput 0
-                ]
-                [(4, 1)] -- custom
-          it "Size of variable groups" $ do
-            inputVarSize counters `shouldBe` (3 + 181 + 4)
-            totalCustomInputSize counters `shouldBe` 1
-            customBinRepVarSize counters `shouldBe` 4 
-            totalBoolVarSize counters `shouldBe` 186
+      Left err -> it "Erasure of example2" $ expectationFailure (show err)
+      Right counters -> do
+        it "VarCounters constuction" $ do
+          -- check the formation of VarCounters
+          counters
+            `shouldBe` makeVarCounters
+              181 -- width of GF(181)
+              3 -- output
+              1 -- Number
+              1 -- Boolean
+              0 -- intermediate
+              [ NumInput 0,
+                CustomInput 4 0,
+                BoolInput 0
+              ]
+              [(4, 1)] -- custom
+        it "Size of variable groups" $ do
+          inputVarSize counters `shouldBe` (3 + 181 + 4)
+          totalCustomInputSize counters `shouldBe` 1
+          customBinRepVarSize counters `shouldBe` 4
+          totalBoolVarSize counters `shouldBe` 186
 
-          it "Index of binary representation" $ do
-            lookupBinRepStart counters 2 `shouldBe` Nothing
-            -- number
-            lookupBinRepStart counters 3 `shouldBe` Just 6
-            -- 4-bit unsigned integer 
-            lookupBinRepStart counters 4 `shouldBe` Just 187
-
+        it "Index of binary representation" $ do
+          lookupBinRepStart counters 2 `shouldBe` Nothing
+          -- number
+          lookupBinRepStart counters 3 `shouldBe` Just 6
+          -- 4-bit unsigned integer
+          lookupBinRepStart counters 4 `shouldBe` Just 187
 
     case asGF181N $ erasedVarCounters <$> erase example3 of
-        Left err -> it "Erasure of example3" $ expectationFailure (show err)
-        Right counters -> do
-          it "VarCounters constuction" $ do
-            -- check the formation of VarCounters
-            counters
-              `shouldBe` makeVarCounters
-                181 -- width of GF(181)
-                4 -- output
-                0 -- Number
-                0 -- Boolean
-                0 -- intermediate
-                [ CustomInput 4 0
-                ]
-                [(4, 1)] -- custom
-          it "Size of variable groups" $ do
-            inputVarSize counters `shouldBe` 5
-            totalCustomInputSize counters `shouldBe` 1
-            customBinRepVarSize counters `shouldBe` 4
-            totalBoolVarSize counters `shouldBe` 4
-            boolVarsRange counters `shouldBe` (5, 9)
+      Left err -> it "Erasure of example3" $ expectationFailure (show err)
+      Right counters -> do
+        it "VarCounters constuction" $ do
+          -- check the formation of VarCounters
+          counters
+            `shouldBe` makeVarCounters
+              181 -- width of GF(181)
+              4 -- output
+              0 -- Number
+              0 -- Boolean
+              0 -- intermediate
+              [ CustomInput 4 0,
+                CustomInput 4 1,
+                CustomInput 3 0
+              ]
+              [(4, 2), (3, 1)] -- custom
+        it "Size of variable groups" $ do
+          totalCustomInputSize counters `shouldBe` 3
+          customBinRepVarSize counters `shouldBe` 4 + 4 + 3
+          inputVarSize counters `shouldBe` 5 + 5 + 4
+          totalBoolVarSize counters `shouldBe` 4 + 4 + 3
+          boolVarsRange counters `shouldBe` (7, 18)
 
     case asGF181N $ erasedVarCounters <$> erase example4 of
-        Left err -> it "Erasure of example4" $ expectationFailure (show err)
-        Right counters -> do
-          it "VarCounters constuction" $ do
-            -- check the formation of VarCounters
-            counters
-              `shouldBe` makeVarCounters
-                181 -- width of GF(181)
-                1 -- output
-                1 -- Number
-                1 -- Boolean
-                0 -- intermediate
-                [ BoolInput 0, NumInput 0]
-                [] -- custom
-          it "Size of variable groups" $ do
-            inputVarSize counters `shouldBe` 183
-            totalBoolVarSize counters `shouldBe` 182
-            boolVarsRange counters `shouldBe` (2, 184)
-            numInputVarsRange counters `shouldBe` (1, 2)
+      Left err -> it "Erasure of example4" $ expectationFailure (show err)
+      Right counters -> do
+        it "VarCounters constuction" $ do
+          -- check the formation of VarCounters
+          counters
+            `shouldBe` makeVarCounters
+              181 -- width of GF(181)
+              1 -- output
+              1 -- Number
+              1 -- Boolean
+              0 -- intermediate
+              [BoolInput 0, NumInput 0]
+              [] -- custom
+        it "Size of variable groups" $ do
+          inputVarSize counters `shouldBe` 183
+          totalBoolVarSize counters `shouldBe` 182
+          boolVarsRange counters `shouldBe` (2, 184)
+          numInputVarsRange counters `shouldBe` (1, 2)
 
-          it "Index of binary representation" $ do
-            lookupBinRepStart counters 0 `shouldBe` Nothing
-            lookupBinRepStart counters 1 `shouldBe` Just 3
-            lookupBinRepStart counters 2 `shouldBe` Nothing
+        it "Index of binary representation" $ do
+          lookupBinRepStart counters 0 `shouldBe` Nothing
+          lookupBinRepStart counters 1 `shouldBe` Just 3
+          lookupBinRepStart counters 2 `shouldBe` Nothing
 
 example1 :: Comp (Arr Number)
 example1 = do
@@ -163,6 +164,8 @@ example2 = do
 example3 :: Comp (Arr Boolean)
 example3 = do
   x <- inputUInt @4
+  _x2 <- inputUInt @4
+  _y <- inputUInt @3
   return $ toArray [x !!! 0, x !!! 1, x !!! 2, x !!! 3]
 
 example4 :: Comp Number

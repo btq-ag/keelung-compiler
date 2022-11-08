@@ -6,7 +6,7 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
-import Keelung.Compiler.Syntax.Bits (toBits)
+import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Syntax.Typed (Computation (compVarCounters), Elaborated (elabComp))
 import Keelung.Syntax.VarCounters
 

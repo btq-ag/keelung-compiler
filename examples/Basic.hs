@@ -273,10 +273,13 @@ bits1 = do
   y <- inputNum
   return $ toArray [(x !!! 0) `And` (y !!! (-1))]
 
-bits2 :: Comp (Arr Boolean)
+bits2 :: Comp Boolean
 bits2 = do
   x <- inputUInt @4
-  return $ toArray [x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4, x !!! 5, x !!! 6, x !!! 7]
+  y <- inputUInt @4
+  z <- inputUInt @4
+  w <- inputUInt @4
+  return $ (x .&. y .&. z .&. w) !!! 0
 
 -- Formula: (0°C × 9/5) + 32 = 32°F
 tempConvert :: Comp Number
