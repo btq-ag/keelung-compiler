@@ -83,6 +83,7 @@ tests:
     main:                Main.hs
     source-dirs:        
       - test/
+      - src/
       - examples/
     dependencies:
     - keelung-compiler

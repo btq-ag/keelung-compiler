@@ -121,7 +121,7 @@ eraseRef' ref = do
     T.BoolVar n -> (Boolean, blendIntermediateVar counters n)
     T.BoolInputVar n -> (Boolean, blendBoolInputVar counters n)
     T.UIntVar w n -> (UInt w, blendIntermediateVar counters n)
-    T.UIntInputVar w n -> (UInt w, blendCustomInputVar counters n)
+    T.UIntInputVar w n -> (UInt w, blendCustomInputVar counters w n)
 
 eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
 eraseRef ref = uncurry Var <$> eraseRef' ref
@@ -190,17 +190,17 @@ bitValue expr i = case expr of
     let i' = case w of
           Boolean -> 0
           Number -> i `mod` getNumBitWidth counters
-          UInt n -> i `mod` n
+          UInt w' -> i `mod` w'
     -- bit variable corresponding to the variable 'var' and the index 'i''
     case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
       Just start -> return $ Var Boolean (start + i')
   BinaryOp {} -> error "Panic: trying to access the bit value of a compound expression"
-  NAryOp _ And x y rest -> NAryOp Boolean And 
-    <$> bitValue x i
-    <*> bitValue y i
-    <*> mapM (`bitValue` i) rest
-    
+  NAryOp _ And x y rest ->
+    NAryOp Boolean And
+      <$> bitValue x i
+      <*> bitValue y i
+      <*> mapM (`bitValue` i) rest
   NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
   If w p a b -> If w p <$> bitValue a i <*> bitValue b i
 

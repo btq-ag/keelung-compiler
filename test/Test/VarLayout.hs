@@ -91,11 +91,16 @@ tests = do
           totalBoolVarSize counters `shouldBe` 186
 
         it "Index of binary representation" $ do
+          -- outputs 
+          lookupBinRepStart counters 0 `shouldBe` Nothing
+          lookupBinRepStart counters 1 `shouldBe` Nothing
           lookupBinRepStart counters 2 `shouldBe` Nothing
           -- number
           lookupBinRepStart counters 3 `shouldBe` Just 6
           -- 4-bit unsigned integer
           lookupBinRepStart counters 4 `shouldBe` Just 187
+          -- boolean
+          lookupBinRepStart counters 5 `shouldBe` Nothing
 
     case asGF181N $ erasedVarCounters <$> erase example3 of
       Left err -> it "Erasure of example3" $ expectationFailure (show err)
@@ -120,6 +125,18 @@ tests = do
           inputVarSize counters `shouldBe` 5 + 5 + 4
           totalBoolVarSize counters `shouldBe` 4 + 4 + 3
           boolVarsRange counters `shouldBe` (7, 18)
+
+        it "Index of binary representation" $ do
+          lookupBinRepStart counters 0 `shouldBe` Nothing
+          lookupBinRepStart counters 1 `shouldBe` Nothing
+          lookupBinRepStart counters 2 `shouldBe` Nothing
+          lookupBinRepStart counters 3 `shouldBe` Nothing
+          lookupBinRepStart counters 4 `shouldBe` Just 7
+          lookupBinRepStart counters 5 `shouldBe` Just 10
+          lookupBinRepStart counters 6 `shouldBe` Just 14
+          blendCustomInputVar counters 4 0 `shouldBe` 5
+          blendCustomInputVar counters 4 1 `shouldBe` 6
+          blendCustomInputVar counters 3 0 `shouldBe` 4
 
     case asGF181N $ erasedVarCounters <$> erase example4 of
       Left err -> it "Erasure of example4" $ expectationFailure (show err)
