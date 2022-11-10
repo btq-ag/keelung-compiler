@@ -100,6 +100,7 @@ instance FreeVar Number where
     Div x y -> (<>) <$> freeVars x <*> freeVars y
     AndNum x y -> (<>) <$> freeVars x <*> freeVars y
     OrNum x y -> (<>) <$> freeVars x <*> freeVars y
+    XorNum x y -> (<>) <$> freeVars x <*> freeVars y
     IfNum x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
     FromBool x -> freeVars x
     FromUInt x -> freeVars x
@@ -130,6 +131,7 @@ instance FreeVar (UInt w) where
     UIntDiv x y -> (<>) <$> freeVars x <*> freeVars y
     AndUInt x y -> (<>) <$> freeVars x <*> freeVars y
     OrUInt x y -> (<>) <$> freeVars x <*> freeVars y
+    XorUInt x y -> (<>) <$> freeVars x <*> freeVars y
     IfUInt p x y -> (<>) <$> freeVars p <*> ((<>) <$> freeVars x <*> freeVars y)
     ToUInt x -> freeVars x
 
@@ -198,6 +200,7 @@ instance (GaloisField n, Integral n) => Interpret Number n where
     Div x y -> zipWith (/) <$> interpret x <*> interpret y
     AndNum x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     OrNum x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
+    XorNum x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     IfNum p x y -> do
       p' <- interpret p
       case p' of
@@ -253,6 +256,7 @@ instance (GaloisField n, Integral n) => Interpret (UInt w) n where
     UIntDiv x y -> zipWith (/) <$> interpret x <*> interpret y
     AndUInt x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     OrUInt x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
+    XorUInt x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     IfUInt p x y -> do
       p' <- interpret p
       case p' of
@@ -398,3 +402,6 @@ bitWiseAnd x y = fromInteger $ (Data.Bits..&.) (toInteger x) (toInteger y)
 
 bitWiseOr :: (GaloisField n, Integral n) => n -> n -> n 
 bitWiseOr x y = fromInteger $ (Data.Bits..|.) (toInteger x) (toInteger y)
+
+bitWiseXor :: (GaloisField n, Integral n) => n -> n -> n 
+bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)

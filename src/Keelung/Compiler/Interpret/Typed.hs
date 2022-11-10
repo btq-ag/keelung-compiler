@@ -128,17 +128,9 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
-    And x y ->
-      zipWith
-        (\a b -> fromInteger (toInteger a Data.Bits..&. toInteger b))
-        <$> interpret x
-        <*> interpret y
-    Or x y ->
-      zipWith
-        (\a b -> fromInteger (toInteger a Data.Bits..|. toInteger b))
-        <$> interpret x
-        <*> interpret y
-    Xor x y -> zipWith (\x' y' -> x' + y' - 2 * (x' * y')) <$> interpret x <*> interpret y
+    And x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
+    Or x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
+    Xor x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     BEq x y -> do
       x' <- interpret x
       y' <- interpret y
@@ -291,3 +283,14 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
   show (InterpretInputSizeError expected actual) =
     "expecting " ++ show expected ++ " inputs but got " ++ show actual
       ++ " inputs"
+
+--------------------------------------------------------------------------------
+
+bitWiseAnd :: (GaloisField n, Integral n) => n -> n -> n
+bitWiseAnd x y = fromInteger $ (Data.Bits..&.) (toInteger x) (toInteger y)
+
+bitWiseOr :: (GaloisField n, Integral n) => n -> n -> n
+bitWiseOr x y = fromInteger $ (Data.Bits..|.) (toInteger x) (toInteger y)
+
+bitWiseXor :: (GaloisField n, Integral n) => n -> n -> n
+bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)
