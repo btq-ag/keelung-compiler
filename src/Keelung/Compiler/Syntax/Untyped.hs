@@ -43,7 +43,7 @@ data BinaryOp = Sub | Div
 --------------------------------------------------------------------------------
 
 data BitWidth = Number | Boolean | UInt Int
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- | Untyped expression
 data Expr n

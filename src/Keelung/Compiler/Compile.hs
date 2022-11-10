@@ -19,6 +19,7 @@ import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Syntax.VarCounters
 import Keelung.Types
+import Keelung.Compiler.Syntax.BinRep
 
 --------------------------------------------------------------------------------
 
@@ -36,6 +37,9 @@ run (TypeErased untypedExprs counters assertions assignments numBinReps customBi
   mapM_ encodeAssertion assertions
 
   constraints <- gets envConstraints
+
+  shiftedBinReps <- gets envShiftedBinReps
+
   return
     ( ConstraintSystem
         constraints
@@ -60,17 +64,32 @@ encodeAssignment (Assignment var expr) = encode var expr
 -- | Monad for compilation
 data Env n = Env
   { envVarCounters :: VarCounters,
-    envConstraints :: Set (Constraint n)
+    envConstraints :: Set (Constraint n),
+    envShiftedBinReps :: Set BinRep
   }
 
 type M n = State (Env n)
 
 runM :: GaloisField n => VarCounters -> M n a -> a
-runM varCounters program = evalState program (Env varCounters mempty)
+runM varCounters program = evalState program (Env varCounters mempty mempty)
 
 add :: GaloisField n => [Constraint n] -> M n ()
 add cs =
   modify (\env -> env {envConstraints = Set.union (Set.fromList cs) (envConstraints env)})
+
+-- | Adds a new view of binary representation of a variable after rotation.
+addRotatedBinRep :: Var -> BitWidth -> Var -> Int -> M n ()
+addRotatedBinRep out bitWidth var rotate = do
+  counters <- gets envVarCounters
+  case lookupBinRepStart counters var of
+    Nothing -> error $ "[ panic ] Cannot find the start of the binary representation of the variable $" <> show var
+    Just index -> do
+      let width = case bitWidth of
+            Number -> getNumBitWidth counters
+            Boolean -> 1
+            UInt n -> n
+      let binRep = BinRep out width index rotate
+      modify (\env -> env {envShiftedBinReps = Set.insert binRep (envShiftedBinReps env)})
 
 freshVar :: M n Var
 freshVar = do
@@ -84,7 +103,7 @@ encode :: GaloisField n => Var -> Expr n -> M n ()
 encode out expr = case expr of
   Val _ val -> add $ cadd val [(out, -1)] -- out = val
   Var _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
-  Rotate {} -> error "[ panic ] dunno how to compile ROTATE"
+  Rotate _ n x -> encodeRotate out n x
   NAryOp _ op x y rest ->
     case op of
       Add -> do
@@ -149,6 +168,18 @@ encode out expr = case expr of
 
 --------------------------------------------------------------------------------
 
+-- | Pushes the constructor of Rotate inwards
+encodeRotate :: GaloisField n => Var -> Int -> Expr n -> M n ()
+encodeRotate out i expr = case expr of
+  Val bw n -> error "[ panic ] dunno how to compile ROTATE VAL"
+  Var bw var -> addRotatedBinRep out bw var i
+  Rotate bw n ex -> error "[ panic ] dunno how to compile ROTATE Rotate"
+  BinaryOp bw bo x y -> error "[ panic ] dunno how to compile ROTATE BinaryOp"
+  NAryOp bw op x y rest -> error "[ panic ] dunno how to compile ROTATE NAryOp"
+  If bw p x y -> error "[ panic ] dunno how to compile ROTATE If"
+
+--------------------------------------------------------------------------------
+
 data Term n
   = Constant n -- c
   | WithVars Var n -- cx
@@ -156,21 +187,21 @@ data Term n
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
 toTerm :: GaloisField n => Expr n -> M n (Term n)
-toTerm (NAryOp _ Mul (Var _ var) (Val _  n) Empty) =
+toTerm (NAryOp _ Mul (Var _ var) (Val _ n) Empty) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul (Val _  n) (Var _  var) Empty) =
+toTerm (NAryOp _ Mul (Val _ n) (Var _ var) Empty) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul expr (Val _  n) Empty) = do
+toTerm (NAryOp _ Mul expr (Val _ n) Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (NAryOp _ Mul (Val _  n) expr Empty) = do
+toTerm (NAryOp _ Mul (Val _ n) expr Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (Val _  n) =
+toTerm (Val _ n) =
   return $ Constant n
-toTerm (Var _  var) =
+toTerm (Var _ var) =
   return $ WithVars var 1
 toTerm expr = do
   out <- freshVar
@@ -185,7 +216,7 @@ negateTerm (Constant c) = Constant (negate c)
 encodeTerms :: GaloisField n => Var -> Seq (Term n) -> M n ()
 encodeTerms out terms =
   let (constant, varsWithCoeffs) = foldl' go (0, []) terms
-   in add $ cadd constant $ (out, - 1) : varsWithCoeffs
+   in add $ cadd constant $ (out, -1) : varsWithCoeffs
   where
     go :: Num n => (n, [(Var, n)]) -> Term n -> (n, [(Var, n)])
     go (constant, pairs) (Constant n) = (constant + n, pairs)
@@ -207,7 +238,7 @@ encodeOtherNAryOp op out x0 x1 xs = do
 
 -- | If the expression is not already a variable, create a new variable
 wireAsVar :: GaloisField n => Expr n -> M n Var
-wireAsVar (Var _  var) = return var
+wireAsVar (Var _ var) = return var
 wireAsVar expr = do
   out <- freshVar
   encode out expr
