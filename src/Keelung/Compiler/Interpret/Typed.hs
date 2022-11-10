@@ -128,8 +128,16 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
-    And x y -> zipWith (*) <$> interpret x <*> interpret y
-    Or x y -> zipWith (+) <$> interpret x <*> interpret y
+    And x y ->
+      zipWith
+        (\a b -> fromInteger (toInteger a Data.Bits..&. toInteger b))
+        <$> interpret x
+        <*> interpret y
+    Or x y ->
+      zipWith
+        (\a b -> fromInteger (toInteger a Data.Bits..|. toInteger b))
+        <$> interpret x
+        <*> interpret y
     Xor x y -> zipWith (\x' y' -> x' + y' - 2 * (x' * y')) <$> interpret x <*> interpret y
     BEq x y -> do
       x' <- interpret x

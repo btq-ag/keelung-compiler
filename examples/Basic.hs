@@ -297,3 +297,15 @@ mixed = do
   boolean <- input
   number <- input
   return $ fromBool boolean + number * 2
+
+bitwise :: Comp (Arr Boolean)
+bitwise = do
+  x <- inputUInt @4
+  y <- inputUInt @4
+  return $
+    toArray
+      [ (x .&. y) !!! 0,
+        (x .|. y) !!! 1,
+        (x .&. y) !!! 2,
+        (x .&. y) !!! 3
+      ]

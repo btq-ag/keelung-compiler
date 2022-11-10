@@ -201,6 +201,11 @@ bitValue expr i = case expr of
       <$> bitValue x i
       <*> bitValue y i
       <*> mapM (`bitValue` i) rest
+  NAryOp _ Or x y rest ->
+    NAryOp Boolean Or
+      <$> bitValue x i
+      <*> bitValue y i
+      <*> mapM (`bitValue` i) rest
   NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
   If w p a b -> If w p <$> bitValue a i <*> bitValue b i
 
