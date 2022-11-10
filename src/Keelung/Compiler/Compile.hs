@@ -84,6 +84,7 @@ encode :: GaloisField n => Var -> Expr n -> M n ()
 encode out expr = case expr of
   Val _ val -> add $ cadd val [(out, -1)] -- out = val
   Var _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  Rotate {} -> error "[ panic ] dunno how to compile ROTATE"
   NAryOp _ op x y rest ->
     case op of
       Add -> do

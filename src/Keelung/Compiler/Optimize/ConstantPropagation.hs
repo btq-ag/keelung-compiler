@@ -50,6 +50,7 @@ propagateConstant bindings = propogate
       Var w var -> case IntMap.lookup var bindings of
         Nothing -> Var w var
         Just (_, val) -> Val w val
+      Rotate w n x -> Rotate w n (propogate x)
       NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
       BinaryOp w op x y -> BinaryOp w op (propogate x) (propogate y)
       If w p x y -> If w (propogate p) (propogate x) (propogate y)

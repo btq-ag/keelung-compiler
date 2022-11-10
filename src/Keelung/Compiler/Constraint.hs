@@ -161,7 +161,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
         let (start, end) = boolVarsRange counters
          in if end - start == 0
               then ""
-              else "  boolean variables: $" <> show start <> " .. $" <> show (end - 1) <> "\n"
+              else "  Boolean variables: $" <> show start <> " .. $" <> show (end - 1) <> "\n"
 
       totalBinRepConstraintSize = numInputVarSize counters + totalCustomInputSize counters
       numBitWidth = getNumBitWidth counters

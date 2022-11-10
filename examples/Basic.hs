@@ -309,3 +309,25 @@ bitwise = do
         (x .^. y) !!! 2,
         (x .&. y) !!! 3
       ]
+
+rotateAndBitTest :: Comp (Arr Boolean)
+rotateAndBitTest = do
+  x <- inputUInt @4
+  y <- inputUInt @4
+  return $
+    toArray
+      [ (x `rotate` 0) !!! 0,
+        (x `rotate` 1) !!! 1,
+        (x `rotate` (-1)) !!! 1,
+        ((x .^. y) `rotate` 1) !!! 2
+      ]
+
+rotateOnly :: Comp (Arr (UInt 4))
+rotateOnly = do
+  x <- inputUInt @4
+  y <- inputUInt @4
+  return $
+    toArray
+      [ x `rotate` 0,
+        (x .^. y) `rotate` 1
+      ]

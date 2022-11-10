@@ -165,6 +165,9 @@ eraseExpr expr = case expr of
     xs <- eraseExpr x
     ys <- eraseExpr y
     return [chainExprsOfAssocOp Xor (head xs) (head ys)]
+  T.RotateR n x -> do
+    xs <- eraseExpr x
+    return [Rotate (bitWidthOf (head xs)) n (head xs)]
   T.BEq x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -186,7 +189,6 @@ bitValue expr i = case expr of
   Var w var -> do
     counters <- get
     -- if the index 'i' overflows or underflows, wrap it around
-
     let i' = case w of
           Boolean -> 0
           Number -> i `mod` getNumBitWidth counters
@@ -195,6 +197,15 @@ bitValue expr i = case expr of
     case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
       Just start -> return $ Var Boolean (start + i')
+  Rotate w n x -> do
+    -- rotate the bit value
+    -- if the index 'i' overflows or underflows, wrap it around
+    counters <- get
+    let i' = case w of
+          Boolean -> 0
+          Number -> n + i `mod` getNumBitWidth counters
+          UInt w' -> n + i `mod` w'
+    bitValue x i'
   BinaryOp {} -> error "Panic: trying to access the bit value of a compound expression"
   NAryOp _ And x y rest ->
     NAryOp Boolean And

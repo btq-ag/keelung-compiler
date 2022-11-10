@@ -131,6 +131,7 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     And x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     Or x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     Xor x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
+    RotateR n x -> map (bitWiseRotateR n) <$> interpret x
     BEq x y -> do
       x' <- interpret x
       y' <- interpret y
@@ -238,6 +239,7 @@ freeVars expr = case expr of
   And x y -> freeVars x <> freeVars y
   Or x y -> freeVars x <> freeVars y
   Xor x y -> freeVars x <> freeVars y
+  RotateR _ x -> freeVars x
   BEq x y -> freeVars x <> freeVars y
   If x y z -> freeVars x <> freeVars y <> freeVars z
   ToNum x -> freeVars x
@@ -294,3 +296,6 @@ bitWiseOr x y = fromInteger $ (Data.Bits..|.) (toInteger x) (toInteger y)
 
 bitWiseXor :: (GaloisField n, Integral n) => n -> n -> n
 bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)
+
+bitWiseRotateR :: (GaloisField n, Integral n) => Int -> n -> n
+bitWiseRotateR n x = fromInteger $ Data.Bits.rotateR (toInteger x) n
