@@ -7,6 +7,7 @@ import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
+import qualified Keelung.Syntax.BinRep as BinRep
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Syntax.VarCounters
 
@@ -16,7 +17,8 @@ run (T.Elaborated expr comp) =
       proxy = 0
    in runM counters $ do
         -- update VarCounters.varNumWidth before type erasure
-        let counters' = setNumBitWidth (bitSize proxy) $ setOutputVarSize (lengthOfExpr expr) counters
+        let numBitWidth = bitSize proxy
+        let counters' = setNumBitWidth numBitWidth $ setOutputVarSize (lengthOfExpr expr) counters
         put counters'
         -- start type erasure
         expr' <- eraseExpr expr
@@ -32,24 +34,20 @@ run (T.Elaborated expr comp) =
         -- associate input variables with their corresponding binary representation
         let numBinReps =
               let (start, end) = numInputVarsRange counters''
-               in IntMap.fromList $
+               in BinRep.fromList $
                     map
-                      ( \v ->
-                          (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters'' v))
-                      )
+                      (\v -> BinRep.fromNumBinRep numBitWidth (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters'' v)))
                       [start .. end - 1]
 
         let customBinReps =
-              fmap
-                ( \(start, end) ->
-                    IntMap.fromList $
+              BinRep.fromList $
+                concatMap
+                  ( \(start, end) ->
                       map
-                        ( \var ->
-                            (var, fromMaybe (error ("Panic: cannot query bits of var $" <> show var)) (lookupBinRepStart counters'' var))
-                        )
+                        (\v -> BinRep.fromNumBinRep numBitWidth (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters'' v)))
                         [start .. end - 1]
-                )
-                (customInputVarsRanges counters'')
+                  )
+                  (IntMap.elems (customInputVarsRanges counters''))
 
         return $
           TypeErased

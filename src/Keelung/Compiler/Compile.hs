@@ -14,12 +14,13 @@ import Data.Sequence (Seq (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint
+import Keelung.Syntax.BinRep (BinRep (..))
+import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Syntax.VarCounters
 import Keelung.Types
-import Keelung.Compiler.Syntax.BinRep
 
 --------------------------------------------------------------------------------
 

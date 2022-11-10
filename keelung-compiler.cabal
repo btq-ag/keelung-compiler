@@ -41,7 +41,6 @@ library
       Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Syntax.BinRep
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
@@ -89,7 +88,6 @@ executable keelungc
       Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Syntax.BinRep
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
@@ -151,7 +149,6 @@ executable profile
       Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Syntax.BinRep
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
@@ -204,7 +201,6 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Syntax.BinRep
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
@@ -262,7 +258,6 @@ benchmark keelung-bench
       Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Syntax.BinRep
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs

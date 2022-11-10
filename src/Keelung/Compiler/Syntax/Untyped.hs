@@ -15,12 +15,12 @@ module Keelung.Compiler.Syntax.Untyped
 where
 
 import Data.Field.Galois (GaloisField)
-import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..))
 import Keelung.Field (N (..))
 import Keelung.Syntax.VarCounters
 import Keelung.Types (Var)
+import Keelung.Syntax.BinRep (BinReps)
+import qualified Keelung.Syntax.BinRep as BinRep
 
 --------------------------------------------------------------------------------
 
@@ -134,12 +134,10 @@ data TypeErased n = TypeErased
     erasedAssertions :: ![Expr n],
     -- | Assignments after type erasure
     erasedAssignments :: ![Assignment n],
-    -- | Pairs of Number input variables and start index of binary representation
-    --    [(inputIndex, binRepIndex)]
-    erasedBinReps :: IntMap Var,
-    -- | Pairs of custom input variables and start index of binary representation
-    --    [(bitWidth,[(inputIndex, binRepIndex)])]
-    erasedCustomBinReps :: IntMap (IntMap Var)
+    -- | Binary representation of Number inputs
+    erasedBinReps :: BinReps,
+    -- | Binary representation of custom inputs
+    erasedCustomBinReps :: BinReps
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
@@ -166,7 +164,6 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
       <> "\n\
          \}"
     where
-      numBitWidth = getNumBitWidth counters
       totalBinRepConstraintSize = numInputVarSize counters + totalCustomInputSize counters
       showBinRepConstraints =
         if totalBinRepConstraintSize == 0
@@ -175,41 +172,6 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
             "  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n"
               <> unlines
                 ( map
-                    (uncurry (showBinRepConstraint numBitWidth))
-                    (IntMap.toList numBinReps)
-                    ++ concatMap
-                      ( \(bitWidth, pairs) ->
-                          map
-                            (uncurry (showBinRepConstraint bitWidth))
-                            (IntMap.toList pairs)
-                      )
-                      (IntMap.toList customBinReps)
+                    (("    " <>) . show)
+                    (BinRep.toList (numBinReps <> customBinReps))
                 )
-        where
-          showBinRepConstraint 2 var binRep =
-            "    $"
-              <> show var
-              <> " = $"
-              <> show binRep
-              <> " + 2$"
-              <> show (binRep + 1)
-          showBinRepConstraint 3 var binRep =
-            "    $"
-              <> show var
-              <> " = $"
-              <> show binRep
-              <> " + 2$"
-              <> show (binRep + 1)
-              <> " + 4$"
-              <> show (binRep + 2)
-          showBinRepConstraint width var binRep =
-            "    $"
-              <> show var
-              <> " = $"
-              <> show binRep
-              <> " + 2$"
-              <> show (binRep + 1)
-              <> " + ... + 2^"
-              <> show (width - 1)
-              <> "$"
-              <> show (binRep + width - 1)

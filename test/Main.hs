@@ -6,7 +6,6 @@ import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import qualified Basic
 import Control.Arrow (ArrowChoice (right), left)
-import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as Set
 import Keelung
 import Keelung.Compiler
@@ -16,6 +15,7 @@ import Keelung.Compiler.Interpret (InterpretError (..))
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (R1CS)
+import qualified Keelung.Syntax.BinRep as BinRep
 import qualified Keelung.Syntax.Typed as C
 import Keelung.Syntax.VarCounters
 import Test.Hspec
@@ -121,7 +121,7 @@ main = hspec $ do
                   Set.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
                 csVarCounters = makeVarCounters 181 0 1 0 0 [NumInput 0] [],
-                csNumBinReps = IntMap.fromList [(0, 1)],
+                csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (0, 1)],
                 csCustomBinReps = mempty
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
@@ -141,7 +141,7 @@ main = hspec $ do
                         cadd 0 [(5, 1)]
                       ],
                 csVarCounters = makeVarCounters 181 6 1 0 0 [NumInput 0] [],
-                csNumBinReps = IntMap.fromList [(6, 7)],
+                csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (6, 7)],
                 csCustomBinReps = mempty
               }
        in Compiler.compileOnly Basic.bits0 `shouldBe` Right cs
@@ -153,7 +153,7 @@ main = hspec $ do
                   Set.fromList $ -- value of outputs
                     cmul [(364, 1)] [(3, 1)] (0 :: GF181, [(0, 1)]),
                 csVarCounters = makeVarCounters 181 1 2 0 0 [NumInput 0, NumInput 1] [],
-                csNumBinReps = IntMap.fromList [(1, 3), (2, 184)],
+                csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (1, 3), BinRep.fromNumBinRep 181 (2, 184)],
                 csCustomBinReps = mempty
               }
        in Compiler.compileOnly Basic.bits1 `shouldBe` Right cs
