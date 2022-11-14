@@ -42,12 +42,12 @@ run (T.Elaborated expr comp) =
         let customBinReps =
               BinRep.fromList $
                 concatMap
-                  ( \(start, end) ->
+                  ( \(width, (start, end)) ->
                       map
-                        (\v -> BinRep.fromNumBinRep numBitWidth (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters'' v)))
+                        (\v -> BinRep.fromNumBinRep width (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters'' v)))
                         [start .. end - 1]
                   )
-                  (IntMap.elems (customInputVarsRanges counters''))
+                  (IntMap.toList (customInputVarsRanges counters''))
 
         return $
           TypeErased

@@ -325,8 +325,10 @@ rotateAndBitTest = do
 rotateOnly :: Comp (Arr (UInt 4))
 rotateOnly = do
   x <- inputUInt @4
+  let constant = 3 :: UInt 4
   -- y <- inputUInt @4
   return $
     toArray
       [ x `rotate` 0
+      , constant `rotate` 1
       ]

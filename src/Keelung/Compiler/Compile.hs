@@ -14,11 +14,11 @@ import Data.Sequence (Seq (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint
-import Keelung.Syntax.BinRep (BinRep (..))
-import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (CNEQ (..))
+import Keelung.Syntax.BinRep (BinRep (..), BinReps)
+import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
@@ -45,7 +45,7 @@ run (TypeErased untypedExprs counters assertions assignments numBinReps customBi
     ( ConstraintSystem
         constraints
         numBinReps
-        customBinReps
+        (customBinReps <> shiftedBinReps)
         counters
     )
 
@@ -66,7 +66,7 @@ encodeAssignment (Assignment var expr) = encode var expr
 data Env n = Env
   { envVarCounters :: VarCounters,
     envConstraints :: Set (Constraint n),
-    envShiftedBinReps :: Set BinRep
+    envShiftedBinReps :: BinReps
   }
 
 type M n = State (Env n)
@@ -90,7 +90,7 @@ addRotatedBinRep out bitWidth var rotate = do
             Boolean -> 1
             UInt n -> n
       let binRep = BinRep out width index rotate
-      modify (\env -> env {envShiftedBinReps = Set.insert binRep (envShiftedBinReps env)})
+      modify (\env -> env {envShiftedBinReps = BinRep.insert binRep (envShiftedBinReps env)})
 
 freshVar :: M n Var
 freshVar = do
