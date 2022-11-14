@@ -86,15 +86,25 @@ addRotatedBinRep out bitWidth var rotate = do
   counters <- gets envVarCounters
   case lookupBinRepStart counters var of
     Nothing -> error $ "[ panic ] Cannot find the start of the binary representation of the variable $" <> show var
-    Just index -> do
-      let binRep = BinRep out (getWidth bitWidth) index rotate
-      modify (\env -> env {envShiftedBinReps = BinRep.insert binRep (envShiftedBinReps env)})
+    Just index -> addBinRep $ BinRep out (getWidth bitWidth) index rotate
+
+addBinRep :: BinRep -> M n ()
+addBinRep binRep = modify (\env -> env {envShiftedBinReps = BinRep.insert binRep (envShiftedBinReps env)})
 
 freshVar :: M n Var
 freshVar = do
   n <- gets (totalVarSize . envVarCounters)
   modify' (\ctx -> ctx {envVarCounters = bumpIntermediateVar (envVarCounters ctx)})
   return n
+
+freshBinRep :: Var -> Int -> M n BinRep
+freshBinRep var width
+  | width < 1 = error $ "[ panic ] Cannot create a binary representation of width " <> show width
+  | otherwise = do
+    vars <- replicateM width freshVar
+    let binRep = BinRep var width (head vars) 0
+    addBinRep binRep
+    return binRep
 
 ----------------------------------------------------------------
 
@@ -105,13 +115,15 @@ encode out expr = case expr of
   Rotate _ n x -> encodeRotate out n x
   NAryOp bw op x y rest ->
     case op of
-      Add -> do
-        case bw of
-          UInt n -> encodeUIntAdd n out x y rest
-          Number _ -> do
-            terms <- mapM toTerm (x :<| y :<| rest)
-            encodeTerms out terms
-          Boolean -> error "[ panic ] Addition on Booleans??"
+      Add -> case bw of
+        Number _ -> do
+          terms <- mapM toTerm (x :<| y :<| rest)
+          encodeTerms out terms
+        UInt n -> do
+          terms <- mapM toTerm (x :<| y :<| rest)
+          encodeTerms out terms
+          encodeUIntAddBinRep n out x y rest
+        Boolean -> error "[ panic ] Addition on Booleans"
       And -> do
         a <- wireAsVar x
         b <- wireAsVar y
@@ -209,11 +221,9 @@ encodeRotate out i expr = case expr of
         encode out (Val bw (fromInteger rotatedVal))
   Var bw var -> addRotatedBinRep out bw var i
   Rotate _ n x -> encodeRotate out (i + n) x
-  BinaryOp bw bo x y -> error "[ panic ] dunno how to compile ROTATE BinaryOp"
-  NAryOp bw op x y rest -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
-  -- -- Add -> do
-  -- _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
-  If bw p x y -> error "[ panic ] dunno how to compile ROTATE If"
+  BinaryOp {} -> error "[ panic ] dunno how to compile ROTATE BinaryOp"
+  NAryOp {} -> error "[ panic ] dunno how to compile ROTATE NAryOp "
+  If {} -> error "[ panic ] dunno how to compile ROTATE If"
 
 --------------------------------------------------------------------------------
 
@@ -339,14 +349,30 @@ encodeEquality isEq out x y = do
 
 --------------------------------------------------------------------------------
 
-encodeUIntAdd :: (GaloisField n, Integral n) => Int -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
-encodeUIntAdd = error "[ panic ] Addition on UInts has not been implemented yet."
--- encodeUIntAdd width out x y rest = do 
---   x' <- wireAsVar x
---   y' <- wireAsVar y
---   rest' <- mapM wireAsVar rest
+-- | Encoding addition on UInts with multiple operands.
+--
+--    Sum    = A    + B   + ... + Y    + Z
+--    Sum₀   = A₀   ⊕ B₀  ⊕ ... ⊕ Y₀   ⊕ Z₀
+--    Sum₁   = A₁   ⊕ B₁  ⊕ ... ⊕ Y₁   ⊕ Z₁
+--    ...
+--    Sumₙ₋₁ = Aₙ₋₁ ⊕ Bₙ₋₁ ⊕ ... ⊕ Yₙ₋₁ ⊕ Zₙ₋₁
+--    Sumₙ   = Aₙ   ⊕ Bₙ   ⊕ ... ⊕ Yₙ   ⊕ Zₙ
+encodeUIntAddBinRep :: (GaloisField n, Integral n) => Int -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
+encodeUIntAddBinRep width out x y rest = do
+  counters <- gets envVarCounters
+  -- helper function for locating binary representations of all operands
+  let locateBinRep var = case lookupBinRepStart counters var of
+        Nothing -> error $ "[ panic ] encodeUIntAddBinRep: cannot locate binary representation of $" <> show var
+        Just index -> index
 
+  outBinRepStart <- binRepBitsIndex <$> freshBinRep out width
+  xBinRepStart <- locateBinRep <$> wireAsVar x
+  yBinRepStart <- locateBinRep <$> wireAsVar y
+  restBinRepStarts <- fmap locateBinRep <$> mapM wireAsVar rest
 
-
---   -- encode the constraints on the value 
---   error ""
+  forM_ [0 .. width - 1] $ \i -> do
+    let out' = outBinRepStart + i
+    let x' = xBinRepStart + i
+    let y' = yBinRepStart + i
+    let rest' = fmap (+ i) restBinRepStarts
+    encodeOtherNAryOp Xor out' (Var Boolean x') (Var Boolean y') (fmap (Var Boolean) rest')

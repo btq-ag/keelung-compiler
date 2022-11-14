@@ -14,13 +14,13 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
-import Keelung.Syntax.BinRep (BinReps)
-import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Field
+import Keelung.Syntax.BinRep (BinReps)
+import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
@@ -143,14 +143,17 @@ numberOfConstraints (ConstraintSystem cs _ _ counters) =
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show (ConstraintSystem constraints numBinReps customBinReps counters) =
     "ConstraintSystem {\n\
-    \  constraints ("
+    \  Total constraint size: "
+      <> show (length constraints + totalBinRepConstraintSize)
+      <> "\n\
+         \  Ordinary constraints ("
       <> show (length constraints)
       <> "):\n\n"
       <> showConstraints (toList constraints)
+      <> showBinRepConstraints
       <> "\n"
       <> indent (show counters)
       <> showBooleanVars
-      <> showBinRepConstraints
       <> "\n}"
     where
       showConstraints = unlines . map (\c -> "    " <> show c)
@@ -166,7 +169,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
         if totalBinRepConstraintSize == 0
           then ""
           else
-            "  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n"
+            "\n  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n\n"
               <> unlines
                 ( map
                     (("    " <>) . show)
