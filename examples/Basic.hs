@@ -298,6 +298,12 @@ mixed = do
   number <- input
   return $ fromBool boolean + number * 2
 
+opsOnUInt :: Comp (Arr (UInt 4))
+opsOnUInt = do
+  x <- inputUInt @4
+  y <- inputUInt @4
+  return $ toArray [x + y]
+
 bitwise :: Comp (Arr Boolean)
 bitwise = do
   x <- inputUInt @4
@@ -329,6 +335,9 @@ rotateOnly = do
   -- y <- inputUInt @4
   return $
     toArray
-      [ x `rotate` 0
-      , constant `rotate` 1
+      [ x `rotate` 0,
+        constant `rotate` 3,
+        constant `rotate` (-2),
+        x `rotate` 1 `rotate` 1,
+        (x + x) `rotate` 1
       ]

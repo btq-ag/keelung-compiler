@@ -7,12 +7,14 @@ module Keelung.Compiler.Compile (run) where
 
 import Control.Monad
 import Control.Monad.State
+import qualified Data.Bits
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
 import qualified Data.IntMap as IntMap
 import Data.Sequence (Seq (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Debug.Trace
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
@@ -25,7 +27,7 @@ import Keelung.Types
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: GaloisField n => TypeErased n -> ConstraintSystem n
+run :: (GaloisField n, Integral n) => TypeErased n -> ConstraintSystem n
 run (TypeErased untypedExprs counters assertions assignments numBinReps customBinReps) = runM counters $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
   forM_ (zip (outputVars counters) untypedExprs) $ \(var, expr) -> do
@@ -50,14 +52,14 @@ run (TypeErased untypedExprs counters assertions assignments numBinReps customBi
     )
 
 -- | Encode the constraint 'out = x'.
-encodeAssertion :: GaloisField n => Expr n -> M n ()
+encodeAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
 encodeAssertion expr = do
   out <- freshVar
   encode out expr
   add $ cadd 1 [(out, -1)] -- 1 = expr
 
 -- | Encode the constraint 'out = expr'.
-encodeAssignment :: GaloisField n => Assignment n -> M n ()
+encodeAssignment :: (GaloisField n, Integral n) => Assignment n -> M n ()
 encodeAssignment (Assignment var expr) = encode var expr
 
 --------------------------------------------------------------------------------
@@ -100,16 +102,20 @@ freshVar = do
 
 ----------------------------------------------------------------
 
-encode :: GaloisField n => Var -> Expr n -> M n ()
+encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
 encode out expr = case expr of
   Val _ val -> add $ cadd val [(out, -1)] -- out = val
   Var _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   Rotate _ n x -> encodeRotate out n x
-  NAryOp _ op x y rest ->
+  NAryOp bw op x y rest ->
     case op of
       Add -> do
-        terms <- mapM toTerm (x :<| y :<| rest)
-        encodeTerms out terms
+        case bw of
+          UInt n -> encodeUIntAdd n out x y rest
+          Number -> do
+            terms <- mapM toTerm (x :<| y :<| rest)
+            encodeTerms out terms
+          Boolean -> error "[ panic ] Addition on Booleans??"
       And -> do
         a <- wireAsVar x
         b <- wireAsVar y
@@ -170,13 +176,51 @@ encode out expr = case expr of
 --------------------------------------------------------------------------------
 
 -- | Pushes the constructor of Rotate inwards
-encodeRotate :: GaloisField n => Var -> Int -> Expr n -> M n ()
+encodeRotate :: (GaloisField n, Integral n) => Var -> Int -> Expr n -> M n ()
 encodeRotate out i expr = case expr of
-  Val bw n -> error "[ panic ] dunno how to compile ROTATE VAL"
+  Val bw n -> do
+    counters <- gets envVarCounters
+    let width = case bw of
+          Number -> getNumBitWidth counters
+          Boolean -> 1
+          UInt n' -> n'
+    let val = toInteger n
+    -- see if we are rotating right (positive) of left (negative)
+    case i `compare` 0 of
+      EQ -> encode out expr -- no rotation
+      LT -> do
+        let rotateDistance = (-i) `mod` width
+        -- collect the bit values of lower bits that will be rotated to higher bits
+        let lowerBits = [Data.Bits.testBit val j | j <- [0 .. rotateDistance - 1]]
+        -- shift the higher bits left by the rotate distance
+        let higherBits = Data.Bits.shiftR val rotateDistance
+        -- combine the lower bits and the higher bits
+        let rotatedVal =
+              foldl'
+                (\acc (bit, j) -> if bit then Data.Bits.setBit acc j else acc)
+                higherBits
+                (zip lowerBits [width - rotateDistance .. width - 1])
+        encode out (Val bw (fromInteger rotatedVal))
+      GT -> do
+        let rotateDistance = i `mod` width
+        -- collect the bit values of higher bits that will be rotated to lower bits
+        let higherBits = [Data.Bits.testBit val j | j <- [width - rotateDistance .. width - 1]]
+        -- shift the lower bits right by the rotate distance
+        let lowerBits = Data.Bits.shiftL val rotateDistance `mod` (2 ^ width)
+        traceShowM (val, rotateDistance, higherBits, lowerBits)
+        -- combine the lower bits and the higher bits
+        let rotatedVal =
+              foldl'
+                (\acc (bit, j) -> if bit then Data.Bits.setBit acc j else acc)
+                lowerBits
+                (zip higherBits [0 .. rotateDistance - 1])
+        encode out (Val bw (fromInteger rotatedVal))
   Var bw var -> addRotatedBinRep out bw var i
-  Rotate bw n ex -> error "[ panic ] dunno how to compile ROTATE Rotate"
+  Rotate _ n x -> encodeRotate out (i + n) x
   BinaryOp bw bo x y -> error "[ panic ] dunno how to compile ROTATE BinaryOp"
-  NAryOp bw op x y rest -> error "[ panic ] dunno how to compile ROTATE NAryOp"
+  NAryOp bw op x y rest -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
+  -- -- Add -> do
+  -- _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
   If bw p x y -> error "[ panic ] dunno how to compile ROTATE If"
 
 --------------------------------------------------------------------------------
@@ -187,7 +231,7 @@ data Term n
 
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
-toTerm :: GaloisField n => Expr n -> M n (Term n)
+toTerm :: (GaloisField n, Integral n) => Expr n -> M n (Term n)
 toTerm (NAryOp _ Mul (Var _ var) (Val _ n) Empty) =
   return $ WithVars var n
 toTerm (NAryOp _ Mul (Val _ n) (Var _ var) Empty) =
@@ -223,14 +267,14 @@ encodeTerms out terms =
     go (constant, pairs) (Constant n) = (constant + n, pairs)
     go (constant, pairs) (WithVars var coeff) = (constant, (var, coeff) : pairs)
 
-encodeOtherNAryOp :: GaloisField n => Op -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
+encodeOtherNAryOp :: (GaloisField n, Integral n) => Op -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
 encodeOtherNAryOp op out x0 x1 xs = do
   x0' <- wireAsVar x0
   x1' <- wireAsVar x1
   vars <- mapM wireAsVar xs
   encodeVars x0' x1' vars
   where
-    encodeVars :: GaloisField n => Var -> Var -> Seq Var -> M n ()
+    encodeVars :: (GaloisField n, Integral n) => Var -> Var -> Seq Var -> M n ()
     encodeVars x y Empty = encodeBinaryOp op out x y
     encodeVars x y (v :<| vs) = do
       out' <- freshVar
@@ -238,7 +282,7 @@ encodeOtherNAryOp op out x0 x1 xs = do
       encodeBinaryOp op out' x y
 
 -- | If the expression is not already a variable, create a new variable
-wireAsVar :: GaloisField n => Expr n -> M n Var
+wireAsVar :: (GaloisField n, Integral n) => Expr n -> M n Var
 wireAsVar (Var _ var) = return var
 wireAsVar expr = do
   out <- freshVar
@@ -246,7 +290,7 @@ wireAsVar expr = do
   return out
 
 -- | Encode the constraint 'x op y = out'.
-encodeBinaryOp :: GaloisField n => Op -> Var -> Var -> Var -> M n ()
+encodeBinaryOp :: (GaloisField n, Integral n) => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
   Add -> error "encodeBinaryOp: Add"
   Mul -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
@@ -268,7 +312,7 @@ encodeBinaryOp op out x y = case op of
 --    The encoding is, for some 'm':
 --        1. (x - y) * m = out
 --        2. (x - y) * (1 - out) = 0
-encodeEquality :: GaloisField n => Bool -> Var -> Var -> Var -> M n ()
+encodeEquality :: (GaloisField n, Integral n) => Bool -> Var -> Var -> Var -> M n ()
 encodeEquality isEq out x y = do
   -- lets build the polynomial for (x - y) first:
   case Poly.buildEither 0 [(x, 1), (y, -1)] of
@@ -300,3 +344,17 @@ encodeEquality isEq out x y = do
 
       --  keep track of the relation between (x - y) and m
       add [CNEq (CNEQ (Left x) (Left y) m)]
+
+--------------------------------------------------------------------------------
+
+encodeUIntAdd :: (GaloisField n, Integral n) => Int -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
+encodeUIntAdd = error "[ panic ] Addition on UInts has not been implemented yet."
+-- encodeUIntAdd width out x y rest = do 
+--   x' <- wireAsVar x
+--   y' <- wireAsVar y
+--   rest' <- mapM wireAsVar rest
+
+
+
+--   -- encode the constraints on the value 
+--   error ""
