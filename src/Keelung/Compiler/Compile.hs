@@ -87,11 +87,7 @@ addRotatedBinRep out bitWidth var rotate = do
   case lookupBinRepStart counters var of
     Nothing -> error $ "[ panic ] Cannot find the start of the binary representation of the variable $" <> show var
     Just index -> do
-      let width = case bitWidth of
-            Number -> getNumBitWidth counters
-            Boolean -> 1
-            UInt n -> n
-      let binRep = BinRep out width index rotate
+      let binRep = BinRep out (getWidth bitWidth) index rotate
       modify (\env -> env {envShiftedBinReps = BinRep.insert binRep (envShiftedBinReps env)})
 
 freshVar :: M n Var
@@ -112,7 +108,7 @@ encode out expr = case expr of
       Add -> do
         case bw of
           UInt n -> encodeUIntAdd n out x y rest
-          Number -> do
+          Number _ -> do
             terms <- mapM toTerm (x :<| y :<| rest)
             encodeTerms out terms
           Boolean -> error "[ panic ] Addition on Booleans??"
@@ -179,11 +175,7 @@ encode out expr = case expr of
 encodeRotate :: (GaloisField n, Integral n) => Var -> Int -> Expr n -> M n ()
 encodeRotate out i expr = case expr of
   Val bw n -> do
-    counters <- gets envVarCounters
-    let width = case bw of
-          Number -> getNumBitWidth counters
-          Boolean -> 1
-          UInt n' -> n'
+    let width = getWidth bw
     let val = toInteger n
     -- see if we are rotating right (positive) of left (negative)
     case i `compare` 0 of

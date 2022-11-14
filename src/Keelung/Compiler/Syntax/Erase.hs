@@ -80,8 +80,12 @@ runM = flip evalState
 --------------------------------------------------------------------------------
 
 eraseVal :: GaloisField n => T.Val -> M n [Expr n]
-eraseVal (T.Integer n) = return [Val Number (fromInteger n)]
-eraseVal (T.Rational n) = return [Val Number (fromRational n)]
+eraseVal (T.Integer n) = do
+  width <- gets getNumBitWidth
+  return [Val (Number width) (fromInteger n)]
+eraseVal (T.Rational n) = do
+  width <- gets getNumBitWidth
+  return [Val (Number width) (fromRational n)]
 eraseVal (T.Unsigned w n) = return [Val (UInt w) (fromInteger n)]
 eraseVal (T.Boolean False) = return [Val Boolean 0]
 eraseVal (T.Boolean True) = return [Val Boolean 1]
@@ -110,9 +114,10 @@ eraseVal T.Unit = return []
 eraseRef' :: T.Ref -> M n (BitWidth, Int)
 eraseRef' ref = do
   counters <- get
+  let numWidth = getNumBitWidth counters
   return $ case ref of
-    T.NumVar n -> (Number, blendIntermediateVar counters n)
-    T.NumInputVar n -> (Number, blendNumInputVar counters n)
+    T.NumVar n -> (Number numWidth, blendIntermediateVar counters n)
+    T.NumInputVar n -> (Number numWidth, blendNumInputVar counters n)
     -- we don't need to mark intermediate Boolean variables
     -- and impose the Boolean constraint on them ($A * $A = $A)
     -- because this property should be guaranteed by the source of its value
@@ -187,10 +192,7 @@ bitValue expr i = case expr of
   Var w var -> do
     counters <- get
     -- if the index 'i' overflows or underflows, wrap it around
-    let i' = case w of
-          Boolean -> 0
-          Number -> i `mod` getNumBitWidth counters
-          UInt w' -> i `mod` w'
+    let i' = i `mod` getWidth w
     -- bit variable corresponding to the variable 'var' and the index 'i''
     case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
@@ -198,11 +200,7 @@ bitValue expr i = case expr of
   Rotate w n x -> do
     -- rotate the bit value
     -- if the index 'i' overflows or underflows, wrap it around
-    counters <- get
-    let i' = case w of
-          Boolean -> 0
-          Number -> n + i `mod` getNumBitWidth counters
-          UInt w' -> n + i `mod` w'
+    let i' = n + i `mod` getWidth w
     bitValue x i'
   BinaryOp {} -> error "Panic: trying to access the bit value of a compound expression"
   NAryOp _ And x y rest ->

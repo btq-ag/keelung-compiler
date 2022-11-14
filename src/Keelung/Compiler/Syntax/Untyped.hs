@@ -6,6 +6,7 @@ module Keelung.Compiler.Syntax.Untyped
   ( Op (..),
     BitWidth (..),
     bitWidthOf,
+    getWidth,
     BinaryOp (..),
     Expr (..),
     TypeErased (..),
@@ -17,10 +18,10 @@ where
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..))
 import Keelung.Field (N (..))
-import Keelung.Syntax.VarCounters
-import Keelung.Types (Var)
 import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
+import Keelung.Syntax.VarCounters
+import Keelung.Types (Var)
 
 --------------------------------------------------------------------------------
 
@@ -42,8 +43,13 @@ data BinaryOp = Sub | Div
 
 --------------------------------------------------------------------------------
 
-data BitWidth = Number | Boolean | UInt Int
+data BitWidth = Number Int | Boolean | UInt Int
   deriving (Eq, Ord, Show)
+
+getWidth :: BitWidth -> Int
+getWidth (Number n) = n
+getWidth Boolean = 1
+getWidth (UInt n) = n
 
 -- | Untyped expression
 data Expr n
@@ -63,7 +69,7 @@ instance Num n => Num (Expr n) where
   x * y = NAryOp (bitWidthOf x) Mul x y Empty
   abs = id
   signum = const 1
-  fromInteger = Val Number . fromInteger -- NOTE: this "Number" is probably wrong
+  fromInteger = error "[ panic ] Dunno how to convert an Integer to a untyped expression"
 
 instance Show n => Show (Expr n) where
   showsPrec prec expr =
