@@ -122,7 +122,7 @@ tests = do
                                 (Poly.buildEither 0 [(3, 1)])
                             ]
 
-    it "Addition on unsigned integers 0" $ do
+    it "Addition on unsigned integers" $ do
       let program = do
             x <- inputUInt @4
             y <- inputUInt @4
@@ -136,6 +136,22 @@ tests = do
                                 (Poly.buildEither 0 [(6, 16)])
                                 (Poly.buildEither 0 [(10, 1)])
                                 (Poly.buildEither 0 [(0, 1), (1, -1), (2, -1)])
+                            ]
+
+    it "Subtraction on unsigned integers" $ do
+      let program = do
+            x <- inputUInt @4
+            y <- inputUInt @4
+            return (x - y)
+      case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        Left err -> expectationFailure (show err)
+        Right r1cs -> do
+          -- x - y - carry = output
+          toR1Cs r1cs
+            `shouldContain` [ R1C
+                                (Poly.buildEither 0 [(6, 16)])
+                                (Poly.buildEither 0 [(10, 1)])
+                                (Poly.buildEither 0 [(0, 1), (1, -1), (2, 1)])
                             ]
 
 example1 :: Comp (Arr Boolean)

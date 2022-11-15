@@ -182,10 +182,14 @@ encode out expr = case expr of
             --  =>  the sum of operands is not 0
             encode out (NAryOp Boolean NEq 0 (NAryOp Boolean Add x y rest) Empty)
       _ -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
-  BinaryOp _ Sub x y -> do
-    x' <- toTerm x
-    y' <- toTerm y
-    encodeTerms out (x' :<| negateTerm y' :<| Empty)
+  BinaryOp bw Sub x y -> do
+    case bw of
+      Number _ -> do
+        x' <- toTerm x
+        y' <- toTerm y
+        encodeTerms out (x' :<| negateTerm y' :<| Empty)
+      UInt n -> encodeAndFoldExprs (encodeUIntSub n) out x y mempty
+      Boolean -> error "[ panic ] Subtraction on Booleans"
   BinaryOp _ Div x y -> do
     x' <- wireAsVar x
     y' <- wireAsVar y
@@ -364,8 +368,8 @@ encodeEquality isEq out x y = do
 
 -- | Encoding addition on UInts with multiple operands: O(2)
 --    Sum = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
-encodeUIntAdd :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
-encodeUIntAdd width out x y = do
+encodeUIntAddOrSub :: (GaloisField n, Integral n) => Bool -> Int -> Var -> Var -> Var -> M n ()
+encodeUIntAddOrSub isSub width out x y = do
   -- allocate a fresh BinRep for the output
   _outBinRep <- freshBinRep out width
 
@@ -384,7 +388,13 @@ encodeUIntAdd width out x y = do
   --    (2ⁿ * Aₙ₋₁) * (Bₙ₋₁) = (out - A - B)
   let polynomial1 = Poly.buildEither 0 [(xBinRepStart + width - 1, multiplier)]
   let polynomial2 = Poly.singleVar (yBinRepStart + width - 1)
-  let polynomial3 = Poly.buildEither 0 [(out, 1), (x, -1), (y, -1)]
+  let polynomial3 = Poly.buildEither 0 [(out, 1), (x, -1), (y, if isSub then 1 else -1)]
 
   numBitWidth <- gets (Number . getNumBitWidth . envVarCounters)
   encode out $ EmbedR1C numBitWidth $ R1C polynomial1 (Right polynomial2) polynomial3
+
+encodeUIntAdd :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
+encodeUIntAdd = encodeUIntAddOrSub False
+
+encodeUIntSub :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
+encodeUIntSub = encodeUIntAddOrSub True
