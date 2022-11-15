@@ -164,7 +164,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               then ""
               else "  Boolean variables: $" <> show start <> " .. $" <> show (end - 1) <> "\n"
 
-      totalBinRepConstraintSize = numInputVarSize counters + totalCustomInputSize counters
+      totalBinRepConstraintSize = BinRep.size customBinReps + BinRep.size numBinReps
       showBinRepConstraints =
         if totalBinRepConstraintSize == 0
           then ""
@@ -219,9 +219,9 @@ renumberConstraints cs =
         else var -- this is an input variable
     renumberConstraint constraint = case constraint of
       CAdd xs ->
-        CAdd $ Poly.mapVars renumber xs
+        CAdd $ Poly.renumberVars renumber xs
       CMul aV bV cV ->
-        CMul (Poly.mapVars renumber aV) (Poly.mapVars renumber bV) (Poly.mapVars renumber <$> cV)
+        CMul (Poly.renumberVars renumber aV) (Poly.renumberVars renumber bV) (Poly.renumberVars renumber <$> cV)
       CNEq (CNEQ (Left x) (Left y) m) ->
         CNEq (CNEQ (Left (renumber x)) (Left (renumber y)) (renumber m))
       CNEq (CNEQ (Left x) (Right y) m) ->

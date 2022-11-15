@@ -116,9 +116,9 @@ encodeVarCoeff (v, c) = list f [Left v, Right c]
 reindexR1C :: R1CS n -> R1C n -> R1C n
 reindexR1C r1cs (R1C a b c) =
   R1C
-    (fmap (Poly.mapVars reindex) a)
-    (fmap (Poly.mapVars reindex) b)
-    (fmap (Poly.mapVars reindex) c)
+    (fmap (Poly.renumberVars reindex) a)
+    (fmap (Poly.renumberVars reindex) b)
+    (fmap (Poly.renumberVars reindex) c)
   where
     reindex :: Var -> Var
     reindex var

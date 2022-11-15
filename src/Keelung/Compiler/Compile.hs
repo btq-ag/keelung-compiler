@@ -14,7 +14,6 @@ import qualified Data.IntMap as IntMap
 import Data.Sequence (Seq (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Debug.Trace
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Constraint.Polynomial (Poly)
@@ -44,13 +43,13 @@ run (TypeErased untypedExprs counters assertions assignments numBinReps customBi
 
   constraints <- gets envConstraints
 
-  shiftedBinReps <- gets envShiftedBinReps
+  extraBinReps <- gets envExtraBinReps
 
   return
     ( ConstraintSystem
         constraints
         numBinReps
-        (customBinReps <> shiftedBinReps)
+        (customBinReps <> extraBinReps)
         counters
     )
 
@@ -71,7 +70,7 @@ encodeAssignment (Assignment var expr) = encode var expr
 data Env n = Env
   { envVarCounters :: VarCounters,
     envConstraints :: Set (Constraint n),
-    envShiftedBinReps :: BinReps
+    envExtraBinReps :: BinReps
   }
 
 type M n = State (Env n)
@@ -106,7 +105,7 @@ addRotatedBinRep out bitWidth var rotate = do
     Just index -> addBinRep $ BinRep out (getWidth bitWidth) index rotate
 
 addBinRep :: BinRep -> M n ()
-addBinRep binRep = modify (\env -> env {envShiftedBinReps = BinRep.insert binRep (envShiftedBinReps env)})
+addBinRep binRep = modify (\env -> env {envExtraBinReps = BinRep.insert binRep (envExtraBinReps env)})
 
 freshVar :: M n Var
 freshVar = do
@@ -226,7 +225,6 @@ encodeRotate out i expr = case expr of
         let higherBits = [Data.Bits.testBit val j | j <- [width - rotateDistance .. width - 1]]
         -- shift the lower bits right by the rotate distance
         let lowerBits = Data.Bits.shiftL val rotateDistance `mod` (2 ^ width)
-        traceShowM (val, rotateDistance, higherBits, lowerBits)
         -- combine the lower bits and the higher bits
         let rotatedVal =
               foldl'
@@ -366,37 +364,8 @@ encodeEquality isEq out x y = do
 
 -- | Encoding addition on UInts with multiple operands: O(2)
 --    Sum = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
-
--- encodeOtherNAryOp :: (GaloisField n, Integral n) => Op -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
--- encodeOtherNAryOp op out x0 x1 xs = do
---   x0' <- wireAsVar x0
---   x1' <- wireAsVar x1
---   vars <- mapM wireAsVar xs
---   encodeVars x0' x1' vars
---   where
---     encodeVars :: (GaloisField n, Integral n) => Var -> Var -> Seq Var -> M n ()
---     encodeVars x y Empty = encodeBinaryOp op out x y
---     encodeVars x y (v :<| vs) = do
---       out' <- freshVar
---       encodeVars out' v vs
---       encodeBinaryOp op out' x y
--- encodeUIntAdds :: (GaloisField n, Integral n) => Int -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
--- encodeUIntAdds width out x y rest = do
---   x' <- wireAsVar x
---   y' <- wireAsVar y
---   rest' <- mapM wireAsVar rest
---   encodeVars x' y' rest'
---   where
---     encodeVars :: (GaloisField n, Integral n) => Var -> Var -> Seq Var -> M n ()
---     encodeVars x y Empty = encodeBinaryOp op out x y
---     encodeVars x y (v :<| vs) = do
---       out' <- freshVar
---       encodeVars out' v vs
---       encodeBinaryOp op out' x y
-
---   where
 encodeUIntAdd :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
-encodeUIntAdd width out x y = traceShow (out, x, y) $ do
+encodeUIntAdd width out x y = do
   -- allocate a fresh BinRep for the output
   _outBinRep <- freshBinRep out width
 
@@ -419,4 +388,3 @@ encodeUIntAdd width out x y = traceShow (out, x, y) $ do
 
   numBitWidth <- gets (Number . getNumBitWidth . envVarCounters)
   encode out $ EmbedR1C numBitWidth $ R1C polynomial1 (Right polynomial2) polynomial3
-

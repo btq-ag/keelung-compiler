@@ -133,9 +133,9 @@ tests = do
           -- x + y - carry = output
           toR1Cs r1cs
             `shouldContain` [ R1C
-                                (Poly.buildEither 0 [(0, -1), (1, 1), (2, 1)])
-                                (Poly.buildEither 1 [])
-                                (Poly.buildEither 0 [])
+                                (Poly.buildEither 0 [(6, 16)])
+                                (Poly.buildEither 0 [(10, 1)])
+                                (Poly.buildEither 0 [(0, 1), (1, -1), (2, -1)])
                             ]
 
 example1 :: Comp (Arr Boolean)
