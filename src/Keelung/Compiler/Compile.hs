@@ -17,7 +17,10 @@ import qualified Data.Set as Set
 import Debug.Trace
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.Untyped
+import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Constraint.R1C (R1C (..))
+import qualified Keelung.Constraint.R1C as R1C
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Syntax.BinRep (BinRep (..), BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
@@ -80,6 +83,20 @@ add :: GaloisField n => [Constraint n] -> M n ()
 add cs =
   modify (\env -> env {envConstraints = Set.union (Set.fromList cs) (envConstraints env)})
 
+addPoly :: GaloisField n => Maybe (Poly n) -> M n ()
+addPoly Nothing = return ()
+addPoly (Just c) = add [CAdd c]
+
+-- | Adding a raw R1C constraint (TODO: eliminate all usage of this function)
+addR1C :: GaloisField n => R1C n -> M n ()
+addR1C (R1C.R1C (Left _) (Left _) (Left _)) = return ()
+addR1C (R1C.R1C (Left a) (Left b) (Right c)) = addPoly $ Poly.buildMaybe (Poly.constant c - a * b) (Poly.coeffs c)
+addR1C (R1C.R1C (Left a) (Right b) (Left c)) = addPoly $ Poly.buildMaybe (a * Poly.constant b - c) (fmap (* a) (Poly.coeffs b))
+addR1C (R1C.R1C (Left a) (Right b) (Right c)) = addPoly $ Poly.buildMaybe (a * Poly.constant b - Poly.constant c) (fmap (* a) (Poly.coeffs b) <> fmap negate (Poly.coeffs c))
+addR1C (R1C.R1C (Right a) (Left b) (Left c)) = addPoly $ Poly.buildMaybe (Poly.constant a * b - c) (fmap (* b) (Poly.coeffs a))
+addR1C (R1C.R1C (Right a) (Left b) (Right c)) = addPoly $ Poly.buildMaybe (Poly.constant a * b - Poly.constant c) (fmap (* b) (Poly.coeffs a) <> fmap negate (Poly.coeffs c))
+addR1C (R1C.R1C (Right a) (Right b) c) = add [CMul a b c]
+
 -- | Adds a new view of binary representation of a variable after rotation.
 addRotatedBinRep :: Var -> BitWidth -> Var -> Int -> M n ()
 addRotatedBinRep out bitWidth var rotate = do
@@ -119,10 +136,7 @@ encode out expr = case expr of
         Number _ -> do
           terms <- mapM toTerm (x :<| y :<| rest)
           encodeTerms out terms
-        UInt n -> do
-          terms <- mapM toTerm (x :<| y :<| rest)
-          encodeTerms out terms
-          encodeUIntAddBinRep n out x y rest
+        UInt n -> encodeAndFoldExprs (encodeUIntAdd n) out x y rest
         Boolean -> error "[ panic ] Addition on Booleans"
       And -> do
         a <- wireAsVar x
@@ -168,7 +182,7 @@ encode out expr = case expr of
             --  =>  if the sum of operands is not 0 then 1 else 0
             --  =>  the sum of operands is not 0
             encode out (NAryOp Boolean NEq 0 (NAryOp Boolean Add x y rest) Empty)
-      _ -> encodeOtherNAryOp op out x y rest
+      _ -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
   BinaryOp _ Sub x y -> do
     x' <- toTerm x
     y' <- toTerm y
@@ -180,6 +194,7 @@ encode out expr = case expr of
   If _ b x y -> do
     b' <- wireAsVar b
     encode out ((Var Boolean b' * x) + ((1 - Var Boolean b') * y))
+  EmbedR1C _ r1c -> addR1C r1c
 
 --------------------------------------------------------------------------------
 
@@ -224,6 +239,7 @@ encodeRotate out i expr = case expr of
   BinaryOp {} -> error "[ panic ] dunno how to compile ROTATE BinaryOp"
   NAryOp {} -> error "[ panic ] dunno how to compile ROTATE NAryOp "
   If {} -> error "[ panic ] dunno how to compile ROTATE If"
+  EmbedR1C {} -> error "[ panic ] dunno how to compile ROTATE EmbedR1C"
 
 --------------------------------------------------------------------------------
 
@@ -269,19 +285,18 @@ encodeTerms out terms =
     go (constant, pairs) (Constant n) = (constant + n, pairs)
     go (constant, pairs) (WithVars var coeff) = (constant, (var, coeff) : pairs)
 
-encodeOtherNAryOp :: (GaloisField n, Integral n) => Op -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
-encodeOtherNAryOp op out x0 x1 xs = do
+encodeAndFoldExprs :: (GaloisField n, Integral n) => (Var -> Var -> Var -> M n ()) -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
+encodeAndFoldExprs f out x0 x1 xs = do
   x0' <- wireAsVar x0
   x1' <- wireAsVar x1
   vars <- mapM wireAsVar xs
-  encodeVars x0' x1' vars
+  go x0' x1' vars
   where
-    encodeVars :: (GaloisField n, Integral n) => Var -> Var -> Seq Var -> M n ()
-    encodeVars x y Empty = encodeBinaryOp op out x y
-    encodeVars x y (v :<| vs) = do
+    go x y Empty = f out x y
+    go x y (v :<| vs) = do
       out' <- freshVar
-      encodeVars out' v vs
-      encodeBinaryOp op out' x y
+      go out' v vs
+      f out' x y
 
 -- | If the expression is not already a variable, create a new variable
 wireAsVar :: (GaloisField n, Integral n) => Expr n -> M n Var
@@ -349,30 +364,59 @@ encodeEquality isEq out x y = do
 
 --------------------------------------------------------------------------------
 
--- | Encoding addition on UInts with multiple operands.
---
---    Sum    = A    + B   + ... + Y    + Z
---    Sum₀   = A₀   ⊕ B₀  ⊕ ... ⊕ Y₀   ⊕ Z₀
---    Sum₁   = A₁   ⊕ B₁  ⊕ ... ⊕ Y₁   ⊕ Z₁
---    ...
---    Sumₙ₋₁ = Aₙ₋₁ ⊕ Bₙ₋₁ ⊕ ... ⊕ Yₙ₋₁ ⊕ Zₙ₋₁
---    Sumₙ   = Aₙ   ⊕ Bₙ   ⊕ ... ⊕ Yₙ   ⊕ Zₙ
-encodeUIntAddBinRep :: (GaloisField n, Integral n) => Int -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
-encodeUIntAddBinRep width out x y rest = do
+-- | Encoding addition on UInts with multiple operands: O(2)
+--    Sum = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
+
+-- encodeOtherNAryOp :: (GaloisField n, Integral n) => Op -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
+-- encodeOtherNAryOp op out x0 x1 xs = do
+--   x0' <- wireAsVar x0
+--   x1' <- wireAsVar x1
+--   vars <- mapM wireAsVar xs
+--   encodeVars x0' x1' vars
+--   where
+--     encodeVars :: (GaloisField n, Integral n) => Var -> Var -> Seq Var -> M n ()
+--     encodeVars x y Empty = encodeBinaryOp op out x y
+--     encodeVars x y (v :<| vs) = do
+--       out' <- freshVar
+--       encodeVars out' v vs
+--       encodeBinaryOp op out' x y
+-- encodeUIntAdds :: (GaloisField n, Integral n) => Int -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
+-- encodeUIntAdds width out x y rest = do
+--   x' <- wireAsVar x
+--   y' <- wireAsVar y
+--   rest' <- mapM wireAsVar rest
+--   encodeVars x' y' rest'
+--   where
+--     encodeVars :: (GaloisField n, Integral n) => Var -> Var -> Seq Var -> M n ()
+--     encodeVars x y Empty = encodeBinaryOp op out x y
+--     encodeVars x y (v :<| vs) = do
+--       out' <- freshVar
+--       encodeVars out' v vs
+--       encodeBinaryOp op out' x y
+
+--   where
+encodeUIntAdd :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
+encodeUIntAdd width out x y = traceShow (out, x, y) $ do
+  -- allocate a fresh BinRep for the output
+  _outBinRep <- freshBinRep out width
+
+  -- locate the binary representations of the operands
   counters <- gets envVarCounters
-  -- helper function for locating binary representations of all operands
   let locateBinRep var = case lookupBinRepStart counters var of
         Nothing -> error $ "[ panic ] encodeUIntAddBinRep: cannot locate binary representation of $" <> show var
         Just index -> index
+  let xBinRepStart = locateBinRep x
+  let yBinRepStart = locateBinRep y
 
-  outBinRepStart <- binRepBitsIndex <$> freshBinRep out width
-  xBinRepStart <- locateBinRep <$> wireAsVar x
-  yBinRepStart <- locateBinRep <$> wireAsVar y
-  restBinRepStarts <- fmap locateBinRep <$> mapM wireAsVar rest
+  let multiplier = 2 ^ width
+  -- We can refactor
+  --    out = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
+  -- into the form of
+  --    (2ⁿ * Aₙ₋₁) * (Bₙ₋₁) = (out - A - B)
+  let polynomial1 = Poly.buildEither 0 [(xBinRepStart + width - 1, multiplier)]
+  let polynomial2 = Poly.singleVar (yBinRepStart + width - 1)
+  let polynomial3 = Poly.buildEither 0 [(out, 1), (x, -1), (y, -1)]
 
-  forM_ [0 .. width - 1] $ \i -> do
-    let out' = outBinRepStart + i
-    let x' = xBinRepStart + i
-    let y' = yBinRepStart + i
-    let rest' = fmap (+ i) restBinRepStarts
-    encodeOtherNAryOp Xor out' (Var Boolean x') (Var Boolean y') (fmap (Var Boolean) rest')
+  numBitWidth <- gets (Number . getNumBitWidth . envVarCounters)
+  encode out $ EmbedR1C numBitWidth $ R1C polynomial1 (Right polynomial2) polynomial3
+

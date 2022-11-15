@@ -302,8 +302,8 @@ opsOnUInt :: Comp (Arr (UInt 4))
 opsOnUInt = do
   x <- inputUInt @4
   y <- inputUInt @4
-  z <- inputUInt @4
-  return $ toArray [x + y + z]
+  -- z <- inputUInt @4
+  return $ toArray [x + y]
 
 bitwise :: Comp (Arr Boolean)
 bitwise = do

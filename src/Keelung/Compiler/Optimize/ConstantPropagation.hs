@@ -4,6 +4,8 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Keelung.Compiler.Syntax.Untyped
+import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Constraint.R1C (R1C (..))
 
 --------------------------------------------------------------------------------
 
@@ -54,3 +56,15 @@ propagateConstant bindings = propogate
       NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
       BinaryOp w op x y -> BinaryOp w op (propogate x) (propogate y)
       If w p x y -> If w (propogate p) (propogate x) (propogate y)
+      EmbedR1C w r1c -> EmbedR1C w (propagateR1C r1c)
+
+    propagateR1C (R1C a b c) = R1C (a >>= propogatePoly) (b >>= propogatePoly) (c >>= propogatePoly)
+
+    propogatePoly xs =
+      let (constant, coeffs) = Poly.view xs
+          (constant', coeffs') = foldl go (constant, mempty) (IntMap.toList coeffs)
+       in Poly.buildEither constant' coeffs'
+      where
+        go (constant, coeffs) (var, coeff) = case IntMap.lookup var bindings of
+          Nothing -> (constant, (var, coeff) : coeffs)
+          Just (_, val) -> (constant + coeff * val, coeffs)

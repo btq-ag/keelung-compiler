@@ -3,13 +3,13 @@
 
 module Test.Compilation (tests) where
 
+import qualified Basic
 import Keelung
 import qualified Keelung.Compiler as Compiler
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (toR1Cs)
 import Test.Hspec
-import qualified Basic
 
 tests :: SpecWith ()
 tests = do
@@ -120,6 +120,22 @@ tests = do
                                 (Poly.buildEither 0 [(9, 1)])
                                 (Poly.buildEither 0 [(13, 1)])
                                 (Poly.buildEither 0 [(3, 1)])
+                            ]
+
+    it "Addition on unsigned integers 0" $ do
+      let program = do
+            x <- inputUInt @4
+            y <- inputUInt @4
+            return (x + y)
+      case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        Left err -> expectationFailure (show err)
+        Right r1cs -> do
+          -- x + y - carry = output
+          toR1Cs r1cs
+            `shouldContain` [ R1C
+                                (Poly.buildEither 0 [(0, -1), (1, 1), (2, 1)])
+                                (Poly.buildEither 1 [])
+                                (Poly.buildEither 0 [])
                             ]
 
 example1 :: Comp (Arr Boolean)
