@@ -32,8 +32,7 @@ import Keelung.Types
 run :: (GaloisField n, Integral n) => TypeErased n -> ConstraintSystem n
 run (TypeErased untypedExprs counters assertions assignments numBinReps customBinReps) = runM counters $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
-  forM_ (zip (outputVars counters) untypedExprs) $ \(var, expr) -> do
-    encode var expr
+  forM_ (zip (outputVars counters) untypedExprs) (uncurry encode)
 
   -- Compile assignments to constraints
   mapM_ encodeAssignment assignments
@@ -129,6 +128,9 @@ lookupExtraBinRepStart width var = do
     Nothing -> return Nothing
     Just binRep -> return $ Just (binRepBitsIndex binRep)
 
+getNumberBitWidth :: M n BitWidth
+getNumberBitWidth = gets (Number . getNumBitWidth . envVarCounters)
+
 ----------------------------------------------------------------
 
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
@@ -173,9 +175,7 @@ encode out expr = case expr of
         b <- wireAsVar y
         vars <- mapM wireAsVar rest
         case vars of
-          Empty -> do
-            -- only 2 operands
-            add [COr a b out]
+          Empty -> add [COr a b out]
           (c :<| Empty) -> do
             -- only 3 operands
             aOrb <- freshVar
@@ -187,7 +187,8 @@ encode out expr = case expr of
             --  =>  if the sum of operands is 0     then 0 else 1
             --  =>  if the sum of operands is not 0 then 1 else 0
             --  =>  the sum of operands is not 0
-            encode out (NAryOp Boolean NEq 0 (NAryOp Boolean Add x y rest) Empty)
+            numBitWidth <- getNumberBitWidth
+            encode out (NAryOp numBitWidth NEq (Val numBitWidth 0) (NAryOp numBitWidth Add x y rest) Empty)
       _ -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
   BinaryOp bw Sub x y -> do
     case bw of
@@ -203,7 +204,9 @@ encode out expr = case expr of
     add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
   If _ b x y -> do
     b' <- wireAsVar b
-    encode out ((Var Boolean b' * x) + ((1 - Var Boolean b') * y))
+    -- using these variables like they are Numbers
+    numBitWidth <- getNumberBitWidth
+    encode out (Var numBitWidth b' * x + (Val numBitWidth 1 - Var numBitWidth b') * y)
   EmbedR1C _ r1c -> addR1C r1c
 
 --------------------------------------------------------------------------------
@@ -235,7 +238,7 @@ encodeRotate out i expr = case expr of
         -- collect the bit values of higher bits that will be rotated to lower bits
         let higherBits = [Data.Bits.testBit val j | j <- [width - rotateDistance .. width - 1]]
         -- shift the lower bits right by the rotate distance
-        let lowerBits = Data.Bits.shiftL val rotateDistance `mod` (2 ^ width)
+        let lowerBits = Data.Bits.shiftL val rotateDistance `mod` 2 ^ width
         -- combine the lower bits and the higher bits
         let rotatedVal =
               foldl'
@@ -350,8 +353,9 @@ encodeBinaryOp op out x y = case op of
   BEq -> do
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.
     -- The encoding is: x*y + (1-x)*(1-y) = out.
+    numBitWidth <- getNumberBitWidth
     encode out $
-      Var Boolean x * Var Boolean y + ((1 - Var Boolean x) * (1 - Var Boolean y))
+      Var numBitWidth x * Var numBitWidth y + (Val numBitWidth 1 - Var numBitWidth x) * (Val numBitWidth 1 - Var numBitWidth y)
 
 --------------------------------------------------------------------------------
 
@@ -361,37 +365,35 @@ encodeBinaryOp op out x y = case op of
 --        1. (x - y) * m = out
 --        2. (x - y) * (1 - out) = 0
 encodeEquality :: (GaloisField n, Integral n) => Bool -> Var -> Var -> Var -> M n ()
-encodeEquality isEq out x y = do
-  -- lets build the polynomial for (x - y) first:
-  case Poly.buildEither 0 [(x, 1), (y, -1)] of
-    Left _ -> do
-      -- in this case, the variable x and y happend to be the same
-      if isEq
-        then encode out (Val Boolean 1)
-        else encode out (Val Boolean 0)
-    Right diff -> do
-      -- introduce a new variable m
-      -- if diff = 0 then m = 0 else m = recip diff
-      m <- freshVar
+encodeEquality isEq out x y = case Poly.buildEither 0 [(x, 1), (y, -1)] of
+                                Left _ -> do
+                                  -- in this case, the variable x and y happend to be the same
+                                  if isEq
+                                    then encode out (Val Boolean 1)
+                                    else encode out (Val Boolean 0)
+                                Right diff -> do
+                                  -- introduce a new variable m
+                                  -- if diff = 0 then m = 0 else m = recip diff
+                                  m <- freshVar
 
-      let notOut = case Poly.buildMaybe 1 (IntMap.fromList [(out, -1)]) of
-            Nothing -> error "encodeBinaryOp: NEq: impossible"
-            Just p -> p
+                                  let notOut = case Poly.buildMaybe 1 (IntMap.fromList [(out, -1)]) of
+                                        Nothing -> error "encodeBinaryOp: NEq: impossible"
+                                        Just p -> p
 
-      if isEq
-        then do
-          --  1. (x - y) * m = 1 - out
-          --  2. (x - y) * out = 0
-          add [CMul diff (Poly.singleVar m) (Right notOut)]
-          add [CMul diff (Poly.singleVar out) (Left 0)]
-        else do
-          --  1. (x - y) * m = out
-          --  2. (x - y) * (1 - out) = 0
-          add [CMul diff (Poly.singleVar m) (Right (Poly.singleVar out))]
-          add [CMul diff notOut (Left 0)]
+                                  if isEq
+                                    then do
+                                      --  1. (x - y) * m = 1 - out
+                                      --  2. (x - y) * out = 0
+                                      add [CMul diff (Poly.singleVar m) (Right notOut)]
+                                      add [CMul diff (Poly.singleVar out) (Left 0)]
+                                    else do
+                                      --  1. (x - y) * m = out
+                                      --  2. (x - y) * (1 - out) = 0
+                                      add [CMul diff (Poly.singleVar m) (Right (Poly.singleVar out))]
+                                      add [CMul diff notOut (Left 0)]
 
-      --  keep track of the relation between (x - y) and m
-      add [CNEq (CNEQ (Left x) (Left y) m)]
+                                  --  keep track of the relation between (x - y) and m
+                                  add [CNEq (CNEQ (Left x) (Left y) m)]
 
 --------------------------------------------------------------------------------
 
@@ -423,7 +425,7 @@ encodeUIntAddOrSub isSub width out x y = do
   let polynomial2 = Poly.singleVar (yBinRepStart + width - 1)
   let polynomial3 = Poly.buildEither 0 [(out, 1), (x, -1), (y, if isSub then 1 else -1)]
 
-  numBitWidth <- gets (Number . getNumBitWidth . envVarCounters)
+  numBitWidth <- getNumberBitWidth
   encode out $ EmbedR1C numBitWidth $ R1C polynomial1 (Right polynomial2) polynomial3
 
 encodeUIntAdd :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
