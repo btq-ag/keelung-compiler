@@ -5,6 +5,7 @@
 module Keelung.Compiler.Syntax.Untyped
   ( Op (..),
     BitWidth (..),
+    Width,
     bitWidthOf,
     getWidth,
     BinaryOp (..),
@@ -44,18 +45,24 @@ data BinaryOp = Sub | Div
 
 --------------------------------------------------------------------------------
 
-data BitWidth = Number Int | Boolean | UInt Int
+type Width = Int
+
+data BitWidth = BWNumber Width | BWBoolean | BWUInt Width
   deriving (Eq, Ord, Show)
 
-getWidth :: BitWidth -> Int
-getWidth (Number n) = n
-getWidth Boolean = 1
-getWidth (UInt n) = n
+getWidth :: BitWidth -> Width
+getWidth (BWNumber n) = n
+getWidth BWBoolean = 1
+getWidth (BWUInt n) = n
 
--- | Untyped expression
+-- | "Untyped" expression
 data Expr n
-  = Val BitWidth n
-  | Var BitWidth Var
+  = -- values
+    Number Width n
+  | UInt Width n
+  | Boolean n
+  | -- variables
+    Var BitWidth Var
   | Rotate BitWidth Int (Expr n)
   | -- Binary operators with only 2 operands
     BinaryOp BitWidth BinaryOp (Expr n) (Expr n)
@@ -83,8 +90,10 @@ instance Show n => Show (Expr n) where
         go _ n (x :<| Empty) = showsPrec (succ n) x
         go delim n (x :<| xs') = showsPrec (succ n) x . showString delim . go delim n xs'
      in case expr of
+          Number _ val -> shows val
+          Boolean val -> shows val
+          UInt _ val -> shows val
           Var _ var -> showString "$" . shows var
-          Val _ val -> shows val
           Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
           NAryOp _ op x0 x1 xs -> case op of
             Add -> chain " + " 6 $ x0 :<| x1 :<| xs
@@ -104,7 +113,9 @@ instance Show n => Show (Expr n) where
 -- | Calculate the "size" of an expression for benchmarking
 sizeOfExpr :: Expr n -> Int
 sizeOfExpr expr = case expr of
-  Val _ _ -> 1
+  Number _ _ -> 1
+  UInt _ _ -> 1
+  Boolean _ -> 1
   Var _ _ -> 1
   Rotate _ _ x -> 1 + sizeOfExpr x
   NAryOp _ _ x0 x1 xs ->
@@ -116,7 +127,9 @@ sizeOfExpr expr = case expr of
 
 bitWidthOf :: Expr n -> BitWidth
 bitWidthOf expr = case expr of
-  Val bw _ -> bw
+  Number w _ -> BWNumber w
+  UInt w _ -> BWUInt w
+  Boolean _ -> BWBoolean
   Var bw _ -> bw
   Rotate bw _ _ -> bw
   NAryOp bw _ _ _ _ -> bw

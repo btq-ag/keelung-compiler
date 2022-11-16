@@ -131,24 +131,27 @@ lookupBinRepIndex width var = do
         Just binRep -> return (binRepBitsIndex binRep)
     Just index -> return index
 
-getNumberBitWidth :: M n BitWidth
-getNumberBitWidth = gets (Number . getNumBitWidth . envVarCounters)
+getNumberBitWidth :: M n Width
+getNumberBitWidth = gets (getNumBitWidth . envVarCounters)
 
 ----------------------------------------------------------------
 
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
 encode out expr = case expr of
-  Val _ val -> add $ cadd val [(out, -1)] -- out = val
+  -- values
+  Number _ val -> add $ cadd val [(out, -1)] -- out = val
+  UInt _ val -> add $ cadd val [(out, -1)] -- out = val
+  Boolean val -> add $ cadd val [(out, -1)] -- out = val
   Var _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   Rotate _ n x -> encodeRotate out n x
   NAryOp bw op x y rest ->
     case op of
       Add -> case bw of
-        Number _ -> do
+        BWNumber _ -> do
           terms <- mapM toTerm (x :<| y :<| rest)
           encodeTerms out terms
-        UInt n -> encodeAndFoldExprsBinRep (encodeUIntAdd n) n out x y rest
-        Boolean -> error "[ panic ] Addition on Booleans"
+        BWUInt n -> encodeAndFoldExprsBinRep (encodeUIntAdd n) n out x y rest
+        BWBoolean -> error "[ panic ] Addition on Booleans"
       And -> do
         a <- wireAsVar x
         b <- wireAsVar y
@@ -191,25 +194,25 @@ encode out expr = case expr of
             --  =>  if the sum of operands is not 0 then 1 else 0
             --  =>  the sum of operands is not 0
             numBitWidth <- getNumberBitWidth
-            encode out (NAryOp numBitWidth NEq (Val numBitWidth 0) (NAryOp numBitWidth Add x y rest) Empty)
+            encode out (NAryOp (BWNumber numBitWidth) NEq (Number numBitWidth 0) (NAryOp (BWNumber numBitWidth) Add x y rest) Empty)
       _ -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
   BinaryOp bw Sub x y -> do
     case bw of
-      Number _ -> do
+      BWNumber _ -> do
         x' <- toTerm x
         y' <- toTerm y
         encodeTerms out (x' :<| negateTerm y' :<| Empty)
-      UInt n -> encodeAndFoldExprs (encodeUIntSub n) out x y mempty
-      Boolean -> error "[ panic ] Subtraction on Booleans"
+      BWUInt n -> encodeAndFoldExprs (encodeUIntSub n) out x y mempty
+      BWBoolean -> error "[ panic ] Subtraction on Booleans"
   BinaryOp _ Div x y -> do
     x' <- wireAsVar x
     y' <- wireAsVar y
     add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
   If _ b x y -> do
     b' <- wireAsVar b
-    -- using these variables like they are Numbers
+    -- treating these variables like they are Numbers
     numBitWidth <- getNumberBitWidth
-    encode out (Var numBitWidth b' * x + (Val numBitWidth 1 - Var numBitWidth b') * y)
+    encode out (Var (BWNumber numBitWidth) b' * x + (Number numBitWidth 1 - Var (BWNumber numBitWidth) b') * y)
   EmbedR1C _ r1c -> addR1C r1c
 
 --------------------------------------------------------------------------------
@@ -217,38 +220,13 @@ encode out expr = case expr of
 -- | Pushes the constructor of Rotate inwards
 encodeRotate :: (GaloisField n, Integral n) => Var -> Int -> Expr n -> M n ()
 encodeRotate out i expr = case expr of
-  Val bw n -> do
-    let width = getWidth bw
-    let val = toInteger n
-    -- see if we are rotating right (positive) of left (negative)
-    case i `compare` 0 of
-      EQ -> encode out expr -- no rotation
-      LT -> do
-        let rotateDistance = (-i) `mod` width
-        -- collect the bit values of lower bits that will be rotated to higher bits
-        let lowerBits = [Data.Bits.testBit val j | j <- [0 .. rotateDistance - 1]]
-        -- shift the higher bits left by the rotate distance
-        let higherBits = Data.Bits.shiftR val rotateDistance
-        -- combine the lower bits and the higher bits
-        let rotatedVal =
-              foldl'
-                (\acc (bit, j) -> if bit then Data.Bits.setBit acc j else acc)
-                higherBits
-                (zip lowerBits [width - rotateDistance .. width - 1])
-        encode out (Val bw (fromInteger rotatedVal))
-      GT -> do
-        let rotateDistance = i `mod` width
-        -- collect the bit values of higher bits that will be rotated to lower bits
-        let higherBits = [Data.Bits.testBit val j | j <- [width - rotateDistance .. width - 1]]
-        -- shift the lower bits right by the rotate distance
-        let lowerBits = Data.Bits.shiftL val rotateDistance `mod` 2 ^ width
-        -- combine the lower bits and the higher bits
-        let rotatedVal =
-              foldl'
-                (\acc (bit, j) -> if bit then Data.Bits.setBit acc j else acc)
-                lowerBits
-                (zip higherBits [0 .. rotateDistance - 1])
-        encode out (Val bw (fromInteger rotatedVal))
+  Number w n -> do
+    n' <- rotateField w n
+    encode out (Number w n')
+  UInt w n -> do
+    n' <- rotateField w n
+    encode out (Number w n')
+  Boolean n -> encode out (Boolean n)
   Var bw var -> addRotatedBinRep out bw var i
   Rotate _ n x -> encodeRotate out (i + n) x
   BinaryOp {} -> error "[ panic ] dunno how to compile ROTATE BinaryOp"
@@ -260,6 +238,42 @@ encodeRotate out i expr = case expr of
     _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
   If {} -> error "[ panic ] dunno how to compile ROTATE If"
   EmbedR1C {} -> error "[ panic ] dunno how to compile ROTATE EmbedR1C"
+  where
+    -- rotateField :: (GaloisField n, Integral n) => Width -> n -> M n ()
+    rotateField width n = do
+      let val = toInteger n
+      -- see if we are rotating right (positive) of left (negative)
+      case i `compare` 0 of
+        EQ -> return n -- no rotation
+        -- encode out expr -- no rotation
+        LT -> do
+          let rotateDistance = (-i) `mod` width
+          -- collect the bit values of lower bits that will be rotated to higher bits
+          let lowerBits = [Data.Bits.testBit val j | j <- [0 .. rotateDistance - 1]]
+          -- shift the higher bits left by the rotate distance
+          let higherBits = Data.Bits.shiftR val rotateDistance
+          -- combine the lower bits and the higher bits
+          return $
+            fromInteger $
+              foldl'
+                (\acc (bit, j) -> if bit then Data.Bits.setBit acc j else acc)
+                higherBits
+                (zip lowerBits [width - rotateDistance .. width - 1])
+
+        -- encode out (Val bw (fromInteger rotatedVal))
+        GT -> do
+          let rotateDistance = i `mod` width
+          -- collect the bit values of higher bits that will be rotated to lower bits
+          let higherBits = [Data.Bits.testBit val j | j <- [width - rotateDistance .. width - 1]]
+          -- shift the lower bits right by the rotate distance
+          let lowerBits = Data.Bits.shiftL val rotateDistance `mod` 2 ^ width
+          -- combine the lower bits and the higher bits
+          return $
+            fromInteger $
+              foldl'
+                (\acc (bit, j) -> if bit then Data.Bits.setBit acc j else acc)
+                lowerBits
+                (zip higherBits [0 .. rotateDistance - 1])
 
 --------------------------------------------------------------------------------
 
@@ -270,20 +284,30 @@ data Term n
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
 toTerm :: (GaloisField n, Integral n) => Expr n -> M n (Term n)
-toTerm (NAryOp _ Mul (Var _ var) (Val _ n) Empty) =
+toTerm (NAryOp _ Mul (Var _ var) (Number _ n) Empty) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul (Val _ n) (Var _ var) Empty) =
+toTerm (NAryOp _ Mul (Var _ _) _ Empty) =
+  error "toTerm on Boolean or UInt"
+toTerm (NAryOp _ Mul (Number _ n) (Var _ var) Empty) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul expr (Val _ n) Empty) = do
+toTerm (NAryOp _ Mul _ (Var _ _) Empty) =
+  error "toTerm on Boolean or UInt"
+toTerm (NAryOp _ Mul expr (Number _ n) Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (NAryOp _ Mul (Val _ n) expr Empty) = do
+toTerm (NAryOp _ Mul (Number _ n) expr Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (Val _ n) =
+toTerm (NAryOp _ Mul _ _ Empty) = do
+  error "toTerm on Boolean or UInt"
+toTerm (Number _ n) =
   return $ Constant n
+toTerm (UInt _ _) =
+  error "toTerm on Boolean or UInt"
+toTerm (Boolean _) =
+  error "toTerm on Boolean or UInt"
 toTerm (Var _ var) =
   return $ WithVars var 1
 toTerm expr = do
@@ -363,7 +387,9 @@ encodeBinaryOp op out x y = case op of
     -- The encoding is: x*y + (1-x)*(1-y) = out.
     numBitWidth <- getNumberBitWidth
     encode out $
-      Var numBitWidth x * Var numBitWidth y + (Val numBitWidth 1 - Var numBitWidth x) * (Val numBitWidth 1 - Var numBitWidth y)
+      Var (BWNumber numBitWidth) x * Var (BWNumber numBitWidth) y
+        + (Number numBitWidth 1 - Var (BWNumber numBitWidth) x)
+        * (Number numBitWidth 1 - Var (BWNumber numBitWidth) y)
 
 --------------------------------------------------------------------------------
 
@@ -377,8 +403,8 @@ encodeEquality isEq out x y = case Poly.buildEither 0 [(x, 1), (y, -1)] of
   Left _ -> do
     -- in this case, the variable x and y happend to be the same
     if isEq
-      then encode out (Val Boolean 1)
-      else encode out (Val Boolean 0)
+      then encode out (Boolean 1)
+      else encode out (Boolean 0)
   Right diff -> do
     -- introduce a new variable m
     -- if diff = 0 then m = 0 else m = recip diff
@@ -426,7 +452,7 @@ encodeUIntAddOrSub isSub width out x y = do
   let polynomial3 = Poly.buildEither 0 [(out, 1), (x, -1), (y, if isSub then 1 else -1)]
 
   numBitWidth <- getNumberBitWidth
-  encode out $ EmbedR1C numBitWidth $ R1C polynomial1 (Right polynomial2) polynomial3
+  encode out $ EmbedR1C (BWNumber numBitWidth) $ R1C polynomial1 (Right polynomial2) polynomial3
 
 encodeUIntAdd :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
 encodeUIntAdd = encodeUIntAddOrSub False
