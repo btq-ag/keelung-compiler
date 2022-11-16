@@ -98,10 +98,8 @@ addR1C (R1C.R1C (Right a) (Right b) c) = add [CMul a b c]
 -- | Adds a new view of binary representation of a variable after rotation.
 addRotatedBinRep :: Var -> BitWidth -> Var -> Int -> M n ()
 addRotatedBinRep out bitWidth var rotate = do
-  counters <- gets envVarCounters
-  case lookupBinRepStart counters var of
-    Nothing -> error $ "[ panic ] Cannot find the start of the binary representation of the variable $" <> show var
-    Just index -> addBinRep $ BinRep out (getWidth bitWidth) index rotate
+  index <- lookupBinRepIndex (getWidth bitWidth) var
+  addBinRep $ BinRep out (getWidth bitWidth) index rotate
 
 addBinRep :: BinRep -> M n ()
 addBinRep binRep = modify (\env -> env {envExtraBinReps = BinRep.insert binRep (envExtraBinReps env)})
@@ -121,12 +119,17 @@ freshBinRep var width
     addBinRep binRep
     return binRep
 
-lookupExtraBinRepStart :: Int -> Var -> M n (Maybe Var)
-lookupExtraBinRepStart width var = do
+-- | Locate the binary representations of some variable
+lookupBinRepIndex :: Int -> Var -> M n Var
+lookupBinRepIndex width var = do
+  counters <- gets envVarCounters
   extraBinReps <- gets envExtraBinReps
-  case BinRep.lookup width var extraBinReps of
-    Nothing -> return Nothing
-    Just binRep -> return $ Just (binRepBitsIndex binRep)
+  case lookupBinRepStart counters var of
+    Nothing -> do
+      case BinRep.lookup width var extraBinReps of
+        Nothing -> error $ "lookupBinRep: could not find binary representation of " ++ show var
+        Just binRep -> return (binRepBitsIndex binRep)
+    Just index -> return index
 
 getNumberBitWidth :: M n BitWidth
 getNumberBitWidth = gets (Number . getNumBitWidth . envVarCounters)
@@ -249,7 +252,12 @@ encodeRotate out i expr = case expr of
   Var bw var -> addRotatedBinRep out bw var i
   Rotate _ n x -> encodeRotate out (i + n) x
   BinaryOp {} -> error "[ panic ] dunno how to compile ROTATE BinaryOp"
-  NAryOp {} -> error "[ panic ] dunno how to compile ROTATE NAryOp "
+  NAryOp bw op _ _ _ -> case op of
+    Add -> do
+      result <- freshVar
+      encode result expr
+      addRotatedBinRep out bw result i
+    _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
   If {} -> error "[ panic ] dunno how to compile ROTATE If"
   EmbedR1C {} -> error "[ panic ] dunno how to compile ROTATE EmbedR1C"
 
@@ -366,55 +374,47 @@ encodeBinaryOp op out x y = case op of
 --        2. (x - y) * (1 - out) = 0
 encodeEquality :: (GaloisField n, Integral n) => Bool -> Var -> Var -> Var -> M n ()
 encodeEquality isEq out x y = case Poly.buildEither 0 [(x, 1), (y, -1)] of
-                                Left _ -> do
-                                  -- in this case, the variable x and y happend to be the same
-                                  if isEq
-                                    then encode out (Val Boolean 1)
-                                    else encode out (Val Boolean 0)
-                                Right diff -> do
-                                  -- introduce a new variable m
-                                  -- if diff = 0 then m = 0 else m = recip diff
-                                  m <- freshVar
+  Left _ -> do
+    -- in this case, the variable x and y happend to be the same
+    if isEq
+      then encode out (Val Boolean 1)
+      else encode out (Val Boolean 0)
+  Right diff -> do
+    -- introduce a new variable m
+    -- if diff = 0 then m = 0 else m = recip diff
+    m <- freshVar
 
-                                  let notOut = case Poly.buildMaybe 1 (IntMap.fromList [(out, -1)]) of
-                                        Nothing -> error "encodeBinaryOp: NEq: impossible"
-                                        Just p -> p
+    let notOut = case Poly.buildMaybe 1 (IntMap.fromList [(out, -1)]) of
+          Nothing -> error "encodeBinaryOp: NEq: impossible"
+          Just p -> p
 
-                                  if isEq
-                                    then do
-                                      --  1. (x - y) * m = 1 - out
-                                      --  2. (x - y) * out = 0
-                                      add [CMul diff (Poly.singleVar m) (Right notOut)]
-                                      add [CMul diff (Poly.singleVar out) (Left 0)]
-                                    else do
-                                      --  1. (x - y) * m = out
-                                      --  2. (x - y) * (1 - out) = 0
-                                      add [CMul diff (Poly.singleVar m) (Right (Poly.singleVar out))]
-                                      add [CMul diff notOut (Left 0)]
+    if isEq
+      then do
+        --  1. (x - y) * m = 1 - out
+        --  2. (x - y) * out = 0
+        add [CMul diff (Poly.singleVar m) (Right notOut)]
+        add [CMul diff (Poly.singleVar out) (Left 0)]
+      else do
+        --  1. (x - y) * m = out
+        --  2. (x - y) * (1 - out) = 0
+        add [CMul diff (Poly.singleVar m) (Right (Poly.singleVar out))]
+        add [CMul diff notOut (Left 0)]
 
-                                  --  keep track of the relation between (x - y) and m
-                                  add [CNEq (CNEQ (Left x) (Left y) m)]
+    --  keep track of the relation between (x - y) and m
+    add [CNEq (CNEQ (Left x) (Left y) m)]
 
 --------------------------------------------------------------------------------
 
--- | Encoding addition on UInts with multiple operands: O(2)
---    Sum = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
+-- | Encoding addition on UInts with multiple operands: O(1)
+--    C = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
 encodeUIntAddOrSub :: (GaloisField n, Integral n) => Bool -> Int -> Var -> Var -> Var -> M n ()
 encodeUIntAddOrSub isSub width out x y = do
   -- allocate a fresh BinRep for the output
-  _outBinRep <- freshBinRep out width
+  -- _outBinRep <- freshBinRep out width
 
   -- locate the binary representations of the operands
-  counters <- gets envVarCounters
-  let locateBinRep var = case lookupBinRepStart counters var of
-        Nothing -> do
-          result <- lookupExtraBinRepStart width var
-          case result of
-            Nothing -> error $ "encodeUIntAddOrSub: could not find binary representation of " ++ show var
-            Just index -> return index
-        Just index -> return index
-  xBinRepStart <- locateBinRep x
-  yBinRepStart <- locateBinRep y
+  xBinRepStart <- lookupBinRepIndex width x
+  yBinRepStart <- lookupBinRepIndex width y
 
   let multiplier = 2 ^ width
   -- We can refactor
@@ -433,3 +433,8 @@ encodeUIntAdd = encodeUIntAddOrSub False
 
 encodeUIntSub :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
 encodeUIntSub = encodeUIntAddOrSub True
+
+-- -- | Encoding addition on UInts with multiple operands: O(1)
+-- --    C = A + B - OVERFLOW
+-- encodeUIntMul :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
+-- encodeUIntMul width out x y = do
