@@ -122,6 +122,13 @@ freshBinRep var width
     addBinRep binRep
     return binRep
 
+lookupExtraBinRepStart :: Int -> Var -> M n (Maybe Var)
+lookupExtraBinRepStart width var = do
+  extraBinReps <- gets envExtraBinReps
+  case BinRep.lookup width var extraBinReps of
+    Nothing -> return Nothing
+    Just binRep -> return $ Just (binRepBitsIndex binRep)
+
 ----------------------------------------------------------------
 
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
@@ -135,7 +142,7 @@ encode out expr = case expr of
         Number _ -> do
           terms <- mapM toTerm (x :<| y :<| rest)
           encodeTerms out terms
-        UInt n -> encodeAndFoldExprs (encodeUIntAdd n) out x y rest
+        UInt n -> encodeAndFoldExprsBinRep (encodeUIntAdd n) n out x y rest
         Boolean -> error "[ panic ] Addition on Booleans"
       And -> do
         a <- wireAsVar x
@@ -287,6 +294,11 @@ encodeTerms out terms =
     go (constant, pairs) (Constant n) = (constant + n, pairs)
     go (constant, pairs) (WithVars var coeff) = (constant, (var, coeff) : pairs)
 
+-- Given a binary function 'f' that knows how to encode '_⊗_'
+-- This functions replaces the occurences of '_⊗_' with 'f' in the following manner:
+--      E₀ ⊗ E₁ ⊗ ... ⊗ Eₙ
+--  =>
+--      E₀ `f` (E₁ `f` ... `f` Eₙ)
 encodeAndFoldExprs :: (GaloisField n, Integral n) => (Var -> Var -> Var -> M n ()) -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
 encodeAndFoldExprs f out x0 x1 xs = do
   x0' <- wireAsVar x0
@@ -297,6 +309,23 @@ encodeAndFoldExprs f out x0 x1 xs = do
     go x y Empty = f out x y
     go x y (v :<| vs) = do
       out' <- freshVar
+      go out' v vs
+      f out' x y
+
+-- | Like 'encodeAndFoldExprs' but allocates a BinRep for the result
+encodeAndFoldExprsBinRep :: (GaloisField n, Integral n) => (Var -> Var -> Var -> M n ()) -> Int -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
+encodeAndFoldExprsBinRep f width out x0 x1 xs = do
+  x0' <- wireAsVar x0
+  x1' <- wireAsVar x1
+  vars <- mapM wireAsVar xs
+  go x0' x1' vars
+  where
+    go x y Empty = do
+      _ <- freshBinRep out width
+      f out x y
+    go x y (v :<| vs) = do
+      out' <- freshVar
+      _ <- freshBinRep out' width
       go out' v vs
       f out' x y
 
@@ -376,10 +405,14 @@ encodeUIntAddOrSub isSub width out x y = do
   -- locate the binary representations of the operands
   counters <- gets envVarCounters
   let locateBinRep var = case lookupBinRepStart counters var of
-        Nothing -> error $ "[ panic ] encodeUIntAddBinRep: cannot locate binary representation of $" <> show var
-        Just index -> index
-  let xBinRepStart = locateBinRep x
-  let yBinRepStart = locateBinRep y
+        Nothing -> do
+          result <- lookupExtraBinRepStart width var
+          case result of
+            Nothing -> error $ "encodeUIntAddOrSub: could not find binary representation of " ++ show var
+            Just index -> return index
+        Just index -> return index
+  xBinRepStart <- locateBinRep x
+  yBinRepStart <- locateBinRep y
 
   let multiplier = 2 ^ width
   -- We can refactor
