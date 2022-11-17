@@ -6,6 +6,41 @@ import qualified Data.IntMap as IntMap
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
+import Keelung.Types (Var)
+
+--------------------------------------------------------------------------------
+
+-- | "Bindings" are assignments with constant values on the RHS
+data Bindings n = Bindings
+  { bindingsF :: IntMap (Width, n), -- Field elements
+    bindingsB :: IntMap n, -- Booleans
+    bindingsU :: IntMap (Width, n) -- Unsigned integers
+  }
+
+addBindingF :: Var -> (Width, n) -> Bindings n -> Bindings n
+addBindingF var n (Bindings fs bs us) = Bindings (IntMap.insert var n fs) bs us
+
+addBindingB :: Var -> n -> Bindings n -> Bindings n
+addBindingB var n (Bindings fs bs us) = Bindings fs (IntMap.insert var n bs) us
+
+addBindingU :: Var -> (Width, n) -> Bindings n -> Bindings n
+addBindingU var n (Bindings fs bs us) = Bindings fs bs (IntMap.insert var n us)
+
+toAssignments :: Bindings n -> [Assignment n]
+toAssignments (Bindings fs bs us) =
+  [Assignment var (Number fw val) | (var, (fw, val)) <- IntMap.toList fs]
+    ++ [Assignment var (Boolean val) | (var, val) <- IntMap.toList bs]
+    ++ [Assignment var (UInt w val) | (var, (w, val)) <- IntMap.toList us]
+
+lookupBinding :: Var -> Bindings n -> Maybe n
+lookupBinding var (Bindings fs bs us) =
+  case IntMap.lookup var fs of
+    Just (_, n) -> Just n
+    Nothing -> case IntMap.lookup var bs of
+      Just n -> Just n
+      Nothing -> case IntMap.lookup var us of
+        Just (_, n) -> Just n
+        Nothing -> Nothing
 
 --------------------------------------------------------------------------------
 
@@ -16,20 +51,11 @@ run (TypeErased expr counters assertions assignments numBinReps customBinReps) =
   let (bindings, assignments') = propagateInAssignments assignments
       expr' = propagateConstant bindings <$> expr
       assertions' = map (propagateConstant bindings) assertions
-
-      assignments'' =
-        assignments'
-          <> map
-            ( \(var, (bw, val)) -> Assignment var $ case bw of
-                BWNumber w -> Number w val
-                BWUInt w -> UInt w val
-                BWBoolean -> Boolean val
-            )
-            (IntMap.toList bindings)
-   in TypeErased expr' counters assertions' assignments'' numBinReps customBinReps
+   in -- bindings are converted back to assignments
+      TypeErased expr' counters assertions' (assignments' <> toAssignments bindings) numBinReps customBinReps
 
 -- Propagate constant in assignments and return the bindings for later use
-propagateInAssignments :: (Integral n, GaloisField n) => [Assignment n] -> (IntMap (BitWidth, n), [Assignment n])
+propagateInAssignments :: (Integral n, GaloisField n) => [Assignment n] -> (Bindings n, [Assignment n])
 propagateInAssignments xs =
   let (bindings, assignments) = extractBindings xs
       assignments' =
@@ -42,37 +68,40 @@ propagateInAssignments xs =
 
 -- Extract bindings of constant values and collect them as an IntMap
 -- and returns the rest of the assignments
-extractBindings :: [Assignment n] -> (IntMap (BitWidth, n), [Assignment n])
-extractBindings = go IntMap.empty []
+extractBindings :: [Assignment n] -> (Bindings n, [Assignment n])
+extractBindings = go (Bindings mempty mempty mempty) []
   where
-    go :: IntMap (BitWidth, n) -> [Assignment n] -> [Assignment n] -> (IntMap (BitWidth, n), [Assignment n])
+    go :: Bindings n -> [Assignment n] -> [Assignment n] -> (Bindings n, [Assignment n])
     go bindings rest [] = (bindings, rest)
     go bindings rest (Assignment var (Number w val) : xs) =
-      go (IntMap.insert var (BWNumber w, val) bindings) rest xs
+      go (addBindingF var (w, val) bindings) rest xs
     go bindings rest (Assignment var (UInt w val) : xs) =
-      go (IntMap.insert var (BWUInt w, val) bindings) rest xs
+      go (addBindingU var (w, val) bindings) rest xs
     go bindings rest (Assignment var (Boolean val) : xs) =
-      go (IntMap.insert var (BWBoolean, val) bindings) rest xs
+      go (addBindingB var val bindings) rest xs
     go bindings rest (others : xs) = go bindings (others : rest) xs
 
 -- constant propogation
-propagateConstant :: (GaloisField n, Integral n) => IntMap (BitWidth, n) -> Expr n -> Expr n
+propagateConstant :: (GaloisField n, Integral n) => Bindings n -> Expr n -> Expr n
 propagateConstant bindings = propogate
   where
     propogate e = case e of
       Number _ _ -> e
       UInt _ _ -> e
       Boolean _ -> e
-      Var bw var -> case IntMap.lookup var bindings of
-        Nothing -> Var bw var
-        Just (BWNumber w, val) -> Number w val
-        Just (BWUInt w, val) -> UInt w val
-        Just (BWBoolean, val) -> Boolean val
-      UVar w var -> case IntMap.lookup var bindings of
-        Nothing -> UVar w var
-        Just (BWNumber w', val) -> Number w' val
-        Just (BWUInt _, val) -> UInt w val
-        Just (BWBoolean, val) -> Boolean val
+      Var bw var -> case bw of
+        BWNumber w -> case IntMap.lookup var (bindingsF bindings) of
+          Nothing -> Var bw var
+          Just (_, val) -> Number w val
+        BWBoolean -> case IntMap.lookup var (bindingsB bindings) of
+          Nothing -> Var bw var
+          Just val -> Boolean val
+        BWUInt w -> case IntMap.lookup var (bindingsU bindings) of
+          Nothing -> Var bw var
+          Just (_, val) -> UInt w val
+      UVar w var -> case IntMap.lookup var (bindingsU bindings) of
+        Nothing -> Var (BWUInt w) var
+        Just (_, val) -> UInt w val
       Rotate w n x -> Rotate w n (propogate x)
       NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
       BinaryOp w op x y -> BinaryOp w op (propogate x) (propogate y)
@@ -86,6 +115,6 @@ propagateConstant bindings = propogate
           (constant', coeffs') = foldl go (constant, mempty) (IntMap.toList coeffs)
        in Poly.buildEither constant' coeffs'
       where
-        go (constant, coeffs) (var, coeff) = case IntMap.lookup var bindings of
+        go (constant, coeffs) (var, coeff) = case lookupBinding var bindings of
           Nothing -> (constant, (var, coeff) : coeffs)
-          Just (_, val) -> (constant + coeff * val, coeffs)
+          Just val -> (constant + coeff * val, coeffs)
