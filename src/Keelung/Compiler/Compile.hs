@@ -17,10 +17,7 @@ import qualified Data.Set as Set
 import Debug.Trace
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.Untyped
-import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Constraint.R1C (R1C (..))
-import qualified Keelung.Constraint.R1C as R1C
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Syntax.BinRep (BinRep (..), BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
@@ -84,20 +81,6 @@ add :: GaloisField n => [Constraint n] -> M n ()
 add cs =
   modify (\env -> env {envConstraints = Set.union (Set.fromList cs) (envConstraints env)})
 
-addPoly :: GaloisField n => Maybe (Poly n) -> M n ()
-addPoly Nothing = return ()
-addPoly (Just c) = add [CAdd c]
-
--- | Adding a raw R1C constraint (TODO: eliminate all usage of this function)
-addR1C :: GaloisField n => R1C n -> M n ()
-addR1C (R1C.R1C (Left _) (Left _) (Left _)) = return ()
-addR1C (R1C.R1C (Left a) (Left b) (Right c)) = addPoly $ Poly.buildMaybe (Poly.constant c - a * b) (Poly.coeffs c)
-addR1C (R1C.R1C (Left a) (Right b) (Left c)) = addPoly $ Poly.buildMaybe (a * Poly.constant b - c) (fmap (* a) (Poly.coeffs b))
-addR1C (R1C.R1C (Left a) (Right b) (Right c)) = addPoly $ Poly.buildMaybe (a * Poly.constant b - Poly.constant c) (fmap (* a) (Poly.coeffs b) <> fmap negate (Poly.coeffs c))
-addR1C (R1C.R1C (Right a) (Left b) (Left c)) = addPoly $ Poly.buildMaybe (Poly.constant a * b - c) (fmap (* b) (Poly.coeffs a))
-addR1C (R1C.R1C (Right a) (Left b) (Right c)) = addPoly $ Poly.buildMaybe (Poly.constant a * b - Poly.constant c) (fmap (* b) (Poly.coeffs a) <> fmap negate (Poly.coeffs c))
-addR1C (R1C.R1C (Right a) (Right b) c) = add [CMul a b c]
-
 -- | Adds a new view of binary representation of a variable after rotation.
 addRotatedBinRep :: Var -> Width -> Var -> Int -> M n ()
 addRotatedBinRep out width var rotate = do
@@ -146,7 +129,6 @@ castToNumber width expr = case expr of
   BinaryOp _ op a b -> BinaryOp (BWNumber width) op a b
   NAryOp _ op a b c -> NAryOp (BWNumber width) op a b c
   If _ p a b -> If (BWNumber width) p a b
-  EmbedR1C _ r1c -> EmbedR1C (BWNumber width) r1c
 
 ----------------------------------------------------------------
 
@@ -244,7 +226,6 @@ encode out expr = case expr of
     -- treating these variables like they are Numbers
     numBitWidth <- getNumberBitWidth
     encode out (Var (BWNumber numBitWidth) b' * castToNumber numBitWidth x + (Number numBitWidth 1 - Var (BWNumber numBitWidth) b') * y)
-  EmbedR1C _ r1c -> addR1C r1c
 
 --------------------------------------------------------------------------------
 
@@ -269,7 +250,6 @@ encodeRotate out i expr = case expr of
       addRotatedBinRep out (getWidth bw) result i
     _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
   If {} -> error "[ panic ] dunno how to compile ROTATE If"
-  EmbedR1C {} -> error "[ panic ] dunno how to compile ROTATE EmbedR1C"
   where
     -- rotateField :: (GaloisField n, Integral n) => Width -> n -> M n ()
     rotateField width n = do
@@ -416,9 +396,9 @@ encodeBinaryOp bw op out x y = case op of
       freshBinRep out w
       encodeUIntMul w out x y
     BWBoolean -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
-        -- error $ "[ panic ] Multiplication on Booleans " <> show (out, x, y)
-      -- add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
-  
+  -- error $ "[ panic ] Multiplication on Booleans " <> show (out, x, y)
+  -- add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
+
   And -> error "encodeBinaryOp: And"
   Or -> error "encodeBinaryOp: Or"
   Xor -> add [CXor x y out]
@@ -488,12 +468,11 @@ encodeUIntAddOrSub isSub width out x y = do
   --    out = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
   -- into the form of
   --    (2ⁿ * Aₙ₋₁) * (Bₙ₋₁) = (out - A - B)
-  let polynomial1 = Poly.buildEither 0 [(xBinRepStart + width - 1, multiplier)]
-  let polynomial2 = Poly.singleVar (yBinRepStart + width - 1)
-  let polynomial3 = Poly.buildEither 0 [(out, 1), (x, -1), (y, if isSub then 1 else -1)]
-
-  numBitWidth <- getNumberBitWidth
-  encode out $ EmbedR1C (BWNumber numBitWidth) $ R1C polynomial1 (Right polynomial2) polynomial3
+  add $
+    cmul
+      [(xBinRepStart + width - 1, multiplier)]
+      [(yBinRepStart + width - 1, 1)]
+      (0, [(out, 1), (x, -1), (y, if isSub then 1 else -1)])
 
 encodeUIntAdd :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
 encodeUIntAdd = encodeUIntAddOrSub False
@@ -510,10 +489,4 @@ encodeUIntMul width out a b = do
   encode rawProduct $ Var (BWNumber width) a * Var (BWNumber width) b
   -- result = rawProduct - 2ⁿ * quotient
   quotient <- freshVar
-  numBitWidth <- getNumberBitWidth
-  encode out $
-    EmbedR1C (BWNumber numBitWidth) $
-      R1C
-        (Poly.buildEither 0 [(rawProduct, 1), (quotient, 2 ^ width)])
-        (Left 1)
-        (Right (Poly.singleVar out))
+  add $ cadd 0 [(out, 1), (rawProduct, -1), (quotient, 2 ^ width)]

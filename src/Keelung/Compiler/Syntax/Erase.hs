@@ -230,7 +230,6 @@ bitValue expr i = case expr of
       <*> mapM (`bitValue` i) rest
   NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
   If w p a b -> If w p <$> bitValue a i <*> bitValue b i
-  EmbedR1C {} -> error "Panic: trying to access the bit value of a R1C"
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.Assignment ref expr) = do

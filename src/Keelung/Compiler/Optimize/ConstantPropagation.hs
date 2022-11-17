@@ -4,8 +4,6 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Keelung.Compiler.Syntax.Untyped
-import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Types (Var)
 
 --------------------------------------------------------------------------------
@@ -31,16 +29,6 @@ toAssignments (Bindings fs bs us) =
   [Assignment var (Number fw val) | (var, (fw, val)) <- IntMap.toList fs]
     ++ [Assignment var (Boolean val) | (var, val) <- IntMap.toList bs]
     ++ [Assignment var (UInt w val) | (var, (w, val)) <- IntMap.toList us]
-
-lookupBinding :: Var -> Bindings n -> Maybe n
-lookupBinding var (Bindings fs bs us) =
-  case IntMap.lookup var fs of
-    Just (_, n) -> Just n
-    Nothing -> case IntMap.lookup var bs of
-      Just n -> Just n
-      Nothing -> case IntMap.lookup var us of
-        Just (_, n) -> Just n
-        Nothing -> Nothing
 
 --------------------------------------------------------------------------------
 
@@ -106,15 +94,3 @@ propagateConstant bindings = propogate
       NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
       BinaryOp w op x y -> BinaryOp w op (propogate x) (propogate y)
       If w p x y -> If w (propogate p) (propogate x) (propogate y)
-      EmbedR1C w r1c -> EmbedR1C w (propagateR1C r1c)
-
-    propagateR1C (R1C a b c) = R1C (a >>= propogatePoly) (b >>= propogatePoly) (c >>= propogatePoly)
-
-    propogatePoly xs =
-      let (constant, coeffs) = Poly.view xs
-          (constant', coeffs') = foldl go (constant, mempty) (IntMap.toList coeffs)
-       in Poly.buildEither constant' coeffs'
-      where
-        go (constant, coeffs) (var, coeff) = case lookupBinding var bindings of
-          Nothing -> (constant, (var, coeff) : coeffs)
-          Just val -> (constant + coeff * val, coeffs)

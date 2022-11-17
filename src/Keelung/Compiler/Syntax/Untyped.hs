@@ -18,7 +18,6 @@ where
 
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..))
-import Keelung.Constraint.R1C (R1C)
 import Keelung.Field (N (..))
 import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
@@ -70,8 +69,6 @@ data Expr n
   | -- N-Ary operators with >= 2 operands
     NAryOp BitWidth Op (Expr n) (Expr n) (Seq (Expr n))
   | If BitWidth (Expr n) (Expr n) (Expr n)
-  | -- Embedding a R1C constraint (TODO: eliminate all usage of this constructor)
-    EmbedR1C BitWidth (R1C n)
   deriving (Functor)
 
 instance Num n => Num (Expr n) where
@@ -110,7 +107,6 @@ instance Show n => Show (Expr n) where
             Sub -> chain " - " 6 $ x0 :<| x1 :<| Empty
             Div -> chain " / " 7 $ x0 :<| x1 :<| Empty
           If _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-          EmbedR1C _ _ -> showString "R1C"
 
 -- | Calculate the "size" of an expression for benchmarking
 sizeOfExpr :: Expr n -> Int
@@ -126,7 +122,6 @@ sizeOfExpr expr = case expr of
      in sum (fmap sizeOfExpr operands) + (length operands - 1)
   BinaryOp _ _ x0 x1 -> sizeOfExpr x0 + sizeOfExpr x1 + 1
   If _ x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
-  EmbedR1C _ _ -> 1
 
 bitWidthOf :: Expr n -> BitWidth
 bitWidthOf expr = case expr of
@@ -139,7 +134,6 @@ bitWidthOf expr = case expr of
   NAryOp bw _ _ _ _ -> bw
   BinaryOp bw _ _ _ -> bw
   If bw _ _ _ -> bw
-  EmbedR1C bw _ -> bw
 
 --------------------------------------------------------------------------------
 
