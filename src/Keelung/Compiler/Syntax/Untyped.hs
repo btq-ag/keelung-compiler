@@ -71,7 +71,7 @@ data Expr n
   | If BitWidth (Expr n) (Expr n) (Expr n)
   | -- Embedding a R1C constraint (TODO: eliminate all usage of this constructor)
     EmbedR1C BitWidth (R1C n)
-  deriving (Eq, Functor)
+  deriving (Functor)
 
 instance Num n => Num (Expr n) where
   x + y = NAryOp (bitWidthOf x) Add x y Empty
