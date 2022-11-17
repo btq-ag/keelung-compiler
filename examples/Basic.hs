@@ -298,11 +298,17 @@ mixed = do
   number <- input
   return $ fromBool boolean + number * 2
 
-opsOnUInt0 :: Comp (UInt 4)
-opsOnUInt0 = do
+addU :: Comp (UInt 4)
+addU = do
   x <- inputUInt @4
   y <- inputUInt @4
   return $ x + y + x
+
+mulU :: Comp (UInt 4)
+mulU = do
+  x <- inputUInt @4
+  y <- inputUInt @4
+  return $ x * y
 
 bitwise :: Comp (Arr Boolean)
 bitwise = do

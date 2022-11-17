@@ -199,6 +199,14 @@ bitValue expr i = case expr of
     case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
       Just start -> return $ Var BWBoolean (start + i')
+  UVar w var -> do
+    counters <- get
+    -- if the index 'i' overflows or underflows, wrap it around
+    let i' = i `mod` w
+    -- bit variable corresponding to the variable 'var' and the index 'i''
+    case lookupBinRepStart counters var of
+      Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
+      Just start -> return $ Var BWBoolean (start + i')
   Rotate w n x -> do
     -- rotate the bit value
     -- if the index 'i' overflows or underflows, wrap it around

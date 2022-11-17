@@ -68,6 +68,11 @@ propagateConstant bindings = propogate
         Just (BWNumber w, val) -> Number w val
         Just (BWUInt w, val) -> UInt w val
         Just (BWBoolean, val) -> Boolean val
+      UVar w var -> case IntMap.lookup var bindings of
+        Nothing -> UVar w var
+        Just (BWNumber w', val) -> Number w' val
+        Just (BWUInt _, val) -> UInt w val
+        Just (BWBoolean, val) -> Boolean val
       Rotate w n x -> Rotate w n (propogate x)
       NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
       BinaryOp w op x y -> BinaryOp w op (propogate x) (propogate y)

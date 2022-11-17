@@ -14,6 +14,7 @@ import qualified Data.IntMap as IntMap
 import Data.Sequence (Seq (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Debug.Trace
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Constraint.Polynomial (Poly)
@@ -44,12 +45,14 @@ run (TypeErased untypedExprs counters assertions assignments numBinReps customBi
 
   extraBinReps <- gets envExtraBinReps
 
+  counters' <- gets envVarCounters
+
   return
     ( ConstraintSystem
         constraints
         numBinReps
         (customBinReps <> extraBinReps)
-        counters
+        counters'
     )
 
 -- | Encode the constraint 'out = x'.
@@ -96,10 +99,10 @@ addR1C (R1C.R1C (Right a) (Left b) (Right c)) = addPoly $ Poly.buildMaybe (Poly.
 addR1C (R1C.R1C (Right a) (Right b) c) = add [CMul a b c]
 
 -- | Adds a new view of binary representation of a variable after rotation.
-addRotatedBinRep :: Var -> BitWidth -> Var -> Int -> M n ()
-addRotatedBinRep out bitWidth var rotate = do
-  index <- lookupBinRepIndex (getWidth bitWidth) var
-  addBinRep $ BinRep out (getWidth bitWidth) index rotate
+addRotatedBinRep :: Var -> Width -> Var -> Int -> M n ()
+addRotatedBinRep out width var rotate = do
+  index <- lookupBinRepIndex width var
+  addBinRep $ BinRep out width index rotate
 
 addBinRep :: BinRep -> M n ()
 addBinRep binRep = modify (\env -> env {envExtraBinReps = BinRep.insert binRep (envExtraBinReps env)})
@@ -110,14 +113,12 @@ freshVar = do
   modify' (\ctx -> ctx {envVarCounters = bumpIntermediateVar (envVarCounters ctx)})
   return n
 
-freshBinRep :: Var -> Int -> M n BinRep
+freshBinRep :: Var -> Int -> M n ()
 freshBinRep var width
   | width < 1 = error $ "[ panic ] Cannot create a binary representation of width " <> show width
   | otherwise = do
     vars <- replicateM width freshVar
-    let binRep = BinRep var width (head vars) 0
-    addBinRep binRep
-    return binRep
+    addBinRep $ BinRep var width (head vars) 0
 
 -- | Locate the binary representations of some variable
 lookupBinRepIndex :: Int -> Var -> M n Var
@@ -134,6 +135,19 @@ lookupBinRepIndex width var = do
 getNumberBitWidth :: M n Width
 getNumberBitWidth = gets (getNumBitWidth . envVarCounters)
 
+castToNumber :: Width -> Expr n -> Expr n
+castToNumber width expr = case expr of
+  Number _ _ -> expr
+  UInt _ n -> Number width n
+  Boolean n -> Number width n
+  Var _ n -> Var (BWNumber width) n
+  UVar _ n -> Var (BWNumber width) n
+  Rotate _ n x -> Rotate (BWNumber width) n x
+  BinaryOp _ op a b -> BinaryOp (BWNumber width) op a b
+  NAryOp _ op a b c -> NAryOp (BWNumber width) op a b c
+  If _ p a b -> If (BWNumber width) p a b
+  EmbedR1C _ r1c -> EmbedR1C (BWNumber width) r1c
+
 ----------------------------------------------------------------
 
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
@@ -142,7 +156,10 @@ encode out expr = case expr of
   Number _ val -> add $ cadd val [(out, -1)] -- out = val
   UInt _ val -> add $ cadd val [(out, -1)] -- out = val
   Boolean val -> add $ cadd val [(out, -1)] -- out = val
+  -- variables
   Var _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  UVar _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  -- operators
   Rotate _ n x -> encodeRotate out n x
   NAryOp bw op x y rest ->
     case op of
@@ -194,8 +211,22 @@ encode out expr = case expr of
             --  =>  if the sum of operands is not 0 then 1 else 0
             --  =>  the sum of operands is not 0
             numBitWidth <- getNumberBitWidth
-            encode out (NAryOp (BWNumber numBitWidth) NEq (Number numBitWidth 0) (NAryOp (BWNumber numBitWidth) Add x y rest) Empty)
-      _ -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
+            encode
+              out
+              ( NAryOp
+                  (BWNumber numBitWidth)
+                  NEq
+                  (Number numBitWidth 0)
+                  ( NAryOp
+                      (BWNumber numBitWidth)
+                      Add
+                      (castToNumber numBitWidth x)
+                      (castToNumber numBitWidth y)
+                      (fmap (castToNumber numBitWidth) rest)
+                  )
+                  Empty
+              )
+      _ -> encodeAndFoldExprs (encodeBinaryOp bw op) out x y rest
   BinaryOp bw Sub x y -> do
     case bw of
       BWNumber _ -> do
@@ -212,7 +243,7 @@ encode out expr = case expr of
     b' <- wireAsVar b
     -- treating these variables like they are Numbers
     numBitWidth <- getNumberBitWidth
-    encode out (Var (BWNumber numBitWidth) b' * x + (Number numBitWidth 1 - Var (BWNumber numBitWidth) b') * y)
+    encode out (Var (BWNumber numBitWidth) b' * castToNumber numBitWidth x + (Number numBitWidth 1 - Var (BWNumber numBitWidth) b') * y)
   EmbedR1C _ r1c -> addR1C r1c
 
 --------------------------------------------------------------------------------
@@ -227,14 +258,15 @@ encodeRotate out i expr = case expr of
     n' <- rotateField w n
     encode out (Number w n')
   Boolean n -> encode out (Boolean n)
-  Var bw var -> addRotatedBinRep out bw var i
+  Var bw var -> addRotatedBinRep out (getWidth bw) var i
+  UVar w var -> addRotatedBinRep out w var i
   Rotate _ n x -> encodeRotate out (i + n) x
   BinaryOp {} -> error "[ panic ] dunno how to compile ROTATE BinaryOp"
   NAryOp bw op _ _ _ -> case op of
     Add -> do
       result <- freshVar
       encode result expr
-      addRotatedBinRep out bw result i
+      addRotatedBinRep out (getWidth bw) result i
     _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
   If {} -> error "[ panic ] dunno how to compile ROTATE If"
   EmbedR1C {} -> error "[ panic ] dunno how to compile ROTATE EmbedR1C"
@@ -286,12 +318,16 @@ data Term n
 toTerm :: (GaloisField n, Integral n) => Expr n -> M n (Term n)
 toTerm (NAryOp _ Mul (Var _ var) (Number _ n) Empty) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul (Var _ _) _ Empty) =
-  error "toTerm on Boolean or UInt"
+toTerm (NAryOp _ Mul (Var _ _) (Boolean _) Empty) =
+  error "toTerm on Boolean"
+toTerm (NAryOp _ Mul (Var _ _) (UInt _ _) Empty) =
+  error "toTerm on UInt"
 toTerm (NAryOp _ Mul (Number _ n) (Var _ var) Empty) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul _ (Var _ _) Empty) =
-  error "toTerm on Boolean or UInt"
+toTerm (NAryOp _ Mul (Boolean _) (Var _ _) Empty) =
+  error "toTerm on Boolean"
+toTerm (NAryOp _ Mul (UInt _ _) (Var _ _) Empty) =
+  error "toTerm on UInt"
 toTerm (NAryOp _ Mul expr (Number _ n) Empty) = do
   out <- freshVar
   encode out expr
@@ -300,14 +336,12 @@ toTerm (NAryOp _ Mul (Number _ n) expr Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (NAryOp _ Mul _ _ Empty) = do
-  error "toTerm on Boolean or UInt"
 toTerm (Number _ n) =
   return $ Constant n
 toTerm (UInt _ _) =
-  error "toTerm on Boolean or UInt"
+  error "[ panic ] toTerm on UInt"
 toTerm (Boolean _) =
-  error "toTerm on Boolean or UInt"
+  error "[ panic ] toTerm on Boolean"
 toTerm (Var _ var) =
   return $ WithVars var 1
 toTerm expr = do
@@ -356,11 +390,11 @@ encodeAndFoldExprsBinRep f width out x0 x1 xs = do
   go x0' x1' vars
   where
     go x y Empty = do
-      _ <- freshBinRep out width
+      freshBinRep out width
       f out x y
     go x y (v :<| vs) = do
       out' <- freshVar
-      _ <- freshBinRep out' width
+      freshBinRep out' width
       go out' v vs
       f out' x y
 
@@ -373,10 +407,18 @@ wireAsVar expr = do
   return out
 
 -- | Encode the constraint 'x op y = out'.
-encodeBinaryOp :: (GaloisField n, Integral n) => Op -> Var -> Var -> Var -> M n ()
-encodeBinaryOp op out x y = case op of
+encodeBinaryOp :: (GaloisField n, Integral n) => BitWidth -> Op -> Var -> Var -> Var -> M n ()
+encodeBinaryOp bw op out x y = case op of
   Add -> error "encodeBinaryOp: Add"
-  Mul -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
+  Mul -> case bw of
+    BWNumber _ -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
+    BWUInt w -> do
+      freshBinRep out w
+      encodeUIntMul w out x y
+    BWBoolean -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
+        -- error $ "[ panic ] Multiplication on Booleans " <> show (out, x, y)
+      -- add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
+  
   And -> error "encodeBinaryOp: And"
   Or -> error "encodeBinaryOp: Or"
   Xor -> add [CXor x y out]
@@ -386,10 +428,12 @@ encodeBinaryOp op out x y = case op of
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.
     -- The encoding is: x*y + (1-x)*(1-y) = out.
     numBitWidth <- getNumberBitWidth
-    encode out $
-      Var (BWNumber numBitWidth) x * Var (BWNumber numBitWidth) y
-        + (Number numBitWidth 1 - Var (BWNumber numBitWidth) x)
-        * (Number numBitWidth 1 - Var (BWNumber numBitWidth) y)
+    traceShow (out, x, y) $
+      encode out $
+        Var (BWNumber numBitWidth) x
+          * Var (BWNumber numBitWidth) y
+          + (Number numBitWidth 1 - Var (BWNumber numBitWidth) x)
+          * (Number numBitWidth 1 - Var (BWNumber numBitWidth) y)
 
 --------------------------------------------------------------------------------
 
@@ -435,9 +479,6 @@ encodeEquality isEq out x y = case Poly.buildEither 0 [(x, 1), (y, -1)] of
 --    C = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
 encodeUIntAddOrSub :: (GaloisField n, Integral n) => Bool -> Int -> Var -> Var -> Var -> M n ()
 encodeUIntAddOrSub isSub width out x y = do
-  -- allocate a fresh BinRep for the output
-  -- _outBinRep <- freshBinRep out width
-
   -- locate the binary representations of the operands
   xBinRepStart <- lookupBinRepIndex width x
   yBinRepStart <- lookupBinRepIndex width y
@@ -460,7 +501,19 @@ encodeUIntAdd = encodeUIntAddOrSub False
 encodeUIntSub :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
 encodeUIntSub = encodeUIntAddOrSub True
 
--- -- | Encoding addition on UInts with multiple operands: O(1)
--- --    C = A + B - OVERFLOW
--- encodeUIntMul :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
--- encodeUIntMul width out x y = do
+-- | Encoding addition on UInts with multiple operands: O(2)
+--    C + 2ⁿ * Q = A * B
+encodeUIntMul :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
+encodeUIntMul width out a b = do
+  -- rawProduct = a * b
+  rawProduct <- freshVar
+  encode rawProduct $ Var (BWNumber width) a * Var (BWNumber width) b
+  -- result = rawProduct - 2ⁿ * quotient
+  quotient <- freshVar
+  numBitWidth <- getNumberBitWidth
+  encode out $
+    EmbedR1C (BWNumber numBitWidth) $
+      R1C
+        (Poly.buildEither 0 [(rawProduct, 1), (quotient, 2 ^ width)])
+        (Left 1)
+        (Right (Poly.singleVar out))

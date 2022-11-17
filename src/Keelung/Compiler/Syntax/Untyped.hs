@@ -63,6 +63,7 @@ data Expr n
   | Boolean n
   | -- variables
     Var BitWidth Var
+  | UVar Width Var
   | Rotate BitWidth Int (Expr n)
   | -- Binary operators with only 2 operands
     BinaryOp BitWidth BinaryOp (Expr n) (Expr n)
@@ -94,6 +95,7 @@ instance Show n => Show (Expr n) where
           Boolean val -> shows val
           UInt _ val -> shows val
           Var _ var -> showString "$" . shows var
+          UVar _ var -> showString "$" . shows var
           Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
           NAryOp _ op x0 x1 xs -> case op of
             Add -> chain " + " 6 $ x0 :<| x1 :<| xs
@@ -117,6 +119,7 @@ sizeOfExpr expr = case expr of
   UInt _ _ -> 1
   Boolean _ -> 1
   Var _ _ -> 1
+  UVar _ _ -> 1
   Rotate _ _ x -> 1 + sizeOfExpr x
   NAryOp _ _ x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
@@ -131,6 +134,7 @@ bitWidthOf expr = case expr of
   UInt w _ -> BWUInt w
   Boolean _ -> BWBoolean
   Var bw _ -> bw
+  UVar w _ -> BWUInt w
   Rotate bw _ _ -> bw
   NAryOp bw _ _ _ _ -> bw
   BinaryOp bw _ _ _ -> bw
