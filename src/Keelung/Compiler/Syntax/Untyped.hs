@@ -12,6 +12,7 @@ module Keelung.Compiler.Syntax.Untyped
     Expr (..),
     TypeErased (..),
     Assignment (..),
+    Relation (..), 
     Relations (..),
     addBindingF,
     addBindingU,
@@ -173,10 +174,12 @@ data TypeErased n = TypeErased
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
   show (TypeErased expr counters relations assertions assignments numBinReps customBinReps) =
-    "TypeErased {\n\
-    \  expression: "
+    "TypeErased {\n"
+      -- expressions
+      <> " . expression: "
       <> show (fmap (fmap N) expr)
       <> "\n"
+      -- relations
       <> show relations
       <> ( if length assignments < 20
              then "  assignments:\n    " <> show (map (fmap N) assignments) <> "\n"
@@ -210,54 +213,63 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
 
 --------------------------------------------------------------------------------
 
--- data Relation n = Relation
---   { relConst :: IntMap n -- $var = constant
---   , relExpr :: IntMap (Expr n) -- $var = expression
---   , relAssertion :: ![Expr n] -- True = expression
---   }
+-- | Relation between variables and expressions of a certain datatype
+data Relation n = Relation
+  { relBindings :: IntMap n, -- var = constant
+    relAssignments :: IntMap (Expr n), -- var = expression
+    relAssertions :: ![Expr n] -- True = expression
+  }
 
--- instance Show n => Show (Relation n) where
---   show (Relation cs es as) =
---     "  Relations {\n"
---       <> "    Bindings of Field elements: "
---       <> unlines (map (("      " <>) . (\(var, val) -> "$" <> show var <> " = " <> show val)) (IntMap.toList fs))
---       <> "\n"
---       <> "    Bindings of Booleans: "
---       <> unlines (map (("      " <>) . (\(var, val) -> "$" <> show var <> " = " <> show val)) (IntMap.toList bs))
---       <> "\n"
---       <> "    Bindings of Unsigned integers: "
---       <> unlines (map (("      " <>) . (\(var, (_, val)) -> "$" <> show var <> " = " <> show val)) (IntMap.toList us))
---       <> "\n"
---       <> "  }"
+instance Show n => Show (Relation n) where
+  show (Relation bindings assignments assertions) =
+    unlines $
+      map (\(var, val) -> "$" <> show var <> " = " <> show val) (IntMap.toList bindings)
+        <> map (\(var, expr) -> "$" <> show var <> " = " <> show expr) (IntMap.toList assignments)
+        <> map (\expr -> "assert " <> show expr) assertions
+
+instance Semigroup (Relation n) where
+  Relation bindings0 assignments0 assertions0 <> Relation bindings1 assignments1 assertions1 =
+    Relation
+      (bindings0 <> bindings1)
+      (assignments0 <> assignments1)
+      (assertions0 <> assertions1)
+
+instance Monoid (Relation n) where
+  mempty = Relation mempty mempty mempty
+
+addBinding :: Var -> n -> Relation n -> Relation n
+addBinding var n relation = relation {relBindings = IntMap.insert var n (relBindings relation)}
+
+--------------------------------------------------------------------------------
 
 data Relations n = Relations
   { -- var = constant
-    bindingsF :: IntMap n, -- Field elements
+    bindingsF :: Relation n, -- Field elements
     bindingsB :: IntMap n, -- Booleans
     bindingsU :: IntMap (IntMap n) -- Unsigned integers of different bitwidths
     -- -- $var = expression
     -- assignmentsF :: IntMap (Expr n), -- Field elements
     -- assignmentsB :: IntMap (Expr n), -- Booleans
-    -- assignmentsU :: IntMap (Width, Expr n), -- Unsigned integers
+    -- assignmentsU :: IntMap (IntMap (Expr n)) -- Unsigned integers of different bitwidths
   }
 
 instance Show n => Show (Relations n) where
   show (Relations fs bs us) =
-    "  Relations {\n"
-      <> "    Bindings of Field elements: "
-      <> unlines (map (("      " <>) . (\(var, val) -> "$" <> show var <> " = " <> show val)) (IntMap.toList fs))
+    "  Relations of Field elements: "
+      <> indent' (show fs)
       <> "\n"
-      <> "    Bindings of Booleans: "
-      <> unlines (map (("      " <>) . (\(var, val) -> "$" <> show var <> " = " <> show val)) (IntMap.toList bs))
+      <> "  Relations of Booleans: "
+      <> unlines (map (("    " <>) . (\(var, val) -> "$" <> show var <> " = " <> show val)) (IntMap.toList bs))
       <> "\n"
-      <> "    Bindings of Unsigned integers: "
+      <> "  Relations of Unsigned integers: "
       <> unlines
         ( map
-            (("      " <>) . (\(var, val) -> "$" <> show var <> " = " <> show val))
+            (("    " <>) . (\(var, val) -> "$" <> show var <> " = " <> show val))
             (concat $ IntMap.elems (fmap IntMap.toList us))
         )
       <> "\n"
-      <> "  }"
+      where 
+        indent' = unlines . map ("    " <>) . lines
 
 instance Semigroup (Relations n) where
   Relations f0 b0 u0 <> Relations f1 b1 u1 =
@@ -267,7 +279,7 @@ instance Monoid (Relations n) where
   mempty = Relations mempty mempty mempty
 
 addBindingF :: Var -> n -> Relations n -> Relations n
-addBindingF var n relations = relations {bindingsF = IntMap.insert var n (bindingsF relations)}
+addBindingF var n relations = relations {bindingsF = addBinding var n (bindingsF relations)}
 
 addBindingB :: Var -> n -> Relations n -> Relations n
 addBindingB var n relations = relations {bindingsB = IntMap.insert var n (bindingsB relations)}

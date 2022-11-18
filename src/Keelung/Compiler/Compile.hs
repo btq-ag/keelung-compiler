@@ -66,11 +66,20 @@ encodeAssertion expr = do
 encodeAssignment :: (GaloisField n, Integral n) => Assignment n -> M n ()
 encodeAssignment (Assignment var expr) = encode var expr
 
+encodeRelation :: (GaloisField n, Integral n) => Relation n -> M n ()
+encodeRelation (Relation bindings assignments assertions) = do
+  forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cadd val [(var, -1)]
+  forM_ (IntMap.toList assignments) $ uncurry encode
+  forM_ assertions $ \expr -> do
+      out <- freshVar
+      encode out expr
+      add $ cadd 1 [(out, -1)] -- 1 = expr
+
 encodeRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
 encodeRelations (Relations fs bs us) = do
-  forM_ (IntMap.toList fs) $ \(var, val) -> add $ cadd val [(var, -1)]
+  encodeRelation fs
   forM_ (IntMap.toList bs) $ \(var, val) -> add $ cadd val [(var, -1)]
-  forM_ (IntMap.toList us) $ \(_, xs) -> do 
+  forM_ (IntMap.toList us) $ \(_, xs) -> do
     forM_ (IntMap.toList xs) $ \(var, val) -> add $ cadd val [(var, -1)]
 
 --------------------------------------------------------------------------------

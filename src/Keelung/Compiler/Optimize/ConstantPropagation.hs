@@ -54,7 +54,7 @@ propagateConstant relations = propogate
       UInt _ _ -> e
       Boolean _ -> e
       Var bw var -> case bw of
-        BWNumber w -> case IntMap.lookup var (bindingsF relations) of
+        BWNumber w -> case IntMap.lookup var (relBindings (bindingsF relations)) of
           Nothing -> Var bw var
           Just val -> Number w val
         BWBoolean -> case IntMap.lookup var (bindingsB relations) of
