@@ -68,9 +68,10 @@ encodeAssignment (Assignment var expr) = encode var expr
 
 encodeRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
 encodeRelations (Relations fs bs us) = do
-  forM_ (IntMap.toList fs) $ \(var, (_, val)) -> add $ cadd val [(var, -1)]
+  forM_ (IntMap.toList fs) $ \(var, val) -> add $ cadd val [(var, -1)]
   forM_ (IntMap.toList bs) $ \(var, val) -> add $ cadd val [(var, -1)]
-  forM_ (IntMap.toList us) $ \(var, (_, val)) -> add $ cadd val [(var, -1)]
+  forM_ (IntMap.toList us) $ \(_, xs) -> do 
+    forM_ (IntMap.toList xs) $ \(var, val) -> add $ cadd val [(var, -1)]
 
 --------------------------------------------------------------------------------
 

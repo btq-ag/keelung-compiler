@@ -37,8 +37,8 @@ extractRelations = go (Relations mempty mempty mempty) []
   where
     go :: Relations n -> [Assignment n] -> [Assignment n] -> (Relations n, [Assignment n])
     go bindings rest [] = (bindings, rest)
-    go bindings rest (Assignment var (Number w val) : xs) =
-      go (addBindingF var (w, val) bindings) rest xs
+    go bindings rest (Assignment var (Number _ val) : xs) =
+      go (addBindingF var val bindings) rest xs
     go bindings rest (Assignment var (UInt w val) : xs) =
       go (addBindingU var (w, val) bindings) rest xs
     go bindings rest (Assignment var (Boolean val) : xs) =
@@ -56,16 +56,20 @@ propagateConstant relations = propogate
       Var bw var -> case bw of
         BWNumber w -> case IntMap.lookup var (bindingsF relations) of
           Nothing -> Var bw var
-          Just (_, val) -> Number w val
+          Just val -> Number w val
         BWBoolean -> case IntMap.lookup var (bindingsB relations) of
           Nothing -> Var bw var
           Just val -> Boolean val
-        BWUInt w -> case IntMap.lookup var (bindingsU relations) of
+        BWUInt w -> case IntMap.lookup w (bindingsU relations) of
           Nothing -> Var bw var
-          Just (_, val) -> UInt w val
-      UVar w var -> case IntMap.lookup var (bindingsU relations) of
+          Just rels -> case IntMap.lookup var rels of
+            Nothing -> Var bw var
+            Just val -> UInt w val
+      UVar w var -> case IntMap.lookup w (bindingsU relations) of
         Nothing -> Var (BWUInt w) var
-        Just (_, val) -> UInt w val
+        Just rels -> case IntMap.lookup var rels of
+          Nothing -> Var (BWUInt w) var
+          Just val -> UInt w val
       Rotate w n x -> Rotate w n (propogate x)
       NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
       BinaryOp w op x y -> BinaryOp w op (propogate x) (propogate y)
