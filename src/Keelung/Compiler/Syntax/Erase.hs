@@ -54,6 +54,7 @@ run (T.Elaborated expr comp) =
             { erasedExpr = expr',
               -- determine the size of output vars by looking at the length of the expression
               erasedVarCounters = counters'',
+              erasedRelations = mempty,
               erasedAssertions = assertions',
               erasedAssignments = assignments,
               erasedBinReps = numBinReps,

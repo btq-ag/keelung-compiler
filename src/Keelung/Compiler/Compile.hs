@@ -28,9 +28,12 @@ import Keelung.Types
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs counters assertions assignments numBinReps customBinReps) = runM counters $ do
+run (TypeErased untypedExprs counters relations assertions assignments numBinReps customBinReps) = runM counters $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
   forM_ (zip (outputVars counters) untypedExprs) (uncurry encode)
+
+  -- Compile all relations
+  encodeRelations relations
 
   -- Compile assignments to constraints
   mapM_ encodeAssignment assignments
@@ -62,6 +65,12 @@ encodeAssertion expr = do
 -- | Encode the constraint 'out = expr'.
 encodeAssignment :: (GaloisField n, Integral n) => Assignment n -> M n ()
 encodeAssignment (Assignment var expr) = encode var expr
+
+encodeRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
+encodeRelations (Relations fs bs us) = do
+  forM_ (IntMap.toList fs) $ \(var, (_, val)) -> add $ cadd val [(var, -1)]
+  forM_ (IntMap.toList bs) $ \(var, val) -> add $ cadd val [(var, -1)]
+  forM_ (IntMap.toList us) $ \(var, (_, val)) -> add $ cadd val [(var, -1)]
 
 --------------------------------------------------------------------------------
 

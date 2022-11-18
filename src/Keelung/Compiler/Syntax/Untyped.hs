@@ -12,11 +12,17 @@ module Keelung.Compiler.Syntax.Untyped
     Expr (..),
     TypeErased (..),
     Assignment (..),
+    Relations (..),
+    addBindingF,
+    addBindingU,
+    addBindingB,
     sizeOfExpr,
   )
 where
 
 import Data.Field.Galois (GaloisField)
+import Data.IntMap (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..))
 import Keelung.Field (N (..))
 import Keelung.Syntax.BinRep (BinReps)
@@ -153,6 +159,8 @@ data TypeErased n = TypeErased
     erasedExpr :: ![Expr n],
     -- | Variable bookkeepung
     erasedVarCounters :: !VarCounters,
+    -- | Relations between variables and/or expressions
+    erasedRelations :: !(Relations n),
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
     -- | Assignments after type erasure
@@ -164,11 +172,12 @@ data TypeErased n = TypeErased
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr counters assertions assignments numBinReps customBinReps) =
+  show (TypeErased expr counters relations assertions assignments numBinReps customBinReps) =
     "TypeErased {\n\
     \  expression: "
       <> show (fmap (fmap N) expr)
       <> "\n"
+      <> show relations
       <> ( if length assignments < 20
              then "  assignments:\n    " <> show (map (fmap N) assignments) <> "\n"
              else ""
@@ -198,3 +207,48 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
                     (("    " <>) . show)
                     (BinRep.toList (numBinReps <> customBinReps))
                 )
+
+--------------------------------------------------------------------------------
+
+data Relations n = Relations
+  { -- "Bindings" are assignments with constant values on the RHS
+    bindingsF :: IntMap (Width, n), -- Field elements
+    bindingsB :: IntMap n, -- Booleans
+    bindingsU :: IntMap (Width, n) -- Unsigned integers
+  }
+
+instance Show n => Show (Relations n) where
+  show (Relations fs bs us) =
+    "  Relations {\n"
+      <> "    Bindings of Field elements: "
+      <> unlines (map (("      " <>) . (\(var, (_, val)) -> "$" <> show var <> " = " <> show val)) (IntMap.toList fs))
+      <> "\n"
+      <> "    Bindings of Booleans: "
+      <> unlines (map (("      " <>) . (\(var, val) -> "$" <> show var <> " = " <> show val)) (IntMap.toList bs))
+      <> "\n"
+      <> "    Bindings of Unsigned integers: "
+      <> unlines (map (("      " <>) . (\(var, (_, val)) -> "$" <> show var <> " = " <> show val)) (IntMap.toList us))
+      <> "\n"
+      <> "  }"
+
+instance Semigroup (Relations n) where
+  Relations f0 b0 u0 <> Relations f1 b1 u1 =
+    Relations (f0 <> f1) (b0 <> b1) (u0 <> u1)
+
+instance Monoid (Relations n) where
+  mempty = Relations mempty mempty mempty
+
+addBindingF :: Var -> (Width, n) -> Relations n -> Relations n
+addBindingF var n relations = relations {bindingsF = IntMap.insert var n (bindingsF relations)}
+
+addBindingB :: Var -> n -> Relations n -> Relations n
+addBindingB var n relations = relations {bindingsB = IntMap.insert var n (bindingsB relations)}
+
+addBindingU :: Var -> (Width, n) -> Relations n -> Relations n
+addBindingU var n relations = relations {bindingsU = IntMap.insert var n (bindingsU relations)}
+
+toAssignments :: Relations n -> [Assignment n]
+toAssignments (Relations fs bs us) =
+  [Assignment var (Number fw val) | (var, (fw, val)) <- IntMap.toList fs]
+    ++ [Assignment var (Boolean val) | (var, val) <- IntMap.toList bs]
+    ++ [Assignment var (UInt w val) | (var, (w, val)) <- IntMap.toList us]
