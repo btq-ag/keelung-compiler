@@ -80,17 +80,17 @@ runM = flip evalState
 
 --------------------------------------------------------------------------------
 
-eraseVal :: GaloisField n => T.Val -> M n [Expr n]
+eraseVal :: GaloisField n => T.Val -> M n (BitWidth, [Expr n])
 eraseVal (T.Integer n) = do
   width <- gets getNumBitWidth
-  return [Number width (fromInteger n)]
+  return (BWNumber width, [Number width (fromInteger n)])
 eraseVal (T.Rational n) = do
   width <- gets getNumBitWidth
-  return [Number width (fromRational n)]
-eraseVal (T.Unsigned w n) = return [UInt w (fromInteger n)]
-eraseVal (T.Boolean False) = return [Boolean 0]
-eraseVal (T.Boolean True) = return [Boolean 1]
-eraseVal T.Unit = return []
+  return (BWNumber width, [Number width (fromRational n)])
+eraseVal (T.Unsigned width n) = return (BWUInt width, [UInt width (fromInteger n)])
+eraseVal (T.Boolean False) = return (BWBoolean, [Boolean 0])
+eraseVal (T.Boolean True) = return (BWBoolean, [Boolean 1])
+eraseVal T.Unit = return (BWUnit, [])
 
 -- Current layout of variables
 --
@@ -127,13 +127,74 @@ eraseRef' ref = do
     T.UIntVar w n -> (BWUInt w, blendIntermediateVar counters n)
     T.UIntInputVar w n -> (BWUInt w, blendCustomInputVar counters w n)
 
-eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
-eraseRef ref = uncurry Var <$> eraseRef' ref
+eraseRef :: GaloisField n => T.Ref -> M n (BitWidth, Expr n)
+eraseRef ref = do
+  (bw, var) <- eraseRef' ref
+  return (bw, Var bw var)
+
+-- eraseExpr' :: (GaloisField n, Integral n) => T.Expr -> M n (BitWidth, [Expr n])
+-- eraseExpr' expr = case expr of
+--   T.Val val -> eraseVal val
+--   T.Var ref -> do
+--     (bw, var) <- eraseRef ref
+--     return (bw, [var])
+--   T.Array exprs -> do
+--     exprss <- mapM eraseExpr' exprs
+--     return (concat exprss)
+--   T.Add x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [chainExprsOfAssocOp Add (head xs) (head ys)]
+--   T.Sub x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [BinaryOp (bitWidthOf (head xs)) Sub (head xs) (head ys)]
+--   T.Mul x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [chainExprsOfAssocOp Mul (head xs) (head ys)]
+--   T.Div x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [BinaryOp (bitWidthOf (head xs)) Div (head xs) (head ys)]
+--   T.Eq x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [chainExprsOfAssocOp Eq (head xs) (head ys)]
+--   T.And x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [chainExprsOfAssocOp And (head xs) (head ys)]
+--   T.Or x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [chainExprsOfAssocOp Or (head xs) (head ys)]
+--   T.Xor x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [chainExprsOfAssocOp Xor (head xs) (head ys)]
+--   T.RotateR n x -> do
+--     xs <- eraseExpr x
+--     return [Rotate (bitWidthOf (head xs)) n (head xs)]
+--   T.BEq x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [chainExprsOfAssocOp BEq (head xs) (head ys)]
+--   T.If b x y -> do
+--     bs <- eraseExpr b
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [If (bitWidthOf (head xs)) (head bs) (head xs) (head ys)]
+--   T.ToNum x -> eraseExpr x
+--   T.Bit x i -> do
+--     x' <- head <$> eraseExpr x
+--     value <- bitValue x' i
+--     return [value]
 
 eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [Expr n]
 eraseExpr expr = case expr of
-  T.Val val -> eraseVal val
-  T.Var ref -> pure <$> eraseRef ref
+  T.Val val -> snd <$> eraseVal val
+  T.Var ref -> pure . snd <$> eraseRef ref
   T.Array exprs -> do
     exprss <- mapM eraseExpr exprs
     return $ concat exprss

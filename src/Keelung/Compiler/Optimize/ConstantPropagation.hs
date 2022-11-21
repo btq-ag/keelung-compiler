@@ -93,6 +93,7 @@ propagateConstant relations = propogate
         BWUInt w -> case lookupU w var (valueBindings relations) of
           Nothing -> Var bw var
           Just val -> UInt w val
+        BWUnit -> Var bw var
       UVar w var -> case lookupU w var (valueBindings relations) of
         Nothing -> Var (BWUInt w) var
         Just val -> UInt w val

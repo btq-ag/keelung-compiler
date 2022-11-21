@@ -56,13 +56,14 @@ data BinaryOp = Sub | Div
 
 type Width = Int
 
-data BitWidth = BWNumber Width | BWBoolean | BWUInt Width
+data BitWidth = BWNumber Width | BWBoolean | BWUInt Width | BWUnit
   deriving (Eq, Ord, Show)
 
 getWidth :: BitWidth -> Width
 getWidth (BWNumber n) = n
 getWidth BWBoolean = 1
 getWidth (BWUInt n) = n
+getWidth BWUnit = 0
 
 -- | "Untyped" expression
 data Expr n

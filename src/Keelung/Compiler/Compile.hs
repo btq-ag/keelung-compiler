@@ -14,7 +14,6 @@ import qualified Data.IntMap as IntMap
 import Data.Sequence (Seq (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Debug.Trace
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
@@ -182,6 +181,7 @@ encode out expr = case expr of
           encodeTerms out terms
         BWUInt n -> encodeAndFoldExprsBinRep (encodeUIntAdd n) n out x y rest
         BWBoolean -> error "[ panic ] Addition on Booleans"
+        BWUnit -> error "[ panic ] Addition on Units"
       And -> do
         a <- wireAsVar x
         b <- wireAsVar y
@@ -248,6 +248,7 @@ encode out expr = case expr of
         encodeTerms out (x' :<| negateTerm y' :<| Empty)
       BWUInt n -> encodeAndFoldExprs (encodeUIntSub n) out x y mempty
       BWBoolean -> error "[ panic ] Subtraction on Booleans"
+      BWUnit -> error "[ panic ] Addition on Units"
   BinaryOp _ Div x y -> do
     x' <- wireAsVar x
     y' <- wireAsVar y
@@ -427,9 +428,7 @@ encodeBinaryOp bw op out x y = case op of
       freshBinRep out w
       encodeUIntMul w out x y
     BWBoolean -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
-  -- error $ "[ panic ] Multiplication on Booleans " <> show (out, x, y)
-  -- add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
-
+    BWUnit -> error "[ panic ] Multiplication on Units"
   And -> error "encodeBinaryOp: And"
   Or -> error "encodeBinaryOp: Or"
   Xor -> add [CXor x y out]
@@ -439,12 +438,11 @@ encodeBinaryOp bw op out x y = case op of
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.
     -- The encoding is: x*y + (1-x)*(1-y) = out.
     numBitWidth <- getNumberBitWidth
-    traceShow (out, x, y) $
-      encode out $
-        Var (BWNumber numBitWidth) x
-          * Var (BWNumber numBitWidth) y
-          + (Number numBitWidth 1 - Var (BWNumber numBitWidth) x)
-          * (Number numBitWidth 1 - Var (BWNumber numBitWidth) y)
+    encode out $
+      Var (BWNumber numBitWidth) x
+        * Var (BWNumber numBitWidth) y
+        + (Number numBitWidth 1 - Var (BWNumber numBitWidth) x)
+        * (Number numBitWidth 1 - Var (BWNumber numBitWidth) y)
 
 --------------------------------------------------------------------------------
 
