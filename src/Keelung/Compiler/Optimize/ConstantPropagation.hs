@@ -51,7 +51,7 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
             case expr of
               Number _ val -> Result (succ n) (insertN var val vbs) ebs
               UInt _ _ -> error "[ panic ] UInt value in Number bindings of expressions"
-              Boolean _ -> error "[ panic ] Boolean value in Number bindings of expressions"
+              ExprB _ -> error "[ panic ] Boolean value in Number bindings of expressions"
               _ -> Result n vbs (insertN var expr ebs)
         )
     handleB =
@@ -60,7 +60,7 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
             case expr of
               Number _ _ -> error "[ panic ] Number value in Number bindings of expressions"
               UInt _ _ -> error "[ panic ] UInt value in Number bindings of expressions"
-              Boolean val -> Result (succ n) (insertB var val vbs) ebs
+              ExprB (ValB val) -> Result (succ n) (insertB var val vbs) ebs
               _ -> Result n vbs (insertB var expr ebs)
         )
     handleU =
@@ -71,7 +71,7 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
                   case expr of
                     Number _ _ -> error "[ panic ] Number value in Number bindings of expressions"
                     UInt _ val -> Result (succ n') (insertU width var val vbs') ebs'
-                    Boolean _ -> error "[ panic ] Boolean value in Number bindings of expressions"
+                    ExprB _ -> error "[ panic ] Boolean value in Number bindings of expressions"
                     _ -> Result n' vbs' (insertU width var expr ebs')
               )
               result'
@@ -85,13 +85,13 @@ propagateConstant relations = propogate
     propogate e = case e of
       Number _ _ -> e
       UInt _ _ -> e
-      Boolean _ -> e
+      ExprB (ValB _) -> e
+      ExprB (VarB var) -> case lookupB var (valueBindings relations) of
+        Nothing -> e
+        Just val -> ExprB (ValB val)
       VarN w var -> case lookupN var (valueBindings relations) of
         Nothing -> e
         Just val -> Number w val
-      VarB var -> case lookupB var (valueBindings relations) of
-        Nothing -> e
-        Just val -> Boolean val
       VarU w var -> case lookupU w var (valueBindings relations) of
         Nothing -> e
         Just val -> UInt w val

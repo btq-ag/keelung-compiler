@@ -9,6 +9,7 @@ module Keelung.Compiler.Syntax.Untyped
     bitWidthOf,
     getWidth,
     castToNumber,
+    Boolean (..),
     Expr (..),
     TypeErased (..),
     Assignment (..),
@@ -68,16 +69,27 @@ getWidth (BWUInt n) = n
 getWidth BWUnit = 0
 getWidth (BWArray ns n) = n * getWidth ns
 
+data Boolean n
+  = ValB n
+  | VarB Var
+  deriving (Functor)
+
+instance (Integral n, Show n) => Show (Boolean n) where
+  showsPrec _prec expr = case expr of
+    ValB 0 -> showString "F"
+    ValB _ -> showString "T"
+    VarB var -> showString "$" . shows var
+
 -- | "Untyped" expression
 data Expr n
   = -- values
     Number Width n
   | UInt Width n
-  | Boolean n
+  | ExprB (Boolean n)
   | -- variables
     VarN Width Var
-  | VarB Var
-  | VarU Width Var
+  | -- | VarB Var
+    VarU Width Var
   | Rotate BitWidth Int (Expr n)
   | -- Binary operators with only 2 operands
     Sub BitWidth (Expr n) (Expr n)
@@ -95,20 +107,19 @@ instance Num n => Num (Expr n) where
   signum = const 1
   fromInteger = error "[ panic ] Dunno how to convert an Integer to a untyped expression"
 
-instance Show n => Show (Expr n) where
+instance (Integral n, Show n) => Show (Expr n) where
   showsPrec prec expr =
-    let chain :: Show n => String -> Int -> Seq (Expr n) -> String -> String
+    let chain :: (Integral n, Show n) => String -> Int -> Seq (Expr n) -> String -> String
         chain delim n = showParen (prec > n) . go delim n
-        go :: Show n => String -> Int -> Seq (Expr n) -> String -> String
+        go :: (Integral n, Show n) => String -> Int -> Seq (Expr n) -> String -> String
         go _ _ Empty = showString ""
         go _ n (x :<| Empty) = showsPrec (succ n) x
         go delim n (x :<| xs') = showsPrec (succ n) x . showString delim . go delim n xs'
      in case expr of
           Number _ val -> shows val
-          Boolean val -> shows val
+          ExprB x -> shows x
           UInt _ val -> shows val
           VarN _ var -> showString "$" . shows var
-          VarB var -> showString "$" . shows var
           VarU _ var -> showString "$" . shows var
           Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
           NAryOp _ op x0 x1 xs -> case op of
@@ -129,10 +140,11 @@ instance Show n => Show (Expr n) where
 sizeOfExpr :: Expr n -> Int
 sizeOfExpr expr = case expr of
   Number _ _ -> 1
+  ExprB x -> case x of
+    ValB _ -> 1
+    VarB _ -> 1
   UInt _ _ -> 1
-  Boolean _ -> 1
   VarN _ _ -> 1
-  VarB _ -> 1
   VarU _ _ -> 1
   Rotate _ _ x -> 1 + sizeOfExpr x
   NAryOp _ _ x0 x1 xs ->
@@ -146,9 +158,8 @@ bitWidthOf :: Expr n -> BitWidth
 bitWidthOf expr = case expr of
   Number w _ -> BWNumber w
   UInt w _ -> BWUInt w
-  Boolean _ -> BWBoolean
+  ExprB _ -> BWBoolean
   VarN w _ -> BWNumber w
-  VarB _ -> BWBoolean
   VarU w _ -> BWUInt w
   Rotate bw _ _ -> bw
   NAryOp bw _ _ _ _ -> bw
@@ -159,11 +170,12 @@ bitWidthOf expr = case expr of
 castToNumber :: Width -> Expr n -> Expr n
 castToNumber width expr = case expr of
   Number _ _ -> expr
+  ExprB x -> case x of
+    ValB val -> Number width val
+    VarB var -> VarN width var
   UInt _ n -> Number width n
-  Boolean n -> Number width n
   -- Arravy xs
   VarN w n -> VarN w n
-  VarB n -> VarN width n
   VarU _ n -> VarN width n
   Rotate _ n x -> Rotate (BWNumber width) n x
   Div _ a b -> Div (BWNumber width) a b
@@ -175,7 +187,7 @@ castToNumber width expr = case expr of
 
 data Assignment n = Assignment Var (Expr n)
 
-instance Show n => Show (Assignment n) where
+instance (Integral n, Show n) => Show (Assignment n) where
   show (Assignment var expr) = "$" <> show var <> " := " <> show expr
 
 instance Functor Assignment where
@@ -320,7 +332,7 @@ data Relations n = Relations
     -- [| expression |] = True
   }
 
-instance Show n => Show (Relations n) where
+instance (Integral n, Show n) => Show (Relations n) where
   show (Relations vbs ebs) =
     "Binding of variables to values:\n" <> show vbs <> "\n"
       <> "Binding of variables to expressions:\n"

@@ -150,15 +150,19 @@ getNumberBitWidth = gets (getNumBitWidth . envVarCounters)
 
 ----------------------------------------------------------------
 
+encodeBoolean :: (GaloisField n, Integral n) => Var -> Boolean n -> M n ()
+encodeBoolean out expr = case expr of
+  ValB val -> add $ cadd val [(out, -1)] -- out = val
+  VarB var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
 encode out expr = case expr of
   -- values
   Number _ val -> add $ cadd val [(out, -1)] -- out = val
+  ExprB x -> encodeBoolean out x
   UInt _ val -> add $ cadd val [(out, -1)] -- out = val
-  Boolean val -> add $ cadd val [(out, -1)] -- out = val
   -- variables
   VarN _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
-  VarB var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   VarU _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   -- operators
   Rotate _ n x -> encodeRotate out n x
@@ -266,10 +270,9 @@ encodeRotate out i expr = case expr of
     encode out (Number w n')
   UInt w n -> do
     n' <- rotateField w n
-    encode out (Number w n')
-  Boolean n -> encode out (Boolean n)
+    encode out (UInt w n')
+  ExprB x -> encode out (ExprB x)
   VarN w var -> addRotatedBinRep out w var i
-  VarB var -> encode out (VarB var)
   VarU w var -> addRotatedBinRep out w var i
   Rotate _ n x -> encodeRotate out (i + n) x
   Sub {} -> error "[ panic ] dunno how to compile ROTATE Sub"
@@ -333,37 +336,37 @@ data Term n
 toTerm :: (GaloisField n, Integral n) => Expr n -> M n (Term n)
 toTerm (NAryOp _ Mul (VarN _ var) (Number _ n) Empty) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul (VarB _) (Number _ _) Empty) =
+toTerm (NAryOp _ Mul (ExprB (VarB _)) (Number _ _) Empty) =
   error "[ panic ] toTerm: Trying to add Boolean variable with Number value"
 toTerm (NAryOp _ Mul (VarU _ _) (Number _ _) Empty) =
   error "[ panic ] toTerm: Trying to add UInt variable with Number value"
-toTerm (NAryOp _ Mul (VarN _ _) (Boolean _) Empty) =
+toTerm (NAryOp _ Mul (VarN _ _) (ExprB (ValB _)) Empty) =
   error "[ panic ] toTerm: Trying to add Number variable with Boolean value"
-toTerm (NAryOp _ Mul (VarB _) (Boolean _) Empty) =
+toTerm (NAryOp _ Mul (ExprB (VarB _)) (ExprB (ValB _)) Empty) =
   error "[ panic ] toTerm: Trying to add Boolean variable with Boolean value"
-toTerm (NAryOp _ Mul (VarU _ _) (Boolean _) Empty) =
+toTerm (NAryOp _ Mul (VarU _ _) (ExprB (ValB _)) Empty) =
   error "[ panic ] toTerm: Trying to add UInt variable with Boolean value"
 toTerm (NAryOp _ Mul (VarN _ _) (UInt _ _) Empty) =
   error "[ panic ] toTerm: Trying to add Number variable with UInt value"
-toTerm (NAryOp _ Mul (VarB _) (UInt _ _) Empty) =
+toTerm (NAryOp _ Mul (ExprB (VarB _)) (UInt _ _) Empty) =
   error "[ panic ] toTerm: Trying to add Boolean variable with UInt value"
 toTerm (NAryOp _ Mul (VarU _ var) (UInt _ n) Empty) =
   return $ WithVars var n
 toTerm (NAryOp _ Mul (Number _ n) (VarN _ var) Empty) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul (Number _ _) (VarB _) Empty) =
+toTerm (NAryOp _ Mul (Number _ _) (ExprB (VarB _)) Empty) =
   error "[ panic ] toTerm: Trying to add Number value with Boolean variable"
 toTerm (NAryOp _ Mul (Number _ _) (VarU _ _) Empty) =
   error "[ panic ] toTerm: Trying to add Number value with UInt variable"
-toTerm (NAryOp _ Mul (Boolean _) (VarN _ _) Empty) =
+toTerm (NAryOp _ Mul (ExprB (ValB _)) (VarN _ _) Empty) =
   error "[ panic ] toTerm: Trying to add Boolean value with Number variable"
-toTerm (NAryOp _ Mul (Boolean _) (VarB _) Empty) =
+toTerm (NAryOp _ Mul (ExprB (ValB _)) (ExprB (VarB _)) Empty) =
   error "[ panic ] toTerm: Trying to add Boolean value with Boolean variable"
-toTerm (NAryOp _ Mul (Boolean _) (VarU _ _) Empty) =
+toTerm (NAryOp _ Mul (ExprB (ValB _)) (VarU _ _) Empty) =
   error "[ panic ] toTerm: Trying to add Boolean value with UInt variable"
 toTerm (NAryOp _ Mul (UInt _ _) (VarN _ _) Empty) =
   error "[ panic ] toTerm: Trying to add UInt value with Number variable"
-toTerm (NAryOp _ Mul (UInt _ _) (VarB _) Empty) =
+toTerm (NAryOp _ Mul (UInt _ _) (ExprB (VarB _)) Empty) =
   error "[ panic ] toTerm: Trying to add UInt value with Boolean variable"
 toTerm (NAryOp _ Mul (UInt _ n) (VarU _ var) Empty) =
   return $ WithVars var n
@@ -379,12 +382,10 @@ toTerm (Number _ n) =
   return $ Constant n
 toTerm (UInt _ _) =
   error "[ panic ] toTerm on UInt"
-toTerm (Boolean _) =
-  error "[ panic ] toTerm on Boolean"
+toTerm (ExprB _) =
+  error "[ panic ] toTerm on Boolean expression"
 toTerm (VarN _ var) =
   return $ WithVars var 1
-toTerm (VarB _) =
-  error "[ panic ] toTerm on Boolean variable"
 toTerm (VarU _ var) =
   return $ WithVars var 1
 toTerm expr = do
@@ -444,7 +445,7 @@ encodeAndFoldExprsBinRep f width out x0 x1 xs = do
 -- | If the expression is not already a variable, create a new variable
 wireAsVar :: (GaloisField n, Integral n) => Expr n -> M n Var
 wireAsVar (VarN _ var) = return var
-wireAsVar (VarB var) = return var
+wireAsVar (ExprB (VarB var)) = return var
 wireAsVar (VarU _ var) = return var
 wireAsVar expr = do
   out <- freshVar
@@ -491,8 +492,8 @@ encodeEquality isEq out x y = case Poly.buildEither 0 [(x, 1), (y, -1)] of
   Left _ -> do
     -- in this case, the variable x and y happend to be the same
     if isEq
-      then encode out (Boolean 1)
-      else encode out (Boolean 0)
+      then encode out (ExprB (ValB 1))
+      else encode out (ExprB (ValB 0))
   Right diff -> do
     -- introduce a new variable m
     -- if diff = 0 then m = 0 else m = recip diff
