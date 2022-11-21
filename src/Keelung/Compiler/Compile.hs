@@ -148,19 +148,6 @@ lookupBinRepIndex width var = do
 getNumberBitWidth :: M n Width
 getNumberBitWidth = gets (getNumBitWidth . envVarCounters)
 
-castToNumber :: Width -> Expr n -> Expr n
-castToNumber width expr = case expr of
-  Number _ _ -> expr
-  UInt _ n -> Number width n
-  Boolean n -> Number width n
-  -- Arravy xs 
-  Var _ n -> Var (BWNumber width) n
-  UVar _ n -> Var (BWNumber width) n
-  Rotate _ n x -> Rotate (BWNumber width) n x
-  BinaryOp _ op a b -> BinaryOp (BWNumber width) op a b
-  NAryOp _ op a b c -> NAryOp (BWNumber width) op a b c
-  If _ p a b -> If (BWNumber width) p a b
-
 ----------------------------------------------------------------
 
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()

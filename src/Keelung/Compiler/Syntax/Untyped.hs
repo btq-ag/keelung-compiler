@@ -8,6 +8,7 @@ module Keelung.Compiler.Syntax.Untyped
     Width,
     bitWidthOf,
     getWidth,
+    castToNumber,
     BinaryOp (..),
     Expr (..),
     TypeErased (..),
@@ -28,7 +29,6 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..))
-import Data.Vector (Vector)
 import Keelung.Field (N (..))
 import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
@@ -154,6 +154,19 @@ bitWidthOf expr = case expr of
   NAryOp bw _ _ _ _ -> bw
   BinaryOp bw _ _ _ -> bw
   If bw _ _ _ -> bw
+
+castToNumber :: Width -> Expr n -> Expr n
+castToNumber width expr = case expr of
+  Number _ _ -> expr
+  UInt _ n -> Number width n
+  Boolean n -> Number width n
+  -- Arravy xs 
+  Var _ n -> Var (BWNumber width) n
+  UVar _ n -> Var (BWNumber width) n
+  Rotate _ n x -> Rotate (BWNumber width) n x
+  BinaryOp _ op a b -> BinaryOp (BWNumber width) op a b
+  NAryOp _ op a b c -> NAryOp (BWNumber width) op a b c
+  If _ p a b -> If (BWNumber width) p a b
 
 --------------------------------------------------------------------------------
 
@@ -317,3 +330,5 @@ instance Semigroup (Relations n) where
 
 instance Monoid (Relations n) where
   mempty = Relations mempty mempty
+
+  
