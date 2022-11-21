@@ -83,10 +83,10 @@ runM = flip evalState
 eraseVal :: GaloisField n => T.Val -> M n [(BitWidth, Expr n)]
 eraseVal (T.Integer n) = do
   width <- gets getNumBitWidth
-  return [(BWNumber width, Number width (fromInteger n))]
+  return [(BWNumber width, ExprN $ ValN width (fromInteger n))]
 eraseVal (T.Rational n) = do
   width <- gets getNumBitWidth
-  return [(BWNumber width, Number width (fromRational n))]
+  return [(BWNumber width, ExprN $ ValN width (fromRational n))]
 eraseVal (T.Unsigned width n) =
   return [(BWUInt width, ExprU $ ValU width (fromIntegral n))]
 eraseVal (T.Boolean False) =
@@ -120,8 +120,8 @@ eraseRef3 ref = do
   counters <- get
   let numWidth = getNumBitWidth counters
   return $ case ref of
-    T.NumVar n -> (BWNumber numWidth, VarN numWidth $ blendIntermediateVar counters n)
-    T.NumInputVar n -> (BWNumber numWidth, VarN numWidth $ blendNumInputVar counters n)
+    T.NumVar n -> (BWNumber numWidth, ExprN $ VarN numWidth $ blendIntermediateVar counters n)
+    T.NumInputVar n -> (BWNumber numWidth, ExprN $ VarN numWidth $ blendNumInputVar counters n)
     T.BoolVar n -> (BWBoolean, ExprB $ VarB $ blendIntermediateVar counters n)
     T.BoolInputVar n -> (BWBoolean, ExprB $ VarB $ blendBoolInputVar counters n)
     T.UIntVar w n -> (BWUInt w, ExprU $ VarU w $ blendIntermediateVar counters n)
@@ -222,8 +222,16 @@ eraseExpr expr = case expr of
 
 bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (Expr n)
 bitValue expr i = case expr of
-  Number w n -> return $ Number w (testBit n i)
-  ExprU (ValU w n) -> return $ ExprU (ValU w (testBit n i))
+  ExprN (ValN _ n) -> return $ ExprB (ValB (testBit n i))
+  ExprN (VarN w var) -> do
+    counters <- get
+    -- if the index 'i' overflows or underflows, wrap it around
+    let i' = i `mod` w
+    -- bit variable corresponding to the variable 'var' and the index 'i''
+    case lookupBinRepStart counters var of
+      Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
+      Just start -> return $ ExprB $ VarB (start + i')
+  ExprU (ValU _ n) -> return $ ExprB (ValB (testBit n i))
   ExprU (VarU w var) -> do
     counters <- get
     -- if the index 'i' overflows or underflows, wrap it around
@@ -234,14 +242,6 @@ bitValue expr i = case expr of
       Just start -> return $ ExprB $ VarB (start + i')
   ExprB (ValB n) -> return $ ExprB (ValB n)
   ExprB (VarB var) -> return $ ExprB (VarB var)
-  VarN w var -> do
-    counters <- get
-    -- if the index 'i' overflows or underflows, wrap it around
-    let i' = i `mod` w
-    -- bit variable corresponding to the variable 'var' and the index 'i''
-    case lookupBinRepStart counters var of
-      Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
-      Just start -> return $ ExprB $ VarB (start + i')
   Rotate w n x -> do
     -- rotate the bit value
     -- if the index 'i' overflows or underflows, wrap it around
