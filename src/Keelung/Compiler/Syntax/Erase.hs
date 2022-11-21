@@ -88,7 +88,7 @@ eraseVal (T.Rational n) = do
   width <- gets getNumBitWidth
   return [(BWNumber width, Number width (fromRational n))]
 eraseVal (T.Unsigned width n) =
-  return [(BWUInt width, UInt width (fromIntegral n))]
+  return [(BWUInt width, ExprU $ ValU width (fromIntegral n))]
 eraseVal (T.Boolean False) =
   return [(BWBoolean, ExprB $ ValB 0)]
 eraseVal (T.Boolean True) =
@@ -124,8 +124,8 @@ eraseRef3 ref = do
     T.NumInputVar n -> (BWNumber numWidth, VarN numWidth $ blendNumInputVar counters n)
     T.BoolVar n -> (BWBoolean, ExprB $ VarB $ blendIntermediateVar counters n)
     T.BoolInputVar n -> (BWBoolean, ExprB $ VarB $ blendBoolInputVar counters n)
-    T.UIntVar w n -> (BWUInt w, VarU w $ blendIntermediateVar counters n)
-    T.UIntInputVar w n -> (BWUInt w, VarU w $ blendCustomInputVar counters w n)
+    T.UIntVar w n -> (BWUInt w, ExprU $ VarU w $ blendIntermediateVar counters n)
+    T.UIntInputVar w n -> (BWUInt w, ExprU $ VarU w $ blendCustomInputVar counters w n)
 
 eraseRef2 :: T.Ref -> M n Int
 eraseRef2 ref = do
@@ -223,10 +223,8 @@ eraseExpr expr = case expr of
 bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (Expr n)
 bitValue expr i = case expr of
   Number w n -> return $ Number w (testBit n i)
-  UInt w n -> return $ UInt w (testBit n i)
-  ExprB (ValB n) -> return $ ExprB (ValB n)
-  ExprB (VarB var) -> return $ ExprB (VarB var)
-  VarN w var -> do
+  ExprU (ValU w n) -> return $ ExprU (ValU w (testBit n i))
+  ExprU (VarU w var) -> do
     counters <- get
     -- if the index 'i' overflows or underflows, wrap it around
     let i' = i `mod` w
@@ -234,7 +232,9 @@ bitValue expr i = case expr of
     case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
       Just start -> return $ ExprB $ VarB (start + i')
-  VarU w var -> do
+  ExprB (ValB n) -> return $ ExprB (ValB n)
+  ExprB (VarB var) -> return $ ExprB (VarB var)
+  VarN w var -> do
     counters <- get
     -- if the index 'i' overflows or underflows, wrap it around
     let i' = i `mod` w

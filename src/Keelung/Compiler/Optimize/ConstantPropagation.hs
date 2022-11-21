@@ -50,8 +50,8 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
         ( \(Result n vbs ebs) var expr ->
             case expr of
               Number _ val -> Result (succ n) (insertN var val vbs) ebs
-              UInt _ _ -> error "[ panic ] UInt value in Number bindings of expressions"
-              ExprB _ -> error "[ panic ] Boolean value in Number bindings of expressions"
+              ExprU _ -> error "[ panic ] UInt expression in Number bindings of expressions"
+              ExprB _ -> error "[ panic ] Boolean expression in Number bindings of expressions"
               _ -> Result n vbs (insertN var expr ebs)
         )
     handleB =
@@ -59,7 +59,7 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
         ( \(Result n vbs ebs) var expr ->
             case expr of
               Number _ _ -> error "[ panic ] Number value in Number bindings of expressions"
-              UInt _ _ -> error "[ panic ] UInt value in Number bindings of expressions"
+              ExprU _ -> error "[ panic ] UInt expression in Number bindings of expressions"
               ExprB (ValB val) -> Result (succ n) (insertB var val vbs) ebs
               _ -> Result n vbs (insertB var expr ebs)
         )
@@ -70,7 +70,7 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
               ( \(Result n' vbs' ebs') var expr ->
                   case expr of
                     Number _ _ -> error "[ panic ] Number value in Number bindings of expressions"
-                    UInt _ val -> Result (succ n') (insertU width var val vbs') ebs'
+                    ExprU (ValU _ val) -> Result (succ n') (insertU width var val vbs') ebs'
                     ExprB _ -> error "[ panic ] Boolean value in Number bindings of expressions"
                     _ -> Result n' vbs' (insertU width var expr ebs')
               )
@@ -84,7 +84,10 @@ propagateConstant relations = propogate
   where
     propogate e = case e of
       Number _ _ -> e
-      UInt _ _ -> e
+      ExprU (ValU _ _) -> e
+      ExprU (VarU w var) -> case lookupU w var (valueBindings relations) of
+        Nothing -> e
+        Just val -> ExprU (ValU w val)
       ExprB (ValB _) -> e
       ExprB (VarB var) -> case lookupB var (valueBindings relations) of
         Nothing -> e
@@ -92,9 +95,9 @@ propagateConstant relations = propogate
       VarN w var -> case lookupN var (valueBindings relations) of
         Nothing -> e
         Just val -> Number w val
-      VarU w var -> case lookupU w var (valueBindings relations) of
-        Nothing -> e
-        Just val -> UInt w val
+      -- VarU w var -> case lookupU w var (valueBindings relations) of
+      --   Nothing -> e
+      --   Just val -> UInt w val
       Rotate w n x -> Rotate w n (propogate x)
       NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
       Div w x y -> Div w (propogate x) (propogate y)

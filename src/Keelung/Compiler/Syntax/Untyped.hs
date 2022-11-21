@@ -9,7 +9,8 @@ module Keelung.Compiler.Syntax.Untyped
     bitWidthOf,
     getWidth,
     castToNumber,
-    Boolean (..),
+    ExprB (..),
+    ExprU (..),
     Expr (..),
     TypeErased (..),
     Assignment (..),
@@ -69,27 +70,41 @@ getWidth (BWUInt n) = n
 getWidth BWUnit = 0
 getWidth (BWArray ns n) = n * getWidth ns
 
-data Boolean n
+--------------------------------------------------------------------------------
+
+data ExprB n
   = ValB n
   | VarB Var
   deriving (Functor)
 
-instance (Integral n, Show n) => Show (Boolean n) where
+instance (Integral n, Show n) => Show (ExprB n) where
   showsPrec _prec expr = case expr of
     ValB 0 -> showString "F"
     ValB _ -> showString "T"
     VarB var -> showString "$" . shows var
 
+--------------------------------------------------------------------------------
+
+data ExprU n
+  = ValU Width n
+  | VarU Width Var
+  deriving (Functor)
+
+instance Show n => Show (ExprU n) where
+  showsPrec _prec expr = case expr of
+    ValU _ n -> shows n
+    VarU _ var -> showString "$" . shows var
+
+--------------------------------------------------------------------------------
+
 -- | "Untyped" expression
 data Expr n
   = -- values
     Number Width n
-  | UInt Width n
-  | ExprB (Boolean n)
+  | ExprB (ExprB n)
+  | ExprU (ExprU n)
   | -- variables
     VarN Width Var
-  | -- | VarB Var
-    VarU Width Var
   | Rotate BitWidth Int (Expr n)
   | -- Binary operators with only 2 operands
     Sub BitWidth (Expr n) (Expr n)
@@ -118,9 +133,8 @@ instance (Integral n, Show n) => Show (Expr n) where
      in case expr of
           Number _ val -> shows val
           ExprB x -> shows x
-          UInt _ val -> shows val
+          ExprU x -> shows x
           VarN _ var -> showString "$" . shows var
-          VarU _ var -> showString "$" . shows var
           Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
           NAryOp _ op x0 x1 xs -> case op of
             AddN -> chain " + " 6 $ x0 :<| x1 :<| xs
@@ -143,9 +157,10 @@ sizeOfExpr expr = case expr of
   ExprB x -> case x of
     ValB _ -> 1
     VarB _ -> 1
-  UInt _ _ -> 1
+  ExprU x -> case x of
+    ValU _ _ -> 1
+    VarU _ _ -> 1
   VarN _ _ -> 1
-  VarU _ _ -> 1
   Rotate _ _ x -> 1 + sizeOfExpr x
   NAryOp _ _ x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
@@ -157,10 +172,11 @@ sizeOfExpr expr = case expr of
 bitWidthOf :: Expr n -> BitWidth
 bitWidthOf expr = case expr of
   Number w _ -> BWNumber w
-  UInt w _ -> BWUInt w
   ExprB _ -> BWBoolean
+  ExprU x -> case x of
+    ValU w _ -> BWUInt w
+    VarU w _ -> BWUInt w
   VarN w _ -> BWNumber w
-  VarU w _ -> BWUInt w
   Rotate bw _ _ -> bw
   NAryOp bw _ _ _ _ -> bw
   Div bw _ _ -> bw
@@ -173,10 +189,11 @@ castToNumber width expr = case expr of
   ExprB x -> case x of
     ValB val -> Number width val
     VarB var -> VarN width var
-  UInt _ n -> Number width n
+  ExprU x -> case x of
+    ValU _ val -> Number width val
+    VarU _ var -> VarN width var
   -- Arravy xs
   VarN w n -> VarN w n
-  VarU _ n -> VarN width n
   Rotate _ n x -> Rotate (BWNumber width) n x
   Div _ a b -> Div (BWNumber width) a b
   Sub _ a b -> Sub (BWNumber width) a b
