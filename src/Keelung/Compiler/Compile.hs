@@ -229,7 +229,7 @@ encode out expr = case expr of
                   Empty
               )
       _ -> encodeAndFoldExprs (encodeBinaryOp bw op) out x y rest
-  BinaryOp bw Sub x y -> do
+  Sub bw x y -> do
     case bw of
       BWNumber _ -> do
         x' <- toTerm x
@@ -239,7 +239,7 @@ encode out expr = case expr of
       BWBoolean -> error "[ panic ] Subtraction on Booleans"
       BWUnit -> error "[ panic ] Addition on Units"
       BWArray _ _ -> error "[ panic ] Addition on Arrays"
-  BinaryOp _ Div x y -> do
+  Div _ x y -> do
     x' <- wireAsVar x
     y' <- wireAsVar y
     add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
@@ -264,7 +264,8 @@ encodeRotate out i expr = case expr of
   Var bw var -> addRotatedBinRep out (getWidth bw) var i
   UVar w var -> addRotatedBinRep out w var i
   Rotate _ n x -> encodeRotate out (i + n) x
-  BinaryOp {} -> error "[ panic ] dunno how to compile ROTATE BinaryOp"
+  Sub {} -> error "[ panic ] dunno how to compile ROTATE Sub"
+  Div {} -> error "[ panic ] dunno how to compile ROTATE Div"
   NAryOp bw op _ _ _ -> case op of
     Add -> do
       result <- freshVar

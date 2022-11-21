@@ -151,7 +151,7 @@ eraseExpr expr = case expr of
     ys <- eraseExpr y
     let (bw, x') = head xs
     let (_, y') = head ys
-    return [(bw, BinaryOp bw Sub x' y')]
+    return [(bw, Sub bw x' y')]
   T.Mul x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -161,7 +161,7 @@ eraseExpr expr = case expr of
     ys <- eraseExpr y
     let (bw, x') = head xs
     let (_, y') = head ys
-    return [(bw, BinaryOp bw Div x' y')]
+    return [(bw, Div bw x' y')]
   T.Eq x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -201,63 +201,6 @@ eraseExpr expr = case expr of
     value <- bitValue x' i
     return [(BWBoolean, value)]
 
--- eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [Expr n]
--- eraseExpr expr = case expr of
---   T.Val val -> map snd <$> eraseVal val
---   T.Var ref -> pure . snd <$> eraseRef ref
---   T.Array exprs -> do
---     exprss <- mapM eraseExpr exprs
---     return $ concat exprss
---   T.Add x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [chainExprsOfAssocOp Add (head xs) (head ys)]
---   T.Sub x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [BinaryOp (bitWidthOf (head xs)) Sub (head xs) (head ys)]
---   T.Mul x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [chainExprsOfAssocOp Mul (head xs) (head ys)]
---   T.Div x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [BinaryOp (bitWidthOf (head xs)) Div (head xs) (head ys)]
---   T.Eq x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [chainExprsOfAssocOp Eq (head xs) (head ys)]
---   T.And x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [chainExprsOfAssocOp And (head xs) (head ys)]
---   T.Or x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [chainExprsOfAssocOp Or (head xs) (head ys)]
---   T.Xor x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [chainExprsOfAssocOp Xor (head xs) (head ys)]
---   T.RotateR n x -> do
---     xs <- eraseExpr x
---     return [Rotate (bitWidthOf (head xs)) n (head xs)]
---   T.BEq x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [chainExprsOfAssocOp BEq (head xs) (head ys)]
---   T.If b x y -> do
---     bs <- eraseExpr b
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [If (bitWidthOf (head xs)) (head bs) (head xs) (head ys)]
---   T.ToNum x -> eraseExpr x
---   T.Bit x i -> do
---     x' <- head <$> eraseExpr x
---     value <- bitValue x' i
---     return [value]
-
 bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (Expr n)
 bitValue expr i = case expr of
   Number w n -> return $ Number w (testBit n i)
@@ -284,7 +227,8 @@ bitValue expr i = case expr of
     -- if the index 'i' overflows or underflows, wrap it around
     let i' = n + i `mod` getWidth w
     bitValue x i'
-  BinaryOp {} -> error "Panic: trying to access the bit value of a compound expression"
+  Div {} -> error "Panic: trying to access the bit value of a compound expression"
+  Sub {} -> error "Panic: trying to access the bit value of a compound expression"
   NAryOp _ And x y rest ->
     NAryOp BWBoolean And
       <$> bitValue x i
@@ -325,4 +269,4 @@ chainExprsOfAssocOp op (bw, x) (_, y) = case (x, y) of
       -- chaining `op` and `op2`
       (bw, NAryOp w op x y0 (y1 :<| ys))
   -- there's nothing left we can do
-  _ -> (bw, NAryOp (bitWidthOf x) op x y mempty)
+  _ -> (bw, NAryOp bw op x y mempty)

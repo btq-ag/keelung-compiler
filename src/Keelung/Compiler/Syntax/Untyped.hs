@@ -9,7 +9,6 @@ module Keelung.Compiler.Syntax.Untyped
     bitWidthOf,
     getWidth,
     castToNumber,
-    BinaryOp (..),
     Expr (..),
     TypeErased (..),
     Assignment (..),
@@ -49,10 +48,6 @@ data Op
   | BEq
   deriving (Eq, Show)
 
--- Binary operators
-data BinaryOp = Sub | Div
-  deriving (Eq, Show)
-
 --------------------------------------------------------------------------------
 
 type Width = Int
@@ -79,13 +74,12 @@ data Expr n
   | UInt Width n
   | Boolean n
   | -- variables
-
-    -- | Array (Vector (Expr n))
     Var BitWidth Var
   | UVar Width Var
   | Rotate BitWidth Int (Expr n)
   | -- Binary operators with only 2 operands
-    BinaryOp BitWidth BinaryOp (Expr n) (Expr n)
+    Sub BitWidth (Expr n) (Expr n)
+  | Div BitWidth (Expr n) (Expr n)
   | -- N-Ary operators with >= 2 operands
     NAryOp BitWidth Op (Expr n) (Expr n) (Seq (Expr n))
   | If BitWidth (Expr n) (Expr n) (Expr n)
@@ -93,7 +87,7 @@ data Expr n
 
 instance Num n => Num (Expr n) where
   x + y = NAryOp (bitWidthOf x) Add x y Empty
-  x - y = BinaryOp (bitWidthOf x) Sub x y
+  x - y = Sub (bitWidthOf x) x y
   x * y = NAryOp (bitWidthOf x) Mul x y Empty
   abs = id
   signum = const 1
@@ -123,9 +117,8 @@ instance Show n => Show (Expr n) where
             NEq -> chain " != " 5 $ x0 :<| x1 :<| xs
             Eq -> chain " == " 5 $ x0 :<| x1 :<| xs
             BEq -> chain " == " 5 $ x0 :<| x1 :<| xs
-          BinaryOp _ op x0 x1 -> case op of
-            Sub -> chain " - " 6 $ x0 :<| x1 :<| Empty
-            Div -> chain " / " 7 $ x0 :<| x1 :<| Empty
+          Sub _ x0 x1 -> chain " - " 6 $ x0 :<| x1 :<| Empty
+          Div _ x0 x1 -> chain " / " 7 $ x0 :<| x1 :<| Empty
           If _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 -- | Calculate the "size" of an expression for benchmarking
@@ -140,7 +133,8 @@ sizeOfExpr expr = case expr of
   NAryOp _ _ x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
      in sum (fmap sizeOfExpr operands) + (length operands - 1)
-  BinaryOp _ _ x0 x1 -> sizeOfExpr x0 + sizeOfExpr x1 + 1
+  Sub _ x0 x1 -> sizeOfExpr x0 + sizeOfExpr x1 + 1
+  Div _ x0 x1 -> sizeOfExpr x0 + sizeOfExpr x1 + 1
   If _ x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
 
 bitWidthOf :: Expr n -> BitWidth
@@ -152,7 +146,8 @@ bitWidthOf expr = case expr of
   UVar w _ -> BWUInt w
   Rotate bw _ _ -> bw
   NAryOp bw _ _ _ _ -> bw
-  BinaryOp bw _ _ _ -> bw
+  Div bw _ _ -> bw
+  Sub bw _ _ -> bw
   If bw _ _ _ -> bw
 
 castToNumber :: Width -> Expr n -> Expr n
@@ -160,11 +155,12 @@ castToNumber width expr = case expr of
   Number _ _ -> expr
   UInt _ n -> Number width n
   Boolean n -> Number width n
-  -- Arravy xs 
+  -- Arravy xs
   Var _ n -> Var (BWNumber width) n
   UVar _ n -> Var (BWNumber width) n
   Rotate _ n x -> Rotate (BWNumber width) n x
-  BinaryOp _ op a b -> BinaryOp (BWNumber width) op a b
+  Div _ a b -> Div (BWNumber width) a b
+  Sub _ a b -> Sub (BWNumber width) a b
   NAryOp _ op a b c -> NAryOp (BWNumber width) op a b c
   If _ p a b -> If (BWNumber width) p a b
 
@@ -330,5 +326,3 @@ instance Semigroup (Relations n) where
 
 instance Monoid (Relations n) where
   mempty = Relations mempty mempty
-
-  

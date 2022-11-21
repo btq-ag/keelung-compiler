@@ -100,5 +100,6 @@ propagateConstant relations = propogate
         Just val -> UInt w val
       Rotate w n x -> Rotate w n (propogate x)
       NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
-      BinaryOp w op x y -> BinaryOp w op (propogate x) (propogate y)
+      Div w x y -> Div w (propogate x) (propogate y)
+      Sub w x y -> Sub w (propogate x) (propogate y)
       If w p x y -> If w (propogate p) (propogate x) (propogate y)
