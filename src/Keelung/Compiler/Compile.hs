@@ -163,10 +163,16 @@ encode out expr = case expr of
   Rotate _ n x -> encodeRotate out n x
   NAryOp bw op x y rest ->
     case op of
-      Add -> case bw of
+      AddN -> case bw of
         BWNumber _ -> do
           terms <- mapM toTerm (x :<| y :<| rest)
           encodeTerms out terms
+        BWUInt _ -> error "[ panic ] AddN on UInt"
+        BWBoolean -> error "[ panic ] Addition on Booleans"
+        BWUnit -> error "[ panic ] Addition on Units"
+        BWArray _ _ -> error "[ panic ] Addition on Arrays"
+      AddU -> case bw of
+        BWNumber _ -> error "[ panic ] AddU on Number"
         BWUInt n -> encodeAndFoldExprsBinRep (encodeUIntAdd n) n out x y rest
         BWBoolean -> error "[ panic ] Addition on Booleans"
         BWUnit -> error "[ panic ] Addition on Units"
@@ -221,7 +227,7 @@ encode out expr = case expr of
                   (Number numBitWidth 0)
                   ( NAryOp
                       (BWNumber numBitWidth)
-                      Add
+                      AddN
                       (castToNumber numBitWidth x)
                       (castToNumber numBitWidth y)
                       (fmap (castToNumber numBitWidth) rest)
@@ -267,7 +273,11 @@ encodeRotate out i expr = case expr of
   Sub {} -> error "[ panic ] dunno how to compile ROTATE Sub"
   Div {} -> error "[ panic ] dunno how to compile ROTATE Div"
   NAryOp bw op _ _ _ -> case op of
-    Add -> do
+    AddN -> do
+      result <- freshVar
+      encode result expr
+      addRotatedBinRep out (getWidth bw) result i
+    AddU -> do
       result <- freshVar
       encode result expr
       addRotatedBinRep out (getWidth bw) result i
@@ -412,7 +422,8 @@ wireAsVar expr = do
 -- | Encode the constraint 'x op y = out'.
 encodeBinaryOp :: (GaloisField n, Integral n) => BitWidth -> Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp bw op out x y = case op of
-  Add -> error "encodeBinaryOp: Add"
+  AddN -> error "encodeBinaryOp: AddN"
+  AddU -> error "encodeBinaryOp: AddU"
   Mul -> case bw of
     BWNumber _ -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
     BWUInt w -> do

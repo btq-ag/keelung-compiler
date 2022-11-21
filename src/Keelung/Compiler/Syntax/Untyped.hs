@@ -38,7 +38,8 @@ import Keelung.Types (Var)
 
 -- N-ary operators
 data Op
-  = Add
+  = AddN
+  | AddU
   | Mul
   | And
   | Or
@@ -86,7 +87,7 @@ data Expr n
   deriving (Functor)
 
 instance Num n => Num (Expr n) where
-  x + y = NAryOp (bitWidthOf x) Add x y Empty
+  x + y = NAryOp (bitWidthOf x) AddN x y Empty
   x - y = Sub (bitWidthOf x) x y
   x * y = NAryOp (bitWidthOf x) Mul x y Empty
   abs = id
@@ -109,7 +110,8 @@ instance Show n => Show (Expr n) where
           UVar _ var -> showString "$" . shows var
           Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
           NAryOp _ op x0 x1 xs -> case op of
-            Add -> chain " + " 6 $ x0 :<| x1 :<| xs
+            AddN -> chain " + " 6 $ x0 :<| x1 :<| xs
+            AddU -> chain " + " 6 $ x0 :<| x1 :<| xs
             Mul -> chain " * " 7 $ x0 :<| x1 :<| xs
             And -> chain " ∧ " 3 $ x0 :<| x1 :<| xs
             Or -> chain " ∨ " 2 $ x0 :<| x1 :<| xs

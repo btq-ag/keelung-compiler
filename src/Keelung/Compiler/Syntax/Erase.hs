@@ -145,7 +145,11 @@ eraseExpr expr = case expr of
   T.Add x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprsOfAssocOp Add (head xs) (head ys)]
+    let (bw, x') = head xs
+    case bw of 
+      BWNumber _ -> return [chainExprsOfAssocOp AddN (bw, x') (head ys)]
+      BWUInt _ -> return [chainExprsOfAssocOp AddU (bw, x') (head ys)]
+      _ -> error "[ panic ] T.Add on wrong types of data"
   T.Sub x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
