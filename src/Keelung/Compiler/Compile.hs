@@ -157,8 +157,9 @@ encode out expr = case expr of
   UInt _ val -> add $ cadd val [(out, -1)] -- out = val
   Boolean val -> add $ cadd val [(out, -1)] -- out = val
   -- variables
-  Var _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
-  UVar _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  VarN _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  VarB var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  VarU _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   -- operators
   Rotate _ n x -> encodeRotate out n x
   NAryOp bw op x y rest ->
@@ -253,7 +254,7 @@ encode out expr = case expr of
     b' <- wireAsVar b
     -- treating these variables like they are Numbers
     numBitWidth <- getNumberBitWidth
-    encode out (Var (BWNumber numBitWidth) b' * castToNumber numBitWidth x + (Number numBitWidth 1 - Var (BWNumber numBitWidth) b') * y)
+    encode out (VarN numBitWidth b' * castToNumber numBitWidth x + (Number numBitWidth 1 - VarN numBitWidth b') * y)
 
 --------------------------------------------------------------------------------
 
@@ -267,8 +268,9 @@ encodeRotate out i expr = case expr of
     n' <- rotateField w n
     encode out (Number w n')
   Boolean n -> encode out (Boolean n)
-  Var bw var -> addRotatedBinRep out (getWidth bw) var i
-  UVar w var -> addRotatedBinRep out w var i
+  VarN w var -> addRotatedBinRep out w var i
+  VarB var -> encode out (VarB var)
+  VarU w var -> addRotatedBinRep out w var i
   Rotate _ n x -> encodeRotate out (i + n) x
   Sub {} -> error "[ panic ] dunno how to compile ROTATE Sub"
   Div {} -> error "[ panic ] dunno how to compile ROTATE Div"
@@ -329,18 +331,42 @@ data Term n
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
 toTerm :: (GaloisField n, Integral n) => Expr n -> M n (Term n)
-toTerm (NAryOp _ Mul (Var _ var) (Number _ n) Empty) =
+toTerm (NAryOp _ Mul (VarN _ var) (Number _ n) Empty) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul (Var _ _) (Boolean _) Empty) =
-  error "toTerm on Boolean"
-toTerm (NAryOp _ Mul (Var _ _) (UInt _ _) Empty) =
-  error "toTerm on UInt"
-toTerm (NAryOp _ Mul (Number _ n) (Var _ var) Empty) =
+toTerm (NAryOp _ Mul (VarB _) (Number _ _) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean variable with Number value"
+toTerm (NAryOp _ Mul (VarU _ _) (Number _ _) Empty) =
+  error "[ panic ] toTerm: Trying to add UInt variable with Number value"
+toTerm (NAryOp _ Mul (VarN _ _) (Boolean _) Empty) =
+  error "[ panic ] toTerm: Trying to add Number variable with Boolean value"
+toTerm (NAryOp _ Mul (VarB _) (Boolean _) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean variable with Boolean value"
+toTerm (NAryOp _ Mul (VarU _ _) (Boolean _) Empty) =
+  error "[ panic ] toTerm: Trying to add UInt variable with Boolean value"
+toTerm (NAryOp _ Mul (VarN _ _) (UInt _ _) Empty) =
+  error "[ panic ] toTerm: Trying to add Number variable with UInt value"
+toTerm (NAryOp _ Mul (VarB _) (UInt _ _) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean variable with UInt value"
+toTerm (NAryOp _ Mul (VarU _ var) (UInt _ n) Empty) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul (Boolean _) (Var _ _) Empty) =
-  error "toTerm on Boolean"
-toTerm (NAryOp _ Mul (UInt _ _) (Var _ _) Empty) =
-  error "toTerm on UInt"
+toTerm (NAryOp _ Mul (Number _ n) (VarN _ var) Empty) =
+  return $ WithVars var n
+toTerm (NAryOp _ Mul (Number _ _) (VarB _) Empty) =
+  error "[ panic ] toTerm: Trying to add Number value with Boolean variable"
+toTerm (NAryOp _ Mul (Number _ _) (VarU _ _) Empty) =
+  error "[ panic ] toTerm: Trying to add Number value with UInt variable"
+toTerm (NAryOp _ Mul (Boolean _) (VarN _ _) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean value with Number variable"
+toTerm (NAryOp _ Mul (Boolean _) (VarB _) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean value with Boolean variable"
+toTerm (NAryOp _ Mul (Boolean _) (VarU _ _) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean value with UInt variable"
+toTerm (NAryOp _ Mul (UInt _ _) (VarN _ _) Empty) =
+  error "[ panic ] toTerm: Trying to add UInt value with Number variable"
+toTerm (NAryOp _ Mul (UInt _ _) (VarB _) Empty) =
+  error "[ panic ] toTerm: Trying to add UInt value with Boolean variable"
+toTerm (NAryOp _ Mul (UInt _ n) (VarU _ var) Empty) =
+  return $ WithVars var n
 toTerm (NAryOp _ Mul expr (Number _ n) Empty) = do
   out <- freshVar
   encode out expr
@@ -355,7 +381,11 @@ toTerm (UInt _ _) =
   error "[ panic ] toTerm on UInt"
 toTerm (Boolean _) =
   error "[ panic ] toTerm on Boolean"
-toTerm (Var _ var) =
+toTerm (VarN _ var) =
+  return $ WithVars var 1
+toTerm (VarB _) =
+  error "[ panic ] toTerm on Boolean variable"
+toTerm (VarU _ var) =
   return $ WithVars var 1
 toTerm expr = do
   out <- freshVar
@@ -413,7 +443,9 @@ encodeAndFoldExprsBinRep f width out x0 x1 xs = do
 
 -- | If the expression is not already a variable, create a new variable
 wireAsVar :: (GaloisField n, Integral n) => Expr n -> M n Var
-wireAsVar (Var _ var) = return var
+wireAsVar (VarN _ var) = return var
+wireAsVar (VarB var) = return var
+wireAsVar (VarU _ var) = return var
 wireAsVar expr = do
   out <- freshVar
   encode out expr
@@ -442,10 +474,10 @@ encodeBinaryOp bw op out x y = case op of
     -- The encoding is: x*y + (1-x)*(1-y) = out.
     numBitWidth <- getNumberBitWidth
     encode out $
-      Var (BWNumber numBitWidth) x
-        * Var (BWNumber numBitWidth) y
-        + (Number numBitWidth 1 - Var (BWNumber numBitWidth) x)
-        * (Number numBitWidth 1 - Var (BWNumber numBitWidth) y)
+      VarN numBitWidth x
+        * VarN numBitWidth y
+        + (Number numBitWidth 1 - VarN numBitWidth x)
+        * (Number numBitWidth 1 - VarN numBitWidth y)
 
 --------------------------------------------------------------------------------
 
@@ -518,7 +550,7 @@ encodeUIntMul :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n 
 encodeUIntMul width out a b = do
   -- rawProduct = a * b
   rawProduct <- freshVar
-  encode rawProduct $ Var (BWNumber width) a * Var (BWNumber width) b
+  encode rawProduct $ VarN width a * VarN width b
   -- result = rawProduct - 2ⁿ * quotient
   quotient <- freshVar
   add $ cadd 0 [(out, 1), (rawProduct, -1), (quotient, 2 ^ width)]

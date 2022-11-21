@@ -115,30 +115,45 @@ eraseVal T.Unit = return []
 -- ┃   Intermediate  ┃
 -- ┗━━━━━━━━━━━━━━━━━┛
 --
-eraseRef' :: T.Ref -> M n (BitWidth, Int)
-eraseRef' ref = do
+eraseRef3 :: T.Ref -> M n (BitWidth, Expr n)
+eraseRef3 ref = do
   counters <- get
   let numWidth = getNumBitWidth counters
   return $ case ref of
-    T.NumVar n -> (BWNumber numWidth, blendIntermediateVar counters n)
-    T.NumInputVar n -> (BWNumber numWidth, blendNumInputVar counters n)
-    -- we don't need to mark intermediate Boolean variables
-    -- and impose the Boolean constraint on them ($A * $A = $A)
-    -- because this property should be guaranteed by the source of its value
-    T.BoolVar n -> (BWBoolean, blendIntermediateVar counters n)
-    T.BoolInputVar n -> (BWBoolean, blendBoolInputVar counters n)
-    T.UIntVar w n -> (BWUInt w, blendIntermediateVar counters n)
-    T.UIntInputVar w n -> (BWUInt w, blendCustomInputVar counters w n)
+    T.NumVar n -> (BWNumber numWidth, VarN numWidth $ blendIntermediateVar counters n)
+    T.NumInputVar n -> (BWNumber numWidth, VarN numWidth $ blendNumInputVar counters n)
+    T.BoolVar n -> (BWBoolean,VarB $ blendIntermediateVar counters n)
+    T.BoolInputVar n -> (BWBoolean,VarB $ blendBoolInputVar counters n)
+    T.UIntVar w n -> (BWUInt w , VarU w $blendIntermediateVar counters n)
+    T.UIntInputVar w n -> (BWUInt w ,VarU w $ blendCustomInputVar counters w n)
 
-eraseRef :: GaloisField n => T.Ref -> M n (BitWidth, Expr n)
-eraseRef ref = do
-  (bw, var) <- eraseRef' ref
-  return (bw, Var bw var)
+eraseRef2 :: T.Ref -> M n Int
+eraseRef2 ref = do
+  counters <- get
+  return $ case ref of
+    T.NumVar n -> blendIntermediateVar counters n
+    T.NumInputVar n -> blendNumInputVar counters n
+    T.BoolVar n -> blendIntermediateVar counters n
+    T.BoolInputVar n -> blendBoolInputVar counters n
+    T.UIntVar _ n -> blendIntermediateVar counters n
+    T.UIntInputVar w n -> blendCustomInputVar counters w n
+
+-- eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
+-- eraseRef ref = do
+--   counters <- get
+--   let numWidth = getNumBitWidth counters
+--   return $ case ref of
+--     T.NumVar n -> VarN numWidth $ blendIntermediateVar counters n
+--     T.NumInputVar n -> VarN numWidth $ blendNumInputVar counters n
+--     T.BoolVar n -> VarB $ blendIntermediateVar counters n
+--     T.BoolInputVar n -> VarB $ blendBoolInputVar counters n
+--     T.UIntVar w n -> VarU w $ blendIntermediateVar counters n
+--     T.UIntInputVar w n -> VarU w $ blendCustomInputVar counters w n
 
 eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [(BitWidth, Expr n)]
 eraseExpr expr = case expr of
   T.Val val -> eraseVal val
-  T.Var ref -> pure <$> eraseRef ref
+  T.Var ref -> pure <$> eraseRef3 ref
   T.Array exprs -> do
     exprss <- mapM eraseExpr exprs
     return (concat exprss)
@@ -146,7 +161,7 @@ eraseExpr expr = case expr of
     xs <- eraseExpr x
     ys <- eraseExpr y
     let (bw, x') = head xs
-    case bw of 
+    case bw of
       BWNumber _ -> return [chainExprsOfAssocOp AddN (bw, x') (head ys)]
       BWUInt _ -> return [chainExprsOfAssocOp AddU (bw, x') (head ys)]
       _ -> error "[ panic ] T.Add on wrong types of data"
@@ -210,22 +225,23 @@ bitValue expr i = case expr of
   Number w n -> return $ Number w (testBit n i)
   UInt w n -> return $ UInt w (testBit n i)
   Boolean n -> return $ Boolean n
-  Var w var -> do
-    counters <- get
-    -- if the index 'i' overflows or underflows, wrap it around
-    let i' = i `mod` getWidth w
-    -- bit variable corresponding to the variable 'var' and the index 'i''
-    case lookupBinRepStart counters var of
-      Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
-      Just start -> return $ Var BWBoolean (start + i')
-  UVar w var -> do
+  VarN w var -> do
     counters <- get
     -- if the index 'i' overflows or underflows, wrap it around
     let i' = i `mod` w
     -- bit variable corresponding to the variable 'var' and the index 'i''
     case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
-      Just start -> return $ Var BWBoolean (start + i')
+      Just start -> return $ VarB (start + i')
+  VarB var -> return $ VarB var
+  VarU w var -> do
+    counters <- get
+    -- if the index 'i' overflows or underflows, wrap it around
+    let i' = i `mod` w
+    -- bit variable corresponding to the variable 'var' and the index 'i''
+    case lookupBinRepStart counters var of
+      Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
+      Just start -> return $ VarB (start + i')
   Rotate w n x -> do
     -- rotate the bit value
     -- if the index 'i' overflows or underflows, wrap it around
@@ -253,7 +269,7 @@ bitValue expr i = case expr of
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.Assignment ref expr) = do
-  (_, var) <- eraseRef' ref
+  var <- eraseRef2 ref
   exprs <- eraseExpr expr
   return $ Assignment var (snd (head exprs))
 

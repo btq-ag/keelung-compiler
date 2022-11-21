@@ -75,8 +75,9 @@ data Expr n
   | UInt Width n
   | Boolean n
   | -- variables
-    Var BitWidth Var
-  | UVar Width Var
+    VarN Width Var
+  | VarB Var
+  | VarU Width Var
   | Rotate BitWidth Int (Expr n)
   | -- Binary operators with only 2 operands
     Sub BitWidth (Expr n) (Expr n)
@@ -106,8 +107,9 @@ instance Show n => Show (Expr n) where
           Number _ val -> shows val
           Boolean val -> shows val
           UInt _ val -> shows val
-          Var _ var -> showString "$" . shows var
-          UVar _ var -> showString "$" . shows var
+          VarN _ var -> showString "$" . shows var
+          VarB var -> showString "$" . shows var
+          VarU _ var -> showString "$" . shows var
           Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
           NAryOp _ op x0 x1 xs -> case op of
             AddN -> chain " + " 6 $ x0 :<| x1 :<| xs
@@ -129,8 +131,9 @@ sizeOfExpr expr = case expr of
   Number _ _ -> 1
   UInt _ _ -> 1
   Boolean _ -> 1
-  Var _ _ -> 1
-  UVar _ _ -> 1
+  VarN _ _ -> 1
+  VarB _ -> 1
+  VarU _ _ -> 1
   Rotate _ _ x -> 1 + sizeOfExpr x
   NAryOp _ _ x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
@@ -144,8 +147,9 @@ bitWidthOf expr = case expr of
   Number w _ -> BWNumber w
   UInt w _ -> BWUInt w
   Boolean _ -> BWBoolean
-  Var bw _ -> bw
-  UVar w _ -> BWUInt w
+  VarN w _ -> BWNumber w
+  VarB _ -> BWBoolean
+  VarU w _ -> BWUInt w
   Rotate bw _ _ -> bw
   NAryOp bw _ _ _ _ -> bw
   Div bw _ _ -> bw
@@ -158,8 +162,9 @@ castToNumber width expr = case expr of
   UInt _ n -> Number width n
   Boolean n -> Number width n
   -- Arravy xs
-  Var _ n -> Var (BWNumber width) n
-  UVar _ n -> Var (BWNumber width) n
+  VarN w n -> VarN w n
+  VarB n -> VarN width n
+  VarU _ n -> VarN width n
   Rotate _ n x -> Rotate (BWNumber width) n x
   Div _ a b -> Div (BWNumber width) a b
   Sub _ a b -> Sub (BWNumber width) a b

@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Replace case with maybe" #-}
 module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 
 import Data.Field.Galois (GaloisField)
@@ -83,20 +86,14 @@ propagateConstant relations = propogate
       Number _ _ -> e
       UInt _ _ -> e
       Boolean _ -> e
-      Var bw var -> case bw of
-        BWNumber w -> case lookupN var (valueBindings relations) of
-          Nothing -> Var bw var
-          Just val -> Number w val
-        BWBoolean -> case lookupB var (valueBindings relations) of
-          Nothing -> Var bw var
-          Just val -> Boolean val
-        BWUInt w -> case lookupU w var (valueBindings relations) of
-          Nothing -> Var bw var
-          Just val -> UInt w val
-        BWUnit -> Var bw var
-        BWArray _ _ -> Var bw var
-      UVar w var -> case lookupU w var (valueBindings relations) of
-        Nothing -> Var (BWUInt w) var
+      VarN w var -> case lookupN var (valueBindings relations) of
+        Nothing -> e
+        Just val -> Number w val
+      VarB var -> case lookupB var (valueBindings relations) of
+        Nothing -> e
+        Just val -> Boolean val
+      VarU w var -> case lookupU w var (valueBindings relations) of
+        Nothing -> e
         Just val -> UInt w val
       Rotate w n x -> Rotate w n (propogate x)
       NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
