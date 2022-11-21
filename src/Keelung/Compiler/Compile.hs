@@ -75,16 +75,24 @@ encodeAssignment (Assignment var expr) = encode var expr
 --       encode out expr
 --       add $ cadd 1 [(out, -1)] -- 1 = expr
 
-encodeBindings :: (GaloisField n, Integral n) => Bindings n -> M n ()
-encodeBindings bindings = do
+encodeValueBindings :: (GaloisField n, Integral n) => Bindings n -> M n ()
+encodeValueBindings bindings = do
   forM_ (IntMap.toList (bindingsN bindings)) $ \(var, val) -> add $ cadd val [(var, -1)]
   forM_ (IntMap.toList (bindingsB bindings)) $ \(var, val) -> add $ cadd val [(var, -1)]
   forM_ (IntMap.toList (bindingsUs bindings)) $ \(_, bindings') ->
     forM_ (IntMap.toList bindings') $ \(var, val) -> add $ cadd val [(var, -1)]
 
+encodeExprBindings :: (GaloisField n, Integral n) => Bindings (Expr n) -> M n ()
+encodeExprBindings bindings = do
+  forM_ (IntMap.toList (bindingsN bindings)) $ uncurry encode
+  forM_ (IntMap.toList (bindingsB bindings)) $ uncurry encode
+  forM_ (IntMap.toList (bindingsUs bindings)) $ \(_, bindings') ->
+    forM_ (IntMap.toList bindings') $ uncurry encode
+
 encodeRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
-encodeRelations (Relations vbs) = do
-  encodeBindings vbs
+encodeRelations (Relations vbs ebs) = do
+  encodeValueBindings vbs
+  encodeExprBindings ebs
 
 --------------------------------------------------------------------------------
 

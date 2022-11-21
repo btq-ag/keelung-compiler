@@ -247,6 +247,14 @@ instance Show n => Show (Bindings n) where
         )
       <> "\n"
 
+instance Foldable Bindings where
+  foldMap f (Bindings ns bs us) =
+    foldMap f ns <> foldMap f bs <> foldMap (foldMap f) us
+
+instance Traversable Bindings where
+  traverse f (Bindings ns bs us) =
+    Bindings <$> traverse f ns <*> traverse f bs <*> traverse (traverse f) us
+
 insertN :: Var -> n -> Bindings n -> Bindings n
 insertN var val (Bindings ns bs us) = Bindings (IntMap.insert var val ns) bs us
 
@@ -265,81 +273,37 @@ lookupB var (Bindings _ bs _) = IntMap.lookup var bs
 lookupU :: Width -> Var -> Bindings n -> Maybe n
 lookupU width var (Bindings _ _ us) = IntMap.lookup width us >>= IntMap.lookup var
 
---------------------------------------------------------------------------------
+-- data Mixed n = MixedN Var n | MixedB Var n | MixedU Width Var n
+--   deriving (Eq, Ord, Show)
 
--- -- | Relation between variables and expressions of a certain datatype
--- data Relation n = Relation
---   { relBindings :: IntMap n, -- var = constant
---     relAssignments :: IntMap (Expr n), -- var = expression
---     relAssertions :: ![Expr n] -- True = expression
---   }
+-- pairWithKey :: Bindings n -> Bindings (Mixed n)
+-- pairWithKey (Bindings ns bs us) =
+--   Bindings (IntMap.mapWithKey MixedN ns) (IntMap.mapWithKey MixedB bs) (IntMap.mapWithKey (IntMap.mapWithKey . MixedU) us)
 
--- instance Show n => Show (Relation n) where
---   show (Relation bindings assignments assertions) =
---     unlines $
---       map (\(var, val) -> "$" <> show var <> " = " <> show val) (IntMap.toList bindings)
---         <> map (\(var, expr) -> "$" <> show var <> " = " <> show expr) (IntMap.toList assignments)
---         <> map (\expr -> "assert " <> show expr) assertions
-
--- instance Semigroup (Relation n) where
---   Relation bindings0 assignments0 assertions0 <> Relation bindings1 assignments1 assertions1 =
---     Relation
---       (bindings0 <> bindings1)
---       (assignments0 <> assignments1)
---       (assertions0 <> assertions1)
-
--- instance Monoid (Relation n) where
---   mempty = Relation mempty mempty mempty
-
--- addBinding :: Var -> n -> Relation n -> Relation n
--- addBinding var n relation = relation {relBindings = IntMap.insert var n (relBindings relation)}
+-- stripKey :: Bindings (Mixed n) -> Bindings n
+-- stripKey (Bindings ns bs us) =
+--   Bindings (fmap (\(MixedN _ n) -> n) ns) (fmap (\(MixedB _ n) -> n) bs) (fmap (fmap (\(MixedU _ _ n) -> n)) us)
 
 --------------------------------------------------------------------------------
 
 data Relations n = Relations
-  { -- $var = value
-    valueBindings :: Bindings n
+  { -- var = value
+    valueBindings :: Bindings n,
+    -- var = expression
+    exprBindings :: Bindings (Expr n)
+    -- [| expression |] = True
   }
 
 instance Show n => Show (Relations n) where
-  show (Relations vbs) =
-    "Binding of variables to values:\n" ++ show vbs
---     "  Relations of Field elements: "
---       <> indent' (show ns)
---       <> "\n"
---       <> "  Relations of Booleans: "
---       <> unlines (map (("    " <>) . (\(var, val) -> "$" <> show var <> " = " <> show val)) (IntMap.toList bs))
---       <> "\n"
---       <> "  Relations of Unsigned integers: "
---       <> unlines
---         ( map
---             (("    " <>) . (\(var, val) -> "$" <> show var <> " = " <> show val))
---             (concat $ IntMap.elems (fmap IntMap.toList us))
---         )
---       <> "\n"
---     where
---       indent' = unlines . map ("    " <>) . lines
+  show (Relations vbs ebs) =
+    "Binding of variables to values:\n" <> show vbs <> "\n"
+      <> "Binding of variables to expressions:\n"
+      <> show ebs
+      <> "\n"
 
 instance Semigroup (Relations n) where
-  Relations vbs0 <> Relations vbs1 =
-    Relations (vbs0 <> vbs1)
+  Relations vbs0 ebs0 <> Relations vbs1 ebs1 =
+    Relations (vbs0 <> vbs1) (ebs0 <> ebs1)
 
 instance Monoid (Relations n) where
-  mempty = Relations mempty
-
--- addBindingF :: Var -> n -> Relations n -> Relations n
--- addBindingF var n relations = relations {bindingsF = IntMap.insert var n (bindingsF relations)}
-
--- addBindingB :: Var -> n -> Relations n -> Relations n
--- addBindingB var n relations = relations {bindingsB = IntMap.insert var n (bindingsB relations)}
-
--- addBindingU :: Var -> (Width, n) -> Relations n -> Relations n
--- addBindingU var (w, n) relations =
---   relations
---     { bindingsU =
---         IntMap.insertWith
---           (<>)
---           w
---           (IntMap.singleton var n)
---           (bindingsU relations)
---     }
+  mempty = Relations mempty mempty
