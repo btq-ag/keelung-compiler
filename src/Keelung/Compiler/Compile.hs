@@ -153,6 +153,7 @@ castToNumber width expr = case expr of
   Number _ _ -> expr
   UInt _ n -> Number width n
   Boolean n -> Number width n
+  -- Arravy xs 
   Var _ n -> Var (BWNumber width) n
   UVar _ n -> Var (BWNumber width) n
   Rotate _ n x -> Rotate (BWNumber width) n x
@@ -182,6 +183,7 @@ encode out expr = case expr of
         BWUInt n -> encodeAndFoldExprsBinRep (encodeUIntAdd n) n out x y rest
         BWBoolean -> error "[ panic ] Addition on Booleans"
         BWUnit -> error "[ panic ] Addition on Units"
+        BWArray _ _ -> error "[ panic ] Addition on Arrays"
       And -> do
         a <- wireAsVar x
         b <- wireAsVar y
@@ -249,6 +251,7 @@ encode out expr = case expr of
       BWUInt n -> encodeAndFoldExprs (encodeUIntSub n) out x y mempty
       BWBoolean -> error "[ panic ] Subtraction on Booleans"
       BWUnit -> error "[ panic ] Addition on Units"
+      BWArray _ _ -> error "[ panic ] Addition on Arrays"
   BinaryOp _ Div x y -> do
     x' <- wireAsVar x
     y' <- wireAsVar y
@@ -429,6 +432,7 @@ encodeBinaryOp bw op out x y = case op of
       encodeUIntMul w out x y
     BWBoolean -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
     BWUnit -> error "[ panic ] Multiplication on Units"
+    BWArray _ _ -> error "[ panic ] Addition on Arrays"
   And -> error "encodeBinaryOp: And"
   Or -> error "encodeBinaryOp: Or"
   Xor -> add [CXor x y out]

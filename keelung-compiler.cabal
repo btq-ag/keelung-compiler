@@ -66,6 +66,7 @@ library
     , optparse-applicative
     , random
     , semirings
+    , vector
   default-language: Haskell2010
 
 executable keelungc
@@ -123,6 +124,7 @@ executable keelungc
     , optparse-applicative
     , random
     , semirings
+    , vector
     , with-utf8
   default-language: Haskell2010
 
@@ -178,6 +180,7 @@ executable profile
     , optparse-applicative
     , random
     , semirings
+    , vector
   default-language: Haskell2010
 
 test-suite keelung-test
@@ -240,6 +243,7 @@ test-suite keelung-test
     , quickcheck-transformer
     , random
     , semirings
+    , vector
   default-language: Haskell2010
 
 benchmark keelung-bench
@@ -298,4 +302,5 @@ benchmark keelung-bench
     , optparse-applicative
     , random
     , semirings
+    , vector
   default-language: Haskell2010

@@ -28,6 +28,7 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..))
+import Data.Vector (Vector)
 import Keelung.Field (N (..))
 import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
@@ -56,7 +57,12 @@ data BinaryOp = Sub | Div
 
 type Width = Int
 
-data BitWidth = BWNumber Width | BWBoolean | BWUInt Width | BWUnit
+data BitWidth
+  = BWNumber Width
+  | BWBoolean
+  | BWUInt Width
+  | BWUnit
+  | BWArray BitWidth Int
   deriving (Eq, Ord, Show)
 
 getWidth :: BitWidth -> Width
@@ -64,6 +70,7 @@ getWidth (BWNumber n) = n
 getWidth BWBoolean = 1
 getWidth (BWUInt n) = n
 getWidth BWUnit = 0
+getWidth (BWArray ns n) = n * getWidth ns
 
 -- | "Untyped" expression
 data Expr n
@@ -72,6 +79,8 @@ data Expr n
   | UInt Width n
   | Boolean n
   | -- variables
+
+    -- | Array (Vector (Expr n))
     Var BitWidth Var
   | UVar Width Var
   | Rotate BitWidth Int (Expr n)
