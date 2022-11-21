@@ -1,7 +1,6 @@
 module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 
 import Data.Field.Galois (GaloisField)
-import qualified Data.IntMap as IntMap
 import Keelung.Compiler.Syntax.Untyped
 
 --------------------------------------------------------------------------------
@@ -33,17 +32,17 @@ propagateInAssignments oldRelations xs =
 -- Extract bindings of constant values, collect them
 -- and returns the rest of the assignments
 extractRelations :: [Assignment n] -> (Relations n, [Assignment n])
-extractRelations = go (Relations mempty mempty mempty) []
+extractRelations = go mempty []
   where
     go :: Relations n -> [Assignment n] -> [Assignment n] -> (Relations n, [Assignment n])
-    go bindings rest [] = (bindings, rest)
-    go bindings rest (Assignment var (Number _ val) : xs) =
-      go (addBindingF var val bindings) rest xs
-    go bindings rest (Assignment var (UInt w val) : xs) =
-      go (addBindingU var (w, val) bindings) rest xs
-    go bindings rest (Assignment var (Boolean val) : xs) =
-      go (addBindingB var val bindings) rest xs
-    go bindings rest (others : xs) = go bindings (others : rest) xs
+    go relation rest [] = (relation, rest)
+    go relation rest (Assignment var (Number _ val) : xs) =
+      go (relation {valueBindings = insertN var val (valueBindings relation)}) rest xs
+    go relation rest (Assignment var (UInt w val) : xs) =
+      go (relation {valueBindings = insertU w var val (valueBindings relation)}) rest xs
+    go relation rest (Assignment var (Boolean val) : xs) =
+      go (relation {valueBindings = insertB var val (valueBindings relation)}) rest xs
+    go relation rest (others : xs) = go relation (others : rest) xs
 
 -- constant propogation
 propagateConstant :: (GaloisField n, Integral n) => Relations n -> Expr n -> Expr n
@@ -54,22 +53,18 @@ propagateConstant relations = propogate
       UInt _ _ -> e
       Boolean _ -> e
       Var bw var -> case bw of
-        BWNumber w -> case IntMap.lookup var (relBindings (bindingsF relations)) of
+        BWNumber w -> case lookupN var (valueBindings relations) of
           Nothing -> Var bw var
           Just val -> Number w val
-        BWBoolean -> case IntMap.lookup var (bindingsB relations) of
+        BWBoolean -> case lookupB var (valueBindings relations) of
           Nothing -> Var bw var
           Just val -> Boolean val
-        BWUInt w -> case IntMap.lookup w (bindingsU relations) of
+        BWUInt w -> case lookupU w var (valueBindings relations) of
           Nothing -> Var bw var
-          Just rels -> case IntMap.lookup var rels of
-            Nothing -> Var bw var
-            Just val -> UInt w val
-      UVar w var -> case IntMap.lookup w (bindingsU relations) of
-        Nothing -> Var (BWUInt w) var
-        Just rels -> case IntMap.lookup var rels of
-          Nothing -> Var (BWUInt w) var
           Just val -> UInt w val
+      UVar w var -> case lookupU w var (valueBindings relations) of
+        Nothing -> Var (BWUInt w) var
+        Just val -> UInt w val
       Rotate w n x -> Rotate w n (propogate x)
       NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
       BinaryOp w op x y -> BinaryOp w op (propogate x) (propogate y)
