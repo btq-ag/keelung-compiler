@@ -286,6 +286,7 @@ encodeExprU out expr = case expr of
   AddU w x y -> do
     x' <- wireAsVar (ExprU x)
     y' <- wireAsVar (ExprU y)
+    freshBinRep out w
     encodeUIntAdd w out x' y'
   MulU w x y -> do
     x' <- wireAsVar (ExprU x)
@@ -309,7 +310,8 @@ encode out expr = case expr of
   ExprU x -> encodeExprU out x
   -- operators
   Rotate _ n x -> encodeRotate out n x
-  -- NAryOp _ op x y rest -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
+
+-- NAryOp _ op x y rest -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
 
 --------------------------------------------------------------------------------
 
@@ -352,7 +354,7 @@ encodeRotate out i expr = case expr of
         EQ -> return n -- no rotation
         -- encode out expr -- no rotation
         LT -> do
-          let rotateDistance = (- i) `mod` width
+          let rotateDistance = (-i) `mod` width
           -- collect the bit values of lower bits that will be rotated to higher bits
           let lowerBits = [Data.Bits.testBit val j | j <- [0 .. rotateDistance - 1]]
           -- shift the higher bits left by the rotate distance
