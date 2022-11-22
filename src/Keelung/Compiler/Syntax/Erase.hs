@@ -406,7 +406,12 @@ eraseExpr expr = case expr of
   T.Xor x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprsOfAssocOp Xor (head xs) (head ys)]
+    let (bw, x') = head xs
+    let (_, y') = head ys
+    case bw of
+      BWBoolean -> return [(bw, ExprB $ XorB (narrowDownToExprB x') (narrowDownToExprB y'))]
+      BWUInt w -> return [(bw, ExprU $ XorU w (narrowDownToExprU x') (narrowDownToExprU y'))]
+      _ -> error "[ panic ] T.XOr on wrong type of data"
   T.RotateR n x -> do
     xs <- eraseExpr x
     let (bw, x') = head xs
@@ -464,6 +469,10 @@ bitValue expr i = case expr of
       <$> bitValue (ExprU x) i
       <*> bitValue (ExprU y) i
       <*> mapM (\x' -> ExprU x' `bitValue` i) rest
+  ExprU (XorU _ x y) ->
+    XorB
+      <$> bitValue (ExprU x) i
+      <*> bitValue (ExprU y) i
   ExprU _ -> error "Panic: trying to access the bit value of a compound expression"
   ExprB x -> return x
   Rotate w n x -> do
@@ -471,13 +480,6 @@ bitValue expr i = case expr of
     -- if the index 'i' overflows or underflows, wrap it around
     let i' = n + i `mod` getWidth w
     bitValue x i'
-  NAryOp _ Xor x y rest ->
-    narrowDownToExprB
-      <$> ( NAryOp BWBoolean Xor
-              <$> (ExprB <$> bitValue x i)
-              <*> (ExprB <$> bitValue y i)
-              <*> mapM (\x' -> ExprB <$> bitValue x' i) rest
-          )
   NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)

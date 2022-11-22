@@ -44,8 +44,7 @@ import Keelung.Types (Var)
 
 -- N-ary operators
 data Op
-  = Xor
-  | NEq
+  = NEq
   | Eq
   | BEq
   deriving (Eq, Show)
@@ -77,6 +76,7 @@ data ExprB n
   | -- logical operators
     AndB (ExprB n) (ExprB n) (Seq (ExprB n))
   | OrB (ExprB n) (ExprB n) (Seq (ExprB n))
+  | XorB (ExprB n) (ExprB n)
   | IfB (ExprB n) (ExprB n) (ExprB n)
   deriving (Functor)
 
@@ -87,6 +87,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     VarB var -> showString "$" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
+    XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 --------------------------------------------------------------------------------
@@ -125,6 +126,7 @@ data ExprU n
   | -- logical operators
     AndU Width (ExprU n) (ExprU n) (Seq (ExprU n))
   | OrU Width (ExprU n) (ExprU n) (Seq (ExprU n))
+  | XorU Width (ExprU n) (ExprU n)
   | IfU Width (ExprB n) (ExprU n) (ExprU n)
   deriving (Functor)
 
@@ -137,6 +139,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
     AndU _ x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrU _ x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
+    XorU _ x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 instance Num n => Num (ExprU n) where
@@ -182,7 +185,6 @@ instance (Integral n, Show n) => Show (Expr n) where
     ExprU x -> shows x
     Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
     NAryOp _ op x0 x1 xs -> case op of
-      Xor -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| xs
       NEq -> chain prec " != " 5 $ x0 :<| x1 :<| xs
       Eq -> chain prec " == " 5 $ x0 :<| x1 :<| xs
       BEq -> chain prec " == " 5 $ x0 :<| x1 :<| xs
@@ -208,6 +210,7 @@ sizeOfExprB expr = case expr of
   OrB x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
      in sum (fmap sizeOfExprB operands) + (length operands - 1)
+  XorB x0 x1 -> 1 + sizeOfExprB x0 + sizeOfExprB x1
   IfB x y z -> 1 + sizeOfExprB x + sizeOfExprB y + sizeOfExprB z
 
 sizeOfExprN :: ExprN n -> Int
@@ -235,6 +238,7 @@ sizeOfExprU xs = case xs of
   OrU _ x0 x1 xs' ->
     let operands = x0 :<| x1 :<| xs'
      in sum (fmap sizeOfExprU operands) + (length operands - 1)
+  XorU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
   IfU _ p x y -> 1 + sizeOfExprB p + sizeOfExprU x + sizeOfExprU y
 
 bitWidthOf :: Expr n -> BitWidth
@@ -264,6 +268,7 @@ widthOfU expr = case expr of
   MulU w _ _ -> w
   AndU w _ _ _ -> w
   OrU w _ _ _ -> w
+  XorU w _ _ -> w
   IfU w _ _ _ -> w
 
 castToNumber :: Width -> Expr n -> Expr n
@@ -273,6 +278,7 @@ castToNumber width expr = case expr of
     VarB var -> ExprN (VarN width var)
     AndB {} -> error "[ panic ] castToNumber: AndB"
     OrB {} -> error "[ panic ] castToNumber: OrB"
+    XorB {} -> error "[ panic ] castToNumber: XorB"
     IfB {} -> error "[ panic ] castToNumber: IfB"
   ExprN x -> case x of
     ValN _ val -> ExprN (ValN width val)
@@ -295,6 +301,7 @@ castToNumber width expr = case expr of
     MulU _ a b -> ExprN (MulN width (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
     AndU {} -> error "[ panic ] castToNumber: AndU"
     OrU {} -> error "[ panic ] castToNumber: OrU"
+    XorU {} -> error "[ panic ] castToNumber: XorU"
     IfU _ p a b -> ExprN (IfN width p (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
   Rotate _ n x -> Rotate (BWNumber width) n x
   NAryOp _ op a b c -> NAryOp (BWNumber width) op a b c

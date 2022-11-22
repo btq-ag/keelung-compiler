@@ -212,6 +212,10 @@ encodeExprB out expr = case expr of
               )
               Empty
           )
+  XorB x y -> do 
+    x' <- wireAsVar (ExprB x)
+    y' <- wireAsVar (ExprB y)
+    add [CXor x' y' out]
   IfB p x y -> do
     p' <- wireAsVar (ExprB p)
     x' <- wireAsVar (ExprB x)
@@ -259,6 +263,7 @@ encodeExprU out expr = case expr of
     encodeUIntMul w out x' y'
   AndU {} -> error "encodeExprU: AndU: not implemented"
   OrU {} -> error "encodeExprU: OrU: not implemented"
+  XorU {} -> error "encodeExprU: XorB: not implemented"
   IfU _ p x y -> do
     p' <- wireAsVar (ExprB p)
     x' <- wireAsVar (ExprU x)
@@ -456,7 +461,6 @@ wireAsVar expr = do
 -- | Encode the constraint 'x op y = out'.
 encodeBinaryOp :: (GaloisField n, Integral n) => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
-  Xor -> add [CXor x y out]
   NEq -> encodeEquality False out x y
   Eq -> encodeEquality True out x y
   BEq -> do
