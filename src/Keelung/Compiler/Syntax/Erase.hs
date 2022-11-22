@@ -316,7 +316,12 @@ eraseExpr expr = case expr of
   T.And x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprsOfAssocOp And (head xs) (head ys)]
+    let (bw, x') = head xs
+    let (_, y') = head ys
+    case bw of
+      BWBoolean -> return [(bw, ExprB $ chainExprsOfAssocOpAndB (narrowDownToExprB x') (narrowDownToExprB y'))]
+      BWUInt w -> return [(bw, ExprU $ chainExprsOfAssocOpAndU w (narrowDownToExprU x') (narrowDownToExprU y'))]
+      _ -> error "[ panic ] T.And on wrong type of data"
   T.Or x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -346,11 +351,11 @@ eraseExpr expr = case expr of
   T.Bit x i -> do
     (_, x') <- head <$> eraseExpr x
     value <- bitValue x' i
-    return [(BWBoolean, value)]
+    return [(BWBoolean, ExprB value)]
 
-bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (Expr n)
+bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (ExprB n)
 bitValue expr i = case expr of
-  ExprN (ValN _ n) -> return $ ExprB (ValB (testBit n i))
+  ExprN (ValN _ n) -> return (ValB (testBit n i))
   ExprN (VarN w var) -> do
     counters <- get
     -- if the index 'i' overflows or underflows, wrap it around
@@ -358,9 +363,9 @@ bitValue expr i = case expr of
     -- bit variable corresponding to the variable 'var' and the index 'i''
     case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
-      Just start -> return $ ExprB $ VarB (start + i')
+      Just start -> return $ VarB (start + i')
   ExprN _ -> error "Panic: trying to access the bit value of a compound expression"
-  ExprU (ValU _ n) -> return $ ExprB (ValB (testBit n i))
+  ExprU (ValU _ n) -> return (ValB (testBit n i))
   ExprU (VarU w var) -> do
     counters <- get
     -- if the index 'i' overflows or underflows, wrap it around
@@ -368,33 +373,35 @@ bitValue expr i = case expr of
     -- bit variable corresponding to the variable 'var' and the index 'i''
     case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
-      Just start -> return $ ExprB $ VarB (start + i')
-  ExprU (SubU {}) -> error "Panic: trying to access the bit value of a compound expression"
-  ExprU (AddU {}) -> error "Panic: trying to access the bit value of a compound expression"
-  ExprU (MulU {}) -> error "Panic: trying to access the bit value of a compound expression"
-  ExprB _ -> return expr 
+      Just start -> return $ VarB (start + i')
+  ExprU (AndU _ x y rest) ->
+    AndB
+      <$> bitValue (ExprU x) i
+      <*> bitValue (ExprU y) i
+      <*> mapM (\x' -> ExprU x' `bitValue` i) rest
+  ExprU _ -> error "Panic: trying to access the bit value of a compound expression"
+  ExprB x -> return x
   Rotate w n x -> do
     -- rotate the bit value
     -- if the index 'i' overflows or underflows, wrap it around
     let i' = n + i `mod` getWidth w
     bitValue x i'
-  NAryOp _ And x y rest ->
-    NAryOp BWBoolean And
-      <$> bitValue x i
-      <*> bitValue y i
-      <*> mapM (`bitValue` i) rest
   NAryOp _ Or x y rest ->
-    NAryOp BWBoolean Or
-      <$> bitValue x i
-      <*> bitValue y i
-      <*> mapM (`bitValue` i) rest
+    narrowDownToExprB
+      <$> ( NAryOp BWBoolean Or
+              <$> (ExprB <$> bitValue x i)
+              <*> (ExprB <$> bitValue y i)
+              <*> mapM (\x' -> ExprB <$> bitValue x' i) rest
+          )
   NAryOp _ Xor x y rest ->
-    NAryOp BWBoolean Xor
-      <$> bitValue x i
-      <*> bitValue y i
-      <*> mapM (`bitValue` i) rest
+    narrowDownToExprB
+      <$> ( NAryOp BWBoolean Xor
+              <$> (ExprB <$> bitValue x i)
+              <*> (ExprB <$> bitValue y i)
+              <*> mapM (\x' -> ExprB <$> bitValue x' i) rest
+          )
   NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
-  If w p a b -> If w p <$> bitValue a i <*> bitValue b i
+  If w p a b -> narrowDownToExprB <$> (If w p <$> (ExprB <$> bitValue a i) <*> (ExprB <$> bitValue b i))
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.Assignment ref expr) = do
@@ -430,3 +437,25 @@ chainExprsOfAssocOpAddN w x y = case (x, y) of
     AddN w x y0 (y1 :<| ys)
   -- there's nothing left we can do
   _ -> AddN w x y mempty
+
+chainExprsOfAssocOpAndB :: ExprB n -> ExprB n -> ExprB n
+chainExprsOfAssocOpAndB x y = case (x, y) of
+  (AndB x0 x1 xs, AndB y0 y1 ys) ->
+    AndB x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (AndB x0 x1 xs, _) ->
+    AndB x0 x1 (xs |> y)
+  (_, AndB y0 y1 ys) ->
+    AndB x y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> AndB x y mempty
+
+chainExprsOfAssocOpAndU :: Width -> ExprU n -> ExprU n -> ExprU n
+chainExprsOfAssocOpAndU w x y = case (x, y) of
+  (AndU _ x0 x1 xs, AndU _ y0 y1 ys) ->
+    AndU w x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (AndU _ x0 x1 xs, _) ->
+    AndU w x0 x1 (xs |> y)
+  (_, AndU _ y0 y1 ys) ->
+    AndU w x y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> AndU w x y mempty

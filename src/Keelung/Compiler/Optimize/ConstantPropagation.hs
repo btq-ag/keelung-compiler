@@ -100,6 +100,7 @@ propagateConstant relations = propagate
       SubU w x y -> SubU w (propagateU x) (propagateU y)
       AddU w x y -> AddU w (propagateU x) (propagateU y)
       MulU w x y -> MulU w (propagateU x) (propagateU y)
+      AndU w x y xs -> AndU w (propagateU x) (propagateU y) (fmap propagateU xs)
 
     propagateB e = case e of
       ValB _ -> e

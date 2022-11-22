@@ -213,6 +213,7 @@ encodeExprU out expr = case expr of
     y' <- wireAsVar (ExprU y)
     freshBinRep out w
     encodeUIntMul w out x' y'
+  AndU {} -> error "encodeExprU: AndU: not implemented"
 
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
 encode out expr = case expr of
@@ -224,30 +225,6 @@ encode out expr = case expr of
   Rotate _ n x -> encodeRotate out n x
   NAryOp _ op x y rest ->
     case op of
-      And -> do
-        a <- wireAsVar x
-        b <- wireAsVar y
-        vars <- mapM wireAsVar rest
-        case vars of
-          Empty -> add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar out))] -- out = a * b
-          (c :<| Empty) -> do
-            aAndb <- freshVar
-            add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar aAndb))] -- x = a * b
-            add [CMul (Poly.singleVar aAndb) (Poly.singleVar c) (Right (Poly.singleVar out))] -- out = x * c
-          _ -> do
-            -- the number of operands
-            let n = 2 + fromIntegral (length vars)
-            -- polynomial = n - sum of operands
-            let polynomial = case Poly.buildMaybe n (IntMap.fromList ((a, -1) : (b, -1) : [(v, -1) | v <- toList vars])) of
-                  Just p -> p
-                  Nothing -> error "encode: And: impossible"
-            -- if the answer is 1 then all operands must be 1
-            --    (n - sum of operands) * out = 0
-            add [CMul polynomial (Poly.singleVar out) (Left 0)]
-            -- if the answer is 0 then not all operands must be 1:
-            --    (n - sum of operands) * inv = 1 - out
-            inv <- freshVar
-            add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
       Or -> do
         a <- wireAsVar x
         b <- wireAsVar y
@@ -534,7 +511,6 @@ wireAsVar expr = do
 -- | Encode the constraint 'x op y = out'.
 encodeBinaryOp :: (GaloisField n, Integral n) => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
-  And -> error "encodeBinaryOp: And"
   Or -> error "encodeBinaryOp: Or"
   Xor -> add [CXor x y out]
   NEq -> encodeEquality False out x y
