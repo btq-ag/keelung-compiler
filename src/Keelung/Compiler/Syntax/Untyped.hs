@@ -92,7 +92,7 @@ data ExprN n
   | VarN Width Var
   | SubN Width (ExprN n) (ExprN n)
   | AddN Width (ExprN n) (ExprN n) (Seq (ExprN n))
-  | MulN Width (ExprN n) (ExprN n) (Seq (ExprN n))
+  | MulN Width (ExprN n) (ExprN n)
   deriving (Functor)
 
 instance (Show n, Integral n) => Show (ExprN n) where
@@ -101,7 +101,7 @@ instance (Show n, Integral n) => Show (ExprN n) where
     VarN _ var -> showString "$" . shows var
     SubN _ x0 x1 -> chain prec " - " 6 $ x0 :<| x1 :<| Empty
     AddN _ x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
-    MulN _ x0 x1 xs -> chain prec " * " 7 $ x0 :<| x1 :<| xs
+    MulN _ x0 x1 -> chain prec " * " 7 $ x0 :<| x1 :<| Empty
 
 --------------------------------------------------------------------------------
 
@@ -135,7 +135,7 @@ data Expr n
 instance Num n => Num (ExprN n) where
   x + y = AddN (widthOfN x) x y Empty
   x - y = SubN (widthOfN x) x y
-  x * y = MulN (widthOfN x) x y Empty
+  x * y = MulN (widthOfN x) x y
   abs = id
   signum = const 1
   fromInteger = error "[ panic ] Dunno how to convert an Integer to a untyped expression"
@@ -189,9 +189,7 @@ sizeOfExprN xs = case xs of
   AddN _ x0 x1 xs' ->
     let operands = x0 :<| x1 :<| xs'
      in sum (fmap sizeOfExprN operands) + (length operands - 1)
-  MulN _ x0 x1 xs' ->
-    let operands = x0 :<| x1 :<| xs'
-     in sum (fmap sizeOfExprN operands) + (length operands - 1)
+  MulN _ x0 x1 -> sizeOfExprN x0 + sizeOfExprN x1 + 1
 
 sizeOfExprU :: ExprU n -> Int
 sizeOfExprU xs = case xs of
@@ -207,7 +205,7 @@ bitWidthOf expr = case expr of
     VarN w _ -> BWNumber w
     SubN w _ _ -> BWNumber w
     AddN w _ _ _ -> BWNumber w
-    MulN w _ _ _ -> BWNumber w
+    MulN w _ _ -> BWNumber w
   ExprU x -> case x of
     ValU w _ -> BWUInt w
     VarU w _ -> BWUInt w
@@ -223,7 +221,7 @@ widthOfN expr = case expr of
   VarN w _ -> w
   SubN w _ _ -> w
   AddN w _ _ _ -> w
-  MulN w _ _ _ -> w
+  MulN w _ _ -> w
 
 castToNumber :: Width -> Expr n -> Expr n
 castToNumber width expr = case expr of
@@ -235,7 +233,7 @@ castToNumber width expr = case expr of
     VarN _ var -> ExprN (VarN width var)
     SubN _ a b -> ExprN (SubN width a b)
     AddN _ a b xs -> ExprN (AddN width a b xs)
-    MulN _ a b xs -> ExprN (MulN width a b xs)
+    MulN _ a b -> ExprN (MulN width a b)
   ExprU x -> case x of
     ValU _ val -> ExprN (ValN width val)
     VarU _ var -> ExprN (VarN width var)

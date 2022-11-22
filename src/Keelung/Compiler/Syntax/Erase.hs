@@ -300,7 +300,7 @@ eraseExpr expr = case expr of
     let (bw, x') = head xs
     let (_, y') = head ys
     case bw of
-      BWNumber w -> return [(bw, ExprN $ chainExprsOfAssocOpMulN w (narrowDownToExprN x') (narrowDownToExprN y'))]
+      BWNumber w -> return [(bw, ExprN $ MulN w (narrowDownToExprN x') (narrowDownToExprN y'))]
       BWUInt _ -> return [chainExprsOfAssocOp MulU (bw, x') (bw, y')]
       _ -> error "[ panic ] T.Mul on wrong type of data"
   T.Div x y -> do
@@ -430,14 +430,3 @@ chainExprsOfAssocOpAddN w x y = case (x, y) of
     AddN w x y0 (y1 :<| ys)
   -- there's nothing left we can do
   _ -> AddN w x y mempty
-
-chainExprsOfAssocOpMulN :: Width -> ExprN n -> ExprN n -> ExprN n
-chainExprsOfAssocOpMulN w x y = case (x, y) of
-  (MulN _ x0 x1 xs, MulN _ y0 y1 ys) ->
-    MulN w x0 x1 (xs <> (y0 :<| y1 :<| ys))
-  (MulN _ x0 x1 xs, _) ->
-    MulN w x0 x1 (xs |> y)
-  (_, MulN _ y0 y1 ys) ->
-    MulN w x y0 (y1 :<| ys)
-  -- there's nothing left we can do
-  _ -> MulN w x y mempty

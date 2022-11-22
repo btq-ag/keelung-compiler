@@ -166,13 +166,10 @@ encodeExprN out expr = case expr of
   AddN _ x y rest -> do
     terms <- mapM toTermN (x :<| y :<| rest)
     encodeTerms out terms
-  MulN _ x y rest ->
-    encodeAndFoldExprsN
-      (\out' x' y' -> add [CMul (Poly.singleVar x') (Poly.singleVar y') (Right $ Poly.singleVar out')])
-      out
-      x
-      y
-      rest
+  MulN _ x y -> do 
+    x' <- wireAsVar (ExprN x)
+    y' <- wireAsVar (ExprN y)
+    add [CMul (Poly.singleVar x') (Poly.singleVar y') (Right $ Poly.singleVar out)]
 
 encodeExprU :: (GaloisField n, Integral n) => Var -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
@@ -407,14 +404,14 @@ toTerm expr = do
   return $ WithVars out 1
 
 toTermN :: (GaloisField n, Integral n) => ExprN n -> M n (Term n)
-toTermN (MulN _ (ValN _ m) (ValN _ n) Empty) = return $ Constant (m * n)
-toTermN (MulN _ (VarN _ var) (ValN _ n) Empty) = return $ WithVars var n
-toTermN (MulN _ (ValN _ n) (VarN _ var) Empty) = return $ WithVars var n
-toTermN (MulN _ (ValN _ n) expr Empty) = do
+toTermN (MulN _ (ValN _ m) (ValN _ n)) = return $ Constant (m * n)
+toTermN (MulN _ (VarN _ var) (ValN _ n)) = return $ WithVars var n
+toTermN (MulN _ (ValN _ n) (VarN _ var)) = return $ WithVars var n
+toTermN (MulN _ (ValN _ n) expr) = do
   out <- freshVar
   encodeExprN out expr
   return $ WithVars out n
-toTermN (MulN _ expr (ValN _ n) Empty) = do
+toTermN (MulN _ expr (ValN _ n)) = do
   out <- freshVar
   encodeExprN out expr
   return $ WithVars out n
@@ -451,19 +448,6 @@ encodeAndFoldExprs f out x0 x1 xs = do
   x0' <- wireAsVar x0
   x1' <- wireAsVar x1
   vars <- mapM wireAsVar xs
-  go x0' x1' vars
-  where
-    go x y Empty = f out x y
-    go x y (v :<| vs) = do
-      out' <- freshVar
-      go out' v vs
-      f out' x y
-
-encodeAndFoldExprsN :: (GaloisField n, Integral n) => (Var -> Var -> Var -> M n ()) -> Var -> ExprN n -> ExprN n -> Seq (ExprN n) -> M n ()
-encodeAndFoldExprsN f out x0 x1 xs = do
-  x0' <- wireAsVar (ExprN x0)
-  x1' <- wireAsVar (ExprN x1)
-  vars <- mapM wireAsVar (fmap ExprN xs)
   go x0' x1' vars
   where
     go x y Empty = f out x y
