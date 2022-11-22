@@ -43,9 +43,11 @@ import Keelung.Types (Var)
 
 -- N-ary operators
 data Op
-  = AddU
-  | MulU
-  | And
+  = --   AddU
+
+    -- | MulU
+    -- |
+    And
   | Or
   | Xor
   | NEq
@@ -109,13 +111,17 @@ data ExprU n
   = ValU Width n
   | VarU Width Var
   | SubU Width (ExprU n) (ExprU n)
+  | AddU Width (ExprU n) (ExprU n)
+  | MulU Width (ExprU n) (ExprU n)
   deriving (Functor)
 
 instance Show n => Show (ExprU n) where
   showsPrec prec expr = case expr of
     ValU _ n -> shows n
     VarU _ var -> showString "$" . shows var
-    SubU _ x0 x1 -> chain prec " - " 6 $ x0 :<| x1 :<| Empty
+    SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
+    AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
+    MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
 
 --------------------------------------------------------------------------------
 
@@ -155,8 +161,6 @@ instance (Integral n, Show n) => Show (Expr n) where
     ExprU x -> shows x
     Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
     NAryOp _ op x0 x1 xs -> case op of
-      AddU -> chain prec " + " 6 $ x0 :<| x1 :<| xs
-      MulU -> chain prec " * " 7 $ x0 :<| x1 :<| xs
       And -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
       Or -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
       Xor -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| xs
@@ -195,7 +199,9 @@ sizeOfExprU :: ExprU n -> Int
 sizeOfExprU xs = case xs of
   ValU _ _ -> 1
   VarU _ _ -> 1
-  SubU _ x0 x1 -> sizeOfExprU x0 + sizeOfExprU x1 + 1
+  SubU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
+  AddU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
+  MulU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
 
 bitWidthOf :: Expr n -> BitWidth
 bitWidthOf expr = case expr of
@@ -210,6 +216,8 @@ bitWidthOf expr = case expr of
     ValU w _ -> BWUInt w
     VarU w _ -> BWUInt w
     SubU w _ _ -> BWUInt w
+    AddU w _ _ -> BWUInt w
+    MulU w _ _ -> BWUInt w
   Rotate bw _ _ -> bw
   NAryOp bw _ _ _ _ -> bw
   Div bw _ _ -> bw
@@ -243,6 +251,8 @@ castToNumber width expr = case expr of
           width
           (narrowDownToExprN (castToNumber width (ExprU a)))
           (narrowDownToExprN (castToNumber width (ExprU b)))
+    AddU _ a b -> ExprN (AddN width (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)) Empty)
+    MulU _ a b -> ExprN (MulN width (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
   Rotate _ n x -> Rotate (BWNumber width) n x
   Div _ a b -> Div (BWNumber width) a b
   NAryOp _ op a b c -> NAryOp (BWNumber width) op a b c

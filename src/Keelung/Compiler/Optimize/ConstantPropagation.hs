@@ -97,6 +97,8 @@ propagateConstant relations = propagate
         Nothing -> e
         Just val -> ValU w val
       SubU w x y -> SubU w (propagateU x) (propagateU y)
+      AddU w x y -> AddU w (propagateU x) (propagateU y)
+      MulU w x y -> MulU w (propagateU x) (propagateU y)
 
     propagate e = case e of
       ExprN x -> ExprN (propagateN x)

@@ -283,7 +283,7 @@ eraseExpr expr = case expr of
     let (_, y') = head ys
     case bw of
       BWNumber w -> return [(bw, ExprN $ chainExprsOfAssocOpAddN w (narrowDownToExprN x') (narrowDownToExprN y'))]
-      BWUInt _ -> return [chainExprsOfAssocOp AddU (bw, x') (bw, y')]
+      BWUInt w -> return [(bw, ExprU $ AddU w (narrowDownToExprU x') (narrowDownToExprU y'))]
       _ -> error "[ panic ] T.Add on wrong type of data"
   T.Sub x y -> do
     xs <- eraseExpr x
@@ -291,8 +291,8 @@ eraseExpr expr = case expr of
     let (bw, x') = head xs
     let (_, y') = head ys
     case bw of
-      BWNumber _ -> return [(bw, ExprN $ SubN (getWidth bw) (narrowDownToExprN x') (narrowDownToExprN y'))]
-      BWUInt _ -> return [(bw, ExprU $ SubU (getWidth bw) (narrowDownToExprU x') (narrowDownToExprU y'))]
+      BWNumber w -> return [(bw, ExprN $ SubN w (narrowDownToExprN x') (narrowDownToExprN y'))]
+      BWUInt w -> return [(bw, ExprU $ SubU w (narrowDownToExprU x') (narrowDownToExprU y'))]
       _ -> error "[ panic ] T.Sub on wrong type of data"
   T.Mul x y -> do
     xs <- eraseExpr x
@@ -301,7 +301,7 @@ eraseExpr expr = case expr of
     let (_, y') = head ys
     case bw of
       BWNumber w -> return [(bw, ExprN $ MulN w (narrowDownToExprN x') (narrowDownToExprN y'))]
-      BWUInt _ -> return [chainExprsOfAssocOp MulU (bw, x') (bw, y')]
+      BWUInt w -> return [(bw, ExprU $ MulU w (narrowDownToExprU x') (narrowDownToExprU y'))]
       _ -> error "[ panic ] T.Mul on wrong type of data"
   T.Div x y -> do
     xs <- eraseExpr x
@@ -370,6 +370,8 @@ bitValue expr i = case expr of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
       Just start -> return $ ExprB $ VarB (start + i')
   ExprU (SubU {}) -> error "Panic: trying to access the bit value of a compound expression"
+  ExprU (AddU {}) -> error "Panic: trying to access the bit value of a compound expression"
+  ExprU (MulU {}) -> error "Panic: trying to access the bit value of a compound expression"
   ExprB (ValB n) -> return $ ExprB (ValB n)
   ExprB (VarB var) -> return $ ExprB (VarB var)
   Rotate w n x -> do
