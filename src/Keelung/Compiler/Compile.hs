@@ -178,6 +178,40 @@ encodeExprB out expr = case expr of
         --    (n - sum of operands) * inv = 1 - out
         inv <- freshVar
         add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
+  OrB x0 x1 xs -> do
+    a <- wireAsVar (ExprB x0)
+    b <- wireAsVar (ExprB x1)
+    vars <- mapM (wireAsVar . ExprB) xs
+    case vars of
+      Empty -> add [COr a b out]
+      (c :<| Empty) -> do
+        -- only 3 operands
+        aOrb <- freshVar
+        add [COr a b aOrb]
+        add [COr aOrb c out]
+      _ -> do
+        -- more than 3 operands, rewrite it as an inequality instead:
+        --      if all operands are 0           then 0 else 1
+        --  =>  if the sum of operands is 0     then 0 else 1
+        --  =>  if the sum of operands is not 0 then 1 else 0
+        --  =>  the sum of operands is not 0
+        numBitWidth <- getNumberBitWidth
+        encode
+          out
+          ( NAryOp
+              (BWNumber numBitWidth)
+              NEq
+              (ExprN (ValN numBitWidth 0))
+              ( ExprN
+                  ( AddN
+                      numBitWidth
+                      ((narrowDownToExprN . castToNumber numBitWidth . ExprB) x0)
+                      ((narrowDownToExprN . castToNumber numBitWidth . ExprB) x1)
+                      (fmap (narrowDownToExprN . castToNumber numBitWidth . ExprB) xs)
+                  )
+              )
+              Empty
+          )
   IfB p x y -> do
     p' <- wireAsVar (ExprB p)
     x' <- wireAsVar (ExprB x)
@@ -224,6 +258,7 @@ encodeExprU out expr = case expr of
     freshBinRep out w
     encodeUIntMul w out x' y'
   AndU {} -> error "encodeExprU: AndU: not implemented"
+  OrU {} -> error "encodeExprU: OrU: not implemented"
   IfU _ p x y -> do
     p' <- wireAsVar (ExprB p)
     x' <- wireAsVar (ExprU x)
@@ -238,43 +273,7 @@ encode out expr = case expr of
   ExprU x -> encodeExprU out x
   -- operators
   Rotate _ n x -> encodeRotate out n x
-  NAryOp _ op x y rest ->
-    case op of
-      Or -> do
-        a <- wireAsVar x
-        b <- wireAsVar y
-        vars <- mapM wireAsVar rest
-        case vars of
-          Empty -> add [COr a b out]
-          (c :<| Empty) -> do
-            -- only 3 operands
-            aOrb <- freshVar
-            add [COr a b aOrb]
-            add [COr aOrb c out]
-          _ -> do
-            -- more than 3 operands, rewrite it as an inequality instead:
-            --      if all operands are 0           then 0 else 1
-            --  =>  if the sum of operands is 0     then 0 else 1
-            --  =>  if the sum of operands is not 0 then 1 else 0
-            --  =>  the sum of operands is not 0
-            numBitWidth <- getNumberBitWidth
-            encode
-              out
-              ( NAryOp
-                  (BWNumber numBitWidth)
-                  NEq
-                  (ExprN (ValN numBitWidth 0))
-                  ( ExprN
-                      ( AddN
-                          numBitWidth
-                          (narrowDownToExprN $ castToNumber numBitWidth x)
-                          (narrowDownToExprN $ castToNumber numBitWidth y)
-                          (fmap (narrowDownToExprN . castToNumber numBitWidth) rest)
-                      )
-                  )
-                  Empty
-              )
-      _ -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
+  NAryOp _ op x y rest -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
 
 --------------------------------------------------------------------------------
 
@@ -317,7 +316,7 @@ encodeRotate out i expr = case expr of
         EQ -> return n -- no rotation
         -- encode out expr -- no rotation
         LT -> do
-          let rotateDistance = (- i) `mod` width
+          let rotateDistance = (-i) `mod` width
           -- collect the bit values of lower bits that will be rotated to higher bits
           let lowerBits = [Data.Bits.testBit val j | j <- [0 .. rotateDistance - 1]]
           -- shift the higher bits left by the rotate distance
@@ -353,66 +352,6 @@ data Term n
 
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
--- toTerm :: (GaloisField n, Integral n) => Expr n -> M n (Term n)
--- toTerm (NAryOp _ MulU (ExprN (VarN _ _)) (ExprN (ValN _ _)) Empty) =
---   error "[ panic ] toTerm: Exepcted UInt, got Number"
--- toTerm (NAryOp _ MulU (ExprB (VarB _)) (ExprN (ValN _ _)) Empty) =
---   error "[ panic ] toTerm: Trying to add Boolean variable with Number value"
--- toTerm (NAryOp _ MulU (ExprU (VarU _ _)) (ExprN (ValN _ _)) Empty) =
---   error "[ panic ] toTerm: Trying to add UInt variable with Number value"
--- toTerm (NAryOp _ MulU (ExprN (VarN _ _)) (ExprB (ValB _)) Empty) =
---   error "[ panic ] toTerm: Trying to add Number variable with Boolean value"
--- toTerm (NAryOp _ MulU (ExprB (VarB _)) (ExprB (ValB _)) Empty) =
---   error "[ panic ] toTerm: Trying to add Boolean variable with Boolean value"
--- toTerm (NAryOp _ MulU (ExprU (VarU _ _)) (ExprB (ValB _)) Empty) =
---   error "[ panic ] toTerm: Trying to add UInt variable with Boolean value"
--- toTerm (NAryOp _ MulU (ExprN (VarN _ _)) (ExprU (ValU _ _)) Empty) =
---   error "[ panic ] toTerm: Trying to add Number variable with UInt value"
--- toTerm (NAryOp _ MulU (ExprB (VarB _)) (ExprU (ValU _ _)) Empty) =
---   error "[ panic ] toTerm: Trying to add Boolean variable with UInt value"
--- toTerm (NAryOp _ MulU (ExprU (VarU _ var)) (ExprU (ValU _ n)) Empty) =
---   return $ WithVars var n
--- toTerm (NAryOp _ MulU (ExprN (ValN _ _)) (ExprN (VarN _ _)) Empty) =
---   error "[ panic ] toTerm: Exepcted UInt, got Number"
--- toTerm (NAryOp _ MulU (ExprN (ValN _ _)) (ExprB (VarB _)) Empty) =
---   error "[ panic ] toTerm: Trying to add Number value with Boolean variable"
--- toTerm (NAryOp _ MulU (ExprN (ValN _ _)) (ExprU (VarU _ _)) Empty) =
---   error "[ panic ] toTerm: Trying to add Number value with UInt variable"
--- toTerm (NAryOp _ MulU (ExprB (ValB _)) (ExprN (VarN _ _)) Empty) =
---   error "[ panic ] toTerm: Trying to add Boolean value with Number variable"
--- toTerm (NAryOp _ MulU (ExprB (ValB _)) (ExprB (VarB _)) Empty) =
---   error "[ panic ] toTerm: Trying to add Boolean value with Boolean variable"
--- toTerm (NAryOp _ MulU (ExprB (ValB _)) (ExprU (VarU _ _)) Empty) =
---   error "[ panic ] toTerm: Trying to add Boolean value with UInt variable"
--- toTerm (NAryOp _ MulU (ExprU (ValU _ _)) (ExprN (VarN _ _)) Empty) =
---   error "[ panic ] toTerm: Trying to add UInt value with Number variable"
--- toTerm (NAryOp _ MulU (ExprU (ValU _ _)) (ExprB (VarB _)) Empty) =
---   error "[ panic ] toTerm: Trying to add UInt value with Boolean variable"
--- toTerm (NAryOp _ MulU (ExprU (ValU _ n)) (ExprU (VarU _ var)) Empty) =
---   return $ WithVars var n
--- toTerm (NAryOp _ MulU expr (ExprN (ValN _ n)) Empty) = do
---   out <- freshVar
---   encode out expr
---   return $ WithVars out n
--- toTerm (NAryOp _ MulU (ExprN (ValN _ n)) expr Empty) = do
---   out <- freshVar
---   encode out expr
---   return $ WithVars out n
--- toTerm (ExprN (ValN _ n)) =
---   return $ Constant n
--- toTerm (ExprB _) =
---   error "[ panic ] toTerm on Boolean expression"
--- toTerm (ExprN (VarN _ var)) =
---   return $ WithVars var 1
--- toTerm (ExprU (VarU _ var)) =
---   return $ WithVars var 1
--- toTerm (ExprU (ValU _ n)) =
---   return $ Constant n
--- toTerm expr = do
---   out <- freshVar
---   encode out expr
---   return $ WithVars out 1
-
 toTermN :: (GaloisField n, Integral n) => ExprN n -> M n (Term n)
 toTermN (MulN _ (ValN _ m) (ValN _ n)) = return $ Constant (m * n)
 toTermN (MulN _ (VarN _ var) (ValN _ n)) = return $ WithVars var n
@@ -517,7 +456,6 @@ wireAsVar expr = do
 -- | Encode the constraint 'x op y = out'.
 encodeBinaryOp :: (GaloisField n, Integral n) => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
-  Or -> error "encodeBinaryOp: Or"
   Xor -> add [CXor x y out]
   NEq -> encodeEquality False out x y
   Eq -> encodeEquality True out x y

@@ -101,6 +101,7 @@ propagateConstant relations = propagate
       AddU w x y -> AddU w (propagateU x) (propagateU y)
       MulU w x y -> MulU w (propagateU x) (propagateU y)
       AndU w x y xs -> AndU w (propagateU x) (propagateU y) (fmap propagateU xs)
+      OrU w x y xs -> OrU w (propagateU x) (propagateU y) (fmap propagateU xs)
       IfU w p x y -> IfU w (propagateB p) (propagateU x) (propagateU y)
 
     propagateB e = case e of
@@ -109,6 +110,7 @@ propagateConstant relations = propagate
         Nothing -> e
         Just val -> ValB val
       AndB x y xs -> AndB (propagateB x) (propagateB y) (fmap propagateB xs)
+      OrB x y xs -> OrB (propagateB x) (propagateB y) (fmap propagateB xs)
       IfB p x y -> IfB (propagateB p) (propagateB x) (propagateB y)
 
     propagate e = case e of

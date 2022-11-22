@@ -269,7 +269,6 @@ eraseRef2 ref = do
 --     value <- bitValue x' i
 --     return [(BWBoolean, narrowDownToExprN value)]
 
-
 -- eraseExprB :: (GaloisField n, Integral n) => T.Expr -> M n [ExprB n]
 -- eraseExprB expr = case expr of
 --   T.Val val -> eraseValB val
@@ -342,7 +341,6 @@ eraseRef2 ref = do
 --     value <- bitValue x' i
 --     return [(BWBoolean, narrowDownToExprN value)]
 
-
 eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [(BitWidth, Expr n)]
 eraseExpr expr = case expr of
   T.Val val -> eraseVal val
@@ -399,7 +397,12 @@ eraseExpr expr = case expr of
   T.Or x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprsOfAssocOp Or (head xs) (head ys)]
+    let (bw, x') = head xs
+    let (_, y') = head ys
+    case bw of
+      BWBoolean -> return [(bw, ExprB $ chainExprsOfAssocOpOrB (narrowDownToExprB x') (narrowDownToExprB y'))]
+      BWUInt w -> return [(bw, ExprU $ chainExprsOfAssocOpOrU w (narrowDownToExprU x') (narrowDownToExprU y'))]
+      _ -> error "[ panic ] T.Or on wrong type of data"
   T.Xor x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -412,11 +415,11 @@ eraseExpr expr = case expr of
     xs <- eraseExpr x
     ys <- eraseExpr y
     return [chainExprsOfAssocOp BEq (head xs) (head ys)]
-  T.If p x y -> do 
+  T.If p x y -> do
     (_, p') <- head <$> eraseExpr p
     (bw, x') <- head <$> eraseExpr x
     (_, y') <- head <$> eraseExpr y
-    case bw of 
+    case bw of
       BWBoolean -> return [(bw, ExprB $ IfB (narrowDownToExprB p') (narrowDownToExprB x') (narrowDownToExprB y'))]
       BWNumber w -> return [(bw, ExprN $ IfN w (narrowDownToExprB p') (narrowDownToExprN x') (narrowDownToExprN y'))]
       BWUInt w -> return [(bw, ExprU $ IfU w (narrowDownToExprB p') (narrowDownToExprU x') (narrowDownToExprU y'))]
@@ -456,6 +459,11 @@ bitValue expr i = case expr of
       <$> bitValue (ExprU x) i
       <*> bitValue (ExprU y) i
       <*> mapM (\x' -> ExprU x' `bitValue` i) rest
+  ExprU (OrU _ x y rest) ->
+    OrB
+      <$> bitValue (ExprU x) i
+      <*> bitValue (ExprU y) i
+      <*> mapM (\x' -> ExprU x' `bitValue` i) rest
   ExprU _ -> error "Panic: trying to access the bit value of a compound expression"
   ExprB x -> return x
   Rotate w n x -> do
@@ -463,13 +471,6 @@ bitValue expr i = case expr of
     -- if the index 'i' overflows or underflows, wrap it around
     let i' = n + i `mod` getWidth w
     bitValue x i'
-  NAryOp _ Or x y rest ->
-    narrowDownToExprB
-      <$> ( NAryOp BWBoolean Or
-              <$> (ExprB <$> bitValue x i)
-              <*> (ExprB <$> bitValue y i)
-              <*> mapM (\x' -> ExprB <$> bitValue x' i) rest
-          )
   NAryOp _ Xor x y rest ->
     narrowDownToExprB
       <$> ( NAryOp BWBoolean Xor
@@ -535,3 +536,25 @@ chainExprsOfAssocOpAndU w x y = case (x, y) of
     AndU w x y0 (y1 :<| ys)
   -- there's nothing left we can do
   _ -> AndU w x y mempty
+
+chainExprsOfAssocOpOrB :: ExprB n -> ExprB n -> ExprB n
+chainExprsOfAssocOpOrB x y = case (x, y) of
+  (OrB x0 x1 xs, OrB y0 y1 ys) ->
+    OrB x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (OrB x0 x1 xs, _) ->
+    OrB x0 x1 (xs |> y)
+  (_, OrB y0 y1 ys) ->
+    OrB x y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> OrB x y mempty
+
+chainExprsOfAssocOpOrU :: Width -> ExprU n -> ExprU n -> ExprU n
+chainExprsOfAssocOpOrU w x y = case (x, y) of
+  (OrU _ x0 x1 xs, OrU _ y0 y1 ys) ->
+    OrU w x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (OrU _ x0 x1 xs, _) ->
+    OrU w x0 x1 (xs |> y)
+  (_, OrU _ y0 y1 ys) ->
+    OrU w x y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> OrU w x y mempty

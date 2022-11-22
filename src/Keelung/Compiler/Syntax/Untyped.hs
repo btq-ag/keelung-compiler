@@ -44,8 +44,7 @@ import Keelung.Types (Var)
 
 -- N-ary operators
 data Op
-  = Or
-  | Xor
+  = Xor
   | NEq
   | Eq
   | BEq
@@ -77,6 +76,7 @@ data ExprB n
   | VarB Var
   | -- logical operators
     AndB (ExprB n) (ExprB n) (Seq (ExprB n))
+  | OrB (ExprB n) (ExprB n) (Seq (ExprB n))
   | IfB (ExprB n) (ExprB n) (ExprB n)
   deriving (Functor)
 
@@ -86,6 +86,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     ValB _ -> showString "T"
     VarB var -> showString "$" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
+    OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 --------------------------------------------------------------------------------
@@ -123,6 +124,7 @@ data ExprU n
   | MulU Width (ExprU n) (ExprU n)
   | -- logical operators
     AndU Width (ExprU n) (ExprU n) (Seq (ExprU n))
+  | OrU Width (ExprU n) (ExprU n) (Seq (ExprU n))
   | IfU Width (ExprB n) (ExprU n) (ExprU n)
   deriving (Functor)
 
@@ -134,6 +136,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
     AndU _ x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
+    OrU _ x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 instance Num n => Num (ExprU n) where
@@ -179,7 +182,6 @@ instance (Integral n, Show n) => Show (Expr n) where
     ExprU x -> shows x
     Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
     NAryOp _ op x0 x1 xs -> case op of
-      Or -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
       Xor -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| xs
       NEq -> chain prec " != " 5 $ x0 :<| x1 :<| xs
       Eq -> chain prec " == " 5 $ x0 :<| x1 :<| xs
@@ -201,6 +203,9 @@ sizeOfExprB expr = case expr of
   ValB _ -> 1
   VarB _ -> 1
   AndB x0 x1 xs ->
+    let operands = x0 :<| x1 :<| xs
+     in sum (fmap sizeOfExprB operands) + (length operands - 1)
+  OrB x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
      in sum (fmap sizeOfExprB operands) + (length operands - 1)
   IfB x y z -> 1 + sizeOfExprB x + sizeOfExprB y + sizeOfExprB z
@@ -225,6 +230,9 @@ sizeOfExprU xs = case xs of
   AddU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
   MulU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
   AndU _ x0 x1 xs' ->
+    let operands = x0 :<| x1 :<| xs'
+     in sum (fmap sizeOfExprU operands) + (length operands - 1)
+  OrU _ x0 x1 xs' ->
     let operands = x0 :<| x1 :<| xs'
      in sum (fmap sizeOfExprU operands) + (length operands - 1)
   IfU _ p x y -> 1 + sizeOfExprB p + sizeOfExprU x + sizeOfExprU y
@@ -255,6 +263,7 @@ widthOfU expr = case expr of
   AddU w _ _ -> w
   MulU w _ _ -> w
   AndU w _ _ _ -> w
+  OrU w _ _ _ -> w
   IfU w _ _ _ -> w
 
 castToNumber :: Width -> Expr n -> Expr n
@@ -263,6 +272,7 @@ castToNumber width expr = case expr of
     ValB val -> ExprN (ValN width val)
     VarB var -> ExprN (VarN width var)
     AndB {} -> error "[ panic ] castToNumber: AndB"
+    OrB {} -> error "[ panic ] castToNumber: OrB"
     IfB {} -> error "[ panic ] castToNumber: IfB"
   ExprN x -> case x of
     ValN _ val -> ExprN (ValN width val)
@@ -284,6 +294,7 @@ castToNumber width expr = case expr of
     AddU _ a b -> ExprN (AddN width (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)) Empty)
     MulU _ a b -> ExprN (MulN width (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
     AndU {} -> error "[ panic ] castToNumber: AndU"
+    OrU {} -> error "[ panic ] castToNumber: OrU"
     IfU _ p a b -> ExprN (IfN width p (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
   Rotate _ n x -> Rotate (BWNumber width) n x
   NAryOp _ op a b c -> NAryOp (BWNumber width) op a b c
