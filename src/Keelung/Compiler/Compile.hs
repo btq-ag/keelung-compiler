@@ -166,6 +166,8 @@ encodeExprN out expr = case expr of
   AddN _ x y rest -> do
     terms <- mapM toTerm (x :<| y :<| rest)
     encodeTerms out terms
+  MulN _ x y rest -> 
+    encodeAndFoldExprs (\out' x' y' -> add [CMul (Poly.singleVar x') (Poly.singleVar y') (Right $ Poly.singleVar out')]) out x y rest
 
 encodeExprU :: (GaloisField n, Integral n) => Var -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
@@ -273,10 +275,11 @@ encodeRotate out i expr = case expr of
       encode out (ExprN (ValN w n'))
     VarN w var -> addRotatedBinRep out w var i
     SubN {} -> error "[ panic ] dunno how to compile ROTATE SubN"
-    AddN w _ _ _-> do
+    AddN w _ _ _ -> do
       result <- freshVar
       encode result expr
       addRotatedBinRep out w result i
+    MulN {} -> error "[ panic ] dunno how to compile ROTATE MulN"
   ExprU x -> case x of
     ValU w n -> do
       n' <- rotateField w n
@@ -338,47 +341,91 @@ data Term n
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
 toTerm :: (GaloisField n, Integral n) => Expr n -> M n (Term n)
-toTerm (NAryOp _ Mul (ExprN (VarN _ var)) (ExprN (ValN _ n)) Empty) =
+toTerm (ExprN (MulN _ (ExprN (VarN _ var)) (ExprN (ValN _ n)) Empty)) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul (ExprB (VarB _)) (ExprN (ValN _ _)) Empty) =
+toTerm (ExprN (MulN _ (ExprB (VarB _)) (ExprN (ValN _ _)) Empty)) =
   error "[ panic ] toTerm: Trying to add Boolean variable with Number value"
-toTerm (NAryOp _ Mul (ExprU (VarU _ _)) (ExprN (ValN _ _)) Empty) =
+toTerm (ExprN (MulN _ (ExprU (VarU _ _)) (ExprN (ValN _ _)) Empty)) =
   error "[ panic ] toTerm: Trying to add UInt variable with Number value"
-toTerm (NAryOp _ Mul (ExprN (VarN _ _)) (ExprB (ValB _)) Empty) =
+toTerm (ExprN (MulN _ (ExprN (VarN _ _)) (ExprB (ValB _)) Empty)) =
   error "[ panic ] toTerm: Trying to add Number variable with Boolean value"
-toTerm (NAryOp _ Mul (ExprB (VarB _)) (ExprB (ValB _)) Empty) =
+toTerm (ExprN (MulN _ (ExprB (VarB _)) (ExprB (ValB _)) Empty)) =
   error "[ panic ] toTerm: Trying to add Boolean variable with Boolean value"
-toTerm (NAryOp _ Mul (ExprU (VarU _ _)) (ExprB (ValB _)) Empty) =
+toTerm (ExprN (MulN _ (ExprU (VarU _ _)) (ExprB (ValB _)) Empty)) =
   error "[ panic ] toTerm: Trying to add UInt variable with Boolean value"
-toTerm (NAryOp _ Mul (ExprN (VarN _ _)) (ExprU (ValU _ _)) Empty) =
+toTerm (ExprN (MulN _ (ExprN (VarN _ _)) (ExprU (ValU _ _)) Empty)) =
   error "[ panic ] toTerm: Trying to add Number variable with UInt value"
-toTerm (NAryOp _ Mul (ExprB (VarB _)) (ExprU (ValU _ _)) Empty) =
+toTerm (ExprN (MulN _ (ExprB (VarB _)) (ExprU (ValU _ _)) Empty)) =
   error "[ panic ] toTerm: Trying to add Boolean variable with UInt value"
-toTerm (NAryOp _ Mul (ExprU (VarU _ var)) (ExprU (ValU _ n)) Empty) =
+toTerm (ExprN (MulN _ (ExprU (VarU _ _)) (ExprU (ValU _ _)) Empty)) =
+  error "[ panic ] toTerm: Exepcted Number, got UInt"
+toTerm (ExprN (MulN _ (ExprN (ValN _ n)) (ExprN (VarN _ var)) Empty)) =
   return $ WithVars var n
-toTerm (NAryOp _ Mul (ExprN (ValN _ n)) (ExprN (VarN _ var)) Empty) =
-  return $ WithVars var n
-toTerm (NAryOp _ Mul (ExprN (ValN _ _)) (ExprB (VarB _)) Empty) =
+toTerm (ExprN (MulN _ (ExprN (ValN _ _)) (ExprB (VarB _)) Empty)) =
   error "[ panic ] toTerm: Trying to add Number value with Boolean variable"
-toTerm (NAryOp _ Mul (ExprN (ValN _ _)) (ExprU (VarU _ _)) Empty) =
+toTerm (ExprN (MulN _ (ExprN (ValN _ _)) (ExprU (VarU _ _)) Empty)) =
   error "[ panic ] toTerm: Trying to add Number value with UInt variable"
-toTerm (NAryOp _ Mul (ExprB (ValB _)) (ExprN (VarN _ _)) Empty) =
+toTerm (ExprN (MulN _ (ExprB (ValB _)) (ExprN (VarN _ _)) Empty)) =
   error "[ panic ] toTerm: Trying to add Boolean value with Number variable"
-toTerm (NAryOp _ Mul (ExprB (ValB _)) (ExprB (VarB _)) Empty) =
+toTerm (ExprN (MulN _ (ExprB (ValB _)) (ExprB (VarB _)) Empty)) =
   error "[ panic ] toTerm: Trying to add Boolean value with Boolean variable"
-toTerm (NAryOp _ Mul (ExprB (ValB _)) (ExprU (VarU _ _)) Empty) =
+toTerm (ExprN (MulN _ (ExprB (ValB _)) (ExprU (VarU _ _)) Empty)) =
   error "[ panic ] toTerm: Trying to add Boolean value with UInt variable"
-toTerm (NAryOp _ Mul (ExprU (ValU _ _)) (ExprN (VarN _ _)) Empty) =
+toTerm (ExprN (MulN _ (ExprU (ValU _ _)) (ExprN (VarN _ _)) Empty)) =
   error "[ panic ] toTerm: Trying to add UInt value with Number variable"
-toTerm (NAryOp _ Mul (ExprU (ValU _ _)) (ExprB (VarB _)) Empty) =
+toTerm (ExprN (MulN _ (ExprU (ValU _ _)) (ExprB (VarB _)) Empty)) =
   error "[ panic ] toTerm: Trying to add UInt value with Boolean variable"
-toTerm (NAryOp _ Mul (ExprU (ValU _ n)) (ExprU (VarU _ var)) Empty) =
-  return $ WithVars var n
-toTerm (NAryOp _ Mul expr (ExprN (ValN _ n)) Empty) = do
+toTerm (ExprN (MulN _ (ExprU (ValU _ _)) (ExprU (VarU _ _)) Empty)) =
+  error "[ panic ] toTerm: Exepcted Number, got UInt"
+toTerm (ExprN (MulN _ expr (ExprN (ValN _ n)) Empty)) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
-toTerm (NAryOp _ Mul (ExprN (ValN _ n)) expr Empty) = do
+toTerm (ExprN (MulN _ (ExprN (ValN _ n)) expr Empty)) = do
+  out <- freshVar
+  encode out expr
+  return $ WithVars out n
+toTerm (NAryOp _ MulU (ExprN (VarN _ _)) (ExprN (ValN _ _)) Empty) =
+  error "[ panic ] toTerm: Exepcted UInt, got Number"
+toTerm (NAryOp _ MulU (ExprB (VarB _)) (ExprN (ValN _ _)) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean variable with Number value"
+toTerm (NAryOp _ MulU (ExprU (VarU _ _)) (ExprN (ValN _ _)) Empty) =
+  error "[ panic ] toTerm: Trying to add UInt variable with Number value"
+toTerm (NAryOp _ MulU (ExprN (VarN _ _)) (ExprB (ValB _)) Empty) =
+  error "[ panic ] toTerm: Trying to add Number variable with Boolean value"
+toTerm (NAryOp _ MulU (ExprB (VarB _)) (ExprB (ValB _)) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean variable with Boolean value"
+toTerm (NAryOp _ MulU (ExprU (VarU _ _)) (ExprB (ValB _)) Empty) =
+  error "[ panic ] toTerm: Trying to add UInt variable with Boolean value"
+toTerm (NAryOp _ MulU (ExprN (VarN _ _)) (ExprU (ValU _ _)) Empty) =
+  error "[ panic ] toTerm: Trying to add Number variable with UInt value"
+toTerm (NAryOp _ MulU (ExprB (VarB _)) (ExprU (ValU _ _)) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean variable with UInt value"
+toTerm (NAryOp _ MulU (ExprU (VarU _ var)) (ExprU (ValU _ n)) Empty) =
+  return $ WithVars var n
+toTerm (NAryOp _ MulU (ExprN (ValN _ _)) (ExprN (VarN _ _)) Empty) =
+  error "[ panic ] toTerm: Exepcted UInt, got Number"
+toTerm (NAryOp _ MulU (ExprN (ValN _ _)) (ExprB (VarB _)) Empty) =
+  error "[ panic ] toTerm: Trying to add Number value with Boolean variable"
+toTerm (NAryOp _ MulU (ExprN (ValN _ _)) (ExprU (VarU _ _)) Empty) =
+  error "[ panic ] toTerm: Trying to add Number value with UInt variable"
+toTerm (NAryOp _ MulU (ExprB (ValB _)) (ExprN (VarN _ _)) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean value with Number variable"
+toTerm (NAryOp _ MulU (ExprB (ValB _)) (ExprB (VarB _)) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean value with Boolean variable"
+toTerm (NAryOp _ MulU (ExprB (ValB _)) (ExprU (VarU _ _)) Empty) =
+  error "[ panic ] toTerm: Trying to add Boolean value with UInt variable"
+toTerm (NAryOp _ MulU (ExprU (ValU _ _)) (ExprN (VarN _ _)) Empty) =
+  error "[ panic ] toTerm: Trying to add UInt value with Number variable"
+toTerm (NAryOp _ MulU (ExprU (ValU _ _)) (ExprB (VarB _)) Empty) =
+  error "[ panic ] toTerm: Trying to add UInt value with Boolean variable"
+toTerm (NAryOp _ MulU (ExprU (ValU _ n)) (ExprU (VarU _ var)) Empty) =
+  return $ WithVars var n
+toTerm (NAryOp _ MulU expr (ExprN (ValN _ n)) Empty) = do
+  out <- freshVar
+  encode out expr
+  return $ WithVars out n
+toTerm (NAryOp _ MulU (ExprN (ValN _ n)) expr Empty) = do
   out <- freshVar
   encode out expr
   return $ WithVars out n
@@ -460,8 +507,8 @@ wireAsVar expr = do
 encodeBinaryOp :: (GaloisField n, Integral n) => BitWidth -> Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp bw op out x y = case op of
   AddU -> error "encodeBinaryOp: AddU"
-  Mul -> case bw of
-    BWNumber _ -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]
+  MulU -> case bw of
+    BWNumber _ -> error "[ panic ] encodeBinaryOp: MulU on Number"
     BWUInt w -> do
       freshBinRep out w
       encodeUIntMul w out x y

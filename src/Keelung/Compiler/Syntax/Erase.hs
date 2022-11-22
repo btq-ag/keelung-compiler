@@ -297,7 +297,12 @@ eraseExpr expr = case expr of
   T.Mul x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprsOfAssocOp Mul (head xs) (head ys)]
+    let (bw, x') = head xs
+    let (_, y') = head ys
+    case bw of
+      BWNumber w -> return [(bw, ExprN $ chainExprsOfAssocOpMulN w (narrowDownToExprN x') (narrowDownToExprN y'))]
+      BWUInt _ -> return [chainExprsOfAssocOp MulU (bw, x') (bw, y')]
+      _ -> error "[ panic ] T.Mul on wrong type of data"
   T.Div x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -425,3 +430,14 @@ chainExprsOfAssocOpAddN w x y = case (x, y) of
     AddN w (ExprN x) y0 (y1 :<| ys)
   -- there's nothing left we can do
   _ -> AddN w (ExprN x) (ExprN y) mempty
+
+chainExprsOfAssocOpMulN :: Width -> ExprN n -> ExprN n -> ExprN n
+chainExprsOfAssocOpMulN w x y = case (x, y) of
+  (MulN _ x0 x1 xs, MulN _ y0 y1 ys) ->
+    MulN w x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (MulN _ x0 x1 xs, _) ->
+    MulN w x0 x1 (xs |> ExprN y)
+  (_, MulN _ y0 y1 ys) ->
+    MulN w (ExprN x) y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> MulN w (ExprN x) (ExprN y) mempty

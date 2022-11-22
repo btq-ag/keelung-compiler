@@ -44,7 +44,7 @@ import Keelung.Types (Var)
 -- N-ary operators
 data Op
   = AddU
-  | Mul
+  | MulU
   | And
   | Or
   | Xor
@@ -92,6 +92,7 @@ data ExprN n
   | VarN Width Var
   | SubN Width (ExprN n) (ExprN n)
   | AddN Width (Expr n) (Expr n) (Seq (Expr n))
+  | MulN Width (Expr n) (Expr n) (Seq (Expr n))
   deriving (Functor)
 
 instance (Show n, Integral n) => Show (ExprN n) where
@@ -100,6 +101,7 @@ instance (Show n, Integral n) => Show (ExprN n) where
     VarN _ var -> showString "$" . shows var
     SubN _ x0 x1 -> chain prec " - " 6 $ x0 :<| x1 :<| Empty
     AddN _ x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
+    MulN _ x0 x1 xs -> chain prec " * " 7 $ x0 :<| x1 :<| xs
 
 --------------------------------------------------------------------------------
 
@@ -133,7 +135,7 @@ data Expr n
 instance Num n => Num (Expr n) where
   x + y = ExprN (AddN (getWidth (bitWidthOf x)) x y Empty)
   x - y = ExprN (SubN (getWidth (bitWidthOf x)) (narrowDownToExprN x) (narrowDownToExprN y))
-  x * y = NAryOp (bitWidthOf x) Mul x y Empty
+  x * y = ExprN (MulN (getWidth (bitWidthOf x)) x y Empty)
   abs = id
   signum = const 1
   fromInteger = error "[ panic ] Dunno how to convert an Integer to a untyped expression"
@@ -154,7 +156,7 @@ instance (Integral n, Show n) => Show (Expr n) where
     Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
     NAryOp _ op x0 x1 xs -> case op of
       AddU -> chain prec " + " 6 $ x0 :<| x1 :<| xs
-      Mul -> chain prec " * " 7 $ x0 :<| x1 :<| xs
+      MulU -> chain prec " * " 7 $ x0 :<| x1 :<| xs
       And -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
       Or -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
       Xor -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| xs
@@ -187,6 +189,9 @@ sizeOfExpr expr = case expr of
       AddN _ x0 x1 xs' ->
         let operands = x0 :<| x1 :<| xs'
          in sum (fmap sizeOfExpr operands) + (length operands - 1)
+      MulN _ x0 x1 xs' ->
+        let operands = x0 :<| x1 :<| xs'
+         in sum (fmap sizeOfExpr operands) + (length operands - 1)
 
     sizeOfExprU :: ExprU n -> Int
     sizeOfExprU xs = case xs of
@@ -202,6 +207,7 @@ bitWidthOf expr = case expr of
     VarN w _ -> BWNumber w
     SubN w _ _ -> BWNumber w
     AddN w _ _ _ -> BWNumber w
+    MulN w _ _ _ -> BWNumber w
   ExprU x -> case x of
     ValU w _ -> BWUInt w
     VarU w _ -> BWUInt w
@@ -221,6 +227,7 @@ castToNumber width expr = case expr of
     VarN _ var -> ExprN (VarN width var)
     SubN _ a b -> ExprN (SubN width a b)
     AddN _ a b xs -> ExprN (AddN width a b xs)
+    MulN _ a b xs -> ExprN (MulN width a b xs)
   ExprU x -> case x of
     ValU _ val -> ExprN (ValN width val)
     VarU _ var -> ExprN (VarN width var)
