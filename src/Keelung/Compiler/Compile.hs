@@ -164,10 +164,15 @@ encodeExprN out expr = case expr of
     y' <- toTerm (ExprN y)
     encodeTerms out (x' :<| negateTerm y' :<| Empty)
   AddN _ x y rest -> do
-    terms <- mapM toTerm (x :<| y :<| rest)
+    terms <- mapM toTermN (x :<| y :<| rest)
     encodeTerms out terms
-  MulN _ x y rest -> 
-    encodeAndFoldExprs (\out' x' y' -> add [CMul (Poly.singleVar x') (Poly.singleVar y') (Right $ Poly.singleVar out')]) out x y rest
+  MulN _ x y rest ->
+    encodeAndFoldExprsN
+      (\out' x' y' -> add [CMul (Poly.singleVar x') (Poly.singleVar y') (Right $ Poly.singleVar out')])
+      out
+      x
+      y
+      rest
 
 encodeExprU :: (GaloisField n, Integral n) => Var -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
@@ -242,9 +247,9 @@ encode out expr = case expr of
                   ( ExprN
                       ( AddN
                           numBitWidth
-                          (castToNumber numBitWidth x)
-                          (castToNumber numBitWidth y)
-                          (fmap (castToNumber numBitWidth) rest)
+                          (narrowDownToExprN $ castToNumber numBitWidth x)
+                          (narrowDownToExprN $ castToNumber numBitWidth y)
+                          (fmap (narrowDownToExprN . castToNumber numBitWidth) rest)
                       )
                   )
                   Empty
@@ -260,8 +265,9 @@ encode out expr = case expr of
     numBitWidth <- getNumberBitWidth
     -- out = b * x + (1 - b) * y
     encode out $
-      ExprN (VarN numBitWidth b') * castToNumber numBitWidth x
-        + (ExprN (ValN numBitWidth 1) - ExprN (VarN numBitWidth b')) * castToNumber numBitWidth y
+      ExprN $
+        VarN numBitWidth b' * narrowDownToExprN (castToNumber numBitWidth x)
+          + (ValN numBitWidth 1 - VarN numBitWidth b') * narrowDownToExprN (castToNumber numBitWidth y)
 
 --------------------------------------------------------------------------------
 
@@ -341,50 +347,6 @@ data Term n
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
 toTerm :: (GaloisField n, Integral n) => Expr n -> M n (Term n)
-toTerm (ExprN (MulN _ (ExprN (VarN _ var)) (ExprN (ValN _ n)) Empty)) =
-  return $ WithVars var n
-toTerm (ExprN (MulN _ (ExprB (VarB _)) (ExprN (ValN _ _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add Boolean variable with Number value"
-toTerm (ExprN (MulN _ (ExprU (VarU _ _)) (ExprN (ValN _ _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add UInt variable with Number value"
-toTerm (ExprN (MulN _ (ExprN (VarN _ _)) (ExprB (ValB _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add Number variable with Boolean value"
-toTerm (ExprN (MulN _ (ExprB (VarB _)) (ExprB (ValB _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add Boolean variable with Boolean value"
-toTerm (ExprN (MulN _ (ExprU (VarU _ _)) (ExprB (ValB _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add UInt variable with Boolean value"
-toTerm (ExprN (MulN _ (ExprN (VarN _ _)) (ExprU (ValU _ _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add Number variable with UInt value"
-toTerm (ExprN (MulN _ (ExprB (VarB _)) (ExprU (ValU _ _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add Boolean variable with UInt value"
-toTerm (ExprN (MulN _ (ExprU (VarU _ _)) (ExprU (ValU _ _)) Empty)) =
-  error "[ panic ] toTerm: Exepcted Number, got UInt"
-toTerm (ExprN (MulN _ (ExprN (ValN _ n)) (ExprN (VarN _ var)) Empty)) =
-  return $ WithVars var n
-toTerm (ExprN (MulN _ (ExprN (ValN _ _)) (ExprB (VarB _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add Number value with Boolean variable"
-toTerm (ExprN (MulN _ (ExprN (ValN _ _)) (ExprU (VarU _ _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add Number value with UInt variable"
-toTerm (ExprN (MulN _ (ExprB (ValB _)) (ExprN (VarN _ _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add Boolean value with Number variable"
-toTerm (ExprN (MulN _ (ExprB (ValB _)) (ExprB (VarB _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add Boolean value with Boolean variable"
-toTerm (ExprN (MulN _ (ExprB (ValB _)) (ExprU (VarU _ _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add Boolean value with UInt variable"
-toTerm (ExprN (MulN _ (ExprU (ValU _ _)) (ExprN (VarN _ _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add UInt value with Number variable"
-toTerm (ExprN (MulN _ (ExprU (ValU _ _)) (ExprB (VarB _)) Empty)) =
-  error "[ panic ] toTerm: Trying to add UInt value with Boolean variable"
-toTerm (ExprN (MulN _ (ExprU (ValU _ _)) (ExprU (VarU _ _)) Empty)) =
-  error "[ panic ] toTerm: Exepcted Number, got UInt"
-toTerm (ExprN (MulN _ expr (ExprN (ValN _ n)) Empty)) = do
-  out <- freshVar
-  encode out expr
-  return $ WithVars out n
-toTerm (ExprN (MulN _ (ExprN (ValN _ n)) expr Empty)) = do
-  out <- freshVar
-  encode out expr
-  return $ WithVars out n
 toTerm (NAryOp _ MulU (ExprN (VarN _ _)) (ExprN (ValN _ _)) Empty) =
   error "[ panic ] toTerm: Exepcted UInt, got Number"
 toTerm (NAryOp _ MulU (ExprB (VarB _)) (ExprN (ValN _ _)) Empty) =
@@ -444,6 +406,27 @@ toTerm expr = do
   encode out expr
   return $ WithVars out 1
 
+toTermN :: (GaloisField n, Integral n) => ExprN n -> M n (Term n)
+toTermN (MulN _ (ValN _ m) (ValN _ n) Empty) = return $ Constant (m * n)
+toTermN (MulN _ (VarN _ var) (ValN _ n) Empty) = return $ WithVars var n
+toTermN (MulN _ (ValN _ n) (VarN _ var) Empty) = return $ WithVars var n
+toTermN (MulN _ (ValN _ n) expr Empty) = do
+  out <- freshVar
+  encodeExprN out expr
+  return $ WithVars out n
+toTermN (MulN _ expr (ValN _ n) Empty) = do
+  out <- freshVar
+  encodeExprN out expr
+  return $ WithVars out n
+toTermN (ValN _ n) =
+  return $ Constant n
+toTermN (VarN _ var) =
+  return $ WithVars var 1
+toTermN expr = do
+  out <- freshVar
+  encodeExprN out expr
+  return $ WithVars out 1
+
 -- | Negate a Term
 negateTerm :: Num n => Term n -> Term n
 negateTerm (WithVars var c) = WithVars var (negate c)
@@ -468,6 +451,19 @@ encodeAndFoldExprs f out x0 x1 xs = do
   x0' <- wireAsVar x0
   x1' <- wireAsVar x1
   vars <- mapM wireAsVar xs
+  go x0' x1' vars
+  where
+    go x y Empty = f out x y
+    go x y (v :<| vs) = do
+      out' <- freshVar
+      go out' v vs
+      f out' x y
+
+encodeAndFoldExprsN :: (GaloisField n, Integral n) => (Var -> Var -> Var -> M n ()) -> Var -> ExprN n -> ExprN n -> Seq (ExprN n) -> M n ()
+encodeAndFoldExprsN f out x0 x1 xs = do
+  x0' <- wireAsVar (ExprN x0)
+  x1' <- wireAsVar (ExprN x1)
+  vars <- mapM wireAsVar (fmap ExprN xs)
   go x0' x1' vars
   where
     go x y Empty = f out x y
@@ -525,10 +521,11 @@ encodeBinaryOp bw op out x y = case op of
     -- The encoding is: x*y + (1-x)*(1-y) = out.
     numBitWidth <- getNumberBitWidth
     encode out $
-      ExprN (VarN numBitWidth x)
-        * ExprN (VarN numBitWidth y)
-        + (ExprN (ValN numBitWidth 1) - ExprN (VarN numBitWidth x))
-        * (ExprN (ValN numBitWidth 1) - ExprN (VarN numBitWidth y))
+      ExprN $
+        VarN numBitWidth x
+          * VarN numBitWidth y
+          + (ValN numBitWidth 1 - VarN numBitWidth x)
+          * (ValN numBitWidth 1 - VarN numBitWidth y)
 
 --------------------------------------------------------------------------------
 
@@ -601,7 +598,7 @@ encodeUIntMul :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n 
 encodeUIntMul width out a b = do
   -- rawProduct = a * b
   rawProduct <- freshVar
-  encode rawProduct $ ExprN (VarN width a) * ExprN (VarN width b)
+  encode rawProduct $ ExprN $ VarN width a * VarN width b
   -- result = rawProduct - 2ⁿ * quotient
   quotient <- freshVar
   add $ cadd 0 [(out, 1), (rawProduct, -1), (quotient, 2 ^ width)]

@@ -91,8 +91,8 @@ data ExprN n
   = ValN Width n
   | VarN Width Var
   | SubN Width (ExprN n) (ExprN n)
-  | AddN Width (Expr n) (Expr n) (Seq (Expr n))
-  | MulN Width (Expr n) (Expr n) (Seq (Expr n))
+  | AddN Width (ExprN n) (ExprN n) (Seq (ExprN n))
+  | MulN Width (ExprN n) (ExprN n) (Seq (ExprN n))
   deriving (Functor)
 
 instance (Show n, Integral n) => Show (ExprN n) where
@@ -132,10 +132,10 @@ data Expr n
   | If BitWidth (Expr n) (Expr n) (Expr n)
   deriving (Functor)
 
-instance Num n => Num (Expr n) where
-  x + y = ExprN (AddN (getWidth (bitWidthOf x)) x y Empty)
-  x - y = ExprN (SubN (getWidth (bitWidthOf x)) (narrowDownToExprN x) (narrowDownToExprN y))
-  x * y = ExprN (MulN (getWidth (bitWidthOf x)) x y Empty)
+instance Num n => Num (ExprN n) where
+  x + y = AddN (widthOfN x) x y Empty
+  x - y = SubN (widthOfN x) x y
+  x * y = MulN (widthOfN x) x y Empty
   abs = id
   signum = const 1
   fromInteger = error "[ panic ] Dunno how to convert an Integer to a untyped expression"
@@ -180,24 +180,24 @@ sizeOfExpr expr = case expr of
      in sum (fmap sizeOfExpr operands) + (length operands - 1)
   Div _ x0 x1 -> sizeOfExpr x0 + sizeOfExpr x1 + 1
   If _ x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
-  where
-    sizeOfExprN :: ExprN n -> Int
-    sizeOfExprN xs = case xs of
-      ValN _ _ -> 1
-      VarN _ _ -> 1
-      SubN _ x0 x1 -> sizeOfExprN x0 + sizeOfExprN x1 + 1
-      AddN _ x0 x1 xs' ->
-        let operands = x0 :<| x1 :<| xs'
-         in sum (fmap sizeOfExpr operands) + (length operands - 1)
-      MulN _ x0 x1 xs' ->
-        let operands = x0 :<| x1 :<| xs'
-         in sum (fmap sizeOfExpr operands) + (length operands - 1)
 
-    sizeOfExprU :: ExprU n -> Int
-    sizeOfExprU xs = case xs of
-      ValU _ _ -> 1
-      VarU _ _ -> 1
-      SubU _ x0 x1 -> sizeOfExprU x0 + sizeOfExprU x1 + 1
+sizeOfExprN :: ExprN n -> Int
+sizeOfExprN xs = case xs of
+  ValN _ _ -> 1
+  VarN _ _ -> 1
+  SubN _ x0 x1 -> sizeOfExprN x0 + sizeOfExprN x1 + 1
+  AddN _ x0 x1 xs' ->
+    let operands = x0 :<| x1 :<| xs'
+     in sum (fmap sizeOfExprN operands) + (length operands - 1)
+  MulN _ x0 x1 xs' ->
+    let operands = x0 :<| x1 :<| xs'
+     in sum (fmap sizeOfExprN operands) + (length operands - 1)
+
+sizeOfExprU :: ExprU n -> Int
+sizeOfExprU xs = case xs of
+  ValU _ _ -> 1
+  VarU _ _ -> 1
+  SubU _ x0 x1 -> sizeOfExprU x0 + sizeOfExprU x1 + 1
 
 bitWidthOf :: Expr n -> BitWidth
 bitWidthOf expr = case expr of
@@ -216,6 +216,14 @@ bitWidthOf expr = case expr of
   NAryOp bw _ _ _ _ -> bw
   Div bw _ _ -> bw
   If bw _ _ _ -> bw
+
+widthOfN :: ExprN n -> Width
+widthOfN expr = case expr of
+  ValN w _ -> w
+  VarN w _ -> w
+  SubN w _ _ -> w
+  AddN w _ _ _ -> w
+  MulN w _ _ _ -> w
 
 castToNumber :: Width -> Expr n -> Expr n
 castToNumber width expr = case expr of

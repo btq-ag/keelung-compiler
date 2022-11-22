@@ -425,19 +425,19 @@ chainExprsOfAssocOpAddN w x y = case (x, y) of
   (AddN _ x0 x1 xs, AddN _ y0 y1 ys) ->
     AddN w x0 x1 (xs <> (y0 :<| y1 :<| ys))
   (AddN _ x0 x1 xs, _) ->
-    AddN w x0 x1 (xs |> ExprN y)
+    AddN w x0 x1 (xs |> y)
   (_, AddN _ y0 y1 ys) ->
-    AddN w (ExprN x) y0 (y1 :<| ys)
+    AddN w x y0 (y1 :<| ys)
   -- there's nothing left we can do
-  _ -> AddN w (ExprN x) (ExprN y) mempty
+  _ -> AddN w x y mempty
 
 chainExprsOfAssocOpMulN :: Width -> ExprN n -> ExprN n -> ExprN n
 chainExprsOfAssocOpMulN w x y = case (x, y) of
   (MulN _ x0 x1 xs, MulN _ y0 y1 ys) ->
     MulN w x0 x1 (xs <> (y0 :<| y1 :<| ys))
   (MulN _ x0 x1 xs, _) ->
-    MulN w x0 x1 (xs |> ExprN y)
+    MulN w x0 x1 (xs |> y)
   (_, MulN _ y0 y1 ys) ->
-    MulN w (ExprN x) y0 (y1 :<| ys)
+    MulN w x y0 (y1 :<| ys)
   -- there's nothing left we can do
-  _ -> MulN w (ExprN x) (ExprN y) mempty
+  _ -> MulN w x y mempty

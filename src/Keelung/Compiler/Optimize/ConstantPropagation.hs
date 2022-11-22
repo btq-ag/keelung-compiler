@@ -88,8 +88,8 @@ propagateConstant relations = propagate
         Nothing -> e
         Just val -> ValN w val
       SubN w x y -> SubN w (propagateN x) (propagateN y)
-      AddN w x y xs -> AddN w (propagate x) (propagate y) (fmap propagate xs)
-      MulN w x y xs -> MulN w (propagate x) (propagate y) (fmap propagate xs)
+      AddN w x y xs -> AddN w (propagateN x) (propagateN y) (fmap propagateN xs)
+      MulN w x y xs -> MulN w (propagateN x) (propagateN y) (fmap propagateN xs)
 
     propagateU e = case e of
       ValU _ _ -> e
