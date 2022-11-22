@@ -154,6 +154,30 @@ encodeExprB :: (GaloisField n, Integral n) => Var -> ExprB n -> M n ()
 encodeExprB out expr = case expr of
   ValB val -> add $ cadd val [(out, -1)] -- out = val
   VarB var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  AndB x0 x1 xs -> do
+    a <- wireAsVar (ExprB x0)
+    b <- wireAsVar (ExprB x1)
+    vars <- mapM (wireAsVar . ExprB) xs
+    case vars of
+      Empty -> add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar out))] -- out = a * b
+      (c :<| Empty) -> do
+        aAndb <- freshVar
+        add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar aAndb))] -- x = a * b
+        add [CMul (Poly.singleVar aAndb) (Poly.singleVar c) (Right (Poly.singleVar out))] -- out = x * c
+      _ -> do
+        -- the number of operands
+        let n = 2 + fromIntegral (length vars)
+        -- polynomial = n - sum of operands
+        let polynomial = case Poly.buildMaybe n (IntMap.fromList ((a, -1) : (b, -1) : [(v, -1) | v <- toList vars])) of
+              Just p -> p
+              Nothing -> error "encode: And: impossible"
+        -- if the answer is 1 then all operands must be 1
+        --    (n - sum of operands) * out = 0
+        add [CMul polynomial (Poly.singleVar out) (Left 0)]
+        -- if the answer is 0 then not all operands must be 1:
+        --    (n - sum of operands) * inv = 1 - out
+        inv <- freshVar
+        add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
 
 encodeExprN :: (GaloisField n, Integral n) => Var -> ExprN n -> M n ()
 encodeExprN out expr = case expr of

@@ -101,13 +101,17 @@ propagateConstant relations = propagate
       AddU w x y -> AddU w (propagateU x) (propagateU y)
       MulU w x y -> MulU w (propagateU x) (propagateU y)
 
+    propagateB e = case e of
+      ValB _ -> e
+      VarB var -> case lookupB var (valueBindings relations) of
+        Nothing -> e
+        Just val -> ValB val
+      AndB x y xs -> AndB (propagateB x) (propagateB y) (fmap propagateB xs)
+
     propagate e = case e of
       ExprN x -> ExprN (propagateN x)
       ExprU x -> ExprU (propagateU x)
-      ExprB (ValB _) -> e
-      ExprB (VarB var) -> case lookupB var (valueBindings relations) of
-        Nothing -> e
-        Just val -> ExprB (ValB val)
+      ExprB x -> ExprB (propagateB x)
       Rotate w n x -> Rotate w n (propagate x)
       NAryOp w op x y es -> NAryOp w op (propagate x) (propagate y) (fmap propagate es)
       If w p x y -> If w (propagate p) (propagate x) (propagate y)

@@ -43,11 +43,7 @@ import Keelung.Types (Var)
 
 -- N-ary operators
 data Op
-  = --   AddU
-
-    -- | MulU
-    -- |
-    And
+  = And
   | Or
   | Xor
   | NEq
@@ -79,13 +75,15 @@ getWidth (BWArray ns n) = n * getWidth ns
 data ExprB n
   = ValB n
   | VarB Var
+  | AndB (ExprB n) (ExprB n) (Seq (ExprB n))
   deriving (Functor)
 
 instance (Integral n, Show n) => Show (ExprB n) where
-  showsPrec _prec expr = case expr of
+  showsPrec prec expr = case expr of
     ValB 0 -> showString "F"
     ValB _ -> showString "T"
     VarB var -> showString "$" . shows var
+    AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
 
 --------------------------------------------------------------------------------
 
@@ -173,15 +171,21 @@ instance (Integral n, Show n) => Show (Expr n) where
 sizeOfExpr :: Expr n -> Int
 sizeOfExpr expr = case expr of
   ExprN x -> sizeOfExprN x
-  ExprB x -> case x of
-    ValB _ -> 1
-    VarB _ -> 1
+  ExprB x -> sizeOfExprB x
   ExprU x -> sizeOfExprU x
   Rotate _ _ x -> 1 + sizeOfExpr x
   NAryOp _ _ x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
      in sum (fmap sizeOfExpr operands) + (length operands - 1)
   If _ x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
+
+sizeOfExprB :: ExprB n -> Int
+sizeOfExprB expr = case expr of
+  ValB _ -> 1
+  VarB _ -> 1
+  AndB x0 x1 xs ->
+    let operands = x0 :<| x1 :<| xs
+     in sum (fmap sizeOfExprB operands) + (length operands - 1)
 
 sizeOfExprN :: ExprN n -> Int
 sizeOfExprN xs = case xs of
@@ -236,6 +240,7 @@ castToNumber width expr = case expr of
   ExprB x -> case x of
     ValB val -> ExprN (ValN width val)
     VarB var -> ExprN (VarN width var)
+    AndB {} -> error "[ panic ] castToNumber: AndB"
   ExprN x -> case x of
     ValN _ val -> ExprN (ValN width val)
     VarN _ var -> ExprN (VarN width var)

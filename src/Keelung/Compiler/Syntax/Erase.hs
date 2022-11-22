@@ -372,8 +372,7 @@ bitValue expr i = case expr of
   ExprU (SubU {}) -> error "Panic: trying to access the bit value of a compound expression"
   ExprU (AddU {}) -> error "Panic: trying to access the bit value of a compound expression"
   ExprU (MulU {}) -> error "Panic: trying to access the bit value of a compound expression"
-  ExprB (ValB n) -> return $ ExprB (ValB n)
-  ExprB (VarB var) -> return $ ExprB (VarB var)
+  ExprB _ -> return expr 
   Rotate w n x -> do
     -- rotate the bit value
     -- if the index 'i' overflows or underflows, wrap it around
