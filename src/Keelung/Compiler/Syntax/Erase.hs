@@ -384,7 +384,13 @@ eraseExpr expr = case expr of
   T.Eq x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprsOfAssocOp Eq (head xs) (head ys)]
+    let (bw, x') = head xs
+    let (_, y') = head ys
+    case bw of
+      BWNumber _ -> return [(bw, ExprB $ EqN (narrowDownToExprN x') (narrowDownToExprN y'))]
+      BWUInt _ -> return [(bw, ExprB $ EqU (narrowDownToExprU x') (narrowDownToExprU y'))]
+      BWBoolean -> return [(bw, ExprB $ EqB (narrowDownToExprB x') (narrowDownToExprB y'))]
+      _ -> error "[ panic ] T.Eq on wrong type of data"
   T.And x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y

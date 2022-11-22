@@ -118,6 +118,9 @@ propagateConstant relations = propagate
       NEqB x y -> NEqB (propagateB x) (propagateB y)
       NEqN x y -> NEqN (propagateN x) (propagateN y)
       NEqU x y -> NEqU (propagateU x) (propagateU y)
+      EqB x y -> EqB (propagateB x) (propagateB y)
+      EqN x y -> EqN (propagateN x) (propagateN y)
+      EqU x y -> EqU (propagateU x) (propagateU y)
 
     propagate e = case e of
       ExprN x -> ExprN (propagateN x)

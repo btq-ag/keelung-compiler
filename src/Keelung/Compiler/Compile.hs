@@ -225,6 +225,15 @@ encodeExprB out expr = case expr of
     x' <- wireAsVar (ExprU x)
     y' <- wireAsVar (ExprU y)
     encodeEquality False out x' y'
+  EqB x y -> encodeExprB out (XorB (ValB 1) (XorB x y))
+  EqN x y -> do
+    x' <- wireAsVar (ExprN x)
+    y' <- wireAsVar (ExprN y)
+    encodeEquality True out x' y'
+  EqU x y -> do
+    x' <- wireAsVar (ExprU x)
+    y' <- wireAsVar (ExprU y)
+    encodeEquality True out x' y'
 
 encodeExprN :: (GaloisField n, Integral n) => Var -> ExprN n -> M n ()
 encodeExprN out expr = case expr of
@@ -465,7 +474,6 @@ wireAsVar expr = do
 -- | Encode the constraint 'x op y = out'.
 encodeBinaryOp :: (GaloisField n, Integral n) => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
-  Eq -> encodeEquality True out x y
   BEq -> do
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.
     -- The encoding is: x*y + (1-x)*(1-y) = out.

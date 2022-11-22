@@ -44,8 +44,7 @@ import Keelung.Types (Var)
 
 -- N-ary operators
 data Op
-  = Eq
-  | BEq
+  = BEq
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -81,6 +80,9 @@ data ExprB n
     NEqB (ExprB n) (ExprB n)
   | NEqN (ExprN n) (ExprN n)
   | NEqU (ExprU n) (ExprU n)
+  | EqB (ExprB n) (ExprB n)
+  | EqN (ExprN n) (ExprN n)
+  | EqU (ExprU n) (ExprU n)
   deriving (Functor)
 
 instance (Integral n, Show n) => Show (ExprB n) where
@@ -95,7 +97,9 @@ instance (Integral n, Show n) => Show (ExprB n) where
     NEqB x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
     NEqN x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
     NEqU x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
-    
+    EqB x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
+    EqN x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
+    EqU x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
 
 --------------------------------------------------------------------------------
 
@@ -192,7 +196,6 @@ instance (Integral n, Show n) => Show (Expr n) where
     ExprU x -> shows x
     Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
     NAryOp _ op x0 x1 xs -> case op of
-      Eq -> chain prec " == " 5 $ x0 :<| x1 :<| xs
       BEq -> chain prec " == " 5 $ x0 :<| x1 :<| xs
 
 -- | Calculate the "size" of an expression for benchmarking
@@ -221,6 +224,9 @@ sizeOfExprB expr = case expr of
   NEqB x y -> 1 + sizeOfExprB x + sizeOfExprB y
   NEqN x y -> 1 + sizeOfExprN x + sizeOfExprN y
   NEqU x y -> 1 + sizeOfExprU x + sizeOfExprU y
+  EqB x y -> 1 + sizeOfExprB x + sizeOfExprB y
+  EqN x y -> 1 + sizeOfExprN x + sizeOfExprN y
+  EqU x y -> 1 + sizeOfExprU x + sizeOfExprU y
 
 sizeOfExprN :: ExprN n -> Int
 sizeOfExprN xs = case xs of
@@ -292,6 +298,9 @@ castToNumber width expr = case expr of
     NEqB {} -> error "[ panic ] castToNumber: NEqB"
     NEqN {} -> error "[ panic ] castToNumber: NEqN"
     NEqU {} -> error "[ panic ] castToNumber: NEqU"
+    EqB {} -> error "[ panic ] castToNumber: EqB"
+    EqN {} -> error "[ panic ] castToNumber: EqN"
+    EqU {} -> error "[ panic ] castToNumber: EqU"
   ExprN x -> case x of
     ValN _ val -> ExprN (ValN width val)
     VarN _ var -> ExprN (VarN width var)
