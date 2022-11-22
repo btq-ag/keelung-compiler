@@ -308,7 +308,7 @@ eraseExpr expr = case expr of
     ys <- eraseExpr y
     let (bw, x') = head xs
     let (_, y') = head ys
-    return [(bw, Div bw x' y')]
+    return [(bw, ExprN $ DivN (getWidth bw) (narrowDownToExprN x') (narrowDownToExprN y'))]
   T.Eq x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
@@ -379,7 +379,6 @@ bitValue expr i = case expr of
     -- if the index 'i' overflows or underflows, wrap it around
     let i' = n + i `mod` getWidth w
     bitValue x i'
-  Div {} -> error "Panic: trying to access the bit value of a compound expression"
   NAryOp _ And x y rest ->
     NAryOp BWBoolean And
       <$> bitValue x i

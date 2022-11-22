@@ -170,6 +170,10 @@ encodeExprN out expr = case expr of
     x' <- wireAsVar (ExprN x)
     y' <- wireAsVar (ExprN y)
     add [CMul (Poly.singleVar x') (Poly.singleVar y') (Right $ Poly.singleVar out)]
+  DivN _ x y -> do
+    x' <- wireAsVar (ExprN x)
+    y' <- wireAsVar (ExprN y)
+    add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
 
 encodeExprU :: (GaloisField n, Integral n) => Var -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
@@ -194,7 +198,7 @@ encode out expr = case expr of
   ExprU x -> encodeExprU out x
   -- operators
   Rotate _ n x -> encodeRotate out n x
-  NAryOp bw op x y rest ->
+  NAryOp _ op x y rest ->
     case op of
       And -> do
         a <- wireAsVar x
@@ -255,10 +259,6 @@ encode out expr = case expr of
                   Empty
               )
       _ -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
-  Div _ x y -> do
-    x' <- wireAsVar x
-    y' <- wireAsVar y
-    add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
   If _ b x y -> do
     b' <- wireAsVar b
     -- treating these variables like they are Numbers
@@ -286,6 +286,7 @@ encodeRotate out i expr = case expr of
       encode result expr
       addRotatedBinRep out w result i
     MulN {} -> error "[ panic ] dunno how to compile ROTATE MulN"
+    DivN {} -> error "[ panic ] dunno how to compile ROTATE DivN"
   ExprU x -> case x of
     ValU w n -> do
       n' <- rotateField w n
@@ -298,7 +299,6 @@ encodeRotate out i expr = case expr of
       addRotatedBinRep out w result i
     _ -> error "[ panic ] dunno how to compile ROTATE on UInt types"
   Rotate _ n x -> encodeRotate out (i + n) x
-  Div {} -> error "[ panic ] dunno how to compile ROTATE Div"
   NAryOp _ op _ _ _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
   If {} -> error "[ panic ] dunno how to compile ROTATE If"
   where

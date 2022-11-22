@@ -90,6 +90,7 @@ propagateConstant relations = propagate
       SubN w x y -> SubN w (propagateN x) (propagateN y)
       AddN w x y xs -> AddN w (propagateN x) (propagateN y) (fmap propagateN xs)
       MulN w x y -> MulN w (propagateN x) (propagateN y)
+      DivN w x y -> DivN w (propagateN x) (propagateN y)
 
     propagateU e = case e of
       ValU _ _ -> e
@@ -109,5 +110,4 @@ propagateConstant relations = propagate
         Just val -> ExprB (ValB val)
       Rotate w n x -> Rotate w n (propagate x)
       NAryOp w op x y es -> NAryOp w op (propagate x) (propagate y) (fmap propagate es)
-      Div w x y -> Div w (propagate x) (propagate y)
       If w p x y -> If w (propagate p) (propagate x) (propagate y)
