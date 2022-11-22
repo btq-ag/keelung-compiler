@@ -163,6 +163,9 @@ encodeExprN out expr = case expr of
     x' <- toTerm (ExprN x)
     y' <- toTerm (ExprN y)
     encodeTerms out (x' :<| negateTerm y' :<| Empty)
+  AddN _ x y rest -> do
+    terms <- mapM toTerm (x :<| y :<| rest)
+    encodeTerms out terms
 
 encodeExprU :: (GaloisField n, Integral n) => Var -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
@@ -180,14 +183,6 @@ encode out expr = case expr of
   Rotate _ n x -> encodeRotate out n x
   NAryOp bw op x y rest ->
     case op of
-      AddN -> case bw of
-        BWNumber _ -> do
-          terms <- mapM toTerm (x :<| y :<| rest)
-          encodeTerms out terms
-        BWUInt _ -> error "[ panic ] AddN on UInt"
-        BWBoolean -> error "[ panic ] Addition on Booleans"
-        BWUnit -> error "[ panic ] Addition on Units"
-        BWArray _ _ -> error "[ panic ] Addition on Arrays"
       AddU -> case bw of
         BWNumber _ -> error "[ panic ] AddU on Number"
         BWUInt n -> encodeAndFoldExprsBinRep (encodeUIntAdd n) n out x y rest
@@ -242,12 +237,13 @@ encode out expr = case expr of
                   (BWNumber numBitWidth)
                   NEq
                   (ExprN (ValN numBitWidth 0))
-                  ( NAryOp
-                      (BWNumber numBitWidth)
-                      AddN
-                      (castToNumber numBitWidth x)
-                      (castToNumber numBitWidth y)
-                      (fmap (castToNumber numBitWidth) rest)
+                  ( ExprN
+                      ( AddN
+                          numBitWidth
+                          (castToNumber numBitWidth x)
+                          (castToNumber numBitWidth y)
+                          (fmap (castToNumber numBitWidth) rest)
+                      )
                   )
                   Empty
               )
@@ -277,6 +273,10 @@ encodeRotate out i expr = case expr of
       encode out (ExprN (ValN w n'))
     VarN w var -> addRotatedBinRep out w var i
     SubN {} -> error "[ panic ] dunno how to compile ROTATE SubN"
+    AddN w _ _ _-> do
+      result <- freshVar
+      encode result expr
+      addRotatedBinRep out w result i
   ExprU x -> case x of
     ValU w n -> do
       n' <- rotateField w n
@@ -286,10 +286,6 @@ encodeRotate out i expr = case expr of
   Rotate _ n x -> encodeRotate out (i + n) x
   Div {} -> error "[ panic ] dunno how to compile ROTATE Div"
   NAryOp bw op _ _ _ -> case op of
-    AddN -> do
-      result <- freshVar
-      encode result expr
-      addRotatedBinRep out (getWidth bw) result i
     AddU -> do
       result <- freshVar
       encode result expr
@@ -463,7 +459,6 @@ wireAsVar expr = do
 -- | Encode the constraint 'x op y = out'.
 encodeBinaryOp :: (GaloisField n, Integral n) => BitWidth -> Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp bw op out x y = case op of
-  AddN -> error "encodeBinaryOp: AddN"
   AddU -> error "encodeBinaryOp: AddU"
   Mul -> case bw of
     BWNumber _ -> add [CMul (Poly.singleVar x) (Poly.singleVar y) (Right $ Poly.singleVar out)]

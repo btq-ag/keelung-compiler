@@ -43,8 +43,7 @@ import Keelung.Types (Var)
 
 -- N-ary operators
 data Op
-  = AddN
-  | AddU
+  = AddU
   | Mul
   | And
   | Or
@@ -92,13 +91,15 @@ data ExprN n
   = ValN Width n
   | VarN Width Var
   | SubN Width (ExprN n) (ExprN n)
+  | AddN Width (Expr n) (Expr n) (Seq (Expr n))
   deriving (Functor)
 
-instance Show n => Show (ExprN n) where
+instance (Show n, Integral n) => Show (ExprN n) where
   showsPrec prec expr = case expr of
     ValN _ n -> shows n
     VarN _ var -> showString "$" . shows var
     SubN _ x0 x1 -> chain prec " - " 6 $ x0 :<| x1 :<| Empty
+    AddN _ x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
 
 --------------------------------------------------------------------------------
 
@@ -130,7 +131,7 @@ data Expr n
   deriving (Functor)
 
 instance Num n => Num (Expr n) where
-  x + y = NAryOp (bitWidthOf x) AddN x y Empty
+  x + y = ExprN (AddN (getWidth (bitWidthOf x)) x y Empty)
   x - y = ExprN (SubN (getWidth (bitWidthOf x)) (narrowDownToExprN x) (narrowDownToExprN y))
   x * y = NAryOp (bitWidthOf x) Mul x y Empty
   abs = id
@@ -152,7 +153,6 @@ instance (Integral n, Show n) => Show (Expr n) where
     ExprU x -> shows x
     Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
     NAryOp _ op x0 x1 xs -> case op of
-      AddN -> chain prec " + " 6 $ x0 :<| x1 :<| xs
       AddU -> chain prec " + " 6 $ x0 :<| x1 :<| xs
       Mul -> chain prec " * " 7 $ x0 :<| x1 :<| xs
       And -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
@@ -184,6 +184,9 @@ sizeOfExpr expr = case expr of
       ValN _ _ -> 1
       VarN _ _ -> 1
       SubN _ x0 x1 -> sizeOfExprN x0 + sizeOfExprN x1 + 1
+      AddN _ x0 x1 xs' ->
+        let operands = x0 :<| x1 :<| xs'
+         in sum (fmap sizeOfExpr operands) + (length operands - 1)
 
     sizeOfExprU :: ExprU n -> Int
     sizeOfExprU xs = case xs of
@@ -198,6 +201,7 @@ bitWidthOf expr = case expr of
     ValN w _ -> BWNumber w
     VarN w _ -> BWNumber w
     SubN w _ _ -> BWNumber w
+    AddN w _ _ _ -> BWNumber w
   ExprU x -> case x of
     ValU w _ -> BWUInt w
     VarU w _ -> BWUInt w
@@ -216,6 +220,7 @@ castToNumber width expr = case expr of
     ValN _ val -> ExprN (ValN width val)
     VarN _ var -> ExprN (VarN width var)
     SubN _ a b -> ExprN (SubN width a b)
+    AddN _ a b xs -> ExprN (AddN width a b xs)
   ExprU x -> case x of
     ValU _ val -> ExprN (ValN width val)
     VarU _ var -> ExprN (VarN width var)

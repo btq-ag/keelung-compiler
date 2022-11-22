@@ -280,9 +280,10 @@ eraseExpr expr = case expr of
     xs <- eraseExpr x
     ys <- eraseExpr y
     let (bw, x') = head xs
+    let (_, y') = head ys
     case bw of
-      BWNumber _ -> return [chainExprsOfAssocOp AddN (bw, x') (head ys)]
-      BWUInt _ -> return [chainExprsOfAssocOp AddU (bw, x') (head ys)]
+      BWNumber w -> return [(bw, ExprN $ chainExprsOfAssocOpAddN w (narrowDownToExprN x') (narrowDownToExprN y'))]
+      BWUInt _ -> return [chainExprsOfAssocOp AddU (bw, x') (bw, y')]
       _ -> error "[ panic ] T.Add on wrong type of data"
   T.Sub x y -> do
     xs <- eraseExpr x
@@ -353,7 +354,7 @@ bitValue expr i = case expr of
     case lookupBinRepStart counters var of
       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
       Just start -> return $ ExprB $ VarB (start + i')
-  ExprN (SubN {}) -> error "Panic: trying to access the bit value of a compound expression"
+  ExprN _ -> error "Panic: trying to access the bit value of a compound expression"
   ExprU (ValU _ n) -> return $ ExprB (ValB (testBit n i))
   ExprU (VarU w var) -> do
     counters <- get
@@ -413,3 +414,14 @@ chainExprsOfAssocOp op (bw, x) (_, y) = case (x, y) of
       (bw, NAryOp w op x y0 (y1 :<| ys))
   -- there's nothing left we can do
   _ -> (bw, NAryOp bw op x y mempty)
+
+chainExprsOfAssocOpAddN :: Width -> ExprN n -> ExprN n -> ExprN n
+chainExprsOfAssocOpAddN w x y = case (x, y) of
+  (AddN _ x0 x1 xs, AddN _ y0 y1 ys) ->
+    AddN w x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (AddN _ x0 x1 xs, _) ->
+    AddN w x0 x1 (xs |> ExprN y)
+  (_, AddN _ y0 y1 ys) ->
+    AddN w (ExprN x) y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> AddN w (ExprN x) (ExprN y) mempty
