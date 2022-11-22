@@ -225,7 +225,25 @@ encodeExprB out expr = case expr of
     x' <- wireAsVar (ExprU x)
     y' <- wireAsVar (ExprU y)
     encodeEquality False out x' y'
-  EqB x y -> encodeExprB out (XorB (ValB 1) (XorB x y))
+  EqB x y -> do
+    x' <- wireAsVar (ExprB x)
+    y' <- wireAsVar (ExprB y)
+    -- Constraint 'x == y = out' ASSUMING x, y are boolean.
+    --     x * y + (1 - x) * (1 - y) = out
+    -- =>
+    --    (1 - x) * (1 - 2y) = (out - y)
+
+    -- (1 - x)
+    let polynomial1 = case Poly.buildEither 1 [(x', -1)] of
+          Left _ -> error "encode: EqB: impossible"
+          Right xs -> xs
+    -- (1 - 2y)
+    let polynomial2 = case Poly.buildEither 1 [(y', -2)] of
+          Left _ -> error "encode: EqB: impossible"
+          Right xs -> xs
+    -- (out - y)
+    let polynomial3 = Poly.buildEither 0 [(y', -1), (out, 1)]
+    add [CMul polynomial1 polynomial2 polynomial3]
   EqN x y -> do
     x' <- wireAsVar (ExprN x)
     y' <- wireAsVar (ExprN y)
@@ -291,7 +309,7 @@ encode out expr = case expr of
   ExprU x -> encodeExprU out x
   -- operators
   Rotate _ n x -> encodeRotate out n x
-  NAryOp _ op x y rest -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
+  -- NAryOp _ op x y rest -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
 
 --------------------------------------------------------------------------------
 
@@ -324,7 +342,7 @@ encodeRotate out i expr = case expr of
       addRotatedBinRep out w result i
     _ -> error "[ panic ] dunno how to compile ROTATE on UInt types"
   Rotate _ n x -> encodeRotate out (i + n) x
-  NAryOp _ op _ _ _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
+  -- NAryOp _ op _ _ _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
   where
     -- rotateField :: (GaloisField n, Integral n) => Width -> n -> M n ()
     rotateField width n = do
@@ -334,7 +352,7 @@ encodeRotate out i expr = case expr of
         EQ -> return n -- no rotation
         -- encode out expr -- no rotation
         LT -> do
-          let rotateDistance = (-i) `mod` width
+          let rotateDistance = (- i) `mod` width
           -- collect the bit values of lower bits that will be rotated to higher bits
           let lowerBits = [Data.Bits.testBit val j | j <- [0 .. rotateDistance - 1]]
           -- shift the higher bits left by the rotate distance
@@ -391,27 +409,6 @@ toTermN expr = do
   encodeExprN out expr
   return $ WithVars out 1
 
--- toTermU :: (GaloisField n, Integral n) => ExprU n -> M n (Term n)
--- toTermU (MulU _ (ValU _ m) (ValU _ n)) = return $ Constant (m * n)
--- toTermU (MulU _ (VarU _ var) (ValU _ n)) = return $ WithVars var n
--- toTermU (MulU _ (ValU _ n) (VarU _ var)) = return $ WithVars var n
--- toTermU (MulU _ (ValU _ n) expr) = do
---   out <- freshVar
---   encodeExprU out expr
---   return $ WithVars out n
--- toTermU (MulU _ expr (ValU _ n)) = do
---   out <- freshVar
---   encodeExprU out expr
---   return $ WithVars out n
--- toTermU (ValU _ n) =
---   return $ Constant n
--- toTermU (VarU _ var) =
---   return $ WithVars var 1
--- toTermU expr = do
---   out <- freshVar
---   encodeExprU out expr
---   return $ WithVars out 1
-
 -- | Negate a Term
 negateTerm :: Num n => Term n -> Term n
 negateTerm (WithVars var c) = WithVars var (negate c)
@@ -444,23 +441,6 @@ encodeAndFoldExprs f out x0 x1 xs = do
       go out' v vs
       f out' x y
 
--- | Like 'encodeAndFoldExprs' but allocates a BinRep for the result
--- encodeAndFoldExprsBinRep :: (GaloisField n, Integral n) => (Var -> Var -> Var -> M n ()) -> Int -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
--- encodeAndFoldExprsBinRep f width out x0 x1 xs = do
---   x0' <- wireAsVar x0
---   x1' <- wireAsVar x1
---   vars <- mapM wireAsVar xs
---   go x0' x1' vars
---   where
---     go x y Empty = do
---       freshBinRep out width
---       f out x y
---     go x y (v :<| vs) = do
---       out' <- freshVar
---       freshBinRep out' width
---       go out' v vs
---       f out' x y
-
 -- | If the expression is not already a variable, create a new variable
 wireAsVar :: (GaloisField n, Integral n) => Expr n -> M n Var
 wireAsVar (ExprB (VarB var)) = return var
@@ -470,20 +450,6 @@ wireAsVar expr = do
   out <- freshVar
   encode out expr
   return out
-
--- | Encode the constraint 'x op y = out'.
-encodeBinaryOp :: (GaloisField n, Integral n) => Op -> Var -> Var -> Var -> M n ()
-encodeBinaryOp op out x y = case op of
-  BEq -> do
-    -- Constraint 'x == y = out' ASSUMING x, y are boolean.
-    -- The encoding is: x*y + (1-x)*(1-y) = out.
-    numBitWidth <- getNumberBitWidth
-    encode out $
-      ExprN $
-        VarN numBitWidth x
-          * VarN numBitWidth y
-          + (ValN numBitWidth 1 - VarN numBitWidth x)
-          * (ValN numBitWidth 1 - VarN numBitWidth y)
 
 --------------------------------------------------------------------------------
 

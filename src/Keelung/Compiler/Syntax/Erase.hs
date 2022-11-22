@@ -425,7 +425,13 @@ eraseExpr expr = case expr of
   T.BEq x y -> do
     xs <- eraseExpr x
     ys <- eraseExpr y
-    return [chainExprsOfAssocOp BEq (head xs) (head ys)]
+    let (bw, x') = head xs
+    let (_, y') = head ys
+    case bw of
+      BWBoolean -> return [(bw, ExprB $ EqB (narrowDownToExprB x') (narrowDownToExprB y'))]
+      BWUInt _ -> return [(bw, ExprB $ EqU (narrowDownToExprU x') (narrowDownToExprU y'))]
+      BWNumber _ -> return [(bw, ExprB $ EqN (narrowDownToExprN x') (narrowDownToExprN y'))]
+      _ -> error "[ panic ] T.XOr on wrong type of data"
   T.If p x y -> do
     (_, p') <- head <$> eraseExpr p
     (bw, x') <- head <$> eraseExpr x
@@ -486,7 +492,6 @@ bitValue expr i = case expr of
     -- if the index 'i' overflows or underflows, wrap it around
     let i' = n + i `mod` getWidth w
     bitValue x i'
-  NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.Assignment ref expr) = do
@@ -494,24 +499,7 @@ eraseAssignment (T.Assignment ref expr) = do
   exprs <- eraseExpr expr
   return $ Assignment var (snd (head exprs))
 
--- Flatten and chain expressions with associative operator together when possible
-chainExprsOfAssocOp :: Op -> (BitWidth, Expr n) -> (BitWidth, Expr n) -> (BitWidth, Expr n)
-chainExprsOfAssocOp op (bw, x) (_, y) = case (x, y) of
-  (NAryOp w op1 x0 x1 xs, NAryOp _ op2 y0 y1 ys)
-    | op1 == op2 && op2 == op ->
-      -- chaining `op`, `op1`, and `op2`
-      (bw, NAryOp w op x0 x1 (xs <> (y0 :<| y1 :<| ys)))
-  (NAryOp w op1 x0 x1 xs, _)
-    | op1 == op ->
-      -- chaining `op` and `op1`
-      (bw, NAryOp w op x0 x1 (xs |> y))
-  (_, NAryOp w op2 y0 y1 ys)
-    | op2 == op ->
-      -- chaining `op` and `op2`
-      (bw, NAryOp w op x y0 (y1 :<| ys))
-  -- there's nothing left we can do
-  _ -> (bw, NAryOp bw op x y mempty)
-
+-- | Flatten and chain expressions with associative operator together when possible
 chainExprsOfAssocOpAddN :: Width -> ExprN n -> ExprN n -> ExprN n
 chainExprsOfAssocOpAddN w x y = case (x, y) of
   (AddN _ x0 x1 xs, AddN _ y0 y1 ys) ->

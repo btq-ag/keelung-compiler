@@ -3,8 +3,7 @@
 {-# LANGUAGE GADTs #-}
 
 module Keelung.Compiler.Syntax.Untyped
-  ( Op (..),
-    BitWidth (..),
+  ( BitWidth (..),
     Width,
     bitWidthOf,
     getWidth,
@@ -39,13 +38,6 @@ import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.VarCounters
 import Keelung.Types (Var)
-
---------------------------------------------------------------------------------
-
--- N-ary operators
-data Op
-  = BEq
-  deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 
@@ -169,8 +161,6 @@ data Expr n
   | ExprN (ExprN n) -- Field expression
   | ExprU (ExprU n) -- UInt expression
   | Rotate BitWidth Int (Expr n)
-  | -- N-Ary operators with >= 2 operands
-    NAryOp BitWidth Op (Expr n) (Expr n) (Seq (Expr n))
   deriving (Functor)
 
 instance Num n => Num (ExprN n) where
@@ -190,13 +180,11 @@ chain prec delim n = showParen (prec > n) . go
     go (x :<| xs') = showsPrec (succ n) x . showString delim . go xs'
 
 instance (Integral n, Show n) => Show (Expr n) where
-  showsPrec prec expr = case expr of
+  showsPrec _prec expr = case expr of
     ExprB x -> shows x
     ExprN x -> shows x
     ExprU x -> shows x
     Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
-    NAryOp _ op x0 x1 xs -> case op of
-      BEq -> chain prec " == " 5 $ x0 :<| x1 :<| xs
 
 -- | Calculate the "size" of an expression for benchmarking
 sizeOfExpr :: Expr n -> Int
@@ -205,9 +193,6 @@ sizeOfExpr expr = case expr of
   ExprB x -> sizeOfExprB x
   ExprU x -> sizeOfExprU x
   Rotate _ _ x -> 1 + sizeOfExpr x
-  NAryOp _ _ x0 x1 xs ->
-    let operands = x0 :<| x1 :<| xs
-     in sum (fmap sizeOfExpr operands) + (length operands - 1)
 
 sizeOfExprB :: ExprB n -> Int
 sizeOfExprB expr = case expr of
@@ -262,7 +247,6 @@ bitWidthOf expr = case expr of
   ExprN x -> BWNumber $ widthOfN x
   ExprU x -> BWUInt $ widthOfU x
   Rotate bw _ _ -> bw
-  NAryOp bw _ _ _ _ -> bw
 
 widthOfN :: ExprN n -> Width
 widthOfN expr = case expr of
@@ -325,7 +309,6 @@ castToNumber width expr = case expr of
     XorU {} -> error "[ panic ] castToNumber: XorU"
     IfU _ p a b -> ExprN (IfN width p (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
   Rotate _ n x -> Rotate (BWNumber width) n x
-  NAryOp _ op a b c -> NAryOp (BWNumber width) op a b c
 
 -- NOTE: temporary hack, should be removed
 narrowDownToExprN :: Expr n -> ExprN n
@@ -470,17 +453,6 @@ lookupB var (Bindings _ bs _) = IntMap.lookup var bs
 
 lookupU :: Width -> Var -> Bindings n -> Maybe n
 lookupU width var (Bindings _ _ us) = IntMap.lookup width us >>= IntMap.lookup var
-
--- data Mixed n = MixedN Var n | MixedB Var n | MixedU Width Var n
---   deriving (Eq, Ord, Show)
-
--- pairWithKey :: Bindings n -> Bindings (Mixed n)
--- pairWithKey (Bindings ns bs us) =
---   Bindings (IntMap.mapWithKey MixedN ns) (IntMap.mapWithKey MixedB bs) (IntMap.mapWithKey (IntMap.mapWithKey . MixedU) us)
-
--- stripKey :: Bindings (Mixed n) -> Bindings n
--- stripKey (Bindings ns bs us) =
---   Bindings (fmap (\(MixedN _ n) -> n) ns) (fmap (\(MixedB _ n) -> n) bs) (fmap (fmap (\(MixedU _ _ n) -> n)) us)
 
 --------------------------------------------------------------------------------
 

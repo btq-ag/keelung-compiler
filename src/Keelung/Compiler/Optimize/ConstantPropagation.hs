@@ -127,4 +127,4 @@ propagateConstant relations = propagate
       ExprU x -> ExprU (propagateU x)
       ExprB x -> ExprB (propagateB x)
       Rotate w n x -> Rotate w n (propagate x)
-      NAryOp w op x y es -> NAryOp w op (propagate x) (propagate y) (fmap propagate es)
+      -- NAryOp w op x y es -> NAryOp w op (propagate x) (propagate y) (fmap propagate es)
