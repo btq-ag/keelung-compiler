@@ -178,6 +178,11 @@ encodeExprB out expr = case expr of
         --    (n - sum of operands) * inv = 1 - out
         inv <- freshVar
         add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
+  IfB p x y -> do
+    p' <- wireAsVar (ExprB p)
+    x' <- wireAsVar (ExprB x)
+    y' <- wireAsVar (ExprB y)
+    encodeIf out p' x' y'
 
 encodeExprN :: (GaloisField n, Integral n) => Var -> ExprN n -> M n ()
 encodeExprN out expr = case expr of
@@ -198,6 +203,11 @@ encodeExprN out expr = case expr of
     x' <- wireAsVar (ExprN x)
     y' <- wireAsVar (ExprN y)
     add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
+  IfN _ p x y -> do
+    p' <- wireAsVar (ExprB p)
+    x' <- wireAsVar (ExprN x)
+    y' <- wireAsVar (ExprN y)
+    encodeIf out p' x' y'
 
 encodeExprU :: (GaloisField n, Integral n) => Var -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
@@ -214,6 +224,11 @@ encodeExprU out expr = case expr of
     freshBinRep out w
     encodeUIntMul w out x' y'
   AndU {} -> error "encodeExprU: AndU: not implemented"
+  IfU _ p x y -> do
+    p' <- wireAsVar (ExprB p)
+    x' <- wireAsVar (ExprU x)
+    y' <- wireAsVar (ExprU y)
+    encodeIf out p' x' y'
 
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
 encode out expr = case expr of
@@ -260,15 +275,6 @@ encode out expr = case expr of
                   Empty
               )
       _ -> encodeAndFoldExprs (encodeBinaryOp op) out x y rest
-  If _ b x y -> do
-    b' <- wireAsVar b
-    -- treating these variables like they are Numbers
-    numBitWidth <- getNumberBitWidth
-    -- out = b * x + (1 - b) * y
-    encode out $
-      ExprN $
-        VarN numBitWidth b' * narrowDownToExprN (castToNumber numBitWidth x)
-          + (ValN numBitWidth 1 - VarN numBitWidth b') * narrowDownToExprN (castToNumber numBitWidth y)
 
 --------------------------------------------------------------------------------
 
@@ -288,6 +294,7 @@ encodeRotate out i expr = case expr of
       addRotatedBinRep out w result i
     MulN {} -> error "[ panic ] dunno how to compile ROTATE MulN"
     DivN {} -> error "[ panic ] dunno how to compile ROTATE DivN"
+    IfN {} -> error "[ panic ] dunno how to compile ROTATE IfN"
   ExprU x -> case x of
     ValU w n -> do
       n' <- rotateField w n
@@ -301,7 +308,6 @@ encodeRotate out i expr = case expr of
     _ -> error "[ panic ] dunno how to compile ROTATE on UInt types"
   Rotate _ n x -> encodeRotate out (i + n) x
   NAryOp _ op _ _ _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
-  If {} -> error "[ panic ] dunno how to compile ROTATE If"
   where
     -- rotateField :: (GaloisField n, Integral n) => Width -> n -> M n ()
     rotateField width n = do
@@ -311,7 +317,7 @@ encodeRotate out i expr = case expr of
         EQ -> return n -- no rotation
         -- encode out expr -- no rotation
         LT -> do
-          let rotateDistance = (-i) `mod` width
+          let rotateDistance = (- i) `mod` width
           -- collect the bit values of lower bits that will be rotated to higher bits
           let lowerBits = [Data.Bits.testBit val j | j <- [0 .. rotateDistance - 1]]
           -- shift the higher bits left by the rotate distance
@@ -601,3 +607,18 @@ encodeUIntMul width out a b = do
   -- result = rawProduct - 2ⁿ * quotient
   quotient <- freshVar
   add $ cadd 0 [(out, 1), (rawProduct, -1), (quotient, 2 ^ width)]
+
+-- | An universal way of compiling a conditional
+encodeIf :: (GaloisField n, Integral n) => Var -> Var -> Var -> Var -> M n ()
+encodeIf out p x y = do
+  --  out = p * x + (1 - p) * y
+  --      =>
+  --  (out - x) = (1 - p) * (y - x)
+  let polynomial1 = case Poly.buildEither 1 [(p, -1)] of
+        Left _ -> error "encode: IfB: impossible"
+        Right xs -> xs
+  let polynomial2 = case Poly.buildEither 0 [(x, -1), (y, 1)] of
+        Left _ -> error "encode: IfB: impossible"
+        Right xs -> xs
+  let polynomial3 = Poly.buildEither 0 [(x, -1), (out, 1)]
+  add [CMul polynomial1 polynomial2 polynomial3]

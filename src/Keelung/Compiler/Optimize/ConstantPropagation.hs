@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Replace case with maybe" #-}
 module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 
@@ -91,6 +90,7 @@ propagateConstant relations = propagate
       AddN w x y xs -> AddN w (propagateN x) (propagateN y) (fmap propagateN xs)
       MulN w x y -> MulN w (propagateN x) (propagateN y)
       DivN w x y -> DivN w (propagateN x) (propagateN y)
+      IfN w p x y -> IfN w (propagateB p) (propagateN x) (propagateN y)
 
     propagateU e = case e of
       ValU _ _ -> e
@@ -101,6 +101,7 @@ propagateConstant relations = propagate
       AddU w x y -> AddU w (propagateU x) (propagateU y)
       MulU w x y -> MulU w (propagateU x) (propagateU y)
       AndU w x y xs -> AndU w (propagateU x) (propagateU y) (fmap propagateU xs)
+      IfU w p x y -> IfU w (propagateB p) (propagateU x) (propagateU y)
 
     propagateB e = case e of
       ValB _ -> e
@@ -108,6 +109,7 @@ propagateConstant relations = propagate
         Nothing -> e
         Just val -> ValB val
       AndB x y xs -> AndB (propagateB x) (propagateB y) (fmap propagateB xs)
+      IfB p x y -> IfB (propagateB p) (propagateB x) (propagateB y)
 
     propagate e = case e of
       ExprN x -> ExprN (propagateN x)
@@ -115,4 +117,3 @@ propagateConstant relations = propagate
       ExprB x -> ExprB (propagateB x)
       Rotate w n x -> Rotate w n (propagate x)
       NAryOp w op x y es -> NAryOp w op (propagate x) (propagate y) (fmap propagate es)
-      If w p x y -> If w (propagate p) (propagate x) (propagate y)

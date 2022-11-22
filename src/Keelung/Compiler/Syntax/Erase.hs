@@ -269,6 +269,80 @@ eraseRef2 ref = do
 --     value <- bitValue x' i
 --     return [(BWBoolean, narrowDownToExprN value)]
 
+
+-- eraseExprB :: (GaloisField n, Integral n) => T.Expr -> M n [ExprB n]
+-- eraseExprB expr = case expr of
+--   T.Val val -> eraseValB val
+--   T.Var ref -> pure <$> eraseRefN ref
+--   T.Array exprs -> do
+--     exprss <- mapM eraseExprN exprs
+--     return (concat exprss)
+--   T.Add x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     let (bw, x') = head xs
+--     case bw of
+--       BWNumber _ -> return [ second narrowDownToExprN (chainExprsOfAssocOp AddN (bw, x') (head ys))]
+--       BWUInt _ -> return [ second narrowDownToExprN (chainExprsOfAssocOp AddU (bw, x') (head ys))]
+--       _ -> error "[ panic ] T.Add on wrong type of data"
+--   T.Sub x y -> do
+--     xs <- eraseExprN x
+--     ys <- eraseExprN y
+--     let (bw, x') = head xs
+--     let (_, y') = head ys
+--     case bw of
+--       BWNumber _ -> return [(bw, SubN bw x' y')]
+--       _ -> error "[ panic ] T.Sub on wrong type of data"
+--   T.Mul x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [second narrowDownToExprN (chainExprsOfAssocOp Mul (head xs) (head ys))]
+--   T.Div x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     let (bw, x') = head xs
+--     let (_, y') = head ys
+--     return [(bw, narrowDownToExprN (Div bw x' y'))]
+--   T.Eq x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [second narrowDownToExprN (chainExprsOfAssocOp Eq (head xs) (head ys))]
+--   T.And x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [second narrowDownToExprN (chainExprsOfAssocOp And (head xs) (head ys))]
+--   T.Or x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [second narrowDownToExprN (chainExprsOfAssocOp Or (head xs) (head ys))]
+--   T.Xor x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [second narrowDownToExprN (chainExprsOfAssocOp Xor (head xs) (head ys))]
+--   T.RotateR n x -> do
+--     xs <- eraseExpr x
+--     let (bw, x') = head xs
+--     return [(bw, narrowDownToExprN (Rotate bw n x'))]
+--   T.BEq x y -> do
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     return [second narrowDownToExprN (chainExprsOfAssocOp BEq (head xs) (head ys))]
+--   T.If b x y -> do
+--     bs <- eraseExpr b
+--     xs <- eraseExpr x
+--     ys <- eraseExpr y
+--     let (bw, x') = head xs
+--     return [(bw, narrowDownToExprN (If bw (snd (head bs)) x' (snd (head ys))))]
+--   T.ToNum x -> do
+--     counters <- get
+--     let numWidth = getNumBitWidth counters
+--     fmap (\(_, e) -> (BWNumber numWidth, narrowDownToExprN e)) <$> eraseExpr x
+--   T.Bit x i -> do
+--     (_, x') <- head <$> eraseExpr x
+--     value <- bitValue x' i
+--     return [(BWBoolean, narrowDownToExprN value)]
+
+
 eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [(BitWidth, Expr n)]
 eraseExpr expr = case expr of
   T.Val val -> eraseVal val
@@ -338,12 +412,15 @@ eraseExpr expr = case expr of
     xs <- eraseExpr x
     ys <- eraseExpr y
     return [chainExprsOfAssocOp BEq (head xs) (head ys)]
-  T.If b x y -> do
-    bs <- eraseExpr b
-    xs <- eraseExpr x
-    ys <- eraseExpr y
-    let (bw, x') = head xs
-    return [(bw, If bw (snd (head bs)) x' (snd (head ys)))]
+  T.If p x y -> do 
+    (_, p') <- head <$> eraseExpr p
+    (bw, x') <- head <$> eraseExpr x
+    (_, y') <- head <$> eraseExpr y
+    case bw of 
+      BWBoolean -> return [(bw, ExprB $ IfB (narrowDownToExprB p') (narrowDownToExprB x') (narrowDownToExprB y'))]
+      BWNumber w -> return [(bw, ExprN $ IfN w (narrowDownToExprB p') (narrowDownToExprN x') (narrowDownToExprN y'))]
+      BWUInt w -> return [(bw, ExprU $ IfU w (narrowDownToExprB p') (narrowDownToExprU x') (narrowDownToExprU y'))]
+      _ -> error "[ panic ] T.If on wrong type of data"
   T.ToNum x -> do
     counters <- get
     let numWidth = getNumBitWidth counters
@@ -401,7 +478,6 @@ bitValue expr i = case expr of
               <*> mapM (\x' -> ExprB <$> bitValue x' i) rest
           )
   NAryOp {} -> error "Panic: trying to access the bit value of a compound expression"
-  If w p a b -> narrowDownToExprB <$> (If w p <$> (ExprB <$> bitValue a i) <*> (ExprB <$> bitValue b i))
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.Assignment ref expr) = do

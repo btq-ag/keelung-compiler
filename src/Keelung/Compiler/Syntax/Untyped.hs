@@ -77,6 +77,7 @@ data ExprB n
   | VarB Var
   | -- logical operators
     AndB (ExprB n) (ExprB n) (Seq (ExprB n))
+  | IfB (ExprB n) (ExprB n) (ExprB n)
   deriving (Functor)
 
 instance (Integral n, Show n) => Show (ExprB n) where
@@ -85,6 +86,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     ValB _ -> showString "T"
     VarB var -> showString "$" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
+    IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 --------------------------------------------------------------------------------
 
@@ -96,6 +98,8 @@ data ExprN n
   | AddN Width (ExprN n) (ExprN n) (Seq (ExprN n))
   | MulN Width (ExprN n) (ExprN n)
   | DivN Width (ExprN n) (ExprN n)
+  | -- logical operators
+    IfN Width (ExprB n) (ExprN n) (ExprN n)
   deriving (Functor)
 
 instance (Show n, Integral n) => Show (ExprN n) where
@@ -106,6 +110,7 @@ instance (Show n, Integral n) => Show (ExprN n) where
     AddN _ x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
     MulN _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
     DivN _ x y -> chain prec " / " 7 $ x :<| y :<| Empty
+    IfN _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 --------------------------------------------------------------------------------
 
@@ -118,9 +123,10 @@ data ExprU n
   | MulU Width (ExprU n) (ExprU n)
   | -- logical operators
     AndU Width (ExprU n) (ExprU n) (Seq (ExprU n))
+  | IfU Width (ExprB n) (ExprU n) (ExprU n)
   deriving (Functor)
 
-instance Show n => Show (ExprU n) where
+instance (Show n, Integral n) => Show (ExprU n) where
   showsPrec prec expr = case expr of
     ValU _ n -> shows n
     VarU _ var -> showString "$" . shows var
@@ -128,6 +134,15 @@ instance Show n => Show (ExprU n) where
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
     AndU _ x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
+    IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+
+instance Num n => Num (ExprU n) where
+  x + y = AddU (widthOfU x) x y
+  x - y = SubU (widthOfU x) x y
+  x * y = MulU (widthOfU x) x y
+  abs = id
+  signum = const 1
+  fromInteger = error "[ panic ] Dunno how to convert an Integer to an UInt"
 
 --------------------------------------------------------------------------------
 
@@ -139,7 +154,6 @@ data Expr n
   | Rotate BitWidth Int (Expr n)
   | -- N-Ary operators with >= 2 operands
     NAryOp BitWidth Op (Expr n) (Expr n) (Seq (Expr n))
-  | If BitWidth (Expr n) (Expr n) (Expr n)
   deriving (Functor)
 
 instance Num n => Num (ExprN n) where
@@ -148,7 +162,7 @@ instance Num n => Num (ExprN n) where
   x * y = MulN (widthOfN x) x y
   abs = id
   signum = const 1
-  fromInteger = error "[ panic ] Dunno how to convert an Integer to a untyped expression"
+  fromInteger = error "[ panic ] Dunno how to convert an Integer to a Number"
 
 chain :: Show n => Int -> String -> Int -> Seq n -> ShowS
 chain prec delim n = showParen (prec > n) . go
@@ -170,7 +184,6 @@ instance (Integral n, Show n) => Show (Expr n) where
       NEq -> chain prec " != " 5 $ x0 :<| x1 :<| xs
       Eq -> chain prec " == " 5 $ x0 :<| x1 :<| xs
       BEq -> chain prec " == " 5 $ x0 :<| x1 :<| xs
-    If _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 -- | Calculate the "size" of an expression for benchmarking
 sizeOfExpr :: Expr n -> Int
@@ -182,7 +195,6 @@ sizeOfExpr expr = case expr of
   NAryOp _ _ x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
      in sum (fmap sizeOfExpr operands) + (length operands - 1)
-  If _ x y z -> 1 + sizeOfExpr x + sizeOfExpr y + sizeOfExpr z
 
 sizeOfExprB :: ExprB n -> Int
 sizeOfExprB expr = case expr of
@@ -191,6 +203,7 @@ sizeOfExprB expr = case expr of
   AndB x0 x1 xs ->
     let operands = x0 :<| x1 :<| xs
      in sum (fmap sizeOfExprB operands) + (length operands - 1)
+  IfB x y z -> 1 + sizeOfExprB x + sizeOfExprB y + sizeOfExprB z
 
 sizeOfExprN :: ExprN n -> Int
 sizeOfExprN xs = case xs of
@@ -202,6 +215,7 @@ sizeOfExprN xs = case xs of
      in sum (fmap sizeOfExprN operands) + (length operands - 1)
   MulN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
   DivN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
+  IfN _ p x y -> 1 + sizeOfExprB p + sizeOfExprN x + sizeOfExprN y
 
 sizeOfExprU :: ExprU n -> Int
 sizeOfExprU xs = case xs of
@@ -213,27 +227,15 @@ sizeOfExprU xs = case xs of
   AndU _ x0 x1 xs' ->
     let operands = x0 :<| x1 :<| xs'
      in sum (fmap sizeOfExprU operands) + (length operands - 1)
+  IfU _ p x y -> 1 + sizeOfExprB p + sizeOfExprU x + sizeOfExprU y
 
 bitWidthOf :: Expr n -> BitWidth
 bitWidthOf expr = case expr of
   ExprB _ -> BWBoolean
-  ExprN x -> case x of
-    ValN w _ -> BWNumber w
-    VarN w _ -> BWNumber w
-    SubN w _ _ -> BWNumber w
-    AddN w _ _ _ -> BWNumber w
-    MulN w _ _ -> BWNumber w
-    DivN w _ _ -> BWNumber w
-  ExprU x -> case x of
-    ValU w _ -> BWUInt w
-    VarU w _ -> BWUInt w
-    SubU w _ _ -> BWUInt w
-    AddU w _ _ -> BWUInt w
-    MulU w _ _ -> BWUInt w
-    AndU w _ _ _ -> BWUInt w
+  ExprN x -> BWNumber $ widthOfN x
+  ExprU x -> BWUInt $ widthOfU x
   Rotate bw _ _ -> bw
   NAryOp bw _ _ _ _ -> bw
-  If bw _ _ _ -> bw
 
 widthOfN :: ExprN n -> Width
 widthOfN expr = case expr of
@@ -243,6 +245,17 @@ widthOfN expr = case expr of
   AddN w _ _ _ -> w
   MulN w _ _ -> w
   DivN w _ _ -> w
+  IfN w _ _ _ -> w
+
+widthOfU :: ExprU n -> Width
+widthOfU expr = case expr of
+  ValU w _ -> w
+  VarU w _ -> w
+  SubU w _ _ -> w
+  AddU w _ _ -> w
+  MulU w _ _ -> w
+  AndU w _ _ _ -> w
+  IfU w _ _ _ -> w
 
 castToNumber :: Width -> Expr n -> Expr n
 castToNumber width expr = case expr of
@@ -250,6 +263,7 @@ castToNumber width expr = case expr of
     ValB val -> ExprN (ValN width val)
     VarB var -> ExprN (VarN width var)
     AndB {} -> error "[ panic ] castToNumber: AndB"
+    IfB {} -> error "[ panic ] castToNumber: IfB"
   ExprN x -> case x of
     ValN _ val -> ExprN (ValN width val)
     VarN _ var -> ExprN (VarN width var)
@@ -257,6 +271,7 @@ castToNumber width expr = case expr of
     AddN _ a b xs -> ExprN (AddN width a b xs)
     MulN _ a b -> ExprN (MulN width a b)
     DivN _ a b -> ExprN (DivN width a b)
+    IfN _ p a b -> ExprN (IfN width p a b)
   ExprU x -> case x of
     ValU _ val -> ExprN (ValN width val)
     VarU _ var -> ExprN (VarN width var)
@@ -269,9 +284,9 @@ castToNumber width expr = case expr of
     AddU _ a b -> ExprN (AddN width (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)) Empty)
     MulU _ a b -> ExprN (MulN width (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
     AndU {} -> error "[ panic ] castToNumber: AndU"
+    IfU _ p a b -> ExprN (IfN width p (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
   Rotate _ n x -> Rotate (BWNumber width) n x
   NAryOp _ op a b c -> NAryOp (BWNumber width) op a b c
-  If _ p a b -> If (BWNumber width) p a b
 
 -- NOTE: temporary hack, should be removed
 narrowDownToExprN :: Expr n -> ExprN n
