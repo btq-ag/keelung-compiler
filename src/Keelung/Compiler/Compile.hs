@@ -159,11 +159,16 @@ encodeExprN :: (GaloisField n, Integral n) => Var -> ExprN n -> M n ()
 encodeExprN out expr = case expr of
   ValN _ val -> add $ cadd val [(out, -1)] -- out = val
   VarN _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  SubN _ x y -> do
+    x' <- toTerm (ExprN x)
+    y' <- toTerm (ExprN y)
+    encodeTerms out (x' :<| negateTerm y' :<| Empty)
 
 encodeExprU :: (GaloisField n, Integral n) => Var -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
   ValU _ val -> add $ cadd val [(out, -1)] -- out = val
   VarU _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  SubU w x y -> encodeAndFoldExprs (encodeUIntSub w) out (ExprU x) (ExprU y) mempty
 
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
 encode out expr = case expr of
@@ -247,16 +252,6 @@ encode out expr = case expr of
                   Empty
               )
       _ -> encodeAndFoldExprs (encodeBinaryOp bw op) out x y rest
-  Sub bw x y -> do
-    case bw of
-      BWNumber _ -> do
-        x' <- toTerm x
-        y' <- toTerm y
-        encodeTerms out (x' :<| negateTerm y' :<| Empty)
-      BWUInt n -> encodeAndFoldExprs (encodeUIntSub n) out x y mempty
-      BWBoolean -> error "[ panic ] Subtraction on Booleans"
-      BWUnit -> error "[ panic ] Addition on Units"
-      BWArray _ _ -> error "[ panic ] Addition on Arrays"
   Div _ x y -> do
     x' <- wireAsVar x
     y' <- wireAsVar y
@@ -281,13 +276,14 @@ encodeRotate out i expr = case expr of
       n' <- rotateField w n
       encode out (ExprN (ValN w n'))
     VarN w var -> addRotatedBinRep out w var i
+    SubN {} -> error "[ panic ] dunno how to compile ROTATE SubN"
   ExprU x -> case x of
     ValU w n -> do
       n' <- rotateField w n
       encode out (ExprU (ValU w n'))
     VarU w var -> addRotatedBinRep out w var i
+    SubU {} -> error "[ panic ] dunno how to compile ROTATE SubU"
   Rotate _ n x -> encodeRotate out (i + n) x
-  Sub {} -> error "[ panic ] dunno how to compile ROTATE Sub"
   Div {} -> error "[ panic ] dunno how to compile ROTATE Div"
   NAryOp bw op _ _ _ -> case op of
     AddN -> do

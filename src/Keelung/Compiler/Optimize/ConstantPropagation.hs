@@ -80,23 +80,30 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
 
 -- constant propogation
 propagateConstant :: (GaloisField n, Integral n) => Relations n -> Expr n -> Expr n
-propagateConstant relations = propogate
+propagateConstant relations = propagate
   where
-    propogate e = case e of
-      ExprN (ValN _ _) -> e
-      ExprN (VarN w var) -> case lookupN var (valueBindings relations) of
+    propagateN e = case e of
+      ValN _ _ -> e
+      VarN w var -> case lookupN var (valueBindings relations) of
         Nothing -> e
-        Just val -> ExprN (ValN w val)
-      ExprU (ValU _ _) -> e
-      ExprU (VarU w var) -> case lookupU w var (valueBindings relations) of
+        Just val -> ValN w val
+      SubN w x y -> SubN w (propagateN x) (propagateN y)
+
+    propagateU e = case e of
+      ValU _ _ -> e
+      VarU w var -> case lookupU w var (valueBindings relations) of
         Nothing -> e
-        Just val -> ExprU (ValU w val)
+        Just val -> ValU w val
+      SubU w x y -> SubU w (propagateU x) (propagateU y)
+
+    propagate e = case e of
+      ExprN x -> ExprN (propagateN x)
+      ExprU x -> ExprU (propagateU x)
       ExprB (ValB _) -> e
       ExprB (VarB var) -> case lookupB var (valueBindings relations) of
         Nothing -> e
         Just val -> ExprB (ValB val)
-      Rotate w n x -> Rotate w n (propogate x)
-      NAryOp w op x y es -> NAryOp w op (propogate x) (propogate y) (fmap propogate es)
-      Div w x y -> Div w (propogate x) (propogate y)
-      Sub w x y -> Sub w (propogate x) (propogate y)
-      If w p x y -> If w (propogate p) (propogate x) (propogate y)
+      Rotate w n x -> Rotate w n (propagate x)
+      NAryOp w op x y es -> NAryOp w op (propagate x) (propagate y) (fmap propagate es)
+      Div w x y -> Div w (propagate x) (propagate y)
+      If w p x y -> If w (propagate p) (propagate x) (propagate y)
