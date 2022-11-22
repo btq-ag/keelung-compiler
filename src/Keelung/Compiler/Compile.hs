@@ -196,23 +196,18 @@ encodeExprB out expr = case expr of
         --  =>  if the sum of operands is not 0 then 1 else 0
         --  =>  the sum of operands is not 0
         numBitWidth <- getNumberBitWidth
-        encode
+        encodeExprB
           out
-          ( NAryOp
-              (BWNumber numBitWidth)
-              NEq
-              (ExprN (ValN numBitWidth 0))
-              ( ExprN
-                  ( AddN
-                      numBitWidth
-                      ((narrowDownToExprN . castToNumber numBitWidth . ExprB) x0)
-                      ((narrowDownToExprN . castToNumber numBitWidth . ExprB) x1)
-                      (fmap (narrowDownToExprN . castToNumber numBitWidth . ExprB) xs)
-                  )
+          ( NEqN
+              (ValN numBitWidth 0)
+              ( AddN
+                  numBitWidth
+                  ((narrowDownToExprN . castToNumber numBitWidth . ExprB) x0)
+                  ((narrowDownToExprN . castToNumber numBitWidth . ExprB) x1)
+                  (fmap (narrowDownToExprN . castToNumber numBitWidth . ExprB) xs)
               )
-              Empty
           )
-  XorB x y -> do 
+  XorB x y -> do
     x' <- wireAsVar (ExprB x)
     y' <- wireAsVar (ExprB y)
     add [CXor x' y' out]
@@ -221,6 +216,15 @@ encodeExprB out expr = case expr of
     x' <- wireAsVar (ExprB x)
     y' <- wireAsVar (ExprB y)
     encodeIf out p' x' y'
+  NEqB x y -> encodeExprB out (XorB x y)
+  NEqN x y -> do
+    x' <- wireAsVar (ExprN x)
+    y' <- wireAsVar (ExprN y)
+    encodeEquality False out x' y'
+  NEqU x y -> do
+    x' <- wireAsVar (ExprU x)
+    y' <- wireAsVar (ExprU y)
+    encodeEquality False out x' y'
 
 encodeExprN :: (GaloisField n, Integral n) => Var -> ExprN n -> M n ()
 encodeExprN out expr = case expr of
@@ -461,7 +465,6 @@ wireAsVar expr = do
 -- | Encode the constraint 'x op y = out'.
 encodeBinaryOp :: (GaloisField n, Integral n) => Op -> Var -> Var -> Var -> M n ()
 encodeBinaryOp op out x y = case op of
-  NEq -> encodeEquality False out x y
   Eq -> encodeEquality True out x y
   BEq -> do
     -- Constraint 'x == y = out' ASSUMING x, y are boolean.

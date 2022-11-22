@@ -44,8 +44,7 @@ import Keelung.Types (Var)
 
 -- N-ary operators
 data Op
-  = NEq
-  | Eq
+  = Eq
   | BEq
   deriving (Eq, Show)
 
@@ -78,6 +77,10 @@ data ExprB n
   | OrB (ExprB n) (ExprB n) (Seq (ExprB n))
   | XorB (ExprB n) (ExprB n)
   | IfB (ExprB n) (ExprB n) (ExprB n)
+  | -- comparison operators
+    NEqB (ExprB n) (ExprB n)
+  | NEqN (ExprN n) (ExprN n)
+  | NEqU (ExprU n) (ExprU n)
   deriving (Functor)
 
 instance (Integral n, Show n) => Show (ExprB n) where
@@ -89,6 +92,10 @@ instance (Integral n, Show n) => Show (ExprB n) where
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    NEqB x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
+    NEqN x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
+    NEqU x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
+    
 
 --------------------------------------------------------------------------------
 
@@ -185,7 +192,6 @@ instance (Integral n, Show n) => Show (Expr n) where
     ExprU x -> shows x
     Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
     NAryOp _ op x0 x1 xs -> case op of
-      NEq -> chain prec " != " 5 $ x0 :<| x1 :<| xs
       Eq -> chain prec " == " 5 $ x0 :<| x1 :<| xs
       BEq -> chain prec " == " 5 $ x0 :<| x1 :<| xs
 
@@ -212,6 +218,9 @@ sizeOfExprB expr = case expr of
      in sum (fmap sizeOfExprB operands) + (length operands - 1)
   XorB x0 x1 -> 1 + sizeOfExprB x0 + sizeOfExprB x1
   IfB x y z -> 1 + sizeOfExprB x + sizeOfExprB y + sizeOfExprB z
+  NEqB x y -> 1 + sizeOfExprB x + sizeOfExprB y
+  NEqN x y -> 1 + sizeOfExprN x + sizeOfExprN y
+  NEqU x y -> 1 + sizeOfExprU x + sizeOfExprU y
 
 sizeOfExprN :: ExprN n -> Int
 sizeOfExprN xs = case xs of
@@ -280,6 +289,9 @@ castToNumber width expr = case expr of
     OrB {} -> error "[ panic ] castToNumber: OrB"
     XorB {} -> error "[ panic ] castToNumber: XorB"
     IfB {} -> error "[ panic ] castToNumber: IfB"
+    NEqB {} -> error "[ panic ] castToNumber: NEqB"
+    NEqN {} -> error "[ panic ] castToNumber: NEqN"
+    NEqU {} -> error "[ panic ] castToNumber: NEqU"
   ExprN x -> case x of
     ValN _ val -> ExprN (ValN width val)
     VarN _ var -> ExprN (VarN width var)

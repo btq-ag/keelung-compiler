@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 {-# HLINT ignore "Replace case with maybe" #-}
 module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 
@@ -114,6 +115,9 @@ propagateConstant relations = propagate
       OrB x y xs -> OrB (propagateB x) (propagateB y) (fmap propagateB xs)
       XorB x y -> XorB (propagateB x) (propagateB y)
       IfB p x y -> IfB (propagateB p) (propagateB x) (propagateB y)
+      NEqB x y -> NEqB (propagateB x) (propagateB y)
+      NEqN x y -> NEqN (propagateN x) (propagateN y)
+      NEqU x y -> NEqU (propagateU x) (propagateU y)
 
     propagate e = case e of
       ExprN x -> ExprN (propagateN x)
