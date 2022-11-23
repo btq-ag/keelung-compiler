@@ -141,6 +141,11 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
+    BitU _ x i -> do
+      xs <- interpret x
+      if testBit (toInteger (head xs)) i
+        then return [one]
+        else return [zero]
     LoopholeB x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret Number n where
@@ -183,33 +188,17 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
 instance (GaloisField n, Integral n) => Interpret Expr n where
   interpret expr = case expr of
     Unit -> return []
-    -- Var (VarN n) -> pure <$> lookupVar n
-    -- Var (InputVarN n) -> pure <$> lookupInputVarN n
-    -- Var (VarB n) -> pure <$> lookupVar n
-    -- Var (InputVarB n) -> pure <$> lookupInputVarB n
-    -- Var (VarU _ n) -> pure <$> lookupVar n
-    -- Var (InputVarU width n) -> pure <$> lookupInputVarU width n
     Boolean e -> interpret e
     Number e -> interpret e
     UInt e -> interpret e
     Array xs -> concat <$> mapM interpret xs
-    -- Eq x y -> do
-    --   x' <- interpret x
-    --   y' <- interpret y
-    --   interpret (x' == y')
-    -- Or x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
-    -- Xor x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
-    -- RotateR n x -> map (bitWiseRotateR n) <$> interpret x
-    -- BEq x y -> do
-    --   x' <- interpret x
-    --   y' <- interpret y
-    --   interpret (x' == y')
     ToNum x -> interpret x
-    Bit x i -> do
-      xs <- interpret x
-      if testBit (toInteger (head xs)) i
-        then return [one]
-        else return [zero]
+
+-- Bit x i -> do
+--   xs <- interpret x
+--   if testBit (toInteger (head xs)) i
+--     then return [one]
+--     else return [zero]
 
 --------------------------------------------------------------------------------
 
@@ -294,7 +283,6 @@ freeVars expr = case expr of
         (ns, bs, cs, os) = unzip4 $ toList $ fmap freeVars xs
      in (IntSet.unions ns, IntSet.unions bs, IntMap.unionsWith (<>) cs, IntSet.unions os)
   ToNum x -> freeVars x
-  Bit x _ -> freeVars x
 
 freeVarsB :: Boolean -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVarsB expr = case expr of
@@ -308,6 +296,7 @@ freeVarsB expr = case expr of
   EqB x y -> freeVarsB x <> freeVarsB y
   EqN x y -> freeVarsN x <> freeVarsN y
   EqU _ x y -> freeVarsU x <> freeVarsU y
+  BitU _ x _ -> freeVarsU x
   LoopholeB x -> freeVars x
 
 freeVarsN :: Number -> (IntSet, IntSet, IntMap IntSet, IntSet)

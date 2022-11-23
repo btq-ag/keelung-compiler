@@ -112,8 +112,6 @@ instance FreeVar Boolean where
     Boolean _ -> return mempty
     VarB var -> return $ IntSet.singleton var
     InputVarB _ -> return mempty
-    NumBit x _ -> freeVars x
-    UIntBit x _ -> freeVars x
     And x y -> (<>) <$> freeVars x <*> freeVars y
     Or x y -> (<>) <$> freeVars x <*> freeVars y
     Xor x y -> (<>) <$> freeVars x <*> freeVars y
@@ -121,6 +119,7 @@ instance FreeVar Boolean where
     EqN x y -> (<>) <$> freeVars x <*> freeVars y
     EqU x y -> (<>) <$> freeVars x <*> freeVars y
     IfB x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
+    BitU x _ -> freeVars x
 
 instance FreeVar (UInt w) where
   freeVars val = case val of
@@ -218,16 +217,6 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
     Boolean b -> interpret b
     VarB var -> pure <$> lookupVar var
     InputVarB var -> pure <$> lookupInputVarB var
-    NumBit x i -> do
-      xs <- interpret x
-      if testBit (toInteger (head xs)) i
-        then return [one]
-        else return [zero]
-    UIntBit x i -> do
-      xs <- interpret x
-      if testBit (toInteger (head xs)) i
-        then return [one]
-        else return [zero]
     And x y -> zipWith (*) <$> interpret x <*> interpret y
     Or x y -> zipWith (+) <$> interpret x <*> interpret y
     Xor x y -> zipWith (\x' y' -> x' + y' - 2 * (x' * y')) <$> interpret x <*> interpret y
@@ -248,6 +237,11 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
+    BitU x i -> do
+      xs <- interpret x
+      if testBit (toInteger (head xs)) i
+        then return [one]
+        else return [zero]
 
 instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
   interpret val = case val of

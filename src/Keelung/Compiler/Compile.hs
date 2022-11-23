@@ -253,6 +253,7 @@ encodeExprB out expr = case expr of
     x' <- wireAsVar (ExprU x)
     y' <- wireAsVar (ExprU y)
     encodeEquality True out x' y'
+  BitU x i -> error "[ panic ] Dunnot how to compile BitU"
 
 encodeExprN :: (GaloisField n, Integral n) => Var -> ExprN n -> M n ()
 encodeExprN out expr = case expr of

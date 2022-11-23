@@ -123,6 +123,7 @@ propagateConstant relations = propagate
       EqB x y -> EqB (propagateB x) (propagateB y)
       EqN x y -> EqN (propagateN x) (propagateN y)
       EqU x y -> EqU (propagateU x) (propagateU y)
+      BitU x i -> BitU (propagateU x) i
 
     propagate e = case e of
       ExprN x -> ExprN (propagateN x)

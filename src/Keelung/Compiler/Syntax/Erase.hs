@@ -115,6 +115,7 @@ eraseExprB expr = do
     T.EqB x y -> EqB <$> eraseExprB x <*> eraseExprB y
     T.EqN x y -> EqN <$> eraseExprN x <*> eraseExprN y
     T.EqU _ x y -> EqU <$> eraseExprU x <*> eraseExprU y
+    T.BitU _ x i -> BitU <$> eraseExprU x <*> pure i
     T.LoopholeB x -> narrowDownToExprB . head <$> eraseExpr x
 
 eraseExprN :: (GaloisField n, Integral n) => T.Number -> M n (ExprN n)
@@ -175,10 +176,10 @@ eraseExpr expr = case expr of
     counters <- get
     let numWidth = getNumBitWidth counters
     fmap (castToNumber numWidth) <$> eraseExpr x
-  T.Bit x i -> do
-    x' <- head <$> eraseExpr x
-    value <- bitValue x' i
-    return [ExprB value]
+  -- T.Bit x i -> do
+  --   x' <- head <$> eraseExpr x
+  --   value <- bitValue x' i
+  --   return [ExprB value]
 
 bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (ExprB n)
 bitValue expr i = case expr of

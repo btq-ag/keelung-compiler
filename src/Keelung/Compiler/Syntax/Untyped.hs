@@ -57,6 +57,7 @@ data ExprB n
   | EqB (ExprB n) (ExprB n)
   | EqN (ExprN n) (ExprN n)
   | EqU (ExprU n) (ExprU n)
+  | BitU (ExprU n) Int
   deriving (Functor)
 
 instance (Integral n, Show n) => Show (ExprB n) where
@@ -74,6 +75,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     EqB x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
     EqN x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
     EqU x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
+    BitU x i -> showsPrec prec x . showString "[" . shows i . showString "]"
 
 --------------------------------------------------------------------------------
 
@@ -257,16 +259,7 @@ castToNumber width expr = case expr of
   ExprB x -> case x of
     ValB val -> ExprN (ValN width val)
     VarB var -> ExprN (VarN width var)
-    AndB {} -> error "[ panic ] castToNumber: AndB"
-    OrB {} -> error "[ panic ] castToNumber: OrB"
-    XorB {} -> error "[ panic ] castToNumber: XorB"
-    IfB {} -> error "[ panic ] castToNumber: IfB"
-    NEqB {} -> error "[ panic ] castToNumber: NEqB"
-    NEqN {} -> error "[ panic ] castToNumber: NEqN"
-    NEqU {} -> error "[ panic ] castToNumber: NEqU"
-    EqB {} -> error "[ panic ] castToNumber: EqB"
-    EqN {} -> error "[ panic ] castToNumber: EqN"
-    EqU {} -> error "[ panic ] castToNumber: EqU"
+    _ -> error "[ panic ] castToNumber"
   ExprN x -> case x of
     ValN _ val -> ExprN (ValN width val)
     VarN _ var -> ExprN (VarN width var)
