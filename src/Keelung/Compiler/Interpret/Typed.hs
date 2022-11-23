@@ -106,13 +106,24 @@ instance GaloisField n => Interpret Bool n where
 instance GaloisField n => Interpret Val n where
   interpret (Integer n) = return [fromIntegral n]
   interpret (Rational n) = return [fromRational n]
-  interpret (Unsigned _ n) = return [fromIntegral n]
-  interpret (Boolean b) = interpret b
+  -- interpret (Unsigned _ n) = return [fromIntegral n]
+  -- interpret (Boolean b) = interpret b
   interpret Unit = return []
+
+instance (GaloisField n, Integral n) => Interpret Boolean n where
+  interpret expr = case expr of
+    ValB b -> interpret b
+    AndB x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
+    OrB x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
+    XorB x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
+    LoopholeB x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret UInt n where
   interpret expr = case expr of
     ValU _ n -> return [fromIntegral n]
+    AndU _ x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
+    OrU _ x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
+    XorU _ x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     NotU _ x -> map bitWiseNot <$> interpret x
     LoopholeU _ x -> interpret x
 
@@ -126,6 +137,7 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     Var (VarU _ n) -> pure <$> lookupVar n
     Var (InputVarU width n) -> pure <$> lookupInputVarU width n
     UInt e -> interpret e
+    Boolean e -> interpret e
     Array xs -> concat <$> mapM interpret xs
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
@@ -135,9 +147,8 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
-    And x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
-    Or x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
-    Xor x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
+    -- Or x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
+    -- Xor x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     RotateR n x -> map (bitWiseRotateR n) <$> interpret x
     BEq x y -> do
       x' <- interpret x
@@ -235,6 +246,7 @@ freeVars expr = case expr of
   Var (VarU _ n) -> (mempty, mempty, mempty, IntSet.singleton n)
   Var (InputVarU w n) -> (mempty, mempty, IntMap.singleton w (IntSet.singleton n), mempty)
   UInt e -> freeVarsU e
+  Boolean e -> freeVarsB e
   Array xs ->
     let unzip4 = foldr (\(u, y, z, w) (us, ys, zs, ws) -> (u : us, y : ys, z : zs, w : ws)) mempty
         (ns, bs, cs, os) = unzip4 $ toList $ fmap freeVars xs
@@ -244,9 +256,8 @@ freeVars expr = case expr of
   Mul x y -> freeVars x <> freeVars y
   Div x y -> freeVars x <> freeVars y
   Eq x y -> freeVars x <> freeVars y
-  And x y -> freeVars x <> freeVars y
-  Or x y -> freeVars x <> freeVars y
-  Xor x y -> freeVars x <> freeVars y
+  -- Or x y -> freeVars x <> freeVars y
+  -- Xor x y -> freeVars x <> freeVars y
   RotateR _ x -> freeVars x
   BEq x y -> freeVars x <> freeVars y
   If x y z -> freeVars x <> freeVars y <> freeVars z
@@ -256,8 +267,19 @@ freeVars expr = case expr of
 freeVarsU :: UInt -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVarsU expr = case expr of
   ValU _ _ -> mempty
+  AndU _ x y -> freeVarsU x <> freeVarsU y
+  OrU _ x y -> freeVarsU x <> freeVarsU y
+  XorU _ x y -> freeVarsU x <> freeVarsU y
   NotU _ x -> freeVarsU x
   LoopholeU _ x -> freeVars x
+
+freeVarsB :: Boolean -> (IntSet, IntSet, IntMap IntSet, IntSet)
+freeVarsB expr = case expr of
+  ValB _ -> mempty
+  AndB x y -> freeVarsB x <> freeVarsB y
+  OrB x y -> freeVarsB x <> freeVarsB y
+  XorB x y -> freeVarsB x <> freeVarsB y
+  LoopholeB x -> freeVars x
 
 --------------------------------------------------------------------------------
 

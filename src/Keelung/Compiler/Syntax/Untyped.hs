@@ -11,6 +11,7 @@ module Keelung.Compiler.Syntax.Untyped
     narrowDownToExprN,
     narrowDownToExprU,
     narrowDownToExprB,
+    widthOfU,
     Expr (..),
     ExprB (..),
     ExprN (..),
