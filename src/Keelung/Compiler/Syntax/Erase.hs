@@ -341,9 +341,22 @@ eraseRef2 ref = do
 --     value <- bitValue x' i
 --     return [(BWBoolean, narrowDownToExprN value)]
 
+eraseExprU :: (GaloisField n, Integral n) => T.UInt -> M n [(BitWidth, ExprU n)]
+eraseExprU expr = case expr of
+  T.ValU w n -> return [(BWUInt w, ValU w (fromIntegral n))]
+  T.NotU w x -> do
+    (bw, x') <- head <$> eraseExprU x
+    return [(bw, NotU w x')]
+  T.LoopholeU _ x -> do
+    (bw, x') <- head <$> eraseExpr x
+    return [(bw, narrowDownToExprU x')]
+
 eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [(BitWidth, Expr n)]
 eraseExpr expr = case expr of
   T.Val val -> eraseVal val
+  T.UInt x -> do
+    (bw, x') <- head <$> eraseExprU x
+    return [(bw, ExprU x')]
   T.Var ref -> pure <$> eraseRef3 ref
   T.Array exprs -> do
     exprss <- mapM eraseExpr exprs
@@ -449,11 +462,12 @@ eraseExpr expr = case expr of
     (_, x') <- head <$> eraseExpr x
     value <- bitValue x' i
     return [(BWBoolean, ExprB value)]
-  T.NotU x -> do
-    (bw, x') <- head <$> eraseExpr x
-    case bw of
-      BWUInt w -> return [(bw, ExprU $ NotU w (narrowDownToExprU x'))]
-      _ -> error "[ panic ] T.NotU on wrong type of data"
+
+-- T.NotU w x -> do
+--   (bw, x') <- head <$> eraseExpr x
+--   case bw of
+--     BWUInt w -> return [(bw, ExprU $ NotU w (narrowDownToExprU x'))]
+--     _ -> error "[ panic ] T.NotU on wrong type of data"
 
 bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (ExprB n)
 bitValue expr i = case expr of

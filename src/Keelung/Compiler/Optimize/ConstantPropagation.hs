@@ -104,6 +104,7 @@ propagateConstant relations = propagate
       AndU w x y xs -> AndU w (propagateU x) (propagateU y) (fmap propagateU xs)
       OrU w x y xs -> OrU w (propagateU x) (propagateU y) (fmap propagateU xs)
       XorU w x y -> XorU w (propagateU x) (propagateU y)
+      NotU w x -> NotU w (propagateU x)
       IfU w p x y -> IfU w (propagateB p) (propagateU x) (propagateU y)
 
     propagateB e = case e of

@@ -110,6 +110,12 @@ instance GaloisField n => Interpret Val n where
   interpret (Boolean b) = interpret b
   interpret Unit = return []
 
+instance (GaloisField n, Integral n) => Interpret UInt n where
+  interpret expr = case expr of
+    ValU _ n -> return [fromIntegral n]
+    NotU _ x -> map bitWiseNot <$> interpret x
+    LoopholeU _ x -> interpret x
+
 instance (GaloisField n, Integral n) => Interpret Expr n where
   interpret expr = case expr of
     Val val -> interpret val
@@ -119,6 +125,7 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     Var (InputVarB n) -> pure <$> lookupInputVarB n
     Var (VarU _ n) -> pure <$> lookupVar n
     Var (InputVarU width n) -> pure <$> lookupInputVarU width n
+    UInt e -> interpret e
     Array xs -> concat <$> mapM interpret xs
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
@@ -216,7 +223,7 @@ freeIntermediateVarsOfElab (Elaborated value context) =
 -- | Collect variables of an expression and group them into sets of:
 --    1. Number input variables
 --    2. Boolean input variables
---    3. Custom input variables
+--    3. UInt input variables
 --    4. intermediate variables
 freeVars :: Expr -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVars expr = case expr of
@@ -227,6 +234,7 @@ freeVars expr = case expr of
   Var (InputVarB n) -> (mempty, IntSet.singleton n, mempty, mempty)
   Var (VarU _ n) -> (mempty, mempty, mempty, IntSet.singleton n)
   Var (InputVarU w n) -> (mempty, mempty, IntMap.singleton w (IntSet.singleton n), mempty)
+  UInt e -> freeVarsU e
   Array xs ->
     let unzip4 = foldr (\(u, y, z, w) (us, ys, zs, ws) -> (u : us, y : ys, z : zs, w : ws)) mempty
         (ns, bs, cs, os) = unzip4 $ toList $ fmap freeVars xs
@@ -244,6 +252,12 @@ freeVars expr = case expr of
   If x y z -> freeVars x <> freeVars y <> freeVars z
   ToNum x -> freeVars x
   Bit x _ -> freeVars x
+
+freeVarsU :: UInt -> (IntSet, IntSet, IntMap IntSet, IntSet)
+freeVarsU expr = case expr of
+  ValU _ _ -> mempty
+  NotU _ x -> freeVarsU x
+  LoopholeU _ x -> freeVars x
 
 --------------------------------------------------------------------------------
 
@@ -296,6 +310,9 @@ bitWiseOr x y = fromInteger $ (Data.Bits..|.) (toInteger x) (toInteger y)
 
 bitWiseXor :: (GaloisField n, Integral n) => n -> n -> n
 bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)
+
+bitWiseNot :: (GaloisField n, Integral n) => n -> n
+bitWiseNot x = fromInteger $ Data.Bits.complement (toInteger x)
 
 bitWiseRotateR :: (GaloisField n, Integral n) => Int -> n -> n
 bitWiseRotateR n x = fromInteger $ Data.Bits.rotateR (toInteger x) n

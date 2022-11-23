@@ -296,6 +296,7 @@ encodeExprU out expr = case expr of
   AndU {} -> error "encodeExprU: AndU: not implemented"
   OrU {} -> error "encodeExprU: OrU: not implemented"
   XorU {} -> error "encodeExprU: XorB: not implemented"
+  NotU {} -> error "encodeExprU: NotU: not implemented"
   IfU _ p x y -> do
     p' <- wireAsVar (ExprB p)
     x' <- wireAsVar (ExprU x)
