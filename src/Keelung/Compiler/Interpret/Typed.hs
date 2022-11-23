@@ -103,46 +103,64 @@ instance GaloisField n => Interpret Bool n where
   interpret True = return [one]
   interpret False = return [zero]
 
-instance GaloisField n => Interpret Val n where
-  interpret (Integer n) = return [fromIntegral n]
-  interpret (Rational n) = return [fromRational n]
-  -- interpret (Unsigned _ n) = return [fromIntegral n]
-  -- interpret (Boolean b) = interpret b
-  interpret Unit = return []
-
 instance (GaloisField n, Integral n) => Interpret Boolean n where
   interpret expr = case expr of
     ValB b -> interpret b
     AndB x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     OrB x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorB x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
+    IfB p x y -> do
+      p' <- interpret p
+      case p' of
+        [0] -> interpret y
+        _ -> interpret x
     LoopholeB x -> interpret x
+
+instance (GaloisField n, Integral n) => Interpret Number n where
+  interpret expr = case expr of
+    ValN n -> return [fromIntegral n]
+    ValNR n -> return [fromRational n]
+    AddN x y -> zipWith (+) <$> interpret x <*> interpret y
+    SubN x y -> zipWith (-) <$> interpret x <*> interpret y
+    MulN x y -> zipWith (*) <$> interpret x <*> interpret y
+    DivN x y -> zipWith (/) <$> interpret x <*> interpret y
+    IfN p x y -> do
+      p' <- interpret p
+      case p' of
+        [0] -> interpret y
+        _ -> interpret x
+    LoopholeN x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret UInt n where
   interpret expr = case expr of
     ValU _ n -> return [fromIntegral n]
+    AddU _ x y -> zipWith (+) <$> interpret x <*> interpret y
+    SubU _ x y -> zipWith (-) <$> interpret x <*> interpret y
+    MulU _ x y -> zipWith (*) <$> interpret x <*> interpret y
     AndU _ x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     OrU _ x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorU _ x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     NotU _ x -> map bitWiseNot <$> interpret x
+    IfU _ p x y -> do
+      p' <- interpret p
+      case p' of
+        [0] -> interpret y
+        _ -> interpret x
     LoopholeU _ x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret Expr n where
   interpret expr = case expr of
-    Val val -> interpret val
+    Unit -> return []
     Var (VarN n) -> pure <$> lookupVar n
     Var (InputVarN n) -> pure <$> lookupInputVarN n
     Var (VarB n) -> pure <$> lookupVar n
     Var (InputVarB n) -> pure <$> lookupInputVarB n
     Var (VarU _ n) -> pure <$> lookupVar n
     Var (InputVarU width n) -> pure <$> lookupInputVarU width n
-    UInt e -> interpret e
     Boolean e -> interpret e
+    Number e -> interpret e
+    UInt e -> interpret e
     Array xs -> concat <$> mapM interpret xs
-    Add x y -> zipWith (+) <$> interpret x <*> interpret y
-    Sub x y -> zipWith (-) <$> interpret x <*> interpret y
-    Mul x y -> zipWith (*) <$> interpret x <*> interpret y
-    Div x y -> zipWith (/) <$> interpret x <*> interpret y
     Eq x y -> do
       x' <- interpret x
       y' <- interpret y
@@ -154,11 +172,6 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
-    If b x y -> do
-      b' <- interpret b
-      case b' of
-        [0] -> interpret y
-        _ -> interpret x
     ToNum x -> interpret x
     Bit x i -> do
       xs <- interpret x
@@ -238,40 +251,28 @@ freeIntermediateVarsOfElab (Elaborated value context) =
 --    4. intermediate variables
 freeVars :: Expr -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVars expr = case expr of
-  Val _ -> mempty
+  Unit -> (mempty, mempty, mempty, mempty)
   Var (VarN n) -> (mempty, mempty, mempty, IntSet.singleton n)
   Var (InputVarN n) -> (IntSet.singleton n, mempty, mempty, mempty)
   Var (VarB n) -> (mempty, mempty, mempty, IntSet.singleton n)
   Var (InputVarB n) -> (mempty, IntSet.singleton n, mempty, mempty)
   Var (VarU _ n) -> (mempty, mempty, mempty, IntSet.singleton n)
   Var (InputVarU w n) -> (mempty, mempty, IntMap.singleton w (IntSet.singleton n), mempty)
-  UInt e -> freeVarsU e
   Boolean e -> freeVarsB e
+  Number e -> freeVarsN e
+  UInt e -> freeVarsU e
   Array xs ->
     let unzip4 = foldr (\(u, y, z, w) (us, ys, zs, ws) -> (u : us, y : ys, z : zs, w : ws)) mempty
         (ns, bs, cs, os) = unzip4 $ toList $ fmap freeVars xs
      in (IntSet.unions ns, IntSet.unions bs, IntMap.unionsWith (<>) cs, IntSet.unions os)
-  Add x y -> freeVars x <> freeVars y
-  Sub x y -> freeVars x <> freeVars y
-  Mul x y -> freeVars x <> freeVars y
-  Div x y -> freeVars x <> freeVars y
   Eq x y -> freeVars x <> freeVars y
   -- Or x y -> freeVars x <> freeVars y
   -- Xor x y -> freeVars x <> freeVars y
   RotateR _ x -> freeVars x
   BEq x y -> freeVars x <> freeVars y
-  If x y z -> freeVars x <> freeVars y <> freeVars z
+  -- If x y z -> freeVars x <> freeVars y <> freeVars z
   ToNum x -> freeVars x
   Bit x _ -> freeVars x
-
-freeVarsU :: UInt -> (IntSet, IntSet, IntMap IntSet, IntSet)
-freeVarsU expr = case expr of
-  ValU _ _ -> mempty
-  AndU _ x y -> freeVarsU x <> freeVarsU y
-  OrU _ x y -> freeVarsU x <> freeVarsU y
-  XorU _ x y -> freeVarsU x <> freeVarsU y
-  NotU _ x -> freeVarsU x
-  LoopholeU _ x -> freeVars x
 
 freeVarsB :: Boolean -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVarsB expr = case expr of
@@ -279,7 +280,32 @@ freeVarsB expr = case expr of
   AndB x y -> freeVarsB x <> freeVarsB y
   OrB x y -> freeVarsB x <> freeVarsB y
   XorB x y -> freeVarsB x <> freeVarsB y
+  IfB p x y -> freeVarsB p <> freeVarsB x <> freeVarsB y
   LoopholeB x -> freeVars x
+
+freeVarsN :: Number -> (IntSet, IntSet, IntMap IntSet, IntSet)
+freeVarsN expr = case expr of
+  ValN _ -> mempty
+  ValNR _ -> mempty
+  AddN x y -> freeVarsN x <> freeVarsN y
+  SubN x y -> freeVarsN x <> freeVarsN y
+  MulN x y -> freeVarsN x <> freeVarsN y
+  DivN x y -> freeVarsN x <> freeVarsN y
+  IfN p x y -> freeVarsB p <> freeVarsN x <> freeVarsN y
+  LoopholeN x -> freeVars x
+
+freeVarsU :: UInt -> (IntSet, IntSet, IntMap IntSet, IntSet)
+freeVarsU expr = case expr of
+  ValU _ _ -> mempty
+  AddU _ x y -> freeVarsU x <> freeVarsU y
+  SubU _ x y -> freeVarsU x <> freeVarsU y
+  MulU _ x y -> freeVarsU x <> freeVarsU y
+  AndU _ x y -> freeVarsU x <> freeVarsU y
+  OrU _ x y -> freeVarsU x <> freeVarsU y
+  XorU _ x y -> freeVarsU x <> freeVarsU y
+  NotU _ x -> freeVarsU x
+  IfU _ p x y -> freeVarsB p <> freeVarsU x <> freeVarsU y
+  LoopholeU _ x -> freeVars x
 
 --------------------------------------------------------------------------------
 

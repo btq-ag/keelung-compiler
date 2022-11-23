@@ -73,7 +73,7 @@ main = hspec $ do
         `shouldBe` Left
           ( InterpretError $
               InterpretAssertionError
-                (C.Eq (C.Var (C.InputVarN 0)) (C.Val (C.Integer 3)))
+                (C.Eq (C.Var (C.InputVarN 0)) (C.Number (C.ValN 3)))
                 [("$N0", 0)]
           )
     it "assert success" $
