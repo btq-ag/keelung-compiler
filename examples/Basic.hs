@@ -21,16 +21,16 @@ import qualified Keelung.Compiler as Compiler
 
 assertToBe42 :: Comp ()
 assertToBe42 = do
-  x <- input
-  assert $ x `Eq` 42
+  x <- inputNum
+  assert $ x `eq` 42
 
 -- | A program that expects the second input to be the square of the first input
 -- This program returns no output
 assertSquare :: Comp ()
 assertSquare = do
-  x <- input
+  x <- inputNum
   y <- input
-  assert ((x * x) `Eq` y)
+  assert ((x * x) `eq` y)
 
 constant1 :: Comp Number
 constant1 =
@@ -44,19 +44,19 @@ identityB = input
 
 add3 :: Comp Number
 add3 = do
-  x <- input
+  x <- inputNum
   return $ x + 3
 
 -- takes an input and see if its equal to 3
 eq1 :: Comp Boolean
 eq1 = do
-  x <- input
-  return $ x `Eq` 3
+  x <- inputNum
+  return $ x `eq` 3
 
 cond' :: Comp Number
 cond' = do
-  x <- input
-  return $ cond (x `Eq` 3) 12 789
+  x <- inputNum
+  return $ cond (x `eq` 3) 12 789
 
 summation :: Comp Number
 summation = do
@@ -67,32 +67,32 @@ summation = do
 
 summation2 :: Comp ()
 summation2 = do
-  arr <- inputs 4
+  arr <- inputs 4 :: Comp (Arr Number)
   sumA <- reduce 0 [0 .. 3] $ \accum i -> do
     let x = access arr i
     return $ accum + x
   sumB <- reduce 0 [3, 2, 1, 0] $ \accum i -> do
     let x = access arr i
     return $ accum + x
-  assert $ sumA `Eq` sumB
+  assert $ sumA `eq` sumB
 
 assertArraysEqual :: Comp ()
 assertArraysEqual = do
-  arrA <- inputs 4
+  arrA <- inputs 4 :: Comp (Arr Number)
   arrB <- inputs 4
   forM_ [0 .. 3] $ \i -> do
     let x = access arrA i
     let y = access arrB i
-    assert $ x `Eq` y
+    assert $ x `eq` y
 
 assertArraysEqual2 :: Comp ()
 assertArraysEqual2 = do
-  arr <- inputs2 2 4
+  arr <- inputs2 2 4 :: Comp (Arr (Arr Number))
   forM_ [0 .. 1] $ \i ->
     forM_ [0 .. 3] $ \j -> do
       let x = access2 arr (i, j)
       let y = access2 arr (i, j)
-      assert $ x `Eq` y
+      assert $ x `eq` y
 
 every :: Comp Boolean
 every = do
@@ -102,29 +102,29 @@ every = do
 assert1 :: Comp Number
 assert1 = do
   x <- input
-  assert (x `Eq` 3)
+  assert (x `eq` 3)
   return x
 
 array1D :: Int -> Comp ()
 array1D n = do
-  xs <- inputs n
+  xs <- inputs n :: Comp (Arr Number)
   expected <- inputs n
-  mapM_ assert (zipWith Eq (map (\x -> x * x) $ fromArray xs) (fromArray expected))
+  mapM_ assert (zipWith eq (map (\x -> x * x) $ fromArray xs) (fromArray expected))
 
 array2D :: Int -> Int -> Comp ()
 array2D n m = do
-  xs <- inputs2 n m
+  xs <- inputs2 n m :: Comp (Arr (Arr Number))
   expected <- inputs2 n m
 
   forM_ [0 .. n - 1] $ \i ->
     forM_ [0 .. m - 1] $ \j -> do
       let x = access2 xs (i, j)
       let x' = access2 expected (i, j)
-      assert (x' `Eq` (x * x))
+      assert (x' `eq` (x * x))
 
 toArray1 :: Comp ()
 toArray1 = do
-  xss <- inputs2 2 4
+  xss <- inputs2 2 4 :: Comp (Arr (Arr Number))
   let yss = toArray [toArray [0, 1, 2, 3], toArray [4, 5, 6, 7]]
 
   forM_ [0 .. 1] $ \i -> do
@@ -133,7 +133,7 @@ toArray1 = do
     forM_ [0 .. 3] $ \j -> do
       let x = access xs j
       let y = access ys j
-      assert $ x `Eq` y
+      assert $ x `eq` y
 
 make :: Int -> Int -> Param GF181
 make dim n = makeParam dim n 42 $ Settings True True True
@@ -207,7 +207,7 @@ xorLists = do
       ( \acc i ->
           let a = access actual i
               b = access expected i
-           in acc `And` (a `BEq` b)
+           in acc `And` (a `eq` b)
       )
       true
       [0]
@@ -247,13 +247,13 @@ birthday :: Comp Boolean
 birthday = do
   -- these inputs are private witnesses
   _hiddenYear <- inputNum
-  hiddenMonth <- input
-  hiddenDate <- input
+  hiddenMonth <- inputNum
+  hiddenDate <- inputNum
   -- these inputs are public inputs
   month <- input
   date <- input
 
-  return $ (hiddenMonth `Eq` month) `And` (hiddenDate `Eq` date)
+  return $ (hiddenMonth `eq` month) `And` (hiddenDate `eq` date)
 
 chainingAND :: Int -> Comp Boolean
 chainingAND n = foldl And true <$> inputs n

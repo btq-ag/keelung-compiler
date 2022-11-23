@@ -139,226 +139,58 @@ runM = flip evalState
 -- ┃   Intermediate  ┃
 -- ┗━━━━━━━━━━━━━━━━━┛
 --
-eraseRef3 :: T.Ref -> M n (BitWidth, Expr n)
-eraseRef3 ref = do
-  counters <- get
-  let numWidth = getNumBitWidth counters
-  return $ case ref of
-    T.VarN n -> (BWNumber numWidth, ExprN $ VarN numWidth $ blendIntermediateVar counters n)
-    T.InputVarN n -> (BWNumber numWidth, ExprN $ VarN numWidth $ blendInputVarN counters n)
-    T.VarB n -> (BWBoolean, ExprB $ VarB $ blendIntermediateVar counters n)
-    T.InputVarB n -> (BWBoolean, ExprB $ VarB $ blendInputVarB counters n)
-    T.VarU w n -> (BWUInt w, ExprU $ VarU w $ blendIntermediateVar counters n)
-    T.InputVarU w n -> (BWUInt w, ExprU $ VarU w $ blendInputVarU counters w n)
-
--- eraseRefN :: T.Ref -> M n (BitWidth, ExprN n)
--- eraseRefN ref = do
+-- eraseRef3 :: T.Ref -> M n (BitWidth, Expr n)
+-- eraseRef3 ref = do
 --   counters <- get
 --   let numWidth = getNumBitWidth counters
 --   return $ case ref of
---     T.VarN n -> (BWNumber numWidth, VarN numWidth $ blendIntermediateVar counters n)
---     T.InputVarN n -> (BWNumber numWidth,  VarN numWidth $ blendInputVarN counters n)
---     T.VarB _ -> error "[ panic ] eraseRefN on BoolVar"
---     T.InputVarB _ -> error "[ panic ] eraseRefN on InputVarB"
---     T.VarU _ _ -> error "[ panic ] eraseRefN on VarU"
---     T.InputVarU _ _ -> error "[ panic ] eraseRefN on InputVarU"
+--     T.VarN n -> (BWNumber numWidth, ExprN $ VarN numWidth $ blendIntermediateVar counters n)
+--     T.InputVarN n -> (BWNumber numWidth, ExprN $ VarN numWidth $ blendInputVarN counters n)
+--     T.VarB n -> (BWBoolean, ExprB $ VarB $ blendIntermediateVar counters n)
+--     T.InputVarB n -> (BWBoolean, ExprB $ VarB $ blendInputVarB counters n)
+--     T.VarU w n -> (BWUInt w, ExprU $ VarU w $ blendIntermediateVar counters n)
+--     T.InputVarU w n -> (BWUInt w, ExprU $ VarU w $ blendInputVarU counters w n)
 
--- eraseRefU :: T.Ref -> M n (BitWidth, ExprU n)
--- eraseRefU ref = do
+
+-- eraseRef2 :: T.Ref -> M n Int
+-- eraseRef2 ref = do
 --   counters <- get
 --   return $ case ref of
---     T.VarN _ -> error "[ panic ] eraseRefU on NumVar"
---     T.InputVarN _ -> error "[ panic ] eraseRefU on InputVarN"
---     T.VarB _ -> error "[ panic ] eraseRefU on BoolVar"
---     T.InputVarB _ -> error "[ panic ] eraseRefU on InputVarB"
---     T.VarU w n -> (BWUInt w, VarU w $ blendIntermediateVar counters n)
---     T.InputVarU w n -> (BWUInt w, VarU w $ blendInputVarU counters w n)
-
-eraseRef2 :: T.Ref -> M n Int
-eraseRef2 ref = do
-  counters <- get
-  return $ case ref of
-    T.VarN n -> blendIntermediateVar counters n
-    T.InputVarN n -> blendInputVarN counters n
-    T.VarB n -> blendIntermediateVar counters n
-    T.InputVarB n -> blendInputVarB counters n
-    T.VarU _ n -> blendIntermediateVar counters n
-    T.InputVarU w n -> blendInputVarU counters w n
-
--- eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
--- eraseRef ref = do
---   counters <- get
---   let numWidth = getNumBitWidth counters
---   return $ case ref of
---     T.VarN n -> VarN numWidth $ blendIntermediateVar counters n
---     T.InputVarN n -> VarN numWidth $ blendInputVarN counters n
---     T.VarB n -> VarB $ blendIntermediateVar counters n
---     T.InputVarB n -> VarB $ blendInputVarB counters n
---     T.VarU w n -> VarU w $ blendIntermediateVar counters n
---     T.InputVarU w n -> VarU w $ blendInputVarU counters w n
-
--- eraseExprN :: (GaloisField n, Integral n) => T.Expr -> M n [(BitWidth, ExprN n)]
--- eraseExprN expr = case expr of
---   T.Val val -> eraseValN val
---   T.Var ref -> pure <$> eraseRefN ref
---   T.Array exprs -> do
---     exprss <- mapM eraseExprN exprs
---     return (concat exprss)
---   T.Add x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     let (bw, x') = head xs
---     case bw of
---       BWNumber _ -> return [ second narrowDownToExprN (chainExprsOfAssocOp AddN (bw, x') (head ys))]
---       BWUInt _ -> return [ second narrowDownToExprN (chainExprsOfAssocOp AddU (bw, x') (head ys))]
---       _ -> error "[ panic ] T.Add on wrong type of data"
---   T.Sub x y -> do
---     xs <- eraseExprN x
---     ys <- eraseExprN y
---     let (bw, x') = head xs
---     let (_, y') = head ys
---     case bw of
---       BWNumber _ -> return [(bw, SubN bw x' y')]
---       _ -> error "[ panic ] T.Sub on wrong type of data"
---   T.Mul x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp Mul (head xs) (head ys))]
---   T.Div x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     let (bw, x') = head xs
---     let (_, y') = head ys
---     return [(bw, narrowDownToExprN (Div bw x' y'))]
---   T.Eq x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp Eq (head xs) (head ys))]
---   T.And x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp And (head xs) (head ys))]
---   T.Or x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp Or (head xs) (head ys))]
---   T.Xor x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp Xor (head xs) (head ys))]
---   T.RotateR n x -> do
---     xs <- eraseExpr x
---     let (bw, x') = head xs
---     return [(bw, narrowDownToExprN (Rotate bw n x'))]
---   T.BEq x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp BEq (head xs) (head ys))]
---   T.If b x y -> do
---     bs <- eraseExpr b
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     let (bw, x') = head xs
---     return [(bw, narrowDownToExprN (If bw (snd (head bs)) x' (snd (head ys))))]
---   T.ToNum x -> do
---     counters <- get
---     let numWidth = getNumBitWidth counters
---     fmap (\(_, e) -> (BWNumber numWidth, narrowDownToExprN e)) <$> eraseExpr x
---   T.Bit x i -> do
---     (_, x') <- head <$> eraseExpr x
---     value <- bitValue x' i
---     return [(BWBoolean, narrowDownToExprN value)]
-
--- eraseExprB :: (GaloisField n, Integral n) => T.Expr -> M n [ExprB n]
--- eraseExprB expr = case expr of
---   T.Val val -> eraseValB val
---   T.Var ref -> pure <$> eraseRefN ref
---   T.Array exprs -> do
---     exprss <- mapM eraseExprN exprs
---     return (concat exprss)
---   T.Add x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     let (bw, x') = head xs
---     case bw of
---       BWNumber _ -> return [ second narrowDownToExprN (chainExprsOfAssocOp AddN (bw, x') (head ys))]
---       BWUInt _ -> return [ second narrowDownToExprN (chainExprsOfAssocOp AddU (bw, x') (head ys))]
---       _ -> error "[ panic ] T.Add on wrong type of data"
---   T.Sub x y -> do
---     xs <- eraseExprN x
---     ys <- eraseExprN y
---     let (bw, x') = head xs
---     let (_, y') = head ys
---     case bw of
---       BWNumber _ -> return [(bw, SubN bw x' y')]
---       _ -> error "[ panic ] T.Sub on wrong type of data"
---   T.Mul x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp Mul (head xs) (head ys))]
---   T.Div x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     let (bw, x') = head xs
---     let (_, y') = head ys
---     return [(bw, narrowDownToExprN (Div bw x' y'))]
---   T.Eq x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp Eq (head xs) (head ys))]
---   T.And x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp And (head xs) (head ys))]
---   T.Or x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp Or (head xs) (head ys))]
---   T.Xor x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp Xor (head xs) (head ys))]
---   T.RotateR n x -> do
---     xs <- eraseExpr x
---     let (bw, x') = head xs
---     return [(bw, narrowDownToExprN (Rotate bw n x'))]
---   T.BEq x y -> do
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     return [second narrowDownToExprN (chainExprsOfAssocOp BEq (head xs) (head ys))]
---   T.If b x y -> do
---     bs <- eraseExpr b
---     xs <- eraseExpr x
---     ys <- eraseExpr y
---     let (bw, x') = head xs
---     return [(bw, narrowDownToExprN (If bw (snd (head bs)) x' (snd (head ys))))]
---   T.ToNum x -> do
---     counters <- get
---     let numWidth = getNumBitWidth counters
---     fmap (\(_, e) -> (BWNumber numWidth, narrowDownToExprN e)) <$> eraseExpr x
---   T.Bit x i -> do
---     (_, x') <- head <$> eraseExpr x
---     value <- bitValue x' i
---     return [(BWBoolean, narrowDownToExprN value)]
+--     T.VarN n -> blendIntermediateVar counters n
+--     T.InputVarN n -> blendInputVarN counters n
+--     T.VarB n -> blendIntermediateVar counters n
+--     T.InputVarB n -> blendInputVarB counters n
+--     T.VarU _ n -> blendIntermediateVar counters n
+--     T.InputVarU w n -> blendInputVarU counters w n
 
 eraseExprB :: (GaloisField n, Integral n) => T.Boolean -> M n (ExprB n)
-eraseExprB expr = case expr of
-  T.ValB True -> return $ ValB 1
-  T.ValB False -> return $ ValB 0
-  T.AndB x y -> chainExprsOfAssocOpAndB <$> eraseExprB x <*> eraseExprB y
-  T.OrB x y -> chainExprsOfAssocOpOrB <$> eraseExprB x <*> eraseExprB y
-  T.XorB x y -> XorB <$> eraseExprB x <*> eraseExprB y
-  T.IfB p x y ->IfB <$> eraseExprB p <*> eraseExprB x <*> eraseExprB y
-  T.LoopholeB x -> do
-    (_, x') <- head <$> eraseExpr x
-    return $ narrowDownToExprB x'
+eraseExprB expr = do 
+  counters <- get
+  case expr of
+    T.ValB True -> return $ ValB 1
+    T.ValB False -> return $ ValB 0
+    T.VarB var -> return $ VarB $ blendIntermediateVar counters var
+    T.InputVarB var -> return $ VarB $ blendInputVarB counters var
+    T.AndB x y -> chainExprsOfAssocOpAndB <$> eraseExprB x <*> eraseExprB y
+    T.OrB x y -> chainExprsOfAssocOpOrB <$> eraseExprB x <*> eraseExprB y
+    T.XorB x y -> XorB <$> eraseExprB x <*> eraseExprB y
+    T.IfB p x y -> IfB <$> eraseExprB p <*> eraseExprB x <*> eraseExprB y
+    T.EqB x y -> EqB <$> eraseExprB x <*> eraseExprB y
+    T.EqN x y -> EqN <$> eraseExprN x <*> eraseExprN y
+    T.EqU _ x y -> EqU <$> eraseExprU x <*> eraseExprU y
+    T.LoopholeB x -> do
+      (_, x') <- head <$> eraseExpr x
+      return $ narrowDownToExprB x'
 
 eraseExprN :: (GaloisField n, Integral n) => T.Number -> M n (ExprN n)
-eraseExprN expr = do 
+eraseExprN expr = do
+  counters <- get
   w <- gets getNumBitWidth
   case expr of
     T.ValN x -> return $ ValN w (fromInteger x)
     T.ValNR x -> return $ ValN w (fromRational x)
+    T.VarN var -> return $ VarN w (blendIntermediateVar counters var)
+    T.InputVarN var -> return $ VarN w (blendInputVarN counters var)
     T.AddN x y -> chainExprsOfAssocOpAddN w <$> eraseExprN x <*> eraseExprN y
     T.SubN x y -> SubN w <$> eraseExprN x <*> eraseExprN y
     T.MulN x y -> MulN w <$> eraseExprN x <*> eraseExprN y
@@ -369,19 +201,23 @@ eraseExprN expr = do
       return $ narrowDownToExprN x'
 
 eraseExprU :: (GaloisField n, Integral n) => T.UInt -> M n (ExprU n)
-eraseExprU expr = case expr of
-  T.ValU w n -> return $ ValU w (fromIntegral n)
-  T.AddU w x y -> AddU w <$> eraseExprU x <*> eraseExprU y
-  T.SubU w x y -> SubU w <$> eraseExprU x <*> eraseExprU y
-  T.MulU w x y -> MulU w <$> eraseExprU x <*> eraseExprU y
-  T.AndU w x y -> chainExprsOfAssocOpAndU w <$> eraseExprU x <*> eraseExprU y
-  T.OrU w x y -> chainExprsOfAssocOpOrU w <$> eraseExprU x <*> eraseExprU y
-  T.XorU w x y -> XorU w <$> eraseExprU x <*> eraseExprU y
-  T.NotU w x -> NotU w <$> eraseExprU x
-  T.IfU w p x y -> IfU w <$> eraseExprB p <*> eraseExprU x <*> eraseExprU y
-  T.LoopholeU _ x -> do
-    (_, x') <- head <$> eraseExpr x
-    return $ narrowDownToExprU x'
+eraseExprU expr = do
+  counters <- get
+  case expr of
+    T.ValU w n -> return $ ValU w (fromIntegral n)
+    T.VarU w var -> return $ VarU w (blendIntermediateVar counters var)
+    T.InputVarU w var -> return $ VarU w (blendInputVarU counters w var)
+    T.AddU w x y -> AddU w <$> eraseExprU x <*> eraseExprU y
+    T.SubU w x y -> SubU w <$> eraseExprU x <*> eraseExprU y
+    T.MulU w x y -> MulU w <$> eraseExprU x <*> eraseExprU y
+    T.AndU w x y -> chainExprsOfAssocOpAndU w <$> eraseExprU x <*> eraseExprU y
+    T.OrU w x y -> chainExprsOfAssocOpOrU w <$> eraseExprU x <*> eraseExprU y
+    T.XorU w x y -> XorU w <$> eraseExprU x <*> eraseExprU y
+    T.NotU w x -> NotU w <$> eraseExprU x
+    T.IfU w p x y -> IfU w <$> eraseExprB p <*> eraseExprU x <*> eraseExprU y
+    T.LoopholeU _ x -> do
+      (_, x') <- head <$> eraseExpr x
+      return $ narrowDownToExprU x'
 
 eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [(BitWidth, Expr n)]
 eraseExpr expr = case expr of
@@ -397,34 +233,34 @@ eraseExpr expr = case expr of
     x' <- eraseExprU x
     let w = widthOfU x'
     return [(BWUInt w, ExprU x')]
-  T.Var ref -> pure <$> eraseRef3 ref
+  -- T.Var ref -> pure <$> eraseRef3 ref
   T.Array exprs -> do
     exprss <- mapM eraseExpr exprs
     return (concat exprss)
-  T.Eq x y -> do
-    xs <- eraseExpr x
-    ys <- eraseExpr y
-    let (bw, x') = head xs
-    let (_, y') = head ys
-    case bw of
-      BWNumber _ -> return [(bw, ExprB $ EqN (narrowDownToExprN x') (narrowDownToExprN y'))]
-      BWUInt _ -> return [(bw, ExprB $ EqU (narrowDownToExprU x') (narrowDownToExprU y'))]
-      BWBoolean -> return [(bw, ExprB $ EqB (narrowDownToExprB x') (narrowDownToExprB y'))]
-      _ -> error "[ panic ] T.Eq on wrong type of data"
+  -- T.Eq x y -> do
+  --   xs <- eraseExpr x
+  --   ys <- eraseExpr y
+  --   let (bw, x') = head xs
+  --   let (_, y') = head ys
+  --   case bw of
+  --     BWNumber _ -> return [(bw, ExprB $ EqN (narrowDownToExprN x') (narrowDownToExprN y'))]
+  --     BWUInt _ -> return [(bw, ExprB $ EqU (narrowDownToExprU x') (narrowDownToExprU y'))]
+  --     BWBoolean -> return [(bw, ExprB $ EqB (narrowDownToExprB x') (narrowDownToExprB y'))]
+  --     _ -> error "[ panic ] T.Eq on wrong type of data"
   T.RotateR n x -> do
     xs <- eraseExpr x
     let (bw, x') = head xs
     return [(bw, Rotate bw n x')]
-  T.BEq x y -> do
-    xs <- eraseExpr x
-    ys <- eraseExpr y
-    let (bw, x') = head xs
-    let (_, y') = head ys
-    case bw of
-      BWBoolean -> return [(bw, ExprB $ EqB (narrowDownToExprB x') (narrowDownToExprB y'))]
-      BWUInt _ -> return [(bw, ExprB $ EqU (narrowDownToExprU x') (narrowDownToExprU y'))]
-      BWNumber _ -> return [(bw, ExprB $ EqN (narrowDownToExprN x') (narrowDownToExprN y'))]
-      _ -> error "[ panic ] T.XOr on wrong type of data"
+  -- T.BEq x y -> do
+  --   xs <- eraseExpr x
+  --   ys <- eraseExpr y
+  --   let (bw, x') = head xs
+  --   let (_, y') = head ys
+  --   case bw of
+  --     BWBoolean -> return [(bw, ExprB $ EqB (narrowDownToExprB x') (narrowDownToExprB y'))]
+  --     BWUInt _ -> return [(bw, ExprB $ EqU (narrowDownToExprU x') (narrowDownToExprU y'))]
+  --     BWNumber _ -> return [(bw, ExprB $ EqN (narrowDownToExprN x') (narrowDownToExprN y'))]
+  --     _ -> error "[ panic ] T.XOr on wrong type of data"
   -- T.If p x y -> do
   --   (_, p') <- head <$> eraseExpr p
   --   (bw, x') <- head <$> eraseExpr x
@@ -493,10 +329,24 @@ bitValue expr i = case expr of
     bitValue x i'
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
-eraseAssignment (T.Assignment ref expr) = do
-  var <- eraseRef2 ref
-  exprs <- eraseExpr expr
-  return $ Assignment var (snd (head exprs))
+eraseAssignment (T.AssignmentB var expr) = do
+  counters <- get
+  AssignmentB (blendIntermediateVar counters var) <$> eraseExprB expr
+eraseAssignment (T.AssignmentBI var expr) = do
+  counters <- get
+  AssignmentB (blendInputVarB counters var) <$> eraseExprB expr
+eraseAssignment (T.AssignmentN var expr) = do
+  counters <- get
+  AssignmentN (blendIntermediateVar counters var) <$> eraseExprN expr
+eraseAssignment (T.AssignmentNI var expr) = do
+  counters <- get
+  AssignmentN (blendInputVarN counters var) <$> eraseExprN expr
+eraseAssignment (T.AssignmentU _ var expr) = do
+  counters <- get
+  AssignmentU (blendIntermediateVar counters var) <$> eraseExprU expr
+eraseAssignment (T.AssignmentUI width var expr) = do
+  counters <- get
+  AssignmentU (blendInputVarU counters width var) <$> eraseExprU expr
 
 -- | Flatten and chain expressions with associative operator together when possible
 chainExprsOfAssocOpAddN :: Width -> ExprN n -> ExprN n -> ExprN n

@@ -27,32 +27,75 @@ run (Elaborated expr comp) = do
 -- rewrite assertion as assignments, returns False if rewriting was made
 rewriteAssertEq :: Expr -> Comp Bool
 rewriteAssertEq expr = case expr of
-  Eq (Var ref) y -> do
-    assignNum ref y
+  Boolean (EqB (VarB ref) y) -> do
+    assignB ref y
     return False
-  Eq x (Var ref) -> do
-    assignNum ref x
+  Boolean (EqB (InputVarB ref) y) -> do
+    assignBI ref y
     return False
-  Eq x y -> do
+  Boolean (EqN (VarN ref) y) -> do
+    assignN ref y
+    return False
+  Boolean (EqN (InputVarN ref) y) -> do
+    assignNI ref y
+    return False
+  Boolean (EqU _ (VarU w ref) y) -> do
+    assignU w ref y
+    return False
+  Boolean (EqU _ (InputVarU w ref) y) -> do
+    assignUI w ref y
+    return False
+  Boolean (EqB x (VarB ref)) -> do
+    assignB ref x
+    return False
+  Boolean (EqB x (InputVarB ref)) -> do
+    assignBI ref x
+    return False
+  Boolean (EqN x (VarN ref)) -> do
+    assignN ref x
+    return False
+  Boolean (EqN x (InputVarN ref)) -> do
+    assignNI ref x
+    return False
+  Boolean (EqU _ x (VarU w ref)) -> do
+    assignU w ref x
+    return False
+  Boolean (EqU _ x (InputVarU w ref)) -> do
+    assignUI w ref x
+    return False
+  Boolean (EqB x y) -> do
     -- introduce a fresh variable
     -- and assign both expressions to it
     var <- allocVar
-    let ref = VarN var
-    assignNum ref x
-    assignNum ref y
+    assignB var x
+    assignB var y
     return False
-  BEq (Var ref) y -> do
-    assignBool ref y
-    return False
-  BEq x (Var ref) -> do
-    assignBool ref x
-    return False
-  BEq x y -> do
+  Boolean (EqN x y) -> do
     -- introduce a fresh variable
     -- and assign both expressions to it
     var <- allocVar
-    let ref = VarB var
-    assignBool ref x
-    assignBool ref y
+    assignN var x
+    assignN var y
     return False
+  Boolean (EqU w x y) -> do
+    -- introduce a fresh variable
+    -- and assign both expressions to it
+    var <- allocVar
+    assignU w var x
+    assignU w var y
+    return False
+  -- BEq (Var ref) y -> do
+  --   assignBool ref y
+  --   return False
+  -- BEq x (Var ref) -> do
+  --   assignBool ref x
+  --   return False
+  -- BEq x y -> do
+  --   -- introduce a fresh variable
+  --   -- and assign both expressions to it
+  --   var <- allocVar
+  --   let ref = VarB var
+  --   assignBool ref x
+  --   assignBool ref y
+  --   return False
   _ -> return True

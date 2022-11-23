@@ -41,9 +41,9 @@ checkAgg (Param dimension numOfSigs setup _) = do
   --    nT: coefficients of terms of signatures as input
   --    nT: remainders of product of signatures & public keys
   --    nT: quotients of product of signatures & public keys
-  sigs <- inputs2 numOfSigs dimension
-  expectedRemainders <- inputs2 numOfSigs dimension
-  expectedQuotients <- inputs2 numOfSigs dimension
+  sigs <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Number))
+  expectedRemainders <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Number))
+  expectedQuotients <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Number))
 
   -- pairs for iterating through public keys with indices
   let publicKeyPairs = zip [0 ..] (setupPublicKeys setup)
@@ -63,7 +63,7 @@ checkAgg (Param dimension numOfSigs setup _) = do
       let quotient = access2 expectedQuotients (t, i)
 
       -- assert the relation between rowSum, remainder and quotient
-      assert $ rowSum `Eq` (quotient * fromInteger q + remainder)
+      assert $ rowSum `eq` (quotient * fromInteger q + remainder)
 
   forM_ [0 .. dimension - 1] $ \i -> do
     let expected = setupAggSig setup Data.Array.! i
@@ -72,7 +72,7 @@ checkAgg (Param dimension numOfSigs setup _) = do
                   in  acc + remainder) 0 [0 .. numOfSigs - 1] 
 
     -- assert that the sum of remainders forms a term of aggregate signature
-    assert $ actual `Eq` fromIntegral expected
+    assert $ actual `eq` fromIntegral expected
 
 checkSize :: (GaloisField n, Integral n) => Param n -> Comp ()
 checkSize (Param dimension numOfSigs setup _) = do
@@ -90,7 +90,7 @@ checkSize (Param dimension numOfSigs setup _) = do
                                 bitValue = fromIntegral (2 ^ k :: Integer)
                                 prod = fromBool bit * bitValue
                             in  (acc + prod))  0 [0 .. 13]
-      assert (fromIntegral coeff `Eq` value)
+      assert (fromIntegral coeff `eq` value)
 
       let bit13 = access3 sigBitStrings (i, j, 13)
       let bit12 = access3 sigBitStrings (i, j, 12)
@@ -99,21 +99,21 @@ checkSize (Param dimension numOfSigs setup _) = do
                               in  acc + fromBool bit) 0 [0 .. 11]
 
       let smallerThan12289 = fromBool bit13 * fromBool bit12 * bit11to0
-      assert (smallerThan12289 `Eq` 0)
+      assert (smallerThan12289 `eq` 0)
 
 checkLength :: (Integral n, GaloisField n) => Param n -> Comp ()
 checkLength (Param dimension numOfSigs _ _) = do
-  sigs <- inputs2 numOfSigs dimension
+  sigs <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Number))
 
   -- expecting square of signatures as input
-  sigSquares <- inputs2 numOfSigs dimension
+  sigSquares <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Number))
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
     forM_ [0 .. dimension - 1] $ \i -> do
       let sig = access2 sigs (t, i)
       let square = access2 sigSquares (t, i)
-      assert (square `Eq` (sig * sig))
+      assert (square `eq` (sig * sig))
 
   -- expecting remainders of length of signatures as input
   sigLengthRemainders <- inputs numOfSigs
@@ -131,7 +131,7 @@ checkLength (Param dimension numOfSigs _ _) = do
     let quotient = access sigLengthQuotients t
 
     -- assert the relation between actualLength, remainder and quotient
-    assert $ actualLength `Eq` (quotient * fromInteger q + remainder)
+    assert $ actualLength `eq` (quotient * fromInteger q + remainder)
 
 aggregateSignature :: (Integral n, GaloisField n) => Param n -> Comp ()
 aggregateSignature param = do

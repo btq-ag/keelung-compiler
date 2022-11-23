@@ -200,7 +200,7 @@ tests = do
         let program = do
               x <- inputUInt @4
               y <- inputUInt @4
-              return (x `UEq` y)
+              return (x `eq` y)
         case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do

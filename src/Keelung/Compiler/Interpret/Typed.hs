@@ -4,6 +4,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 -- Interpreter for Keelung.Syntax.Typed
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use lambda-case" #-}
 
 module Keelung.Compiler.Interpret.Typed (InterpretError (..), runAndOutputWitnesses, run, runAndCheck) where
 
@@ -39,14 +42,24 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
   let numAssignments = reverse (compNumAsgns comp)
-  forM_ numAssignments $ \(Assignment var e) -> do
-    values <- interpret e
-    addBinding var values
+  forM_ numAssignments $ \x -> case x of
+    AssignmentN var e -> do
+      values <- interpret e
+      addBinding var values
+    AssignmentNI var e -> do
+      values <- interpret e
+      addBinding var values
+    _ -> error "[ panic ] runAndOutputWitnesses: unexpected assignment"
 
   let boolAssignments = reverse (compBoolAsgns comp)
-  forM_ boolAssignments $ \(Assignment var e) -> do
-    values <- interpret e
-    addBinding var values
+  forM_ boolAssignments $ \x -> case x of
+    AssignmentB var e -> do
+      values <- interpret e
+      addBinding var values
+    AssignmentBI var e -> do
+      values <- interpret e
+      addBinding var values
+    _ -> error "[ panic ] runAndOutputWitnesses: unexpected assignment"
 
   -- interpret the assertions next
   -- throw error if any assertion fails
@@ -106,6 +119,8 @@ instance GaloisField n => Interpret Bool n where
 instance (GaloisField n, Integral n) => Interpret Boolean n where
   interpret expr = case expr of
     ValB b -> interpret b
+    VarB var -> pure <$> lookupVar var
+    InputVarB var -> pure <$> lookupInputVarB var
     AndB x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     OrB x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorB x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
@@ -114,11 +129,25 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       case p' of
         [0] -> interpret y
         _ -> interpret x
+    EqB x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' == y')
+    EqN x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' == y')
+    EqU _ x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' == y')
     LoopholeB x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret Number n where
   interpret expr = case expr of
     ValN n -> return [fromIntegral n]
+    VarN var -> pure <$> lookupVar var
+    InputVarN var -> pure <$> lookupInputVarN var
     ValNR n -> return [fromRational n]
     AddN x y -> zipWith (+) <$> interpret x <*> interpret y
     SubN x y -> zipWith (-) <$> interpret x <*> interpret y
@@ -134,6 +163,8 @@ instance (GaloisField n, Integral n) => Interpret Number n where
 instance (GaloisField n, Integral n) => Interpret UInt n where
   interpret expr = case expr of
     ValU _ n -> return [fromIntegral n]
+    VarU _ var -> pure <$> lookupVar var
+    InputVarU w var -> pure <$> lookupInputVarU w var
     AddU _ x y -> zipWith (+) <$> interpret x <*> interpret y
     SubU _ x y -> zipWith (-) <$> interpret x <*> interpret y
     MulU _ x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -151,27 +182,27 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
 instance (GaloisField n, Integral n) => Interpret Expr n where
   interpret expr = case expr of
     Unit -> return []
-    Var (VarN n) -> pure <$> lookupVar n
-    Var (InputVarN n) -> pure <$> lookupInputVarN n
-    Var (VarB n) -> pure <$> lookupVar n
-    Var (InputVarB n) -> pure <$> lookupInputVarB n
-    Var (VarU _ n) -> pure <$> lookupVar n
-    Var (InputVarU width n) -> pure <$> lookupInputVarU width n
+    -- Var (VarN n) -> pure <$> lookupVar n
+    -- Var (InputVarN n) -> pure <$> lookupInputVarN n
+    -- Var (VarB n) -> pure <$> lookupVar n
+    -- Var (InputVarB n) -> pure <$> lookupInputVarB n
+    -- Var (VarU _ n) -> pure <$> lookupVar n
+    -- Var (InputVarU width n) -> pure <$> lookupInputVarU width n
     Boolean e -> interpret e
     Number e -> interpret e
     UInt e -> interpret e
     Array xs -> concat <$> mapM interpret xs
-    Eq x y -> do
-      x' <- interpret x
-      y' <- interpret y
-      interpret (x' == y')
+    -- Eq x y -> do
+    --   x' <- interpret x
+    --   y' <- interpret y
+    --   interpret (x' == y')
     -- Or x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     -- Xor x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     RotateR n x -> map (bitWiseRotateR n) <$> interpret x
-    BEq x y -> do
-      x' <- interpret x
-      y' <- interpret y
-      interpret (x' == y')
+    -- BEq x y -> do
+    --   x' <- interpret x
+    --   y' <- interpret y
+    --   interpret (x' == y')
     ToNum x -> interpret x
     Bit x i -> do
       xs <- interpret x
@@ -189,11 +220,13 @@ runM inputs p = runExcept (runStateT (runReaderT p inputs) mempty)
 
 -- | A `Ref` is given a list of numbers
 -- but in reality it should be just a single number.
-addBinding :: Ref -> [n] -> M n ()
-addBinding _ [] = error "addBinding: empty list"
-addBinding (VarN var) val = modify (IntMap.insert var (head val))
-addBinding (VarB var) val = modify (IntMap.insert var (head val))
-addBinding _ _ = error "addBinding: not VarN or VarB"
+-- addBinding :: Ref -> [n] -> M n ()
+-- addBinding _ [] = error "addBinding: empty list"
+-- addBinding (VarN var) val = modify (IntMap.insert var (head val))
+-- addBinding (VarB var) val = modify (IntMap.insert var (head val))
+-- addBinding _ _ = error "addBinding: not VarN or VarB"
+addBinding :: Var -> [n] -> M n ()
+addBinding var vals = modify (IntMap.insert var (head vals))
 
 lookupVar :: Show n => Var -> M n n
 lookupVar var = do
@@ -234,11 +267,11 @@ freeIntermediateVarsOfElab (Elaborated value context) =
   let (_, _, _, inOutputValue) = freeVars value
       inNumBindings =
         map
-          (\(Assignment (VarN var) val) -> let (_, _, _, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
+          (\(AssignmentN var val) -> let (_, _, _, vars) = freeVarsN val in IntSet.insert var vars) -- collect both the var and its value
           (compNumAsgns context)
       inBoolBindings =
         map
-          (\(Assignment (VarB var) val) -> let (_, _, _, vars) = freeVars val in IntSet.insert var vars) -- collect both the var and its value
+          (\(AssignmentB var val) -> let (_, _, _, vars) = freeVarsB val in IntSet.insert var vars) -- collect both the var and its value
           (compBoolAsgns context)
    in inOutputValue
         <> IntSet.unions inNumBindings
@@ -252,12 +285,6 @@ freeIntermediateVarsOfElab (Elaborated value context) =
 freeVars :: Expr -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVars expr = case expr of
   Unit -> (mempty, mempty, mempty, mempty)
-  Var (VarN n) -> (mempty, mempty, mempty, IntSet.singleton n)
-  Var (InputVarN n) -> (IntSet.singleton n, mempty, mempty, mempty)
-  Var (VarB n) -> (mempty, mempty, mempty, IntSet.singleton n)
-  Var (InputVarB n) -> (mempty, IntSet.singleton n, mempty, mempty)
-  Var (VarU _ n) -> (mempty, mempty, mempty, IntSet.singleton n)
-  Var (InputVarU w n) -> (mempty, mempty, IntMap.singleton w (IntSet.singleton n), mempty)
   Boolean e -> freeVarsB e
   Number e -> freeVarsN e
   UInt e -> freeVarsU e
@@ -265,11 +292,9 @@ freeVars expr = case expr of
     let unzip4 = foldr (\(u, y, z, w) (us, ys, zs, ws) -> (u : us, y : ys, z : zs, w : ws)) mempty
         (ns, bs, cs, os) = unzip4 $ toList $ fmap freeVars xs
      in (IntSet.unions ns, IntSet.unions bs, IntMap.unionsWith (<>) cs, IntSet.unions os)
-  Eq x y -> freeVars x <> freeVars y
   -- Or x y -> freeVars x <> freeVars y
   -- Xor x y -> freeVars x <> freeVars y
   RotateR _ x -> freeVars x
-  BEq x y -> freeVars x <> freeVars y
   -- If x y z -> freeVars x <> freeVars y <> freeVars z
   ToNum x -> freeVars x
   Bit x _ -> freeVars x
@@ -277,16 +302,23 @@ freeVars expr = case expr of
 freeVarsB :: Boolean -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVarsB expr = case expr of
   ValB _ -> mempty
+  VarB _ -> mempty
+  InputVarB var -> (mempty, IntSet.singleton var, mempty, mempty)
   AndB x y -> freeVarsB x <> freeVarsB y
   OrB x y -> freeVarsB x <> freeVarsB y
   XorB x y -> freeVarsB x <> freeVarsB y
   IfB p x y -> freeVarsB p <> freeVarsB x <> freeVarsB y
+  EqB x y -> freeVarsB x <> freeVarsB y
+  EqN x y -> freeVarsN x <> freeVarsN y
+  EqU _ x y -> freeVarsU x <> freeVarsU y
   LoopholeB x -> freeVars x
 
 freeVarsN :: Number -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVarsN expr = case expr of
   ValN _ -> mempty
   ValNR _ -> mempty
+  VarN _ -> mempty
+  InputVarN var -> (IntSet.singleton var, mempty, mempty, mempty)
   AddN x y -> freeVarsN x <> freeVarsN y
   SubN x y -> freeVarsN x <> freeVarsN y
   MulN x y -> freeVarsN x <> freeVarsN y
@@ -297,6 +329,8 @@ freeVarsN expr = case expr of
 freeVarsU :: UInt -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVarsU expr = case expr of
   ValU _ _ -> mempty
+  VarU _ _ -> mempty
+  InputVarU w var -> (mempty, mempty, IntMap.singleton w (IntSet.singleton var), mempty)
   AddU _ x y -> freeVarsU x <> freeVarsU y
   SubU _ x y -> freeVarsU x <> freeVarsU y
   MulU _ x y -> freeVarsU x <> freeVarsU y

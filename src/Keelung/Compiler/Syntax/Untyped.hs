@@ -334,13 +334,22 @@ narrowDownToExprB x = case x of
 
 --------------------------------------------------------------------------------
 
-data Assignment n = Assignment Var (Expr n)
+data Assignment n
+  = AssignmentN Var (ExprN n)
+  | AssignmentU Var (ExprU n)
+  | AssignmentB Var (ExprB n)
 
 instance (Integral n, Show n) => Show (Assignment n) where
-  show (Assignment var expr) = "$" <> show var <> " := " <> show expr
+  show (AssignmentN var expr) = show var ++ " = " ++ show expr
+  show (AssignmentU var expr) = show var ++ " = " ++ show expr
+  show (AssignmentB var expr) = show var ++ " = " ++ show expr
+  -- show (Assignment var expr) = "$" <> show var <> " := " <> show expr
 
 instance Functor Assignment where
-  fmap f (Assignment var expr) = Assignment var (fmap f expr)
+  fmap f (AssignmentN var expr) = AssignmentN var (fmap f expr)
+  fmap f (AssignmentU var expr) = AssignmentU var (fmap f expr)
+  fmap f (AssignmentB var expr) = AssignmentB var (fmap f expr)
+  -- fmap f (Assignment var expr) = Assignment var (fmap f expr)
 
 --------------------------------------------------------------------------------
 

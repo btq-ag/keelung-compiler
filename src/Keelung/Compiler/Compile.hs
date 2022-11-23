@@ -63,7 +63,9 @@ encodeAssertion expr = do
 
 -- | Encode the constraint 'out = expr'.
 encodeAssignment :: (GaloisField n, Integral n) => Assignment n -> M n ()
-encodeAssignment (Assignment var expr) = encode var expr
+encodeAssignment (AssignmentB var expr) = encodeExprB var expr
+encodeAssignment (AssignmentN var expr) = encodeExprN var expr
+encodeAssignment (AssignmentU var expr) = encodeExprU var expr
 
 -- encodeRelation :: (GaloisField n, Integral n) => Relation n -> M n ()
 -- encodeRelation (Relation bindings assignments assertions) = do

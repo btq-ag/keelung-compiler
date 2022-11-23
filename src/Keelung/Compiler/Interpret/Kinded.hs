@@ -23,6 +23,7 @@ import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
 import Keelung.Syntax.VarCounters
 import Keelung.Types
+import GHC.TypeLits (KnownNat)
 
 --------------------------------------------------------------------------------
 
@@ -34,12 +35,12 @@ run' elab inputs = runM elab inputs $ do
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
   let numAssignments = reverse (compNumAsgns comp)
-  forM_ numAssignments $ \(NumAssignment var e) -> do
+  forM_ numAssignments $ \(AssignmentN var e) -> do
     values <- interpret e
     addBinding var values
 
   let boolAssignments = reverse (compBoolAsgns comp)
-  forM_ boolAssignments $ \(BoolAssignment var e) -> do
+  forM_ boolAssignments $ \(AssignmentB var e) -> do
     values <- interpret e
     addBinding var values
 
@@ -113,19 +114,19 @@ instance FreeVar Boolean where
     InputVarB _ -> return mempty
     NumBit x _ -> freeVars x
     UIntBit x _ -> freeVars x
-    Eq x y -> (<>) <$> freeVars x <*> freeVars y
     And x y -> (<>) <$> freeVars x <*> freeVars y
     Or x y -> (<>) <$> freeVars x <*> freeVars y
     Xor x y -> (<>) <$> freeVars x <*> freeVars y
-    BEq x y -> (<>) <$> freeVars x <*> freeVars y
-    UEq x y -> (<>) <$> freeVars x <*> freeVars y
+    EqB x y -> (<>) <$> freeVars x <*> freeVars y
+    EqN x y -> (<>) <$> freeVars x <*> freeVars y
+    EqU x y -> (<>) <$> freeVars x <*> freeVars y
     IfB x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
 
 instance FreeVar (UInt w) where
   freeVars val = case val of
-    UInt _ _ -> return mempty
-    VarU _ var -> return $ IntSet.singleton var
-    InputVarU _ _ -> return mempty
+    UInt _ -> return mempty
+    VarU var -> return $ IntSet.singleton var
+    InputVarU _ -> return mempty
     AddU x y -> (<>) <$> freeVars x <*> freeVars y
     SubU x y -> (<>) <$> freeVars x <*> freeVars y
     MulU x y -> (<>) <$> freeVars x <*> freeVars y
@@ -163,10 +164,10 @@ instance FreeVar t => FreeVar (ArrM t) where
 instance FreeVar t => FreeVar (Elaborated t) where
   freeVars (Elaborated value comp) = do
     inOutputValue <- freeVars value
-    inNumBindings <- forM (compNumAsgns comp) $ \(NumAssignment var val) -> do
+    inNumBindings <- forM (compNumAsgns comp) $ \(AssignmentN var val) -> do
       -- collect both the var and its value
       IntSet.insert var <$> freeVars val
-    inBoolBindings <- forM (compBoolAsgns comp) $ \(BoolAssignment var val) -> do
+    inBoolBindings <- forM (compBoolAsgns comp) $ \(AssignmentB var val) -> do
       -- collect both the var and its value
       IntSet.insert var <$> freeVars val
     return $
@@ -227,32 +228,32 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       if testBit (toInteger (head xs)) i
         then return [one]
         else return [zero]
-    Eq x y -> do
-      x' <- interpret x
-      y' <- interpret y
-      interpret (x' == y')
     And x y -> zipWith (*) <$> interpret x <*> interpret y
     Or x y -> zipWith (+) <$> interpret x <*> interpret y
     Xor x y -> zipWith (\x' y' -> x' + y' - 2 * (x' * y')) <$> interpret x <*> interpret y
-    BEq x y -> do
-      x' <- interpret x
-      y' <- interpret y
-      interpret (x' == y')
-    UEq x y -> do
-      x' <- interpret x
-      y' <- interpret y
-      interpret (x' == y')
     IfB p x y -> do
       p' <- interpret p
       case p' of
         [0] -> interpret y
         _ -> interpret x
+    EqB x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' == y')
+    EqN x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' == y')
+    EqU x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' == y')
 
-instance (GaloisField n, Integral n) => Interpret (UInt w) n where
+instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
   interpret val = case val of
-    UInt _ n -> interpret n
-    VarU _ var -> pure <$> lookupVar var
-    InputVarU width var -> pure <$> lookupInputVarU width var
+    UInt n -> interpret n
+    VarU var -> pure <$> lookupVar var
+    InputVarU var -> pure <$> lookupInputVarU (widthOf val) var
     AddU x y -> zipWith (+) <$> interpret x <*> interpret y
     SubU x y -> zipWith (-) <$> interpret x <*> interpret y
     MulU x y -> zipWith (*) <$> interpret x <*> interpret y
