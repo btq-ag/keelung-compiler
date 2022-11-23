@@ -172,6 +172,7 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
     OrU _ x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorU _ x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     NotU _ x -> map bitWiseNot <$> interpret x
+    RoLU _ i x -> map (bitWiseRotateL i) <$> interpret x
     IfU _ p x y -> do
       p' <- interpret p
       case p' of
@@ -198,7 +199,7 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     --   interpret (x' == y')
     -- Or x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     -- Xor x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
-    RotateR n x -> map (bitWiseRotateR n) <$> interpret x
+    -- RotateR n x -> map (bitWiseRotateR n) <$> interpret x
     -- BEq x y -> do
     --   x' <- interpret x
     --   y' <- interpret y
@@ -292,10 +293,6 @@ freeVars expr = case expr of
     let unzip4 = foldr (\(u, y, z, w) (us, ys, zs, ws) -> (u : us, y : ys, z : zs, w : ws)) mempty
         (ns, bs, cs, os) = unzip4 $ toList $ fmap freeVars xs
      in (IntSet.unions ns, IntSet.unions bs, IntMap.unionsWith (<>) cs, IntSet.unions os)
-  -- Or x y -> freeVars x <> freeVars y
-  -- Xor x y -> freeVars x <> freeVars y
-  RotateR _ x -> freeVars x
-  -- If x y z -> freeVars x <> freeVars y <> freeVars z
   ToNum x -> freeVars x
   Bit x _ -> freeVars x
 
@@ -338,6 +335,7 @@ freeVarsU expr = case expr of
   OrU _ x y -> freeVarsU x <> freeVarsU y
   XorU _ x y -> freeVarsU x <> freeVarsU y
   NotU _ x -> freeVarsU x
+  RoLU _ _ x -> freeVarsU x
   IfU _ p x y -> freeVarsB p <> freeVarsU x <> freeVarsU y
   LoopholeU _ x -> freeVars x
 
@@ -396,5 +394,5 @@ bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)
 bitWiseNot :: (GaloisField n, Integral n) => n -> n
 bitWiseNot x = fromInteger $ Data.Bits.complement (toInteger x)
 
-bitWiseRotateR :: (GaloisField n, Integral n) => Int -> n -> n
-bitWiseRotateR n x = fromInteger $ Data.Bits.rotateR (toInteger x) n
+bitWiseRotateL :: (GaloisField n, Integral n) => Int -> n -> n
+bitWiseRotateL n x = fromInteger $ Data.Bits.rotateL (toInteger x) n

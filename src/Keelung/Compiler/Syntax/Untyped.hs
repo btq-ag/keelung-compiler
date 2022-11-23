@@ -3,10 +3,8 @@
 {-# LANGUAGE GADTs #-}
 
 module Keelung.Compiler.Syntax.Untyped
-  ( BitWidth (..),
-    Width,
-    bitWidthOf,
-    getWidth,
+  ( Width,
+    -- bitWidthOf,
     castToNumber,
     narrowDownToExprN,
     narrowDownToExprU,
@@ -26,7 +24,7 @@ module Keelung.Compiler.Syntax.Untyped
     lookupB,
     lookupU,
     Relations (..),
-    sizeOfExpr,
+    -- sizeOfExpr,
   )
 where
 
@@ -43,23 +41,6 @@ import Keelung.Types (Var)
 --------------------------------------------------------------------------------
 
 type Width = Int
-
-data BitWidth
-  = BWNumber Width
-  | BWBoolean
-  | BWUInt Width
-  | BWUnit
-  | BWArray BitWidth Int
-  deriving (Eq, Ord, Show)
-
-getWidth :: BitWidth -> Width
-getWidth (BWNumber n) = n
-getWidth BWBoolean = 1
-getWidth (BWUInt n) = n
-getWidth BWUnit = 0
-getWidth (BWArray ns n) = n * getWidth ns
-
---------------------------------------------------------------------------------
 
 data ExprB n
   = ValB n
@@ -133,6 +114,7 @@ data ExprU n
   | XorU Width (ExprU n) (ExprU n)
   | NotU Width (ExprU n)
   | IfU Width (ExprB n) (ExprU n) (ExprU n)
+  | RoLU Width Int (ExprU n)
   deriving (Functor)
 
 instance (Show n, Integral n) => Show (ExprU n) where
@@ -147,6 +129,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     XorU _ x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
     NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    RoLU _ n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
 
 instance Num n => Num (ExprU n) where
   x + y = AddU (widthOfU x) x y
@@ -163,8 +146,7 @@ data Expr n
   = ExprB (ExprB n) -- Boolean expression
   | ExprN (ExprN n) -- Field expression
   | ExprU (ExprU n) -- UInt expression
-  | Rotate BitWidth Int (Expr n)
-  deriving (Functor)
+  deriving ( Functor)
 
 instance Num n => Num (ExprN n) where
   x + y = AddN (widthOfN x) x y Empty
@@ -187,70 +169,64 @@ instance (Integral n, Show n) => Show (Expr n) where
     ExprB x -> shows x
     ExprN x -> shows x
     ExprU x -> shows x
-    Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
 
--- | Calculate the "size" of an expression for benchmarking
-sizeOfExpr :: Expr n -> Int
-sizeOfExpr expr = case expr of
-  ExprN x -> sizeOfExprN x
-  ExprB x -> sizeOfExprB x
-  ExprU x -> sizeOfExprU x
-  Rotate _ _ x -> 1 + sizeOfExpr x
+-- Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
 
-sizeOfExprB :: ExprB n -> Int
-sizeOfExprB expr = case expr of
-  ValB _ -> 1
-  VarB _ -> 1
-  AndB x0 x1 xs ->
-    let operands = x0 :<| x1 :<| xs
-     in sum (fmap sizeOfExprB operands) + (length operands - 1)
-  OrB x0 x1 xs ->
-    let operands = x0 :<| x1 :<| xs
-     in sum (fmap sizeOfExprB operands) + (length operands - 1)
-  XorB x0 x1 -> 1 + sizeOfExprB x0 + sizeOfExprB x1
-  IfB x y z -> 1 + sizeOfExprB x + sizeOfExprB y + sizeOfExprB z
-  NEqB x y -> 1 + sizeOfExprB x + sizeOfExprB y
-  NEqN x y -> 1 + sizeOfExprN x + sizeOfExprN y
-  NEqU x y -> 1 + sizeOfExprU x + sizeOfExprU y
-  EqB x y -> 1 + sizeOfExprB x + sizeOfExprB y
-  EqN x y -> 1 + sizeOfExprN x + sizeOfExprN y
-  EqU x y -> 1 + sizeOfExprU x + sizeOfExprU y
+-- -- | Calculate the "size" of an expression for benchmarking
+-- sizeOfExpr :: Expr n -> Int
+-- sizeOfExpr expr = case expr of
+--   ExprN x -> sizeOfExprN x
+--   ExprB x -> sizeOfExprB x
+--   ExprU x -> sizeOfExprU x
+--   Rotate _ _ x -> 1 + sizeOfExpr x
 
-sizeOfExprN :: ExprN n -> Int
-sizeOfExprN xs = case xs of
-  ValN _ _ -> 1
-  VarN _ _ -> 1
-  SubN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
-  AddN _ x0 x1 xs' ->
-    let operands = x0 :<| x1 :<| xs'
-     in sum (fmap sizeOfExprN operands) + (length operands - 1)
-  MulN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
-  DivN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
-  IfN _ p x y -> 1 + sizeOfExprB p + sizeOfExprN x + sizeOfExprN y
+-- sizeOfExprB :: ExprB n -> Int
+-- sizeOfExprB expr = case expr of
+--   ValB _ -> 1
+--   VarB _ -> 1
+--   AndB x0 x1 xs ->
+--     let operands = x0 :<| x1 :<| xs
+--      in sum (fmap sizeOfExprB operands) + (length operands - 1)
+--   OrB x0 x1 xs ->
+--     let operands = x0 :<| x1 :<| xs
+--      in sum (fmap sizeOfExprB operands) + (length operands - 1)
+--   XorB x0 x1 -> 1 + sizeOfExprB x0 + sizeOfExprB x1
+--   IfB x y z -> 1 + sizeOfExprB x + sizeOfExprB y + sizeOfExprB z
+--   NEqB x y -> 1 + sizeOfExprB x + sizeOfExprB y
+--   NEqN x y -> 1 + sizeOfExprN x + sizeOfExprN y
+--   NEqU x y -> 1 + sizeOfExprU x + sizeOfExprU y
+--   EqB x y -> 1 + sizeOfExprB x + sizeOfExprB y
+--   EqN x y -> 1 + sizeOfExprN x + sizeOfExprN y
+--   EqU x y -> 1 + sizeOfExprU x + sizeOfExprU y
 
-sizeOfExprU :: ExprU n -> Int
-sizeOfExprU xs = case xs of
-  ValU _ _ -> 1
-  VarU _ _ -> 1
-  SubU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
-  AddU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
-  MulU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
-  AndU _ x0 x1 xs' ->
-    let operands = x0 :<| x1 :<| xs'
-     in sum (fmap sizeOfExprU operands) + (length operands - 1)
-  OrU _ x0 x1 xs' ->
-    let operands = x0 :<| x1 :<| xs'
-     in sum (fmap sizeOfExprU operands) + (length operands - 1)
-  XorU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
-  NotU _ x -> sizeOfExprU x + 1
-  IfU _ p x y -> 1 + sizeOfExprB p + sizeOfExprU x + sizeOfExprU y
+-- sizeOfExprN :: ExprN n -> Int
+-- sizeOfExprN xs = case xs of
+--   ValN _ _ -> 1
+--   VarN _ _ -> 1
+--   SubN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
+--   AddN _ x0 x1 xs' ->
+--     let operands = x0 :<| x1 :<| xs'
+--      in sum (fmap sizeOfExprN operands) + (length operands - 1)
+--   MulN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
+--   DivN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
+--   IfN _ p x y -> 1 + sizeOfExprB p + sizeOfExprN x + sizeOfExprN y
 
-bitWidthOf :: Expr n -> BitWidth
-bitWidthOf expr = case expr of
-  ExprB _ -> BWBoolean
-  ExprN x -> BWNumber $ widthOfN x
-  ExprU x -> BWUInt $ widthOfU x
-  Rotate bw _ _ -> bw
+-- sizeOfExprU :: ExprU n -> Int
+-- sizeOfExprU xs = case xs of
+--   ValU _ _ -> 1
+--   VarU _ _ -> 1
+--   SubU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
+--   AddU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
+--   MulU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
+--   AndU _ x0 x1 xs' ->
+--     let operands = x0 :<| x1 :<| xs'
+--      in sum (fmap sizeOfExprU operands) + (length operands - 1)
+--   OrU _ x0 x1 xs' ->
+--     let operands = x0 :<| x1 :<| xs'
+--      in sum (fmap sizeOfExprU operands) + (length operands - 1)
+--   XorU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
+--   NotU _ x -> sizeOfExprU x + 1
+--   IfU _ p x y -> 1 + sizeOfExprB p + sizeOfExprU x + sizeOfExprU y
 
 widthOfN :: ExprN n -> Width
 widthOfN expr = case expr of
@@ -274,6 +250,7 @@ widthOfU expr = case expr of
   XorU w _ _ -> w
   NotU w _ -> w
   IfU w _ _ _ -> w
+  RoLU w _ _ -> w
 
 castToNumber :: Width -> Expr n -> Expr n
 castToNumber width expr = case expr of
@@ -314,7 +291,7 @@ castToNumber width expr = case expr of
     XorU {} -> error "[ panic ] castToNumber: XorU"
     NotU {} -> error "[ panic ] castToNumber: NotU"
     IfU _ p a b -> ExprN (IfN width p (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
-  Rotate _ n x -> Rotate (BWNumber width) n x
+    RoLU {} -> error "[ panic ] castToNumber: RoLU"
 
 -- NOTE: temporary hack, should be removed
 narrowDownToExprN :: Expr n -> ExprN n
@@ -343,13 +320,15 @@ instance (Integral n, Show n) => Show (Assignment n) where
   show (AssignmentN var expr) = show var ++ " = " ++ show expr
   show (AssignmentU var expr) = show var ++ " = " ++ show expr
   show (AssignmentB var expr) = show var ++ " = " ++ show expr
-  -- show (Assignment var expr) = "$" <> show var <> " := " <> show expr
+
+-- show (Assignment var expr) = "$" <> show var <> " := " <> show expr
 
 instance Functor Assignment where
   fmap f (AssignmentN var expr) = AssignmentN var (fmap f expr)
   fmap f (AssignmentU var expr) = AssignmentU var (fmap f expr)
   fmap f (AssignmentB var expr) = AssignmentB var (fmap f expr)
-  -- fmap f (Assignment var expr) = Assignment var (fmap f expr)
+
+-- fmap f (Assignment var expr) = Assignment var (fmap f expr)
 
 --------------------------------------------------------------------------------
 

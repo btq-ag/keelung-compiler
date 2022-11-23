@@ -134,7 +134,7 @@ instance FreeVar (UInt w) where
     OrU x y -> (<>) <$> freeVars x <*> freeVars y
     XorU x y -> (<>) <$> freeVars x <*> freeVars y
     NotU x -> freeVars x
-    RoRU _ x -> freeVars x
+    RoLU _ x -> freeVars x
     IfU p x y -> (<>) <$> freeVars p <*> ((<>) <$> freeVars x <*> freeVars y)
     ToUInt x -> freeVars x
 
@@ -262,7 +262,7 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
     OrU x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorU x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     NotU x -> map bitWiseNot <$> interpret x
-    RoRU n x -> map (bitWiseRotateR n) <$> interpret x
+    RoLU n x -> map (bitWiseRotateL n) <$> interpret x
     IfU p x y -> do
       p' <- interpret p
       case p' of
@@ -415,5 +415,5 @@ bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)
 bitWiseNot :: (GaloisField n, Integral n) => n -> n
 bitWiseNot x = fromInteger $ Data.Bits.complement (toInteger x)
 
-bitWiseRotateR :: (GaloisField n, Integral n) => Int -> n -> n
-bitWiseRotateR n x = fromInteger $ Data.Bits.rotateR (toInteger x) n
+bitWiseRotateL :: (GaloisField n, Integral n) => Int -> n -> n
+bitWiseRotateL n x = fromInteger $ Data.Bits.rotateL (toInteger x) n

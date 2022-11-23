@@ -106,6 +106,7 @@ propagateConstant relations = propagate
       XorU w x y -> XorU w (propagateU x) (propagateU y)
       NotU w x -> NotU w (propagateU x)
       IfU w p x y -> IfU w (propagateB p) (propagateU x) (propagateU y)
+      RoLU w i x -> RoLU w i (propagateU x)
 
     propagateB e = case e of
       ValB _ -> e
@@ -127,5 +128,3 @@ propagateConstant relations = propagate
       ExprN x -> ExprN (propagateN x)
       ExprU x -> ExprU (propagateU x)
       ExprB x -> ExprB (propagateB x)
-      Rotate w n x -> Rotate w n (propagate x)
-      -- NAryOp w op x y es -> NAryOp w op (propagate x) (propagate y) (fmap propagate es)
