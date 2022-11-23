@@ -92,25 +92,25 @@ instance FreeVar Number where
   freeVars expr = case expr of
     Integer _ -> return mempty
     Rational _ -> return mempty
-    NumVar var -> return $ IntSet.singleton var
-    NumInputVar _ -> return mempty
+    VarN var -> return $ IntSet.singleton var
+    InputVarN _ -> return mempty
     Add x y -> (<>) <$> freeVars x <*> freeVars y
     Sub x y -> (<>) <$> freeVars x <*> freeVars y
     Mul x y -> (<>) <$> freeVars x <*> freeVars y
     Div x y -> (<>) <$> freeVars x <*> freeVars y
-    AndNum x y -> (<>) <$> freeVars x <*> freeVars y
-    OrNum x y -> (<>) <$> freeVars x <*> freeVars y
-    XorNum x y -> (<>) <$> freeVars x <*> freeVars y
-    RotateRNum _ x -> freeVars x
-    IfNum x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
+    -- AndN x y -> (<>) <$> freeVars x <*> freeVars y
+    -- OrN x y -> (<>) <$> freeVars x <*> freeVars y
+    -- XorN x y -> (<>) <$> freeVars x <*> freeVars y
+    -- RoRN _ x -> freeVars x
+    IfN x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
     FromBool x -> freeVars x
     FromUInt x -> freeVars x
 
 instance FreeVar Boolean where
   freeVars expr = case expr of
     Boolean _ -> return mempty
-    BoolVar var -> return $ IntSet.singleton var
-    BoolInputVar _ -> return mempty
+    VarB var -> return $ IntSet.singleton var
+    InputVarB _ -> return mempty
     NumBit x _ -> freeVars x
     UIntBit x _ -> freeVars x
     Eq x y -> (<>) <$> freeVars x <*> freeVars y
@@ -119,22 +119,21 @@ instance FreeVar Boolean where
     Xor x y -> (<>) <$> freeVars x <*> freeVars y
     BEq x y -> (<>) <$> freeVars x <*> freeVars y
     UEq x y -> (<>) <$> freeVars x <*> freeVars y
-    IfBool x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
+    IfB x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
 
 instance FreeVar (UInt w) where
   freeVars val = case val of
     UInt _ _ -> return mempty
-    UIntVar _ var -> return $ IntSet.singleton var
-    UIntInputVar _ _ -> return mempty
-    UIntAdd x y -> (<>) <$> freeVars x <*> freeVars y
-    UIntSub x y -> (<>) <$> freeVars x <*> freeVars y
-    UIntMul x y -> (<>) <$> freeVars x <*> freeVars y
-    UIntDiv x y -> (<>) <$> freeVars x <*> freeVars y
-    AndUInt x y -> (<>) <$> freeVars x <*> freeVars y
-    OrUInt x y -> (<>) <$> freeVars x <*> freeVars y
-    XorUInt x y -> (<>) <$> freeVars x <*> freeVars y
-    RotateRUInt _ x -> freeVars x
-    IfUInt p x y -> (<>) <$> freeVars p <*> ((<>) <$> freeVars x <*> freeVars y)
+    VarU _ var -> return $ IntSet.singleton var
+    InputVarU _ _ -> return mempty
+    AddU x y -> (<>) <$> freeVars x <*> freeVars y
+    SubU x y -> (<>) <$> freeVars x <*> freeVars y
+    MulU x y -> (<>) <$> freeVars x <*> freeVars y
+    AndU x y -> (<>) <$> freeVars x <*> freeVars y
+    OrU x y -> (<>) <$> freeVars x <*> freeVars y
+    XorU x y -> (<>) <$> freeVars x <*> freeVars y
+    RoRU _ x -> freeVars x
+    IfU p x y -> (<>) <$> freeVars p <*> ((<>) <$> freeVars x <*> freeVars y)
     ToUInt x -> freeVars x
 
 instance FreeVar () where
@@ -194,17 +193,17 @@ instance (GaloisField n, Integral n) => Interpret Number n where
   interpret val = case val of
     Integer n -> interpret n
     Rational n -> interpret n
-    NumVar var -> pure <$> lookupVar var
-    NumInputVar var -> pure <$> lookupNumInputVar var
+    VarN var -> pure <$> lookupVar var
+    InputVarN var -> pure <$> lookupInputVarN var
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
     Mul x y -> zipWith (*) <$> interpret x <*> interpret y
     Div x y -> zipWith (/) <$> interpret x <*> interpret y
-    AndNum x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
-    OrNum x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
-    XorNum x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
-    RotateRNum n x -> map (bitWiseRotateR n) <$> interpret x
-    IfNum p x y -> do
+    -- AndN x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
+    -- OrN x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
+    -- XorN x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
+    -- RoRN n x -> map (bitWiseRotateR n) <$> interpret x
+    IfN p x y -> do
       p' <- interpret p
       case p' of
         [0] -> interpret y
@@ -215,8 +214,8 @@ instance (GaloisField n, Integral n) => Interpret Number n where
 instance (GaloisField n, Integral n) => Interpret Boolean n where
   interpret val = case val of
     Boolean b -> interpret b
-    BoolVar var -> pure <$> lookupVar var
-    BoolInputVar var -> pure <$> lookupBoolInputVar var
+    VarB var -> pure <$> lookupVar var
+    InputVarB var -> pure <$> lookupInputVarB var
     NumBit x i -> do
       xs <- interpret x
       if testBit (toInteger (head xs)) i
@@ -242,7 +241,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
-    IfBool p x y -> do
+    IfB p x y -> do
       p' <- interpret p
       case p' of
         [0] -> interpret y
@@ -251,17 +250,17 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
 instance (GaloisField n, Integral n) => Interpret (UInt w) n where
   interpret val = case val of
     UInt _ n -> interpret n
-    UIntVar _ var -> pure <$> lookupVar var
-    UIntInputVar width var -> pure <$> lookupUIntInputVar width var
-    UIntAdd x y -> zipWith (+) <$> interpret x <*> interpret y
-    UIntSub x y -> zipWith (-) <$> interpret x <*> interpret y
-    UIntMul x y -> zipWith (*) <$> interpret x <*> interpret y
-    UIntDiv x y -> zipWith (/) <$> interpret x <*> interpret y
-    AndUInt x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
-    OrUInt x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
-    XorUInt x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
-    RotateRUInt n x -> map (bitWiseRotateR n) <$> interpret x
-    IfUInt p x y -> do
+    VarU _ var -> pure <$> lookupVar var
+    InputVarU width var -> pure <$> lookupInputVarU width var
+    AddU x y -> zipWith (+) <$> interpret x <*> interpret y
+    SubU x y -> zipWith (-) <$> interpret x <*> interpret y
+    MulU x y -> zipWith (*) <$> interpret x <*> interpret y
+    -- UIntDiv x y -> zipWith (/) <$> interpret x <*> interpret y
+    AndU x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
+    OrU x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
+    XorU x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
+    RoRU n x -> map (bitWiseRotateR n) <$> interpret x
+    IfU p x y -> do
       p' <- interpret p
       case p' of
         [0] -> interpret y
@@ -299,25 +298,25 @@ lookupVar var = do
     Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val
 
-lookupNumInputVar :: Show n => Var -> M n n
-lookupNumInputVar var = do
+lookupInputVarN :: Show n => Var -> M n n
+lookupInputVarN var = do
   inputs <- asks (Inputs.numInputs . fst)
   case inputs Seq.!? var of
     Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
     Just val -> return val
 
-lookupBoolInputVar :: Show n => Var -> M n n
-lookupBoolInputVar var = do
+lookupInputVarB :: Show n => Var -> M n n
+lookupInputVarB var = do
   inputs <- asks (Inputs.boolInputs . fst)
   case inputs Seq.!? var of
     Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
     Just val -> return val
 
-lookupUIntInputVar :: Show n => Int -> Var -> M n n
-lookupUIntInputVar width var = do
+lookupInputVarU :: Show n => Int -> Var -> M n n
+lookupInputVarU width var = do
   inputss <- asks (Inputs.uintInputs . fst)
   case IntMap.lookup width inputss of
-    Nothing -> error ("lookupUIntInputVar: no UInt of such bit width: " <> show width)
+    Nothing -> error ("lookupInputVarU: no UInt of such bit width: " <> show width)
     Just inputs ->
       case inputs Seq.!? var of
         Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
@@ -337,7 +336,7 @@ addBinding :: Var -> [n] -> M n ()
 addBinding var [val] = modify (IntMap.insert var val)
 addBinding _ _ = error "addBinding: expected a single value"
 
--- addBinding (NumVar var) [val] = modify (IntMap.insert var val)
+-- addBinding (VarN var) [val] = modify (IntMap.insert var val)
 -- addBinding (ArrayRef _ _ addr) vals = do
 --   vars <- collectVarsFromAddr addr
 --   mapM_

@@ -134,9 +134,9 @@ tests = do
           lookupBinRepStart counters 4 `shouldBe` Just 7
           lookupBinRepStart counters 5 `shouldBe` Just 10
           lookupBinRepStart counters 6 `shouldBe` Just 14
-          blendCustomInputVar counters 4 0 `shouldBe` 5
-          blendCustomInputVar counters 4 1 `shouldBe` 6
-          blendCustomInputVar counters 3 0 `shouldBe` 4
+          blendInputVarU counters 4 0 `shouldBe` 5
+          blendInputVarU counters 4 1 `shouldBe` 6
+          blendInputVarU counters 3 0 `shouldBe` 4
 
     case asGF181N $ erasedVarCounters <$> erase example4 of
       Left err -> it "Erasure of example4" $ expectationFailure (show err)

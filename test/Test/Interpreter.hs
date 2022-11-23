@@ -90,7 +90,7 @@ tests = do
 
 -- data Ctx = Ctx
 --   { ctxNumVar :: Int,
---     ctxNumInputVar :: Int,
+--     ctxInputVarN :: Int,
 --     ctxBoolVars :: IntSet
 --   }
 --   deriving (Show)

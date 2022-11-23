@@ -144,58 +144,58 @@ eraseRef3 ref = do
   counters <- get
   let numWidth = getNumBitWidth counters
   return $ case ref of
-    T.NumVar n -> (BWNumber numWidth, ExprN $ VarN numWidth $ blendIntermediateVar counters n)
-    T.NumInputVar n -> (BWNumber numWidth, ExprN $ VarN numWidth $ blendNumInputVar counters n)
-    T.BoolVar n -> (BWBoolean, ExprB $ VarB $ blendIntermediateVar counters n)
-    T.BoolInputVar n -> (BWBoolean, ExprB $ VarB $ blendBoolInputVar counters n)
-    T.UIntVar w n -> (BWUInt w, ExprU $ VarU w $ blendIntermediateVar counters n)
-    T.UIntInputVar w n -> (BWUInt w, ExprU $ VarU w $ blendCustomInputVar counters w n)
+    T.VarN n -> (BWNumber numWidth, ExprN $ VarN numWidth $ blendIntermediateVar counters n)
+    T.InputVarN n -> (BWNumber numWidth, ExprN $ VarN numWidth $ blendInputVarN counters n)
+    T.VarB n -> (BWBoolean, ExprB $ VarB $ blendIntermediateVar counters n)
+    T.InputVarB n -> (BWBoolean, ExprB $ VarB $ blendInputVarB counters n)
+    T.VarU w n -> (BWUInt w, ExprU $ VarU w $ blendIntermediateVar counters n)
+    T.InputVarU w n -> (BWUInt w, ExprU $ VarU w $ blendInputVarU counters w n)
 
 -- eraseRefN :: T.Ref -> M n (BitWidth, ExprN n)
 -- eraseRefN ref = do
 --   counters <- get
 --   let numWidth = getNumBitWidth counters
 --   return $ case ref of
---     T.NumVar n -> (BWNumber numWidth, VarN numWidth $ blendIntermediateVar counters n)
---     T.NumInputVar n -> (BWNumber numWidth,  VarN numWidth $ blendNumInputVar counters n)
---     T.BoolVar _ -> error "[ panic ] eraseRefN on BoolVar"
---     T.BoolInputVar _ -> error "[ panic ] eraseRefN on BoolInputVar"
---     T.UIntVar _ _ -> error "[ panic ] eraseRefN on UIntVar"
---     T.UIntInputVar _ _ -> error "[ panic ] eraseRefN on UIntInputVar"
+--     T.VarN n -> (BWNumber numWidth, VarN numWidth $ blendIntermediateVar counters n)
+--     T.InputVarN n -> (BWNumber numWidth,  VarN numWidth $ blendInputVarN counters n)
+--     T.VarB _ -> error "[ panic ] eraseRefN on BoolVar"
+--     T.InputVarB _ -> error "[ panic ] eraseRefN on InputVarB"
+--     T.VarU _ _ -> error "[ panic ] eraseRefN on VarU"
+--     T.InputVarU _ _ -> error "[ panic ] eraseRefN on InputVarU"
 
 -- eraseRefU :: T.Ref -> M n (BitWidth, ExprU n)
 -- eraseRefU ref = do
 --   counters <- get
 --   return $ case ref of
---     T.NumVar _ -> error "[ panic ] eraseRefU on NumVar"
---     T.NumInputVar _ -> error "[ panic ] eraseRefU on NumInputVar"
---     T.BoolVar _ -> error "[ panic ] eraseRefU on BoolVar"
---     T.BoolInputVar _ -> error "[ panic ] eraseRefU on BoolInputVar"
---     T.UIntVar w n -> (BWUInt w, VarU w $ blendIntermediateVar counters n)
---     T.UIntInputVar w n -> (BWUInt w, VarU w $ blendCustomInputVar counters w n)
+--     T.VarN _ -> error "[ panic ] eraseRefU on NumVar"
+--     T.InputVarN _ -> error "[ panic ] eraseRefU on InputVarN"
+--     T.VarB _ -> error "[ panic ] eraseRefU on BoolVar"
+--     T.InputVarB _ -> error "[ panic ] eraseRefU on InputVarB"
+--     T.VarU w n -> (BWUInt w, VarU w $ blendIntermediateVar counters n)
+--     T.InputVarU w n -> (BWUInt w, VarU w $ blendInputVarU counters w n)
 
 eraseRef2 :: T.Ref -> M n Int
 eraseRef2 ref = do
   counters <- get
   return $ case ref of
-    T.NumVar n -> blendIntermediateVar counters n
-    T.NumInputVar n -> blendNumInputVar counters n
-    T.BoolVar n -> blendIntermediateVar counters n
-    T.BoolInputVar n -> blendBoolInputVar counters n
-    T.UIntVar _ n -> blendIntermediateVar counters n
-    T.UIntInputVar w n -> blendCustomInputVar counters w n
+    T.VarN n -> blendIntermediateVar counters n
+    T.InputVarN n -> blendInputVarN counters n
+    T.VarB n -> blendIntermediateVar counters n
+    T.InputVarB n -> blendInputVarB counters n
+    T.VarU _ n -> blendIntermediateVar counters n
+    T.InputVarU w n -> blendInputVarU counters w n
 
 -- eraseRef :: GaloisField n => T.Ref -> M n (Expr n)
 -- eraseRef ref = do
 --   counters <- get
 --   let numWidth = getNumBitWidth counters
 --   return $ case ref of
---     T.NumVar n -> VarN numWidth $ blendIntermediateVar counters n
---     T.NumInputVar n -> VarN numWidth $ blendNumInputVar counters n
---     T.BoolVar n -> VarB $ blendIntermediateVar counters n
---     T.BoolInputVar n -> VarB $ blendBoolInputVar counters n
---     T.UIntVar w n -> VarU w $ blendIntermediateVar counters n
---     T.UIntInputVar w n -> VarU w $ blendCustomInputVar counters w n
+--     T.VarN n -> VarN numWidth $ blendIntermediateVar counters n
+--     T.InputVarN n -> VarN numWidth $ blendInputVarN counters n
+--     T.VarB n -> VarB $ blendIntermediateVar counters n
+--     T.InputVarB n -> VarB $ blendInputVarB counters n
+--     T.VarU w n -> VarU w $ blendIntermediateVar counters n
+--     T.InputVarU w n -> VarU w $ blendInputVarU counters w n
 
 -- eraseExprN :: (GaloisField n, Integral n) => T.Expr -> M n [(BitWidth, ExprN n)]
 -- eraseExprN expr = case expr of
@@ -449,6 +449,11 @@ eraseExpr expr = case expr of
     (_, x') <- head <$> eraseExpr x
     value <- bitValue x' i
     return [(BWBoolean, ExprB value)]
+  T.NotU x -> do
+    (bw, x') <- head <$> eraseExpr x
+    case bw of
+      BWUInt w -> return [(bw, ExprU $ NotU w (narrowDownToExprU x'))]
+      _ -> error "[ panic ] T.NotU on wrong type of data"
 
 bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (ExprB n)
 bitValue expr i = case expr of

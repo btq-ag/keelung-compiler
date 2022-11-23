@@ -176,6 +176,26 @@ tests = do
                                   (Poly.buildEither 0 [(0, 1), (1, -1), (2, 1)])
                               ]
 
+      -- it "AND 0" $ do
+      --   let program = do
+      --         x <- inputUInt @4
+      --         y <- inputUInt @4
+      --         return (x `And` y)
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- x - y - carry = output
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(1, 1), (2, -1)])
+      --                             (Poly.buildEither 0 [(0, 1)])
+      --                             (Poly.buildEither 0 []),
+      --                           R1C
+      --                             (Poly.buildEither 0 [(1, 1), (2, -1)])
+      --                             (Poly.buildEither 0 [(11, 1)])
+      --                             (Poly.buildEither 1 [(0, -1)])
+      --                         ]
+      
       it "Equality 0" $ do
         let program = do
               x <- inputUInt @4

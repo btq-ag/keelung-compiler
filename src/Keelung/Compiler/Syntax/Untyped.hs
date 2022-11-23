@@ -130,6 +130,7 @@ data ExprU n
     AndU Width (ExprU n) (ExprU n) (Seq (ExprU n))
   | OrU Width (ExprU n) (ExprU n) (Seq (ExprU n))
   | XorU Width (ExprU n) (ExprU n)
+  | NotU Width (ExprU n)
   | IfU Width (ExprB n) (ExprU n) (ExprU n)
   deriving (Functor)
 
@@ -143,6 +144,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     AndU _ x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrU _ x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorU _ x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
+    NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
 
 instance Num n => Num (ExprU n) where
@@ -239,6 +241,7 @@ sizeOfExprU xs = case xs of
     let operands = x0 :<| x1 :<| xs'
      in sum (fmap sizeOfExprU operands) + (length operands - 1)
   XorU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
+  NotU _ x -> sizeOfExprU x + 1
   IfU _ p x y -> 1 + sizeOfExprB p + sizeOfExprU x + sizeOfExprU y
 
 bitWidthOf :: Expr n -> BitWidth
@@ -268,6 +271,7 @@ widthOfU expr = case expr of
   AndU w _ _ _ -> w
   OrU w _ _ _ -> w
   XorU w _ _ -> w
+  NotU w _ -> w
   IfU w _ _ _ -> w
 
 castToNumber :: Width -> Expr n -> Expr n
@@ -307,6 +311,7 @@ castToNumber width expr = case expr of
     AndU {} -> error "[ panic ] castToNumber: AndU"
     OrU {} -> error "[ panic ] castToNumber: OrU"
     XorU {} -> error "[ panic ] castToNumber: XorU"
+    NotU {} -> error "[ panic ] castToNumber: NotU"
     IfU _ p a b -> ExprN (IfN width p (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
   Rotate _ n x -> Rotate (BWNumber width) n x
 

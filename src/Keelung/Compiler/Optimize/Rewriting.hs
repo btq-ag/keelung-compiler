@@ -37,7 +37,7 @@ rewriteAssertEq expr = case expr of
     -- introduce a fresh variable
     -- and assign both expressions to it
     var <- allocVar
-    let ref = NumVar var
+    let ref = VarN var
     assignNum ref x
     assignNum ref y
     return False
@@ -51,7 +51,7 @@ rewriteAssertEq expr = case expr of
     -- introduce a fresh variable
     -- and assign both expressions to it
     var <- allocVar
-    let ref = BoolVar var
+    let ref = VarB var
     assignBool ref x
     assignBool ref y
     return False
