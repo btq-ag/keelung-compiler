@@ -279,22 +279,22 @@ tests = do
                                   (Poly.buildEither 0 [])
                               ]
 
-      -- it "AND" $ do 
-      --   -- oii bbbb bbbb
-      --   -- 012 3456 7890
-      --   let program = do
-      --         x <- inputUInt @4
-      --         y <- inputUInt @4
-      --         return $ x .&. y
-      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-      --     Left err -> expectationFailure (show err)
-      --     Right r1cs -> do
-      --       toR1Cs r1cs
-      --         `shouldContain` [ R1C
-      --                             (Poly.buildEither 0 [(3, 1)])
-      --                             (Poly.buildEither 0 [(7, 1)])
-      --                             (Poly.buildEither 0 [(0, 1)])
-      --                         ]
+      it "AND" $ do 
+        -- oii bbbb bbbb bbbb
+        -- 012 3456 7890 1234
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              return $ x .&. y
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(3, 1)])
+                                  (Poly.buildEither 0 [(7, 1)])
+                                  (Poly.buildEither 0 [(11, 1)])
+                              ]
 
 --   it "Addition 0" $ do
 --     let program = do

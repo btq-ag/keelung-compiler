@@ -100,6 +100,7 @@ propagateConstant relations = propagate
       VarU w var -> case lookupU w var (valueBindings relations) of
         Nothing -> e
         Just val -> ValU w val
+      OutputVarU _ _ -> e -- no constant propagation for output variables
       InputVarU _ _ -> e -- no constant propagation for input variables
       SubU w x y -> SubU w (propagateU x) (propagateU y)
       AddU w x y -> AddU w (propagateU x) (propagateU y)

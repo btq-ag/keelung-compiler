@@ -116,7 +116,7 @@ add cs =
 -- | Adds a new view of binary representation of a variable after rotation.
 addRotatedBinRep :: Var -> Width -> Var -> Int -> M n ()
 addRotatedBinRep out width var rotate = do
-  index <- lookupBinRepIndex width var
+  index <- lookupBinRep width var
   addBinRep $ BinRep out width index rotate
 
 addBinRep :: BinRep -> M n ()
@@ -136,15 +136,14 @@ freshBinRep var width
     addBinRep $ BinRep var width (head vars) 0
 
 -- | Locate the binary representations of some variable
-lookupBinRepIndex :: Int -> Var -> M n Var
-lookupBinRepIndex width var = do
+lookupBinRep :: Int -> Var -> M n Var
+lookupBinRep width var = do
   counters <- gets envVarCounters
   extraBinReps <- gets envExtraBinReps
   case lookupBinRepStart counters var of
-    Nothing -> do
-      case BinRep.lookup width var extraBinReps of
-        Nothing -> error $ "lookupBinRep: could not find binary representation of " ++ show var
-        Just binRep -> return (binRepBitsIndex binRep)
+    Nothing -> case BinRep.lookup width var extraBinReps of
+      Nothing -> error $ "lookupBinRep: could not find binary representation of " ++ show var
+      Just binRep -> return (binRepBitsIndex binRep)
     Just index -> return index
 
 getNumberBitWidth :: M n Width
@@ -268,24 +267,40 @@ encodeExprB out expr = case expr of
     result <- bitTestU x i
     var <- wireAsVar (ExprB result)
     add $ cadd 0 [(out, 1), (var, -1)] -- out = var
-    -- counters <- gets envVarCounters
-    -- case lookupBinRepStart counters x' of
-    --   Nothing -> error "[ panic ] Unable to look up the variable index of the start of the binary representation of for BitU"
-    --   Just start -> do
-    --     let var = start + i
-    --     add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+
+bitTestUOnVar :: (Integral n, GaloisField n) => Width -> Var -> Int -> M n (ExprB n)
+bitTestUOnVar w var i = do
+  counters <- gets envVarCounters
+  if var < outputVarSize counters
+    then bitTestU (OutputVarU w var) i
+    else do
+      let var' = blendIntermediateVar counters var
+      bitTestU (VarU w var') i
 
 bitTestU :: (Integral n, GaloisField n) => ExprU n -> Int -> M n (ExprB n)
 bitTestU expr i = case expr of
   ValU _ val -> return (ValB (testBit val i))
+  VarU w var -> do
+    counters <- gets envVarCounters
+    -- if the index 'i' overflows or underflows, wrap it around
+    let i' = i `mod` w
+    let var' = blendIntermediateVar counters var
+    start <- lookupBinRep w var'
+    return $ VarB (start + i')
+  OutputVarU w var -> do
+    -- if the index 'i' overflows or underflows, wrap it around
+    let i' = i `mod` w
+    -- let var' = blendInputVarU counters w var
+    start <- lookupBinRep w var
+    -- traceShow ("OutputVarU $" <> show var <> "[" <> show i <> "] => " <> show (start + i')) $ return $ VarB (start + i')
+    return $ VarB (start + i')
   InputVarU w var -> do
     counters <- gets envVarCounters
     -- if the index 'i' overflows or underflows, wrap it around
     let i' = i `mod` w
     let var' = blendInputVarU counters w var
-    case lookupBinRepStart counters var' of
-      Nothing -> error $ "[ panic ] Unable to get perform bit test on $" <> show var' <> "[" <> show i' <> "]"
-      Just start -> return $ VarB (start + i')
+    start <- lookupBinRep w var'
+    return $ VarB (start + i')
   AndU _ x y xs ->
     AndB
       <$> bitTestU x i
@@ -301,7 +316,7 @@ bitTestU expr i = case expr of
       <$> bitTestU x i
       <*> bitTestU y i
   NotU _ x -> NotB <$> bitTestU x i
-  _ -> error $ "[ panic ] Unable to to perform bitTestU of " <> show expr
+  _ -> error $ "[ panic ] Unable to perform bitTestU of " <> show expr
 
 -- ValU n n' -> _
 -- VarU n j -> _
@@ -357,11 +372,17 @@ encodeExprU out expr = case expr of
     counters <- gets envVarCounters
     let var' = blendIntermediateVar counters var
     add $ cadd 0 [(out, 1), (var', -1)] -- out = var
+  OutputVarU _ var -> do
+    add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   InputVarU w var -> do
     counters <- gets envVarCounters
     let var' = blendInputVarU counters w var
     add $ cadd 0 [(out, 1), (var', -1)] -- out = var
-  SubU w x y -> encodeAndFoldExprs (encodeUIntSub w) out (ExprU x) (ExprU y) mempty
+  SubU w x y -> do
+    x' <- wireAsVar (ExprU x)
+    y' <- wireAsVar (ExprU y)
+    freshBinRep out w
+    encodeUIntSub w out x' y'
   AddU w x y -> do
     x' <- wireAsVar (ExprU x)
     y' <- wireAsVar (ExprU y)
@@ -372,7 +393,14 @@ encodeExprU out expr = case expr of
     y' <- wireAsVar (ExprU y)
     freshBinRep out w
     encodeUIntMul w out x' y'
-  AndU {} -> error "encodeExprU: AndU: not implemented"
+  AndU w x y xs -> do
+    () <- freshBinRep out w
+    forM_ [0 .. w - 1] $ \i -> do
+      x' <- bitTestU x i
+      y' <- bitTestU y i
+      xs' <- mapM (`bitTestU` i) xs
+      out' <- bitTestUOnVar w out i >>= wireAsVar . ExprB
+      encodeExprB out' (AndB x' y' xs')
   OrU {} -> error "encodeExprU: OrU: not implemented"
   XorU {} -> error "encodeExprU: XorB: not implemented"
   NotU {} -> error "encodeExprU: NotU: not implemented"
@@ -576,8 +604,8 @@ encodeEquality isEq out x y = case Poly.buildEither 0 [(x, 1), (y, -1)] of
 encodeUIntAddOrSub :: (GaloisField n, Integral n) => Bool -> Int -> Var -> Var -> Var -> M n ()
 encodeUIntAddOrSub isSub width out x y = do
   -- locate the binary representations of the operands
-  xBinRepStart <- lookupBinRepIndex width x
-  yBinRepStart <- lookupBinRepIndex width y
+  xBinRepStart <- lookupBinRep width x
+  yBinRepStart <- lookupBinRep width y
 
   let multiplier = 2 ^ width
   -- We can refactor

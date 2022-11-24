@@ -109,6 +109,7 @@ instance (Show n, Integral n) => Show (ExprN n) where
 data ExprU n
   = ValU Width n
   | VarU Width Var
+  | OutputVarU Width Var
   | InputVarU Width Var
   | -- arithmetic operators
     SubU Width (ExprU n) (ExprU n)
@@ -128,6 +129,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
   showsPrec prec expr = case expr of
     ValU _ n -> shows n
     VarU _ var -> showString "$" . shows var
+    OutputVarU _ var -> showString "$U" . shows var
     InputVarU _ var -> showString "$U" . shows var
     SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
@@ -195,6 +197,7 @@ widthOfU :: ExprU n -> Width
 widthOfU expr = case expr of
   ValU w _ -> w
   VarU w _ -> w
+  OutputVarU w _ -> w
   InputVarU w _ -> w
   SubU w _ _ -> w
   AddU w _ _ -> w
