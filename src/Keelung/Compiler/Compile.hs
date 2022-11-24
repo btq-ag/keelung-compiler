@@ -394,14 +394,21 @@ encodeExprU out expr = case expr of
     freshBinRep out w
     encodeUIntMul w out x' y'
   AndU w x y xs -> do
-    () <- freshBinRep out w
+    freshBinRep out w
     forM_ [0 .. w - 1] $ \i -> do
       x' <- bitTestU x i
       y' <- bitTestU y i
       xs' <- mapM (`bitTestU` i) xs
       out' <- bitTestUOnVar w out i >>= wireAsVar . ExprB
       encodeExprB out' (AndB x' y' xs')
-  OrU {} -> error "encodeExprU: OrU: not implemented"
+  OrU w x y xs -> do
+    freshBinRep out w
+    forM_ [0 .. w - 1] $ \i -> do
+      x' <- bitTestU x i
+      y' <- bitTestU y i
+      xs' <- mapM (`bitTestU` i) xs
+      out' <- bitTestUOnVar w out i >>= wireAsVar . ExprB
+      encodeExprB out' (OrB x' y' xs')
   XorU {} -> error "encodeExprU: XorB: not implemented"
   NotU {} -> error "encodeExprU: NotU: not implemented"
   IfU _ p x y -> do
