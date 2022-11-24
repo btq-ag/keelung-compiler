@@ -362,6 +362,25 @@ tests = do
                                     (Poly.buildEither 1 [(7 + i, 1)])
                                     (Poly.buildEither 1 [(11 + i, 1), (3 + i, -3)])
                                 ]
+      
+      it "NOT" $ do 
+        -- oi bbbb bbbb
+        -- 01 2345 6789
+        let program = do
+              x <- inputUInt @4
+              return $ complement x
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- 1 - x[i] = out[i]
+            forM_ [0 .. 3] $ \i -> 
+              toR1Cs r1cs
+                `shouldContain` [ R1C
+                                    (Poly.buildEither 1 [(2 + i, -1), (6 + i, -1)])
+                                    (Poly.buildEither 1 [])
+                                    (Poly.buildEither 0 [])
+                                ]
+                                                                
 --   it "Addition 0" $ do
 --     let program = do
 --           x <- inputUInt @4
