@@ -110,6 +110,7 @@ instance FreeVar Boolean where
     And x y -> (<>) <$> freeVars x <*> freeVars y
     Or x y -> (<>) <$> freeVars x <*> freeVars y
     Xor x y -> (<>) <$> freeVars x <*> freeVars y
+    Not x -> freeVars x
     EqB x y -> (<>) <$> freeVars x <*> freeVars y
     EqN x y -> (<>) <$> freeVars x <*> freeVars y
     EqU x y -> (<>) <$> freeVars x <*> freeVars y
@@ -210,6 +211,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
     And x y -> zipWith (*) <$> interpret x <*> interpret y
     Or x y -> zipWith (+) <$> interpret x <*> interpret y
     Xor x y -> zipWith (\x' y' -> x' + y' - 2 * (x' * y')) <$> interpret x <*> interpret y
+    Not x -> map (1 -) <$> interpret x
     IfB p x y -> do
       p' <- interpret p
       case p' of

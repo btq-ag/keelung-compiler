@@ -220,6 +220,9 @@ encodeExprB out expr = case expr of
     x' <- wireAsVar (ExprB x)
     y' <- wireAsVar (ExprB y)
     add [CXor x' y' out]
+  NotB x -> do
+    x' <- wireAsVar (ExprB x)
+    add $ cadd 1 [(x', -1), (out, -1)] -- out = 1 - x
   IfB p x y -> do
     p' <- wireAsVar (ExprB p)
     x' <- wireAsVar (ExprB x)
@@ -297,6 +300,7 @@ bitTestU expr i = case expr of
     XorB
       <$> bitTestU x i
       <*> bitTestU y i
+  NotU _ x -> NotB <$> bitTestU x i
   _ -> error $ "[ panic ] Unable to to perform bitTestU of " <> show expr
 
 -- ValU n n' -> _

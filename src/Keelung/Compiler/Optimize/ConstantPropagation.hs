@@ -121,6 +121,7 @@ propagateConstant relations = propagate
       AndB x y xs -> AndB (propagateB x) (propagateB y) (fmap propagateB xs)
       OrB x y xs -> OrB (propagateB x) (propagateB y) (fmap propagateB xs)
       XorB x y -> XorB (propagateB x) (propagateB y)
+      NotB x -> NotB (propagateB x)
       IfB p x y -> IfB (propagateB p) (propagateB x) (propagateB y)
       NEqB x y -> NEqB (propagateB x) (propagateB y)
       NEqN x y -> NEqN (propagateN x) (propagateN y)

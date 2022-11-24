@@ -110,6 +110,7 @@ eraseExprB expr = case expr of
     T.AndB x y -> chainExprsOfAssocOpAndB <$> eraseExprB x <*> eraseExprB y
     T.OrB x y -> chainExprsOfAssocOpOrB <$> eraseExprB x <*> eraseExprB y
     T.XorB x y -> XorB <$> eraseExprB x <*> eraseExprB y
+    T.NotB x -> NotB <$> eraseExprB x
     T.IfB p x y -> IfB <$> eraseExprB p <*> eraseExprB x <*> eraseExprB y
     T.EqB x y -> EqB <$> eraseExprB x <*> eraseExprB y
     T.EqN x y -> EqN <$> eraseExprN x <*> eraseExprN y

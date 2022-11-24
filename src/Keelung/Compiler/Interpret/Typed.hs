@@ -124,6 +124,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
     AndB x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     OrB x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorB x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
+    NotB x -> map bitWiseNot <$> interpret x
     IfB p x y -> do
       p' <- interpret p
       case p' of
@@ -289,6 +290,7 @@ freeVarsB expr = case expr of
   AndB x y -> freeVarsB x <> freeVarsB y
   OrB x y -> freeVarsB x <> freeVarsB y
   XorB x y -> freeVarsB x <> freeVarsB y
+  NotB x -> freeVarsB x
   IfB p x y -> freeVarsB p <> freeVarsB x <> freeVarsB y
   EqB x y -> freeVarsB x <> freeVarsB y
   EqN x y -> freeVarsN x <> freeVarsN y

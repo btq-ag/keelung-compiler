@@ -45,6 +45,7 @@ data ExprB n
     AndB (ExprB n) (ExprB n) (Seq (ExprB n))
   | OrB (ExprB n) (ExprB n) (Seq (ExprB n))
   | XorB (ExprB n) (ExprB n)
+  | NotB (ExprB n)
   | IfB (ExprB n) (ExprB n) (ExprB n)
   | -- comparison operators
     NEqB (ExprB n) (ExprB n)
@@ -65,6 +66,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
+    NotB x -> chain prec "¬ " 5 $ x :<| Empty
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     NEqB x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
     NEqN x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
