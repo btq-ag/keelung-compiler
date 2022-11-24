@@ -344,6 +344,24 @@ tests = do
                                     (Poly.buildEither 0 [(11 + i, 1), (15 + i, -1)])
                                 ]
 
+      it "XOR" $ do 
+        -- oii bbbb bbbb bbbb
+        -- 012 3456 7890 1234
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              return $ x .^. y
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- (1 - 2x[i]) * y[i] = out[i] - 3x[i]
+            forM_ [0 .. 3] $ \i -> 
+              toR1Cs r1cs
+                `shouldContain` [ R1C
+                                    (Poly.buildEither 1 [(3 + i, -2)])
+                                    (Poly.buildEither 1 [(7 + i, 1)])
+                                    (Poly.buildEither 1 [(11 + i, 1), (3 + i, -3)])
+                                ]
 --   it "Addition 0" $ do
 --     let program = do
 --           x <- inputUInt @4

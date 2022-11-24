@@ -409,7 +409,13 @@ encodeExprU out expr = case expr of
       xs' <- mapM (`bitTestU` i) xs
       out' <- bitTestUOnVar w out i >>= wireAsVar . ExprB
       encodeExprB out' (OrB x' y' xs')
-  XorU {} -> error "encodeExprU: XorB: not implemented"
+  XorU w x y -> do
+    freshBinRep out w
+    forM_ [0 .. w - 1] $ \i -> do
+      x' <- bitTestU x i
+      y' <- bitTestU y i
+      out' <- bitTestUOnVar w out i >>= wireAsVar . ExprB
+      encodeExprB out' (XorB x' y')
   NotU {} -> error "encodeExprU: NotU: not implemented"
   IfU _ p x y -> do
     p' <- wireAsVar (ExprB p)
