@@ -92,6 +92,7 @@ propagateConstant relations = propagate
       MulN w x y -> MulN w (propagateN x) (propagateN y)
       DivN w x y -> DivN w (propagateN x) (propagateN y)
       IfN w p x y -> IfN w (propagateB p) (propagateN x) (propagateN y)
+      BtoN w x -> BtoN w (propagateB x)
 
     propagateU e = case e of
       ValU _ _ -> e
@@ -107,6 +108,7 @@ propagateConstant relations = propagate
       NotU w x -> NotU w (propagateU x)
       IfU w p x y -> IfU w (propagateB p) (propagateU x) (propagateU y)
       RoLU w i x -> RoLU w i (propagateU x)
+      BtoU w x -> BtoU w (propagateB x)
 
     propagateB e = case e of
       ValB _ -> e

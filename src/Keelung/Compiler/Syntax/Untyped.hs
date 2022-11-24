@@ -89,6 +89,7 @@ data ExprN n
   | DivN Width (ExprN n) (ExprN n)
   | -- logical operators
     IfN Width (ExprB n) (ExprN n) (ExprN n)
+  | BtoN Width (ExprB n)
   deriving (Functor)
 
 instance (Show n, Integral n) => Show (ExprN n) where
@@ -100,6 +101,7 @@ instance (Show n, Integral n) => Show (ExprN n) where
     MulN _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
     DivN _ x y -> chain prec " / " 7 $ x :<| y :<| Empty
     IfN _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    BtoN _ x -> showString "B→N " . showsPrec prec x
 
 --------------------------------------------------------------------------------
 
@@ -117,6 +119,7 @@ data ExprU n
   | NotU Width (ExprU n)
   | IfU Width (ExprB n) (ExprU n) (ExprU n)
   | RoLU Width Int (ExprU n)
+  | BtoU Width (ExprB n)
   deriving (Functor)
 
 instance (Show n, Integral n) => Show (ExprU n) where
@@ -132,6 +135,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     RoLU _ n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
+    BtoU _ x -> showString "B→U " . showsPrec prec x
 
 instance Num n => Num (ExprU n) where
   x + y = AddU (widthOfU x) x y
@@ -239,6 +243,7 @@ widthOfN expr = case expr of
   MulN w _ _ -> w
   DivN w _ _ -> w
   IfN w _ _ _ -> w
+  BtoN w _ -> w
 
 widthOfU :: ExprU n -> Width
 widthOfU expr = case expr of
@@ -253,6 +258,7 @@ widthOfU expr = case expr of
   NotU w _ -> w
   IfU w _ _ _ -> w
   RoLU w _ _ -> w
+  BtoU w _ -> w
 
 castToNumber :: Width -> Expr n -> Expr n
 castToNumber width expr = case expr of
@@ -268,6 +274,7 @@ castToNumber width expr = case expr of
     MulN _ a b -> ExprN (MulN width a b)
     DivN _ a b -> ExprN (DivN width a b)
     IfN _ p a b -> ExprN (IfN width p a b)
+    BtoN _ a -> ExprN (BtoN width a)
   ExprU x -> case x of
     ValU _ val -> ExprN (ValN width val)
     VarU _ var -> ExprN (VarN width var)
@@ -285,6 +292,7 @@ castToNumber width expr = case expr of
     NotU {} -> error "[ panic ] castToNumber: NotU"
     IfU _ p a b -> ExprN (IfN width p (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
     RoLU {} -> error "[ panic ] castToNumber: RoLU"
+    BtoU {} -> error "[ panic ] castToNumber: BtoU"
 
 -- NOTE: temporary hack, should be removed
 narrowDownToExprN :: Expr n -> ExprN n

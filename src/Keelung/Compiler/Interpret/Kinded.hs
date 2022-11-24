@@ -99,13 +99,8 @@ instance FreeVar Number where
     Sub x y -> (<>) <$> freeVars x <*> freeVars y
     Mul x y -> (<>) <$> freeVars x <*> freeVars y
     Div x y -> (<>) <$> freeVars x <*> freeVars y
-    -- AndN x y -> (<>) <$> freeVars x <*> freeVars y
-    -- OrN x y -> (<>) <$> freeVars x <*> freeVars y
-    -- XorN x y -> (<>) <$> freeVars x <*> freeVars y
-    -- RoRN _ x -> freeVars x
     IfN x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
-    FromBool x -> freeVars x
-    FromUInt x -> freeVars x
+    BtoN x -> freeVars x
 
 instance FreeVar Boolean where
   freeVars expr = case expr of
@@ -135,7 +130,7 @@ instance FreeVar (UInt w) where
     NotU x -> freeVars x
     RoLU _ x -> freeVars x
     IfU p x y -> (<>) <$> freeVars p <*> ((<>) <$> freeVars x <*> freeVars y)
-    ToUInt x -> freeVars x
+    BtoU x -> freeVars x
 
 instance FreeVar () where
   freeVars expr = case expr of
@@ -200,17 +195,12 @@ instance (GaloisField n, Integral n) => Interpret Number n where
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
     Mul x y -> zipWith (*) <$> interpret x <*> interpret y
     Div x y -> zipWith (/) <$> interpret x <*> interpret y
-    -- AndN x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
-    -- OrN x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
-    -- XorN x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
-    -- RoRN n x -> map (bitWiseRotateR n) <$> interpret x
     IfN p x y -> do
       p' <- interpret p
       case p' of
         [0] -> interpret y
         _ -> interpret x
-    FromBool x -> interpret x
-    FromUInt x -> interpret x
+    BtoN x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret Boolean n where
   interpret val = case val of
@@ -262,7 +252,7 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
       case p' of
         [0] -> interpret y
         _ -> interpret x
-    ToUInt x -> interpret x
+    BtoU x -> interpret x
 
 instance GaloisField n => Interpret () n where
   interpret val = case val of

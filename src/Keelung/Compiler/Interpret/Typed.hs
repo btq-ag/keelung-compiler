@@ -146,7 +146,6 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       if testBit (toInteger (head xs)) i
         then return [one]
         else return [zero]
-    LoopholeB x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret Number n where
   interpret expr = case expr of
@@ -163,7 +162,7 @@ instance (GaloisField n, Integral n) => Interpret Number n where
       case p' of
         [0] -> interpret y
         _ -> interpret x
-    LoopholeN x -> interpret x
+    BtoN x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret UInt n where
   interpret expr = case expr of
@@ -183,7 +182,7 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
       case p' of
         [0] -> interpret y
         _ -> interpret x
-    LoopholeU _ x -> interpret x
+    BtoU _ x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret Expr n where
   interpret expr = case expr of
@@ -192,7 +191,6 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     Number e -> interpret e
     UInt e -> interpret e
     Array xs -> concat <$> mapM interpret xs
-    ToNum x -> interpret x
 
 -- Bit x i -> do
 --   xs <- interpret x
@@ -282,7 +280,6 @@ freeVars expr = case expr of
     let unzip4 = foldr (\(u, y, z, w) (us, ys, zs, ws) -> (u : us, y : ys, z : zs, w : ws)) mempty
         (ns, bs, cs, os) = unzip4 $ toList $ fmap freeVars xs
      in (IntSet.unions ns, IntSet.unions bs, IntMap.unionsWith (<>) cs, IntSet.unions os)
-  ToNum x -> freeVars x
 
 freeVarsB :: Boolean -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVarsB expr = case expr of
@@ -297,7 +294,6 @@ freeVarsB expr = case expr of
   EqN x y -> freeVarsN x <> freeVarsN y
   EqU _ x y -> freeVarsU x <> freeVarsU y
   BitU _ x _ -> freeVarsU x
-  LoopholeB x -> freeVars x
 
 freeVarsN :: Number -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVarsN expr = case expr of
@@ -310,7 +306,7 @@ freeVarsN expr = case expr of
   MulN x y -> freeVarsN x <> freeVarsN y
   DivN x y -> freeVarsN x <> freeVarsN y
   IfN p x y -> freeVarsB p <> freeVarsN x <> freeVarsN y
-  LoopholeN x -> freeVars x
+  BtoN x -> freeVarsB x
 
 freeVarsU :: UInt -> (IntSet, IntSet, IntMap IntSet, IntSet)
 freeVarsU expr = case expr of
@@ -326,7 +322,7 @@ freeVarsU expr = case expr of
   NotU _ x -> freeVarsU x
   RoLU _ _ x -> freeVarsU x
   IfU _ p x y -> freeVarsB p <> freeVarsU x <> freeVarsU y
-  LoopholeU _ x -> freeVars x
+  BtoU _ x -> freeVarsB x
 
 --------------------------------------------------------------------------------
 

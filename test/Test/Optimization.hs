@@ -3,7 +3,7 @@ module Test.Optimization (tests) where
 import qualified Basic
 import qualified Data.IntMap as IntMap
 import qualified Data.Set as Set
-import Keelung (Comp, Elaborable, GF181)
+import Keelung (Comp, Encode, GF181)
 import Keelung.Compiler (asGF181, toR1CS)
 import qualified Keelung.Compiler as Compiler
 import Keelung.Compiler.Constraint
@@ -156,7 +156,7 @@ tests = do
       it "6 variables" $ count (Basic.chainingOR 6) `shouldBe` Right (6 + 3)
       it "7 variables" $ count (Basic.chainingOR 7) `shouldBe` Right (7 + 3)
   where
-    count :: Elaborable t => Comp t -> Either (Error GF181) Int
+    count :: Encode t => Comp t -> Either (Error GF181) Int
     count program = do
       cs <- asGF181 (Compiler.compile program)
       return $ length $ toR1Cs $ toR1CS cs

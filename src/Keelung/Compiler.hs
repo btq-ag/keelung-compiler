@@ -41,7 +41,7 @@ import Control.Arrow (left)
 import Control.Monad (when)
 import Data.Field.Galois (GaloisField)
 import Data.Semiring (Semiring (one, zero))
-import Keelung (Elaborable, N (..))
+import Keelung (Encode, N (..))
 import qualified Keelung as Lang
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
@@ -65,11 +65,11 @@ import Keelung.Syntax.Typed (Elaborated)
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
 
-elaborate :: Elaborable t => Comp t -> Either (Error n) Elaborated
+elaborate :: Encode t => Comp t -> Either (Error n) Elaborated
 elaborate = left LangError . Lang.elaborate
 
 -- elaboration => interpretation
-interpret :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
+interpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 interpret prog rawInputs = do
   elab <- elaborate prog
   let inputs = Inputs.deserializeElab elab rawInputs
@@ -77,7 +77,7 @@ interpret prog rawInputs = do
 
 -- | Given a Keelung program and a list of raw inputs
 --   Generate (structured inputs, outputs, witness)
-genInputsOutputsWitnesses :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) (Inputs n, [n], Witness n)
+genInputsOutputsWitnesses :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) (Inputs n, [n], Witness n)
 genInputsOutputsWitnesses prog rawInputs = do
   elab <- elaborate prog
   outputs <- left InterpretError (Interpret.run elab (Inputs.deserializeElab elab rawInputs))
@@ -87,41 +87,41 @@ genInputsOutputsWitnesses prog rawInputs = do
   return (inputs, outputs, witness)
 
 -- elaboration => rewriting => type erasure
-erase :: (GaloisField n, Integral n, Elaborable t) => Comp t -> Either (Error n) (TypeErased n)
+erase :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (TypeErased n)
 erase prog = elaborate prog >>= eraseElab
 
 -- elaboration => rewriting => type erasure => compilation
-compileOnly :: (GaloisField n, Integral n, Elaborable t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
 compileOnly prog = erase prog >>= return . Compile.run
 
 -- | elaboration => rewriting => type erasure => constant propagation => compilation
-compileO0 :: (GaloisField n, Integral n, Elaborable t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
 compileO0 prog = erase prog >>= return . Compile.run . ConstantPropagation.run
 
 -- | elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
 compileO1 ::
-  (GaloisField n, Integral n, Elaborable t) =>
+  (GaloisField n, Integral n, Encode t) =>
   Comp t ->
   Either (Error n) (ConstraintSystem n)
 compileO1 prog = compileO0 prog >>= return . Optimizer.optimize1
 
 -- | 'compile' defaults to 'compileO1'
 compile ::
-  (GaloisField n, Integral n, Elaborable t) =>
+  (GaloisField n, Integral n, Encode t) =>
   Comp t ->
   Either (Error n) (ConstraintSystem n)
 compile = compileO1
 
 -- | elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
 compileO2 ::
-  (GaloisField n, Integral n, Elaborable t) =>
+  (GaloisField n, Integral n, Encode t) =>
   Comp t ->
   Either (Error n) (ConstraintSystem n)
 compileO2 prog = compileO1 prog >>= return . Optimizer.optimize2
 
 -- with optimisation + partial evaluation with inputs
 optimizeWithInput ::
-  (GaloisField n, Integral n, Elaborable t) =>
+  (GaloisField n, Integral n, Encode t) =>
   Comp t ->
   [n] ->
   Either (Error n) (ConstraintSystem n)
@@ -131,14 +131,14 @@ optimizeWithInput program inputs = do
   return cs'
 
 -- computes witnesses
--- computeWitness :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) (Witness n)
+-- computeWitness :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) (Witness n)
 -- computeWitness prog inputs = compile prog >>= left ExecError . witnessOfR1CS inputs . toR1CS
 
 -- | (1) Compile to R1CS.
 --   (2) Generate a satisfying assignment, 'w'.
 --   (3) Check whether 'w' satisfies the constraint system produced in (1).
 --   (4) Check whether the R1CS result matches the interpreter result.
-execute :: (GaloisField n, Integral n, Elaborable t) => Comp t -> [n] -> Either (Error n) [n]
+execute :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 execute prog rawInputs = do
   elab <- elaborate prog
 

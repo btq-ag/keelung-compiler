@@ -169,14 +169,14 @@ example1 = do
   bools0 <- inputs 3
   nums1 <- inputs 4
   bool1 <- inputBool
-  return $ toArray [num0, sum (fmap FromBool bools0), sum nums1, FromBool bool1]
+  return $ toArray [num0, sum (fmap BtoN bools0), sum nums1, BtoN bool1]
 
 example2 :: Comp (Arr Number)
 example2 = do
   num0 <- inputNum
   uint0 <- inputUInt @4
   bool0 <- inputBool
-  return $ toArray [num0, FromBool (uint0 !!! 0), FromBool bool0]
+  return $ toArray [num0, BtoN (uint0 !!! 0), BtoN bool0]
 
 example3 :: Comp (Arr Boolean)
 example3 = do

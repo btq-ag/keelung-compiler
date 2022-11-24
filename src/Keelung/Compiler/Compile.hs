@@ -279,6 +279,7 @@ encodeExprN out expr = case expr of
     x' <- wireAsVar (ExprN x)
     y' <- wireAsVar (ExprN y)
     encodeIf out p' x' y'
+  BtoN _ x -> encodeExprB out x
 
 encodeExprU :: (GaloisField n, Integral n) => Var -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
@@ -305,6 +306,7 @@ encodeExprU out expr = case expr of
     y' <- wireAsVar (ExprU y)
     encodeIf out p' x' y'
   RoLU {} -> error "encodeExprU: RoLU: not implemented" 
+  BtoU _ x -> encodeExprB out x
 
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
 encode out expr = case expr of

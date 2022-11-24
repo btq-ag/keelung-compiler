@@ -116,7 +116,6 @@ eraseExprB expr = do
     T.EqN x y -> EqN <$> eraseExprN x <*> eraseExprN y
     T.EqU _ x y -> EqU <$> eraseExprU x <*> eraseExprU y
     T.BitU _ x i -> BitU <$> eraseExprU x <*> pure i
-    T.LoopholeB x -> narrowDownToExprB . head <$> eraseExpr x
 
 eraseExprN :: (GaloisField n, Integral n) => T.Number -> M n (ExprN n)
 eraseExprN expr = do
@@ -132,7 +131,7 @@ eraseExprN expr = do
     T.MulN x y -> MulN w <$> eraseExprN x <*> eraseExprN y
     T.DivN x y -> DivN w <$> eraseExprN x <*> eraseExprN y
     T.IfN p x y -> IfN w <$> eraseExprB p <*> eraseExprN x <*> eraseExprN y
-    T.LoopholeN x -> narrowDownToExprN . head <$> eraseExpr x
+    T.BtoN x -> BtoN w <$> eraseExprB x
 
 eraseExprU :: (GaloisField n, Integral n) => T.UInt -> M n (ExprU n)
 eraseExprU expr = do
@@ -150,7 +149,7 @@ eraseExprU expr = do
     T.NotU w x -> NotU w <$> eraseExprU x
     T.RoLU w i x -> RoLU w i <$> eraseExprU x
     T.IfU w p x y -> IfU w <$> eraseExprB p <*> eraseExprU x <*> eraseExprU y
-    T.LoopholeU _ x -> narrowDownToExprU . head <$> eraseExpr x
+    T.BtoU w x -> BtoU w <$> eraseExprB x
 
 eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [Expr n]
 eraseExpr expr = case expr of
@@ -168,18 +167,19 @@ eraseExpr expr = case expr of
   T.Array exprs -> do
     exprss <- mapM eraseExpr exprs
     return (concat exprss)
-  -- T.RotateR n x -> error "TODO: eraseExpr RotateR"
-    -- xs <- eraseExpr x
-    -- let x' = head xs
-    -- return [Rotate bw n x']
-  T.ToNum x -> do
-    counters <- get
-    let numWidth = getNumBitWidth counters
-    fmap (castToNumber numWidth) <$> eraseExpr x
-  -- T.Bit x i -> do
-  --   x' <- head <$> eraseExpr x
-  --   value <- bitValue x' i
-  --   return [ExprB value]
+
+-- T.RotateR n x -> error "TODO: eraseExpr RotateR"
+-- xs <- eraseExpr x
+-- let x' = head xs
+-- return [Rotate bw n x']
+-- T.ToNum x -> do
+--   counters <- get
+--   let numWidth = getNumBitWidth counters
+--   fmap (castToNumber numWidth) <$> eraseExpr x
+-- T.Bit x i -> do
+--   x' <- head <$> eraseExpr x
+--   value <- bitValue x' i
+--   return [ExprB value]
 
 bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (ExprB n)
 bitValue expr i = case expr of
@@ -218,11 +218,12 @@ bitValue expr i = case expr of
       <*> bitValue (ExprU y) i
   ExprU _ -> error "Panic: trying to access the bit value of a compound expression"
   ExprB x -> return x
-  -- Rotate w n x -> do
-  --   -- rotate the bit value
-  --   -- if the index 'i' overflows or underflows, wrap it around
-  --   let i' = n + i `mod` getWidth w
-  --   bitValue x i'
+
+-- Rotate w n x -> do
+--   -- rotate the bit value
+--   -- if the index 'i' overflows or underflows, wrap it around
+--   let i' = n + i `mod` getWidth w
+--   bitValue x i'
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.AssignmentB var expr) = do

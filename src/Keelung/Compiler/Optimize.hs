@@ -8,7 +8,7 @@ module Keelung.Compiler.Optimize where
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
-import Keelung (Elaborable, elaborate)
+import Keelung (Encode, elaborate)
 import Keelung.Compiler.Constraint
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints2 as MinimizeConstraints2
@@ -23,7 +23,7 @@ import Keelung.Syntax.VarCounters
 
 --------------------------------------------------------------------------------
 
-elaborateAndRewrite :: Elaborable t => Comp t -> Either Error C.Elaborated
+elaborateAndRewrite :: Encode t => Comp t -> Either Error C.Elaborated
 elaborateAndRewrite prog = elaborate prog >>= Rewriting.run
 
 optimizeWithWitness :: (GaloisField n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
