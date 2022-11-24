@@ -14,6 +14,7 @@ import Data.Sequence (Seq (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint
+import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (CNEQ (..))
@@ -260,7 +261,57 @@ encodeExprB out expr = case expr of
     x' <- wireAsVar (ExprU x)
     y' <- wireAsVar (ExprU y)
     encodeEquality True out x' y'
-  BitU x i -> error "[ panic ] Dunnot how to compile BitU"
+  BitU x i -> do
+    result <- bitTestU x i
+    var <- wireAsVar (ExprB result)
+    add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+    -- counters <- gets envVarCounters
+    -- case lookupBinRepStart counters x' of
+    --   Nothing -> error "[ panic ] Unable to look up the variable index of the start of the binary representation of for BitU"
+    --   Just start -> do
+    --     let var = start + i
+    --     add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+
+bitTestU :: (Integral n, GaloisField n) => ExprU n -> Int -> M n (ExprB n)
+bitTestU expr i = case expr of
+  ValU _ val -> return (ValB (testBit val i))
+  InputVarU w var -> do
+    counters <- gets envVarCounters
+    -- if the index 'i' overflows or underflows, wrap it around
+    let i' = i `mod` w
+    let var' = blendInputVarU counters w var
+    case lookupBinRepStart counters var' of
+      Nothing -> error $ "[ panic ] Unable to get perform bit test on $" <> show var' <> "[" <> show i' <> "]"
+      Just start -> return $ VarB (start + i')
+  AndU _ x y xs ->
+    AndB
+      <$> bitTestU x i
+      <*> bitTestU y i
+      <*> mapM (`bitTestU` i) xs
+  OrU _ x y xs ->
+    OrB
+      <$> bitTestU x i
+      <*> bitTestU y i
+      <*> mapM (`bitTestU` i) xs
+  XorU _ x y ->
+    XorB
+      <$> bitTestU x i
+      <*> bitTestU y i
+  _ -> error $ "[ panic ] Unable to to perform bitTestU of " <> show expr
+
+-- ValU n n' -> _
+-- VarU n j -> _
+-- InputVarU n j -> _
+-- SubU n eu eu' -> _
+-- AddU n eu eu' -> _
+-- MulU n eu eu' -> _
+-- AndU n eu eu' seq -> _
+-- OrU n eu eu' seq -> _
+-- XorU n eu eu' -> _
+-- NotU n eu -> _
+-- IfU n eb eu eu' -> _
+-- RoLU n j eu -> _
+-- BtoU n eb -> _
 
 encodeExprN :: (GaloisField n, Integral n) => Var -> ExprN n -> M n ()
 encodeExprN out expr = case expr of

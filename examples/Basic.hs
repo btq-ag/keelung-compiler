@@ -261,12 +261,6 @@ chainingAND n = foldl And true <$> inputs n
 chainingOR :: Int -> Comp Boolean
 chainingOR n = foldl Or false <$> inputs n
 
--- bits0 :: Comp (Arr Boolean)
--- bits0 = do
---   x <- inputNum
---   let c = 3 :: Number
---   return $ toArray [x !!! 0, x !!! 1, x !!! 2, c !!! 0, c !!! 1, c !!! 2]
-
 -- bits1 :: Comp (Arr Boolean)
 -- bits1 = do
 --   x <- inputNum
@@ -319,7 +313,7 @@ bitwise = do
       [ (x .&. y) !!! 0,
         (x .|. y) !!! 1,
         (x .^. y) !!! 2,
-        (x .&. y) !!! 3
+        complement x !!! 3
       ]
 
 rotateAndBitTest :: Comp (Arr Boolean)
