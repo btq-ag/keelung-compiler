@@ -15,6 +15,7 @@ module Keelung.Compiler
     module Keelung.Compiler.R1CS,
     --
     erase,
+    elaborate,
     interpret,
     genInputsOutputsWitnesses,
     compileOnly,

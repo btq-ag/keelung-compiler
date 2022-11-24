@@ -154,7 +154,14 @@ getNumberBitWidth = gets (getNumBitWidth . envVarCounters)
 encodeExprB :: (GaloisField n, Integral n) => Var -> ExprB n -> M n ()
 encodeExprB out expr = case expr of
   ValB val -> add $ cadd val [(out, -1)] -- out = val
-  VarB var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  VarB var -> do
+    counters <- gets envVarCounters
+    let var' = blendIntermediateVar counters var
+    add $ cadd 0 [(out, 1), (var', -1)] -- out = var
+  InputVarB var -> do
+    counters <- gets envVarCounters
+    let var' = blendInputVarB counters var
+    add $ cadd 0 [(out, 1), (var', -1)] -- out = var
   AndB x0 x1 xs -> do
     a <- wireAsVar (ExprB x0)
     b <- wireAsVar (ExprB x1)
@@ -258,7 +265,14 @@ encodeExprB out expr = case expr of
 encodeExprN :: (GaloisField n, Integral n) => Var -> ExprN n -> M n ()
 encodeExprN out expr = case expr of
   ValN _ val -> add $ cadd val [(out, -1)] -- out = val
-  VarN _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  VarN _ var -> do
+    counters <- gets envVarCounters
+    let var' = blendIntermediateVar counters var
+    add $ cadd 0 [(out, 1), (var', -1)] -- out = var
+  InputVarN _ var -> do
+    counters <- gets envVarCounters
+    let var' = blendInputVarN counters var
+    add $ cadd 0 [(out, 1), (var', -1)] -- out = var
   SubN _ x y -> do
     x' <- toTermN x
     y' <- toTermN y
@@ -284,7 +298,14 @@ encodeExprN out expr = case expr of
 encodeExprU :: (GaloisField n, Integral n) => Var -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
   ValU _ val -> add $ cadd val [(out, -1)] -- out = val
-  VarU _ var -> add $ cadd 0 [(out, 1), (var, -1)] -- out = var
+  VarU _ var -> do
+    counters <- gets envVarCounters
+    let var' = blendIntermediateVar counters var
+    add $ cadd 0 [(out, 1), (var', -1)] -- out = var
+  InputVarU w var -> do
+    counters <- gets envVarCounters
+    let var' = blendInputVarU counters w var
+    add $ cadd 0 [(out, 1), (var', -1)] -- out = var
   SubU w x y -> encodeAndFoldExprs (encodeUIntSub w) out (ExprU x) (ExprU y) mempty
   AddU w x y -> do
     x' <- wireAsVar (ExprU x)

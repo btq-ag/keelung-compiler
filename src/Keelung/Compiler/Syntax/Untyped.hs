@@ -40,6 +40,7 @@ type Width = Int
 data ExprB n
   = ValB n
   | VarB Var
+  | InputVarB Var
   | -- logical operators
     AndB (ExprB n) (ExprB n) (Seq (ExprB n))
   | OrB (ExprB n) (ExprB n) (Seq (ExprB n))
@@ -60,6 +61,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     ValB 0 -> showString "F"
     ValB _ -> showString "T"
     VarB var -> showString "$" . shows var
+    InputVarB var -> showString "$B" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
@@ -77,6 +79,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
 data ExprN n
   = ValN Width n
   | VarN Width Var
+  | InputVarN Width Var
   | -- arithmetic operators
     SubN Width (ExprN n) (ExprN n)
   | AddN Width (ExprN n) (ExprN n) (Seq (ExprN n))
@@ -91,6 +94,7 @@ instance (Show n, Integral n) => Show (ExprN n) where
   showsPrec prec expr = case expr of
     ValN _ n -> shows n
     VarN _ var -> showString "$" . shows var
+    InputVarN _ var -> showString "$N" . shows var
     SubN _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddN _ x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
     MulN _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -103,6 +107,7 @@ instance (Show n, Integral n) => Show (ExprN n) where
 data ExprU n
   = ValU Width n
   | VarU Width Var
+  | InputVarU Width Var
   | -- arithmetic operators
     SubU Width (ExprU n) (ExprU n)
   | AddU Width (ExprU n) (ExprU n)
@@ -121,6 +126,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
   showsPrec prec expr = case expr of
     ValU _ n -> shows n
     VarU _ var -> showString "$" . shows var
+    InputVarU _ var -> showString "$U" . shows var
     SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -175,6 +181,7 @@ widthOfN :: ExprN n -> Width
 widthOfN expr = case expr of
   ValN w _ -> w
   VarN w _ -> w
+  InputVarN w _ -> w
   SubN w _ _ -> w
   AddN w _ _ _ -> w
   MulN w _ _ -> w
@@ -186,6 +193,7 @@ widthOfU :: ExprU n -> Width
 widthOfU expr = case expr of
   ValU w _ -> w
   VarU w _ -> w
+  InputVarU w _ -> w
   SubU w _ _ -> w
   AddU w _ _ -> w
   MulU w _ _ -> w

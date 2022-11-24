@@ -87,6 +87,7 @@ propagateConstant relations = propagate
       VarN w var -> case lookupN var (valueBindings relations) of
         Nothing -> e
         Just val -> ValN w val
+      InputVarN _ _ -> e -- no constant propagation for input variables
       SubN w x y -> SubN w (propagateN x) (propagateN y)
       AddN w x y xs -> AddN w (propagateN x) (propagateN y) (fmap propagateN xs)
       MulN w x y -> MulN w (propagateN x) (propagateN y)
@@ -99,6 +100,7 @@ propagateConstant relations = propagate
       VarU w var -> case lookupU w var (valueBindings relations) of
         Nothing -> e
         Just val -> ValU w val
+      InputVarU _ _ -> e -- no constant propagation for input variables
       SubU w x y -> SubU w (propagateU x) (propagateU y)
       AddU w x y -> AddU w (propagateU x) (propagateU y)
       MulU w x y -> MulU w (propagateU x) (propagateU y)
@@ -115,6 +117,7 @@ propagateConstant relations = propagate
       VarB var -> case lookupB var (valueBindings relations) of
         Nothing -> e
         Just val -> ValB val
+      InputVarB _ -> e -- no constant propagation for input variables
       AndB x y xs -> AndB (propagateB x) (propagateB y) (fmap propagateB xs)
       OrB x y xs -> OrB (propagateB x) (propagateB y) (fmap propagateB xs)
       XorB x y -> XorB (propagateB x) (propagateB y)

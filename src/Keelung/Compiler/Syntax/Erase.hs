@@ -101,13 +101,11 @@ runM = flip evalState
 -- ┗━━━━━━━━━━━━━━━━━┛
 --
 eraseExprB :: (GaloisField n, Integral n) => T.Boolean -> M n (ExprB n)
-eraseExprB expr = do
-  counters <- get
-  case expr of
+eraseExprB expr = case expr of
     T.ValB True -> return $ ValB 1
     T.ValB False -> return $ ValB 0
-    T.VarB var -> return $ VarB $ blendIntermediateVar counters var
-    T.InputVarB var -> return $ VarB $ blendInputVarB counters var
+    T.VarB var -> return $ VarB var
+    T.InputVarB var -> return $ InputVarB var
     T.AndB x y -> chainExprsOfAssocOpAndB <$> eraseExprB x <*> eraseExprB y
     T.OrB x y -> chainExprsOfAssocOpOrB <$> eraseExprB x <*> eraseExprB y
     T.XorB x y -> XorB <$> eraseExprB x <*> eraseExprB y
@@ -119,13 +117,12 @@ eraseExprB expr = do
 
 eraseExprN :: (GaloisField n, Integral n) => T.Number -> M n (ExprN n)
 eraseExprN expr = do
-  counters <- get
   w <- gets getNumBitWidth
   case expr of
     T.ValN x -> return $ ValN w (fromInteger x)
     T.ValNR x -> return $ ValN w (fromRational x)
-    T.VarN var -> return $ VarN w (blendIntermediateVar counters var)
-    T.InputVarN var -> return $ VarN w (blendInputVarN counters var)
+    T.VarN var -> return $ VarN w var
+    T.InputVarN var -> return $ InputVarN w var
     T.AddN x y -> chainExprsOfAssocOpAddN w <$> eraseExprN x <*> eraseExprN y
     T.SubN x y -> SubN w <$> eraseExprN x <*> eraseExprN y
     T.MulN x y -> MulN w <$> eraseExprN x <*> eraseExprN y
@@ -134,12 +131,10 @@ eraseExprN expr = do
     T.BtoN x -> BtoN w <$> eraseExprB x
 
 eraseExprU :: (GaloisField n, Integral n) => T.UInt -> M n (ExprU n)
-eraseExprU expr = do
-  counters <- get
-  case expr of
+eraseExprU expr = case expr of
     T.ValU w n -> return $ ValU w (fromIntegral n)
-    T.VarU w var -> return $ VarU w (blendIntermediateVar counters var)
-    T.InputVarU w var -> return $ VarU w (blendInputVarU counters w var)
+    T.VarU w var -> return $ VarU w var
+    T.InputVarU w var -> return $ InputVarU w var
     T.AddU w x y -> AddU w <$> eraseExprU x <*> eraseExprU y
     T.SubU w x y -> SubU w <$> eraseExprU x <*> eraseExprU y
     T.MulU w x y -> MulU w <$> eraseExprU x <*> eraseExprU y
