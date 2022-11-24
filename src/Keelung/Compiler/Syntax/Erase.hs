@@ -168,19 +168,6 @@ eraseExpr expr = case expr of
     exprss <- mapM eraseExpr exprs
     return (concat exprss)
 
--- T.RotateR n x -> error "TODO: eraseExpr RotateR"
--- xs <- eraseExpr x
--- let x' = head xs
--- return [Rotate bw n x']
--- T.ToNum x -> do
---   counters <- get
---   let numWidth = getNumBitWidth counters
---   fmap (castToNumber numWidth) <$> eraseExpr x
--- T.Bit x i -> do
---   x' <- head <$> eraseExpr x
---   value <- bitValue x' i
---   return [ExprB value]
-
 bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (ExprB n)
 bitValue expr i = case expr of
   ExprN (ValN _ n) -> return (ValB (testBit n i))

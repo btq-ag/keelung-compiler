@@ -203,9 +203,9 @@ encodeExprB out expr = case expr of
               (ValN numBitWidth 0)
               ( AddN
                   numBitWidth
-                  ((narrowDownToExprN . castToNumber numBitWidth . ExprB) x0)
-                  ((narrowDownToExprN . castToNumber numBitWidth . ExprB) x1)
-                  (fmap (narrowDownToExprN . castToNumber numBitWidth . ExprB) xs)
+                  (BtoN numBitWidth x0)
+                  (BtoN numBitWidth x1)
+                  (fmap (BtoN numBitWidth) xs)
               )
           )
   XorB x y -> do
@@ -305,7 +305,7 @@ encodeExprU out expr = case expr of
     x' <- wireAsVar (ExprU x)
     y' <- wireAsVar (ExprU y)
     encodeIf out p' x' y'
-  RoLU {} -> error "encodeExprU: RoLU: not implemented" 
+  RoLU {} -> error "encodeExprU: RoLU: not implemented"
   BtoU _ x -> encodeExprB out x
 
 encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()

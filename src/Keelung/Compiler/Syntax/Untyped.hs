@@ -4,11 +4,6 @@
 
 module Keelung.Compiler.Syntax.Untyped
   ( Width,
-    -- bitWidthOf,
-    castToNumber,
-    narrowDownToExprN,
-    narrowDownToExprU,
-    narrowDownToExprB,
     widthOfU,
     Expr (..),
     ExprB (..),
@@ -176,64 +171,6 @@ instance (Integral n, Show n) => Show (Expr n) where
     ExprN x -> shows x
     ExprU x -> shows x
 
--- Rotate _ n x -> showString "ROTATE " . shows n . showString " " . showsPrec 11 x
-
--- -- | Calculate the "size" of an expression for benchmarking
--- sizeOfExpr :: Expr n -> Int
--- sizeOfExpr expr = case expr of
---   ExprN x -> sizeOfExprN x
---   ExprB x -> sizeOfExprB x
---   ExprU x -> sizeOfExprU x
---   Rotate _ _ x -> 1 + sizeOfExpr x
-
--- sizeOfExprB :: ExprB n -> Int
--- sizeOfExprB expr = case expr of
---   ValB _ -> 1
---   VarB _ -> 1
---   AndB x0 x1 xs ->
---     let operands = x0 :<| x1 :<| xs
---      in sum (fmap sizeOfExprB operands) + (length operands - 1)
---   OrB x0 x1 xs ->
---     let operands = x0 :<| x1 :<| xs
---      in sum (fmap sizeOfExprB operands) + (length operands - 1)
---   XorB x0 x1 -> 1 + sizeOfExprB x0 + sizeOfExprB x1
---   IfB x y z -> 1 + sizeOfExprB x + sizeOfExprB y + sizeOfExprB z
---   NEqB x y -> 1 + sizeOfExprB x + sizeOfExprB y
---   NEqN x y -> 1 + sizeOfExprN x + sizeOfExprN y
---   NEqU x y -> 1 + sizeOfExprU x + sizeOfExprU y
---   EqB x y -> 1 + sizeOfExprB x + sizeOfExprB y
---   EqN x y -> 1 + sizeOfExprN x + sizeOfExprN y
---   EqU x y -> 1 + sizeOfExprU x + sizeOfExprU y
-
--- sizeOfExprN :: ExprN n -> Int
--- sizeOfExprN xs = case xs of
---   ValN _ _ -> 1
---   VarN _ _ -> 1
---   SubN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
---   AddN _ x0 x1 xs' ->
---     let operands = x0 :<| x1 :<| xs'
---      in sum (fmap sizeOfExprN operands) + (length operands - 1)
---   MulN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
---   DivN _ x y -> sizeOfExprN x + sizeOfExprN y + 1
---   IfN _ p x y -> 1 + sizeOfExprB p + sizeOfExprN x + sizeOfExprN y
-
--- sizeOfExprU :: ExprU n -> Int
--- sizeOfExprU xs = case xs of
---   ValU _ _ -> 1
---   VarU _ _ -> 1
---   SubU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
---   AddU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
---   MulU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
---   AndU _ x0 x1 xs' ->
---     let operands = x0 :<| x1 :<| xs'
---      in sum (fmap sizeOfExprU operands) + (length operands - 1)
---   OrU _ x0 x1 xs' ->
---     let operands = x0 :<| x1 :<| xs'
---      in sum (fmap sizeOfExprU operands) + (length operands - 1)
---   XorU _ x y -> sizeOfExprU x + sizeOfExprU y + 1
---   NotU _ x -> sizeOfExprU x + 1
---   IfU _ p x y -> 1 + sizeOfExprB p + sizeOfExprU x + sizeOfExprU y
-
 widthOfN :: ExprN n -> Width
 widthOfN expr = case expr of
   ValN w _ -> w
@@ -259,56 +196,6 @@ widthOfU expr = case expr of
   IfU w _ _ _ -> w
   RoLU w _ _ -> w
   BtoU w _ -> w
-
-castToNumber :: Width -> Expr n -> Expr n
-castToNumber width expr = case expr of
-  ExprB x -> case x of
-    ValB val -> ExprN (ValN width val)
-    VarB var -> ExprN (VarN width var)
-    _ -> error "[ panic ] castToNumber"
-  ExprN x -> case x of
-    ValN _ val -> ExprN (ValN width val)
-    VarN _ var -> ExprN (VarN width var)
-    SubN _ a b -> ExprN (SubN width a b)
-    AddN _ a b xs -> ExprN (AddN width a b xs)
-    MulN _ a b -> ExprN (MulN width a b)
-    DivN _ a b -> ExprN (DivN width a b)
-    IfN _ p a b -> ExprN (IfN width p a b)
-    BtoN _ a -> ExprN (BtoN width a)
-  ExprU x -> case x of
-    ValU _ val -> ExprN (ValN width val)
-    VarU _ var -> ExprN (VarN width var)
-    SubU _ a b ->
-      ExprN $
-        SubN
-          width
-          (narrowDownToExprN (castToNumber width (ExprU a)))
-          (narrowDownToExprN (castToNumber width (ExprU b)))
-    AddU _ a b -> ExprN (AddN width (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)) Empty)
-    MulU _ a b -> ExprN (MulN width (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
-    AndU {} -> error "[ panic ] castToNumber: AndU"
-    OrU {} -> error "[ panic ] castToNumber: OrU"
-    XorU {} -> error "[ panic ] castToNumber: XorU"
-    NotU {} -> error "[ panic ] castToNumber: NotU"
-    IfU _ p a b -> ExprN (IfN width p (narrowDownToExprN $ castToNumber width (ExprU a)) (narrowDownToExprN $ castToNumber width (ExprU b)))
-    RoLU {} -> error "[ panic ] castToNumber: RoLU"
-    BtoU {} -> error "[ panic ] castToNumber: BtoU"
-
--- NOTE: temporary hack, should be removed
-narrowDownToExprN :: Expr n -> ExprN n
-narrowDownToExprN x = case x of
-  ExprN x' -> x'
-  _ -> error "[ panic ] Expected ExprN"
-
-narrowDownToExprU :: Expr n -> ExprU n
-narrowDownToExprU x = case x of
-  ExprU x' -> x'
-  _ -> error "[ panic ] Expected ExprU"
-
-narrowDownToExprB :: Expr n -> ExprB n
-narrowDownToExprB x = case x of
-  ExprB x' -> x'
-  _ -> error "[ panic ] Expected ExprB"
 
 --------------------------------------------------------------------------------
 
