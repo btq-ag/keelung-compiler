@@ -52,6 +52,7 @@ run (TypeErased untypedExprs counters relations assertions assignments numBinRep
         numBinReps
         (customBinReps <> extraBinReps)
         counters'
+        mempty
     )
 
 -- | Encode the constraint 'out = x'.

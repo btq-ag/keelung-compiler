@@ -21,6 +21,7 @@ import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
+import Keelung.Syntax.Counters
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
@@ -131,17 +132,18 @@ data ConstraintSystem n = ConstraintSystem
     csNumBinReps :: BinReps,
     -- | Binary representation of custom output variables
     csCustomBinReps :: BinReps,
-    csVarCounters :: !VarCounters
+    csVarCounters :: !VarCounters,
+    csCounters :: Counters
   }
   deriving (Eq, Generic, NFData)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem cs _ _ counters) =
+numberOfConstraints (ConstraintSystem cs _ _ counters _) =
   Set.size cs + totalBoolVarSize counters + numInputVarSize counters + totalCustomInputSize counters
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints numBinReps customBinReps counters) =
+  show (ConstraintSystem constraints numBinReps customBinReps counters _) =
     "ConstraintSystem {\n\
     \  Total constraint size: "
       <> show (length constraints + totalBinRepConstraintSize)
@@ -182,11 +184,10 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 --   renumbered) in and out variables.
 renumberConstraints :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
 renumberConstraints cs =
-  ConstraintSystem
-    (Set.map renumberConstraint (csConstraints cs))
-    (csNumBinReps cs) -- pinned, no need to renumber
-    (csCustomBinReps cs) -- pinned, no need to renumber
-    (setIntermediateVarSize (IntSet.size newIntermediateVars) counters)
+  cs
+    { csConstraints = Set.map renumberConstraint (csConstraints cs),
+      csVarCounters = setIntermediateVarSize (IntSet.size newIntermediateVars) (csVarCounters cs)
+    }
   where
     counters = csVarCounters cs
 

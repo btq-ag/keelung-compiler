@@ -63,11 +63,13 @@ satisfyR1CS witness r1cs =
 toR1CS :: GaloisField n => ConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
-    (rights convertedConstratins)
-    (csVarCounters cs)
-    (lefts convertedConstratins)
-    (csNumBinReps cs)
-    (csCustomBinReps cs)
+    { r1csConstraints = rights convertedConstratins,
+      r1csVarCounters = csVarCounters cs,
+      r1csCounters = csCounters cs,
+      r1csCNEQs = lefts convertedConstratins,
+      r1csNumBinReps = csNumBinReps cs,
+      r1csCustomBinReps = csCustomBinReps cs
+    }
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
 
@@ -109,6 +111,7 @@ fromR1CS r1cs =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
       csVarCounters = r1csVarCounters r1cs,
+      csCounters = r1csCounters r1cs,
       csNumBinReps = r1csNumBinReps r1cs,
       csCustomBinReps = r1csCustomBinReps r1cs
     }
