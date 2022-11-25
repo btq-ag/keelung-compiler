@@ -4,6 +4,7 @@
 
 module Keelung.Compiler.Syntax.Untyped
   ( Width,
+    Ref(..), Ref'(..),
     widthOfU,
     Expr (..),
     ExprB (..),
@@ -34,6 +35,11 @@ import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Counters as Counters
 import Keelung.Syntax.VarCounters
 import Keelung.Types (Var)
+
+--------------------------------------------------------------------------------
+
+data Ref' = RefF Var | RefB Var | RefU Width Var | RefUBit Width Int
+data Ref = RefI Ref' | RefO Ref' | Ref Ref' | HACK Var
 
 --------------------------------------------------------------------------------
 
