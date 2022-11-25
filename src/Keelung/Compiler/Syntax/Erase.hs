@@ -14,12 +14,12 @@ import Keelung.Syntax.VarCounters
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation counters numAsgns boolAsgns _ assertions = comp
+  let T.Computation countersOld counters numAsgns boolAsgns _ assertions = comp
       proxy = 0
-   in runM counters $ do
+   in runM countersOld $ do
         -- update VarCounters.varNumWidth before type erasure
         let numBitWidth = bitSize proxy
-        let counters' = setNumBitWidth numBitWidth $ setOutputVarSize (lengthOfExpr expr) counters
+        let counters' = setNumBitWidth numBitWidth $ setOutputVarSize (lengthOfExpr expr) countersOld
         put counters'
         -- start type erasure
         expr' <- eraseExpr expr
@@ -55,6 +55,7 @@ run (T.Elaborated expr comp) =
             { erasedExpr = expr',
               -- determine the size of output vars by looking at the length of the expression
               erasedVarCounters = counters'',
+              erasedCounters = counters,
               erasedRelations = mempty,
               erasedAssertions = assertions',
               erasedAssignments = assignments,

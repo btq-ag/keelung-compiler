@@ -27,9 +27,9 @@ import Keelung.Types
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs counters relations assertions assignments numBinReps customBinReps) = runM counters $ do
+run (TypeErased untypedExprs countersOld counters relations assertions assignments numBinReps customBinReps) = runM countersOld $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
-  forM_ (zip (outputVars counters) untypedExprs) (uncurry encode)
+  forM_ (zip (outputVars countersOld) untypedExprs) (uncurry encode)
 
   -- Compile all relations
   encodeRelations relations
@@ -52,7 +52,7 @@ run (TypeErased untypedExprs counters relations assertions assignments numBinRep
         numBinReps
         (customBinReps <> extraBinReps)
         counters'
-        mempty
+        counters
     )
 
 -- | Encode the constraint 'out = x'.
@@ -318,20 +318,6 @@ bitTestU expr i = case expr of
       <*> bitTestU y i
   NotU _ x -> NotB <$> bitTestU x i
   _ -> error $ "[ panic ] Unable to perform bitTestU of " <> show expr
-
--- ValU n n' -> _
--- VarU n j -> _
--- InputVarU n j -> _
--- SubU n eu eu' -> _
--- AddU n eu eu' -> _
--- MulU n eu eu' -> _
--- AndU n eu eu' seq -> _
--- OrU n eu eu' seq -> _
--- XorU n eu eu' -> _
--- NotU n eu -> _
--- IfU n eb eu eu' -> _
--- RoLU n j eu -> _
--- BtoU n eb -> _
 
 encodeExprN :: (GaloisField n, Integral n) => Var -> ExprN n -> M n ()
 encodeExprN out expr = case expr of

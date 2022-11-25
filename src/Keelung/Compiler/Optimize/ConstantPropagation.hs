@@ -12,11 +12,11 @@ import Keelung.Compiler.Syntax.Untyped
 -- 1. Propagate constant in bindings of expressions
 -- 2. Propagate constant in the expression and assertions
 run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
-run (TypeErased expr counters oldRelations assertions assignments numBinReps customBinReps) =
+run (TypeErased expr countersOld counters oldRelations assertions assignments numBinReps customBinReps) =
   let newRelations = propagateRelations oldRelations
       expr' = propagateConstant newRelations <$> expr
       newAssertions = map (propagateConstant newRelations) assertions
-   in TypeErased expr' counters newRelations newAssertions assignments numBinReps customBinReps
+   in TypeErased expr' countersOld counters newRelations newAssertions assignments numBinReps customBinReps
 
 data Result n
   = Result

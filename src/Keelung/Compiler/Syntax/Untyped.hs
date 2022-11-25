@@ -30,6 +30,8 @@ import Data.Sequence (Seq (..))
 import Keelung.Field (N (..))
 import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
+import Keelung.Syntax.Counters
+import qualified Keelung.Syntax.Counters as Counters
 import Keelung.Syntax.VarCounters
 import Keelung.Types (Var)
 
@@ -157,7 +159,7 @@ data Expr n
   = ExprB (ExprB n) -- Boolean expression
   | ExprN (ExprN n) -- Field expression
   | ExprU (ExprU n) -- UInt expression
-  deriving ( Functor)
+  deriving (Functor)
 
 instance Num n => Num (ExprN n) where
   x + y = AddN (widthOfN x) x y Empty
@@ -239,6 +241,8 @@ data TypeErased n = TypeErased
     erasedExpr :: ![Expr n],
     -- | Variable bookkeepung
     erasedVarCounters :: !VarCounters,
+    -- | Variable bookkeepung
+    erasedCounters :: !Counters,
     -- | Relations between variables and/or expressions
     erasedRelations :: !(Relations n),
     -- | Assertions after type erasure
@@ -252,10 +256,10 @@ data TypeErased n = TypeErased
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr counters relations assertions assignments numBinReps customBinReps) =
+  show (TypeErased expr countersOld counters relations assertions assignments numBinReps customBinReps) =
     "TypeErased {\n"
       -- expressions
-      <> " . expression: "
+      <> "  Expression: "
       <> show (fmap (fmap N) expr)
       <> "\n"
       -- relations
@@ -268,17 +272,18 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
              then "  assertions:\n    " <> show assertions <> "\n"
              else ""
          )
-      <> indent (show counters)
+      <> unlines (map ("  " <>) (Counters.prettyPrint counters))
+      <> indent (show countersOld)
       <> "  Boolean variables: $"
-      <> show (fst (boolVarsRange counters))
+      <> show (fst (boolVarsRange countersOld))
       <> " .. $"
-      <> show (snd (boolVarsRange counters) - 1)
+      <> show (snd (boolVarsRange countersOld) - 1)
       <> "\n"
       <> showBinRepConstraints
       <> "\n\
          \}"
     where
-      totalBinRepConstraintSize = numInputVarSize counters + totalCustomInputSize counters
+      totalBinRepConstraintSize = numInputVarSize countersOld + totalCustomInputSize countersOld
       showBinRepConstraints =
         if totalBinRepConstraintSize == 0
           then ""
