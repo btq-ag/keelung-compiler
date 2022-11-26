@@ -3,7 +3,7 @@
 
 module Test.Compilation (tests) where
 
-import qualified Basic
+-- import qualified Basic
 import Keelung
 import qualified Keelung.Compiler as Compiler
 import qualified Keelung.Constraint.Polynomial as Poly
@@ -474,21 +474,21 @@ tests = do
 --                               (Poly.buildEither 1 [(0, -1)])
 --                           ]
 
-example1 :: Comp (Arr Boolean)
-example1 = do
-  x <- inputUInt @4
-  _x2 <- inputUInt @4
-  y <- inputUInt @3
-  return $
-    toArray
-      [ x !!! 0,
-        x !!! 1,
-        x !!! 2,
-        x !!! 3,
-        x !!! 5,
-        x !!! (-1),
-        y !!! 1,
-        y !!! (-1),
-        y !!! 3,
-        y !!! 13
-      ]
+-- example1 :: Comp (Arr Boolean)
+-- example1 = do
+--   x <- inputUInt @4
+--   _x2 <- inputUInt @4
+--   y <- inputUInt @3
+--   return $
+--     toArray
+--       [ x !!! 0,
+--         x !!! 1,
+--         x !!! 2,
+--         x !!! 3,
+--         x !!! 5,
+--         x !!! (-1),
+--         y !!! 1,
+--         y !!! (-1),
+--         y !!! 3,
+--         y !!! 13
+--       ]

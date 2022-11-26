@@ -115,10 +115,10 @@ add cs =
   modify (\env -> env {envConstraints = Set.union (Set.fromList cs) (envConstraints env)})
 
 -- | Adds a new view of binary representation of a variable after rotation.
-addRotatedBinRep :: Var -> Width -> Var -> Int -> M n ()
-addRotatedBinRep out width var rotate = do
-  index <- lookupBinRep width var
-  addBinRep $ BinRep out width index rotate
+-- addRotatedBinRep :: Var -> Width -> Var -> Int -> M n ()
+-- addRotatedBinRep out width var rotate = do
+--   index <- lookupBinRep width var
+--   addBinRep $ BinRep out width index rotate
 
 addBinRep :: BinRep -> M n ()
 addBinRep binRep = modify (\env -> env {envExtraBinReps = BinRep.insert binRep (envExtraBinReps env)})
@@ -192,12 +192,12 @@ encodeExprB out expr = case expr of
     b <- wireAsVar (ExprB x1)
     vars <- mapM (wireAsVar . ExprB) xs
     case vars of
-      Empty -> add [COr a b out]
+      Empty -> encodeOrB out a b
       (c :<| Empty) -> do
         -- only 3 operands
         aOrb <- freshVar
-        add [COr a b aOrb]
-        add [COr aOrb c out]
+        encodeOrB aOrb a b
+        encodeOrB out aOrb c
       _ -> do
         -- more than 3 operands, rewrite it as an inequality instead:
         --      if all operands are 0           then 0 else 1
@@ -541,18 +541,18 @@ encodeTerms out terms =
 --      E₀ ⊗ E₁ ⊗ ... ⊗ Eₙ
 --  =>
 --      E₀ `f` (E₁ `f` ... `f` Eₙ)
-encodeAndFoldExprs :: (GaloisField n, Integral n) => (Var -> Var -> Var -> M n ()) -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
-encodeAndFoldExprs f out x0 x1 xs = do
-  x0' <- wireAsVar x0
-  x1' <- wireAsVar x1
-  vars <- mapM wireAsVar xs
-  go x0' x1' vars
-  where
-    go x y Empty = f out x y
-    go x y (v :<| vs) = do
-      out' <- freshVar
-      go out' v vs
-      f out' x y
+-- encodeAndFoldExprs :: (GaloisField n, Integral n) => (Var -> Var -> Var -> M n ()) -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
+-- encodeAndFoldExprs f out x0 x1 xs = do
+--   x0' <- wireAsVar x0
+--   x1' <- wireAsVar x1
+--   vars <- mapM wireAsVar xs
+--   go x0' x1' vars
+--   where
+--     go x y Empty = f out x y
+--     go x y (v :<| vs) = do
+--       out' <- freshVar
+--       go out' v vs
+--       f out' x y
 
 -- | If the expression is not already a variable, create a new variable
 wireAsVar :: (GaloisField n, Integral n) => Expr n -> M n Var
@@ -652,5 +652,15 @@ encodeIf out p x y = do
   let polynomial2 = case Poly.buildEither 0 [(x, -1), (y, 1)] of
         Left _ -> error "encode: IfB: impossible"
         Right xs -> xs
+  let polynomial3 = Poly.buildEither 0 [(x, -1), (out, 1)]
+  add [CMul polynomial1 polynomial2 polynomial3]
+
+encodeOrB :: (GaloisField n, Integral n) => Var -> Var -> Var -> M n ()
+encodeOrB out x y = do
+  -- (1 - x) * y = (out - x)
+  let polynomial1 = case Poly.buildEither 1 [(x, -1)] of
+        Left _ -> error "encode: OrB: impossible"
+        Right xs -> xs
+  let polynomial2 = Poly.singleVar y
   let polynomial3 = Poly.buildEither 0 [(x, -1), (out, 1)]
   add [CMul polynomial1 polynomial2 polynomial3]

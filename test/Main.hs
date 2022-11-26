@@ -122,7 +122,8 @@ main = hspec $ do
                     cadd (-42 :: GF181) [(0, 1)],
                 csVarCounters = makeVarCounters 181 0 1 0 0 [NumInput 0] [],
                 csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (0, 1)],
-                csCustomBinReps = mempty
+                csCustomBinReps = mempty,
+                csCounters = mempty
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
 

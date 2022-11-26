@@ -38,7 +38,7 @@ data Constraint n
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
   | CNEq (CNEQ n) -- x y m
   | CXor Var Var Var
-  | COr Var Var Var
+  -- | COr Var Var Var
   deriving (Generic, NFData)
 
 instance GaloisField n => Eq (Constraint n) where
@@ -48,7 +48,6 @@ instance GaloisField n => Eq (Constraint n) where
       (x == u && y == v || x == v && y == u) && z == w
     (CNEq x, CNEq y) -> x == y
     (CXor x y z, CXor u v w) -> x == u && y == v && z == w
-    (COr x y z, COr u v w) -> x == u && y == v && z == w
     _ -> False
 
 instance Functor Constraint where
@@ -57,7 +56,6 @@ instance Functor Constraint where
   fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
   fmap f (CNEq x) = CNEq (fmap f x)
   fmap _ (CXor x y z) = CXor x y z
-  fmap _ (COr x y z) = COr x y z
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
@@ -80,15 +78,9 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
   show (CNEq x) = show x
   show (CXor x y z) = "X $" <> show x <> " ⊕ $" <> show y <> " = $" <> show z
-  show (COr x y z) = "O $" <> show x <> " ∨ $" <> show y <> " = $" <> show z
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
-
-  -- CXor is always greater than anything
-  compare (COr x y z) (COr u v w) = compare (x, y, z) (u, v, w)
-  compare _ COr {} = LT
-  compare COr {} _ = GT
   -- CXor
   compare (CXor x y z) (CXor u v w) = compare (x, y, z) (u, v, w)
   compare _ CXor {} = LT
@@ -117,7 +109,6 @@ varsInConstraint (CNEq (CNEQ (Left x) _ m)) = IntSet.fromList [x, m]
 varsInConstraint (CNEq (CNEQ _ (Left y) m)) = IntSet.fromList [y, m]
 varsInConstraint (CNEq (CNEQ _ _ m)) = IntSet.fromList [m]
 varsInConstraint (CXor x y z) = IntSet.fromList [x, y, z]
-varsInConstraint (COr x y z) = IntSet.fromList [x, y, z]
 
 varsInConstraints :: Set (Constraint a) -> IntSet
 varsInConstraints = IntSet.unions . Set.map varsInConstraint
@@ -233,5 +224,3 @@ renumberConstraints cs =
         CNEq (CNEQ (Right x) (Right y) (renumber m))
       CXor x y z ->
         CXor (renumber x) (renumber y) (renumber z)
-      COr x y z ->
-        COr (renumber x) (renumber y) (renumber z)

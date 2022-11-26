@@ -93,16 +93,6 @@ toR1CS cs =
           (Poly.buildEither 1 [(x, -2), (y, 0), (z, 0)])
           (Poly.buildEither 1 [(x, 0), (y, 1), (z, 0)])
           (Poly.buildEither 1 [(x, -3), (y, 0), (z, 1)])
-    toR1C (COr x y z) =
-      --     x  y  z  1
-      -- a [-1, 0, 0, 1]
-      -- b [0 , 1, 0, 0]
-      -- c [-1, 0, 1, 0]
-      Right $
-        R1C
-          (Poly.buildEither 1 [(x, -1), (y, 0), (z, 0)])
-          (Poly.buildEither 0 [(x, 0), (y, 1), (z, 0)])
-          (Poly.buildEither 0 [(x, -1), (y, 0), (z, 1)])
 
 fromR1CS :: GaloisField n => R1CS n -> ConstraintSystem n
 fromR1CS r1cs =
