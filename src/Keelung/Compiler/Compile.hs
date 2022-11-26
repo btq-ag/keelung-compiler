@@ -219,7 +219,7 @@ encodeExprB out expr = case expr of
   XorB x y -> do
     x' <- wireAsVar (ExprB x)
     y' <- wireAsVar (ExprB y)
-    add [CXor x' y' out]
+    encodeXorB out x' y'
   NotB x -> do
     x' <- wireAsVar (ExprB x)
     add $ cadd 1 [(x', -1), (out, -1)] -- out = 1 - x
@@ -663,4 +663,16 @@ encodeOrB out x y = do
         Right xs -> xs
   let polynomial2 = Poly.singleVar y
   let polynomial3 = Poly.buildEither 0 [(x, -1), (out, 1)]
+  add [CMul polynomial1 polynomial2 polynomial3]
+
+encodeXorB :: (GaloisField n, Integral n) => Var -> Var -> Var -> M n ()
+encodeXorB out x y = do
+  -- (1 - 2x) * (y + 1) = (1 + out - 3x)
+  let polynomial1 = case Poly.buildEither 1 [(x, -2)] of
+        Left _ -> error "encode: XorB: impossible"
+        Right xs -> xs
+  let polynomial2 = case Poly.buildEither 1 [(y, 1)] of
+        Left _ -> error "encode: XorB: impossible"
+        Right xs -> xs
+  let polynomial3 = Poly.buildEither 1 [(x, -3), (out, 1)]
   add [CMul polynomial1 polynomial2 polynomial3]

@@ -167,43 +167,43 @@ eraseExpr expr = case expr of
     exprss <- mapM eraseExpr exprs
     return (concat exprss)
 
-bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (ExprB n)
-bitValue expr i = case expr of
-  ExprN (ValN _ n) -> return (ValB (testBit n i))
-  ExprN (VarN w var) -> do
-    counters <- get
-    -- if the index 'i' overflows or underflows, wrap it around
-    let i' = i `mod` w
-    -- bit variable corresponding to the variable 'var' and the index 'i''
-    case lookupBinRepStart counters var of
-      Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
-      Just start -> return $ VarB (start + i')
-  ExprN _ -> error "Panic: trying to access the bit value of a compound expression"
-  ExprU (ValU _ n) -> return (ValB (testBit n i))
-  ExprU (VarU w var) -> do
-    counters <- get
-    -- if the index 'i' overflows or underflows, wrap it around
-    let i' = i `mod` w
-    -- bit variable corresponding to the variable 'var' and the index 'i''
-    case lookupBinRepStart counters var of
-      Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
-      Just start -> return $ VarB (start + i')
-  ExprU (AndU _ x y rest) ->
-    AndB
-      <$> bitValue (ExprU x) i
-      <*> bitValue (ExprU y) i
-      <*> mapM (\x' -> ExprU x' `bitValue` i) rest
-  ExprU (OrU _ x y rest) ->
-    OrB
-      <$> bitValue (ExprU x) i
-      <*> bitValue (ExprU y) i
-      <*> mapM (\x' -> ExprU x' `bitValue` i) rest
-  ExprU (XorU _ x y) ->
-    XorB
-      <$> bitValue (ExprU x) i
-      <*> bitValue (ExprU y) i
-  ExprU _ -> error "Panic: trying to access the bit value of a compound expression"
-  ExprB x -> return x
+-- bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (ExprB n)
+-- bitValue expr i = case expr of
+--   ExprN (ValN _ n) -> return (ValB (testBit n i))
+--   ExprN (VarN w var) -> do
+--     counters <- get
+--     -- if the index 'i' overflows or underflows, wrap it around
+--     let i' = i `mod` w
+--     -- bit variable corresponding to the variable 'var' and the index 'i''
+--     case lookupBinRepStart counters var of
+--       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
+--       Just start -> return $ VarB (start + i')
+--   ExprN _ -> error "Panic: trying to access the bit value of a compound expression"
+--   ExprU (ValU _ n) -> return (ValB (testBit n i))
+--   ExprU (VarU w var) -> do
+--     counters <- get
+--     -- if the index 'i' overflows or underflows, wrap it around
+--     let i' = i `mod` w
+--     -- bit variable corresponding to the variable 'var' and the index 'i''
+--     case lookupBinRepStart counters var of
+--       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
+--       Just start -> return $ VarB (start + i')
+--   ExprU (AndU _ x y rest) ->
+--     AndB
+--       <$> bitValue (ExprU x) i
+--       <*> bitValue (ExprU y) i
+--       <*> mapM (\x' -> ExprU x' `bitValue` i) rest
+--   ExprU (OrU _ x y rest) ->
+--     OrB
+--       <$> bitValue (ExprU x) i
+--       <*> bitValue (ExprU y) i
+--       <*> mapM (\x' -> ExprU x' `bitValue` i) rest
+--   ExprU (XorU _ x y) ->
+--     XorB
+--       <$> bitValue (ExprU x) i
+--       <*> bitValue (ExprU y) i
+--   ExprU _ -> error "Panic: trying to access the bit value of a compound expression"
+--   ExprB x -> return x
 
 -- Rotate w n x -> do
 --   -- rotate the bit value

@@ -180,31 +180,6 @@ substConstraint !constraint = case constraint of
           else do
             bindVar m (recip diff)
             return Nothing
-  CXor x y z -> do
-    x' <- lookupVar x
-    y' <- lookupVar y
-    z' <- lookupVar z
-    case (x', y', z') of
-      (Value _, Value _, Value _) -> return Nothing
-      (Value 0, Value 0, Root c) -> bindVar c 0 >> return Nothing
-      (Value 0, Value _, Root c) -> bindVar c 1 >> return Nothing
-      (Value _, Value 0, Root c) -> bindVar c 1 >> return Nothing
-      (Value _, Value _, Root c) -> bindVar c 0 >> return Nothing
-      (Value 0, Root b, Value 0) -> bindVar b 0 >> return Nothing
-      (Value 0, Root b, Value _) -> bindVar b 1 >> return Nothing
-      (Value _, Root b, Value 0) -> bindVar b 1 >> return Nothing
-      (Value _, Root b, Value _) -> bindVar b 0 >> return Nothing
-      (Root a, Value 0, Value 0) -> bindVar a 0 >> return Nothing
-      (Root a, Value 0, Value _) -> bindVar a 1 >> return Nothing
-      (Root a, Value _, Value 0) -> bindVar a 1 >> return Nothing
-      (Root a, Value _, Value _) -> bindVar a 0 >> return Nothing
-      (Value 0, Root b, Root c) -> unifyVars b c >> return Nothing
-      (Value _, Root b, Root c) -> return $ Just $ CXor x b c -- TODO: learn about this case
-      (Root a, Value 0, Root c) -> unifyVars a c >> return Nothing
-      (Root a, Value _, Root c) -> return $ Just $ CXor a y c -- TODO: learn about this case
-      (Root a, Root b, Value 0) -> unifyVars a b >> return Nothing
-      (Root a, Root b, Value _) -> return $ Just $ CXor a b z -- TODO: learn about this case
-      (Root a, Root b, Root c) -> return $ Just $ CXor a b c
   
 -- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
@@ -214,20 +189,6 @@ isTautology constraint = case constraint of
   -- we assume that the variables in CNEQ has all been substituted with values when possible
   -- so that we can just check if the values are equal
   CNEq {} -> return False
-  CXor x y z -> do
-    x' <- lookupVar x
-    case x' of
-      Root _ -> return False
-      Value x'' -> do
-        y' <- lookupVar y
-        case y' of
-          Root _ -> return False
-          Value y'' -> do
-            z' <- lookupVar z
-            case z' of
-              Root _ -> return False
-              Value z'' ->
-                return $ x'' + y'' - 2 * (x'' * y'') == z''
   
 -- | Learn bindings and variable equalities from a constraint
 learn :: (GaloisField n, Integral n) => Constraint n -> OptiM n ()
@@ -238,18 +199,6 @@ learn (CAdd xs) = case IntMap.toList (Poly.coeffs xs) of
       else bindVar x (- Poly.constant xs / c)
   [(x, c), (y, d)] -> when (Poly.constant xs == 0 && c == - d) $ unifyVars x y
   _ -> return ()
--- learn (CAdd a xs) = case CoeffMap.toList xs of
---   [(x, c)] ->
---     if c == 0
---       then return ()
---       else bindVar x (- a / c)
---   [(x, c), (y, d)] -> when (a == 0 && c == - d) $ unifyVars x y
---   _ -> return ()
-learn (CXor x y z)
-  | x == z = bindVar y 0 -- x ⊕ y = x => y = 0
-  | y == z = bindVar x 0 -- x ⊕ y = y => x = 0
-  | x == y = bindVar z 0 -- x ⊕ x = z => z = 0
-  | otherwise = return ()
 learn _ = return ()
 
 -- NOTE: We handle pinned variables 'var' as follows:

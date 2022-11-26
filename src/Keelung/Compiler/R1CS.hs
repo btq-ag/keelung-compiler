@@ -18,7 +18,6 @@ import Keelung.Compiler.Optimize (optimizeWithWitness)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
-import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import qualified Keelung.Constraint.R1C as R1C
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
@@ -83,16 +82,6 @@ toR1CS cs =
     toR1C (CMul aX bX cX) =
       Right $ R1C (Right aX) (Right bX) cX
     toR1C (CNEq x) = Left x
-    toR1C (CXor x y z) =
-      --     x  y  z  1
-      -- a [-2, 0, 0, 1]
-      -- b [0 , 1, 0, 1]
-      -- c [-3, 0, 1, 1]
-      Right $
-        R1C
-          (Poly.buildEither 1 [(x, -2), (y, 0), (z, 0)])
-          (Poly.buildEither 1 [(x, 0), (y, 1), (z, 0)])
-          (Poly.buildEither 1 [(x, -3), (y, 0), (z, 1)])
 
 fromR1CS :: GaloisField n => R1CS n -> ConstraintSystem n
 fromR1CS r1cs =
