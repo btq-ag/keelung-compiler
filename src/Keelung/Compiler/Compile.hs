@@ -18,17 +18,17 @@ import Keelung.Compiler.Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Syntax.BinRep (BinRep (..), BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.VarCounters
 import Keelung.Types
+import Keelung.Syntax.Counters (Counters, getCount, VarSort (..), VarKind (..), setCount)
 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
-run (TypeErased untypedExprs countersOld counters relations assertions assignments numBinReps customBinReps) = runM countersOld $ do
+run (TypeErased untypedExprs countersOld counters relations assertions assignments numBinReps customBinReps) = runM countersOld counters $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
   forM_ (zip (outputVars countersOld) untypedExprs) (uncurry encode)
 
@@ -47,9 +47,11 @@ run (TypeErased untypedExprs countersOld counters relations assertions assignmen
 
   counters' <- gets envVarCounters
 
+  counters'' <- gets envCounters
+
   return
     ( Constraint.ConstraintSystem
-        (Set.map Constraint.fromConstraint constraints)
+        (Set.map (Constraint.fromConstraint counters'') constraints)
         numBinReps
         (customBinReps <> extraBinReps)
         counters'
@@ -102,14 +104,18 @@ encodeRelations (Relations vbs ebs) = do
 -- | Monad for compilation
 data Env n = Env
   { envVarCounters :: VarCounters,
+    envCounters :: Counters,
     envConstraints :: Set (Constraint n),
     envExtraBinReps :: BinReps
   }
 
 type M n = State (Env n)
 
-runM :: GaloisField n => VarCounters -> M n a -> a
-runM varCounters program = evalState program (Env varCounters mempty mempty)
+runM :: GaloisField n => VarCounters -> Counters -> M n a -> a
+runM varCounters counters program = evalState program (Env varCounters counters mempty mempty)
+
+modifyCounter :: (Counters -> Counters) -> M n ()
+modifyCounter f = modify (\env -> env {envCounters = f (envCounters env)})
 
 add :: GaloisField n => [Constraint n] -> M n ()
 add cs =
@@ -128,6 +134,27 @@ freshVar = do
   n <- gets (totalVarSize . envVarCounters)
   modify' (\ctx -> ctx {envVarCounters = bumpIntermediateVar (envVarCounters ctx)})
   return n
+
+freshRefF :: M n RefF
+freshRefF = do
+  counters <- gets envCounters
+  let index = getCount OfIntermediate OfField counters
+  modifyCounter $ setCount OfIntermediate OfField (index + 1)
+  return $ RefF index
+
+freshRefB :: M n RefB
+freshRefB = do
+  counters <- gets envCounters
+  let index = getCount OfIntermediate OfBoolean counters
+  modifyCounter $ setCount OfIntermediate OfBoolean (index + 1)
+  return $ RefB index
+
+freshRefU :: Width -> M n RefU
+freshRefU width = do
+  counters <- gets envCounters
+  let index = getCount OfIntermediate (OfUInt width) counters
+  modifyCounter $ setCount OfIntermediate (OfUInt width) (index + 1)
+  return $ RefU width index
 
 freshBinRep :: Var -> Int -> M n ()
 freshBinRep var width
@@ -581,7 +608,7 @@ encodeEquality isEq out x y = case Poly.buildEither 0 [(x, 1), (y, -1)] of
   Right diff -> do
     -- introduce a new variable m
     -- if diff = 0 then m = 0 else m = recip diff
-    m <- freshVar
+    m <- freshRefF
 
     let notOut = case Poly.buildMaybe 1 (IntMap.fromList [(out, -1)]) of
           Nothing -> error "encodeBinaryOp: NEq: impossible"
@@ -591,16 +618,18 @@ encodeEquality isEq out x y = case Poly.buildEither 0 [(x, 1), (y, -1)] of
       then do
         --  1. (x - y) * m = 1 - out
         --  2. (x - y) * out = 0
-        add [CMul diff (Poly.singleVar m) (Right notOut)]
+        counters <- gets envCounters
+        add [CMul diff (Poly.singleVar (reindexRefF counters m)) (Right notOut)]
         add [CMul diff (Poly.singleVar out) (Left 0)]
       else do
         --  1. (x - y) * m = out
         --  2. (x - y) * (1 - out) = 0
-        add [CMul diff (Poly.singleVar m) (Right (Poly.singleVar out))]
+        counters <- gets envCounters
+        add [CMul diff (Poly.singleVar (reindexRefF counters m)) (Right (Poly.singleVar out))]
         add [CMul diff notOut (Left 0)]
 
     --  keep track of the relation between (x - y) and m
-    add [CNEq (CNEQ (Left x) (Left y) m)]
+    add [CNEq x y m]
 
 --------------------------------------------------------------------------------
 

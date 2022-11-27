@@ -23,14 +23,14 @@ import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
-import Keelung.Syntax.Counters
+import Keelung.Syntax.Counters (Counters)
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
-fromConstraint :: Constraint2.Constraint n -> Constraint n
-fromConstraint (Constraint2.CAdd p) = CAdd p
-fromConstraint (Constraint2.CMul p q r) = CMul p q r
-fromConstraint (Constraint2.CNEq (CNEQ x y m)) = CNEq (CNEQ x y m)
+fromConstraint :: Counters -> Constraint2.Constraint n -> Constraint n
+fromConstraint _ (Constraint2.CAdd p) = CAdd p
+fromConstraint _ (Constraint2.CMul p q r) = CMul p q r
+fromConstraint counters (Constraint2.CNEq x y m) = CNEq (CNEQ (Left x) (Left y) (Constraint2.reindexRefF counters m))
 
 --------------------------------------------------------------------------------
 

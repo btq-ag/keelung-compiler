@@ -12,34 +12,73 @@ import GHC.Generics (Generic)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
-import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters
-import Keelung.Syntax.Typed (Width)
 import Keelung.Syntax.VarCounters
 import Keelung.Types
+import Keelung.Compiler.Syntax.Untyped (Width)
 
 --------------------------------------------------------------------------------
 
-data Ref' = RefI Var | RefO Var | Ref Var
+-- data Ref' = RefI Var | RefO Var | Ref Var
+--   deriving (Generic, NFData, Eq, Ord)
+
+-- instance Show Ref' where
+--   show (RefI x) = "$I" ++ show x
+--   show (RefO x) = "$O" ++ show x
+--   show (Ref x) = "$" ++ show x
+
+-- data Type = F | B | U Width | UBit Width Int
+--   deriving (Generic, NFData, Eq)
+
+-- data Ref = RefF Ref' | RefB Ref' | RefU Width Ref' | RefUBit Width Ref'
+
+-- instance Show Type where
+--   show F = "F"
+--   show B = "B"
+--   show (U w) = "U" ++ show w
+--   show (UBit w i) = "U" ++ show w ++ "[" ++ show i ++ "]"
+
+
+data RefB = RefBI Var | RefBO Var | RefB Var
   deriving (Generic, NFData, Eq, Ord)
 
-instance Show Ref' where
-  show (RefI x) = "$I" ++ show x
-  show (RefO x) = "$O" ++ show x
-  show (Ref x) = "$" ++ show x
+instance Show RefB where
+  show (RefBI x) = "$BI" ++ show x
+  show (RefBO x) = "$BO" ++ show x
+  show (RefB x) = "$B" ++ show x
 
-data Type = F | B | U Width | UBit Width Int
-  deriving (Generic, NFData, Eq)
+data RefF = RefFI Var | RefFO Var | RefF Var
+  deriving (Generic, NFData, Eq, Ord)
 
-data Ref = RefF Ref' | RefB Ref' | RefU Width Ref' | RefUBit Width Ref'
+instance Show RefF where
+  show (RefFI x) = "$FI" ++ show x
+  show (RefFO x) = "$FO" ++ show x
+  show (RefF x) = "$F" ++ show x
 
-instance Show Type where
-  show F = "F"
-  show B = "B"
-  show (U w) = "U" ++ show w
-  show (UBit w i) = "U" ++ show w ++ "[" ++ show i ++ "]"
+data RefU = RefUI Width Var | RefUO Width Var | RefU Width Var
+  deriving (Generic, NFData, Eq, Ord)
+
+instance Show RefU where
+  show (RefUI w x) = "$UI[" ++ show w ++ "]" ++ show x
+  show (RefUO w x) = "$UO[" ++ show w ++ "]" ++ show x
+  show (RefU w x) = "$U[" ++ show w ++ "]" ++ show x
+
+reindexRefF :: Counters -> RefF -> Var
+reindexRefF counters (RefFI x) = reindex counters OfInput OfField x
+reindexRefF counters (RefFO x) = reindex counters OfOutput OfField x
+reindexRefF counters (RefF x) = reindex counters OfIntermediate OfField x
+
+reindexRefB :: Counters -> RefB -> Var
+reindexRefB counters (RefBI x) = reindex counters OfInput OfBoolean x
+reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
+reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
+
+reindexRefU :: Counters -> RefU -> Var
+reindexRefU counters (RefUI w x) = reindex counters OfInput (OfUInt w) x
+reindexRefU counters (RefUO w x) = reindex counters OfOutput (OfUInt w) x
+reindexRefU counters (RefU w x) = reindex counters OfIntermediate (OfUInt w) x
 
 --------------------------------------------------------------------------------
 
@@ -50,7 +89,7 @@ instance Show Type where
 data Constraint n
   = CAdd !(Poly n)
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
-  | CNEq (CNEQ n) -- x y m
+  | CNEq Var Var RefF
   deriving (Generic, NFData)
 
 instance GaloisField n => Eq (Constraint n) where
@@ -58,7 +97,8 @@ instance GaloisField n => Eq (Constraint n) where
     (CAdd x, CAdd y) -> x == y
     (CMul x y z, CMul u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
-    (CNEq x, CNEq y) -> x == y
+    (CNEq x y z, CNEq u v w) ->
+      (x == u && y == v || x == v && y == u) && z == w
     _ -> False
 
 instance Functor Constraint where
@@ -66,7 +106,7 @@ instance Functor Constraint where
   -- fmap f (CAdd2 t x) = CAdd2 t (fmap f x)
   fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
-  fmap f (CNEq x) = CNEq (fmap f x)
+  fmap _ (CNEq x y z) = CNEq x y z
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
@@ -88,10 +128,11 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"
   -- show (CAdd2 t xs) = "A " <> show t <> " " <> show xs <> " = 0"
   show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
-  show (CNEq x) = show x
+  show (CNEq x y m) = "Q " <> show x <> " " <> show y <> " " <> show m
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
+
   -- CMul
   compare (CMul aV bV cV) (CMul aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMul {} = LT
@@ -100,9 +141,9 @@ instance GaloisField n => Ord (Constraint n) where
   compare (CAdd xs) (CAdd ys) = compare xs ys
   -- compare (CAdd2 {}) (CAdd {}) = LT
   -- compare (CAdd {}) (CAdd2 {}) = GT
-  -- compare (CAdd2 t xs) (CAdd2 u ys) = 
-  --   if t == u 
-  --     then compare xs ys 
+  -- compare (CAdd2 t xs) (CAdd2 u ys) =
+  --   if t == u
+  --     then compare xs ys
   --     else error "[ panic ] CAdd type mismatch"
   -- CNEq
   compare CNEq {} CNEq {} = EQ
