@@ -13,7 +13,13 @@ module Keelung.Compiler.Constraint2
     reindexRefU,
     Constraint,
     cadd,
+    cAddB,
+    cAddF,
+    cAddU,
     cmul,
+    cMulB,
+    cMulF,
+    cMulU,
     cmulSimple,
     cneq,
     ConstraintSystem,
@@ -42,6 +48,9 @@ import Keelung.Types
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Constraint.Constraint n
 fromConstraint _ (CAdd p) = Constraint.CAdd p
+fromConstraint counters (CAddB as) = Constraint.CAdd (fromPolyB_ counters as)
+fromConstraint counters (CAddF as) = Constraint.CAdd (fromPolyF_ counters as)
+fromConstraint counters (CAddU as) = Constraint.CAdd (fromPolyU_ counters as)
 fromConstraint _ (CMul p q r) = Constraint.CMul p q r
 fromConstraint counters (CMulF as bs cs) =
   Constraint.CMul
@@ -149,6 +158,9 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
   = CAdd !(Poly n)
+  | CAddF !(Poly' RefF n)
+  | CAddB !(Poly' RefB n)
+  | CAddU !(Poly' RefU n)
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
   | CMulF !(Poly' RefF n) !(Poly' RefF n) !(Either n (Poly' RefF n))
   | CMulB !(Poly' RefB n) !(Poly' RefB n) !(Either n (Poly' RefB n))
@@ -159,9 +171,16 @@ data Constraint n
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAdd x, CAdd y) -> x == y
+    (CAddF x, CAddF y) -> x == y
+    (CAddB x, CAddB y) -> x == y
+    (CAddU x, CAddU y) -> x == y
     (CMul x y z, CMul u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CMulF x y z, CMulF u v w) ->
+      (x == u && y == v || x == v && y == u) && z == w
+    (CMulB x y z, CMulB u v w) ->
+      (x == u && y == v || x == v && y == u) && z == w
+    (CMulU x y z, CMulU u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CNEq x y z, CNEq u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
@@ -169,7 +188,9 @@ instance GaloisField n => Eq (Constraint n) where
 
 instance Functor Constraint where
   fmap f (CAdd x) = CAdd (fmap f x)
-  -- fmap f (CAdd2 t x) = CAdd2 t (fmap f x)
+  fmap f (CAddF x) = CAddF (fmap f x)
+  fmap f (CAddB x) = CAddB (fmap f x)
+  fmap f (CAddU x) = CAddU (fmap f x)
   fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
@@ -185,6 +206,18 @@ cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
 cadd !c !xs = map CAdd $ case Poly.buildEither c xs of
   Left _ -> []
   Right xs' -> [xs']
+
+-- | Smart constructor for the CAddB constraint
+cAddB :: GaloisField n => n -> [(RefB, n)] -> [Constraint n]
+cAddB !c !xs = [CAddB (Poly' c (Map.fromList xs))]
+
+-- | Smart constructor for the CAddF constraint
+cAddF :: GaloisField n => n -> [(RefF, n)] -> [Constraint n]
+cAddF !c !xs = [CAddF (Poly' c (Map.fromList xs))]
+
+-- | Smart constructor for the CAddU constraint
+cAddU :: GaloisField n => n -> [(RefU, n)] -> [Constraint n]
+cAddU !c !xs = [CAddU (Poly' c (Map.fromList xs))]
 
 cmulSimple :: GaloisField n => Var -> Var -> Var -> [Constraint n]
 cmulSimple !x !y !z = [CMul (Poly.singleVar x) (Poly.singleVar y) (Poly.buildEither 0 [(z, 1)])]
@@ -233,7 +266,9 @@ cneq x y m = [CNEq x y m]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"
-  -- show (CAdd2 t xs) = "A " <> show t <> " " <> show xs <> " = 0"
+  show (CAddF xs) = "AF " <> show xs <> " = 0"
+  show (CAddB xs) = "AB " <> show xs <> " = 0"
+  show (CAddU xs) = "AU " <> show xs <> " = 0"
   show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulB aV bV cV) = "MB " <> show aV <> " * " <> show bV <> " = " <> show cV
@@ -261,13 +296,19 @@ instance GaloisField n => Ord (Constraint n) where
   compare CMulU {} _ = GT
   -- CAdd
   compare (CAdd xs) (CAdd ys) = compare xs ys
-  -- compare (CAdd2 {}) (CAdd {}) = LT
-  -- compare (CAdd {}) (CAdd2 {}) = GT
-  -- compare (CAdd2 t xs) (CAdd2 u ys) =
-  --   if t == u
-  --     then compare xs ys
-  --     else error "[ panic ] CAdd type mismatch"
-  -- CNEq
+  -- CAddF
+  compare (CAddF xs) (CAddF ys) = compare xs ys
+  compare _ CAddF {} = LT
+  compare CAddF {} _ = GT
+  -- CAddB 
+  compare (CAddB xs) (CAddB ys) = compare xs ys
+  compare _ CAddB {} = LT
+  compare CAddB {} _ = GT
+  -- CAddU
+  compare (CAddU xs) (CAddU ys) = compare xs ys
+  compare _ CAddU {} = LT
+  compare CAddU {} _ = GT
+
   compare CNEq {} CNEq {} = EQ
   compare CNEq {} _ = LT
   compare _ CNEq {} = GT
