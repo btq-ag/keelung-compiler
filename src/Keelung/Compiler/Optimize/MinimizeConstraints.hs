@@ -180,7 +180,7 @@ substConstraint !constraint = case constraint of
           else do
             bindVar m (recip diff)
             return Nothing
-  
+
 -- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
@@ -189,15 +189,15 @@ isTautology constraint = case constraint of
   -- we assume that the variables in CNEQ has all been substituted with values when possible
   -- so that we can just check if the values are equal
   CNEq {} -> return False
-  
+
 -- | Learn bindings and variable equalities from a constraint
 learn :: (GaloisField n, Integral n) => Constraint n -> OptiM n ()
 learn (CAdd xs) = case IntMap.toList (Poly.coeffs xs) of
   [(x, c)] ->
     if c == 0
       then return ()
-      else bindVar x (- Poly.constant xs / c)
-  [(x, c), (y, d)] -> when (Poly.constant xs == 0 && c == - d) $ unifyVars x y
+      else bindVar x (-Poly.constant xs / c)
+  [(x, c), (y, d)] -> when (Poly.constant xs == 0 && c == -d) $ unifyVars x y
   _ -> return ()
 learn _ = return ()
 
@@ -219,7 +219,7 @@ handlePinnedVars pinnedVars = do
         concatMap
           ( \(var, result) -> case result of
               Root root -> cadd 0 [(var, 1), (root, -1)] -- var == root
-              Value c -> cadd (- c) [(var, 1)] -- var == c
+              Value c -> cadd (-c) [(var, 1)] -- var == c
           )
           (filter isNotRoot pinnedTerms)
   return pinnedEquations

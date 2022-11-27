@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 
@@ -21,7 +22,10 @@ module Keelung.Compiler.Constraint2
 where
 
 import Control.DeepSeq (NFData)
+import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import GHC.Generics (Generic)
 import qualified Keelung.Compiler.Constraint as Constraint
@@ -36,9 +40,17 @@ import Keelung.Syntax.Counters
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
-fromConstraint :: Counters -> Constraint n -> Constraint.Constraint n
+fromConstraint :: Integral n => Counters -> Constraint n -> Constraint.Constraint n
 fromConstraint _ (CAdd p) = Constraint.CAdd p
 fromConstraint _ (CMul p q r) = Constraint.CMul p q r
+fromConstraint counters (CMulF as bs cs) =
+  Constraint.CMul
+    (fromPolyF_ counters as)
+    (fromPolyF_ counters bs)
+    ( case cs of
+        Left n -> Left n
+        Right xs -> fromPolyF counters xs
+    )
 fromConstraint counters (CNEq x y m) = Constraint.CNEq (Constraint.CNEQ (Left x) (Left y) (reindexRefF counters m))
 
 --------------------------------------------------------------------------------
@@ -103,6 +115,19 @@ reindexRefU counters (RefU w x) = reindex counters OfIntermediate (OfUInt w) x
 
 --------------------------------------------------------------------------------
 
+data Poly' ref n = Poly' n (Map ref n)
+  deriving (Generic, NFData, Eq, Functor, Show, Ord)
+
+fromPolyF :: Integral n => Counters -> Poly' RefF n -> Either n (Poly n)
+fromPolyF counters (Poly' c xs) = Poly.buildEither c (map (first (reindexRefF counters)) (Map.toList xs))
+
+fromPolyF_ :: Integral n => Counters -> Poly' RefF n -> Poly n
+fromPolyF_ counters xs = case fromPolyF counters xs of
+  Left _ -> error "[ panic ] fromPolyF_: Left"
+  Right p -> p
+
+--------------------------------------------------------------------------------
+
 -- | Constraint
 --      CAdd: 0 = c + c₀x₀ + c₁x₁ ... cₙxₙ
 --      CMul: ax * by = c or ax * by = cz
@@ -110,6 +135,7 @@ reindexRefU counters (RefU w x) = reindex counters OfIntermediate (OfUInt w) x
 data Constraint n
   = CAdd !(Poly n)
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
+  | CMulF !(Poly' RefF n) !(Poly' RefF n) !(Either n (Poly' RefF n))
   | CNEq Var Var RefF
   deriving (Generic, NFData)
 
@@ -117,6 +143,8 @@ instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAdd x, CAdd y) -> x == y
     (CMul x y z, CMul u v w) ->
+      (x == u && y == v || x == v && y == u) && z == w
+    (CMulF x y z, CMulF u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CNEq x y z, CNEq u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
@@ -127,6 +155,8 @@ instance Functor Constraint where
   -- fmap f (CAdd2 t x) = CAdd2 t (fmap f x)
   fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
+  fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
+  fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
   fmap _ (CNEq x y z) = CNEq x y z
 
 -- | Smart constructor for the CAdd constraint
@@ -156,6 +186,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"
   -- show (CAdd2 t xs) = "A " <> show t <> " " <> show xs <> " = 0"
   show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
+  show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CNEq x y m) = "Q " <> show x <> " " <> show y <> " " <> show m
 
 instance GaloisField n => Ord (Constraint n) where
@@ -165,6 +196,10 @@ instance GaloisField n => Ord (Constraint n) where
   compare (CMul aV bV cV) (CMul aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMul {} = LT
   compare CMul {} _ = GT
+  -- CMulF
+  compare (CMulF aV bV cV) (CMulF aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
+  compare _ CMulF {} = LT
+  compare CMulF {} _ = GT
   -- CAdd
   compare (CAdd xs) (CAdd ys) = compare xs ys
   -- compare (CAdd2 {}) (CAdd {}) = LT
