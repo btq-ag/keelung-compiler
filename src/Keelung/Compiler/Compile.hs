@@ -13,7 +13,8 @@ import qualified Data.IntMap as IntMap
 import Data.Sequence (Seq (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Compiler.Constraint
+import qualified Keelung.Compiler.Constraint as Constraint
+import Keelung.Compiler.Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Constraint.Polynomial as Poly
@@ -26,7 +27,7 @@ import Keelung.Types
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => TypeErased n -> ConstraintSystem n
+run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
 run (TypeErased untypedExprs countersOld counters relations assertions assignments numBinReps customBinReps) = runM countersOld $ do
   -- we need to encode `untypedExprs` to constriants and wire them to 'outputVars'
   forM_ (zip (outputVars countersOld) untypedExprs) (uncurry encode)
@@ -47,8 +48,8 @@ run (TypeErased untypedExprs countersOld counters relations assertions assignmen
   counters' <- gets envVarCounters
 
   return
-    ( ConstraintSystem
-        constraints
+    ( Constraint.ConstraintSystem
+        (Set.map Constraint.fromConstraint constraints)
         numBinReps
         (customBinReps <> extraBinReps)
         counters'
@@ -119,7 +120,6 @@ add cs =
 -- addRotatedBinRep out width var rotate = do
 --   index <- lookupBinRep width var
 --   addBinRep $ BinRep out width index rotate
-
 addBinRep :: BinRep -> M n ()
 addBinRep binRep = modify (\env -> env {envExtraBinReps = BinRep.insert binRep (envExtraBinReps env)})
 

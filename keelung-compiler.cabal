@@ -28,6 +28,7 @@ library
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Interpret.Kinded
@@ -77,6 +78,7 @@ executable keelungc
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Interpret.Kinded
@@ -140,6 +142,7 @@ executable profile
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Interpret.Kinded
@@ -194,6 +197,7 @@ test-suite keelung-test
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Interpret.Kinded
@@ -253,6 +257,7 @@ benchmark keelung-bench
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Interpret.Kinded

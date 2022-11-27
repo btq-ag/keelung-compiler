@@ -11,9 +11,11 @@ import Data.Foldable (toList)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
+-- import Data.Map.Strict (Map)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
+import qualified Keelung.Compiler.Constraint2 as Constraint2
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
@@ -24,6 +26,11 @@ import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.Counters
 import Keelung.Syntax.VarCounters
 import Keelung.Types
+
+fromConstraint :: Constraint2.Constraint n -> Constraint n
+fromConstraint (Constraint2.CAdd p) = CAdd p
+fromConstraint (Constraint2.CMul p q r) = CMul p q r
+fromConstraint (Constraint2.CNEq (CNEQ x y m)) = CNEq (CNEQ x y m)
 
 --------------------------------------------------------------------------------
 
@@ -69,18 +76,25 @@ cmul !xs !ys (c, zs) = case ( do
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"
+  -- show (CAdd2 t xs) = "A " <> show t <> " " <> show xs <> " = 0"
   show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
   show (CNEq x) = show x
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
+
   -- CMul
   compare (CMul aV bV cV) (CMul aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMul {} = LT
   compare CMul {} _ = GT
   -- CAdd
-  compare (CAdd xs) (CAdd ys) =
-    if xs == ys then EQ else compare xs ys
+  compare (CAdd xs) (CAdd ys) = compare xs ys
+  -- compare (CAdd2 {}) (CAdd {}) = LT
+  -- compare (CAdd {}) (CAdd2 {}) = GT
+  -- compare (CAdd2 t xs) (CAdd2 u ys) =
+  --   if t == u
+  --     then compare xs ys
+  --     else error "[ panic ] CAdd type mismatch"
   -- CNEq
   compare CNEq {} CNEq {} = EQ
   compare CNEq {} _ = LT
