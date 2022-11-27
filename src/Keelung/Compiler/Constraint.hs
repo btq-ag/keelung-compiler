@@ -15,7 +15,6 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
-import qualified Keelung.Compiler.Constraint2 as Constraint2
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
@@ -26,11 +25,6 @@ import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.Counters (Counters)
 import Keelung.Syntax.VarCounters
 import Keelung.Types
-
-fromConstraint :: Counters -> Constraint2.Constraint n -> Constraint n
-fromConstraint _ (Constraint2.CAdd p) = CAdd p
-fromConstraint _ (Constraint2.CMul p q r) = CMul p q r
-fromConstraint counters (Constraint2.CNEq x y m) = CNEq (CNEQ (Left x) (Left y) (Constraint2.reindexRefF counters m))
 
 --------------------------------------------------------------------------------
 

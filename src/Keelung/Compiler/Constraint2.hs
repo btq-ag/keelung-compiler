@@ -3,21 +3,43 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 
-module Keelung.Compiler.Constraint2 where
+module Keelung.Compiler.Constraint2
+  ( RefF (..),
+    RefB (..),
+    RefU (..),
+    reindexRefF,
+    reindexRefB,
+    reindexRefU,
+    Constraint,
+    cadd,
+    cmul,
+    cmulSimple,
+    cneq,
+    ConstraintSystem,
+    fromConstraint,
+  )
+where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Set (Set)
 import GHC.Generics (Generic)
+import qualified Keelung.Compiler.Constraint as Constraint
+import Keelung.Compiler.Syntax.Untyped (Width)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
+import qualified Keelung.Constraint.R1CS as Constraint
 import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.VarCounters
 import Keelung.Types
-import Keelung.Compiler.Syntax.Untyped (Width)
+
+fromConstraint :: Counters -> Constraint n -> Constraint.Constraint n
+fromConstraint _ (CAdd p) = Constraint.CAdd p
+fromConstraint _ (CMul p q r) = Constraint.CMul p q r
+fromConstraint counters (CNEq x y m) = Constraint.CNEq (Constraint.CNEQ (Left x) (Left y) (reindexRefF counters m))
 
 --------------------------------------------------------------------------------
 
@@ -39,7 +61,6 @@ import Keelung.Compiler.Syntax.Untyped (Width)
 --   show B = "B"
 --   show (U w) = "U" ++ show w
 --   show (UBit w i) = "U" ++ show w ++ "[" ++ show i ++ "]"
-
 
 data RefB = RefBI Var | RefBO Var | RefB Var
   deriving (Generic, NFData, Eq, Ord)
@@ -114,15 +135,22 @@ cadd !c !xs = map CAdd $ case Poly.buildEither c xs of
   Left _ -> []
   Right xs' -> [xs']
 
+cmulSimple :: GaloisField n => Var -> Var -> Var -> [Constraint n]
+cmulSimple !x !y !z = [CMul (Poly.singleVar x) (Poly.singleVar y) (Poly.buildEither 0 [(z, 1)])]
+
 -- | Smart constructor for the CAdd constraint
-cmul :: GaloisField n => [(Var, n)] -> [(Var, n)] -> (n, [(Var, n)]) -> [Constraint n]
-cmul !xs !ys (c, zs) = case ( do
-                                xs' <- Poly.buildEither 0 xs
-                                ys' <- Poly.buildEither 0 ys
-                                return $ CMul xs' ys' (Poly.buildEither c zs)
-                            ) of
+cmul :: GaloisField n => (n, [(Var, n)]) -> (n, [(Var, n)]) -> (n, [(Var, n)]) -> [Constraint n]
+cmul (a, xs) (b, ys) (c, zs) = case ( do
+                                        xs' <- Poly.buildEither a xs
+                                        ys' <- Poly.buildEither b ys
+                                        return $ CMul xs' ys' (Poly.buildEither c zs)
+                                    ) of
   Left _ -> []
   Right result -> [result]
+
+-- | Smart constructor for the CNEq constraint
+cneq :: GaloisField n => Var -> Var -> RefF -> [Constraint n]
+cneq x y m = [CNEq x y m]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"

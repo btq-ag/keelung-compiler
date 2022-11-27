@@ -15,14 +15,14 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Keelung.Compiler.Constraint as Constraint
 import Keelung.Compiler.Constraint2
+import qualified Keelung.Compiler.Constraint2 as Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
-import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Syntax.BinRep (BinRep (..), BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
+import Keelung.Syntax.Counters (Counters, VarKind (..), VarSort (..), getCount, setCount)
 import Keelung.Syntax.VarCounters
 import Keelung.Types
-import Keelung.Syntax.Counters (Counters, getCount, VarSort (..), VarKind (..), setCount)
 
 --------------------------------------------------------------------------------
 
@@ -51,7 +51,7 @@ run (TypeErased untypedExprs countersOld counters relations assertions assignmen
 
   return
     ( Constraint.ConstraintSystem
-        (Set.map (Constraint.fromConstraint counters'') constraints)
+        (Set.map (Constraint2.fromConstraint counters'') constraints)
         numBinReps
         (customBinReps <> extraBinReps)
         counters'
@@ -195,25 +195,32 @@ encodeExprB out expr = case expr of
     b <- wireAsVar (ExprB x1)
     vars <- mapM (wireAsVar . ExprB) xs
     case vars of
-      Empty -> add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar out))] -- out = a * b
+      Empty ->
+        add $ cmulSimple a b out -- out = a * b
       (c :<| Empty) -> do
         aAndb <- freshVar
-        add [CMul (Poly.singleVar a) (Poly.singleVar b) (Right (Poly.singleVar aAndb))] -- x = a * b
-        add [CMul (Poly.singleVar aAndb) (Poly.singleVar c) (Right (Poly.singleVar out))] -- out = x * c
+        add $ cmulSimple a b aAndb -- aAndb = a * b
+        add $ cmulSimple aAndb c out -- out = aAndb * c
       _ -> do
         -- the number of operands
         let n = 2 + fromIntegral (length vars)
         -- polynomial = n - sum of operands
-        let polynomial = case Poly.buildMaybe n (IntMap.fromList ((a, -1) : (b, -1) : [(v, -1) | v <- toList vars])) of
-              Just p -> p
-              Nothing -> error "encode: And: impossible"
+        let polynomial = (n, (a, -1) : (b, -1) : [(v, -1) | v <- toList vars])
         -- if the answer is 1 then all operands must be 1
         --    (n - sum of operands) * out = 0
-        add [CMul polynomial (Poly.singleVar out) (Left 0)]
+        add $
+          cmul
+            polynomial
+            (0, [(out, 1)])
+            (0, [])
         -- if the answer is 0 then not all operands must be 1:
         --    (n - sum of operands) * inv = 1 - out
         inv <- freshVar
-        add [CMul polynomial (Poly.singleVar inv) (Poly.buildEither 1 [(out, -1)])]
+        add $
+          cmul
+            polynomial
+            (0, [(inv, 1)])
+            (1, [(out, -1)])
   OrB x0 x1 xs -> do
     a <- wireAsVar (ExprB x0)
     b <- wireAsVar (ExprB x1)
@@ -271,18 +278,11 @@ encodeExprB out expr = case expr of
     --     x * y + (1 - x) * (1 - y) = out
     -- =>
     --    (1 - x) * (1 - 2y) = (out - y)
-
-    -- (1 - x)
-    let polynomial1 = case Poly.buildEither 1 [(x', -1)] of
-          Left _ -> error "encode: EqB: impossible"
-          Right xs -> xs
-    -- (1 - 2y)
-    let polynomial2 = case Poly.buildEither 1 [(y', -2)] of
-          Left _ -> error "encode: EqB: impossible"
-          Right xs -> xs
-    -- (out - y)
-    let polynomial3 = Poly.buildEither 0 [(y', -1), (out, 1)]
-    add [CMul polynomial1 polynomial2 polynomial3]
+    add $
+      cmul
+        (1, [(x', -1)])
+        (1, [(y', -2)])
+        (0, [(out, 1), (y', -1)])
   EqN x y -> do
     x' <- wireAsVar (ExprN x)
     y' <- wireAsVar (ExprN y)
@@ -367,11 +367,11 @@ encodeExprN out expr = case expr of
   MulN _ x y -> do
     x' <- wireAsVar (ExprN x)
     y' <- wireAsVar (ExprN y)
-    add [CMul (Poly.singleVar x') (Poly.singleVar y') (Right $ Poly.singleVar out)]
+    add $ cmulSimple x' y' out
   DivN _ x y -> do
     x' <- wireAsVar (ExprN x)
     y' <- wireAsVar (ExprN y)
-    add [CMul (Poly.singleVar y') (Poly.singleVar out) (Right $ Poly.singleVar x')]
+    add $ cmulSimple y' out x'
   IfN _ p x y -> do
     p' <- wireAsVar (ExprB p)
     x' <- wireAsVar (ExprN x)
@@ -599,37 +599,50 @@ wireAsVar expr = do
 --        1. (x - y) * m = out
 --        2. (x - y) * (1 - out) = 0
 encodeEquality :: (GaloisField n, Integral n) => Bool -> Var -> Var -> Var -> M n ()
-encodeEquality isEq out x y = case Poly.buildEither 0 [(x, 1), (y, -1)] of
-  Left _ -> do
-    -- in this case, the variable x and y happend to be the same
-    if isEq
-      then encode out (ExprB (ValB 1))
-      else encode out (ExprB (ValB 0))
-  Right diff -> do
-    -- introduce a new variable m
-    -- if diff = 0 then m = 0 else m = recip diff
-    m <- freshRefF
+encodeEquality isEq out x y =
+  if x == y
+    then do
+      -- in this case, the variable x and y happend to be the same
+      if isEq
+        then encode out (ExprB (ValB 1))
+        else encode out (ExprB (ValB 0))
+    else do
+      -- introduce a new variable m
+      -- if diff = 0 then m = 0 else m = recip diff
+      m <- freshRefF
 
-    let notOut = case Poly.buildMaybe 1 (IntMap.fromList [(out, -1)]) of
-          Nothing -> error "encodeBinaryOp: NEq: impossible"
-          Just p -> p
+      if isEq
+        then do
+          --  1. (x - y) * m = 1 - out
+          --  2. (x - y) * out = 0
+          counters <- gets envCounters
+          add $
+            cmul
+              (0, [(x, 1), (y, -1)])
+              (0, [(reindexRefF counters m, 1)])
+              (1, [(out, -1)])
+          add $
+            cmul
+              (0, [(x, 1), (y, -1)])
+              (0, [(out, 1)])
+              (0, [])
+        else do
+          --  1. (x - y) * m = out
+          --  2. (x - y) * (1 - out) = 0
+          counters <- gets envCounters
+          add $
+            cmul
+              (0, [(x, 1), (y, -1)])
+              (0, [(reindexRefF counters m, 1)])
+              (0, [(out, 1)])
+          add $
+            cmul
+              (0, [(x, 1), (y, -1)])
+              (1, [(out, -1)])
+              (0, [])
 
-    if isEq
-      then do
-        --  1. (x - y) * m = 1 - out
-        --  2. (x - y) * out = 0
-        counters <- gets envCounters
-        add [CMul diff (Poly.singleVar (reindexRefF counters m)) (Right notOut)]
-        add [CMul diff (Poly.singleVar out) (Left 0)]
-      else do
-        --  1. (x - y) * m = out
-        --  2. (x - y) * (1 - out) = 0
-        counters <- gets envCounters
-        add [CMul diff (Poly.singleVar (reindexRefF counters m)) (Right (Poly.singleVar out))]
-        add [CMul diff notOut (Left 0)]
-
-    --  keep track of the relation between (x - y) and m
-    add [CNEq x y m]
+      --  keep track of the relation between (x - y) and m
+      add $ cneq x y m
 
 --------------------------------------------------------------------------------
 
@@ -648,8 +661,8 @@ encodeUIntAddOrSub isSub width out x y = do
   --    (2ⁿ * Aₙ₋₁) * (Bₙ₋₁) = (out - A - B)
   add $
     cmul
-      [(xBinRepStart + width - 1, multiplier)]
-      [(yBinRepStart + width - 1, 1)]
+      (0, [(xBinRepStart + width - 1, multiplier)])
+      (0, [(yBinRepStart + width - 1, 1)])
       (0, [(out, 1), (x, -1), (y, if isSub then 1 else -1)])
 
 encodeUIntAdd :: (GaloisField n, Integral n) => Int -> Var -> Var -> Var -> M n ()
@@ -675,33 +688,23 @@ encodeIf out p x y = do
   --  out = p * x + (1 - p) * y
   --      =>
   --  (out - x) = (1 - p) * (y - x)
-  let polynomial1 = case Poly.buildEither 1 [(p, -1)] of
-        Left _ -> error "encode: IfB: impossible"
-        Right xs -> xs
-  let polynomial2 = case Poly.buildEither 0 [(x, -1), (y, 1)] of
-        Left _ -> error "encode: IfB: impossible"
-        Right xs -> xs
-  let polynomial3 = Poly.buildEither 0 [(x, -1), (out, 1)]
-  add [CMul polynomial1 polynomial2 polynomial3]
+  add $ cmul 
+    (1, [(p, -1)])
+    (0, [(x, -1), (y, 1)])
+    (0, [(x, -1), (out, 1)])
 
 encodeOrB :: (GaloisField n, Integral n) => Var -> Var -> Var -> M n ()
 encodeOrB out x y = do
   -- (1 - x) * y = (out - x)
-  let polynomial1 = case Poly.buildEither 1 [(x, -1)] of
-        Left _ -> error "encode: OrB: impossible"
-        Right xs -> xs
-  let polynomial2 = Poly.singleVar y
-  let polynomial3 = Poly.buildEither 0 [(x, -1), (out, 1)]
-  add [CMul polynomial1 polynomial2 polynomial3]
+  add $ cmul
+    (1, [(x, -1)])
+    (0, [(y, 1)])
+    (0, [(x, -1), (out, 1)])
 
 encodeXorB :: (GaloisField n, Integral n) => Var -> Var -> Var -> M n ()
 encodeXorB out x y = do
   -- (1 - 2x) * (y + 1) = (1 + out - 3x)
-  let polynomial1 = case Poly.buildEither 1 [(x, -2)] of
-        Left _ -> error "encode: XorB: impossible"
-        Right xs -> xs
-  let polynomial2 = case Poly.buildEither 1 [(y, 1)] of
-        Left _ -> error "encode: XorB: impossible"
-        Right xs -> xs
-  let polynomial3 = Poly.buildEither 1 [(x, -3), (out, 1)]
-  add [CMul polynomial1 polynomial2 polynomial3]
+  add $ cmul
+    (1, [(x, -2)])
+    (1, [(y, 1)])
+    (1, [(x, -3), (out, 1)])
