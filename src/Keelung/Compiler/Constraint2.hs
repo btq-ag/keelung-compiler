@@ -22,6 +22,9 @@ module Keelung.Compiler.Constraint2
     cMulU,
     cmulSimple,
     cneq,
+    cNEqB,
+    cNEqF,
+    cNEqU,
     ConstraintSystem,
     fromConstraint,
   )
@@ -77,6 +80,9 @@ fromConstraint counters (CMulU as bs cs) =
         Right xs -> fromPolyU counters xs
     )
 fromConstraint counters (CNEq x y m) = Constraint.CNEq (Constraint.CNEQ (Left x) (Left y) (reindexRefF counters m))
+fromConstraint counters (CNEqF x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))
+fromConstraint counters (CNEqB x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefB counters x)) (Left (reindexRefB counters y)) (reindexRefB counters m))
+fromConstraint counters (CNEqU x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))
 
 --------------------------------------------------------------------------------
 
@@ -166,6 +172,9 @@ data Constraint n
   | CMulB !(Poly' RefB n) !(Poly' RefB n) !(Either n (Poly' RefB n))
   | CMulU !(Poly' RefU n) !(Poly' RefU n) !(Either n (Poly' RefU n))
   | CNEq Var Var RefF
+  | CNEqF RefF RefF RefF
+  | CNEqB RefB RefB RefB
+  | CNEqU RefU RefU RefU
   deriving (Generic, NFData)
 
 instance GaloisField n => Eq (Constraint n) where
@@ -184,6 +193,12 @@ instance GaloisField n => Eq (Constraint n) where
       (x == u && y == v || x == v && y == u) && z == w
     (CNEq x y z, CNEq u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
+    (CNEqF x y z, CNEqF u v w) ->
+      (x == u && y == v || x == v && y == u) && z == w
+    (CNEqB x y z, CNEqB u v w) ->
+      (x == u && y == v || x == v && y == u) && z == w
+    (CNEqU x y z, CNEqU u v w) ->
+      (x == u && y == v || x == v && y == u) && z == w
     _ -> False
 
 instance Functor Constraint where
@@ -200,6 +215,9 @@ instance Functor Constraint where
   fmap f (CMulU x y (Left z)) = CMulU (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulU x y (Right z)) = CMulU (fmap f x) (fmap f y) (Right (fmap f z))
   fmap _ (CNEq x y z) = CNEq x y z
+  fmap _ (CNEqF x y z) = CNEqF x y z
+  fmap _ (CNEqB x y z) = CNEqB x y z
+  fmap _ (CNEqU x y z) = CNEqU x y z
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
@@ -259,10 +277,19 @@ cMulU (a, xs) (b, ys) (c, zs) =
       (if null zs then Left c else Right (Poly' c (Map.fromList zs)))
   ]
 
-
 -- | Smart constructor for the CNEq constraint
 cneq :: GaloisField n => Var -> Var -> RefF -> [Constraint n]
 cneq x y m = [CNEq x y m]
+
+cNEqF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
+cNEqF x y m = [CNEqF x y m]
+
+cNEqB :: GaloisField n => RefB -> RefB -> RefB -> [Constraint n]
+cNEqB x y m = [CNEqB x y m]
+
+cNEqU :: GaloisField n => RefU -> RefU -> RefU -> [Constraint n]
+cNEqU x y m = [CNEqU x y m]
+
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"
@@ -274,6 +301,10 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CMulB aV bV cV) = "MB " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulU aV bV cV) = "MU " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CNEq x y m) = "Q " <> show x <> " " <> show y <> " " <> show m
+  show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
+  show (CNEqB x y m) = "QB " <> show x <> " " <> show y <> " " <> show m
+  show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
+
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
@@ -300,7 +331,7 @@ instance GaloisField n => Ord (Constraint n) where
   compare (CAddF xs) (CAddF ys) = compare xs ys
   compare _ CAddF {} = LT
   compare CAddF {} _ = GT
-  -- CAddB 
+  -- CAddB
   compare (CAddB xs) (CAddB ys) = compare xs ys
   compare _ CAddB {} = LT
   compare CAddB {} _ = GT
@@ -308,6 +339,19 @@ instance GaloisField n => Ord (Constraint n) where
   compare (CAddU xs) (CAddU ys) = compare xs ys
   compare _ CAddU {} = LT
   compare CAddU {} _ = GT
+  -- CNEqF 
+  compare CNEqF {} CNEqF {} = EQ
+  compare _ CNEqF {} = LT
+  compare CNEqF {} _ = GT
+  -- CNEqB
+  compare CNEqB {} CNEqB {} = EQ
+  compare _ CNEqB {} = LT
+  compare CNEqB {} _ = GT
+  -- CNEqU
+  compare CNEqU {} CNEqU {} = EQ
+  compare _ CNEqU {} = LT
+  compare CNEqU {} _ = GT
+
 
   compare CNEq {} CNEq {} = EQ
   compare CNEq {} _ = LT
