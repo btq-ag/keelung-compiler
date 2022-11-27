@@ -47,6 +47,7 @@ type Width = Int
 data ExprB n
   = ValB n
   | VarB Var
+  | OutputVarB Var
   | InputVarB Var
   | -- logical operators
     AndB (ExprB n) (ExprB n) (Seq (ExprB n))
@@ -69,6 +70,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     ValB 0 -> showString "F"
     ValB _ -> showString "T"
     VarB var -> showString "$" . shows var
+    OutputVarB var -> showString "$" . shows var
     InputVarB var -> showString "$B" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
@@ -88,6 +90,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
 data ExprN n
   = ValN Width n
   | VarN Width Var
+  | OutputVarN Width Var
   | InputVarN Width Var
   | -- arithmetic operators
     SubN Width (ExprN n) (ExprN n)
@@ -103,6 +106,7 @@ instance (Show n, Integral n) => Show (ExprN n) where
   showsPrec prec expr = case expr of
     ValN _ n -> shows n
     VarN _ var -> showString "$" . shows var
+    OutputVarN _ var -> showString "$N" . shows var
     InputVarN _ var -> showString "$N" . shows var
     SubN _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddN _ x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
@@ -193,6 +197,7 @@ widthOfN expr = case expr of
   ValN w _ -> w
   VarN w _ -> w
   InputVarN w _ -> w
+  OutputVarN w _ -> w
   SubN w _ _ -> w
   AddN w _ _ _ -> w
   MulN w _ _ -> w

@@ -186,6 +186,8 @@ encodeExprB out expr = case expr of
     counters <- gets envVarCounters
     let var' = blendIntermediateVar counters var
     add $ cadd 0 [(out, 1), (var', -1)] -- out = var
+  OutputVarB var -> do
+    add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   InputVarB var -> do
     counters <- gets envVarCounters
     let var' = blendInputVarB counters var
@@ -353,6 +355,8 @@ encodeExprN out expr = case expr of
     counters <- gets envVarCounters
     let var' = blendIntermediateVar counters var
     add $ cadd 0 [(out, 1), (var', -1)] -- out = var
+  OutputVarN _ var -> do
+    add $ cadd 0 [(out, 1), (var, -1)] -- out = var
   InputVarN _ var -> do
     counters <- gets envVarCounters
     let var' = blendInputVarN counters var
