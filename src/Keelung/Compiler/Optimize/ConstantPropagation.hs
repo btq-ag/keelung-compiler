@@ -6,6 +6,8 @@ module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
 import Keelung.Compiler.Syntax.Untyped
+import qualified Data.Map.Strict as Map
+import Keelung.Compiler.Constraint2
 
 --------------------------------------------------------------------------------
 
@@ -46,7 +48,7 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
   handleU (handleB (handleN result ns) bs) us
   where
     handleN =
-      IntMap.foldlWithKey'
+      Map.foldlWithKey'
         ( \(Result n vbs ebs) var expr ->
             case expr of
               ExprN (ValN _ val) -> Result (succ n) (insertN var val vbs) ebs
@@ -55,7 +57,7 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
               _ -> Result n vbs (insertN var expr ebs)
         )
     handleB =
-      IntMap.foldlWithKey'
+      Map.foldlWithKey'
         ( \(Result n vbs ebs) var expr ->
             case expr of
               ExprN _ -> error "[ panic ] Number value in Number bindings of expressions"
@@ -66,7 +68,7 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
     handleU =
       IntMap.foldlWithKey'
         ( \result' width mapping ->
-            IntMap.foldlWithKey'
+            Map.foldlWithKey'
               ( \(Result n' vbs' ebs') var expr ->
                   case expr of
                     ExprN _ -> error "[ panic ] Number value in Number bindings of expressions"
@@ -84,7 +86,7 @@ propagateConstant relations = propagate
   where
     propagateN e = case e of
       ValN _ _ -> e
-      VarN w var -> case lookupN var (valueBindings relations) of
+      VarN w var -> case lookupN (RefF var) (valueBindings relations) of
         Nothing -> e
         Just val -> ValN w val
       OutputVarN _ _ -> e -- no constant propagation for output variables
@@ -98,7 +100,7 @@ propagateConstant relations = propagate
 
     propagateU e = case e of
       ValU _ _ -> e
-      VarU w var -> case lookupU w var (valueBindings relations) of
+      VarU w var -> case lookupU w (RefU w var) (valueBindings relations) of
         Nothing -> e
         Just val -> ValU w val
       OutputVarU _ _ -> e -- no constant propagation for output variables
@@ -116,7 +118,7 @@ propagateConstant relations = propagate
 
     propagateB e = case e of
       ValB _ -> e
-      VarB var -> case lookupB var (valueBindings relations) of
+      VarB var -> case lookupB (RefB var) (valueBindings relations) of
         Nothing -> e
         Just val -> ValB val
       OutputVarB _ -> e -- no constant propagation for output variables

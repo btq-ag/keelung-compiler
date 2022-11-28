@@ -21,6 +21,9 @@ module Keelung.Compiler.Constraint2
     cMulF,
     cMulU,
     cmulSimple,
+    cMulSimpleB,
+    cMulSimpleF,
+    cMulSimpleU,
     cneq,
     cNEqB,
     cNEqF,
@@ -38,7 +41,6 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import GHC.Generics (Generic)
 import qualified Keelung.Compiler.Constraint as Constraint
-import Keelung.Compiler.Syntax.Untyped (Width)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
@@ -48,6 +50,8 @@ import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.VarCounters
 import Keelung.Types
+
+type Width = Int
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Constraint.Constraint n
 fromConstraint _ (CAdd p) = Constraint.CAdd p
@@ -86,46 +90,50 @@ fromConstraint counters (CNEqU x y m) = Constraint.CNEq (Constraint.CNEQ (Left (
 
 --------------------------------------------------------------------------------
 
-data RefB = RefBI Var | RefBO Var | RefB Var
+data RefB = RefBI Var | RefBO Var | RefB Var | RefUBit RefU Int
   deriving (Generic, NFData, Eq, Ord)
 
 instance Show RefB where
   show (RefBI x) = "$BI" ++ show x
   show (RefBO x) = "$BO" ++ show x
   show (RefB x) = "$B" ++ show x
+  show (RefUBit x i) = show x ++ "[" ++ show i ++ "]"
 
-data RefF = RefFI Var | RefFO Var | RefF Var | FromRefB RefB
+data RefF = RefFI Var | RefFO Var | RefF Var | RefBtoRefF RefB
   deriving (Generic, NFData, Eq, Ord)
 
 instance Show RefF where
   show (RefFI x) = "$FI" ++ show x
   show (RefFO x) = "$FO" ++ show x
   show (RefF x) = "$F" ++ show x
-  show (FromRefB x) = show x
+  show (RefBtoRefF x) = show x
 
-data RefU = RefUI Width Var | RefUO Width Var | RefU Width Var
+data RefU = RefUI Width Var | RefUO Width Var | RefU Width Var | RefBtoRefU RefB
   deriving (Generic, NFData, Eq, Ord)
 
 instance Show RefU where
   show (RefUI w x) = "$UI[" ++ show w ++ "]" ++ show x
   show (RefUO w x) = "$UO[" ++ show w ++ "]" ++ show x
   show (RefU w x) = "$U[" ++ show w ++ "]" ++ show x
+  show (RefBtoRefU x) = show x
 
 reindexRefF :: Counters -> RefF -> Var
 reindexRefF counters (RefFI x) = reindex counters OfInput OfField x
 reindexRefF counters (RefFO x) = reindex counters OfOutput OfField x
 reindexRefF counters (RefF x) = reindex counters OfIntermediate OfField x
-reindexRefF counters (FromRefB x) = reindexRefB counters x
+reindexRefF counters (RefBtoRefF x) = reindexRefB counters x
 
 reindexRefB :: Counters -> RefB -> Var
 reindexRefB counters (RefBI x) = reindex counters OfInput OfBoolean x
 reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
 reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
+reindexRefB counters (RefUBit x i) = error "[ panic ] Dunno how to encode RefUBit"
 
 reindexRefU :: Counters -> RefU -> Var
 reindexRefU counters (RefUI w x) = reindex counters OfInput (OfUInt w) x
 reindexRefU counters (RefUO w x) = reindex counters OfOutput (OfUInt w) x
 reindexRefU counters (RefU w x) = reindex counters OfIntermediate (OfUInt w) x
+reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 
 --------------------------------------------------------------------------------
 
@@ -239,6 +247,15 @@ cAddU !c !xs = [CAddU (Poly' c (Map.fromList xs))]
 
 cmulSimple :: GaloisField n => Var -> Var -> Var -> [Constraint n]
 cmulSimple !x !y !z = [CMul (Poly.singleVar x) (Poly.singleVar y) (Poly.buildEither 0 [(z, 1)])]
+
+cMulSimpleF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
+cMulSimpleF !x !y !z = [CMulF (Poly' 0 (Map.singleton x 1)) (Poly' 0 (Map.singleton y 1)) (Right (Poly' 0 (Map.singleton z 1)))]
+
+cMulSimpleB :: GaloisField n => RefB -> RefB -> RefB -> [Constraint n]
+cMulSimpleB !x !y !z = [CMulB (Poly' 0 (Map.singleton x 1)) (Poly' 0 (Map.singleton y 1)) (Right (Poly' 0 (Map.singleton z 1)))]
+
+cMulSimpleU :: GaloisField n => RefU -> RefU -> RefU -> [Constraint n]
+cMulSimpleU !x !y !z = [CMulU (Poly' 0 (Map.singleton x 1)) (Poly' 0 (Map.singleton y 1)) (Right (Poly' 0 (Map.singleton z 1)))]
 
 -- | Smart constructor for the CMul constraint
 cmul :: GaloisField n => (n, [(Var, n)]) -> (n, [(Var, n)]) -> (n, [(Var, n)]) -> [Constraint n]

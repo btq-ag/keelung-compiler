@@ -10,6 +10,7 @@ import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Syntax.BinRep as BinRep
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Syntax.VarCounters
+import Keelung.Compiler.Constraint2
 
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
@@ -213,23 +214,17 @@ eraseExpr expr = case expr of
 
 eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
 eraseAssignment (T.AssignmentB var expr) = do
-  counters <- get
-  AssignmentB (blendIntermediateVar counters var) <$> eraseExprB expr
+  AssignmentB (RefB var) <$> eraseExprB expr
 eraseAssignment (T.AssignmentBI var expr) = do
-  counters <- get
-  AssignmentB (blendInputVarB counters var) <$> eraseExprB expr
+  AssignmentB (RefBI var) <$> eraseExprB expr
 eraseAssignment (T.AssignmentN var expr) = do
-  counters <- get
-  AssignmentN (blendIntermediateVar counters var) <$> eraseExprN expr
+  AssignmentN (RefF var) <$> eraseExprN expr
 eraseAssignment (T.AssignmentNI var expr) = do
-  counters <- get
-  AssignmentN (blendInputVarN counters var) <$> eraseExprN expr
-eraseAssignment (T.AssignmentU _ var expr) = do
-  counters <- get
-  AssignmentU (blendIntermediateVar counters var) <$> eraseExprU expr
+  AssignmentN (RefFI var) <$> eraseExprN expr
+eraseAssignment (T.AssignmentU width var expr) = do
+  AssignmentU (RefU width var) <$> eraseExprU expr
 eraseAssignment (T.AssignmentUI width var expr) = do
-  counters <- get
-  AssignmentU (blendInputVarU counters width var) <$> eraseExprU expr
+  AssignmentU (RefUI width var) <$> eraseExprU expr
 
 -- | Flatten and chain expressions with associative operator together when possible
 chainExprsOfAssocOpAddN :: Width -> ExprN n -> ExprN n -> ExprN n

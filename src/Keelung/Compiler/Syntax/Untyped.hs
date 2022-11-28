@@ -34,6 +34,9 @@ import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Counters as Counters
 import Keelung.Syntax.VarCounters
 import Keelung.Types (Var)
+import Keelung.Compiler.Constraint2
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 
 --------------------------------------------------------------------------------
 
@@ -225,9 +228,9 @@ widthOfU expr = case expr of
 --------------------------------------------------------------------------------
 
 data Assignment n
-  = AssignmentN Var (ExprN n)
-  | AssignmentU Var (ExprU n)
-  | AssignmentB Var (ExprB n)
+  = AssignmentN RefF (ExprN n)
+  | AssignmentU RefU (ExprU n)
+  | AssignmentB RefB (ExprB n)
 
 instance (Integral n, Show n) => Show (Assignment n) where
   show (AssignmentN var expr) = show var ++ " = " ++ show expr
@@ -309,11 +312,11 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
 
 -- | Container for holding something for each datatypes
 data Bindings n = Bindings
-  { bindingsN :: IntMap n, -- Field elements
-    bindingsB :: IntMap n, -- Booleans
-    bindingsUs :: IntMap (IntMap n) -- Unsigned integers of different bitwidths
+  { bindingsN :: Map RefF n, -- Field elements
+    bindingsB :: Map RefB n, -- Booleans
+    bindingsUs :: IntMap (Map RefU n) -- Unsigned integers of different bitwidths
   }
-  deriving (Eq, Functor)
+  deriving (Eq, Functor, Show)
 
 instance Semigroup (Bindings n) where
   Bindings n0 b0 u0 <> Bindings n1 b1 u1 =
@@ -322,21 +325,21 @@ instance Semigroup (Bindings n) where
 instance Monoid (Bindings n) where
   mempty = Bindings mempty mempty mempty
 
-instance Show n => Show (Bindings n) where
-  show (Bindings ns bs us) =
-    "  Field elements: "
-      <> unlines (map (("    " <>) . show) (IntMap.toList ns))
-      <> "\n"
-      <> "  Booleans: "
-      <> unlines (map (("    " <>) . show) (IntMap.toList bs))
-      <> "\n"
-      <> "  Unsigned integers: "
-      <> unlines
-        ( map
-            (("    " <>) . show)
-            (concat $ IntMap.elems (fmap IntMap.toList us))
-        )
-      <> "\n"
+-- instance Show n => Show (Bindings n) where
+--   show (Bindings ns bs us) =
+--     "  Field elements: "
+--       <> unlines (map (("    " <>) . show) (IntMap.toList ns))
+--       <> "\n"
+--       <> "  Booleans: "
+--       <> unlines (map (("    " <>) . show) (IntMap.toList bs))
+--       <> "\n"
+--       <> "  Unsigned integers: "
+--       <> unlines
+--         ( map
+--             (("    " <>) . show)
+--             (concat $ IntMap.elems (fmap IntMap.toList us))
+--         )
+--       <> "\n"
 
 instance Foldable Bindings where
   foldMap f (Bindings ns bs us) =
@@ -346,23 +349,23 @@ instance Traversable Bindings where
   traverse f (Bindings ns bs us) =
     Bindings <$> traverse f ns <*> traverse f bs <*> traverse (traverse f) us
 
-insertN :: Var -> n -> Bindings n -> Bindings n
-insertN var val (Bindings ns bs us) = Bindings (IntMap.insert var val ns) bs us
+insertN :: RefF -> n -> Bindings n -> Bindings n
+insertN var val (Bindings ns bs us) = Bindings (Map.insert var val ns) bs us
 
-insertB :: Var -> n -> Bindings n -> Bindings n
-insertB var val (Bindings ns bs us) = Bindings ns (IntMap.insert var val bs) us
+insertB :: RefB -> n -> Bindings n -> Bindings n
+insertB var val (Bindings ns bs us) = Bindings ns (Map.insert var val bs) us
 
-insertU :: Var -> Width -> n -> Bindings n -> Bindings n
-insertU var width val (Bindings ns bs us) = Bindings ns bs (IntMap.insertWith (<>) width (IntMap.singleton var val) us)
+insertU :: Width -> RefU -> n -> Bindings n -> Bindings n
+insertU width var val (Bindings ns bs us) = Bindings ns bs (IntMap.insertWith (<>) width (Map.singleton var val) us)
 
-lookupN :: Var -> Bindings n -> Maybe n
-lookupN var (Bindings ns _ _) = IntMap.lookup var ns
+lookupN :: RefF -> Bindings n -> Maybe n
+lookupN var (Bindings ns _ _) = Map.lookup var ns
 
-lookupB :: Var -> Bindings n -> Maybe n
-lookupB var (Bindings _ bs _) = IntMap.lookup var bs
+lookupB :: RefB -> Bindings n -> Maybe n
+lookupB var (Bindings _ bs _) = Map.lookup var bs
 
-lookupU :: Width -> Var -> Bindings n -> Maybe n
-lookupU width var (Bindings _ _ us) = IntMap.lookup width us >>= IntMap.lookup var
+lookupU :: Width -> RefU -> Bindings n -> Maybe n
+lookupU width var (Bindings _ _ us) = IntMap.lookup width us >>= Map.lookup var
 
 --------------------------------------------------------------------------------
 
