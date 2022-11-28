@@ -1,27 +1,26 @@
 module Keelung.Compiler.Syntax.Erase (run) where
 
-import Control.Monad.State
+import Control.Monad.Reader
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq (..), (|>))
+import Keelung.Compiler.Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Syntax.BinRep as BinRep
 import qualified Keelung.Syntax.Typed as T
 import Keelung.Syntax.VarCounters
-import Keelung.Compiler.Constraint2
-
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
   let T.Computation countersOld counters numAsgns boolAsgns _ assertions = comp
       proxy = 0
-   in runM countersOld $ do
+      numBitWidth = bitSize proxy
+   in runM numBitWidth $ do
         -- update VarCounters.varNumWidth before type erasure
-        let numBitWidth = bitSize proxy
         let counters' = setNumBitWidth numBitWidth $ setOutputVarSize (lengthOfExpr expr) countersOld
-        put counters'
+        -- put counters'
         -- start type erasure
         expr' <- eraseExpr expr
         sameType proxy expr'
@@ -31,14 +30,14 @@ run (T.Elaborated expr comp) =
         assertions' <- concat <$> mapM eraseExpr assertions
 
         -- retrieve updated Context and return it
-        counters'' <- get
+        -- counters'' <- get
 
         -- associate input variables with their corresponding binary representation
         let numBinReps =
-              let (start, end) = numInputVarsRange counters''
+              let (start, end) = numInputVarsRange counters'
                in BinRep.fromList $
                     map
-                      (\v -> BinRep.fromNumBinRep numBitWidth (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters'' v)))
+                      (\v -> BinRep.fromNumBinRep numBitWidth (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters' v)))
                       [start .. end - 1]
 
         let customBinReps =
@@ -46,16 +45,17 @@ run (T.Elaborated expr comp) =
                 concatMap
                   ( \(width, (start, end)) ->
                       map
-                        (\v -> BinRep.fromNumBinRep width (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters'' v)))
+                        (\v -> BinRep.fromNumBinRep width (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters' v)))
                         [start .. end - 1]
                   )
-                  (IntMap.toList (customInputVarsRanges counters''))
+                  (IntMap.toList (customInputVarsRanges counters'))
 
         return $
           TypeErased
             { erasedExpr = expr',
+              erasedFieldBitWidth = numBitWidth,
               -- determine the size of output vars by looking at the length of the expression
-              erasedVarCounters = counters'',
+              erasedVarCounters = counters',
               erasedCounters = counters,
               erasedRelations = mempty,
               erasedAssertions = assertions',
@@ -76,10 +76,10 @@ run (T.Elaborated expr comp) =
 --------------------------------------------------------------------------------
 
 -- monad for collecting boolean vars along the way
-type M n = State VarCounters
+type M n = Reader Width
 
-runM :: VarCounters -> M n a -> a
-runM = flip evalState
+runM :: Width -> M n a -> a
+runM width f = runReader f width
 
 --------------------------------------------------------------------------------
 
@@ -105,23 +105,23 @@ runM = flip evalState
 --
 eraseExprB :: (GaloisField n, Integral n) => T.Boolean -> M n (ExprB n)
 eraseExprB expr = case expr of
-    T.ValB True -> return $ ValB 1
-    T.ValB False -> return $ ValB 0
-    T.VarB var -> return $ VarB var
-    T.InputVarB var -> return $ InputVarB var
-    T.AndB x y -> chainExprsOfAssocOpAndB <$> eraseExprB x <*> eraseExprB y
-    T.OrB x y -> chainExprsOfAssocOpOrB <$> eraseExprB x <*> eraseExprB y
-    T.XorB x y -> XorB <$> eraseExprB x <*> eraseExprB y
-    T.NotB x -> NotB <$> eraseExprB x
-    T.IfB p x y -> IfB <$> eraseExprB p <*> eraseExprB x <*> eraseExprB y
-    T.EqB x y -> EqB <$> eraseExprB x <*> eraseExprB y
-    T.EqN x y -> EqN <$> eraseExprN x <*> eraseExprN y
-    T.EqU _ x y -> EqU <$> eraseExprU x <*> eraseExprU y
-    T.BitU _ x i -> BitU <$> eraseExprU x <*> pure i
+  T.ValB True -> return $ ValB 1
+  T.ValB False -> return $ ValB 0
+  T.VarB var -> return $ VarB var
+  T.InputVarB var -> return $ InputVarB var
+  T.AndB x y -> chainExprsOfAssocOpAndB <$> eraseExprB x <*> eraseExprB y
+  T.OrB x y -> chainExprsOfAssocOpOrB <$> eraseExprB x <*> eraseExprB y
+  T.XorB x y -> XorB <$> eraseExprB x <*> eraseExprB y
+  T.NotB x -> NotB <$> eraseExprB x
+  T.IfB p x y -> IfB <$> eraseExprB p <*> eraseExprB x <*> eraseExprB y
+  T.EqB x y -> EqB <$> eraseExprB x <*> eraseExprB y
+  T.EqN x y -> EqN <$> eraseExprN x <*> eraseExprN y
+  T.EqU _ x y -> EqU <$> eraseExprU x <*> eraseExprU y
+  T.BitU _ x i -> BitU <$> eraseExprU x <*> pure i
 
 eraseExprN :: (GaloisField n, Integral n) => T.Number -> M n (ExprN n)
 eraseExprN expr = do
-  w <- gets getNumBitWidth
+  w <- ask
   case expr of
     T.ValN x -> return $ ValN w (fromInteger x)
     T.ValNR x -> return $ ValN w (fromRational x)
@@ -136,20 +136,20 @@ eraseExprN expr = do
 
 eraseExprU :: (GaloisField n, Integral n) => T.UInt -> M n (ExprU n)
 eraseExprU expr = case expr of
-    T.ValU w n -> return $ ValU w (fromIntegral n)
-    T.VarU w var -> return $ VarU w var
-    T.InputVarU w var -> return $ InputVarU w var
-    -- T.InputVarU w var -> return $ InputVarU w (blendInputVarU counters w var)
-    T.AddU w x y -> AddU w <$> eraseExprU x <*> eraseExprU y
-    T.SubU w x y -> SubU w <$> eraseExprU x <*> eraseExprU y
-    T.MulU w x y -> MulU w <$> eraseExprU x <*> eraseExprU y
-    T.AndU w x y -> chainExprsOfAssocOpAndU w <$> eraseExprU x <*> eraseExprU y
-    T.OrU w x y -> chainExprsOfAssocOpOrU w <$> eraseExprU x <*> eraseExprU y
-    T.XorU w x y -> XorU w <$> eraseExprU x <*> eraseExprU y
-    T.NotU w x -> NotU w <$> eraseExprU x
-    T.RoLU w i x -> RoLU w i <$> eraseExprU x
-    T.IfU w p x y -> IfU w <$> eraseExprB p <*> eraseExprU x <*> eraseExprU y
-    T.BtoU w x -> BtoU w <$> eraseExprB x
+  T.ValU w n -> return $ ValU w (fromIntegral n)
+  T.VarU w var -> return $ VarU w var
+  T.InputVarU w var -> return $ InputVarU w var
+  -- T.InputVarU w var -> return $ InputVarU w (blendInputVarU counters w var)
+  T.AddU w x y -> AddU w <$> eraseExprU x <*> eraseExprU y
+  T.SubU w x y -> SubU w <$> eraseExprU x <*> eraseExprU y
+  T.MulU w x y -> MulU w <$> eraseExprU x <*> eraseExprU y
+  T.AndU w x y -> chainExprsOfAssocOpAndU w <$> eraseExprU x <*> eraseExprU y
+  T.OrU w x y -> chainExprsOfAssocOpOrU w <$> eraseExprU x <*> eraseExprU y
+  T.XorU w x y -> XorU w <$> eraseExprU x <*> eraseExprU y
+  T.NotU w x -> NotU w <$> eraseExprU x
+  T.RoLU w i x -> RoLU w i <$> eraseExprU x
+  T.IfU w p x y -> IfU w <$> eraseExprB p <*> eraseExprU x <*> eraseExprU y
+  T.BtoU w x -> BtoU w <$> eraseExprB x
 
 eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [Expr n]
 eraseExpr expr = case expr of

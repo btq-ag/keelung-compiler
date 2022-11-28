@@ -19,17 +19,15 @@ import Keelung.Compiler.Constraint2
 import qualified Keelung.Compiler.Constraint2 as Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
-import Keelung.Syntax.BinRep (BinRep (..), BinReps)
-import qualified Keelung.Syntax.BinRep as BinRep
+import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters (Counters, VarType (..), VarSort (..), getCount, addCount)
 import Keelung.Syntax.VarCounters
-import Keelung.Types
 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
-run (TypeErased untypedExprs countersOld counters relations assertions assignments numBinReps customBinReps) = runM countersOld counters $ do
+run (TypeErased untypedExprs _ countersOld counters relations assertions assignments numBinReps customBinReps) = runM countersOld counters $ do
   forM_ untypedExprs $ \untypedExpr -> do
     case untypedExpr of
       ExprB x -> do
@@ -203,15 +201,15 @@ freshRefU width = do
 --     addBinRep $ BinRep var width (head vars) 0
 
 -- | Locate the binary representations of some variable
-lookupBinRep :: Int -> Var -> M n Var
-lookupBinRep width var = do
-  counters <- gets envVarCounters
-  extraBinReps <- gets envExtraBinReps
-  case lookupBinRepStart counters var of
-    Nothing -> case BinRep.lookup width var extraBinReps of
-      Nothing -> error $ "lookupBinRep: could not find binary representation of " ++ show var
-      Just binRep -> return (binRepBitsIndex binRep)
-    Just index -> return index
+-- lookupBinRep :: Int -> Var -> M n Var
+-- lookupBinRep width var = do
+--   counters <- gets envVarCounters
+--   extraBinReps <- gets envExtraBinReps
+--   case lookupBinRepStart counters var of
+--     Nothing -> case BinRep.lookup width var extraBinReps of
+--       Nothing -> error $ "lookupBinRep: could not find binary representation of " ++ show var
+--       Just binRep -> return (binRepBitsIndex binRep)
+--     Just index -> return index
 
 getNumberBitWidth :: M n Width
 getNumberBitWidth = gets (getNumBitWidth . envVarCounters)
@@ -345,27 +343,27 @@ encodeExprB out expr = case expr of
 bitTestU :: (Integral n, GaloisField n) => ExprU n -> Int -> M n (ExprB n)
 bitTestU expr i = case expr of
   ValU _ val -> return (ValB (testBit val i))
-  VarU w var -> do
-    counters <- gets envVarCounters
-    -- if the index 'i' overflows or underflows, wrap it around
-    let i' = i `mod` w
-    let var' = blendIntermediateVar counters var
-    start <- lookupBinRep w var'
-    return $ VarB (start + i')
-  OutputVarU w var -> do
-    -- if the index 'i' overflows or underflows, wrap it around
-    let i' = i `mod` w
+  VarU {} -> error "[ panic ] bitTestU: VarU"
+    -- counters <- gets envVarCounters
+    -- -- if the index 'i' overflows or underflows, wrap it around
+    -- let i' = i `mod` w
+    -- let var' = blendIntermediateVar counters var
+    -- start <- lookupBinRep w var'
+    -- return $ VarB (start + i')
+  OutputVarU {} -> error "[ panic ] bitTestU: OutputVarU"
+    -- -- if the index 'i' overflows or underflows, wrap it around
+    -- let i' = i `mod` w
+    -- -- let var' = blendInputVarU counters w var
+    -- start <- lookupBinRep w var
+    -- -- traceShow ("OutputVarU $" <> show var <> "[" <> show i <> "] => " <> show (start + i')) $ return $ VarB (start + i')
+    -- return $ VarB (start + i')
+  InputVarU {} -> error "[ panic ] bitTestU: InputVarU"
+    -- counters <- gets envVarCounters
+    -- -- if the index 'i' overflows or underflows, wrap it around
+    -- let i' = i `mod` w
     -- let var' = blendInputVarU counters w var
-    start <- lookupBinRep w var
-    -- traceShow ("OutputVarU $" <> show var <> "[" <> show i <> "] => " <> show (start + i')) $ return $ VarB (start + i')
-    return $ VarB (start + i')
-  InputVarU w var -> do
-    counters <- gets envVarCounters
-    -- if the index 'i' overflows or underflows, wrap it around
-    let i' = i `mod` w
-    let var' = blendInputVarU counters w var
-    start <- lookupBinRep w var'
-    return $ VarB (start + i')
+    -- start <- lookupBinRep w var'
+    -- return $ VarB (start + i')
   AndU _ x y xs ->
     AndB
       <$> bitTestU x i
