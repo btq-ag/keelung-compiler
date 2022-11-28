@@ -91,7 +91,7 @@ runAndCheck elab inputs = do
   (output, witness) <- runAndOutputWitnesses elab inputs
 
   -- See if input size is valid
-  let expectedInputSize = getCountOfAll OfInput (compCounters (elabComp elab))
+  let expectedInputSize = getCountBySort OfInput (compCounters (elabComp elab))
   let actualInputSize = length (Inputs.numInputs inputs <> Inputs.boolInputs inputs)
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize

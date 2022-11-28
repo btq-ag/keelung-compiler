@@ -68,7 +68,7 @@ runAndCheck elab inputs = do
 
   -- See if input size is valid
   let (Elaborated _ comp) = elab
-  let expectedInputSize = getCountOfAll OfInput (compCounters comp)
+  let expectedInputSize = getCountBySort OfInput (compCounters comp)
   let actualInputSize = length (Inputs.numInputs inputs <> Inputs.boolInputs inputs)
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize

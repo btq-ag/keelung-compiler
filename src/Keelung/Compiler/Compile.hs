@@ -21,7 +21,7 @@ import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Syntax.BinRep (BinRep (..), BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
-import Keelung.Syntax.Counters (Counters, VarKind (..), VarSort (..), getCount, addCount)
+import Keelung.Syntax.Counters (Counters, VarType (..), VarSort (..), getCount, addCount)
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
@@ -165,7 +165,7 @@ freshRefF = do
   return $ RefF index
 
 -- fresh :: M n RefB
-fresh :: VarSort -> VarKind -> (Int -> ref) -> M n ref
+fresh :: VarSort -> VarType -> (Int -> ref) -> M n ref
 fresh sort kind ctor = do
   counters <- gets envCounters
   let index = getCount sort kind counters

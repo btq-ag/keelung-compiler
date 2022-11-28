@@ -66,21 +66,21 @@ rewriteAssertEq expr = case expr of
   Boolean (EqB x y) -> do
     -- introduce a fresh variable
     -- and assign both expressions to it
-    var <- allocVar
+    var <- allocVarB
     assignB var x
     assignB var y
     return False
   Boolean (EqN x y) -> do
     -- introduce a fresh variable
     -- and assign both expressions to it
-    var <- allocVar
+    var <- allocVarN
     assignN var x
     assignN var y
     return False
   Boolean (EqU w x y) -> do
     -- introduce a fresh variable
     -- and assign both expressions to it
-    var <- allocVar
+    var <- allocVarU w
     assignU w var x
     assignU w var y
     return False
