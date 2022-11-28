@@ -1,192 +1,77 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
-
 module Test.VarLayout (tests) where
 
-import qualified Data.Sequence as Seq
 import Keelung
 import Keelung.Compiler
-import Keelung.Syntax.VarCounters
+import qualified Keelung.Compiler as Compiler
+import Keelung.Syntax.Counters
 import Test.Hspec
 
 tests :: SpecWith ()
 tests = do
-  describe "Layout" $ do
-    case asGF181N $ erasedVarCounters <$> erase example1 of
-      Left err -> it "Erasure of example1" $ expectationFailure (show err)
+  describe "Variable indexing" $ do
+    --
+    --                F   B   BR  U
+    --       output   3   0   0   0
+    --        input   2   1   0   0
+    -- intermediate   0   0   20  4
+    --
+    let counters =
+          ( setCount OfInput OfBoolean 1
+              . setCount OfInput OfField 2
+              . setCount OfOutput OfField 3
+              . setCount OfIntermediate (OfUIntBinRep 4) 5
+              . setCount OfIntermediate (OfUInt 4) 5
+          )
+            mempty
+    it "reindex 0" $ do
+      reindex counters OfOutput OfField 0 `shouldBe` 0
+      reindex counters OfOutput OfField 1 `shouldBe` 1
+      reindex counters OfOutput OfField 2 `shouldBe` 2
+      reindex counters OfInput OfField 0 `shouldBe` 3
+      reindex counters OfInput OfField 1 `shouldBe` 4
+      reindex counters OfInput OfBoolean 0 `shouldBe` 5
+      reindex counters OfIntermediate (OfUIntBinRep 4) 0 `shouldBe` 6
+      reindex counters OfIntermediate (OfUIntBinRep 4) 1 `shouldBe` 7
+      reindex counters OfIntermediate (OfUIntBinRep 4) 2 `shouldBe` 8
+      reindex counters OfIntermediate (OfUIntBinRep 4) 3 `shouldBe` 9
+      reindex counters OfIntermediate (OfUIntBinRep 4) 4 `shouldBe` 10
+      reindex counters OfIntermediate (OfUInt 4) 0 `shouldBe` 26
+      reindex counters OfIntermediate (OfUInt 4) 1 `shouldBe` 27
+      reindex counters OfIntermediate (OfUInt 4) 2 `shouldBe` 28
+      reindex counters OfIntermediate (OfUInt 4) 3 `shouldBe` 29
+
+  describe "Layout 0" $ do
+    --                F   B   BR  U
+    --       output   1   0   0   0
+    --        input   3   0   0   0
+    -- intermediate   0   0   0   0
+    let program = do
+          x <- inputNum
+          y <- inputNum
+          z <- inputNum
+          return $ x + y + z
+    case asGF181N $ csCounters <$> Compiler.compile program of
+      Left err -> it "Erasure failure" $ expectationFailure (show err)
       Right counters -> do
-        it "VarCounters constuction" $ do
-          -- check the formation of VarCounters
-          counters
-            `shouldBe` makeVarCounters
-              181 -- width of GF(181)
-              4 -- output
-              5 -- Number
-              4 -- Boolean
-              0 -- intermediate
-              [ NumInput 0,
-                BoolInput 0,
-                BoolInput 1,
-                BoolInput 2,
-                NumInput 1,
-                NumInput 2,
-                NumInput 3,
-                NumInput 4,
-                BoolInput 3
-              ]
-              [] -- custom
-        it "Size of variable groups" $ do
-          inputVarSize counters `shouldBe` (182 * 5 + 1 * 4)
-          outputVars counters `shouldBe` [0 .. 3]
-          inputVars counters `shouldBe` [4 .. 182 * 5 + 1 * 4 + 4 - 1]
-          inputVarsRange counters `shouldBe` (4, 182 * 5 + 1 * 4 + 4)
-          boolVarsRange counters `shouldBe` (9, 9 + 4 + 181 * 5)
-          numInputVarsRange counters `shouldBe` (4, 9)
-        it "Input sequence" $ do
-          getInputSequence counters
-            `shouldBe` Seq.fromList
-              [ NumInput 0,
-                BoolInput 0,
-                BoolInput 1,
-                BoolInput 2,
-                NumInput 1,
-                NumInput 2,
-                NumInput 3,
-                NumInput 4,
-                BoolInput 3
-              ]
+        it "reindex" $ do
+          reindex counters OfOutput OfField 0 `shouldBe` 0
+          reindex counters OfInput OfField 0 `shouldBe` 1
+          reindex counters OfInput OfField 1 `shouldBe` 2
+          reindex counters OfInput OfField 2 `shouldBe` 3
 
-        it "Index of binary representation" $ do
-          lookupBinRepStart counters 3 `shouldBe` Nothing
-          -- number
-          lookupBinRepStart counters 4 `shouldBe` Just 13
-          lookupBinRepStart counters 5 `shouldBe` Just 194
-          lookupBinRepStart counters 6 `shouldBe` Just 375
-          lookupBinRepStart counters 7 `shouldBe` Just 556
-          lookupBinRepStart counters 8 `shouldBe` Just 737
-          -- booleans
-          lookupBinRepStart counters 9 `shouldBe` Nothing
-
-    case asGF181N $ erasedVarCounters <$> erase example2 of
-      Left err -> it "Erasure of example2" $ expectationFailure (show err)
+  describe "Layout 1" $ do
+    --                F   B   BR  U
+    --       output   1   0   0   0
+    --        input   1   1   0   0
+    -- intermediate   0   0   0   0
+    let program = do
+          x <- inputNum
+          y <- inputBool
+          return $ cond y x 0
+    case asGF181N $ csCounters <$> Compiler.compile program of
+      Left err -> it "Erasure failure" $ expectationFailure (show err)
       Right counters -> do
-        it "VarCounters constuction" $ do
-          -- check the formation of VarCounters
-          counters
-            `shouldBe` makeVarCounters
-              181 -- width of GF(181)
-              3 -- output
-              1 -- Number
-              1 -- Boolean
-              0 -- intermediate
-              [ NumInput 0,
-                CustomInput 4 0,
-                BoolInput 0
-              ]
-              [(4, 1)] -- custom
-        it "Size of variable groups" $ do
-          inputVarSize counters `shouldBe` (3 + 181 + 4)
-          totalCustomInputSize counters `shouldBe` 1
-          customBinRepVarSize counters `shouldBe` 4
-          totalBoolVarSize counters `shouldBe` 186
-
-        it "Index of binary representation" $ do
-          -- outputs 
-          lookupBinRepStart counters 0 `shouldBe` Nothing
-          lookupBinRepStart counters 1 `shouldBe` Nothing
-          lookupBinRepStart counters 2 `shouldBe` Nothing
-          -- number
-          lookupBinRepStart counters 3 `shouldBe` Just 6
-          -- 4-bit unsigned integer
-          lookupBinRepStart counters 4 `shouldBe` Just 187
-          -- boolean
-          lookupBinRepStart counters 5 `shouldBe` Nothing
-
-    case asGF181N $ erasedVarCounters <$> erase example3 of
-      Left err -> it "Erasure of example3" $ expectationFailure (show err)
-      Right counters -> do
-        it "VarCounters constuction" $ do
-          -- check the formation of VarCounters
-          counters
-            `shouldBe` makeVarCounters
-              181 -- width of GF(181)
-              4 -- output
-              0 -- Number
-              0 -- Boolean
-              0 -- intermediate
-              [ CustomInput 4 0,
-                CustomInput 4 1,
-                CustomInput 3 0
-              ]
-              [(4, 2), (3, 1)] -- custom
-        it "Size of variable groups" $ do
-          totalCustomInputSize counters `shouldBe` 3
-          customBinRepVarSize counters `shouldBe` 4 + 4 + 3
-          inputVarSize counters `shouldBe` 5 + 5 + 4
-          totalBoolVarSize counters `shouldBe` 4 + 4 + 3
-          boolVarsRange counters `shouldBe` (7, 18)
-
-        it "Index of binary representation" $ do
-          lookupBinRepStart counters 0 `shouldBe` Nothing
-          lookupBinRepStart counters 1 `shouldBe` Nothing
-          lookupBinRepStart counters 2 `shouldBe` Nothing
-          lookupBinRepStart counters 3 `shouldBe` Nothing
-          lookupBinRepStart counters 4 `shouldBe` Just 7
-          lookupBinRepStart counters 5 `shouldBe` Just 10
-          lookupBinRepStart counters 6 `shouldBe` Just 14
-          blendInputVarU counters 4 0 `shouldBe` 5
-          blendInputVarU counters 4 1 `shouldBe` 6
-          blendInputVarU counters 3 0 `shouldBe` 4
-
-    case asGF181N $ erasedVarCounters <$> erase example4 of
-      Left err -> it "Erasure of example4" $ expectationFailure (show err)
-      Right counters -> do
-        it "VarCounters constuction" $ do
-          -- check the formation of VarCounters
-          counters
-            `shouldBe` makeVarCounters
-              181 -- width of GF(181)
-              1 -- output
-              1 -- Number
-              1 -- Boolean
-              0 -- intermediate
-              [BoolInput 0, NumInput 0]
-              [] -- custom
-        it "Size of variable groups" $ do
-          inputVarSize counters `shouldBe` 183
-          totalBoolVarSize counters `shouldBe` 182
-          boolVarsRange counters `shouldBe` (2, 184)
-          numInputVarsRange counters `shouldBe` (1, 2)
-
-        it "Index of binary representation" $ do
-          lookupBinRepStart counters 0 `shouldBe` Nothing
-          lookupBinRepStart counters 1 `shouldBe` Just 3
-          lookupBinRepStart counters 2 `shouldBe` Nothing
-
-example1 :: Comp (Arr Number)
-example1 = do
-  num0 <- inputNum
-  bools0 <- inputs 3
-  nums1 <- inputs 4
-  bool1 <- inputBool
-  return $ toArray [num0, sum (fmap BtoN bools0), sum nums1, BtoN bool1]
-
-example2 :: Comp (Arr Number)
-example2 = do
-  num0 <- inputNum
-  uint0 <- inputUInt @4
-  bool0 <- inputBool
-  return $ toArray [num0, BtoN (uint0 !!! 0), BtoN bool0]
-
-example3 :: Comp (Arr Boolean)
-example3 = do
-  x <- inputUInt @4
-  _x2 <- inputUInt @4
-  _y <- inputUInt @3
-  return $ toArray [x !!! 0, x !!! 1, x !!! 2, x !!! 3]
-
-example4 :: Comp Number
-example4 = do
-  boolean <- input
-  number <- input
-  return $ fromBool boolean + number * 2
+        it "reindex" $ do
+          reindex counters OfOutput OfField 0 `shouldBe` 0
+          reindex counters OfInput OfField 0 `shouldBe` 1
+          reindex counters OfInput OfBoolean 0 `shouldBe` 2

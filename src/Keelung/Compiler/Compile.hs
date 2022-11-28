@@ -41,6 +41,7 @@ run (TypeErased untypedExprs countersOld counters relations assertions assignmen
       ExprU x -> do
         out <- freshRefUO (widthOfU x)
         encodeExprU out x
+  
 
   -- Compile all relations
   encodeRelations relations
@@ -65,7 +66,7 @@ run (TypeErased untypedExprs countersOld counters relations assertions assignmen
         numBinReps
         (customBinReps <> extraBinReps)
         counters'
-        counters
+        counters''
     )
 
 -- | Encode the constraint 'out = x'.

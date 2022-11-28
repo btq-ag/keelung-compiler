@@ -307,7 +307,6 @@ cNEqB x y m = [CNEqB x y m]
 cNEqU :: GaloisField n => RefU -> RefU -> RefU -> [Constraint n]
 cNEqU x y m = [CNEqU x y m]
 
-
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"
   show (CAddF xs) = "AF " <> show xs <> " = 0"
@@ -321,7 +320,6 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
   show (CNEqB x y m) = "QB " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
-
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
@@ -356,7 +354,7 @@ instance GaloisField n => Ord (Constraint n) where
   compare (CAddU xs) (CAddU ys) = compare xs ys
   compare _ CAddU {} = LT
   compare CAddU {} _ = GT
-  -- CNEqF 
+  -- CNEqF
   compare CNEqF {} CNEqF {} = EQ
   compare _ CNEqF {} = LT
   compare CNEqF {} _ = GT
@@ -368,8 +366,6 @@ instance GaloisField n => Ord (Constraint n) where
   compare CNEqU {} CNEqU {} = EQ
   compare _ CNEqU {} = LT
   compare CNEqU {} _ = GT
-
-
   compare CNEq {} CNEq {} = EQ
   compare CNEq {} _ = LT
   compare _ CNEq {} = GT
