@@ -21,7 +21,7 @@ import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Syntax.BinRep (BinRep (..), BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
-import Keelung.Syntax.Counters (Counters, VarKind (..), VarSort (..), getCount, setCount)
+import Keelung.Syntax.Counters (Counters, VarKind (..), VarSort (..), getCount, addCount)
 import Keelung.Syntax.VarCounters
 import Keelung.Types
 
@@ -161,7 +161,7 @@ freshRefF :: M n RefF
 freshRefF = do
   counters <- gets envCounters
   let index = getCount OfIntermediate OfField counters
-  modifyCounter $ setCount OfIntermediate OfField (index + 1)
+  modifyCounter $ addCount OfIntermediate OfField 1
   return $ RefF index
 
 -- fresh :: M n RefB
@@ -169,7 +169,7 @@ fresh :: VarSort -> VarKind -> (Int -> ref) -> M n ref
 fresh sort kind ctor = do
   counters <- gets envCounters
   let index = getCount sort kind counters
-  modifyCounter $ setCount sort kind (index + 1)
+  modifyCounter $ addCount sort kind 1
   return $ ctor index
 
 freshRefBO :: M n RefB
@@ -185,14 +185,14 @@ freshRefB :: M n RefB
 freshRefB = do
   counters <- gets envCounters
   let index = getCount OfIntermediate OfBoolean counters
-  modifyCounter $ setCount OfIntermediate OfBoolean (index + 1)
+  modifyCounter $ addCount OfIntermediate OfBoolean 1
   return $ RefB index
 
 freshRefU :: Width -> M n RefU
 freshRefU width = do
   counters <- gets envCounters
   let index = getCount OfIntermediate (OfUInt width) counters
-  modifyCounter $ setCount OfIntermediate (OfUInt width) (index + 1)
+  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
   return $ RefU width index
 
 -- freshBinRep :: Var -> Int -> M n ()

@@ -30,8 +30,8 @@ import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
 import Keelung.Syntax.Typed
-import Keelung.Syntax.VarCounters
 import Keelung.Types
+import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
@@ -91,7 +91,7 @@ runAndCheck elab inputs = do
   (output, witness) <- runAndOutputWitnesses elab inputs
 
   -- See if input size is valid
-  let expectedInputSize = inputVarSize (compVarCounters (elabComp elab))
+  let expectedInputSize = getCountOfAll OfInput (compCounters (elabComp elab))
   let actualInputSize = length (Inputs.numInputs inputs <> Inputs.boolInputs inputs)
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize

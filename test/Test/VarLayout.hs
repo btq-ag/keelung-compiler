@@ -16,11 +16,10 @@ tests = do
     -- intermediate   0   0   20  4
     --
     let counters =
-          ( setCount OfInput OfBoolean 1
-              . setCount OfInput OfField 2
-              . setCount OfOutput OfField 3
-              . setCount OfIntermediate (OfUIntBinRep 4) 5
-              . setCount OfIntermediate (OfUInt 4) 5
+          ( addCount OfInput OfBoolean 1
+              . addCount OfInput OfField 2
+              . addCount OfOutput OfField 3
+              . addCount OfIntermediate (OfUInt 4) 5
           )
             mempty
     it "reindex 0" $ do

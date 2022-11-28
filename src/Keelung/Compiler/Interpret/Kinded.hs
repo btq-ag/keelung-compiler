@@ -17,13 +17,13 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import qualified Data.Sequence as Seq
+import GHC.TypeLits (KnownNat)
 import Keelung hiding (inputs, interpret, run)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
-import Keelung.Syntax.VarCounters
+import Keelung.Syntax.Counters
 import Keelung.Types
-import GHC.TypeLits (KnownNat)
 
 --------------------------------------------------------------------------------
 
@@ -68,7 +68,7 @@ runAndCheck elab inputs = do
 
   -- See if input size is valid
   let (Elaborated _ comp) = elab
-  let expectedInputSize = inputVarSize (compVarCounters comp)
+  let expectedInputSize = getCountOfAll OfInput (compCounters comp)
   let actualInputSize = length (Inputs.numInputs inputs <> Inputs.boolInputs inputs)
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
@@ -273,7 +273,7 @@ instance (Interpret t n, GaloisField n) => Interpret (ArrM t) n where
 -- | The interpreter monad
 type M n = ReaderT (Inputs n, Heap) (StateT (Witness n) (Except (InterpretError n)))
 
-runM :: Elaborated t -> Inputs n -> M n a -> Either (InterpretError n) (a, Witness n)
+runM :: Show n => Elaborated t -> Inputs n -> M n a -> Either (InterpretError n) (a, Witness n)
 runM elab inputs p =
   runExcept (runStateT (runReaderT p (inputs, heap)) mempty)
   where
@@ -291,14 +291,14 @@ lookupInputVarN :: Show n => Var -> M n n
 lookupInputVarN var = do
   inputs <- asks (Inputs.numInputs . fst)
   case inputs Seq.!? var of
-    Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
+    Nothing -> throwError $ InterpretUnboundInputVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
     Just val -> return val
 
 lookupInputVarB :: Show n => Var -> M n n
 lookupInputVarB var = do
   inputs <- asks (Inputs.boolInputs . fst)
   case inputs Seq.!? var of
-    Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
+    Nothing -> throwError $ InterpretUnboundInputVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
     Just val -> return val
 
 lookupInputVarU :: Show n => Int -> Var -> M n n
@@ -308,7 +308,7 @@ lookupInputVarU width var = do
     Nothing -> error ("lookupInputVarU: no UInt of such bit width: " <> show width)
     Just inputs ->
       case inputs Seq.!? var of
-        Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
+        Nothing -> throwError $ InterpretUnboundInputVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
         Just val -> return val
 
 lookupAddr :: Show n => Int -> M n [n]

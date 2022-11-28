@@ -83,7 +83,7 @@ genInputsOutputsWitnesses prog rawInputs = do
   elab <- elaborate prog
   outputs <- left InterpretError (Interpret.run elab (Inputs.deserializeElab elab rawInputs))
   r1cs <- toR1CS <$> compileO1 prog
-  let inputs = Inputs.deserialize (r1csVarCounters r1cs) rawInputs
+  let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
   witness <- left ExecError (witnessOfR1CS inputs r1cs)
   return (inputs, outputs, witness)
 
@@ -144,7 +144,7 @@ execute prog rawInputs = do
   elab <- elaborate prog
 
   r1cs <- toR1CS <$> compile prog
-  let inputs = Inputs.deserialize (r1csVarCounters r1cs) rawInputs
+  let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
   (actualOutputs, actualWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputs)
 
   -- interpret the program to see if the output value is correct
@@ -177,7 +177,7 @@ genInputsOutputsWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n
 genInputsOutputsWitnessesElab elab rawInputs = do
   outputs <- left (show . InterpretError) (Interpret.run elab (Inputs.deserializeElab elab rawInputs))
   r1cs <- toR1CS <$> left show (compileO1Elab elab)
-  let inputs = Inputs.deserialize (r1csVarCounters r1cs) rawInputs
+  let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
   witness <- left (show . ExecError) (witnessOfR1CS inputs r1cs)
   return (inputs, outputs, witness)
 
