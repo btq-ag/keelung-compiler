@@ -21,13 +21,13 @@ import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters (Counters, VarType (..), VarSort (..), getCount, addCount)
-import Keelung.Syntax.VarCounters
+
 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
-run (TypeErased untypedExprs _ countersOld counters relations assertions assignments numBinReps customBinReps) = runM countersOld counters $ do
+run (TypeErased untypedExprs fieldWidith countersOld counters relations assertions assignments numBinReps customBinReps) = runM fieldWidith counters $ do
   forM_ untypedExprs $ \untypedExpr -> do
     case untypedExpr of
       ExprB x -> do
@@ -54,8 +54,6 @@ run (TypeErased untypedExprs _ countersOld counters relations assertions assignm
 
   extraBinReps <- gets envExtraBinReps
 
-  counters' <- gets envVarCounters
-
   counters'' <- gets envCounters
 
   return
@@ -63,7 +61,7 @@ run (TypeErased untypedExprs _ countersOld counters relations assertions assignm
         (Set.map (Constraint2.fromConstraint counters'') constraints)
         numBinReps
         (customBinReps <> extraBinReps)
-        counters'
+        countersOld
         counters''
     )
 
@@ -123,7 +121,7 @@ encodeRelations (Relations vbs ebs) = do
 
 -- | Monad for compilation
 data Env n = Env
-  { envVarCounters :: VarCounters,
+  { envFieldWidth :: Width,
     envCounters :: Counters,
     envConstraints :: Set (Constraint n),
     envExtraBinReps :: BinReps
@@ -131,8 +129,8 @@ data Env n = Env
 
 type M n = State (Env n)
 
-runM :: GaloisField n => VarCounters -> Counters -> M n a -> a
-runM varCounters counters program = evalState program (Env varCounters counters mempty mempty)
+runM :: GaloisField n => Width -> Counters -> M n a -> a
+runM fieldWidith counters program = evalState program (Env fieldWidith counters mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\env -> env {envCounters = f (envCounters env)})
@@ -211,9 +209,6 @@ freshRefU width = do
 --       Just binRep -> return (binRepBitsIndex binRep)
 --     Just index -> return index
 
-getNumberBitWidth :: M n Width
-getNumberBitWidth = gets (getNumBitWidth . envVarCounters)
-
 ----------------------------------------------------------------
 
 encodeExprB :: (GaloisField n, Integral n) => RefB -> ExprB n -> M n ()
@@ -273,16 +268,16 @@ encodeExprB out expr = case expr of
         --  =>  if the sum of operands is 0     then 0 else 1
         --  =>  if the sum of operands is not 0 then 1 else 0
         --  =>  the sum of operands is not 0
-        numBitWidth <- getNumberBitWidth
+        fieldWidth <- gets envFieldWidth
         encodeExprB
           out
           ( NEqN
-              (ValN numBitWidth 0)
+              (ValN fieldWidth 0)
               ( AddN
-                  numBitWidth
-                  (BtoN numBitWidth x0)
-                  (BtoN numBitWidth x1)
-                  (fmap (BtoN numBitWidth) xs)
+                  fieldWidth
+                  (BtoN fieldWidth x0)
+                  (BtoN fieldWidth x1)
+                  (fmap (BtoN fieldWidth) xs)
               )
           )
   XorB x y -> do

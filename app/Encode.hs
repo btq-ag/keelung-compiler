@@ -17,7 +17,7 @@ import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
-import Keelung.Syntax.VarCounters
+import Keelung.Syntax.Counters hiding (reindex)
 import Keelung.Types
 
 -- | J-R1CS – a JSON Lines format for R1CS
@@ -57,7 +57,7 @@ serializeR1CS2 r1cs =
     -- the constraints are reindexed and all field numbers are converted to Integer
     r1cConstraints = map (fmap toInteger . reindexR1C r1cs) (toR1Cs r1cs)
 
-    varCounters = r1csVarCounters r1cs
+    counters = r1csCounters r1cs
 
     header :: Encoding
     header =
@@ -67,8 +67,8 @@ serializeR1CS2 r1cs =
             pairStr "version" (string "0.7.0")
               <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
               <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
-              <> pairStr "instances" (int (pinnedVarSize varCounters)) -- inputs & outputs
-              <> pairStr "witness" (int (totalVarSize varCounters - pinnedVarSize varCounters)) -- other intermediate variables
+              <> pairStr "instances" (int (getCountBySort OfInput counters + getCountBySort OfOutput counters)) -- inputs & outputs
+              <> pairStr "witness" (int (getCountBySort OfIntermediate counters)) -- other intermediate variables
               <> pairStr "constraints" (int (length r1cConstraints))
               <> pairStr "optimized" (bool True)
 
@@ -122,7 +122,7 @@ reindexR1C r1cs (R1C a b c) =
   where
     reindex :: Var -> Var
     reindex var
-      | isInputOrOutputVar var = - (var + 1) -- + 1 to avoid $0 the constant 1
+      | isInputOrOutputVar var = -(var + 1) -- + 1 to avoid $0 the constant 1
       | otherwise = var + 1 -- + 1 to avoid $0 the constant 1
     isInputOrOutputVar :: Var -> Bool
-    isInputOrOutputVar var = var < pinnedVarSize (r1csVarCounters r1cs)
+    isInputOrOutputVar var = var < (getCountBySort OfInput (r1csCounters r1cs) + getCountBySort OfOutput (r1csCounters r1cs))

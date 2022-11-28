@@ -48,7 +48,7 @@ import qualified Keelung.Constraint.R1CS as Constraint
 import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters
-import Keelung.Syntax.VarCounters
+import Keelung.Syntax.VarCounters (VarCounters)
 import Keelung.Types
 
 type Width = Int

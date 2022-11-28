@@ -9,7 +9,6 @@ import qualified Data.Sequence as Seq
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed (Computation (compCounters), Elaborated (elabComp))
--- import Keelung.Syntax.VarCounters
 
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs

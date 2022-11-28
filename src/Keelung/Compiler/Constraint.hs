@@ -10,8 +10,8 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified Data.List as List
 import qualified Data.Map as Map
--- import Data.Map.Strict (Map)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
@@ -22,9 +22,10 @@ import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
-import Keelung.Syntax.Counters (Counters)
-import Keelung.Syntax.VarCounters
+import Keelung.Syntax.Counters
+import Keelung.Syntax.VarCounters (VarCounters)
 import Keelung.Types
+import Keelung.Compiler.Util (showBooleanVars)
 
 --------------------------------------------------------------------------------
 
@@ -126,11 +127,13 @@ data ConstraintSystem n = ConstraintSystem
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem cs _ _ counters _) =
-  Set.size cs + totalBoolVarSize counters + numInputVarSize counters + totalCustomInputSize counters
+numberOfConstraints (ConstraintSystem cs _ _ _ counters) =
+  Set.size cs + getBooleanConstraintSize counters + getBinRepConstraintSize counters
+
+-- totalBoolVarSize counters + numInputVarSize counters + totalCustomInputSize counters
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints numBinReps customBinReps counters _) =
+  show (ConstraintSystem constraints numBinReps customBinReps _ counters) =
     "ConstraintSystem {\n\
     \  Total constraint size: "
       <> show (length constraints + totalBinRepConstraintSize)
@@ -142,16 +145,10 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showBinRepConstraints
       <> "\n"
       <> indent (show counters)
-      <> showBooleanVars
+      <> showBooleanVars counters
       <> "\n}"
     where
       showConstraints = unlines . map (\c -> "    " <> show c)
-
-      showBooleanVars =
-        let (start, end) = boolVarsRange counters
-         in if end - start == 0
-              then ""
-              else "  Boolean variables: $" <> show start <> " .. $" <> show (end - 1) <> "\n"
 
       totalBinRepConstraintSize = BinRep.size customBinReps + BinRep.size numBinReps
       showBinRepConstraints =
@@ -172,28 +169,30 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 renumberConstraints :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
 renumberConstraints cs =
   cs
-    { csConstraints = Set.map renumberConstraint (csConstraints cs),
-      csVarCounters = setIntermediateVarSize (IntSet.size newIntermediateVars) (csVarCounters cs)
+    { csConstraints = Set.map renumberConstraint (csConstraints cs)
+    -- csVarCounters = setIntermediateVarSize (IntSet.size newIntermediateVars) (csVarCounters cs)
     }
   where
-    counters = csVarCounters cs
+    -- counters = csVarCounters cs
+    counters = csCounters cs
+    pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
 
     -- variables in constraints (that should be kept after renumbering!)
     vars = varsInConstraints (csConstraints cs)
     -- variables in constraints excluding input & output variables
-    newIntermediateVars = IntSet.filter (>= pinnedVarSize counters) vars
+    newIntermediateVars = IntSet.filter (>= pinnedVarSize) vars
     -- new variables after renumbering (excluding input & output variables)
-    renumberedIntermediateVars = [pinnedVarSize counters .. pinnedVarSize counters + IntSet.size newIntermediateVars - 1]
+    renumberedIntermediateVars = [pinnedVarSize .. pinnedVarSize + IntSet.size newIntermediateVars - 1]
 
     -- all variables after renumbering
-    renumberedVars = [0 .. pinnedVarSize counters + IntSet.size newIntermediateVars - 1]
+    renumberedVars = [0 .. pinnedVarSize + IntSet.size newIntermediateVars - 1]
 
     -- mapping of old variables to new variables
     -- input variables are placed in the front
     variableMap = Map.fromList $ zip (IntSet.toList newIntermediateVars) renumberedIntermediateVars
 
     renumber var =
-      if var >= pinnedVarSize counters
+      if var >= pinnedVarSize
         then case Map.lookup var variableMap of
           Nothing ->
             error

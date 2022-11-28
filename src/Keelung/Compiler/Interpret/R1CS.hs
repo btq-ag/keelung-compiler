@@ -9,7 +9,7 @@ import qualified Data.IntMap as IntMap
 import Keelung.Compiler.R1CS (ExecError (..), witnessOfR1CS)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1CS
-import Keelung.Syntax.VarCounters
+import Keelung.Syntax.Counters (getOutputVarRange)
 
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (ExecError n) [n]
 run r1cs inputs = fst <$> run' r1cs inputs
@@ -18,7 +18,8 @@ run r1cs inputs = fst <$> run' r1cs inputs
 run' :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (ExecError n) ([n], IntMap n)
 run' r1cs inputs = do
   witness <- witnessOfR1CS inputs r1cs
-  let varCounters = r1csVarCounters r1cs
+  let (start, end) = getOutputVarRange (r1csCounters r1cs)
+  let outputVars = [start .. end - 1]
   -- extract output values from the witness
   let (execErrors, outputs) =
         Either.partitionEithers $
@@ -28,10 +29,10 @@ run' r1cs inputs = do
                   Nothing -> Left var
                   Just value -> Right value
             )
-            (outputVars varCounters)
+            outputVars
 
   unless (null execErrors) $ do
-    Left $ ExecOutputVarsNotMappedError (outputVars varCounters) witness
+    Left $ ExecOutputVarsNotMappedError outputVars witness
 
   return (outputs, witness)
 

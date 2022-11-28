@@ -22,7 +22,7 @@ import Keelung.Constraint.R1C (R1C (..))
 import qualified Keelung.Constraint.R1C as R1C
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
 import Keelung.Field (N (..))
-import Keelung.Syntax.VarCounters
+import Keelung.Syntax.Counters
 import Keelung.Types
 
 -- | Starting from an initial partial assignment, solve the
@@ -38,7 +38,7 @@ generateWitness ::
   Either (ExecError n) (Witness n)
 generateWitness cs initWit =
   let cs' = renumberConstraints cs
-      variables = [0 .. totalVarSize (csVarCounters cs) - 1]
+      variables = [0 .. getTotalCount (csCounters cs) - 1]
       (witness, _) = optimizeWithWitness initWit cs'
    in if all (isMapped witness) variables
         then Right witness
@@ -105,7 +105,7 @@ fromR1CS r1cs =
 -- | Computes an assignment for a R1CS with given inputs
 witnessOfR1CS :: (GaloisField n, Integral n) => Inputs n -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
-  let inputSize = inputVarSize (r1csVarCounters r1cs)
+  let inputSize = getCountBySort OfInput (r1csCounters r1cs)
    in if inputSize /= Inputs.size inputs
         then Left $ ExecInputUnmatchedError inputSize (Inputs.size inputs)
         else generateWitness (fromR1CS r1cs) (Inputs.toIntMap inputs)

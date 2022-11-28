@@ -18,8 +18,8 @@ import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import Keelung.Error (Error)
 import Keelung.Monad (Comp)
+import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Typed as C
-import Keelung.Syntax.VarCounters
 
 --------------------------------------------------------------------------------
 
@@ -33,16 +33,20 @@ optimizeWithWitness witness cs =
   --   - output vars
   -- Pinned vars are never optimized away.
 
-  let pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize (csVarCounters cs) - 1]
+  let counters = csCounters cs
+      pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
+      pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize - 1]
    in runOptiM witness $ do
         constraints <- MinimizeConstraints.run (IntSet.toList pinnedVars) (csConstraints cs)
-        witness' <- witnessOfVars [0 .. totalVarSize (csVarCounters cs) - 1]
+        witness' <- witnessOfVars [0 .. getTotalCount counters - 1]
 
         return (witness', renumberConstraints $ cs {csConstraints = constraints})
 
 optimizeWithInput :: (GaloisField n, Integral n) => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
 optimizeWithInput inputs cs =
-  let witness = IntMap.fromList (zip (inputVars (csVarCounters cs)) inputs)
+  let (start, end) = getInputVarRange (csCounters cs)
+      inputVars = [start .. end - 1]
+      witness = IntMap.fromList (zip inputVars inputs)
    in optimizeWithWitness witness cs
 
 optimize1 :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
@@ -54,7 +58,9 @@ optimize2 cs =
   --   - input vars
   --   - output vars
   -- Pinned vars are never optimized away.
-  let pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize (csVarCounters cs) - 1]
+  let counters = csCounters cs
+      pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
+      pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize - 1]
       constraints = MinimizeConstraints2.run pinnedVars (csConstraints cs)
    in renumberConstraints $ cs {csConstraints = constraints}
 
@@ -75,6 +81,6 @@ compareTypeErased :: TypeErased n -> TypeErased n -> Result
 compareTypeErased x y =
   Result
     { resultConstraintReduction = 0,
-      resultVariableReduction = totalVarSize (erasedVarCounters x) - totalVarSize (erasedVarCounters y),
+      resultVariableReduction = getTotalCount (erasedCounters x) - getTotalCount (erasedCounters y),
       resultAssignmentReduction = length (erasedAssignments x) - length (erasedAssignments y)
     }

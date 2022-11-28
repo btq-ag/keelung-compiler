@@ -33,7 +33,7 @@ import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Counters as Counters
 import Keelung.Syntax.VarCounters
-import Keelung.Types (Var)
+import Keelung.Types (Var, indent)
 import Keelung.Compiler.Constraint2
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
