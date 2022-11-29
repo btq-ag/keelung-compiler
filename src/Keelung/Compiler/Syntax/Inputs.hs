@@ -16,7 +16,7 @@ data Inputs n = Inputs
     numInputs :: Seq n,
     boolInputs :: Seq n,
     uintInputs :: IntMap (Seq n),
-    numBinReps :: Seq n,
+    -- numBinReps :: Seq n,
     uintBinReps :: IntMap (Seq n)
   }
   deriving (Eq, Show)
@@ -33,8 +33,8 @@ deserialize counters rawInputs = do
         case inputType of
           OfField ->
             inputs
-              { numInputs = numInputs inputs Seq.:|> rawInputValue,
-                numBinReps = numBinReps inputs <> Seq.fromList (toBits rawInputValue)
+              { numInputs = numInputs inputs Seq.:|> rawInputValue
+                -- numBinReps = numBinReps inputs <> Seq.fromList (toBits rawInputValue)
               }
           OfBoolean ->
             inputs
@@ -47,7 +47,7 @@ deserialize counters rawInputs = do
                 uintBinReps = IntMap.insertWith (flip (<>)) width (Seq.fromList (toBits rawInputValue)) (uintBinReps inputs)
               }
     )
-    (Inputs counters mempty mempty mempty mempty mempty)
+    (Inputs counters mempty mempty mempty mempty)
     (Seq.zip (getInputSequence counters) (Seq.fromList rawInputs))
 
 -- | Alternative version of 'deserialize' that accepts elaborated Keelung programs
@@ -56,12 +56,11 @@ deserializeElab elab = deserialize (compCounters (elabComp elab))
 
 -- | Concatenate all inputs into a single list
 flatten :: Inputs n -> [n]
-flatten (Inputs _ a b c d e) =
+flatten (Inputs _ a b c d) =
   toList a
     <> toList b
     <> concatMap toList (IntMap.elems c)
-    <> toList d
-    <> concatMap toList (IntMap.elems e)
+    <> concatMap toList (IntMap.elems d)
 
 -- | Size of all inputs
 size :: Inputs n -> Int

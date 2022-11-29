@@ -10,11 +10,11 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
-import qualified Data.List as List
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
+import Keelung.Compiler.Util (showBooleanVars)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
@@ -25,7 +25,6 @@ import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.Counters
 import Keelung.Syntax.VarCounters (VarCounters)
 import Keelung.Types
-import Keelung.Compiler.Util (showBooleanVars)
 
 --------------------------------------------------------------------------------
 
@@ -71,7 +70,6 @@ cmul !xs !ys (c, zs) = case ( do
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"
-  -- show (CAdd2 t xs) = "A " <> show t <> " " <> show xs <> " = 0"
   show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
   show (CNEq x) = show x
 

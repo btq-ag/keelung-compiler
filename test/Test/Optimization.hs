@@ -70,7 +70,7 @@ tests = do
             ConstraintSystem
               { csConstraints =
                   Set.fromList $
-                    cadd 0 [(0, 1), (1, 1), (2, -1), (3, -1)],
+                    cadd 0 [(0, -1), (1, -1), (2, 1), (3, 1)],
                 csVarCounters = makeVarCounters 0 0 4 0 0 [] [],
                 csNumBinReps = mempty,
                 csCustomBinReps = mempty,
@@ -116,7 +116,7 @@ tests = do
           cs' =
             ConstraintSystem
               { csConstraints =
-                  Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
+                  Set.fromList (cmul [(2, 1)] [(0, -1), (1, -1)] (42, [])), -- (- $0 - $1) * $2 = 42
                 csVarCounters = makeVarCounters 0 0 3 0 0 [] [],
                 csNumBinReps = mempty,
                 csCustomBinReps = mempty,

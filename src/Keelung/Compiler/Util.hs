@@ -19,8 +19,11 @@ showWitness xs =
 showBooleanVars :: Counters -> String
 showBooleanVars counters =
   let segments = getBooleanConstraintRanges counters
-      showSegment (start, end) = "$" <> show start <> " .. $" <> show (end - 1)
+      showSegment (start, end) = 
+          if start + 1 == end
+          then "$" <> show start
+          else "$" <> show start <> " .. $" <> show (end - 1)
       allSegments = List.intercalate ", " (map showSegment segments)
    in if getBooleanConstraintSize counters == 0
         then ""
-        else " . Boolean variables: " <> allSegments <> "\n"
+        else "  Boolean variables: " <> allSegments <> "\n"
