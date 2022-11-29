@@ -27,7 +27,7 @@ import Keelung.Syntax.Counters (Counters, VarType (..), VarSort (..), getCount, 
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
-run (TypeErased untypedExprs fieldWidith countersOld counters relations assertions assignments numBinReps customBinReps) = runM fieldWidith counters $ do
+run (TypeErased untypedExprs fieldWidith counters relations assertions assignments numBinReps customBinReps) = runM fieldWidith counters $ do
   forM_ untypedExprs $ \untypedExpr -> do
     case untypedExpr of
       ExprB x -> do
@@ -54,15 +54,14 @@ run (TypeErased untypedExprs fieldWidith countersOld counters relations assertio
 
   extraBinReps <- gets envExtraBinReps
 
-  counters'' <- gets envCounters
+  counters' <- gets envCounters
 
   return
     ( Constraint.ConstraintSystem
-        (Set.map (Constraint2.fromConstraint counters'') constraints)
+        (Set.map (Constraint2.fromConstraint counters') constraints)
         numBinReps
         (customBinReps <> extraBinReps)
-        countersOld
-        counters''
+        counters'
     )
 
 -- | Encode the constraint 'out = x'.

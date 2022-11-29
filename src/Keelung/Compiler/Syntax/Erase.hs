@@ -2,24 +2,20 @@ module Keelung.Compiler.Syntax.Erase (run) where
 
 import Control.Monad.Reader
 import Data.Field.Galois (GaloisField)
-import qualified Data.IntMap.Strict as IntMap
-import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
-import qualified Keelung.Syntax.BinRep as BinRep
 import qualified Keelung.Syntax.Typed as T
-import Keelung.Syntax.VarCounters
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation countersOld counters numAsgns boolAsgns _ assertions = comp
+  let T.Computation counters numAsgns boolAsgns _ assertions = comp
       proxy = 0
       numBitWidth = bitSize proxy
    in runM numBitWidth $ do
         -- update VarCounters.varNumWidth before type erasure
-        let counters' = setNumBitWidth numBitWidth $ setOutputVarSize (lengthOfExpr expr) countersOld
+        -- let counters' = setNumBitWidth numBitWidth $ setOutputVarSize (lengthOfExpr expr) countersOld
         -- put counters'
         -- start type erasure
         expr' <- eraseExpr expr
@@ -33,45 +29,44 @@ run (T.Elaborated expr comp) =
         -- counters'' <- get
 
         -- associate input variables with their corresponding binary representation
-        let numBinReps =
-              let (start, end) = numInputVarsRange counters'
-               in BinRep.fromList $
-                    map
-                      (\v -> BinRep.fromNumBinRep numBitWidth (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters' v)))
-                      [start .. end - 1]
+        -- let numBinReps =
+        --       let (start, end) = numInputVarsRange counters'
+        --        in BinRep.fromList $
+        --             map
+        --               (\v -> BinRep.fromNumBinRep numBitWidth (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters' v)))
+        --               [start .. end - 1]
 
-        let customBinReps =
-              BinRep.fromList $
-                concatMap
-                  ( \(width, (start, end)) ->
-                      map
-                        (\v -> BinRep.fromNumBinRep width (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters' v)))
-                        [start .. end - 1]
-                  )
-                  (IntMap.toList (customInputVarsRanges counters'))
+        -- let customBinReps =
+        --       BinRep.fromList $
+        --         concatMap
+        --           ( \(width, (start, end)) ->
+        --               map
+        --                 (\v -> BinRep.fromNumBinRep width (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters' v)))
+        --                 [start .. end - 1]
+        --           )
+        --           (IntMap.toList (customInputVarsRanges counters'))
 
         return $
           TypeErased
             { erasedExpr = expr',
               erasedFieldBitWidth = numBitWidth,
               -- determine the size of output vars by looking at the length of the expression
-              erasedVarCounters = counters',
               erasedCounters = counters,
               erasedRelations = mempty,
               erasedAssertions = assertions',
               erasedAssignments = assignments,
-              erasedBinReps = numBinReps,
-              erasedCustomBinReps = customBinReps
+              erasedBinReps = mempty,
+              erasedCustomBinReps = mempty
             }
   where
     -- proxy trick for devising the bit width of field elements
     sameType :: n -> [Expr n] -> M n ()
     sameType _ _ = return ()
 
-    lengthOfExpr :: T.Expr -> Int
-    lengthOfExpr (T.Array xs) = sum $ fmap lengthOfExpr xs
-    lengthOfExpr T.Unit = 0
-    lengthOfExpr _ = 1
+    -- lengthOfExpr :: T.Expr -> Int
+    -- lengthOfExpr (T.Array xs) = sum $ fmap lengthOfExpr xs
+    -- lengthOfExpr T.Unit = 0
+    -- lengthOfExpr _ = 1
 
 --------------------------------------------------------------------------------
 

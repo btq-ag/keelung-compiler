@@ -23,7 +23,6 @@ import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.Counters
-import Keelung.Syntax.VarCounters (VarCounters)
 import Keelung.Types
 
 --------------------------------------------------------------------------------
@@ -118,20 +117,19 @@ data ConstraintSystem n = ConstraintSystem
     csNumBinReps :: BinReps,
     -- | Binary representation of custom output variables
     csCustomBinReps :: BinReps,
-    csVarCounters :: !VarCounters,
     csCounters :: Counters
   }
   deriving (Eq, Generic, NFData)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem cs _ _ _ counters) =
+numberOfConstraints (ConstraintSystem cs _ _ counters) =
   Set.size cs + getBooleanConstraintSize counters + getBinRepConstraintSize counters
 
 -- totalBoolVarSize counters + numInputVarSize counters + totalCustomInputSize counters
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints numBinReps customBinReps _ counters) =
+  show (ConstraintSystem constraints numBinReps customBinReps counters) =
     "ConstraintSystem {\n\
     \  Total constraint size: "
       <> show (length constraints + totalBinRepConstraintSize)

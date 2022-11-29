@@ -63,7 +63,6 @@ toR1CS :: GaloisField n => ConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
     { r1csConstraints = rights convertedConstratins,
-      r1csVarCounters = csVarCounters cs,
       r1csCounters = csCounters cs,
       r1csCNEQs = lefts convertedConstratins,
       r1csNumBinReps = csNumBinReps cs,
@@ -89,7 +88,6 @@ fromR1CS r1cs =
     { csConstraints =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
-      csVarCounters = r1csVarCounters r1cs,
       csCounters = r1csCounters r1cs,
       csNumBinReps = r1csNumBinReps r1cs,
       csCustomBinReps = r1csCustomBinReps r1cs

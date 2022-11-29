@@ -17,7 +17,6 @@ import qualified Keelung.Constraint.Polynomial as Poly
 -- import Keelung.Constraint.R1CS (R1CS)
 import qualified Keelung.Syntax.BinRep as BinRep
 import qualified Keelung.Syntax.Typed as C
-import Keelung.Syntax.VarCounters
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
@@ -120,78 +119,77 @@ main = hspec $ do
               { csConstraints =
                   Set.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
-                csVarCounters = makeVarCounters 181 0 1 0 0 [NumInput 0] [],
                 csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (0, 1)],
                 csCustomBinReps = mempty,
                 csCounters = mempty
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
 
-    -- it "Bit value query 0" $
-    --   let cs =
-    --         ConstraintSystem
-    --           { csConstraints =
-    --               Set.fromList $
-    --                 concat
-    --                   [ -- value of outputs
-    --                     cadd (0 :: GF181) [(0, 1), (7, -1)],
-    --                     cadd 0 [(1, 1), (8, -1)],
-    --                     cadd 0 [(2, 1), (9, -1)],
-    --                     cadd (-1) [(3, 1)],
-    --                     cadd 1 [(4, -1)],
-    --                     cadd 0 [(5, 1)]
-    --                   ],
-    --             csVarCounters = makeVarCounters 181 6 1 0 0 [NumInput 0] [],
-    --             csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (6, 7)],
-    --             csCustomBinReps = mempty
-    --           }
-    --    in Compiler.compileOnly Basic.bits0 `shouldBe` Right cs
+-- it "Bit value query 0" $
+--   let cs =
+--         ConstraintSystem
+--           { csConstraints =
+--               Set.fromList $
+--                 concat
+--                   [ -- value of outputs
+--                     cadd (0 :: GF181) [(0, 1), (7, -1)],
+--                     cadd 0 [(1, 1), (8, -1)],
+--                     cadd 0 [(2, 1), (9, -1)],
+--                     cadd (-1) [(3, 1)],
+--                     cadd 1 [(4, -1)],
+--                     cadd 0 [(5, 1)]
+--                   ],
+--             csVarCounters = makeVarCounters 181 6 1 0 0 [NumInput 0] [],
+--             csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (6, 7)],
+--             csCustomBinReps = mempty
+--           }
+--    in Compiler.compileOnly Basic.bits0 `shouldBe` Right cs
 
-    -- it "Bit value query 1" $
-    --   let cs =
-    --         ConstraintSystem
-    --           { csConstraints =
-    --               Set.fromList $ -- value of outputs
-    --                 cmul [(364, 1)] [(3, 1)] (0 :: GF181, [(0, 1)]),
-    --             csVarCounters = makeVarCounters 181 1 2 0 0 [NumInput 0, NumInput 1] [],
-    --             csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (1, 3), BinRep.fromNumBinRep 181 (2, 184)],
-    --             csCustomBinReps = mempty
-    --           }
-    --    in Compiler.compileOnly Basic.bits1 `shouldBe` Right cs
+-- it "Bit value query 1" $
+--   let cs =
+--         ConstraintSystem
+--           { csConstraints =
+--               Set.fromList $ -- value of outputs
+--                 cmul [(364, 1)] [(3, 1)] (0 :: GF181, [(0, 1)]),
+--             csVarCounters = makeVarCounters 181 1 2 0 0 [NumInput 0, NumInput 1] [],
+--             csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (1, 3), BinRep.fromNumBinRep 181 (2, 184)],
+--             csCustomBinReps = mempty
+--           }
+--    in Compiler.compileOnly Basic.bits1 `shouldBe` Right cs
 
-  -- describe "Keelung `compile`" $ do
-  --   it "Program that throws ElabError.IndexOutOfBoundsError" $ do
-  --     let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.outOfBound)
-  --     actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.outOfBound
-  --     actual `shouldBe` expected
+-- describe "Keelung `compile`" $ do
+--   it "Program that throws ElabError.IndexOutOfBoundsError" $ do
+--     let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.outOfBound)
+--     actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.outOfBound
+--     actual `shouldBe` expected
 
-  --   it "Program that throws ElabError.EmptyArrayError" $ do
-  --     let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.emptyArray)
-  --     actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.emptyArray
-  --     actual `shouldBe` expected
+--   it "Program that throws ElabError.EmptyArrayError" $ do
+--     let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.emptyArray)
+--     actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.emptyArray
+--     actual `shouldBe` expected
 
-  --   it "Program that compiles successfully" $ do
-  --     let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.identity)
-  --     actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.identity
-  --     actual `shouldBe` expected
+--   it "Program that compiles successfully" $ do
+--     let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.identity)
+--     actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.identity
+--     actual `shouldBe` expected
 
-  -- describe "Keelung `interpret`" $ do
-  --   it "Program that throws ElabError.IndexOutOfBoundsError" $ do
-  --     let expected = left show (Compiler.interpret Basic.outOfBound ([] :: [GF181]))
-  --     actual <- left show <$> Keelung.interpret_ GF181 Basic.outOfBound []
-  --     actual `shouldBe` expected
+-- describe "Keelung `interpret`" $ do
+--   it "Program that throws ElabError.IndexOutOfBoundsError" $ do
+--     let expected = left show (Compiler.interpret Basic.outOfBound ([] :: [GF181]))
+--     actual <- left show <$> Keelung.interpret_ GF181 Basic.outOfBound []
+--     actual `shouldBe` expected
 
-  --   it "Program that throws ElabError.EmptyArrayError" $ do
-  --     let expected = left show (Compiler.interpret Basic.emptyArray ([] :: [GF181]))
-  --     actual <- left show <$> Keelung.interpret_ GF181 Basic.emptyArray []
-  --     actual `shouldBe` expected
+--   it "Program that throws ElabError.EmptyArrayError" $ do
+--     let expected = left show (Compiler.interpret Basic.emptyArray ([] :: [GF181]))
+--     actual <- left show <$> Keelung.interpret_ GF181 Basic.emptyArray []
+--     actual `shouldBe` expected
 
-  --   it "Basic.eq1 1" $ do
-  --     let expected = left show (Compiler.interpret Basic.eq1 ([0] :: [GF181]))
-  --     actual <- left show <$> Keelung.interpret_ GF181 Basic.eq1 [0]
-  --     actual `shouldBe` expected
+--   it "Basic.eq1 1" $ do
+--     let expected = left show (Compiler.interpret Basic.eq1 ([0] :: [GF181]))
+--     actual <- left show <$> Keelung.interpret_ GF181 Basic.eq1 [0]
+--     actual `shouldBe` expected
 
-  --   it "Basic.eq1 2" $ do
-  --     let expected = left show (Compiler.interpret Basic.eq1 ([3] :: [GF181]))
-  --     actual <- left show <$> Keelung.interpret_ GF181 Basic.eq1 [3]
-  --     actual `shouldBe` expected
+--   it "Basic.eq1 2" $ do
+--     let expected = left show (Compiler.interpret Basic.eq1 ([3] :: [GF181]))
+--     actual <- left show <$> Keelung.interpret_ GF181 Basic.eq1 [3]
+--     actual `shouldBe` expected

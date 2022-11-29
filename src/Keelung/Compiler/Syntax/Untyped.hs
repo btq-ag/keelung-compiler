@@ -32,8 +32,7 @@ import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Counters as Counters
-import Keelung.Syntax.VarCounters
-import Keelung.Types (Var, indent)
+import Keelung.Types (Var)
 import Keelung.Compiler.Constraint2
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -255,8 +254,6 @@ data TypeErased n = TypeErased
     -- | Bit width of the chosen field
     erasedFieldBitWidth :: !Width,
     -- | Variable bookkeepung
-    erasedVarCounters :: !VarCounters,
-    -- | Variable bookkeepung
     erasedCounters :: !Counters,
     -- | Relations between variables and/or expressions
     erasedRelations :: !(Relations n),
@@ -271,7 +268,7 @@ data TypeErased n = TypeErased
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ countersOld counters relations assertions assignments numBinReps customBinReps) =
+  show (TypeErased expr _ counters relations assertions assignments numBinReps customBinReps) =
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
@@ -288,17 +285,17 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
              else ""
          )
       <> unlines (map ("  " <>) (Counters.prettyPrint counters))
-      <> indent (show countersOld)
-      <> "  Boolean variables: $"
-      <> show (fst (boolVarsRange countersOld))
-      <> " .. $"
-      <> show (snd (boolVarsRange countersOld) - 1)
-      <> "\n"
+      -- <> indent (show countersOld)
+      -- <> "  Boolean variables: $"
+      -- <> show (fst (boolVarsRange countersOld))
+      -- <> " .. $"
+      -- <> show (snd (boolVarsRange countersOld) - 1)
+      -- <> "\n"
       <> showBinRepConstraints
       <> "\n\
          \}"
     where
-      totalBinRepConstraintSize = numInputVarSize countersOld + totalCustomInputSize countersOld
+      totalBinRepConstraintSize = getBinRepConstraintSize counters
       showBinRepConstraints =
         if totalBinRepConstraintSize == 0
           then ""
