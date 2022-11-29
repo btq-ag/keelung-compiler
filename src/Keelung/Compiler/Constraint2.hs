@@ -39,6 +39,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
+import Debug.Trace
 import GHC.Generics (Generic)
 import qualified Keelung.Compiler.Constraint as Constraint
 import Keelung.Constraint.Polynomial (Poly)
@@ -130,8 +131,8 @@ reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
 reindexRefB counters (RefUBit w x i) =
   let i' = i `mod` w
    in case x of
-        RefUI _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
-        RefUO _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
+        RefUI _ x' -> reindex counters OfInput (OfUIntBinRep w) x' + i'
+        RefUO _ x' -> reindex counters OfOutput (OfUIntBinRep w) x' + i'
         RefU _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
         RefBtoRefU x' -> error "[ panic ] reindexRefB on RefUBit on RefBtoRefU"
 

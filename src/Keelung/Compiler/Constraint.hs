@@ -141,6 +141,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showBooleanVars counters
       <> "\n"
       <> indent (unlines (prettyPrint counters))
+      <> indent (show counters)
       <> "\n}"
     where
       showConstraints = unlines . map (\c -> "    " <> show c)

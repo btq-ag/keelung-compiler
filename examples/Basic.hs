@@ -272,6 +272,11 @@ bitValueU = do
   let c = 3 :: UInt 4
   return $ toArray [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
 
+bitTestInputVarU :: Comp (Arr Boolean)
+bitTestInputVarU = do
+  x <- inputUInt @4
+  return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
+
 bits2 :: Comp Boolean
 bits2 = do
   x <- inputUInt @4

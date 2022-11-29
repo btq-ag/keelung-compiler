@@ -20,7 +20,7 @@ import qualified Keelung.Compiler.Constraint2 as Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Syntax.BinRep (BinReps)
-import Keelung.Syntax.Counters (Counters, VarType (..), VarSort (..), getCount, addCount)
+import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
 
 --------------------------------------------------------------------------------
 
@@ -38,7 +38,6 @@ run (TypeErased untypedExprs fieldWidith counters relations assertions assignmen
       ExprU x -> do
         out <- freshRefUO (widthOfU x)
         encodeExprU out x
-  
 
   -- Compile all relations
   encodeRelations relations
@@ -321,11 +320,13 @@ encodeExprB out expr = case expr of
     encodeEqualityU True out x' y'
   BitU x i -> do
     x' <- wireU x
+
+    counters <- gets envCounters
     add $ cAddB 0 [(out, 1), (RefUBit (widthOfU x) x' i, -1)] -- out = var
 
-    -- result <- bitTestU x i
-    -- var <- wireB result
-    -- add $ cAddB 0 [(out, 1), (var, -1)] -- out = var
+-- result <- bitTestU x i
+-- var <- wireB result
+-- add $ cAddB 0 [(out, 1), (var, -1)] -- out = var
 
 -- bitTestUOnVar :: (Integral n, GaloisField n) => Width -> Var -> Int -> M n (ExprB n)
 -- bitTestUOnVar w var i = do
@@ -413,19 +414,29 @@ encodeExprN out expr = case expr of
 
 encodeExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
-  ValU w val -> do
+  ValU width val -> do
     -- constraint for UInt : out = val
-    add $ cAddU val [(out, -1)] -- out = val
+    add $ cAddU val [(out, -1)]
     -- constraints for BinRep of UInt
-    forM_ [0 .. w - 1] $ \i -> do
+    forM_ [0 .. width - 1] $ \i -> do
       let bit = testBit val i
-      add $ cAddB bit [(RefUBit w out i, -1)] -- out = var
+      add $ cAddB bit [(RefUBit width out i, -1)] -- out = var
   VarU width var -> do
-    add $ cAddU 0 [(out, 1), (RefU width var, -1)] -- out = var
+    let ref = RefU width var
+    -- constraint for UInt : out = ref
+    add $ cAddU 0 [(out, 1), (ref, -1)]
+    -- constraints for BinRep of UInt
+    forM_ [0 .. width - 1] $ \i -> do
+      add $ cAddB 0 [(RefUBit width out i, -1), (RefUBit width ref i, 1)] -- out[i] = ref[i]
   OutputVarU width var -> do
     add $ cAddU 0 [(out, 1), (RefU width var, -1)] -- out = var
   InputVarU width var -> do
-    add $ cAddU 0 [(out, 1), (RefU width var, -1)] -- out = var
+    let ref = RefUI width var
+    -- constraint for UInt : out = ref
+    add $ cAddU 0 [(out, 1), (ref, -1)]
+    -- constraints for BinRep of UInt
+    forM_ [0 .. width - 1] $ \i -> do
+      add $ cAddB 0 [(RefUBit width out i, -1), (RefUBit width ref i, 1)] -- out[i] = ref[i]
   SubU w x y -> do
     x' <- wireU x
     y' <- wireU y

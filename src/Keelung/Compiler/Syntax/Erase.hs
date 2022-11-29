@@ -134,7 +134,6 @@ eraseExprU expr = case expr of
   T.ValU w n -> return $ ValU w (fromIntegral n)
   T.VarU w var -> return $ VarU w var
   T.InputVarU w var -> return $ InputVarU w var
-  -- T.InputVarU w var -> return $ InputVarU w (blendInputVarU counters w var)
   T.AddU w x y -> AddU w <$> eraseExprU x <*> eraseExprU y
   T.SubU w x y -> SubU w <$> eraseExprU x <*> eraseExprU y
   T.MulU w x y -> MulU w <$> eraseExprU x <*> eraseExprU y

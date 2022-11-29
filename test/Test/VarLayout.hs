@@ -8,12 +8,12 @@ import Test.Hspec
 
 tests :: SpecWith ()
 tests = do
-  describe "Variable indexing" $ do
+  describe "Variable indexing 0" $ do
     --
     --                F   B   BR  U
     --       output   3   0   0   0
     --        input   2   1   0   0
-    -- intermediate   0   0   20  4
+    -- intermediate   0   0   20  5
     --
     let counters =
           ( addCount OfInput OfBoolean 1
@@ -22,7 +22,7 @@ tests = do
               . addCount OfIntermediate (OfUInt 4) 5
           )
             mempty
-    it "reindex 0" $ do
+    it "reindex" $ do
       reindex counters OfOutput OfField 0 `shouldBe` 0
       reindex counters OfOutput OfField 1 `shouldBe` 1
       reindex counters OfOutput OfField 2 `shouldBe` 2
@@ -38,6 +38,106 @@ tests = do
       reindex counters OfIntermediate (OfUInt 4) 1 `shouldBe` 27
       reindex counters OfIntermediate (OfUInt 4) 2 `shouldBe` 28
       reindex counters OfIntermediate (OfUInt 4) 3 `shouldBe` 29
+
+    it "getCount" $ do
+      getCount OfOutput OfField counters `shouldBe` 3
+      getCount OfOutput OfBoolean counters `shouldBe` 0
+      getCount OfOutput (OfUIntBinRep 3) counters `shouldBe` 0
+      getCount OfOutput (OfUIntBinRep 4) counters `shouldBe` 0
+      getCount OfOutput (OfUIntBinRep 5) counters `shouldBe` 0
+      getCount OfOutput (OfUInt 3) counters `shouldBe` 0
+      getCount OfOutput (OfUInt 4) counters `shouldBe` 0
+      getCount OfOutput (OfUInt 5) counters `shouldBe` 0
+      getCount OfInput OfField counters `shouldBe` 2
+      getCount OfInput OfBoolean counters `shouldBe` 1
+      getCount OfInput (OfUIntBinRep 3) counters `shouldBe` 0
+      getCount OfInput (OfUIntBinRep 4) counters `shouldBe` 0
+      getCount OfInput (OfUIntBinRep 5) counters `shouldBe` 0
+      getCount OfInput (OfUInt 3) counters `shouldBe` 0
+      getCount OfInput (OfUInt 4) counters `shouldBe` 0
+      getCount OfInput (OfUInt 5) counters `shouldBe` 0
+      getCount OfIntermediate OfField counters `shouldBe` 0
+      getCount OfIntermediate OfBoolean counters `shouldBe` 0
+      getCount OfIntermediate (OfUIntBinRep 3) counters `shouldBe` 0
+      getCount OfIntermediate (OfUIntBinRep 4) counters `shouldBe` 20
+      getCount OfIntermediate (OfUIntBinRep 5) counters `shouldBe` 0
+      getCount OfIntermediate (OfUInt 3) counters `shouldBe` 0
+      getCount OfIntermediate (OfUInt 4) counters `shouldBe` 5
+      getCount OfIntermediate (OfUInt 5) counters `shouldBe` 0
+
+    it "getCountBySort" $ do
+      getCountBySort OfOutput counters `shouldBe` 3
+      getCountBySort OfInput counters `shouldBe` 3
+      getCountBySort OfIntermediate counters `shouldBe` 25
+
+    it "getCountByType" $ do
+      getCountByType OfField counters `shouldBe` 5
+      getCountByType OfBoolean counters `shouldBe` 1
+      getCountByType (OfUIntBinRep undefined) counters `shouldBe` 20
+      getCountByType (OfUInt undefined) counters `shouldBe` 5
+
+  describe "Variable indexing 1" $ do
+    --
+    --                F   B   BR  U
+    --       output   0   6   0   0
+    --        input   0   0   4   1
+    -- intermediate   0   0   0   0
+    --
+    -- bitTestInputVarU :: Comp (Arr Boolean)
+    -- bitTestInputVarU = do
+    --   x <- inputUInt @4
+    --   return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
+    let counters =
+          ( addCount OfInput (OfUInt 4) 1
+              . addCount OfOutput OfBoolean 6
+          )
+            mempty
+    it "reindex" $ do
+      reindex counters OfOutput OfBoolean 0 `shouldBe` 0
+      reindex counters OfOutput OfBoolean 1 `shouldBe` 1
+      reindex counters OfOutput OfBoolean 2 `shouldBe` 2
+      reindex counters OfOutput OfBoolean 3 `shouldBe` 3
+      reindex counters OfOutput OfBoolean 4 `shouldBe` 4
+      reindex counters OfOutput OfBoolean 5 `shouldBe` 5
+      reindex counters OfInput (OfUIntBinRep 4) 0 `shouldBe` 6
+      reindex counters OfInput (OfUInt 4) 0 `shouldBe` 10
+
+    it "getCount" $ do
+      getCount OfOutput OfField counters `shouldBe` 0
+      getCount OfOutput OfBoolean counters `shouldBe` 6
+      getCount OfOutput (OfUIntBinRep 3) counters `shouldBe` 0
+      getCount OfOutput (OfUIntBinRep 4) counters `shouldBe` 0
+      getCount OfOutput (OfUIntBinRep 5) counters `shouldBe` 0
+      getCount OfOutput (OfUInt 3) counters `shouldBe` 0
+      getCount OfOutput (OfUInt 4) counters `shouldBe` 0
+      getCount OfOutput (OfUInt 5) counters `shouldBe` 0
+      getCount OfInput OfField counters `shouldBe` 0
+      getCount OfInput OfBoolean counters `shouldBe` 0
+      getCount OfInput (OfUIntBinRep 3) counters `shouldBe` 0
+      getCount OfInput (OfUIntBinRep 4) counters `shouldBe` 4
+      getCount OfInput (OfUIntBinRep 5) counters `shouldBe` 0
+      getCount OfInput (OfUInt 3) counters `shouldBe` 0
+      getCount OfInput (OfUInt 4) counters `shouldBe` 1
+      getCount OfInput (OfUInt 5) counters `shouldBe` 0
+      getCount OfIntermediate OfField counters `shouldBe` 0
+      getCount OfIntermediate OfBoolean counters `shouldBe` 0
+      getCount OfIntermediate (OfUIntBinRep 3) counters `shouldBe` 0
+      getCount OfIntermediate (OfUIntBinRep 4) counters `shouldBe` 0
+      getCount OfIntermediate (OfUIntBinRep 5) counters `shouldBe` 0
+      getCount OfIntermediate (OfUInt 3) counters `shouldBe` 0
+      getCount OfIntermediate (OfUInt 4) counters `shouldBe` 0
+      getCount OfIntermediate (OfUInt 5) counters `shouldBe` 0
+
+    it "getCountBySort" $ do
+      getCountBySort OfOutput counters `shouldBe` 6
+      getCountBySort OfInput counters `shouldBe` 5
+      getCountBySort OfIntermediate counters `shouldBe` 0
+
+    it "getCountByType" $ do
+      getCountByType OfField counters `shouldBe` 0
+      getCountByType OfBoolean counters `shouldBe` 6
+      getCountByType (OfUIntBinRep undefined) counters `shouldBe` 4
+      getCountByType (OfUInt undefined) counters `shouldBe` 1
 
   describe "Layout 0" $ do
     --                F   B   BR  U

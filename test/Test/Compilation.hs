@@ -160,57 +160,57 @@ tests = do
                                   (Poly.buildEither 0 [])
                               ]
 
-      -- it "Bit test / Input variable" $ do
-      --   -- ooooooibbbb
-      --   -- 01234567890
-      --   let program = do
-      --         x <- inputUInt @4
-      --         return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
-      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-      --     Left err -> expectationFailure (show err)
-      --     Right r1cs -> do
-      --       -- x !!! (-1) == x !!! 3
-      --       toR1Cs r1cs
-      --         `shouldContain` [ R1C
-      --                             (Poly.buildEither 0 [(0, -1), (4, 1)])
-      --                             (Poly.buildEither 1 [])
-      --                             (Poly.buildEither 0 [])
-      --                         ]
-      --       -- x !!! 3
-      --       toR1Cs r1cs
-      --         `shouldContain` [ R1C
-      --                             (Poly.buildEither 0 [(0, -1), (10, 1)])
-      --                             (Poly.buildEither 1 [])
-      --                             (Poly.buildEither 0 [])
-      --                         ]
-      --       -- x !!! 0 == x !!! 4
-      --       toR1Cs r1cs
-      --         `shouldContain` [ R1C
-      --                             (Poly.buildEither 0 [(1, -1), (5, 1)])
-      --                             (Poly.buildEither 1 [])
-      --                             (Poly.buildEither 0 [])
-      --                         ]
-      --       -- x !!! 0
-      --       toR1Cs r1cs
-      --         `shouldContain` [ R1C
-      --                             (Poly.buildEither 0 [(1, -1), (7, 1)])
-      --                             (Poly.buildEither 1 [])
-      --                             (Poly.buildEither 0 [])
-      --                         ]
-      --       -- x !!! 1
-      --       toR1Cs r1cs
-      --         `shouldContain` [ R1C
-      --                             (Poly.buildEither 0 [(2, -1), (8, 1)])
-      --                             (Poly.buildEither 1 [])
-      --                             (Poly.buildEither 0 [])
-      --                         ]
-      --       -- x !!! 2
-      --       toR1Cs r1cs
-      --         `shouldContain` [ R1C
-      --                             (Poly.buildEither 0 [(3, -1), (9, 1)])
-      --                             (Poly.buildEither 1 [])
-      --                             (Poly.buildEither 0 [])
-      --                         ]
+      it "Bit test / Input variable" $ do
+        -- oooooobbbbi
+        -- 01234567890
+        let program = do
+              x <- inputUInt @4
+              return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- x !!! (-1) == x !!! (-3)
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(0, -1), (4, 1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- x !!! (-1)
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(0, -1), (9, 1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- x !!! 0 == x !!! 4
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(1, -1), (5, 1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- x !!! 0
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(1, -1), (6, 1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- x !!! 1
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(2, -1), (7, 1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- x !!! 2
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(3, -1), (8, 1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
 
       -- it "Bit test / AND" $ do
       --   -- oii bbbb bbbb

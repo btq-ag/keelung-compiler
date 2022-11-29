@@ -71,9 +71,9 @@ instance (Integral n, Show n) => Show (ExprB n) where
   showsPrec prec expr = case expr of
     ValB 0 -> showString "F"
     ValB _ -> showString "T"
-    VarB var -> showString "$" . shows var
-    OutputVarB var -> showString "$" . shows var
-    InputVarB var -> showString "$B" . shows var
+    VarB var -> showString "$B" . shows var
+    OutputVarB var -> showString "$BO" . shows var
+    InputVarB var -> showString "$BI" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
@@ -107,9 +107,9 @@ data ExprN n
 instance (Show n, Integral n) => Show (ExprN n) where
   showsPrec prec expr = case expr of
     ValN _ n -> shows n
-    VarN _ var -> showString "$" . shows var
-    OutputVarN _ var -> showString "$N" . shows var
-    InputVarN _ var -> showString "$N" . shows var
+    VarN _ var -> showString "$N" . shows var
+    OutputVarN _ var -> showString "$NO" . shows var
+    InputVarN _ var -> showString "$NI" . shows var
     SubN _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddN _ x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
     MulN _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -141,9 +141,9 @@ data ExprU n
 instance (Show n, Integral n) => Show (ExprU n) where
   showsPrec prec expr = case expr of
     ValU _ n -> shows n
-    VarU _ var -> showString "$" . shows var
-    OutputVarU _ var -> showString "$U" . shows var
-    InputVarU _ var -> showString "$U" . shows var
+    VarU _ var -> showString "$U" . shows var
+    OutputVarU _ var -> showString "$UO" . shows var
+    InputVarU _ var -> showString "$UI" . shows var
     SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
