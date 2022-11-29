@@ -320,8 +320,6 @@ encodeExprB out expr = case expr of
     encodeEqualityU True out x' y'
   BitU x i -> do
     x' <- wireU x
-
-    counters <- gets envCounters
     add $ cAddB 0 [(out, 1), (RefUBit (widthOfU x) x' i, -1)] -- out = var
 
 -- result <- bitTestU x i

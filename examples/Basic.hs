@@ -277,6 +277,11 @@ bitTestInputVarU = do
   x <- inputUInt @4
   return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
 
+notU :: Comp (UInt 4)
+notU = do
+      x <- inputUInt @4
+      return $ complement x
+
 bits2 :: Comp Boolean
 bits2 = do
   x <- inputUInt @4

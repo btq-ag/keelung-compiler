@@ -39,7 +39,6 @@ import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
-import Debug.Trace
 import GHC.Generics (Generic)
 import qualified Keelung.Compiler.Constraint as Constraint
 import Keelung.Constraint.Polynomial (Poly)
