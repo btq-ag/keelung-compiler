@@ -5,9 +5,9 @@ module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
-import Keelung.Compiler.Syntax.Untyped
 import qualified Data.Map.Strict as Map
 import Keelung.Compiler.Constraint2
+import Keelung.Compiler.Syntax.Untyped
 
 --------------------------------------------------------------------------------
 

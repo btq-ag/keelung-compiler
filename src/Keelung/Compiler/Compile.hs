@@ -349,7 +349,6 @@ bitTestU expr i = case expr of
     -- let i' = i `mod` w
     -- -- let var' = blendInputVarU counters w var
     -- start <- lookupBinRep w var
-    -- -- traceShow ("OutputVarU $" <> show var <> "[" <> show i <> "] => " <> show (start + i')) $ return $ VarB (start + i')
     -- return $ VarB (start + i')
   InputVarU {} -> error "[ panic ] bitTestU: InputVarU"
     -- counters <- gets envVarCounters

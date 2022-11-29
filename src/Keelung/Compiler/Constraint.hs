@@ -126,8 +126,6 @@ numberOfConstraints :: ConstraintSystem n -> Int
 numberOfConstraints (ConstraintSystem cs _ _ counters) =
   Set.size cs + getBooleanConstraintSize counters + getBinRepConstraintSize counters
 
--- totalBoolVarSize counters + numInputVarSize counters + totalCustomInputSize counters
-
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show (ConstraintSystem constraints numBinReps customBinReps counters) =
     "ConstraintSystem {\n\
@@ -163,10 +161,10 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 --   variables in the (renumbered) constraint set and the (possibly
 --   renumbered) in and out variables.
 renumberConstraints :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
-renumberConstraints cs =
+renumberConstraints cs = 
   cs
-    { csConstraints = Set.map renumberConstraint (csConstraints cs)
-    -- csVarCounters = setIntermediateVarSize (IntSet.size newIntermediateVars) (csVarCounters cs)
+    { csConstraints = Set.map renumberConstraint (csConstraints cs),
+      csCounters = setReducedCount reducedCount counters
     }
   where
     -- counters = csVarCounters cs
@@ -175,6 +173,8 @@ renumberConstraints cs =
 
     -- variables in constraints (that should be kept after renumbering!)
     vars = varsInConstraints (csConstraints cs)
+    -- numbers of variables reduced via renumbering
+    reducedCount = getTotalCount counters - IntSet.size vars
     -- variables in constraints excluding input & output variables
     newIntermediateVars = IntSet.filter (>= pinnedVarSize) vars
     -- new variables after renumbering (excluding input & output variables)
@@ -186,6 +186,7 @@ renumberConstraints cs =
     -- mapping of old variables to new variables
     -- input variables are placed in the front
     variableMap = Map.fromList $ zip (IntSet.toList newIntermediateVars) renumberedIntermediateVars
+
 
     renumber var =
       if var >= pinnedVarSize

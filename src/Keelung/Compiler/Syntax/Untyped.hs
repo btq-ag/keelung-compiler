@@ -26,16 +26,16 @@ where
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Sequence (Seq (..))
+import Keelung.Compiler.Constraint2
 import Keelung.Field (N (..))
 import Keelung.Syntax.BinRep (BinReps)
 import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Counters as Counters
 import Keelung.Types (Var)
-import Keelung.Compiler.Constraint2
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 
 --------------------------------------------------------------------------------
 

@@ -17,8 +17,8 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap.Lazy as Map
 import Keelung.Compiler.Optimize.UnionFind (UnionFind (..))
 import qualified Keelung.Compiler.Optimize.UnionFind as UnionFind
-import Keelung.Types (Var)
 import Keelung.Compiler.Util (Witness)
+import Keelung.Types (Var)
 
 ----------------------------------------------------------------
 --                  Simplifier State Monad                    --

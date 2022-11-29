@@ -63,10 +63,10 @@ run (T.Elaborated expr comp) =
     sameType :: n -> [Expr n] -> M n ()
     sameType _ _ = return ()
 
-    -- lengthOfExpr :: T.Expr -> Int
-    -- lengthOfExpr (T.Array xs) = sum $ fmap lengthOfExpr xs
-    -- lengthOfExpr T.Unit = 0
-    -- lengthOfExpr _ = 1
+-- lengthOfExpr :: T.Expr -> Int
+-- lengthOfExpr (T.Array xs) = sum $ fmap lengthOfExpr xs
+-- lengthOfExpr T.Unit = 0
+-- lengthOfExpr _ = 1
 
 --------------------------------------------------------------------------------
 
