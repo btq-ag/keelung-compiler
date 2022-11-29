@@ -30,10 +30,10 @@ tests = do
       reindex counters OfInput OfField 1 `shouldBe` 4
       reindex counters OfInput OfBoolean 0 `shouldBe` 5
       reindex counters OfIntermediate (OfUIntBinRep 4) 0 `shouldBe` 6
-      reindex counters OfIntermediate (OfUIntBinRep 4) 1 `shouldBe` 7
-      reindex counters OfIntermediate (OfUIntBinRep 4) 2 `shouldBe` 8
-      reindex counters OfIntermediate (OfUIntBinRep 4) 3 `shouldBe` 9
-      reindex counters OfIntermediate (OfUIntBinRep 4) 4 `shouldBe` 10
+      reindex counters OfIntermediate (OfUIntBinRep 4) 1 `shouldBe` 10
+      reindex counters OfIntermediate (OfUIntBinRep 4) 2 `shouldBe` 14
+      reindex counters OfIntermediate (OfUIntBinRep 4) 3 `shouldBe` 18
+      reindex counters OfIntermediate (OfUIntBinRep 4) 4 `shouldBe` 22
       reindex counters OfIntermediate (OfUInt 4) 0 `shouldBe` 26
       reindex counters OfIntermediate (OfUInt 4) 1 `shouldBe` 27
       reindex counters OfIntermediate (OfUInt 4) 2 `shouldBe` 28

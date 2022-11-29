@@ -22,7 +22,6 @@ import Keelung.Compiler.Syntax.Untyped
 import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters (Counters, VarType (..), VarSort (..), getCount, addCount)
 
-
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
@@ -321,9 +320,12 @@ encodeExprB out expr = case expr of
     y' <- wireU y
     encodeEqualityU True out x' y'
   BitU x i -> do
-    result <- bitTestU x i
-    var <- wireB result
-    add $ cAddB 0 [(out, 1), (var, -1)] -- out = var
+    x' <- wireU x
+    add $ cAddB 0 [(out, 1), (RefUBit (widthOfU x) x' i, -1)] -- out = var
+
+    -- result <- bitTestU x i
+    -- var <- wireB result
+    -- add $ cAddB 0 [(out, 1), (var, -1)] -- out = var
 
 -- bitTestUOnVar :: (Integral n, GaloisField n) => Width -> Var -> Int -> M n (ExprB n)
 -- bitTestUOnVar w var i = do
@@ -334,45 +336,46 @@ encodeExprB out expr = case expr of
 --       let var' = blendIntermediateVar counters var
 --       bitTestU (VarU w var') i
 
-bitTestU :: (Integral n, GaloisField n) => ExprU n -> Int -> M n (ExprB n)
-bitTestU expr i = case expr of
-  ValU _ val -> return (ValB (testBit val i))
-  VarU {} -> error "[ panic ] bitTestU: VarU"
-    -- counters <- gets envVarCounters
-    -- -- if the index 'i' overflows or underflows, wrap it around
-    -- let i' = i `mod` w
-    -- let var' = blendIntermediateVar counters var
-    -- start <- lookupBinRep w var'
-    -- return $ VarB (start + i')
-  OutputVarU {} -> error "[ panic ] bitTestU: OutputVarU"
-    -- -- if the index 'i' overflows or underflows, wrap it around
-    -- let i' = i `mod` w
-    -- -- let var' = blendInputVarU counters w var
-    -- start <- lookupBinRep w var
-    -- return $ VarB (start + i')
-  InputVarU {} -> error "[ panic ] bitTestU: InputVarU"
-    -- counters <- gets envVarCounters
-    -- -- if the index 'i' overflows or underflows, wrap it around
-    -- let i' = i `mod` w
-    -- let var' = blendInputVarU counters w var
-    -- start <- lookupBinRep w var'
-    -- return $ VarB (start + i')
-  AndU _ x y xs ->
-    AndB
-      <$> bitTestU x i
-      <*> bitTestU y i
-      <*> mapM (`bitTestU` i) xs
-  OrU _ x y xs ->
-    OrB
-      <$> bitTestU x i
-      <*> bitTestU y i
-      <*> mapM (`bitTestU` i) xs
-  XorU _ x y ->
-    XorB
-      <$> bitTestU x i
-      <*> bitTestU y i
-  NotU _ x -> NotB <$> bitTestU x i
-  _ -> error $ "[ panic ] Unable to perform bitTestU of " <> show expr
+-- bitTestU :: (Integral n, GaloisField n) => ExprU n -> Int -> M n (ExprB n)
+-- bitTestU expr i = case expr of
+--   ValU _ val -> return (ValB (testBit val i))
+--   VarU {} -> error "[ panic ] bitTestU: VarU"
+--     -- counters <- gets envVarCounters
+--     -- -- if the index 'i' overflows or underflows, wrap it around
+--     -- let i' = i `mod` w
+--     -- let var' = blendIntermediateVar counters var
+--     -- start <- lookupBinRep w var'
+--     -- return $ VarB (start + i')
+--   OutputVarU {} -> error "[ panic ] bitTestU: OutputVarU"
+--     -- -- if the index 'i' overflows or underflows, wrap it around
+--     -- let i' = i `mod` w
+--     -- -- let var' = blendInputVarU counters w var
+--     -- start <- lookupBinRep w var
+--     -- return $ VarB (start + i')
+--   InputVarU {} -> error "[ panic ] bitTestU: InputVarU"
+--     -- error "[ panic ] bitTestU: InputVarU"
+--     -- counters <- gets envVarCounters
+--     -- -- if the index 'i' overflows or underflows, wrap it around
+--     -- let i' = i `mod` w
+--     -- let var' = blendInputVarU counters w var
+--     -- start <- lookupBinRep w var'
+--     -- return $ VarB (start + i')
+--   AndU _ x y xs ->
+--     AndB
+--       <$> bitTestU x i
+--       <*> bitTestU y i
+--       <*> mapM (`bitTestU` i) xs
+--   OrU _ x y xs ->
+--     OrB
+--       <$> bitTestU x i
+--       <*> bitTestU y i
+--       <*> mapM (`bitTestU` i) xs
+--   XorU _ x y ->
+--     XorB
+--       <$> bitTestU x i
+--       <*> bitTestU y i
+--   NotU _ x -> NotB <$> bitTestU x i
+--   _ -> error $ "[ panic ] Unable to perform bitTestU of " <> show expr
 
 encodeExprN :: (GaloisField n, Integral n) => RefF -> ExprN n -> M n ()
 encodeExprN out expr = case expr of
@@ -410,7 +413,13 @@ encodeExprN out expr = case expr of
 
 encodeExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
-  ValU _ val -> add $ cAddU val [(out, -1)] -- out = val
+  ValU w val -> do
+    -- constraint for UInt : out = val
+    add $ cAddU val [(out, -1)] -- out = val
+    -- constraints for BinRep of UInt
+    forM_ [0 .. w - 1] $ \i -> do
+      let bit = testBit val i
+      add $ cAddB bit [(RefUBit w out i, -1)] -- out = var
   VarU width var -> do
     add $ cAddU 0 [(out, 1), (RefU width var, -1)] -- out = var
   OutputVarU width var -> do
@@ -436,13 +445,13 @@ encodeExprU out expr = case expr of
     -- freshBinRep out w
     forM_ [0 .. w - 1] $ \i -> do
       encodeExprB
-        (RefUBit out i)
+        (RefUBit w out i)
         (AndB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
   OrU w x y xs -> do
     -- freshBinRep out w
     forM_ [0 .. w - 1] $ \i -> do
       encodeExprB
-        (RefUBit out i)
+        (RefUBit w out i)
         (OrB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
   -- x' <- bitTestU x i
   -- y' <- bitTestU y i
@@ -453,7 +462,7 @@ encodeExprU out expr = case expr of
     -- freshBinRep out w
     forM_ [0 .. w - 1] $ \i -> do
       encodeExprB
-        (RefUBit out i)
+        (RefUBit w out i)
         (XorB (BitU x i) (BitU y i))
   -- x' <- bitTestU x i
   -- y' <- bitTestU y i
@@ -463,7 +472,7 @@ encodeExprU out expr = case expr of
     -- freshBinRep out w
     forM_ [0 .. w - 1] $ \i -> do
       encodeExprB
-        (RefUBit out i)
+        (RefUBit w out i)
         (NotB (BitU x i))
   -- x' <- bitTestU x i
   -- out' <- bitTestUOnVar w out i >>= wireAsVar . ExprB
@@ -778,8 +787,8 @@ encodeAddOrSubU isSub width out x y = do
   --    (2ⁿ * Aₙ₋₁) * (Bₙ₋₁) = (out - A - B)
   add $
     cMulU
-      (0, [(RefBtoRefU (RefUBit x (width - 1)), multiplier)])
-      (0, [(RefBtoRefU (RefUBit y (width - 1)), 1)])
+      (0, [(RefBtoRefU (RefUBit width x (width - 1)), multiplier)])
+      (0, [(RefBtoRefU (RefUBit width y (width - 1)), 1)])
       (0, [(out, 1), (x, -1), (y, if isSub then 1 else -1)])
 
 encodeAddU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()

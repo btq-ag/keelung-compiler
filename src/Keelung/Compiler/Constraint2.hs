@@ -90,14 +90,14 @@ fromConstraint counters (CNEqU x y m) = Constraint.CNEq (Constraint.CNEQ (Left (
 
 --------------------------------------------------------------------------------
 
-data RefB = RefBI Var | RefBO Var | RefB Var | RefUBit RefU Int
+data RefB = RefBI Var | RefBO Var | RefB Var | RefUBit Width RefU Int
   deriving (Generic, NFData, Eq, Ord)
 
 instance Show RefB where
   show (RefBI x) = "$BI" ++ show x
   show (RefBO x) = "$BO" ++ show x
   show (RefB x) = "$B" ++ show x
-  show (RefUBit x i) = show x ++ "[" ++ show i ++ "]"
+  show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
 data RefF = RefFI Var | RefFO Var | RefF Var | RefBtoRefF RefB
   deriving (Generic, NFData, Eq, Ord)
@@ -127,7 +127,13 @@ reindexRefB :: Counters -> RefB -> Var
 reindexRefB counters (RefBI x) = reindex counters OfInput OfBoolean x
 reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
 reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
-reindexRefB counters (RefUBit x i) = error "[ panic ] Dunno how to encode RefUBit"
+reindexRefB counters (RefUBit w x i) =
+  let i' = i `mod` w
+   in case x of
+        RefUI _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
+        RefUO _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
+        RefU _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
+        RefBtoRefU x' -> error "[ panic ] reindexRefB on RefUBit on RefBtoRefU"
 
 reindexRefU :: Counters -> RefU -> Var
 reindexRefU counters (RefUI w x) = reindex counters OfInput (OfUInt w) x

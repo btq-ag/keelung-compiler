@@ -267,6 +267,11 @@ chainingOR n = foldl Or false <$> inputs n
 --   y <- inputNum
 --   return $ toArray [(x !!! 0) `And` (y !!! (-1))]
 
+bitValueU :: Comp (Arr Boolean)
+bitValueU = do
+  let c = 3 :: UInt 4
+  return $ toArray [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
+
 bits2 :: Comp Boolean
 bits2 = do
   x <- inputUInt @4

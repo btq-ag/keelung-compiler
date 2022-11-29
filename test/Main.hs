@@ -14,13 +14,13 @@ import Keelung.Compiler.Constraint (cadd)
 import Keelung.Compiler.Interpret (InterpretError (..))
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
--- import Keelung.Constraint.R1CS (R1CS)
+import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Typed as C
 import Test.Hspec
+import qualified Test.Compilation as Compilation
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
 import qualified Test.VarLayout as VarBookkeep
-import Keelung.Syntax.Counters
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
@@ -38,6 +38,8 @@ runKeelungAggSig dimension numberOfSignatures =
 main :: IO ()
 main = hspec $ do
   describe "Interpreter" Interpreter.tests
+
+  describe "Compilation" Compilation.tests
 
   describe "Optimization" Optimization.tests
 

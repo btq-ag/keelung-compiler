@@ -51,109 +51,109 @@ tests = do
               }
        in optimize1 (cs :: ConstraintSystem GF181) `shouldNotBe` cs
 
-  describe "Constraint merging (O2)" $ do
-    it "CAdd & CAdd" $
-      let cs =
-            ConstraintSystem
-              { csConstraints =
-                  Set.fromList $
-                    cadd 0 [(0, 1), (1, 1), (4, 1)]
-                      ++ cadd 0 [(2, 1), (3, 1), (4, 1)],
-                csNumBinReps = mempty,
-                csCustomBinReps = mempty,
-                csCounters = mempty
-              }
-          cs' =
-            ConstraintSystem
-              { csConstraints =
-                  Set.fromList $
-                    cadd 0 [(0, -1), (1, -1), (2, 1), (3, 1)],
-                csNumBinReps = mempty,
-                csCustomBinReps = mempty,
-                csCounters = mempty
-              }
-       in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+  -- describe "Constraint merging (O2)" $ do
+  --   it "CAdd & CAdd" $
+  --     let cs =
+  --           ConstraintSystem
+  --             { csConstraints =
+  --                 Set.fromList $
+  --                   cadd 0 [(0, 1), (1, 1), (4, 1)]
+  --                     ++ cadd 0 [(2, 1), (3, 1), (4, 1)],
+  --               csNumBinReps = mempty,
+  --               csCustomBinReps = mempty,
+  --               csCounters = mempty
+  --             }
+  --         cs' =
+  --           ConstraintSystem
+  --             { csConstraints =
+  --                 Set.fromList $
+  --                   cadd 0 [(0, -1), (1, -1), (2, 1), (3, 1)],
+  --               csNumBinReps = mempty,
+  --               csCustomBinReps = mempty,
+  --               csCounters = mempty
+  --             }
+  --      in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
-    it "CAdd & CMul 1" $
-      let cs =
-            ConstraintSystem
-              { csConstraints =
-                  Set.fromList $
-                    cmul [(3, 1)] [(2, 1)] (42, []) --- $3 * $2 = 42
-                      ++ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
-                csNumBinReps = mempty,
-                csCustomBinReps = mempty,
-                csCounters = mempty
-              }
-          cs' =
-            ConstraintSystem
-              { csConstraints =
-                  Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
-                csNumBinReps = mempty,
-                csCustomBinReps = mempty,
-                csCounters = mempty
-              }
-       in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+  --   it "CAdd & CMul 1" $
+  --     let cs =
+  --           ConstraintSystem
+  --             { csConstraints =
+  --                 Set.fromList $
+  --                   cmul [(3, 1)] [(2, 1)] (42, []) --- $3 * $2 = 42
+  --                     ++ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
+  --               csNumBinReps = mempty,
+  --               csCustomBinReps = mempty,
+  --               csCounters = mempty
+  --             }
+  --         cs' =
+  --           ConstraintSystem
+  --             { csConstraints =
+  --                 Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
+  --               csNumBinReps = mempty,
+  --               csCustomBinReps = mempty,
+  --               csCounters = mempty
+  --             }
+  --      in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
-    it "CAdd & CMul 2" $
-      let cs =
-            ConstraintSystem
-              { csConstraints =
-                  Set.fromList $
-                    cadd 0 [(3, 1), (0, 1), (1, 1)] --- 0 = $3 + $0 + $1
-                      ++ cmul [(2, 1)] [(3, 1)] (42, []), --- $2 * $3 = 42
-                csNumBinReps = mempty,
-                csCustomBinReps = mempty,
-                csCounters = mempty
-              }
-          cs' =
-            ConstraintSystem
-              { csConstraints =
-                  Set.fromList (cmul [(2, 1)] [(0, -1), (1, -1)] (42, [])), -- (- $0 - $1) * $2 = 42
-                csNumBinReps = mempty,
-                csCustomBinReps = mempty,
-                csCounters = mempty
-              }
-       in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+  --   it "CAdd & CMul 2" $
+  --     let cs =
+  --           ConstraintSystem
+  --             { csConstraints =
+  --                 Set.fromList $
+  --                   cadd 0 [(3, 1), (0, 1), (1, 1)] --- 0 = $3 + $0 + $1
+  --                     ++ cmul [(2, 1)] [(3, 1)] (42, []), --- $2 * $3 = 42
+  --               csNumBinReps = mempty,
+  --               csCustomBinReps = mempty,
+  --               csCounters = mempty
+  --             }
+  --         cs' =
+  --           ConstraintSystem
+  --             { csConstraints =
+  --                 Set.fromList (cmul [(2, 1)] [(0, -1), (1, -1)] (42, [])), -- (- $0 - $1) * $2 = 42
+  --               csNumBinReps = mempty,
+  --               csCustomBinReps = mempty,
+  --               csCounters = mempty
+  --             }
+  --      in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
-    it "CAdd & CMul 3" $
-      let cs =
-            ConstraintSystem
-              { csConstraints =
-                  Set.fromList $
-                    cadd 0 [(4, 1), (0, 1), (1, 1)] --- 0 = $4 + $0 + $1
-                      ++ cmul [(2, 1)] [(3, 1)] (0, [(4, 1)]), --- $2 * $3 = $4
-                csNumBinReps = mempty,
-                csCustomBinReps = mempty,
-                csCounters = mempty
-              }
-          cs' =
-            ConstraintSystem
-              { csConstraints =
-                  Set.fromList $
-                    cmul [(2, 1)] [(3, 1)] (0, [(0, -1), (1, -1)]), --- $2 * $3 = - $0 - $1
-                csNumBinReps = mempty,
-                csCustomBinReps = mempty,
-                csCounters = mempty
-              }
-       in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+  --   it "CAdd & CMul 3" $
+  --     let cs =
+  --           ConstraintSystem
+  --             { csConstraints =
+  --                 Set.fromList $
+  --                   cadd 0 [(4, 1), (0, 1), (1, 1)] --- 0 = $4 + $0 + $1
+  --                     ++ cmul [(2, 1)] [(3, 1)] (0, [(4, 1)]), --- $2 * $3 = $4
+  --               csNumBinReps = mempty,
+  --               csCustomBinReps = mempty,
+  --               csCounters = mempty
+  --             }
+  --         cs' =
+  --           ConstraintSystem
+  --             { csConstraints =
+  --                 Set.fromList $
+  --                   cmul [(2, 1)] [(3, 1)] (0, [(0, -1), (1, -1)]), --- $2 * $3 = - $0 - $1
+  --               csNumBinReps = mempty,
+  --               csCustomBinReps = mempty,
+  --               csCounters = mempty
+  --             }
+  --      in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
 
   describe "Constraint number counting" $ do
     describe "AND Chaining" $ do
-      it "1 variable" $ count (Basic.chainingAND 1) `shouldBe` Right (1 + 1)
-      it "2 variables" $ count (Basic.chainingAND 2) `shouldBe` Right (2 + 1)
-      it "3 variables" $ count (Basic.chainingAND 3) `shouldBe` Right (3 + 2)
-      it "4 variables" $ count (Basic.chainingAND 4) `shouldBe` Right (4 + 2)
-      it "5 variables" $ count (Basic.chainingAND 5) `shouldBe` Right (5 + 2)
+      it "1 variable" $ count (Basic.chainingAND 1) `shouldBe` Right (2 + 1)
+      it "2 variables" $ count (Basic.chainingAND 2) `shouldBe` Right (3 + 1)
+      it "3 variables" $ count (Basic.chainingAND 3) `shouldBe` Right (4 + 2)
+      it "4 variables" $ count (Basic.chainingAND 4) `shouldBe` Right (5 + 2)
+      it "5 variables" $ count (Basic.chainingAND 5) `shouldBe` Right (6 + 2)
 
     describe "OR Chaining" $ do
-      it "1 variable" $ count (Basic.chainingOR 1) `shouldBe` Right 2
-      it "2 variables" $ count (Basic.chainingOR 2) `shouldBe` Right 3
-      it "3 variables" $ count (Basic.chainingOR 3) `shouldBe` Right (3 + 3)
-      it "4 variables" $ count (Basic.chainingOR 4) `shouldBe` Right (4 + 3)
-      it "5 variables" $ count (Basic.chainingOR 5) `shouldBe` Right (5 + 3)
-      it "6 variables" $ count (Basic.chainingOR 6) `shouldBe` Right (6 + 3)
-      it "7 variables" $ count (Basic.chainingOR 7) `shouldBe` Right (7 + 3)
+      it "1 variable" $ count (Basic.chainingOR 1) `shouldBe` Right 3
+      it "2 variables" $ count (Basic.chainingOR 2) `shouldBe` Right 4
+      it "3 variables" $ count (Basic.chainingOR 3) `shouldBe` Right (4 + 3)
+      it "4 variables" $ count (Basic.chainingOR 4) `shouldBe` Right (5 + 3)
+      it "5 variables" $ count (Basic.chainingOR 5) `shouldBe` Right (6 + 3)
+      it "6 variables" $ count (Basic.chainingOR 6) `shouldBe` Right (7 + 3)
+      it "7 variables" $ count (Basic.chainingOR 7) `shouldBe` Right (8 + 3)
   where
     count :: Encode t => Comp t -> Either (Error GF181) Int
     count program = do

@@ -155,232 +155,232 @@ tests = do
                                   (Poly.buildEither 1 [])
                                   (Poly.buildEither 0 []),
                                 R1C -- c !!! 4
-                                  (Poly.buildEither 0 [(5, -1)])
+                                  (Poly.buildEither 1 [(5, -1)])
                                   (Poly.buildEither 1 [])
                                   (Poly.buildEither 0 [])
                               ]
 
-      it "Bit test / Input variable" $ do
-        -- ooooooibbbb
-        -- 01234567890
-        let program = do
-              x <- inputUInt @4
-              return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            -- x !!! (-1) == x !!! 3
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(0, -1), (4, 1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            -- x !!! 3
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(0, -1), (10, 1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            -- x !!! 0 == x !!! 4
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(1, -1), (5, 1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            -- x !!! 0
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(1, -1), (7, 1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            -- x !!! 1
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(2, -1), (8, 1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            -- x !!! 2
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(3, -1), (9, 1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
+      -- it "Bit test / Input variable" $ do
+      --   -- ooooooibbbb
+      --   -- 01234567890
+      --   let program = do
+      --         x <- inputUInt @4
+      --         return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- x !!! (-1) == x !!! 3
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(0, -1), (4, 1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       -- x !!! 3
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(0, -1), (10, 1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       -- x !!! 0 == x !!! 4
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(1, -1), (5, 1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       -- x !!! 0
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(1, -1), (7, 1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       -- x !!! 1
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(2, -1), (8, 1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       -- x !!! 2
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(3, -1), (9, 1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
 
-      it "Bit test / AND" $ do
-        -- oii bbbb bbbb
-        -- 012 3456 7890
-        let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              return $ (x .&. y) !!! 0
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(3, 1)])
-                                  (Poly.buildEither 0 [(7, 1)])
-                                  (Poly.buildEither 0 [(0, 1)])
-                              ]
+      -- it "Bit test / AND" $ do
+      --   -- oii bbbb bbbb
+      --   -- 012 3456 7890
+      --   let program = do
+      --         x <- inputUInt @4
+      --         y <- inputUInt @4
+      --         return $ (x .&. y) !!! 0
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(3, 1)])
+      --                             (Poly.buildEither 0 [(7, 1)])
+      --                             (Poly.buildEither 0 [(0, 1)])
+      --                         ]
 
-      it "Bit test / OR" $ do
-        -- oii bbbb bbbb
-        -- 012 3456 7890
-        let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              return $ (x .|. y) !!! 0
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            -- (1 - x[0]) * y[0] = output - x[0]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 1 [(3, -1)])
-                                  (Poly.buildEither 0 [(7, 1)])
-                                  (Poly.buildEither 0 [(0, 1), (3, -1)])
-                              ]
+      -- it "Bit test / OR" $ do
+      --   -- oii bbbb bbbb
+      --   -- 012 3456 7890
+      --   let program = do
+      --         x <- inputUInt @4
+      --         y <- inputUInt @4
+      --         return $ (x .|. y) !!! 0
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- (1 - x[0]) * y[0] = output - x[0]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 1 [(3, -1)])
+      --                             (Poly.buildEither 0 [(7, 1)])
+      --                             (Poly.buildEither 0 [(0, 1), (3, -1)])
+      --                         ]
 
-      it "Bit test / XOR" $ do
-        -- oii bbbb bbbb
-        -- 012 3456 7890
-        let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              return $ (x .^. y) !!! 0
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            -- (1 - 2x[0]) * (1 + y[0]) = 1 + output - 3x[0]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 1 [(3, -2)])
-                                  (Poly.buildEither 1 [(7, 1)])
-                                  (Poly.buildEither 1 [(0, 1), (3, -3)])
-                              ]
+      -- it "Bit test / XOR" $ do
+      --   -- oii bbbb bbbb
+      --   -- 012 3456 7890
+      --   let program = do
+      --         x <- inputUInt @4
+      --         y <- inputUInt @4
+      --         return $ (x .^. y) !!! 0
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- (1 - 2x[0]) * (1 + y[0]) = 1 + output - 3x[0]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 1 [(3, -2)])
+      --                             (Poly.buildEither 1 [(7, 1)])
+      --                             (Poly.buildEither 1 [(0, 1), (3, -3)])
+      --                         ]
 
-      it "Bit test / NOT" $ do
-        -- oi bbbb
-        -- 01 2345
-        let program = do
-              x <- inputUInt @4
-              return $ complement x !!! 0
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 1 [(0, -1), (2, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
+      -- it "Bit test / NOT" $ do
+      --   -- oi bbbb
+      --   -- 01 2345
+      --   let program = do
+      --         x <- inputUInt @4
+      --         return $ complement x !!! 0
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 1 [(0, -1), (2, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
 
-      it "AND" $ do
-        -- oii bbbb bbbb bbbb
-        -- 012 3456 7890 1234
-        let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              return $ x .&. y
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(3, 1)])
-                                  (Poly.buildEither 0 [(7, 1)])
-                                  (Poly.buildEither 0 [(11, 1)])
-                              ]
+      -- it "AND" $ do
+      --   -- oii bbbb bbbb bbbb
+      --   -- 012 3456 7890 1234
+      --   let program = do
+      --         x <- inputUInt @4
+      --         y <- inputUInt @4
+      --         return $ x .&. y
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(3, 1)])
+      --                             (Poly.buildEither 0 [(7, 1)])
+      --                             (Poly.buildEither 0 [(11, 1)])
+      --                         ]
 
-      it "OR 1" $ do
-        -- oii bbbb bbbb bbbb
-        -- 012 3456 7890 1234
-        let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              return $ x .|. y
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            -- (1 - x[i]) * y[i] = out[i] - x[i]
-            forM_ [0 .. 3] $ \i ->
-              toR1Cs r1cs
-                `shouldContain` [ R1C
-                                    (Poly.buildEither 1 [(3 + i, -1)])
-                                    (Poly.buildEither 0 [(7 + i, 1)])
-                                    (Poly.buildEither 0 [(11 + i, 1), (3 + i, -1)])
-                                ]
+      -- it "OR 1" $ do
+      --   -- oii bbbb bbbb bbbb
+      --   -- 012 3456 7890 1234
+      --   let program = do
+      --         x <- inputUInt @4
+      --         y <- inputUInt @4
+      --         return $ x .|. y
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- (1 - x[i]) * y[i] = out[i] - x[i]
+      --       forM_ [0 .. 3] $ \i ->
+      --         toR1Cs r1cs
+      --           `shouldContain` [ R1C
+      --                               (Poly.buildEither 1 [(3 + i, -1)])
+      --                               (Poly.buildEither 0 [(7 + i, 1)])
+      --                               (Poly.buildEither 0 [(11 + i, 1), (3 + i, -1)])
+      --                           ]
 
-      it "OR 2" $ do
-        -- oii bbbb bbbb bbbb bbbb
-        -- 012 3456 7890 1234 5678
-        let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              return $ x .|. y .|. x
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            -- let temp = x .|. y
-            -- (1 - x[i]) * y[i] = temp[i] - x[i]
-            forM_ [0 .. 3] $ \i ->
-              toR1Cs r1cs
-                `shouldContain` [ R1C
-                                    (Poly.buildEither 1 [(3 + i, -1)])
-                                    (Poly.buildEither 0 [(7 + i, 1)])
-                                    (Poly.buildEither 0 [(15 + i, 1), (3 + i, -1)])
-                                ]
-            -- (1 - temp[i]) * x[i] = output[i] - temp[i]
-            forM_ [0 .. 3] $ \i ->
-              toR1Cs r1cs
-                `shouldContain` [ R1C
-                                    (Poly.buildEither 1 [(15 + i, -1)])
-                                    (Poly.buildEither 0 [(3 + i, 1)])
-                                    (Poly.buildEither 0 [(11 + i, 1), (15 + i, -1)])
-                                ]
+      -- it "OR 2" $ do
+      --   -- oii bbbb bbbb bbbb bbbb
+      --   -- 012 3456 7890 1234 5678
+      --   let program = do
+      --         x <- inputUInt @4
+      --         y <- inputUInt @4
+      --         return $ x .|. y .|. x
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- let temp = x .|. y
+      --       -- (1 - x[i]) * y[i] = temp[i] - x[i]
+      --       forM_ [0 .. 3] $ \i ->
+      --         toR1Cs r1cs
+      --           `shouldContain` [ R1C
+      --                               (Poly.buildEither 1 [(3 + i, -1)])
+      --                               (Poly.buildEither 0 [(7 + i, 1)])
+      --                               (Poly.buildEither 0 [(15 + i, 1), (3 + i, -1)])
+      --                           ]
+      --       -- (1 - temp[i]) * x[i] = output[i] - temp[i]
+      --       forM_ [0 .. 3] $ \i ->
+      --         toR1Cs r1cs
+      --           `shouldContain` [ R1C
+      --                               (Poly.buildEither 1 [(15 + i, -1)])
+      --                               (Poly.buildEither 0 [(3 + i, 1)])
+      --                               (Poly.buildEither 0 [(11 + i, 1), (15 + i, -1)])
+      --                           ]
 
-      it "XOR" $ do
-        -- oii bbbb bbbb bbbb
-        -- 012 3456 7890 1234
-        let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              return $ x .^. y
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            -- (1 - 2x[i]) * y[i] = out[i] - 3x[i]
-            forM_ [0 .. 3] $ \i ->
-              toR1Cs r1cs
-                `shouldContain` [ R1C
-                                    (Poly.buildEither 1 [(3 + i, -2)])
-                                    (Poly.buildEither 1 [(7 + i, 1)])
-                                    (Poly.buildEither 1 [(11 + i, 1), (3 + i, -3)])
-                                ]
+      -- it "XOR" $ do
+      --   -- oii bbbb bbbb bbbb
+      --   -- 012 3456 7890 1234
+      --   let program = do
+      --         x <- inputUInt @4
+      --         y <- inputUInt @4
+      --         return $ x .^. y
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- (1 - 2x[i]) * y[i] = out[i] - 3x[i]
+      --       forM_ [0 .. 3] $ \i ->
+      --         toR1Cs r1cs
+      --           `shouldContain` [ R1C
+      --                               (Poly.buildEither 1 [(3 + i, -2)])
+      --                               (Poly.buildEither 1 [(7 + i, 1)])
+      --                               (Poly.buildEither 1 [(11 + i, 1), (3 + i, -3)])
+      --                           ]
 
-      it "NOT" $ do
-        -- oi bbbb bbbb
-        -- 01 2345 6789
-        let program = do
-              x <- inputUInt @4
-              return $ complement x
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            -- 1 - x[i] = out[i]
-            forM_ [0 .. 3] $ \i ->
-              toR1Cs r1cs
-                `shouldContain` [ R1C
-                                    (Poly.buildEither 1 [(2 + i, -1), (6 + i, -1)])
-                                    (Poly.buildEither 1 [])
-                                    (Poly.buildEither 0 [])
-                                ]
+      -- it "NOT" $ do
+      --   -- oi bbbb bbbb
+      --   -- 01 2345 6789
+      --   let program = do
+      --         x <- inputUInt @4
+      --         return $ complement x
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- 1 - x[i] = out[i]
+      --       forM_ [0 .. 3] $ \i ->
+      --         toR1Cs r1cs
+      --           `shouldContain` [ R1C
+      --                               (Poly.buildEither 1 [(2 + i, -1), (6 + i, -1)])
+      --                               (Poly.buildEither 1 [])
+      --                               (Poly.buildEither 0 [])
+      --                           ]
 
 --   it "Addition 0" $ do
 --     let program = do

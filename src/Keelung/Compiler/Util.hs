@@ -26,4 +26,4 @@ showBooleanVars counters =
       allSegments = List.intercalate ", " (map showSegment segments)
    in if getBooleanConstraintSize counters == 0
         then ""
-        else "  Boolean variables: " <> allSegments <> "\n"
+        else "  Boolean constraints on: " <> allSegments <> "\n"

@@ -130,19 +130,22 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show (ConstraintSystem constraints numBinReps customBinReps counters) =
     "ConstraintSystem {\n\
     \  Total constraint size: "
-      <> show (length constraints + totalBinRepConstraintSize)
+      <> show (length constraints + totalBinRepConstraintSize + totalBooleanConstraintSize)
       <> "\n\
          \  Ordinary constraints ("
       <> show (length constraints)
       <> "):\n\n"
       <> showConstraints (toList constraints)
-      <> showBinRepConstraints
       <> "\n"
-      <> indent (show counters)
+      <> showBinRepConstraints
       <> showBooleanVars counters
+      <> "\n"
+      <> indent (unlines (prettyPrint counters))
       <> "\n}"
     where
       showConstraints = unlines . map (\c -> "    " <> show c)
+
+      totalBooleanConstraintSize = getBooleanConstraintSize counters
 
       totalBinRepConstraintSize = BinRep.size customBinReps + BinRep.size numBinReps
       showBinRepConstraints =
@@ -161,7 +164,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 --   variables in the (renumbered) constraint set and the (possibly
 --   renumbered) in and out variables.
 renumberConstraints :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
-renumberConstraints cs = 
+renumberConstraints cs =
   cs
     { csConstraints = Set.map renumberConstraint (csConstraints cs),
       csCounters = setReducedCount reducedCount counters
@@ -186,7 +189,6 @@ renumberConstraints cs =
     -- mapping of old variables to new variables
     -- input variables are placed in the front
     variableMap = Map.fromList $ zip (IntSet.toList newIntermediateVars) renumberedIntermediateVars
-
 
     renumber var =
       if var >= pinnedVarSize
