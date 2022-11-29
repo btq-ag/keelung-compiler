@@ -15,7 +15,6 @@ import Keelung.Compiler.Interpret (InterpretError (..))
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 -- import Keelung.Constraint.R1CS (R1CS)
-import qualified Keelung.Syntax.BinRep as BinRep
 import qualified Keelung.Syntax.Typed as C
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter

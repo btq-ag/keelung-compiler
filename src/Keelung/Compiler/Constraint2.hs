@@ -140,6 +140,13 @@ reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 data Poly' ref n = Poly' n (Map ref n)
   deriving (Generic, NFData, Eq, Functor, Show, Ord)
 
+buildPoly' :: (GaloisField n, Ord ref) => n -> [(ref, n)] -> Either n (Poly' ref n)
+buildPoly' c xs =
+  let result = Map.filter (/= 0) $ Map.fromListWith (+) xs
+   in if Map.null result
+        then Left c
+        else Right (Poly' c result)
+
 fromPolyF :: Integral n => Counters -> Poly' RefF n -> Either n (Poly n)
 fromPolyF counters (Poly' c xs) = Poly.buildEither c (map (first (reindexRefF counters)) (Map.toList xs))
 
@@ -235,15 +242,21 @@ cadd !c !xs = map CAdd $ case Poly.buildEither c xs of
 
 -- | Smart constructor for the CAddB constraint
 cAddB :: GaloisField n => n -> [(RefB, n)] -> [Constraint n]
-cAddB !c !xs = [CAddB (Poly' c (Map.fromList xs))]
+cAddB !c !xs = case buildPoly' c xs of
+  Left _ -> []
+  Right xs' -> [CAddB xs']
 
 -- | Smart constructor for the CAddF constraint
 cAddF :: GaloisField n => n -> [(RefF, n)] -> [Constraint n]
-cAddF !c !xs = [CAddF (Poly' c (Map.fromList xs))]
+cAddF !c !xs = case buildPoly' c xs of
+  Left _ -> []
+  Right xs' -> [CAddF xs']
 
 -- | Smart constructor for the CAddU constraint
 cAddU :: GaloisField n => n -> [(RefU, n)] -> [Constraint n]
-cAddU !c !xs = [CAddU (Poly' c (Map.fromList xs))]
+cAddU !c !xs = case buildPoly' c xs of
+  Left _ -> []
+  Right xs' -> [CAddU xs']
 
 cmulSimple :: GaloisField n => Var -> Var -> Var -> [Constraint n]
 cmulSimple !x !y !z = [CMul (Poly.singleVar x) (Poly.singleVar y) (Poly.buildEither 0 [(z, 1)])]
@@ -267,32 +280,32 @@ cmul (a, xs) (b, ys) (c, zs) = case ( do
   Left _ -> []
   Right result -> [result]
 
+cMul ::
+  (GaloisField n, Ord ref) =>
+  (Poly' ref n -> Poly' ref n -> Either n (Poly' ref n) -> Constraint n) ->
+  (n, [(ref, n)]) ->
+  (n, [(ref, n)]) ->
+  (n, [(ref, n)]) ->
+  [Constraint n]
+cMul ctor (a, xs) (b, ys) (c, zs) = case ( do
+                                             xs' <- buildPoly' a xs
+                                             ys' <- buildPoly' b ys
+                                             return $ ctor xs' ys' (buildPoly' c zs)
+                                         ) of
+  Left _ -> []
+  Right result -> [result]
+
 -- | Smart constructor for the CMulF constraint
 cMulF :: GaloisField n => (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> [Constraint n]
-cMulF (a, xs) (b, ys) (c, zs) =
-  [ CMulF
-      (Poly' a (Map.fromList xs))
-      (Poly' b (Map.fromList ys))
-      (if null zs then Left c else Right (Poly' c (Map.fromList zs)))
-  ]
+cMulF = cMul CMulF
 
 -- | Smart constructor for the CMulB constraint
 cMulB :: GaloisField n => (n, [(RefB, n)]) -> (n, [(RefB, n)]) -> (n, [(RefB, n)]) -> [Constraint n]
-cMulB (a, xs) (b, ys) (c, zs) =
-  [ CMulB
-      (Poly' a (Map.fromList xs))
-      (Poly' b (Map.fromList ys))
-      (if null zs then Left c else Right (Poly' c (Map.fromList zs)))
-  ]
+cMulB = cMul CMulB
 
 -- | Smart constructor for the CMulU constraint
 cMulU :: GaloisField n => (n, [(RefU, n)]) -> (n, [(RefU, n)]) -> (n, [(RefU, n)]) -> [Constraint n]
-cMulU (a, xs) (b, ys) (c, zs) =
-  [ CMulU
-      (Poly' a (Map.fromList xs))
-      (Poly' b (Map.fromList ys))
-      (if null zs then Left c else Right (Poly' c (Map.fromList zs)))
-  ]
+cMulU = cMul CMulU
 
 -- | Smart constructor for the CNEq constraint
 cneq :: GaloisField n => Var -> Var -> RefF -> [Constraint n]

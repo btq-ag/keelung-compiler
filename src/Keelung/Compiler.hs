@@ -144,6 +144,7 @@ execute prog rawInputs = do
   elab <- elaborate prog
 
   r1cs <- toR1CS <$> compile prog
+
   let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
   (actualOutputs, actualWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputs)
 
