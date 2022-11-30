@@ -7,21 +7,18 @@ module Keelung.Compiler.Constraint where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Util (showBooleanVars)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
-import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.Counters
 import Keelung.Types
 
@@ -127,37 +124,12 @@ numberOfConstraints (ConstraintSystem cs _ _ counters) =
   Set.size cs + getBooleanConstraintSize counters + getBinRepConstraintSize counters
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem constraints numBinReps customBinReps counters) =
-    "ConstraintSystem {\n\
-    \  Total constraint size: "
-      <> show (length constraints + totalBinRepConstraintSize + totalBooleanConstraintSize)
-      <> "\n\
-         \  Ordinary constraints ("
-      <> show (length constraints)
-      <> "):\n\n"
-      <> showConstraints (toList constraints)
+  show (ConstraintSystem constraints _ _ counters) =
+    "ConstraintSystem {\n"
+      <> prettyConstraints counters (Set.toList constraints)
       <> "\n"
-      <> showBinRepConstraints
-      <> showBooleanVars counters
-      <> "\n"
-      <> indent (unlines (prettyPrint counters))
+      <> prettyVariables counters
       <> "\n}"
-    where
-      showConstraints = unlines . map (\c -> "    " <> show c)
-
-      totalBooleanConstraintSize = getBooleanConstraintSize counters
-
-      totalBinRepConstraintSize = BinRep.size customBinReps + BinRep.size numBinReps
-      showBinRepConstraints =
-        if totalBinRepConstraintSize == 0
-          then ""
-          else
-            "\n  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n\n"
-              <> unlines
-                ( map
-                    (("    " <>) . show)
-                    (BinRep.toList (numBinReps <> customBinReps))
-                )
 
 -- | Sequentially renumber term variables '0..max_var'.  Return
 --   renumbered constraints, together with the total number of
@@ -170,7 +142,6 @@ renumberConstraints cs =
       csCounters = setReducedCount reducedCount counters
     }
   where
-    -- counters = csVarCounters cs
     counters = csCounters cs
     pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
 

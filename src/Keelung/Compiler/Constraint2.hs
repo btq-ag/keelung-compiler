@@ -48,7 +48,6 @@ import qualified Keelung.Constraint.R1CS as Constraint
 import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters
-import Keelung.Syntax.VarCounters (VarCounters)
 import Keelung.Types
 
 type Width = Int
@@ -399,7 +398,6 @@ data ConstraintSystem n = ConstraintSystem
     csNumBinReps :: BinReps,
     -- | Binary representation of custom output variables
     csCustomBinReps :: BinReps,
-    csVarCounters :: !VarCounters,
     csCounters :: Counters
   }
   deriving (Eq, Generic, NFData)

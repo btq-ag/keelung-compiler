@@ -136,20 +136,6 @@ add :: GaloisField n => [Constraint n] -> M n ()
 add cs =
   modify (\env -> env {envConstraints = Set.union (Set.fromList cs) (envConstraints env)})
 
--- | Adds a new view of binary representation of a variable after rotation.
--- addRotatedBinRep :: Var -> Width -> Var -> Int -> M n ()
--- addRotatedBinRep out width var rotate = do
---   index <- lookupBinRep width var
---   addBinRep $ BinRep out width index rotate
--- addBinRep :: BinRep -> M n ()
--- addBinRep binRep = modify (\env -> env {envExtraBinReps = BinRep.insert binRep (envExtraBinReps env)})
-
--- freshVar :: M n Var
--- freshVar = do
---   n <- gets (totalVarSize . envVarCounters)
---   modify' (\ctx -> ctx {envVarCounters = bumpIntermediateVar (envVarCounters ctx)})
---   return n
-
 freshRefF :: M n RefF
 freshRefF = do
   counters <- gets envCounters
@@ -187,24 +173,6 @@ freshRefU width = do
   let index = getCount OfIntermediate (OfUInt width) counters
   modifyCounter $ addCount OfIntermediate (OfUInt width) 1
   return $ RefU width index
-
--- freshBinRep :: Var -> Int -> M n ()
--- freshBinRep var width
---   | width < 1 = error $ "[ panic ] Cannot create a binary representation of width " <> show width
---   | otherwise = do
---     vars <- replicateM width freshVar
---     addBinRep $ BinRep var width (head vars) 0
-
--- | Locate the binary representations of some variable
--- lookupBinRep :: Int -> Var -> M n Var
--- lookupBinRep width var = do
---   counters <- gets envVarCounters
---   extraBinReps <- gets envExtraBinReps
---   case lookupBinRepStart counters var of
---     Nothing -> case BinRep.lookup width var extraBinReps of
---       Nothing -> error $ "lookupBinRep: could not find binary representation of " ++ show var
---       Just binRep -> return (binRepBitsIndex binRep)
---     Just index -> return index
 
 ----------------------------------------------------------------
 
@@ -321,60 +289,6 @@ encodeExprB out expr = case expr of
   BitU x i -> do
     x' <- wireU x
     add $ cAddB 0 [(out, 1), (RefUBit (widthOfU x) x' i, -1)] -- out = var
-
--- result <- bitTestU x i
--- var <- wireB result
--- add $ cAddB 0 [(out, 1), (var, -1)] -- out = var
-
--- bitTestUOnVar :: (Integral n, GaloisField n) => Width -> Var -> Int -> M n (ExprB n)
--- bitTestUOnVar w var i = do
---   counters <- gets envVarCounters
---   if var < outputVarSize counters
---     then bitTestU (OutputVarU w var) i
---     else do
---       let var' = blendIntermediateVar counters var
---       bitTestU (VarU w var') i
-
--- bitTestU :: (Integral n, GaloisField n) => ExprU n -> Int -> M n (ExprB n)
--- bitTestU expr i = case expr of
---   ValU _ val -> return (ValB (testBit val i))
---   VarU {} -> error "[ panic ] bitTestU: VarU"
---     -- counters <- gets envVarCounters
---     -- -- if the index 'i' overflows or underflows, wrap it around
---     -- let i' = i `mod` w
---     -- let var' = blendIntermediateVar counters var
---     -- start <- lookupBinRep w var'
---     -- return $ VarB (start + i')
---   OutputVarU {} -> error "[ panic ] bitTestU: OutputVarU"
---     -- -- if the index 'i' overflows or underflows, wrap it around
---     -- let i' = i `mod` w
---     -- -- let var' = blendInputVarU counters w var
---     -- start <- lookupBinRep w var
---     -- return $ VarB (start + i')
---   InputVarU {} -> error "[ panic ] bitTestU: InputVarU"
---     -- error "[ panic ] bitTestU: InputVarU"
---     -- counters <- gets envVarCounters
---     -- -- if the index 'i' overflows or underflows, wrap it around
---     -- let i' = i `mod` w
---     -- let var' = blendInputVarU counters w var
---     -- start <- lookupBinRep w var'
---     -- return $ VarB (start + i')
---   AndU _ x y xs ->
---     AndB
---       <$> bitTestU x i
---       <*> bitTestU y i
---       <*> mapM (`bitTestU` i) xs
---   OrU _ x y xs ->
---     OrB
---       <$> bitTestU x i
---       <*> bitTestU y i
---       <*> mapM (`bitTestU` i) xs
---   XorU _ x y ->
---     XorB
---       <$> bitTestU x i
---       <*> bitTestU y i
---   NotU _ x -> NotB <$> bitTestU x i
---   _ -> error $ "[ panic ] Unable to perform bitTestU of " <> show expr
 
 encodeExprN :: (GaloisField n, Integral n) => RefF -> ExprN n -> M n ()
 encodeExprN out expr = case expr of

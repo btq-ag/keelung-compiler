@@ -48,38 +48,6 @@ main = hspec $ do
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
 
--- it "Bit value query 0" $
---   let cs =
---         ConstraintSystem
---           { csConstraints =
---               Set.fromList $
---                 concat
---                   [ -- value of outputs
---                     cadd (0 :: GF181) [(0, 1), (7, -1)],
---                     cadd 0 [(1, 1), (8, -1)],
---                     cadd 0 [(2, 1), (9, -1)],
---                     cadd (-1) [(3, 1)],
---                     cadd 1 [(4, -1)],
---                     cadd 0 [(5, 1)]
---                   ],
---             csVarCounters = makeVarCounters 181 6 1 0 0 [NumInput 0] [],
---             csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (6, 7)],
---             csCustomBinReps = mempty
---           }
---    in Compiler.compileOnly Basic.bits0 `shouldBe` Right cs
-
--- it "Bit value query 1" $
---   let cs =
---         ConstraintSystem
---           { csConstraints =
---               Set.fromList $ -- value of outputs
---                 cmul [(364, 1)] [(3, 1)] (0 :: GF181, [(0, 1)]),
---             csVarCounters = makeVarCounters 181 1 2 0 0 [NumInput 0, NumInput 1] [],
---             csNumBinReps = BinRep.fromList [BinRep.fromNumBinRep 181 (1, 3), BinRep.fromNumBinRep 181 (2, 184)],
---             csCustomBinReps = mempty
---           }
---    in Compiler.compileOnly Basic.bits1 `shouldBe` Right cs
-
 -- describe "Keelung `compile`" $ do
 --   it "Program that throws ElabError.IndexOutOfBoundsError" $ do
 --     let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.outOfBound)

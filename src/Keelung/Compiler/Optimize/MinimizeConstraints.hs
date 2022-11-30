@@ -13,6 +13,7 @@ import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Types (Var)
+import Debug.Trace
 
 run ::
   (GaloisField n, Integral n) =>
@@ -21,6 +22,7 @@ run ::
   OptiM n (Set (Constraint n))
 run pinnedVars constraints = do
   minimised <- minimiseManyTimes constraints
+  () <- traceShowM ("minimised", minimised)
   pinned <- handlePinnedVars pinnedVars
   return (Set.fromList pinned <> minimised)
 
@@ -213,6 +215,7 @@ handlePinnedVars pinnedVars = do
   pinnedTerms <- forM pinnedVars $ \var -> do
     result <- lookupVar var
     return (var, result)
+  () <- traceShowM pinnedTerms
 
   let isNotRoot (var, reuslt) = Root var /= reuslt
   let pinnedEquations =

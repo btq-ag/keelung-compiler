@@ -14,9 +14,6 @@ run (T.Elaborated expr comp) =
       proxy = 0
       numBitWidth = bitSize proxy
    in runM numBitWidth $ do
-        -- update VarCounters.varNumWidth before type erasure
-        -- let counters' = setNumBitWidth numBitWidth $ setOutputVarSize (lengthOfExpr expr) countersOld
-        -- put counters'
         -- start type erasure
         expr' <- eraseExpr expr
         sameType proxy expr'

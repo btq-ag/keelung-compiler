@@ -57,11 +57,11 @@ deserializeElab elab = deserialize (compCounters (elabComp elab))
 
 -- | Concatenate all inputs into a single list
 flatten :: Inputs n -> [n]
-flatten (Inputs _ a b c d) =
-  toList a
+flatten (Inputs _ f b u ubr) =
+  toList f
     <> toList b
-    <> concatMap toList (IntMap.elems c)
-    <> concatMap toList (IntMap.elems d)
+    <> concatMap toList (IntMap.elems ubr)
+    <> concatMap toList (IntMap.elems u)
 
 -- | Size of all inputs
 size :: Inputs n -> Int

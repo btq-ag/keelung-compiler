@@ -284,7 +284,7 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
              then "  assertions:\n    " <> show assertions <> "\n"
              else ""
          )
-      <> unlines (map ("  " <>) (Counters.prettyPrint counters))
+      <> Counters.prettyVariables counters
       -- <> indent (show countersOld)
       -- <> "  Boolean variables: $"
       -- <> show (fst (boolVarsRange countersOld))
