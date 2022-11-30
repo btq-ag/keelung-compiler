@@ -337,6 +337,12 @@ bitwise = do
         complement x !!! 3
       ]
 
+arithU0 :: Comp (UInt 4)
+arithU0 = do
+  x <- inputUInt @4
+  y <- inputUInt @4
+  return $ x + y
+
 rotateAndBitTest :: Comp (Arr Boolean)
 rotateAndBitTest = do
   x <- inputUInt @4

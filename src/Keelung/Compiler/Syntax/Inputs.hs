@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 module Keelung.Compiler.Syntax.Inputs where
 
 import Data.Field.Galois (GaloisField)
@@ -19,7 +20,7 @@ data Inputs n = Inputs
     -- numBinReps :: Seq n,
     uintBinReps :: IntMap (Seq n)
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 
 -- | Parse raw inputs into structured inputs and populate corresponding binary representations
 deserialize :: (GaloisField n, Integral n) => Counters -> [n] -> Inputs n
@@ -44,7 +45,7 @@ deserialize counters rawInputs = do
           OfUInt width ->
             inputs
               { uintInputs = IntMap.insertWith (flip (<>)) width (Seq.singleton rawInputValue) (uintInputs inputs),
-                uintBinReps = IntMap.insertWith (flip (<>)) width (Seq.fromList (toBits rawInputValue)) (uintBinReps inputs)
+                uintBinReps = IntMap.insertWith (flip (<>)) width (Seq.fromList (take width (toBits rawInputValue))) (uintBinReps inputs)
               }
     )
     (Inputs counters mempty mempty mempty mempty)

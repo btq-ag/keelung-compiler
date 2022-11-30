@@ -36,11 +36,11 @@ generateWitness ::
   Witness n ->
   -- | Resulting assignment
   Either (ExecError n) (Witness n)
-generateWitness cs initWit =
+generateWitness cs initWit = 
   let cs' = renumberConstraints cs
       variables = [0 .. getTotalCount (csCounters cs) - 1]
       (witness, _) = optimizeWithWitness initWit cs'
-   in if all (isMapped witness) variables
+   in  if all (isMapped witness) variables
         then Right witness
         else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
   where
