@@ -9,53 +9,58 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Constraint (Constraint (..), cadd)
 import Keelung.Compiler.Optimize.Monad
+import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (CNEQ (..))
+import Keelung.Syntax.BinRep (BinRep (BinRep))
+import Keelung.Syntax.Counters
 import Keelung.Types (Var)
-import Debug.Trace
 
 run ::
   (GaloisField n, Integral n) =>
+  Counters ->
   [Var] ->
   Set (Constraint n) ->
   OptiM n (Set (Constraint n))
-run pinnedVars constraints = do
-  minimised <- minimiseManyTimes constraints
-  () <- traceShowM ("minimised", minimised)
+run counters pinnedVars constraints = do
+  minimised <- minimiseManyTimes (constraints, getBinReps counters)
   pinned <- handlePinnedVars pinnedVars
   return (Set.fromList pinned <> minimised)
 
 minimiseManyTimes ::
   (GaloisField n, Integral n) =>
   -- | Initial constraint set
-  Set (Constraint n) ->
+  (Set (Constraint n), [BinRep]) ->
   -- | Resulting simplified constraint set
   OptiM n (Set (Constraint n))
-minimiseManyTimes constraints = do
-  constraints' <- minimiseOnce constraints
-  let hasShrunk = Set.size constraints' < Set.size constraints
-  let hasChanged = not $ Set.null (Set.difference constraints constraints')
+minimiseManyTimes (constraints, binReps) = do
+  constraints' <- minimiseConstraintsOnce constraints
+  -- see if the constraints have changed
+  let constraintHadChanged =
+        (Set.size constraints' < Set.size constraints)
+          || not (Set.null (Set.difference constraints constraints'))
   -- keep minimising if the constraints have shrunk or changed
-  if hasShrunk || hasChanged
-    then minimiseManyTimes constraints' -- keep going
-    else return constraints' -- stop here
+  if constraintHadChanged
+    then minimiseManyTimes (constraints', binReps) -- keep going
+    else do
+      binReps' <- goOverBinReps binReps
+      let binRepsHadShrinked = length binReps' < length binReps
+      if binRepsHadShrinked
+        then minimiseManyTimes (constraints', binReps') -- keep going
+        else return constraints' -- there's nothing we can do, stop here
 
-minimiseOnce ::
+minimiseConstraintsOnce ::
   (GaloisField n, Integral n) =>
   -- | Initial constraint set
   Set (Constraint n) ->
   -- | Resulting simplified constraint set
   OptiM n (Set (Constraint n))
-minimiseOnce = goOverConstraints Set.empty
+minimiseConstraintsOnce = goOverConstraints Set.empty
 
--- --
--- -- constraints' <- goOverConstraints Set.empty constraints
--- -- -- substitute roots/constants in constraints
--- -- substituted <- mapM substConstraint $ Set.toList constraints'
--- -- -- keep only constraints that is not tautologous
--- -- removedTautology <- filterM (fmap not . isTautology) substituted
--- return $ Set.fromList removedTautology
+-- | Go over BinReps, fill in the bit variables if we know the value, and throw them away
+goOverBinReps :: (GaloisField n, Integral n) => [BinRep] -> OptiM n [BinRep]
+goOverBinReps = filterM substBinRep
 
 --
 goOverConstraints ::
@@ -109,6 +114,21 @@ substPoly poly = do
           if val' == 0
             then return (accConstant, accMapping)
             else return (accConstant + val', accMapping)
+
+-- | Returns `False` if we have learned something about this BinRep
+substBinRep :: (Integral n, GaloisField n) => BinRep -> OptiM n Bool
+substBinRep (BinRep var w bits _) = do
+  -- although a value is isomorphic to its binary representation
+  -- we are only substituting the bits in the binary representation
+  result <- lookupVar var
+  case result of
+    Root _ -> do
+      -- hit another variable, can't substitute shit
+      return True
+    Value n -> do
+      forM_ (zip [bits .. bits + w - 1] (toBits n)) $ \(index, bit) -> do
+        bindVar index bit
+      return False
 
 -- | Normalize constraints by substituting roots/constants
 -- for the variables that appear in the constraint. Note that, when
@@ -215,8 +235,6 @@ handlePinnedVars pinnedVars = do
   pinnedTerms <- forM pinnedVars $ \var -> do
     result <- lookupVar var
     return (var, result)
-  () <- traceShowM pinnedTerms
-
   let isNotRoot (var, reuslt) = Root var /= reuslt
   let pinnedEquations =
         concatMap
