@@ -282,6 +282,12 @@ notU = do
       x <- inputUInt @4
       return $ complement x
 
+neqU :: Comp Boolean
+neqU = do
+      x <- inputUInt @4
+      y <- inputUInt @4
+      return $ x `neq` y
+
 bits2 :: Comp Boolean
 bits2 = do
   x <- inputUInt @4

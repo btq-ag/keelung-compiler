@@ -133,33 +133,48 @@ tests = do
         case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
+            -- c !!! (-1)
             toR1Cs r1cs
-              `shouldContain` [ R1C -- c !!! (-1)
+              `shouldContain` [ R1C
                                   (Poly.buildEither 0 [(0, 1)])
                                   (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 []),
-                                R1C -- c !!! 0
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- c !!! 0
+            toR1Cs r1cs
+              `shouldContain` [ R1C
                                   (Poly.buildEither 1 [(1, -1)])
                                   (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 []),
-                                R1C -- c !!! 1
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- c !!! 1
+            toR1Cs r1cs
+              `shouldContain` [ R1C
                                   (Poly.buildEither 1 [(2, -1)])
                                   (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 []),
-                                R1C -- c !!! 2
-                                  (Poly.buildEither 0 [(3, -1)])
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- c !!! 2
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(3, 1)])
                                   (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 []),
-                                R1C -- c !!! 3
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- c !!! 3
+            toR1Cs r1cs
+              `shouldContain` [ R1C
                                   (Poly.buildEither 0 [(4, -1)])
                                   (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 []),
-                                R1C -- c !!! 4
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- c !!! 4
+            toR1Cs r1cs
+              `shouldContain` [ R1C
                                   (Poly.buildEither 1 [(5, -1)])
                                   (Poly.buildEither 1 [])
                                   (Poly.buildEither 0 [])
                               ]
-
       it "Bit test / Input variable" $ do
         -- oooooobbbbi
         -- 01234567890
@@ -491,7 +506,7 @@ tests = do
                               ]
 
       it "NOT 1" $ do
-        -- output | input 
+        -- output | input
         -- rrrru    rrrru
         -- 01234    56789
         let program = do
@@ -500,7 +515,6 @@ tests = do
         case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
-            print r1cs
             -- 1 - x[i] = out[i]
             forM_ [0 .. 3] $ \i ->
               toR1Cs r1cs
@@ -509,115 +523,283 @@ tests = do
                                     (Poly.buildEither 1 [])
                                     (Poly.buildEither 0 [])
                                 ]
-        
---   it "Addition 0" $ do
---     let program = do
---           x <- inputUInt @4
---           y <- inputUInt @4
---           return (x + y)
---     case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
---       Left err -> expectationFailure (show err)
---       Right r1cs -> do
---         -- x + y - carry = output
---         toR1Cs r1cs
---           `shouldContain` [ R1C
---                               (Poly.buildEither 0 [(6, 16)])
---                               (Poly.buildEither 0 [(10, 1)])
---                               (Poly.buildEither 0 [(0, 1), (1, -1), (2, -1)])
---                           ]
 
---   it "Addition 1" $ do
---     let program = do
---           x <- inputUInt @4
---           y <- inputUInt @4
---           return (x + y + x)
---     case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
---       Left err -> expectationFailure (show err)
---       Right r1cs -> do
---         -- x + y - carryXY = temp
---         -- temp + x - carryTempX = output
---         toR1Cs r1cs
---           `shouldContain` [ R1C
---                               (Poly.buildEither 0 [(6, 16)])
---                               (Poly.buildEither 0 [(10, 1)])
---                               (Poly.buildEither 0 [(11, 1), (1, -1), (2, -1)]),
---                             R1C
---                               (Poly.buildEither 0 [(12, 16)])
---                               (Poly.buildEither 0 [(6, 1)])
---                               (Poly.buildEither 0 [(0, 1), (1, -1), (11, -1)])
---                           ]
+      it "EQ 0" $ do
+        -- output | input      | intermediate
+        -- b        rrrrrrrruu   m
+        -- 0        1234567890   1
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              return $ x `eq` y
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            --  (x - y) * m = 1 - out
+            --  (x - y) * out = 0
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(9, 1), (10, -1)])
+                                  (Poly.buildEither 0 [(11, 1)])
+                                  (Poly.buildEither 1 [(0, -1)])
+                              ]
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(9, 1), (10, -1)])
+                                  (Poly.buildEither 0 [(0, 1)])
+                                  (Poly.buildEither 0 [])
+                              ]
 
---   it "Subtraction 0" $ do
---     let program = do
---           x <- inputUInt @4
---           y <- inputUInt @4
---           return (x - y)
---     case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
---       Left err -> expectationFailure (show err)
---       Right r1cs -> do
---         -- x - y - carry = output
---         toR1Cs r1cs
---           `shouldContain` [ R1C
---                               (Poly.buildEither 0 [(6, 16)])
---                               (Poly.buildEither 0 [(10, 1)])
---                               (Poly.buildEither 0 [(0, 1), (1, -1), (2, 1)])
---                           ]
+      it "EQ 1" $ do
+        -- output | input | intermediate
+        -- b        rrrru   m
+        -- 0        12345   6
+        let program = do
+              x <- inputUInt @4
+              return $ x `eq` 3
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            --  (x - 3) * m = 1 - out
+            --  (x - 3) * out = 0
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither (-3) [(5, 1)])
+                                  (Poly.buildEither 0 [(6, 1)])
+                                  (Poly.buildEither 1 [(0, -1)])
+                              ]
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither (-3) [(5, 1)])
+                                  (Poly.buildEither 0 [(0, 1)])
+                                  (Poly.buildEither 0 [])
+                              ]
 
---   -- it "AND 0" $ do
---   --   let program = do
---   --         x <- inputUInt @4
---   --         y <- inputUInt @4
---   --         return (x `And` y)
---   --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
---   --     Left err -> expectationFailure (show err)
---   --     Right r1cs -> do
---   --       -- x - y - carry = output
---   --       toR1Cs r1cs
---   --         `shouldContain` [ R1C
---   --                             (Poly.buildEither 0 [(1, 1), (2, -1)])
---   --                             (Poly.buildEither 0 [(0, 1)])
---   --                             (Poly.buildEither 0 []),
---   --                           R1C
---   --                             (Poly.buildEither 0 [(1, 1), (2, -1)])
---   --                             (Poly.buildEither 0 [(11, 1)])
---   --                             (Poly.buildEither 1 [(0, -1)])
---   --                         ]
+      -- it "NEQ 0" $ do
+      --   -- output | input      | intermediate
+      --   -- b        rrrrrrrruu   m
+      --   -- 0        1234567890   1
+      --   let program = do
+      --         x <- inputUInt @4
+      --         y <- inputUInt @4
+      --         return $ x `neq` y
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --         --  (x - y) * m = out
+      --         --  (x - y) * (1 - out) = 0
+      --         toR1Cs r1cs
+      --           `shouldContain` [ R1C
+      --                               (Poly.buildEither 0 [(9, 1), (10, -1)])
+      --                               (Poly.buildEither 0 [(11, 1)])
+      --                               (Poly.buildEither 0 [(0, 1)])
+      --                           ]
+      -- toR1Cs r1cs
+      --   `shouldContain` [ R1C
+      --                       (Poly.buildEither 0 [(9, 1), (10, -1)])
+      --                       (Poly.buildEither 1 [(0, -1)])
+      --                       (Poly.buildEither 0 [])
+      --                   ]
 
---   it "Equality 0" $ do
---     let program = do
---           x <- inputUInt @4
---           y <- inputUInt @4
---           return (x `eq` y)
---     case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
---       Left err -> expectationFailure (show err)
---       Right r1cs -> do
---         -- x - y - carry = output
---         toR1Cs r1cs
---           `shouldContain` [ R1C
---                               (Poly.buildEither 0 [(1, 1), (2, -1)])
---                               (Poly.buildEither 0 [(0, 1)])
---                               (Poly.buildEither 0 []),
---                             R1C
---                               (Poly.buildEither 0 [(1, 1), (2, -1)])
---                               (Poly.buildEither 0 [(11, 1)])
---                               (Poly.buildEither 1 [(0, -1)])
---                           ]
+      -- -- 1 - x[i] = out[i]
+      -- forM_ [0 .. 3] $ \i ->
+      --   toR1Cs r1cs
+      --     `shouldContain` [ R1C
+      --                         (Poly.buildEither 1 [(5 + i, -1), (0 + i, -1)])
+      --                         (Poly.buildEither 1 [])
+      --                         (Poly.buildEither 0 [])
+      --                     ]
 
--- example1 :: Comp (Arr Boolean)
--- example1 = do
---   x <- inputUInt @4
---   _x2 <- inputUInt @4
---   y <- inputUInt @3
---   return $
---     toArray
---       [ x !!! 0,
---         x !!! 1,
---         x !!! 2,
---         x !!! 3,
---         x !!! 5,
---         x !!! (-1),
---         y !!! 1,
---         y !!! (-1),
---         y !!! 3,
---         y !!! 13
---       ]
+      it "ADD 0" $ do
+        -- output | input
+        -- rrrru    rrrrrrrruu
+        -- 01234    5678901234
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              return (x + y)
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- (2ⁿ * xₙ₋₁) * (yₙ₋₁) = (out - x - y)
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(8, 16)])
+                                  (Poly.buildEither 0 [(12, 1)])
+                                  (Poly.buildEither 0 [(4, 1), (13, -1), (14, -1)])
+                              ]
+
+      it "ADD 1" $ do
+        -- output | input      | intermediate
+        -- rrrru    rrrrrrrruu   rrrru
+        -- 01234    5678901234   56789
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              return (x + y + x)
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- (2ⁿ * xₙ₋₁) * (yₙ₋₁) = (temp - x - y)
+            -- NOTE: 'temp' will be moved from $19 to $16 after variable renumbering
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(8, 16)])
+                                  (Poly.buildEither 0 [(12, 1)])
+                                  (Poly.buildEither 0 [(16, 1), (13, -1), (14, -1)])
+                              ]
+            -- (2ⁿ * tempₙ₋₁) * (xₙ₋₁) = (out - temp - x)
+            -- NOTE: 'tempₙ₋₁' will be moved from $18 to $15 after variable renumbering
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(15, 16)])
+                                  (Poly.buildEither 0 [(8, 1)])
+                                  (Poly.buildEither 0 [(4, 1), (16, -1), (13, -1)])
+                              ]
+
+      it "ADD 2" $ do
+        -- output | input      | intermediate
+        -- rrrru    rrrrrrrruu   rrrru
+        -- 01234    5678901234   56789
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              let z = 3
+              return (x + y + z)
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- (2ⁿ * xₙ₋₁) * (yₙ₋₁) = (temp - x - y)
+            -- NOTE: 'temp' will be moved from $19 to $15 after variable renumbering
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(8, 16)])
+                                  (Poly.buildEither 0 [(12, 1)])
+                                  (Poly.buildEither 0 [(15, 1), (13, -1), (14, -1)])
+                              ]
+            -- (2ⁿ * tempₙ₋₁) * (3ₙ₋₁) = (out - temp - 3)
+            -- => 0 = out - temp - 3
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither (-3) [(4, 1), (15, -1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+
+      it "SUB 0" $ do
+        -- output | input           | intermediate
+        -- rrrru    rrrrrrrrrrrruuu   rrrru
+        -- 01234    567890123456789   01234
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              z <- inputUInt @4
+              return (x - y - z)
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- (2ⁿ * xₙ₋₁) * (yₙ₋₁) = (temp - x + y)
+            -- NOTE: 'temp' will be moved from $24 to $21 after variable renumbering
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(8, 16)])
+                                  (Poly.buildEither 0 [(12, 1)])
+                                  (Poly.buildEither 0 [(21, 1), (17, -1), (18, 1)])
+                              ]
+            -- (2ⁿ * tempₙ₋₁) * (zₙ₋₁) = (out - temp + z)
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(20, 16)])
+                                  (Poly.buildEither 0 [(16, 1)])
+                                  (Poly.buildEither 0 [(4, 1), (21, -1), (19, 1)])
+                              ]
+
+      it "MUL 0" $ do
+        -- output | input      | intermediate
+        -- rrrru    rrrrrrrruu   u
+        -- 01234    5678901234   5
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              return (x * y)
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- x * y = out + 2ⁿ * quotient
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(13, 1)])
+                                  (Poly.buildEither 0 [(14, 1)])
+                                  (Poly.buildEither 0 [(4, 1), (15, 16)])
+                              ]
+
+      it "MUL 1" $ do
+        -- output | input           | intermediate
+        -- rrrru    rrrrrrrrrrrruuu   utqqq
+        -- 01234    567890123456789   01234
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              z <- inputUInt @4
+              return (x * y * z * 3)
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- x * y = temp1 + 2ⁿ * quotient1
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(17, 1)])
+                                  (Poly.buildEither 0 [(18, 1)])
+                                  (Poly.buildEither 0 [(21, 1), (22, 16)])
+                              ]
+            -- temp * z = temp2 + 2ⁿ * quotient2
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(21, 1)])
+                                  (Poly.buildEither 0 [(19, 1)])
+                                  (Poly.buildEither 0 [(20, 1), (23, 16)])
+                              ]
+            -- temp2 * 3 = out + 2ⁿ * quotient3
+            -- => 0 = out + 2ⁿ * quotient3 - temp2 * 3
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(4, -1), (24, -16), (20, 3)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+      it "ARITH 0" $ do
+        -- output | input           | intermediate
+        -- rrrru    rrrrrrrrrrrruuu   rutqr
+        -- 01234    567890123456789   01234
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              z <- inputUInt @4
+              return (x * y + z - 3)
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- x * y = temp1 + 2ⁿ * quotient
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(17, 1)])
+                                  (Poly.buildEither 0 [(18, 1)])
+                                  (Poly.buildEither 0 [(22, 1), (23, 16)])
+                              ]
+            -- (2ⁿ * temp1ₙ₋₁) * (zₙ₋₁) = (temp2 - temp1 - z)
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(20, 16)])
+                                  (Poly.buildEither 0 [(16, 1)])
+                                  (Poly.buildEither 0 [(21, 1), (22, -1), (19, -1)])
+                              ]
+            -- (2ⁿ * temp2ₙ₋₁) * (3ₙ₋₁) = (out - temp2 + 3)
+            -- => (out - temp2 + 3) = 0 
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither (-3) [(4, -1), (21, 1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+
+

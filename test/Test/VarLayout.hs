@@ -139,6 +139,40 @@ tests = do
       getCountByType (OfUIntBinRep undefined) counters `shouldBe` 4
       getCountByType (OfUInt undefined) counters `shouldBe` 1
 
+  describe "Variable indexing 2" $ do
+    --
+    --                F   B   BR  U
+    --       output   0   0   4   1
+    --        input   0   0   8   2
+    -- intermediate   0   0   4   1
+    --
+    let counters =
+          ( addCount OfOutput (OfUInt 4) 1
+              . addCount OfInput (OfUInt 4) 2
+              . addCount OfIntermediate (OfUInt 4) 1
+          )
+            mempty
+    it "reindex" $ do
+      reindex counters OfOutput (OfUIntBinRep 4) 0 `shouldBe` 0
+      reindex counters OfOutput (OfUInt 4) 0 `shouldBe` 4
+      reindex counters OfInput (OfUIntBinRep 4) 0 `shouldBe` 5
+      reindex counters OfInput (OfUIntBinRep 4) 1 `shouldBe` 9
+      reindex counters OfInput (OfUInt 4) 0 `shouldBe` 13
+      reindex counters OfInput (OfUInt 4) 1 `shouldBe` 14
+      reindex counters OfIntermediate (OfUIntBinRep 4) 0 `shouldBe` 15
+      reindex counters OfIntermediate (OfUInt 4) 0 `shouldBe` 19
+
+    it "getCountBySort" $ do
+      getCountBySort OfOutput counters `shouldBe` 5
+      getCountBySort OfInput counters `shouldBe` 10
+      getCountBySort OfIntermediate counters `shouldBe` 5
+
+    it "getCountByType" $ do
+      getCountByType OfField counters `shouldBe` 0
+      getCountByType OfBoolean counters `shouldBe` 0
+      getCountByType (OfUIntBinRep undefined) counters `shouldBe` 16
+      getCountByType (OfUInt undefined) counters `shouldBe` 4
+
   describe "Layout 0" $ do
     --                F   B   BR  U
     --       output   1   0   0   0

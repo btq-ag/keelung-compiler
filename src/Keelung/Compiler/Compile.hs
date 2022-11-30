@@ -438,12 +438,10 @@ encodeExprU out expr = case expr of
   SubU w x y -> do
     x' <- wireU x
     y' <- wireU y
-    -- freshBinRep out w
     encodeSubU w out x' y'
   AddU w x y -> do
     x' <- wireU x
     y' <- wireU y
-    -- freshBinRep out w
     encodeAddU w out x' y'
   MulU w x y -> do
     x' <- wireU x
@@ -810,12 +808,9 @@ encodeSubU = encodeAddOrSubU True
 --    C + 2ⁿ * Q = A * B
 encodeMulU :: (GaloisField n, Integral n) => Int -> RefU -> RefU -> RefU -> M n ()
 encodeMulU width out a b = do
-  -- rawProduct = a * b
-  rawProduct <- freshRefU width
-  add $ cMulSimpleU a b rawProduct
-  -- result = rawProduct - 2ⁿ * quotient
+  -- (a) * (b) = result + 2ⁿ * quotient
   quotient <- freshRefU width
-  add $ cAddU 0 [(out, 1), (rawProduct, -1), (quotient, 2 ^ width)]
+  add $ cMulU (0, [(a, 1)]) (0, [(b, 1)]) (0, [(out, 1), (quotient, 2 ^ width)])
 
 -- | An universal way of compiling a conditional
 encodeIfB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> RefB -> M n ()
