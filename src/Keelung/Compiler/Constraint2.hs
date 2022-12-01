@@ -132,7 +132,7 @@ reindexRefB counters (RefUBit w x i) =
         RefUI _ x' -> reindex counters OfInput (OfUIntBinRep w) x' + i'
         RefUO _ x' -> reindex counters OfOutput (OfUIntBinRep w) x' + i'
         RefU _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
-        RefBtoRefU x' -> error "[ panic ] reindexRefB on RefUBit on RefBtoRefU"
+        RefBtoRefU x' -> reindexRefB counters x'
 
 reindexRefU :: Counters -> RefU -> Var
 reindexRefU counters (RefUI w x) = reindex counters OfInput (OfUInt w) x
