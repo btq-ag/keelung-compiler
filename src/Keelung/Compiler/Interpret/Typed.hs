@@ -178,6 +178,7 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
     XorU _ x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     NotU _ x -> map bitWiseNot <$> interpret x
     RoLU _ i x -> map (bitWiseRotateL i) <$> interpret x
+    ShLU _ i x -> map (bitWiseShiftL i) <$> interpret x
     IfU _ p x y -> do
       p' <- interpret p
       case p' of
@@ -323,6 +324,7 @@ freeVarsU expr = case expr of
   XorU _ x y -> freeVarsU x <> freeVarsU y
   NotU _ x -> freeVarsU x
   RoLU _ _ x -> freeVarsU x
+  ShLU _ _ x -> freeVarsU x
   IfU _ p x y -> freeVarsB p <> freeVarsU x <> freeVarsU y
   BtoU _ x -> freeVarsB x
 
@@ -383,3 +385,6 @@ bitWiseNot x = fromInteger $ Data.Bits.complement (toInteger x)
 
 bitWiseRotateL :: (GaloisField n, Integral n) => Int -> n -> n
 bitWiseRotateL n x = fromInteger $ Data.Bits.rotateL (toInteger x) n
+
+bitWiseShiftL :: (GaloisField n, Integral n) => Int -> n -> n
+bitWiseShiftL n x = fromInteger $ Data.Bits.shiftL (toInteger x) n

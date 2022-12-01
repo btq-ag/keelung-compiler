@@ -114,6 +114,7 @@ propagateConstant relations = propagate
       NotU w x -> NotU w (propagateU x)
       IfU w p x y -> IfU w (propagateB p) (propagateU x) (propagateU y)
       RoLU w i x -> RoLU w i (propagateU x)
+      ShLU w i x -> ShLU w i (propagateU x)
       BtoU w x -> BtoU w (propagateB x)
 
     propagateB e = case e of
