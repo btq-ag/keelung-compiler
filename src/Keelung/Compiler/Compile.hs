@@ -403,7 +403,13 @@ encodeExprU out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     encodeIfU out p' x' y'
-  RoLU {} -> error "[ panic ] encodeExprU: RoLU: not implemented"
+  RoLU w n x -> do 
+    x' <- wireU x
+    forM_ [0 .. w - 1] $ \i -> do 
+      let i' = (i - n) `mod` w
+      add $ cAddB 0 [(RefUBit w out i, 1), (RefUBit w x' i', -1)]
+    
+    -- error "[ panic ] encodeExprU: RoLU: not implemented"
   BtoU w x -> do
     -- 1. wire 'out[0]' to 'x'
     -- 2. wire 'out[_]' to '0' for all other bits

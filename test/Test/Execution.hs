@@ -78,6 +78,10 @@ tests = describe "Execution" $ do
   it "arithU" $
     execute Basic.arithU0 [2, 3] `shouldBe` Right [5 :: GF181]
 
+  it "rotateAndBitTest" $
+    -- 0011 0100211003
+    execute Basic.rotateAndBitTest [2, 3] `shouldBe` Right [0, 0, 1, 1 :: GF181]
+
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
   let settings =

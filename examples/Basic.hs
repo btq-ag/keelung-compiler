@@ -360,8 +360,8 @@ rotateAndBitTest = do
     toArray
       [ (x `rotate` 0) !!! 0,
         (x `rotate` 1) !!! 1,
-        (x `rotate` (-1)) !!! 1,
-        ((x .^. y) `rotate` 1) !!! 2
+        (x `rotate` (-1)) !!! 0,
+        ((x .^. y) `rotate` 1) !!! 1
       ]
 
 rotateOnly :: Comp (Arr (UInt 4))
