@@ -404,18 +404,17 @@ encodeExprU out expr = case expr of
     y' <- wireU y
     encodeIfU out p' x' y'
   RoLU {} -> error "[ panic ] encodeExprU: RoLU: not implemented"
-  BtoU _ x -> do
-    result <- freshRefB
-    encodeExprB result x
-    add $ cAddU 0 [(out, 1), (RefBtoRefU result, -1)] -- out = var
-    -- encodeExprB out x
-
--- encode :: (GaloisField n, Integral n) => Var -> Expr n -> M n ()
--- encode out expr = case expr of
---   -- values
---   ExprB x -> encodeExprB out x
---   ExprN x -> encodeExprN out x
---   ExprU x -> encodeExprU out x
+  BtoU w x -> do
+    -- 1. wire 'out[0]' to 'x'
+    -- 2. wire 'out[_]' to '0' for all other bits
+    forM_ [0 .. w - 1] $ \i ->
+      if i == 0
+        then do
+          result <- freshRefB
+          encodeExprB result x
+          add $ cAddB 0 [(RefUBit w out i, 1), (result, -1)]
+        else do
+          add $ cAddB 0 [(RefUBit w out i, 1)]
 
 --------------------------------------------------------------------------------
 
@@ -586,6 +585,16 @@ wireU :: (GaloisField n, Integral n) => ExprU n -> M n RefU
 wireU (VarU w ref) = return (RefU w ref)
 wireU (OutputVarU w ref) = return (RefUO w ref)
 wireU (InputVarU w ref) = return (RefUI w ref)
+-- wireU (BtoU w x) = do
+--   error "hey"
+--   out <- freshRefU w
+--   encodeExprB out x
+
+--   -- result <- freshRefB
+--   -- encodeExprB result x
+--   -- add $ cAddU 0 [(out, 1), (RefBtoRefU result, -1)] -- out = var
+--   return out
+
 wireU expr = do
   out <- freshRefU (widthOfU expr)
   encodeExprU out expr

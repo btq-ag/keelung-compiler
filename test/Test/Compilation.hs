@@ -156,6 +156,33 @@ tests = do
                                   (Poly.buildEither 0 [(0, 1), (1, -1)])
                               ]
 
+      it "Bit test / Value" $ do
+        -- output | input | intermediate
+        -- bbbb     b       rrrrrrrrrrrrrrrruuuu
+        -- 0123     4       56789012345678901234
+        let program = do
+              x <- input
+              let u = BtoU x :: UInt 4
+              return $ toArray [u !!! 0, u !!! 1, u !!! 2, u !!! 3]
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- u !!! 0 == x
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(0, -1), (4, 1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- u !!! i == 0
+            forM_ [1 .. 3] $ \i ->
+              toR1Cs r1cs
+                `shouldContain` [ R1C
+                                    (Poly.buildEither 0 [(i, -1)])
+                                    (Poly.buildEither 1 [])
+                                    (Poly.buildEither 0 [])
+                                ]
+
       it "AND 0" $ do
         -- output | input
         -- rrrru    rrrrrrrruu
@@ -686,12 +713,10 @@ tests = do
                                   (Poly.buildEither 0 [(21, 1), (22, -1), (19, -1)])
                               ]
             -- (2ⁿ * temp2ₙ₋₁) * (3ₙ₋₁) = (out - temp2 + 3)
-            -- => (out - temp2 + 3) = 0 
+            -- => (out - temp2 + 3) = 0
             toR1Cs r1cs
               `shouldContain` [ R1C
                                   (Poly.buildEither (-3) [(4, -1), (21, 1)])
                                   (Poly.buildEither 1 [])
                                   (Poly.buildEither 0 [])
                               ]
-
-

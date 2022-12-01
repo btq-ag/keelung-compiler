@@ -279,14 +279,14 @@ bitTestInputVarU = do
 
 notU :: Comp (UInt 4)
 notU = do
-      x <- inputUInt @4
-      return $ complement x
+  x <- inputUInt @4
+  return $ complement x
 
 neqU :: Comp Boolean
 neqU = do
-      x <- inputUInt @4
-      y <- inputUInt @4
-      return $ x `neq` y
+  x <- inputUInt @4
+  y <- inputUInt @4
+  return $ x `neq` y
 
 bits2 :: Comp Boolean
 bits2 = do
@@ -295,6 +295,15 @@ bits2 = do
   z <- inputUInt @4
   w <- inputUInt @4
   return $ (x .&. y .&. z .&. w) !!! 0
+
+bitTestsOnBtoU :: Comp (Arr Boolean)
+bitTestsOnBtoU = do
+  -- output | input | intermediate
+  -- bb       b       rrrrrrrruu
+  -- 01       2       3456789012
+  x <- input
+  let u = BtoU x :: UInt 4
+  return $ toArray [u !!! 0, u !!! 1]
 
 -- Formula: (0°C × 9/5) + 32 = 32°F
 tempConvert :: Comp Number
