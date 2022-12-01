@@ -61,6 +61,7 @@ import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
+import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed (Elaborated)
 
 --------------------------------------------------------------------------------
@@ -148,11 +149,13 @@ execute prog rawInputs = do
   let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
   (actualOutputs, actualWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputs)
 
+  let outputsWithoutBinReps = removeBinRepsFromOutputs (r1csCounters r1cs) actualOutputs
+
   -- interpret the program to see if the output value is correct
   expectedOutputs <- left InterpretError (Interpret.run elab inputs)
 
-  when (actualOutputs /= expectedOutputs) $ do
-    Left $ ExecError $ ExecOutputError expectedOutputs actualOutputs
+  when (outputsWithoutBinReps /= expectedOutputs) $ do
+    Left $ ExecError $ ExecOutputError expectedOutputs outputsWithoutBinReps
 
   case satisfyR1CS actualWitness r1cs of
     Nothing -> return ()
@@ -161,7 +164,12 @@ execute prog rawInputs = do
         ExecError $
           ExecR1CUnsatisfiableError r1c's actualWitness
 
-  return actualOutputs
+  return outputsWithoutBinReps
+  where
+    removeBinRepsFromOutputs :: Counters -> [n] -> [n]
+    removeBinRepsFromOutputs counters outputs =
+      let (start, end) = getOutputBinRepRange counters
+       in take start outputs ++ drop end outputs
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs

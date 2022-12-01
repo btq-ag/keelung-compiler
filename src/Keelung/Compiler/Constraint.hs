@@ -127,7 +127,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show (ConstraintSystem constraints _ _ counters) =
     "ConstraintSystem {\n"
       <> prettyConstraints counters (Set.toList constraints)
-      <> "\n"
       <> prettyVariables counters
       <> "\n}"
 

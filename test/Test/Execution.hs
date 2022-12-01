@@ -76,7 +76,7 @@ tests = describe "Execution" $ do
     execute Basic.returnArray2 [2] `shouldBe` Right [2, 4 :: GF181]
 
   it "arithU" $
-    execute Basic.arithU0 [2, 3] `shouldBe` Right [0, 1, 0, 1, 5 :: GF181]
+    execute Basic.arithU0 [2, 3] `shouldBe` Right [5 :: GF181]
 
 runKeelungAggSig :: Int -> Int -> Either (Error GF181) [GF181]
 runKeelungAggSig dimension numberOfSignatures =
