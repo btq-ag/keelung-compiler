@@ -135,6 +135,7 @@ data ExprU n
   | NotU Width (ExprU n)
   | IfU Width (ExprB n) (ExprU n) (ExprU n)
   | RoLU Width Int (ExprU n)
+  | ShLU Width Int (ExprU n)
   | BtoU Width (ExprB n)
   deriving (Functor)
 
@@ -153,6 +154,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     RoLU _ n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
+    ShLU _ n x -> showParen (prec > 8) $ showString "ShL " . showsPrec 9 n . showString " " . showsPrec 9 x
     BtoU _ x -> showString "B→U " . showsPrec prec x
 
 instance Num n => Num (ExprU n) where
@@ -222,6 +224,7 @@ widthOfU expr = case expr of
   NotU w _ -> w
   IfU w _ _ _ -> w
   RoLU w _ _ -> w
+  ShLU w _ _ -> w
   BtoU w _ -> w
 
 --------------------------------------------------------------------------------

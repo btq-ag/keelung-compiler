@@ -139,6 +139,7 @@ eraseExprU expr = case expr of
   T.XorU w x y -> XorU w <$> eraseExprU x <*> eraseExprU y
   T.NotU w x -> NotU w <$> eraseExprU x
   T.RoLU w i x -> RoLU w i <$> eraseExprU x
+  T.ShLU w i x -> ShLU w i <$> eraseExprU x
   T.IfU w p x y -> IfU w <$> eraseExprB p <*> eraseExprU x <*> eraseExprU y
   T.BtoU w x -> BtoU w <$> eraseExprB x
 
