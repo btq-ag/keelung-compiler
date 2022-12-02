@@ -50,8 +50,6 @@ import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters
 import Keelung.Types
 
-type Width = Int
-
 fromConstraint :: Integral n => Counters -> Constraint n -> Constraint.Constraint n
 fromConstraint _ (CAdd p) = Constraint.CAdd p
 fromConstraint counters (CAddB as) = Constraint.CAdd (fromPolyB_ counters as)

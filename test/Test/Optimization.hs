@@ -45,8 +45,6 @@ tests = do
                         cadd 10623 [(13, -1)],
                         cadd 11179 [(12, -1)]
                       ],
-                csNumBinReps = mempty,
-                csCustomBinReps = mempty,
                 csCounters = mempty
               }
        in optimize1 (cs :: ConstraintSystem GF181) `shouldNotBe` cs

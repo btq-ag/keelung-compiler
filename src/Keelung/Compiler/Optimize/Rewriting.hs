@@ -33,11 +33,11 @@ rewriteAssertEq expr = case expr of
   Boolean (EqB (InputVarB ref) y) -> do
     assignBI ref y
     return False
-  Boolean (EqN (VarN ref) y) -> do
-    assignN ref y
+  Boolean (EqF (VarF ref) y) -> do
+    assignF ref y
     return False
-  Boolean (EqN (InputVarN ref) y) -> do
-    assignNI ref y
+  Boolean (EqF (VarFI ref) y) -> do
+    assignFI ref y
     return False
   Boolean (EqU _ (VarU w ref) y) -> do
     assignU w ref y
@@ -51,11 +51,11 @@ rewriteAssertEq expr = case expr of
   Boolean (EqB x (InputVarB ref)) -> do
     assignBI ref x
     return False
-  Boolean (EqN x (VarN ref)) -> do
-    assignN ref x
+  Boolean (EqF x (VarF ref)) -> do
+    assignF ref x
     return False
-  Boolean (EqN x (InputVarN ref)) -> do
-    assignNI ref x
+  Boolean (EqF x (VarFI ref)) -> do
+    assignFI ref x
     return False
   Boolean (EqU _ x (VarU w ref)) -> do
     assignU w ref x
@@ -70,12 +70,12 @@ rewriteAssertEq expr = case expr of
     assignB var x
     assignB var y
     return False
-  Boolean (EqN x y) -> do
+  Boolean (EqF x y) -> do
     -- introduce a fresh variable
     -- and assign both expressions to it
     var <- allocVarN
-    assignN var x
-    assignN var y
+    assignF var x
+    assignF var y
     return False
   Boolean (EqU w x y) -> do
     -- introduce a fresh variable

@@ -18,8 +18,8 @@ run (T.Elaborated expr comp) =
         -- start type erasure
         expr' <- eraseExpr expr
         sameType proxy expr'
-        assignmentsF <- mapM (\(var, val) -> AssignmentF (RefF var) <$> eraseExprN val) (IntMap.toList aF)
-        assignmentsFI <- mapM (\(var, val) -> AssignmentF (RefFI var) <$> eraseExprN val) (IntMap.toList aFI)
+        assignmentsF <- mapM (\(var, val) -> AssignmentF (RefF var) <$> eraseExprF val) (IntMap.toList aF)
+        assignmentsFI <- mapM (\(var, val) -> AssignmentF (RefFI var) <$> eraseExprF val) (IntMap.toList aFI)
         assignmentsB <- mapM (\(var, val) -> AssignmentB (RefB var) <$> eraseExprB val) (IntMap.toList bF)
         assignmentsBI <- mapM (\(var, val) -> AssignmentB (RefBI var) <$> eraseExprB val) (IntMap.toList bFI)
         let assignments = assignmentsF ++ assignmentsFI ++ assignmentsB ++ assignmentsBI
@@ -33,9 +33,7 @@ run (T.Elaborated expr comp) =
               erasedCounters = counters,
               erasedRelations = mempty,
               erasedAssertions = assertions',
-              erasedAssignments = assignments,
-              erasedBinReps = mempty,
-              erasedCustomBinReps = mempty
+              erasedAssignments = assignments
             }
   where
     -- proxy trick for devising the bit width of field elements
@@ -52,26 +50,6 @@ runM width f = runReader f width
 
 --------------------------------------------------------------------------------
 
--- Current layout of variables
---
--- ┏━━━━━━━━━━━━━━━━━┓
--- ┃         Output  ┃
--- ┣─────────────────┫
--- ┃   Number Input  ┃
--- ┣─────────────────┫
--- ┃   Custom Input  ┃
--- ┣─────────────────┫─ ─ ─ ─ ─ ─ ─ ─
--- ┃  Boolean Input  ┃               │
--- ┣─────────────────┫
--- ┃  Binary Rep of  ┃
--- ┃   Number Input  ┃   Contiguous chunk of bits
--- ┣─────────────────┫
--- ┃  Binary Rep of  ┃
--- ┃   Custom Input  ┃               │
--- ┣─────────────────┫─ ─ ─ ─ ─ ─ ─ ─
--- ┃   Intermediate  ┃
--- ┗━━━━━━━━━━━━━━━━━┛
---
 eraseExprB :: (GaloisField n, Integral n) => T.Boolean -> M n (ExprB n)
 eraseExprB expr = case expr of
   T.ValB True -> return $ ValB 1
@@ -84,24 +62,24 @@ eraseExprB expr = case expr of
   T.NotB x -> NotB <$> eraseExprB x
   T.IfB p x y -> IfB <$> eraseExprB p <*> eraseExprB x <*> eraseExprB y
   T.EqB x y -> EqB <$> eraseExprB x <*> eraseExprB y
-  T.EqN x y -> EqN <$> eraseExprN x <*> eraseExprN y
+  T.EqF x y -> EqF <$> eraseExprF x <*> eraseExprF y
   T.EqU _ x y -> EqU <$> eraseExprU x <*> eraseExprU y
   T.BitU _ x i -> BitU <$> eraseExprU x <*> pure i
 
-eraseExprN :: (GaloisField n, Integral n) => T.Number -> M n (ExprN n)
-eraseExprN expr = do
+eraseExprF :: (GaloisField n, Integral n) => T.Field -> M n (ExprF n)
+eraseExprF expr = do
   w <- ask
   case expr of
-    T.ValN x -> return $ ValN w (fromInteger x)
-    T.ValNR x -> return $ ValN w (fromRational x)
-    T.VarN var -> return $ VarN w var
-    T.InputVarN var -> return $ InputVarN w var
-    T.AddN x y -> chainExprsOfAssocOpAddN w <$> eraseExprN x <*> eraseExprN y
-    T.SubN x y -> SubN w <$> eraseExprN x <*> eraseExprN y
-    T.MulN x y -> MulN w <$> eraseExprN x <*> eraseExprN y
-    T.DivN x y -> DivN w <$> eraseExprN x <*> eraseExprN y
-    T.IfN p x y -> IfN w <$> eraseExprB p <*> eraseExprN x <*> eraseExprN y
-    T.BtoN x -> BtoN w <$> eraseExprB x
+    T.ValF x -> return $ ValF w (fromInteger x)
+    T.ValFR x -> return $ ValF w (fromRational x)
+    T.VarF var -> return $ VarF w var
+    T.VarFI var -> return $ VarFI w var
+    T.AddF x y -> chainExprsOfAssocOpAddF w <$> eraseExprF x <*> eraseExprF y
+    T.SubF x y -> SubF w <$> eraseExprF x <*> eraseExprF y
+    T.MulF x y -> MulF w <$> eraseExprF x <*> eraseExprF y
+    T.DivF x y -> DivF w <$> eraseExprF x <*> eraseExprF y
+    T.IfF p x y -> IfF w <$> eraseExprB p <*> eraseExprF x <*> eraseExprF y
+    T.BtoF x -> BtoF w <$> eraseExprB x
 
 eraseExprU :: (GaloisField n, Integral n) => T.UInt -> M n (ExprU n)
 eraseExprU expr = case expr of
@@ -126,9 +104,9 @@ eraseExpr expr = case expr of
   T.Boolean x -> do
     x' <- eraseExprB x
     return [ExprB x']
-  T.Number x -> do
-    x' <- eraseExprN x
-    return [ExprN x']
+  T.Field x -> do
+    x' <- eraseExprF x
+    return [ExprF x']
   T.UInt x -> do
     x' <- eraseExprU x
     return [ExprU x']
@@ -138,16 +116,16 @@ eraseExpr expr = case expr of
     return (concat exprss)
 
 -- | Flatten and chain expressions with associative operator together when possible
-chainExprsOfAssocOpAddN :: Width -> ExprN n -> ExprN n -> ExprN n
-chainExprsOfAssocOpAddN w x y = case (x, y) of
-  (AddN _ x0 x1 xs, AddN _ y0 y1 ys) ->
-    AddN w x0 x1 (xs <> (y0 :<| y1 :<| ys))
-  (AddN _ x0 x1 xs, _) ->
-    AddN w x0 x1 (xs |> y)
-  (_, AddN _ y0 y1 ys) ->
-    AddN w x y0 (y1 :<| ys)
+chainExprsOfAssocOpAddF :: Width -> ExprF n -> ExprF n -> ExprF n
+chainExprsOfAssocOpAddF w x y = case (x, y) of
+  (AddF _ x0 x1 xs, AddF _ y0 y1 ys) ->
+    AddF w x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (AddF _ x0 x1 xs, _) ->
+    AddF w x0 x1 (xs |> y)
+  (_, AddF _ y0 y1 ys) ->
+    AddF w x y0 (y1 :<| ys)
   -- there's nothing left we can do
-  _ -> AddN w x y mempty
+  _ -> AddF w x y mempty
 
 chainExprsOfAssocOpAndB :: ExprB n -> ExprB n -> ExprB n
 chainExprsOfAssocOpAndB x y = case (x, y) of

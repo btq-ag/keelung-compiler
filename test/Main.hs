@@ -44,8 +44,6 @@ main = hspec $ do
               { csConstraints =
                   Set.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
-                csNumBinReps = mempty,
-                csCustomBinReps = mempty,
                 csCounters = addCount OfInput OfField 1 mempty
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs

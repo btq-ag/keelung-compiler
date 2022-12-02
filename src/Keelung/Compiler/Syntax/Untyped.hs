@@ -7,15 +7,15 @@ module Keelung.Compiler.Syntax.Untyped
     widthOfU,
     Expr (..),
     ExprB (..),
-    ExprN (..),
+    ExprF (..),
     ExprU (..),
     TypeErased (..),
     Assignment (..),
     Bindings (..),
-    insertN,
+    insertF,
     insertB,
     insertU,
-    lookupN,
+    lookupF,
     lookupB,
     lookupU,
     Relations (..),
@@ -31,20 +31,11 @@ import qualified Data.Map.Strict as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint2
 import Keelung.Field (N (..))
-import Keelung.Syntax.BinRep (BinReps)
-import qualified Keelung.Syntax.BinRep as BinRep
 import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Counters as Counters
-import Keelung.Types (Var)
+import Keelung.Types (Var, Width)
 
 --------------------------------------------------------------------------------
-
--- data Ref' = RefF Var | RefB Var | RefU Width Var | RefUBit Width Int
--- data Ref = RefI Ref' | RefO Ref' | Ref Ref' | HACK Var
-
---------------------------------------------------------------------------------
-
-type Width = Int
 
 data ExprB n
   = ValB n
@@ -59,10 +50,10 @@ data ExprB n
   | IfB (ExprB n) (ExprB n) (ExprB n)
   | -- comparison operators
     NEqB (ExprB n) (ExprB n)
-  | NEqN (ExprN n) (ExprN n)
+  | NEqF (ExprF n) (ExprF n)
   | NEqU (ExprU n) (ExprU n)
   | EqB (ExprB n) (ExprB n)
-  | EqN (ExprN n) (ExprN n)
+  | EqF (ExprF n) (ExprF n)
   | EqU (ExprU n) (ExprU n)
   | BitU (ExprU n) Int
   deriving (Functor)
@@ -80,42 +71,42 @@ instance (Integral n, Show n) => Show (ExprB n) where
     NotB x -> chain prec "¬ " 5 $ x :<| Empty
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     NEqB x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
-    NEqN x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
+    NEqF x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
     NEqU x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
     EqB x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
-    EqN x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
+    EqF x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
     EqU x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
     BitU x i -> showsPrec prec x . showString "[" . shows i . showString "]"
 
 --------------------------------------------------------------------------------
 
-data ExprN n
-  = ValN Width n
-  | VarN Width Var
-  | OutputVarN Width Var
-  | InputVarN Width Var
+data ExprF n
+  = ValF Width n
+  | VarF Width Var
+  | VarFO Width Var
+  | VarFI Width Var
   | -- arithmetic operators
-    SubN Width (ExprN n) (ExprN n)
-  | AddN Width (ExprN n) (ExprN n) (Seq (ExprN n))
-  | MulN Width (ExprN n) (ExprN n)
-  | DivN Width (ExprN n) (ExprN n)
+    SubF Width (ExprF n) (ExprF n)
+  | AddF Width (ExprF n) (ExprF n) (Seq (ExprF n))
+  | MulF Width (ExprF n) (ExprF n)
+  | DivF Width (ExprF n) (ExprF n)
   | -- logical operators
-    IfN Width (ExprB n) (ExprN n) (ExprN n)
-  | BtoN Width (ExprB n)
+    IfF Width (ExprB n) (ExprF n) (ExprF n)
+  | BtoF Width (ExprB n)
   deriving (Functor)
 
-instance (Show n, Integral n) => Show (ExprN n) where
+instance (Show n, Integral n) => Show (ExprF n) where
   showsPrec prec expr = case expr of
-    ValN _ n -> shows n
-    VarN _ var -> showString "$N" . shows var
-    OutputVarN _ var -> showString "$NO" . shows var
-    InputVarN _ var -> showString "$NI" . shows var
-    SubN _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
-    AddN _ x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
-    MulN _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
-    DivN _ x y -> chain prec " / " 7 $ x :<| y :<| Empty
-    IfN _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    BtoN _ x -> showString "B→N " . showsPrec prec x
+    ValF _ n -> shows n
+    VarF _ var -> showString "$N" . shows var
+    VarFO _ var -> showString "$NO" . shows var
+    VarFI _ var -> showString "$NI" . shows var
+    SubF _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
+    AddF _ x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
+    MulF _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
+    DivF _ x y -> chain prec " / " 7 $ x :<| y :<| Empty
+    IfF _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    BtoF _ x -> showString "B→F " . showsPrec prec x
 
 --------------------------------------------------------------------------------
 
@@ -170,14 +161,14 @@ instance Num n => Num (ExprU n) where
 -- | "Untyped" expression
 data Expr n
   = ExprB (ExprB n) -- Boolean expression
-  | ExprN (ExprN n) -- Field expression
+  | ExprF (ExprF n) -- Field expression
   | ExprU (ExprU n) -- UInt expression
   deriving (Functor)
 
-instance Num n => Num (ExprN n) where
-  x + y = AddN (widthOfN x) x y Empty
-  x - y = SubN (widthOfN x) x y
-  x * y = MulN (widthOfN x) x y
+instance Num n => Num (ExprF n) where
+  x + y = AddF (widthOfF x) x y Empty
+  x - y = SubF (widthOfF x) x y
+  x * y = MulF (widthOfF x) x y
   abs = id
   signum = const 1
   fromInteger = error "[ panic ] Dunno how to convert an Integer to a Number"
@@ -193,21 +184,21 @@ chain prec delim n = showParen (prec > n) . go
 instance (Integral n, Show n) => Show (Expr n) where
   showsPrec _prec expr = case expr of
     ExprB x -> shows x
-    ExprN x -> shows x
+    ExprF x -> shows x
     ExprU x -> shows x
 
-widthOfN :: ExprN n -> Width
-widthOfN expr = case expr of
-  ValN w _ -> w
-  VarN w _ -> w
-  InputVarN w _ -> w
-  OutputVarN w _ -> w
-  SubN w _ _ -> w
-  AddN w _ _ _ -> w
-  MulN w _ _ -> w
-  DivN w _ _ -> w
-  IfN w _ _ _ -> w
-  BtoN w _ -> w
+widthOfF :: ExprF n -> Width
+widthOfF expr = case expr of
+  ValF w _ -> w
+  VarF w _ -> w
+  VarFI w _ -> w
+  VarFO w _ -> w
+  SubF w _ _ -> w
+  AddF w _ _ _ -> w
+  MulF w _ _ -> w
+  DivF w _ _ -> w
+  IfF w _ _ _ -> w
+  BtoF w _ -> w
 
 widthOfU :: ExprU n -> Width
 widthOfU expr = case expr of
@@ -230,23 +221,19 @@ widthOfU expr = case expr of
 --------------------------------------------------------------------------------
 
 data Assignment n
-  = AssignmentF RefF (ExprN n)
+  = AssignmentF RefF (ExprF n)
   | AssignmentU RefU (ExprU n)
   | AssignmentB RefB (ExprB n)
 
 instance (Integral n, Show n) => Show (Assignment n) where
-  show (AssignmentF var expr) = show var ++ " = " ++ show expr
-  show (AssignmentU var expr) = show var ++ " = " ++ show expr
-  show (AssignmentB var expr) = show var ++ " = " ++ show expr
-
--- show (Assignment var expr) = "$" <> show var <> " := " <> show expr
+  show (AssignmentF var expr) = show var ++ " := " ++ show expr
+  show (AssignmentU var expr) = show var ++ " := " ++ show expr
+  show (AssignmentB var expr) = show var ++ " := " ++ show expr
 
 instance Functor Assignment where
   fmap f (AssignmentF var expr) = AssignmentF var (fmap f expr)
   fmap f (AssignmentU var expr) = AssignmentU var (fmap f expr)
   fmap f (AssignmentB var expr) = AssignmentB var (fmap f expr)
-
--- fmap f (Assignment var expr) = Assignment var (fmap f expr)
 
 --------------------------------------------------------------------------------
 
@@ -263,15 +250,11 @@ data TypeErased n = TypeErased
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
     -- | Assignments after type erasure
-    erasedAssignments :: ![Assignment n],
-    -- | Binary representation of Number inputs
-    erasedBinReps :: BinReps,
-    -- | Binary representation of custom inputs
-    erasedCustomBinReps :: BinReps
+    erasedAssignments :: ![Assignment n]
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ counters relations assertions assignments numBinReps customBinReps) =
+  show (TypeErased expr _ counters relations assertions assignments) =
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
@@ -288,33 +271,15 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
              else ""
          )
       <> Counters.prettyVariables counters
-      -- <> indent (show countersOld)
-      -- <> "  Boolean variables: $"
-      -- <> show (fst (boolVarsRange countersOld))
-      -- <> " .. $"
-      -- <> show (snd (boolVarsRange countersOld) - 1)
-      -- <> "\n"
-      <> showBinRepConstraints
       <> "\n\
          \}"
-    where
-      totalBinRepConstraintSize = getBinRepConstraintSize counters
-      showBinRepConstraints =
-        if totalBinRepConstraintSize == 0
-          then ""
-          else
-            "  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n"
-              <> unlines
-                ( map
-                    (("    " <>) . show)
-                    (BinRep.toList (numBinReps <> customBinReps))
-                )
+    
 
 --------------------------------------------------------------------------------
 
 -- | Container for holding something for each datatypes
 data Bindings n = Bindings
-  { bindingsN :: Map RefF n, -- Field elements
+  { bindingsF :: Map RefF n, -- Field elements
     bindingsB :: Map RefB n, -- Booleans
     bindingsUs :: IntMap (Map RefU n) -- Unsigned integers of different bitwidths
   }
@@ -328,7 +293,7 @@ instance Monoid (Bindings n) where
   mempty = Bindings mempty mempty mempty
 
 -- instance Show n => Show (Bindings n) where
---   show (Bindings ns bs us) =
+--   show (Bindings fs bs us) =
 --     "  Field elements: "
 --       <> unlines (map (("    " <>) . show) (IntMap.toList ns))
 --       <> "\n"
@@ -344,24 +309,24 @@ instance Monoid (Bindings n) where
 --       <> "\n"
 
 instance Foldable Bindings where
-  foldMap f (Bindings ns bs us) =
-    foldMap f ns <> foldMap f bs <> foldMap (foldMap f) us
+  foldMap f (Bindings fs bs us) =
+    foldMap f fs <> foldMap f bs <> foldMap (foldMap f) us
 
 instance Traversable Bindings where
-  traverse f (Bindings ns bs us) =
-    Bindings <$> traverse f ns <*> traverse f bs <*> traverse (traverse f) us
+  traverse f (Bindings fs bs us) =
+    Bindings <$> traverse f fs <*> traverse f bs <*> traverse (traverse f) us
 
-insertN :: RefF -> n -> Bindings n -> Bindings n
-insertN var val (Bindings ns bs us) = Bindings (Map.insert var val ns) bs us
+insertF :: RefF -> n -> Bindings n -> Bindings n
+insertF var val (Bindings fs bs us) = Bindings (Map.insert var val fs) bs us
 
 insertB :: RefB -> n -> Bindings n -> Bindings n
-insertB var val (Bindings ns bs us) = Bindings ns (Map.insert var val bs) us
+insertB var val (Bindings fs bs us) = Bindings fs (Map.insert var val bs) us
 
 insertU :: Width -> RefU -> n -> Bindings n -> Bindings n
-insertU width var val (Bindings ns bs us) = Bindings ns bs (IntMap.insertWith (<>) width (Map.singleton var val) us)
+insertU width var val (Bindings fs bs us) = Bindings fs bs (IntMap.insertWith (<>) width (Map.singleton var val) us)
 
-lookupN :: RefF -> Bindings n -> Maybe n
-lookupN var (Bindings ns _ _) = Map.lookup var ns
+lookupF :: RefF -> Bindings n -> Maybe n
+lookupF var (Bindings fs _ _) = Map.lookup var fs
 
 lookupB :: RefB -> Bindings n -> Maybe n
 lookupB var (Bindings _ bs _) = Map.lookup var bs

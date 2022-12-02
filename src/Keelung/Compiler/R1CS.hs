@@ -64,9 +64,7 @@ toR1CS cs =
   R1CS
     { r1csConstraints = rights convertedConstratins,
       r1csCounters = csCounters cs,
-      r1csCNEQs = lefts convertedConstratins,
-      r1csNumBinReps = csNumBinReps cs,
-      r1csCustomBinReps = csCustomBinReps cs
+      r1csCNEQs = lefts convertedConstratins
     }
   where
     convertedConstratins = map toR1C (Set.toList (csConstraints cs))
@@ -88,9 +86,7 @@ fromR1CS r1cs =
     { csConstraints =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
-      csCounters = r1csCounters r1cs,
-      csNumBinReps = r1csNumBinReps r1cs,
-      csCustomBinReps = r1csCustomBinReps r1cs
+      csCounters = r1csCounters r1cs
     }
   where
     fromR1C (R1C aX bX cX) =

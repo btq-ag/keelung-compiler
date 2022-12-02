@@ -31,7 +31,6 @@ import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
 import Keelung.Syntax.Counters
-import Keelung.Syntax.Typed (Width)
 import Keelung.Types
 
 --------------------------------------------------------------------------------
@@ -43,7 +42,6 @@ run' elab inputs = runM elab inputs $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
-
 
   -- interpret assignments of values first
   assignmentsF <-
@@ -64,7 +62,6 @@ run' elab inputs = runM elab inputs $ do
   -- interpret the rest of the assignments
   forM_ assignmentsF $ \(var, e) -> interpret e >>= addBinding var
   forM_ assignmentsB $ \(var, e) -> interpret e >>= addBinding var
-
 
   -- interpret the assertions next
   -- throw error if any assertion fails
@@ -177,6 +174,7 @@ instance FreeVar t => FreeVar (ArrM t) where
             NumElem -> return $ IntSet.fromList (IntMap.elems array)
             BoolElem -> return $ IntSet.fromList (IntMap.elems array)
             (ArrElem _ _) -> IntSet.unions <$> mapM freeVarsOfArray (IntMap.elems array)
+            UElem _ -> return $ IntSet.fromList (IntMap.elems array)
 
 -- | Collect free variables of an elaborated program (excluding input variables).
 instance FreeVar t => FreeVar (Elaborated t) where
@@ -344,6 +342,7 @@ lookupAddr addr = do
       NumElem -> mapM lookupVar (IntMap.elems array)
       BoolElem -> mapM lookupVar (IntMap.elems array)
       (ArrElem _ _) -> concat <$> mapM lookupAddr (IntMap.elems array)
+      UElem _ -> mapM lookupVar (IntMap.elems array)
 
 addBinding :: Var -> [n] -> M n ()
 addBinding var [val] = modify (IntMap.insert var val)

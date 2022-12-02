@@ -14,11 +14,11 @@ import Keelung.Compiler.Syntax.Untyped
 -- 1. Propagate constant in bindings of expressions
 -- 2. Propagate constant in the expression and assertions
 run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
-run (TypeErased expr fieldWidth counters oldRelations assertions assignments numBinReps customBinReps) =
+run (TypeErased expr fieldWidth counters oldRelations assertions assignments) =
   let newRelations = propagateRelations oldRelations
       expr' = propagateConstant newRelations <$> expr
       newAssertions = map (propagateConstant newRelations) assertions
-   in TypeErased expr' fieldWidth counters newRelations newAssertions assignments numBinReps customBinReps
+   in TypeErased expr' fieldWidth counters newRelations newAssertions assignments
 
 data Result n
   = Result
@@ -44,24 +44,24 @@ propagateRelations = toRelations . go . fromRelations
 
 -- | Seperate value bindings from expression bindings
 refineResult :: Result n -> Result n
-refineResult result@(Result _ _ (Bindings ns bs us)) =
-  handleU (handleB (handleN result ns) bs) us
+refineResult result@(Result _ _ (Bindings fs bs us)) =
+  handleU (handleB (handleF result fs) bs) us
   where
-    handleN =
+    handleF =
       Map.foldlWithKey'
         ( \(Result n vbs ebs) var expr ->
             case expr of
-              ExprN (ValN _ val) -> Result (succ n) (insertN var val vbs) ebs
-              ExprU _ -> error "[ panic ] UInt expression in Number bindings of expressions"
-              ExprB _ -> error "[ panic ] Boolean expression in Number bindings of expressions"
-              _ -> Result n vbs (insertN var expr ebs)
+              ExprF (ValF _ val) -> Result (succ n) (insertF var val vbs) ebs
+              ExprU _ -> error "[ panic ] UInt expression in Field bindings of expressions"
+              ExprB _ -> error "[ panic ] Boolean expression in Field bindings of expressions"
+              _ -> Result n vbs (insertF var expr ebs)
         )
     handleB =
       Map.foldlWithKey'
         ( \(Result n vbs ebs) var expr ->
             case expr of
-              ExprN _ -> error "[ panic ] Number value in Number bindings of expressions"
-              ExprU _ -> error "[ panic ] UInt expression in Number bindings of expressions"
+              ExprF _ -> error "[ panic ] Field value in Boolean bindings of expressions"
+              ExprU _ -> error "[ panic ] UInt expression in Boolean bindings of expressions"
               ExprB (ValB val) -> Result (succ n) (insertB var val vbs) ebs
               _ -> Result n vbs (insertB var expr ebs)
         )
@@ -71,9 +71,9 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
             Map.foldlWithKey'
               ( \(Result n' vbs' ebs') var expr ->
                   case expr of
-                    ExprN _ -> error "[ panic ] Number value in Number bindings of expressions"
+                    ExprF _ -> error "[ panic ] Field value in UInt bindings of expressions"
                     ExprU (ValU _ val) -> Result (succ n') (insertU width var val vbs') ebs'
-                    ExprB _ -> error "[ panic ] Boolean value in Number bindings of expressions"
+                    ExprB _ -> error "[ panic ] Boolean value in UInt bindings of expressions"
                     _ -> Result n' vbs' (insertU width var expr ebs')
               )
               result'
@@ -84,19 +84,19 @@ refineResult result@(Result _ _ (Bindings ns bs us)) =
 propagateConstant :: (GaloisField n, Integral n) => Relations n -> Expr n -> Expr n
 propagateConstant relations = propagate
   where
-    propagateN e = case e of
-      ValN _ _ -> e
-      VarN w var -> case lookupN (RefF var) (valueBindings relations) of
+    propagateF e = case e of
+      ValF _ _ -> e
+      VarF w var -> case lookupF (RefF var) (valueBindings relations) of
         Nothing -> e
-        Just val -> ValN w val
-      OutputVarN _ _ -> e -- no constant propagation for output variables
-      InputVarN _ _ -> e -- no constant propagation for input variables
-      SubN w x y -> SubN w (propagateN x) (propagateN y)
-      AddN w x y xs -> AddN w (propagateN x) (propagateN y) (fmap propagateN xs)
-      MulN w x y -> MulN w (propagateN x) (propagateN y)
-      DivN w x y -> DivN w (propagateN x) (propagateN y)
-      IfN w p x y -> IfN w (propagateB p) (propagateN x) (propagateN y)
-      BtoN w x -> BtoN w (propagateB x)
+        Just val -> ValF w val
+      VarFO _ _ -> e -- no constant propagation for output variables
+      VarFI _ _ -> e -- no constant propagation for input variables
+      SubF w x y -> SubF w (propagateF x) (propagateF y)
+      AddF w x y xs -> AddF w (propagateF x) (propagateF y) (fmap propagateF xs)
+      MulF w x y -> MulF w (propagateF x) (propagateF y)
+      DivF w x y -> DivF w (propagateF x) (propagateF y)
+      IfF w p x y -> IfF w (propagateB p) (propagateF x) (propagateF y)
+      BtoF w x -> BtoF w (propagateB x)
 
     propagateU e = case e of
       ValU _ _ -> e
@@ -130,14 +130,14 @@ propagateConstant relations = propagate
       NotB x -> NotB (propagateB x)
       IfB p x y -> IfB (propagateB p) (propagateB x) (propagateB y)
       NEqB x y -> NEqB (propagateB x) (propagateB y)
-      NEqN x y -> NEqN (propagateN x) (propagateN y)
+      NEqF x y -> NEqF (propagateF x) (propagateF y)
       NEqU x y -> NEqU (propagateU x) (propagateU y)
       EqB x y -> EqB (propagateB x) (propagateB y)
-      EqN x y -> EqN (propagateN x) (propagateN y)
+      EqF x y -> EqF (propagateF x) (propagateF y)
       EqU x y -> EqU (propagateU x) (propagateU y)
       BitU x i -> BitU (propagateU x) i
 
     propagate e = case e of
-      ExprN x -> ExprN (propagateN x)
+      ExprF x -> ExprF (propagateF x)
       ExprU x -> ExprU (propagateU x)
       ExprB x -> ExprB (propagateB x)

@@ -6,7 +6,7 @@ import qualified Basic
 import Keelung
 import Keelung.Compiler (Error (..), execute)
 import Keelung.Compiler.Interpret.Typed (InterpretError (..))
-import qualified Keelung.Syntax.Typed as C
+import qualified Keelung.Syntax.Typed as Typed
 import Test.Hspec
 
 tests :: SpecWith ()
@@ -39,7 +39,7 @@ tests = describe "Execution" $ do
       `shouldBe` Left
         ( InterpretError $
             InterpretAssertionError
-              (C.Boolean $ C.EqN (C.InputVarN 0) (C.ValN 3))
+              (Typed.Boolean $ Typed.EqF (Typed.VarFI 0) (Typed.ValF 3))
               [("$N0", 0)]
         )
   it "assert success" $
