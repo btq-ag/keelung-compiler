@@ -129,8 +129,8 @@ instance FreeVar (UInt w) where
     OrU x y -> (<>) <$> freeVars x <*> freeVars y
     XorU x y -> (<>) <$> freeVars x <*> freeVars y
     NotU x -> freeVars x
-    RoLU _ x -> freeVars x
-    ShLU _ x -> freeVars x
+    RoLU _ _ x -> freeVars x
+    ShLU _ _ x -> freeVars x
     IfU p x y -> (<>) <$> freeVars p <*> ((<>) <$> freeVars x <*> freeVars y)
     BtoU x -> freeVars x
 
@@ -249,8 +249,8 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
     OrU x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorU x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     NotU x -> map bitWiseNot <$> interpret x
-    RoLU n x -> map (bitWiseRotateL n) <$> interpret x
-    ShLU n x -> map (bitWiseShiftL n) <$> interpret x
+    RoLU _ n x -> map (bitWiseRotateL n) <$> interpret x
+    ShLU _ n x -> map (bitWiseShiftL n) <$> interpret x
     IfU p x y -> do
       p' <- interpret p
       case p' of

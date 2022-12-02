@@ -77,3 +77,13 @@ tests = do
           `shouldBe` Right expectedOutput
         typed Basic.summation2 input
           `shouldBe` Right expectedOutput
+
+    -- it "Rotate" $
+    --   let program = do 
+    --     x <- inputUInt @4 
+    --     return [shift (-4) x, shift 4 
+    
+    --   kinded Basic.summation2 (input :: [GF181])
+    --     `shouldBe` Right expectedOutput
+    --   typed Basic.summation2 input
+    --     `shouldBe` Right expectedOutput
