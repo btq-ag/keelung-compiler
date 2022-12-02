@@ -230,19 +230,19 @@ widthOfU expr = case expr of
 --------------------------------------------------------------------------------
 
 data Assignment n
-  = AssignmentN RefF (ExprN n)
+  = AssignmentF RefF (ExprN n)
   | AssignmentU RefU (ExprU n)
   | AssignmentB RefB (ExprB n)
 
 instance (Integral n, Show n) => Show (Assignment n) where
-  show (AssignmentN var expr) = show var ++ " = " ++ show expr
+  show (AssignmentF var expr) = show var ++ " = " ++ show expr
   show (AssignmentU var expr) = show var ++ " = " ++ show expr
   show (AssignmentB var expr) = show var ++ " = " ++ show expr
 
 -- show (Assignment var expr) = "$" <> show var <> " := " <> show expr
 
 instance Functor Assignment where
-  fmap f (AssignmentN var expr) = AssignmentN var (fmap f expr)
+  fmap f (AssignmentF var expr) = AssignmentF var (fmap f expr)
   fmap f (AssignmentU var expr) = AssignmentU var (fmap f expr)
   fmap f (AssignmentB var expr) = AssignmentB var (fmap f expr)
 

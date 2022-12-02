@@ -26,41 +26,57 @@ import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (N (N))
+import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
+import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed
 import Keelung.Types
-import Keelung.Syntax.Counters
-import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
 runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) ([n], Witness n)
 runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
-  -- interpret the assignments first
-  -- reverse the list assignments so that "simple values" are binded first
-  -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
-  let numAssignments = reverse (compNumAsgns comp)
-  forM_ numAssignments $ \x -> case x of
-    AssignmentN var e -> do
-      values <- interpret e
-      addBinding var values
-    AssignmentNI var e -> do
-      values <- interpret e
-      addBinding var values
-    _ -> error "[ panic ] runAndOutputWitnesses: unexpected assignment"
+  -- interpret assignments of values first
+  assignmentsF <-
+    filterM
+      ( \(var, e) -> case e of
+          ValN val -> interpret val >>= addBinding var >> return False
+          _ -> return True
+      )
+      (IntMap.toList (compAssignmentF comp))
+  assignmentsB <-
+    filterM
+      ( \(var, e) -> case e of
+          ValB val -> interpret val >>= addBinding var >> return False
+          _ -> return True
+      )
+      (IntMap.toList (compAssignmentB comp))
+  -- interpret the rest of the assignments
+  forM_ assignmentsF $ \(var, e) -> interpret e >>= addBinding var
+  forM_ assignmentsB $ \(var, e) -> interpret e >>= addBinding var
 
-  let boolAssignments = reverse (compBoolAsgns comp)
-  forM_ boolAssignments $ \x -> case x of
-    AssignmentB var e -> do
-      values <- interpret e
-      addBinding var values
-    AssignmentBI var e -> do
-      values <- interpret e
-      addBinding var values
-    _ -> error "[ panic ] runAndOutputWitnesses: unexpected assignment"
+  -- let numAssignments = reverse (compNumAsgns comp)
+  -- forM_ numAssignments $ \x -> case x of
+  --   AssignmentN var e -> do
+  --     values <- interpret e
+  --     addBinding var values
+  --   AssignmentNI var e -> do
+  --     values <- interpret e
+  --     addBinding var values
+  --   _ -> error "[ panic ] runAndOutputWitnesses: unexpected assignment"
+
+  -- let boolAssignments = reverse (compBoolAsgns comp)
+  -- forM_ boolAssignments $ \x -> case x of
+  --   AssignmentB var e -> do
+  --     values <- interpret e
+  --     addBinding var values
+  --   AssignmentBI var e -> do
+  --     values <- interpret e
+  --     addBinding var values
+  --   _ -> error "[ panic ] runAndOutputWitnesses: unexpected assignment"
 
   -- interpret the assertions next
   -- throw error if any assertion fails
@@ -148,6 +164,9 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       if testBit (toInteger (head xs)) i
         then return [one]
         else return [zero]
+
+instance GaloisField n => Interpret Integer n where
+  interpret n = return [fromIntegral n]
 
 instance (GaloisField n, Integral n) => Interpret Number n where
   interpret expr = case expr of
@@ -256,17 +275,17 @@ lookupInputVarU width var = do
 freeIntermediateVarsOfElab :: Elaborated -> IntSet
 freeIntermediateVarsOfElab (Elaborated value context) =
   let (_, _, _, inOutputValue) = freeVars value
-      inNumBindings =
+      inBindingsF =
         map
-          (\(AssignmentN var val) -> let (_, _, _, vars) = freeVarsN val in IntSet.insert var vars) -- collect both the var and its value
-          (compNumAsgns context)
-      inBoolBindings =
+          (\(var, val) -> let (_, _, _, vars) = freeVarsN val in IntSet.insert var vars) -- collect both the var and its value
+          (IntMap.toList (compAssignmentF context))
+      inBindingsB =
         map
-          (\(AssignmentB var val) -> let (_, _, _, vars) = freeVarsB val in IntSet.insert var vars) -- collect both the var and its value
-          (compBoolAsgns context)
+          (\(var, val) -> let (_, _, _, vars) = freeVarsB val in IntSet.insert var vars) -- collect both the var and its value
+          (IntMap.toList (compAssignmentB context))
    in inOutputValue
-        <> IntSet.unions inNumBindings
-        <> IntSet.unions inBoolBindings
+        <> IntSet.unions inBindingsF
+        <> IntSet.unions inBindingsB
 
 -- | Collect variables of an expression and group them into sets of:
 --    1. Number input variables

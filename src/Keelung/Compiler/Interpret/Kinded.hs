@@ -43,15 +43,28 @@ run' elab inputs = runM elab inputs $ do
   -- interpret the assignments first
   -- reverse the list assignments so that "simple values" are binded first
   -- see issue#3: https://github.com/btq-ag/keelung-compiler/issues/3
-  let numAssignments = reverse (compNumAsgns comp)
-  forM_ numAssignments $ \(AssignmentN var e) -> do
-    values <- interpret e
-    addBinding var values
 
-  let boolAssignments = reverse (compBoolAsgns comp)
-  forM_ boolAssignments $ \(AssignmentB var e) -> do
-    values <- interpret e
-    addBinding var values
+
+  -- interpret assignments of values first
+  assignmentsF <-
+    filterM
+      ( \(var, e) -> case e of
+          Integer val -> interpret val >>= addBinding var >> return False
+          Rational val -> interpret val >>= addBinding var >> return False
+          _ -> return True
+      )
+      (IntMap.toList (compAssignmentF comp))
+  assignmentsB <-
+    filterM
+      ( \(var, e) -> case e of
+          Boolean val -> interpret val >>= addBinding var >> return False
+          _ -> return True
+      )
+      (IntMap.toList (compAssignmentB comp))
+  -- interpret the rest of the assignments
+  forM_ assignmentsF $ \(var, e) -> interpret e >>= addBinding var
+  forM_ assignmentsB $ \(var, e) -> interpret e >>= addBinding var
+
 
   -- interpret the assertions next
   -- throw error if any assertion fails
@@ -169,10 +182,10 @@ instance FreeVar t => FreeVar (ArrM t) where
 instance FreeVar t => FreeVar (Elaborated t) where
   freeVars (Elaborated value comp) = do
     inOutputValue <- freeVars value
-    inNumBindings <- forM (compNumAsgns comp) $ \(AssignmentN var val) -> do
+    inNumBindings <- forM (IntMap.toList (compAssignmentF comp)) $ \(var, val) -> do
       -- collect both the var and its value
       IntSet.insert var <$> freeVars val
-    inBoolBindings <- forM (compBoolAsgns comp) $ \(AssignmentB var val) -> do
+    inBoolBindings <- forM (IntMap.toList (compAssignmentB comp)) $ \(var, val) -> do
       -- collect both the var and its value
       IntSet.insert var <$> freeVars val
     return $

@@ -2,6 +2,7 @@ module Keelung.Compiler.Syntax.Erase (run) where
 
 import Control.Monad.Reader
 import Data.Field.Galois (GaloisField)
+import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
@@ -10,38 +11,19 @@ import qualified Keelung.Syntax.Typed as T
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation counters numAsgns boolAsgns _ assertions = comp
+  let T.Computation counters aF aFI bF bFI _ _ assertions = comp
       proxy = 0
       numBitWidth = bitSize proxy
    in runM numBitWidth $ do
         -- start type erasure
         expr' <- eraseExpr expr
         sameType proxy expr'
-        numAssignments' <- mapM eraseAssignment numAsgns
-        boolAssignments' <- mapM eraseAssignment boolAsgns
-        let assignments = numAssignments' <> boolAssignments'
+        assignmentsF <- mapM (\(var, val) -> AssignmentF (RefF var) <$> eraseExprN val) (IntMap.toList aF)
+        assignmentsFI <- mapM (\(var, val) -> AssignmentF (RefFI var) <$> eraseExprN val) (IntMap.toList aFI)
+        assignmentsB <- mapM (\(var, val) -> AssignmentB (RefB var) <$> eraseExprB val) (IntMap.toList bF)
+        assignmentsBI <- mapM (\(var, val) -> AssignmentB (RefBI var) <$> eraseExprB val) (IntMap.toList bFI)
+        let assignments = assignmentsF ++ assignmentsFI ++ assignmentsB ++ assignmentsBI
         assertions' <- concat <$> mapM eraseExpr assertions
-
-        -- retrieve updated Context and return it
-        -- counters'' <- get
-
-        -- associate input variables with their corresponding binary representation
-        -- let numBinReps =
-        --       let (start, end) = numInputVarsRange counters'
-        --        in BinRep.fromList $
-        --             map
-        --               (\v -> BinRep.fromNumBinRep numBitWidth (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters' v)))
-        --               [start .. end - 1]
-
-        -- let customBinReps =
-        --       BinRep.fromList $
-        --         concatMap
-        --           ( \(width, (start, end)) ->
-        --               map
-        --                 (\v -> BinRep.fromNumBinRep width (v, fromMaybe (error ("Panic: cannot query bits of var $" <> show v)) (lookupBinRepStart counters' v)))
-        --                 [start .. end - 1]
-        --           )
-        --           (IntMap.toList (customInputVarsRanges counters'))
 
         return $
           TypeErased
@@ -59,11 +41,6 @@ run (T.Elaborated expr comp) =
     -- proxy trick for devising the bit width of field elements
     sameType :: n -> [Expr n] -> M n ()
     sameType _ _ = return ()
-
--- lengthOfExpr :: T.Expr -> Int
--- lengthOfExpr (T.Array xs) = sum $ fmap lengthOfExpr xs
--- lengthOfExpr T.Unit = 0
--- lengthOfExpr _ = 1
 
 --------------------------------------------------------------------------------
 
@@ -159,64 +136,6 @@ eraseExpr expr = case expr of
   T.Array exprs -> do
     exprss <- mapM eraseExpr exprs
     return (concat exprss)
-
--- bitValue :: (Integral n, GaloisField n) => Expr n -> Int -> M n (ExprB n)
--- bitValue expr i = case expr of
---   ExprN (ValN _ n) -> return (ValB (testBit n i))
---   ExprN (VarN w var) -> do
---     counters <- get
---     -- if the index 'i' overflows or underflows, wrap it around
---     let i' = i `mod` w
---     -- bit variable corresponding to the variable 'var' and the index 'i''
---     case lookupBinRepStart counters var of
---       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
---       Just start -> return $ VarB (start + i')
---   ExprN _ -> error "Panic: trying to access the bit value of a compound expression"
---   ExprU (ValU _ n) -> return (ValB (testBit n i))
---   ExprU (VarU w var) -> do
---     counters <- get
---     -- if the index 'i' overflows or underflows, wrap it around
---     let i' = i `mod` w
---     -- bit variable corresponding to the variable 'var' and the index 'i''
---     case lookupBinRepStart counters var of
---       Nothing -> error $ "Panic: unable to get perform bit test on $" <> show var <> "[" <> show i' <> "]"
---       Just start -> return $ VarB (start + i')
---   ExprU (AndU _ x y rest) ->
---     AndB
---       <$> bitValue (ExprU x) i
---       <*> bitValue (ExprU y) i
---       <*> mapM (\x' -> ExprU x' `bitValue` i) rest
---   ExprU (OrU _ x y rest) ->
---     OrB
---       <$> bitValue (ExprU x) i
---       <*> bitValue (ExprU y) i
---       <*> mapM (\x' -> ExprU x' `bitValue` i) rest
---   ExprU (XorU _ x y) ->
---     XorB
---       <$> bitValue (ExprU x) i
---       <*> bitValue (ExprU y) i
---   ExprU _ -> error "Panic: trying to access the bit value of a compound expression"
---   ExprB x -> return x
-
--- Rotate w n x -> do
---   -- rotate the bit value
---   -- if the index 'i' overflows or underflows, wrap it around
---   let i' = n + i `mod` getWidth w
---   bitValue x i'
-
-eraseAssignment :: (GaloisField n, Integral n) => T.Assignment -> M n (Assignment n)
-eraseAssignment (T.AssignmentB var expr) = do
-  AssignmentB (RefB var) <$> eraseExprB expr
-eraseAssignment (T.AssignmentBI var expr) = do
-  AssignmentB (RefBI var) <$> eraseExprB expr
-eraseAssignment (T.AssignmentN var expr) = do
-  AssignmentN (RefF var) <$> eraseExprN expr
-eraseAssignment (T.AssignmentNI var expr) = do
-  AssignmentN (RefFI var) <$> eraseExprN expr
-eraseAssignment (T.AssignmentU width var expr) = do
-  AssignmentU (RefU width var) <$> eraseExprU expr
-eraseAssignment (T.AssignmentUI width var expr) = do
-  AssignmentU (RefUI width var) <$> eraseExprU expr
 
 -- | Flatten and chain expressions with associative operator together when possible
 chainExprsOfAssocOpAddN :: Width -> ExprN n -> ExprN n -> ExprN n
