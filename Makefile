@@ -12,3 +12,6 @@ prof:
 
 repl test: 
 	stack repl keelung-compiler:test:keelung-test
+
+# repl: 
+# 	stack ghci keelung-compiler:exe:keelungc

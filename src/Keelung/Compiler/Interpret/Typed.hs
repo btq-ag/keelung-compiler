@@ -32,6 +32,7 @@ import Keelung.Compiler.Util
 import Keelung.Syntax.Typed
 import Keelung.Types
 import Keelung.Syntax.Counters
+import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 
 --------------------------------------------------------------------------------
 
@@ -92,7 +93,7 @@ runAndCheck elab inputs = do
 
   -- See if input size is valid
   let expectedInputSize = getCountBySort OfInput (compCounters (elabComp elab))
-  let actualInputSize = length (Inputs.numInputs inputs <> Inputs.boolInputs inputs)
+  let actualInputSize = Inputs.size inputs
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
@@ -177,8 +178,8 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
     OrU _ x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorU _ x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     NotU _ x -> map bitWiseNot <$> interpret x
-    RoLU _ i x -> map (bitWiseRotateL i) <$> interpret x
-    ShLU _ i x -> map (bitWiseShiftL i) <$> interpret x
+    RoLU w i x -> map (Kinded.bitWiseRotateL w i) <$> interpret x
+    ShLU w i x -> map (Kinded.bitWiseShiftL w i) <$> interpret x
     IfU _ p x y -> do
       p' <- interpret p
       case p' of
@@ -382,9 +383,3 @@ bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)
 
 bitWiseNot :: (GaloisField n, Integral n) => n -> n
 bitWiseNot x = fromInteger $ Data.Bits.complement (toInteger x)
-
-bitWiseRotateL :: (GaloisField n, Integral n) => Int -> n -> n
-bitWiseRotateL n x = fromInteger $ Data.Bits.rotateL (toInteger x) n
-
-bitWiseShiftL :: (GaloisField n, Integral n) => Int -> n -> n
-bitWiseShiftL n x = fromInteger $ Data.Bits.shiftL (toInteger x) n

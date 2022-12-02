@@ -4,7 +4,15 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Interpret.Kinded (run, runAndCheck, FreeVar, Interpret) where
+module Keelung.Compiler.Interpret.Kinded
+  ( run,
+    runAndCheck,
+    FreeVar,
+    Interpret,
+    bitWiseRotateL,
+    bitWiseShiftL,
+  )
+where
 
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -23,6 +31,7 @@ import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
 import Keelung.Syntax.Counters
+import Keelung.Syntax.Typed (Width)
 import Keelung.Types
 
 --------------------------------------------------------------------------------
@@ -69,7 +78,7 @@ runAndCheck elab inputs = do
   -- See if input size is valid
   let (Elaborated _ comp) = elab
   let expectedInputSize = getCountBySort OfInput (compCounters comp)
-  let actualInputSize = length (Inputs.numInputs inputs <> Inputs.boolInputs inputs)
+  let actualInputSize = Inputs.size inputs
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
@@ -249,8 +258,8 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
     OrU x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorU x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     NotU x -> map bitWiseNot <$> interpret x
-    RoLU _ n x -> map (bitWiseRotateL n) <$> interpret x
-    ShLU _ n x -> map (bitWiseShiftL n) <$> interpret x
+    RoLU w n x -> map (bitWiseRotateL w n) <$> interpret x
+    ShLU w n x -> map (bitWiseShiftL w n) <$> interpret x
     IfU p x y -> do
       p' <- interpret p
       case p' of
@@ -403,8 +412,17 @@ bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)
 bitWiseNot :: (GaloisField n, Integral n) => n -> n
 bitWiseNot x = fromInteger $ Data.Bits.complement (toInteger x)
 
-bitWiseRotateL :: (GaloisField n, Integral n) => Int -> n -> n
-bitWiseRotateL n x = fromInteger $ Data.Bits.rotateL (toInteger x) n
+-- w is the bit width of the result
+-- n is the amount to shift left by
+-- x is the value to shift
+bitWiseRotateL :: (GaloisField n, Integral n) => Width -> Int -> n -> n
+bitWiseRotateL w n x =
+  fromInteger $
+    (toInteger x `Data.Bits.shiftL` fromIntegral (n `mod` w) Data.Bits..&. (2 ^ w - 1))
+      Data.Bits..|. (toInteger x `Data.Bits.shiftR` fromIntegral (w - (n `mod` w)))
 
-bitWiseShiftL :: (GaloisField n, Integral n) => Int -> n -> n
-bitWiseShiftL n x = fromInteger $ Data.Bits.shiftL (toInteger x) n
+bitWiseShiftL :: (GaloisField n, Integral n) => Width -> Int -> n -> n
+bitWiseShiftL w n x =
+  if n < 0
+    then fromInteger $ Data.Bits.shiftR (toInteger x) (-n)
+    else fromInteger $ Data.Bits.shiftL (toInteger x) n Data.Bits..&. (2 ^ w - 1)
