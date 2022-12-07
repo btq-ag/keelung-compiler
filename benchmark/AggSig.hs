@@ -6,7 +6,7 @@ import qualified AggregateSignature.Program as AggSig
 import AggregateSignature.Util
 import Criterion
 import Keelung (Comp, GF181, elaborate)
-import Keelung.Compiler
+import Keelung.Compiler hiding (elaborate)
 
 run :: Benchmark
 run =

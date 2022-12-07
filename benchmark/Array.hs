@@ -5,7 +5,7 @@ module Array (fromString, fullAdder, multiplier) where
 import qualified Array.Immutable as I
 import Criterion
 import Keelung (Arr, Boolean, Comp, elaborate)
-import Keelung.Compiler
+import Keelung.Compiler hiding (elaborate)
 
 fromString :: Benchmark
 fromString =
