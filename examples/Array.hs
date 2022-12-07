@@ -5,10 +5,10 @@ module Array where
 import Control.Monad
 import Keelung
 
-echo :: Comp (Arr Number)
+echo :: Comp (Arr Field)
 echo = inputs 4
 
-modify :: Comp (Arr Number)
+modify :: Comp (Arr Field)
 modify = do
   xs <- inputs 4 >>= thaw
 
@@ -30,19 +30,19 @@ initM2 = do
   xs <- toArrayM $ replicate 4 false
   freeze xs
 
-sharing :: Comp (Arr Number)
+sharing :: Comp (Arr Field)
 sharing = do
   x <- input
   let y = x * x * x * x
   return $ toArray [y, y]
 
-sharing' :: Comp (Arr Number)
+sharing' :: Comp (Arr Field)
 sharing' = do
   x <- input
   y <- reuse $ x * x * x * x
   return $ toArray [y, y]
 
-fold :: Comp (Arr Number)
+fold :: Comp (Arr Field)
 fold = do
   x <- input
   (xs, _) <-
@@ -54,7 +54,7 @@ fold = do
       ([0 .. 10] :: [Int])
   return $ toArray xs
 
-fold' :: Comp (Arr Number)
+fold' :: Comp (Arr Field)
 fold' = do
   x <- input
   (xs, _) <-

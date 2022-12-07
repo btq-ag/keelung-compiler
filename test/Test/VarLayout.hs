@@ -179,9 +179,9 @@ tests = do
     --        input   3   0   0   0
     -- intermediate   0   0   0   0
     let program = do
-          x <- inputNum
-          y <- inputNum
-          z <- inputNum
+          x <- inputField
+          y <- inputField
+          z <- inputField
           return $ x + y + z
     case asGF181N $ csCounters <$> Compiler.compile program of
       Left err -> it "Erasure failure" $ expectationFailure (show err)
@@ -198,7 +198,7 @@ tests = do
     --        input   1   1   0   0
     -- intermediate   0   0   0   0
     let program = do
-          x <- inputNum
+          x <- inputField
           y <- inputBool
           return $ cond y x 0
     case asGF181N $ csCounters <$> Compiler.compile program of

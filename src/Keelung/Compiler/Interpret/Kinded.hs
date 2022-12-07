@@ -108,18 +108,18 @@ runAndCheck elab inputs = do
 class FreeVar a where
   freeVars :: a -> M n IntSet
 
-instance FreeVar Number where
+instance FreeVar Field where
   freeVars expr = case expr of
     Integer _ -> return mempty
     Rational _ -> return mempty
-    VarN var -> return $ IntSet.singleton var
-    InputVarN _ -> return mempty
+    VarF var -> return $ IntSet.singleton var
+    VarFI _ -> return mempty
     Add x y -> (<>) <$> freeVars x <*> freeVars y
     Sub x y -> (<>) <$> freeVars x <*> freeVars y
     Mul x y -> (<>) <$> freeVars x <*> freeVars y
     Div x y -> (<>) <$> freeVars x <*> freeVars y
-    IfN x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
-    BtoN x -> freeVars x
+    IfF x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
+    BtoF x -> freeVars x
 
 instance FreeVar Boolean where
   freeVars expr = case expr of
@@ -131,7 +131,7 @@ instance FreeVar Boolean where
     Xor x y -> (<>) <$> freeVars x <*> freeVars y
     Not x -> freeVars x
     EqB x y -> (<>) <$> freeVars x <*> freeVars y
-    EqN x y -> (<>) <$> freeVars x <*> freeVars y
+    EqF x y -> (<>) <$> freeVars x <*> freeVars y
     EqU x y -> (<>) <$> freeVars x <*> freeVars y
     IfB x y z -> (<>) <$> freeVars x <*> ((<>) <$> freeVars y <*> freeVars z)
     BitU x _ -> freeVars x
@@ -171,10 +171,10 @@ instance FreeVar t => FreeVar (ArrM t) where
         case IntMap.lookup addr heap of
           Nothing -> throwError $ InterpretUnboundAddrError addr heap
           Just (elemType, array) -> case elemType of
-            NumElem -> return $ IntSet.fromList (IntMap.elems array)
-            BoolElem -> return $ IntSet.fromList (IntMap.elems array)
-            (ArrElem _ _) -> IntSet.unions <$> mapM freeVarsOfArray (IntMap.elems array)
-            UElem _ -> return $ IntSet.fromList (IntMap.elems array)
+            ElemF -> return $ IntSet.fromList (IntMap.elems array)
+            ElemB -> return $ IntSet.fromList (IntMap.elems array)
+            (ElemArr _ _) -> IntSet.unions <$> mapM freeVarsOfArray (IntMap.elems array)
+            ElemU _ -> return $ IntSet.fromList (IntMap.elems array)
 
 -- | Collect free variables of an elaborated program (excluding input variables).
 instance FreeVar t => FreeVar (Elaborated t) where
@@ -207,22 +207,22 @@ instance GaloisField n => Interpret Bool n where
   interpret True = return [one]
   interpret False = return [zero]
 
-instance (GaloisField n, Integral n) => Interpret Number n where
+instance (GaloisField n, Integral n) => Interpret Field n where
   interpret val = case val of
     Integer n -> interpret n
     Rational n -> interpret n
-    VarN var -> pure <$> lookupVar var
-    InputVarN var -> pure <$> lookupInputVarN var
+    VarF var -> pure <$> lookupVar var
+    VarFI var -> pure <$> lookupVarFI var
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
     Mul x y -> zipWith (*) <$> interpret x <*> interpret y
     Div x y -> zipWith (/) <$> interpret x <*> interpret y
-    IfN p x y -> do
+    IfF p x y -> do
       p' <- interpret p
       case p' of
         [0] -> interpret y
         _ -> interpret x
-    BtoN x -> interpret x
+    BtoF x -> interpret x
 
 instance (GaloisField n, Integral n) => Interpret Boolean n where
   interpret val = case val of
@@ -242,7 +242,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
-    EqN x y -> do
+    EqF x y -> do
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
@@ -309,8 +309,8 @@ lookupVar var = do
     Nothing -> throwError $ InterpretUnboundVarError var bindings
     Just val -> return val
 
-lookupInputVarN :: Show n => Var -> M n n
-lookupInputVarN var = do
+lookupVarFI :: Show n => Var -> M n n
+lookupVarFI var = do
   inputs <- asks (Inputs.numInputs . fst)
   case inputs Seq.!? var of
     Nothing -> throwError $ InterpretUnboundInputVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
@@ -339,16 +339,16 @@ lookupAddr addr = do
   case IntMap.lookup addr heap of
     Nothing -> throwError $ InterpretUnboundAddrError addr heap
     Just (elemType, array) -> case elemType of
-      NumElem -> mapM lookupVar (IntMap.elems array)
-      BoolElem -> mapM lookupVar (IntMap.elems array)
-      (ArrElem _ _) -> concat <$> mapM lookupAddr (IntMap.elems array)
-      UElem _ -> mapM lookupVar (IntMap.elems array)
+      ElemF -> mapM lookupVar (IntMap.elems array)
+      ElemB -> mapM lookupVar (IntMap.elems array)
+      (ElemArr _ _) -> concat <$> mapM lookupAddr (IntMap.elems array)
+      ElemU _ -> mapM lookupVar (IntMap.elems array)
 
 addBinding :: Var -> [n] -> M n ()
 addBinding var [val] = modify (IntMap.insert var val)
 addBinding _ _ = error "addBinding: expected a single value"
 
--- addBinding (VarN var) [val] = modify (IntMap.insert var val)
+-- addBinding (VarF var) [val] = modify (IntMap.insert var val)
 -- addBinding (ArrayRef _ _ addr) vals = do
 --   vars <- collectVarsFromAddr addr
 --   mapM_
@@ -361,9 +361,9 @@ addBinding _ _ = error "addBinding: expected a single value"
 --       case IntMap.lookup address heap of
 --         Nothing -> throwError $ InterpretUnboundAddrError addr heap
 --         Just (elemType, array) -> case elemType of
---           NumElem -> return $ IntMap.elems array
---           BoolElem -> return $ IntMap.elems array
---           (ArrElem _ _) -> concat <$> mapM collectVarsFromAddr (IntMap.elems array)
+--           ElemF -> return $ IntMap.elems array
+--           ElemB -> return $ IntMap.elems array
+--           (ElemArr _ _) -> concat <$> mapM collectVarsFromAddr (IntMap.elems array)
 -- addBinding _ _ = error "addBinding: too many values"
 
 --------------------------------------------------------------------------------

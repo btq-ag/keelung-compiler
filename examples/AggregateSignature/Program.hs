@@ -41,9 +41,9 @@ checkAgg (Param dimension numOfSigs setup _) = do
   --    nT: coefficients of terms of signatures as input
   --    nT: remainders of product of signatures & public keys
   --    nT: quotients of product of signatures & public keys
-  sigs <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Number))
-  expectedRemainders <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Number))
-  expectedQuotients <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Number))
+  sigs <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Field))
+  expectedRemainders <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Field))
+  expectedQuotients <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Field))
 
   -- pairs for iterating through public keys with indices
   let publicKeyPairs = zip [0 ..] (setupPublicKeys setup)
@@ -88,7 +88,7 @@ checkSize (Param dimension numOfSigs setup _) = do
       let value = foldl (\acc k ->
                             let bit = access3 sigBitStrings (i, j, k)
                                 bitValue = fromIntegral (2 ^ k :: Integer)
-                                prod = fromBool bit * bitValue
+                                prod = BtoF bit * bitValue
                             in  (acc + prod))  0 [0 .. 13]
       assert (fromIntegral coeff `eq` value)
 
@@ -96,17 +96,17 @@ checkSize (Param dimension numOfSigs setup _) = do
       let bit12 = access3 sigBitStrings (i, j, 12)
       let bit11to0 = foldl (\acc k ->
                               let bit = access3 sigBitStrings (i, j, k)
-                              in  acc + fromBool bit) 0 [0 .. 11]
+                              in  acc + BtoF bit) 0 [0 .. 11]
 
-      let smallerThan12289 = fromBool bit13 * fromBool bit12 * bit11to0
+      let smallerThan12289 = BtoF bit13 * BtoF bit12 * bit11to0
       assert (smallerThan12289 `eq` 0)
 
 checkLength :: (Integral n, GaloisField n) => Param n -> Comp ()
 checkLength (Param dimension numOfSigs _ _) = do
-  sigs <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Number))
+  sigs <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Field))
 
   -- expecting square of signatures as input
-  sigSquares <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Number))
+  sigSquares <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Field))
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature

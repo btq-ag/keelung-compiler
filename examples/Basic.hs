@@ -21,44 +21,44 @@ import qualified Keelung.Compiler as Compiler
 
 assertToBe42 :: Comp ()
 assertToBe42 = do
-  x <- inputNum
+  x <- inputField
   assert $ x `eq` 42
 
 -- | A program that expects the second input to be the square of the first input
 -- This program returns no output
 assertSquare :: Comp ()
 assertSquare = do
-  x <- inputNum
+  x <- inputField
   y <- input
   assert ((x * x) `eq` y)
 
-constant1 :: Comp Number
+constant1 :: Comp Field
 constant1 =
   return $ 1 + 1
 
-identity :: Comp Number
+identity :: Comp Field
 identity = input
 
 identityB :: Comp Boolean
 identityB = input
 
-add3 :: Comp Number
+add3 :: Comp Field
 add3 = do
-  x <- inputNum
+  x <- inputField
   return $ x + 3
 
 -- takes an input and see if its equal to 3
 eq1 :: Comp Boolean
 eq1 = do
-  x <- inputNum
+  x <- inputField
   return $ x `eq` 3
 
-cond' :: Comp Number
+cond' :: Comp Field
 cond' = do
-  x <- inputNum
+  x <- inputField
   return $ cond (x `eq` 3) 12 789
 
-summation :: Comp Number
+summation :: Comp Field
 summation = do
   arr <- inputs 4
   reduce 0 [0 .. 3] $ \accum i -> do
@@ -67,7 +67,7 @@ summation = do
 
 summation2 :: Comp ()
 summation2 = do
-  arr <- inputs 4 :: Comp (Arr Number)
+  arr <- inputs 4 :: Comp (Arr Field)
   sumA <- reduce 0 [0 .. 3] $ \accum i -> do
     let x = access arr i
     return $ accum + x
@@ -78,7 +78,7 @@ summation2 = do
 
 assertArraysEqual :: Comp ()
 assertArraysEqual = do
-  arrA <- inputs 4 :: Comp (Arr Number)
+  arrA <- inputs 4 :: Comp (Arr Field)
   arrB <- inputs 4
   forM_ [0 .. 3] $ \i -> do
     let x = access arrA i
@@ -87,7 +87,7 @@ assertArraysEqual = do
 
 assertArraysEqual2 :: Comp ()
 assertArraysEqual2 = do
-  arr <- inputs2 2 4 :: Comp (Arr (Arr Number))
+  arr <- inputs2 2 4 :: Comp (Arr (Arr Field))
   forM_ [0 .. 1] $ \i ->
     forM_ [0 .. 3] $ \j -> do
       let x = access2 arr (i, j)
@@ -99,7 +99,7 @@ every = do
   arr <- inputs 4
   return $ foldl And true (fromArray arr)
 
-assert1 :: Comp Number
+assert1 :: Comp Field
 assert1 = do
   x <- input
   assert (x `eq` 3)
@@ -107,13 +107,13 @@ assert1 = do
 
 array1D :: Int -> Comp ()
 array1D n = do
-  xs <- inputs n :: Comp (Arr Number)
+  xs <- inputs n :: Comp (Arr Field)
   expected <- inputs n
   mapM_ assert (zipWith eq (map (\x -> x * x) $ fromArray xs) (fromArray expected))
 
 array2D :: Int -> Int -> Comp ()
 array2D n m = do
-  xs <- inputs2 n m :: Comp (Arr (Arr Number))
+  xs <- inputs2 n m :: Comp (Arr (Arr Field))
   expected <- inputs2 n m
 
   forM_ [0 .. n - 1] $ \i ->
@@ -124,7 +124,7 @@ array2D n m = do
 
 toArray1 :: Comp ()
 toArray1 = do
-  xss <- inputs2 2 4 :: Comp (Arr (Arr Number))
+  xss <- inputs2 2 4 :: Comp (Arr (Arr Field))
   let yss = toArray [toArray [0, 1, 2, 3], toArray [4, 5, 6, 7]]
 
   forM_ [0 .. 1] $ \i -> do
@@ -223,19 +223,19 @@ emptyArray = do
   let _ = toArray [] :: Arr Boolean
   return ()
 
-dupArray :: Comp Number
+dupArray :: Comp Field
 dupArray = do
   x <- input
   let xs = toArray [x, x]
   return $ access xs 1
 
-returnArray :: Comp (Arr Number)
+returnArray :: Comp (Arr Field)
 returnArray = do
   x <- input
   y <- input
   return $ toArray [x, y]
 
-returnArray2 :: Comp (Arr Number)
+returnArray2 :: Comp (Arr Field)
 returnArray2 = do
   x <- input
   return $ toArray [x, x * 2]
@@ -246,9 +246,9 @@ toArrayM1 = toArrayM [false]
 birthday :: Comp Boolean
 birthday = do
   -- these inputs are private witnesses
-  _hiddenYear <- inputNum
-  hiddenMonth <- inputNum
-  hiddenDate <- inputNum
+  _hiddenYear <- inputField
+  hiddenMonth <- inputField
+  hiddenDate <- inputField
   -- these inputs are public inputs
   month <- input
   date <- input
@@ -263,8 +263,8 @@ chainingOR n = foldl Or false <$> inputs n
 
 -- bits1 :: Comp (Arr Boolean)
 -- bits1 = do
---   x <- inputNum
---   y <- inputNum
+--   x <- inputField
+--   y <- inputField
 --   return $ toArray [(x !!! 0) `And` (y !!! (-1))]
 
 bitValueU :: Comp (Arr Boolean)
@@ -306,7 +306,7 @@ bitTestsOnBtoU = do
   return $ toArray [u !!! 0, u !!! 1]
 
 -- Formula: (0°C × 9/5) + 32 = 32°F
-tempConvert :: Comp Number
+tempConvert :: Comp Field
 tempConvert = do
   toFahrenheit <- input
   degree <- input
@@ -316,11 +316,11 @@ tempConvert = do
       (degree * 9 / 5 + 32)
       (degree - 32 * 5 / 9)
 
-mixed :: Comp Number
+mixed :: Comp Field
 mixed = do
   boolean <- input
   number <- input
-  return $ fromBool boolean + number * 2
+  return $ BtoF boolean + number * 2
 
 addU :: Comp (UInt 4)
 addU = do
