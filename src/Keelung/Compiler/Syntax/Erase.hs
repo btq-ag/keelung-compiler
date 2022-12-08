@@ -11,7 +11,7 @@ import qualified Keelung.Syntax.Typed as T
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation counters aF aFI bF bFI _ _ assertions = comp
+  let T.Computation counters aF aFI aB aBI aU aUI assertions = comp
       proxy = 0
       numBitWidth = bitSize proxy
    in runM numBitWidth $ do
@@ -20,9 +20,11 @@ run (T.Elaborated expr comp) =
         sameType proxy expr'
         assignmentsF <- mapM (\(var, val) -> AssignmentF (RefF var) <$> eraseExprF val) (IntMap.toList aF)
         assignmentsFI <- mapM (\(var, val) -> AssignmentF (RefFI var) <$> eraseExprF val) (IntMap.toList aFI)
-        assignmentsB <- mapM (\(var, val) -> AssignmentB (RefB var) <$> eraseExprB val) (IntMap.toList bF)
-        assignmentsBI <- mapM (\(var, val) -> AssignmentB (RefBI var) <$> eraseExprB val) (IntMap.toList bFI)
-        let assignments = assignmentsF ++ assignmentsFI ++ assignmentsB ++ assignmentsBI
+        assignmentsB <- mapM (\(var, val) -> AssignmentB (RefB var) <$> eraseExprB val) (IntMap.toList aB)
+        assignmentsBI <- mapM (\(var, val) -> AssignmentB (RefBI var) <$> eraseExprB val) (IntMap.toList aBI)
+        assignmentsU <- mapM (\(width, xs) -> mapM (\(var, val) -> AssignmentU (RefU width var) <$> eraseExprU val) (IntMap.toList xs) ) (IntMap.toList aU)
+        assignmentsUI <- mapM (\(width, xs) -> mapM (\(var, val) -> AssignmentU (RefUI width var) <$> eraseExprU val) (IntMap.toList xs) ) (IntMap.toList aUI)
+        let assignments = assignmentsF ++ assignmentsFI ++ assignmentsB ++ assignmentsBI ++ concat assignmentsU ++ concat assignmentsUI
         assertions' <- concat <$> mapM eraseExpr assertions
 
         return $
