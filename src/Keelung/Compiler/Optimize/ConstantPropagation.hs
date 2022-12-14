@@ -51,7 +51,7 @@ refineResult result@(Result _ _ (Bindings fs bs us)) =
       Map.foldlWithKey'
         ( \(Result n vbs ebs) var expr ->
             case expr of
-              ExprF (ValF _ val) -> Result (succ n) (insertF var val vbs) ebs
+              ExprF (ValF val) -> Result (succ n) (insertF var val vbs) ebs
               ExprU _ -> error "[ panic ] UInt expression in Field bindings of expressions"
               ExprB _ -> error "[ panic ] Boolean expression in Field bindings of expressions"
               _ -> Result n vbs (insertF var expr ebs)
@@ -85,18 +85,18 @@ propagateConstant :: (GaloisField n, Integral n) => Relations n -> Expr n -> Exp
 propagateConstant relations = propagate
   where
     propagateF e = case e of
-      ValF _ _ -> e
-      VarF w var -> case lookupF (RefF var) (valueBindings relations) of
+      ValF _ -> e
+      VarF var -> case lookupF (RefF var) (valueBindings relations) of
         Nothing -> e
-        Just val -> ValF w val
-      VarFO _ _ -> e -- no constant propagation for output variables
-      VarFI _ _ -> e -- no constant propagation for input variables
-      SubF w x y -> SubF w (propagateF x) (propagateF y)
-      AddF w x y xs -> AddF w (propagateF x) (propagateF y) (fmap propagateF xs)
-      MulF w x y -> MulF w (propagateF x) (propagateF y)
-      DivF w x y -> DivF w (propagateF x) (propagateF y)
-      IfF w p x y -> IfF w (propagateB p) (propagateF x) (propagateF y)
-      BtoF w x -> BtoF w (propagateB x)
+        Just val -> ValF val
+      VarFO _ -> e -- no constant propagation for output variables
+      VarFI _ -> e -- no constant propagation for input variables
+      SubF x y -> SubF (propagateF x) (propagateF y)
+      AddF x y xs -> AddF (propagateF x) (propagateF y) (fmap propagateF xs)
+      MulF x y -> MulF (propagateF x) (propagateF y)
+      DivF x y -> DivF (propagateF x) (propagateF y)
+      IfF p x y -> IfF (propagateB p) (propagateF x) (propagateF y)
+      BtoF x -> BtoF (propagateB x)
 
     propagateU e = case e of
       ValU _ _ -> e

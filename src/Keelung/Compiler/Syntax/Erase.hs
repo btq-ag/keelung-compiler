@@ -22,8 +22,8 @@ run (T.Elaborated expr comp) =
         assignmentsFI <- mapM (\(var, val) -> AssignmentF (RefFI var) <$> eraseExprF val) (IntMap.toList aFI)
         assignmentsB <- mapM (\(var, val) -> AssignmentB (RefB var) <$> eraseExprB val) (IntMap.toList aB)
         assignmentsBI <- mapM (\(var, val) -> AssignmentB (RefBI var) <$> eraseExprB val) (IntMap.toList aBI)
-        assignmentsU <- mapM (\(width, xs) -> mapM (\(var, val) -> AssignmentU (RefU width var) <$> eraseExprU val) (IntMap.toList xs) ) (IntMap.toList aU)
-        assignmentsUI <- mapM (\(width, xs) -> mapM (\(var, val) -> AssignmentU (RefUI width var) <$> eraseExprU val) (IntMap.toList xs) ) (IntMap.toList aUI)
+        assignmentsU <- mapM (\(width, xs) -> mapM (\(var, val) -> AssignmentU (RefU width var) <$> eraseExprU val) (IntMap.toList xs)) (IntMap.toList aU)
+        assignmentsUI <- mapM (\(width, xs) -> mapM (\(var, val) -> AssignmentU (RefUI width var) <$> eraseExprU val) (IntMap.toList xs)) (IntMap.toList aUI)
         let assignments = assignmentsF ++ assignmentsFI ++ assignmentsB ++ assignmentsBI ++ concat assignmentsU ++ concat assignmentsUI
         assertions' <- concat <$> mapM eraseExpr assertions
 
@@ -69,19 +69,17 @@ eraseExprB expr = case expr of
   T.BitU _ x i -> BitU <$> eraseExprU x <*> pure i
 
 eraseExprF :: (GaloisField n, Integral n) => T.Field -> M n (ExprF n)
-eraseExprF expr = do
-  w <- ask
-  case expr of
-    T.ValF x -> return $ ValF w (fromInteger x)
-    T.ValFR x -> return $ ValF w (fromRational x)
-    T.VarF var -> return $ VarF w var
-    T.VarFI var -> return $ VarFI w var
-    T.AddF x y -> chainExprsOfAssocOpAddF w <$> eraseExprF x <*> eraseExprF y
-    T.SubF x y -> SubF w <$> eraseExprF x <*> eraseExprF y
-    T.MulF x y -> MulF w <$> eraseExprF x <*> eraseExprF y
-    T.DivF x y -> DivF w <$> eraseExprF x <*> eraseExprF y
-    T.IfF p x y -> IfF w <$> eraseExprB p <*> eraseExprF x <*> eraseExprF y
-    T.BtoF x -> BtoF w <$> eraseExprB x
+eraseExprF expr = case expr of
+  T.ValF x -> return $ ValF (fromInteger x)
+  T.ValFR x -> return $ ValF (fromRational x)
+  T.VarF var -> return $ VarF var
+  T.VarFI var -> return $ VarFI var
+  T.AddF x y -> chainExprsOfAssocOpAddF <$> eraseExprF x <*> eraseExprF y
+  T.SubF x y -> SubF <$> eraseExprF x <*> eraseExprF y
+  T.MulF x y -> MulF <$> eraseExprF x <*> eraseExprF y
+  T.DivF x y -> DivF <$> eraseExprF x <*> eraseExprF y
+  T.IfF p x y -> IfF <$> eraseExprB p <*> eraseExprF x <*> eraseExprF y
+  T.BtoF x -> BtoF <$> eraseExprB x
 
 eraseExprU :: (GaloisField n, Integral n) => T.UInt -> M n (ExprU n)
 eraseExprU expr = case expr of
@@ -118,16 +116,16 @@ eraseExpr expr = case expr of
     return (concat exprss)
 
 -- | Flatten and chain expressions with associative operator together when possible
-chainExprsOfAssocOpAddF :: Width -> ExprF n -> ExprF n -> ExprF n
-chainExprsOfAssocOpAddF w x y = case (x, y) of
-  (AddF _ x0 x1 xs, AddF _ y0 y1 ys) ->
-    AddF w x0 x1 (xs <> (y0 :<| y1 :<| ys))
-  (AddF _ x0 x1 xs, _) ->
-    AddF w x0 x1 (xs |> y)
-  (_, AddF _ y0 y1 ys) ->
-    AddF w x y0 (y1 :<| ys)
+chainExprsOfAssocOpAddF :: ExprF n -> ExprF n -> ExprF n
+chainExprsOfAssocOpAddF x y = case (x, y) of
+  (AddF x0 x1 xs, AddF y0 y1 ys) ->
+    AddF x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (AddF x0 x1 xs, _) ->
+    AddF x0 x1 (xs |> y)
+  (_, AddF y0 y1 ys) ->
+    AddF x y0 (y1 :<| ys)
   -- there's nothing left we can do
-  _ -> AddF w x y mempty
+  _ -> AddF x y mempty
 
 chainExprsOfAssocOpAndB :: ExprB n -> ExprB n -> ExprB n
 chainExprsOfAssocOpAndB x y = case (x, y) of

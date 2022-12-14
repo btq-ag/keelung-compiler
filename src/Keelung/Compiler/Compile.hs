@@ -24,7 +24,7 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
-run (TypeErased untypedExprs fieldWidith counters relations assertions assignments) = runM fieldWidith counters $ do
+run (TypeErased untypedExprs _ counters relations assertions assignments) = runM counters $ do
   forM_ untypedExprs $ \untypedExpr -> do
     case untypedExpr of
       ExprB x -> do
@@ -112,15 +112,14 @@ encodeRelations (Relations vbs ebs) = do
 
 -- | Monad for compilation
 data Env n = Env
-  { envFieldWidth :: Width,
-    envCounters :: Counters,
+  { envCounters :: Counters,
     envConstraints :: [Constraint n]
   }
 
 type M n = State (Env n)
 
-runM :: GaloisField n => Width -> Counters -> M n a -> a
-runM fieldWidith counters program = evalState program (Env fieldWidith counters mempty)
+runM :: GaloisField n => Counters -> M n a -> a
+runM counters program = evalState program (Env counters mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\env -> env {envCounters = f (envCounters env)})
@@ -226,16 +225,14 @@ encodeExprB out expr = case expr of
         --  =>  if the sum of operands is 0     then 0 else 1
         --  =>  if the sum of operands is not 0 then 1 else 0
         --  =>  the sum of operands is not 0
-        fieldWidth <- gets envFieldWidth
         encodeExprB
           out
           ( NEqF
-              (ValF fieldWidth 0)
+              (ValF 0)
               ( AddF
-                  fieldWidth
-                  (BtoF fieldWidth x0)
-                  (BtoF fieldWidth x1)
-                  (fmap (BtoF fieldWidth) xs)
+                  (BtoF x0)
+                  (BtoF x1)
+                  (fmap BtoF xs)
               )
           )
   XorB x y -> do
@@ -285,34 +282,34 @@ encodeExprB out expr = case expr of
 
 encodeExprF :: (GaloisField n, Integral n) => RefF -> ExprF n -> M n ()
 encodeExprF out expr = case expr of
-  ValF _ val -> add $ cAddF val [(out, -1)] -- out = val
-  VarF _ var -> do
+  ValF val -> add $ cAddF val [(out, -1)] -- out = val
+  VarF var -> do
     add $ cAddF 0 [(out, 1), (RefF var, -1)] -- out = var
-  VarFO _ var -> do
+  VarFO var -> do
     add $ cAddF 0 [(out, 1), (RefFO var, -1)] -- out = var
-  VarFI _ var -> do
+  VarFI var -> do
     add $ cAddF 0 [(out, 1), (RefFI var, -1)] -- out = var
-  SubF _ x y -> do
+  SubF x y -> do
     x' <- toTerm x
     y' <- toTerm y
     encodeTerms out (x' :<| negateTerm y' :<| Empty)
-  AddF _ x y rest -> do
+  AddF x y rest -> do
     terms <- mapM toTerm (x :<| y :<| rest)
     encodeTerms out terms
-  MulF _ x y -> do
+  MulF x y -> do
     x' <- wireF x
     y' <- wireF y
     add $ cMulSimpleF x' y' out
-  DivF _ x y -> do
+  DivF x y -> do
     x' <- wireF x
     y' <- wireF y
     add $ cMulSimpleF y' out x'
-  IfF _ p x y -> do
+  IfF p x y -> do
     p' <- wireB p
     x' <- wireF x
     y' <- wireF y
     encodeIfF out p' x' y'
-  BtoF _ x -> do
+  BtoF x -> do
     result <- freshRefB
     encodeExprB result x
     add $ cAddF 0 [(out, 1), (RefBtoRefF result, -1)] -- out = var
@@ -418,75 +415,6 @@ encodeExprU out expr = case expr of
 
 --------------------------------------------------------------------------------
 
--- | Pushes the constructor of Rotate inwards
--- encodeRotate :: (GaloisField n, Integral n) => Var -> Int -> ExprU n -> M n ()
--- encodeRotate out i expr = case expr of
---   -- ExprB x -> encode out (ExprB x)
---   -- ExprF x -> case x of
---   --   ValF w n -> do
---   --     n' <- rotateField w n
---   --     encode out (ExprF (ValF w n'))
---   --   VarF w var -> addRotatedBinRep out w var i
---   --   SubN {} -> error "[ panic ] dunno how to compile ROTATE SubN"
---   --   AddF w _ _ _ -> do
---   --     result <- freshVar
---   --     encode result expr
---   --     addRotatedBinRep out w result i
---   --   MulF {} -> error "[ panic ] dunno how to compile ROTATE MulF"
---   --   DivF {} -> error "[ panic ] dunno how to compile ROTATE DivF"
---   --   IfF {} -> error "[ panic ] dunno how to compile ROTATE IfF"
---   --   RoLN {} -> error "[ panic ] dunno how to compile ROTATE RoLN"
---   -- ExprU x -> case x of
---   ValU w n -> do
---     n' <- rotateField w n
---     encode out (ExprU (ValU w n'))
---   VarU w var -> addRotatedBinRep out w var i
---   SubU {} -> error "[ panic ] dunno how to compile ROTATE SubU"
---   AddU w _ _ -> do
---     result <- freshVar
---     encodeExorU result expr
---     addRotatedBinRep out w result i
---   _ -> error "[ panic ] dunno how to compile ROTATE on UInt types"
---   -- Rotate _ n x -> encodeRotate out (i + n) x
---   -- -- NAryOp _ op _ _ _ -> error $ "[ panic ] dunno how to compile ROTATE NAryOp " <> show op
---   where
---     rotateField width n = do
---       let val = toInteger n
---       -- see if we are rotating right (positive) of left (negative)
---       case i `compare` 0 of
---         EQ -> return n -- no rotation
---         -- encode out expr -- no rotation
---         LT -> do
---           let rotateDistance = (-i) `mod` width
---           -- collect the bit values of lower bits that will be rotated to higher bits
---           let lowerBits = [Data.Bits.testBit val j | j <- [0 .. rotateDistance - 1]]
---           -- shift the higher bits left by the rotate distance
---           let higherBits = Data.Bits.shiftR val rotateDistance
---           -- combine the lower bits and the higher bits
---           return $
---             fromInteger $
---               foldl'
---                 (\acc (bit, j) -> if bit then Data.Bits.setBit acc j else acc)
---                 higherBits
---                 (zip lowerBits [width - rotateDistance .. width - 1])
-
---         -- encode out (Val bw (fromInteger rotatedVal))
---         GT -> do
---           let rotateDistance = i `mod` width
---           -- collect the bit values of higher bits that will be rotated to lower bits
---           let higherBits = [Data.Bits.testBit val j | j <- [width - rotateDistance .. width - 1]]
---           -- shift the lower bits right by the rotate distance
---           let lowerBits = Data.Bits.shiftL val rotateDistance `mod` 2 ^ width
---           -- combine the lower bits and the higher bits
---           return $
---             fromInteger $
---               foldl'
---                 (\acc (bit, j) -> if bit then Data.Bits.setBit acc j else acc)
---                 lowerBits
---                 (zip higherBits [0 .. rotateDistance - 1])
-
---------------------------------------------------------------------------------
-
 data Term n
   = Constant n -- c
   | WithVars RefF n -- cx
@@ -494,28 +422,28 @@ data Term n
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
 toTerm :: (GaloisField n, Integral n) => ExprF n -> M n (Term n)
-toTerm (MulF _ (ValF _ m) (ValF _ n)) = return $ Constant (m * n)
-toTerm (MulF _ (VarF _ var) (ValF _ n)) = return $ WithVars (RefF var) n
-toTerm (MulF _ (VarFI _ var) (ValF _ n)) = return $ WithVars (RefFI var) n
-toTerm (MulF _ (VarFO _ var) (ValF _ n)) = return $ WithVars (RefFO var) n
-toTerm (MulF _ (ValF _ n) (VarF _ var)) = return $ WithVars (RefF var) n
-toTerm (MulF _ (ValF _ n) (VarFI _ var)) = return $ WithVars (RefFI var) n
-toTerm (MulF _ (ValF _ n) (VarFO _ var)) = return $ WithVars (RefFO var) n
-toTerm (MulF _ (ValF _ n) expr) = do
+toTerm (MulF (ValF m) (ValF n)) = return $ Constant (m * n)
+toTerm (MulF (VarF var) (ValF n)) = return $ WithVars (RefF var) n
+toTerm (MulF (VarFI var) (ValF n)) = return $ WithVars (RefFI var) n
+toTerm (MulF (VarFO var) (ValF n)) = return $ WithVars (RefFO var) n
+toTerm (MulF (ValF n) (VarF var)) = return $ WithVars (RefF var) n
+toTerm (MulF (ValF n) (VarFI var)) = return $ WithVars (RefFI var) n
+toTerm (MulF (ValF n) (VarFO var)) = return $ WithVars (RefFO var) n
+toTerm (MulF (ValF n) expr) = do
   out <- freshRefF
   encodeExprF out expr
   return $ WithVars out n
-toTerm (MulF _ expr (ValF _ n)) = do
+toTerm (MulF expr (ValF n)) = do
   out <- freshRefF
   encodeExprF out expr
   return $ WithVars out n
-toTerm (ValF _ n) =
+toTerm (ValF n) =
   return $ Constant n
-toTerm (VarF _ var) =
+toTerm (VarF var) =
   return $ WithVars (RefF var) 1
-toTerm (VarFI _ var) =
+toTerm (VarFI var) =
   return $ WithVars (RefFI var) 1
-toTerm (VarFO _ var) =
+toTerm (VarFO var) =
   return $ WithVars (RefFO var) 1
 toTerm expr = do
   out <- freshRefF
@@ -557,7 +485,7 @@ encodeTerms out terms =
 -- | If the expression is not already a variable, create a new variable
 -- wireAsVar :: (GaloisField n, Integral n) => Expr n -> M n Var
 -- wireAsVar (ExprB (VarB var)) = return var
--- wireAsVar (ExprF (VarF _ var)) = return var
+-- wireAsVar (ExprF (VarF var)) = return var
 -- wireAsVar (ExprU (VarU _ var)) = return var
 -- wireAsVar expr = do
 --   out <- freshVar
@@ -573,9 +501,9 @@ wireB expr = do
   return out
 
 wireF :: (GaloisField n, Integral n) => ExprF n -> M n RefF
-wireF (VarF _ ref) = return (RefF ref)
-wireF (VarFO _ ref) = return (RefFO ref)
-wireF (VarFI _ ref) = return (RefFI ref)
+wireF (VarF ref) = return (RefF ref)
+wireF (VarFO ref) = return (RefFO ref)
+wireF (VarFI ref) = return (RefFI ref)
 wireF expr = do
   out <- freshRefF
   encodeExprF out expr
@@ -585,7 +513,6 @@ wireU :: (GaloisField n, Integral n) => ExprU n -> M n RefU
 wireU (VarU w ref) = return (RefU w ref)
 wireU (OutputVarU w ref) = return (RefUO w ref)
 wireU (InputVarU w ref) = return (RefUI w ref)
-
 wireU expr = do
   out <- freshRefU (widthOfU expr)
   encodeExprU out expr

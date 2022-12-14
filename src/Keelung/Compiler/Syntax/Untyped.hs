@@ -81,32 +81,32 @@ instance (Integral n, Show n) => Show (ExprB n) where
 --------------------------------------------------------------------------------
 
 data ExprF n
-  = ValF Width n
-  | VarF Width Var
-  | VarFO Width Var
-  | VarFI Width Var
+  = ValF n
+  | VarF Var
+  | VarFO Var
+  | VarFI Var
   | -- arithmetic operators
-    SubF Width (ExprF n) (ExprF n)
-  | AddF Width (ExprF n) (ExprF n) (Seq (ExprF n))
-  | MulF Width (ExprF n) (ExprF n)
-  | DivF Width (ExprF n) (ExprF n)
+    SubF (ExprF n) (ExprF n)
+  | AddF (ExprF n) (ExprF n) (Seq (ExprF n))
+  | MulF (ExprF n) (ExprF n)
+  | DivF (ExprF n) (ExprF n)
   | -- logical operators
-    IfF Width (ExprB n) (ExprF n) (ExprF n)
-  | BtoF Width (ExprB n)
+    IfF (ExprB n) (ExprF n) (ExprF n)
+  | BtoF (ExprB n)
   deriving (Functor)
 
 instance (Show n, Integral n) => Show (ExprF n) where
   showsPrec prec expr = case expr of
-    ValF _ n -> shows n
-    VarF _ var -> showString "$N" . shows var
-    VarFO _ var -> showString "$NO" . shows var
-    VarFI _ var -> showString "$NI" . shows var
-    SubF _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
-    AddF _ x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
-    MulF _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
-    DivF _ x y -> chain prec " / " 7 $ x :<| y :<| Empty
-    IfF _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    BtoF _ x -> showString "B→F " . showsPrec prec x
+    ValF n -> shows n
+    VarF var -> showString "$N" . shows var
+    VarFO var -> showString "$NO" . shows var
+    VarFI var -> showString "$NI" . shows var
+    SubF x y -> chain prec " - " 6 $ x :<| y :<| Empty
+    AddF x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
+    MulF x y -> chain prec " * " 7 $ x :<| y :<| Empty
+    DivF x y -> chain prec " / " 7 $ x :<| y :<| Empty
+    IfF p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    BtoF x -> showString "B→F " . showsPrec prec x
 
 --------------------------------------------------------------------------------
 
@@ -148,14 +148,6 @@ instance (Show n, Integral n) => Show (ExprU n) where
     ShLU _ n x -> showParen (prec > 8) $ showString "ShL " . showsPrec 9 n . showString " " . showsPrec 9 x
     BtoU _ x -> showString "B→U " . showsPrec prec x
 
-instance Num n => Num (ExprU n) where
-  x + y = AddU (widthOfU x) x y
-  x - y = SubU (widthOfU x) x y
-  x * y = MulU (widthOfU x) x y
-  abs = id
-  signum = const 1
-  fromInteger = error "[ panic ] Dunno how to convert an Integer to an UInt"
-
 --------------------------------------------------------------------------------
 
 -- | "Untyped" expression
@@ -164,14 +156,6 @@ data Expr n
   | ExprF (ExprF n) -- Field expression
   | ExprU (ExprU n) -- UInt expression
   deriving (Functor)
-
-instance Num n => Num (ExprF n) where
-  x + y = AddF (widthOfF x) x y Empty
-  x - y = SubF (widthOfF x) x y
-  x * y = MulF (widthOfF x) x y
-  abs = id
-  signum = const 1
-  fromInteger = error "[ panic ] Dunno how to convert an Integer to a Number"
 
 chain :: Show n => Int -> String -> Int -> Seq n -> ShowS
 chain prec delim n = showParen (prec > n) . go
@@ -187,19 +171,7 @@ instance (Integral n, Show n) => Show (Expr n) where
     ExprF x -> shows x
     ExprU x -> shows x
 
-widthOfF :: ExprF n -> Width
-widthOfF expr = case expr of
-  ValF w _ -> w
-  VarF w _ -> w
-  VarFI w _ -> w
-  VarFO w _ -> w
-  SubF w _ _ -> w
-  AddF w _ _ _ -> w
-  MulF w _ _ -> w
-  DivF w _ _ -> w
-  IfF w _ _ _ -> w
-  BtoF w _ -> w
-
+-- | Bit width of a unsigned integer expression
 widthOfU :: ExprU n -> Width
 widthOfU expr = case expr of
   ValU w _ -> w
@@ -273,7 +245,6 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
       <> Counters.prettyVariables counters
       <> "\n\
          \}"
-    
 
 --------------------------------------------------------------------------------
 
@@ -291,22 +262,6 @@ instance Semigroup (Bindings n) where
 
 instance Monoid (Bindings n) where
   mempty = Bindings mempty mempty mempty
-
--- instance Show n => Show (Bindings n) where
---   show (Bindings fs bs us) =
---     "  Field elements: "
---       <> unlines (map (("    " <>) . show) (IntMap.toList ns))
---       <> "\n"
---       <> "  Booleans: "
---       <> unlines (map (("    " <>) . show) (IntMap.toList bs))
---       <> "\n"
---       <> "  Unsigned integers: "
---       <> unlines
---         ( map
---             (("    " <>) . show)
---             (concat $ IntMap.elems (fmap IntMap.toList us))
---         )
---       <> "\n"
 
 instance Foldable Bindings where
   foldMap f (Bindings fs bs us) =
