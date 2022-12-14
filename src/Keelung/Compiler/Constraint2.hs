@@ -1,10 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use list comprehension" #-}
 
 module Keelung.Compiler.Constraint2
@@ -33,13 +29,11 @@ module Keelung.Compiler.Constraint2
   )
 where
 
-import Control.DeepSeq (NFData)
 import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
-import GHC.Generics (Generic)
 import qualified Keelung.Compiler.Constraint as Constraint
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
@@ -85,8 +79,13 @@ fromConstraint counters (CNEqU x y m) = Constraint.CNEq (Constraint.CNEQ (Left (
 
 --------------------------------------------------------------------------------
 
+-- data Ref = Ref Var | RefI Var | RefO Var
+--   deriving (Eq, Ord)
+
+--------------------------------------------------------------------------------
+
 data RefB = RefBI Var | RefBO Var | RefB Var | RefUBit Width RefU Int
-  deriving (Generic, NFData, Eq, Ord)
+  deriving (Eq, Ord)
 
 instance Show RefB where
   show (RefBI x) = "$BI" ++ show x
@@ -95,7 +94,7 @@ instance Show RefB where
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
 data RefF = RefFI Var | RefFO Var | RefF Var | RefBtoRefF RefB
-  deriving (Generic, NFData, Eq, Ord)
+  deriving (Eq, Ord)
 
 instance Show RefF where
   show (RefFI x) = "$FI" ++ show x
@@ -104,13 +103,15 @@ instance Show RefF where
   show (RefBtoRefF x) = show x
 
 data RefU = RefUI Width Var | RefUO Width Var | RefU Width Var | RefBtoRefU RefB
-  deriving (Generic, NFData, Eq, Ord)
+  deriving (Eq, Ord)
 
 instance Show RefU where
   show (RefUI w x) = "$UI[" ++ show w ++ "]" ++ show x
   show (RefUO w x) = "$UO[" ++ show w ++ "]" ++ show x
   show (RefU w x) = "$U[" ++ show w ++ "]" ++ show x
   show (RefBtoRefU x) = show x
+
+--------------------------------------------------------------------------------
 
 reindexRefF :: Counters -> RefF -> Var
 reindexRefF counters (RefFI x) = reindex counters OfInput OfField x
@@ -143,7 +144,7 @@ reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 
 -- | Like Poly but with using Refs instead of Ints as variables
 data Poly' ref n = Poly' n (Map ref n)
-  deriving (Generic, NFData, Eq, Functor, Show, Ord)
+  deriving (Eq, Functor, Show, Ord)
 
 buildPoly' :: (GaloisField n, Ord ref) => n -> [(ref, n)] -> Either n (Poly' ref n)
 buildPoly' c xs =
@@ -193,7 +194,6 @@ data Constraint n
   | CNEqF RefF RefF RefF
   | CNEqB RefB RefB RefB
   | CNEqU RefU RefU RefU
-  deriving (Generic, NFData)
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -319,11 +319,11 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 -- | Constraint System
 data ConstraintSystem n = ConstraintSystem
   { -- | Constraints
-    csConstraints :: !(Set (Constraint n)),
+    _csConstraints :: !(Set (Constraint n)),
     -- | Binary representation of Number input variables
-    csNumBinReps :: BinReps,
+    _csNumBinReps :: BinReps,
     -- | Binary representation of custom output variables
-    csCustomBinReps :: BinReps,
-    csCounters :: Counters
+    _csCustomBinReps :: BinReps,
+    _csCounters :: Counters
   }
-  deriving (Eq, Generic, NFData)
+  deriving (Eq)
