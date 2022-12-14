@@ -72,7 +72,7 @@ encodeAssertion expr = do
     ExprU x -> do
       out <- freshRefU (widthOfU x)
       encodeExprU out x
-      add $ cAddU 1 [(out, -1)]
+      add $ cVarBindU out 1
 
 -- | Encode the constraint 'out = expr'.
 encodeAssignment :: (GaloisField n, Integral n) => Assignment n -> M n ()
@@ -94,7 +94,7 @@ encodeValueBindings bindings = do
   forM_ (Map.toList (bindingsF bindings)) $ \(var, val) -> add $ cAddF val [(var, -1)]
   forM_ (Map.toList (bindingsB bindings)) $ \(var, val) -> add $ cAddB val [(var, -1)]
   forM_ (IntMap.toList (bindingsUs bindings)) $ \(_, bindings') ->
-    forM_ (Map.toList bindings') $ \(var, val) -> add $ cAddU val [(var, -1)]
+    forM_ (Map.toList bindings') $ \(var, val) -> add $ cVarBindU var val
 
 encodeExprBindings :: (GaloisField n, Integral n) => Bindings (Expr n) -> M n ()
 encodeExprBindings bindings = do
@@ -321,7 +321,7 @@ encodeExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 encodeExprU out expr = case expr of
   ValU width val -> do
     -- constraint for UInt : out = val
-    add $ cAddU val [(out, -1)]
+    add $ cVarBindU out val
     -- constraints for BinRep of UInt
     forM_ [0 .. width - 1] $ \i -> do
       let bit = testBit val i
@@ -329,16 +329,16 @@ encodeExprU out expr = case expr of
   VarU width var -> do
     let ref = RefU width var
     -- constraint for UInt : out = ref
-    add $ cAddU 0 [(out, 1), (ref, -1)]
+    add $ cVarEqU out ref
     -- constraints for BinRep of UInt
     forM_ [0 .. width - 1] $ \i -> do
       add $ cAddB 0 [(RefUBit width out i, -1), (RefUBit width ref i, 1)] -- out[i] = ref[i]
   OutputVarU width var -> do
-    add $ cAddU 0 [(out, 1), (RefU width var, -1)] -- out = var
+    add $ cVarEqU out (RefU width var) -- out = var
   InputVarU width var -> do
     let ref = RefUI width var
     -- constraint for UInt : out = ref
-    add $ cAddU 0 [(out, 1), (ref, -1)]
+    add $ cVarEqU out ref
     -- constraints for BinRep of UInt
     forM_ [0 .. width - 1] $ \i -> do
       add $ cAddB 0 [(RefUBit width out i, -1), (RefUBit width ref i, 1)] -- out[i] = ref[i]
@@ -387,7 +387,7 @@ encodeExprU out expr = case expr of
   ShLU w n x -> do
     x' <- wireU x
     case compare n 0 of
-      EQ -> add $ cAddU 0 [(out, 1), (x', -1)]
+      EQ -> add $ cVarEqU out x'
       GT -> do
         -- fill lower bits with 0s
         forM_ [0 .. n - 1] $ \i -> do
