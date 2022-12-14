@@ -12,7 +12,6 @@ import Data.Foldable (Foldable (foldl'), toList)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map.Strict as Map
 import Data.Sequence (Seq (..))
-import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Keelung.Compiler.Constraint as Constraint
 import Keelung.Compiler.Constraint2
@@ -53,7 +52,7 @@ run (TypeErased untypedExprs fieldWidith counters relations assertions assignmen
 
   return
     ( Constraint.ConstraintSystem
-        (Set.map (Constraint2.fromConstraint counters') constraints)
+        (Set.fromList $ map (Constraint2.fromConstraint counters') constraints)
         counters'
     )
 
@@ -115,7 +114,7 @@ encodeRelations (Relations vbs ebs) = do
 data Env n = Env
   { envFieldWidth :: Width,
     envCounters :: Counters,
-    envConstraints :: Set (Constraint n)
+    envConstraints :: [Constraint n]
   }
 
 type M n = State (Env n)
@@ -128,7 +127,7 @@ modifyCounter f = modify (\env -> env {envCounters = f (envCounters env)})
 
 add :: GaloisField n => [Constraint n] -> M n ()
 add cs =
-  modify (\env -> env {envConstraints = Set.union (Set.fromList cs) (envConstraints env)})
+  modify (\env -> env {envConstraints = cs <> envConstraints env})
 
 freshRefF :: M n RefF
 freshRefF = do

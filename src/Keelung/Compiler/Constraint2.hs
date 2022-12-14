@@ -40,7 +40,6 @@ import qualified Keelung.Compiler.Constraint as Constraint
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Constraint.R1CS as Constraint
-import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters
 import Keelung.Types
@@ -49,9 +48,10 @@ fromConstraint :: Integral n => Counters -> Constraint n -> Constraint.Constrain
 fromConstraint counters (CAddB as) = Constraint.CAdd (fromPolyB_ counters as)
 fromConstraint counters (CAddF as) = Constraint.CAdd (fromPolyF_ counters as)
 fromConstraint counters (CAddU as) = Constraint.CAdd (fromPolyU_ counters as)
-fromConstraint counters (CVarEqU x y) = Constraint.CAdd $ case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
-  Left _ -> error "[ panic ] Two variables in CVarEqU are same"
-  Right xs -> xs
+fromConstraint counters (CVarEqU x y) = case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
+  Left _ -> error "CVarEqU: two variables are equal"
+  Right xs -> Constraint.CAdd xs
+fromConstraint counters (CVarBindU x n) = Constraint.CAdd (Poly.singleton (reindexRefU counters x) n)
 fromConstraint counters (CMulF as bs cs) =
   Constraint.CMul
     (fromPolyF_ counters as)
@@ -184,6 +184,7 @@ data Constraint n
   | CAddB !(Poly' RefB n)
   | CAddU !(Poly' RefU n)
   | CVarEqU RefU RefU -- when x == y
+  | CVarBindU RefU n -- when x = val
   | CMulF !(Poly' RefF n) !(Poly' RefF n) !(Either n (Poly' RefF n))
   | CMulB !(Poly' RefB n) !(Poly' RefB n) !(Either n (Poly' RefB n))
   | CMulU !(Poly' RefU n) !(Poly' RefU n) !(Either n (Poly' RefU n))
@@ -198,6 +199,7 @@ instance GaloisField n => Eq (Constraint n) where
     (CAddB x, CAddB y) -> x == y
     (CAddU x, CAddU y) -> x == y
     (CVarEqU x y, CVarEqU u v) -> (x == u && y == v) || (x == v && y == u)
+    (CVarBindU x y, CVarBindU u v) -> x == u && y == v
     (CMulF x y z, CMulF u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CMulB x y z, CMulB u v w) ->
@@ -217,6 +219,7 @@ instance Functor Constraint where
   fmap f (CAddB x) = CAddB (fmap f x)
   fmap f (CAddU x) = CAddU (fmap f x)
   fmap _ (CVarEqU x y) = CVarEqU x y
+  fmap f (CVarBindU x y) = CVarBindU x (f y)
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
   fmap f (CMulB x y (Left z)) = CMulB (fmap f x) (fmap f y) (Left (f z))
@@ -302,6 +305,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddB xs) = "AB " <> show xs <> " = 0"
   show (CAddU xs) = "AU " <> show xs <> " = 0"
   show (CVarEqU x y) = "VU " <> show x <> " = " <> show y
+  show (CVarBindU x n) = "BU " <> show x <> " = " <> show n
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulB aV bV cV) = "MB " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulU aV bV cV) = "MU " <> show aV <> " * " <> show bV <> " = " <> show cV
@@ -309,46 +313,48 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CNEqB x y m) = "QB " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
 
-instance GaloisField n => Ord (Constraint n) where
-  {-# SPECIALIZE instance Ord (Constraint GF181) #-}
-  -- CMulF
-  compare (CMulF aV bV cV) (CMulF aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
-  compare _ CMulF {} = LT
-  compare CMulF {} _ = GT
-  -- CMulB
-  compare (CMulB aV bV cV) (CMulB aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
-  compare _ CMulB {} = LT
-  compare CMulB {} _ = GT
-  -- CMulU
-  compare (CMulU aV bV cV) (CMulU aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
-  compare _ CMulU {} = LT
-  compare CMulU {} _ = GT
-  -- CAddF
-  compare (CAddF xs) (CAddF ys) = compare xs ys
-  compare _ CAddF {} = LT
-  compare CAddF {} _ = GT
-  -- CAddB
-  compare (CAddB xs) (CAddB ys) = compare xs ys
-  compare _ CAddB {} = LT
-  compare CAddB {} _ = GT
-  -- CAddU
-  compare (CAddU xs) (CAddU ys) = compare xs ys
-  compare _ CAddU {} = LT
-  compare CAddU {} _ = GT
-  -- CVarEqU
-  compare (CVarEqU x y) (CVarEqU x' y') = compare (x, y) (x', y')
-  compare _ CVarEqU {} = LT
-  compare CVarEqU {} _ = GT
-  -- CNEqF
-  compare CNEqF {} CNEqF {} = EQ
-  compare _ CNEqF {} = LT
-  compare CNEqF {} _ = GT
-  -- CNEqB
-  compare CNEqB {} CNEqB {} = EQ
-  compare _ CNEqB {} = LT
-  compare CNEqB {} _ = GT
-  -- CNEqU
-  compare CNEqU {} CNEqU {} = EQ
+-- instance GaloisField n => Ord (Constraint n) where
+--   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
+
+--   -- CMulF
+--   compare (CMulF aV bV cV) (CMulF aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
+--   compare _ CMulF {} = LT
+--   compare CMulF {} _ = GT
+--   -- CMulB
+--   compare (CMulB aV bV cV) (CMulB aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
+--   compare _ CMulB {} = LT
+--   compare CMulB {} _ = GT
+--   -- CMulU
+--   compare (CMulU aV bV cV) (CMulU aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
+--   compare _ CMulU {} = LT
+--   compare CMulU {} _ = GT
+--   -- CAddF
+--   compare (CAddF xs) (CAddF ys) = compare xs ys
+--   compare _ CAddF {} = LT
+--   compare CAddF {} _ = GT
+--   -- CAddB
+--   compare (CAddB xs) (CAddB ys) = compare xs ys
+--   compare _ CAddB {} = LT
+--   compare CAddB {} _ = GT
+--   -- CAddU
+--   compare (CAddU xs) (CAddU ys) = compare xs ys
+--   compare _ CAddU {} = LT
+--   compare CAddU {} _ = GT
+--   -- CVarEqU
+--   compare (CVarEqU x y) (CVarEqU x' y') = compare (x, y) (x', y')
+--   compare _ CVarEqU {} = LT
+--   compare CVarEqU {} _ = GT
+--   -- CVarBindU
+--   -- CNEqF
+--   compare CNEqF {} CNEqF {} = EQ
+--   compare _ CNEqF {} = LT
+--   compare CNEqF {} _ = GT
+--   -- CNEqB
+--   compare CNEqB {} CNEqB {} = EQ
+--   compare _ CNEqB {} = LT
+--   compare CNEqB {} _ = GT
+--   -- CNEqU
+--   compare CNEqU {} CNEqU {} = EQ
 
 --------------------------------------------------------------------------------
 
