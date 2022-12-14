@@ -354,44 +354,27 @@ encodeExprU out expr = case expr of
   MulU w x y -> do
     x' <- wireU x
     y' <- wireU y
-    -- freshBinRep out w
     encodeMulU w out x' y'
   AndU w x y xs -> do
-    -- freshBinRep out w
     forM_ [0 .. w - 1] $ \i -> do
       encodeExprB
         (RefUBit w out i)
         (AndB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
   OrU w x y xs -> do
-    -- freshBinRep out w
     forM_ [0 .. w - 1] $ \i -> do
       encodeExprB
         (RefUBit w out i)
         (OrB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
-  -- x' <- bitTestU x i
-  -- y' <- bitTestU y i
-  -- xs' <- mapM (`bitTestU` i) xs
-  -- out' <- bitTestUOnVar w out i >>= wireAsVar . ExprB
-  -- encodeExprB out' (OrB x' y' xs')
   XorU w x y -> do
-    -- freshBinRep out w
     forM_ [0 .. w - 1] $ \i -> do
       encodeExprB
         (RefUBit w out i)
         (XorB (BitU x i) (BitU y i))
-  -- x' <- bitTestU x i
-  -- y' <- bitTestU y i
-  -- out' <- bitTestUOnVar w out i >>= wireAsVar . ExprB
-  -- encodeExprB out' (XorB x' y')
   NotU w x -> do
-    -- freshBinRep out w
     forM_ [0 .. w - 1] $ \i -> do
       encodeExprB
         (RefUBit w out i)
         (NotB (BitU x i))
-  -- x' <- bitTestU x i
-  -- out' <- bitTestUOnVar w out i >>= wireAsVar . ExprB
-  -- encodeExprB out' (NotB x')
   IfU _ p x y -> do
     p' <- wireB p
     x' <- wireU x
@@ -422,8 +405,6 @@ encodeExprU out expr = case expr of
         -- fill upper bits with 0s
         forM_ [w + n .. w - 1] $ \i -> do
           add $ cAddB 0 [(RefUBit w out i, 1)]
-
-  -- error "[ panic ] encodeExprU: RoLU: not implemented"
   BtoU w x -> do
     -- 1. wire 'out[0]' to 'x'
     -- 2. wire 'out[_]' to '0' for all other bits
@@ -605,15 +586,6 @@ wireU :: (GaloisField n, Integral n) => ExprU n -> M n RefU
 wireU (VarU w ref) = return (RefU w ref)
 wireU (OutputVarU w ref) = return (RefUO w ref)
 wireU (InputVarU w ref) = return (RefUI w ref)
--- wireU (BtoU w x) = do
---   error "hey"
---   out <- freshRefU w
---   encodeExprB out x
-
---   -- result <- freshRefB
---   -- encodeExprB result x
---   -- add $ cAddU 0 [(out, 1), (RefBtoRefU result, -1)] -- out = var
---   return out
 
 wireU expr = do
   out <- freshRefU (widthOfU expr)
