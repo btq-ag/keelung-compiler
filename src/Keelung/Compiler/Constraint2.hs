@@ -12,19 +12,15 @@ module Keelung.Compiler.Constraint2
     reindexRefB,
     reindexRefU,
     Constraint,
-    cadd,
     cAddB,
     cAddF,
     cAddU,
-    cmul,
     cMulB,
     cMulF,
     cMulU,
-    cmulSimple,
     cMulSimpleB,
     cMulSimpleF,
     cMulSimpleU,
-    cneq,
     cNEqB,
     cNEqF,
     cNEqU,
@@ -43,7 +39,6 @@ import GHC.Generics (Generic)
 import qualified Keelung.Compiler.Constraint as Constraint
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
-import Keelung.Constraint.R1C (R1C (..))
 import qualified Keelung.Constraint.R1CS as Constraint
 import Keelung.Field
 import Keelung.Syntax.BinRep (BinReps)
@@ -51,11 +46,9 @@ import Keelung.Syntax.Counters
 import Keelung.Types
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Constraint.Constraint n
-fromConstraint _ (CAdd p) = Constraint.CAdd p
 fromConstraint counters (CAddB as) = Constraint.CAdd (fromPolyB_ counters as)
 fromConstraint counters (CAddF as) = Constraint.CAdd (fromPolyF_ counters as)
 fromConstraint counters (CAddU as) = Constraint.CAdd (fromPolyU_ counters as)
-fromConstraint _ (CMul p q r) = Constraint.CMul p q r
 fromConstraint counters (CMulF as bs cs) =
   Constraint.CMul
     (fromPolyF_ counters as)
@@ -80,7 +73,6 @@ fromConstraint counters (CMulU as bs cs) =
         Left n -> Left n
         Right xs -> fromPolyU counters xs
     )
-fromConstraint counters (CNEq x y m) = Constraint.CNEq (Constraint.CNEQ (Left x) (Left y) (reindexRefF counters m))
 fromConstraint counters (CNEqF x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))
 fromConstraint counters (CNEqB x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefB counters x)) (Left (reindexRefB counters y)) (reindexRefB counters m))
 fromConstraint counters (CNEqU x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))
@@ -130,8 +122,8 @@ reindexRefB counters (RefUBit w x i) =
         RefUI _ x' -> reindex counters OfInput (OfUIntBinRep w) x' + i'
         RefUO _ x' -> reindex counters OfOutput (OfUIntBinRep w) x' + i'
         RefU _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
-        RefBtoRefU x' -> 
-          if i' == 0 
+        RefBtoRefU x' ->
+          if i' == 0
             then reindexRefB counters x'
             else error "reindexRefB: RefUBit"
 
@@ -184,15 +176,12 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 --      CMul: ax * by = c or ax * by = cz
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
-  = CAdd !(Poly n)
-  | CAddF !(Poly' RefF n)
+  = CAddF !(Poly' RefF n)
   | CAddB !(Poly' RefB n)
   | CAddU !(Poly' RefU n)
-  | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
   | CMulF !(Poly' RefF n) !(Poly' RefF n) !(Either n (Poly' RefF n))
   | CMulB !(Poly' RefB n) !(Poly' RefB n) !(Either n (Poly' RefB n))
   | CMulU !(Poly' RefU n) !(Poly' RefU n) !(Either n (Poly' RefU n))
-  | CNEq Var Var RefF
   | CNEqF RefF RefF RefF
   | CNEqB RefB RefB RefB
   | CNEqU RefU RefU RefU
@@ -200,19 +189,14 @@ data Constraint n
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
-    (CAdd x, CAdd y) -> x == y
     (CAddF x, CAddF y) -> x == y
     (CAddB x, CAddB y) -> x == y
     (CAddU x, CAddU y) -> x == y
-    (CMul x y z, CMul u v w) ->
-      (x == u && y == v || x == v && y == u) && z == w
     (CMulF x y z, CMulF u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CMulB x y z, CMulB u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CMulU x y z, CMulU u v w) ->
-      (x == u && y == v || x == v && y == u) && z == w
-    (CNEq x y z, CNEq u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CNEqF x y z, CNEqF u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
@@ -223,28 +207,18 @@ instance GaloisField n => Eq (Constraint n) where
     _ -> False
 
 instance Functor Constraint where
-  fmap f (CAdd x) = CAdd (fmap f x)
   fmap f (CAddF x) = CAddF (fmap f x)
   fmap f (CAddB x) = CAddB (fmap f x)
   fmap f (CAddU x) = CAddU (fmap f x)
-  fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
-  fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
   fmap f (CMulB x y (Left z)) = CMulB (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulB x y (Right z)) = CMulB (fmap f x) (fmap f y) (Right (fmap f z))
   fmap f (CMulU x y (Left z)) = CMulU (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulU x y (Right z)) = CMulU (fmap f x) (fmap f y) (Right (fmap f z))
-  fmap _ (CNEq x y z) = CNEq x y z
   fmap _ (CNEqF x y z) = CNEqF x y z
   fmap _ (CNEqB x y z) = CNEqB x y z
   fmap _ (CNEqU x y z) = CNEqU x y z
-
--- | Smart constructor for the CAdd constraint
-cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
-cadd !c !xs = map CAdd $ case Poly.buildEither c xs of
-  Left _ -> []
-  Right xs' -> [xs']
 
 -- | Smart constructor for the CAddB constraint
 cAddB :: GaloisField n => n -> [(RefB, n)] -> [Constraint n]
@@ -264,28 +238,21 @@ cAddU !c !xs = case buildPoly' c xs of
   Left _ -> []
   Right xs' -> [CAddU xs']
 
-cmulSimple :: GaloisField n => Var -> Var -> Var -> [Constraint n]
-cmulSimple !x !y !z = [CMul (Poly.singleVar x) (Poly.singleVar y) (Poly.buildEither 0 [(z, 1)])]
+cMulSimple :: GaloisField n => (Poly' ref n -> Poly' ref n -> Either n (Poly' ref n) -> Constraint n) -> ref -> ref -> ref -> [Constraint n]
+cMulSimple ctor !x !y !z =
+  [ ctor (Poly' 0 (Map.singleton x 1)) (Poly' 0 (Map.singleton y 1)) (Right (Poly' 0 (Map.singleton z 1)))
+  ]
 
 cMulSimpleF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
-cMulSimpleF !x !y !z = [CMulF (Poly' 0 (Map.singleton x 1)) (Poly' 0 (Map.singleton y 1)) (Right (Poly' 0 (Map.singleton z 1)))]
+cMulSimpleF = cMulSimple CMulF
 
 cMulSimpleB :: GaloisField n => RefB -> RefB -> RefB -> [Constraint n]
-cMulSimpleB !x !y !z = [CMulB (Poly' 0 (Map.singleton x 1)) (Poly' 0 (Map.singleton y 1)) (Right (Poly' 0 (Map.singleton z 1)))]
+cMulSimpleB = cMulSimple CMulB
 
 cMulSimpleU :: GaloisField n => RefU -> RefU -> RefU -> [Constraint n]
-cMulSimpleU !x !y !z = [CMulU (Poly' 0 (Map.singleton x 1)) (Poly' 0 (Map.singleton y 1)) (Right (Poly' 0 (Map.singleton z 1)))]
+cMulSimpleU = cMulSimple CMulU
 
 -- | Smart constructor for the CMul constraint
-cmul :: GaloisField n => (n, [(Var, n)]) -> (n, [(Var, n)]) -> (n, [(Var, n)]) -> [Constraint n]
-cmul (a, xs) (b, ys) (c, zs) = case ( do
-                                        xs' <- Poly.buildEither a xs
-                                        ys' <- Poly.buildEither b ys
-                                        return $ CMul xs' ys' (Poly.buildEither c zs)
-                                    ) of
-  Left _ -> []
-  Right result -> [result]
-
 cMul ::
   (GaloisField n, Ord ref) =>
   (Poly' ref n -> Poly' ref n -> Either n (Poly' ref n) -> Constraint n) ->
@@ -314,9 +281,6 @@ cMulU :: GaloisField n => (n, [(RefU, n)]) -> (n, [(RefU, n)]) -> (n, [(RefU, n)
 cMulU = cMul CMulU
 
 -- | Smart constructor for the CNEq constraint
-cneq :: GaloisField n => Var -> Var -> RefF -> [Constraint n]
-cneq x y m = [CNEq x y m]
-
 cNEqF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
 cNEqF x y m = [CNEqF x y m]
 
@@ -327,26 +291,18 @@ cNEqU :: GaloisField n => RefU -> RefU -> RefU -> [Constraint n]
 cNEqU x y m = [CNEqU x y m]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
-  show (CAdd xs) = "A " <> show xs <> " = 0"
   show (CAddF xs) = "AF " <> show xs <> " = 0"
   show (CAddB xs) = "AB " <> show xs <> " = 0"
   show (CAddU xs) = "AU " <> show xs <> " = 0"
-  show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulB aV bV cV) = "MB " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulU aV bV cV) = "MU " <> show aV <> " * " <> show bV <> " = " <> show cV
-  show (CNEq x y m) = "Q " <> show x <> " " <> show y <> " " <> show m
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
   show (CNEqB x y m) = "QB " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
-
-  -- CMul
-  compare (CMul aV bV cV) (CMul aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
-  compare _ CMul {} = LT
-  compare CMul {} _ = GT
   -- CMulF
   compare (CMulF aV bV cV) (CMulF aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMulF {} = LT
@@ -359,8 +315,6 @@ instance GaloisField n => Ord (Constraint n) where
   compare (CMulU aV bV cV) (CMulU aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMulU {} = LT
   compare CMulU {} _ = GT
-  -- CAdd
-  compare (CAdd xs) (CAdd ys) = compare xs ys
   -- CAddF
   compare (CAddF xs) (CAddF ys) = compare xs ys
   compare _ CAddF {} = LT
@@ -383,11 +337,6 @@ instance GaloisField n => Ord (Constraint n) where
   compare CNEqB {} _ = GT
   -- CNEqU
   compare CNEqU {} CNEqU {} = EQ
-  compare _ CNEqU {} = LT
-  compare CNEqU {} _ = GT
-  compare CNEq {} CNEq {} = EQ
-  compare CNEq {} _ = LT
-  compare _ CNEq {} = GT
 
 --------------------------------------------------------------------------------
 
