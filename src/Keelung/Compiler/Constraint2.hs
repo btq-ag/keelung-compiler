@@ -98,10 +98,27 @@ data RefU = RefUI Width Var | RefUO Width Var | RefU Width Var | RefBtoRefU RefB
   deriving (Eq, Ord)
 
 instance Show RefU where
-  show (RefUI w x) = "$UI[" ++ show w ++ "]" ++ show x
-  show (RefUO w x) = "$UO[" ++ show w ++ "]" ++ show x
-  show (RefU w x) = "$U[" ++ show w ++ "]" ++ show x
-  show (RefBtoRefU x) = show x
+  show ref = case ref of
+    RefUI w x -> "$UI" ++ toSubscript w ++ show x
+    RefUO w x -> "$UO" ++ toSubscript w ++ show x
+    RefU w x -> "$U" ++ toSubscript w ++ show x
+    RefBtoRefU x -> show x
+    where
+      toSubscript :: Int -> String
+      toSubscript = map go . show
+        where
+          go c = case c of
+            '0' -> '₀'
+            '1' -> '₁'
+            '2' -> '₂'
+            '3' -> '₃'
+            '4' -> '₄'
+            '5' -> '₅'
+            '6' -> '₆'
+            '7' -> '₇'
+            '8' -> '₈'
+            '9' -> '₉'
+            _ -> c
 
 --------------------------------------------------------------------------------
 
