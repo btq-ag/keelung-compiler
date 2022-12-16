@@ -402,16 +402,13 @@ encodeExprU out expr = case expr of
         forM_ [w + n .. w - 1] $ \i -> do
           add $ cAddB 0 [(RefUBit w out i, 1)]
   BtoU w x -> do
-    -- 1. wire 'out[0]' to 'x'
-    -- 2. wire 'out[_]' to '0' for all other bits
-    forM_ [0 .. w - 1] $ \i ->
-      if i == 0
-        then do
-          result <- freshRefB
-          encodeExprB result x
-          add $ cAddB 0 [(RefUBit w out i, 1), (result, -1)]
-        else do
-          add $ cAddB 0 [(RefUBit w out i, 1)]
+    -- 1. wire 'out[ZERO]' to 'x'
+    result <- freshRefB
+    encodeExprB result x
+    add $ cAddB 0 [(RefUBit w out 0, 1), (result, -1)]
+    -- 2. wire 'out[SUCC _]' to '0' for all other bits
+    forM_ [1 .. w - 1] $ \i ->
+      add $ cAddB 0 [(RefUBit w out i, 1)]
 
 --------------------------------------------------------------------------------
 

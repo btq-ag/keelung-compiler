@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 {-# HLINT ignore "Use list comprehension" #-}
 
 module Keelung.Compiler.Constraint2
@@ -20,11 +21,9 @@ module Keelung.Compiler.Constraint2
     cMulU,
     cMulSimpleB,
     cMulSimpleF,
-    cMulSimpleU,
     cNEqB,
     cNEqF,
     cNEqU,
-    ConstraintSystem,
     fromConstraint,
   )
 where
@@ -33,12 +32,10 @@ import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Set (Set)
 import qualified Keelung.Compiler.Constraint as Constraint
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Constraint.R1CS as Constraint
-import Keelung.Syntax.BinRep (BinReps)
 import Keelung.Syntax.Counters
 import Keelung.Types
 
@@ -46,7 +43,7 @@ fromConstraint :: Integral n => Counters -> Constraint n -> Constraint.Constrain
 fromConstraint counters (CAddB as) = Constraint.CAdd (fromPolyB_ counters as)
 fromConstraint counters (CAddF as) = Constraint.CAdd (fromPolyF_ counters as)
 fromConstraint counters (CVarEqU x y) = case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
-  Left _ -> error "CVarEqU: two variables are equal"
+  Left _ -> error "CVarEqU: two variables are the same"
   Right xs -> Constraint.CAdd xs
 fromConstraint counters (CVarBindU x n) = Constraint.CAdd (Poly.bind (reindexRefU counters x) n)
 fromConstraint counters (CMulF as bs cs) =
@@ -76,11 +73,6 @@ fromConstraint counters (CMulU as bs cs) =
 fromConstraint counters (CNEqF x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))
 fromConstraint counters (CNEqB x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefB counters x)) (Left (reindexRefB counters y)) (reindexRefB counters m))
 fromConstraint counters (CNEqU x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))
-
---------------------------------------------------------------------------------
-
--- data Ref = Ref Var | RefI Var | RefO Var
---   deriving (Eq, Ord)
 
 --------------------------------------------------------------------------------
 
@@ -261,9 +253,6 @@ cMulSimpleF = cMulSimple CMulF
 cMulSimpleB :: GaloisField n => RefB -> RefB -> RefB -> [Constraint n]
 cMulSimpleB = cMulSimple CMulB
 
-cMulSimpleU :: GaloisField n => RefU -> RefU -> RefU -> [Constraint n]
-cMulSimpleU = cMulSimple CMulU
-
 -- | Smart constructor for the CMul constraint
 cMul ::
   (GaloisField n, Ord ref) =>
@@ -313,17 +302,3 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
   show (CNEqB x y m) = "QB " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
-
---------------------------------------------------------------------------------
-
--- | Constraint System
-data ConstraintSystem n = ConstraintSystem
-  { -- | Constraints
-    _csConstraints :: !(Set (Constraint n)),
-    -- | Binary representation of Number input variables
-    _csNumBinReps :: BinReps,
-    -- | Binary representation of custom output variables
-    _csCustomBinReps :: BinReps,
-    _csCounters :: Counters
-  }
-  deriving (Eq)
