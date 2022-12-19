@@ -21,7 +21,6 @@ module Keelung.Compiler.Constraint2
     cMulU,
     cMulSimpleB,
     cMulSimpleF,
-    cNEqB,
     cNEqF,
     cNEqU,
     fromConstraint,
@@ -71,7 +70,6 @@ fromConstraint counters (CMulU as bs cs) =
         Right xs -> fromPolyU counters xs
     )
 fromConstraint counters (CNEqF x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))
-fromConstraint counters (CNEqB x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefB counters x)) (Left (reindexRefB counters y)) (reindexRefB counters m))
 fromConstraint counters (CNEqU x y m) = Constraint.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))
 
 --------------------------------------------------------------------------------
@@ -201,7 +199,6 @@ data Constraint n
   | CMulB !(Poly' RefB n) !(Poly' RefB n) !(Either n (Poly' RefB n))
   | CMulU !(Poly' RefU n) !(Poly' RefU n) !(Either n (Poly' RefU n))
   | CNEqF RefF RefF RefF
-  | CNEqB RefB RefB RefB
   | CNEqU RefU RefU RefU
 
 instance GaloisField n => Eq (Constraint n) where
@@ -217,8 +214,6 @@ instance GaloisField n => Eq (Constraint n) where
     (CMulU x y z, CMulU u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CNEqF x y z, CNEqF u v w) ->
-      (x == u && y == v || x == v && y == u) && z == w
-    (CNEqB x y z, CNEqB u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CNEqU x y z, CNEqU u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
@@ -236,7 +231,6 @@ instance Functor Constraint where
   fmap f (CMulU x y (Left z)) = CMulU (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulU x y (Right z)) = CMulU (fmap f x) (fmap f y) (Right (fmap f z))
   fmap _ (CNEqF x y z) = CNEqF x y z
-  fmap _ (CNEqB x y z) = CNEqB x y z
   fmap _ (CNEqU x y z) = CNEqU x y z
 
 -- | Smart constructor for the CAddB constraint
@@ -302,9 +296,6 @@ cMulU = cMul CMulU
 cNEqF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
 cNEqF x y m = [CNEqF x y m]
 
-cNEqB :: GaloisField n => RefB -> RefB -> RefB -> [Constraint n]
-cNEqB x y m = [CNEqB x y m]
-
 cNEqU :: GaloisField n => RefU -> RefU -> RefU -> [Constraint n]
 cNEqU x y m = [CNEqU x y m]
 
@@ -317,5 +308,4 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CMulB aV bV cV) = "MB " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulU aV bV cV) = "MU " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
-  show (CNEqB x y m) = "QB " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
