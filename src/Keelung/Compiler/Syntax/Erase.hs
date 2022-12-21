@@ -2,9 +2,7 @@ module Keelung.Compiler.Syntax.Erase (run) where
 
 import Control.Monad.Reader
 import Data.Field.Galois (GaloisField)
-import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..), (|>))
-import Keelung.Compiler.Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import qualified Keelung.Syntax.Typed as T
@@ -18,13 +16,6 @@ run (T.Elaborated expr comp) =
         -- start type erasure
         expr' <- eraseExpr expr
         sameType proxy expr'
-        assignmentsF <- mapM (\(var, val) -> AssignmentF (RefF var) <$> eraseExprF val) (IntMap.toList aF)
-        assignmentsFI <- mapM (\(var, val) -> AssignmentF (RefFI var) <$> eraseExprF val) (IntMap.toList aFI)
-        assignmentsB <- mapM (\(var, val) -> AssignmentB (RefB var) <$> eraseExprB val) (IntMap.toList aB)
-        assignmentsBI <- mapM (\(var, val) -> AssignmentB (RefBI var) <$> eraseExprB val) (IntMap.toList aBI)
-        assignmentsU <- mapM (\(width, xs) -> mapM (\(var, val) -> AssignmentU (RefU width var) <$> eraseExprU val) (IntMap.toList xs)) (IntMap.toList aU)
-        assignmentsUI <- mapM (\(width, xs) -> mapM (\(var, val) -> AssignmentU (RefUI width var) <$> eraseExprU val) (IntMap.toList xs)) (IntMap.toList aUI)
-        let assignments = assignmentsF ++ assignmentsFI ++ assignmentsB ++ assignmentsBI ++ concat assignmentsU ++ concat assignmentsUI
         assertions' <- concat <$> mapM eraseExpr assertions
 
         relations <-
@@ -44,8 +35,7 @@ run (T.Elaborated expr comp) =
               erasedFieldBitWidth = numBitWidth,
               erasedCounters = counters,
               erasedRelations = relations,
-              erasedAssertions = assertions',
-              erasedAssignments = assignments
+              erasedAssertions = assertions'
             }
   where
     -- proxy trick for devising the bit width of field elements

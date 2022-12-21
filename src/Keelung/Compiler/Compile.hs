@@ -23,7 +23,7 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
-run (TypeErased untypedExprs _ counters relations assertions assignments) = runM counters $ do
+run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ do
   forM_ untypedExprs $ \untypedExpr -> do
     case untypedExpr of
       ExprB x -> do
@@ -39,8 +39,8 @@ run (TypeErased untypedExprs _ counters relations assertions assignments) = runM
   -- Compile all relations
   encodeRelations relations
 
-  -- Compile assignments to constraints
-  mapM_ encodeAssignment assignments
+  -- -- Compile assignments to constraints
+  -- mapM_ encodeAssignment assignments
 
   -- Compile assertions to constraints
   mapM_ encodeAssertion assertions
@@ -72,21 +72,6 @@ encodeAssertion expr = do
       out <- freshRefU (widthOfU x)
       encodeExprU out x
       add $ cVarBindU out 1
-
--- | Encode the constraint 'out = expr'.
-encodeAssignment :: (GaloisField n, Integral n) => Assignment n -> M n ()
-encodeAssignment (AssignmentB ref expr) = encodeExprB ref expr
-encodeAssignment (AssignmentF ref expr) = encodeExprF ref expr
-encodeAssignment (AssignmentU ref expr) = encodeExprU ref expr
-
--- encodeRelation :: (GaloisField n, Integral n) => Relation n -> M n ()
--- encodeRelation (Relation bindings assignments assertions) = do
---   forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cadd val [(var, -1)]
---   forM_ (IntMap.toList assignments) $ uncurry encode
---   forM_ assertions $ \expr -> do
---       out <- freshVar
---       encode out expr
---       add $ cadd 1 [(out, -1)] -- 1 = expr
 
 encodeValueBindings :: (GaloisField n, Integral n) => Bindings n n n -> M n ()
 encodeValueBindings bindings = do

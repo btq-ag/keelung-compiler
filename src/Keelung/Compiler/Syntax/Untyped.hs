@@ -215,13 +215,11 @@ data TypeErased n = TypeErased
     -- | Relations between variables and/or expressions
     erasedRelations :: !(Relations n),
     -- | Assertions after type erasure
-    erasedAssertions :: ![Expr n],
-    -- | Assignments after type erasure
-    erasedAssignments :: ![Assignment n]
+    erasedAssertions :: ![Expr n]
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ counters relations assertions assignments) =
+  show (TypeErased expr _ counters relations assertions) =
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
@@ -229,10 +227,6 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
       <> "\n"
       -- relations
       <> show relations
-      <> ( if length assignments < 20
-             then "  assignments:\n    " <> show (map (fmap N) assignments) <> "\n"
-             else ""
-         )
       <> ( if length assertions < 20
              then "  assertions:\n    " <> show assertions <> "\n"
              else ""
@@ -301,7 +295,6 @@ data Relations n = Relations
     valueBindings :: Bindings n n n,
     -- var = expression
     exprBindings :: Bindings (ExprF n) (ExprB n) (ExprU n)
-    -- [| expression |] = True
   }
 
 instance (Integral n, Show n) => Show (Relations n) where

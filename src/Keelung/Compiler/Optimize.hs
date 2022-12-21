@@ -70,9 +70,9 @@ data Result = Result
   { -- | The number of constraints that have been optimized away
     resultConstraintReduction :: Int,
     -- | The number of variables that have been optimized away
-    resultVariableReduction :: Int,
+    resultVariableReduction :: Int
     -- | The number of assignments that have been optimized away
-    resultAssignmentReduction :: Int
+    -- resultAssignmentReduction :: Int
   }
   deriving (Eq, Ord, Show)
 
@@ -80,6 +80,6 @@ compareTypeErased :: TypeErased n -> TypeErased n -> Result
 compareTypeErased x y =
   Result
     { resultConstraintReduction = 0,
-      resultVariableReduction = getTotalCount (erasedCounters x) - getTotalCount (erasedCounters y),
-      resultAssignmentReduction = length (erasedAssignments x) - length (erasedAssignments y)
+      resultVariableReduction = getTotalCount (erasedCounters x) - getTotalCount (erasedCounters y)
+      -- resultAssignmentReduction = length (erasedAssignments x) - length (erasedAssignments y)
     }

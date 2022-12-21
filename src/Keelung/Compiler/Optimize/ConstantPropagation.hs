@@ -14,11 +14,11 @@ import Keelung.Compiler.Syntax.Untyped
 -- 2. Propagate constant in the output expression
 -- 3. Propagate constant in assertions
 run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
-run (TypeErased expr fieldWidth counters oldRelations assertions assignments) =
+run (TypeErased expr fieldWidth counters oldRelations assertions) =
   let newRelations = propagateRelations oldRelations
       expr' = propagateConstant newRelations <$> expr
       newAssertions = map (propagateConstant newRelations) assertions
-   in TypeErased expr' fieldWidth counters newRelations newAssertions assignments
+   in TypeErased expr' fieldWidth counters newRelations newAssertions
 
 -- | Propagate constants in the relations, and return the fixed point of constant propagation
 propagateRelations :: Relations n -> Relations n
