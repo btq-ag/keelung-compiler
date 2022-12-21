@@ -20,30 +20,17 @@ run (TypeErased expr fieldWidth counters oldRelations assertions assignments) =
       newAssertions = map (propagateConstant newRelations) assertions
    in TypeErased expr' fieldWidth counters newRelations newAssertions assignments
 
-data Result n
-  = Result
-      (Bindings n n n) -- extracted bindings of values after propagation
-      (Bindings (ExprF n) (ExprB n) (ExprU n)) -- bindings of expressions waiting to be processed
-
 -- | Propagate constants in the relations, and return the fixed point of constant propagation
 propagateRelations :: Relations n -> Relations n
-propagateRelations = toRelations . go . fromRelations
-  where
-    go :: Result n -> Result n
-    go before =
-      let (after, changed) = refineResult before
-       in if changed
-            then go after -- keep running
-            else after -- fixed point of 'refineResult'
-    toRelations :: Result n -> Relations n
-    toRelations (Result vbs ebs) = Relations vbs ebs
-
-    fromRelations :: Relations n -> Result n
-    fromRelations (Relations vbs ebs) = Result vbs ebs
+propagateRelations before =
+  let (after, changed) = refineRelations before
+   in if changed
+        then propagateRelations after -- keep running
+        else after -- fixed point of 'refineResult'
 
 -- | Seperate value bindings from expression bindings
-refineResult :: Result n -> (Result n, Bool)
-refineResult (Result vals exprs) =
+refineRelations :: Relations n -> (Relations n, Bool)
+refineRelations (Relations vals exprs) =
   -- extract value bindings from expression bindings
   let (fsV, fsE) = IntMap.mapEither seperateF (bindingsF exprs)
       (fisV, fisE) = IntMap.mapEither seperateF (bindingsFI exprs)
@@ -52,7 +39,7 @@ refineResult (Result vals exprs) =
       (usV, usE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (bindingsUs exprs)
       (uisV, uisE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (bindingsUIs exprs)
       changed = not $ IntMap.null fsV || IntMap.null fisV || IntMap.null bsV || IntMap.null bisV || IntMap.null usV || IntMap.null uisV
-   in ( Result
+   in ( Relations
           ( vals
               { bindingsF = bindingsF vals <> fsV,
                 bindingsFI = bindingsFI vals <> fisV,
