@@ -30,19 +30,18 @@ run (T.Elaborated expr comp) =
         relations <-
           Relations mempty
             <$> ( Bindings
-                    <$> mapM (fmap ExprF . eraseExprF) aF
-                    <*> mapM (fmap ExprF . eraseExprF) aFI
-                    <*> mapM (fmap ExprB . eraseExprB) aB
-                    <*> mapM (fmap ExprB . eraseExprB) aBI
-                    <*> mapM (mapM (fmap ExprU . eraseExprU)) aU
-                    <*> mapM (mapM (fmap ExprU . eraseExprU)) aUI
+                    <$> mapM eraseExprF aF
+                    <*> mapM eraseExprF aFI
+                    <*> mapM eraseExprB aB
+                    <*> mapM eraseExprB aBI
+                    <*> mapM (mapM eraseExprU) aU
+                    <*> mapM (mapM eraseExprU) aUI
                 )
 
         return $
           TypeErased
             { erasedExpr = expr',
               erasedFieldBitWidth = numBitWidth,
-              -- determine the size of output vars by looking at the length of the expression
               erasedCounters = counters,
               erasedRelations = relations,
               erasedAssertions = assertions',

@@ -22,8 +22,8 @@ run (TypeErased expr fieldWidth counters oldRelations assertions assignments) =
 
 data Result n
   = Result
-      (Bindings n) -- extracted bindings of values after propagation
-      (Bindings (Expr n)) -- bindings of expressions waiting to be processed
+      (Bindings n n n) -- extracted bindings of values after propagation
+      (Bindings (ExprF n) (ExprB n) (ExprU n)) -- bindings of expressions waiting to be processed
 
 -- | Propagate constants in the relations, and return the fixed point of constant propagation
 propagateRelations :: Relations n -> Relations n
@@ -66,25 +66,19 @@ refineResult (Result vals exprs) =
         changed
       )
   where
-    seperateF :: Expr n -> Either n (Expr n)
+    seperateF :: ExprF n -> Either n (ExprF n)
     seperateF expr = case expr of
-      ExprF (ValF val) -> Left val
-      ExprU _ -> error "[ panic ] UInt expression in Field bindings of expressions"
-      ExprB _ -> error "[ panic ] Boolean expression in Field bindings of expressions"
+      ValF val -> Left val
       _ -> Right expr
 
-    seperateB :: Expr n -> Either n (Expr n)
+    seperateB :: ExprB n -> Either n (ExprB n)
     seperateB expr = case expr of
-      ExprF _ -> error "[ panic ] Field value in Boolean bindings of expressions"
-      ExprU _ -> error "[ panic ] UInt expression in Boolean bindings of expressions"
-      ExprB (ValB val) -> Left val
+      ValB val -> Left val
       _ -> Right expr
 
-    seperateU :: Expr n -> Either n (Expr n)
+    seperateU :: ExprU n -> Either n (ExprU n)
     seperateU expr = case expr of
-      ExprF _ -> error "[ panic ] Field value in UInt bindings of expressions"
-      ExprU (ValU _ val) -> Left val
-      ExprB _ -> error "[ panic ] Boolean value in UInt bindings of expressions"
+      ValU _ val -> Left val
       _ -> Right expr
 
 -- constant propogation

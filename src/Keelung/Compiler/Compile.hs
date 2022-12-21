@@ -88,7 +88,7 @@ encodeAssignment (AssignmentU ref expr) = encodeExprU ref expr
 --       encode out expr
 --       add $ cadd 1 [(out, -1)] -- 1 = expr
 
-encodeValueBindings :: (GaloisField n, Integral n) => Bindings n -> M n ()
+encodeValueBindings :: (GaloisField n, Integral n) => Bindings n n n -> M n ()
 encodeValueBindings bindings = do
   forM_ (IntMap.toList (bindingsF bindings)) $ \(var, val) -> add $ cAddF val [(RefF var, -1)]
   forM_ (IntMap.toList (bindingsFI bindings)) $ \(var, val) -> add $ cAddF val [(RefFI var, -1)]
@@ -99,16 +99,16 @@ encodeValueBindings bindings = do
   forM_ (IntMap.toList (bindingsUIs bindings)) $ \(width, bindings') ->
     forM_ (IntMap.toList bindings') $ \(var, val) -> add $ cVarBindU (RefUI width var) val
 
-encodeExprBindings :: (GaloisField n, Integral n) => Bindings (Expr n) -> M n ()
+encodeExprBindings :: (GaloisField n, Integral n) => Bindings (ExprF n) (ExprB n) (ExprU n) -> M n ()
 encodeExprBindings bindings = do
-  forM_ (IntMap.toList (bindingsF bindings)) $ \(var, ExprF val) -> encodeExprF (RefF var) val
-  forM_ (IntMap.toList (bindingsFI bindings)) $ \(var, ExprF val) -> encodeExprF (RefFI var) val
-  forM_ (IntMap.toList (bindingsB bindings)) $ \(var, ExprB val) -> encodeExprB (RefB var) val
-  forM_ (IntMap.toList (bindingsBI bindings)) $ \(var, ExprB val) -> encodeExprB (RefBI var) val
+  forM_ (IntMap.toList (bindingsF bindings)) $ \(var, val) -> encodeExprF (RefF var) val
+  forM_ (IntMap.toList (bindingsFI bindings)) $ \(var, val) -> encodeExprF (RefFI var) val
+  forM_ (IntMap.toList (bindingsB bindings)) $ \(var, val) -> encodeExprB (RefB var) val
+  forM_ (IntMap.toList (bindingsBI bindings)) $ \(var, val) -> encodeExprB (RefBI var) val
   forM_ (IntMap.toList (bindingsUs bindings)) $ \(width, bindings') ->
-    forM_ (IntMap.toList bindings') $ \(var, ExprU val) -> encodeExprU (RefU width var) val
+    forM_ (IntMap.toList bindings') $ \(var, val) -> encodeExprU (RefU width var) val
   forM_ (IntMap.toList (bindingsUIs bindings)) $ \(width, bindings') ->
-    forM_ (IntMap.toList bindings') $ \(var, ExprU val) -> encodeExprU (RefUI width var) val
+    forM_ (IntMap.toList bindings') $ \(var, val) -> encodeExprU (RefUI width var) val
 
 encodeRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
 encodeRelations (Relations vbs ebs) = do

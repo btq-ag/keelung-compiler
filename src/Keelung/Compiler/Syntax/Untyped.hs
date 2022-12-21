@@ -244,17 +244,17 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
 --------------------------------------------------------------------------------
 
 -- | Container for holding something for each datatypes
-data Bindings n = Bindings
-  { bindingsF :: IntMap n, -- bindings to Field elements intermediate variables
-    bindingsFI :: IntMap n, -- bindings to Field elements input variables
-    bindingsB :: IntMap n, -- bindings to Boolean intermediate variables
-    bindingsBI :: IntMap n, -- bindings to Boolean input variables
-    bindingsUs :: IntMap (IntMap n), -- bindings to intermediate Unsigned integers variables of different bitwidths
-    bindingsUIs :: IntMap (IntMap n) -- bindings to input Unsigned integers variables of different bitwidths
+data Bindings f b u = Bindings
+  { bindingsF :: IntMap f, -- bindings to Field elements intermediate variables
+    bindingsFI :: IntMap f, -- bindings to Field elements input variables
+    bindingsB :: IntMap b, -- bindings to Boolean intermediate variables
+    bindingsBI :: IntMap b, -- bindings to Boolean input variables
+    bindingsUs :: IntMap (IntMap u), -- bindings to intermediate Unsigned integers variables of different bitwidths
+    bindingsUIs :: IntMap (IntMap u) -- bindings to input Unsigned integers variables of different bitwidths
   }
   deriving (Eq, Functor, Show)
 
-instance Semigroup (Bindings n) where
+instance Semigroup (Bindings f b u) where
   Bindings fs0 fis0 bs0 bis0 us0 uis0 <> Bindings fs1 fis1 bs1 bis1 us1 uis1 =
     Bindings
       (fs0 <> fs1)
@@ -264,50 +264,43 @@ instance Semigroup (Bindings n) where
       (us0 <> us1)
       (uis0 <> uis1)
 
-instance Monoid (Bindings n) where
+instance Monoid (Bindings f b u) where
   mempty = Bindings mempty mempty mempty mempty mempty mempty
 
-instance Foldable Bindings where
-  foldMap f bindings =
-    foldMap f (bindingsF bindings)
-      <> foldMap f (bindingsFI bindings)
-      <> foldMap f (bindingsB bindings)
-      <> foldMap f (bindingsBI bindings)
-      <> foldMap (foldMap f) (bindingsUs bindings)
-      <> foldMap (foldMap f) (bindingsUIs bindings)
+-- instance Foldable Bindings where
+--   foldMap f bindings =
+--     foldMap f (bindingsF bindings)
+--       <> foldMap f (bindingsFI bindings)
+--       <> foldMap f (bindingsB bindings)
+--       <> foldMap f (bindingsBI bindings)
+--       <> foldMap (foldMap f) (bindingsUs bindings)
+--       <> foldMap (foldMap f) (bindingsUIs bindings)
 
-instance Traversable Bindings where
-  traverse f bindings =
-    Bindings <$> traverse f (bindingsF bindings)
-      <*> traverse f (bindingsFI bindings)
-      <*> traverse f (bindingsB bindings)
-      <*> traverse f (bindingsBI bindings)
-      <*> traverse (traverse f) (bindingsUs bindings)
-      <*> traverse (traverse f) (bindingsUIs bindings)
+-- instance Traversable Bindings where
+--   traverse f bindings =
+--     Bindings <$> traverse f (bindingsF bindings)
+--       <*> traverse f (bindingsFI bindings)
+--       <*> traverse f (bindingsB bindings)
+--       <*> traverse f (bindingsBI bindings)
+--       <*> traverse (traverse f) (bindingsUs bindings)
+--       <*> traverse (traverse f) (bindingsUIs bindings)
 
--- insertU :: Width -> RefU -> n -> Bindings n -> Bindings n
--- insertU width var val bindings =
---   bindings
---     { bindingsUs =
---         IntMap.insertWith (<>) width (Map.singleton var val) (bindingsUs bindings)
---     }
-
-lookupF :: Var -> Bindings n -> Maybe n
+lookupF :: Var -> Bindings f b u -> Maybe f
 lookupF var = IntMap.lookup var . bindingsF
 
-lookupB :: Var -> Bindings n -> Maybe n
+lookupB :: Var -> Bindings f b u -> Maybe b
 lookupB var = IntMap.lookup var . bindingsB
 
-lookupU :: Width -> Var -> Bindings n -> Maybe n
+lookupU :: Width -> Var -> Bindings f b u -> Maybe u
 lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (bindingsUs bindings)
 
 --------------------------------------------------------------------------------
 
 data Relations n = Relations
   { -- var = value
-    valueBindings :: Bindings n,
+    valueBindings :: Bindings n n n,
     -- var = expression
-    exprBindings :: Bindings (Expr n)
+    exprBindings :: Bindings (ExprF n) (ExprB n) (ExprU n)
     -- [| expression |] = True
   }
 
