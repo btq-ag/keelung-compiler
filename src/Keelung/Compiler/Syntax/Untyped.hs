@@ -12,9 +12,6 @@ module Keelung.Compiler.Syntax.Untyped
     TypeErased (..),
     Assignment (..),
     Bindings (..),
-    insertF,
-    insertB,
-    insertU,
     lookupF,
     lookupB,
     lookupU,
@@ -26,8 +23,6 @@ where
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint2
 import Keelung.Field (N (..))
@@ -250,44 +245,61 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
 
 -- | Container for holding something for each datatypes
 data Bindings n = Bindings
-  { bindingsF :: Map RefF n, -- Field elements
-    bindingsB :: Map RefB n, -- Booleans
-    bindingsUs :: IntMap (Map RefU n) -- Unsigned integers of different bitwidths
+  { bindingsF :: IntMap n, -- bindings to Field elements intermediate variables
+    bindingsFI :: IntMap n, -- bindings to Field elements input variables
+    bindingsB :: IntMap n, -- bindings to Boolean intermediate variables
+    bindingsBI :: IntMap n, -- bindings to Boolean input variables
+    bindingsUs :: IntMap (IntMap n), -- bindings to intermediate Unsigned integers variables of different bitwidths
+    bindingsUIs :: IntMap (IntMap n) -- bindings to input Unsigned integers variables of different bitwidths
   }
   deriving (Eq, Functor, Show)
 
 instance Semigroup (Bindings n) where
-  Bindings n0 b0 u0 <> Bindings n1 b1 u1 =
-    Bindings (n0 <> n1) (b0 <> b1) (IntMap.unionWith (<>) u0 u1)
+  Bindings fs0 fis0 bs0 bis0 us0 uis0 <> Bindings fs1 fis1 bs1 bis1 us1 uis1 =
+    Bindings
+      (fs0 <> fs1)
+      (fis0 <> fis1)
+      (bs0 <> bs1)
+      (bis0 <> bis1)
+      (us0 <> us1)
+      (uis0 <> uis1)
 
 instance Monoid (Bindings n) where
-  mempty = Bindings mempty mempty mempty
+  mempty = Bindings mempty mempty mempty mempty mempty mempty
 
 instance Foldable Bindings where
-  foldMap f (Bindings fs bs us) =
-    foldMap f fs <> foldMap f bs <> foldMap (foldMap f) us
+  foldMap f bindings =
+    foldMap f (bindingsF bindings)
+      <> foldMap f (bindingsFI bindings)
+      <> foldMap f (bindingsB bindings)
+      <> foldMap f (bindingsBI bindings)
+      <> foldMap (foldMap f) (bindingsUs bindings)
+      <> foldMap (foldMap f) (bindingsUIs bindings)
 
 instance Traversable Bindings where
-  traverse f (Bindings fs bs us) =
-    Bindings <$> traverse f fs <*> traverse f bs <*> traverse (traverse f) us
+  traverse f bindings =
+    Bindings <$> traverse f (bindingsF bindings)
+      <*> traverse f (bindingsFI bindings)
+      <*> traverse f (bindingsB bindings)
+      <*> traverse f (bindingsBI bindings)
+      <*> traverse (traverse f) (bindingsUs bindings)
+      <*> traverse (traverse f) (bindingsUIs bindings)
 
-insertF :: RefF -> n -> Bindings n -> Bindings n
-insertF var val (Bindings fs bs us) = Bindings (Map.insert var val fs) bs us
+-- insertU :: Width -> RefU -> n -> Bindings n -> Bindings n
+-- insertU width var val bindings =
+--   bindings
+--     { bindingsUs =
+--         IntMap.insertWith (<>) width (Map.singleton var val) (bindingsUs bindings)
+--     }
 
-insertB :: RefB -> n -> Bindings n -> Bindings n
-insertB var val (Bindings fs bs us) = Bindings fs (Map.insert var val bs) us
+lookupF :: Var -> Bindings n -> Maybe n
+lookupF var = IntMap.lookup var . bindingsF
 
-insertU :: Width -> RefU -> n -> Bindings n -> Bindings n
-insertU width var val (Bindings fs bs us) = Bindings fs bs (IntMap.insertWith (<>) width (Map.singleton var val) us)
+lookupB :: Var -> Bindings n -> Maybe n
+lookupB var = IntMap.lookup var . bindingsB
 
-lookupF :: RefF -> Bindings n -> Maybe n
-lookupF var (Bindings fs _ _) = Map.lookup var fs
-
-lookupB :: RefB -> Bindings n -> Maybe n
-lookupB var (Bindings _ bs _) = Map.lookup var bs
-
-lookupU :: Width -> RefU -> Bindings n -> Maybe n
-lookupU width var (Bindings _ _ us) = IntMap.lookup width us >>= Map.lookup var
+lookupU :: Width -> Var -> Bindings n -> Maybe n
+lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (bindingsUs bindings)
 
 --------------------------------------------------------------------------------
 

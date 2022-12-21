@@ -3,16 +3,16 @@
 {-# HLINT ignore "Replace case with maybe" #-}
 module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 
+import Data.Bifunctor (bimap)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Map.Strict as Map
-import Keelung.Compiler.Constraint2
 import Keelung.Compiler.Syntax.Untyped
 
 --------------------------------------------------------------------------------
 
--- 1. Propagate constant in bindings of expressions
--- 2. Propagate constant in the expression and assertions
+-- 1. Propagate constants in Relations
+-- 2. Propagate constant in the output expression
+-- 3. Propagate constant in assertions
 run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
 run (TypeErased expr fieldWidth counters oldRelations assertions assignments) =
   let newRelations = propagateRelations oldRelations
@@ -22,63 +22,70 @@ run (TypeErased expr fieldWidth counters oldRelations assertions assignments) =
 
 data Result n
   = Result
-      Int -- number of entries in the extracted bindings of values
       (Bindings n) -- extracted bindings of values after propagation
       (Bindings (Expr n)) -- bindings of expressions waiting to be processed
 
--- |
+-- | Propagate constants in the relations, and return the fixed point of constant propagation
 propagateRelations :: Relations n -> Relations n
 propagateRelations = toRelations . go . fromRelations
   where
     go :: Result n -> Result n
-    go (Result n vbs ebs) =
-      let (Result n' vbs' ebs') = refineResult (Result n vbs ebs)
-       in if n' == n
-            then Result n' vbs' ebs' -- fixed point of 'refineResult'
-            else go (Result n' vbs' ebs') -- keep running
+    go before =
+      let (after, changed) = refineResult before
+       in if changed
+            then go after -- keep running
+            else after -- fixed point of 'refineResult'
     toRelations :: Result n -> Relations n
-    toRelations (Result _ vbs ebs) = Relations vbs ebs
+    toRelations (Result vbs ebs) = Relations vbs ebs
 
     fromRelations :: Relations n -> Result n
-    fromRelations (Relations vbs ebs) = Result 0 vbs ebs
+    fromRelations (Relations vbs ebs) = Result vbs ebs
 
 -- | Seperate value bindings from expression bindings
-refineResult :: Result n -> Result n
-refineResult result@(Result _ _ (Bindings fs bs us)) =
-  handleU (handleB (handleF result fs) bs) us
+refineResult :: Result n -> (Result n, Bool)
+refineResult (Result vals exprs) =
+  -- extract value bindings from expression bindings
+  let (fsV, fsE) = IntMap.mapEither seperateF (bindingsF exprs)
+      (fisV, fisE) = IntMap.mapEither seperateF (bindingsFI exprs)
+      (bsV, bsE) = IntMap.mapEither seperateB (bindingsB exprs)
+      (bisV, bisE) = IntMap.mapEither seperateB (bindingsBI exprs)
+      (usV, usE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (bindingsUs exprs)
+      (uisV, uisE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (bindingsUIs exprs)
+      changed = not $ IntMap.null fsV || IntMap.null fisV || IntMap.null bsV || IntMap.null bisV || IntMap.null usV || IntMap.null uisV
+   in ( Result
+          ( vals
+              { bindingsF = bindingsF vals <> fsV,
+                bindingsFI = bindingsFI vals <> fisV,
+                bindingsB = bindingsB vals <> bsV,
+                bindingsBI = bindingsBI vals <> bisV,
+                bindingsUs = bindingsUs vals <> usV,
+                bindingsUIs = bindingsUIs vals <> uisV
+              }
+          )
+          (Bindings fsE fisE bsE bisE usE uisE),
+        changed
+      )
   where
-    handleF =
-      Map.foldlWithKey'
-        ( \(Result n vbs ebs) var expr ->
-            case expr of
-              ExprF (ValF val) -> Result (succ n) (insertF var val vbs) ebs
-              ExprU _ -> error "[ panic ] UInt expression in Field bindings of expressions"
-              ExprB _ -> error "[ panic ] Boolean expression in Field bindings of expressions"
-              _ -> Result n vbs (insertF var expr ebs)
-        )
-    handleB =
-      Map.foldlWithKey'
-        ( \(Result n vbs ebs) var expr ->
-            case expr of
-              ExprF _ -> error "[ panic ] Field value in Boolean bindings of expressions"
-              ExprU _ -> error "[ panic ] UInt expression in Boolean bindings of expressions"
-              ExprB (ValB val) -> Result (succ n) (insertB var val vbs) ebs
-              _ -> Result n vbs (insertB var expr ebs)
-        )
-    handleU =
-      IntMap.foldlWithKey'
-        ( \result' width mapping ->
-            Map.foldlWithKey'
-              ( \(Result n' vbs' ebs') var expr ->
-                  case expr of
-                    ExprF _ -> error "[ panic ] Field value in UInt bindings of expressions"
-                    ExprU (ValU _ val) -> Result (succ n') (insertU width var val vbs') ebs'
-                    ExprB _ -> error "[ panic ] Boolean value in UInt bindings of expressions"
-                    _ -> Result n' vbs' (insertU width var expr ebs')
-              )
-              result'
-              mapping
-        )
+    seperateF :: Expr n -> Either n (Expr n)
+    seperateF expr = case expr of
+      ExprF (ValF val) -> Left val
+      ExprU _ -> error "[ panic ] UInt expression in Field bindings of expressions"
+      ExprB _ -> error "[ panic ] Boolean expression in Field bindings of expressions"
+      _ -> Right expr
+
+    seperateB :: Expr n -> Either n (Expr n)
+    seperateB expr = case expr of
+      ExprF _ -> error "[ panic ] Field value in Boolean bindings of expressions"
+      ExprU _ -> error "[ panic ] UInt expression in Boolean bindings of expressions"
+      ExprB (ValB val) -> Left val
+      _ -> Right expr
+
+    seperateU :: Expr n -> Either n (Expr n)
+    seperateU expr = case expr of
+      ExprF _ -> error "[ panic ] Field value in UInt bindings of expressions"
+      ExprU (ValU _ val) -> Left val
+      ExprB _ -> error "[ panic ] Boolean value in UInt bindings of expressions"
+      _ -> Right expr
 
 -- constant propogation
 propagateConstant :: (GaloisField n, Integral n) => Relations n -> Expr n -> Expr n
@@ -86,7 +93,7 @@ propagateConstant relations = propagate
   where
     propagateF e = case e of
       ValF _ -> e
-      VarF var -> case lookupF (RefF var) (valueBindings relations) of
+      VarF var -> case lookupF var (valueBindings relations) of
         Nothing -> e
         Just val -> ValF val
       VarFO _ -> e -- no constant propagation for output variables
@@ -100,7 +107,7 @@ propagateConstant relations = propagate
 
     propagateU e = case e of
       ValU _ _ -> e
-      VarU w var -> case lookupU w (RefU w var) (valueBindings relations) of
+      VarU w var -> case lookupU w var (valueBindings relations) of
         Nothing -> e
         Just val -> ValU w val
       OutputVarU _ _ -> e -- no constant propagation for output variables
@@ -119,7 +126,7 @@ propagateConstant relations = propagate
 
     propagateB e = case e of
       ValB _ -> e
-      VarB var -> case lookupB (RefB var) (valueBindings relations) of
+      VarB var -> case lookupB var (valueBindings relations) of
         Nothing -> e
         Just val -> ValB val
       OutputVarB _ -> e -- no constant propagation for output variables

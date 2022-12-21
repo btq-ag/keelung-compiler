@@ -27,13 +27,24 @@ run (T.Elaborated expr comp) =
         let assignments = assignmentsF ++ assignmentsFI ++ assignmentsB ++ assignmentsBI ++ concat assignmentsU ++ concat assignmentsUI
         assertions' <- concat <$> mapM eraseExpr assertions
 
+        relations <-
+          Relations mempty
+            <$> ( Bindings
+                    <$> mapM (fmap ExprF . eraseExprF) aF
+                    <*> mapM (fmap ExprF . eraseExprF) aFI
+                    <*> mapM (fmap ExprB . eraseExprB) aB
+                    <*> mapM (fmap ExprB . eraseExprB) aBI
+                    <*> mapM (mapM (fmap ExprU . eraseExprU)) aU
+                    <*> mapM (mapM (fmap ExprU . eraseExprU)) aUI
+                )
+
         return $
           TypeErased
             { erasedExpr = expr',
               erasedFieldBitWidth = numBitWidth,
               -- determine the size of output vars by looking at the length of the expression
               erasedCounters = counters,
-              erasedRelations = mempty,
+              erasedRelations = relations,
               erasedAssertions = assertions',
               erasedAssignments = assignments
             }
