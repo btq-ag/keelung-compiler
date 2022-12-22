@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+
 module Keelung.Compiler.Syntax.Inputs where
 
 import Data.Field.Galois (GaloisField)
@@ -7,6 +8,8 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import Data.Vector (Vector)
+import qualified Data.Vector as Vector
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed (Computation (compCounters), Elaborated (elabComp))
@@ -35,7 +38,7 @@ deserialize counters rawInputs = do
           OfField ->
             inputs
               { numInputs = numInputs inputs Seq.:|> rawInputValue
-                -- numBinReps = numBinReps inputs <> Seq.fromList (toBits rawInputValue)
+              -- numBinReps = numBinReps inputs <> Seq.fromList (toBits rawInputValue)
               }
           OfBoolean ->
             inputs
@@ -71,3 +74,11 @@ toIntMap :: Inputs n -> IntMap n
 toIntMap inputs =
   let (start, _) = getInputVarRange (varCounters inputs)
    in IntMap.fromDistinctAscList (zip [start ..] (flatten inputs))
+
+toVector :: Inputs n -> Vector (Maybe n)
+toVector inputs =
+  let (start, end) = getInputVarRange (varCounters inputs)
+      totalCount = getTotalCount (varCounters inputs)
+   in Vector.replicate start Nothing
+        <> Vector.fromList (map Just (flatten inputs))
+        <> Vector.replicate (totalCount - end) Nothing

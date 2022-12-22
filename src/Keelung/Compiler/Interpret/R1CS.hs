@@ -1,15 +1,25 @@
 -- Interpreter for Keelung.Compiler.R1CS
-module Keelung.Compiler.Interpret.R1CS (run, run') where
+module Keelung.Compiler.Interpret.R1CS (run, run', runNew) where
 
 import Control.Monad.Except
+import Control.Monad.State
 import qualified Data.Either as Either
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Data.Vector (Vector)
+import qualified Data.Vector as Vector
 import Keelung.Compiler.R1CS (ExecError (..), witnessOfR1CS)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
+import qualified Keelung.Compiler.Syntax.Inputs as Inputs
+import Keelung.Constraint.Polynomial (Poly)
+import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
-import Keelung.Syntax.Counters (getOutputVarRange)
+import Keelung.Syntax.Counters
+import Keelung.Types
 
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (ExecError n) [n]
 run r1cs inputs = fst <$> run' r1cs inputs
@@ -36,71 +46,185 @@ run' r1cs inputs = do
 
   return (outputs, witness)
 
--- -- | Return interpreted outputs along with the witnesses
--- run2 :: (GaloisField n, Integral n) => R1CS n -> [n] -> Either (ExecError n) ([n], Witness n)
--- run2 r1cs inputs = runM inputs $ do
---   let constraints = toR1Cs r1cs
+--------------------------------------------------------------------------------
 
---   return undefined
+-- | The interpreter monad
+type M n = State (Vector (Maybe n))
 
--- -- -- | Go through a set of constraints and return the one constraint that cannot be shrinked or eliminated
--- -- goThrough :: (GaloisField n, Integral n) => Set (R1C n) -> M n (Maybe (R1C n))
--- -- goThrough set = case Set.minView set of
--- --   Nothing -> return Nothing
--- --   Just (r1c, set') -> do
--- --     result <- shrink r1c
--- --     case result of
--- --       Shrinked r1c' -> goThrough (Set.insert r1c' set')
--- --       Eliminated -> goThrough set'
--- --       Stuck -> return $ Just r1c
+runM :: Num n => Inputs n -> M n a -> Vector n
+runM inputs p =
+  let vector = execState p (Inputs.toVector inputs)
+   in Vector.imapMaybe
+        ( \i x -> case x of
+            Nothing -> error $ "[ panic ] R1CS interpreter: variable $" ++ show i ++ " not assigned with value"
+            Just val -> Just val
+        )
+        vector
 
--- shrink :: (GaloisField n, Integral n) => R1C n -> M n (Result n)
--- shrink (R1C a b c) = do
---   env <- get
-
---   case (substAndView env a, substAndView env b, substAndView env c) of
---     (Left _, Left _, Left _) -> return Eliminated
---     (Left ac, Left bc, Right (cc, () cs)) -> case IntMap.toList cs of
---       [] ->
-
---        _ -- ac * bc - cc = cs
---     (Left ac, Right (bc, bs), Left cc) -> _
---     (Left ac, Right (bc, bs), Right (cc, cs)) -> _
---     (Right (ac, as), y, z) -> _
-
--- substAndView :: (Num n, Eq n) => IntMap n -> Either n (Poly n) -> Either n (n, (Var, n), IntMap n)
--- substAndView _ (Left constant) = Left constant
--- substAndView bindings (Right xs) =
---   let (constant, xs') = Poly.view (Poly.substWithBindings xs bindings)
---    in case IntMap.minViewWithKey xs' of
---         Nothing -> Left constant
---         Just ((var, coeff), xs'') -> Right (constant, (var, coeff), xs'')
-
--- -- | Result of shrinking a constraint
--- data Result n = Shrinked (R1C n) | Eliminated | Stuck
-
--- -- Nothing -> return set
--- -- Just (r1c, set') -> do
--- --   let (a, b, c) = r1c
--- --   a' <- goThroughVars a
--- --   b' <- goThroughVars b
--- --   c' <- goThroughVars c
--- --   let r1c' = (a', b', c')
--- --   goThroughConstraints $ Set.insert r1c' set'
-
--- --------------------------------------------------------------------------------
-
--- -- | The interpreter monad
--- type M n = StateT (IntMap n) (Except (ExecError n))
-
--- runM :: [n] -> M n a -> Either (ExecError n) (a, Witness n)
--- runM inputs p = runExcept (runStateT p inputBindings)
---   where
---     inputBindings = IntMap.fromDistinctAscList $ zip [0 ..] inputs
-
--- lookupVar :: Show n => Int -> M n n
+-- lookupVar :: Show n => Var -> M n n
 -- lookupVar var = do
---   bindings <- get
---   case IntMap.lookup var bindings of
---     Nothing -> throwError $ ExecVarUnassignedError [var] bindings
---     Just val -> return val
+--   env <- get
+--   case env Vector.!? var of
+--     Nothing -> error "[ panic ] R1CS interpreter: variable out of range"
+--     Just Nothing -> error "[ panic ] R1CS interpreter: variable not assigned with value"
+--     Just (Just value) -> return value
+
+bindVar :: Var -> n -> M n ()
+bindVar var val = do
+  env <- get
+  put $ env Vector.// [(var, Just val)]
+
+runNew :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Vector n
+runNew r1cs inputs = runM inputs $ do
+  result <- goThrough (Set.fromList (toR1Cs r1cs))
+  case result of
+    Nothing -> return ()
+    Just r1c -> error $ "[ panic ] R1CS interpreter: stuck at " ++ show r1c
+  where
+    -- Go through a set of constraints and return the one constraint that cannot be shrinked or eliminated
+    goThrough :: (GaloisField n, Integral n) => Set (R1C n) -> M n (Maybe (R1C n))
+    goThrough set = case Set.minView set of
+      Nothing -> return Nothing
+      Just (r1c, set') -> do
+        result <- shrink r1c
+        case result of
+          Shrinked r1c' -> goThrough (Set.insert r1c' set')
+          Eliminated -> goThrough set'
+          Stuck -> return $ Just r1c
+
+--------------------------------------------------------------------------------
+
+-- | Result of shrinking a constraint
+data Result n = Shrinked (R1C n) | Eliminated | Stuck
+
+shrink :: (GaloisField n, Integral n) => R1C n -> M n (Result n)
+shrink r1cs = do
+  env <- get
+  case r1cs of
+    R1C (Left _) (Left _) (Left _) -> return Eliminated
+    R1C (Left a) (Left b) (Right cs) -> case substAndView env cs of
+      Constant _ -> return Eliminated
+      Uninomial c (var, coeff) -> do
+        -- a * b - c = coeff var
+        bindVar var ((a * b - c) / coeff)
+        return Eliminated
+      Polynomial _ -> return Stuck
+    R1C (Left a) (Right bs) (Left c) -> case substAndView env bs of
+      Constant _ -> return Eliminated
+      Uninomial b (var, coeff) -> do
+        -- a * (b - coeff var) = c
+        bindVar var ((b - c / a) / coeff)
+        return Eliminated
+      Polynomial _ -> return Stuck
+    R1C (Left a) (Right bs) (Right cs) -> case (substAndView env bs, substAndView env cs) of
+      (Constant _, Constant _) -> return Eliminated
+      (Constant b, Uninomial c (var, coeff)) -> do
+        -- a * b - c = coeff var
+        bindVar var ((a * b - c) / coeff)
+        return Eliminated
+      (Constant _, Polynomial _) -> return Stuck
+      (Uninomial b (var, coeff), Constant c) -> do
+        -- a * (b + coeff var) = c
+        bindVar var ((c - a * b) / (coeff * a))
+        return Eliminated
+      (Uninomial _ _, Uninomial _ _) -> return Stuck
+      (Uninomial _ _, Polynomial _) -> return Stuck
+      (Polynomial _, Constant _) -> return Stuck
+      (Polynomial _, Uninomial _ _) -> return Stuck
+      (Polynomial _, Polynomial _) -> return Stuck
+    R1C (Right as) (Left b) (Left c) -> case substAndView env as of
+      Constant _ -> return Eliminated
+      Uninomial a (var, coeff) -> do
+        -- (a + coeff var) * b = c
+        -- var = (c - a * b) / (coeff * b)
+        bindVar var ((c - a * b) / (coeff * b))
+        return Eliminated
+      Polynomial _ -> return Stuck
+    R1C (Right as) (Left b) (Right cs) -> case (substAndView env as, substAndView env cs) of
+      (Constant _, Constant _) -> return Eliminated
+      (Constant a, Uninomial c (var, coeff)) -> do
+        -- a * b - c = coeff var
+        bindVar var ((a * b - c) / coeff)
+        return Eliminated
+      (Constant _, Polynomial _) -> return Stuck
+      (Uninomial a (var, coeff), Constant c) -> do
+        -- (a + coeff var) * b = c
+        bindVar var ((c - a * b) / (coeff * b))
+        return Eliminated
+      (Uninomial _ _, Uninomial _ _) -> return Stuck
+      (Uninomial _ _, Polynomial _) -> return Stuck
+      (Polynomial _, Constant _) -> return Stuck
+      (Polynomial _, Uninomial _ _) -> return Stuck
+      (Polynomial _, Polynomial _) -> return Stuck
+    R1C (Right as) (Right bs) (Left c) -> case (substAndView env as, substAndView env bs) of
+      (Constant _, Constant _) -> return Eliminated
+      (Constant a, Uninomial b (var, coeff)) -> do
+        -- a * (b + coeff var) = c
+        bindVar var ((c / a - b) / coeff)
+        return Eliminated
+      (Constant _, Polynomial _) -> return Stuck
+      (Uninomial a (var, coeff), Constant b) -> do
+        -- (a + coeff var) * b = c
+        bindVar var ((c - a * b) / (coeff * b))
+        return Eliminated
+      (Uninomial _ _, Uninomial _ _) -> return Stuck
+      (Uninomial _ _, Polynomial _) -> return Stuck
+      (Polynomial _, Constant _) -> return Stuck
+      (Polynomial _, Uninomial _ _) -> return Stuck
+      (Polynomial _, Polynomial _) -> return Stuck
+    R1C (Right as) (Right bs) (Right cs) -> case (substAndView env as, substAndView env bs, substAndView env cs) of
+      (Constant _, Constant _, Constant _) -> return Eliminated
+      (Constant a, Constant b, Uninomial c (var, coeff)) -> do
+        -- a * b - c = coeff var
+        bindVar var ((a * b - c) / coeff)
+        return Eliminated
+      (Constant _, Constant _, Polynomial _) -> return Stuck
+      (Constant a, Uninomial b (var, coeff), Constant c) -> do
+        -- a * (b + coeff var) = c
+        bindVar var ((c / a - b) / coeff)
+        return Eliminated
+      (Constant _, Uninomial _ _, Uninomial _ _) -> return Stuck
+      (Constant _, Uninomial _ _, Polynomial _) -> return Stuck
+      (Constant _, Polynomial _, Constant _) -> return Stuck
+      (Constant _, Polynomial _, Uninomial _ _) -> return Stuck
+      (Constant _, Polynomial _, Polynomial _) -> return Stuck
+      (Uninomial a (var, coeff), Constant b, Constant c) -> do
+        -- (a + coeff var) * b = c
+        bindVar var ((c - a * b) / (coeff * b))
+        return Eliminated
+      (Uninomial _ _, Constant _, Uninomial _ _) -> return Stuck
+      (Uninomial _ _, Constant _, Polynomial _) -> return Stuck
+      (Uninomial _ _, Uninomial _ _, Constant _) -> return Stuck
+      (Uninomial _ _, Uninomial _ _, Uninomial _ _) -> return Stuck
+      (Uninomial _ _, Uninomial _ _, Polynomial _) -> return Stuck
+      (Uninomial _ _, Polynomial _, Constant _) -> return Stuck
+      (Uninomial _ _, Polynomial _, Uninomial _ _) -> return Stuck
+      (Uninomial _ _, Polynomial _, Polynomial _) -> return Stuck
+      (Polynomial _, Constant _, Constant _) -> return Stuck
+      (Polynomial _, Constant _, Uninomial _ _) -> return Stuck
+      (Polynomial _, Constant _, Polynomial _) -> return Stuck
+      (Polynomial _, Uninomial _ _, Constant _) -> return Stuck
+      (Polynomial _, Uninomial _ _, Uninomial _ _) -> return Stuck
+      (Polynomial _, Uninomial _ _, Polynomial _) -> return Stuck
+      (Polynomial _, Polynomial _, Constant _) -> return Stuck
+      (Polynomial _, Polynomial _, Uninomial _ _) -> return Stuck
+      (Polynomial _, Polynomial _, Polynomial _) -> return Stuck
+
+-- | Substitute variables with values in a polynomial
+substAndView :: (Num n, Eq n) => Vector (Maybe n) -> Poly n -> PolyResult n
+substAndView env xs = case Poly.substWithVector xs env of
+  Left constant -> Constant constant
+  Right poly ->
+    let (constant, xs') = Poly.view poly
+     in case IntMap.minViewWithKey xs' of
+          Nothing -> Constant constant
+          Just ((var, coeff), xs'') ->
+            if IntMap.null xs''
+              then Uninomial constant (var, coeff)
+              else Polynomial poly
+
+-- | View of result after substituting a polynomial
+data PolyResult n
+  = Constant n
+  | Uninomial n (Var, n)
+  | Polynomial (Poly n)
