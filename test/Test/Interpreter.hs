@@ -15,7 +15,7 @@ import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import qualified Keelung.Compiler.Interpret.Typed as Typed
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Test.Hspec
-import Test.QuickCheck
+import Test.QuickCheck hiding ((.&.))
 
 kinded :: (GaloisField n, Integral n, Encode t, Kinded.FreeVar t, Kinded.Interpret t n) => Comp t -> [n] -> Either String [n]
 kinded prog rawInputs = do
@@ -77,6 +77,27 @@ tests = do
           `shouldBe` Right expectedOutput
         typed Basic.summation2 inp
           `shouldBe` Right expectedOutput
+
+    it "Mixed 0" $ do
+      let program = do
+            f <- inputField
+            u4 <- inputUInt @4
+            b <- inputBool
+            return $
+              cond
+                (b .&. (u4 !!! 0))
+                (f + 1)
+                (f + 2)
+
+      kinded program [100, 1, 1 :: GF181]
+        `shouldBe` Right [101]
+      typed program [100, 1, 1 :: GF181]
+        `shouldBe` Right [101]
+
+      kinded program [100, 0, 1 :: GF181]
+        `shouldBe` Right [102]
+      typed program [100, 0, 1 :: GF181]
+        `shouldBe` Right [102]
 
     it "Rotate" $ do
       let program = do
