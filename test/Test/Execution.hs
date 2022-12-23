@@ -40,7 +40,7 @@ tests = describe "Execution" $ do
         ( InterpretError $
             InterpretAssertionError
               (Typed.Boolean $ Typed.EqF (Typed.VarFI 0) (Typed.ValF 3))
-              [("$N0", 0)]
+              [("$FI0", 0)]
         )
   it "assert success" $
     execute Basic.assert1 [3] `shouldBe` Right [3 :: GF181]
