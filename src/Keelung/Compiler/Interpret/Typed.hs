@@ -21,7 +21,6 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
@@ -30,7 +29,6 @@ import Keelung (N (N))
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
-import Keelung.Compiler.Util
 import Keelung.Data.Bindings
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed
@@ -39,7 +37,7 @@ import Keelung.Types
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
-runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) ([n], (IntMap n, IntMap n, IntMap (IntMap n)))
+runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) ([n], Total n)
 runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   -- interpret assignments of values first
   fs <-
@@ -107,7 +105,7 @@ run elab inputs = fst <$> runAndOutputWitnesses elab inputs
 -- | Interpret a program with inputs and run some additional checks.
 runAndCheck :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) [n]
 runAndCheck elab inputs = do
-  (output, witness) <- runAndOutputWitnesses elab inputs
+  output <- run elab inputs
 
   -- See if input size is valid
   let expectedInputSize = getCountBySort OfInput (compCounters (elabComp elab))
@@ -115,17 +113,6 @@ runAndCheck elab inputs = do
 
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
-
-  -- TODO: restore this check
-
-  -- See if free variables of the program and the witness are the same
-  let variables = freeVars elab
-  -- traceShowM variables
-  -- let varsInWitness = IntMap.keysSet witness
-  -- when (variables /= varsInWitness) $ do
-  --   let missingInWitness = variables IntSet.\\ varsInWitness
-  --   let missingInProgram = IntMap.withoutKeys witness variables
-  --   throwError $ InterpretVarUnassignedError missingInWitness missingInProgram
 
   return output
 
@@ -220,32 +207,26 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     UInt e -> interpret e
     Array xs -> concat <$> mapM interpret xs
 
--- Bit x i -> do
---   xs <- interpret x
---   if testBit (toInteger (head xs)) i
---     then return [one]
---     else return [zero]
-
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M2 n = ReaderT (Inputs n) (StateT (Partial n) (Except (InterpretError n)))
+type M n = ReaderT (Inputs n) (StateT (Partial n) (Except (InterpretError n)))
 
-runM2 :: Inputs n -> M2 n a -> Either (InterpretError n) (a, Total n)
-runM2 inputs p =
+runM :: Inputs n -> M n a -> Either (InterpretError n) (a, Total n)
+runM inputs p =
   let counters = Inputs.varCounters inputs
       -- construct the initial partial Bindings from Inputs
       initBindings =
         Bindings
           { ofF =
               Binding
-                { ofX = Vector.replicate (getCount OfInput OfField counters) Nothing,
+                { ofX = Vector.replicate (getCount OfIntermediate OfField counters) Nothing,
                   ofO = Vector.replicate (getCount OfOutput OfField counters) Nothing,
                   ofI = Vector.fromList (map Just (toList (Inputs.numInputs inputs)))
                 },
             ofB =
               Binding
-                { ofX = Vector.replicate (getCount OfInput OfBoolean counters) Nothing,
+                { ofX = Vector.replicate (getCount OfIntermediate OfBoolean counters) Nothing,
                   ofO = Vector.replicate (getCount OfOutput OfBoolean counters) Nothing,
                   ofI = Vector.fromList (map Just (toList (Inputs.boolInputs inputs)))
                 },
@@ -253,7 +234,7 @@ runM2 inputs p =
               IntMap.mapWithKey
                 ( \width bindings ->
                     Binding
-                      { ofX = Vector.replicate (getCount OfInput (OfUInt width) counters) Nothing,
+                      { ofX = Vector.replicate (getCount OfIntermediate (OfUInt width) counters) Nothing,
                         ofO = Vector.replicate (getCount OfOutput (OfUInt width) counters) Nothing,
                         ofI = Vector.fromList (map Just (toList bindings))
                       }
@@ -267,103 +248,49 @@ runM2 inputs p =
           Left unbound -> Left (InterpretVarUnassignedError unbound)
           Right bindings -> Right (result, bindings)
 
-addF2 :: Var -> [n] -> M2 n ()
-addF2 var vals = modify (updateF (updateX (Vector.// [(var, safeHead vals)])))
+addF :: Var -> [n] -> M n ()
+addF var vals = modify (updateF (updateX (Vector.// [(var, safeHead vals)])))
 
-addB2 :: Var -> [n] -> M2 n ()
-addB2 var vals = modify (updateB (updateX (Vector.// [(var, safeHead vals)])))
+addB :: Var -> [n] -> M n ()
+addB var vals = modify (updateB (updateX (Vector.// [(var, safeHead vals)])))
 
-addU2 :: Width -> Var -> [n] -> M2 n ()
-addU2 w var vals = modify (updateU w (updateX (Vector.// [(var, safeHead vals)])))
+addU :: Width -> Var -> [n] -> M n ()
+addU w var vals = modify (updateU w (updateX (Vector.// [(var, safeHead vals)])))
 
-lookup' :: (Partial n -> Vector (Maybe a)) -> Int -> M2 n a
-lookup' selector var = do
+lookupVar :: (Partial n -> Vector (Maybe a)) -> Int -> M n a
+lookupVar selector var = do
   f <- gets selector
   case f Vector.!? var of
-    Nothing -> error "[ panic ] unbound witness index"
-    Just Nothing -> error "[ panic ] variable not assigned"
+    Nothing -> throwError $ InterpretUnboundVarError var
+    Just Nothing -> throwError $ InterpretUnboundVarError var
     Just (Just val) -> return val
 
-lookupF2 :: Var -> M2 n n
-lookupF2 = lookup' (ofX . ofF)
+lookupF :: Var -> M n n
+lookupF = lookupVar (ofX . ofF)
 
-lookupB2 :: Var -> M2 n n
-lookupB2 = lookup' (ofX . ofB)
+lookupFI :: Var -> M n n
+lookupFI = lookupVar (ofI . ofF)
 
-lookupU2 :: Width -> Var -> M2 n n
-lookupU2 w = lookup' (ofX . unsafeLookup w . ofU)
-  where
-    unsafeLookup x y = case IntMap.lookup x y of
-      Nothing -> error "[ panic ] bit width not found"
-      Just z -> z
+lookupB :: Var -> M n n
+lookupB = lookupVar (ofX . ofB)
+
+lookupBI :: Var -> M n n
+lookupBI = lookupVar (ofI . ofB)
+
+lookupU :: Width -> Var -> M n n
+lookupU w = lookupVar (ofX . unsafeLookup w . ofU)
+
+lookupUI :: Width -> Var -> M n n
+lookupUI w = lookupVar (ofI . unsafeLookup w . ofU)
+
+unsafeLookup :: Int -> IntMap a -> a
+unsafeLookup x y = case IntMap.lookup x y of
+  Nothing -> error "[ panic ] bit width not found"
+  Just z -> z
 
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (x : _) = Just x
-
---------------------------------------------------------------------------------
-
--- | The interpreter monad
-type M n = ReaderT (Inputs n) (StateT (IntMap n, IntMap n, IntMap (IntMap n)) (Except (InterpretError n)))
-
-runM :: Inputs n -> M n a -> Either (InterpretError n) (a, (IntMap n, IntMap n, IntMap (IntMap n)))
-runM inputs p = runExcept (runStateT (runReaderT p inputs) (mempty, mempty, mempty))
-
-addF :: Var -> [n] -> M n ()
-addF var vals = modify (\(f, b, u) -> (IntMap.insert var (head vals) f, b, u))
-
-addB :: Var -> [n] -> M n ()
-addB var vals = modify (\(f, b, u) -> (f, IntMap.insert var (head vals) b, u))
-
-addU :: Width -> Var -> [n] -> M n ()
-addU w var vals = modify (\(f, b, u) -> (f, b, IntMap.insertWith (<>) w (IntMap.singleton var (head vals)) u))
-
-lookupF :: Show n => Var -> M n n
-lookupF var = do
-  (fs, _, _) <- get
-  case IntMap.lookup var fs of
-    Nothing -> throwError $ InterpretUnboundVarError var fs
-    Just val -> return val
-
-lookupB :: Show n => Var -> M n n
-lookupB var = do
-  (_, bs, _) <- get
-  case IntMap.lookup var bs of
-    Nothing -> throwError $ InterpretUnboundVarError var bs
-    Just val -> return val
-
-lookupU :: Show n => Width -> Var -> M n n
-lookupU w var = do
-  (_, _, us) <- get
-  case IntMap.lookup w us of
-    Nothing -> error "[ panic ] Wrong bit width"
-    Just us' -> case IntMap.lookup var us' of
-      Nothing -> throwError $ InterpretUnboundVarError var us'
-      Just val -> return val
-
-lookupFI :: Show n => Var -> M n n
-lookupFI var = do
-  inputs <- asks Inputs.numInputs
-  case inputs Seq.!? var of
-    Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
-    Just val -> return val
-
-lookupBI :: Show n => Var -> M n n
-lookupBI var = do
-  inputs <- asks Inputs.boolInputs
-  case inputs Seq.!? var of
-    Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
-    Just val -> return val
-
-lookupUI :: Show n => Int -> Var -> M n n
-lookupUI width var = do
-  inputss <- asks Inputs.uintInputs
-  case IntMap.lookup width inputss of
-    Nothing -> error ("lookupUI: no UInt of such bit width: " <> show width)
-    Just inputs ->
-      case inputs Seq.!? var of
-        Nothing -> throwError $ InterpretUnboundVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
-        Just val -> return val
 
 --------------------------------------------------------------------------------
 
@@ -442,25 +369,26 @@ instance FreeVar UInt where
 --------------------------------------------------------------------------------
 
 data InterpretError n
-  = InterpretUnboundVarError Var (Witness n)
-  | InterpretUnboundAddrError Addr Heap
-  | InterpretAssertionError Expr [(String, n)]
-  -- | InterpretVarUnassignedError IntSet (Witness n)
-  | InterpretInputSizeError Int Int
+  = InterpretUnboundVarError Var
+  | -- (Witness n)
+    -- InterpretUnboundAddrError Addr Heap
+    InterpretAssertionError Expr [(String, n)]
+  | -- | InterpretVarUnassignedError IntSet (Witness n)
+    InterpretInputSizeError Int Int
   | InterpretVarUnassignedError (Vars n)
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (InterpretError n)
 
 instance (GaloisField n, Integral n) => Show (InterpretError n) where
-  show (InterpretUnboundVarError var witness) =
+  show (InterpretUnboundVarError var) =
     "unbound variable $" ++ show var
-      ++ " in witness "
-      ++ showWitness witness
-  show (InterpretUnboundAddrError var heap) =
-    "unbound address " ++ show var
-      ++ " in heap "
-      ++ show heap
+  -- ++ " in witness "
+  -- ++ showWitness witness
+  -- show (InterpretUnboundAddrError var heap) =
+  --   "unbound address " ++ show var
+  --     ++ " in heap "
+  --     ++ show heap
   show (InterpretAssertionError expr assignments) =
     "assertion failed: " <> show expr
       <> "\nassignment of variables:\n"
@@ -469,19 +397,20 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
     "expecting " ++ show expected ++ " inputs but got " ++ show actual
       ++ " inputs"
   show (InterpretVarUnassignedError unboundVariables) =
-      "these variables have no bindings:\n  "
-            ++ show unboundVariables
-    -- ( if IntSet.null missingInWitness
-    --     then ""
-    --     else
-    --       "these variables have no bindings:\n  "
-    --         ++ show (IntSet.toList missingInWitness)
-    -- )
-    --   <> if IntMap.null missingInProgram
-    --     then ""
-    --     else
-    --       "these bindings are not in the program:\n  "
-    --         ++ showWitness missingInProgram
+    "these variables have no bindings:\n  "
+      ++ show unboundVariables
+
+-- ( if IntSet.null missingInWitness
+--     then ""
+--     else
+--       "these variables have no bindings:\n  "
+--         ++ show (IntSet.toList missingInWitness)
+-- )
+--   <> if IntMap.null missingInProgram
+--     then ""
+--     else
+--       "these bindings are not in the program:\n  "
+--         ++ showWitness missingInProgram
 
 --------------------------------------------------------------------------------
 
