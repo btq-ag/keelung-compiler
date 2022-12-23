@@ -24,16 +24,21 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
+import qualified Data.Vector as Vector
+import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Syntax.Untyped (Bindings (..))
+import qualified Keelung.Compiler.Syntax.Untyped as Untyped
 import Keelung.Compiler.Util
+import Keelung.Data.Bindings
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed
 import Keelung.Types
+import Data.Vector (Vector)
 
 --------------------------------------------------------------------------------
 
@@ -112,13 +117,15 @@ runAndCheck elab inputs = do
   -- See if input size is valid
   let expectedInputSize = getCountBySort OfInput (compCounters (elabComp elab))
   let actualInputSize = Inputs.size inputs
+
   when (expectedInputSize /= actualInputSize) $ do
     throwError $ InterpretInputSizeError expectedInputSize actualInputSize
 
   -- TODO: restore this check
 
   -- See if free variables of the program and the witness are the same
-  -- let variables = freeVars elab
+  let variables = freeVars elab
+  traceShowM variables
   -- let varsInWitness = IntMap.keysSet witness
   -- when (variables /= varsInWitness) $ do
   --   let missingInWitness = variables IntSet.\\ varsInWitness
@@ -227,6 +234,48 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
+type M2 n = ReaderT (Inputs n) (StateT (Partial n) (Except (InterpretError n)))
+
+runM2 :: Inputs n -> M2 n a -> Either (InterpretError n) (a, Partial n)
+runM2 inputs p = runExcept (runStateT (runReaderT p inputs) mempty)
+
+addF2 :: Var -> [n] -> M2 n ()
+addF2 var vals = modify (updateF (updateX (Vector.// [(var, safeHead vals)])))
+
+addB2 :: Var -> [n] -> M2 n ()
+addB2 var vals = modify (updateB (updateX (Vector.// [(var, safeHead vals)])))
+
+addU2 :: Width -> Var -> [n] -> M2 n ()
+addU2 w var vals = modify (updateU w (updateX (Vector.// [(var, safeHead vals)])))
+
+lookup' :: (Partial n -> Vector (Maybe a)) -> Int -> M2 n a
+lookup' selector var = do
+  f <- gets selector
+  case f Vector.!? var of
+    Nothing -> error "[ panic ] unbound witness index"
+    Just Nothing -> error "[ panic ] variable not assigned"
+    Just (Just val) -> return val
+
+lookupF2 :: Var -> M2 n n
+lookupF2 = lookup' (ofX . ofF)
+
+lookupB2 :: Var -> M2 n n
+lookupB2 = lookup' (ofX . ofB)
+
+lookupU2 :: Width -> Var -> M2 n n
+lookupU2 w = lookup' (ofX . unsafeLookup w . ofU)
+  where 
+    unsafeLookup x y = case IntMap.lookup x y of
+      Nothing -> error "[ panic ] bit width not found"
+      Just z -> z
+
+safeHead :: [a] -> Maybe a
+safeHead [] = Nothing
+safeHead (x : _) = Just x
+
+--------------------------------------------------------------------------------
+
+-- | The interpreter monad
 type M n = ReaderT (Inputs n) (StateT (IntMap n, IntMap n, IntMap (IntMap n)) (Except (InterpretError n)))
 
 runM :: Inputs n -> M n a -> Either (InterpretError n) (a, (IntMap n, IntMap n, IntMap (IntMap n)))
@@ -292,7 +341,7 @@ lookupUI width var = do
 
 -- | For collecting free variables
 class FreeVar a where
-  freeVars :: a -> Bindings () () ()
+  freeVars :: a -> Untyped.Bindings () () ()
 
 instance FreeVar Expr where
   freeVars expr = case expr of

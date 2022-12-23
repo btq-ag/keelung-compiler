@@ -46,8 +46,8 @@ library
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
-      Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
+      Keelung.Data.Bindings
   other-modules:
       Paths_keelung_compiler
   hs-source-dirs:
@@ -95,8 +95,8 @@ executable keelungc
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
-      Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
+      Keelung.Data.Bindings
       AggregateSignature.Program
       AggregateSignature.Util
       Array
@@ -158,8 +158,8 @@ executable profile
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
-      Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
+      Keelung.Data.Bindings
       Paths_keelung_compiler
   hs-source-dirs:
       examples/
@@ -213,8 +213,8 @@ test-suite keelung-test
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
-      Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
+      Keelung.Data.Bindings
       AggregateSignature.Program
       AggregateSignature.Util
       Array
@@ -272,8 +272,8 @@ benchmark keelung-bench
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
-      Keelung.Compiler.Syntax.VarLayout
       Keelung.Compiler.Util
+      Keelung.Data.Bindings
       AggSig
       Array
       AggregateSignature.Program
