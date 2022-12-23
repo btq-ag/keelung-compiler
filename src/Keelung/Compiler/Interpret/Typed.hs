@@ -19,21 +19,17 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
-import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
-import Keelung.Compiler.Syntax.Untyped (Bindings (..))
-import qualified Keelung.Compiler.Syntax.Untyped as Untyped
 import Keelung.Compiler.Util
 import Keelung.Data.Bindings
 import Keelung.Syntax.Counters
@@ -92,10 +88,10 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
       us' <-
         concat
           <$> mapM
-            (\(width, bindings) -> do
-              is <- mapM (\var -> ("$UI" <> show var,) <$> lookupUI width var) (IntSet.toList (ofI bindings))
-              xs <- mapM (\var -> ("$U" <> show var,) <$> lookupU width var) (IntSet.toList (ofX bindings))
-              return (is <> xs)
+            ( \(width, bindings) -> do
+                is <- mapM (\var -> ("$UI" <> show var,) <$> lookupUI width var) (IntSet.toList (ofI bindings))
+                xs <- mapM (\var -> ("$U" <> show var,) <$> lookupU width var) (IntSet.toList (ofX bindings))
+                return (is <> xs)
             )
             (IntMap.toList (ofU freeVarsInExpr))
       -- collect variables and their bindings in the expression and report them
@@ -235,8 +231,41 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
 -- | The interpreter monad
 type M2 n = ReaderT (Inputs n) (StateT (Partial n) (Except (InterpretError n)))
 
-runM2 :: Inputs n -> M2 n a -> Either (InterpretError n) (a, Partial n)
-runM2 inputs p = runExcept (runStateT (runReaderT p inputs) mempty)
+runM2 :: Inputs n -> M2 n a -> Either (InterpretError n) (a, Total n)
+runM2 inputs p =
+  let counters = Inputs.varCounters inputs
+      -- construct the initial partial Bindings from Inputs
+      initBindings =
+        Bindings
+          { ofF =
+              Binding
+                { ofX = Vector.replicate (getCount OfInput OfField counters) Nothing,
+                  ofO = Vector.replicate (getCount OfOutput OfField counters) Nothing,
+                  ofI = Vector.fromList (map Just (toList (Inputs.numInputs inputs)))
+                },
+            ofB =
+              Binding
+                { ofX = Vector.replicate (getCount OfInput OfBoolean counters) Nothing,
+                  ofO = Vector.replicate (getCount OfOutput OfBoolean counters) Nothing,
+                  ofI = Vector.fromList (map Just (toList (Inputs.boolInputs inputs)))
+                },
+            ofU =
+              IntMap.mapWithKey
+                ( \width bindings ->
+                    Binding
+                      { ofX = Vector.replicate (getCount OfInput (OfUInt width) counters) Nothing,
+                        ofO = Vector.replicate (getCount OfOutput (OfUInt width) counters) Nothing,
+                        ofI = Vector.fromList (map Just (toList bindings))
+                      }
+                )
+                (Inputs.uintInputs inputs)
+          }
+   in do
+        (result, partialBindings) <- runExcept (runStateT (runReaderT p inputs) initBindings)
+        -- make the partial Bindings total
+        case toTotal partialBindings of
+          Left unbound -> Left (InterpretVarUnassignedError unbound)
+          Right bindings -> Right (result, bindings)
 
 addF2 :: Var -> [n] -> M2 n ()
 addF2 var vals = modify (updateF (updateX (Vector.// [(var, safeHead vals)])))
@@ -416,8 +445,9 @@ data InterpretError n
   = InterpretUnboundVarError Var (Witness n)
   | InterpretUnboundAddrError Addr Heap
   | InterpretAssertionError Expr [(String, n)]
-  | InterpretVarUnassignedError IntSet (Witness n)
+  -- | InterpretVarUnassignedError IntSet (Witness n)
   | InterpretInputSizeError Int Int
+  | InterpretVarUnassignedError (Vars n)
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (InterpretError n)
@@ -435,21 +465,23 @@ instance (GaloisField n, Integral n) => Show (InterpretError n) where
     "assertion failed: " <> show expr
       <> "\nassignment of variables:\n"
       <> unlines (map (\(var, val) -> "  " <> var <> " := " <> show (N val)) assignments)
-  show (InterpretVarUnassignedError missingInWitness missingInProgram) =
-    ( if IntSet.null missingInWitness
-        then ""
-        else
-          "these variables have no bindings:\n  "
-            ++ show (IntSet.toList missingInWitness)
-    )
-      <> if IntMap.null missingInProgram
-        then ""
-        else
-          "these bindings are not in the program:\n  "
-            ++ showWitness missingInProgram
   show (InterpretInputSizeError expected actual) =
     "expecting " ++ show expected ++ " inputs but got " ++ show actual
       ++ " inputs"
+  show (InterpretVarUnassignedError unboundVariables) =
+      "these variables have no bindings:\n  "
+            ++ show unboundVariables
+    -- ( if IntSet.null missingInWitness
+    --     then ""
+    --     else
+    --       "these variables have no bindings:\n  "
+    --         ++ show (IntSet.toList missingInWitness)
+    -- )
+    --   <> if IntMap.null missingInProgram
+    --     then ""
+    --     else
+    --       "these bindings are not in the program:\n  "
+    --         ++ showWitness missingInProgram
 
 --------------------------------------------------------------------------------
 
