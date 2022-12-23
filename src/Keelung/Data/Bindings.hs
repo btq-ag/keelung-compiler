@@ -3,7 +3,8 @@ module Keelung.Data.Bindings where
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Vector (Vector)
-import Keelung.Types (Width)
+import Keelung.Types 
+import Data.IntSet (IntSet)
 
 --------------------------------------------------------------------------------
 type Total n = Bindings (Binding (Vector n)) (Binding (Vector n)) (Binding (Vector n))
@@ -11,6 +12,8 @@ type Total n = Bindings (Binding (Vector n)) (Binding (Vector n)) (Binding (Vect
 type Partial n = Bindings (Binding (Vector (Maybe n))) (Binding (Vector (Maybe n))) (Binding (Vector (Maybe n)))
 
 type Sparse n = Bindings (Binding (IntMap n)) (Binding (IntMap n)) (Binding (IntMap n))
+
+type Vars n = Bindings (Binding IntSet) (Binding IntSet) (Binding IntSet)
 
 --------------------------------------------------------------------------------
 
@@ -26,6 +29,9 @@ instance Semigroup n => Semigroup (Binding n) where
 
 instance Monoid n => Monoid (Binding n) where
   mempty = Binding mempty mempty mempty
+
+instance Foldable Binding where
+  foldMap f (Binding i o x) = f i <> f o <> f x
 
 updateX :: (n -> n) -> Binding n -> Binding n
 updateX f (Binding i o x) = Binding i o (f x)

@@ -24,6 +24,7 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import qualified Data.Sequence as Seq
 import Data.Serialize (Serialize)
+import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import Debug.Trace
 import GHC.Generics (Generic)
@@ -38,7 +39,6 @@ import Keelung.Data.Bindings
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed
 import Keelung.Types
-import Data.Vector (Vector)
 
 --------------------------------------------------------------------------------
 
@@ -85,22 +85,21 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
     values <- interpret e
     when (values /= [1]) $ do
       let freeVarsInExpr = freeVars e
-      fis <- mapM (\var -> ("$FI" <> show var,) <$> lookupFI var) $ IntMap.keys (bindingsFI freeVarsInExpr)
-      fs' <- mapM (\var -> ("$F" <> show var,) <$> lookupF var) $ IntMap.keys (bindingsF freeVarsInExpr)
-      bis <- mapM (\var -> ("$BI" <> show var,) <$> lookupBI var) $ IntMap.keys (bindingsBI freeVarsInExpr)
-      bs' <- mapM (\var -> ("$B" <> show var,) <$> lookupB var) $ IntMap.keys (bindingsB freeVarsInExpr)
-      uis <-
-        concat
-          <$> mapM
-            (\(width, vars) -> mapM (\var -> ("$UI" <> show var,) <$> lookupUI width var) (IntMap.keys vars))
-            (IntMap.toList (bindingsUIs freeVarsInExpr))
+      fis <- mapM (\var -> ("$FI" <> show var,) <$> lookupFI var) $ IntSet.toList (ofI $ ofF freeVarsInExpr)
+      fs' <- mapM (\var -> ("$F" <> show var,) <$> lookupF var) $ IntSet.toList (ofX $ ofF freeVarsInExpr)
+      bis <- mapM (\var -> ("$BI" <> show var,) <$> lookupBI var) $ IntSet.toList (ofI $ ofB freeVarsInExpr)
+      bs' <- mapM (\var -> ("$B" <> show var,) <$> lookupB var) $ IntSet.toList (ofX $ ofB freeVarsInExpr)
       us' <-
         concat
           <$> mapM
-            (\(width, vars) -> mapM (\var -> ("$U" <> show var,) <$> lookupU width var) (IntMap.keys vars))
-            (IntMap.toList (bindingsUs freeVarsInExpr))
+            (\(width, bindings) -> do
+              is <- mapM (\var -> ("$UI" <> show var,) <$> lookupUI width var) (IntSet.toList (ofI bindings))
+              xs <- mapM (\var -> ("$U" <> show var,) <$> lookupU width var) (IntSet.toList (ofX bindings))
+              return (is <> xs)
+            )
+            (IntMap.toList (ofU freeVarsInExpr))
       -- collect variables and their bindings in the expression and report them
-      throwError $ InterpretAssertionError e (fis <> fs' <> bis <> bs' <> uis <> us')
+      throwError $ InterpretAssertionError e (fis <> fs' <> bis <> bs' <> us')
 
   -- lastly interpret the expression and return the result
   interpret expr
@@ -125,7 +124,7 @@ runAndCheck elab inputs = do
 
   -- See if free variables of the program and the witness are the same
   let variables = freeVars elab
-  traceShowM variables
+  -- traceShowM variables
   -- let varsInWitness = IntMap.keysSet witness
   -- when (variables /= varsInWitness) $ do
   --   let missingInWitness = variables IntSet.\\ varsInWitness
@@ -264,7 +263,7 @@ lookupB2 = lookup' (ofX . ofB)
 
 lookupU2 :: Width -> Var -> M2 n n
 lookupU2 w = lookup' (ofX . unsafeLookup w . ofU)
-  where 
+  where
     unsafeLookup x y = case IntMap.lookup x y of
       Nothing -> error "[ panic ] bit width not found"
       Just z -> z
@@ -341,7 +340,7 @@ lookupUI width var = do
 
 -- | For collecting free variables
 class FreeVar a where
-  freeVars :: a -> Untyped.Bindings () () ()
+  freeVars :: a -> Vars n
 
 instance FreeVar Expr where
   freeVars expr = case expr of
@@ -369,8 +368,8 @@ instance FreeVar Computation where
 instance FreeVar Boolean where
   freeVars expr = case expr of
     ValB _ -> mempty
-    VarB var -> mempty {bindingsB = IntMap.singleton var ()}
-    InputVarB var -> mempty {bindingsBI = IntMap.singleton var ()}
+    VarB var -> updateF (updateX (IntSet.insert var)) mempty
+    InputVarB var -> updateF (updateX (IntSet.insert var)) mempty
     AndB x y -> freeVars x <> freeVars y
     OrB x y -> freeVars x <> freeVars y
     XorB x y -> freeVars x <> freeVars y
@@ -385,8 +384,8 @@ instance FreeVar Field where
   freeVars expr = case expr of
     ValF _ -> mempty
     ValFR _ -> mempty
-    VarF var -> mempty {bindingsF = IntMap.singleton var ()}
-    VarFI var -> mempty {bindingsFI = IntMap.singleton var ()}
+    VarF var -> updateF (updateI (IntSet.insert var)) mempty
+    VarFI var -> updateF (updateI (IntSet.insert var)) mempty
     AddF x y -> freeVars x <> freeVars y
     SubF x y -> freeVars x <> freeVars y
     MulF x y -> freeVars x <> freeVars y
@@ -397,8 +396,8 @@ instance FreeVar Field where
 instance FreeVar UInt where
   freeVars expr = case expr of
     ValU _ _ -> mempty
-    VarU w var -> mempty {bindingsUs = IntMap.singleton w (IntMap.singleton var ())}
-    InputVarU w var -> mempty {bindingsUIs = IntMap.singleton w (IntMap.singleton var ())}
+    VarU w var -> updateU w (updateI (IntSet.insert var)) mempty
+    InputVarU w var -> updateU w (updateI (IntSet.insert var)) mempty
     AddU _ x y -> freeVars x <> freeVars y
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y
