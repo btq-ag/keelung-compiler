@@ -20,11 +20,11 @@ tests = describe "Execution" $ do
       runKeelungAggSig 10 1 `shouldBe` Right []
     it "dim:10 sig:10" $
       runKeelungAggSig 10 10 `shouldBe` Right []
-  it "identity (Num)" $
+  it "identity (Field element)" $
     execute Basic.identity [42] `shouldBe` Right [42 :: GF181]
-  it "identity (Bool)" $
+  it "identity (Boolean) 0" $
     execute Basic.identityB [1] `shouldBe` Right [1 :: GF181]
-  it "identity (Bool)" $
+  it "identity (Boolean) 1" $
     execute Basic.identityB [0] `shouldBe` Right [0 :: GF181]
   it "add3" $
     execute Basic.add3 [0] `shouldBe` Right [3 :: GF181]
