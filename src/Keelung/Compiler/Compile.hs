@@ -619,10 +619,10 @@ compileAddOrSubU isSub width out x y = do
   -- We can refactor
   --    out = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
   -- into the form of
-  --    (2ⁿ * Aₙ₋₁) * (Bₙ₋₁) = (out - A - B)
+  --    (-2ⁿ * Aₙ₋₁) * (Bₙ₋₁) = (out - A - B)
   add $
     cMulU
-      (0, [(RefBtoRefU (RefUBit width x (width - 1)), multiplier)])
+      (0, [(RefBtoRefU (RefUBit width x (width - 1)), -multiplier)])
       (0, [(RefBtoRefU (RefUBit width y (width - 1)), 1)])
       (0, [(out, 1), (x, -1), (y, if isSub then 1 else -1)])
 
