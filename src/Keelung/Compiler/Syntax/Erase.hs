@@ -17,7 +17,6 @@ run (T.Elaborated expr comp) =
         expr' <- eraseExpr expr
         sameType proxy expr'
         assertions' <- concat <$> mapM eraseExpr assertions
-
         relations <-
           Relations mempty
             <$> ( Bindings

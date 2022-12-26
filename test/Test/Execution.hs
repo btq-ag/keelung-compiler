@@ -48,8 +48,8 @@ tests = describe "Execution" $ do
   --   execute Basic.toArrayM1 [] `shouldBe` Right ([0] :: [GF181])
   -- it "summation" $
   --   execute Basic.summation [0, 2, 4, 8 :: GF181] `shouldBe` Right [14]
-  it "summation2" $
-    execute Basic.summation2 [0, 2, 4, 8 :: GF181] `shouldBe` Right []
+  -- it "summation2" $
+  --   execute Basic.summation2 [0, 2, 4, 8 :: GF181] `shouldBe` Right []
   -- it "assertArraysEqual" $
   --   execute Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] `shouldBe` Right []
   -- it "assertArraysEqual2" $
@@ -66,8 +66,8 @@ tests = describe "Execution" $ do
   -- it "toArray1" $
   --   execute Basic.toArray1 [0 .. 7 :: GF181] `shouldBe` Right []
 
-  -- it "xorLists" $
-  --   execute Basic.xorLists [] `shouldBe` Right [1 :: GF181]
+  it "xorLists" $
+    execute Basic.xorLists [] `shouldBe` Right [1 :: GF181]
 
   -- it "dupArray" $
   --   execute Basic.dupArray [1] `shouldBe` Right [1 :: GF181]

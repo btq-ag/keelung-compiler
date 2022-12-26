@@ -24,6 +24,7 @@ import Data.Semiring (Semiring (..))
 import Data.Serialize (Serialize)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
+import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
@@ -33,7 +34,6 @@ import Keelung.Data.Bindings
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed
 import Keelung.Types
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -79,9 +79,8 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   forM_ (compAssertions comp) $ \e -> do
     values <- interpret e
     get >>= traceShowM
-    () <- traceShowM e
+    () <- traceShowM comp
     when (values /= [1]) $ do
-
       let freeVarsInExpr = freeVars e
       fis <- mapM (\var -> ("$FI" <> show var,) <$> lookupFI var) $ IntSet.toList (ofI $ ofF freeVarsInExpr)
       fs' <- mapM (\var -> ("$F" <> show var,) <$> lookupF var) $ IntSet.toList (ofX $ ofF freeVarsInExpr)
@@ -99,63 +98,63 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
       -- collect variables and their bindings in the expression and report them
       throwError $ InterpretAssertionError e (fis <> fs' <> bis <> bs' <> us')
 
-
   -- lastly interpret the expression and return the result
   interpret expr
-  -- rawOutputs <- interpret expr
 
-  -- traceShowM (Inputs.varCounters inputs)
+-- rawOutputs <- interpret expr
 
-  -- case expr of
-  --   Unit -> return ()
-  --   Boolean _ -> setBO rawOutputs
-  --   Field _ -> setFO rawOutputs
-  --   UInt x -> setUO (widthOfUInt x) rawOutputs
-  --   Array xs -> case toList xs of
-  --     [] -> return ()
-  --     (x : _) -> case x of
-  --       Boolean _ -> setBO rawOutputs
-  --       Field _ -> setFO rawOutputs
-  --       UInt x' -> setUO (widthOfUInt x') rawOutputs
-  --       _ -> error "impossible"
+-- traceShowM (Inputs.varCounters inputs)
 
-  -- return rawOutputs
-  -- -- where
+-- case expr of
+--   Unit -> return ()
+--   Boolean _ -> setBO rawOutputs
+--   Field _ -> setFO rawOutputs
+--   UInt x -> setUO (widthOfUInt x) rawOutputs
+--   Array xs -> case toList xs of
+--     [] -> return ()
+--     (x : _) -> case x of
+--       Boolean _ -> setBO rawOutputs
+--       Field _ -> setFO rawOutputs
+--       UInt x' -> setUO (widthOfUInt x') rawOutputs
+--       _ -> error "impossible"
 
-  --   -- parse the interpreted outputs
-  --   -- and fill in the bindings of outputs
-  --   addBindingsOfOutputs :: Expr -> [n] -> M n ()
-  --   addBindingsOfOutputs expression values = case expression of
-  --     Unit -> return ()
-  --     Boolean _ -> addBO values
-  --     Field _ -> addFO values
-  --     UInt x -> addUO (widthOfUInt x) values
-  --     Array xs -> case toList xs of
-  --       [] -> return ()
-  --       (x : _) -> case x of
-  --         Unit -> return ()
-  --         Boolean _ -> setBO values
-  --         Field _ -> setFO values
-  --         UInt x' -> setUO (widthOfUInt x') values
-  --         Array xs -> _
+-- return rawOutputs
+-- -- where
 
-  --   -- Bit width of an UInt
-  --   widthOfUInt :: UInt -> Width
-  --   widthOfUInt uint = case uint of
-  --     ValU w _ -> w
-  --     VarU w _ -> w
-  --     VarUI w _ -> w
-  --     AddU w _ _ -> w
-  --     SubU w _ _ -> w
-  --     MulU w _ _ -> w
-  --     AndU w _ _ -> w
-  --     OrU w _ _ -> w
-  --     XorU w _ _ -> w
-  --     NotU w _ -> w
-  --     RoLU w _ _ -> w
-  --     ShLU w _ _ -> w
-  --     IfU w _ _ _ -> w
-  --     BtoU w _ -> w
+--   -- parse the interpreted outputs
+--   -- and fill in the bindings of outputs
+--   addBindingsOfOutputs :: Expr -> [n] -> M n ()
+--   addBindingsOfOutputs expression values = case expression of
+--     Unit -> return ()
+--     Boolean _ -> addBO values
+--     Field _ -> addFO values
+--     UInt x -> addUO (widthOfUInt x) values
+--     Array xs -> case toList xs of
+--       [] -> return ()
+--       (x : _) -> case x of
+--         Unit -> return ()
+--         Boolean _ -> setBO values
+--         Field _ -> setFO values
+--         UInt x' -> setUO (widthOfUInt x') values
+--         Array xs -> _
+
+--   -- Bit width of an UInt
+--   widthOfUInt :: UInt -> Width
+--   widthOfUInt uint = case uint of
+--     ValU w _ -> w
+--     VarU w _ -> w
+--     VarUI w _ -> w
+--     AddU w _ _ -> w
+--     SubU w _ _ -> w
+--     MulU w _ _ -> w
+--     AndU w _ _ -> w
+--     OrU w _ _ -> w
+--     XorU w _ _ -> w
+--     NotU w _ -> w
+--     RoLU w _ _ -> w
+--     ShLU w _ _ -> w
+--     IfU w _ _ _ -> w
+--     BtoU w _ -> w
 
 -- | Interpret a program with inputs.
 run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) [n]

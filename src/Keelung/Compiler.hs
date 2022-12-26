@@ -142,10 +142,11 @@ optimizeWithInput program inputs = do
 --   (4) Check whether the R1CS result matches the interpreter result.
 execute :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 execute prog rawInputs = do
-  elab <- elaborate prog
+  -- 1. elaborate & rewrite
+  elab <- elaborate prog >>= left LangError . Rewriting.run
 
+  -- 2. elaborate & rewrite & compile
   r1cs <- toR1CS <$> compile prog
-
   let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
   (actualOutputs, actualWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputs)
 
