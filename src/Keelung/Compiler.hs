@@ -57,6 +57,7 @@ import Keelung.Compiler.Syntax.Erase as Erase
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
+import qualified Keelung.Syntax.Typed as Typed
 import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
@@ -144,29 +145,30 @@ execute :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Err
 execute prog rawInputs = do
   -- 1. elaborate & rewrite
   elab <- elaborate prog >>= left LangError . Rewriting.run
+  let inputsForTypedInterpreter = Inputs.deserialize (Typed.compCounters (Typed.elabComp elab)) rawInputs
+  typedInterpreterOutputs <- left InterpretError (Interpret.run elab inputsForTypedInterpreter)
 
   -- 2. elaborate & rewrite & compile
   r1cs <- toR1CS <$> compile prog
-  let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
-  (actualOutputs, actualWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputs)
+  let inputsForR1CSInterpreter = Inputs.deserialize (r1csCounters r1cs) rawInputs
+  (r1csInterpreterOutputs, r1csInterpreterWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputsForR1CSInterpreter)
 
-  let outputsWithoutBinReps = removeBinRepsFromOutputs (r1csCounters r1cs) actualOutputs
+  let r1csOutputsWithoutBinReps = removeBinRepsFromOutputs (r1csCounters r1cs) r1csInterpreterOutputs
 
-  -- interpret the program to see if the output value is correct
-  expectedOutputs <- left InterpretError (Interpret.run elab inputs)
+  when (r1csOutputsWithoutBinReps /= typedInterpreterOutputs) $ do
+    Left $ ExecError $ ExecOutputError typedInterpreterOutputs r1csOutputsWithoutBinReps
 
-  when (outputsWithoutBinReps /= expectedOutputs) $ do
-    Left $ ExecError $ ExecOutputError expectedOutputs outputsWithoutBinReps
-
-  case satisfyR1CS actualWitness r1cs of
+  case satisfyR1CS r1csInterpreterWitness r1cs of
     Nothing -> return ()
     Just r1c's ->
       Left $
         ExecError $
-          ExecR1CUnsatisfiableError r1c's actualWitness
+          ExecR1CUnsatisfiableError r1c's r1csInterpreterWitness
 
-  return outputsWithoutBinReps
+  return r1csOutputsWithoutBinReps
   where
+    -- | Deserialise the outputs from the R1CS interpreter
+    --   TODO: make it something like a proper inverse of Inputs.deserialize
     removeBinRepsFromOutputs :: Counters -> [n] -> [n]
     removeBinRepsFromOutputs counters outputs =
       let (start, end) = getOutputBinRepRange counters

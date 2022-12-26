@@ -24,7 +24,6 @@ import Data.Semiring (Semiring (..))
 import Data.Serialize (Serialize)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
-import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
@@ -78,8 +77,6 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   -- throw error if any assertion fails
   forM_ (compAssertions comp) $ \e -> do
     values <- interpret e
-    get >>= traceShowM
-    () <- traceShowM comp
     when (values /= [1]) $ do
       let freeVarsInExpr = freeVars e
       fis <- mapM (\var -> ("$FI" <> show var,) <$> lookupFI var) $ IntSet.toList (ofI $ ofF freeVarsInExpr)

@@ -99,11 +99,10 @@ every = do
   arr <- inputs 4
   return $ foldl And true (fromArray arr)
 
-assert1 :: Comp Field
+assert1 :: Comp ()
 assert1 = do
-  x <- input
+  x <- inputField
   assert (x `eq` 3)
-  return x
 
 array1D :: Int -> Comp ()
 array1D n = do
