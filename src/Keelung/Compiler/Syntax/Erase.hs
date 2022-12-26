@@ -57,7 +57,7 @@ eraseExprB expr = case expr of
   T.ValB True -> return $ ValB 1
   T.ValB False -> return $ ValB 0
   T.VarB var -> return $ VarB var
-  T.InputVarB var -> return $ InputVarB var
+  T.VarBI var -> return $ VarBI var
   T.AndB x y -> chainExprsOfAssocOpAndB <$> eraseExprB x <*> eraseExprB y
   T.OrB x y -> chainExprsOfAssocOpOrB <$> eraseExprB x <*> eraseExprB y
   T.XorB x y -> XorB <$> eraseExprB x <*> eraseExprB y
@@ -85,7 +85,7 @@ eraseExprU :: (GaloisField n, Integral n) => T.UInt -> M n (ExprU n)
 eraseExprU expr = case expr of
   T.ValU w n -> return $ ValU w (fromIntegral n)
   T.VarU w var -> return $ VarU w var
-  T.InputVarU w var -> return $ InputVarU w var
+  T.VarUI w var -> return $ VarUI w var
   T.AddU w x y -> AddU w <$> eraseExprU x <*> eraseExprU y
   T.SubU w x y -> SubU w <$> eraseExprU x <*> eraseExprU y
   T.MulU w x y -> MulU w <$> eraseExprU x <*> eraseExprU y

@@ -6,6 +6,8 @@
 module Keelung.Data.Bindings where
 
 import Control.DeepSeq (NFData)
+import Data.Bifunctor (second)
+import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
@@ -16,6 +18,7 @@ import Data.Serialize (Serialize)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import GHC.Generics (Generic)
+import Keelung.Field.N (N (N))
 import Keelung.Types
 
 --------------------------------------------------------------------------------
@@ -80,6 +83,17 @@ instance Traversable Binding where
   traverse f (Binding o i x) = Binding <$> f o <*> f i <*> f x
 
 instance Serialize n => Serialize (Binding n)
+
+instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Binding (Vector (Maybe n))) where
+  show (Binding o i x) = "output: " <> showVec o <> ", input: " <> showVec i <> ", intermediate: " <> showVec x
+    where
+      showVec =
+        show . Vector.toList
+          . Vector.imapMaybe
+            ( \index value -> case value of
+                Nothing -> Nothing
+                Just value' -> Just (index, N value')
+            )
 
 updateX :: (n -> n) -> Binding n -> Binding n
 updateX f (Binding o i x) = Binding o i (f x)

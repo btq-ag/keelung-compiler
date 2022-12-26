@@ -35,8 +35,8 @@ import Keelung.Types (Var, Width)
 data ExprB n
   = ValB n
   | VarB Var
-  | OutputVarB Var
-  | InputVarB Var
+  | VarBO Var
+  | VarBI Var
   | -- logical operators
     AndB (ExprB n) (ExprB n) (Seq (ExprB n))
   | OrB (ExprB n) (ExprB n) (Seq (ExprB n))
@@ -58,8 +58,8 @@ instance (Integral n, Show n) => Show (ExprB n) where
     ValB 0 -> showString "F"
     ValB _ -> showString "T"
     VarB var -> showString "$B" . shows var
-    OutputVarB var -> showString "$BO" . shows var
-    InputVarB var -> showString "$BI" . shows var
+    VarBO var -> showString "$BO" . shows var
+    VarBI var -> showString "$BI" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
@@ -108,8 +108,8 @@ instance (Show n, Integral n) => Show (ExprF n) where
 data ExprU n
   = ValU Width n
   | VarU Width Var
-  | OutputVarU Width Var
-  | InputVarU Width Var
+  | VarUO Width Var
+  | VarUI Width Var
   | -- arithmetic operators
     SubU Width (ExprU n) (ExprU n)
   | AddU Width (ExprU n) (ExprU n)
@@ -129,8 +129,8 @@ instance (Show n, Integral n) => Show (ExprU n) where
   showsPrec prec expr = case expr of
     ValU _ n -> shows n
     VarU _ var -> showString "$U" . shows var
-    OutputVarU _ var -> showString "$UO" . shows var
-    InputVarU _ var -> showString "$UI" . shows var
+    VarUO _ var -> showString "$UO" . shows var
+    VarUI _ var -> showString "$UI" . shows var
     SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -171,8 +171,8 @@ widthOfU :: ExprU n -> Width
 widthOfU expr = case expr of
   ValU w _ -> w
   VarU w _ -> w
-  OutputVarU w _ -> w
-  InputVarU w _ -> w
+  VarUO w _ -> w
+  VarUI w _ -> w
   SubU w _ _ -> w
   AddU w _ _ -> w
   MulU w _ _ -> w

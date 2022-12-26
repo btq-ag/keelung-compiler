@@ -125,7 +125,7 @@ instance FreeVar Boolean where
   freeVars expr = case expr of
     Boolean _ -> return mempty
     VarB var -> return $ IntSet.singleton var
-    InputVarB _ -> return mempty
+    VarBI _ -> return mempty
     And x y -> (<>) <$> freeVars x <*> freeVars y
     Or x y -> (<>) <$> freeVars x <*> freeVars y
     Xor x y -> (<>) <$> freeVars x <*> freeVars y
@@ -140,7 +140,7 @@ instance FreeVar (UInt w) where
   freeVars val = case val of
     UInt _ -> return mempty
     VarU var -> return $ IntSet.singleton var
-    InputVarU _ -> return mempty
+    VarUI _ -> return mempty
     AddU x y -> (<>) <$> freeVars x <*> freeVars y
     SubU x y -> (<>) <$> freeVars x <*> freeVars y
     MulU x y -> (<>) <$> freeVars x <*> freeVars y
@@ -228,7 +228,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
   interpret val = case val of
     Boolean b -> interpret b
     VarB var -> pure <$> lookupVar var
-    InputVarB var -> pure <$> lookupInputVarB var
+    VarBI var -> pure <$> lookupVarBI var
     And x y -> zipWith (*) <$> interpret x <*> interpret y
     Or x y -> zipWith (+) <$> interpret x <*> interpret y
     Xor x y -> zipWith (\x' y' -> x' + y' - 2 * (x' * y')) <$> interpret x <*> interpret y
@@ -260,7 +260,7 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
   interpret val = case val of
     UInt n -> interpret n
     VarU var -> pure <$> lookupVar var
-    InputVarU var -> pure <$> lookupInputVarU (widthOf val) var
+    VarUI var -> pure <$> lookupVarUI (widthOf val) var
     AddU x y -> zipWith (+) <$> interpret x <*> interpret y
     SubU x y -> zipWith (-) <$> interpret x <*> interpret y
     MulU x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -316,18 +316,18 @@ lookupVarFI var = do
     Nothing -> throwError $ InterpretUnboundInputVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
     Just val -> return val
 
-lookupInputVarB :: Show n => Var -> M n n
-lookupInputVarB var = do
+lookupVarBI :: Show n => Var -> M n n
+lookupVarBI var = do
   inputs <- asks (Inputs.boolInputs . fst)
   case inputs Seq.!? var of
     Nothing -> throwError $ InterpretUnboundInputVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))
     Just val -> return val
 
-lookupInputVarU :: Show n => Int -> Var -> M n n
-lookupInputVarU width var = do
+lookupVarUI :: Show n => Int -> Var -> M n n
+lookupVarUI width var = do
   inputss <- asks (Inputs.uintInputs . fst)
   case IntMap.lookup width inputss of
-    Nothing -> error ("lookupInputVarU: no UInt of such bit width: " <> show width)
+    Nothing -> error ("lookupVarUI: no UInt of such bit width: " <> show width)
     Just inputs ->
       case inputs Seq.!? var of
         Nothing -> throwError $ InterpretUnboundInputVarError var (IntMap.fromDistinctAscList (zip [0 ..] (toList inputs)))

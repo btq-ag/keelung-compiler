@@ -163,9 +163,9 @@ compileExprB out expr = case expr of
   ValB val -> add $ cAddB val [(out, -1)] -- out = val
   VarB var -> do
     add $ cAddB 0 [(out, 1), (RefB var, -1)] -- out = var
-  OutputVarB var -> do
+  VarBO var -> do
     add $ cAddB 0 [(out, 1), (RefBO var, -1)] -- out = var
-  InputVarB var -> do
+  VarBI var -> do
     add $ cAddB 0 [(out, 1), (RefBI var, -1)] -- out = var
   AndB x0 x1 xs -> do
     a <- wireB x0
@@ -320,9 +320,9 @@ compileExprU out expr = case expr of
     -- constraints for BinRep of UInt
     forM_ [0 .. width - 1] $ \i -> do
       add $ cAddB 0 [(RefUBit width out i, -1), (RefUBit width ref i, 1)] -- out[i] = ref[i]
-  OutputVarU width var -> do
+  VarUO width var -> do
     add $ cVarEqU out (RefU width var) -- out = var
-  InputVarU width var -> do
+  VarUI width var -> do
     let ref = RefUI width var
     -- constraint for UInt : out = ref
     add $ cVarEqU out ref
@@ -480,8 +480,8 @@ compileTerms out terms =
 --   return out
 wireB :: (GaloisField n, Integral n) => ExprB n -> M n RefB
 wireB (VarB ref) = return (RefB ref)
-wireB (OutputVarB ref) = return (RefBO ref)
-wireB (InputVarB ref) = return (RefBI ref)
+wireB (VarBO ref) = return (RefBO ref)
+wireB (VarBI ref) = return (RefBI ref)
 wireB expr = do
   out <- freshRefB
   compileExprB out expr
@@ -498,8 +498,8 @@ wireF expr = do
 
 wireU :: (GaloisField n, Integral n) => ExprU n -> M n RefU
 wireU (VarU w ref) = return (RefU w ref)
-wireU (OutputVarU w ref) = return (RefUO w ref)
-wireU (InputVarU w ref) = return (RefUI w ref)
+wireU (VarUO w ref) = return (RefUO w ref)
+wireU (VarUI w ref) = return (RefUI w ref)
 wireU expr = do
   out <- freshRefU (widthOfU expr)
   compileExprU out expr

@@ -30,7 +30,7 @@ rewriteAssertEq expr = case expr of
   Boolean (EqB (VarB ref) y) -> do
     assignB ref y
     return False
-  Boolean (EqB (InputVarB ref) y) -> do
+  Boolean (EqB (VarBI ref) y) -> do
     assignBI ref y
     return False
   Boolean (EqF (VarF ref) y) -> do
@@ -42,13 +42,13 @@ rewriteAssertEq expr = case expr of
   Boolean (EqU _ (VarU w ref) y) -> do
     assignU w ref y
     return False
-  Boolean (EqU _ (InputVarU w ref) y) -> do
+  Boolean (EqU _ (VarUI w ref) y) -> do
     assignUI w ref y
     return False
   Boolean (EqB x (VarB ref)) -> do
     assignB ref x
     return False
-  Boolean (EqB x (InputVarB ref)) -> do
+  Boolean (EqB x (VarBI ref)) -> do
     assignBI ref x
     return False
   Boolean (EqF x (VarF ref)) -> do
@@ -60,7 +60,7 @@ rewriteAssertEq expr = case expr of
   Boolean (EqU _ x (VarU w ref)) -> do
     assignU w ref x
     return False
-  Boolean (EqU _ x (InputVarU w ref)) -> do
+  Boolean (EqU _ x (VarUI w ref)) -> do
     assignUI w ref x
     return False
   Boolean (EqB x y) -> do

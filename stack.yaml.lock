@@ -31,11 +31,11 @@ packages:
     git: git@github.com:btq-ag/keelung.git
     pantry-tree:
       size: 1684
-      sha256: 78fa097b58e5654a87e888ee28331045c068fec3f3b6e3f35f09f78e75cb23c4
-    commit: 35ac43d676dd19d4285f92b2703d93e866ecbc90
+      sha256: efb6c03d9196f584614408e23f5f84a43a92a4fd57a4c22d183d8b2917e0ee1a
+    commit: e55276ad8232ff80f908d53492bbd5af603dc2ee
   original:
     git: git@github.com:btq-ag/keelung.git
-    commit: 35ac43d676dd19d4285f92b2703d93e866ecbc90
+    commit: e55276ad8232ff80f908d53492bbd5af603dc2ee
 snapshots:
 - completed:
     size: 618884

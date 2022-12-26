@@ -83,8 +83,8 @@ tests = do
     --        input   0   0   4   1
     -- intermediate   0   0   0   0
     --
-    -- bitTestInputVarU :: Comp (Arr Boolean)
-    -- bitTestInputVarU = do
+    -- bitTestVarUI :: Comp (Arr Boolean)
+    -- bitTestVarUI = do
     --   x <- inputUInt @4
     --   return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
     let counters =

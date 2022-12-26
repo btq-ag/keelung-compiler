@@ -33,6 +33,7 @@ import Keelung.Data.Bindings
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed
 import Keelung.Types
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -77,7 +78,10 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   -- throw error if any assertion fails
   forM_ (compAssertions comp) $ \e -> do
     values <- interpret e
+    get >>= traceShowM
+    () <- traceShowM e
     when (values /= [1]) $ do
+
       let freeVarsInExpr = freeVars e
       fis <- mapM (\var -> ("$FI" <> show var,) <$> lookupFI var) $ IntSet.toList (ofI $ ofF freeVarsInExpr)
       fs' <- mapM (\var -> ("$F" <> show var,) <$> lookupF var) $ IntSet.toList (ofX $ ofF freeVarsInExpr)
@@ -94,6 +98,7 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
             (IntMap.toList (ofU freeVarsInExpr))
       -- collect variables and their bindings in the expression and report them
       throwError $ InterpretAssertionError e (fis <> fs' <> bis <> bs' <> us')
+
 
   -- lastly interpret the expression and return the result
   interpret expr
@@ -139,7 +144,7 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   --   widthOfUInt uint = case uint of
   --     ValU w _ -> w
   --     VarU w _ -> w
-  --     InputVarU w _ -> w
+  --     VarUI w _ -> w
   --     AddU w _ _ -> w
   --     SubU w _ _ -> w
   --     MulU w _ _ -> w
@@ -184,7 +189,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
   interpret expr = case expr of
     ValB b -> interpret b
     VarB var -> pure <$> lookupB var
-    InputVarB var -> pure <$> lookupBI var
+    VarBI var -> pure <$> lookupBI var
     AndB x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     OrB x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorB x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
@@ -236,7 +241,7 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
   interpret expr = case expr of
     ValU _ n -> return [fromIntegral n]
     VarU w var -> pure <$> lookupU w var
-    InputVarU w var -> pure <$> lookupUI w var
+    VarUI w var -> pure <$> lookupUI w var
     AddU _ x y -> zipWith (+) <$> interpret x <*> interpret y
     SubU _ x y -> zipWith (-) <$> interpret x <*> interpret y
     MulU _ x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -388,7 +393,7 @@ instance FreeVar Boolean where
   freeVars expr = case expr of
     ValB _ -> mempty
     VarB var -> updateF (updateX (IntSet.insert var)) mempty
-    InputVarB var -> updateF (updateX (IntSet.insert var)) mempty
+    VarBI var -> updateF (updateX (IntSet.insert var)) mempty
     AndB x y -> freeVars x <> freeVars y
     OrB x y -> freeVars x <> freeVars y
     XorB x y -> freeVars x <> freeVars y
@@ -416,7 +421,7 @@ instance FreeVar UInt where
   freeVars expr = case expr of
     ValU _ _ -> mempty
     VarU w var -> updateU w (updateI (IntSet.insert var)) mempty
-    InputVarU w var -> updateU w (updateI (IntSet.insert var)) mempty
+    VarUI w var -> updateU w (updateI (IntSet.insert var)) mempty
     AddU _ x y -> freeVars x <> freeVars y
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y
