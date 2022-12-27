@@ -6,14 +6,16 @@
 module Keelung.Data.Bindings where
 
 import Control.DeepSeq (NFData)
+import Data.Bifunctor (Bifunctor (..))
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.List as List
-import Data.Maybe (isNothing)
 import Data.Serialize (Serialize)
+import Data.Validation
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import GHC.Generics (Generic)
@@ -21,136 +23,110 @@ import Keelung.Field.N (N (N))
 import Keelung.Types
 
 --------------------------------------------------------------------------------
-type Total n = Bindings (Binding (Vector n)) (Binding (Vector n)) (Binding (Vector n))
 
-type Partial n = Bindings (Binding (Vector (Maybe n))) (Binding (Vector (Maybe n))) (Binding (Vector (Maybe n)))
+-- | Data structure for data associated with different primitive datatypes
+data Struct f b u = Struct
+  { structF :: f,
+    structB :: b,
+    structU :: IntMap u
+  }
+  deriving (Eq, Show, NFData, Generic)
 
-type Sparse n = Bindings (Binding (IntMap n)) (Binding (IntMap n)) (Binding (IntMap n))
+instance (Serialize f, Serialize b, Serialize u) => Serialize (Struct f b u)
 
-type Vars n = Bindings (Binding IntSet) (Binding IntSet) (Binding IntSet)
+instance (Semigroup f, Semigroup b, Semigroup u) => Semigroup (Struct f b u) where
+  Struct f1 b1 u1 <> Struct f2 b2 u2 = Struct (f1 <> f2) (b1 <> b2) (u1 <> u2)
 
--- | Convert a partial binding to a total binding, or return the variables that are not bound
-toTotal :: Partial n -> Either (Vars n) (Total n)
-toTotal (Bindings f b u) =
-  let -- 1. convert the partial binding to a total binding
-      -- 2. collect the variables that are not bound
-      (fK, fV) = splitPair $ fmap collectNothings f
-      (bK, bV) = splitPair $ fmap collectNothings b
-      (uK, uV) = splitIntMap $ fmap (splitPair . fmap collectNothings) u
-      -- tally the number of variables that are not bound
-      fKSize = varsSize fK
-      bKSize = varsSize bK
-      uKSize = sum $ fmap varsSize uK
-   in if fKSize + bKSize + uKSize == 0
-        then Right $ Bindings fV bV uV
-        else Left $ Bindings fK bK uK
-  where
-    collectNothings :: Vector (Maybe n) -> (IntSet, Vector n)
-    collectNothings xs = (IntSet.fromList $ Vector.toList $ Vector.findIndices isNothing xs, Vector.mapMaybe id xs)
+instance (Monoid f, Monoid b, Monoid u) => Monoid (Struct f b u) where
+  mempty = Struct mempty mempty mempty
 
-    splitIntMap :: IntMap (a, b) -> (IntMap a, IntMap b)
-    splitIntMap m = (IntMap.map fst m, IntMap.map snd m)
+updateF :: (x -> y) -> Struct x b u -> Struct y b u
+updateF func (Struct f b u) = Struct (func f) b u
 
-    -- NOTE: should take output variables into account
-    --       and restore this to "IntSet.size o + IntSet.size i + IntSet.size x"
-    varsSize :: Binding IntSet -> Int
-    varsSize (Binding _ i x) = IntSet.size i + IntSet.size x
+updateB :: (x -> y) -> Struct f x u -> Struct f y u
+updateB func (Struct f b u) = Struct f (func b) u
+
+updateU :: Width -> (x -> x) -> Struct f b x -> Struct f b x
+updateU w func (Struct f b u) = Struct f b $ IntMap.adjust func w u
 
 --------------------------------------------------------------------------------
 
--- | Binding of a single datatype
-data Binding n = Binding
+data OIX n = OIX
   { ofO :: n,
     ofI :: n,
     ofX :: n
   }
   deriving (Eq, Show, NFData, Generic)
 
-instance Semigroup n => Semigroup (Binding n) where
-  Binding o1 i1 x1 <> Binding o2 i2 x2 = Binding (o1 <> o2) (i1 <> i2) (x1 <> x2)
+instance Serialize n => Serialize (OIX n)
 
-instance Monoid n => Monoid (Binding n) where
-  mempty = Binding mempty mempty mempty
+instance (Semigroup n) => Semigroup (OIX n) where
+  OIX o1 i1 x1 <> OIX o2 i2 x2 = OIX (o1 <> o2) (i1 <> i2) (x1 <> x2)
 
-instance Foldable Binding where
-  foldMap f (Binding o i x) = f o <> f i <> f x
+instance (Monoid n) => Monoid (OIX n) where
+  mempty = OIX mempty mempty mempty
 
-instance Functor Binding where
-  fmap f (Binding o i x) = Binding (f o) (f i) (f x)
+updateO :: (n -> n) -> OIX n -> OIX n
+updateO f (OIX o i x) = OIX (f o) i x
 
-instance Traversable Binding where
-  traverse f (Binding o i x) = Binding <$> f o <*> f i <*> f x
+updateI :: (n -> n) -> OIX n -> OIX n
+updateI f (OIX o i x) = OIX o (f i) x
 
-instance Serialize n => Serialize (Binding n)
-
-instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Binding (Vector (Maybe n))) where
-  show (Binding o i x) = "output: " <> showVec o <> ", input: " <> showVec i <> ", intermediate: " <> showVec x
-    where
-      showVec = showList' . Vector.toList . fmap (\(index, value) -> case value of
-                Nothing -> "(" <> show index <> ",?)"
-                Just value' -> show (index, N value')
-            ) . Vector.indexed
-
-      showList' :: [String] -> String
-      showList' xs = "[" <> List.intercalate ", " xs <> "]"
-
-      
-
-updateX :: (n -> n) -> Binding n -> Binding n
-updateX f (Binding o i x) = Binding o i (f x)
-
-updateO :: (n -> n) -> Binding n -> Binding n
-updateO f (Binding o i x) = Binding (f o) i x
-
-updateI :: (n -> n) -> Binding n -> Binding n
-updateI f (Binding o i x) = Binding o (f i) x
-
-splitPair :: Binding (a, b) -> (Binding a, Binding b)
-splitPair (Binding (o1, o2) (i1, i2) (x1, x2)) = (Binding o1 i1 x1, Binding o2 i2 x2)
+updateX :: (n -> n) -> OIX n -> OIX n
+updateX f (OIX o i x) = OIX o i (f x)
 
 --------------------------------------------------------------------------------
 
--- | Bindings of different datatypes
-data Bindings f b u = Bindings
-  { ofF :: f,
-    ofB :: b,
-    ofU :: IntMap u
-  }
-  deriving (Eq, Show, NFData, Generic)
+type Witness n = OIX (Struct (TotalBinding n) (TotalBinding n) (TotalBinding n))
 
-instance (Semigroup f, Semigroup b, Semigroup u) => Semigroup (Bindings f b u) where
-  Bindings f1 b1 u1 <> Bindings f2 b2 u2 = Bindings (f1 <> f2) (b1 <> b2) (u1 <> u2)
+type TotalBinding n = Vector n
 
-instance (Monoid f, Monoid b, Monoid u) => Monoid (Bindings f b u) where
-  mempty = Bindings mempty mempty mempty
+-- | Convert a partial binding to a total binding, or return the variables that are not bound
+toTotal2 :: Sparse n -> Either (Vars n) (Witness n)
+toTotal2 (OIX o i x) =
+  toEither $
+    OIX
+      <$> first (\struct -> OIX struct mempty mempty) (convertStruct o)
+      <*> first (\struct -> OIX mempty struct mempty) (convertStruct i)
+      <*> first (OIX mempty mempty) (convertStruct x)
+  where
+    convertStruct ::
+      Struct (Int, IntMap n) (Int, IntMap n) (Int, IntMap n) ->
+      Validation (Struct IntSet IntSet IntSet) (Struct (Vector n) (Vector n) (Vector n))
+    convertStruct (Struct f b u) =
+      Struct
+        <$> first (\set -> Struct set mempty mempty) (convert f)
+        <*> first (\set -> Struct mempty set mempty) (convert b)
+        <*> first (Struct mempty mempty) (sequenceIntMap convert u)
 
-instance (Serialize f, Serialize b, Serialize u) => Serialize (Bindings f b u)
+    convert :: (Int, IntMap n) -> Validation IntSet (Vector n)
+    convert (size, xs) =
+      if IntMap.size xs < size
+        then
+          let completeIntSet = IntSet.fromDistinctAscList [0 .. size - 1]
+           in Failure (IntSet.difference completeIntSet (IntMap.keysSet xs))
+        else Success (Vector.fromList (toList xs))
 
-updateF :: (f -> f) -> Bindings f b u -> Bindings f b u
-updateF f (Bindings f' b u) = Bindings (f f') b u
-
-updateB :: (b -> b) -> Bindings f b u -> Bindings f b u
-updateB f (Bindings f' b u) = Bindings f' (f b) u
-
-updateU :: Width -> (u -> u) -> Bindings f b u -> Bindings f b u
-updateU w f (Bindings f' b u) = Bindings f' b $ IntMap.adjust f w u
+    sequenceIntMap :: (a -> Validation b c) -> IntMap a -> Validation (IntMap b) (IntMap c)
+    sequenceIntMap f = sequenceA . IntMap.mapWithKey (\width xs -> first (IntMap.singleton width) (f xs))
 
 --------------------------------------------------------------------------------
+
+type Vars n = OIX (Struct IntSet IntSet IntSet)
 
 instance {-# OVERLAPPING #-} Show (Vars n) where
-  show (Bindings f b u) =
+  show (OIX o i x) =
     showList' $
-      showBinding "F" f <> showBinding "B" b
-        <> concatMap (\(width, xs) -> showBinding ("U" <> toSubscript width) xs) (IntMap.toList u)
+      showStruct "O" o <> showStruct "I" i <> showStruct "" x
     where
       showList' :: [String] -> String
       showList' xs = "[" <> List.intercalate ", " xs <> "]"
 
-      showBinding :: String -> Binding IntSet -> [String]
-      showBinding prefix (Binding o i x) =
-        map (\var -> "$" <> prefix <> "O" <> show var) (IntSet.toList o)
-          <> map (\var -> "$" <> prefix <> "I" <> show var) (IntSet.toList i)
-          <> map (\var -> "$" <> prefix <> show var) (IntSet.toList x)
+      showStruct :: String -> Struct IntSet IntSet IntSet -> [String]
+      showStruct prefix (Struct f b u) =
+        map (\var -> "$B" <> prefix <> show var) (IntSet.toList b)
+          <> map (\var -> "$F" <> prefix <> show var) (IntSet.toList f)
+          <> concatMap (\(width, xs) -> map (\var -> "$U" <> toSubscript width <> prefix <> show var) (IntSet.toList xs)) (IntMap.toList u)
 
       toSubscript :: Int -> String
       toSubscript = map go . show
@@ -167,3 +143,21 @@ instance {-# OVERLAPPING #-} Show (Vars n) where
             '8' -> '₈'
             '9' -> '₉'
             _ -> c
+
+--------------------------------------------------------------------------------
+
+type SparseBinding n = (Int, IntMap n) -- Int for indicating the number of elements if the IntMap is total
+
+type Sparse n = OIX (Struct (SparseBinding n) (SparseBinding n) (SparseBinding n))
+
+instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (SparseBinding n) where
+  show (_size, bindings) = showList' $ map (\(k, v) -> "($" <> show k <> "," <> show (N v) <> ")") (IntMap.toList bindings)
+    where
+      showList' :: [String] -> String
+      showList' xs = "[" <> List.intercalate ", " xs <> "]"
+
+instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Struct (SparseBinding n) (SparseBinding n) (SparseBinding n)) where
+  show (Struct f b u) = "{ F: " <> show f <> ", B: " <> show b <> ", U: " <> show u <> " }"
+
+instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Sparse n) where
+  show (OIX o i x) = "{ O: " <> show o <> ", I: " <> show i <> ", X: " <> show x <> " }"

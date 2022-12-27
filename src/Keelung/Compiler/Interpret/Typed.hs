@@ -22,8 +22,6 @@ import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Data.Serialize (Serialize)
-import Data.Vector (Vector)
-import qualified Data.Vector as Vector
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
@@ -33,11 +31,12 @@ import Keelung.Data.Bindings
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed
 import Keelung.Types
+import Data.Bifunctor (Bifunctor(..))
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
-runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) ([n], Total n)
+runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) ([n], Witness n)
 runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   -- interpret assignments of values first
   fs <-
@@ -79,28 +78,31 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
     values <- interpret e
     when (values /= [1]) $ do
       let freeVarsInExpr = freeVars e
-      fis <- mapM (\var -> ("$FI" <> show var,) <$> lookupFI var) $ IntSet.toList (ofI $ ofF freeVarsInExpr)
-      fs' <- mapM (\var -> ("$F" <> show var,) <$> lookupF var) $ IntSet.toList (ofX $ ofF freeVarsInExpr)
-      bis <- mapM (\var -> ("$BI" <> show var,) <$> lookupBI var) $ IntSet.toList (ofI $ ofB freeVarsInExpr)
-      bs' <- mapM (\var -> ("$B" <> show var,) <$> lookupB var) $ IntSet.toList (ofX $ ofB freeVarsInExpr)
+      fis <- mapM (\var -> ("$FI" <> show var,) <$> lookupFI var) $ IntSet.toList (structF $ ofI freeVarsInExpr)
+      fs' <- mapM (\var -> ("$F" <> show var,) <$> lookupF var) $ IntSet.toList (structF $ ofX freeVarsInExpr)
+      bis <- mapM (\var -> ("$BI" <> show var,) <$> lookupBI var) $ IntSet.toList (structB $ ofI freeVarsInExpr)
+      bs' <- mapM (\var -> ("$B" <> show var,) <$> lookupB var) $ IntSet.toList (structB $ ofX freeVarsInExpr)
+
+      uis <-
+        concat
+          <$> mapM
+            ( \(width, bindings) -> mapM (\var -> ("$UI" <> show var,) <$> lookupU width var) (IntSet.toList bindings)
+            )
+            (IntMap.toList (structU $ ofI freeVarsInExpr))
+
       us' <-
         concat
           <$> mapM
-            ( \(width, bindings) -> do
-                is <- mapM (\var -> ("$UI" <> show var,) <$> lookupUI width var) (IntSet.toList (ofI bindings))
-                xs <- mapM (\var -> ("$U" <> show var,) <$> lookupU width var) (IntSet.toList (ofX bindings))
-                return (is <> xs)
+            ( \(width, bindings) -> mapM (\var -> ("$U" <> show var,) <$> lookupU width var) (IntSet.toList bindings)
             )
-            (IntMap.toList (ofU freeVarsInExpr))
+            (IntMap.toList (structU $ ofX freeVarsInExpr))
       -- collect variables and their bindings in the expression and report them
-      throwError $ InterpretAssertionError e (fis <> fs' <> bis <> bs' <> us')
+      throwError $ InterpretAssertionError e (fis <> fs' <> bis <> bs' <> uis <> us')
 
   -- lastly interpret the expression and return the result
   interpret expr
 
 -- rawOutputs <- interpret expr
-
--- traceShowM (Inputs.varCounters inputs)
 
 -- case expr of
 --   Unit -> return ()
@@ -265,96 +267,78 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = ReaderT (Inputs n) (StateT (Partial n) (Except (InterpretError n)))
+type M n = ReaderT (Inputs n) (StateT (Sparse n) (Except (InterpretError n)))
 
-runM :: Inputs n -> M n a -> Either (InterpretError n) (a, Total n)
+runM :: Inputs n -> M n a -> Either (InterpretError n) (a, Witness n)
 runM inputs p =
   let counters = Inputs.varCounters inputs
       -- construct the initial partial Bindings from Inputs
       initBindings =
-        Bindings
-          { ofF =
-              Binding
-                { ofX = Vector.replicate (getCount OfIntermediate OfField counters) Nothing,
-                  ofO = Vector.replicate (getCount OfOutput OfField counters) Nothing,
-                  ofI = Vector.fromList (map Just (toList (Inputs.numInputs inputs)))
+        OIX
+          { ofO =
+              Struct
+                { structF = (getCount OfOutput OfField counters, mempty),
+                  structB = (getCount OfOutput OfBoolean counters, mempty),
+                  structU = IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
                 },
-            ofB =
-              Binding
-                { ofX = Vector.replicate (getCount OfIntermediate OfBoolean counters) Nothing,
-                  ofO = Vector.replicate (getCount OfOutput OfBoolean counters) Nothing,
-                  ofI = Vector.fromList (map Just (toList (Inputs.boolInputs inputs)))
+            ofI =
+              Struct
+                { structF = (getCount OfInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.numInputs inputs))),
+                  structB = (getCount OfInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.boolInputs inputs))),
+                  structU = IntMap.mapWithKey (\w bindings -> (getCount OfInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.uintInputs inputs)
                 },
-            ofU =
-              IntMap.mapWithKey
-                ( \width bindings ->
-                    Binding
-                      { ofX = Vector.replicate (getCount OfIntermediate (OfUInt width) counters) Nothing,
-                        ofO = Vector.replicate (getCount OfOutput (OfUInt width) counters) Nothing,
-                        ofI = Vector.fromList (map Just (toList bindings))
-                      }
-                )
-                (Inputs.uintInputs inputs)
+            ofX =
+              Struct
+                { structF = (getCount OfIntermediate OfField counters, mempty),
+                  structB = (getCount OfIntermediate OfBoolean counters, mempty),
+                  structU = IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
+                }
           }
    in do
         (result, partialBindings) <- runExcept (runStateT (runReaderT p inputs) initBindings)
         -- make the partial Bindings total
-        case toTotal partialBindings of
+        case toTotal2 partialBindings of
           Left unbound -> Left (InterpretVarUnassignedError unbound)
           Right bindings -> Right (result, bindings)
 
 addF :: Var -> [n] -> M n ()
-addF var vals = modify (updateF (updateX (Vector.// [(var, safeHead vals)])))
-
--- addFO :: [n] -> M n ()
--- addFO vals = modify (updateF (updateO (\xs -> xs <> Vector.fromList (map Just vals))))
+addF var vals = modify (updateX (updateF (second (IntMap.insert var (head vals)))))
 
 addB :: Var -> [n] -> M n ()
-addB var vals = modify (updateB (updateX (Vector.// [(var, safeHead vals)])))
-
--- addBO :: [n] -> M n ()
--- addBO vals = modify (updateB (updateO (\xs -> xs <> Vector.fromList (map Just vals))))
+addB var vals = modify (updateX (updateB (second (IntMap.insert var (head vals)))))
 
 addU :: Width -> Var -> [n] -> M n ()
-addU w var vals = modify (updateU w (updateX (Vector.// [(var, safeHead vals)])))
+addU width var vals = modify (updateX (updateU width (second (IntMap.insert var (head vals)))))
 
--- addUO :: Width -> [n] -> M n ()
--- addUO w vals = modify (updateU w (updateO (\xs -> xs <> Vector.fromList (map Just vals))))
-
-lookupVar :: (Partial n -> Vector (Maybe a)) -> Int -> M n a
+lookupVar :: (Sparse n -> (Int, IntMap a)) -> Int -> M n a
 lookupVar selector var = do
-  f <- gets selector
-  case f Vector.!? var of
+  (_, f) <- gets selector
+  case IntMap.lookup var f of
     Nothing -> throwError $ InterpretUnboundVarError var
-    Just Nothing -> throwError $ InterpretUnboundVarError var
-    Just (Just val) -> return val
+    Just val -> return val
 
 lookupF :: Var -> M n n
-lookupF = lookupVar (ofX . ofF)
+lookupF = lookupVar (structF . ofX)
 
 lookupFI :: Var -> M n n
-lookupFI = lookupVar (ofI . ofF)
+lookupFI = lookupVar (structF . ofI)
 
 lookupB :: Var -> M n n
-lookupB = lookupVar (ofX . ofB)
+lookupB = lookupVar (structB . ofX)
 
 lookupBI :: Var -> M n n
-lookupBI = lookupVar (ofI . ofB)
+lookupBI = lookupVar (structB . ofI)
 
 lookupU :: Width -> Var -> M n n
-lookupU w = lookupVar (ofX . unsafeLookup w . ofU)
+lookupU w = lookupVar (unsafeLookup w . structU . ofX)
 
 lookupUI :: Width -> Var -> M n n
-lookupUI w = lookupVar (ofI . unsafeLookup w . ofU)
+lookupUI w = lookupVar (unsafeLookup w . structU . ofI)
 
 unsafeLookup :: Int -> IntMap a -> a
 unsafeLookup x y = case IntMap.lookup x y of
   Nothing -> error "[ panic ] bit width not found"
   Just z -> z
-
-safeHead :: [a] -> Maybe a
-safeHead [] = Nothing
-safeHead (x : _) = Just x
 
 --------------------------------------------------------------------------------
 
@@ -388,8 +372,8 @@ instance FreeVar Computation where
 instance FreeVar Boolean where
   freeVars expr = case expr of
     ValB _ -> mempty
-    VarB var -> updateF (updateX (IntSet.insert var)) mempty
-    VarBI var -> updateF (updateX (IntSet.insert var)) mempty
+    VarB var -> updateX (updateB (IntSet.insert var)) mempty
+    VarBI var -> updateI (updateB (IntSet.insert var)) mempty
     AndB x y -> freeVars x <> freeVars y
     OrB x y -> freeVars x <> freeVars y
     XorB x y -> freeVars x <> freeVars y
@@ -404,8 +388,8 @@ instance FreeVar Field where
   freeVars expr = case expr of
     ValF _ -> mempty
     ValFR _ -> mempty
-    VarF var -> updateF (updateI (IntSet.insert var)) mempty
-    VarFI var -> updateF (updateI (IntSet.insert var)) mempty
+    VarF var -> updateX (updateF (IntSet.insert var)) mempty
+    VarFI var -> updateI (updateF (IntSet.insert var)) mempty
     AddF x y -> freeVars x <> freeVars y
     SubF x y -> freeVars x <> freeVars y
     MulF x y -> freeVars x <> freeVars y
@@ -416,8 +400,8 @@ instance FreeVar Field where
 instance FreeVar UInt where
   freeVars expr = case expr of
     ValU _ _ -> mempty
-    VarU w var -> updateU w (updateI (IntSet.insert var)) mempty
-    VarUI w var -> updateU w (updateI (IntSet.insert var)) mempty
+    VarU w var -> updateX (updateU w (IntSet.insert var)) mempty
+    VarUI w var -> updateI (updateU w (IntSet.insert var)) mempty
     AddU _ x y -> freeVars x <> freeVars y
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y
