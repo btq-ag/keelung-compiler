@@ -72,30 +72,8 @@ compileAssertion expr = do
       compileExprU out x
       add $ cVarBindU out 1
 
--- compileValueBindings :: (GaloisField n, Integral n) => Struct (IntMap n) (IntMap n) (IntMap n) -> M n ()
--- compileValueBindings bindings = do
---   forM_ (IntMap.toList (structF bindings)) $ \(var, val) -> add $ cAddF val [(RefF var, -1)]
---   forM_ (IntMap.toList (bindingsFI bindings)) $ \(var, val) -> add $ cAddF val [(RefFI var, -1)]
---   forM_ (IntMap.toList (bindingsB bindings)) $ \(var, val) -> add $ cAddB val [(RefB var, -1)]
---   forM_ (IntMap.toList (bindingsBI bindings)) $ \(var, val) -> add $ cAddB val [(RefBI var, -1)]
---   forM_ (IntMap.toList (bindingsUs bindings)) $ \(width, bindings') ->
---     forM_ (IntMap.toList bindings') $ \(var, val) -> add $ cVarBindU (RefU width var) val
---   forM_ (IntMap.toList (bindingsUIs bindings)) $ \(width, bindings') ->
---     forM_ (IntMap.toList bindings') $ \(var, val) -> add $ cVarBindU (RefUI width var) val
-
-compileExprBindings :: (GaloisField n, Integral n) => Bindings (ExprF n) (ExprB n) (ExprU n) -> M n ()
-compileExprBindings bindings = do
-  forM_ (IntMap.toList (bindingsF bindings)) $ \(var, val) -> compileExprF (RefF var) val
-  forM_ (IntMap.toList (bindingsFI bindings)) $ \(var, val) -> compileExprF (RefFI var) val
-  forM_ (IntMap.toList (bindingsB bindings)) $ \(var, val) -> compileExprB (RefB var) val
-  forM_ (IntMap.toList (bindingsBI bindings)) $ \(var, val) -> compileExprB (RefBI var) val
-  forM_ (IntMap.toList (bindingsUs bindings)) $ \(width, bindings') ->
-    forM_ (IntMap.toList bindings') $ \(var, val) -> compileExprU (RefU width var) val
-  forM_ (IntMap.toList (bindingsUIs bindings)) $ \(width, bindings') ->
-    forM_ (IntMap.toList bindings') $ \(var, val) -> compileExprU (RefUI width var) val
-
 compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
-compileRelations (Relations vb vbi ebs) = do
+compileRelations (Relations vb vbi eb ebi) = do
   -- intermediate variable bindings of values
   forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cAddF val [(RefF var, -1)]
   forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cAddB val [(RefB var, -1)]
@@ -106,8 +84,16 @@ compileRelations (Relations vb vbi ebs) = do
   forM_ (IntMap.toList (structB vbi)) $ \(var, val) -> add $ cAddB val [(RefBI var, -1)]
   forM_ (IntMap.toList (structU vbi)) $ \(width, bindings) ->
     forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefUI width var) val
-
-  compileExprBindings ebs
+  -- intermediate variable bindings of expressions
+  forM_ (IntMap.toList (structF eb)) $ \(var, val) -> compileExprF (RefF var) val
+  forM_ (IntMap.toList (structB eb)) $ \(var, val) -> compileExprB (RefB var) val
+  forM_ (IntMap.toList (structU eb)) $ \(width, bindings) ->
+    forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefU width var) val
+  -- input variable bindings of expressions
+  forM_ (IntMap.toList (structF ebi)) $ \(var, val) -> compileExprF (RefFI var) val
+  forM_ (IntMap.toList (structB ebi)) $ \(var, val) -> compileExprB (RefBI var) val
+  forM_ (IntMap.toList (structU ebi)) $ \(width, bindings) ->
+    forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefUI width var) val
 
 --------------------------------------------------------------------------------
 

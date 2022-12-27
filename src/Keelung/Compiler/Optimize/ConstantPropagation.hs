@@ -31,14 +31,14 @@ propagateRelations before =
 
 -- | Seperate value bindings from expression bindings
 refineRelations :: Relations n -> (Relations n, Bool)
-refineRelations (Relations vals valsI exprs) =
+refineRelations (Relations vals valsI exprs exprsI) =
   -- extract value bindings from expression bindings
-  let (fsV, fsE) = IntMap.mapEither seperateF (bindingsF exprs)
-      (fisV, fisE) = IntMap.mapEither seperateF (bindingsFI exprs)
-      (bsV, bsE) = IntMap.mapEither seperateB (bindingsB exprs)
-      (bisV, bisE) = IntMap.mapEither seperateB (bindingsBI exprs)
-      (usV, usE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (bindingsUs exprs)
-      (uisV, uisE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (bindingsUIs exprs)
+  let (fsV, fsE) = IntMap.mapEither seperateF (structF exprs)
+      (fisV, fisE) = IntMap.mapEither seperateF (structF exprsI)
+      (bsV, bsE) = IntMap.mapEither seperateB (structB exprs)
+      (bisV, bisE) = IntMap.mapEither seperateB (structB exprsI)
+      (usV, usE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (structU exprs)
+      (uisV, uisE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (structU exprsI)
       changed = not $ IntMap.null fsV || IntMap.null fisV || IntMap.null bsV || IntMap.null bisV || IntMap.null usV || IntMap.null uisV
    in ( Relations
           ( vals
@@ -53,7 +53,8 @@ refineRelations (Relations vals valsI exprs) =
                 structU = structU valsI <> uisV
               }
           )
-          (Bindings fsE fisE bsE bisE usE uisE),
+          (Struct fsE bsE usE)
+          (Struct fisE bisE uisE),
         changed
       )
   where

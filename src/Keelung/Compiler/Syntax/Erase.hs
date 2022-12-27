@@ -5,6 +5,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
+import Keelung.Data.Bindings (Struct (..))
 import qualified Keelung.Syntax.Typed as T
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
@@ -19,12 +20,14 @@ run (T.Elaborated expr comp) =
         assertions' <- concat <$> mapM eraseExpr assertions
         relations <-
           Relations mempty mempty
-            <$> ( Bindings
+            <$> ( Struct
                     <$> mapM eraseExprF aF
-                    <*> mapM eraseExprF aFI
                     <*> mapM eraseExprB aB
-                    <*> mapM eraseExprB aBI
                     <*> mapM (mapM eraseExprU) aU
+                )
+            <*> ( Struct
+                    <$> mapM eraseExprF aFI
+                    <*> mapM eraseExprB aBI
                     <*> mapM (mapM eraseExprU) aUI
                 )
 

@@ -348,24 +348,6 @@ addBinding :: Var -> [n] -> M n ()
 addBinding var [val] = modify (IntMap.insert var val)
 addBinding _ _ = error "addBinding: expected a single value"
 
--- addBinding (VarF var) [val] = modify (IntMap.insert var val)
--- addBinding (ArrayRef _ _ addr) vals = do
---   vars <- collectVarsFromAddr addr
---   mapM_
---     (modify . uncurry IntMap.insert)
---     (zip vars vals)
---   where
---     collectVarsFromAddr :: Addr -> M n [Var]
---     collectVarsFromAddr address = do
---       heap <- asks snd
---       case IntMap.lookup address heap of
---         Nothing -> throwError $ InterpretUnboundAddrError addr heap
---         Just (elemType, array) -> case elemType of
---           ElemF -> return $ IntMap.elems array
---           ElemB -> return $ IntMap.elems array
---           (ElemArr _ _) -> concat <$> mapM collectVarsFromAddr (IntMap.elems array)
--- addBinding _ _ = error "addBinding: too many values"
-
 --------------------------------------------------------------------------------
 
 data InterpretError n

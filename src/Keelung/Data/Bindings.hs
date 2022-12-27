@@ -84,40 +84,11 @@ type Witness n = OIX (Struct (TotalBinding n) (TotalBinding n) (TotalBinding n))
 
 type TotalBinding n = Vector n
 
--- | Convert a partial binding to a total binding, or return the variables that are not bound
-toTotal2 :: Sparse n -> Either (Vars n) (Witness n)
-toTotal2 (OIX o i x) =
-  toEither $
-    OIX
-      <$> first (\struct -> OIX struct mempty mempty) (convertStruct o)
-      <*> first (\struct -> OIX mempty struct mempty) (convertStruct i)
-      <*> first (OIX mempty mempty) (convertStruct x)
-  where
-    convertStruct ::
-      Struct (Int, IntMap n) (Int, IntMap n) (Int, IntMap n) ->
-      Validation (Struct IntSet IntSet IntSet) (Struct (Vector n) (Vector n) (Vector n))
-    convertStruct (Struct f b u) =
-      Struct
-        <$> first (\set -> Struct set mempty mempty) (convert f)
-        <*> first (\set -> Struct mempty set mempty) (convert b)
-        <*> first (Struct mempty mempty) (sequenceIntMap convert u)
-
-    convert :: (Int, IntMap n) -> Validation IntSet (Vector n)
-    convert (size, xs) =
-      if IntMap.size xs < size
-        then
-          let completeIntSet = IntSet.fromDistinctAscList [0 .. size - 1]
-           in Failure (IntSet.difference completeIntSet (IntMap.keysSet xs))
-        else Success (Vector.fromList (toList xs))
-
-    sequenceIntMap :: (a -> Validation b c) -> IntMap a -> Validation (IntMap b) (IntMap c)
-    sequenceIntMap f = sequenceA . IntMap.mapWithKey (\width xs -> first (IntMap.singleton width) (f xs))
-
 --------------------------------------------------------------------------------
 
-type Vars n = OIX (Struct IntSet IntSet IntSet)
+type VarSet n = OIX (Struct IntSet IntSet IntSet)
 
-instance {-# OVERLAPPING #-} Show (Vars n) where
+instance {-# OVERLAPPING #-} Show (VarSet n) where
   show (OIX o i x) =
     showList' $
       showStruct "O" o <> showStruct "I" i <> showStruct "" x
@@ -149,18 +120,49 @@ instance {-# OVERLAPPING #-} Show (Vars n) where
 
 --------------------------------------------------------------------------------
 
-type SparseBinding n = (Int, IntMap n) -- Int for indicating the number of elements if the IntMap is total
+-- | Data structure for interpreters
+type Partial n = OIX (Struct (PartialBinding n) (PartialBinding n) (PartialBinding n))
 
-type Sparse n = OIX (Struct (SparseBinding n) (SparseBinding n) (SparseBinding n))
+-- | Expected number of bindings and actual bindings
+type PartialBinding n = (Int, IntMap n)
 
-instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (SparseBinding n) where
+instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (PartialBinding n) where
   show (_size, bindings) = showList' $ map (\(k, v) -> "($" <> show k <> "," <> show (N v) <> ")") (IntMap.toList bindings)
     where
       showList' :: [String] -> String
       showList' xs = "[" <> List.intercalate ", " xs <> "]"
 
-instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Struct (SparseBinding n) (SparseBinding n) (SparseBinding n)) where
+instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Struct (PartialBinding n) (PartialBinding n) (PartialBinding n)) where
   show (Struct f b u) = "{ F: " <> show f <> ", B: " <> show b <> ", U: " <> show u <> " }"
 
-instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Sparse n) where
+instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) where
   show (OIX o i x) = "{ O: " <> show o <> ", I: " <> show i <> ", X: " <> show x <> " }"
+
+-- | Convert a partial binding to a total binding, or return the variables that are not bound
+toTotal :: Partial n -> Either (VarSet n) (Witness n)
+toTotal (OIX o i x) =
+  toEither $
+    OIX
+      <$> first (\struct -> OIX struct mempty mempty) (convertStruct o)
+      <*> first (\struct -> OIX mempty struct mempty) (convertStruct i)
+      <*> first (OIX mempty mempty) (convertStruct x)
+  where
+    convertStruct ::
+      Struct (Int, IntMap n) (Int, IntMap n) (Int, IntMap n) ->
+      Validation (Struct IntSet IntSet IntSet) (Struct (Vector n) (Vector n) (Vector n))
+    convertStruct (Struct f b u) =
+      Struct
+        <$> first (\set -> Struct set mempty mempty) (convert f)
+        <*> first (\set -> Struct mempty set mempty) (convert b)
+        <*> first (Struct mempty mempty) (sequenceIntMap convert u)
+
+    convert :: (Int, IntMap n) -> Validation IntSet (Vector n)
+    convert (size, xs) =
+      if IntMap.size xs < size
+        then
+          let completeIntSet = IntSet.fromDistinctAscList [0 .. size - 1]
+           in Failure (IntSet.difference completeIntSet (IntMap.keysSet xs))
+        else Success (Vector.fromList (toList xs))
+
+    sequenceIntMap :: (a -> Validation b c) -> IntMap a -> Validation (IntMap b) (IntMap c)
+    sequenceIntMap f = sequenceA . IntMap.mapWithKey (\width xs -> first (IntMap.singleton width) (f xs))

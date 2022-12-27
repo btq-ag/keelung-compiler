@@ -11,7 +11,6 @@ module Keelung.Compiler.Syntax.Untyped
     ExprU (..),
     TypeErased (..),
     Assignment (..),
-    Bindings (..),
     lookupF,
     lookupB,
     lookupU,
@@ -25,7 +24,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint2
-import Keelung.Data.Bindings
+import Keelung.Data.Bindings (Struct (structB, structF, structU))
 import qualified Keelung.Data.Bindings as Struct
 import Keelung.Field (N (..))
 import Keelung.Syntax.Counters
@@ -53,7 +52,7 @@ data ExprB n
   | EqF (ExprF n) (ExprF n)
   | EqU (ExprU n) (ExprU n)
   | BitU (ExprU n) Int
-  deriving (Functor)
+  deriving (Functor, Eq)
 
 instance (Integral n, Show n) => Show (ExprB n) where
   showsPrec prec expr = case expr of
@@ -90,7 +89,7 @@ data ExprF n
   | -- logical operators
     IfF (ExprB n) (ExprF n) (ExprF n)
   | BtoF (ExprB n)
-  deriving (Functor)
+  deriving (Functor, Eq)
 
 instance (Show n, Integral n) => Show (ExprF n) where
   showsPrec prec expr = case expr of
@@ -125,7 +124,7 @@ data ExprU n
   | RoLU Width Int (ExprU n)
   | ShLU Width Int (ExprU n)
   | BtoU Width (ExprB n)
-  deriving (Functor)
+  deriving (Functor, Eq)
 
 instance (Show n, Integral n) => Show (ExprU n) where
   showsPrec prec expr = case expr of
@@ -239,48 +238,6 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
 
 --------------------------------------------------------------------------------
 
--- | Container for holding something for each datatypes
-data Bindings f b u = Bindings
-  { bindingsF :: IntMap f, -- bindings to Field elements intermediate variables
-    bindingsFI :: IntMap f, -- bindings to Field elements input variables
-    bindingsB :: IntMap b, -- bindings to Boolean intermediate variables
-    bindingsBI :: IntMap b, -- bindings to Boolean input variables
-    bindingsUs :: IntMap (IntMap u), -- bindings to intermediate Unsigned integers variables of different bitwidths
-    bindingsUIs :: IntMap (IntMap u) -- bindings to input Unsigned integers variables of different bitwidths
-  }
-  deriving (Eq, Functor, Show)
-
-instance Semigroup (Bindings f b u) where
-  Bindings fs0 fis0 bs0 bis0 us0 uis0 <> Bindings fs1 fis1 bs1 bis1 us1 uis1 =
-    Bindings
-      (fs0 <> fs1)
-      (fis0 <> fis1)
-      (bs0 <> bs1)
-      (bis0 <> bis1)
-      (us0 <> us1)
-      (uis0 <> uis1)
-
-instance Monoid (Bindings f b u) where
-  mempty = Bindings mempty mempty mempty mempty mempty mempty
-
--- instance Foldable Bindings where
---   foldMap f bindings =
---     foldMap f (bindingsF bindings)
---       <> foldMap f (bindingsFI bindings)
---       <> foldMap f (bindingsB bindings)
---       <> foldMap f (bindingsBI bindings)
---       <> foldMap (foldMap f) (bindingsUs bindings)
---       <> foldMap (foldMap f) (bindingsUIs bindings)
-
--- instance Traversable Bindings where
---   traverse f bindings =
---     Bindings <$> traverse f (bindingsF bindings)
---       <*> traverse f (bindingsFI bindings)
---       <*> traverse f (bindingsB bindings)
---       <*> traverse f (bindingsBI bindings)
---       <*> traverse (traverse f) (bindingsUs bindings)
---       <*> traverse (traverse f) (bindingsUIs bindings)
-
 lookupF :: Var -> Struct (IntMap f) b u -> Maybe f
 lookupF var = IntMap.lookup var . structF
 
@@ -297,11 +254,12 @@ data Relations n = Relations
     valueBindings :: Struct (IntMap n) (IntMap n) (IntMap n),
     valueBindingsI :: Struct (IntMap n) (IntMap n) (IntMap n),
     -- var = expression
-    exprBindings :: Bindings (ExprF n) (ExprB n) (ExprU n)
+    exprBindings :: Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n)),
+    exprBindingsI :: Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n))
   }
 
 instance (Integral n, Show n) => Show (Relations n) where
-  show (Relations vb vbi ebs) =
+  show (Relations vb vbi eb ebi) =
     ( if Struct.empty vb
         then ""
         else "Binding of intermediate variables to values:\n" <> show vb <> "\n"
@@ -310,13 +268,22 @@ instance (Integral n, Show n) => Show (Relations n) where
              then ""
              else "Binding of input variables to values:\n" <> show vb <> "\n"
          )
-      <> "Binding of variables to expressions:\n"
-      <> show ebs
-      <> "\n"
+      <> ( if Struct.empty eb
+             then ""
+             else "Binding of intermediate variables to expressions:\n" <> show eb <> "\n"
+         )
+      <> ( if Struct.empty ebi
+             then ""
+             else "Binding of input variables to expressions:\n" <> show ebi <> "\n"
+         )
 
 instance Semigroup (Relations n) where
-  Relations vb0 vbi0 eb0 <> Relations vb1 vbi1 eb1 =
-    Relations (vb0 <> vb1) (vbi0 <> vbi1) (eb0 <> eb1)
+  Relations vb0 vbi0 eb0 ebi0 <> Relations vb1 vbi1 eb1 ebi1 =
+    Relations
+      (vb0 <> vb1)
+      (vbi0 <> vbi1)
+      (eb0 <> eb1)
+      (ebi0 <> ebi1)
 
 instance Monoid (Relations n) where
-  mempty = Relations mempty mempty mempty
+  mempty = Relations mempty mempty mempty mempty

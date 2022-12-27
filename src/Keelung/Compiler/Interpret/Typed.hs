@@ -267,7 +267,7 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = ReaderT (Inputs n) (StateT (Sparse n) (Except (InterpretError n)))
+type M n = ReaderT (Inputs n) (StateT (Partial n) (Except (InterpretError n)))
 
 runM :: Inputs n -> M n a -> Either (InterpretError n) (a, Witness n)
 runM inputs p =
@@ -297,7 +297,7 @@ runM inputs p =
    in do
         (result, partialBindings) <- runExcept (runStateT (runReaderT p inputs) initBindings)
         -- make the partial Bindings total
-        case toTotal2 partialBindings of
+        case toTotal partialBindings of
           Left unbound -> Left (InterpretVarUnassignedError unbound)
           Right bindings -> Right (result, bindings)
 
@@ -310,7 +310,7 @@ addB var vals = modify (updateX (updateB (second (IntMap.insert var (head vals))
 addU :: Width -> Var -> [n] -> M n ()
 addU width var vals = modify (updateX (updateU width (second (IntMap.insert var (head vals)))))
 
-lookupVar :: (Sparse n -> (Int, IntMap a)) -> Int -> M n a
+lookupVar :: (Partial n -> (Int, IntMap a)) -> Int -> M n a
 lookupVar selector var = do
   (_, f) <- gets selector
   case IntMap.lookup var f of
@@ -344,7 +344,7 @@ unsafeLookup x y = case IntMap.lookup x y of
 
 -- | For collecting free variables
 class FreeVar a where
-  freeVars :: a -> Vars n
+  freeVars :: a -> VarSet n
 
 instance FreeVar Expr where
   freeVars expr = case expr of
@@ -423,7 +423,7 @@ data InterpretError n
     InterpretAssertionError Expr [(String, n)]
   | -- | InterpretVarUnassignedError IntSet (Witness n)
     InterpretInputSizeError Int Int
-  | InterpretVarUnassignedError (Vars n)
+  | InterpretVarUnassignedError (VarSet n)
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (InterpretError n)
