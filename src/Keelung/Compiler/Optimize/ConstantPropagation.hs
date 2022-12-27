@@ -7,6 +7,7 @@ import Data.Bifunctor (bimap)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
 import Keelung.Compiler.Syntax.Untyped
+import Keelung.Data.Bindings (Struct (..))
 
 --------------------------------------------------------------------------------
 
@@ -30,7 +31,7 @@ propagateRelations before =
 
 -- | Seperate value bindings from expression bindings
 refineRelations :: Relations n -> (Relations n, Bool)
-refineRelations (Relations vals exprs) =
+refineRelations (Relations vals valsI exprs) =
   -- extract value bindings from expression bindings
   let (fsV, fsE) = IntMap.mapEither seperateF (bindingsF exprs)
       (fisV, fisE) = IntMap.mapEither seperateF (bindingsFI exprs)
@@ -41,12 +42,15 @@ refineRelations (Relations vals exprs) =
       changed = not $ IntMap.null fsV || IntMap.null fisV || IntMap.null bsV || IntMap.null bisV || IntMap.null usV || IntMap.null uisV
    in ( Relations
           ( vals
-              { bindingsF = bindingsF vals <> fsV,
-                bindingsFI = bindingsFI vals <> fisV,
-                bindingsB = bindingsB vals <> bsV,
-                bindingsBI = bindingsBI vals <> bisV,
-                bindingsUs = bindingsUs vals <> usV,
-                bindingsUIs = bindingsUIs vals <> uisV
+              { structF = structF vals <> fsV,
+                structB = structB vals <> bsV,
+                structU = structU vals <> usV
+              }
+          )
+          ( valsI
+              { structF = structF valsI <> fisV,
+                structB = structB valsI <> bisV,
+                structU = structU valsI <> uisV
               }
           )
           (Bindings fsE fisE bsE bisE usE uisE),

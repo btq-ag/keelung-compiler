@@ -17,6 +17,7 @@ import Keelung.Compiler.Constraint2
 import qualified Keelung.Compiler.Constraint2 as Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
+import Keelung.Data.Bindings (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
 
 --------------------------------------------------------------------------------
@@ -71,16 +72,16 @@ compileAssertion expr = do
       compileExprU out x
       add $ cVarBindU out 1
 
-compileValueBindings :: (GaloisField n, Integral n) => Bindings n n n -> M n ()
-compileValueBindings bindings = do
-  forM_ (IntMap.toList (bindingsF bindings)) $ \(var, val) -> add $ cAddF val [(RefF var, -1)]
-  forM_ (IntMap.toList (bindingsFI bindings)) $ \(var, val) -> add $ cAddF val [(RefFI var, -1)]
-  forM_ (IntMap.toList (bindingsB bindings)) $ \(var, val) -> add $ cAddB val [(RefB var, -1)]
-  forM_ (IntMap.toList (bindingsBI bindings)) $ \(var, val) -> add $ cAddB val [(RefBI var, -1)]
-  forM_ (IntMap.toList (bindingsUs bindings)) $ \(width, bindings') ->
-    forM_ (IntMap.toList bindings') $ \(var, val) -> add $ cVarBindU (RefU width var) val
-  forM_ (IntMap.toList (bindingsUIs bindings)) $ \(width, bindings') ->
-    forM_ (IntMap.toList bindings') $ \(var, val) -> add $ cVarBindU (RefUI width var) val
+-- compileValueBindings :: (GaloisField n, Integral n) => Struct (IntMap n) (IntMap n) (IntMap n) -> M n ()
+-- compileValueBindings bindings = do
+--   forM_ (IntMap.toList (structF bindings)) $ \(var, val) -> add $ cAddF val [(RefF var, -1)]
+--   forM_ (IntMap.toList (bindingsFI bindings)) $ \(var, val) -> add $ cAddF val [(RefFI var, -1)]
+--   forM_ (IntMap.toList (bindingsB bindings)) $ \(var, val) -> add $ cAddB val [(RefB var, -1)]
+--   forM_ (IntMap.toList (bindingsBI bindings)) $ \(var, val) -> add $ cAddB val [(RefBI var, -1)]
+--   forM_ (IntMap.toList (bindingsUs bindings)) $ \(width, bindings') ->
+--     forM_ (IntMap.toList bindings') $ \(var, val) -> add $ cVarBindU (RefU width var) val
+--   forM_ (IntMap.toList (bindingsUIs bindings)) $ \(width, bindings') ->
+--     forM_ (IntMap.toList bindings') $ \(var, val) -> add $ cVarBindU (RefUI width var) val
 
 compileExprBindings :: (GaloisField n, Integral n) => Bindings (ExprF n) (ExprB n) (ExprU n) -> M n ()
 compileExprBindings bindings = do
@@ -94,8 +95,18 @@ compileExprBindings bindings = do
     forM_ (IntMap.toList bindings') $ \(var, val) -> compileExprU (RefUI width var) val
 
 compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
-compileRelations (Relations vbs ebs) = do
-  compileValueBindings vbs
+compileRelations (Relations vb vbi ebs) = do
+  -- intermediate variable bindings of values
+  forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cAddF val [(RefF var, -1)]
+  forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cAddB val [(RefB var, -1)]
+  forM_ (IntMap.toList (structU vb)) $ \(width, bindings) ->
+    forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefU width var) val
+  -- input variable bindings of values
+  forM_ (IntMap.toList (structF vbi)) $ \(var, val) -> add $ cAddF val [(RefFI var, -1)]
+  forM_ (IntMap.toList (structB vbi)) $ \(var, val) -> add $ cAddB val [(RefBI var, -1)]
+  forM_ (IntMap.toList (structU vbi)) $ \(width, bindings) ->
+    forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefUI width var) val
+
   compileExprBindings ebs
 
 --------------------------------------------------------------------------------

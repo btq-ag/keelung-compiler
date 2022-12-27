@@ -25,6 +25,8 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint2
+import Keelung.Data.Bindings
+import qualified Keelung.Data.Bindings as Struct
 import Keelung.Field (N (..))
 import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Counters as Counters
@@ -279,34 +281,42 @@ instance Monoid (Bindings f b u) where
 --       <*> traverse (traverse f) (bindingsUs bindings)
 --       <*> traverse (traverse f) (bindingsUIs bindings)
 
-lookupF :: Var -> Bindings f b u -> Maybe f
-lookupF var = IntMap.lookup var . bindingsF
+lookupF :: Var -> Struct (IntMap f) b u -> Maybe f
+lookupF var = IntMap.lookup var . structF
 
-lookupB :: Var -> Bindings f b u -> Maybe b
-lookupB var = IntMap.lookup var . bindingsB
+lookupB :: Var -> Struct a (IntMap b) u -> Maybe b
+lookupB var = IntMap.lookup var . structB
 
-lookupU :: Width -> Var -> Bindings f b u -> Maybe u
-lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (bindingsUs bindings)
+lookupU :: Width -> Var -> Struct a b (IntMap u) -> Maybe u
+lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (structU bindings)
 
 --------------------------------------------------------------------------------
 
 data Relations n = Relations
   { -- var = value
-    valueBindings :: Bindings n n n,
+    valueBindings :: Struct (IntMap n) (IntMap n) (IntMap n),
+    valueBindingsI :: Struct (IntMap n) (IntMap n) (IntMap n),
     -- var = expression
     exprBindings :: Bindings (ExprF n) (ExprB n) (ExprU n)
   }
 
 instance (Integral n, Show n) => Show (Relations n) where
-  show (Relations vbs ebs) =
-    "Binding of variables to values:\n" <> show vbs <> "\n"
+  show (Relations vb vbi ebs) =
+    ( if Struct.empty vb
+        then ""
+        else "Binding of intermediate variables to values:\n" <> show vb <> "\n"
+    )
+      <> ( if Struct.empty vbi
+             then ""
+             else "Binding of input variables to values:\n" <> show vb <> "\n"
+         )
       <> "Binding of variables to expressions:\n"
       <> show ebs
       <> "\n"
 
 instance Semigroup (Relations n) where
-  Relations vbs0 ebs0 <> Relations vbs1 ebs1 =
-    Relations (vbs0 <> vbs1) (ebs0 <> ebs1)
+  Relations vb0 vbi0 eb0 <> Relations vb1 vbi1 eb1 =
+    Relations (vb0 <> vb1) (vbi0 <> vbi1) (eb0 <> eb1)
 
 instance Monoid (Relations n) where
-  mempty = Relations mempty mempty
+  mempty = Relations mempty mempty mempty

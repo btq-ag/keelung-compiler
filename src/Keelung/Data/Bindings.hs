@@ -49,6 +49,9 @@ updateB func (Struct f b u) = Struct f (func b) u
 updateU :: Width -> (x -> x) -> Struct f b x -> Struct f b x
 updateU w func (Struct f b u) = Struct f b $ IntMap.adjust func w u
 
+empty :: (Monoid f, Eq f, Eq b, Monoid b) => Struct f b u -> Bool
+empty (Struct f b u) = f == mempty && b == mempty && IntMap.null u
+
 --------------------------------------------------------------------------------
 
 data OIX n = OIX
