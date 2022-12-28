@@ -27,7 +27,7 @@ typed :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error
 typed prog rawInputs = do
   elab <- left LangError (elaborate prog)
   let inps = Inputs.deserializeElab elab rawInputs
-  left InterpretError (Typed.runAndCheck elab inps)
+  left InterpretError (Typed.run elab inps)
 
 tests :: SpecWith ()
 tests = do

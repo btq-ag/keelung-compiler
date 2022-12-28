@@ -32,6 +32,8 @@ library
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Interpret.Kinded
+      Keelung.Compiler.Interpret.Kinded2
+      Keelung.Compiler.Interpret.Monad
       Keelung.Compiler.Interpret.R1CS
       Keelung.Compiler.Interpret.Typed
       Keelung.Compiler.Optimize
@@ -82,6 +84,8 @@ executable keelungc
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Interpret.Kinded
+      Keelung.Compiler.Interpret.Kinded2
+      Keelung.Compiler.Interpret.Monad
       Keelung.Compiler.Interpret.R1CS
       Keelung.Compiler.Interpret.Typed
       Keelung.Compiler.Optimize
@@ -146,6 +150,8 @@ executable profile
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Interpret.Kinded
+      Keelung.Compiler.Interpret.Kinded2
+      Keelung.Compiler.Interpret.Monad
       Keelung.Compiler.Interpret.R1CS
       Keelung.Compiler.Interpret.Typed
       Keelung.Compiler.Optimize
@@ -202,6 +208,8 @@ test-suite keelung-test
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Interpret.Kinded
+      Keelung.Compiler.Interpret.Kinded2
+      Keelung.Compiler.Interpret.Monad
       Keelung.Compiler.Interpret.R1CS
       Keelung.Compiler.Interpret.Typed
       Keelung.Compiler.Optimize
@@ -262,6 +270,8 @@ benchmark keelung-bench
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
       Keelung.Compiler.Interpret.Kinded
+      Keelung.Compiler.Interpret.Kinded2
+      Keelung.Compiler.Interpret.Monad
       Keelung.Compiler.Interpret.R1CS
       Keelung.Compiler.Interpret.Typed
       Keelung.Compiler.Optimize

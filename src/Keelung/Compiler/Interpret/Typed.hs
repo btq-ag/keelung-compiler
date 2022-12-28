@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 -- Interpreter for Keelung.Syntax.Typed
@@ -10,28 +8,20 @@
 
 module Keelung.Compiler.Interpret.Typed (Error (..), runAndOutputWitnesses, run) where
 
-import Control.DeepSeq (NFData)
 import Control.Monad.Except
-import Control.Monad.Reader
 import Control.Monad.State
-import Data.Bifunctor (Bifunctor (..))
 import Data.Bits (Bits (..))
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
-import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Data.Serialize (Serialize)
-import GHC.Generics (Generic)
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
+import Keelung.Compiler.Interpret.Monad
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Data.Bindings
 import qualified Keelung.Data.Bindings as Struct
-import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed
-import Keelung.Types
 
 --------------------------------------------------------------------------------
 
@@ -80,7 +70,7 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
       bindings <- get
       let bindingsInExpr = Struct.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
-      throwError $ AssertionError e bindingsInExpr
+      throwError $ AssertionError (show e) bindingsInExpr
 
   -- lastly interpret the expression and return the result
   interpret expr
@@ -143,10 +133,6 @@ run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n)
 run elab inputs = fst <$> runAndOutputWitnesses elab inputs
 
 --------------------------------------------------------------------------------
-
--- | The interpreter typeclass
-class Interpret a n where
-  interpret :: a -> M n [n]
 
 instance GaloisField n => Interpret Bool n where
   interpret True = return [one]
@@ -235,86 +221,6 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
 
 --------------------------------------------------------------------------------
 
--- | The interpreter monad
-type M n = ReaderT (Inputs n) (StateT (Partial n) (Except (Error n)))
-
-runM :: Inputs n -> M n a -> Either (Error n) (a, Witness n)
-runM inputs p =
-  let counters = Inputs.varCounters inputs
-      -- construct the initial partial Bindings from Inputs
-      initBindings =
-        OIX
-          { ofO =
-              Struct
-                { structF = (getCount OfOutput OfField counters, mempty),
-                  structB = (getCount OfOutput OfBoolean counters, mempty),
-                  structU = IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
-                },
-            ofI =
-              Struct
-                { structF = (getCount OfInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.numInputs inputs))),
-                  structB = (getCount OfInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.boolInputs inputs))),
-                  structU = IntMap.mapWithKey (\w bindings -> (getCount OfInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.uintInputs inputs)
-                },
-            ofX =
-              Struct
-                { structF = (getCount OfIntermediate OfField counters, mempty),
-                  structB = (getCount OfIntermediate OfBoolean counters, mempty),
-                  structU = IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
-                }
-          }
-   in do
-        (result, partialBindings) <- runExcept (runStateT (runReaderT p inputs) initBindings)
-        -- make the partial Bindings total
-        case toTotal partialBindings of
-          Left unbound -> Left (VarUnassignedError unbound)
-          Right bindings -> Right (result, bindings)
-
-addF :: Var -> [n] -> M n ()
-addF var vals = modify (updateX (updateF (second (IntMap.insert var (head vals)))))
-
-addB :: Var -> [n] -> M n ()
-addB var vals = modify (updateX (updateB (second (IntMap.insert var (head vals)))))
-
-addU :: Width -> Var -> [n] -> M n ()
-addU width var vals = modify (updateX (updateU width (second (IntMap.insert var (head vals)))))
-
-lookupVar :: String -> (Partial n -> (Int, IntMap a)) -> Int -> M n a
-lookupVar prefix selector var = do
-  (_, f) <- gets selector
-  case IntMap.lookup var f of
-    Nothing -> throwError $ VarUnboundError prefix var
-    Just val -> return val
-
-lookupF :: Var -> M n n
-lookupF = lookupVar "F" (structF . ofX)
-
-lookupFI :: Var -> M n n
-lookupFI = lookupVar "FI" (structF . ofI)
-
-lookupB :: Var -> M n n
-lookupB = lookupVar "B" (structB . ofX)
-
-lookupBI :: Var -> M n n
-lookupBI = lookupVar "BI" (structB . ofI)
-
-lookupU :: Width -> Var -> M n n
-lookupU w = lookupVar ("U" <> toSubscript w) (unsafeLookup w . structU . ofX)
-
-lookupUI :: Width -> Var -> M n n
-lookupUI w = lookupVar ("UI" <> toSubscript w) (unsafeLookup w . structU . ofI)
-
-unsafeLookup :: Int -> IntMap a -> a
-unsafeLookup x y = case IntMap.lookup x y of
-  Nothing -> error "[ panic ] bit width not found"
-  Just z -> z
-
---------------------------------------------------------------------------------
-
--- | For collecting free variables
-class FreeVar a where
-  freeVars :: a -> VarSet n
-
 instance FreeVar Expr where
   freeVars expr = case expr of
     Unit -> mempty
@@ -382,38 +288,3 @@ instance FreeVar UInt where
     ShLU _ _ x -> freeVars x
     IfU _ p x y -> freeVars p <> freeVars x <> freeVars y
     BtoU _ x -> freeVars x
-
---------------------------------------------------------------------------------
-
-data Error n
-  = VarUnboundError String Var
-  | VarUnassignedError (VarSet n)
-  | AssertionError Expr (Partial n)
-  deriving (Eq, Generic, NFData)
-
-instance Serialize n => Serialize (Error n)
-
-instance (GaloisField n, Integral n) => Show (Error n) where
-  show (VarUnboundError prefix var) =
-    "unbound variable $" <> prefix <> show var
-  show (VarUnassignedError unboundVariables) =
-    "these variables have no bindings:\n  "
-      ++ show unboundVariables
-  show (AssertionError expr bindings) =
-    "assertion failed: " <> show expr
-      <> "\nbindings of free variables in the assertion:\n"
-      <> show bindings
-
---------------------------------------------------------------------------------
-
-bitWiseAnd :: (GaloisField n, Integral n) => n -> n -> n
-bitWiseAnd x y = fromInteger $ (Data.Bits..&.) (toInteger x) (toInteger y)
-
-bitWiseOr :: (GaloisField n, Integral n) => n -> n -> n
-bitWiseOr x y = fromInteger $ (Data.Bits..|.) (toInteger x) (toInteger y)
-
-bitWiseXor :: (GaloisField n, Integral n) => n -> n -> n
-bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)
-
-bitWiseNot :: (GaloisField n, Integral n) => n -> n
-bitWiseNot x = fromInteger $ Data.Bits.complement (toInteger x)
