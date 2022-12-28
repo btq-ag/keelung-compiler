@@ -12,16 +12,17 @@ import Control.Arrow (left)
 import Keelung
 import Keelung.Compiler (Error (..))
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
+import Keelung.Compiler.Interpret.Monad hiding (Error)
 import qualified Keelung.Compiler.Interpret.Typed as Typed
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 
-kinded :: (GaloisField n, Integral n, Encode t, Kinded.FreeVar t, Kinded.Interpret t n) => Comp t -> [n] -> Either String [n]
+kinded :: (GaloisField n, Integral n, Encode t, FreeVar t, Interpret t n) => Comp t -> [n] -> Either (Error n) [n]
 kinded prog rawInputs = do
-  elab <- left show (elaborate' prog)
+  elab <- left LangError (elaborate' prog)
   let inps = Inputs.deserialize (compCounters (elabComp elab)) rawInputs
-  left show (Kinded.runAndCheck elab inps)
+  left InterpretError (Kinded.run elab inps)
 
 typed :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 typed prog rawInputs = do

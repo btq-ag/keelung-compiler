@@ -6,7 +6,7 @@
 
 {-# HLINT ignore "Use lambda-case" #-}
 
-module Keelung.Compiler.Interpret.Typed (Error (..), runAndOutputWitnesses, run) where
+module Keelung.Compiler.Interpret.Typed (runAndOutputWitnesses, run) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -16,7 +16,6 @@ import Data.Foldable (toList)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import Keelung.Compiler.Interpret.Monad
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Data.Bindings
@@ -202,8 +201,8 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
     OrU _ x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorU _ x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
     NotU _ x -> map bitWiseNot <$> interpret x
-    RoLU w i x -> map (Kinded.bitWiseRotateL w i) <$> interpret x
-    ShLU w i x -> map (Kinded.bitWiseShiftL w i) <$> interpret x
+    RoLU w i x -> map (bitWiseRotateL w i) <$> interpret x
+    ShLU w i x -> map (bitWiseShiftL w i) <$> interpret x
     IfU _ p x y -> do
       p' <- interpret p
       case p' of
@@ -241,7 +240,8 @@ instance FreeVar Computation where
         mconcat $ map freeVars (toList (compAssignmentB context)),
         mconcat $ map freeVars (toList (compAssignmentBI context)),
         mconcat $ concatMap (map freeVars . toList) (toList (compAssignmentU context)),
-        mconcat $ concatMap (map freeVars . toList) (toList (compAssignmentUI context))
+        mconcat $ concatMap (map freeVars . toList) (toList (compAssignmentUI context)),
+        mconcat $ map freeVars (toList (compAssertions context))
       ]
 
 instance FreeVar Boolean where

@@ -7,13 +7,13 @@ import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import qualified Keelung.Compiler.Interpret.Typed as Typed
+import qualified Keelung.Compiler.Interpret.Monad as Interpreter
 import Keelung.Compiler.R1CS (ExecError)
 import qualified Keelung.Error as Lang
 
 data Error n
   = ExecError (ExecError n)
-  | InterpretError (Typed.Error n)
+  | InterpretError (Interpreter.Error n)
   | LangError Lang.Error
   deriving (Eq, Generic, NFData)
 
