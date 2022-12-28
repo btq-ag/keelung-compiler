@@ -102,21 +102,21 @@ instance {-# OVERLAPPING #-} Show (VarSet n) where
           <> map (\var -> "$F" <> prefix <> show var) (IntSet.toList f)
           <> concatMap (\(width, xs) -> map (\var -> "$U" <> toSubscript width <> prefix <> show var) (IntSet.toList xs)) (IntMap.toList u)
 
-      toSubscript :: Int -> String
-      toSubscript = map go . show
-        where
-          go c = case c of
-            '0' -> '₀'
-            '1' -> '₁'
-            '2' -> '₂'
-            '3' -> '₃'
-            '4' -> '₄'
-            '5' -> '₅'
-            '6' -> '₆'
-            '7' -> '₇'
-            '8' -> '₈'
-            '9' -> '₉'
-            _ -> c
+toSubscript :: Int -> String
+toSubscript = map go . show
+  where
+    go c = case c of
+      '0' -> '₀'
+      '1' -> '₁'
+      '2' -> '₂'
+      '3' -> '₃'
+      '4' -> '₄'
+      '5' -> '₅'
+      '6' -> '₆'
+      '7' -> '₇'
+      '8' -> '₈'
+      '9' -> '₉'
+      _ -> c
 
 --------------------------------------------------------------------------------
 
@@ -126,17 +126,20 @@ type Partial n = OIX (Struct (PartialBinding n) (PartialBinding n) (PartialBindi
 -- | Expected number of bindings and actual bindings
 type PartialBinding n = (Int, IntMap n)
 
-instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (PartialBinding n) where
-  show (_size, bindings) = showList' $ map (\(k, v) -> "($" <> show k <> "," <> show (N v) <> ")") (IntMap.toList bindings)
+instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) where
+  show (OIX o i x) = showList' $ showStruct "O" o <> showStruct "I" i <> showStruct "" x
     where
       showList' :: [String] -> String
       showList' xs = "[" <> List.intercalate ", " xs <> "]"
 
-instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Struct (PartialBinding n) (PartialBinding n) (PartialBinding n)) where
-  show (Struct f b u) = "{ F: " <> show f <> ", B: " <> show b <> ", U: " <> show u <> " }"
+      showPartialBinding :: (GaloisField n, Integral n) => String -> (Int, IntMap n) -> IntMap String
+      showPartialBinding prefix (_size, bindings) = IntMap.mapWithKey (\k v -> "$" <> prefix <> show k <> " := " <> show (N v)) bindings
 
-instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) where
-  show (OIX o i x) = "{ O: " <> show o <> ", I: " <> show i <> ", X: " <> show x <> " }"
+      showStruct :: (GaloisField n, Integral n) => String -> Struct (PartialBinding n) (PartialBinding n) (PartialBinding n) -> [String]
+      showStruct suffix (Struct f b u) =
+        toList (showPartialBinding ("F" <> suffix) f)
+          <> toList (showPartialBinding ("B" <> suffix) b)
+          <> concatMap (\(width, xs) -> toList (showPartialBinding ("U" <> suffix <> toSubscript width) xs)) (IntMap.toList u)
 
 -- | Convert a partial binding to a total binding, or return the variables that are not bound
 toTotal :: Partial n -> Either (VarSet n) (Witness n)
@@ -166,3 +169,20 @@ toTotal (OIX o i x) =
 
     sequenceIntMap :: (a -> Validation b c) -> IntMap a -> Validation (IntMap b) (IntMap c)
     sequenceIntMap f = sequenceA . IntMap.mapWithKey (\width xs -> first (IntMap.singleton width) (f xs))
+
+restrictVars :: Partial n -> VarSet n -> Partial n
+restrictVars (OIX o i x) (OIX o' i' x') =
+  OIX
+    (restrictStruct o o')
+    (restrictStruct i i')
+    (restrictStruct x x')
+  where
+    restrictStruct :: Struct (PartialBinding n) (PartialBinding n) (PartialBinding n) -> Struct IntSet IntSet IntSet -> Struct (PartialBinding n) (PartialBinding n) (PartialBinding n)
+    restrictStruct (Struct f b u) (Struct f' b' u') =
+      Struct
+        (restrict f f')
+        (restrict b b')
+        (IntMap.intersectionWith restrict u u')
+
+    restrict :: (Int, IntMap n) -> IntSet -> (Int, IntMap n)
+    restrict (size, xs) set = (size, IntMap.restrictKeys xs set)

@@ -8,7 +8,7 @@
 
 {-# HLINT ignore "Use lambda-case" #-}
 
-module Keelung.Compiler.Interpret.Typed (InterpretError (..), runAndOutputWitnesses, run) where
+module Keelung.Compiler.Interpret.Typed (Error (..), runAndOutputWitnesses, run) where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
@@ -24,11 +24,11 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung (N (N))
 import qualified Keelung.Compiler.Interpret.Kinded as Kinded
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Data.Bindings
+import qualified Keelung.Data.Bindings as Struct
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed
 import Keelung.Types
@@ -36,7 +36,7 @@ import Keelung.Types
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
-runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) ([n], Witness n)
+runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) ([n], Witness n)
 runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   -- interpret assignments of values first
   fs <-
@@ -77,27 +77,10 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
   forM_ (compAssertions comp) $ \e -> do
     values <- interpret e
     when (values /= [1]) $ do
-      let freeVarsInExpr = freeVars e
-      fis <- mapM (\var -> ("$FI" <> show var,) <$> lookupFI var) $ IntSet.toList (structF $ ofI freeVarsInExpr)
-      fs' <- mapM (\var -> ("$F" <> show var,) <$> lookupF var) $ IntSet.toList (structF $ ofX freeVarsInExpr)
-      bis <- mapM (\var -> ("$BI" <> show var,) <$> lookupBI var) $ IntSet.toList (structB $ ofI freeVarsInExpr)
-      bs' <- mapM (\var -> ("$B" <> show var,) <$> lookupB var) $ IntSet.toList (structB $ ofX freeVarsInExpr)
-
-      uis <-
-        concat
-          <$> mapM
-            ( \(width, bindings) -> mapM (\var -> ("$UI" <> show var,) <$> lookupU width var) (IntSet.toList bindings)
-            )
-            (IntMap.toList (structU $ ofI freeVarsInExpr))
-
-      us' <-
-        concat
-          <$> mapM
-            ( \(width, bindings) -> mapM (\var -> ("$U" <> show var,) <$> lookupU width var) (IntSet.toList bindings)
-            )
-            (IntMap.toList (structU $ ofX freeVarsInExpr))
+      bindings <- get
+      let bindingsInExpr = Struct.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
-      throwError $ InterpretAssertionError e (fis <> fs' <> bis <> bs' <> uis <> us')
+      throwError $ AssertionError e bindingsInExpr
 
   -- lastly interpret the expression and return the result
   interpret expr
@@ -156,7 +139,7 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
 --     BtoU w _ -> w
 
 -- | Interpret a program with inputs.
-run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) [n]
+run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) [n]
 run elab inputs = fst <$> runAndOutputWitnesses elab inputs
 
 --------------------------------------------------------------------------------
@@ -253,9 +236,9 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = ReaderT (Inputs n) (StateT (Partial n) (Except (InterpretError n)))
+type M n = ReaderT (Inputs n) (StateT (Partial n) (Except (Error n)))
 
-runM :: Inputs n -> M n a -> Either (InterpretError n) (a, Witness n)
+runM :: Inputs n -> M n a -> Either (Error n) (a, Witness n)
 runM inputs p =
   let counters = Inputs.varCounters inputs
       -- construct the initial partial Bindings from Inputs
@@ -284,7 +267,7 @@ runM inputs p =
         (result, partialBindings) <- runExcept (runStateT (runReaderT p inputs) initBindings)
         -- make the partial Bindings total
         case toTotal partialBindings of
-          Left unbound -> Left (InterpretVarUnassignedError unbound)
+          Left unbound -> Left (VarUnassignedError unbound)
           Right bindings -> Right (result, bindings)
 
 addF :: Var -> [n] -> M n ()
@@ -296,30 +279,30 @@ addB var vals = modify (updateX (updateB (second (IntMap.insert var (head vals))
 addU :: Width -> Var -> [n] -> M n ()
 addU width var vals = modify (updateX (updateU width (second (IntMap.insert var (head vals)))))
 
-lookupVar :: (Partial n -> (Int, IntMap a)) -> Int -> M n a
-lookupVar selector var = do
+lookupVar :: String -> (Partial n -> (Int, IntMap a)) -> Int -> M n a
+lookupVar prefix selector var = do
   (_, f) <- gets selector
   case IntMap.lookup var f of
-    Nothing -> throwError $ InterpretVarUnboundError var
+    Nothing -> throwError $ VarUnboundError prefix var
     Just val -> return val
 
 lookupF :: Var -> M n n
-lookupF = lookupVar (structF . ofX)
+lookupF = lookupVar "F" (structF . ofX)
 
 lookupFI :: Var -> M n n
-lookupFI = lookupVar (structF . ofI)
+lookupFI = lookupVar "FI" (structF . ofI)
 
 lookupB :: Var -> M n n
-lookupB = lookupVar (structB . ofX)
+lookupB = lookupVar "B" (structB . ofX)
 
 lookupBI :: Var -> M n n
-lookupBI = lookupVar (structB . ofI)
+lookupBI = lookupVar "BI" (structB . ofI)
 
 lookupU :: Width -> Var -> M n n
-lookupU w = lookupVar (unsafeLookup w . structU . ofX)
+lookupU w = lookupVar ("U" <> toSubscript w) (unsafeLookup w . structU . ofX)
 
 lookupUI :: Width -> Var -> M n n
-lookupUI w = lookupVar (unsafeLookup w . structU . ofI)
+lookupUI w = lookupVar ("UI" <> toSubscript w) (unsafeLookup w . structU . ofI)
 
 unsafeLookup :: Int -> IntMap a -> a
 unsafeLookup x y = case IntMap.lookup x y of
@@ -402,24 +385,24 @@ instance FreeVar UInt where
 
 --------------------------------------------------------------------------------
 
-data InterpretError n
-  = InterpretVarUnboundError Var
-  | InterpretVarUnassignedError (VarSet n)
-  | InterpretAssertionError Expr [(String, n)]
+data Error n
+  = VarUnboundError String Var
+  | VarUnassignedError (VarSet n)
+  | AssertionError Expr (Partial n)
   deriving (Eq, Generic, NFData)
 
-instance Serialize n => Serialize (InterpretError n)
+instance Serialize n => Serialize (Error n)
 
-instance (GaloisField n, Integral n) => Show (InterpretError n) where
-  show (InterpretVarUnboundError var) =
-    "unbound variable $" ++ show var
-  show (InterpretVarUnassignedError unboundVariables) =
+instance (GaloisField n, Integral n) => Show (Error n) where
+  show (VarUnboundError prefix var) =
+    "unbound variable $" <> prefix <> show var
+  show (VarUnassignedError unboundVariables) =
     "these variables have no bindings:\n  "
       ++ show unboundVariables
-  show (InterpretAssertionError expr assignments) =
+  show (AssertionError expr bindings) =
     "assertion failed: " <> show expr
-      <> "\nassignment of variables:\n"
-      <> unlines (map (\(var, val) -> "  " <> var <> " := " <> show (N val)) assignments)
+      <> "\nbindings of free variables in the assertion:\n"
+      <> show bindings
 
 --------------------------------------------------------------------------------
 
