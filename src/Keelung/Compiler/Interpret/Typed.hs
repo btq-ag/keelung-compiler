@@ -8,12 +8,13 @@
 
 {-# HLINT ignore "Use lambda-case" #-}
 
-module Keelung.Compiler.Interpret.Typed (InterpretError (..), runAndOutputWitnesses, run, runAndCheck) where
+module Keelung.Compiler.Interpret.Typed (InterpretError (..), runAndOutputWitnesses, run) where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Bifunctor (Bifunctor (..))
 import Data.Bits (Bits (..))
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
@@ -31,7 +32,6 @@ import Keelung.Data.Bindings
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed
 import Keelung.Types
-import Data.Bifunctor (Bifunctor(..))
 
 --------------------------------------------------------------------------------
 
@@ -158,20 +158,6 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
 -- | Interpret a program with inputs.
 run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) [n]
 run elab inputs = fst <$> runAndOutputWitnesses elab inputs
-
--- | Interpret a program with inputs and run some additional checks.
-runAndCheck :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (InterpretError n) [n]
-runAndCheck elab inputs = do
-  output <- run elab inputs
-
-  -- See if input size is valid
-  let expectedInputSize = getCountBySort OfInput (compCounters (elabComp elab))
-  let actualInputSize = Inputs.size inputs
-
-  when (expectedInputSize /= actualInputSize) $ do
-    throwError $ InterpretInputSizeError expectedInputSize actualInputSize
-
-  return output
 
 --------------------------------------------------------------------------------
 
@@ -314,7 +300,7 @@ lookupVar :: (Partial n -> (Int, IntMap a)) -> Int -> M n a
 lookupVar selector var = do
   (_, f) <- gets selector
   case IntMap.lookup var f of
-    Nothing -> throwError $ InterpretUnboundVarError var
+    Nothing -> throwError $ InterpretVarUnboundError var
     Just val -> return val
 
 lookupF :: Var -> M n n
@@ -417,48 +403,23 @@ instance FreeVar UInt where
 --------------------------------------------------------------------------------
 
 data InterpretError n
-  = InterpretUnboundVarError Var
-  | -- (Witness n)
-    -- InterpretUnboundAddrError Addr Heap
-    InterpretAssertionError Expr [(String, n)]
-  | -- | InterpretVarUnassignedError IntSet (Witness n)
-    InterpretInputSizeError Int Int
+  = InterpretVarUnboundError Var
   | InterpretVarUnassignedError (VarSet n)
+  | InterpretAssertionError Expr [(String, n)]
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (InterpretError n)
 
 instance (GaloisField n, Integral n) => Show (InterpretError n) where
-  show (InterpretUnboundVarError var) =
+  show (InterpretVarUnboundError var) =
     "unbound variable $" ++ show var
-  -- ++ " in witness "
-  -- ++ showWitness witness
-  -- show (InterpretUnboundAddrError var heap) =
-  --   "unbound address " ++ show var
-  --     ++ " in heap "
-  --     ++ show heap
+  show (InterpretVarUnassignedError unboundVariables) =
+    "these variables have no bindings:\n  "
+      ++ show unboundVariables
   show (InterpretAssertionError expr assignments) =
     "assertion failed: " <> show expr
       <> "\nassignment of variables:\n"
       <> unlines (map (\(var, val) -> "  " <> var <> " := " <> show (N val)) assignments)
-  show (InterpretInputSizeError expected actual) =
-    "expecting " ++ show expected ++ " inputs but got " ++ show actual
-      ++ " inputs"
-  show (InterpretVarUnassignedError unboundVariables) =
-    "these variables have no bindings:\n  "
-      ++ show unboundVariables
-
--- ( if IntSet.null missingInWitness
---     then ""
---     else
---       "these variables have no bindings:\n  "
---         ++ show (IntSet.toList missingInWitness)
--- )
---   <> if IntMap.null missingInProgram
---     then ""
---     else
---       "these bindings are not in the program:\n  "
---         ++ showWitness missingInProgram
 
 --------------------------------------------------------------------------------
 
