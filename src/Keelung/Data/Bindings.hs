@@ -88,14 +88,14 @@ type TotalBinding n = Vector n
 
 type VarSet n = OIX (Struct IntSet IntSet IntSet)
 
+showList' :: [String] -> String
+showList' xs = "[" <> List.intercalate ", " xs <> "]"
+
 instance {-# OVERLAPPING #-} Show (VarSet n) where
   show (OIX o i x) =
     showList' $
       showStruct "O" o <> showStruct "I" i <> showStruct "" x
     where
-      showList' :: [String] -> String
-      showList' xs = "[" <> List.intercalate ", " xs <> "]"
-
       showStruct :: String -> Struct IntSet IntSet IntSet -> [String]
       showStruct prefix (Struct f b u) =
         map (\var -> "$B" <> prefix <> show var) (IntSet.toList b)
@@ -129,9 +129,6 @@ type PartialBinding n = (Int, IntMap n)
 instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) where
   show (OIX o i x) = showList' $ showStruct "O" o <> showStruct "I" i <> showStruct "" x
     where
-      showList' :: [String] -> String
-      showList' xs = "[" <> List.intercalate ", " xs <> "]"
-
       showPartialBinding :: (GaloisField n, Integral n) => String -> (Int, IntMap n) -> IntMap String
       showPartialBinding prefix (_size, bindings) = IntMap.mapWithKey (\k v -> "$" <> prefix <> show k <> " := " <> show (N v)) bindings
 
@@ -155,20 +152,20 @@ toTotal (OIX o i x) =
       Validation (Struct IntSet IntSet IntSet) (Struct (Vector n) (Vector n) (Vector n))
     convertStruct (Struct f b u) =
       Struct
-        <$> first (\set -> Struct set mempty mempty) (convert f)
-        <*> first (\set -> Struct mempty set mempty) (convert b)
-        <*> first (Struct mempty mempty) (sequenceIntMap convert u)
-
-    convert :: (Int, IntMap n) -> Validation IntSet (Vector n)
-    convert (size, xs) =
-      if IntMap.size xs < size
-        then
-          let completeIntSet = IntSet.fromDistinctAscList [0 .. size - 1]
-           in Failure (IntSet.difference completeIntSet (IntMap.keysSet xs))
-        else Success (Vector.fromList (toList xs))
+        <$> first (\set -> Struct set mempty mempty) (toTotal' f)
+        <*> first (\set -> Struct mempty set mempty) (toTotal' b)
+        <*> first (Struct mempty mempty) (sequenceIntMap toTotal' u)
 
     sequenceIntMap :: (a -> Validation b c) -> IntMap a -> Validation (IntMap b) (IntMap c)
     sequenceIntMap f = sequenceA . IntMap.mapWithKey (\width xs -> first (IntMap.singleton width) (f xs))
+
+toTotal' :: (Int, IntMap n) -> Validation IntSet (Vector n)
+toTotal' (size, xs) =
+  if IntMap.size xs < size
+    then
+      let completeIntSet = IntSet.fromDistinctAscList [0 .. size - 1]
+       in Failure (IntSet.difference completeIntSet (IntMap.keysSet xs))
+    else Success (Vector.fromList (toList xs))
 
 restrictVars :: Partial n -> VarSet n -> Partial n
 restrictVars (OIX o i x) (OIX o' i' x') =

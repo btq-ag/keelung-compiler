@@ -9,18 +9,22 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bifunctor (second)
+import qualified Data.Bits
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Data.Bindings
 import Keelung.Syntax.Counters
 import Keelung.Types
-import qualified Data.Bits
+import Keelung.Constraint.R1C (R1C)
 
 --------------------------------------------------------------------------------
 
@@ -115,7 +119,10 @@ class FreeVar a where
 data Error n
   = VarUnboundError String Var
   | VarUnassignedError (VarSet n)
+  | VarUnassignedError' IntSet -- R1CS 
   | AssertionError String (Partial n)
+  | AssertionError' String (IntMap n) -- R1CS
+  | R1CSStuckError (R1C n) -- R1CS
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -126,10 +133,19 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (VarUnassignedError unboundVariables) =
     "these variables have no bindings:\n  "
       ++ show unboundVariables
+  show (VarUnassignedError' unboundVariables) =
+    "these variables have no bindings:\n  "
+      ++ showList' (map (\var -> "$" <> show var) $ IntSet.toList unboundVariables)
   show (AssertionError expr bindings) =
     "assertion failed: " <> expr
       <> "\nbindings of free variables in the assertion:\n"
       <> show bindings
+  show (AssertionError' expr bindings) =
+    "assertion failed: " <> expr
+      <> "\nbindings of free variables in the assertion:\n"
+      <> showList' (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList bindings))
+  show (R1CSStuckError r1c) = 
+    "stuck at " <> show r1c
 
 --------------------------------------------------------------------------------
 
