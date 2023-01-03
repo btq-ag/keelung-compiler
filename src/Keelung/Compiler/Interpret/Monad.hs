@@ -21,11 +21,27 @@ import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
-import Keelung.Data.Bindings
-import Keelung.Syntax.Counters
-import Keelung.Types
 import Keelung.Constraint.R1C (R1C)
 import Keelung.Constraint.R1CS (CNEQ)
+import Keelung.Data.Bindings
+import Keelung.Syntax.BinRep (BinRep)
+import Keelung.Syntax.Counters
+import Keelung.Types
+
+--------------------------------------------------------------------------------
+
+data Constraint n
+  = R1CConstraint (R1C n)
+  | CNEQConstraint (CNEQ n)
+  | BinRepConstraint BinRep
+  deriving (Eq, Show, Generic, NFData)
+
+instance Serialize n => Serialize (Constraint n)
+
+instance Functor Constraint where
+  fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
+  fmap f (CNEQConstraint cneq) = CNEQConstraint (fmap f cneq)
+  fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
 
 --------------------------------------------------------------------------------
 
@@ -120,10 +136,10 @@ class FreeVar a where
 data Error n
   = VarUnboundError String Var
   | VarUnassignedError (VarSet n)
-  | VarUnassignedError' IntSet -- R1CS 
+  | VarUnassignedError' IntSet -- R1CS
   | AssertionError String (Partial n)
   | AssertionError' String (IntMap n) -- R1CS
-  | R1CSStuckError [Either (R1C n) (CNEQ n)] -- R1CS
+  | R1CSStuckError [Constraint n] -- R1CS
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -145,7 +161,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "assertion failed: " <> expr
       <> "\nbindings of free variables in the assertion:\n"
       <> showList' (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList bindings))
-  show (R1CSStuckError constraint) = 
+  show (R1CSStuckError constraint) =
     "stuck at " <> show constraint
 
 --------------------------------------------------------------------------------

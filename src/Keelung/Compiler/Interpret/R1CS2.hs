@@ -14,7 +14,8 @@ import qualified Data.Sequence as Seq
 import Data.Validation (toEither)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
-import Keelung.Compiler.Interpret.Monad (Error (..))
+import Keelung.Compiler.Interpret.Monad (Constraint (..), Error (..))
+import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Constraint.Polynomial (Poly)
@@ -22,6 +23,7 @@ import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
 import Keelung.Data.Bindings
+import Keelung.Syntax.BinRep (BinRep (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
 
@@ -31,9 +33,7 @@ run r1cs inputs = fst <$> run' r1cs inputs
 -- | Return interpreted outputs along with the witnesses
 run' :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) ([n], Vector n)
 run' r1cs inputs = do
-  let constraints =
-        Seq.fromList (map R1CConstraint (toR1Cs r1cs))
-          <> Seq.fromList (map CNEQConstraint (r1csCNEQs r1cs))
+  let constraints = fromOrdinaryConstraints r1cs
 
   witness <- runM inputs $ goThroughManyTimes constraints
   -- extract output values from the witness
@@ -43,22 +43,51 @@ run' r1cs inputs = do
 
   return (outputs, witness)
 
+-- | Return Constraints from a R1CS, which include:
+--   1. ordinary constraints
+--   2. Boolean input variable constraints
+--   3. binary representation constraints
+--   4. CNEQ constraints
+fromOrdinaryConstraints :: (Num n, Eq n) => R1CS n -> Seq (Constraint n)
+fromOrdinaryConstraints (R1CS ordinaryConstraints counters cneqs) =
+  Seq.fromList (map R1CConstraint ordinaryConstraints)
+    <> Seq.fromList booleanInputVarConstraints
+    <> Seq.fromList (map BinRepConstraint (getBinReps counters))
+    <> Seq.fromList (map CNEQConstraint cneqs)
+  where
+    booleanInputVarConstraints =
+      let generate (start, end) =
+            map
+              ( \var ->
+                  R1CConstraint $
+                    R1C
+                      (Right (Poly.singleVar var))
+                      (Right (Poly.singleVar var))
+                      (Right (Poly.singleVar var))
+              )
+              [start .. end - 1]
+       in concatMap generate (getBooleanConstraintRanges counters)
+
 goThroughManyTimes :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n ()
 goThroughManyTimes constraints = do
+  -- traceShowM (fmap (fmap N) constraints)
+  -- traceShowM (fmap N r1cs)
+
   result <- goThroughOnce constraints
   case result of
     -- keep going
     Shrinked constraints' -> goThroughManyTimes constraints'
-    -- done 
+    -- done
     Eliminated -> return ()
     NothingToDo -> return ()
-    -- stuck 
-    Stuck _ -> throwError (R1CSStuckError $ toList $ fmap constraintToEither constraints)
+    -- stuck
+    Stuck _ -> do
+      throwError (R1CSStuckError $ toList constraints)
 
-  where 
-    constraintToEither :: Constraint n -> Either (R1C n) (CNEQ n)
-    constraintToEither (R1CConstraint r1c) = Left r1c
-    constraintToEither (CNEQConstraint cneq) = Right cneq
+-- where
+--   constraintToEither :: Constraint n -> Either (R1C n) (CNEQ n)
+--   constraintToEither (R1CConstraint r1c) = Left r1c
+--   constraintToEither (CNEQConstraint cneq) = Right cneq
 
 -- result <- goThroughOnce constraints
 -- case result of
@@ -76,6 +105,35 @@ lookupVar var = gets (IntMap.lookup var)
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (R1CConstraint r1c) = fmap (pure . R1CConstraint) <$> shrinkR1C r1c
 shrink (CNEQConstraint cneq) = fmap (pure . CNEQConstraint) <$> shrinkCNEQ cneq
+shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
+
+-- | Trying to reduce a BinRep constraint
+shrinkBinRep :: (GaloisField n, Integral n) => BinRep -> M n (Result BinRep)
+shrinkBinRep binRep@(BinRep var width bitVarStart _) = do
+  varResult <- lookupVar var
+  case varResult of
+    -- value of "var" is known
+    Just val -> do
+      let bitVals = toBits val
+      forM_ (zip [bitVarStart .. bitVarStart + width - 1] bitVals) $ \(bitVar, bitVal) -> do
+        bindVar bitVar bitVal
+      return Eliminated
+    Nothing -> do
+      -- see if all bit variables are bound
+      bitVal <- foldM go (Just 0) [bitVarStart + width - 1, bitVarStart + width - 2 .. bitVarStart]
+      case bitVal of
+        Nothing -> return $ Stuck binRep
+        Just bitVal' -> do
+          bindVar var bitVal'
+          return Eliminated
+  where
+    go acc bitVar = case acc of
+      Nothing -> return Nothing
+      Just accVal -> do
+        bitValue <- lookupVar bitVar
+        case bitValue of
+          Nothing -> return Nothing
+          Just bit -> return (Just (accVal * 2 + bit))
 
 -- if (x - y) = 0 then m = 0 else m = recip (x - y)
 shrinkCNEQ :: (GaloisField n, Integral n) => CNEQ n -> M n (Result (CNEQ n))
@@ -117,13 +175,6 @@ runM inputs p =
 
 bindVar :: Var -> n -> M n ()
 bindVar var val = modify' $ IntMap.insert var val
-
---------------------------------------------------------------------------------
-
-data Constraint n
-  = R1CConstraint (R1C n)
-  | CNEQConstraint (CNEQ n)
-  deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
 

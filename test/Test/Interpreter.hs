@@ -116,27 +116,12 @@ tests = do
       run program [3 :: GF181] [3, 6, 12, 9, 3, 6, 12, 9, 3]
       run program [5 :: GF181] [5, 10, 5, 10, 5, 10, 5, 10, 5]
 
--- it "Shift" $ do
---   let program = do
---         x <- inputUInt @4
---         return $ toArray [shift x (-4), shift x (-3), shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
+    it "Shift" $ do
+      let program = do
+            x <- inputUInt @4
+            return $ toArray [shift x (-4), shift x (-3), shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
 
---   kinded program [0 :: GF181]
---     `shouldBe` Right [0, 0, 0, 0, 0, 0, 0, 0, 0]
---   typed program [0 :: GF181]
---     `shouldBe` Right [0, 0, 0, 0, 0, 0, 0, 0, 0]
-
---   kinded program [1 :: GF181]
---     `shouldBe` Right [0, 0, 0, 0, 1, 2, 4, 8, 0]
---   typed program [1 :: GF181]
---     `shouldBe` Right [0, 0, 0, 0, 1, 2, 4, 8, 0]
-
---   kinded program [3 :: GF181]
---     `shouldBe` Right [0, 0, 0, 1, 3, 6, 12, 8, 0]
---   typed program [3 :: GF181]
---     `shouldBe` Right [0, 0, 0, 1, 3, 6, 12, 8, 0]
-
---   kinded program [5 :: GF181]
---     `shouldBe` Right [0, 0, 1, 2, 5, 10, 4, 8, 0]
---   typed program [5 :: GF181]
---     `shouldBe` Right [0, 0, 1, 2, 5, 10, 4, 8, 0]
+      run program [0 :: GF181] [0, 0, 0, 0, 0, 0, 0, 0, 0]
+      run program [1 :: GF181] [0, 0, 0, 0, 1, 2, 4, 8, 0]
+      run program [3 :: GF181] [0, 0, 0, 1, 3, 6, 12, 8, 0]
+      run program [5 :: GF181] [0, 0, 1, 2, 5, 10, 4, 8, 0]
