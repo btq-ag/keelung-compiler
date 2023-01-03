@@ -25,6 +25,7 @@ import Keelung.Data.Bindings
 import Keelung.Syntax.Counters
 import Keelung.Types
 import Keelung.Constraint.R1C (R1C)
+import Keelung.Constraint.R1CS (CNEQ)
 
 --------------------------------------------------------------------------------
 
@@ -122,7 +123,7 @@ data Error n
   | VarUnassignedError' IntSet -- R1CS 
   | AssertionError String (Partial n)
   | AssertionError' String (IntMap n) -- R1CS
-  | R1CSStuckError (R1C n) -- R1CS
+  | R1CSStuckError [Either (R1C n) (CNEQ n)] -- R1CS
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -144,8 +145,8 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "assertion failed: " <> expr
       <> "\nbindings of free variables in the assertion:\n"
       <> showList' (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList bindings))
-  show (R1CSStuckError r1c) = 
-    "stuck at " <> show r1c
+  show (R1CSStuckError constraint) = 
+    "stuck at " <> show constraint
 
 --------------------------------------------------------------------------------
 

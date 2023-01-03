@@ -6,13 +6,16 @@ module Keelung.Compiler.Interpret.R1CS2 (run, run') where
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import Data.Validation (toEither)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
+import Debug.Trace
+import Keelung (N (N))
 import Keelung.Compiler.Interpret.Monad (Error (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
@@ -30,7 +33,11 @@ run r1cs inputs = fst <$> run' r1cs inputs
 -- | Return interpreted outputs along with the witnesses
 run' :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) ([n], Vector n)
 run' r1cs inputs = do
-  witness <- runM inputs $ goThrough (Set.fromList (toR1Cs r1cs))
+  let constraints =
+        Seq.fromList (map R1CConstraint (toR1Cs r1cs))
+          <> Seq.fromList (map CNEQConstraint (r1csCNEQs r1cs))
+
+  witness <- runM inputs $ goThroughManyTimes constraints
   -- extract output values from the witness
   let (start, end) = getOutputVarRange (r1csCounters r1cs)
   let outputVars = [start .. end - 1]
@@ -38,16 +45,63 @@ run' r1cs inputs = do
 
   return (outputs, witness)
 
--- Go through a set of constraints and return the one constraint that cannot be shrinked or eliminated
-goThrough :: (GaloisField n, Integral n) => Set (R1C n) -> M n ()
-goThrough set = case Set.minView set of
-  Nothing -> return ()
-  Just (r1c, set') -> do
-    result <- shrink r1c
-    case result of
-      Shrinked r1c' -> goThrough (Set.insert r1c' set')
-      Eliminated -> goThrough set'
-      Stuck -> throwError $ R1CSStuckError r1c
+goThroughManyTimes :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n ()
+goThroughManyTimes constraints = do
+  result <- goThroughOnce constraints
+  case result of
+    -- keep going
+    Shrinked constraints' -> goThroughManyTimes constraints'
+    -- done 
+    Eliminated -> return ()
+    NothingToDo -> return ()
+    -- stuck 
+    Stuck _ -> throwError (R1CSStuckError $ toList $ fmap constraintToEither constraints)
+
+  where 
+    constraintToEither :: Constraint n -> Either (R1C n) (CNEQ n)
+    constraintToEither (R1CConstraint r1c) = Left r1c
+    constraintToEither (CNEQConstraint cneq) = Right cneq
+
+-- result <- goThroughOnce constraints
+-- case result of
+--   Shrinked constraints' -> _
+--   Eliminated -> _
+--   Stuck -> throwError (R1CSStuckError constraints)
+
+-- Go through a sequence of constraints
+goThroughOnce :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n (Result (Seq (Constraint n)))
+goThroughOnce constraints = mconcat <$> mapM shrink (toList constraints)
+
+lookupVar :: Var -> M n (Maybe n)
+lookupVar var = gets (IntMap.lookup var)
+
+shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
+shrink (R1CConstraint r1c) = fmap (pure . R1CConstraint) <$> shrinkR1C r1c
+shrink (CNEQConstraint cneq) = fmap (pure . CNEQConstraint) <$> shrinkCNEQ cneq
+
+-- if (x - y) = 0 then m = 0 else m = recip (x - y)
+shrinkCNEQ :: (GaloisField n, Integral n) => CNEQ n -> M n (Result (CNEQ n))
+shrinkCNEQ cneq@(CNEQ (Left x) (Left y) m) = do
+  resultX <- lookupVar x
+  resultY <- lookupVar x
+  case (resultX, resultY) of
+    (Nothing, Nothing) -> return $ Stuck cneq
+    (Just a, Nothing) -> return $ Shrinked (CNEQ (Right a) (Left y) m)
+    (Nothing, Just b) -> return $ Shrinked (CNEQ (Left x) (Right b) m)
+    (Just a, Just b) -> shrinkCNEQ (CNEQ (Right a) (Right b) m)
+shrinkCNEQ cneq@(CNEQ (Left x) (Right b) m) = do
+  result <- lookupVar x
+  case result of
+    Nothing -> return $ Stuck cneq
+    Just a -> shrinkCNEQ (CNEQ (Right a) (Right b) m)
+shrinkCNEQ cneq@(CNEQ (Right a) (Left y) m) = do
+  result <- lookupVar y
+  case result of
+    Nothing -> return $ Stuck cneq
+    Just b -> shrinkCNEQ (CNEQ (Right a) (Right b) m)
+shrinkCNEQ (CNEQ (Right a) (Right b) m) = do
+  bindVar m (recip (a - b))
+  return Eliminated
 
 --------------------------------------------------------------------------------
 
@@ -68,13 +122,43 @@ bindVar var val = modify' $ IntMap.insert var val
 
 --------------------------------------------------------------------------------
 
--- | Result of shrinking a constraint
-data Result n = Shrinked (R1C n) | Eliminated | Stuck
+data Constraint n
+  = R1CConstraint (R1C n)
+  | CNEQConstraint (CNEQ n)
+  deriving (Eq, Show)
 
-shrink :: (GaloisField n, Integral n) => R1C n -> M n (Result n)
-shrink r1cs = do
+--------------------------------------------------------------------------------
+
+-- | Result of shrinking a constraint
+data Result a = Shrinked a | Stuck a | Eliminated | NothingToDo
+  deriving (Eq, Show)
+
+instance Semigroup a => Semigroup (Result a) where
+  NothingToDo <> x = x
+  x <> NothingToDo = x
+  Shrinked x <> Shrinked y = Shrinked (x <> y)
+  Shrinked x <> Stuck y = Shrinked (x <> y)
+  Shrinked x <> Eliminated = Shrinked x
+  Stuck x <> Shrinked y = Shrinked (x <> y)
+  Stuck x <> Stuck y = Stuck (x <> y)
+  Stuck x <> Eliminated = Shrinked x
+  Eliminated <> Shrinked x = Shrinked x
+  Eliminated <> Stuck x = Shrinked x
+  Eliminated <> Eliminated = Eliminated
+
+instance Monoid a => Monoid (Result a) where
+  mempty = NothingToDo
+
+instance Functor Result where
+  fmap f (Shrinked x) = Shrinked (f x)
+  fmap f (Stuck x) = Stuck (f x)
+  fmap _ Eliminated = Eliminated
+  fmap _ NothingToDo = NothingToDo
+
+shrinkR1C :: (GaloisField n, Integral n) => R1C n -> M n (Result (R1C n))
+shrinkR1C r1c = do
   bindings <- get
-  case r1cs of
+  case r1c of
     R1C (Left _) (Left _) (Left _) -> return Eliminated
     R1C (Left a) (Left b) (Right cs) -> case substAndView bindings cs of
       Constant _ -> return Eliminated
@@ -82,30 +166,30 @@ shrink r1cs = do
         -- a * b - c = coeff var
         bindVar var ((a * b - c) / coeff)
         return Eliminated
-      Polynomial _ -> return Stuck
+      Polynomial _ -> return $ Stuck r1c
     R1C (Left a) (Right bs) (Left c) -> case substAndView bindings bs of
       Constant _ -> return Eliminated
       Uninomial b (var, coeff) -> do
-        -- a * (b - coeff var) = c
-        bindVar var ((b - c / a) / coeff)
+        -- a * (b + coeff var) = c
+        bindVar var ((c / a - b) / coeff)
         return Eliminated
-      Polynomial _ -> return Stuck
+      Polynomial _ -> return $ Stuck r1c
     R1C (Left a) (Right bs) (Right cs) -> case (substAndView bindings bs, substAndView bindings cs) of
       (Constant _, Constant _) -> return Eliminated
       (Constant b, Uninomial c (var, coeff)) -> do
         -- a * b - c = coeff var
         bindVar var ((a * b - c) / coeff)
         return Eliminated
-      (Constant _, Polynomial _) -> return Stuck
+      (Constant _, Polynomial _) -> return $ Stuck r1c
       (Uninomial b (var, coeff), Constant c) -> do
         -- a * (b + coeff var) = c
         bindVar var ((c - a * b) / (coeff * a))
         return Eliminated
-      (Uninomial _ _, Uninomial _ _) -> return Stuck
-      (Uninomial _ _, Polynomial _) -> return Stuck
-      (Polynomial _, Constant _) -> return Stuck
-      (Polynomial _, Uninomial _ _) -> return Stuck
-      (Polynomial _, Polynomial _) -> return Stuck
+      (Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
+      (Uninomial _ _, Polynomial _) -> return $ Stuck r1c
+      (Polynomial _, Constant _) -> return $ Stuck r1c
+      (Polynomial _, Uninomial _ _) -> return $ Stuck r1c
+      (Polynomial _, Polynomial _) -> return $ Stuck r1c
     R1C (Right as) (Left b) (Left c) -> case substAndView bindings as of
       Constant _ -> return Eliminated
       Uninomial a (var, coeff) -> do
@@ -113,78 +197,78 @@ shrink r1cs = do
         -- var = (c - a * b) / (coeff * b)
         bindVar var ((c - a * b) / (coeff * b))
         return Eliminated
-      Polynomial _ -> return Stuck
+      Polynomial _ -> return $ Stuck r1c
     R1C (Right as) (Left b) (Right cs) -> case (substAndView bindings as, substAndView bindings cs) of
       (Constant _, Constant _) -> return Eliminated
       (Constant a, Uninomial c (var, coeff)) -> do
         -- a * b - c = coeff var
         bindVar var ((a * b - c) / coeff)
         return Eliminated
-      (Constant _, Polynomial _) -> return Stuck
+      (Constant _, Polynomial _) -> return $ Stuck r1c
       (Uninomial a (var, coeff), Constant c) -> do
         -- (a + coeff var) * b = c
         bindVar var ((c - a * b) / (coeff * b))
         return Eliminated
-      (Uninomial _ _, Uninomial _ _) -> return Stuck
-      (Uninomial _ _, Polynomial _) -> return Stuck
-      (Polynomial _, Constant _) -> return Stuck
-      (Polynomial _, Uninomial _ _) -> return Stuck
-      (Polynomial _, Polynomial _) -> return Stuck
+      (Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
+      (Uninomial _ _, Polynomial _) -> return $ Stuck r1c
+      (Polynomial _, Constant _) -> return $ Stuck r1c
+      (Polynomial _, Uninomial _ _) -> return $ Stuck r1c
+      (Polynomial _, Polynomial _) -> return $ Stuck r1c
     R1C (Right as) (Right bs) (Left c) -> case (substAndView bindings as, substAndView bindings bs) of
       (Constant _, Constant _) -> return Eliminated
       (Constant a, Uninomial b (var, coeff)) -> do
         -- a * (b + coeff var) = c
         bindVar var ((c / a - b) / coeff)
         return Eliminated
-      (Constant _, Polynomial _) -> return Stuck
+      (Constant _, Polynomial _) -> return $ Stuck r1c
       (Uninomial a (var, coeff), Constant b) -> do
         -- (a + coeff var) * b = c
         bindVar var ((c - a * b) / (coeff * b))
         return Eliminated
-      (Uninomial _ _, Uninomial _ _) -> return Stuck
-      (Uninomial _ _, Polynomial _) -> return Stuck
-      (Polynomial _, Constant _) -> return Stuck
-      (Polynomial _, Uninomial _ _) -> return Stuck
-      (Polynomial _, Polynomial _) -> return Stuck
+      (Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
+      (Uninomial _ _, Polynomial _) -> return $ Stuck r1c
+      (Polynomial _, Constant _) -> return $ Stuck r1c
+      (Polynomial _, Uninomial _ _) -> return $ Stuck r1c
+      (Polynomial _, Polynomial _) -> return $ Stuck r1c
     R1C (Right as) (Right bs) (Right cs) -> case (substAndView bindings as, substAndView bindings bs, substAndView bindings cs) of
       (Constant _, Constant _, Constant _) -> return Eliminated
       (Constant a, Constant b, Uninomial c (var, coeff)) -> do
         -- a * b - c = coeff var
         bindVar var ((a * b - c) / coeff)
         return Eliminated
-      (Constant _, Constant _, Polynomial _) -> return Stuck
+      (Constant _, Constant _, Polynomial _) -> return $ Stuck r1c
       (Constant a, Uninomial b (var, coeff), Constant c) -> do
         -- a * (b + coeff var) = c
         bindVar var ((c / a - b) / coeff)
         return Eliminated
-      (Constant _, Uninomial _ _, Uninomial _ _) -> return Stuck
-      (Constant _, Uninomial _ _, Polynomial _) -> return Stuck
-      (Constant _, Polynomial _, Constant _) -> return Stuck
-      (Constant _, Polynomial _, Uninomial _ _) -> return Stuck
-      (Constant _, Polynomial _, Polynomial _) -> return Stuck
+      (Constant _, Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
+      (Constant _, Uninomial _ _, Polynomial _) -> return $ Stuck r1c
+      (Constant _, Polynomial _, Constant _) -> return $ Stuck r1c
+      (Constant _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
+      (Constant _, Polynomial _, Polynomial _) -> return $ Stuck r1c
       (Uninomial a (var, coeff), Constant b, Constant c) -> do
         -- (a + coeff var) * b = c
         bindVar var ((c - a * b) / (coeff * b))
         return Eliminated
-      (Uninomial _ _, Constant _, Uninomial _ _) -> return Stuck
-      (Uninomial _ _, Constant _, Polynomial _) -> return Stuck
-      (Uninomial _ _, Uninomial _ _, Constant _) -> return Stuck
-      (Uninomial _ _, Uninomial _ _, Uninomial _ _) -> return Stuck
-      (Uninomial _ _, Uninomial _ _, Polynomial _) -> return Stuck
-      (Uninomial _ _, Polynomial _, Constant _) -> return Stuck
-      (Uninomial _ _, Polynomial _, Uninomial _ _) -> return Stuck
-      (Uninomial _ _, Polynomial _, Polynomial _) -> return Stuck
-      (Polynomial _, Constant _, Constant _) -> return Stuck
-      (Polynomial _, Constant _, Uninomial _ _) -> return Stuck
-      (Polynomial _, Constant _, Polynomial _) -> return Stuck
-      (Polynomial _, Uninomial _ _, Constant _) -> return Stuck
-      (Polynomial _, Uninomial _ _, Uninomial _ _) -> return Stuck
-      (Polynomial _, Uninomial _ _, Polynomial _) -> return Stuck
-      (Polynomial _, Polynomial _, Constant _) -> return Stuck
-      (Polynomial _, Polynomial _, Uninomial _ _) -> return Stuck
-      (Polynomial _, Polynomial _, Polynomial _) -> return Stuck
+      (Uninomial _ _, Constant _, Uninomial _ _) -> return $ Stuck r1c
+      (Uninomial _ _, Constant _, Polynomial _) -> return $ Stuck r1c
+      (Uninomial _ _, Uninomial _ _, Constant _) -> return $ Stuck r1c
+      (Uninomial _ _, Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
+      (Uninomial _ _, Uninomial _ _, Polynomial _) -> return $ Stuck r1c
+      (Uninomial _ _, Polynomial _, Constant _) -> return $ Stuck r1c
+      (Uninomial _ _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
+      (Uninomial _ _, Polynomial _, Polynomial _) -> return $ Stuck r1c
+      (Polynomial _, Constant _, Constant _) -> return $ Stuck r1c
+      (Polynomial _, Constant _, Uninomial _ _) -> return $ Stuck r1c
+      (Polynomial _, Constant _, Polynomial _) -> return $ Stuck r1c
+      (Polynomial _, Uninomial _ _, Constant _) -> return $ Stuck r1c
+      (Polynomial _, Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
+      (Polynomial _, Uninomial _ _, Polynomial _) -> return $ Stuck r1c
+      (Polynomial _, Polynomial _, Constant _) -> return $ Stuck r1c
+      (Polynomial _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
+      (Polynomial _, Polynomial _, Polynomial _) -> return $ Stuck r1c
 
--- | Substitute variables with values in a polynomial
+-- | Substitute varaibles with values in a polynomial
 substAndView :: (Num n, Eq n) => IntMap n -> Poly n -> PolyResult n
 substAndView bindings xs = case Poly.substWithIntMap xs bindings of
   Left constant -> Constant constant
