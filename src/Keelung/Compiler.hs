@@ -57,13 +57,12 @@ import Keelung.Compiler.Syntax.Erase as Erase
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
-import qualified Keelung.Syntax.Typed as Typed
 import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
-import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed (Elaborated)
+import qualified Keelung.Syntax.Typed as Typed
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
@@ -153,7 +152,7 @@ execute prog rawInputs = do
   let inputsForR1CSInterpreter = Inputs.deserialize (r1csCounters r1cs) rawInputs
   (r1csInterpreterOutputs, r1csInterpreterWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputsForR1CSInterpreter)
 
-  let r1csOutputsWithoutBinReps = removeBinRepsFromOutputs (r1csCounters r1cs) r1csInterpreterOutputs
+  let r1csOutputsWithoutBinReps = Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) r1csInterpreterOutputs
 
   when (r1csOutputsWithoutBinReps /= typedInterpreterOutputs) $ do
     Left $ ExecError $ ExecOutputError typedInterpreterOutputs r1csOutputsWithoutBinReps
@@ -166,13 +165,6 @@ execute prog rawInputs = do
           ExecR1CUnsatisfiableError r1c's r1csInterpreterWitness
 
   return r1csOutputsWithoutBinReps
-  where
-    -- | Deserialise the outputs from the R1CS interpreter
-    --   TODO: make it something like a proper inverse of Inputs.deserialize
-    removeBinRepsFromOutputs :: Counters -> [n] -> [n]
-    removeBinRepsFromOutputs counters outputs =
-      let (start, end) = getOutputBinRepRange counters
-       in take start outputs ++ drop end outputs
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs

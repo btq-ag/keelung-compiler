@@ -14,6 +14,13 @@ import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Typed (Computation (compCounters), Elaborated (elabComp))
 
+-- | Deserialise the outputs from the R1CS interpreter
+--   TODO: make it something like a proper inverse of Inputs.deserialize
+removeBinRepsFromOutputs :: Counters -> [n] -> [n]
+removeBinRepsFromOutputs counters outputs =
+  let (start, end) = getOutputBinRepRange counters
+    in take start outputs ++ drop end outputs
+
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs
   { varCounters :: Counters,

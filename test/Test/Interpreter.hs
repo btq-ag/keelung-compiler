@@ -37,13 +37,17 @@ r1cs1 :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error
 r1cs1 prog rawInputs = do
   r1cs <- toR1CS <$> compile prog
   let inps = Inputs.deserialize (r1csCounters r1cs) rawInputs
-  left ExecError (R1CS1.run r1cs inps)
+  case R1CS1.run r1cs inps of 
+    Left err -> Left (ExecError err)
+    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
 r1cs2 :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 r1cs2 prog rawInputs = do
   r1cs <- toR1CS <$> compile prog
   let inps = Inputs.deserialize (r1csCounters r1cs) rawInputs
-  left InterpretError (R1CS2.run r1cs inps)
+  case R1CS2.run r1cs inps of 
+    Left err -> Left (InterpretError err)
+    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
 -- run :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Expectation
 run :: (GaloisField n, Integral n, Encode t, FreeVar t, Interpret t n) => Comp t -> [n] -> [n] -> IO ()
@@ -100,20 +104,17 @@ tests = do
                 (f + 2)
 
       run program [100, 1, 1 :: GF181] [101]
-
       run program [100, 0, 1 :: GF181] [102]
 
-    -- it "Rotate" $ do
-    --   let program = do
-    --         x <- inputUInt @4
-    --         return $ toArray [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
+    it "Rotate" $ do
+      let program = do
+            x <- inputUInt @4
+            return $ toArray [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
 
-    --   run program [0 :: GF181] [0, 0, 0, 0, 0, 0, 0, 0, 0]
-
-      
-      -- run program [1 :: GF181] [1, 2, 4, 8, 1, 2, 4, 8, 1]
-      -- run program [3 :: GF181] [3, 6, 12, 9, 3, 6, 12, 9, 3]
-      -- run program [5 :: GF181] [5, 10, 5, 10, 5, 10, 5, 10, 5]
+      run program [0 :: GF181] [0, 0, 0, 0, 0, 0, 0, 0, 0]
+      run program [1 :: GF181] [1, 2, 4, 8, 1, 2, 4, 8, 1]
+      run program [3 :: GF181] [3, 6, 12, 9, 3, 6, 12, 9, 3]
+      run program [5 :: GF181] [5, 10, 5, 10, 5, 10, 5, 10, 5]
 
 -- it "Shift" $ do
 --   let program = do

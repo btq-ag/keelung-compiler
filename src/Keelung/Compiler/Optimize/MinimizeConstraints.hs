@@ -123,8 +123,24 @@ substBinRep (BinRep var w bits _) = do
   result <- lookupVar var
   case result of
     Root _ -> do
-      -- hit another variable, can't substitute shit
-      return True
+      -- dunno the value of "var", see if we can go the other way and restore the value of "var" from its bits
+      varValue <-
+        foldM
+          ( \acc bitVar -> case acc of
+              Nothing -> return Nothing
+              Just accVal -> do
+                bitValue <- lookupVar bitVar
+                case bitValue of
+                  Root _ -> return Nothing
+                  Value bit -> return (Just (accVal * 2 + bit))
+          )
+          (Just 0)
+          [bits + w - 1, bits + w - 2 .. bits]
+      case varValue of
+        Nothing -> return True
+        Just varValue' -> do
+          bindVar var varValue'
+          return False
     Value n -> do
       forM_ (zip [bits .. bits + w - 1] (toBits n)) $ \(index, bit) -> do
         bindVar index bit

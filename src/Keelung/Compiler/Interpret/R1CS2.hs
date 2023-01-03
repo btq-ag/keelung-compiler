@@ -14,8 +14,6 @@ import qualified Data.Sequence as Seq
 import Data.Validation (toEither)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
-import Debug.Trace
-import Keelung (N (N))
 import Keelung.Compiler.Interpret.Monad (Error (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
