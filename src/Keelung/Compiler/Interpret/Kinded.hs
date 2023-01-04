@@ -18,14 +18,15 @@ import Keelung.Compiler.Interpret.Monad
 import Keelung.Compiler.Interpret.Typed ()
 import Keelung.Compiler.Syntax.Inputs (Inputs (..))
 import Keelung.Data.Bindings
-import qualified Keelung.Data.Bindings as Struct
+import Keelung.Data.Struct
+import qualified Keelung.Data.Bindings as Bindings
 import qualified Keelung.Syntax.Typed as Typed
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
 runAndOutputWitnesses :: (GaloisField n, Integral n, Interpret t n) => Elaborated t -> Inputs n -> Either (Error n) ([n], Witness n)
-runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
+runAndOutputWitnesses (Elaborated expr context) inputs = runM inputs $ do
   -- interpret assignments of values first
   fs <-
     filterM
@@ -34,14 +35,14 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
           Rational val -> interpret val >>= addF var >> return False
           _ -> return True
       )
-      (IntMap.toList (compAssignmentF comp))
+      (IntMap.toList (structF (compExprBindings context)))
   bs <-
     filterM
       ( \(var, e) -> case e of
           Boolean val -> interpret val >>= addB var >> return False
           _ -> return True
       )
-      (IntMap.toList (compAssignmentB comp))
+      (IntMap.toList (structB (compExprBindings context)))
   us <-
     mapM
       ( \(width, xs) ->
@@ -53,7 +54,7 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
               )
               (IntMap.toList xs)
       )
-      (IntMap.toList (compAssignmentU comp))
+      (IntMap.toList (structU (compExprBindings context)))
 
   -- interpret the rest of the assignments
   forM_ fs $ \(var, e) -> interpret e >>= addF var
@@ -63,11 +64,11 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
 
   -- interpret the assertions next
   -- throw error if any assertion fails
-  forM_ (compAssertions comp) $ \e -> do
+  forM_ (compAssertions context) $ \e -> do
     values <- interpret e
     when (values /= [1]) $ do
       bindings <- get
-      let bindingsInExpr = Struct.restrictVars bindings (freeVars e)
+      let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e) bindingsInExpr
 
@@ -224,8 +225,8 @@ instance FreeVar t => FreeVar (Elaborated t) where
 instance FreeVar Computation where
   freeVars context =
     mconcat
-      [ mconcat $ map freeVars (toList (compAssignmentF context)),
-        mconcat $ map freeVars (toList (compAssignmentB context)),
-        mconcat $ concatMap (map freeVars . toList) (toList (compAssignmentU context)),
+      [ mconcat $ map freeVars (toList (structF (compExprBindings context))),
+        mconcat $ map freeVars (toList (structB (compExprBindings context))),
+        mconcat $ concatMap (map freeVars . toList) (toList (structU (compExprBindings context))),
         mconcat $ map freeVars (toList (compAssertions context))
       ]

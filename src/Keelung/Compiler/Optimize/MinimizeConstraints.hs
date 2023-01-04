@@ -117,7 +117,7 @@ substPoly poly = do
 
 -- | Returns `False` if we have learned something about this BinRep
 substBinRep :: (Integral n, GaloisField n) => BinRep -> OptiM n Bool
-substBinRep (BinRep var w bits _) = do
+substBinRep (BinRep var w bits) = do
   -- although a value is isomorphic to its binary representation
   -- we are only substituting the bits in the binary representation
   result <- lookupVar var

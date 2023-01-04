@@ -109,7 +109,7 @@ shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinR
 
 -- | Trying to reduce a BinRep constraint
 shrinkBinRep :: (GaloisField n, Integral n) => BinRep -> M n (Result BinRep)
-shrinkBinRep binRep@(BinRep var width bitVarStart _) = do
+shrinkBinRep binRep@(BinRep var width bitVarStart) = do
   varResult <- lookupVar var
   case varResult of
     -- value of "var" is known

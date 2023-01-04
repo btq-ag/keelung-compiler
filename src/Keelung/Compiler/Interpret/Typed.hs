@@ -18,8 +18,9 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Interpret.Monad
 import Keelung.Compiler.Syntax.Inputs (Inputs)
+import Keelung.Data.Struct
 import Keelung.Data.Bindings
-import qualified Keelung.Data.Bindings as Struct
+import qualified Keelung.Data.Bindings as Bindings
 import Keelung.Syntax.Typed
 
 --------------------------------------------------------------------------------
@@ -34,14 +35,14 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
           ValF val -> interpret val >>= addF var >> return False
           _ -> return True
       )
-      (IntMap.toList (compAssignmentF comp))
+      (IntMap.toList (structF (compExprBindings comp)))
   bs <-
     filterM
       ( \(var, e) -> case e of
           ValB val -> interpret val >>= addB var >> return False
           _ -> return True
       )
-      (IntMap.toList (compAssignmentB comp))
+      (IntMap.toList (structB (compExprBindings comp)))
   us <-
     mapM
       ( \(width, xs) ->
@@ -53,7 +54,7 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
               )
               (IntMap.toList xs)
       )
-      (IntMap.toList (compAssignmentU comp))
+      (IntMap.toList (structU (compExprBindings comp)))
 
   -- interpret the rest of the assignments
   forM_ fs $ \(var, e) -> interpret e >>= addF var
@@ -67,7 +68,7 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
     values <- interpret e
     when (values /= [1]) $ do
       bindings <- get
-      let bindingsInExpr = Struct.restrictVars bindings (freeVars e)
+      let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e) bindingsInExpr
 
@@ -235,12 +236,12 @@ instance FreeVar Elaborated where
 instance FreeVar Computation where
   freeVars context =
     mconcat
-      [ mconcat $ map freeVars (toList (compAssignmentF context)),
-        mconcat $ map freeVars (toList (compAssignmentFI context)),
-        mconcat $ map freeVars (toList (compAssignmentB context)),
-        mconcat $ map freeVars (toList (compAssignmentBI context)),
-        mconcat $ concatMap (map freeVars . toList) (toList (compAssignmentU context)),
-        mconcat $ concatMap (map freeVars . toList) (toList (compAssignmentUI context)),
+      [ mconcat $ map freeVars (toList (structF (compExprBindings context))),
+        mconcat $ map freeVars (toList (structF (compExprBindingsI context))),
+        mconcat $ map freeVars (toList (structB (compExprBindings context))),
+        mconcat $ map freeVars (toList (structB (compExprBindingsI context))),
+        mconcat $ concatMap (map freeVars . toList) (toList (structU (compExprBindings context))),
+        mconcat $ concatMap (map freeVars . toList) (toList (structU (compExprBindingsI context))),
         mconcat $ map freeVars (toList (compAssertions context))
       ]
 

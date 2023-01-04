@@ -7,7 +7,7 @@ import Data.Bifunctor (bimap)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
 import Keelung.Compiler.Syntax.Untyped
-import Keelung.Data.Bindings (Struct (..))
+import Keelung.Data.Struct (Struct (..))
 
 --------------------------------------------------------------------------------
 

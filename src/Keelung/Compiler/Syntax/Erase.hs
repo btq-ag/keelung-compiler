@@ -5,12 +5,12 @@ import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
-import Keelung.Data.Bindings (Struct (..))
+import Keelung.Data.Struct (Struct (..))
 import qualified Keelung.Syntax.Typed as T
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation counters aF aFI aB aBI aU aUI assertions = comp
+  let T.Computation counters eb ebi assertions = comp
       proxy = 0
       numBitWidth = bitSize proxy
    in runM numBitWidth $ do
@@ -21,14 +21,14 @@ run (T.Elaborated expr comp) =
         relations <-
           Relations mempty mempty
             <$> ( Struct
-                    <$> mapM eraseExprF aF
-                    <*> mapM eraseExprB aB
-                    <*> mapM (mapM eraseExprU) aU
+                    <$> mapM eraseExprF (structF eb)
+                    <*> mapM eraseExprB (structB eb)
+                    <*> mapM (mapM eraseExprU) (structU eb)
                 )
             <*> ( Struct
-                    <$> mapM eraseExprF aFI
-                    <*> mapM eraseExprB aBI
-                    <*> mapM (mapM eraseExprU) aUI
+                    <$> mapM eraseExprF (structF ebi)
+                    <*> mapM eraseExprB (structB ebi)
+                    <*> mapM (mapM eraseExprU) (structU ebi)
                 )
 
         return $

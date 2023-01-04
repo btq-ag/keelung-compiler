@@ -17,7 +17,7 @@ import Keelung.Compiler.Constraint2
 import qualified Keelung.Compiler.Constraint2 as Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
-import Keelung.Data.Bindings (Struct (..))
+import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
 
 --------------------------------------------------------------------------------
@@ -448,33 +448,7 @@ compileTerms out terms =
     go (constant, pairs) (Constant n) = (constant + n, pairs)
     go (constant, pairs) (WithVars var coeff) = (constant, (var, coeff) : pairs)
 
--- Given a binary function 'f' that knows how to compile '_⊗_'
--- This functions replaces the occurences of '_⊗_' with 'f' in the following manner:
---      E₀ ⊗ E₁ ⊗ ... ⊗ Eₙ
---  =>
---      E₀ `f` (E₁ `f` ... `f` Eₙ)
--- compileAndFoldExprs :: (GaloisField n, Integral n) => (Var -> Var -> Var -> M n ()) -> Var -> Expr n -> Expr n -> Seq (Expr n) -> M n ()
--- compileAndFoldExprs f out x0 x1 xs = do
---   x0' <- wireAsVar x0
---   x1' <- wireAsVar x1
---   vars <- mapM wireAsVar xs
---   go x0' x1' vars
---   where
---     go x y Empty = f out x y
---     go x y (v :<| vs) = do
---       out' <- freshVar
---       go out' v vs
---       f out' x y
-
 -- | If the expression is not already a variable, create a new variable
--- wireAsVar :: (GaloisField n, Integral n) => Expr n -> M n Var
--- wireAsVar (ExprB (VarB var)) = return var
--- wireAsVar (ExprF (VarF var)) = return var
--- wireAsVar (ExprU (VarU _ var)) = return var
--- wireAsVar expr = do
---   out <- freshVar
---   compile out expr
---   return out
 wireB :: (GaloisField n, Integral n) => ExprB n -> M n RefB
 wireB (VarB ref) = return (RefB ref)
 wireB (VarBO ref) = return (RefBO ref)

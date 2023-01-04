@@ -24,8 +24,8 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint2
-import Keelung.Data.Bindings (Struct (structB, structF, structU))
-import qualified Keelung.Data.Bindings as Struct
+import Keelung.Data.Struct (Struct (..))
+import qualified Keelung.Data.Struct as Struct
 import Keelung.Field (N (..))
 import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Counters as Counters

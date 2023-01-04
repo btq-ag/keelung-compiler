@@ -24,6 +24,7 @@ import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Constraint.R1C (R1C)
 import Keelung.Constraint.R1CS (CNEQ)
 import Keelung.Data.Bindings
+import Keelung.Data.Struct
 import Keelung.Syntax.BinRep (BinRep)
 import Keelung.Syntax.Counters
 import Keelung.Types
