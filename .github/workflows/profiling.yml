@@ -1,0 +1,101 @@
+# modified from https://github.com/simonmichael/hledger/blob/master/.github/workflows/linux.yml
+
+name: Profiling
+
+on:
+  push:
+    branches:
+      - profiling
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v2
+    # Make sure the @v0.5.4 matches the current version of the
+    # action 
+    - uses: webfactory/ssh-agent@v0.5.4
+      with:
+        ssh-private-key: ${{ secrets.KEELUNG_CI }}
+
+    # things to be cached/restored:
+
+    - name: 💾 Cache stack global package db
+      id:   stack-global
+      uses: actions/cache@v2
+      with:
+        path: ~/.stack
+        key: ${{ runner.os }}-stack-global-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-stack-global-${{ matrix.plan.ghc }}
+    - name: 💾 Cache stack-installed programs in ~/.local/bin
+      id:   stack-programs
+      uses: actions/cache@v2
+      with:
+        path: ~/.local/bin
+        key: ${{ runner.os }}-stack-programs-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-stack-programs-${{ matrix.plan.ghc }}
+    - name: 💾 Cache .stack-work
+      uses: actions/cache@v2
+      with:
+        path: .stack-work
+        key: ${{ runner.os }}-stack-work-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-stack-work-${{ matrix.plan.ghc }}
+    - name: 💾 Cache keelung-compiler/.stack-work
+      uses: actions/cache@v2
+      with:
+        path: keelung-compiler/.stack-work
+        key: ${{ runner.os }}-keelung-compiler-stack-work-${{ matrix.plan.ghc }}-${{ hashFiles('keelung-compiler/package.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-keelung-compiler-stack-work-${{ matrix.plan.ghc }}
+    # actions:
+
+    - name: ⏬ Install stack
+      run: |
+        mkdir -p ~/.local/bin
+        export PATH=~/.local/bin:$PATH
+        # curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'; chmod a+x ~/.local/bin/stack
+        if [[ ! -x ~/.local/bin/stack ]]; then curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'; chmod a+x ~/.local/bin/stack; fi
+        stack --version
+    - name: ⏬ Install GHC
+      run: |
+        df -h
+        stack setup --install-ghc
+        df -h
+    - name: 🔨 Build the compiler with profiling enabled
+      run: |
+        stack build --profile
+    - name: 📥 Checkout examples
+      uses: actions/checkout@v3
+      with:
+        repository: 'btq-ag/keelung-examples'
+        ref: 'main'
+    - name: 🔨 Build the examples
+      run: |
+        cd keelung-examples
+        stack build --flags keelung-examples:profile
+    - name: 🩺 Run profilings
+      run: |
+        stack exec profile
+    - name: 🍳 Prepare .prof files
+      run: |
+        mkdir output
+        mv ./*.prof output
+        cd output
+        git init
+        git add -A
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git commit -m 'profile with compiler@$GITHUB_SHA'
+
+    - name: 🚢 Release .prof files
+      uses: ad-m/github-push-action@v0.5.0
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: profiling-artifacts
+        force: true
+        directory: ./output
