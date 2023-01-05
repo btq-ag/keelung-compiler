@@ -18,7 +18,9 @@ jobs:
     # action 
     - uses: webfactory/ssh-agent@v0.5.4
       with:
-        ssh-private-key: ${{ secrets.KEELUNG }}
+        ssh-private-key: |
+          ${{ secrets.KEELUNG_CI }}
+          ${{ secrets.KEELUNG_EXAMPLES_CI }}
 
     # things to be cached/restored:
 
@@ -74,7 +76,7 @@ jobs:
       with:
         repository: 'btq-ag/keelung-examples'
         ref: 'main'
-        ssh-key: ${{ secrets.KEELUNG }}
+        ssh-key: ${{ secrets.KEELUNG_EXAMPLES_CI }}
     - name: 🔨 Build the examples
       run: |
         cd keelung-examples
