@@ -18,7 +18,7 @@ jobs:
     # action 
     - uses: webfactory/ssh-agent@v0.5.4
       with:
-        ssh-private-key: ${{ secrets.KEELUNG_CI }}
+        ssh-private-key: ${{ secrets.KEELUNG }}
 
     # things to be cached/restored:
 
@@ -27,31 +27,31 @@ jobs:
       uses: actions/cache@v2
       with:
         path: ~/.stack
-        key: ${{ runner.os }}-stack-global-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        key: ${{ runner.os }}-stack-global-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
         restore-keys: |
-             ${{ runner.os }}-stack-global-${{ matrix.plan.ghc }}
+             ${{ runner.os }}-stack-global-profiling-${{ matrix.plan.ghc }}
     - name: 💾 Cache stack-installed programs in ~/.local/bin
       id:   stack-programs
       uses: actions/cache@v2
       with:
         path: ~/.local/bin
-        key: ${{ runner.os }}-stack-programs-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        key: ${{ runner.os }}-stack-programs-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
         restore-keys: |
-             ${{ runner.os }}-stack-programs-${{ matrix.plan.ghc }}
+             ${{ runner.os }}-stack-programs-profiling-${{ matrix.plan.ghc }}
     - name: 💾 Cache .stack-work
       uses: actions/cache@v2
       with:
         path: .stack-work
-        key: ${{ runner.os }}-stack-work-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        key: ${{ runner.os }}-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
         restore-keys: |
-             ${{ runner.os }}-stack-work-${{ matrix.plan.ghc }}
+             ${{ runner.os }}-stack-work-profiling-${{ matrix.plan.ghc }}
     - name: 💾 Cache keelung-compiler/.stack-work
       uses: actions/cache@v2
       with:
         path: keelung-compiler/.stack-work
-        key: ${{ runner.os }}-keelung-compiler-stack-work-${{ matrix.plan.ghc }}-${{ hashFiles('keelung-compiler/package.yaml') }}
+        key: ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('keelung-compiler/package.yaml') }}
         restore-keys: |
-             ${{ runner.os }}-keelung-compiler-stack-work-${{ matrix.plan.ghc }}
+             ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}
     # actions:
 
     - name: ⏬ Install stack
@@ -74,7 +74,7 @@ jobs:
       with:
         repository: 'btq-ag/keelung-examples'
         ref: 'main'
-        ssh-key: ${{ secrets.KEELUNG_CI }}
+        ssh-key: ${{ secrets.KEELUNG }}
     - name: 🔨 Build the examples
       run: |
         cd keelung-examples
