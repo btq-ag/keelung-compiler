@@ -5,9 +5,13 @@ name: CI (macOS)
 # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#onpushpull_requestbranchestags
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
   pull_request: 
+    branches:
+      - main
     types: [opened, reopened]
 
 jobs:

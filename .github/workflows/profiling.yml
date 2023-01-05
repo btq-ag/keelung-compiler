@@ -66,9 +66,9 @@ jobs:
         df -h
         stack setup --install-ghc
         df -h
-    - name: 🔨 Build the compiler with profiling enabled
+    - name: 🔨 Build and install the compiler with profiling enabled
       run: |
-        stack build --profile
+        stack install --profile
     - name: 📥 Checkout examples
       uses: actions/checkout@v3
       with:
