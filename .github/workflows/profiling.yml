@@ -74,28 +74,35 @@ jobs:
       with:
         repository: 'btq-ag/keelung-examples'
         ref: 'main'
+        ssh-key: ${{ secrets.KEELUNG_CI }}
     - name: 🔨 Build the examples
       run: |
         cd keelung-examples
         stack build --flags keelung-examples:profile
+    - name: 🔥 Install ghc-prof-flamegraph
+      run: |
+        stack install ghc-prof-flamegraph
     - name: 🩺 Run profilings
       run: |
         stack exec profile
-    - name: 🍳 Prepare .prof files
+    - name: 🍳 Prepare .prof files and flamegraphs
       run: |
         mkdir output
         mv ./*.prof output
         cd output
+        for f in *.prof; do ghc-prof-flamegraph --alloc $f -o $f-alloc.svg; ghc-prof-flamegraph --time $f -o $f-time.svg; done
+        mkdir flamegraphs
+        mv *.svg flamegraphs
         git init
         git add -A
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git commit -m 'profile with compiler@$GITHUB_SHA'
 
-    - name: 🚢 Release .prof files
+    - name: 🚢 Ship profiling results
       uses: ad-m/github-push-action@v0.5.0
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        ssh: true
         branch: profiling-artifacts
         force: true
         directory: ./output
