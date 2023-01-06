@@ -22,6 +22,25 @@ jobs:
           ${{ secrets.KEELUNG_CI }}
           ${{ secrets.KEELUNG_EXAMPLES_CI }}
 
+    - name: Test pushing
+      run: |
+        mkdir test_pushing
+        cd test_pushing
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git init
+        git commit --allow-empty -m "test_pushing"
+
+    - name: Test pushing
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        SSH_DEPLOY_KEY: ${{ secrets.KEELUNG }}
+      with:
+        source-directory: 'test_pushing'
+        destination-github-username: 'btq-ag'
+        destination-repository-name: 'Keelung-Profiling-Results'
+        user-email: action@github.com
+        target-branch: main
     # things to be cached/restored:
 
     - name: 💾 Cache stack global package db
@@ -103,9 +122,12 @@ jobs:
         git commit -m 'profile with compiler@$GITHUB_SHA'
 
     - name: 🚢 Ship profiling results
-      uses: ad-m/github-push-action@v0.5.0
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        SSH_DEPLOY_KEY: ${{ secrets.KEELUNG }}
       with:
-        ssh: true
-        branch: profiling-artifacts
-        force: true
-        directory: ./output
+        source-directory: 'output'
+        destination-github-username: 'btq-ag'
+        destination-repository-name: 'Keelung-Profiling-Results'
+        user-email: action@github.com
+        target-branch: main
