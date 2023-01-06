@@ -26,8 +26,8 @@ jobs:
       run: |
         mkdir test_pushing
         cd test_pushing
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --global user.email "action@github.com"
+        git config --global user.name "GitHub Action"
         git init
         git commit --allow-empty -m "test_pushing"
 
