@@ -23,16 +23,6 @@ jobs:
           ${{ secrets.KEELUNG_EXAMPLES_CI }}
           ${{ secrets.KEELUNG_PROFILING }}
 
-    - name: Test pushing
-      uses: cpina/github-action-push-to-another-repository@main
-      env:
-        SSH_DEPLOY_KEY: ${{ secrets.KEELUNG_PROFILING }}
-      with:
-        source-directory: 'results'
-        destination-github-username: 'btq-ag'
-        destination-repository-name: 'Keelung-Profiling-Results'
-        user-email: action@github.com
-        target-branch: main
     # things to be cached/restored:
 
     - name: 💾 Cache stack global package db
