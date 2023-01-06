@@ -22,6 +22,17 @@ jobs:
           ${{ secrets.KEELUNG_CI }}
           ${{ secrets.KEELUNG_EXAMPLES_CI }}
 
+    - name: 📥 Checkout examples
+      uses: actions/checkout@v3
+      with:
+        repository: 'btq-ag/keelung-examples'
+        path: './keelung-examples'
+        ref: 'main'
+        ssh-key: ${{ secrets.KEELUNG_EXAMPLES_CI }}
+    - name: 🔨 Test checkouts
+      run: |
+        cd ./keelung-examples
+        cd ..
     # things to be cached/restored:
 
     - name: 💾 Cache stack global package db
