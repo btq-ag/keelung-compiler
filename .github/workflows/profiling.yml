@@ -22,13 +22,20 @@ jobs:
           ${{ secrets.KEELUNG_CI }}
           ${{ secrets.KEELUNG_EXAMPLES_CI }}
 
-    - name: Test pushing
+    - name: 📥 Checkout profiling repo
+      uses: actions/checkout@v3
+      with:
+        repository: 'btq-ag/Keelung-Profiling-Results'
+        path: './results'
+        ref: 'main'
+        ssh-key: ${{ secrets.KEELUNG }}
+    - name: Test removing files
       run: |
-        mkdir test_pushing
-        cd test_pushing
+        cd results
+        rm -r ./*
+        git add -A
         git config --global user.email "action@github.com"
         git config --global user.name "GitHub Action"
-        git init
         git commit --allow-empty -m "test_pushing"
 
     - name: Test pushing
@@ -36,7 +43,7 @@ jobs:
       env:
         SSH_DEPLOY_KEY: ${{ secrets.KEELUNG }}
       with:
-        source-directory: 'test_pushing'
+        source-directory: 'results'
         destination-github-username: 'btq-ag'
         destination-repository-name: 'Keelung-Profiling-Results'
         user-email: action@github.com
