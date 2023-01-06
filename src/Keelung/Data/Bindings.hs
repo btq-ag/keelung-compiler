@@ -20,7 +20,6 @@ import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import GHC.Generics (Generic)
 import Keelung.Field.N (N (N))
-import Keelung.Types
 import Keelung.Data.Struct 
 
 --------------------------------------------------------------------------------
