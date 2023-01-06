@@ -23,22 +23,6 @@ jobs:
           ${{ secrets.KEELUNG_EXAMPLES_CI }}
           ${{ secrets.KEELUNG_PROFILING }}
 
-    - name: 📥 Checkout profiling repo
-      uses: actions/checkout@v3
-      with:
-        repository: 'btq-ag/Keelung-Profiling-Results'
-        path: './results'
-        ref: 'main'
-        ssh-key: ${{ secrets.KEELUNG_PROFILING }}
-    - name: Test removing files
-      run: |
-        cd results
-        rm -r ./*
-        git add -A
-        git config --global user.email "action@github.com"
-        git config --global user.name "GitHub Action"
-        git commit --allow-empty -m "test_pushing"
-
     - name: Test pushing
       uses: cpina/github-action-push-to-another-repository@main
       env:
@@ -115,15 +99,26 @@ jobs:
     - name: 🩺 Run profilings
       run: |
         stack exec profile
+
+    - name: 📥 Checkout profiling repo
+      uses: actions/checkout@v3
+      with:
+        repository: 'btq-ag/Keelung-Profiling-Results'
+        path: './results'
+        ref: 'main'
+        ssh-key: ${{ secrets.KEELUNG_PROFILING }}
+
+    - name: Remove old profiling files
+      run: |
+        rm -r ./results/*
+
     - name: 🍳 Prepare .prof files and flamegraphs
       run: |
-        mkdir output
-        mv ./*.prof output
-        cd output
+        mv ./*.prof results
+        cd results
         for f in *.prof; do ghc-prof-flamegraph --alloc $f -o $f-alloc.svg; ghc-prof-flamegraph --time $f -o $f-time.svg; done
         mkdir flamegraphs
-        mv *.svg flamegraphs
-        git init
+        mv ./*.svg flamegraphs
         git add -A
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
