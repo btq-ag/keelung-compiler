@@ -79,7 +79,7 @@ jobs:
         ssh-key: ${{ secrets.KEELUNG_EXAMPLES_CI }}
     - name: 🔨 Build the examples
       run: |
-        cd keelung-examples
+        cd $GITHUB_WORKSPACE/keelung-examples
         stack build --flags keelung-examples:profile
     - name: 🔥 Install ghc-prof-flamegraph
       run: |
