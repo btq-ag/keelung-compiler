@@ -81,7 +81,7 @@ jobs:
     - name: 🔨 Build the examples
       run: |
         cd ./keelung-examples
-        stack build --flags keelung-examples:profile
+        stack build --flag keelung-examples:profile
     - name: 🔥 Install ghc-prof-flamegraph
       run: |
         stack install ghc-prof-flamegraph
