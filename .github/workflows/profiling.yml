@@ -28,7 +28,7 @@ jobs:
         repository: 'btq-ag/Keelung-Profiling-Results'
         path: './results'
         ref: 'main'
-        ssh-key: ${{ secrets.KEELUNG }}
+        ssh-key: ${{ secrets.KEELUNG_PROFILING }}
     - name: Test removing files
       run: |
         cd results
@@ -41,7 +41,7 @@ jobs:
     - name: Test pushing
       uses: cpina/github-action-push-to-another-repository@main
       env:
-        SSH_DEPLOY_KEY: ${{ secrets.KEELUNG }}
+        SSH_DEPLOY_KEY: ${{ secrets.KEELUNG_PROFILING }}
       with:
         source-directory: 'results'
         destination-github-username: 'btq-ag'
