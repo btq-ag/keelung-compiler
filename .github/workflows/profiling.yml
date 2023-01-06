@@ -21,6 +21,7 @@ jobs:
         ssh-private-key: |
           ${{ secrets.KEELUNG_CI }}
           ${{ secrets.KEELUNG_EXAMPLES_CI }}
+          ${{ secrets.KEELUNG_PROFILING }}
 
     - name: 📥 Checkout profiling repo
       uses: actions/checkout@v3
