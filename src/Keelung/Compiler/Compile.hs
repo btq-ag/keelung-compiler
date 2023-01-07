@@ -25,16 +25,16 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
 run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ do
-  forM_ untypedExprs $ \untypedExpr -> do
-    case untypedExpr of
+  forM_ untypedExprs $ \(var, expr) -> do
+    case expr of
       ExprB x -> do
-        out <- freshRefBO
+        let out = RefBO var
         compileExprB out x
       ExprF x -> do
-        out <- freshRefFO
+        let out = RefFO var
         compileExprF out x
       ExprU x -> do
-        out <- freshRefUO (widthOfU x)
+        let out = RefUO (widthOfU x) var
         compileExprU out x
 
   -- compile all relations to constraints
@@ -121,23 +121,6 @@ freshRefF = do
   let index = getCount OfIntermediate OfField counters
   modifyCounter $ addCount OfIntermediate OfField 1
   return $ RefF index
-
--- fresh :: M n RefB
-fresh :: VarSort -> VarType -> (Int -> ref) -> M n ref
-fresh sort kind ctor = do
-  counters <- gets envCounters
-  let index = getCount sort kind counters
-  modifyCounter $ addCount sort kind 1
-  return $ ctor index
-
-freshRefBO :: M n RefB
-freshRefBO = fresh OfOutput OfBoolean RefBO
-
-freshRefFO :: M n RefF
-freshRefFO = fresh OfOutput OfField RefFO
-
-freshRefUO :: Width -> M n RefU
-freshRefUO width = fresh OfOutput (OfUInt width) (RefUO width)
 
 freshRefB :: M n RefB
 freshRefB = do

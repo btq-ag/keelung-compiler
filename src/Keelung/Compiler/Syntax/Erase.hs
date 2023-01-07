@@ -1,22 +1,25 @@
 module Keelung.Compiler.Syntax.Erase (run) where
 
 import Control.Monad.Reader
+import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
+import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Typed as T
+import Keelung.Types
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
   let T.Computation counters eb ebi assertions = comp
       proxy = 0
       numBitWidth = bitSize proxy
-   in runM numBitWidth $ do
+   in runM counters numBitWidth $ do
         -- start type erasure
-        expr' <- eraseExpr expr
-        sameType proxy expr'
+        exprs <- eraseExprAndAllocOutputVar expr
+        sameType proxy exprs
         assertions' <- concat <$> mapM eraseExpr assertions
         relations <-
           Relations mempty mempty
@@ -31,26 +34,28 @@ run (T.Elaborated expr comp) =
                     <*> mapM (mapM eraseExprU) (structU ebi)
                 )
 
+        counters' <- get
+
         return $
           TypeErased
-            { erasedExpr = expr',
+            { erasedExpr = exprs,
               erasedFieldBitWidth = numBitWidth,
-              erasedCounters = counters,
+              erasedCounters = counters',
               erasedRelations = relations,
               erasedAssertions = assertions'
             }
   where
     -- proxy trick for devising the bit width of field elements
-    sameType :: n -> [Expr n] -> M n ()
+    sameType :: n -> [(Var, Expr n)] -> M n ()
     sameType _ _ = return ()
 
 --------------------------------------------------------------------------------
 
 -- monad for collecting boolean vars along the way
-type M n = Reader Width
+type M n = StateT Counters (Reader Width)
 
-runM :: Width -> M n a -> a
-runM width f = runReader f width
+runM :: Counters -> Width -> M n a -> a
+runM counters width f = runReader (evalStateT f counters) width
 
 --------------------------------------------------------------------------------
 
@@ -99,6 +104,32 @@ eraseExprU expr = case expr of
   T.ShLU w i x -> ShLU w i <$> eraseExprU x
   T.IfU w p x y -> IfU w <$> eraseExprB p <*> eraseExprU x <*> eraseExprU y
   T.BtoU w x -> BtoU w <$> eraseExprB x
+
+eraseExprAndAllocOutputVar :: (GaloisField n, Integral n) => T.Expr -> M n [(Var, Expr n)]
+eraseExprAndAllocOutputVar expr = case expr of
+  T.Unit -> return []
+  T.Boolean x -> do
+    var <- fresh OfOutput OfBoolean
+    x' <- eraseExprB x
+    return [(var, ExprB x')]
+  T.Field x -> do
+    var <- fresh OfOutput OfField
+    x' <- eraseExprF x
+    return [(var, ExprF x')]
+  T.UInt x -> do
+    x' <- eraseExprU x
+    var <- fresh OfOutput (OfUInt (widthOfU x'))
+    return [(var, ExprU x')]
+  T.Array exprs -> do
+    exprss <- mapM eraseExprAndAllocOutputVar exprs
+    return (concat exprss)
+  where
+    fresh :: VarSort -> VarType -> M n Var
+    fresh sort kind = do
+      counters <- get
+      let index = getCount sort kind counters
+      modify $ addCount sort kind 1
+      return index
 
 eraseExpr :: (GaloisField n, Integral n) => T.Expr -> M n [Expr n]
 eraseExpr expr = case expr of

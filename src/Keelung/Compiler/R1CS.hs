@@ -24,7 +24,6 @@ import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
 import Keelung.Field (N (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
-import Debug.Trace
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -43,10 +42,7 @@ generateWitness cs initWit =
       (witness, _) = optimizeWithWitness initWit cs'
    in if all (isMapped witness) variables
         then Right witness
-        else 
-          traceShow ("Witness", cs') $
-          -- traceShow ("Witness", fmap N witness, "Variables", getTotalCount (csCounters cs) - 1) $
-            Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
+        else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
   where
     isMapped witness var = IntMap.member var witness
 

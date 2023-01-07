@@ -3,7 +3,7 @@
 {-# HLINT ignore "Replace case with maybe" #-}
 module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (Bifunctor (second), bimap)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
 import Keelung.Compiler.Syntax.Untyped
@@ -15,11 +15,11 @@ import Keelung.Data.Struct (Struct (..))
 -- 2. Propagate constant in the output expression
 -- 3. Propagate constant in assertions
 run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
-run (TypeErased expr fieldWidth counters oldRelations assertions) =
+run (TypeErased exprs fieldWidth counters oldRelations assertions) =
   let newRelations = propagateRelations oldRelations
-      expr' = propagateConstant newRelations <$> expr
+      exprs' = map (second (propagateConstant newRelations)) exprs
       newAssertions = map (propagateConstant newRelations) assertions
-   in TypeErased expr' fieldWidth counters newRelations newAssertions
+   in TypeErased exprs' fieldWidth counters newRelations newAssertions
 
 -- | Propagate constants in the relations, and return the fixed point of constant propagation
 propagateRelations :: Relations n -> Relations n

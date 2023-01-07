@@ -208,7 +208,7 @@ instance Functor Assignment where
 -- | The result after type erasure
 data TypeErased n = TypeErased
   { -- | The expression after type erasure
-    erasedExpr :: ![Expr n],
+    erasedExpr :: ![(Var, Expr n)],
     -- | Bit width of the chosen field
     erasedFieldBitWidth :: !Width,
     -- | Variable bookkeepung
@@ -224,7 +224,7 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
-      <> show (fmap (fmap N) expr)
+      <> show (map (fmap N. snd) expr)
       <> "\n"
       -- relations
       <> show relations
