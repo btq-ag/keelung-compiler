@@ -70,9 +70,6 @@ fromOrdinaryConstraints (R1CS ordinaryConstraints counters cneqs) =
 
 goThroughManyTimes :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n ()
 goThroughManyTimes constraints = do
-  -- traceShowM (fmap (fmap N) constraints)
-  -- traceShowM (fmap N r1cs)
-
   result <- goThroughOnce constraints
   case result of
     -- keep going
@@ -81,19 +78,7 @@ goThroughManyTimes constraints = do
     Eliminated -> return ()
     NothingToDo -> return ()
     -- stuck
-    Stuck _ -> do
-      throwError (R1CSStuckError $ toList constraints)
-
--- where
---   constraintToEither :: Constraint n -> Either (R1C n) (CNEQ n)
---   constraintToEither (R1CConstraint r1c) = Left r1c
---   constraintToEither (CNEQConstraint cneq) = Right cneq
-
--- result <- goThroughOnce constraints
--- case result of
---   Shrinked constraints' -> _
---   Eliminated -> _
---   Stuck -> throwError (R1CSStuckError constraints)
+    Stuck _ -> throwError (R1CSStuckError $ toList constraints)
 
 -- Go through a sequence of constraints
 goThroughOnce :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n (Result (Seq (Constraint n)))
@@ -110,6 +95,7 @@ shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinR
 -- | Trying to reduce a BinRep constraint
 shrinkBinRep :: (GaloisField n, Integral n) => BinRep -> M n (Result BinRep)
 shrinkBinRep binRep@(BinRep var width bitVarStart) = do
+  
   varResult <- lookupVar var
   case varResult of
     -- value of "var" is known
@@ -121,6 +107,7 @@ shrinkBinRep binRep@(BinRep var width bitVarStart) = do
     Nothing -> do
       -- see if all bit variables are bound
       bitVal <- foldM go (Just 0) [bitVarStart + width - 1, bitVarStart + width - 2 .. bitVarStart]
+
       case bitVal of
         Nothing -> return $ Stuck binRep
         Just bitVal' -> do
@@ -139,7 +126,7 @@ shrinkBinRep binRep@(BinRep var width bitVarStart) = do
 shrinkCNEQ :: (GaloisField n, Integral n) => CNEQ n -> M n (Result (CNEQ n))
 shrinkCNEQ cneq@(CNEQ (Left x) (Left y) m) = do
   resultX <- lookupVar x
-  resultY <- lookupVar x
+  resultY <- lookupVar y
   case (resultX, resultY) of
     (Nothing, Nothing) -> return $ Stuck cneq
     (Just a, Nothing) -> return $ Shrinked (CNEQ (Right a) (Left y) m)
@@ -203,6 +190,7 @@ instance Functor Result where
   fmap f (Stuck x) = Stuck (f x)
   fmap _ Eliminated = Eliminated
   fmap _ NothingToDo = NothingToDo
+
 
 shrinkR1C :: (GaloisField n, Integral n) => R1C n -> M n (Result (R1C n))
 shrinkR1C r1c = do

@@ -20,6 +20,7 @@ import qualified Keelung.Interpreter.R1CS2 as R1CS2
 import qualified Keelung.Interpreter.Typed as Typed
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
+import qualified Keelung.Compiler as Compiler
 
 kinded :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> Either (Error n) [n]
 kinded prog rawInputs = do
@@ -43,7 +44,7 @@ r1cs1 prog rawInputs = do
 
 r1cs2 :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 r1cs2 prog rawInputs = do
-  r1cs <- toR1CS <$> compile prog
+  r1cs <- toR1CS <$> Compiler.compileO0 prog
   let inps = Inputs.deserialize (r1csCounters r1cs) rawInputs
   case R1CS2.run r1cs inps of
     Left err -> Left (InterpretError err)
@@ -155,6 +156,10 @@ tests = do
       run program [1 :: GF181] [1, 2, 4, 8, 1, 2, 4, 8, 1]
       run program [3 :: GF181] [3, 6, 12, 9, 3, 6, 12, 9, 3]
       run program [5 :: GF181] [5, 10, 5, 10, 5, 10, 5, 10, 5]
+
+    it "Basic.rotateAndBitTest" $
+      -- 0011 0100211003
+      run Basic.rotateAndBitTest [2, 3] [0, 0, 1, 1 :: GF181]
 
     it "Shift" $ do
       let program = do
