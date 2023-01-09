@@ -55,6 +55,13 @@ jobs:
         key: ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('keelung-compiler/package.yaml') }}
         restore-keys: |
              ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}
+    - name: 💾 Cache keelung-examples/.stack-work
+      uses: actions/cache@v2
+      with:
+        path: ./keelung-examples/.stack-work
+        key: ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('./keelung-examples/package.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}
     # actions:
 
     - name: ⏬ Install stack
@@ -119,7 +126,7 @@ jobs:
       env:
         SSH_DEPLOY_KEY: ${{ secrets.KEELUNG }}
       with:
-        source-directory: 'output'
+        source-directory: 'results'
         destination-github-username: 'btq-ag'
         destination-repository-name: 'Keelung-Profiling-Results'
         user-email: action@github.com
