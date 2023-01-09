@@ -119,7 +119,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE
         ls
-        find keelung_examples -name "*.prof" -exec mv '{}' results \;
+        find keelung-examples -name "*.prof" -exec mv '{}' results \;
         cd results
         find . -name "*.prof" -exec ghc-prof-flamegraph --alloc $f -o $f-alloc.svg \;
         find . -name "*.prof" -exec ghc-prof-flamegraph --time $f -o $f-time.svg \;
