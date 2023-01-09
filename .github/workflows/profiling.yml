@@ -128,9 +128,6 @@ jobs:
         git config --local user.name "GitHub Action"
         git commit -m 'profile with compiler@$GITHUB_SHA'
 
-    - name: Setup upterm session
-      uses: lhotari/action-upterm@v1
-
     - name: 🚢 Ship profiling results
       uses: cpina/github-action-push-to-another-repository@main
       env:
