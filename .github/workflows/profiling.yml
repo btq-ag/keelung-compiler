@@ -22,10 +22,6 @@ jobs:
           ${{ secrets.KEELUNG_CI }}
           ${{ secrets.KEELUNG_EXAMPLES_CI }}
           ${{ secrets.KEELUNG_PROFILING }}
-    - name: test ls
-      run: |
-        ls "$GITHUB_WORKSPACE"/*
-        ls $GITHUB_WORKSPACE/*
 
     # things to be cached/restored:
 
@@ -63,9 +59,9 @@ jobs:
       uses: actions/cache@v2
       with:
         path: ./keelung-examples/.stack-work
-        key: ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('./keelung-examples/package.yaml') }}
+        key: ${{ runner.os }}-keelung-examples-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('./keelung-examples/package.yaml') }}
         restore-keys: |
-             ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}
+             ${{ runner.os }}-keelung-examples-stack-work-profiling-${{ matrix.plan.ghc }}
     # actions:
 
     - name: ⏬ Install stack
@@ -109,9 +105,13 @@ jobs:
         ref: 'main'
         ssh-key: ${{ secrets.KEELUNG_PROFILING }}
 
+    - name: Test ls
+      run: |
+        ls "$GITHUB_WORKSPACE/results"
+
     - name: Remove old profiling files
       run: |
-        rm -r "$GITHUB_WORKSPACE/results"/*
+        find "$GITHUB_WORKSPACE/results" -min-depth 1 -delete
 
     - name: 🍳 Prepare .prof files and flamegraphs
       run: |
