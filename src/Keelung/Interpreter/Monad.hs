@@ -27,6 +27,7 @@ import Keelung.Data.Struct
 import Keelung.Syntax.BinRep (BinRep)
 import Keelung.Syntax.Counters
 import Keelung.Types
+import Control.Monad.Reader
 
 --------------------------------------------------------------------------------
 
@@ -46,12 +47,12 @@ instance Functor Constraint where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = StateT (Partial n) (Except (Error n))
+type M n = ReaderT Heap (StateT (Partial n) (Except (Error n)))
 
-runM :: Inputs n -> M n a -> Either (Error n) (a, Witness n)
-runM inputs p = do
+runM :: Heap -> Inputs n -> M n a -> Either (Error n) (a, Witness n)
+runM heap inputs p = do
   partialBindings <- toPartialBindings inputs
-  (result, partialBindings') <- runExcept (runStateT p partialBindings)
+  (result, partialBindings') <- runExcept (runStateT (runReaderT p heap) partialBindings)
   -- make the partial Bindings total
   case toTotal partialBindings' of
     Left unbound -> Left (VarUnassignedError unbound)

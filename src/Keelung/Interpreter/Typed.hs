@@ -27,7 +27,7 @@ import Keelung.Syntax.Typed
 
 -- | Interpret a program with inputs and return outputs along with the witness
 runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) ([n], Witness n)
-runAndOutputWitnesses (Elaborated expr comp) inputs = runM inputs $ do
+runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
   -- interpret assignments of values first
   fs <-
     filterM

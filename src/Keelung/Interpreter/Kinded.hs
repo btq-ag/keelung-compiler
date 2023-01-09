@@ -6,6 +6,7 @@
 module Keelung.Interpreter.Kinded (run, runAndOutputWitnesses) where
 
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.State
 import qualified Data.Bits
 import Data.Foldable (toList)
@@ -21,12 +22,13 @@ import Keelung.Data.Struct
 import Keelung.Interpreter.Monad
 import Keelung.Interpreter.Typed ()
 import qualified Keelung.Syntax.Typed as Typed
+import Keelung.Types (ElemType (..))
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
 runAndOutputWitnesses :: (GaloisField n, Integral n, Interpret t n) => Elaborated t -> Inputs n -> Either (Error n) ([n], Witness n)
-runAndOutputWitnesses (Elaborated expr context) inputs = runM inputs $ do
+runAndOutputWitnesses (Elaborated expr context) inputs = runM (compHeap context) inputs $ do
   -- interpret assignments of values first
   fs <-
     filterM
@@ -159,14 +161,24 @@ instance GaloisField n => Interpret () n where
   interpret val = case val of
     () -> return []
 
+instance (Interpret t n, GaloisField n) => Interpret [t] n where
+  interpret xs = concat <$> mapM interpret xs
+
 instance (Interpret t n, GaloisField n) => Interpret (Arr t) n where
   interpret val = case val of
     Arr xs -> concat <$> mapM interpret xs
 
--- instance (Interpret t n, GaloisField n) => Interpret (ArrM t) n where
---   interpret val = case val of
---     ArrayRef elemType len addr -> _
---     -- Arr xs -> concat <$> mapM interpret xs
+instance (GaloisField n, Integral n) => Interpret (ArrM t) n where
+  interpret val = case val of
+    ArrayRef _elemType _len addr -> do
+      heap <- ask
+      case IntMap.lookup addr heap of
+        Nothing -> error "[ panic ] address not found when trying to read heap"
+        Just (elemType, vars) -> case elemType of
+          ElemF -> interpret $ map VarF (toList vars)
+          ElemB -> interpret $ map VarB (toList vars)
+          ElemU width -> mapM (lookupU width) (toList vars)
+          ElemArr elemType' len -> concat <$> mapM (interpret . ArrayRef elemType' len) (toList vars)
 
 --------------------------------------------------------------------------------
 

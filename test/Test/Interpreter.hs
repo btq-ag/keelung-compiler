@@ -89,8 +89,8 @@ tests = do
     it "Basic.assert1" $
       run Basic.assert1 [3 :: GF181] []
 
-    -- it "Basic.toArrayM1" $
-    --   run Basic.toArrayM1 [] [0 :: GF181]
+    it "Basic.toArrayM1" $
+      run Basic.toArrayM1 [] [0 :: GF181]
 
     it "Basic.summation" $
       forAll (vector 4) $ \inp -> do
