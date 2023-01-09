@@ -94,12 +94,9 @@ jobs:
       run: |
         cd ./keelung-examples
         stack build --flag keelung-examples:profile
-    - name: 🔥 Install ghc-prof-flamegraph
-      run: |
-        stack install ghc-prof-flamegraph
     - name: 🩺 Run profilings
       run: |
-        stack exec profile
+        stack exec profile > /dev/null
         cp hash.prof $GITHUB_WORKSPACE
         cp MerkleProof.prof $GITHUB_WORKSPACE
 
@@ -118,6 +115,10 @@ jobs:
     - name: Remove old profiling files
       run: |
         find "$GITHUB_WORKSPACE/results" -mindepth 1 -delete
+
+    - name: 🔥 Install ghc-prof-flamegraph
+      run: |
+        stack install ghc-prof-flamegraph
 
     - name: 🍳 Prepare .prof files and flamegraphs
       run: |
