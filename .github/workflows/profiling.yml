@@ -116,7 +116,7 @@ jobs:
     - name: 🍳 Prepare .prof files and flamegraphs
       run: |
         cd $GITHUB_WORKSPACE
-        ls
+        ls keelung-examples
         find keelung-examples -name "*.prof" -exec mv '{}' results \;
         cd results
         find . -name "*.prof" -exec ghc-prof-flamegraph --alloc $f -o $f-alloc.svg \;
