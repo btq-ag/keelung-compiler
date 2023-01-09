@@ -11,6 +11,7 @@ import qualified Basic
 import Control.Arrow (left)
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), compile, toR1CS)
+import qualified Keelung.Compiler as Compiler
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import qualified Keelung.Interpreter.Kinded as Kinded
@@ -20,7 +21,8 @@ import qualified Keelung.Interpreter.R1CS2 as R1CS2
 import qualified Keelung.Interpreter.Typed as Typed
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
-import qualified Keelung.Compiler as Compiler
+import qualified AggregateSignature.Util as AggSig
+import qualified AggregateSignature.Program as AggSig
 
 kinded :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> Either (Error n) [n]
 kinded prog rawInputs = do
@@ -170,3 +172,27 @@ tests = do
       run program [1 :: GF181] [0, 0, 0, 0, 1, 2, 4, 8, 0]
       run program [3 :: GF181] [0, 0, 0, 1, 3, 6, 12, 8, 0]
       run program [5 :: GF181] [0, 0, 1, 2, 5, 10, 4, 8, 0]
+
+    describe "Aggregate Signature" $ do
+      it "dim:1 sig:1" $
+        runKeelungAggSig 1 1 []
+      it "dim:1 sig:10" $
+        runKeelungAggSig 1 10 []
+      it "dim:10 sig:1" $
+        runKeelungAggSig 10 1 []
+      it "dim:10 sig:10" $
+        runKeelungAggSig 10 10 []
+  where
+    runKeelungAggSig :: Int -> Int -> [GF181] -> IO ()
+    runKeelungAggSig dimension numberOfSignatures outputs =
+      let settings =
+            AggSig.Settings
+              { AggSig.enableAggChecking = True,
+                AggSig.enableSizeChecking = True,
+                AggSig.enableLengthChecking = True
+              }
+          param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
+       in run
+            (AggSig.aggregateSignature param :: Comp ())
+            (AggSig.genInputFromParam param)
+            outputs

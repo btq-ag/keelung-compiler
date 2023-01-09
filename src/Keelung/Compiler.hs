@@ -24,8 +24,6 @@ module Keelung.Compiler
     compileO1,
     compileO2,
     optimizeWithInput,
-    -- computeWitness,
-    execute,
     --
     compileO0Elab,
     compileO1Elab,
@@ -39,7 +37,6 @@ module Keelung.Compiler
 where
 
 import Control.Arrow (left)
-import Control.Monad (when)
 import Data.Field.Galois (GaloisField)
 import Data.Semiring (Semiring (one, zero))
 import Keelung (Encode, N (..))
@@ -48,7 +45,6 @@ import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
 import qualified Keelung.Compiler.Interpret as Interpret
-import qualified Keelung.Interpreter.R1CS as Interpret.R1CS
 import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
@@ -62,7 +58,6 @@ import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Typed (Elaborated)
-import qualified Keelung.Syntax.Typed as Typed
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
@@ -131,40 +126,6 @@ optimizeWithInput program inputs = do
   cs <- compile program
   let (_, cs') = Optimizer.optimizeWithInput inputs cs
   return cs'
-
--- computes witnesses
--- computeWitness :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) (Witness n)
--- computeWitness prog inputs = compile prog >>= left ExecError . witnessOfR1CS inputs . toR1CS
-
--- | (1) Compile to R1CS.
---   (2) Generate a satisfying assignment, 'w'.
---   (3) Check whether 'w' satisfies the constraint system produced in (1).
---   (4) Check whether the R1CS result matches the interpreter result.
-execute :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
-execute prog rawInputs = do
-  -- 1. elaborate & rewrite
-  elab <- elaborate prog >>= left LangError . Rewriting.run
-  let inputsForTypedInterpreter = Inputs.deserialize (Typed.compCounters (Typed.elabComp elab)) rawInputs
-  typedInterpreterOutputs <- left InterpretError (Interpret.run elab inputsForTypedInterpreter)
-
-  -- 2. elaborate & rewrite & compile
-  r1cs <- toR1CS <$> compile prog
-  let inputsForR1CSInterpreter = Inputs.deserialize (r1csCounters r1cs) rawInputs
-  (r1csInterpreterOutputs, r1csInterpreterWitness) <- left ExecError (Interpret.R1CS.run' r1cs inputsForR1CSInterpreter)
-
-  let r1csOutputsWithoutBinReps = Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) r1csInterpreterOutputs
-
-  when (r1csOutputsWithoutBinReps /= typedInterpreterOutputs) $ do
-    Left $ ExecError $ ExecOutputError typedInterpreterOutputs r1csOutputsWithoutBinReps
-
-  case satisfyR1CS r1csInterpreterWitness r1cs of
-    Nothing -> return ()
-    Just r1c's ->
-      Left $
-        ExecError $
-          ExecR1CUnsatisfiableError r1c's r1csInterpreterWitness
-
-  return r1csOutputsWithoutBinReps
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs

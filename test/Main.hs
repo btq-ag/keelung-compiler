@@ -13,7 +13,6 @@ import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Syntax.Counters
 import qualified Test.Compilation as Compilation
-import qualified Test.Execution as Execution
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
@@ -30,8 +29,6 @@ main = hspec $ do
   describe "Optimization" Optimization.tests
 
   describe "Variable Bookkeeping" VarBookkeep.tests
-
-  describe "Execution" Execution.tests
 
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))
