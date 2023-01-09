@@ -14,6 +14,10 @@ jobs:
 
     - name: 📥 Checkout repository
       uses: actions/checkout@v2
+
+    - name: Setup upterm session
+      uses: lhotari/action-upterm@v1
+
     # Make sure the @v0.5.4 matches the current version of the
     # action 
     - uses: webfactory/ssh-agent@v0.5.4
@@ -127,9 +131,6 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git commit -m 'profile with compiler@$GITHUB_SHA'
-
-    - name: Setup upterm session
-      uses: lhotari/action-upterm@v1
 
     - name: 🚢 Ship profiling results
       uses: cpina/github-action-push-to-another-repository@main
