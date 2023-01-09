@@ -95,7 +95,7 @@ jobs:
         stack install ghc-prof-flamegraph
     - name: 🩺 Run profilings
       run: |
-        stack exec profile
+        stack exec profile > /dev/null
 
     - name: 📥 Checkout profiling repo
       uses: actions/checkout@v3
@@ -127,6 +127,9 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git commit -m 'profile with compiler@$GITHUB_SHA'
+
+    - name: Setup upterm session
+      uses: lhotari/action-upterm@v1
 
     - name: 🚢 Ship profiling results
       uses: cpina/github-action-push-to-another-repository@main
