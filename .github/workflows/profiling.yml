@@ -116,11 +116,13 @@ jobs:
     - name: 🍳 Prepare .prof files and flamegraphs
       run: |
         cd $GITHUB_WORKSPACE
-        mv *.prof results
+        ls
+        find . -name "*.prof" -exec mv '{}' results \;
         cd results
-        for f in *.prof; do ghc-prof-flamegraph --alloc $f -o $f-alloc.svg; ghc-prof-flamegraph --time $f -o $f-time.svg; done
+        find . -name "*.prof" -exec ghc-prof-flamegraph --alloc $f -o $f-alloc.svg \;
+        find . -name "*.prof" -exec ghc-prof-flamegraph --time $f -o $f-time.svg \;
         mkdir flamegraphs
-        mv *.svg flamegraphs
+        find . -name "*.svg" -exec mv '{}' results \;
         git add -A
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
