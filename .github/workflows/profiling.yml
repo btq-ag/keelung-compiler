@@ -100,6 +100,8 @@ jobs:
     - name: 🩺 Run profilings
       run: |
         stack exec profile
+        cp hash.prof $GITHUB_WORKSPACE
+        cp MerkleProof.prof $GITHUB_WORKSPACE
 
     - name: 📥 Checkout profiling repo
       uses: actions/checkout@v3
@@ -122,6 +124,8 @@ jobs:
         cd $GITHUB_WORKSPACE
         ls keelung-examples
         find keelung-examples -name "*.prof" -exec mv '{}' results \;
+        find $GITHUB_WORKSPACE -name "*.prof"
+        find $GITHUB_WORKSPACE -name "*.prof" -exec mv '{}' results \;
         cd results
         find . -name "*.prof" -exec ghc-prof-flamegraph --alloc $f -o $f-alloc.svg \;
         find . -name "*.prof" -exec ghc-prof-flamegraph --time $f -o $f-time.svg \;
