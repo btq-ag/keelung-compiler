@@ -107,10 +107,11 @@ jobs:
 
     - name: Remove old profiling files
       run: |
-        rm -r ./results/*
+        rm -r $GITHUB_WORKSPACE/results/*
 
     - name: 🍳 Prepare .prof files and flamegraphs
       run: |
+        cd $GITHUB_WORKSPACE
         mv ./*.prof results
         cd results
         for f in *.prof; do ghc-prof-flamegraph --alloc $f -o $f-alloc.svg; ghc-prof-flamegraph --time $f -o $f-time.svg; done
