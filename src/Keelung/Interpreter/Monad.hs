@@ -6,7 +6,6 @@ module Keelung.Interpreter.Monad where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
-import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bifunctor (second)
 import qualified Data.Bits
@@ -47,39 +46,47 @@ instance Functor Constraint where
 --------------------------------------------------------------------------------
 
 -- | The interpreter monad
-type M n = ReaderT (Inputs n) (StateT (Partial n) (Except (Error n)))
+type M n = StateT (Partial n) (Except (Error n))
 
 runM :: Inputs n -> M n a -> Either (Error n) (a, Witness n)
-runM inputs p =
+runM inputs p = do
+  partialBindings <- toPartialBindings inputs
+  (result, partialBindings') <- runExcept (runStateT p partialBindings)
+  -- make the partial Bindings total
+  case toTotal partialBindings' of
+    Left unbound -> Left (VarUnassignedError unbound)
+    Right bindings -> Right (result, bindings)
+
+-- | Construct partial Bindings from Inputs
+toPartialBindings :: Inputs n -> Either (Error n) (Partial n)
+toPartialBindings inputs =
   let counters = Inputs.varCounters inputs
-      -- construct the initial partial Bindings from Inputs
-      initBindings =
-        OIX
-          { ofO =
-              Struct
-                { structF = (getCount OfOutput OfField counters, mempty),
-                  structB = (getCount OfOutput OfBoolean counters, mempty),
-                  structU = IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
-                },
-            ofI =
-              Struct
-                { structF = (getCount OfInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.numInputs inputs))),
-                  structB = (getCount OfInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.boolInputs inputs))),
-                  structU = IntMap.mapWithKey (\w bindings -> (getCount OfInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.uintInputs inputs)
-                },
-            ofX =
-              Struct
-                { structF = (getCount OfIntermediate OfField counters, mempty),
-                  structB = (getCount OfIntermediate OfBoolean counters, mempty),
-                  structU = IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
-                }
-          }
-   in do
-        (result, partialBindings) <- runExcept (runStateT (runReaderT p inputs) initBindings)
-        -- make the partial Bindings total
-        case toTotal partialBindings of
-          Left unbound -> Left (VarUnassignedError unbound)
-          Right bindings -> Right (result, bindings)
+      expectedInputSize = getCountBySort OfInput counters
+      actualInputSize = Inputs.size inputs
+   in if expectedInputSize /= actualInputSize
+        then Left (InputSizeError (Inputs.size inputs) (getCount OfInput OfField counters))
+        else
+          Right $
+            OIX
+              { ofO =
+                  Struct
+                    { structF = (getCount OfOutput OfField counters, mempty),
+                      structB = (getCount OfOutput OfBoolean counters, mempty),
+                      structU = IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
+                    },
+                ofI =
+                  Struct
+                    { structF = (getCount OfInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.numInputs inputs))),
+                      structB = (getCount OfInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.boolInputs inputs))),
+                      structU = IntMap.mapWithKey (\w bindings -> (getCount OfInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.uintInputs inputs)
+                    },
+                ofX =
+                  Struct
+                    { structF = (getCount OfIntermediate OfField counters, mempty),
+                      structB = (getCount OfIntermediate OfBoolean counters, mempty),
+                      structU = IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
+                    }
+              }
 
 addF :: Var -> [n] -> M n ()
 addF var vals = modify (updateX (updateF (second (IntMap.insert var (head vals)))))
@@ -141,6 +148,7 @@ data Error n
   | AssertionError String (Partial n)
   | AssertionError' String (IntMap n) -- R1CS
   | R1CSStuckError [Constraint n] -- R1CS
+  | InputSizeError Int Int
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -164,6 +172,8 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> showList' (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList bindings))
   show (R1CSStuckError constraint) =
     "stuck at " <> show constraint
+  show (InputSizeError expected actual) =
+    "expecting " <> show expected <> " input(s) but got " <> show actual <> " input(s)"
 
 --------------------------------------------------------------------------------
 

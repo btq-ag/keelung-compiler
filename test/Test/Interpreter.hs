@@ -11,13 +11,13 @@ import qualified Basic
 import Control.Arrow (left)
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), compile, toR1CS)
+import qualified Keelung.Compiler.Syntax.Inputs as Inputs
+import Keelung.Constraint.R1CS (R1CS (..))
 import qualified Keelung.Interpreter.Kinded as Kinded
 import Keelung.Interpreter.Monad hiding (Error)
 import qualified Keelung.Interpreter.R1CS as R1CS1
 import qualified Keelung.Interpreter.R1CS2 as R1CS2
 import qualified Keelung.Interpreter.Typed as Typed
-import qualified Keelung.Compiler.Syntax.Inputs as Inputs
-import Keelung.Constraint.R1CS (R1CS (..))
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 
@@ -37,7 +37,7 @@ r1cs1 :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error
 r1cs1 prog rawInputs = do
   r1cs <- toR1CS <$> compile prog
   let inps = Inputs.deserialize (r1csCounters r1cs) rawInputs
-  case R1CS1.run r1cs inps of 
+  case R1CS1.run r1cs inps of
     Left err -> Left (ExecError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
@@ -45,7 +45,7 @@ r1cs2 :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error
 r1cs2 prog rawInputs = do
   r1cs <- toR1CS <$> compile prog
   let inps = Inputs.deserialize (r1csCounters r1cs) rawInputs
-  case R1CS2.run r1cs inps of 
+  case R1CS2.run r1cs inps of
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
