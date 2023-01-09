@@ -29,43 +29,43 @@ jobs:
 
     # things to be cached/restored:
 
-    - name: 💾 Cache stack global package db
-      id:   stack-global
-      uses: actions/cache@v2
-      with:
-        path: ~/.stack
-        key: ${{ runner.os }}-stack-global-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
-        restore-keys: |
-             ${{ runner.os }}-stack-global-profiling-${{ matrix.plan.ghc }}
-    - name: 💾 Cache stack-installed programs in ~/.local/bin
-      id:   stack-programs
-      uses: actions/cache@v2
-      with:
-        path: ~/.local/bin
-        key: ${{ runner.os }}-stack-programs-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
-        restore-keys: |
-             ${{ runner.os }}-stack-programs-profiling-${{ matrix.plan.ghc }}
-    - name: 💾 Cache .stack-work
-      uses: actions/cache@v2
-      with:
-        path: .stack-work
-        key: ${{ runner.os }}-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
-        restore-keys: |
-             ${{ runner.os }}-stack-work-profiling-${{ matrix.plan.ghc }}
-    - name: 💾 Cache keelung-compiler/.stack-work
-      uses: actions/cache@v2
-      with:
-        path: keelung-compiler/.stack-work
-        key: ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('keelung-compiler/package.yaml') }}
-        restore-keys: |
-             ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}
-    - name: 💾 Cache keelung-examples/.stack-work
-      uses: actions/cache@v2
-      with:
-        path: ./keelung-examples/.stack-work
-        key: ${{ runner.os }}-keelung-examples-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('./keelung-examples/package.yaml') }}
-        restore-keys: |
-             ${{ runner.os }}-keelung-examples-stack-work-profiling-${{ matrix.plan.ghc }}
+    # - name: 💾 Cache stack global package db
+    #   id:   stack-global
+    #   uses: actions/cache@v2
+    #   with:
+    #     path: ~/.stack
+    #     key: ${{ runner.os }}-stack-global-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+    #     restore-keys: |
+    #          ${{ runner.os }}-stack-global-profiling-${{ matrix.plan.ghc }}
+    # - name: 💾 Cache stack-installed programs in ~/.local/bin
+    #   id:   stack-programs
+    #   uses: actions/cache@v2
+    #   with:
+    #     path: ~/.local/bin
+    #     key: ${{ runner.os }}-stack-programs-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+    #     restore-keys: |
+    #          ${{ runner.os }}-stack-programs-profiling-${{ matrix.plan.ghc }}
+    # - name: 💾 Cache .stack-work
+    #   uses: actions/cache@v2
+    #   with:
+    #     path: .stack-work
+    #     key: ${{ runner.os }}-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+    #     restore-keys: |
+    #          ${{ runner.os }}-stack-work-profiling-${{ matrix.plan.ghc }}
+    # - name: 💾 Cache keelung-compiler/.stack-work
+    #   uses: actions/cache@v2
+    #   with:
+    #     path: keelung-compiler/.stack-work
+    #     key: ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('keelung-compiler/package.yaml') }}
+    #     restore-keys: |
+    #          ${{ runner.os }}-keelung-compiler-stack-work-profiling-${{ matrix.plan.ghc }}
+    # - name: 💾 Cache keelung-examples/.stack-work
+    #   uses: actions/cache@v2
+    #   with:
+    #     path: ./keelung-examples/.stack-work
+    #     key: ${{ runner.os }}-keelung-examples-stack-work-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('./keelung-examples/package.yaml') }}
+    #     restore-keys: |
+    #          ${{ runner.os }}-keelung-examples-stack-work-profiling-${{ matrix.plan.ghc }}
     # actions:
 
     - name: ⏬ Install stack
