@@ -99,7 +99,7 @@ jobs:
         stack install ghc-prof-flamegraph
     - name: 🩺 Run profilings
       run: |
-        stack exec profile > /dev/null
+        stack exec profile
 
     - name: 📥 Checkout profiling repo
       uses: actions/checkout@v3
