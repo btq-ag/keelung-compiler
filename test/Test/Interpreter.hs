@@ -11,11 +11,11 @@ import qualified Basic
 import Control.Arrow (left)
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), compile, toR1CS)
-import qualified Keelung.Compiler.Interpret.Kinded as Kinded
-import Keelung.Compiler.Interpret.Monad hiding (Error)
-import qualified Keelung.Compiler.Interpret.R1CS as R1CS1
-import qualified Keelung.Compiler.Interpret.R1CS2 as R1CS2
-import qualified Keelung.Compiler.Interpret.Typed as Typed
+import qualified Keelung.Interpreter.Kinded as Kinded
+import Keelung.Interpreter.Monad hiding (Error)
+import qualified Keelung.Interpreter.R1CS as R1CS1
+import qualified Keelung.Interpreter.R1CS2 as R1CS2
+import qualified Keelung.Interpreter.Typed as Typed
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import Test.Hspec

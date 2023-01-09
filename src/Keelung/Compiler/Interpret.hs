@@ -1,5 +1,5 @@
 module Keelung.Compiler.Interpret (
-    module Keelung.Compiler.Interpret.Typed 
+    module Keelung.Interpreter.Typed 
 ) where 
 
-import Keelung.Compiler.Interpret.Typed
+import Keelung.Interpreter.Typed

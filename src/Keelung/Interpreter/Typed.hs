@@ -6,7 +6,7 @@
 
 {-# HLINT ignore "Use lambda-case" #-}
 
-module Keelung.Compiler.Interpret.Typed (runAndOutputWitnesses, run) where
+module Keelung.Interpreter.Typed (runAndOutputWitnesses, run) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -16,7 +16,7 @@ import Data.Foldable (toList)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung.Compiler.Interpret.Monad
+import Keelung.Interpreter.Monad
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Data.Struct
 import Keelung.Data.Bindings

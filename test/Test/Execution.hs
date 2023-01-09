@@ -5,7 +5,7 @@ import AggregateSignature.Util
 import qualified Basic
 import Keelung
 import Keelung.Compiler (Error (..), execute)
--- import Keelung.Compiler.Interpret.Typed (InterpretError (..))
+-- import Keelung.Interpreter.Typed (InterpretError (..))
 -- import qualified Keelung.Syntax.Typed as Typed
 import Test.Hspec
 

@@ -31,11 +31,6 @@ library
       Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Interpret.Kinded
-      Keelung.Compiler.Interpret.Monad
-      Keelung.Compiler.Interpret.R1CS
-      Keelung.Compiler.Interpret.R1CS2
-      Keelung.Compiler.Interpret.Typed
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
@@ -50,6 +45,11 @@ library
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Keelung.Data.Bindings
+      Keelung.Interpreter.Kinded
+      Keelung.Interpreter.Monad
+      Keelung.Interpreter.R1CS
+      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Typed
   other-modules:
       Paths_keelung_compiler
   hs-source-dirs:
@@ -83,11 +83,6 @@ executable keelungc
       Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Interpret.Kinded
-      Keelung.Compiler.Interpret.Monad
-      Keelung.Compiler.Interpret.R1CS
-      Keelung.Compiler.Interpret.R1CS2
-      Keelung.Compiler.Interpret.Typed
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
@@ -102,6 +97,11 @@ executable keelungc
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Keelung.Data.Bindings
+      Keelung.Interpreter.Kinded
+      Keelung.Interpreter.Monad
+      Keelung.Interpreter.R1CS
+      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Typed
       AggregateSignature.Program
       AggregateSignature.Util
       Array
@@ -149,11 +149,6 @@ executable profile
       Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Interpret.Kinded
-      Keelung.Compiler.Interpret.Monad
-      Keelung.Compiler.Interpret.R1CS
-      Keelung.Compiler.Interpret.R1CS2
-      Keelung.Compiler.Interpret.Typed
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
@@ -168,6 +163,11 @@ executable profile
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Keelung.Data.Bindings
+      Keelung.Interpreter.Kinded
+      Keelung.Interpreter.Monad
+      Keelung.Interpreter.R1CS
+      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Typed
       Paths_keelung_compiler
   hs-source-dirs:
       examples/
@@ -207,11 +207,6 @@ test-suite keelung-test
       Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Interpret.Kinded
-      Keelung.Compiler.Interpret.Monad
-      Keelung.Compiler.Interpret.R1CS
-      Keelung.Compiler.Interpret.R1CS2
-      Keelung.Compiler.Interpret.Typed
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
@@ -226,6 +221,11 @@ test-suite keelung-test
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Keelung.Data.Bindings
+      Keelung.Interpreter.Kinded
+      Keelung.Interpreter.Monad
+      Keelung.Interpreter.R1CS
+      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Typed
       AggregateSignature.Program
       AggregateSignature.Util
       Array
@@ -269,11 +269,6 @@ benchmark keelung-bench
       Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
       Keelung.Compiler.Interpret
-      Keelung.Compiler.Interpret.Kinded
-      Keelung.Compiler.Interpret.Monad
-      Keelung.Compiler.Interpret.R1CS
-      Keelung.Compiler.Interpret.R1CS2
-      Keelung.Compiler.Interpret.Typed
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
@@ -288,6 +283,11 @@ benchmark keelung-bench
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Keelung.Data.Bindings
+      Keelung.Interpreter.Kinded
+      Keelung.Interpreter.Monad
+      Keelung.Interpreter.R1CS
+      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Typed
       AggSig
       Array
       AggregateSignature.Program

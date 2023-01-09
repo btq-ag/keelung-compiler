@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compiler.Interpret.R1CS2 (run, run') where
+module Keelung.Interpreter.R1CS2 (run, run') where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -14,7 +14,7 @@ import qualified Data.Sequence as Seq
 import Data.Validation (toEither)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
-import Keelung.Compiler.Interpret.Monad (Constraint (..), Error (..))
+import Keelung.Interpreter.Monad (Constraint (..), Error (..))
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs

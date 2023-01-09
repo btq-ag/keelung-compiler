@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compiler.Interpret.Monad where
+module Keelung.Interpreter.Monad where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except

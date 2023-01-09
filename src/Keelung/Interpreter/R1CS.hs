@@ -1,5 +1,5 @@
 -- Interpreter for Keelung.Compiler.R1CS
-module Keelung.Compiler.Interpret.R1CS (run, run') where
+module Keelung.Interpreter.R1CS (run, run') where
 
 import Control.Monad.Except
 import qualified Data.Either as Either

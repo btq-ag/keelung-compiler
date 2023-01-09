@@ -7,7 +7,7 @@ import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import qualified Keelung.Compiler.Interpret.Monad as Interpreter
+import qualified Keelung.Interpreter.Monad as Interpreter
 import Keelung.Compiler.R1CS (ExecError)
 import qualified Keelung.Error as Lang
 

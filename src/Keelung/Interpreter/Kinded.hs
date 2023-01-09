@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Interpret.Kinded (run, runAndOutputWitnesses) where
+module Keelung.Interpreter.Kinded (run, runAndOutputWitnesses) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -14,8 +14,8 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import GHC.TypeLits (KnownNat)
 import Keelung hiding (inputs, interpret, run)
-import Keelung.Compiler.Interpret.Monad
-import Keelung.Compiler.Interpret.Typed ()
+import Keelung.Interpreter.Monad
+import Keelung.Interpreter.Typed ()
 import Keelung.Compiler.Syntax.Inputs (Inputs (..))
 import Keelung.Data.Bindings
 import Keelung.Data.Struct
