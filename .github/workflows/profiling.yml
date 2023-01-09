@@ -14,6 +14,8 @@ jobs:
 
     - name: 📥 Checkout repository
       uses: actions/checkout@v2
+    - name: Setup upterm session
+      uses: lhotari/action-upterm@v1
     # Make sure the @v0.5.4 matches the current version of the
     # action 
     - uses: webfactory/ssh-agent@v0.5.4
@@ -107,7 +109,7 @@ jobs:
 
     - name: Test ls
       run: |
-        ls "$GITHUB_WORKSPACE/results"
+        ls "$GITHUB_WORKSPACE/keelung-examples"
 
     - name: Remove old profiling files
       run: |
@@ -117,12 +119,12 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE
         ls
-        find . -name "*.prof" -exec mv '{}' results \;
+        find keelung_examples -name "*.prof" -exec mv '{}' results \;
         cd results
         find . -name "*.prof" -exec ghc-prof-flamegraph --alloc $f -o $f-alloc.svg \;
         find . -name "*.prof" -exec ghc-prof-flamegraph --time $f -o $f-time.svg \;
         mkdir flamegraphs
-        find . -name "*.svg" -exec mv '{}' results \;
+        find . -name "*.svg" -exec mv '{}' flamegraphs \;
         git add -A
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
