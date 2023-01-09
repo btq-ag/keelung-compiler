@@ -15,6 +15,11 @@ jobs:
     - name: 📥 Checkout repository
       uses: actions/checkout@v2
 
+    - name: test touch
+      run: |
+        touch what_is_this
+        ls
+
     - name: Setup upterm session
       uses: lhotari/action-upterm@v1
 
