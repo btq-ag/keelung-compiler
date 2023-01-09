@@ -131,6 +131,9 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git commit -m 'profile with compiler@$GITHUB_SHA'
+    - name: Wait a while
+      run: |
+        sleep 30m
 
     - name: 🚢 Ship profiling results
       uses: cpina/github-action-push-to-another-repository@main
