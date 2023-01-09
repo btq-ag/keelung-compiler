@@ -20,7 +20,7 @@ import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util
 import Keelung.Constraint.R1C (R1C (..))
 import qualified Keelung.Constraint.R1C as R1C
-import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..))
+import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
 import Keelung.Field (N (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
@@ -52,7 +52,7 @@ generateWitness cs initWit =
 --   returns `Just [R1C]` if at least one constraint is unsatisfiable
 satisfyR1CS :: (GaloisField n, Integral n) => Witness n -> R1CS n -> Maybe [R1C n]
 satisfyR1CS witness r1cs =
-  let constraints = r1csConstraints r1cs
+  let constraints = toR1Cs r1cs
       unsatisfiable = filter (not . flip R1C.satisfy witness) constraints
    in if null unsatisfiable
         then Nothing

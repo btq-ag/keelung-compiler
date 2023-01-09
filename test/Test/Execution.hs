@@ -20,20 +20,6 @@ tests = describe "Execution" $ do
       runKeelungAggSig 10 1 `shouldBe` Right []
     it "dim:10 sig:10" $
       runKeelungAggSig 10 10 `shouldBe` Right []
-  it "identity (Field element)" $
-    execute Basic.identity [42] `shouldBe` Right [42 :: GF181]
-  it "identity (Boolean) 0" $
-    execute Basic.identityB [1] `shouldBe` Right [1 :: GF181]
-  it "identity (Boolean) 1" $
-    execute Basic.identityB [0] `shouldBe` Right [0 :: GF181]
-  it "add3" $
-    execute Basic.add3 [0] `shouldBe` Right [3 :: GF181]
-  it "eq1 1" $
-    execute Basic.eq1 [0] `shouldBe` Right [0 :: GF181]
-  it "eq1 2" $
-    execute Basic.eq1 [3] `shouldBe` Right [1 :: GF181]
-  it "cond 1" $
-    execute Basic.cond' [0] `shouldBe` Right [789 :: GF181]
   -- it "assert fail" $
   --   execute Basic.assert1 [0 :: GF181]
   --     `shouldBe` Left
@@ -42,8 +28,6 @@ tests = describe "Execution" $ do
   --             (Typed.Boolean $ Typed.EqF (Typed.VarFI 0) (Typed.ValF 3))
   --             [("$FI0", 0)]
   --       )
-  it "assert success" $
-    execute Basic.assert1 [3] `shouldBe` Right ([] :: [GF181])
   it "toArrayM" $
     execute Basic.toArrayM1 [] `shouldBe` Right ([0] :: [GF181])
   it "summation" $

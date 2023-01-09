@@ -21,7 +21,7 @@ import qualified Keelung.Interpreter.Typed as Typed
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 
-kinded :: (GaloisField n, Integral n, Encode t, FreeVar t, Interpret t n) => Comp t -> [n] -> Either (Error n) [n]
+kinded :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> Either (Error n) [n]
 kinded prog rawInputs = do
   elab <- left LangError (elaborate' prog)
   let inps = Inputs.deserialize (compCounters (elabComp elab)) rawInputs
@@ -50,7 +50,7 @@ r1cs2 prog rawInputs = do
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
 -- run :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Expectation
-run :: (GaloisField n, Integral n, Encode t, FreeVar t, Interpret t n) => Comp t -> [n] -> [n] -> IO ()
+run :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> IO ()
 run program rawInputs rawOutputs = do
   kinded program rawInputs
     `shouldBe` Right rawOutputs
@@ -68,6 +68,10 @@ tests = do
       property $ \inp -> do
         run Basic.identity [inp :: GF181] [inp]
 
+    it "Basic.identityB" $ do
+      run Basic.identityB [1 :: GF181] [1]
+      run Basic.identityB [0 :: GF181] [0]
+
     it "Basic.add3" $ do
       property $ \inp -> do
         run Basic.add3 [inp :: GF181] [inp + 3]
@@ -81,6 +85,12 @@ tests = do
       property $ \inp -> do
         let expectedOutput = if inp == 3 then [12] else [789]
         run Basic.cond' [inp :: GF181] expectedOutput
+
+    it "Basic.assert1" $
+      run Basic.assert1 [3 :: GF181] []
+
+    -- it "Basic.toArrayM1" $
+    --   run Basic.toArrayM1 [] [0 :: GF181]
 
     it "Basic.summation" $
       forAll (vector 4) $ \inp -> do

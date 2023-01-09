@@ -14,12 +14,12 @@ import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
 import GHC.TypeLits (KnownNat)
 import Keelung hiding (inputs, interpret, run)
-import Keelung.Interpreter.Monad
-import Keelung.Interpreter.Typed ()
 import Keelung.Compiler.Syntax.Inputs (Inputs (..))
 import Keelung.Data.Bindings
-import Keelung.Data.Struct
 import qualified Keelung.Data.Bindings as Bindings
+import Keelung.Data.Struct
+import Keelung.Interpreter.Monad
+import Keelung.Interpreter.Typed ()
 import qualified Keelung.Syntax.Typed as Typed
 
 --------------------------------------------------------------------------------
@@ -162,6 +162,11 @@ instance GaloisField n => Interpret () n where
 instance (Interpret t n, GaloisField n) => Interpret (Arr t) n where
   interpret val = case val of
     Arr xs -> concat <$> mapM interpret xs
+
+-- instance (Interpret t n, GaloisField n) => Interpret (ArrM t) n where
+--   interpret val = case val of
+--     ArrayRef elemType len addr -> _
+--     -- Arr xs -> concat <$> mapM interpret xs
 
 --------------------------------------------------------------------------------
 
