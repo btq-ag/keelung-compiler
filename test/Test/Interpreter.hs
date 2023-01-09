@@ -102,6 +102,36 @@ tests = do
         let expectedOutput = []
         run Basic.summation2 (inp :: [GF181]) expectedOutput
 
+    it "Basic.assertArraysEqual" $
+      run Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] []
+
+    it "Basic.assertArraysEqual2" $
+      run Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] []
+
+    it "Basic.array1D" $
+      run (Basic.array1D 1) [2, 4 :: GF181] []
+
+    it "Basic.array2D 1" $
+      run (Basic.array2D 1 1) [2, 4 :: GF181] []
+
+    it "Basic.array2D 2" $
+      run (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9 :: GF181] []
+
+    it "Basic.toArray1" $
+      run Basic.toArray1 [0 .. 7 :: GF181] []
+
+    it "Basic.xorLists" $
+      run Basic.xorLists [] [1 :: GF181]
+
+    it "Basic.dupArray" $
+      run Basic.dupArray [1] [1 :: GF181]
+
+    it "Basic.returnArray2" $
+      run Basic.returnArray2 [2] [2, 4 :: GF181]
+
+    it "Basic.arithU0" $
+      run Basic.arithU0 [2, 3] [5 :: GF181]
+
     it "Mixed 0" $ do
       let program = do
             f <- inputField
