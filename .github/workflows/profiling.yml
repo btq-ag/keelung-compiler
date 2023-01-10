@@ -38,14 +38,14 @@ jobs:
         restore-keys: |
              ${{ runner.os }}-stack-global-profiling-${{ matrix.plan.ghc }}
 
-    - name: 💾 Cache stack-installed programs in ~/.local/bin
-      id:   stack-programs
-      uses: actions/cache@v2
-      with:
-        path: ~/.local/bin
-        key: ${{ runner.os }}-stack-programs-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
-        restore-keys: |
-             ${{ runner.os }}-stack-programs-profiling-${{ matrix.plan.ghc }}
+    # - name: 💾 Cache stack-installed programs in ~/.local/bin
+    #   id:   stack-programs
+    #   uses: actions/cache@v2
+    #   with:
+    #     path: ~/.local/bin
+    #     key: ${{ runner.os }}-stack-programs-profiling-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+    #     restore-keys: |
+    #          ${{ runner.os }}-stack-programs-profiling-${{ matrix.plan.ghc }}
 
     - name: 💾 Cache .stack-work
       uses: actions/cache@v2
@@ -79,6 +79,7 @@ jobs:
         # curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'; chmod a+x ~/.local/bin/stack
         if [[ ! -x ~/.local/bin/stack ]]; then curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'; chmod a+x ~/.local/bin/stack; fi
         stack --version
+        stack update
     - name: ⏬ Install GHC
       run: |
         df -h
