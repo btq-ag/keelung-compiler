@@ -11,10 +11,8 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
 import qualified Data.IntMap as IntMap
 import Data.Sequence (Seq (..))
-import qualified Data.Set as Set
 import qualified Keelung.Compiler.Constraint as Constraint
 import Keelung.Compiler.Constraint2
-import qualified Keelung.Compiler.Constraint2 as Constraint2
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
@@ -24,7 +22,7 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
-run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ do
+run (TypeErased untypedExprs _ counters relations assertions) = fromConstraintSystem $ runM counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -43,16 +41,16 @@ run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ 
   -- compile assertions to constraints
   mapM_ compileAssertion assertions
 
-  constraints <- gets envConstraints
+-- constraints <- gets envConstraints
 
-  -- get new counters because the output variables have been bumped
-  counters' <- gets envCounters
+-- -- get new counters because the output variables have been bumped
+-- counters' <- gets csCounters
 
-  return
-    ( Constraint.ConstraintSystem
-        (Set.fromList $ map (Constraint2.fromConstraint counters') constraints)
-        counters'
-    )
+-- return
+--   ( Constraint2.ConstraintSystem
+--       (Set.fromList $ map (Constraint2.fromConstraint counters') constraints)
+--       counters'
+--   )
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
@@ -98,40 +96,50 @@ compileRelations (Relations vb vbi eb ebi) = do
 --------------------------------------------------------------------------------
 
 -- | Monad for compilation
-data Env n = Env
-  { envCounters :: Counters,
-    envConstraints :: [Constraint n]
-  }
+-- data Env n = Env
+--   { csCounters :: Counters,
+--     envConstraints :: [Constraint n]
+--   }
 
-type M n = State (Env n)
+type M n = State (ConstraintSystem n)
 
-runM :: GaloisField n => Counters -> M n a -> a
-runM counters program = evalState program (Env counters mempty)
+runM :: GaloisField n => Counters -> M n a -> ConstraintSystem n
+runM counters program = execState program (ConstraintSystem counters mempty mempty mempty mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
-modifyCounter f = modify (\env -> env {envCounters = f (envCounters env)})
+modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
 
 add :: GaloisField n => [Constraint n] -> M n ()
-add cs =
-  modify (\env -> env {envConstraints = cs <> envConstraints env})
+add = mapM_ addOne 
+  where 
+    addOne :: GaloisField n => Constraint n -> M n ()
+    addOne (CAddF xs) = modify (\cs -> cs { csAddF = xs : csAddF cs })
+    addOne (CAddB xs) = modify (\cs -> cs { csAddB = xs : csAddB cs })
+    addOne (CVarEqU x y) = modify (\cs -> cs { csVarEqU = (x, y) : csVarEqU cs })
+    addOne (CVarBindU x c) = modify (\cs -> cs { csVarBindU = (x, c) : csVarBindU cs })
+    addOne (CMulF x y z) = modify (\cs -> cs { csMulF = (x, y, z) : csMulF cs })
+    addOne (CMulB x y z) = modify (\cs -> cs { csMulB = (x, y, z) : csMulB cs })
+    addOne (CMulU x y z) = modify (\cs -> cs { csMulU = (x, y, z) : csMulU cs })
+    addOne (CNEqF x y m) = modify (\cs -> cs { csNEqF = (x, y, m) : csNEqF cs })
+    addOne (CNEqU x y m) = modify (\cs -> cs { csNEqU = (x, y, m) : csNEqU cs })
 
 freshRefF :: M n RefF
 freshRefF = do
-  counters <- gets envCounters
+  counters <- gets csCounters
   let index = getCount OfIntermediate OfField counters
   modifyCounter $ addCount OfIntermediate OfField 1
   return $ RefF index
 
 freshRefB :: M n RefB
 freshRefB = do
-  counters <- gets envCounters
+  counters <- gets csCounters
   let index = getCount OfIntermediate OfBoolean counters
   modifyCounter $ addCount OfIntermediate OfBoolean 1
   return $ RefB index
 
 freshRefU :: Width -> M n RefU
 freshRefU width = do
-  counters <- gets envCounters
+  counters <- gets csCounters
   let index = getCount OfIntermediate (OfUInt width) counters
   modifyCounter $ addCount OfIntermediate (OfUInt width) 1
   return $ RefU width index

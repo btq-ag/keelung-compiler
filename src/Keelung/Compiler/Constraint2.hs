@@ -11,7 +11,7 @@ module Keelung.Compiler.Constraint2
     reindexRefF,
     reindexRefB,
     reindexRefU,
-    Constraint,
+    Constraint (..),
     cAddB,
     cAddF,
     cVarEqU,
@@ -24,6 +24,8 @@ module Keelung.Compiler.Constraint2
     cNEqF,
     cNEqU,
     fromConstraint,
+    ConstraintSystem (..),
+    fromConstraintSystem,
   )
 where
 
@@ -31,6 +33,7 @@ import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Keelung.Compiler.Constraint as Constraint
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
@@ -309,3 +312,38 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CMulU aV bV cV) = "MU " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
+
+--------------------------------------------------------------------------------
+
+-- | A constraint system is a collection of constraints
+data ConstraintSystem n = ConstraintSystem
+  { csCounters :: !Counters,
+    csVarEqU :: [(RefU, RefU)], -- when x == y
+    csVarBindU :: [(RefU, n)], -- when x = val
+    csAddF :: [Poly' RefF n],
+    csAddB :: [Poly' RefB n],
+    csMulF :: [(Poly' RefF n, Poly' RefF n, Either n (Poly' RefF n))],
+    csMulB :: [(Poly' RefB n, Poly' RefB n, Either n (Poly' RefB n))],
+    csMulU :: [(Poly' RefU n, Poly' RefU n, Either n (Poly' RefU n))],
+    csNEqF :: [(RefF, RefF, RefF)],
+    csNEqU :: [(RefU, RefU, RefU)]
+  }
+
+fromConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Constraint.ConstraintSystem n
+fromConstraintSystem cs =
+  Constraint.ConstraintSystem
+    { Constraint.csCounters = counters,
+      Constraint.csConstraints = varEqUs <> varBindUs <> addFs <> addBs <> mulFs <> mulBs <> mulUs <> nEqFs <> nEqUs
+    }
+  where
+    counters = csCounters cs
+    uncurry3 f (a, b, c) = f a b c
+    varEqUs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
+    varBindUs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ csVarBindU cs
+    addFs = Set.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
+    addBs = Set.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
+    mulFs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
+    mulBs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulB) $ csMulB cs
+    mulUs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulU) $ csMulU cs
+    nEqFs = Set.fromList $ map (\(x, y, m) -> Constraint.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ csNEqF cs
+    nEqUs = Set.fromList $ map (\(x, y, m) -> Constraint.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ csNEqU cs
