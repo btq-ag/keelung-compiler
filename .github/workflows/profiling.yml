@@ -125,11 +125,11 @@ jobs:
         cd $GITHUB_WORKSPACE
         ls keelung-examples
         find $GITHUB_WORKSPACE -name "*.prof"
+        find . -name "*.prof" -exec ghc-prof-flamegraph --alloc $f -o ./results/$f-alloc.svg \;
+        find . -name "*.prof" -exec ghc-prof-flamegraph --time $f -o ./results/$f-time.svg \;
         find $GITHUB_WORKSPACE -name "*.prof" -exec rsync '{}' results \;
+        mkdir results/flamegraphs
         cd results
-        find . -name "*.prof" -exec ghc-prof-flamegraph --alloc $f -o $f-alloc.svg \;
-        find . -name "*.prof" -exec ghc-prof-flamegraph --time $f -o $f-time.svg \;
-        mkdir flamegraphs
         find . -name "*.svg" -exec rsync '{}' flamegraphs \;
         git add -A
         git config --local user.email "action@github.com"
