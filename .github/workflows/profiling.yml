@@ -101,7 +101,7 @@ jobs:
         stack build --flag keelung-examples:profile
     - name: 🩺 Run profilings
       run: |
-        stack exec profile $GITHUB_WORKSPACE > /dev/null
+        stack exec -- profile $GITHUB_WORKSPACE
         cp hash.prof $GITHUB_WORKSPACE
         cp MerkleProof.prof $GITHUB_WORKSPACE
 
