@@ -15,8 +15,8 @@ jobs:
     - name: 📥 Checkout repository
       uses: actions/checkout@v2
 
-    - name: Setup upterm session
-      uses: lhotari/action-upterm@v1
+    # - name: Setup upterm session
+    #   uses: lhotari/action-upterm@v1
 
     # Make sure the @v0.5.4 matches the current version of the
     # action 
@@ -125,19 +125,19 @@ jobs:
         cd $GITHUB_WORKSPACE
         ls keelung-examples
         find $GITHUB_WORKSPACE -name "*.prof"
-        find $GITHUB_WORKSPACE -name "*.prof" -exec mv -f '{}' results \;
+        find $GITHUB_WORKSPACE -name "*.prof" -exec rsync '{}' results \;
         cd results
         find . -name "*.prof" -exec ghc-prof-flamegraph --alloc $f -o $f-alloc.svg \;
         find . -name "*.prof" -exec ghc-prof-flamegraph --time $f -o $f-time.svg \;
         mkdir flamegraphs
-        find . -name "*.svg" -exec mv -f '{}' flamegraphs \;
+        find . -name "*.svg" -exec rsync '{}' flamegraphs \;
         git add -A
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git commit -m 'profile with compiler@$GITHUB_SHA'
-    - name: Wait a while
-      run: |
-        sleep 30m
+    # - name: Wait a while
+    #   run: |
+    #     sleep 30m
 
     - name: 🚢 Ship profiling results
       uses: cpina/github-action-push-to-another-repository@main
