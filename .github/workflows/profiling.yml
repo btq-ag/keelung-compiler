@@ -113,11 +113,8 @@ jobs:
         repository: 'btq-ag/Keelung-Profiling-Results'
         path: './results'
         ref: 'main'
+        fetch-depth: "0"
         ssh-key: ${{ secrets.KEELUNG_PROFILING }}
-
-    - name: Remove old profiling files
-      run: |
-        find "$GITHUB_WORKSPACE/results" -mindepth 1 -delete
 
     - name: 🩺 Run profilings
       run: |
