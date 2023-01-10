@@ -289,6 +289,8 @@ benchmark keelung-bench
       Keelung.Interpreter.Typed
       AggSig
       Array
+      Merkle
+      Poseidon
       AggregateSignature.Program
       AggregateSignature.Util
       Array
@@ -312,6 +314,7 @@ benchmark keelung-bench
     , galois-field
     , keelung
     , keelung-compiler
+    , keelung-examples
     , mtl
     , optparse-applicative
     , random
