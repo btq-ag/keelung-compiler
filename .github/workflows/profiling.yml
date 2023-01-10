@@ -15,11 +15,6 @@ jobs:
     - name: 📥 Checkout repository
       uses: actions/checkout@v2
 
-    - name: test touch
-      run: |
-        touch what_is_this
-        ls
-
     - name: Setup upterm session
       uses: lhotari/action-upterm@v1
 
@@ -101,7 +96,8 @@ jobs:
         stack build --flag keelung-examples:profile
     - name: 🩺 Run profilings
       run: |
-        bash gen.sh
+        cd $GITHUB_WORKSPACE/keelung-examples
+        bash $GITHUB_WORKSPACE/keelung-examples/gen.sh
         ls $GITHUB_WORKSPACE
 
     - name: 📥 Checkout profiling repo
