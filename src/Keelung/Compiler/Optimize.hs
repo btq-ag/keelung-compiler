@@ -9,8 +9,8 @@ import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Keelung (Encode, elaborate)
-import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
-import qualified Keelung.Compiler.Optimize.MinimizeConstraints2 as MinimizeConstraints2
+import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints as MinimizeRelocatedConstraints
+import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2 as MinimizeRelocatedConstraints2
 import Keelung.Compiler.Optimize.Monad
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
 import Keelung.Compiler.Relocated
@@ -20,6 +20,8 @@ import Keelung.Error (Error)
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Typed as C
+import Keelung.Compiler.Constraint (ConstraintSystem)
+import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
 
 --------------------------------------------------------------------------------
 
@@ -37,7 +39,7 @@ optimizeWithWitness witness cs =
       pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
       pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize - 1]
    in runOptiM witness $ do
-        constraints <- MinimizeConstraints.run counters (IntSet.toList pinnedVars) (csConstraints cs)
+        constraints <- MinimizeRelocatedConstraints.run counters (IntSet.toList pinnedVars) (csConstraints cs)
         witness' <- witnessOfVars [0 .. getTotalCount counters - 1]
         return (witness', renumberConstraints $ cs {csConstraints = constraints})
 
@@ -51,6 +53,9 @@ optimizeWithInput inputs cs =
 optimize1 :: (GaloisField n, Integral n) => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
 optimize1 = snd . optimizeWithInput mempty
 
+optimize1' :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
+optimize1' = MinimizeConstraints.run
+
 optimize2 :: GaloisField n => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
 optimize2 rcs =
   -- NOTE: Pinned vars include:
@@ -60,7 +65,7 @@ optimize2 rcs =
   let counters = csCounters rcs
       pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
       pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize - 1]
-      constraints = MinimizeConstraints2.run pinnedVars (csConstraints rcs)
+      constraints = MinimizeRelocatedConstraints2.run pinnedVars (csConstraints rcs)
    in renumberConstraints $ rcs {csConstraints = constraints}
 
 --------------------------------------------------------------------------------

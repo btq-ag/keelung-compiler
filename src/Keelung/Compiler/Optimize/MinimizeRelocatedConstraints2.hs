@@ -6,7 +6,7 @@
 --    C + D = X
 --
 
-module Keelung.Compiler.Optimize.MinimizeConstraints2 (run) where
+module Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2 (run) where
 
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)

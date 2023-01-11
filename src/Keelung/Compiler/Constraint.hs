@@ -25,7 +25,7 @@ module Keelung.Compiler.Constraint
     cNEqU,
     fromConstraint,
     ConstraintSystem (..),
-    fromConstraintSystem,
+    relocateConstraintSystem,
   )
 where
 
@@ -329,8 +329,8 @@ data ConstraintSystem n = ConstraintSystem
     csNEqU :: [(RefU, RefU, RefU)]
   }
 
-fromConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
-fromConstraintSystem cs =
+relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
+relocateConstraintSystem cs =
   Relocated.RelocatedConstraintSystem
     { Relocated.csCounters = counters,
       Relocated.csConstraints = varEqUs <> varBindUs <> addFs <> addBs <> mulFs <> mulBs <> mulUs <> nEqFs <> nEqUs

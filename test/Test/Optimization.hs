@@ -9,7 +9,7 @@ import qualified Keelung.Compiler as Compiler
 import Keelung.Compiler.Relocated
 import Keelung.Compiler.Error (Error)
 import Keelung.Compiler.Optimize
-import qualified Keelung.Compiler.Optimize.MinimizeConstraints as O1
+import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints as O1
 import Keelung.Compiler.Optimize.Monad
 import Keelung.Constraint.R1CS (toR1Cs)
 import Test.Hspec

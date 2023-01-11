@@ -11,7 +11,6 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
 import qualified Data.IntMap as IntMap
 import Data.Sequence (Seq (..))
-import qualified Keelung.Compiler.Relocated as Relocated
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
@@ -21,8 +20,8 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => TypeErased n -> Relocated.RelocatedConstraintSystem n
-run (TypeErased untypedExprs _ counters relations assertions) = fromConstraintSystem $ runM counters $ do
+run :: (GaloisField n, Integral n) => TypeErased n -> ConstraintSystem n
+run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -100,7 +99,6 @@ compileRelations (Relations vb vbi eb ebi) = do
 --   { csCounters :: Counters,
 --     envConstraints :: [Constraint n]
 --   }
-
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Counters -> M n a -> ConstraintSystem n
@@ -110,18 +108,18 @@ modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
 
 add :: GaloisField n => [Constraint n] -> M n ()
-add = mapM_ addOne 
-  where 
+add = mapM_ addOne
+  where
     addOne :: GaloisField n => Constraint n -> M n ()
-    addOne (CAddF xs) = modify (\cs -> cs { csAddF = xs : csAddF cs })
-    addOne (CAddB xs) = modify (\cs -> cs { csAddB = xs : csAddB cs })
-    addOne (CVarEqU x y) = modify (\cs -> cs { csVarEqU = (x, y) : csVarEqU cs })
-    addOne (CVarBindU x c) = modify (\cs -> cs { csVarBindU = (x, c) : csVarBindU cs })
-    addOne (CMulF x y z) = modify (\cs -> cs { csMulF = (x, y, z) : csMulF cs })
-    addOne (CMulB x y z) = modify (\cs -> cs { csMulB = (x, y, z) : csMulB cs })
-    addOne (CMulU x y z) = modify (\cs -> cs { csMulU = (x, y, z) : csMulU cs })
-    addOne (CNEqF x y m) = modify (\cs -> cs { csNEqF = (x, y, m) : csNEqF cs })
-    addOne (CNEqU x y m) = modify (\cs -> cs { csNEqU = (x, y, m) : csNEqU cs })
+    addOne (CAddF xs) = modify (\cs -> cs {csAddF = xs : csAddF cs})
+    addOne (CAddB xs) = modify (\cs -> cs {csAddB = xs : csAddB cs})
+    addOne (CVarEqU x y) = modify (\cs -> cs {csVarEqU = (x, y) : csVarEqU cs})
+    addOne (CVarBindU x c) = modify (\cs -> cs {csVarBindU = (x, c) : csVarBindU cs})
+    addOne (CMulF x y z) = modify (\cs -> cs {csMulF = (x, y, z) : csMulF cs})
+    addOne (CMulB x y z) = modify (\cs -> cs {csMulB = (x, y, z) : csMulB cs})
+    addOne (CMulU x y z) = modify (\cs -> cs {csMulU = (x, y, z) : csMulU cs})
+    addOne (CNEqF x y m) = modify (\cs -> cs {csNEqF = (x, y, m) : csNEqF cs})
+    addOne (CNEqU x y m) = modify (\cs -> cs {csNEqU = (x, y, m) : csNEqU cs})
 
 freshRefF :: M n RefF
 freshRefF = do
