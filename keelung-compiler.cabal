@@ -48,7 +48,7 @@ library
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Relocated
       Keelung.Interpreter.Typed
   other-modules:
       Paths_keelung_compiler
@@ -100,7 +100,7 @@ executable keelungc
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Relocated
       Keelung.Interpreter.Typed
       AggregateSignature.Program
       AggregateSignature.Util
@@ -139,6 +139,7 @@ test-suite keelung-test
   main-is: Main.hs
   other-modules:
       Test.Compilation
+      Test.ConstraintMinimizer
       Test.Interpreter
       Test.Optimization
       Test.VarLayout
@@ -165,7 +166,7 @@ test-suite keelung-test
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Relocated
       Keelung.Interpreter.Typed
       AggregateSignature.Program
       AggregateSignature.Util
@@ -227,7 +228,7 @@ benchmark keelung-bench
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Relocated
       Keelung.Interpreter.Typed
       AggSig
       Array

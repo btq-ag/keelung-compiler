@@ -104,7 +104,7 @@ compileO1 ::
   Either (Error n) (RelocatedConstraintSystem n)
 compileO1 prog = compileO0 prog >>= return . Optimizer.optimize1
 
--- elaborate => rewrite => type erase => constant propagation => compile => relocate => optimisation I
+-- elaborate => rewrite => type erase => constant propagation => compile => optimisation (new)
 compileO1' ::
   (GaloisField n, Integral n, Encode t) =>
   Comp t ->

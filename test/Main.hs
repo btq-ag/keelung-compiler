@@ -4,6 +4,8 @@ module Main where
 
 import qualified Basic
 -- import Control.Arrow (ArrowChoice (right), left)
+
+import Control.Arrow (ArrowChoice (..))
 import qualified Data.Set as Set
 import Keelung
 import Keelung.Compiler
@@ -11,20 +13,22 @@ import qualified Keelung.Compiler as Compiler
 import Keelung.Compiler.Relocated (cadd)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Syntax.Counters
 import qualified Test.Compilation as Compilation
+import qualified Test.ConstraintMinimizer as ConstraintMinimizer
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
 import qualified Test.VarLayout as VarBookkeep
-import Keelung.Constraint.R1CS (R1CS)
-import Control.Arrow (ArrowChoice(..))
 
 main :: IO ()
 main = hspec $ do
   describe "Interpreter" Interpreter.tests
 
   describe "Compilation" Compilation.tests
+
+  describe "Constraint Minimization" ConstraintMinimizer.tests
 
   describe "Optimization" Optimization.tests
 
