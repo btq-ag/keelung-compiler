@@ -44,7 +44,6 @@ import qualified Keelung as Lang
 import qualified Keelung.Compiler.Compile as Compile
 import Keelung.Compiler.Relocated (RelocatedConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
-import qualified Keelung.Compiler.Interpret as Interpret
 import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
@@ -58,6 +57,7 @@ import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Typed (Elaborated)
+import qualified Keelung.Interpreter.Typed as Typed
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
@@ -70,14 +70,14 @@ interpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (E
 interpret prog rawInputs = do
   elab <- elaborate prog
   let inputs = Inputs.deserializeElab elab rawInputs
-  left InterpretError (Interpret.run elab inputs)
+  left InterpretError (Typed.run elab inputs)
 
 -- | Given a Keelung program and a list of raw inputs
 --   Generate (structured inputs, outputs, witness)
 genInputsOutputsWitnesses :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) (Inputs n, [n], Witness n)
 genInputsOutputsWitnesses prog rawInputs = do
   elab <- elaborate prog
-  outputs <- left InterpretError (Interpret.run elab (Inputs.deserializeElab elab rawInputs))
+  outputs <- left InterpretError (Typed.run elab (Inputs.deserializeElab elab rawInputs))
   r1cs <- toR1CS <$> compileO1 prog
   let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
   witness <- left ExecError (witnessOfR1CS inputs r1cs)
@@ -136,11 +136,11 @@ eraseElab elab = left LangError (Rewriting.run elab) >>= return . Erase.run
 interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
 interpretElab elab rawInputs =
   let inputs = Inputs.deserializeElab elab rawInputs
-   in left (show . InterpretError) (Interpret.run elab inputs)
+   in left (show . InterpretError) (Typed.run elab inputs)
 
 genInputsOutputsWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String (Inputs n, [n], Witness n)
 genInputsOutputsWitnessesElab elab rawInputs = do
-  outputs <- left (show . InterpretError) (Interpret.run elab (Inputs.deserializeElab elab rawInputs))
+  outputs <- left (show . InterpretError) (Typed.run elab (Inputs.deserializeElab elab rawInputs))
   r1cs <- toR1CS <$> left show (compileO1Elab elab)
   let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
   witness <- left (show . ExecError) (witnessOfR1CS inputs r1cs)
