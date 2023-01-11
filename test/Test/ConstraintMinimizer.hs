@@ -21,6 +21,9 @@ runTest program = do
   let cs = Compiler.asGF181N $ compileOnly program
   let cs' = Optimizer.optimize1' <$> cs
 
+--   traceShowM cs
+--   traceShowM cs'
+
   -- var counters should remain the same
   csCounters <$> cs `shouldBe` csCounters <$> cs'
 

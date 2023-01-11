@@ -328,6 +328,48 @@ data ConstraintSystem n = ConstraintSystem
     csNEqF :: [(RefF, RefF, RefF)],
     csNEqU :: [(RefU, RefU, RefU)]
   }
+  deriving (Eq)
+
+instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
+  show cs =
+    "ConstraintSystem {\n"
+      <> showAddF
+      <> showBooleanConstraints
+      <> showBinRepConstraints
+      <> prettyVariables counters
+      <> "}"
+    where
+      counters = csCounters cs
+      -- sizes of constraint groups
+      totalBinRepConstraintSize = getBinRepConstraintSize counters
+      booleanConstraintSize = getBooleanConstraintSize counters
+
+      adapt :: String -> [a] -> (a -> String) -> String
+      adapt name xs f =
+        let size = length xs
+         in if size == 0
+              then ""
+              else "  " <> name <> " (" <> show size <> "):\n\n" <> unlines (map (("    " <>) . f) xs) <> "\n"
+
+      -- Boolean constraints
+      showBooleanConstraints =
+        if booleanConstraintSize == 0
+          then ""
+          else
+            "  Boolean constriants (" <> show booleanConstraintSize <> "):\n\n"
+              <> unlines (map ("    " <>) (prettyBooleanConstraints counters))
+              <> "\n"
+
+      -- BinRep constraints
+      showBinRepConstraints =
+        if totalBinRepConstraintSize == 0
+          then ""
+          else
+            "  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n\n"
+              <> unlines (map ("    " <>) (prettyBinRepConstraints counters))
+              <> "\n"
+
+      showAddF = adapt "AddF" (csAddF cs) show
 
 relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
 relocateConstraintSystem cs =
@@ -347,3 +389,15 @@ relocateConstraintSystem cs =
     mulUs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulU) $ csMulU cs
     nEqFs = Set.fromList $ map (\(x, y, m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ csNEqF cs
     nEqUs = Set.fromList $ map (\(x, y, m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ csNEqU cs
+
+-- sizeOfConstraintSystem :: ConstraintSystem n -> Int
+-- sizeOfConstraintSystem cs =
+--   length (csVarEqU cs)
+--     + length (csVarBindU cs)
+--     + length (csAddF cs)
+--     + length (csAddB cs)
+--     + length (csMulF cs)
+--     + length (csMulB cs)
+--     + length (csMulU cs)
+--     + length (csNEqF cs)
+--     + length (csNEqU cs)
