@@ -7,7 +7,7 @@ import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Keelung.Compiler.Constraint (Constraint (..), cadd)
+import Keelung.Compiler.Relocated (Constraint (..), cadd)
 import Keelung.Compiler.Optimize.Monad
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Constraint.Polynomial (Poly)

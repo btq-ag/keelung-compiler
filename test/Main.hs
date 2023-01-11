@@ -8,7 +8,7 @@ import qualified Data.Set as Set
 import Keelung
 import Keelung.Compiler
 import qualified Keelung.Compiler as Compiler
-import Keelung.Compiler.Constraint (cadd)
+import Keelung.Compiler.Relocated (cadd)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Syntax.Counters
@@ -37,7 +37,7 @@ main = hspec $ do
   describe "Constraint Generation" $ do
     it "assertToBe42" $
       let cs =
-            ConstraintSystem
+            RelocatedConstraintSystem
               { csConstraints =
                   Set.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
@@ -47,17 +47,17 @@ main = hspec $ do
 
   describe "Keelung `compile`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
-      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.outOfBound)
+      let expected = left show ((toR1CS :: RelocatedConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.outOfBound)
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.outOfBound
       actual `shouldBe` expected
 
     it "Program that throws ElabError.EmptyArrayError" $ do
-      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.emptyArray)
+      let expected = left show ((toR1CS :: RelocatedConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.emptyArray)
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.emptyArray
       actual `shouldBe` expected
 
     it "Program that compiles successfully" $ do
-      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.identity)
+      let expected = left show ((toR1CS :: RelocatedConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.identity)
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.identity
       actual `shouldBe` expected
 

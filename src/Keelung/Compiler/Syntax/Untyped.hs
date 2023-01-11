@@ -23,7 +23,7 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..))
-import Keelung.Compiler.Constraint2
+import Keelung.Compiler.Constraint
 import Keelung.Data.Struct (Struct (..))
 import qualified Keelung.Data.Struct as Struct
 import Keelung.Field (N (..))

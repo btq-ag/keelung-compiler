@@ -9,7 +9,7 @@ module Keelung.Compiler
     GaloisField,
     Semiring (one, zero),
     module Prelude,
-    ConstraintSystem (..),
+    RelocatedConstraintSystem (..),
     numberOfConstraints,
     TypeErased (..),
     module Keelung.Compiler.R1CS,
@@ -42,7 +42,7 @@ import Data.Semiring (Semiring (one, zero))
 import Keelung (Encode, N (..))
 import qualified Keelung as Lang
 import qualified Keelung.Compiler.Compile as Compile
-import Keelung.Compiler.Constraint (ConstraintSystem (..), numberOfConstraints)
+import Keelung.Compiler.Relocated (RelocatedConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
 import qualified Keelung.Compiler.Interpret as Interpret
 import qualified Keelung.Compiler.Optimize as Optimizer
@@ -88,32 +88,32 @@ erase :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (Ty
 erase prog = elaborate prog >>= eraseElab
 
 -- elaboration => rewriting => type erasure => compilation
-compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)
 compileOnly prog = erase prog >>= return . Compile.run
 
 -- | elaboration => rewriting => type erasure => constant propagation => compilation
-compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)
 compileO0 prog = erase prog >>= return . Compile.run . ConstantPropagation.run
 
 -- | elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I
 compileO1 ::
   (GaloisField n, Integral n, Encode t) =>
   Comp t ->
-  Either (Error n) (ConstraintSystem n)
+  Either (Error n) (RelocatedConstraintSystem n)
 compileO1 prog = compileO0 prog >>= return . Optimizer.optimize1
 
 -- | 'compile' defaults to 'compileO1'
 compile ::
   (GaloisField n, Integral n, Encode t) =>
   Comp t ->
-  Either (Error n) (ConstraintSystem n)
+  Either (Error n) (RelocatedConstraintSystem n)
 compile = compileO1
 
 -- | elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
 compileO2 ::
   (GaloisField n, Integral n, Encode t) =>
   Comp t ->
-  Either (Error n) (ConstraintSystem n)
+  Either (Error n) (RelocatedConstraintSystem n)
 compileO2 prog = compileO1 prog >>= return . Optimizer.optimize2
 
 -- with optimisation + partial evaluation with inputs
@@ -121,7 +121,7 @@ optimizeWithInput ::
   (GaloisField n, Integral n, Encode t) =>
   Comp t ->
   [n] ->
-  Either (Error n) (ConstraintSystem n)
+  Either (Error n) (RelocatedConstraintSystem n)
 optimizeWithInput program inputs = do
   cs <- compile program
   let (_, cs') = Optimizer.optimizeWithInput inputs cs
@@ -146,17 +146,17 @@ genInputsOutputsWitnessesElab elab rawInputs = do
   witness <- left (show . ExecError) (witnessOfR1CS inputs r1cs)
   return (inputs, outputs, witness)
 
-compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
 compileO0Elab elab = do
   rewritten <- left LangError (Rewriting.run elab)
   return $ Compile.run $ ConstantPropagation.run $ Erase.run rewritten
 
-compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
 compileO1Elab elab = do
   rewritten <- left LangError (Rewriting.run elab)
   return $ Optimizer.optimize1 $ Compile.run $ ConstantPropagation.run $ Erase.run rewritten
 
-compileO2Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO2Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
 compileO2Elab elab = do
   rewritten <- left LangError (Rewriting.run elab)
   return $ Optimizer.optimize2 $ Optimizer.optimize1 $ Compile.run $ ConstantPropagation.run $ Erase.run rewritten

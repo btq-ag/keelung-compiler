@@ -11,8 +11,8 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
 import qualified Data.IntMap as IntMap
 import Data.Sequence (Seq (..))
-import qualified Keelung.Compiler.Constraint as Constraint
-import Keelung.Compiler.Constraint2
+import qualified Keelung.Compiler.Relocated as Relocated
+import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
@@ -21,7 +21,7 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
+run :: (GaloisField n, Integral n) => TypeErased n -> Relocated.RelocatedConstraintSystem n
 run (TypeErased untypedExprs _ counters relations assertions) = fromConstraintSystem $ runM counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
@@ -47,8 +47,8 @@ run (TypeErased untypedExprs _ counters relations assertions) = fromConstraintSy
 -- counters' <- gets csCounters
 
 -- return
---   ( Constraint2.ConstraintSystem
---       (Set.fromList $ map (Constraint2.fromConstraint counters') constraints)
+--   ( Constraint.ConstraintSystem
+--       (Set.fromList $ map (Constraint.fromConstraint counters') constraints)
 --       counters'
 --   )
 

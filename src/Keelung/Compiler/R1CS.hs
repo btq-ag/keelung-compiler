@@ -13,7 +13,7 @@ import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Constraint hiding (numberOfConstraints)
+import Keelung.Compiler.Relocated hiding (numberOfConstraints)
 import Keelung.Compiler.Optimize (optimizeWithWitness)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
@@ -31,7 +31,7 @@ import Keelung.Types
 generateWitness ::
   (GaloisField n, Integral n) =>
   -- | Constraints to be solved
-  ConstraintSystem n ->
+  RelocatedConstraintSystem n ->
   -- | Initial assignment
   Witness n ->
   -- | Resulting assignment
@@ -59,7 +59,7 @@ satisfyR1CS witness r1cs =
         else Just unsatisfiable
 
 -- | Converts ConstraintSystem to R1CS
-toR1CS :: GaloisField n => ConstraintSystem n -> R1CS n
+toR1CS :: GaloisField n => RelocatedConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
     { r1csConstraints = rights convertedConstratins,
@@ -80,9 +80,9 @@ toR1CS cs =
       Right $ R1C (Right aX) (Right bX) cX
     toR1C (CNEq x) = Left x
 
-fromR1CS :: GaloisField n => R1CS n -> ConstraintSystem n
+fromR1CS :: GaloisField n => R1CS n -> RelocatedConstraintSystem n
 fromR1CS r1cs =
-  ConstraintSystem
+  RelocatedConstraintSystem
     { csConstraints =
         Set.fromList (map fromR1C (r1csConstraints r1cs))
           <> Set.fromList (map CNEq (r1csCNEQs r1cs)),

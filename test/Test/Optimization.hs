@@ -6,7 +6,7 @@ import qualified Data.Set as Set
 import Keelung (Comp, Encode, GF181)
 import Keelung.Compiler (asGF181, toR1CS)
 import qualified Keelung.Compiler as Compiler
-import Keelung.Compiler.Constraint
+import Keelung.Compiler.Relocated
 import Keelung.Compiler.Error (Error)
 import Keelung.Compiler.Optimize
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints as O1
@@ -28,7 +28,7 @@ tests = do
 
     it "should work 1" $
       let cs =
-            ConstraintSystem
+            RelocatedConstraintSystem
               { csConstraints =
                   Set.fromList $
                     concat
@@ -47,7 +47,7 @@ tests = do
                       ],
                 csCounters = mempty
               }
-       in optimize1 (cs :: ConstraintSystem GF181) `shouldNotBe` cs
+       in optimize1 (cs :: RelocatedConstraintSystem GF181) `shouldNotBe` cs
 
   -- describe "Constraint merging (O2)" $ do
   --   it "CAdd & CAdd" $

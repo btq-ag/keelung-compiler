@@ -9,11 +9,11 @@ import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Keelung (Encode, elaborate)
-import Keelung.Compiler.Constraint
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints2 as MinimizeConstraints2
 import Keelung.Compiler.Optimize.Monad
 import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
+import Keelung.Compiler.Relocated
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import Keelung.Error (Error)
@@ -26,7 +26,7 @@ import qualified Keelung.Syntax.Typed as C
 elaborateAndRewrite :: Encode t => Comp t -> Either Error C.Elaborated
 elaborateAndRewrite prog = elaborate prog >>= Rewriting.run
 
-optimizeWithWitness :: (GaloisField n, Integral n) => Witness n -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
+optimizeWithWitness :: (GaloisField n, Integral n) => Witness n -> RelocatedConstraintSystem n -> (Witness n, RelocatedConstraintSystem n)
 optimizeWithWitness witness cs =
   -- NOTE: Pinned vars include:
   --   - input vars
@@ -41,27 +41,27 @@ optimizeWithWitness witness cs =
         witness' <- witnessOfVars [0 .. getTotalCount counters - 1]
         return (witness', renumberConstraints $ cs {csConstraints = constraints})
 
-optimizeWithInput :: (GaloisField n, Integral n) => [n] -> ConstraintSystem n -> (Witness n, ConstraintSystem n)
+optimizeWithInput :: (GaloisField n, Integral n) => [n] -> RelocatedConstraintSystem n -> (Witness n, RelocatedConstraintSystem n)
 optimizeWithInput inputs cs =
   let (start, end) = getInputVarRange (csCounters cs)
       inputVars = [start .. end - 1]
       witness = IntMap.fromList (zip inputVars inputs)
    in optimizeWithWitness witness cs
 
-optimize1 :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
+optimize1 :: (GaloisField n, Integral n) => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
 optimize1 = snd . optimizeWithInput mempty
 
-optimize2 :: GaloisField n => ConstraintSystem n -> ConstraintSystem n
-optimize2 cs =
+optimize2 :: GaloisField n => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
+optimize2 rcs =
   -- NOTE: Pinned vars include:
   --   - input vars
   --   - output vars
   -- Pinned vars are never optimized away.
-  let counters = csCounters cs
+  let counters = csCounters rcs
       pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
       pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize - 1]
-      constraints = MinimizeConstraints2.run pinnedVars (csConstraints cs)
-   in renumberConstraints $ cs {csConstraints = constraints}
+      constraints = MinimizeConstraints2.run pinnedVars (csConstraints rcs)
+   in renumberConstraints $ rcs {csConstraints = constraints}
 
 --------------------------------------------------------------------------------
 
@@ -71,7 +71,7 @@ data Result = Result
     resultConstraintReduction :: Int,
     -- | The number of variables that have been optimized away
     resultVariableReduction :: Int
-    -- | The number of assignments that have been optimized away
+    -- The number of assignments that have been optimized away
     -- resultAssignmentReduction :: Int
   }
   deriving (Eq, Ord, Show)
