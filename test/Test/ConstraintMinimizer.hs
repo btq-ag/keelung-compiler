@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use <&>" #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE DataKinds #-}
 module Test.ConstraintMinimizer (tests) where
 
 import Keelung
@@ -11,6 +13,7 @@ import Keelung.Compiler.Error (Error)
 import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
 import Test.Hspec
+import Debug.Trace
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
@@ -21,8 +24,8 @@ runTest program = do
   let cs = Compiler.asGF181N $ compileOnly program
   let cs' = Optimizer.optimize1' <$> cs
 
---   traceShowM cs
---   traceShowM cs'
+  traceShowM cs
+  traceShowM cs'
 
   -- var counters should remain the same
   csCounters <$> cs `shouldBe` csCounters <$> cs'
@@ -32,7 +35,7 @@ tests = do
   describe "Constraint minimization" $ do
     it "1" $ do
         runTest $ do 
-            x <- inputField
-            y <- inputField
-            z <- inputField
+            x <- inputUInt @4
+            y <- inputUInt @4
+            z <- inputUInt @4
             return $ x + y + z

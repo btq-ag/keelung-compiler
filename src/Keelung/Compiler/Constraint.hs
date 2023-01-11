@@ -25,7 +25,7 @@ module Keelung.Compiler.Constraint
     cNEqU,
     fromConstraint,
     ConstraintSystem (..),
-    relocateConstraintSystem,
+    relocateConstraintSystem
   )
 where
 
@@ -40,6 +40,8 @@ import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Constraint.R1CS as Constraint
 import Keelung.Syntax.Counters
 import Keelung.Types
+import Keelung.Data.Struct (Struct(..))
+import qualified Data.IntMap.Strict as IntMap
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)
@@ -154,7 +156,27 @@ reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 
 -- | Like Poly but with using Refs instead of Ints as variables
 data Poly' ref n = Poly' n (Map ref n)
-  deriving (Eq, Functor, Show, Ord)
+  deriving (Eq, Functor, Ord)
+
+instance (Show n, Ord n, Eq n, Num n, Show ref) => Show (Poly' ref n) where
+  show (Poly' n xs)
+    | n == 0 =
+      if firstSign == " + "
+        then concat restOfTerms
+        else "- " <> concat restOfTerms
+    | otherwise = concat (show n : termStrings)
+    where
+      (firstSign : restOfTerms) = termStrings
+
+      termStrings = concatMap printTerm $ Map.toList xs
+      -- return a pair of the sign ("+" or "-") and the string representation
+      printTerm :: (Show n, Ord n, Eq n, Num n, Show ref) => (ref, n) -> [String]
+      printTerm (x, c)
+        | c == 0 = error "printTerm: coefficient of 0"
+        | c == 1 = [" + ", show x]
+        | c == -1 = [" - ", show x]
+        | c < 0 = [" - ", show (Prelude.negate c) <> show x]
+        | otherwise = [" + ", show c <> show x]
 
 buildPoly' :: (GaloisField n, Ord ref) => n -> [(ref, n)] -> Either n (Poly' ref n)
 buildPoly' c xs =
@@ -336,7 +358,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showAddF
       <> showBooleanConstraints
       <> showBinRepConstraints
-      <> prettyVariables counters
+      <> showVariables
       <> "}"
     where
       counters = csCounters cs
@@ -370,6 +392,39 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               <> "\n"
 
       showAddF = adapt "AddF" (csAddF cs) show
+
+      showVariables :: String
+      showVariables =
+        let totalSize = getTotalCount counters
+            padRight4 s = s <> replicate (4 - length s) ' '
+            padLeft12 n = replicate (12 - length (show n)) ' ' <> show n
+            formLine typ = padLeft12 (getCount OfOutput typ counters) <> "  " <> padLeft12 (getCount OfInput typ counters) <> "      " <> padLeft12 (getCount OfIntermediate typ counters)
+            toSubscript = map go . show
+              where
+                go c = case c of
+                  '0' -> '₀'
+                  '1' -> '₁'
+                  '2' -> '₂'
+                  '3' -> '₃'
+                  '4' -> '₄'
+                  '5' -> '₅'
+                  '6' -> '₆'
+                  '7' -> '₇'
+                  '8' -> '₈'
+                  '9' -> '₉'
+                  _ -> c
+            uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (OfUInt w)
+            showUInts (Counters o _ _ _ _) = let xs = map uint (IntMap.keys (structU o))
+             in if null xs then "\n    UInt            none          none              none" else mconcat xs
+        in if totalSize == 0
+              then ""
+              else
+                "  Variables (" <> show totalSize <> "):\n"
+                  <> "                  output         input      intermediate\n"   
+                  <> "\n    Field   " <> formLine OfField
+                  <> "\n    Boolean " <> formLine OfBoolean
+                  <> showUInts counters
+                  <> "\n"
 
 relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
 relocateConstraintSystem cs =
