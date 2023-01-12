@@ -71,6 +71,7 @@ tests:
       - examples/
     dependencies:
     - keelung-compiler
+    - keelung-examples
     - hspec
     - QuickCheck
     - quickcheck-transformer

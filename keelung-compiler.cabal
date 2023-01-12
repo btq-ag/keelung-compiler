@@ -192,6 +192,7 @@ test-suite keelung-test
     , hspec
     , keelung
     , keelung-compiler
+    , keelung-examples
     , mtl
     , optparse-applicative
     , quickcheck-transformer

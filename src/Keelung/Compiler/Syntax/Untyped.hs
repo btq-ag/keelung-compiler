@@ -24,12 +24,13 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
+import Keelung.Data.Bindings (toSubscript)
 import Keelung.Data.Struct (Struct (..))
 import qualified Keelung.Data.Struct as Struct
 import Keelung.Field (N (..))
 import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Counters as Counters
-import Keelung.Types (Var, Width)
+import Keelung.Types (Var, Width, indent)
 
 --------------------------------------------------------------------------------
 
@@ -227,7 +228,7 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
       <> show (map (fmap N . snd) expr)
       <> "\n"
       -- relations
-      <> show relations
+      <> indent (show relations)
       <> ( if length assertions < 20
              then "  assertions:\n    " <> show assertions <> "\n"
              else ""
@@ -262,20 +263,32 @@ instance (Integral n, Show n) => Show (Relations n) where
   show (Relations vb vbi eb ebi) =
     ( if Struct.empty vb
         then ""
-        else "Binding of intermediate variables to values:\n" <> show vb <> "\n"
+        else "Binding of intermediate variables to values:\n" <> indent (show vb) <> "\n"
     )
       <> ( if Struct.empty vbi
              then ""
-             else "Binding of input variables to values:\n" <> show vbi <> "\n"
+             else "Binding of input variables to values:\n" <> indent (show vbi) <> "\n"
          )
       <> ( if Struct.empty eb
              then ""
-             else "Binding of intermediate variables to expressions:\n" <> show eb <> "\n"
+             else "Binding of intermediate variables to expressions:\n" <> indent' (showExprBindings "" eb) <> "\n"
          )
       <> ( if Struct.empty ebi
              then ""
-             else "Binding of input variables to expressions:\n" <> show ebi <> "\n"
+             else "Binding of input variables to expressions:\n" <> indent' (showExprBindings "I" ebi) <> "\n"
          )
+    where
+      indent' = unlines . map ("  " <>)
+
+      showExprBinding prefix suffix (var, val) = prefix <> suffix <> show var <> " = " <> show val
+
+      showExprBindings :: (Integral n, Show n) => String -> Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n)) -> [String]
+      showExprBindings suffix (Struct f b u) =
+        map (showExprBinding "F" suffix) (IntMap.toList f)
+          <> map (showExprBinding "B" suffix) (IntMap.toList b)
+          <> concatMap (\(width, xs) -> map (showExprBinding ("U" <> toSubscript width) suffix) (IntMap.toList xs)) (IntMap.toList u)
+
+--   show (Struct f b u) = "hi"
 
 instance Semigroup (Relations n) where
   Relations vb0 vbi0 eb0 ebi0 <> Relations vb1 vbi1 eb1 ebi1 =
