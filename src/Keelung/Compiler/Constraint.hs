@@ -31,6 +31,7 @@ module Keelung.Compiler.Constraint
     fromConstraint,
     ConstraintSystem (..),
     relocateConstraintSystem,
+    sizeOfConstraintSystem,
   )
 where
 
@@ -97,18 +98,18 @@ data RefB = RefBI Var | RefBO Var | RefB Var | RefUBit Width RefU Int
   deriving (Eq, Ord)
 
 instance Show RefB where
-  show (RefBI x) = "$BI" ++ show x
-  show (RefBO x) = "$BO" ++ show x
-  show (RefB x) = "$B" ++ show x
+  show (RefBI x) = "BI" ++ show x
+  show (RefBO x) = "BO" ++ show x
+  show (RefB x) = "B" ++ show x
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
 data RefF = RefFI Var | RefFO Var | RefF Var | RefBtoRefF RefB
   deriving (Eq, Ord)
 
 instance Show RefF where
-  show (RefFI x) = "$FI" ++ show x
-  show (RefFO x) = "$FO" ++ show x
-  show (RefF x) = "$F" ++ show x
+  show (RefFI x) = "FI" ++ show x
+  show (RefFO x) = "FO" ++ show x
+  show (RefF x) = "F" ++ show x
   show (RefBtoRefF x) = show x
 
 data RefU = RefUI Width Var | RefUO Width Var | RefU Width Var | RefBtoRefU RefB
@@ -116,9 +117,9 @@ data RefU = RefUI Width Var | RefUO Width Var | RefU Width Var | RefBtoRefU RefB
 
 instance Show RefU where
   show ref = case ref of
-    RefUI w x -> "$UI" ++ toSubscript w ++ show x
-    RefUO w x -> "$UO" ++ toSubscript w ++ show x
-    RefU w x -> "$U" ++ toSubscript w ++ show x
+    RefUI w x -> "UI" ++ toSubscript w ++ show x
+    RefUO w x -> "UO" ++ toSubscript w ++ show x
+    RefU w x -> "U" ++ toSubscript w ++ show x
     RefBtoRefU x -> show x
     where
       toSubscript :: Int -> String
@@ -412,11 +413,20 @@ data ConstraintSystem n = ConstraintSystem
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show cs =
     "ConstraintSystem {\n"
+      <> showVarEqF
+      <> showVarEqB
       <> showVarEqU
-      <> showVarBindU
       <> showVarBindF
+      <> showVarBindB
+      <> showVarBindU
       <> showAddF
       <> showAddB
+      <> showAddU
+      <> showMulF
+      <> showMulB
+      <> showMulU
+      <> showNEqF
+      <> showNEqU
       <> showBooleanConstraints
       <> showBinRepConstraints
       <> showVariables
@@ -452,13 +462,24 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               <> unlines (map ("    " <>) (prettyBinRepConstraints counters))
               <> "\n"
 
-      showAddF = adapt "AddF" (csAddF cs) show
-      showAddB = adapt "AddB" (csAddB cs) show
-
-      showVarEqU = adapt "VarEqU" (csVarEqU cs) show
+      showVarEqF = adapt "VarEqF" (csVarEqF cs) $ \(var, val) -> show var <> " = " <> show val
+      showVarEqB = adapt "VarEqB" (csVarEqB cs) $ \(var, val) -> show var <> " = " <> show val
+      showVarEqU = adapt "VarEqU" (csVarEqU cs) $ \(var, val) -> show var <> " = " <> show val
 
       showVarBindU = adapt "VarBindU" (csVarBindU cs) $ \(var, val) -> show var <> " = " <> show val
       showVarBindF = adapt "VarBindF" (csVarBindF cs) $ \(var, val) -> show var <> " = " <> show val
+      showVarBindB = adapt "VarBindB" (csVarBindB cs) $ \(var, val) -> show var <> " = " <> show val
+
+      showAddF = adapt "AddF" (csAddF cs) show
+      showAddB = adapt "AddB" (csAddB cs) show
+      showAddU = adapt "AddU" (csAddU cs) show
+
+      showMulF = adapt "MulF" (csMulF cs) $ \(a, b, c) -> show a <> " * " <> show b <> " = " <> show c
+      showMulB = adapt "MulB" (csMulB cs) $ \(a, b, c) -> show a <> " * " <> show b <> " = " <> show c
+      showMulU = adapt "MulU" (csMulU cs) $ \(a, b, c) -> show a <> " * " <> show b <> " = " <> show c
+
+      showNEqF = adapt "NEqF" (csNEqF cs) $ \(a, b, c) -> show a <> " != " <> show b <> " = " <> show c
+      showNEqU = adapt "NEqU" (csNEqU cs) $ \(a, b, c) -> show a <> " != " <> show b <> " = " <> show c
 
       showVariables :: String
       showVariables =
@@ -500,29 +521,51 @@ relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n ->
 relocateConstraintSystem cs =
   Relocated.RelocatedConstraintSystem
     { Relocated.csCounters = counters,
-      Relocated.csConstraints = varEqUs <> varBindUs <> addFs <> addBs <> mulFs <> mulBs <> mulUs <> nEqFs <> nEqUs
+      Relocated.csConstraints =
+        varEqFs <> varEqBs <> varEqUs
+          <> varBindFs
+          <> varBindBs
+          <> varBindUs
+          <> addFs
+          <> addBs
+          <> addUs
+          <> mulFs
+          <> mulBs
+          <> mulUs
+          <> nEqFs
+          <> nEqUs
     }
   where
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
+    varEqFs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqF) $ csVarEqF cs
+    varEqBs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
+    varBindFs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ csVarBindF cs
+    varBindBs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ csVarBindB cs
     varBindUs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ csVarBindU cs
     addFs = Set.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     addBs = Set.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
+    addUs = Set.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs
     mulFs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
     mulBs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulB) $ csMulB cs
     mulUs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulU) $ csMulU cs
     nEqFs = Set.fromList $ map (\(x, y, m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ csNEqF cs
     nEqUs = Set.fromList $ map (\(x, y, m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ csNEqU cs
 
--- sizeOfConstraintSystem :: ConstraintSystem n -> Int
--- sizeOfConstraintSystem cs =
---   length (csVarEqU cs)
---     + length (csVarBindU cs)
---     + length (csAddF cs)
---     + length (csAddB cs)
---     + length (csMulF cs)
---     + length (csMulB cs)
---     + length (csMulU cs)
---     + length (csNEqF cs)
---     + length (csNEqU cs)
+sizeOfConstraintSystem :: ConstraintSystem n -> Int
+sizeOfConstraintSystem cs =
+  length (csVarEqF cs)
+    + length (csVarEqB cs)
+    + length (csVarEqU cs)
+    + length (csVarBindF cs)
+    + length (csVarBindB cs)
+    + length (csVarBindU cs)
+    + length (csAddF cs)
+    + length (csAddB cs)
+    + length (csAddU cs)
+    + length (csMulF cs)
+    + length (csMulB cs)
+    + length (csMulU cs)
+    + length (csNEqF cs)
+    + length (csNEqU cs)

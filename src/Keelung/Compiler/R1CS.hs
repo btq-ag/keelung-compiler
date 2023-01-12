@@ -13,8 +13,8 @@ import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
 import qualified Data.Set as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Relocated hiding (numberOfConstraints)
 import Keelung.Compiler.Optimize (optimizeWithWitness)
+import Keelung.Compiler.Relocated hiding (numberOfConstraints)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Compiler.Util

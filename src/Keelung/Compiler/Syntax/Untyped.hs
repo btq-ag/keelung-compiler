@@ -58,9 +58,9 @@ instance (Integral n, Show n) => Show (ExprB n) where
   showsPrec prec expr = case expr of
     ValB 0 -> showString "F"
     ValB _ -> showString "T"
-    VarB var -> showString "$B" . shows var
-    VarBO var -> showString "$BO" . shows var
-    VarBI var -> showString "$BI" . shows var
+    VarB var -> showString "B" . shows var
+    VarBO var -> showString "BO" . shows var
+    VarBI var -> showString "BI" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
@@ -94,9 +94,9 @@ data ExprF n
 instance (Show n, Integral n) => Show (ExprF n) where
   showsPrec prec expr = case expr of
     ValF n -> shows n
-    VarF var -> showString "$N" . shows var
-    VarFO var -> showString "$NO" . shows var
-    VarFI var -> showString "$NI" . shows var
+    VarF var -> showString "F" . shows var
+    VarFO var -> showString "FO" . shows var
+    VarFI var -> showString "FI" . shows var
     SubF x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddF x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
     MulF x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -129,9 +129,9 @@ data ExprU n
 instance (Show n, Integral n) => Show (ExprU n) where
   showsPrec prec expr = case expr of
     ValU _ n -> shows n
-    VarU _ var -> showString "$U" . shows var
-    VarUO _ var -> showString "$UO" . shows var
-    VarUI _ var -> showString "$UI" . shows var
+    VarU _ var -> showString "U" . shows var
+    VarUO _ var -> showString "UO" . shows var
+    VarUI _ var -> showString "UI" . shows var
     SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -224,7 +224,7 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
-      <> show (map (fmap N. snd) expr)
+      <> show (map (fmap N . snd) expr)
       <> "\n"
       -- relations
       <> show relations

@@ -19,8 +19,8 @@ import Data.Validation
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import GHC.Generics (Generic)
+import Keelung.Data.Struct
 import Keelung.Field.N (N (N))
-import Keelung.Data.Struct 
 
 --------------------------------------------------------------------------------
 
@@ -68,9 +68,9 @@ instance {-# OVERLAPPING #-} Show (VarSet n) where
     where
       showStruct :: String -> Struct IntSet IntSet IntSet -> [String]
       showStruct prefix (Struct f b u) =
-        map (\var -> "$B" <> prefix <> show var) (IntSet.toList b)
-          <> map (\var -> "$F" <> prefix <> show var) (IntSet.toList f)
-          <> concatMap (\(width, xs) -> map (\var -> "$U" <> toSubscript width <> prefix <> show var) (IntSet.toList xs)) (IntMap.toList u)
+        map (\var -> "B" <> prefix <> show var) (IntSet.toList b)
+          <> map (\var -> "F" <> prefix <> show var) (IntSet.toList f)
+          <> concatMap (\(width, xs) -> map (\var -> "U" <> toSubscript width <> prefix <> show var) (IntSet.toList xs)) (IntMap.toList u)
 
 toSubscript :: Int -> String
 toSubscript = map go . show
@@ -100,7 +100,7 @@ instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) whe
   show (OIX o i x) = showList' $ showStruct "O" o <> showStruct "I" i <> showStruct "" x
     where
       showPartialBinding :: (GaloisField n, Integral n) => String -> (Int, IntMap n) -> IntMap String
-      showPartialBinding prefix (_size, bindings) = IntMap.mapWithKey (\k v -> "$" <> prefix <> show k <> " := " <> show (N v)) bindings
+      showPartialBinding prefix (_size, bindings) = IntMap.mapWithKey (\k v -> prefix <> show k <> " := " <> show (N v)) bindings
 
       showStruct :: (GaloisField n, Integral n) => String -> Struct (PartialBinding n) (PartialBinding n) (PartialBinding n) -> [String]
       showStruct suffix (Struct f b u) =

@@ -6,11 +6,11 @@ import qualified Data.Set as Set
 import Keelung (Comp, Encode, GF181)
 import Keelung.Compiler (asGF181, toR1CS)
 import qualified Keelung.Compiler as Compiler
-import Keelung.Compiler.Relocated
 import Keelung.Compiler.Error (Error)
 import Keelung.Compiler.Optimize
 import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints as O1
 import Keelung.Compiler.Optimize.Monad
+import Keelung.Compiler.Relocated
 import Keelung.Constraint.R1CS (toR1Cs)
 import Test.Hspec
 

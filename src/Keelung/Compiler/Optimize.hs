@@ -9,6 +9,8 @@ import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Keelung (Encode, elaborate)
+import Keelung.Compiler.Constraint (ConstraintSystem)
+import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
 import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints as MinimizeRelocatedConstraints
 import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2 as MinimizeRelocatedConstraints2
 import Keelung.Compiler.Optimize.Monad
@@ -20,8 +22,6 @@ import Keelung.Error (Error)
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Typed as C
-import Keelung.Compiler.Constraint (ConstraintSystem)
-import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
 
 --------------------------------------------------------------------------------
 

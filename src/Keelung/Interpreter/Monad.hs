@@ -6,6 +6,7 @@ module Keelung.Interpreter.Monad where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bifunctor (second)
 import qualified Data.Bits
@@ -27,7 +28,6 @@ import Keelung.Data.Struct
 import Keelung.Syntax.BinRep (BinRep)
 import Keelung.Syntax.Counters
 import Keelung.Types
-import Control.Monad.Reader
 
 --------------------------------------------------------------------------------
 

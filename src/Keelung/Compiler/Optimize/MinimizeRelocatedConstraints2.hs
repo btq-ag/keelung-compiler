@@ -20,7 +20,7 @@ import qualified Keelung.Constraint.Polynomial as Poly
 --------------------------------------------------------------------------------
 
 run ::
-  GaloisField n => 
+  GaloisField n =>
   IntSet ->
   Set (Constraint n) ->
   Set (Constraint n)

@@ -48,11 +48,11 @@ compileAssertion expr = do
     ExprB x -> do
       out <- freshRefB
       compileExprB out x
-      add $ cAddB 1 [(out, -1)]
+      add $ cVarBindB out 1 -- out = 1
     ExprF x -> do
       out <- freshRefF
       compileExprF out x
-      add $ cAddF 1 [(out, -1)]
+      add $ cVarBindF out 1
     ExprU x -> do
       out <- freshRefU (widthOfU x)
       compileExprU out x
@@ -84,10 +84,6 @@ compileRelations (Relations vb vbi eb ebi) = do
 --------------------------------------------------------------------------------
 
 -- | Monad for compilation
--- data Env n = Env
---   { csCounters :: Counters,
---     envConstraints :: [Constraint n]
---   }
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Counters -> M n a -> ConstraintSystem n
@@ -140,13 +136,10 @@ freshRefU width = do
 
 compileExprB :: (GaloisField n, Integral n) => RefB -> ExprB n -> M n ()
 compileExprB out expr = case expr of
-  ValB val -> add $ cAddB val [(out, -1)] -- out = val
-  VarB var -> do
-    add $ cAddB 0 [(out, 1), (RefB var, -1)] -- out = var
-  VarBO var -> do
-    add $ cAddB 0 [(out, 1), (RefBO var, -1)] -- out = var
-  VarBI var -> do
-    add $ cAddB 0 [(out, 1), (RefBI var, -1)] -- out = var
+  ValB val -> add $ cVarBindB out val -- out = val
+  VarB var -> add $ cVarEqB out (RefB var) -- out = var
+  VarBO var -> add $ cVarEqB out (RefBO var) -- out = var
+  VarBI var -> add $ cVarEqB out (RefBI var) -- out = var
   AndB x0 x1 xs -> do
     a <- wireB x0
     b <- wireB x1
@@ -211,7 +204,7 @@ compileExprB out expr = case expr of
     compileXorB out x' y'
   NotB x -> do
     x' <- wireB x
-    add $ cAddB 1 [(x', -1), (out, -1)] -- out = 1 - x
+    add $ cAddB 1 [(x', -1), (out, -1)] -- out = 1 - x'
   IfB p x y -> do
     p' <- wireB p
     x' <- wireB x
@@ -248,17 +241,14 @@ compileExprB out expr = case expr of
     compileEqualityU True out x' y'
   BitU x i -> do
     x' <- wireU x
-    add $ cAddB 0 [(out, 1), (RefUBit (widthOfU x) x' i, -1)] -- out = var
+    add $ cVarEqB out (RefUBit (widthOfU x) x' i) -- out = x'[i]
 
 compileExprF :: (GaloisField n, Integral n) => RefF -> ExprF n -> M n ()
 compileExprF out expr = case expr of
-  ValF val -> add $ cAddF val [(out, -1)] -- out = val
-  VarF var -> do
-    add $ cAddF 0 [(out, 1), (RefF var, -1)] -- out = var
-  VarFO var -> do
-    add $ cAddF 0 [(out, 1), (RefFO var, -1)] -- out = var
-  VarFI var -> do
-    add $ cAddF 0 [(out, 1), (RefFI var, -1)] -- out = var
+  ValF val -> add $ cVarBindF out val -- out = val
+  VarF var -> add $ cVarEqF out (RefF var) -- out = var
+  VarFO var -> add $ cVarEqF out (RefFO var) -- out = var
+  VarFI var -> add $ cVarEqF out (RefFI var) -- out = var
   SubF x y -> do
     x' <- toTerm x
     y' <- toTerm y
@@ -282,7 +272,7 @@ compileExprF out expr = case expr of
   BtoF x -> do
     result <- freshRefB
     compileExprB result x
-    add $ cAddF 0 [(out, 1), (RefBtoRefF result, -1)] -- out = var
+    add $ cVarEqF out (RefBtoRefF result) -- out = var
 
 compileExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compileExprU out expr = case expr of
@@ -292,14 +282,14 @@ compileExprU out expr = case expr of
     -- constraints for BinRep of UInt
     forM_ [0 .. width - 1] $ \i -> do
       let bit = testBit val i
-      add $ cAddB bit [(RefUBit width out i, -1)] -- out = var
+      add $ cVarBindB (RefUBit width out i) bit -- out[i] = bit
   VarU width var -> do
     let ref = RefU width var
     -- constraint for UInt : out = ref
     add $ cVarEqU out ref
     -- constraints for BinRep of UInt
     forM_ [0 .. width - 1] $ \i -> do
-      add $ cAddB 0 [(RefUBit width out i, -1), (RefUBit width ref i, 1)] -- out[i] = ref[i]
+      add $ cVarEqB (RefUBit width out i) (RefUBit width ref i) -- out[i] = ref[i]
   VarUO width var -> do
     add $ cVarEqU out (RefU width var) -- out = var
   VarUI width var -> do
@@ -308,7 +298,7 @@ compileExprU out expr = case expr of
     add $ cVarEqU out ref
     -- constraints for BinRep of UInt
     forM_ [0 .. width - 1] $ \i -> do
-      add $ cAddB 0 [(RefUBit width out i, -1), (RefUBit width ref i, 1)] -- out[i] = ref[i]
+      add $ cVarEqB (RefUBit width out i) (RefUBit width ref i) -- out[i] = ref[i]
   SubU w x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -350,7 +340,7 @@ compileExprU out expr = case expr of
     x' <- wireU x
     forM_ [0 .. w - 1] $ \i -> do
       let i' = (i - n) `mod` w
-      add $ cAddB 0 [(RefUBit w out i, 1), (RefUBit w x' i', -1)]
+      add $ cVarEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']
   ShLU w n x -> do
     x' <- wireU x
     case compare n 0 of
@@ -358,27 +348,27 @@ compileExprU out expr = case expr of
       GT -> do
         -- fill lower bits with 0s
         forM_ [0 .. n - 1] $ \i -> do
-          add $ cAddB 0 [(RefUBit w out i, 1)]
-        -- shift upper bits
+          add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
+          -- shift upper bits
         forM_ [n .. w - 1] $ \i -> do
           let i' = i - n
-          add $ cAddB 0 [(RefUBit w out i, 1), (RefUBit w x' i', -1)]
+          add $ cVarEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']
       LT -> do
         -- shift lower bits
         forM_ [0 .. w + n - 1] $ \i -> do
           let i' = i - n
-          add $ cAddB 0 [(RefUBit w out i, 1), (RefUBit w x' i', -1)]
-        -- fill upper bits with 0s
+          add $ cVarEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']
+          -- fill upper bits with 0s
         forM_ [w + n .. w - 1] $ \i -> do
-          add $ cAddB 0 [(RefUBit w out i, 1)]
+          add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
   BtoU w x -> do
     -- 1. wire 'out[ZERO]' to 'x'
     result <- freshRefB
     compileExprB result x
-    add $ cAddB 0 [(RefUBit w out 0, 1), (result, -1)]
+    add $ cVarEqB (RefUBit w out 0) result -- out[0] = x
     -- 2. wire 'out[SUCC _]' to '0' for all other bits
     forM_ [1 .. w - 1] $ \i ->
-      add $ cAddB 0 [(RefUBit w out i, 1)]
+      add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
 
 --------------------------------------------------------------------------------
 
@@ -425,7 +415,9 @@ negateTerm (Constant c) = Constant (negate c)
 compileTerms :: GaloisField n => RefF -> Seq (Term n) -> M n ()
 compileTerms out terms =
   let (constant, varsWithCoeffs) = foldl' go (0, []) terms
-   in add $ cAddF constant $ (out, -1) : varsWithCoeffs
+   in case varsWithCoeffs of
+        [] -> add $ cVarBindF out constant
+        _ -> add $ cAddF constant $ (out, -1) : varsWithCoeffs
   where
     go :: Num n => (n, [(RefF, n)]) -> Term n -> (n, [(RefF, n)])
     go (constant, pairs) (Constant n) = (constant + n, pairs)

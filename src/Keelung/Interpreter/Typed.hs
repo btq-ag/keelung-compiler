@@ -16,11 +16,11 @@ import Data.Foldable (toList)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung.Interpreter.Monad
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Data.Struct
 import Keelung.Data.Bindings
 import qualified Keelung.Data.Bindings as Bindings
+import Keelung.Data.Struct
+import Keelung.Interpreter.Monad
 import Keelung.Syntax.Typed
 
 --------------------------------------------------------------------------------

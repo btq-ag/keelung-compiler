@@ -70,6 +70,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
+
   -- CMul
   compare (CMul aV bV cV) (CMul aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
   compare _ CMul {} = LT

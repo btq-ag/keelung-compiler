@@ -15,8 +15,8 @@ class (Integral a) => FieldBits a where
   testBit :: a -> Int -> a
   testBit x i = if Data.Bits.testBit (toInteger x) (i `mod` bitSize x) then 1 else 0
 
-  -- and :: a -> a -> a
-  -- and x y = fromInteger $ (Data.Bits..&.) (toInteger x) (toInteger y)
+-- and :: a -> a -> a
+-- and x y = fromInteger $ (Data.Bits..&.) (toInteger x) (toInteger y)
 
 -- | All instances of Galois fields are also instances of `Bits`
 --   `bitSize` will have to be calculated at runtime every time though,

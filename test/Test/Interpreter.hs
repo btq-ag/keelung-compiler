@@ -7,23 +7,23 @@
 
 module Test.Interpreter (tests) where
 
+import qualified AggregateSignature.Program as AggSig
+import qualified AggregateSignature.Util as AggSig
 import qualified Basic
 import Control.Arrow (left)
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), compile, toR1CS)
 import qualified Keelung.Compiler as Compiler
+import Keelung.Compiler.Constraint (relocateConstraintSystem)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import qualified Keelung.Interpreter.Kinded as Kinded
 import Keelung.Interpreter.Monad hiding (Error)
-import qualified Keelung.Interpreter.Relocated as Relocated
 import qualified Keelung.Interpreter.R1CS as R1CS
+import qualified Keelung.Interpreter.Relocated as Relocated
 import qualified Keelung.Interpreter.Typed as Typed
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
-import qualified AggregateSignature.Util as AggSig
-import qualified AggregateSignature.Program as AggSig
-import Keelung.Compiler.Constraint (relocateConstraintSystem)
 
 kinded :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> Either (Error n) [n]
 kinded prog rawInputs = do

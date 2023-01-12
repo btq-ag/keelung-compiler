@@ -19,7 +19,7 @@ import Keelung.Syntax.Typed (Computation (compCounters), Elaborated (elabComp))
 removeBinRepsFromOutputs :: Counters -> [n] -> [n]
 removeBinRepsFromOutputs counters outputs =
   let (start, end) = getOutputBinRepRange counters
-    in take start outputs ++ drop end outputs
+   in take start outputs ++ drop end outputs
 
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs

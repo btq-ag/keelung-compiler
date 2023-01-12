@@ -14,7 +14,6 @@ import qualified Data.Sequence as Seq
 import Data.Validation (toEither)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
-import Keelung.Interpreter.Monad (Constraint (..), Error (..))
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
@@ -23,6 +22,7 @@ import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
 import Keelung.Data.Bindings
+import Keelung.Interpreter.Monad (Constraint (..), Error (..))
 import Keelung.Syntax.BinRep (BinRep (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
@@ -95,7 +95,6 @@ shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinR
 -- | Trying to reduce a BinRep constraint
 shrinkBinRep :: (GaloisField n, Integral n) => BinRep -> M n (Result BinRep)
 shrinkBinRep binRep@(BinRep var width bitVarStart) = do
-  
   varResult <- lookupVar var
   case varResult of
     -- value of "var" is known
@@ -190,7 +189,6 @@ instance Functor Result where
   fmap f (Stuck x) = Stuck (f x)
   fmap _ Eliminated = Eliminated
   fmap _ NothingToDo = NothingToDo
-
 
 shrinkR1C :: (GaloisField n, Integral n) => R1C n -> M n (Result (R1C n))
 shrinkR1C r1c = do
