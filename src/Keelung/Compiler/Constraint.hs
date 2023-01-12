@@ -12,9 +12,14 @@ module Keelung.Compiler.Constraint
     reindexRefB,
     reindexRefU,
     Constraint (..),
-    cAddB,
     cAddF,
+    cAddB,
+    cAddU,
+    cVarEqF,
+    cVarEqB,
     cVarEqU,
+    cVarBindF,
+    cVarBindB,
     cVarBindU,
     cMulB,
     cMulF,
@@ -25,12 +30,13 @@ module Keelung.Compiler.Constraint
     cNEqU,
     fromConstraint,
     ConstraintSystem (..),
-    relocateConstraintSystem
+    relocateConstraintSystem,
   )
 where
 
 import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
+import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -38,17 +44,25 @@ import qualified Keelung.Compiler.Relocated as Relocated
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Constraint.R1CS as Constraint
+import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
-import Keelung.Data.Struct (Struct(..))
-import qualified Data.IntMap.Strict as IntMap
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)
 fromConstraint counters (CAddF as) = Relocated.CAdd (fromPolyF_ counters as)
+fromConstraint counters (CAddU as) = Relocated.CAdd (fromPolyU_ counters as)
+fromConstraint counters (CVarEqF x y) = case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
+  Left _ -> error "CVarEqF: two variables are the same"
+  Right xs -> Relocated.CAdd xs
+fromConstraint counters (CVarEqB x y) = case Poly.buildEither 0 [(reindexRefB counters x, 1), (reindexRefB counters y, -1)] of
+  Left _ -> error "CVarEqB: two variables are the same"
+  Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarEqU x y) = case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
   Left _ -> error "CVarEqU: two variables are the same"
   Right xs -> Relocated.CAdd xs
+fromConstraint counters (CVarBindF x n) = Relocated.CAdd (Poly.bind (reindexRefF counters x) n)
+fromConstraint counters (CVarBindB x n) = Relocated.CAdd (Poly.bind (reindexRefB counters x) n)
 fromConstraint counters (CVarBindU x n) = Relocated.CAdd (Poly.bind (reindexRefU counters x) n)
 fromConstraint counters (CMulF as bs cs) =
   Relocated.CMul
@@ -218,7 +232,12 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 data Constraint n
   = CAddF !(Poly' RefF n)
   | CAddB !(Poly' RefB n)
+  | CAddU !(Poly' RefU n)
+  | CVarEqF RefF RefF -- when x == y
+  | CVarEqB RefB RefB -- when x == y
   | CVarEqU RefU RefU -- when x == y
+  | CVarBindF RefF n -- when x = val
+  | CVarBindB RefB n -- when x = val
   | CVarBindU RefU n -- when x = val
   | CMulF !(Poly' RefF n) !(Poly' RefF n) !(Either n (Poly' RefF n))
   | CMulB !(Poly' RefB n) !(Poly' RefB n) !(Either n (Poly' RefB n))
@@ -232,6 +251,7 @@ instance GaloisField n => Eq (Constraint n) where
     (CAddB x, CAddB y) -> x == y
     (CVarEqU x y, CVarEqU u v) -> (x == u && y == v) || (x == v && y == u)
     (CVarBindU x y, CVarBindU u v) -> x == u && y == v
+    (CVarBindF x y, CVarBindF u v) -> x == u && y == v
     (CMulF x y z, CMulF u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CMulB x y z, CMulB u v w) ->
@@ -247,7 +267,12 @@ instance GaloisField n => Eq (Constraint n) where
 instance Functor Constraint where
   fmap f (CAddF x) = CAddF (fmap f x)
   fmap f (CAddB x) = CAddB (fmap f x)
+  fmap f (CAddU x) = CAddU (fmap f x)
+  fmap _ (CVarEqF x y) = CVarEqF x y
+  fmap _ (CVarEqB x y) = CVarEqB x y
   fmap _ (CVarEqU x y) = CVarEqU x y
+  fmap f (CVarBindF x y) = CVarBindF x (f y)
+  fmap f (CVarBindB x y) = CVarBindB x (f y)
   fmap f (CVarBindU x y) = CVarBindU x (f y)
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
@@ -258,21 +283,43 @@ instance Functor Constraint where
   fmap _ (CNEqF x y z) = CNEqF x y z
   fmap _ (CNEqU x y z) = CNEqU x y z
 
--- | Smart constructor for the CAddB constraint
-cAddB :: GaloisField n => n -> [(RefB, n)] -> [Constraint n]
-cAddB !c !xs = case buildPoly' c xs of
-  Left _ -> []
-  Right xs' -> [CAddB xs']
-
 -- | Smart constructor for the CAddF constraint
 cAddF :: GaloisField n => n -> [(RefF, n)] -> [Constraint n]
 cAddF !c !xs = case buildPoly' c xs of
   Left _ -> []
   Right xs' -> [CAddF xs']
 
+-- | Smart constructor for the CAddB constraint
+cAddB :: GaloisField n => n -> [(RefB, n)] -> [Constraint n]
+cAddB !c !xs = case buildPoly' c xs of
+  Left _ -> []
+  Right xs' -> [CAddB xs']
+
+-- | Smart constructor for the CAddU constraint
+cAddU :: GaloisField n => n -> [(RefU, n)] -> [Constraint n]
+cAddU !c !xs = case buildPoly' c xs of
+  Left _ -> []
+  Right xs' -> [CAddU xs']
+
+-- | Smart constructor for the CVarEqF constraint
+cVarEqF :: GaloisField n => RefF -> RefF -> [Constraint n]
+cVarEqF x y = if x == y then [] else [CVarEqF x y]
+
+-- | Smart constructor for the CVarEqB constraint
+cVarEqB :: GaloisField n => RefB -> RefB -> [Constraint n]
+cVarEqB x y = if x == y then [] else [CVarEqB x y]
+
 -- | Smart constructor for the CVarEqU constraint
 cVarEqU :: GaloisField n => RefU -> RefU -> [Constraint n]
 cVarEqU x y = if x == y then [] else [CVarEqU x y]
+
+-- | Smart constructor for the cVarBindF constraint
+cVarBindF :: GaloisField n => RefF -> n -> [Constraint n]
+cVarBindF x n = [CVarBindF x n]
+
+-- | Smart constructor for the cVarBindB constraint
+cVarBindB :: GaloisField n => RefB -> n -> [Constraint n]
+cVarBindB x n = [CVarBindB x n]
 
 -- | Smart constructor for the cVarBindU constraint
 cVarBindU :: GaloisField n => RefU -> n -> [Constraint n]
@@ -327,7 +374,12 @@ cNEqU x y m = [CNEqU x y m]
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddF xs) = "AF " <> show xs <> " = 0"
   show (CAddB xs) = "AB " <> show xs <> " = 0"
+  show (CAddU xs) = "AU " <> show xs <> " = 0"
+  show (CVarEqF x y) = "VF " <> show x <> " = " <> show y
+  show (CVarEqB x y) = "VB " <> show x <> " = " <> show y
   show (CVarEqU x y) = "VU " <> show x <> " = " <> show y
+  show (CVarBindF x n) = "BF " <> show x <> " = " <> show n
+  show (CVarBindB x n) = "BB " <> show x <> " = " <> show n
   show (CVarBindU x n) = "BU " <> show x <> " = " <> show n
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulB aV bV cV) = "MB " <> show aV <> " * " <> show bV <> " = " <> show cV
@@ -340,10 +392,15 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 -- | A constraint system is a collection of constraints
 data ConstraintSystem n = ConstraintSystem
   { csCounters :: !Counters,
+    csVarEqF :: [(RefF, RefF)], -- when x == y
+    csVarEqB :: [(RefB, RefB)], -- when x == y
     csVarEqU :: [(RefU, RefU)], -- when x == y
+    csVarBindF :: [(RefF, n)], -- when x = val
+    csVarBindB :: [(RefB, n)], -- when x = val
     csVarBindU :: [(RefU, n)], -- when x = val
     csAddF :: [Poly' RefF n],
     csAddB :: [Poly' RefB n],
+    csAddU :: [Poly' RefU n],
     csMulF :: [(Poly' RefF n, Poly' RefF n, Either n (Poly' RefF n))],
     csMulB :: [(Poly' RefB n, Poly' RefB n, Either n (Poly' RefB n))],
     csMulU :: [(Poly' RefU n, Poly' RefU n, Either n (Poly' RefU n))],
@@ -355,7 +412,11 @@ data ConstraintSystem n = ConstraintSystem
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show cs =
     "ConstraintSystem {\n"
+      <> showVarEqU
+      <> showVarBindU
+      <> showVarBindF
       <> showAddF
+      <> showAddB
       <> showBooleanConstraints
       <> showBinRepConstraints
       <> showVariables
@@ -392,6 +453,12 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               <> "\n"
 
       showAddF = adapt "AddF" (csAddF cs) show
+      showAddB = adapt "AddB" (csAddB cs) show
+
+      showVarEqU = adapt "VarEqU" (csVarEqU cs) show
+
+      showVarBindU = adapt "VarBindU" (csVarBindU cs) $ \(var, val) -> show var <> " = " <> show val
+      showVarBindF = adapt "VarBindF" (csVarBindF cs) $ \(var, val) -> show var <> " = " <> show val
 
       showVariables :: String
       showVariables =
@@ -414,15 +481,18 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
                   '9' -> '₉'
                   _ -> c
             uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (OfUInt w)
-            showUInts (Counters o _ _ _ _) = let xs = map uint (IntMap.keys (structU o))
-             in if null xs then "\n    UInt            none          none              none" else mconcat xs
-        in if totalSize == 0
+            showUInts (Counters o _ _ _ _) =
+              let xs = map uint (IntMap.keys (structU o))
+               in if null xs then "\n    UInt            none          none              none" else mconcat xs
+         in if totalSize == 0
               then ""
               else
                 "  Variables (" <> show totalSize <> "):\n"
-                  <> "                  output         input      intermediate\n"   
-                  <> "\n    Field   " <> formLine OfField
-                  <> "\n    Boolean " <> formLine OfBoolean
+                  <> "                  output         input      intermediate\n"
+                  <> "\n    Field   "
+                  <> formLine OfField
+                  <> "\n    Boolean "
+                  <> formLine OfBoolean
                   <> showUInts counters
                   <> "\n"
 

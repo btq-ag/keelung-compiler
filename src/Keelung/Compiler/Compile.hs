@@ -40,17 +40,6 @@ run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ 
   -- compile assertions to constraints
   mapM_ compileAssertion assertions
 
--- constraints <- gets envConstraints
-
--- -- get new counters because the output variables have been bumped
--- counters' <- gets csCounters
-
--- return
---   ( Constraint.ConstraintSystem
---       (Set.fromList $ map (Constraint.fromConstraint counters') constraints)
---       counters'
---   )
-
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
 compileAssertion expr = do
@@ -72,13 +61,13 @@ compileAssertion expr = do
 compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
 compileRelations (Relations vb vbi eb ebi) = do
   -- intermediate variable bindings of values
-  forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cAddF val [(RefF var, -1)]
-  forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cAddB val [(RefB var, -1)]
+  forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cVarBindF (RefF var) val
+  forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cVarBindB (RefB var) val
   forM_ (IntMap.toList (structU vb)) $ \(width, bindings) ->
     forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefU width var) val
   -- input variable bindings of values
-  forM_ (IntMap.toList (structF vbi)) $ \(var, val) -> add $ cAddF val [(RefFI var, -1)]
-  forM_ (IntMap.toList (structB vbi)) $ \(var, val) -> add $ cAddB val [(RefBI var, -1)]
+  forM_ (IntMap.toList (structF vbi)) $ \(var, val) -> add $ cVarBindF (RefFI var) val
+  forM_ (IntMap.toList (structB vbi)) $ \(var, val) -> add $ cVarBindB (RefBI var) val
   forM_ (IntMap.toList (structU vbi)) $ \(width, bindings) ->
     forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefUI width var) val
   -- intermediate variable bindings of expressions
@@ -102,7 +91,7 @@ compileRelations (Relations vb vbi eb ebi) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Counters -> M n a -> ConstraintSystem n
-runM counters program = execState program (ConstraintSystem counters mempty mempty mempty mempty mempty mempty mempty mempty mempty)
+runM counters program = execState program (ConstraintSystem counters mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -113,7 +102,12 @@ add = mapM_ addOne
     addOne :: GaloisField n => Constraint n -> M n ()
     addOne (CAddF xs) = modify (\cs -> cs {csAddF = xs : csAddF cs})
     addOne (CAddB xs) = modify (\cs -> cs {csAddB = xs : csAddB cs})
+    addOne (CAddU xs) = modify (\cs -> cs {csAddU = xs : csAddU cs})
+    addOne (CVarEqF x y) = modify (\cs -> cs {csVarEqF = (x, y) : csVarEqF cs})
+    addOne (CVarEqB x y) = modify (\cs -> cs {csVarEqB = (x, y) : csVarEqB cs})
     addOne (CVarEqU x y) = modify (\cs -> cs {csVarEqU = (x, y) : csVarEqU cs})
+    addOne (CVarBindF x c) = modify (\cs -> cs {csVarBindF = (x, c) : csVarBindF cs})
+    addOne (CVarBindB x c) = modify (\cs -> cs {csVarBindB = (x, c) : csVarBindB cs})
     addOne (CVarBindU x c) = modify (\cs -> cs {csVarBindU = (x, c) : csVarBindU cs})
     addOne (CMulF x y z) = modify (\cs -> cs {csMulF = (x, y, z) : csMulF cs})
     addOne (CMulB x y z) = modify (\cs -> cs {csMulB = (x, y, z) : csMulB cs})

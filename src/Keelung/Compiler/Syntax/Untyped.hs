@@ -266,7 +266,7 @@ instance (Integral n, Show n) => Show (Relations n) where
     )
       <> ( if Struct.empty vbi
              then ""
-             else "Binding of input variables to values:\n" <> show vb <> "\n"
+             else "Binding of input variables to values:\n" <> show vbi <> "\n"
          )
       <> ( if Struct.empty eb
              then ""
