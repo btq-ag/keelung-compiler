@@ -393,20 +393,25 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 -- | A constraint system is a collection of constraints
 data ConstraintSystem n = ConstraintSystem
   { csCounters :: !Counters,
-    csVarEqF :: [(RefF, RefF)], -- when x == y
-    csVarEqB :: [(RefB, RefB)], -- when x == y
-    csVarEqU :: [(RefU, RefU)], -- when x == y
-    csVarBindF :: [(RefF, n)], -- when x = val
-    csVarBindB :: [(RefB, n)], -- when x = val
-    csVarBindU :: [(RefU, n)], -- when x = val
+    -- when x == y
+    csVarEqF :: [(RefF, RefF)],
+    csVarEqB :: [(RefB, RefB)],
+    csVarEqU :: [(RefU, RefU)],
+    -- when x = val
+    csVarBindF :: Map RefF n,
+    csVarBindB :: Map RefB n,
+    csVarBindU :: Map RefU n,
+    -- addative constraints
     csAddF :: [Poly' RefF n],
     csAddB :: [Poly' RefB n],
     csAddU :: [Poly' RefU n],
+    -- multiplicative constraints
     csMulF :: [(Poly' RefF n, Poly' RefF n, Either n (Poly' RefF n))],
     csMulB :: [(Poly' RefB n, Poly' RefB n, Either n (Poly' RefB n))],
     csMulU :: [(Poly' RefU n, Poly' RefU n, Either n (Poly' RefU n))],
-    csNEqF :: [(RefF, RefF, RefF)],
-    csNEqU :: [(RefU, RefU, RefU)]
+    -- constraints for computing equality
+    csNEqF :: Map (RefF, RefF) RefF,
+    csNEqU :: Map (RefU, RefU) RefU
   }
   deriving (Eq)
 
@@ -466,9 +471,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       showVarEqB = adapt "VarEqB" (csVarEqB cs) $ \(var, val) -> show var <> " = " <> show val
       showVarEqU = adapt "VarEqU" (csVarEqU cs) $ \(var, val) -> show var <> " = " <> show val
 
-      showVarBindU = adapt "VarBindU" (csVarBindU cs) $ \(var, val) -> show var <> " = " <> show val
-      showVarBindF = adapt "VarBindF" (csVarBindF cs) $ \(var, val) -> show var <> " = " <> show val
-      showVarBindB = adapt "VarBindB" (csVarBindB cs) $ \(var, val) -> show var <> " = " <> show val
+      showVarBindU = adapt "VarBindU" (Map.toList $ csVarBindU cs) $ \(var, val) -> show var <> " = " <> show val
+      showVarBindF = adapt "VarBindF" (Map.toList $ csVarBindF cs) $ \(var, val) -> show var <> " = " <> show val
+      showVarBindB = adapt "VarBindB" (Map.toList $ csVarBindB cs) $ \(var, val) -> show var <> " = " <> show val
 
       showAddF = adapt "AddF" (csAddF cs) show
       showAddB = adapt "AddB" (csAddB cs) show
@@ -478,8 +483,8 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       showMulB = adapt "MulB" (csMulB cs) $ \(a, b, c) -> show a <> " * " <> show b <> " = " <> show c
       showMulU = adapt "MulU" (csMulU cs) $ \(a, b, c) -> show a <> " * " <> show b <> " = " <> show c
 
-      showNEqF = adapt "NEqF" (csNEqF cs) $ \(a, b, c) -> show a <> " != " <> show b <> " = " <> show c
-      showNEqU = adapt "NEqU" (csNEqU cs) $ \(a, b, c) -> show a <> " != " <> show b <> " = " <> show c
+      showNEqF = adapt "NEqF" (Map.toList $ csNEqF cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
+      showNEqU = adapt "NEqU" (Map.toList $ csNEqU cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
 
       showVariables :: String
       showVariables =
@@ -541,17 +546,17 @@ relocateConstraintSystem cs =
     varEqFs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqF) $ csVarEqF cs
     varEqBs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
-    varBindFs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ csVarBindF cs
-    varBindBs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ csVarBindB cs
-    varBindUs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ csVarBindU cs
+    varBindFs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList (csVarBindF cs)
+    varBindBs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList (csVarBindB cs)
+    varBindUs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList (csVarBindU cs)
     addFs = Set.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     addBs = Set.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
     addUs = Set.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs
     mulFs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
     mulBs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulB) $ csMulB cs
     mulUs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulU) $ csMulU cs
-    nEqFs = Set.fromList $ map (\(x, y, m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ csNEqF cs
-    nEqUs = Set.fromList $ map (\(x, y, m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ csNEqU cs
+    nEqFs = Set.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
+    nEqUs = Set.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ Map.toList $ csNEqU cs
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =

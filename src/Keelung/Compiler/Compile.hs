@@ -16,6 +16,7 @@ import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
+import qualified Data.Map.Strict as Map
 
 --------------------------------------------------------------------------------
 
@@ -102,14 +103,14 @@ add = mapM_ addOne
     addOne (CVarEqF x y) = modify (\cs -> cs {csVarEqF = (x, y) : csVarEqF cs})
     addOne (CVarEqB x y) = modify (\cs -> cs {csVarEqB = (x, y) : csVarEqB cs})
     addOne (CVarEqU x y) = modify (\cs -> cs {csVarEqU = (x, y) : csVarEqU cs})
-    addOne (CVarBindF x c) = modify (\cs -> cs {csVarBindF = (x, c) : csVarBindF cs})
-    addOne (CVarBindB x c) = modify (\cs -> cs {csVarBindB = (x, c) : csVarBindB cs})
-    addOne (CVarBindU x c) = modify (\cs -> cs {csVarBindU = (x, c) : csVarBindU cs})
+    addOne (CVarBindF x c) = modify (\cs -> cs {csVarBindF = Map.insert x c (csVarBindF cs)})
+    addOne (CVarBindB x c) = modify (\cs -> cs {csVarBindB = Map.insert x c (csVarBindB cs)})
+    addOne (CVarBindU x c) = modify (\cs -> cs {csVarBindU = Map.insert x c (csVarBindU cs)})
     addOne (CMulF x y z) = modify (\cs -> cs {csMulF = (x, y, z) : csMulF cs})
     addOne (CMulB x y z) = modify (\cs -> cs {csMulB = (x, y, z) : csMulB cs})
     addOne (CMulU x y z) = modify (\cs -> cs {csMulU = (x, y, z) : csMulU cs})
-    addOne (CNEqF x y m) = modify (\cs -> cs {csNEqF = (x, y, m) : csNEqF cs})
-    addOne (CNEqU x y m) = modify (\cs -> cs {csNEqU = (x, y, m) : csNEqU cs})
+    addOne (CNEqF x y m) = modify (\cs -> cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
+    addOne (CNEqU x y m) = modify (\cs -> cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
 
 freshRefF :: M n RefF
 freshRefF = do
