@@ -140,6 +140,23 @@ instance Show RefU where
 
 --------------------------------------------------------------------------------
 
+pinnedRefF :: RefF -> Bool
+pinnedRefF (RefFI _) = True
+pinnedRefF (RefFO _) = True
+pinnedRefF _ = False
+
+pinnedRefB :: RefB -> Bool
+pinnedRefB (RefBI _) = True
+pinnedRefB (RefBO _) = True
+pinnedRefB _ = False
+
+pinnedRefU :: RefU -> Bool
+pinnedRefU (RefUI _ _) = True
+pinnedRefU (RefUO _ _) = True
+pinnedRefU _ = False
+
+--------------------------------------------------------------------------------
+
 reindexRefF :: Counters -> RefF -> Var
 reindexRefF counters (RefFI x) = reindex counters OfInput OfField x
 reindexRefF counters (RefFO x) = reindex counters OfOutput OfField x
@@ -546,9 +563,9 @@ relocateConstraintSystem cs =
     varEqFs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqF) $ csVarEqF cs
     varEqBs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
-    varBindFs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList (csVarBindF cs)
-    varBindBs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList (csVarBindB cs)
-    varBindUs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList (csVarBindU cs)
+    varBindFs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList $ Map.filterWithKey (\var _ -> pinnedRefF var) $ csVarBindF cs
+    varBindBs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ Map.filterWithKey (\var _ -> pinnedRefB var) $ csVarBindB cs
+    varBindUs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ Map.filterWithKey (\var _ -> pinnedRefU var) $ csVarBindU cs
     addFs = Set.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     addBs = Set.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
     addUs = Set.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs

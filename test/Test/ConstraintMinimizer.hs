@@ -12,6 +12,7 @@ import Keelung.Compiler.Error (Error)
 import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
 import Test.Hspec
+import qualified Keelung.Compiler.Relocated as Relocated
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
@@ -23,20 +24,21 @@ runTest expectedSize program = do
   let cs' = Optimizer.optimize1' <$> cs
 
 --   let r1cs = Compiler.asGF181N $  Compiler.toR1CS <$> Compiler.compileO2 program
-  -- print cs'
+  print cs'
 
   -- var counters should remain the same
   csCounters <$> cs `shouldBe` csCounters <$> cs'
 
-  sizeOfConstraintSystem <$> cs' `shouldBe` Right expectedSize
+  Relocated.numberOfConstraints . relocateConstraintSystem <$> cs' `shouldBe` Right expectedSize
 
 tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
-    it "VarBindF" $ do
-      runTest 2 $ do 
-        reuse (3 :: Field) 
-        
+    it "Union Find" $ do
+      runTest 1 $ do 
+        x <- inputField 
+        y <- reuse x
+        return (x + y)
 
 
     -- it "Basic.summation" $ do

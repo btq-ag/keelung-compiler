@@ -32,6 +32,7 @@ library
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
@@ -62,6 +63,7 @@ library
     , cereal
     , containers
     , deepseq
+    , equivalence
     , galois-field
     , keelung
     , mtl
@@ -84,6 +86,7 @@ executable keelungc
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
@@ -122,6 +125,7 @@ executable keelungc
     , cereal
     , containers
     , deepseq
+    , equivalence
     , galois-field
     , keelung
     , keelung-compiler
@@ -150,6 +154,7 @@ test-suite keelung-test
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
@@ -188,6 +193,7 @@ test-suite keelung-test
     , cereal
     , containers
     , deepseq
+    , equivalence
     , galois-field
     , hspec
     , keelung
@@ -213,6 +219,7 @@ benchmark keelung-bench
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
@@ -255,10 +262,10 @@ benchmark keelung-bench
     , containers
     , criterion >=1.0
     , deepseq
+    , equivalence
     , galois-field
     , keelung
     , keelung-compiler
-    , keelung-examples
     , mtl
     , optparse-applicative
     , random

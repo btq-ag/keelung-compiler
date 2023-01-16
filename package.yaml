@@ -26,6 +26,7 @@ dependencies:
 - cereal
 - containers
 - deepseq
+- equivalence
 - galois-field
 - keelung 
 - mtl
