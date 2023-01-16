@@ -41,6 +41,8 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
+import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as UnionFind
 import qualified Keelung.Compiler.Relocated as Relocated
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
@@ -411,7 +413,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 data ConstraintSystem n = ConstraintSystem
   { csCounters :: !Counters,
     -- when x == y
-    csVarEqF :: [(RefF, RefF)],
+    csVarEqF :: UnionFind RefF,
     csVarEqB :: [(RefB, RefB)],
     csVarEqU :: [(RefU, RefU)],
     -- when x = val
@@ -484,7 +486,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               <> unlines (map ("    " <>) (prettyBinRepConstraints counters))
               <> "\n"
 
-      showVarEqF = adapt "VarEqF" (csVarEqF cs) $ \(var, val) -> show var <> " = " <> show val
+      showVarEqF = "  VarEqF:\n" <> indent (indent (show (csVarEqF cs)))
       showVarEqB = adapt "VarEqB" (csVarEqB cs) $ \(var, val) -> show var <> " = " <> show val
       showVarEqU = adapt "VarEqU" (csVarEqU cs) $ \(var, val) -> show var <> " = " <> show val
 
@@ -560,7 +562,7 @@ relocateConstraintSystem cs =
   where
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
-    varEqFs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqF) $ csVarEqF cs
+    varEqFs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqF) $ Map.toList $ UnionFind.toIntMap $ csVarEqF cs
     varEqBs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
     varBindFs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList $ Map.filterWithKey (\var _ -> pinnedRefF var) $ csVarBindF cs
@@ -577,7 +579,7 @@ relocateConstraintSystem cs =
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
-  length (csVarEqF cs)
+    UnionFind.size (csVarEqF cs)
     + length (csVarEqB cs)
     + length (csVarEqU cs)
     + length (csVarBindF cs)

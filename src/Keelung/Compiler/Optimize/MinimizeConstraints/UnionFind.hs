@@ -1,21 +1,21 @@
-module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, new, union, find) where
+module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, new, union, find, toIntMap, size) where
 
-import Data.Field.Galois (GaloisField)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 
-data UnionFind ref n = UnionFind
+data UnionFind ref = UnionFind
   { links :: Map ref ref,
     sizes :: Map ref Int
   }
+  deriving (Eq)
 
-instance (GaloisField n, Integral n, Show ref) => Show (UnionFind ref n) where
+instance Show ref => Show (UnionFind ref) where
   show xs =
     "UnionFind {\n"
       ++ "  links = "
-      ++ showList' (map (\(x, y) -> show x <> " -> $" <> show y) (Map.toList $ links xs))
+      ++ showList' (map (\(x, y) -> show x <> " -> " <> show y) (Map.toList $ links xs))
       ++ "\n"
       ++ "  sizes = "
       ++ showList' (map (\(x, y) -> show x <> ": " <> show y) (Map.toList $ sizes xs))
@@ -23,11 +23,11 @@ instance (GaloisField n, Integral n, Show ref) => Show (UnionFind ref n) where
     where
       showList' ys = "[" <> List.intercalate ", " ys <> "]"
 
-new :: Ord ref => UnionFind ref n
+new :: Ord ref => UnionFind ref
 new = UnionFind mempty mempty
 
 -- | Find the root of a variable
-find :: (GaloisField n, Ord ref) => UnionFind ref n -> ref -> (ref, UnionFind ref n)
+find :: Ord ref => UnionFind ref -> ref -> (ref, UnionFind ref)
 find xs var =
   let parent = parentOf xs var
    in if parent == var
@@ -43,14 +43,14 @@ find xs var =
                 parent
 
 -- If a variable has no parent, it is its own parent.
-parentOf :: Ord ref => UnionFind ref n -> ref -> ref
+parentOf :: Ord ref => UnionFind ref -> ref -> ref
 parentOf xs var = fromMaybe var $ Map.lookup var (links xs)
 
 -- | Unify x with y.  On ties, prefer smaller variables. This is just
 -- a heuristic that biases toward pinned variables, many of which are
 -- low-numbered input vars. This way, we avoid introducing pinned
 -- eqns. in some cases.
-union :: (GaloisField n, Ord ref) => UnionFind ref n -> ref -> ref -> UnionFind ref n
+union :: Ord ref => UnionFind ref -> ref -> ref -> UnionFind ref
 union xs x y
   | x < y =
     union' xs x y
@@ -61,7 +61,7 @@ union xs x y
 
 -- | Choose the first argument as root on ties.
 -- Left-biased: if size x == size y, prefer x as root.
-union' :: (GaloisField n, Ord ref) => UnionFind ref n -> ref -> ref -> UnionFind ref n
+union' :: Ord ref => UnionFind ref -> ref -> ref -> UnionFind ref
 union' xs x y =
   let (rootOfX, xs2) = find xs x
       (rootOfY, xs3) = find xs2 y
@@ -79,5 +79,12 @@ union' xs x y =
               sizes = Map.insert y (sizeOfRootX + sizeOfRootY) (sizes xs3)
             }
 
-sizeOf :: Ord ref => UnionFind ref n -> ref -> Int
+sizeOf :: Ord ref => UnionFind ref -> ref -> Int
 sizeOf xs x = fromMaybe 1 $ Map.lookup x (sizes xs)
+
+
+toIntMap :: UnionFind ref -> Map ref ref
+toIntMap = links 
+
+size :: UnionFind ref -> Int
+size = Map.size . links

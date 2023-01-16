@@ -10,13 +10,14 @@ import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
 import qualified Data.IntMap as IntMap
+import qualified Data.Map.Strict as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
+import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as UnionFind
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
-import qualified Data.Map.Strict as Map
 
 --------------------------------------------------------------------------------
 
@@ -88,7 +89,7 @@ compileRelations (Relations vb vbi eb ebi) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Counters -> M n a -> ConstraintSystem n
-runM counters program = execState program (ConstraintSystem counters mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty)
+runM counters program = execState program (ConstraintSystem counters UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -100,7 +101,7 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify (\cs -> cs {csAddF = xs : csAddF cs})
     addOne (CAddB xs) = modify (\cs -> cs {csAddB = xs : csAddB cs})
     addOne (CAddU xs) = modify (\cs -> cs {csAddU = xs : csAddU cs})
-    addOne (CVarEqF x y) = modify (\cs -> cs {csVarEqF = (x, y) : csVarEqF cs})
+    addOne (CVarEqF x y) = modify (\cs -> cs {csVarEqF = UnionFind.union (csVarEqF cs) x y})
     addOne (CVarEqB x y) = modify (\cs -> cs {csVarEqB = (x, y) : csVarEqB cs})
     addOne (CVarEqU x y) = modify (\cs -> cs {csVarEqU = (x, y) : csVarEqU cs})
     addOne (CVarBindF x c) = modify (\cs -> cs {csVarBindF = Map.insert x c (csVarBindF cs)})
