@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use list comprehension" #-}
@@ -12,9 +11,7 @@ module Keelung.Compiler.Constraint
     reindexRefB,
     reindexRefU,
     Constraint (..),
-    substPoly,
-    Poly',
-    buildPolyUnsafe,
+    substPolyG,
     cAddF,
     cAddB,
     cAddU,
@@ -50,6 +47,8 @@ import qualified Keelung.Compiler.Relocated as Relocated
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
 import qualified Keelung.Constraint.R1CS as Constraint
+import Keelung.Data.PolyG (PolyG)
+import qualified Keelung.Data.PolyG as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
@@ -191,64 +190,26 @@ reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 
 --------------------------------------------------------------------------------
 
--- | Like Poly but with using Refs instead of Ints as variables
-data Poly' ref n = Poly' n (Map ref n)
-  deriving (Eq, Functor, Ord)
+fromPolyF :: Integral n => Counters -> PolyG RefF n -> Either n (Poly n)
+fromPolyF counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefF counters)) (Map.toList xs))
 
-instance (Show n, Ord n, Eq n, Num n, Show ref) => Show (Poly' ref n) where
-  show (Poly' n xs)
-    | n == 0 =
-      if firstSign == " + "
-        then concat restOfTerms
-        else "- " <> concat restOfTerms
-    | otherwise = concat (show n : termStrings)
-    where
-      (firstSign : restOfTerms) = termStrings
+fromPolyB :: Integral n => Counters -> PolyG RefB n -> Either n (Poly n)
+fromPolyB counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefB counters)) (Map.toList xs))
 
-      termStrings = concatMap printTerm $ Map.toList xs
-      -- return a pair of the sign ("+" or "-") and the string representation
-      printTerm :: (Show n, Ord n, Eq n, Num n, Show ref) => (ref, n) -> [String]
-      printTerm (x, c)
-        | c == 0 = error "printTerm: coefficient of 0"
-        | c == 1 = [" + ", show x]
-        | c == -1 = [" - ", show x]
-        | c < 0 = [" - ", show (Prelude.negate c) <> show x]
-        | otherwise = [" + ", show c <> show x]
+fromPolyU :: Integral n => Counters -> PolyG RefU n -> Either n (Poly n)
+fromPolyU counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefU counters)) (Map.toList xs))
 
-buildPoly' :: (GaloisField n, Ord ref) => n -> [(ref, n)] -> Either n (Poly' ref n)
-buildPoly' c xs =
-  let result = Map.filter (/= 0) $ Map.fromListWith (+) xs
-   in if Map.null result
-        then Left c
-        else Right (Poly' c result)
-
-buildPolyUnsafe :: (GaloisField n, Ord ref) => n -> [(ref, n)] -> Poly' ref n
-buildPolyUnsafe c xs =
-  let result = Map.filter (/= 0) $ Map.fromListWith (+) xs
-   in if Map.null result
-        then error "[ panic ] buildPolyUnsafe: empty polynomial"
-        else Poly' c result
-
-fromPolyF :: Integral n => Counters -> Poly' RefF n -> Either n (Poly n)
-fromPolyF counters (Poly' c xs) = Poly.buildEither c (map (first (reindexRefF counters)) (Map.toList xs))
-
-fromPolyB :: Integral n => Counters -> Poly' RefB n -> Either n (Poly n)
-fromPolyB counters (Poly' c xs) = Poly.buildEither c (map (first (reindexRefB counters)) (Map.toList xs))
-
-fromPolyU :: Integral n => Counters -> Poly' RefU n -> Either n (Poly n)
-fromPolyU counters (Poly' c xs) = Poly.buildEither c (map (first (reindexRefU counters)) (Map.toList xs))
-
-fromPolyF_ :: Integral n => Counters -> Poly' RefF n -> Poly n
+fromPolyF_ :: Integral n => Counters -> PolyG RefF n -> Poly n
 fromPolyF_ counters xs = case fromPolyF counters xs of
   Left _ -> error "[ panic ] fromPolyF_: Left"
   Right p -> p
 
-fromPolyB_ :: Integral n => Counters -> Poly' RefB n -> Poly n
+fromPolyB_ :: Integral n => Counters -> PolyG RefB n -> Poly n
 fromPolyB_ counters xs = case fromPolyB counters xs of
   Left _ -> error "[ panic ] fromPolyB_: Left"
   Right p -> p
 
-fromPolyU_ :: Integral n => Counters -> Poly' RefU n -> Poly n
+fromPolyU_ :: Integral n => Counters -> PolyG RefU n -> Poly n
 fromPolyU_ counters xs = case fromPolyU counters xs of
   Left _ -> error "[ panic ] fromPolyU_: Left"
   Right p -> p
@@ -257,16 +218,19 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 
 -- | Normalize a polynomial by substituting roots
 -- for the variables that appear in the polynomial.
--- substPoly :: (GaloisField n, Integral n) => UnionFind RefF -> Poly' RefF n -> Maybe (Poly' RefF n, UnionFind RefF)
-substPoly :: (GaloisField n, Integral n, Ord ref) => UnionFind ref -> Poly' ref n -> Maybe (Poly' ref n, UnionFind ref)
-substPoly ctx (Poly' c xs) = do
-  case Map.foldlWithKey' substPoly' (False, ctx, mempty) xs of
+-- substPoly :: (GaloisField n, Integral n) => UnionFind RefF -> PolyG RefF n -> Maybe (PolyG RefF n, UnionFind RefF)
+substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref)
+substPolyG ctx poly = do
+  let (c, xs) = PolyG.view poly
+  case Map.foldlWithKey' substPolyG_ (False, ctx, mempty) xs of
     (False, _, _) -> Nothing
-    (True, ctx', xs') -> Just (Poly' c xs', ctx')
+    (True, ctx', xs') -> case PolyG.buildWithMap c xs' of 
+      Left _ -> Nothing
+      Right poly' -> Just (poly', ctx')
 
--- substPoly' :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
-substPoly' :: (Integral n, Ord ref) => (Bool, UnionFind ref, Map ref n) -> ref -> n -> (Bool, UnionFind ref, Map ref n)
-substPoly' (changed, ctx, xs) ref coeff = case UnionFind.find' ctx ref of
+-- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
+substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref, Map ref n) -> ref -> n -> (Bool, UnionFind ref, Map ref n)
+substPolyG_ (changed, ctx, xs) ref coeff = case UnionFind.find' ctx ref of
   Nothing -> (changed, ctx, Map.insert ref coeff xs)
   Just (ref', ctx') -> (True, ctx', Map.insertWith (+) ref' coeff xs)
 
@@ -277,18 +241,18 @@ substPoly' (changed, ctx, xs) ref coeff = case UnionFind.find' ctx ref of
 --      CMul: ax * by = c or ax * by = cz
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
-  = CAddF !(Poly' RefF n)
-  | CAddB !(Poly' RefB n)
-  | CAddU !(Poly' RefU n)
+  = CAddF !(PolyG RefF n)
+  | CAddB !(PolyG RefB n)
+  | CAddU !(PolyG RefU n)
   | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y
   | CVarEqU RefU RefU -- when x == y
   | CVarBindF RefF n -- when x = val
   | CVarBindB RefB n -- when x = val
   | CVarBindU RefU n -- when x = val
-  | CMulF !(Poly' RefF n) !(Poly' RefF n) !(Either n (Poly' RefF n))
-  | CMulB !(Poly' RefB n) !(Poly' RefB n) !(Either n (Poly' RefB n))
-  | CMulU !(Poly' RefU n) !(Poly' RefU n) !(Either n (Poly' RefU n))
+  | CMulF !(PolyG RefF n) !(PolyG RefF n) !(Either n (PolyG RefF n))
+  | CMulB !(PolyG RefB n) !(PolyG RefB n) !(Either n (PolyG RefB n))
+  | CMulU !(PolyG RefU n) !(PolyG RefU n) !(Either n (PolyG RefU n))
   | CNEqF RefF RefF RefF
   | CNEqU RefU RefU RefU
 
@@ -332,19 +296,19 @@ instance Functor Constraint where
 
 -- | Smart constructor for the CAddF constraint
 cAddF :: GaloisField n => n -> [(RefF, n)] -> [Constraint n]
-cAddF !c !xs = case buildPoly' c xs of
+cAddF !c !xs = case PolyG.build c xs of
   Left _ -> []
   Right xs' -> [CAddF xs']
 
 -- | Smart constructor for the CAddB constraint
 cAddB :: GaloisField n => n -> [(RefB, n)] -> [Constraint n]
-cAddB !c !xs = case buildPoly' c xs of
+cAddB !c !xs = case PolyG.build c xs of
   Left _ -> []
   Right xs' -> [CAddB xs']
 
 -- | Smart constructor for the CAddU constraint
 cAddU :: GaloisField n => n -> [(RefU, n)] -> [Constraint n]
-cAddU !c !xs = case buildPoly' c xs of
+cAddU !c !xs = case PolyG.build c xs of
   Left _ -> []
   Right xs' -> [CAddU xs']
 
@@ -372,10 +336,14 @@ cVarBindB x n = [CVarBindB x n]
 cVarBindU :: GaloisField n => RefU -> n -> [Constraint n]
 cVarBindU x n = [CVarBindU x n]
 
-cMulSimple :: GaloisField n => (Poly' ref n -> Poly' ref n -> Either n (Poly' ref n) -> Constraint n) -> ref -> ref -> ref -> [Constraint n]
-cMulSimple ctor !x !y !z =
-  [ ctor (Poly' 0 (Map.singleton x 1)) (Poly' 0 (Map.singleton y 1)) (Right (Poly' 0 (Map.singleton z 1)))
-  ]
+cMulSimple :: (GaloisField n, Ord ref) => (PolyG ref n -> PolyG ref n -> Either n (PolyG ref n) -> Constraint n) -> ref -> ref -> ref -> [Constraint n]
+cMulSimple ctor !x !y !z =  case ( do
+                                             xs' <- PolyG.build 0 [(x, 1)]
+                                             ys' <- PolyG.build 0 [(y, 1)]
+                                             return $ ctor xs' ys' (PolyG.build 0 [(z, 1)])
+                                         ) of
+  Left _ -> []
+  Right result -> [result]
 
 cMulSimpleF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
 cMulSimpleF = cMulSimple CMulF
@@ -386,15 +354,15 @@ cMulSimpleB = cMulSimple CMulB
 -- | Smart constructor for the CMul constraint
 cMul ::
   (GaloisField n, Ord ref) =>
-  (Poly' ref n -> Poly' ref n -> Either n (Poly' ref n) -> Constraint n) ->
+  (PolyG ref n -> PolyG ref n -> Either n (PolyG ref n) -> Constraint n) ->
   (n, [(ref, n)]) ->
   (n, [(ref, n)]) ->
   (n, [(ref, n)]) ->
   [Constraint n]
 cMul ctor (a, xs) (b, ys) (c, zs) = case ( do
-                                             xs' <- buildPoly' a xs
-                                             ys' <- buildPoly' b ys
-                                             return $ ctor xs' ys' (buildPoly' c zs)
+                                             xs' <- PolyG.build a xs
+                                             ys' <- PolyG.build b ys
+                                             return $ ctor xs' ys' (PolyG.build c zs)
                                          ) of
   Left _ -> []
   Right result -> [result]
@@ -448,13 +416,13 @@ data ConstraintSystem n = ConstraintSystem
     csVarBindB :: Map RefB n,
     csVarBindU :: Map RefU n,
     -- addative constraints
-    csAddF :: [Poly' RefF n],
-    csAddB :: [Poly' RefB n],
-    csAddU :: [Poly' RefU n],
+    csAddF :: [PolyG RefF n],
+    csAddB :: [PolyG RefB n],
+    csAddU :: [PolyG RefU n],
     -- multiplicative constraints
-    csMulF :: [(Poly' RefF n, Poly' RefF n, Either n (Poly' RefF n))],
-    csMulB :: [(Poly' RefB n, Poly' RefB n, Either n (Poly' RefB n))],
-    csMulU :: [(Poly' RefU n, Poly' RefU n, Either n (Poly' RefU n))],
+    csMulF :: [(PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))],
+    csMulB :: [(PolyG RefB n, PolyG RefB n, Either n (PolyG RefB n))],
+    csMulU :: [(PolyG RefU n, PolyG RefU n, Either n (PolyG RefU n))],
     -- constraints for computing equality
     csNEqF :: Map (RefF, RefF) RefF,
     csNEqU :: Map (RefU, RefU) RefU

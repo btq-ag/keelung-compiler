@@ -12,7 +12,6 @@ main =
     [ 
       Poseidon.run,
       Merkle.run
-
     ]
   where
     config :: Config

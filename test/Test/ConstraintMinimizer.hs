@@ -14,6 +14,7 @@ import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropag
 import qualified Keelung.Compiler.Relocated as Relocated
 import Test.HUnit
 import Test.Hspec
+import qualified Keelung.Data.PolyG as PolyG
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
@@ -49,7 +50,7 @@ tests = do
         z <- reuse x
         return (x + y + z)
 
-      csAddF cs `shouldContain` [buildPolyUnsafe 0 [(RefFI 0, 3), (RefFO 0, -1)]]
+      csAddF cs `shouldContain` [PolyG.unsafeBuild 0 [(RefFI 0, 3), (RefFO 0, -1)]]
 
     it "Union Find 2" $ do
       cs <- runTest 1 $ do
@@ -58,7 +59,7 @@ tests = do
         z <- reuse (x + y)
         return (x + y + z)
 
-      csAddF cs `shouldContain` [buildPolyUnsafe 0 [(RefFI 0, 3), (RefFO 0, -1)]]
+      csAddF cs `shouldContain` [PolyG.unsafeBuild 0 [(RefFI 0, 3), (RefFO 0, -1)]]
 
 
 
