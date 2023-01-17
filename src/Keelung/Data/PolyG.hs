@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 -- | Polynomial with variables generalized (unliked Poly which is limited to only Int)
-module Keelung.Data.PolyG (PolyG, build, buildWithMap, unsafeBuild, view) where
+module Keelung.Data.PolyG (PolyG, build, buildWithMap, unsafeBuild, view, viewAsMap) where
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -50,5 +50,8 @@ unsafeBuild c xs =
         then error "[ panic ] PolyG.unsafeBuild: empty polynomial"
         else PolyG c result
 
-view :: PolyG ref n -> (n, Map ref n)
-view (PolyG c xs) = (c, xs)
+view :: PolyG ref n -> (n, [(ref, n)])
+view (PolyG c xs) = (c, Map.toList xs)
+
+viewAsMap :: PolyG ref n -> (n, Map ref n)
+viewAsMap (PolyG c xs) = (c, xs)

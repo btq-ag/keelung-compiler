@@ -144,20 +144,20 @@ instance Show RefU where
 
 --------------------------------------------------------------------------------
 
-pinnedRefF :: RefF -> Bool
-pinnedRefF (RefFI _) = True
-pinnedRefF (RefFO _) = True
-pinnedRefF _ = False
+-- pinnedRefF :: RefF -> Bool
+-- pinnedRefF (RefFI _) = True
+-- pinnedRefF (RefFO _) = True
+-- pinnedRefF _ = True
 
-pinnedRefB :: RefB -> Bool
-pinnedRefB (RefBI _) = True
-pinnedRefB (RefBO _) = True
-pinnedRefB _ = False
+-- pinnedRefB :: RefB -> Bool
+-- pinnedRefB (RefBI _) = True
+-- pinnedRefB (RefBO _) = True
+-- pinnedRefB _ = True
 
-pinnedRefU :: RefU -> Bool
-pinnedRefU (RefUI _ _) = True
-pinnedRefU (RefUO _ _) = True
-pinnedRefU _ = False
+-- pinnedRefU :: RefU -> Bool
+-- pinnedRefU (RefUI _ _) = True
+-- pinnedRefU (RefUO _ _) = True
+-- pinnedRefU _ = True
 
 --------------------------------------------------------------------------------
 
@@ -191,13 +191,13 @@ reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 --------------------------------------------------------------------------------
 
 fromPolyF :: Integral n => Counters -> PolyG RefF n -> Either n (Poly n)
-fromPolyF counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefF counters)) (Map.toList xs))
+fromPolyF counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefF counters)) xs)
 
 fromPolyB :: Integral n => Counters -> PolyG RefB n -> Either n (Poly n)
-fromPolyB counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefB counters)) (Map.toList xs))
+fromPolyB counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefB counters)) xs)
 
 fromPolyU :: Integral n => Counters -> PolyG RefU n -> Either n (Poly n)
-fromPolyU counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefU counters)) (Map.toList xs))
+fromPolyU counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefU counters)) xs)
 
 fromPolyF_ :: Integral n => Counters -> PolyG RefF n -> Poly n
 fromPolyF_ counters xs = case fromPolyF counters xs of
@@ -221,7 +221,7 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 -- substPoly :: (GaloisField n, Integral n) => UnionFind RefF -> PolyG RefF n -> Maybe (PolyG RefF n, UnionFind RefF)
 substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref)
 substPolyG ctx poly = do
-  let (c, xs) = PolyG.view poly
+  let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' substPolyG_ (False, ctx, mempty) xs of
     (False, _, _) -> Nothing
     (True, ctx', xs') -> case PolyG.buildWithMap c xs' of 
@@ -560,9 +560,9 @@ relocateConstraintSystem cs =
     varEqFs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqF) $ Map.toList $ UnionFind.toIntMap $ csVarEqF cs
     varEqBs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
-    varBindFs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList $ Map.filterWithKey (\var _ -> pinnedRefF var) $ csVarBindF cs
-    varBindBs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ Map.filterWithKey (\var _ -> pinnedRefB var) $ csVarBindB cs
-    varBindUs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ Map.filterWithKey (\var _ -> pinnedRefU var) $ csVarBindU cs
+    varBindFs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList $ csVarBindF cs
+    varBindBs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
+    varBindUs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ csVarBindU cs
     addFs = Set.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     addBs = Set.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
     addUs = Set.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs

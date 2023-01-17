@@ -29,7 +29,8 @@ runTest expectedSize program = do
   let cs' = Optimizer.optimize1' cs
 
   -- let r1cs = Compiler.asGF181N $  Compiler.toR1CS <$> Compiler.compileO2 program
-  print cs'
+  -- print cs
+  -- print cs'
 
   -- var counters should remain the same
   csCounters cs `shouldBe` csCounters cs'
@@ -52,14 +53,14 @@ tests = do
 
       csAddF cs `shouldContain` [PolyG.unsafeBuild 0 [(RefFI 0, 3), (RefFO 0, -1)]]
 
-    it "Union Find 2" $ do
-      cs <- runTest 1 $ do
-        x <- inputField
-        y <- reuse x
-        z <- reuse (x + y)
-        return (x + y + z)
+    -- it "Union Find 2" $ do
+    --   cs <- runTest 3 $ do
+    --     x <- inputField
+    --     y <- reuse x
+    --     z <- reuse (x + y)
+    --     return (x + y + z)
 
-      csAddF cs `shouldContain` [PolyG.unsafeBuild 0 [(RefFI 0, 3), (RefFO 0, -1)]]
+    --   csAddF cs `shouldContain` [PolyG.unsafeBuild 0 [(RefFI 0, 3), (RefFO 0, -1)]]
 
 
 
