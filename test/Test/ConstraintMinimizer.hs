@@ -11,47 +11,69 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.Error (Error)
 import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
-import Test.Hspec
 import qualified Keelung.Compiler.Relocated as Relocated
+import Test.HUnit
+import Test.Hspec
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
 compileOnly program = Compiler.erase program >>= return . Compiler.run . ConstantPropagation.run
 
-runTest :: Encode t => Int -> Comp t -> IO ()
+runTest :: Encode t => Int -> Comp t -> IO (ConstraintSystem (N GF181))
 runTest expectedSize program = do
-  let cs = Compiler.asGF181N $ compileOnly program
-  let cs' = Optimizer.optimize1' <$> cs
+  cs <- case Compiler.asGF181N $ compileOnly program of
+    Left err -> assertFailure $ show err
+    Right result -> return result
 
---   let r1cs = Compiler.asGF181N $  Compiler.toR1CS <$> Compiler.compileO2 program
+  let cs' = Optimizer.optimize1' cs
+
+  -- let r1cs = Compiler.asGF181N $  Compiler.toR1CS <$> Compiler.compileO2 program
   print cs'
 
   -- var counters should remain the same
-  csCounters <$> cs `shouldBe` csCounters <$> cs'
+  csCounters cs `shouldBe` csCounters cs'
 
-  Relocated.numberOfConstraints . relocateConstraintSystem <$> cs' `shouldBe` Right expectedSize
+  -- compare the number of constraints
+  let actualSize = Relocated.numberOfConstraints (relocateConstraintSystem cs')
+  actualSize `shouldBe` expectedSize
+
+  return cs'
 
 tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
-    it "Union Find" $ do
-      runTest 1 $ do 
-        x <- inputField 
+    it "Union Find 1" $ do
+      cs <- runTest 3 $ do
+        x <- inputField
         y <- reuse x
-        return (x + y)
+        z <- reuse x
+        return (x + y + z)
+
+      csAddF cs `shouldContain` [buildPolyUnsafe 0 [(RefFI 0, 3), (RefFO 0, -1)]]
+
+    it "Union Find 2" $ do
+      cs <- runTest 1 $ do
+        x <- inputField
+        y <- reuse x
+        z <- reuse (x + y)
+        return (x + y + z)
+
+      csAddF cs `shouldContain` [buildPolyUnsafe 0 [(RefFI 0, 3), (RefFO 0, -1)]]
 
 
-    -- it "Basic.summation" $ do
-    --   runTest 1 Basic.summation
-    -- it "Basic.summation2" $ do
-    --   runTest 1 Basic.summation2
-    -- it "Basic.assertArraysEqual2" $ do
-    --   runTest 0 Basic.assertArraysEqual2
-    -- it "Basic.assert1" $ do 
-    --   runTest 1 Basic.assert1
-    -- it "Basic.returnArray2" $ do 
-    --   runTest 2 Basic.returnArray2
-    -- it "Poseidon Hash 1" $ do 
-    --     runTest 1665 $ do 
-    --         x <- input
-    --         Poseidon.hash [x]
+
+
+-- it "Basic.summation" $ do
+--   runTest 1 Basic.summation
+-- it "Basic.summation2" $ do
+--   runTest 1 Basic.summation2
+-- it "Basic.assertArraysEqual2" $ do
+--   runTest 0 Basic.assertArraysEqual2
+-- it "Basic.assert1" $ do
+--   runTest 1 Basic.assert1
+-- it "Basic.returnArray2" $ do
+--   runTest 2 Basic.returnArray2
+-- it "Poseidon Hash 1" $ do
+--     runTest 1665 $ do
+--         x <- input
+--         Poseidon.hash [x]

@@ -19,7 +19,7 @@ go :: (GaloisField n, Integral n) => (Bool, UnionFind RefF, [Poly' RefF n]) -> P
 go (changed, unionFind, acc) poly = case substPoly unionFind poly of
   Nothing -> (changed, unionFind, poly : acc)
   Just (poly', unionFind') -> (True, unionFind', poly' : acc)
-
+ 
 ------------------------------------------------------------------------------
 
 -- type M n = State (ConstraintSystem n)

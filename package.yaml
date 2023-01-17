@@ -74,6 +74,7 @@ tests:
     - keelung-compiler
     - keelung-examples
     - hspec
+    - HUnit
     - QuickCheck
     - quickcheck-transformer
 

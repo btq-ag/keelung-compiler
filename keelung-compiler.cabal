@@ -186,7 +186,8 @@ test-suite keelung-test
       examples/
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      QuickCheck
+      HUnit
+    , QuickCheck
     , array
     , base >=4.7 && <5
     , bytestring
