@@ -12,6 +12,8 @@ module Keelung.Compiler.Constraint
     reindexRefB,
     reindexRefU,
     Constraint (..),
+    substPoly,
+    Poly',
     cAddF,
     cAddB,
     cAddU,
@@ -242,6 +244,23 @@ fromPolyU_ :: Integral n => Counters -> Poly' RefU n -> Poly n
 fromPolyU_ counters xs = case fromPolyU counters xs of
   Left _ -> error "[ panic ] fromPolyU_: Left"
   Right p -> p
+
+--------------------------------------------------------------------------------
+
+-- | Normalize a polynomial by substituting roots
+-- for the variables that appear in the polynomial.
+substPoly :: (GaloisField n, Integral n) => UnionFind RefF -> Poly' RefF n -> Maybe (Poly' RefF n, UnionFind RefF)
+-- substPoly :: (GaloisField n, Integral n, Ord ref) => UnionFind ref -> Poly' ref n -> Maybe (Poly' ref n, UnionFind ref)
+substPoly ctx (Poly' c xs) = do
+  case Map.foldlWithKey' substPoly' (False, ctx, mempty) xs of
+    (False, _, _) -> Nothing
+    (True, ctx', xs') -> Just (Poly' c xs', ctx')
+
+substPoly' :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
+-- substPoly' :: (Integral n, Ord ref) => (Bool, UnionFind ref, Map ref n) -> ref -> n -> (Bool, UnionFind ref, Map ref n)
+substPoly' (changed, ctx, xs) ref coeff = case UnionFind.find' ctx ref of
+  Nothing -> (changed, ctx, Map.insert ref coeff xs)
+  Just (ref', ctx') -> (True, ctx', Map.insertWith (+) ref' coeff xs)
 
 --------------------------------------------------------------------------------
 
@@ -579,7 +598,7 @@ relocateConstraintSystem cs =
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
-    UnionFind.size (csVarEqF cs)
+  UnionFind.size (csVarEqF cs)
     + length (csVarEqB cs)
     + length (csVarEqU cs)
     + length (csVarBindF cs)

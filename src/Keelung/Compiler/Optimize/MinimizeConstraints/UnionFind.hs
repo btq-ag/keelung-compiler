@@ -1,4 +1,4 @@
-module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, new, union, find, toIntMap, size) where
+module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, new, union, find, find', toIntMap, size) where
 
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -42,6 +42,14 @@ find xs var =
                 )
                 parent
 
+-- | Find the root of a variable. Returns Nothing if the variable is a root.
+find' :: Ord ref => UnionFind ref -> ref -> Maybe (ref, UnionFind ref)
+find' xs var = 
+  let (var', xs') = find xs var
+   in if var' == var
+        then Nothing -- root
+        else Just (var', xs')
+
 -- If a variable has no parent, it is its own parent.
 parentOf :: Ord ref => UnionFind ref -> ref -> ref
 parentOf xs var = fromMaybe var $ Map.lookup var (links xs)
@@ -82,9 +90,8 @@ union' xs x y =
 sizeOf :: Ord ref => UnionFind ref -> ref -> Int
 sizeOf xs x = fromMaybe 1 $ Map.lookup x (sizes xs)
 
-
 toIntMap :: UnionFind ref -> Map ref ref
-toIntMap = links 
+toIntMap = links
 
 size :: UnionFind ref -> Int
 size = Map.size . links
