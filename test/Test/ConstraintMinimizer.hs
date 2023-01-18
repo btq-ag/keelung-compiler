@@ -1,12 +1,12 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use <&>" #-}
-module Test.ConstraintMinimizer (tests) where
+module Test.ConstraintMinimizer (tests, run) where
 
 -- import qualified Basic
 
 import qualified Data.Map.Strict as Map
-import Keelung
+import Keelung hiding (run)
 import qualified Keelung.Compiler as Compiler
 import qualified Keelung.Compiler.Compile as Compiler
 import Keelung.Compiler.Constraint
@@ -17,6 +17,7 @@ import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as Unio
 import qualified Keelung.Compiler.Relocated as Relocated
 import Test.HUnit
 import Test.Hspec
+-- import qualified Hash.Poseidon as Poseidon
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
@@ -43,18 +44,21 @@ runTest expectedSize program = do
 
   return cs'
 
+run :: IO ()
+run = hspec tests
+
 tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
-    -- it "Union Find 1" $ do
-    --   cs <- runTest 3 $ do
-    --     x <- inputField
-    --     y <- reuse x
-    --     z <- reuse x
-    --     return (x + y + z)
+    it "Union Find 1" $ do
+      cs <- runTest 3 $ do
+        x <- inputField
+        y <- reuse x
+        z <- reuse x
+        return (x + y + z)
 
-    --   Map.toList (UnionFind.toMap (csVarEqF cs))
-    --     `shouldContain` [(RefFO 0, (3, RefFI 0))]
+      Map.toList (UnionFind.toMap (csVarEqF cs))
+        `shouldContain` [(RefFO 0, (3, RefFI 0))]
 
     it "Union Find 2" $ do
       cs <- runTest 3 $ do
@@ -76,7 +80,8 @@ tests = do
 --   runTest 1 Basic.assert1
 -- it "Basic.returnArray2" $ do
 --   runTest 2 Basic.returnArray2
--- it "Poseidon Hash 1" $ do
---     runTest 1665 $ do
---         x <- input
---         Poseidon.hash [x]
+    -- it "Poseidon Hash 1" $ do
+    --   cs <- runTest 1665 $ do
+    --         x <- input
+    --         Poseidon.hash [x]
+    --   return ()

@@ -148,6 +148,7 @@ test-suite keelung-test
       Test.ConstraintMinimizer
       Test.Interpreter
       Test.Optimization
+      Test.UnionFind
       Test.VarLayout
       Keelung.Compiler
       Keelung.Compiler.Compile
@@ -200,6 +201,7 @@ test-suite keelung-test
     , equivalence
     , galois-field
     , hspec
+    , hspec-expectations-lifted
     , keelung
     , keelung-compiler
     , keelung-examples

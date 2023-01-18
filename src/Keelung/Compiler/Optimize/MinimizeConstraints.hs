@@ -7,12 +7,11 @@ import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Debug.Trace
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
+import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as UnionFind
 import Keelung.Data.PolyG (PolyG)
 import qualified Keelung.Data.PolyG as PolyG
-import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as UnionFind
 
 -- import Control.Monad.State.Strict
 
@@ -30,7 +29,7 @@ run cs =
         foldM goThroughAddFM [] (csAddF cs)
       cs' = cs {csVarEqF = unionFindF', csAddF = csAddF', csVarBindF = csVarBindF cs <> learnedFromAddBind learned}
    in if learned /= mempty
-        then traceShow ("LEARNED", unionFindF') $ run cs'
+        then run cs'
         else cs'
 
 goThroughAddFM :: (GaloisField n, Integral n) => [PolyG RefF n] -> PolyG RefF n -> AddM n [PolyG RefF n]
@@ -41,13 +40,12 @@ goThroughAddFM acc poly = do
     Just (poly', unionFind') -> do
       put unionFind'
       keep <- classifyAdd poly'
-      if keep 
+      if keep
         then return (poly' : acc)
         else return acc
 
 newtype LearnedFromAdd n = LearnedFromAdd
-  { 
-    -- learnedFromAddEq :: Seq (RefF, (n, RefF)),
+  { -- learnedFromAddEq :: Seq (RefF, (n, RefF)),
     learnedFromAddBind :: Map RefF n
   }
   deriving (Eq, Show)
@@ -68,14 +66,14 @@ runAddM unoinFind m = runState (runWriterT m) unoinFind
 classifyAdd :: (GaloisField n, Integral n) => PolyG RefF n -> AddM n Bool
 classifyAdd poly = case PolyG.view poly of
   (_, []) -> error "[ panic ] Empty polynomial"
-  (0, [(var, _)]) -> do 
+  (0, [(var, _)]) -> do
     tell $ mempty {learnedFromAddBind = Map.singleton var 0}
     return False
-  (0, [(var1, c), (var2, d)]) -> do 
-    modify' $ \unionFind -> UnionFind.union unionFind var1 (-d / c, var2)
+  (0, [(var1, c), (var2, d)]) -> do
+    modify' $ \unionFind -> UnionFind.union var1 (-d / c, var2) unionFind
     return False
   (0, _) -> return True
-  (c, [(var, coeff)]) -> do 
+  (c, [(var, coeff)]) -> do
     tell $ mempty {learnedFromAddBind = Map.singleton var (-c / coeff)}
     return False
   (_, _) -> return True
