@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, new, union, find, find', toMap, size) where
 
 import Data.Field.Galois (GaloisField)
@@ -5,12 +7,14 @@ import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 data UnionFind ref n = UnionFind
   { links :: Map ref (n, ref),
     sizes :: Map ref Int
   }
-  deriving (Eq)
+  deriving (Eq, Generic, NFData)
 
 instance (Show ref, Show n, Eq n, Num n) => Show (UnionFind ref n) where
   show xs =

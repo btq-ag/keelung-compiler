@@ -1,7 +1,7 @@
 module Main where
 
 import qualified Poseidon
-import qualified Merkle
+-- import qualified Merkle
 import Criterion.Main
 import Criterion.Types
 
@@ -10,8 +10,9 @@ main =
   defaultMainWith
     config
     [ 
-      Poseidon.run,
-      Merkle.run
+      Poseidon.run
+      -- ,
+      -- Merkle.run
     ]
   where
     config :: Config

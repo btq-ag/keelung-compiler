@@ -2,6 +2,8 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use list comprehension" #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Keelung.Compiler.Constraint
   ( RefF (..),
@@ -52,6 +54,8 @@ import qualified Keelung.Data.PolyG as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)
@@ -99,7 +103,7 @@ fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (r
 --------------------------------------------------------------------------------
 
 data RefB = RefBO Var | RefBI Var | RefB Var | RefUBit Width RefU Int
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefB where
   show (RefBI x) = "BI" ++ show x
@@ -108,7 +112,7 @@ instance Show RefB where
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
 data RefF = RefFO Var | RefFI Var | RefBtoRefF RefB | RefF Var
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefF where
   show (RefFI x) = "FI" ++ show x
@@ -117,7 +121,7 @@ instance Show RefF where
   show (RefBtoRefF x) = show x
 
 data RefU = RefUO Width Var | RefUI Width Var | RefBtoRefU RefB | RefU Width Var
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefU where
   show ref = case ref of
@@ -427,7 +431,7 @@ data ConstraintSystem n = ConstraintSystem
     csNEqF :: Map (RefF, RefF) RefF,
     csNEqU :: Map (RefU, RefU) RefU
   }
-  deriving (Eq)
+  deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show cs =

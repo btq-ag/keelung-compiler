@@ -1,13 +1,17 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 -- | Polynomial with variables generalized (unliked Poly which is limited to only Int)
 module Keelung.Data.PolyG (PolyG, build, buildWithMap, unsafeBuild, view, viewAsMap) where
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 data PolyG ref n = PolyG n (Map ref n)
-  deriving (Eq, Functor, Ord)
+  deriving (Eq, Functor, Ord, Generic, NFData)
 
 instance (Show n, Ord n, Eq n, Num n, Show ref) => Show (PolyG ref n) where
   show (PolyG n xs)

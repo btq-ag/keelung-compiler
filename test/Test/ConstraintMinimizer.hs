@@ -17,6 +17,7 @@ import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as Unio
 import qualified Keelung.Compiler.Relocated as Relocated
 import Test.HUnit
 import Test.Hspec
+import qualified Hash.Poseidon as Poseidon
 -- import qualified Hash.Poseidon as Poseidon
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
@@ -81,7 +82,7 @@ tests = do
 -- it "Basic.returnArray2" $ do
 --   runTest 2 Basic.returnArray2
     -- it "Poseidon Hash 1" $ do
-    --   cs <- runTest 1665 $ do
+    --   _cs <- runTest 1665 $ do
     --         x <- input
     --         Poseidon.hash [x]
     --   return ()
