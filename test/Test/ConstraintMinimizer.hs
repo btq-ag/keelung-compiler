@@ -4,6 +4,8 @@
 module Test.ConstraintMinimizer (tests) where
 
 -- import qualified Basic
+
+import qualified Data.Map.Strict as Map
 import Keelung
 import qualified Keelung.Compiler as Compiler
 import qualified Keelung.Compiler.Compile as Compiler
@@ -11,10 +13,10 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.Error (Error)
 import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
+import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as UnionFind
 import qualified Keelung.Compiler.Relocated as Relocated
 import Test.HUnit
 import Test.Hspec
-import qualified Keelung.Data.PolyG as PolyG
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
@@ -30,7 +32,7 @@ runTest expectedSize program = do
 
   -- let r1cs = Compiler.asGF181N $  Compiler.toR1CS <$> Compiler.compileO2 program
   -- print cs
-  -- print cs'
+  print cs'
 
   -- var counters should remain the same
   csCounters cs `shouldBe` csCounters cs'
@@ -44,26 +46,25 @@ runTest expectedSize program = do
 tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
-    it "Union Find 1" $ do
-      cs <- runTest 3 $ do
-        x <- inputField
-        y <- reuse x
-        z <- reuse x
-        return (x + y + z)
-
-      csAddF cs `shouldContain` [PolyG.unsafeBuild 0 [(RefFI 0, 3), (RefFO 0, -1)]]
-
-    -- it "Union Find 2" $ do
+    -- it "Union Find 1" $ do
     --   cs <- runTest 3 $ do
     --     x <- inputField
     --     y <- reuse x
-    --     z <- reuse (x + y)
+    --     z <- reuse x
     --     return (x + y + z)
 
-    --   csAddF cs `shouldContain` [PolyG.unsafeBuild 0 [(RefFI 0, 3), (RefFO 0, -1)]]
+    --   Map.toList (UnionFind.toMap (csVarEqF cs))
+    --     `shouldContain` [(RefFO 0, (3, RefFI 0))]
 
+    it "Union Find 2" $ do
+      cs <- runTest 3 $ do
+        x <- inputField
+        y <- reuse x
+        z <- reuse (x + y)
+        return (x + y + z)
 
-
+      Map.toList (UnionFind.toMap (csVarEqF cs))
+        `shouldContain` [(RefFO 0, (4, RefFI 0))]
 
 -- it "Basic.summation" $ do
 --   runTest 1 Basic.summation

@@ -98,7 +98,7 @@ fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (r
 
 --------------------------------------------------------------------------------
 
-data RefB = RefBI Var | RefBO Var | RefB Var | RefUBit Width RefU Int
+data RefB = RefBO Var | RefBI Var | RefB Var | RefUBit Width RefU Int
   deriving (Eq, Ord)
 
 instance Show RefB where
@@ -107,7 +107,7 @@ instance Show RefB where
   show (RefB x) = "B" ++ show x
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
-data RefF = RefFI Var | RefFO Var | RefF Var | RefBtoRefF RefB
+data RefF = RefFO Var | RefFI Var | RefBtoRefF RefB | RefF Var
   deriving (Eq, Ord)
 
 instance Show RefF where
@@ -116,7 +116,7 @@ instance Show RefF where
   show (RefF x) = "F" ++ show x
   show (RefBtoRefF x) = show x
 
-data RefU = RefUI Width Var | RefUO Width Var | RefU Width Var | RefBtoRefU RefB
+data RefU = RefUO Width Var | RefUI Width Var | RefBtoRefU RefB | RefU Width Var
   deriving (Eq, Ord)
 
 instance Show RefU where
@@ -219,20 +219,20 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 -- | Normalize a polynomial by substituting roots
 -- for the variables that appear in the polynomial.
 -- substPoly :: (GaloisField n, Integral n) => UnionFind RefF -> PolyG RefF n -> Maybe (PolyG RefF n, UnionFind RefF)
-substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref)
+substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref n)
 substPolyG ctx poly = do
   let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' substPolyG_ (False, ctx, mempty) xs of
     (False, _, _) -> Nothing
-    (True, ctx', xs') -> case PolyG.buildWithMap c xs' of 
+    (True, ctx', xs') -> case PolyG.buildWithMap c xs' of
       Left _ -> Nothing
       Right poly' -> Just (poly', ctx')
 
 -- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
-substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref, Map ref n) -> ref -> n -> (Bool, UnionFind ref, Map ref n)
+substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref n, Map ref n) -> ref -> n -> (Bool, UnionFind ref n, Map ref n)
 substPolyG_ (changed, ctx, xs) ref coeff = case UnionFind.find' ctx ref of
-  Nothing -> (changed, ctx, Map.insert ref coeff xs)
-  Just (ref', ctx') -> (True, ctx', Map.insertWith (+) ref' coeff xs)
+  Nothing -> (changed, ctx, Map.insertWith (+) ref coeff xs)
+  Just ((coeff', ref'), ctx') -> (True, ctx', Map.insertWith (+) ref' (coeff * coeff') xs)
 
 --------------------------------------------------------------------------------
 
@@ -337,11 +337,11 @@ cVarBindU :: GaloisField n => RefU -> n -> [Constraint n]
 cVarBindU x n = [CVarBindU x n]
 
 cMulSimple :: (GaloisField n, Ord ref) => (PolyG ref n -> PolyG ref n -> Either n (PolyG ref n) -> Constraint n) -> ref -> ref -> ref -> [Constraint n]
-cMulSimple ctor !x !y !z =  case ( do
-                                             xs' <- PolyG.build 0 [(x, 1)]
-                                             ys' <- PolyG.build 0 [(y, 1)]
-                                             return $ ctor xs' ys' (PolyG.build 0 [(z, 1)])
-                                         ) of
+cMulSimple ctor !x !y !z = case ( do
+                                    xs' <- PolyG.build 0 [(x, 1)]
+                                    ys' <- PolyG.build 0 [(y, 1)]
+                                    return $ ctor xs' ys' (PolyG.build 0 [(z, 1)])
+                                ) of
   Left _ -> []
   Right result -> [result]
 
@@ -408,7 +408,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 data ConstraintSystem n = ConstraintSystem
   { csCounters :: !Counters,
     -- when x == y
-    csVarEqF :: UnionFind RefF,
+    csVarEqF :: UnionFind RefF n,
     csVarEqB :: [(RefB, RefB)],
     csVarEqU :: [(RefU, RefU)],
     -- when x = val
@@ -557,7 +557,17 @@ relocateConstraintSystem cs =
   where
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
-    varEqFs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqF) $ Map.toList $ UnionFind.toIntMap $ csVarEqF cs
+
+    fromUnionFind ctor1 _ctor2 (var1, (1, var2)) = fromConstraint counters (ctor1 var1 var2)
+    fromUnionFind _ctor1 ctor2 (var1, (coeff, var2)) =
+      fromConstraint
+        counters
+        ( case PolyG.build 0 [(var1, -1), (var2, coeff)] of
+            Left _ -> error "[ panic ] empty polynomial"
+            Right poly -> ctor2 poly
+        )
+
+    varEqFs = Set.fromList $ map (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
     varEqBs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
     varBindFs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList $ csVarBindF cs
