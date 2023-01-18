@@ -17,8 +17,6 @@ import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as Unio
 import qualified Keelung.Compiler.Relocated as Relocated
 import Test.HUnit
 import Test.Hspec
-import qualified Hash.Poseidon as Poseidon
--- import qualified Hash.Poseidon as Poseidon
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
@@ -34,7 +32,7 @@ runTest expectedSize program = do
 
   -- let r1cs = Compiler.asGF181N $  Compiler.toR1CS <$> Compiler.compileO2 program
   -- print cs
-  print cs'
+  -- print cs'
 
   -- var counters should remain the same
   csCounters cs `shouldBe` csCounters cs'

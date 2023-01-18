@@ -2,7 +2,7 @@ module Test.Optimization (tests) where
 
 import qualified Basic
 import qualified Data.IntMap as IntMap
-import qualified Data.Set as Set
+import qualified Data.Sequence as Seq
 import Keelung (Comp, Encode, GF181)
 import Keelung.Compiler (asGF181, toR1CS)
 import qualified Keelung.Compiler as Compiler
@@ -30,7 +30,7 @@ tests = do
       let cs =
             RelocatedConstraintSystem
               { csConstraints =
-                  Set.fromList $
+                  Seq.fromList $
                     concat
                       [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
                         cadd 0 [(0, 10582), (1, 7317), (17, -1)],

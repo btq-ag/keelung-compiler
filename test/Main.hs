@@ -6,7 +6,7 @@ import qualified Basic
 -- import Control.Arrow (ArrowChoice (right), left)
 
 import Control.Arrow (ArrowChoice (..))
-import qualified Data.Set as Set
+import qualified Data.Sequence as Seq
 import Keelung
 import Keelung.Compiler
 import qualified Keelung.Compiler as Compiler
@@ -21,6 +21,7 @@ import Test.Hspec
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
 import qualified Test.VarLayout as VarBookkeep
+import Debug.Trace (traceShowM)
 
 main :: IO ()
 main = hspec $ do
@@ -43,7 +44,7 @@ main = hspec $ do
       let cs =
             RelocatedConstraintSystem
               { csConstraints =
-                  Set.fromList $
+                  Seq.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
                 csCounters = addCount OfInput OfField 1 mempty
               }
@@ -62,6 +63,7 @@ main = hspec $ do
 
     it "Program that compiles successfully" $ do
       let expected = left show ((toR1CS :: RelocatedConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.identity)
+      traceShowM expected
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.identity
       actual `shouldBe` expected
 

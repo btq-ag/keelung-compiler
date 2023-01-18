@@ -11,7 +11,6 @@ import qualified Data.IntMap as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Serialize (Serialize)
-import qualified Data.Set as Set
 import GHC.Generics (Generic)
 import Keelung.Compiler.Optimize (optimizeWithWitness)
 import Keelung.Compiler.Relocated hiding (numberOfConstraints)
@@ -24,6 +23,8 @@ import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
 import Keelung.Field (N (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
+import qualified Data.Sequence as Seq
+import Data.Foldable (Foldable(toList))
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -67,7 +68,7 @@ toR1CS cs =
       r1csCNEQs = lefts convertedConstratins
     }
   where
-    convertedConstratins = map toR1C (Set.toList (csConstraints cs))
+    convertedConstratins = map toR1C (toList (csConstraints cs))
 
     toR1C :: GaloisField n => Constraint n -> Either (CNEQ n) (R1C n)
     toR1C (CAdd xs) =
@@ -84,8 +85,8 @@ fromR1CS :: GaloisField n => R1CS n -> RelocatedConstraintSystem n
 fromR1CS r1cs =
   RelocatedConstraintSystem
     { csConstraints =
-        Set.fromList (map fromR1C (r1csConstraints r1cs))
-          <> Set.fromList (map CNEq (r1csCNEQs r1cs)),
+        Seq.fromList (map fromR1C (r1csConstraints r1cs))
+          <> Seq.fromList (map CNEq (r1csCNEQs r1cs)),
       csCounters = r1csCounters r1cs
     }
   where

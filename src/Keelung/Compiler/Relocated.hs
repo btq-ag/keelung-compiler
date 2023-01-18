@@ -7,11 +7,11 @@ module Keelung.Compiler.Relocated where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.Sequence (Seq)
 import GHC.Generics (Generic)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
@@ -94,15 +94,15 @@ varsInConstraint (CNEq (CNEQ (Left x) _ m)) = IntSet.fromList [x, m]
 varsInConstraint (CNEq (CNEQ _ (Left y) m)) = IntSet.fromList [y, m]
 varsInConstraint (CNEq (CNEQ _ _ m)) = IntSet.fromList [m]
 
-varsInConstraints :: Set (Constraint a) -> IntSet
-varsInConstraints = IntSet.unions . Set.map varsInConstraint
+varsInConstraints :: Seq (Constraint a) -> IntSet
+varsInConstraints = IntSet.unions . fmap varsInConstraint
 
 --------------------------------------------------------------------------------
 
 -- | Relocated Constraint System
 data RelocatedConstraintSystem n = RelocatedConstraintSystem
   { -- | Constraints
-    csConstraints :: !(Set (Constraint n)),
+    csConstraints :: !(Seq (Constraint n)),
     csCounters :: Counters
   }
   deriving (Eq, Generic, NFData)
@@ -110,12 +110,12 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: RelocatedConstraintSystem n -> Int
 numberOfConstraints (RelocatedConstraintSystem cs counters) =
-  Set.size cs + getBooleanConstraintSize counters + getBinRepConstraintSize counters
+  length cs + getBooleanConstraintSize counters + getBinRepConstraintSize counters
 
 instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
   show (RelocatedConstraintSystem constraints counters) =
     "ConstraintSystem {\n"
-      <> prettyConstraints counters (Set.toList constraints)
+      <> prettyConstraints counters (toList constraints)
       <> prettyVariables counters
       <> "\n}"
 
@@ -126,7 +126,7 @@ instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
 renumberConstraints :: GaloisField n => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
 renumberConstraints cs =
   cs
-    { csConstraints = Set.map renumberConstraint (csConstraints cs),
+    { csConstraints = fmap renumberConstraint (csConstraints cs),
       csCounters = setReducedCount reducedCount counters
     }
   where

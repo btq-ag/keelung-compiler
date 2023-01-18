@@ -4,7 +4,10 @@ module Keelung.Compiler.Optimize.MinimizeRelocatedConstraints (run, substConstra
 
 import Control.Monad
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import qualified Data.IntMap as IntMap
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Optimize.Monad
@@ -21,12 +24,13 @@ run ::
   (GaloisField n, Integral n) =>
   Counters ->
   [Var] ->
-  Set (Constraint n) ->
-  OptiM n (Set (Constraint n))
+  Seq (Constraint n) ->
+  OptiM n (Seq (Constraint n))
 run counters pinnedVars constraints = do
-  minimised <- minimiseManyTimes (constraints, getBinReps counters)
+  let set = Set.fromList $ toList constraints
+  minimised <- minimiseManyTimes (set, getBinReps counters)
   pinned <- handlePinnedVars pinnedVars
-  return (Set.fromList pinned <> minimised)
+  return (Seq.fromList pinned <> Seq.fromList (Set.toList minimised))
 
 minimiseManyTimes ::
   (GaloisField n, Integral n) =>

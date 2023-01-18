@@ -10,8 +10,11 @@ module Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2 (run) where
 
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Keelung.Compiler.Relocated
@@ -22,11 +25,13 @@ import qualified Keelung.Constraint.Polynomial as Poly
 run ::
   GaloisField n =>
   IntSet ->
-  Set (Constraint n) ->
-  Set (Constraint n)
+  Seq (Constraint n) ->
+  Seq (Constraint n)
 run pinnedVars constraints =
-  poolConstraints $
-    execState (forM_ constraints dumpInsert) (Pool pinnedVars mempty)
+  Seq.fromList $
+    toList $
+      poolConstraints $
+        execState (forM_ (Set.fromList (toList constraints)) dumpInsert) (Pool pinnedVars mempty)
 
 --------------------------------------------------------------------------------
 

@@ -1,9 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
+{-# LANGUAGE DeriveAnyClass #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Keelung.Compiler.Constraint
   ( RefF (..),
@@ -37,12 +36,14 @@ module Keelung.Compiler.Constraint
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
+import qualified Data.Sequence as Seq
+import GHC.Generics (Generic)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as UnionFind
 import qualified Keelung.Compiler.Relocated as Relocated
@@ -54,8 +55,6 @@ import qualified Keelung.Data.PolyG as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)
@@ -571,20 +570,20 @@ relocateConstraintSystem cs =
             Right poly -> ctor2 poly
         )
 
-    varEqFs = Set.fromList $ map (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
-    varEqBs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
-    varEqUs = Set.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
-    varBindFs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList $ csVarBindF cs
-    varBindBs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
-    varBindUs = Set.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ csVarBindU cs
-    addFs = Set.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
-    addBs = Set.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
-    addUs = Set.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs
-    mulFs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
-    mulBs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulB) $ csMulB cs
-    mulUs = Set.fromList $ map (fromConstraint counters . uncurry3 CMulU) $ csMulU cs
-    nEqFs = Set.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
-    nEqUs = Set.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ Map.toList $ csNEqU cs
+    varEqFs = Seq.fromList $ map (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
+    varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
+    varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
+    varBindFs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList $ csVarBindF cs
+    varBindBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
+    varBindUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ csVarBindU cs
+    addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
+    addBs = Seq.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
+    addUs = Seq.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs
+    mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
+    mulBs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulB) $ csMulB cs
+    mulUs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulU) $ csMulU cs
+    nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
+    nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ Map.toList $ csNEqU cs
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
