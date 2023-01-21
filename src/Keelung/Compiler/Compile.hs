@@ -18,6 +18,8 @@ import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
+import Debug.Trace
+import qualified Data.Sequence as Seq
 
 --------------------------------------------------------------------------------
 
@@ -44,21 +46,115 @@ run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ 
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
-compileAssertion expr = do
-  -- 1 = expr
-  case expr of
-    ExprB x -> do
-      out <- freshRefB
-      compileExprB out x
-      add $ cVarBindB out 1 -- out = 1
-    ExprF x -> do
-      out <- freshRefF
-      compileExprF out x
-      add $ cVarBindF out 1
-    ExprU x -> do
-      out <- freshRefU (widthOfU x)
-      compileExprU out x
-      add $ cVarBindU out 1
+compileAssertion expr = case expr of
+  ExprB (EqB x y) -> compileAssertionEqB x y
+  ExprB (EqF x y) -> compileAssertionEqF x y
+  ExprB (EqU x y) -> compileAssertionEqU x y
+  ExprB x -> do
+    out <- freshRefB
+    compileExprB out x
+    add $ cVarBindB out 1 -- out = 1
+  ExprF x -> do
+    out <- freshRefF
+    compileExprF out x
+    add $ cVarBindF out 1
+  ExprU x -> do
+    out <- freshRefU (widthOfU x)
+    compileExprU out x
+    add $ cVarBindU out 1
+
+compileAssertionEqB :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> M n ()
+compileAssertionEqB (VarB a) (ValB b) = add $ cVarBindB (RefB a) b
+compileAssertionEqB (VarB a) (VarB b) = add $ cVarEqB (RefB a) (RefB b)
+compileAssertionEqB (VarB a) (VarBO b) = add $ cVarEqB (RefB a) (RefBO b)
+compileAssertionEqB (VarB a) (VarBI b) = add $ cVarEqB (RefB a) (RefBI b)
+compileAssertionEqB (VarB a) b = do
+  out <- freshRefB
+  compileExprB out b
+  add $ cVarEqB (RefB a) out
+compileAssertionEqB (VarBO a) (ValB b) = add $ cVarBindB (RefBO a) b
+compileAssertionEqB (VarBO a) (VarB b) = add $ cVarEqB (RefBO a) (RefB b)
+compileAssertionEqB (VarBO a) (VarBO b) = add $ cVarEqB (RefBO a) (RefBO b)
+compileAssertionEqB (VarBO a) (VarBI b) = add $ cVarEqB (RefBO a) (RefBI b)
+compileAssertionEqB (VarBO a) b = do
+  out <- freshRefB
+  compileExprB out b
+  add $ cVarEqB (RefBO a) out
+compileAssertionEqB (VarBI a) (ValB b) = add $ cVarBindB (RefBI a) b
+compileAssertionEqB (VarBI a) (VarB b) = add $ cVarEqB (RefBI a) (RefB b)
+compileAssertionEqB (VarBI a) (VarBO b) = add $ cVarEqB (RefBI a) (RefBO b)
+compileAssertionEqB (VarBI a) (VarBI b) = add $ cVarEqB (RefBI a) (RefBI b)
+compileAssertionEqB (VarBI a) b = do
+  out <- freshRefB
+  compileExprB out b
+  add $ cVarEqB (RefBI a) out
+compileAssertionEqB a b = do
+  a' <- freshRefB
+  b' <- freshRefB
+  compileExprB a' a
+  compileExprB b' b
+  add $ cVarEqB a' b'
+
+compileAssertionEqF :: (GaloisField n, Integral n) => ExprF n -> ExprF n -> M n ()
+compileAssertionEqF (VarF a) (ValF b) = add $ cVarBindF (RefF a) b
+compileAssertionEqF (VarF a) (VarF b) = add $ cVarEqF (RefF a) (RefF b)
+compileAssertionEqF (VarF a) (VarFO b) = add $ cVarEqF (RefF a) (RefFO b)
+compileAssertionEqF (VarF a) (VarFI b) = add $ cVarEqF (RefF a) (RefFI b)
+compileAssertionEqF (VarF a) b = do
+  out <- freshRefF
+  compileExprF out b
+  add $ cVarEqF (RefF a) out
+compileAssertionEqF (VarFO a) (ValF b) = add $ cVarBindF (RefFO a) b
+compileAssertionEqF (VarFO a) (VarF b) = add $ cVarEqF (RefFO a) (RefF b)
+compileAssertionEqF (VarFO a) (VarFO b) = add $ cVarEqF (RefFO a) (RefFO b)
+compileAssertionEqF (VarFO a) b = do
+  out <- freshRefF
+  compileExprF out b
+  add $ cVarEqF (RefFO a) out
+compileAssertionEqF (VarFI a) (ValF b) = add $ cVarBindF (RefFI a) b
+compileAssertionEqF (VarFI a) (VarF b) = add $ cVarEqF (RefFI a) (RefF b)
+compileAssertionEqF (VarFI a) (VarFO b) = add $ cVarEqF (RefFI a) (RefF b)
+compileAssertionEqF (VarFI a) b = do
+  out <- freshRefF
+  compileExprF out b
+  add $ cVarEqF (RefFI a) out
+compileAssertionEqF a b = do
+  a' <- freshRefF
+  b' <- freshRefF
+  compileExprF a' a
+  compileExprF b' b
+  add $ cVarEqF a' b'
+
+compileAssertionEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()
+compileAssertionEqU (VarU w a) (ValU _ b) = add $ cVarBindU (RefU w a) b
+compileAssertionEqU (VarU w a) (VarU _ b) = add $ cVarEqU (RefU w a) (RefU w b)
+compileAssertionEqU (VarU w a) (VarUO _ b) = add $ cVarEqU (RefU w a) (RefUO w b)
+compileAssertionEqU (VarU w a) (VarUI _ b) = add $ cVarEqU (RefU w a) (RefUI w b)
+compileAssertionEqU (VarU w a) b = do
+  out <- freshRefU w
+  compileExprU out b
+  add $ cVarEqU (RefU w a) out
+compileAssertionEqU (VarUO w a) (ValU _ b) = add $ cVarBindU (RefUO w a) b
+compileAssertionEqU (VarUO w a) (VarU _ b) = add $ cVarEqU (RefUO w a) (RefU w b)
+compileAssertionEqU (VarUO w a) (VarUO _ b) = add $ cVarEqU (RefUO w a) (RefUO w b)
+compileAssertionEqU (VarUO w a) b = do
+  out <- freshRefU w
+  compileExprU out b
+  add $ cVarEqU (RefUO w a) out
+compileAssertionEqU (VarUI w a) (ValU _ b) = add $ cVarBindU (RefUI w a) b
+compileAssertionEqU (VarUI w a) (VarU _ b) = add $ cVarEqU (RefUI w a) (RefU w b)
+compileAssertionEqU (VarUI w a) (VarUO _ b) = add $ cVarEqU (RefUI w a) (RefUO w b)
+compileAssertionEqU (VarUI w a) b = do
+  out <- freshRefU w
+  compileExprU out b
+  add $ cVarEqU (RefUI w a) out
+compileAssertionEqU a b = do
+  let width = widthOfU a
+  a' <- freshRefU width
+  b' <- freshRefU width
+  compileExprU a' a
+  compileExprU b' b
+  add $ cVarEqU a' b'
 
 compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
 compileRelations (Relations vb vbi eb ebi) = do
@@ -101,7 +197,7 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify (\cs -> cs {csAddF = xs : csAddF cs})
     addOne (CAddB xs) = modify (\cs -> cs {csAddB = xs : csAddB cs})
     addOne (CAddU xs) = modify (\cs -> cs {csAddU = xs : csAddU cs})
-    addOne (CVarEqF x y) = modify (\cs -> cs {csVarEqF = UnionFind.union x (1, y) (csVarEqF cs) })
+    addOne (CVarEqF x y) = modify (\cs -> cs {csVarEqF = UnionFind.union x (1, y) (csVarEqF cs)})
     addOne (CVarEqB x y) = modify (\cs -> cs {csVarEqB = (x, y) : csVarEqB cs})
     addOne (CVarEqU x y) = modify (\cs -> cs {csVarEqU = (x, y) : csVarEqU cs})
     addOne (CVarBindF x c) = modify (\cs -> cs {csVarBindF = Map.insert x c (csVarBindF cs)})
@@ -639,3 +735,5 @@ compileXorB out x y = do
       (1, [(x, -2)])
       (1, [(y, 1)])
       (1, [(x, -3), (out, 1)])
+
+--------------------------------------------------------------------------------

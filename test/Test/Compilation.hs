@@ -16,6 +16,28 @@ import Test.Hspec
 tests :: SpecWith ()
 tests = do
   describe "Compilation" $ do
+    describe "Assertion" $ do
+      it "Rewriting" $ do
+        let program = do
+              xs <- inputs 4
+              ys <- inputs 4
+              assert (sum xs `eq` sum (ys :: Arr Field))
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(0, 1), (1, 1), (2, 1), (3, 1), (8, -1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(4, 1), (5, 1), (6, 1), (7, 1), (8, -1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+
     describe "Unsigned Integer" $ do
       it "Bit test / Value" $ do
         -- 0011

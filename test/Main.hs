@@ -21,7 +21,6 @@ import Test.Hspec
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
 import qualified Test.VarLayout as VarBookkeep
-import Debug.Trace (traceShowM)
 
 main :: IO ()
 main = hspec $ do
@@ -63,7 +62,6 @@ main = hspec $ do
 
     it "Program that compiles successfully" $ do
       let expected = left show ((toR1CS :: RelocatedConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.identity)
-      traceShowM expected
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.identity
       actual `shouldBe` expected
 

@@ -288,8 +288,6 @@ instance (Integral n, Show n) => Show (Relations n) where
           <> map (showExprBinding "B" suffix) (IntMap.toList b)
           <> concatMap (\(width, xs) -> map (showExprBinding ("U" <> toSubscript width) suffix) (IntMap.toList xs)) (IntMap.toList u)
 
---   show (Struct f b u) = "hi"
-
 instance Semigroup (Relations n) where
   Relations vb0 vbi0 eb0 ebi0 <> Relations vb1 vbi1 eb1 ebi1 =
     Relations
