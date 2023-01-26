@@ -72,7 +72,7 @@ tests:
       - examples/
     dependencies:
     - keelung-compiler
-    - keelung-examples
+    # - keelung-examples
     - hspec
     - hspec-expectations-lifted
     - HUnit
@@ -94,7 +94,7 @@ benchmarks:
       - examples/
     dependencies:
       - keelung-compiler
-      - keelung-examples
+      # - keelung-examples
       - criterion 		>=1.0
 
     ghc-options:

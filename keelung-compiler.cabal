@@ -111,6 +111,8 @@ executable keelungc
       Array.Immutable
       Array.Mutable
       Basic
+      Hash.Poseidon
+      Hash.Poseidon.Constant
       Paths_keelung_compiler
   hs-source-dirs:
       app/
@@ -180,6 +182,8 @@ test-suite keelung-test
       Array.Immutable
       Array.Mutable
       Basic
+      Hash.Poseidon
+      Hash.Poseidon.Constant
       Paths_keelung_compiler
   hs-source-dirs:
       test/
@@ -201,7 +205,6 @@ test-suite keelung-test
     , hspec-expectations-lifted
     , keelung
     , keelung-compiler
-    , keelung-examples
     , mtl
     , optparse-applicative
     , quickcheck-transformer
@@ -251,6 +254,8 @@ benchmark keelung-bench
       Array.Immutable
       Array.Mutable
       Basic
+      Hash.Poseidon
+      Hash.Poseidon.Constant
       Paths_keelung_compiler
   hs-source-dirs:
       src
@@ -269,7 +274,6 @@ benchmark keelung-bench
     , galois-field
     , keelung
     , keelung-compiler
-    , keelung-examples
     , mtl
     , optparse-applicative
     , random
