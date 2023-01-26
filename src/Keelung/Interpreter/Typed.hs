@@ -237,11 +237,8 @@ instance FreeVar Computation where
   freeVars context =
     mconcat
       [ mconcat $ map freeVars (toList (structF (compExprBindings context))),
-        mconcat $ map freeVars (toList (structF (compExprBindingsI context))),
         mconcat $ map freeVars (toList (structB (compExprBindings context))),
-        mconcat $ map freeVars (toList (structB (compExprBindingsI context))),
         mconcat $ concatMap (map freeVars . toList) (toList (structU (compExprBindings context))),
-        mconcat $ concatMap (map freeVars . toList) (toList (structU (compExprBindingsI context))),
         mconcat $ map freeVars (toList (compAssertions context))
       ]
 

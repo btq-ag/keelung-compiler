@@ -31,15 +31,12 @@ propagateRelations before =
 
 -- | Seperate value bindings from expression bindings
 refineRelations :: Relations n -> (Relations n, Bool)
-refineRelations (Relations vals valsI exprs exprsI) =
+refineRelations (Relations vals exprs) =
   -- extract value bindings from expression bindings
   let (fsV, fsE) = IntMap.mapEither seperateF (structF exprs)
-      (fisV, fisE) = IntMap.mapEither seperateF (structF exprsI)
       (bsV, bsE) = IntMap.mapEither seperateB (structB exprs)
-      (bisV, bisE) = IntMap.mapEither seperateB (structB exprsI)
       (usV, usE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (structU exprs)
-      (uisV, uisE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (structU exprsI)
-      changed = not $ IntMap.null fsV || IntMap.null fisV || IntMap.null bsV || IntMap.null bisV || IntMap.null usV || IntMap.null uisV
+      changed = not $ IntMap.null fsV || IntMap.null bsV || IntMap.null usV
    in ( Relations
           ( vals
               { structF = structF vals <> fsV,
@@ -47,14 +44,7 @@ refineRelations (Relations vals valsI exprs exprsI) =
                 structU = structU vals <> usV
               }
           )
-          ( valsI
-              { structF = structF valsI <> fisV,
-                structB = structB valsI <> bisV,
-                structU = structU valsI <> uisV
-              }
-          )
-          (Struct fsE bsE usE)
-          (Struct fisE bisE uisE),
+          (Struct fsE bsE usE),
         changed
       )
   where

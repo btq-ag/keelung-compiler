@@ -18,8 +18,6 @@ import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
-import Debug.Trace
-import qualified Data.Sequence as Seq
 
 --------------------------------------------------------------------------------
 
@@ -157,27 +155,17 @@ compileAssertionEqU a b = do
   add $ cVarEqU a' b'
 
 compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
-compileRelations (Relations vb vbi eb ebi) = do
+compileRelations (Relations vb eb) = do
   -- intermediate variable bindings of values
   forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cVarBindF (RefF var) val
   forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cVarBindB (RefB var) val
   forM_ (IntMap.toList (structU vb)) $ \(width, bindings) ->
     forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefU width var) val
-  -- input variable bindings of values
-  forM_ (IntMap.toList (structF vbi)) $ \(var, val) -> add $ cVarBindF (RefFI var) val
-  forM_ (IntMap.toList (structB vbi)) $ \(var, val) -> add $ cVarBindB (RefBI var) val
-  forM_ (IntMap.toList (structU vbi)) $ \(width, bindings) ->
-    forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefUI width var) val
   -- intermediate variable bindings of expressions
   forM_ (IntMap.toList (structF eb)) $ \(var, val) -> compileExprF (RefF var) val
   forM_ (IntMap.toList (structB eb)) $ \(var, val) -> compileExprB (RefB var) val
   forM_ (IntMap.toList (structU eb)) $ \(width, bindings) ->
     forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefU width var) val
-  -- input variable bindings of expressions
-  forM_ (IntMap.toList (structF ebi)) $ \(var, val) -> compileExprF (RefFI var) val
-  forM_ (IntMap.toList (structB ebi)) $ \(var, val) -> compileExprB (RefBI var) val
-  forM_ (IntMap.toList (structU ebi)) $ \(width, bindings) ->
-    forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefUI width var) val
 
 --------------------------------------------------------------------------------
 

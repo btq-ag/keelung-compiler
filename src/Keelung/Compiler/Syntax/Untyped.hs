@@ -253,29 +253,19 @@ lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (structU 
 data Relations n = Relations
   { -- var = value
     valueBindings :: Struct (IntMap n) (IntMap n) (IntMap n),
-    valueBindingsI :: Struct (IntMap n) (IntMap n) (IntMap n),
     -- var = expression
-    exprBindings :: Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n)),
-    exprBindingsI :: Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n))
+    exprBindings :: Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n))
   }
 
 instance (Integral n, Show n) => Show (Relations n) where
-  show (Relations vb vbi eb ebi) =
+  show (Relations vb eb) =
     ( if Struct.empty vb
         then ""
         else "Binding of intermediate variables to values:\n" <> indent (show vb) <> "\n"
     )
-      <> ( if Struct.empty vbi
-             then ""
-             else "Binding of input variables to values:\n" <> indent (show vbi) <> "\n"
-         )
       <> ( if Struct.empty eb
              then ""
              else "Binding of intermediate variables to expressions:\n" <> indent' (showExprBindings "" eb) <> "\n"
-         )
-      <> ( if Struct.empty ebi
-             then ""
-             else "Binding of input variables to expressions:\n" <> indent' (showExprBindings "I" ebi) <> "\n"
          )
     where
       indent' = unlines . map ("  " <>)
@@ -289,12 +279,10 @@ instance (Integral n, Show n) => Show (Relations n) where
           <> concatMap (\(width, xs) -> map (showExprBinding ("U" <> toSubscript width) suffix) (IntMap.toList xs)) (IntMap.toList u)
 
 instance Semigroup (Relations n) where
-  Relations vb0 vbi0 eb0 ebi0 <> Relations vb1 vbi1 eb1 ebi1 =
+  Relations vb0 eb0 <> Relations vb1 eb1 =
     Relations
       (vb0 <> vb1)
-      (vbi0 <> vbi1)
       (eb0 <> eb1)
-      (ebi0 <> ebi1)
 
 instance Monoid (Relations n) where
-  mempty = Relations mempty mempty mempty mempty
+  mempty = Relations mempty mempty

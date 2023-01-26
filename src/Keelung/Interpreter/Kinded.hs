@@ -179,6 +179,7 @@ instance (GaloisField n, Integral n) => Interpret (ArrM t) n where
           ElemB -> interpret $ map VarB (toList vars)
           ElemU width -> mapM (lookupU width) (toList vars)
           ElemArr elemType' len -> concat <$> mapM (interpret . ArrayRef elemType' len) (toList vars)
+          EmptyArr -> return []
 
 --------------------------------------------------------------------------------
 
