@@ -8,25 +8,17 @@ module Keelung.Compiler.Optimize where
 import Data.Field.Galois (GaloisField)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
-import Keelung (Encode, elaborate)
 import Keelung.Compiler.Constraint (ConstraintSystem)
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
 import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints as MinimizeRelocatedConstraints
 import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2 as MinimizeRelocatedConstraints2
 import Keelung.Compiler.Optimize.Monad
-import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
 import Keelung.Compiler.Relocated
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
-import Keelung.Error (Error)
-import Keelung.Monad (Comp)
 import Keelung.Syntax.Counters
-import qualified Keelung.Syntax.Typed as C
 
 --------------------------------------------------------------------------------
-
-elaborateAndRewrite :: Encode t => Comp t -> Either Error C.Elaborated
-elaborateAndRewrite prog = elaborate prog >>= Rewriting.run
 
 optimizeWithWitness :: (GaloisField n, Integral n) => Witness n -> RelocatedConstraintSystem n -> (Witness n, RelocatedConstraintSystem n)
 optimizeWithWitness witness cs =

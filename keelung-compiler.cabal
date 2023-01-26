@@ -36,7 +36,6 @@ library
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relocated
@@ -91,7 +90,6 @@ executable keelungc
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relocated
@@ -161,7 +159,6 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relocated
@@ -229,7 +226,6 @@ benchmark keelung-bench
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relocated

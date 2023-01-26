@@ -47,7 +47,6 @@ import Keelung.Compiler.Constraint (ConstraintSystem, relocateConstraintSystem)
 import Keelung.Compiler.Error
 import qualified Keelung.Compiler.Optimize as Optimizer
 import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
-import qualified Keelung.Compiler.Optimize.Rewriting as Rewriting
 import Keelung.Compiler.R1CS
 import Keelung.Compiler.Relocated (RelocatedConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Syntax.Erase as Erase
@@ -87,7 +86,7 @@ genInputsOutputsWitnesses prog rawInputs = do
 
 -- elaborate => rewrite => type erase
 erase :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (TypeErased n)
-erase prog = elaborate prog >>= eraseElab
+erase prog = eraseElab <$> elaborate prog
 
 -- elaborate => rewrite => type erase => compile => relocate
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)
@@ -139,8 +138,8 @@ optimizeWithInput program inputs = do
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
 
-eraseElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (TypeErased n)
-eraseElab elab = left LangError (Rewriting.run elab) >>= return . Erase.run
+eraseElab :: (GaloisField n, Integral n) => Elaborated -> TypeErased n
+eraseElab = Erase.run
 
 interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
 interpretElab elab rawInputs =
@@ -156,13 +155,13 @@ genInputsOutputsWitnessesElab elab rawInputs = do
   return (inputs, outputs, witness)
 
 compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO0Elab elab = left LangError (Rewriting.run elab) >>= return . relocateConstraintSystem . Compile.run . ConstantPropagation.run . Erase.run
+compileO0Elab = return . relocateConstraintSystem . Compile.run . ConstantPropagation.run . Erase.run
 
 compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO1Elab elab = left LangError (Rewriting.run elab) >>= return . Optimizer.optimize1 . relocateConstraintSystem . Compile.run . ConstantPropagation.run . Erase.run
+compileO1Elab = return . Optimizer.optimize1 . relocateConstraintSystem . Compile.run . ConstantPropagation.run . Erase.run
 
 compileO2Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO2Elab elab = left LangError (Rewriting.run elab) >>= return . Optimizer.optimize2 . Optimizer.optimize1 . relocateConstraintSystem . Compile.run . ConstantPropagation.run . Erase.run
+compileO2Elab = return . Optimizer.optimize2 . Optimizer.optimize1 . relocateConstraintSystem . Compile.run . ConstantPropagation.run . Erase.run
 
 --------------------------------------------------------------------------------
 
