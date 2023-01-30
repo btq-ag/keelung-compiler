@@ -19,11 +19,11 @@ instance (Show n, Ord n, Eq n, Num n, Show ref) => Show (PolyG ref n) where
       if firstSign == " + "
         then concat restOfTerms
         else "- " <> concat restOfTerms
-    | otherwise = concat (show n : termStrings)
+    | otherwise = concat (show n : firstSign : restOfTerms)
     where
-      (firstSign : restOfTerms) = termStrings
-
-      termStrings = concatMap printTerm $ Map.toList xs
+      (firstSign, restOfTerms) = case concatMap printTerm $ Map.toList xs of 
+        [] -> error "[ panic ] Empty PolyG"
+        (x': xs') -> (x', xs')
       -- return a pair of the sign ("+" or "-") and the string representation
       printTerm :: (Show n, Ord n, Eq n, Num n, Show ref) => (ref, n) -> [String]
       printTerm (x, c)
