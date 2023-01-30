@@ -55,6 +55,7 @@ import qualified Keelung.Data.PolyG as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
+import qualified Data.Maybe as Maybe
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)
@@ -561,16 +562,31 @@ relocateConstraintSystem cs =
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
 
-    fromUnionFind ctor1 _ctor2 (var1, (1, var2)) = fromConstraint counters (ctor1 var1 var2)
-    fromUnionFind _ctor1 ctor2 (var1, (coeff, var2)) =
-      fromConstraint
-        counters
-        ( case PolyG.build 0 [(var1, -1), (var2, coeff)] of
-            Left _ -> error "[ panic ] empty polynomial"
-            Right poly -> ctor2 poly
-        )
+    fromUnionFind pinned ctor1 _ctor2 (var1, (1, var2)) = if pinned var1 && pinned var2 
+      then Just $ fromConstraint counters (ctor1 var1 var2) 
+      else Nothing
+    fromUnionFind pinned _ctor1 ctor2 (var1, (coeff, var2)) =
+      if pinned var1 && pinned var2 
+        then Just $ fromConstraint
+          counters
+          ( case PolyG.build 0 [(var1, -1), (var2, coeff)] of
+              Left _ -> error "[ panic ] empty polynomial"
+              Right poly -> ctor2 poly
+          )
+        else Nothing
+    
+    isPinnedF :: RefF -> Bool
+    isPinnedF (RefFO _) = True
+    isPinnedF (RefFI _) = True
+    isPinnedF (RefBtoRefF b) = isPinnedB b
+    isPinnedF _ = False
 
-    varEqFs = Seq.fromList $ map (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
+    isPinnedB :: RefB -> Bool
+    isPinnedB (RefBO _) = True
+    isPinnedB (RefBI _) = True
+    isPinnedB _ = False
+
+    varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFind isPinnedF CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
     varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
     varBindFs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList $ csVarBindF cs
