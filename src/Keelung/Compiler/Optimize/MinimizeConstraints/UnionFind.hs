@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, new, union, find, find', toMap, size) where
+module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, new, union, findMaybe, find, toMap, size) where
 
 import Data.Field.Galois (GaloisField)
 import qualified Data.List as List
@@ -32,18 +32,18 @@ new :: Ord ref => UnionFind ref n
 new = UnionFind mempty mempty
 
 -- | Find the root of a variable
-find :: (Ord ref, Num n) => ref -> UnionFind ref n -> Maybe ((n, ref), UnionFind ref n)
-find var xs = case parentOf xs var of
+findMaybe :: (Ord ref, Num n) => ref -> UnionFind ref n -> Maybe ((n, ref), UnionFind ref n)
+findMaybe var xs = case parentOf xs var of
   Nothing -> Just ((1, var), xs) -- returns self as root
   Just (coeff, parent) -> case parentOf xs parent of
     Nothing -> Just ((coeff, parent), xs) -- returns parent as root
     Just (coeff', grandparent) ->
       let coeff'' = coeff * coeff'
-       in find grandparent (xs {links = Map.insert var (coeff'', grandparent) (links xs)})
+       in findMaybe grandparent (xs {links = Map.insert var (coeff'', grandparent) (links xs)})
 
 -- | Find the root of a variable. Returns Nothing if the variable is a root.
-find' :: (Ord ref, Num n) => ref -> UnionFind ref n -> ((n, ref), UnionFind ref n)
-find' var xs = case find var xs of
+find :: (Ord ref, Num n) => ref -> UnionFind ref n -> ((n, ref), UnionFind ref n)
+find var xs = case findMaybe var xs of
   Nothing -> ((1, var), xs) -- returns self as root
   Just ((coeff, parent), xs') -> ((coeff, parent), xs')
 
@@ -66,8 +66,8 @@ union x (coeff, y) xs
 -- Left-biased: if size x == size y, prefer x as root.
 union' :: (Ord ref, GaloisField n) => ref -> (n, ref) -> UnionFind ref n -> UnionFind ref n
 union' x (coeff, y) xs =
-  let ((coeff2, rootOfX), xs2) = find' x xs -- x = coeff2 * rootOfX
-      ((coeff3, rootOfY), xs3) = find' y xs2 -- y = coeff3 * rootOfY
+  let ((coeff2, rootOfX), xs2) = find x xs -- x = coeff2 * rootOfX
+      ((coeff3, rootOfY), xs3) = find y xs2 -- y = coeff3 * rootOfY
       sizeOfRootX = sizeOf xs3 rootOfX
       sizeOfRootY = sizeOf xs3 rootOfY
    in if sizeOfRootX >= sizeOfRootY

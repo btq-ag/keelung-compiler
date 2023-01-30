@@ -233,7 +233,7 @@ substPolyG ctx poly = do
 
 -- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
 substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref n, Map ref n) -> ref -> n -> (Bool, UnionFind ref n, Map ref n)
-substPolyG_ (changed, ctx, xs) ref coeff = case UnionFind.find ref ctx of
+substPolyG_ (changed, ctx, xs) ref coeff = case UnionFind.findMaybe ref ctx of
   Nothing -> (changed, ctx, Map.insertWith (+) ref coeff xs)
   Just ((coeff', ref'), ctx') -> (True, ctx', Map.insertWith (+) ref' (coeff * coeff') xs)
 
