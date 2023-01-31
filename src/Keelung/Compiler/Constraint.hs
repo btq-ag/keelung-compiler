@@ -574,29 +574,45 @@ relocateConstraintSystem cs =
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
 
-    fromUnionFind pinned ctor1 _ctor2 (var1, (1, var2, 0)) =
-      if pinned var1 && pinned var2
-        then Just $ fromConstraint counters (ctor1 var1 var2)
-        else Nothing
-    fromUnionFind pinned _ctor1 ctor2 (var1, (slope2, var2, intercept2)) =
-      if pinned var1 && pinned var2
-        then case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
+    -- fromUnionFind pinned ctor1 _ctor2 (var1, (1, var2, 0)) =
+    --   if pinned var1 && pinned var2
+    --     then Just $ fromConstraint counters (ctor1 var1 var2)
+    --     else Nothing
+    -- fromUnionFind pinned _ctor1 ctor2 (var1, (slope2, var2, intercept2)) =
+    --   if pinned var1 && pinned var2
+    --     then case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
+    --       Left _ -> Nothing
+    --       Right poly -> Just $ fromConstraint counters (ctor2 poly)
+    --     else Nothing
+
+    -- isPinnedF :: RefF -> Bool
+    -- isPinnedF (RefFO _) = True
+    -- isPinnedF (RefFI _) = True
+    -- isPinnedF (RefBtoRefF b) = isPinnedB b
+    -- isPinnedF _ = False
+
+    -- isPinnedB :: RefB -> Bool
+    -- isPinnedB (RefBO _) = True
+    -- isPinnedB (RefBI _) = True
+    -- isPinnedB _ = False
+
+    -- varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFind isPinnedF CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
+
+    fromUnionFind ctor1 _ctor2 (var1, (1, var2, 0)) = Just $ fromConstraint counters (ctor1 var1 var2)
+    fromUnionFind _ctor1 ctor2 (var1, (slope2, var2, intercept2)) =
+      case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
           Left _ -> Nothing
           Right poly -> Just $ fromConstraint counters (ctor2 poly)
-        else Nothing
+      -- fromConstraint
+      --   counters
+      --   ( case PolyG.build 0 [(var1, -1), (var2, coeff)] of
+      --       Left _ -> error "[ panic ] empty polynomial"
+      --       Right poly -> ctor2 poly
+      --   )
 
-    isPinnedF :: RefF -> Bool
-    isPinnedF (RefFO _) = True
-    isPinnedF (RefFI _) = True
-    isPinnedF (RefBtoRefF b) = isPinnedB b
-    isPinnedF _ = False
+    varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
+    -- varEqFs = Seq.fromList $ map (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
 
-    isPinnedB :: RefB -> Bool
-    isPinnedB (RefBO _) = True
-    isPinnedB (RefBI _) = True
-    isPinnedB _ = False
-
-    varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFind isPinnedF CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
     varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
     varBindFs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList $ csVarBindF cs
