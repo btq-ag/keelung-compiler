@@ -185,7 +185,7 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify (\cs -> cs {csAddF = xs : csAddF cs})
     addOne (CAddB xs) = modify (\cs -> cs {csAddB = xs : csAddB cs})
     addOne (CAddU xs) = modify (\cs -> cs {csAddU = xs : csAddU cs})
-    addOne (CVarEqF x y) = modify (\cs -> cs {csVarEqF = UnionFind.union x (1, y) (csVarEqF cs)})
+    addOne (CVarEqF x y) = modify (\cs -> cs {csVarEqF = UnionFind.union x (1, y, 0) (csVarEqF cs)})
     addOne (CVarEqB x y) = modify (\cs -> cs {csVarEqB = (x, y) : csVarEqB cs})
     addOne (CVarEqU x y) = modify (\cs -> cs {csVarEqU = (x, y) : csVarEqU cs})
     addOne (CVarBindF x c) = modify (\cs -> cs {csVarBindF = Map.insert x c (csVarBindF cs)})

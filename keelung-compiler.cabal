@@ -55,6 +55,8 @@ library
       Paths_keelung_compiler
   hs-source-dirs:
       src
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       array
@@ -118,6 +120,8 @@ executable keelungc
       app/
       src/
       examples/
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       aeson
@@ -189,6 +193,8 @@ test-suite keelung-test
       test/
       src/
       examples/
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       HUnit
@@ -261,6 +267,8 @@ benchmark keelung-bench
       src
       benchmark/
       examples/
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       array

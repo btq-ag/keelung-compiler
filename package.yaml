@@ -36,6 +36,9 @@ dependencies:
 - validation
 - vector
 
+default-extensions: 
+- ImportQualifiedPost
+
 library:
   source-dirs: src
   ghc-options:

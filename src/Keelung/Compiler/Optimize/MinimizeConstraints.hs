@@ -12,6 +12,7 @@ import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as UnionFind
 import Keelung.Data.PolyG (PolyG)
 import qualified Keelung.Data.PolyG as PolyG
+-- import Debug.Trace
 
 -- import Control.Monad.State.Strict
 
@@ -35,6 +36,9 @@ run cs =
 goThroughAddFM :: (GaloisField n, Integral n) => [PolyG RefF n] -> PolyG RefF n -> AddM n [PolyG RefF n]
 goThroughAddFM acc poly = do
   unionFind <- get
+  -- () <- traceShowM unionFind
+  -- () <- traceShowM poly
+  -- () <- traceShowM (substPolyG unionFind poly)
   case substPolyG unionFind poly of
     Nothing -> return (poly : acc)
     Just (poly', unionFind') -> do
