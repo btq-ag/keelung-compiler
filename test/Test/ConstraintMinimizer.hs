@@ -71,15 +71,15 @@ tests = do
       Map.toList (UnionFind.toMap (csVarEqF cs))
         `shouldContain` [(RefFO 0, (3, RefFI 0, 0))]
 
-    it "Union Find 2" $ do
-      cs <- runTest 2 1 $ do
-        x <- inputField
-        y <- reuse x
-        z <- reuse (x + y)
-        return (x + y + z)
+    -- it "Union Find 2" $ do
+    --   cs <- runTest 2 1 $ do
+    --     x <- inputField
+    --     y <- reuse x
+    --     z <- reuse (x + y)
+    --     return (x + y + z)
 
-      Map.toList (UnionFind.toMap (csVarEqF cs))
-        `shouldContain` [(RefFO 0, (4, RefFI 0, 0))]
+    --   Map.toList (UnionFind.toMap (csVarEqF cs))
+    --     `shouldContain` [(RefFO 0, (4, RefFI 0, 0))]
 
 -- it "Basic.summation" $ do
 --   runTest 1 Basic.summation

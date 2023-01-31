@@ -234,10 +234,13 @@ substPolyG ctx poly = do
 -- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
 substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref n, Maybe (PolyG ref n)) -> ref -> n -> (Bool, UnionFind ref n, Maybe (PolyG ref n))
 substPolyG_ (changed, ctx, xs) ref coeff = case UnionFind.findMaybe ref ctx of
-  Nothing -> (changed, ctx, PolyG.insert 0 (ref, coeff) <$> xs)
-  Just ((slope, root, intercept), ctx') ->
+  Nothing -> case xs of
+    Nothing -> (changed, ctx, Just $ PolyG.singleton 0 (ref, coeff))
+    Just xs' -> (changed, ctx, Just $ PolyG.insert 0 (ref, coeff) xs')
+  Just ((slope, root, intercept), ctx') ->case xs of
     -- ref = slope * root + intercept
-    (True, ctx', PolyG.insert (intercept * coeff) (root, slope * coeff) <$> xs)
+    Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff))
+    Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs')
 
 --------------------------------------------------------------------------------
 

@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial with variables generalized (unliked Poly which is limited to only Int)
-module Keelung.Data.PolyG (PolyG, build, buildWithMap, unsafeBuild, view, viewAsMap, insert, addConstant) where
+module Keelung.Data.PolyG (PolyG, build, buildWithMap, unsafeBuild, view, viewAsMap, insert, addConstant, singleton) where
 
 import Control.DeepSeq (NFData)
 import Data.Map.Strict (Map)
@@ -46,6 +46,9 @@ buildWithMap c xs =
    in if Map.null result
         then Left c
         else Right (PolyG c result)
+
+singleton :: (Ord ref, Num n) => n -> (ref, n) -> PolyG ref n
+singleton c (x, coeff) = PolyG c (Map.singleton x coeff)
 
 insert :: (Ord ref, Num n) => n -> (ref, n) -> PolyG ref n -> PolyG ref n
 insert c' (x, coeff) (PolyG c xs) =
