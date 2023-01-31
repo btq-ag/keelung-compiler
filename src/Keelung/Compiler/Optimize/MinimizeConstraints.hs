@@ -70,7 +70,7 @@ classifyAdd poly = case PolyG.view poly of
     tell $ mempty {learnedFromAddBind = Map.singleton var 0}
     return False
   (0, [(var1, c), (var2, d)]) -> do
-    modify' $ \unionFind -> UnionFind.union var1 (-d / c, var2) unionFind
+    modify' $ \unionFind -> UnionFind.union var1 (-d / c, var2, 0) unionFind
     return False
   (0, _) -> return True
   (c, [(var, coeff)]) -> do

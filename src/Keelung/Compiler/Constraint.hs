@@ -39,23 +39,23 @@ where
 import Control.DeepSeq (NFData)
 import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
+import Data.Map.Strict qualified as Map
+import Data.Maybe qualified as Maybe
+import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
-import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as UnionFind
-import qualified Keelung.Compiler.Relocated as Relocated
+import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
+import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
-import qualified Keelung.Constraint.R1CS as Constraint
+import Keelung.Constraint.Polynomial qualified as Poly
+import Keelung.Constraint.R1CS qualified as Constraint
 import Keelung.Data.PolyG (PolyG)
-import qualified Keelung.Data.PolyG as PolyG
+import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
-import qualified Data.Maybe as Maybe
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)
@@ -226,17 +226,18 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref n)
 substPolyG ctx poly = do
   let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' substPolyG_ (False, ctx, mempty) xs of
+  case Map.foldlWithKey' substPolyG_ (False, ctx, Nothing) xs of
     (False, _, _) -> Nothing
-    (True, ctx', xs') -> case PolyG.buildWithMap c xs' of
-      Left _ -> Nothing
-      Right poly' -> Just (poly', ctx')
+    (True, _, Nothing) -> Nothing
+    (True, ctx', Just poly') -> Just (PolyG.addConstant c poly', ctx')
 
 -- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
-substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref n, Map ref n) -> ref -> n -> (Bool, UnionFind ref n, Map ref n)
+substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref n, Maybe (PolyG ref n)) -> ref -> n -> (Bool, UnionFind ref n, Maybe (PolyG ref n))
 substPolyG_ (changed, ctx, xs) ref coeff = case UnionFind.findMaybe ref ctx of
-  Nothing -> (changed, ctx, Map.insertWith (+) ref coeff xs)
-  Just ((coeff', ref'), ctx') -> (True, ctx', Map.insertWith (+) ref' (coeff * coeff') xs)
+  Nothing -> (changed, ctx, PolyG.insert 0 (ref, coeff) <$> xs)
+  Just ((slope, root, intercept), ctx') ->
+    -- ref = slope * root + intercept
+    (True, ctx', PolyG.insert (intercept * coeff) (root, slope * coeff) <$> xs)
 
 --------------------------------------------------------------------------------
 
@@ -472,7 +473,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
         if booleanConstraintSize == 0
           then ""
           else
-            "  Boolean constriants (" <> show booleanConstraintSize <> "):\n\n"
+            "  Boolean constriants ("
+              <> show booleanConstraintSize
+              <> "):\n\n"
               <> unlines (map ("    " <>) (prettyBooleanConstraints counters))
               <> "\n"
 
@@ -481,7 +484,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
         if totalBinRepConstraintSize == 0
           then ""
           else
-            "  Binary representation constriants (" <> show totalBinRepConstraintSize <> "):\n\n"
+            "  Binary representation constriants ("
+              <> show totalBinRepConstraintSize
+              <> "):\n\n"
               <> unlines (map ("    " <>) (prettyBinRepConstraints counters))
               <> "\n"
 
@@ -531,7 +536,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
          in if totalSize == 0
               then ""
               else
-                "  Variables (" <> show totalSize <> "):\n"
+                "  Variables ("
+                  <> show totalSize
+                  <> "):\n"
                   <> "                  output         input      intermediate\n"
                   <> "\n    Field   "
                   <> formLine OfField
@@ -545,7 +552,9 @@ relocateConstraintSystem cs =
   Relocated.RelocatedConstraintSystem
     { Relocated.csCounters = counters,
       Relocated.csConstraints =
-        varEqFs <> varEqBs <> varEqUs
+        varEqFs
+          <> varEqBs
+          <> varEqUs
           <> varBindFs
           <> varBindBs
           <> varBindUs
@@ -562,19 +571,17 @@ relocateConstraintSystem cs =
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
 
-    fromUnionFind pinned ctor1 _ctor2 (var1, (1, var2)) = if pinned var1 && pinned var2 
-      then Just $ fromConstraint counters (ctor1 var1 var2) 
-      else Nothing
-    fromUnionFind pinned _ctor1 ctor2 (var1, (coeff, var2)) =
-      if pinned var1 && pinned var2 
-        then Just $ fromConstraint
-          counters
-          ( case PolyG.build 0 [(var1, -1), (var2, coeff)] of
-              Left _ -> error "[ panic ] empty polynomial"
-              Right poly -> ctor2 poly
-          )
+    fromUnionFind pinned ctor1 _ctor2 (var1, (1, var2, 0)) =
+      if pinned var1 && pinned var2
+        then Just $ fromConstraint counters (ctor1 var1 var2)
         else Nothing
-    
+    fromUnionFind pinned _ctor1 ctor2 (var1, (slope2, var2, intercept2)) =
+      if pinned var1 && pinned var2
+        then case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
+          Left _ -> Nothing
+          Right poly -> Just $ fromConstraint counters (ctor2 poly)
+        else Nothing
+
     isPinnedF :: RefF -> Bool
     isPinnedF (RefFO _) = True
     isPinnedF (RefFI _) = True

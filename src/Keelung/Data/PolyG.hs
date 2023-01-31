@@ -1,14 +1,14 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
 
 -- | Polynomial with variables generalized (unliked Poly which is limited to only Int)
-module Keelung.Data.PolyG (PolyG, build, buildWithMap, unsafeBuild, view, viewAsMap) where
+module Keelung.Data.PolyG (PolyG, build, buildWithMap, unsafeBuild, view, viewAsMap, insert, addConstant) where
 
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+import GHC.Generics (Generic)
 
 data PolyG ref n = PolyG n (Map ref n)
   deriving (Eq, Functor, Ord, Generic, NFData)
@@ -16,14 +16,14 @@ data PolyG ref n = PolyG n (Map ref n)
 instance (Show n, Ord n, Eq n, Num n, Show ref) => Show (PolyG ref n) where
   show (PolyG n xs)
     | n == 0 =
-      if firstSign == " + "
-        then concat restOfTerms
-        else "- " <> concat restOfTerms
+        if firstSign == " + "
+          then concat restOfTerms
+          else "- " <> concat restOfTerms
     | otherwise = concat (show n : firstSign : restOfTerms)
     where
-      (firstSign, restOfTerms) = case concatMap printTerm $ Map.toList xs of 
+      (firstSign, restOfTerms) = case concatMap printTerm $ Map.toList xs of
         [] -> error "[ panic ] Empty PolyG"
-        (x': xs') -> (x', xs')
+        (x' : xs') -> (x', xs')
       -- return a pair of the sign ("+" or "-") and the string representation
       printTerm :: (Show n, Ord n, Eq n, Num n, Show ref) => (ref, n) -> [String]
       printTerm (x, c)
@@ -46,6 +46,16 @@ buildWithMap c xs =
    in if Map.null result
         then Left c
         else Right (PolyG c result)
+
+insert :: (Ord ref, Num n) => n -> (ref, n) -> PolyG ref n -> PolyG ref n
+insert c' (x, coeff) (PolyG c xs) =
+  let result = Map.insertWith (+) x coeff xs
+   in if Map.null result
+        then error "[ panic ] PolyG.insert: empty polynomial"
+        else PolyG (c + c') result
+
+addConstant :: Num n => n -> PolyG ref n -> PolyG ref n
+addConstant c' (PolyG c xs) = PolyG (c + c') xs
 
 unsafeBuild :: (Ord ref, Eq n, Num n) => n -> [(ref, n)] -> PolyG ref n
 unsafeBuild c xs =
