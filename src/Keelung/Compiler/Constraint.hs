@@ -59,6 +59,7 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
+import Keelung.Data.Bindings (showList')
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)
@@ -463,6 +464,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showNEqU
       <> showBooleanConstraints
       <> showBinRepConstraints
+      <> showOccurrencesF
+      <> showOccurrencesB
+      <> showOccurrencesU
       <> showVariables
       <> "}"
     where
@@ -518,6 +522,13 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 
       showNEqF = adapt "NEqF" (Map.toList $ csNEqF cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
       showNEqU = adapt "NEqU" (Map.toList $ csNEqU cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
+
+      showOccurrencesF = if Map.null $ csOccurrenceF cs then "" else
+        "  OccruencesF:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceF cs)))
+      showOccurrencesB = if Map.null $ csOccurrenceB cs then "" else
+        "  OccruencesB:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceB cs)))
+      showOccurrencesU = if Map.null $ csOccurrenceU cs then "" else
+        "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceU cs)))
 
       showVariables :: String
       showVariables =
