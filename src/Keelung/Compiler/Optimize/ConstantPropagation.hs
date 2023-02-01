@@ -21,11 +21,12 @@ run (TypeErased exprs fieldWidth counters oldRelations assertions divModRelsU) =
       newAssertions = map (propagateConstant newRelations) assertions
       newDivModRels =
         fmap
-          ( \(r, q, d, a) ->
-              ( propagateExprU newRelations r,
-                propagateExprU newRelations q,
-                propagateExprU newRelations d,
-                propagateExprU newRelations a
+          -- dividend = divisor * quotient + remainder
+          ( \(dividend, divisor, quotient, remainder) ->
+              ( propagateExprU newRelations dividend,
+                propagateExprU newRelations divisor,
+                propagateExprU newRelations quotient,
+                propagateExprU newRelations remainder
               )
           )
           divModRelsU

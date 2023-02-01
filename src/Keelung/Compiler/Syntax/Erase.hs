@@ -29,7 +29,7 @@ run (T.Elaborated expr comp) =
                     <*> mapM (mapM eraseExprU) (structU eb)
                 )
 
-        divModRelsU' <- mapM (\(r, q, d, a) -> (,,,) <$> eraseExprU r <*> eraseExprU q <*> eraseExprU d <*> eraseExprU a) divModRelsU
+        divModRelsU' <- mapM (\(dividend, divisor, quotient, remainder) -> (,,,) <$> eraseExprU dividend <*> eraseExprU divisor <*> eraseExprU quotient <*> eraseExprU remainder) divModRelsU
 
         counters' <- get
 

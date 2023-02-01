@@ -43,7 +43,7 @@ run (TypeErased untypedExprs _ counters relations assertions divModRelsU) = runM
   mapM_ compileAssertion assertions
 
   -- compile DivMod relations to constraints
-  mapM_ (\(width, (r, q, d, a)) -> compileDivModU width r q d a) (IntMap.toList divModRelsU)
+  mapM_ (\(width, (dividend, divisor, quotient, remainder)) -> compileDivModU width dividend divisor quotient remainder) (IntMap.toList divModRelsU)
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
@@ -890,12 +890,12 @@ assertLTEU width x y = do
 -- -- compileOrBs
 
 -- | Division with remainder on UInts
---    1. remainder + divisor * quotient = dividend
+--    1. dividend = divisor * quotient + remainder
 --    2. 0 ≤ remainder < divisor
 --    3. 0 < divisor
 compileDivModU :: (GaloisField n, Integral n) => Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
-compileDivModU width remainder quotient dividend divisor = do
-  --    remainder + divisor * quotient = dividend
+compileDivModU width dividend divisor quotient remainder = do
+  --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder
   remainderRef <- wireU remainder

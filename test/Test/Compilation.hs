@@ -1,42 +1,45 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Test.Compilation (tests) where
+module Test.Compilation (run, tests) where
 
 -- import qualified Basic
 
 import Control.Monad
-import Keelung
-import qualified Keelung.Compiler as Compiler
-import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung hiding (run)
+import Keelung.Compiler qualified as Compiler
+import Keelung.Constraint.Polynomial qualified as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (toR1Cs)
 import Test.Hspec
+
+run :: IO ()
+run = hspec tests
 
 tests :: SpecWith ()
 tests = do
   describe "Compilation" $ do
     describe "Assertion" $ do
-      it "Rewriting" $ do
-        let program = do
-              xs <- inputs 4
-              ys <- inputs 4
-              assert (sum xs `eq` sum (ys :: Arr Field))
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(0, 1), (1, 1), (2, 1), (3, 1), (8, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(4, 1), (5, 1), (6, 1), (7, 1), (8, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
+        it "Rewriting" $ do
+          let program = do
+                xs <- inputs 4
+                ys <- inputs 4
+                assert (sum xs `eq` sum (ys :: Arr Field))
+          case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+            Left err -> expectationFailure (show err)
+            Right r1cs -> do
+              toR1Cs r1cs
+                `shouldContain` [ R1C
+                                    (Poly.buildEither 0 [(0, 1), (1, 1), (2, 1), (3, 1), (8, -1)])
+                                    (Poly.buildEither 1 [])
+                                    (Poly.buildEither 0 [])
+                                ]
+              toR1Cs r1cs
+                `shouldContain` [ R1C
+                                    (Poly.buildEither 0 [(4, 1), (5, 1), (6, 1), (7, 1), (8, -1)])
+                                    (Poly.buildEither 1 [])
+                                    (Poly.buildEither 0 [])
+                                ]
 
     describe "Unsigned Integer" $ do
       it "Bit test / Value" $ do
@@ -922,4 +925,42 @@ tests = do
                                   (Poly.buildEither 1 [(11, -1)])
                                   (Poly.buildEither 1 [])
                                   (Poly.buildEither 0 [])
+                              ]
+      it "DivMod" $ do
+        -- output     | input
+        -- rrrrrrrruu   rrrrrrrruu
+        -- 0123456789   0123456789
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              performDivMod x y
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- dividend = divisor * quotient + remainder
+            -- \$18 = $19 * $8 + $9
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(19, 1)])
+                                  (Poly.buildEither 0 [(8, 1)])
+                                  (Poly.buildEither 0 [(18, 1), (9, -1)])
+                              ]
+            -- 0 ≤ remainder ($9) < divisor ($19)
+            -- remainder + 1 ($21) ≤ divisor ($19)
+            -- temp = diviser - remainder - 1 ($22)
+            -- 1 + $9 - $21 = 0
+            -- \$22 = $19 - $21 - 16$17 * $20
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(17, -16)])
+                                  (Poly.buildEither 0 [(20, 1)])
+                                  (Poly.buildEither 0 [(19, 1), (21, -1), (22, -1)])
+                              ]
+            -- divisor != 0
+            -- \$23 * $19 = 1
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(23, 1)])
+                                  (Poly.buildEither 0 [(19, 1)])
+                                  (Poly.buildEither 1 [])
                               ]

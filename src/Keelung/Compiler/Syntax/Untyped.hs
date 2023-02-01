@@ -224,7 +224,7 @@ data TypeErased n = TypeErased
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
     -- | DivMod relations
-    erasedDivModRelsU :: IntMap (ExprU n, ExprU n, ExprU n, ExprU n) -- remainder + quotient * divisor = dividend
+    erasedDivModRelsU :: IntMap (ExprU n, ExprU n, ExprU n, ExprU n) -- dividend = divisor * quotient + remainder
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
