@@ -926,7 +926,7 @@ tests = do
                                   (Poly.buildEither 1 [])
                                   (Poly.buildEither 0 [])
                               ]
-      it "DivMod" $ do
+      it "DivMod 1" $ do
         -- output     | input
         -- rrrrrrrruu   rrrrrrrruu
         -- 0123456789   0123456789
@@ -947,14 +947,14 @@ tests = do
                               ]
             -- 0 ≤ remainder ($9) < divisor ($19)
             -- diff ($20) = $19 - $9
-            -- diff != 0
-            -- $20 * $21 = 1
             toR1Cs r1cs
               `shouldContain` [ R1C
                                   (Poly.buildEither 0 [(17, -16)])
                                   (Poly.buildEither 0 [(7, 1)])
                                   (Poly.buildEither 0 [(9, 1), (19, -1), (20, 1)])
                               ]
+            -- diff != 0
+            -- $20 * $21 = 1
             toR1Cs r1cs
               `shouldContain` [ R1C
                                   (Poly.buildEither 0 [(20, 1)])
@@ -967,5 +967,38 @@ tests = do
               `shouldContain` [ R1C
                                   (Poly.buildEither 0 [(22, 1)])
                                   (Poly.buildEither 0 [(19, 1)])
+                                  (Poly.buildEither 1 [])
+                              ]
+      it "DivMod 2" $ do
+        -- output     | input
+        -- rrrrrrrruu   rrrrrrrruu
+        -- 0123456789   0123456789
+        let program = do
+              x <- inputUInt @4
+              y <- inputUInt @4
+              assertDivMod x 2 7 y -- x = 2 * 7 + y
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            -- dividend = 2 * 7 + remainder
+            -- $18 = 14 + $9
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 14 [(9, 1), (8, -1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+            -- 0 ≤ remainder ($9) < 2
+            -- diff ($10) = 2 - $9
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 2 [(9, -1), (10, -1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(10, 1)])
+                                  (Poly.buildEither 0 [(11, 1)])
                                   (Poly.buildEither 1 [])
                               ]
