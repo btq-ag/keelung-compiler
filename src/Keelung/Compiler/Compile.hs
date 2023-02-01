@@ -23,7 +23,7 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ do
+run (TypeErased untypedExprs _ counters relations assertions divModRels) = runM counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -41,6 +41,9 @@ run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ 
 
   -- compile assertions to constraints
   mapM_ compileAssertion assertions
+
+  -- compile DivMod relations to constraints 
+  mapM_ (\(width, (r, q, d, a)) -> compileDivModU width r q d a) (IntMap.toList divModRels)
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()

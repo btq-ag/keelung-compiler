@@ -37,7 +37,8 @@ run (T.Elaborated expr comp) =
               erasedFieldBitWidth = numBitWidth,
               erasedCounters = counters',
               erasedRelations = relations,
-              erasedAssertions = assertions'
+              erasedAssertions = assertions',
+              erasedDivModU = mempty
             }
   where
     -- proxy trick for devising the bit width of field elements

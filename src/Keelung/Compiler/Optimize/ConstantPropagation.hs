@@ -15,11 +15,11 @@ import Keelung.Data.Struct (Struct (..))
 -- 2. Propagate constant in the output expression
 -- 3. Propagate constant in assertions
 run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
-run (TypeErased exprs fieldWidth counters oldRelations assertions) =
+run (TypeErased exprs fieldWidth counters oldRelations assertions divModRels) =
   let newRelations = propagateRelations oldRelations
       exprs' = map (second (propagateConstant newRelations)) exprs
       newAssertions = map (propagateConstant newRelations) assertions
-   in TypeErased exprs' fieldWidth counters newRelations newAssertions
+   in TypeErased exprs' fieldWidth counters newRelations newAssertions divModRels
 
 -- | Propagate constants in the relations, and return the fixed point of constant propagation
 propagateRelations :: Relations n -> Relations n

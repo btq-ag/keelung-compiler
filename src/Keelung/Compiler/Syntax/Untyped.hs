@@ -222,11 +222,13 @@ data TypeErased n = TypeErased
     -- | Relations between variables and/or expressions
     erasedRelations :: !(Relations n),
     -- | Assertions after type erasure
-    erasedAssertions :: ![Expr n]
+    erasedAssertions :: ![Expr n],
+    -- | DivMod relations 
+    erasedDivModU :: IntMap (ExprU n, ExprU n, ExprU n, ExprU n) -- remainder + quotient * divisor = dividend
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ counters relations assertions) =
+  show (TypeErased expr _ counters relations assertions divModRels) =
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
@@ -236,6 +238,10 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
       <> indent (show relations)
       <> ( if length assertions < 20
              then "  assertions:\n    " <> show assertions <> "\n"
+             else ""
+         )
+      <> ( if length divModRels < 20
+             then "  div mod relations:\n    " <> show assertions <> "\n"
              else ""
          )
       <> Counters.prettyVariables counters
