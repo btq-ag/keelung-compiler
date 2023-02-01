@@ -224,11 +224,11 @@ data TypeErased n = TypeErased
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
     -- | DivMod relations
-    erasedDivModU :: IntMap (ExprU n, ExprU n, ExprU n, ExprU n) -- remainder + quotient * divisor = dividend
+    erasedDivModRelsU :: IntMap (ExprU n, ExprU n, ExprU n, ExprU n) -- remainder + quotient * divisor = dividend
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ counters relations assertions divModRels) =
+  show (TypeErased expr _ counters relations assertions divModRelsU) =
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
@@ -240,7 +240,7 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
              then "  assertions:\n    " <> show assertions <> "\n"
              else ""
          )
-      <> ( if length divModRels < 20
+      <> ( if length divModRelsU < 20
              then "  div mod relations:\n    " <> show assertions <> "\n"
              else ""
          )

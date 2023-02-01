@@ -13,7 +13,7 @@ import Keelung.Types
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation counters eb assertions = comp
+  let T.Computation counters eb assertions divModRelsU = comp
       proxy = 0
       numBitWidth = bitSize proxy
    in runM counters numBitWidth $ do
@@ -29,6 +29,8 @@ run (T.Elaborated expr comp) =
                     <*> mapM (mapM eraseExprU) (structU eb)
                 )
 
+        divModRelsU' <- mapM (\(r, q, d, a) -> (,,,) <$> eraseExprU r <*> eraseExprU q <*> eraseExprU d <*> eraseExprU a) divModRelsU
+
         counters' <- get
 
         return $
@@ -38,7 +40,7 @@ run (T.Elaborated expr comp) =
               erasedCounters = counters',
               erasedRelations = relations,
               erasedAssertions = assertions',
-              erasedDivModU = mempty
+              erasedDivModRelsU = divModRelsU'
             }
   where
     -- proxy trick for devising the bit width of field elements
