@@ -938,7 +938,7 @@ tests = do
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- dividend = divisor * quotient + remainder
-            -- \$18 = $19 * $8 + $9
+            -- $18 = $19 * $8 + $9
             toR1Cs r1cs
               `shouldContain` [ R1C
                                   (Poly.buildEither 0 [(19, 1)])
@@ -946,21 +946,26 @@ tests = do
                                   (Poly.buildEither 0 [(18, 1), (9, -1)])
                               ]
             -- 0 ≤ remainder ($9) < divisor ($19)
-            -- remainder + 1 ($21) ≤ divisor ($19)
-            -- temp = diviser - remainder - 1 ($22)
-            -- 1 + $9 - $21 = 0
-            -- \$22 = $19 - $21 - 16$17 * $20
+            -- diff ($20) = $19 - $9
+            -- diff != 0
+            -- $20 * $21 = 1
             toR1Cs r1cs
               `shouldContain` [ R1C
                                   (Poly.buildEither 0 [(17, -16)])
-                                  (Poly.buildEither 0 [(20, 1)])
-                                  (Poly.buildEither 0 [(19, 1), (21, -1), (22, -1)])
+                                  (Poly.buildEither 0 [(7, 1)])
+                                  (Poly.buildEither 0 [(9, 1), (19, -1), (20, 1)])
                               ]
-            -- divisor != 0
-            -- \$23 * $19 = 1
             toR1Cs r1cs
               `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(23, 1)])
+                                  (Poly.buildEither 0 [(20, 1)])
+                                  (Poly.buildEither 0 [(21, 1)])
+                                  (Poly.buildEither 1 [])
+                              ]
+            -- divisor != 0
+            -- $22 * $19 = 1
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(22, 1)])
                                   (Poly.buildEither 0 [(19, 1)])
                                   (Poly.buildEither 1 [])
                               ]

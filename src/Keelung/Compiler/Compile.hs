@@ -228,6 +228,13 @@ freshRefU width = do
   modifyCounter $ addCount OfIntermediate (OfUInt width) 1
   return $ RefU width index
 
+freshVarU :: Width -> M n (ExprU n)
+freshVarU width = do
+  counters <- gets csCounters
+  let index = getCount OfIntermediate (OfUInt width) counters
+  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
+  return $ VarU width index
+
 ----------------------------------------------------------------
 
 compileExprB :: (GaloisField n, Integral n) => RefB -> ExprB n -> M n ()
@@ -826,14 +833,25 @@ assertNotZeroU width expr = do
 --
 -- TODO, replace with a more efficient implementation
 --  as in A.3.2.2 Range check in https://zips.z.cash/protocol/protocol.pdf
-assertLTEU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
-assertLTEU width x y = do
-  --    x ≤ y
+-- assertLTEU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
+-- assertLTEU width x y = do
+--   --    x ≤ y
+--   --  =>
+--   --    0 ≤ y - x
+--   --  that is, there exists a BinRep of y - x
+--   difference <- freshRefU width
+--   compileSubU width difference y x
+
+assertLTU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
+assertLTU width x y = do
+  --    x < y
   --  =>
-  --    0 ≤ y - x
-  --  that is, there exists a BinRep of y - x
-  difference <- freshRefU width
-  compileSubU width difference y x
+  --    0 < y - x
+  --  that is, there exists a non-zero BinRep of y - x
+  difference <- freshVarU width
+  difference' <- wireU difference
+  compileSubU width difference' y x
+  assertNotZeroU width difference
 
 -- -- | Assert that the BinRep of a UInt is non-zero
 -- assertBinRepNonZeroU :: (GaloisField n, Integral n) => Width -> ExprU n -> M n ()
@@ -908,9 +926,8 @@ compileDivModU width dividend divisor quotient remainder = do
       (0, [(quotientRef, 1)])
       (0, [(dividendRef, 1), (remainderRef, -1)])
   --    0 ≤ remainder < divisor
-  remainderSucc <- wireU $ AddU width remainder (ValU width 1)
-  assertLTEU width remainderSucc divisorRef
-  --    0 < divisor
-  -- =>
-  --    divisor != 0
+  assertLTU width remainderRef divisorRef
+  -- --    0 < divisor
+  -- -- =>
+  -- --    divisor != 0
   assertNotZeroU width divisor
