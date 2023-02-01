@@ -9,11 +9,11 @@ import Control.Monad
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
-import qualified Data.IntMap as IntMap
-import qualified Data.Map.Strict as Map
+import Data.IntMap qualified as IntMap
+import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
-import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as UnionFind
+import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
@@ -211,6 +211,13 @@ freshRefB = do
   modifyCounter $ addCount OfIntermediate OfBoolean 1
   return $ RefB index
 
+freshVarB :: M n (ExprB n)
+freshVarB = do
+  counters <- gets csCounters
+  let index = getCount OfIntermediate OfBoolean counters
+  modifyCounter $ addCount OfIntermediate OfBoolean 1
+  return $ VarB index
+
 freshRefU :: Width -> M n RefU
 freshRefU width = do
   counters <- gets csCounters
@@ -258,32 +265,7 @@ compileExprB out expr = case expr of
             (0, [(inv, 1)])
             (1, [(out, -1)])
   OrB x0 x1 xs -> do
-    a <- wireB x0
-    b <- wireB x1
-    vars <- mapM wireB xs
-    case vars of
-      Empty -> compileOrB out a b
-      (c :<| Empty) -> do
-        -- only 3 operands
-        aOrb <- freshRefB
-        compileOrB aOrb a b
-        compileOrB out aOrb c
-      _ -> do
-        -- more than 3 operands, rewrite it as an inequality instead:
-        --      if all operands are 0           then 0 else 1
-        --  =>  if the sum of operands is 0     then 0 else 1
-        --  =>  if the sum of operands is not 0 then 1 else 0
-        --  =>  the sum of operands is not 0
-        compileExprB
-          out
-          ( NEqF
-              (ValF 0)
-              ( AddF
-                  (BtoF x0)
-                  (BtoF x1)
-                  (fmap BtoF xs)
-              )
-          )
+    compileOrBs out x0 x1 xs
   XorB x y -> do
     x' <- wireB x
     y' <- wireB y
@@ -715,6 +697,85 @@ compileOrB out x y = do
       (0, [(y, 1)])
       (0, [(x, -1), (out, 1)])
 
+assertOrB :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> ExprB n -> M n ()
+assertOrB (ValB 0) (ValB 0) (ValB 0) = return ()
+assertOrB (ValB 0) (ValB _) (ValB _) = error "[ error ] assertOrB: invalid constraint"
+assertOrB (ValB 1) (ValB 0) (ValB 0) = error "[ error ] assertOrB: invalid constraint"
+assertOrB (ValB 1) (ValB _) (ValB _) = return ()
+assertOrB out x y = do
+  out' <- wireB out
+  x' <- wireB x
+  y' <- wireB y
+  -- (1 - x) * y = (out - x)
+  add $
+    cMulB
+      (1, [(x', -1)])
+      (0, [(y', 1)])
+      (0, [(x', -1), (out', 1)])
+
+compileOrBs :: (GaloisField n, Integral n) => RefB -> ExprB n -> ExprB n -> Seq (ExprB n) -> M n ()
+compileOrBs out x0 x1 xs = do
+  a <- wireB x0
+  b <- wireB x1
+  vars <- mapM wireB xs
+  case vars of
+    Empty -> compileOrB out a b
+    (c :<| Empty) -> do
+      -- only 3 operands
+      aOrb <- freshRefB
+      compileOrB aOrb a b
+      compileOrB out aOrb c
+    _ -> do
+      -- more than 3 operands, rewrite it as an inequality instead:
+      --      if all operands are 0           then 0 else 1
+      --  =>  if the sum of operands is 0     then 0 else 1
+      --  =>  if the sum of operands is not 0 then 1 else 0
+      --  =>  the sum of operands is not 0
+      compileExprB
+        out
+        ( NEqF
+            (ValF 0)
+            ( AddF
+                (BtoF x0)
+                (BtoF x1)
+                (fmap BtoF xs)
+            )
+        )
+
+assertOrBs :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> ExprB n -> Seq (ExprB n) -> M n ()
+assertOrBs out x0 x1 xs = case xs of
+  Empty -> assertOrB out x0 x1
+  (x2 :<| Empty) -> do
+    -- only 3 operands
+    aOrb <- freshVarB
+    assertOrB aOrb x0 x1
+    assertOrB out aOrb x2
+  _ -> do
+    -- more than 3 operands, rewrite it as an inequality instead:
+    --      if all operands are 0           then 0 else 1
+    --  =>  if the sum of operands is 0     then 0 else 1
+    --  =>  if the sum of operands is not 0 then 1 else 0
+    --  =>  the sum of operands is not 0
+
+    let sumOfOperands = AddF (BtoF x0) (BtoF x1) (fmap BtoF xs)
+    case out of
+      -- if the output is 0, then the sum of operands must be 0
+      ValB 0 -> assertExprF 0 sumOfOperands
+      -- if the output is 1, then the sum of operands must not be 0
+      ValB _ -> assertNotZeroF sumOfOperands
+      _ -> do
+        out' <- wireB out
+        compileExprB
+          out'
+          ( NEqF
+              (ValF 0)
+              ( AddF
+                  (BtoF x0)
+                  (BtoF x1)
+                  (fmap BtoF xs)
+              )
+          )
+
 compileXorB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> M n ()
 compileXorB out x y = do
   -- (1 - 2x) * (y + 1) = (1 + out - 3x)
@@ -726,9 +787,41 @@ compileXorB out x y = do
 
 --------------------------------------------------------------------------------
 
+assertExprB :: (GaloisField n, Integral n) => Bool -> ExprB n -> M n ()
+assertExprB val expr = do
+  ref <- wireB expr
+  add [CVarBindB ref (if val then 1 else 0)]
+
+assertExprF :: (GaloisField n, Integral n) => n -> ExprF n -> M n ()
+assertExprF val expr = do
+  ref <- wireF expr
+  add [CVarBindF ref val]
+
+assertNotZeroF :: (GaloisField n, Integral n) => ExprF n -> M n ()
+assertNotZeroF expr = do
+  ref <- wireF expr
+  -- introduce a new variable m, such that `expr * m = 1`
+  m <- freshRefF
+  add $
+    cMulF
+      (0, [(ref, 1)])
+      (0, [(m, 1)])
+      (1, [])
+
+assertNotZeroU :: (GaloisField n, Integral n) => Width -> ExprU n -> M n ()
+assertNotZeroU width expr = do
+  ref <- wireU expr
+  -- introduce a new variable m, such that `expr * m = 1`
+  m <- freshRefU width
+  add $
+    cMulU
+      (0, [(ref, 1)])
+      (0, [(m, 1)])
+      (1, [])
+
 -- | Assert that x is less than or equal to y
 --
--- TODO, replace with a more efficient implementation 
+-- TODO, replace with a more efficient implementation
 --  as in A.3.2.2 Range check in https://zips.z.cash/protocol/protocol.pdf
 assertLTEU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
 assertLTEU width x y = do
@@ -738,3 +831,83 @@ assertLTEU width x y = do
   --  that is, there exists a BinRep of y - x
   difference <- freshRefU width
   compileSubU width difference y x
+
+-- -- | Assert that the BinRep of a UInt is non-zero
+-- assertBinRepNonZeroU :: (GaloisField n, Integral n) => Width -> ExprU n -> M n ()
+-- assertBinRepNonZeroU width x
+--   | width < 1 = error "[ panic ] assertBinRepNonZeroU: width of a UInt must be at least 1"
+--   | width == 1 = do
+--       --    x != 0
+--       --  =>
+--       --    x == 1
+--       --  =>
+--       --    x[0] == 1
+--       assertExprB True (BitU x 0)
+--   | width == 2 = do
+--       --    x != 0
+--       --  =>
+--       --    x[0] ∨ x[1] == 1
+--       --  =>
+--       --    (1 - x[0]) * x[1] = (1 - x[0])
+--       assertOrB (ValB 1) (BitU x 0) (BitU x 1)
+--   | width == 3 = do
+--       --    x != 0
+--       --  =>
+--       --    x[0] + x[1] + ... + x[n] != 0
+--       --  =>
+--       --    (1 - x[0]) * x[1] = (1 - x[0])
+--       --    (1 - x[0]) * x[2] = (1 - x[0])
+--       return ()
+
+--  = case compare width 1 of
+--   LT -> error "[ panic ] assertBinRepNonZeroU: width of a UInt must be at least 1"
+--   EQ -> do
+--       --    divisor != 0
+--       --  =>
+--       --    divisor == 1
+--       --  =>
+--       --    divisor[0] == 1
+--       add [CVarBindB (RefUBit width divisor 0) 1]
+--   GT -> do
+
+--         -- more than 3 operands, rewrite it as an inequality instead:
+--         --      if all operands are 0           then 0 else 1
+--         --  =>  if the sum of operands is 0     then 0 else 1
+--         --  =>  if the sum of operands is not 0 then 1 else 0
+--         --  =>  the sum of operands is not 0
+
+--   one <- freshRefU width
+--   compileSubU width one x (ValU width 1)
+--   GT -> do
+--     --    divisor != 0
+--     --  =>
+--     --    conjunction of all bits of divisor = 1
+--     compileOrBs
+--     -- add $ cGeqB (0, [(divisor, 1)]) (0, [(RefUtoRefB quotient, 2)])
+-- -- compileOrBs
+
+-- | Division with remainder on UInts
+--    1. remainder + divisor * quotient = dividend
+--    2. 0 ≤ remainder < divisor
+--    3. 0 < divisor
+compileDivModU :: (GaloisField n, Integral n) => Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
+compileDivModU width remainder quotient dividend divisor = do
+  --    remainder + divisor * quotient = dividend
+  --  =>
+  --    divisor * quotient = dividend - remainder
+  remainderRef <- wireU remainder
+  divisorRef <- wireU divisor
+  quotientRef <- wireU quotient
+  dividendRef <- wireU dividend
+  add $
+    cMulU
+      (0, [(divisorRef, 1)])
+      (0, [(quotientRef, 1)])
+      (0, [(dividendRef, 1), (remainderRef, -1)])
+  --    0 ≤ remainder < divisor
+  remainderSucc <- wireU $ AddU width remainder (ValU width 1)
+  assertLTEU width remainderSucc divisorRef
+  --    0 < divisor
+  -- =>
+  --    divisor != 0
+  assertNotZeroU width divisor
