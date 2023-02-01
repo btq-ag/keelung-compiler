@@ -223,7 +223,7 @@ data TypeErased n = TypeErased
     erasedRelations :: !(Relations n),
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
-    -- | DivMod relations 
+    -- | DivMod relations
     erasedDivModU :: IntMap (ExprU n, ExprU n, ExprU n, ExprU n) -- remainder + quotient * divisor = dividend
   }
 
