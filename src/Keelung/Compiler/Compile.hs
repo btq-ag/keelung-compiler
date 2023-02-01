@@ -325,6 +325,10 @@ compileExprB out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileEqualityU True out x' y'
+  -- LTEU w x y -> do
+  --   x' <- wireU x
+  --   y' <- wireU y
+  --   assertLTEU w out x' y'
   BitU x i -> do
     x' <- wireU x
     add $ cVarEqB out (RefUBit (widthOfU x) x' i) -- out = x'[i]
@@ -643,10 +647,6 @@ compileEqualityF isEq out x y =
 --    C = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
 compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> RefU -> RefU -> M n ()
 compileAddOrSubU isSub width out x y = do
-  -- locate the binary representations of the operands
-  -- xBinRepStart <- lookupBinRep width x
-  -- yBinRepStart <- lookupBinRep width y
-
   let multiplier = 2 ^ width
   -- We can refactor
   --    out = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
@@ -725,3 +725,16 @@ compileXorB out x y = do
       (1, [(x, -3), (out, 1)])
 
 --------------------------------------------------------------------------------
+
+-- | Assert that x is less than or equal to y
+--
+-- TODO, replace with a more efficient implementation 
+--  as in A.3.2.2 Range check in https://zips.z.cash/protocol/protocol.pdf
+assertLTEU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
+assertLTEU width x y = do
+  --    x ≤ y
+  --  =>
+  --    0 ≤ y - x
+  --  that is, there exists a BinRep of y - x
+  difference <- freshRefU width
+  compileSubU width difference y x
