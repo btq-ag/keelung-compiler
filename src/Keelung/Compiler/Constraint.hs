@@ -12,6 +12,8 @@ module Keelung.Compiler.Constraint
     reindexRefB,
     reindexRefU,
     Constraint (..),
+    addOccurrencesWithPolyG,
+    addOccurrences,
     substPolyG,
     cAddF,
     cAddB,
@@ -40,6 +42,7 @@ import Control.DeepSeq (NFData)
 import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
+import Data.Map.Merge.Strict qualified as Map
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
@@ -237,7 +240,7 @@ substPolyG_ (changed, ctx, xs) ref coeff = case UnionFind.findMaybe ref ctx of
   Nothing -> case xs of
     Nothing -> (changed, ctx, Just $ PolyG.singleton 0 (ref, coeff))
     Just xs' -> (changed, ctx, Just $ PolyG.insert 0 (ref, coeff) xs')
-  Just ((slope, root, intercept), ctx') ->case xs of
+  Just ((slope, root, intercept), ctx') -> case xs of
     -- ref = slope * root + intercept
     Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff))
     Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs')
@@ -415,7 +418,11 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 -- | A constraint system is a collection of constraints
 data ConstraintSystem n = ConstraintSystem
   { csCounters :: !Counters,
-    -- when x == y
+    -- for counting the occurences of variables in constraints (excluding the ones that are in UnionFind)
+    csOccurrenceF :: !(Map RefF Int),
+    csOccurrenceB :: !(Map RefB Int),
+    csOccurrenceU :: !(Map RefU Int),
+    -- when x == y (UnionFind)
     csVarEqF :: UnionFind RefF n,
     csVarEqB :: [(RefB, RefB)],
     csVarEqU :: [(RefU, RefU)],
@@ -601,14 +608,14 @@ relocateConstraintSystem cs =
     fromUnionFind ctor1 _ctor2 (var1, (1, var2, 0)) = Just $ fromConstraint counters (ctor1 var1 var2)
     fromUnionFind _ctor1 ctor2 (var1, (slope2, var2, intercept2)) =
       case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
-          Left _ -> Nothing
-          Right poly -> Just $ fromConstraint counters (ctor2 poly)
-      -- fromConstraint
-      --   counters
-      --   ( case PolyG.build 0 [(var1, -1), (var2, coeff)] of
-      --       Left _ -> error "[ panic ] empty polynomial"
-      --       Right poly -> ctor2 poly
-      --   )
+        Left _ -> Nothing
+        Right poly -> Just $ fromConstraint counters (ctor2 poly)
+    -- fromConstraint
+    --   counters
+    --   ( case PolyG.build 0 [(var1, -1), (var2, coeff)] of
+    --       Left _ -> error "[ panic ] empty polynomial"
+    --       Right poly -> ctor2 poly
+    --   )
 
     varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
     -- varEqFs = Seq.fromList $ map (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
@@ -626,6 +633,17 @@ relocateConstraintSystem cs =
     mulUs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulU) $ csMulU cs
     nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
     nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ Map.toList $ csNEqU cs
+
+addOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
+addOccurrencesWithPolyG poly occurrences = 
+  Map.merge
+    (Map.traverseMissing (\_ count -> return count)) -- do nothing when it's not in the polynomial
+    (Map.traverseMissing (\_ _ -> return 1)) -- set the occurrence count to 1 when it's not in the occurrences map
+    (Map.zipWithAMatched (\_ count _ -> return (succ count))) -- increment the occurrence count when it's present in both
+     occurrences (snd (PolyG.viewAsMap poly))
+
+addOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
+addOccurrences = flip $ foldl (\occurrences ref -> Map.insertWith (+) ref 1 occurrences)
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
