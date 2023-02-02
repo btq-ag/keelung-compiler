@@ -3,11 +3,7 @@
 {-# HLINT ignore "Use <&>" #-}
 module Test.ConstraintMinimizer (tests, run) where
 
--- import qualified Basic
-
--- import Data.Foldable (Foldable (toList))
 import Data.Map.Strict qualified as Map
--- import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (run)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Compile qualified as Compiler
@@ -17,7 +13,7 @@ import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Compiler.Relocated qualified as Relocated
-import Test.HUnit
+import Test.HUnit (assertFailure)
 import Test.Hspec
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
@@ -54,7 +50,7 @@ tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
     -- it "Poseidon" $ do
-    --   cs <- runTest 1536 1536 $ do
+    --   cs <- runTest 1537 1537 $ do
     --     xs <- inputs 1
     --     Poseidon.hash (toList xs)
 
@@ -62,28 +58,23 @@ tests = do
     --     `shouldContain` []
 
     it "Union Find 1" $ do
-      cs <- runTest 3 3 $ do
+      cs <- runTest 3 1 $ do
         x <- inputField
         y <- reuse x
         z <- reuse x
         return (x + y + z)
-
-      print cs
-      
       Map.toList (UnionFind.toMap (csVarEqF cs))
         `shouldContain` [(RefFO 0, (3, RefFI 0, 0))]
 
+    it "Union Find 2" $ do
+      cs <- runTest 3 1 $ do
+        x <- inputField
+        y <- reuse x
+        z <- reuse (x + y)
+        return (x + y + z)
 
-
-    -- it "Union Find 2" $ do
-    --   cs <- runTest 3 3 $ do
-    --     x <- inputField
-    --     y <- reuse x
-    --     z <- reuse (x + y)
-    --     return (x + y + z)
-
-    --   Map.toList (UnionFind.toMap (csVarEqF cs))
-    --     `shouldContain` [(RefFO 0, (4, RefFI 0, 0))]
+      Map.toList (UnionFind.toMap (csVarEqF cs))
+        `shouldContain` [(RefFO 0, (4, RefFI 0, 0))]
 
 -- it "Basic.summation" $ do
 --   runTest 1 Basic.summation

@@ -154,20 +154,23 @@ instance Show RefU where
 
 --------------------------------------------------------------------------------
 
--- pinnedRefF :: RefF -> Bool
--- pinnedRefF (RefFI _) = True
--- pinnedRefF (RefFO _) = True
--- pinnedRefF _ = True
+pinnedRefF :: RefF -> Bool
+pinnedRefF (RefFI _) = True
+pinnedRefF (RefFO _) = True
+pinnedRefF (RefBtoRefF ref) = pinnedRefB ref
+pinnedRefF _ = False
 
--- pinnedRefB :: RefB -> Bool
--- pinnedRefB (RefBI _) = True
--- pinnedRefB (RefBO _) = True
--- pinnedRefB _ = True
+pinnedRefB :: RefB -> Bool
+pinnedRefB (RefBI _) = True
+pinnedRefB (RefBO _) = True
+pinnedRefB (RefUBit _ ref _) = pinnedRefU ref
+pinnedRefB _ = False
 
--- pinnedRefU :: RefU -> Bool
--- pinnedRefU (RefUI _ _) = True
--- pinnedRefU (RefUO _ _) = True
--- pinnedRefU _ = True
+pinnedRefU :: RefU -> Bool
+pinnedRefU (RefUI _ _) = True
+pinnedRefU (RefUO _ _) = True
+pinnedRefU (RefBtoRefU ref) = pinnedRefB ref
+pinnedRefU _ = False
 
 --------------------------------------------------------------------------------
 
@@ -243,13 +246,12 @@ substPolyG_ (changed, ctx, xs, substitutedRefs) ref coeff = case UnionFind.findM
   Nothing -> case xs of
     Nothing -> (changed, ctx, Just $ PolyG.singleton 0 (ref, coeff), substitutedRefs)
     Just xs' -> (changed, ctx, Just $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
-  Just ((slope, root, intercept), ctx') -> 
+  Just ((slope, root, intercept), ctx') ->
     let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
-     in
-    case xs of
-    -- ref = slope * root + intercept
-    Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff),  substitutedRefs')
-    Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs',  substitutedRefs')
+     in case xs of
+          -- ref = slope * root + intercept
+          Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff), substitutedRefs')
+          Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
 
 --------------------------------------------------------------------------------
 
@@ -603,35 +605,29 @@ relocateConstraintSystem cs =
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
 
-    -- fromUnionFind pinned ctor1 _ctor2 (var1, (1, var2, 0)) =
-    --   if pinned var1 && pinned var2
-    --     then Just $ fromConstraint counters (ctor1 var1 var2)
-    --     else Nothing
-    -- fromUnionFind pinned _ctor1 ctor2 (var1, (slope2, var2, intercept2)) =
-    --   if pinned var1 && pinned var2
-    --     then case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
-    --       Left _ -> Nothing
-    --       Right poly -> Just $ fromConstraint counters (ctor2 poly)
-    --     else Nothing
+    -- remove the constraint if it containts any variable that is not pinned and have occurrence count of 0
+    shouldRemoveF occurrences var = case Map.lookup var occurrences of
+      Nothing -> not (pinnedRefF var)
+      Just 0 -> not (pinnedRefF var)
+      Just _ -> False
 
-    -- isPinnedF :: RefF -> Bool
-    -- isPinnedF (RefFO _) = True
-    -- isPinnedF (RefFI _) = True
-    -- isPinnedF (RefBtoRefF b) = isPinnedB b
-    -- isPinnedF _ = False
-
-    -- isPinnedB :: RefB -> Bool
-    -- isPinnedB (RefBO _) = True
-    -- isPinnedB (RefBI _) = True
-    -- isPinnedB _ = False
-
-    -- varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFind isPinnedF CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
-
-    fromUnionFind ctor1 _ctor2 (var1, (1, var2, 0)) = Just $ fromConstraint counters (ctor1 var1 var2)
-    fromUnionFind _ctor1 ctor2 (var1, (slope2, var2, intercept2)) =
+    fromUnionFindF occurrences (var1, (1, var2, 0)) =
+      if shouldRemoveF occurrences var1 || shouldRemoveF occurrences var2
+        then Nothing
+        else Just $ fromConstraint counters (CVarEqF var1 var2)
+    fromUnionFindF occurrences (var1, (slope2, var2, intercept2)) =
       case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
         Left _ -> Nothing
-        Right poly -> Just $ fromConstraint counters (ctor2 poly)
+        Right poly ->
+          if shouldRemoveF occurrences var1 || shouldRemoveF occurrences var2
+            then Nothing
+            else Just $ fromConstraint counters (CAddF poly)
+
+    -- fromUnionFind ctor1 _ctor2 (var1, (1, var2, 0)) = Just $ fromConstraint counters (ctor1 var1 var2)
+    -- fromUnionFind _ctor1 ctor2 (var1, (slope2, var2, intercept2)) =
+    --   case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
+    --     Left _ -> Nothing
+    --     Right poly -> Just $ fromConstraint counters (ctor2 poly)
     -- fromConstraint
     --   counters
     --   ( case PolyG.build 0 [(var1, -1), (var2, coeff)] of
@@ -639,7 +635,7 @@ relocateConstraintSystem cs =
     --       Right poly -> ctor2 poly
     --   )
 
-    varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
+    varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindF (csOccurrenceF cs)) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
     -- varEqFs = Seq.fromList $ map (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
 
     varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
