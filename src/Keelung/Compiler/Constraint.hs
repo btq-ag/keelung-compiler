@@ -426,6 +426,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 -- | A constraint system is a collection of constraints
 data ConstraintSystem n = ConstraintSystem
   { csCounters :: !Counters,
+    csUseNewOptimizer :: Bool,
     -- for counting the occurences of variables in constraints (excluding the ones that are in UnionFind)
     csOccurrenceF :: !(Map RefF Int),
     csOccurrenceB :: !(Map RefB Int),
@@ -606,11 +607,12 @@ relocateConstraintSystem cs =
     uncurry3 f (a, b, c) = f a b c
 
     -- remove the constraint if it containts any variable that is not pinned and have occurrence count of 0
-    shouldRemoveF occurrences var = False
-      -- case Map.lookup var occurrences of
-      -- Nothing -> not (pinnedRefF var)
-      -- Just 0 -> not (pinnedRefF var)
-      -- Just _ -> False
+    shouldRemoveF occurrences var =
+      csUseNewOptimizer cs
+        && case Map.lookup var occurrences of
+          Nothing -> not (pinnedRefF var)
+          Just 0 -> not (pinnedRefF var)
+          Just _ -> False
 
     fromUnionFindF occurrences (var1, (1, var2, 0)) =
       if shouldRemoveF occurrences var1 || shouldRemoveF occurrences var2
@@ -624,20 +626,7 @@ relocateConstraintSystem cs =
             then Nothing
             else Just $ fromConstraint counters (CAddF poly)
 
-    -- fromUnionFind ctor1 _ctor2 (var1, (1, var2, 0)) = Just $ fromConstraint counters (ctor1 var1 var2)
-    -- fromUnionFind _ctor1 ctor2 (var1, (slope2, var2, intercept2)) =
-    --   case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
-    --     Left _ -> Nothing
-    --     Right poly -> Just $ fromConstraint counters (ctor2 poly)
-    -- fromConstraint
-    --   counters
-    --   ( case PolyG.build 0 [(var1, -1), (var2, coeff)] of
-    --       Left _ -> error "[ panic ] empty polynomial"
-    --       Right poly -> ctor2 poly
-    --   )
-
     varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindF (csOccurrenceF cs)) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
-    -- varEqFs = Seq.fromList $ map (fromUnionFind CVarEqF CAddF) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
 
     varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs

@@ -4,7 +4,7 @@
 module Test.ConstraintMinimizer (tests, run) where
 
 import Data.Map.Strict qualified as Map
-import Keelung hiding (run)
+import Keelung hiding (compileO0, run)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Compile qualified as Compiler
 import Keelung.Compiler.Constraint
@@ -18,12 +18,12 @@ import Test.Hspec
 import Control.Monad
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
-compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
-compileOnly program = Compiler.erase program >>= return . Compiler.run . ConstantPropagation.run
+compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0 program = Compiler.erase program >>= return . Compiler.run True . ConstantPropagation.run
 
 runTest :: Encode t => Int -> Int -> Comp t -> IO (ConstraintSystem (N GF181))
 runTest expectedBeforeSize expectedAfterSize program = do
-  cs <- case Compiler.asGF181N $ compileOnly program of
+  cs <- case Compiler.asGF181N $ compileO0 program of
     Left err -> assertFailure $ show err
     Right result -> return result
 
@@ -91,7 +91,7 @@ tests = do
 
     -- within the range of [0, 12289)
     it "Manual range check (< 12289)" $ do
-      void $ runTest 77 77 $ do 
+      void $ runTest 49 49 $ do 
         value <- input
         bits <- inputs 14
 
@@ -111,7 +111,28 @@ tests = do
         let smallerThan12289 = BtoF bit13 * BtoF bit12 * bit11to0
         assert (smallerThan12289 `eq` 0)
 
-      -- print cs
+    it "Fake range check on Field" $ do
+      void $ runTest 7 7 $ do 
+        value <- inputField
+        let dimension = 2
+        bits <- inputs dimension
+
+        let summation = foldl (\acc k ->
+                              let bit = access bits k
+                                  bitValue = fromInteger (2 ^ k :: Integer)
+                                  prod = bit * bitValue
+                              in  (acc + prod))  0 [0 .. dimension - 1]
+        assert (value `eq` summation)
+
+        let bit13 = access bits (dimension - 1)
+        let bit12 = access bits (dimension - 2)
+        let bit11to0 = foldl (\acc k ->
+                                let bit = access bits k
+                                in  acc + bit) 0 [0 .. dimension - 3]
+
+        let smallerThan12289 = bit13 * bit12 * bit11to0
+        assert (smallerThan12289 `eq` 0)
+
 -- it "Basic.summation2" $ do
 --   runTest 1 Basic.summation2
 -- it "Basic.assertArraysEqual2" $ do

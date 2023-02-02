@@ -90,11 +90,11 @@ erase prog = eraseElab <$> elaborate prog
 
 -- elaborate => rewrite => type erase => compile => relocate
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)
-compileOnly prog = erase prog >>= return . relocateConstraintSystem . Compile.run
+compileOnly prog = erase prog >>= return . relocateConstraintSystem . Compile.run False
 
 -- elaborate => rewrite => type erase => constant propagation => compile => relocate
 compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)
-compileO0 prog = erase prog >>= return . relocateConstraintSystem . Compile.run . ConstantPropagation.run
+compileO0 prog = erase prog >>= return . relocateConstraintSystem . Compile.run False . ConstantPropagation.run
 
 -- elaborate => rewrite => type erase => constant propagation => compile => relocate => optimisation I
 compileO1 ::
@@ -108,7 +108,7 @@ compileO1' ::
   (GaloisField n, Integral n, Encode t) =>
   Comp t ->
   Either (Error n) (ConstraintSystem n)
-compileO1' prog = erase prog >>= return . Optimizer.optimize1' . Compile.run . ConstantPropagation.run
+compileO1' prog = erase prog >>= return . Optimizer.optimize1' . Compile.run True . ConstantPropagation.run
 
 -- | 'compile' defaults to 'compileO1'
 compile ::
@@ -155,13 +155,13 @@ genInputsOutputsWitnessesElab elab rawInputs = do
   return (inputs, outputs, witness)
 
 compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO0Elab = return . relocateConstraintSystem . Compile.run . ConstantPropagation.run . Erase.run
+compileO0Elab = return . relocateConstraintSystem . Compile.run False . ConstantPropagation.run . Erase.run
 
 compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO1Elab = return . Optimizer.optimize1 . relocateConstraintSystem . Compile.run . ConstantPropagation.run . Erase.run
+compileO1Elab = return . Optimizer.optimize1 . relocateConstraintSystem . Compile.run False . ConstantPropagation.run . Erase.run
 
 compileO2Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO2Elab = return . Optimizer.optimize2 . Optimizer.optimize1 . relocateConstraintSystem . Compile.run . ConstantPropagation.run . Erase.run
+compileO2Elab = return . Optimizer.optimize2 . Optimizer.optimize1 . relocateConstraintSystem . Compile.run False . ConstantPropagation.run . Erase.run
 
 --------------------------------------------------------------------------------
 

@@ -22,8 +22,8 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => TypeErased n -> ConstraintSystem n
-run (TypeErased untypedExprs _ counters relations assertions divModRelsU) = runM counters $ do
+run :: (GaloisField n, Integral n) => Bool -> TypeErased n -> ConstraintSystem n
+run useNewOptimizer (TypeErased untypedExprs _ counters relations assertions divModRelsU) = runM useNewOptimizer counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -175,8 +175,8 @@ compileRelations (Relations vb eb) = do
 -- | Monad for compilation
 type M n = State (ConstraintSystem n)
 
-runM :: GaloisField n => Counters -> M n a -> ConstraintSystem n
-runM counters program = execState program (ConstraintSystem counters mempty mempty mempty UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty)
+runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
