@@ -13,7 +13,9 @@ module Keelung.Compiler.Constraint
     reindexRefU,
     Constraint (..),
     addOccurrencesWithPolyG,
+    removeOccurrencesWithPolyG,
     addOccurrences,
+    removeOccurrences,
     substPolyG,
     cAddF,
     cAddB,
@@ -54,12 +56,12 @@ import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Constraint.Polynomial (Poly)
 import Keelung.Constraint.Polynomial qualified as Poly
 import Keelung.Constraint.R1CS qualified as Constraint
+import Keelung.Data.Bindings (showList')
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters
 import Keelung.Types
-import Keelung.Data.Bindings (showList')
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)
@@ -227,24 +229,27 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 -- | Normalize a polynomial by substituting roots
 -- for the variables that appear in the polynomial.
 -- substPoly :: (GaloisField n, Integral n) => UnionFind RefF -> PolyG RefF n -> Maybe (PolyG RefF n, UnionFind RefF)
-substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref n)
+substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref n, [ref])
 substPolyG ctx poly = do
   let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' substPolyG_ (False, ctx, Nothing) xs of
-    (False, _, _) -> Nothing
-    (True, _, Nothing) -> Nothing
-    (True, ctx', Just poly') -> Just (PolyG.addConstant c poly', ctx')
+  case Map.foldlWithKey' substPolyG_ (False, ctx, Nothing, []) xs of
+    (False, _, _, _) -> Nothing
+    (True, _, Nothing, _) -> Nothing
+    (True, ctx', Just poly', substitutedRefs) -> Just (PolyG.addConstant c poly', ctx', substitutedRefs)
 
 -- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
-substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref n, Maybe (PolyG ref n)) -> ref -> n -> (Bool, UnionFind ref n, Maybe (PolyG ref n))
-substPolyG_ (changed, ctx, xs) ref coeff = case UnionFind.findMaybe ref ctx of
+substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref n, Maybe (PolyG ref n), [ref]) -> ref -> n -> (Bool, UnionFind ref n, Maybe (PolyG ref n), [ref])
+substPolyG_ (changed, ctx, xs, substitutedRefs) ref coeff = case UnionFind.findMaybe ref ctx of
   Nothing -> case xs of
-    Nothing -> (changed, ctx, Just $ PolyG.singleton 0 (ref, coeff))
-    Just xs' -> (changed, ctx, Just $ PolyG.insert 0 (ref, coeff) xs')
-  Just ((slope, root, intercept), ctx') -> case xs of
+    Nothing -> (changed, ctx, Just $ PolyG.singleton 0 (ref, coeff), substitutedRefs)
+    Just xs' -> (changed, ctx, Just $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
+  Just ((slope, root, intercept), ctx') -> 
+    let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
+     in
+    case xs of
     -- ref = slope * root + intercept
-    Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff))
-    Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs')
+    Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff),  substitutedRefs')
+    Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs',  substitutedRefs')
 
 --------------------------------------------------------------------------------
 
@@ -523,12 +528,18 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       showNEqF = adapt "NEqF" (Map.toList $ csNEqF cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
       showNEqU = adapt "NEqU" (Map.toList $ csNEqU cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
 
-      showOccurrencesF = if Map.null $ csOccurrenceF cs then "" else
-        "  OccruencesF:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceF cs)))
-      showOccurrencesB = if Map.null $ csOccurrenceB cs then "" else
-        "  OccruencesB:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceB cs)))
-      showOccurrencesU = if Map.null $ csOccurrenceU cs then "" else
-        "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceU cs)))
+      showOccurrencesF =
+        if Map.null $ csOccurrenceF cs
+          then ""
+          else "  OccruencesF:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceF cs)))
+      showOccurrencesB =
+        if Map.null $ csOccurrenceB cs
+          then ""
+          else "  OccruencesB:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceB cs)))
+      showOccurrencesU =
+        if Map.null $ csOccurrenceU cs
+          then ""
+          else "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceU cs)))
 
       showVariables :: String
       showVariables =
@@ -646,15 +657,28 @@ relocateConstraintSystem cs =
     nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ Map.toList $ csNEqU cs
 
 addOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
-addOccurrencesWithPolyG poly occurrences = 
+addOccurrencesWithPolyG poly occurrences =
   Map.merge
     (Map.traverseMissing (\_ count -> return count)) -- do nothing when it's not in the polynomial
     (Map.traverseMissing (\_ _ -> return 1)) -- set the occurrence count to 1 when it's not in the occurrences map
     (Map.zipWithAMatched (\_ count _ -> return (succ count))) -- increment the occurrence count when it's present in both
-     occurrences (snd (PolyG.viewAsMap poly))
+    occurrences
+    (snd (PolyG.viewAsMap poly))
 
 addOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
 addOccurrences = flip $ foldl (\occurrences ref -> Map.insertWith (+) ref 1 occurrences)
+
+removeOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
+removeOccurrencesWithPolyG poly occurrences =
+  Map.merge
+    (Map.traverseMissing (\_ count -> return count)) -- do nothing when it's not in the polynomial
+    (Map.traverseMissing (\_ _ -> return 1)) -- do nothing when it's not in the occurrences map
+    (Map.zipWithAMatched (\_ count _ -> return (pred count `max` 0))) -- increment the occurrence count when it's present in both
+    occurrences
+    (snd (PolyG.viewAsMap poly))
+
+removeOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
+removeOccurrences = flip $ foldl (flip (Map.adjust (\count -> pred count `max` 0)))
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
