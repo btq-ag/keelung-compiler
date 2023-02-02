@@ -15,6 +15,7 @@ import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as Unio
 import Keelung.Compiler.Relocated qualified as Relocated
 import Test.HUnit (assertFailure)
 import Test.Hspec
+import Control.Monad
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
@@ -88,8 +89,29 @@ tests = do
       Map.toList (UnionFind.toMap (csVarEqF cs))
         `shouldContain` [(RefF 0, (1, RefFI 0, 1))]
 
--- it "Basic.summation" $ do
---   runTest 1 Basic.summation
+    -- within the range of [0, 12289)
+    it "Manual range check (< 12289)" $ do
+      void $ runTest 77 77 $ do 
+        value <- input
+        bits <- inputs 14
+
+        let summation = foldl (\acc k ->
+                              let bit = access bits k
+                                  bitValue = fromIntegral (2 ^ k :: Integer)
+                                  prod = BtoF bit * bitValue
+                              in  (acc + prod))  0 [0 .. 13]
+        assert (value `eq` summation)
+
+        let bit13 = access bits 13
+        let bit12 = access bits 12
+        let bit11to0 = foldl (\acc k ->
+                                let bit = access bits k
+                                in  acc + BtoF bit) 0 [0 .. 11]
+
+        let smallerThan12289 = BtoF bit13 * BtoF bit12 * bit11to0
+        assert (smallerThan12289 `eq` 0)
+
+      -- print cs
 -- it "Basic.summation2" $ do
 --   runTest 1 Basic.summation2
 -- it "Basic.assertArraysEqual2" $ do

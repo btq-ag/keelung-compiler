@@ -606,10 +606,11 @@ relocateConstraintSystem cs =
     uncurry3 f (a, b, c) = f a b c
 
     -- remove the constraint if it containts any variable that is not pinned and have occurrence count of 0
-    shouldRemoveF occurrences var = case Map.lookup var occurrences of
-      Nothing -> not (pinnedRefF var)
-      Just 0 -> not (pinnedRefF var)
-      Just _ -> False
+    shouldRemoveF occurrences var = False
+      -- case Map.lookup var occurrences of
+      -- Nothing -> not (pinnedRefF var)
+      -- Just 0 -> not (pinnedRefF var)
+      -- Just _ -> False
 
     fromUnionFindF occurrences (var1, (1, var2, 0)) =
       if shouldRemoveF occurrences var1 || shouldRemoveF occurrences var2
