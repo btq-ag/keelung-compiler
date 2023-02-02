@@ -58,14 +58,13 @@ runAddM cs m = runState (runWriterT m) cs
 classifyAdd :: (GaloisField n, Integral n) => PolyG RefF n -> AddM n Bool
 classifyAdd poly = case PolyG.view poly of
   (_, []) -> error "[ panic ] Empty polynomial"
-  (0, [(var, _)]) -> do
-    tell $ mempty {learnedFromAddBind = Map.singleton var 0}
+  (intercept, [(var, slope)]) -> do
+    tell $ mempty {learnedFromAddBind = Map.singleton var (-intercept / slope)}
     return False
-  (0, [(var1, c), (var2, d)]) -> do
-    modify' $ \cs -> cs {csVarEqF = UnionFind.union var1 (-d / c, var2, 0) (csVarEqF cs)}
-    return False
-  (0, _) -> return True
-  (c, [(var, coeff)]) -> do
-    tell $ mempty {learnedFromAddBind = Map.singleton var (-c / coeff)}
+  (intercept, [(var1, slope1), (var2, slope2)]) -> do
+    --    intercept + slope1 * var1 + slope2 * var2 = 0
+    --  =>
+    --    var1 = - intercept / slope1 - slope2 / slope1 * var2
+    modify' $ \cs -> cs {csVarEqF = UnionFind.union var1 (-slope2 / slope1, var2, -intercept / slope1) (csVarEqF cs)}
     return False
   (_, _) -> return True

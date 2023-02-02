@@ -24,7 +24,7 @@ instance (Show ref, Show n, Eq n, Num n) => Show (UnionFind ref n) where
   show xs =
     "UnionFind {\n"
       ++ "  links = "
-      ++ showList' (map (\(var, (slope, root, intercept)) -> show var <> " = " <> (if slope == 1 then "" else show slope) <> show root <> (if intercept == 0 then "" else show intercept)) (Map.toList $ links xs))
+      ++ showList' (map (\(var, (slope, root, intercept)) -> show var <> " = " <> (if slope == 1 then "" else show slope) <> show root <> (if intercept == 0 then "" else " + " <> show intercept)) (Map.toList $ links xs))
       ++ "\n"
       ++ "  sizes = "
       ++ showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ sizes xs))
