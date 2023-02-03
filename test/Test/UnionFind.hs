@@ -1,12 +1,16 @@
 module Test.UnionFind (tests, run) where
 
 import Control.Monad.State
-import qualified Data.Map.Strict as Map
+import Data.Map.Strict qualified as Map
+import Data.Maybe qualified as Maybe
 import Keelung hiding (run)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
-import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind as UnionFind
+import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
+import Test.QuickCheck (Arbitrary (arbitrary))
+import Test.QuickCheck.Arbitrary (Arbitrary)
+import Test.QuickCheck.Arbitrary qualified as Arbitrary
 
 run :: IO ()
 run = hspec tests
@@ -75,9 +79,9 @@ tests = do
         "z" `relate` (2, "y", 4) -- z = 2y + 4
         "y" `relate` (3, "x", 1) -- y = 3x + 1
         xs <- list
-        xs `shouldContain` [("x", (1 / 3, "y", -1/3))] -- x = (y - 1)/3
+        xs `shouldContain` [("x", (1 / 3, "y", -1 / 3))] -- x = (y - 1)/3
         xs `shouldContain` [("z", (2, "y", 4))] -- z = 2y + 4
-        lookupAndAssert "x" (1 / 3, "y", -1/3)
+        lookupAndAssert "x" (1 / 3, "y", -1 / 3)
         lookupAndAssert "z" (2, "y", 4)
 
 type M = StateT (UnionFind String GF181) IO
@@ -104,7 +108,7 @@ findAndAssert var expected = do
   actual `shouldBe` expected
 
 relate :: String -> (GF181, String, GF181) -> M ()
-relate var val = do 
+relate var val = do
   xs <- get
   forM_ (UnionFind.relate var val xs) put
 
@@ -113,3 +117,13 @@ lookupAndAssert var expected = do
   xs <- get
   let (_varIsRoot, slope, root, intercept) = UnionFind.lookup var xs
   (slope, root, intercept) `shouldBe` expected
+
+------------------------------------------------------------------------
+
+instance (Arbitrary ref, Arbitrary n, GaloisField n, Ord ref) => Arbitrary (UnionFind ref n) where
+  arbitrary = do
+    relations <- Arbitrary.vector 100
+
+    return $ foldl go UnionFind.new relations
+    where
+      go xs (var, slope, ref, intercept) = Maybe.fromMaybe xs (UnionFind.relate var (slope, ref, intercept) xs)

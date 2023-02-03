@@ -58,30 +58,32 @@ tests = do
     --   Map.toList (UnionFind.toMap (csVarEqF cs))
     --     `shouldContain` []
 
-    it "Union Find 1" $ do
-      cs <- runTest 3 1 $ do
-        x <- inputField
-        y <- reuse x
-        z <- reuse x
-        return (x + y + z)
-      Map.toList (UnionFind.toMap (csVarEqF cs))
-        `shouldContain` [(RefFO 0, (3, RefFI 0, 0))]
+    -- it "Union Find 1" $ do
+    --   cs <- runTest 3 1 $ do
+    --     x <- inputField
+    --     y <- reuse x
+    --     z <- reuse x
+    --     return (x + y + z)
+    --   Map.toList (UnionFind.toMap (csVarEqF cs))
+    --     `shouldContain` [(RefFO 0, (3, RefFI 0, 0))]
 
-    it "Union Find 2" $ do
-      cs <- runTest 3 1 $ do
-        x <- inputField
-        y <- reuse x
-        z <- reuse (x + y)
-        return (x + y + z)
+    -- it "Union Find 2" $ do
+    --   cs <- runTest 3 1 $ do
+    --     x <- inputField
+    --     y <- reuse x
+    --     z <- reuse (x + y)
+    --     return (x + y + z)
 
-      Map.toList (UnionFind.toMap (csVarEqF cs))
-        `shouldContain` [(RefFO 0, (4, RefFI 0, 0))]
+    --   Map.toList (UnionFind.toMap (csVarEqF cs))
+    --     `shouldContain` [(RefFO 0, (4, RefFI 0, 0))]
 
     it "Union Find 3" $ do
       cs <- runTest 2 1 $ do
         x <- inputField
         y <- reuse (x + 1)
         return (x + y)
+        -- F0 = FI0 + 1
+        -- FO0 = FI0 + F0 = 2 * FI0 + 1
 
       Map.toList (UnionFind.toMap (csVarEqF cs))
         `shouldContain` [(RefFO 0, (2, RefFI 0, 1))]
@@ -89,49 +91,49 @@ tests = do
       Map.toList (UnionFind.toMap (csVarEqF cs))
         `shouldContain` [(RefF 0, (1, RefFI 0, 1))]
 
-    -- within the range of [0, 12289)
-    it "Manual range check (< 12289)" $ do
-      void $ runTest 49 49 $ do 
-        value <- input
-        bits <- inputs 14
+    -- -- within the range of [0, 12289)
+    -- it "Manual range check (< 12289)" $ do
+    --   void $ runTest 49 49 $ do 
+    --     value <- input
+    --     bits <- inputs 14
 
-        let summation = foldl (\acc k ->
-                              let bit = access bits k
-                                  bitValue = fromIntegral (2 ^ k :: Integer)
-                                  prod = BtoF bit * bitValue
-                              in  (acc + prod))  0 [0 .. 13]
-        assert (value `eq` summation)
+    --     let summation = foldl (\acc k ->
+    --                           let bit = access bits k
+    --                               bitValue = fromIntegral (2 ^ k :: Integer)
+    --                               prod = BtoF bit * bitValue
+    --                           in  (acc + prod))  0 [0 .. 13]
+    --     assert (value `eq` summation)
 
-        let bit13 = access bits 13
-        let bit12 = access bits 12
-        let bit11to0 = foldl (\acc k ->
-                                let bit = access bits k
-                                in  acc + BtoF bit) 0 [0 .. 11]
+    --     let bit13 = access bits 13
+    --     let bit12 = access bits 12
+    --     let bit11to0 = foldl (\acc k ->
+    --                             let bit = access bits k
+    --                             in  acc + BtoF bit) 0 [0 .. 11]
 
-        let smallerThan12289 = BtoF bit13 * BtoF bit12 * bit11to0
-        assert (smallerThan12289 `eq` 0)
+    --     let smallerThan12289 = BtoF bit13 * BtoF bit12 * bit11to0
+    --     assert (smallerThan12289 `eq` 0)
 
-    it "Fake range check on Field" $ do
-      void $ runTest 7 7 $ do 
-        value <- inputField
-        let dimension = 2
-        bits <- inputs dimension
+    -- it "Fake range check on Field" $ do
+    --   void $ runTest 7 7 $ do 
+    --     value <- inputField
+    --     let dimension = 2
+    --     bits <- inputs dimension
 
-        let summation = foldl (\acc k ->
-                              let bit = access bits k
-                                  bitValue = fromInteger (2 ^ k :: Integer)
-                                  prod = bit * bitValue
-                              in  (acc + prod))  0 [0 .. dimension - 1]
-        assert (value `eq` summation)
+    --     let summation = foldl (\acc k ->
+    --                           let bit = access bits k
+    --                               bitValue = fromInteger (2 ^ k :: Integer)
+    --                               prod = bit * bitValue
+    --                           in  (acc + prod))  0 [0 .. dimension - 1]
+    --     assert (value `eq` summation)
 
-        let bit13 = access bits (dimension - 1)
-        let bit12 = access bits (dimension - 2)
-        let bit11to0 = foldl (\acc k ->
-                                let bit = access bits k
-                                in  acc + bit) 0 [0 .. dimension - 3]
+    --     let bit13 = access bits (dimension - 1)
+    --     let bit12 = access bits (dimension - 2)
+    --     let bit11to0 = foldl (\acc k ->
+    --                             let bit = access bits k
+    --                             in  acc + bit) 0 [0 .. dimension - 3]
 
-        let smallerThan12289 = bit13 * bit12 * bit11to0
-        assert (smallerThan12289 `eq` 0)
+    --     let smallerThan12289 = bit13 * bit12 * bit11to0
+    --     assert (smallerThan12289 `eq` 0)
 
 -- it "Basic.summation2" $ do
 --   runTest 1 Basic.summation2

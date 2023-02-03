@@ -11,6 +11,7 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Debug.Trace
 
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 run cs =
@@ -27,6 +28,8 @@ goThroughAddFM acc poly = do
   case substPolyG unionFind poly of
     Nothing -> return (poly : acc)
     Just (poly', unionFind', substitutedRefs) -> do
+      traceShowM (poly, " => ", poly')
+
       modify' $ \cs -> cs {csVarEqF = unionFind'}
       keep <- classifyAdd poly'
       if keep
@@ -64,7 +67,13 @@ classifyAdd poly = case PolyG.view poly of
   (intercept, [(var1, slope1), (var2, slope2)]) -> do
     --    intercept + slope1 * var1 + slope2 * var2 = 0
     --  =>
-    --    var1 = - intercept / slope1 - slope2 / slope1 * var2
-    modify' $ \cs -> cs {csVarEqF = UnionFind.union var1 (-slope2 / slope1, var2, -intercept / slope1) (csVarEqF cs)}
-    return False
+    --    slope1 * var1 = - slope2 * var2 - intercept
+    --  =>
+    --    var1 = - slope2 * var2 / slope1 - intercept / slope1
+    cs <- get
+    case UnionFind.relate var1 (-slope2 / slope1, var2, -intercept / slope1) (csVarEqF cs) of
+      Nothing -> return True
+      Just unionFind' -> do
+        put $ cs {csVarEqF = unionFind'}
+        return False
   (_, _) -> return True

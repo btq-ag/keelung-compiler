@@ -100,9 +100,12 @@ relate' x (slope, y, intercept) xs =
         then Nothing
         else
           if sizeOfRootX > sizeOfRootY
-            then --  x = slope * y + intercept
+            then 
+              --  x = slope * y + intercept
             --    =>
             --  y = (x - intercept) / slope
+            --    =>
+            --  y = (slopeX * rootOfX + interceptX - intercept) / slope
             --    =>
             --  y = slopeX * rootOfX / slope + (interceptX - intercept) / slope
 

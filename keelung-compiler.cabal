@@ -152,6 +152,7 @@ test-suite keelung-test
       Test.ConstraintMinimizer
       Test.Interpreter
       Test.Optimization
+      Test.PolyG
       Test.UnionFind
       Test.VarLayout
       Keelung.Compiler

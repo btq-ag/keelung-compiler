@@ -17,6 +17,7 @@ module Keelung.Compiler.Constraint
     addOccurrences,
     removeOccurrences,
     substPolyG,
+    substPolyG2,
     cAddF,
     cAddB,
     cAddU,
@@ -252,6 +253,29 @@ substPolyG_ (changed, ctx, xs, substitutedRefs) ref coeff = case UnionFind.findM
           -- ref = slope * root + intercept
           Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff), substitutedRefs')
           Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
+
+substPolyG2 :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, [ref])
+substPolyG2 ctx poly = do
+  let (c, xs) = PolyG.viewAsMap poly
+  case Map.foldlWithKey' (substPolyG2_ ctx) (False, Nothing, []) xs of
+    (False, _, _) -> Nothing
+    (True, Nothing, _) -> Nothing
+    (True, Just poly', substitutedRefs) -> Just (PolyG.addConstant c poly', substitutedRefs)
+
+-- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
+substPolyG2_ :: (Integral n, Ord ref) => UnionFind ref n -> (Bool, Maybe (PolyG ref n), [ref]) -> ref -> n -> (Bool, Maybe (PolyG ref n), [ref])
+substPolyG2_ ctx (changed, xs, substitutedRefs) ref coeff =
+  let (isAlreadyRoot, slope, root, intercept) = UnionFind.lookup ref ctx
+   in if isAlreadyRoot
+        then case xs of
+          Nothing -> (changed, Just $ PolyG.singleton 0 (ref, coeff), substitutedRefs)
+          Just xs' -> (changed, Just $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
+        else
+          let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
+           in case xs of
+                -- ref = slope * root + intercept
+                Nothing -> (changed, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff), substitutedRefs')
+                Just xs' -> (True, Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
 
 --------------------------------------------------------------------------------
 
