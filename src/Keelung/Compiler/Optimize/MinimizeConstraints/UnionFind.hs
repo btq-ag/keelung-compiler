@@ -4,7 +4,7 @@
 
 {-# HLINT ignore "Replace case with fromMaybe" #-}
 
-module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, relationBetween, new, lookup, relate, toMap, size) where
+module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, relationBetween, new, lookup, relate, bindToValue, toMap, size) where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)

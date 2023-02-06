@@ -3,8 +3,10 @@
 {-# HLINT ignore "Use <&>" #-}
 module Test.ConstraintMinimizer (tests, run) where
 
-import Data.Foldable (toList)
-import Data.Map.Strict qualified as Map
+-- import Data.Foldable (toList)
+-- import Hash.Poseidon qualified as Poseidon
+
+import Data.Foldable
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compileO0, run)
 import Keelung.Compiler qualified as Compiler
@@ -51,13 +53,11 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
-    -- it "Poseidon" $ do
-    --   cs <- runTest 1537 855 $ do
-    --     xs <- inputs 1
-    --     Poseidon.hash (toList xs)
-
-    --   Map.toList (UnionFind.toMap (csVarEqF cs))
-    --     `shouldContain` []
+    it "Poseidon" $ do
+      _cs <- runTest 1537 855 $ do
+        xs <- inputs 1
+        Poseidon.hash (toList xs)
+      return ()
 
     it "Union Find 1" $ do
       cs <- runTest 3 1 $ do
@@ -93,19 +93,17 @@ tests = do
         y <- reuse (x + 1)
         return (x + y)
 
-      -- FO0 = 2FI0 + 1 
+      -- FO0 = 2FI0 + 1
       UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (2, 1)
 
-    -- it "Union Find 4" $ do
-    --   cs <- runTest 2 2 $ do
-    --     let x = 4
-    --     y <- reuse x
-    --     return (x + y :: Field)
-    
-    --   -- FO0 = 8 
-    --   snd (UnionFind.lookup (RefFO 0) (csVarEqF cs)) `shouldBe` (Nothing, 8)
+    it "Union Find 4" $ do
+      cs <- runTest 1 1 $ do
+        let x = 4
+        y <- reuse x
+        return (x + y :: Field)
 
-
+      -- FO0 = 8
+      snd (UnionFind.lookup (RefFO 0) (csVarEqF cs)) `shouldBe` (Nothing, 8)
 
 --   print cs
 

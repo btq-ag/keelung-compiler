@@ -21,7 +21,7 @@ run cs =
         else cs''
 
 -- goThroughUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> UnionFind RefF n
--- goThroughUnionFindF unionFind = 
+-- goThroughUnionFindF unionFind =
 
 goThroughAddFM :: (GaloisField n, Integral n) => [PolyG RefF n] -> PolyG RefF n -> AddM n [PolyG RefF n]
 goThroughAddFM acc poly = do

@@ -188,12 +188,15 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify (\cs -> cs {csAddF = xs : csAddF cs, csOccurrenceF = addOccurrencesWithPolyG xs (csOccurrenceF cs)})
     addOne (CAddB xs) = modify (\cs -> cs {csAddB = xs : csAddB cs, csOccurrenceB = addOccurrencesWithPolyG xs (csOccurrenceB cs)})
     addOne (CAddU xs) = modify (\cs -> cs {csAddU = xs : csAddU cs, csOccurrenceU = addOccurrencesWithPolyG xs (csOccurrenceU cs)})
-    addOne (CVarBindF x c) = modify (\cs -> cs {csVarBindF = Map.insert x c (csVarBindF cs), csOccurrenceF = addOccurrences [x] (csOccurrenceF cs)})
+    addOne (CVarBindF x c) = do
+      cs <- get
+      let csVarEqF' = UnionFind.bindToValue x c (csVarEqF cs)
+      put cs {csVarEqF = csVarEqF', csVarBindF = Map.insert x c (csVarBindF cs)}
     addOne (CVarBindB x c) = modify (\cs -> cs {csVarBindB = Map.insert x c (csVarBindB cs), csOccurrenceB = addOccurrences [x] (csOccurrenceB cs)})
     addOne (CVarBindU x c) = modify (\cs -> cs {csVarBindU = Map.insert x c (csVarBindU cs), csOccurrenceU = addOccurrences [x] (csOccurrenceU cs)})
-    addOne (CVarEqF x y) = do 
+    addOne (CVarEqF x y) = do
       cs <- get
-      case UnionFind.relate x (1, y, 0) (csVarEqF cs) of 
+      case UnionFind.relate x (1, y, 0) (csVarEqF cs) of
         Nothing -> return ()
         Just csVarEqF' -> put cs {csVarEqF = csVarEqF'}
     addOne (CVarEqB x y) = modify (\cs -> cs {csVarEqB = (x, y) : csVarEqB cs})

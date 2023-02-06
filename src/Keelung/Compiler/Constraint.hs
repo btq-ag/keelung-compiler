@@ -632,7 +632,6 @@ relocateConstraintSystem cs =
         varEqFs
           <> varEqBs
           <> varEqUs
-          <> varBindFs
           <> varBindBs
           <> varBindUs
           <> addFs
@@ -656,11 +655,11 @@ relocateConstraintSystem cs =
           Just 0 -> not (pinnedRefF var)
           Just _ -> False
 
-    fromUnionFindF _occurrences (var1, (Nothing, c)) = 
-      Just $ fromConstraint counters (CVarBindF var1 c)
-      -- if shouldRemoveF occurrences var1 || shouldRemoveF occurrences var2
-      --   then Nothing
-      --   else Just $ fromConstraint counters (CVarEqF var1 var2)
+    fromUnionFindF :: (GaloisField n, Integral n) => Map RefF Int -> (RefF, (Maybe (n, RefF), n)) -> Maybe (Relocated.Constraint n)
+    fromUnionFindF occurrences (var1, (Nothing, c)) =
+      if shouldRemoveF occurrences var1
+        then Nothing
+        else Just $ fromConstraint counters (CVarBindF var1 c)
     fromUnionFindF occurrences (var1, (Just (1, var2), 0)) =
       if shouldRemoveF occurrences var1 || shouldRemoveF occurrences var2
         then Nothing
@@ -677,7 +676,6 @@ relocateConstraintSystem cs =
 
     varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
-    varBindFs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindF) $ Map.toList $ csVarBindF cs
     varBindBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
     varBindUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ csVarBindU cs
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
