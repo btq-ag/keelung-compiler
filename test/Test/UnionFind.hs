@@ -19,14 +19,14 @@ tests = do
   describe "UnionFind" $ do
     it "Find root 1" $
       runM $ do
-        lookupAndAssert "x" (1, "x", 0)
+        lookupAndAssert "x" (Just (1, "x"), 0)
 
     it "Union 1" $
       runM $ do
         "x" `relate` (1, "a", 0)
         xs <- list
-        xs `shouldBe` [("x", (1, "a", 0))]
-        lookupAndAssert "x" (1, "a", 0)
+        xs `shouldBe` [("x", (Just (1, "a"), 0))]
+        lookupAndAssert "x" (Just (1, "a"), 0)
 
     it "Union 2" $
       runM $ do
@@ -35,32 +35,32 @@ tests = do
         "x" `relate` (5, "w", 0) -- x = 5w = 1/3y
         "a" `relate` (7, "z", 0) -- a = 7z = 14y
         xs <- list
-        xs `shouldContain` [("x", (1 / 3, "y", 0))]
-        xs `shouldContain` [("z", (2, "y", 0))]
-        xs `shouldContain` [("w", (1 / 15, "y", 0))]
-        xs `shouldContain` [("a", (14, "y", 0))]
+        xs `shouldContain` [("x", (Just (1 / 3, "y"), 0))]
+        xs `shouldContain` [("z", (Just (2, "y"), 0))]
+        xs `shouldContain` [("w", (Just (1 / 15, "y"), 0))]
+        xs `shouldContain` [("a", (Just (14, "y"), 0))]
 
-        lookupAndAssert "x" (1 / 3, "y", 0)
-        lookupAndAssert "z" (2, "y", 0)
-        lookupAndAssert "w" (1 / 15, "y", 0)
-        lookupAndAssert "a" (14, "y", 0)
+        lookupAndAssert "x" (Just (1 / 3, "y"), 0)
+        lookupAndAssert "z" (Just (2, "y"), 0)
+        lookupAndAssert "w" (Just (1 / 15, "y"), 0)
+        lookupAndAssert "a" (Just (14, "y"), 0)
 
     it "Union 3" $
       runM $ do
         "z" `relate` (2, "y", 4) -- z = 2y + 4
         "y" `relate` (3, "x", 1) -- y = 3x + 1
         xs <- list
-        xs `shouldContain` [("x", (1 / 3, "y", -1 / 3))] -- x = (y - 1)/3
-        xs `shouldContain` [("z", (2, "y", 4))] -- z = 2y + 4
-        lookupAndAssert "x" (1 / 3, "y", -1 / 3)
-        lookupAndAssert "z" (2, "y", 4)
+        xs `shouldContain` [("x", (Just (1 / 3, "y"), -1 / 3))]
+        xs `shouldContain` [("z", (Just (2, "y"), 4))]
+        lookupAndAssert "x" (Just (1 / 3, "y"), -1 / 3)
+        lookupAndAssert "z" (Just (2, "y"), 4)
 
 type M = StateT (UnionFind String GF181) IO
 
 runM :: M a -> IO a
 runM p = evalStateT p UnionFind.new
 
-list :: M [(String, (GF181, String, GF181))]
+list :: M [(String, (Maybe (GF181, String), GF181))]
 list = gets (Map.toList . UnionFind.toMap)
 
 relate :: String -> (GF181, String, GF181) -> M ()
@@ -68,11 +68,11 @@ relate var val = do
   xs <- get
   forM_ (UnionFind.relate var val xs) put
 
-lookupAndAssert :: String -> (GF181, String, GF181) -> M ()
+lookupAndAssert :: String -> (Maybe (GF181, String), GF181) -> M ()
 lookupAndAssert var expected = do
   xs <- get
-  let (_varIsRoot, slope, root, intercept) = UnionFind.lookup var xs
-  (slope, root, intercept) `shouldBe` expected
+  let (result, intercept) = snd $ UnionFind.lookup var xs
+  (result, intercept) `shouldBe` expected
 
 ------------------------------------------------------------------------
 

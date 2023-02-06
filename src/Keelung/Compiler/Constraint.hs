@@ -256,25 +256,44 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, [ref])
 substPolyG ctx poly = do
   let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' (substPolyG_ ctx) (False, Nothing, []) xs of
+  case Map.foldlWithKey' (substPolyG_ ctx) (False, Left c, []) xs of
     (False, _, _) -> Nothing
-    (True, Nothing, _) -> Nothing
-    (True, Just poly', substitutedRefs) -> Just (PolyG.addConstant c poly', substitutedRefs)
+    (True, Left _constant, _) -> Nothing
+    (True, Right poly', substitutedRefs) -> Just (poly', substitutedRefs)
 
 -- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
-substPolyG_ :: (Integral n, Ord ref) => UnionFind ref n -> (Bool, Maybe (PolyG ref n), [ref]) -> ref -> n -> (Bool, Maybe (PolyG ref n), [ref])
+substPolyG_ :: (Integral n, Ord ref) => UnionFind ref n -> (Bool, Either n (PolyG ref n), [ref]) -> ref -> n -> (Bool, Either n (PolyG ref n), [ref])
 substPolyG_ ctx (changed, xs, substitutedRefs) ref coeff =
-  let (isAlreadyRoot, slope, root, intercept) = UnionFind.lookup ref ctx
+  let (isAlreadyRoot, (result, intercept)) = UnionFind.lookup ref ctx
    in if isAlreadyRoot
         then case xs of
-          Nothing -> (changed, Just $ PolyG.singleton 0 (ref, coeff), substitutedRefs)
-          Just xs' -> (changed, Just $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
-        else
-          let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
-           in case xs of
-                -- ref = slope * root + intercept
-                Nothing -> (changed, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff), substitutedRefs')
-                Just xs' -> (True, Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
+          Left c -> (changed, Right $ PolyG.singleton c (ref, coeff), substitutedRefs)
+          Right xs' -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
+        else case result of
+          Nothing ->
+            -- ref = intercept
+            let substitutedRefs' = ref : substitutedRefs
+             in case xs of
+                  Left c -> (changed, Left (intercept + c), substitutedRefs')
+                  Right xs' -> (True, Right $ PolyG.insert (intercept * coeff) (ref, 1) xs', substitutedRefs')
+          Just (slope, root) ->
+            let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
+             in case xs of
+                  -- ref = slope * root + intercept
+                  Left c -> (changed, Right $ PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
+                  Right xs' -> (True, Right $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
+
+-- let (isAlreadyRoot, slope, root, intercept) = UnionFind.lookup ref ctx
+--  in if isAlreadyRoot
+--       then case xs of
+--         Nothing -> (changed, Just $ PolyG.singleton 0 (ref, coeff), substitutedRefs)
+--         Just xs' -> (changed, Just $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
+--       else
+--         let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
+--          in case xs of
+--               -- ref = slope * root + intercept
+--               Nothing -> (changed, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff), substitutedRefs')
+--               Just xs' -> (True, Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
 
 --------------------------------------------------------------------------------
 
@@ -637,11 +656,16 @@ relocateConstraintSystem cs =
           Just 0 -> not (pinnedRefF var)
           Just _ -> False
 
-    fromUnionFindF occurrences (var1, (1, var2, 0)) =
+    fromUnionFindF _occurrences (var1, (Nothing, c)) = 
+      Just $ fromConstraint counters (CVarBindF var1 c)
+      -- if shouldRemoveF occurrences var1 || shouldRemoveF occurrences var2
+      --   then Nothing
+      --   else Just $ fromConstraint counters (CVarEqF var1 var2)
+    fromUnionFindF occurrences (var1, (Just (1, var2), 0)) =
       if shouldRemoveF occurrences var1 || shouldRemoveF occurrences var2
         then Nothing
         else Just $ fromConstraint counters (CVarEqF var1 var2)
-    fromUnionFindF occurrences (var1, (slope2, var2, intercept2)) =
+    fromUnionFindF occurrences (var1, (Just (slope2, var2), intercept2)) =
       case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
         Left _ -> Nothing
         Right poly ->
