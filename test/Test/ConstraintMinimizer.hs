@@ -15,7 +15,8 @@ import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as Unio
 import Keelung.Compiler.Relocated qualified as Relocated
 import Test.HUnit (assertFailure)
 import Test.Hspec
-import Control.Monad
+import qualified Hash.Poseidon as Poseidon
+import Data.Foldable (toList)
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
@@ -50,40 +51,43 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
-    -- it "Poseidon" $ do
-    --   cs <- runTest 1537 1537 $ do
-    --     xs <- inputs 1
-    --     Poseidon.hash (toList xs)
+    it "Poseidon" $ do
+      cs <- runTest 1537 855 $ do
+        xs <- inputs 1
+        Poseidon.hash (toList xs)
 
-    --   Map.toList (UnionFind.toMap (csVarEqF cs))
-    --     `shouldContain` []
+      print cs
 
-    -- it "Union Find 1" $ do
-    --   cs <- runTest 3 1 $ do
-    --     x <- inputField
-    --     y <- reuse x
-    --     z <- reuse x
-    --     return (x + y + z)
-    --   Map.toList (UnionFind.toMap (csVarEqF cs))
-    --     `shouldContain` [(RefFO 0, (3, RefFI 0, 0))]
+      Map.toList (UnionFind.toMap (csVarEqF cs))
+        `shouldContain` []
 
-    -- it "Union Find 2" $ do
-    --   cs <- runTest 3 1 $ do
-    --     x <- inputField
-    --     y <- reuse x
-    --     z <- reuse (x + y)
-    --     return (x + y + z)
+    it "Union Find 1" $ do
+      cs <- runTest 3 1 $ do
+        x <- inputField
+        y <- reuse x
+        z <- reuse x
+        return (x + y + z)
 
-    --   Map.toList (UnionFind.toMap (csVarEqF cs))
-    --     `shouldContain` [(RefFO 0, (4, RefFI 0, 0))]
+      Map.toList (UnionFind.toMap (csVarEqF cs))
+        `shouldContain` [(RefF 0, (1, RefFI 0, 0))]
+      Map.toList (UnionFind.toMap (csVarEqF cs))
+        `shouldContain` [(RefF 1, (1, RefFI 0, 0))]
+
+    it "Union Find 2" $ do
+      cs <- runTest 3 1 $ do
+        x <- inputField
+        y <- reuse x
+        z <- reuse (x + y)
+        return (x + y + z)
+
+      Map.toList (UnionFind.toMap (csVarEqF cs))
+        `shouldContain` [(RefFO 0, (4, RefFI 0, 0))]
 
     it "Union Find 3" $ do
       cs <- runTest 2 1 $ do
         x <- inputField
         y <- reuse (x + 1)
         return (x + y)
-        -- F0 = FI0 + 1
-        -- FO0 = FI0 + F0 = 2 * FI0 + 1
 
       Map.toList (UnionFind.toMap (csVarEqF cs))
         `shouldContain` [(RefFO 0, (2, RefFI 0, 1))]

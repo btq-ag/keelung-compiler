@@ -9,7 +9,6 @@ import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as Unio
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
 import Test.QuickCheck (Arbitrary (arbitrary))
-import Test.QuickCheck.Arbitrary (Arbitrary)
 import Test.QuickCheck.Arbitrary qualified as Arbitrary
 
 run :: IO ()

@@ -85,8 +85,9 @@ union x (slope, y, intercept) xs
 relate :: (Ord ref, GaloisField n) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
 relate x (slope, y, intercept) xs
   | x > y = relate' x (slope, y, intercept) xs -- x = slope * y + intercept
-  | x < y = relate' y (recip slope, x, intercept / slope) xs -- y = x / slope - intercept / slope
+  | x < y = relate' y (recip slope, x, - intercept / slope) xs -- y = x / slope - intercept / slope
   | otherwise = Nothing
+
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
@@ -100,8 +101,7 @@ relate' x (slope, y, intercept) xs =
         then Nothing
         else
           if sizeOfRootX > sizeOfRootY
-            then 
-              --  x = slope * y + intercept
+            then --  x = slope * y + intercept
             --    =>
             --  y = (x - intercept) / slope
             --    =>
