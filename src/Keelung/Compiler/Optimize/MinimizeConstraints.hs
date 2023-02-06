@@ -16,7 +16,7 @@ run cs =
   let (csAddF', (changed, cs')) = runAddM cs $ do
         foldM goThroughAddFM [] (csAddF cs)
       cs'' = cs' {csAddF = csAddF'}
-   in if changed
+   in if changed /= NothingChanged
         then run cs''
         else cs''
 
@@ -30,25 +30,45 @@ goThroughAddFM acc poly = do
       case substPolyG2 unionFind poly of
         Nothing -> return (poly : acc)
         Just (poly', substitutedRefs) -> do
-          setToChanged
+          markChanged AdditiveConstraintChanged
           updateConstraintSystem $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG poly' (csOccurrenceF cs)}
           return (poly' : acc)
 
 ------------------------------------------------------------------------------
 
-type AddM n = State (Bool, ConstraintSystem n)
+data WhatChanged
+  = NothingChanged
+  | BindingChanged
+  | RelationChanged
+  | AdditiveConstraintChanged
+  deriving (Eq, Show)
 
-runAddM :: ConstraintSystem n -> AddM n a -> (a, (Bool, ConstraintSystem n))
-runAddM cs m = runState m (False, cs)
+instance Semigroup WhatChanged where
+  NothingChanged <> x = x
+  x <> NothingChanged = x
+  BindingChanged <> _ = BindingChanged
+  _ <> BindingChanged = BindingChanged
+  RelationChanged <> _ = RelationChanged
+  _ <> RelationChanged = RelationChanged
+  AdditiveConstraintChanged <> _ = AdditiveConstraintChanged
 
-setToChanged :: AddM n ()
-setToChanged = modify' $ \(_, cs) -> (True, cs)
+-- _ <> AdditiveConstraintChanged = AdditiveConstraintChanged
+
+instance Monoid WhatChanged where
+  mempty = NothingChanged
+
+------------------------------------------------------------------------------
+
+type AddM n = State (WhatChanged, ConstraintSystem n)
+
+runAddM :: ConstraintSystem n -> AddM n a -> (a, (WhatChanged, ConstraintSystem n))
+runAddM cs m = runState m (NothingChanged, cs)
+
+markChanged :: WhatChanged -> AddM n ()
+markChanged whatChanged = modify' $ \(_, cs) -> (whatChanged, cs)
 
 updateConstraintSystem :: (ConstraintSystem n -> ConstraintSystem n) -> AddM n ()
 updateConstraintSystem = modify' . second
-
--- updateUnionFind :: (UnionFind RefF n -> UnionFind RefF n) -> AddM n ()
--- updateUnionFind f = modify' $ \(changed, cs) -> (changed, cs {csVarEqF = f (csVarEqF cs)})
 
 -- | Decide whether to keep the Add constraint or not.
 classifyAdd :: (GaloisField n, Integral n) => PolyG RefF n -> AddM n Bool
@@ -58,7 +78,7 @@ classifyAdd poly = case PolyG.view poly of
     --    intercept + slope * var = 0
     --  =>
     --    var = - intercept / slope
-    setToChanged
+    markChanged BindingChanged
     updateConstraintSystem $ \cs -> cs {csVarBindF = Map.insert var (-intercept / slope) (csVarBindF cs), csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)}
     return True
   (intercept, [(var1, slope1), (var2, slope2)]) -> do
@@ -71,7 +91,7 @@ classifyAdd poly = case PolyG.view poly of
     case UnionFind.relate var1 (-slope2 / slope1, var2, -intercept / slope1) (csVarEqF cs) of
       Nothing -> return False
       Just unionFind' -> do
-        setToChanged
+        markChanged RelationChanged
         updateConstraintSystem $ \cs' -> cs' {csVarEqF = unionFind', csOccurrenceF = removeOccurrences [var1, var2] (csOccurrenceF cs)}
         return True
   (_, _) -> return False
