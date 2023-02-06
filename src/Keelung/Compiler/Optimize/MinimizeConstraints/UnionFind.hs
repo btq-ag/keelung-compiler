@@ -52,14 +52,38 @@ lookup var xs = case parentOf xs var of
 
 -- If a variable has no parent, it is its own parent.
 parentOf :: (Ord ref, Num n) => UnionFind ref n -> ref -> Maybe (Maybe (n, ref), n)
-parentOf xs var = Map.lookup var (links xs)
+parentOf xs var = case Map.lookup var (links xs) of
+  Nothing -> Nothing -- var is a root
+  Just (Nothing, intercept) -> Just (Nothing, intercept) -- var is a root
+  Just (Just (slope, parent), intercept) -> case parentOf xs parent of
+    Nothing ->
+      -- parent is a root
+      Just (Just (slope, parent), intercept)
+    Just (Nothing, intercept') ->
+      -- parent is a value
+      -- var = slope * parent + intercept
+      -- parent = intercept'
+      --  =>
+      -- var = slope * intercept' + intercept
+      Just (Nothing, slope * intercept' + intercept)
+    Just (Just (slope', grandparent), intercept') ->
+      -- var = slope * parent + intercept
+      -- parent = slope' * grandparent + intercept'
+      --  =>
+      -- var = slope * (slope' * grandparent + intercept') + intercept
+      --  =>
+      -- var = slope * slope' * grandparent + slope * intercept' + intercept
+      Just (Just (slope * slope', grandparent), slope * intercept' + intercept)
 
 -- | Calculates the relation between two variables `var1` and `var2`
 --   Returns `Nothing` if the two variables are not related.
 --   Returns `Just (slope, intercept)` where `var1 = slope * var2 + intercept` if the two variables are related.
 relationBetween :: (Ord ref, GaloisField n) => ref -> ref -> UnionFind ref n -> Maybe (n, n)
 relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
-  ((True, _), (True, _)) -> Nothing -- both are roots
+  ((True, _), (True, _)) ->
+    if var1 == var2
+      then Just (1, 0)
+      else Nothing -- var1 and var2 are roots, but not the same one
   ((True, _), (False, (Just (slope2, root2), intercept2))) ->
     -- var2 = slope2 * root2 + intercept2
     --  =>
@@ -72,11 +96,11 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       else Nothing
   ((True, _), (False, (Nothing, _))) -> Nothing -- var1 is a root, var2 is a value
   ((False, (Just (slope1, root1), intercept1)), (True, _)) ->
-    -- var1 = slope1 * root1 + intercept
+    -- var1 = slope1 * root1 + intercept1
     if var2 == root1
       then -- var2 = root1
       --  =>
-      -- var1 = slope1 * var2 + intercept
+      -- var1 = slope1 * var2 + intercept1
         Just (slope1, intercept1)
       else Nothing
   ((False, (Nothing, _)), (True, _)) -> Nothing -- var1 is a value, var2 is a root
@@ -84,14 +108,16 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
     -- var1 = slope1 * root1 + intercept1
     -- var2 = slope2 * root2 + intercept2
     if root1 == root2
-      then -- var1 = slope1 * root + intercept1
+      then -- var2 = slope2 * root2 + intercept2
       --  =>
-      -- root = (var1 - intercept1) / slope1
+      -- root2 = (var2 - intercept2) / slope2 = root1
       --  =>
-      -- var2 = slope2 * (var1 / slope1 - intercept1 / slope1) + intercept2
+      -- var1 = slope1 * root1 + intercept1
       --  =>
-      -- var2 = slope2 / slope1 * var1 - slope2 * intercept1 / slope1 + intercept2
-        Just (slope2 / slope1, -slope2 * intercept1 / slope1 + intercept2)
+      -- var1 = slope1 * ((var2 - intercept2) / slope2) + intercept1
+      --  =>
+      -- var1 = slope1 * var2 / slope2 - slope1 * intercept2 / slope2 + intercept1
+        Just (slope1 / slope2, -slope1 * intercept2 / slope2 + intercept1)
       else Nothing
   ((False, (Just _, _)), (False, (Nothing, _))) -> Nothing -- var2 is a value
   ((False, (Nothing, _)), (False, (Just _, _))) -> Nothing -- var1 is a value

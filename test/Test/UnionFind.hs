@@ -1,7 +1,6 @@
 module Test.UnionFind (tests, run) where
 
 import Control.Monad.State
-import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
 import Keelung hiding (run)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
@@ -17,62 +16,59 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "UnionFind" $ do
-    it "Find root 1" $
+    it "Relate (x = y)" $
       runM $ do
-        lookupAndAssert "x" (Just (1, "x"), 0)
+        "x" `relate` (1, "y", 0)
 
-    it "Union 1" $
+        assertRelation "x" 1 "y" 0
+        assertRelation "y" 1 "x" 0
+
+    it "Relate (x = 2y)" $
       runM $ do
-        "x" `relate` (1, "a", 0)
-        xs <- list
-        xs `shouldBe` [("x", (Just (1, "a"), 0))]
-        lookupAndAssert "x" (Just (1, "a"), 0)
+        "x" `relate` (2, "y", 0) -- x = 2y
+        assertRelation "x" 2 "y" 0
+        assertRelation "x" 1 "x" 0
+        assertRelation "y" (1 / 2) "x" 0
+        assertRelation "y" 1 "y" 0
 
-    it "Union 2" $
+    it "Relate (x = 2y + 1)" $
       runM $ do
-        "z" `relate` (2, "y", 0) -- z = 2y
-        "y" `relate` (3, "x", 0) -- y = 3x
-        "x" `relate` (5, "w", 0) -- x = 5w = 1/3y
-        "a" `relate` (7, "z", 0) -- a = 7z = 14y
-        xs <- list
-        xs `shouldContain` [("x", (Just (1 / 3, "y"), 0))]
-        xs `shouldContain` [("z", (Just (2, "y"), 0))]
-        xs `shouldContain` [("w", (Just (1 / 15, "y"), 0))]
-        xs `shouldContain` [("a", (Just (14, "y"), 0))]
-
-        lookupAndAssert "x" (Just (1 / 3, "y"), 0)
-        lookupAndAssert "z" (Just (2, "y"), 0)
-        lookupAndAssert "w" (Just (1 / 15, "y"), 0)
-        lookupAndAssert "a" (Just (14, "y"), 0)
-
-    it "Union 3" $
+        "x" `relate` (2, "y", 1) -- x = 2y + 1
+        assertRelation "x" 2 "y" 1
+        assertRelation "y" (1 / 2) "x" (-1 / 2) -- y = 1/2x - 1/2
+    it "Relate (x = 2y + 1 & y = 3z + 2)" $
       runM $ do
-        "z" `relate` (2, "y", 4) -- z = 2y + 4
-        "y" `relate` (3, "x", 1) -- y = 3x + 1
-        xs <- list
-        xs `shouldContain` [("x", (Just (1 / 3, "y"), -1 / 3))]
-        xs `shouldContain` [("z", (Just (2, "y"), 4))]
-        lookupAndAssert "x" (Just (1 / 3, "y"), -1 / 3)
-        lookupAndAssert "z" (Just (2, "y"), 4)
+        "x" `relate` (2, "y", 1) -- x = 2y + 1
+        "y" `relate` (3, "z", 2) -- y = 3z + 2
+
+        -- x = 2y + 1
+        assertRelation "x" 2 "y" 1
+        -- y = 1/2x - 1/2
+        assertRelation "y" (1 / 2) "x" (-1 / 2)
+        -- x = 6z + 5
+        assertRelation "x" 6 "z" 5
+        -- z = 1/6x - 5/6
+        assertRelation "z" (1 / 6) "x" (-5 / 6)
+        -- y = 3z + 2
+        assertRelation "y" 3 "z" 2
+        -- z = 1/3y - 2/3
+        assertRelation "z" (1 / 3) "y" (-2 / 3)
 
 type M = StateT (UnionFind String GF181) IO
 
 runM :: M a -> IO a
 runM p = evalStateT p UnionFind.new
 
-list :: M [(String, (Maybe (GF181, String), GF181))]
-list = gets (Map.toList . UnionFind.toMap)
-
 relate :: String -> (GF181, String, GF181) -> M ()
 relate var val = do
   xs <- get
   forM_ (UnionFind.relate var val xs) put
 
-lookupAndAssert :: String -> (Maybe (GF181, String), GF181) -> M ()
-lookupAndAssert var expected = do
+-- | Assert that `var1 = slope * var2 + intercept`
+assertRelation :: String -> GF181 -> String -> GF181 -> M ()
+assertRelation var1 slope var2 intercept = do
   xs <- get
-  let (result, intercept) = snd $ UnionFind.lookup var xs
-  (result, intercept) `shouldBe` expected
+  UnionFind.relationBetween var1 var2 xs `shouldBe` Just (slope, intercept)
 
 ------------------------------------------------------------------------
 
