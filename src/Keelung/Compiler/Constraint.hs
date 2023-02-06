@@ -253,7 +253,7 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 --           Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff), substitutedRefs')
 --           Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
 
-substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, [ref])
+substPolyG :: (GaloisField n, Integral n, Ord ref, Show ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, [ref])
 substPolyG ctx poly = do
   let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' (substPolyG_ ctx) (False, Left c, []) xs of
@@ -262,26 +262,44 @@ substPolyG ctx poly = do
     (True, Right poly', substitutedRefs) -> Just (poly', substitutedRefs)
 
 -- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
-substPolyG_ :: (Integral n, Ord ref) => UnionFind ref n -> (Bool, Either n (PolyG ref n), [ref]) -> ref -> n -> (Bool, Either n (PolyG ref n), [ref])
-substPolyG_ ctx (changed, xs, substitutedRefs) ref coeff =
-  let (isAlreadyRoot, (result, intercept)) = UnionFind.lookup ref ctx
-   in if isAlreadyRoot
-        then case xs of
-          Left c -> (changed, Right $ PolyG.singleton c (ref, coeff), substitutedRefs)
-          Right xs' -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
-        else case result of
-          Nothing ->
-            -- ref = intercept
-            let substitutedRefs' = ref : substitutedRefs
-             in case xs of
-                  Left c -> (changed, Left (intercept + c), substitutedRefs')
-                  Right xs' -> (True, Right $ PolyG.insert (intercept * coeff) (ref, 1) xs', substitutedRefs')
-          Just (slope, root) ->
-            let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
-             in case xs of
-                  -- ref = slope * root + intercept
-                  Left c -> (changed, Right $ PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
-                  Right xs' -> (True, Right $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
+substPolyG_ :: (Integral n, Ord ref, Show ref, GaloisField n) => UnionFind ref n -> (Bool, Either n (PolyG ref n), [ref]) -> ref -> n -> (Bool, Either n (PolyG ref n), [ref])
+substPolyG_ ctx (changed, accPoly, substitutedRefs) ref coeff =
+  case UnionFind.parentOf ctx ref of
+    Nothing ->
+      case accPoly of -- ref is :ralready a root
+        Left c -> (changed, Right $ PolyG.singleton c (ref, coeff), substitutedRefs)
+        Right xs -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
+    Just (Nothing, intercept) ->
+      -- ref = intercept
+      let substitutedRefs' = ref : substitutedRefs
+       in case accPoly of
+            Left c -> (changed, Left (intercept + c), substitutedRefs')
+            Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', substitutedRefs')
+    Just (Just (slope, root), intercept) ->
+      let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
+       in case accPoly of
+            -- ref = slope * root + intercept
+            Left c -> (changed, Right $ PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
+            Right accPoly' -> (True, Right $ PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', substitutedRefs')
+
+-- let (isAlreadyRoot, (result, intercept)) = UnionFind.lookup ref ctx
+--  in if isAlreadyRoot
+--       then case xs of
+--         Left c -> (changed, Right $ PolyG.singleton c (ref, coeff), substitutedRefs)
+--         Right xs' -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
+--       else case result of
+--         Nothing ->
+--           -- ref = intercept
+--           let substitutedRefs' = ref : substitutedRefs
+--            in case xs of
+--                 Left c -> (changed, Left (intercept + c), substitutedRefs')
+--                 Right xs' -> (True, Right $ PolyG.insert (intercept * coeff) (ref, 1) xs', substitutedRefs')
+--         Just (slope, root) ->
+--           let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
+--            in case xs of
+--                 -- ref = slope * root + intercept
+--                 Left c -> (changed, Right $ PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
+--                 Right xs' -> (True, Right $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
 
 -- let (isAlreadyRoot, slope, root, intercept) = UnionFind.lookup ref ctx
 --  in if isAlreadyRoot
@@ -474,7 +492,7 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceB :: !(Map RefB Int),
     csOccurrenceU :: !(Map RefU Int),
     -- when x = val
-    csVarBindF :: Map RefF n,
+    -- csVarBindF :: Map RefF n,
     csVarBindB :: Map RefB n,
     csVarBindU :: Map RefU n,
     -- when x == y (UnionFind)
@@ -498,7 +516,7 @@ data ConstraintSystem n = ConstraintSystem
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show cs =
     "ConstraintSystem {\n"
-      <> showVarBindF
+      -- <> showVarBindF
       <> showVarBindB
       <> showVarBindU
       <> showVarEqF
@@ -559,7 +577,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       showVarEqU = adapt "VarEqU" (csVarEqU cs) $ \(var, val) -> show var <> " = " <> show val
 
       showVarBindU = adapt "VarBindU" (Map.toList $ csVarBindU cs) $ \(var, val) -> show var <> " = " <> show val
-      showVarBindF = adapt "VarBindF" (Map.toList $ csVarBindF cs) $ \(var, val) -> show var <> " = " <> show val
+      -- showVarBindF = adapt "VarBindF" (Map.toList $ csVarBindF cs) $ \(var, val) -> show var <> " = " <> show val
       showVarBindB = adapt "VarBindB" (Map.toList $ csVarBindB cs) $ \(var, val) -> show var <> " = " <> show val
 
       showAddF = adapt "AddF" (csAddF cs) show
@@ -651,7 +669,8 @@ relocateConstraintSystem cs =
     shouldRemoveF occurrences var =
       csUseNewOptimizer cs
         && case Map.lookup var occurrences of
-          Nothing -> not (pinnedRefF var)
+          Nothing -> False
+          -- Nothing -> not (pinnedRefF var)
           Just 0 -> not (pinnedRefF var)
           Just _ -> False
 
@@ -716,7 +735,7 @@ sizeOfConstraintSystem cs =
   UnionFind.size (csVarEqF cs)
     + length (csVarEqB cs)
     + length (csVarEqU cs)
-    + length (csVarBindF cs)
+    -- + length (csVarBindF cs)
     + length (csVarBindB cs)
     + length (csVarBindU cs)
     + length (csAddF cs)

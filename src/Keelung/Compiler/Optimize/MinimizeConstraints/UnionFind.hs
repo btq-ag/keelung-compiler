@@ -4,7 +4,7 @@
 
 {-# HLINT ignore "Replace case with fromMaybe" #-}
 
-module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, relationBetween, new, lookup, relate, bindToValue, toMap, size) where
+module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind, relationBetween, new, lookup, parentOf, relate, bindToValue, toMap, size) where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
@@ -50,7 +50,8 @@ lookup var xs = case parentOf xs var of
   Nothing -> (True, (Just (1, var), 0)) -- returns self as root
   Just (parent, intercept) -> (False, (parent, intercept))
 
--- If a variable has no parent, it is its own parent.
+-- | Returns 'Nothing' if the variable is already a root.
+--   else returns 'Just (slope, root)'  where 'var = slope * root + intercept'
 parentOf :: (Ord ref, Num n) => UnionFind ref n -> ref -> Maybe (Maybe (n, ref), n)
 parentOf xs var = case Map.lookup var (links xs) of
   Nothing -> Nothing -- var is a root

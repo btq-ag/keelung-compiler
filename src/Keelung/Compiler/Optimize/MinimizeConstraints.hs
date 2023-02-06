@@ -5,7 +5,6 @@ module Keelung.Compiler.Optimize.MinimizeConstraints (run) where
 import Control.Monad.State
 import Data.Bifunctor (second)
 import Data.Field.Galois (GaloisField)
-import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Data.PolyG (PolyG)
@@ -16,9 +15,9 @@ run cs =
   let (csAddF', (changed, cs')) = runAddM cs $ do
         foldM goThroughAddFM [] (csAddF cs)
       cs'' = cs' {csAddF = csAddF'}
-   in if changed /= NothingChanged
-        then run cs''
-        else cs''
+   in if changed == NothingChanged
+        then cs''
+        else run cs''
 
 -- goThroughUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> UnionFind RefF n
 -- goThroughUnionFindF unionFind =
@@ -82,7 +81,13 @@ classifyAdd poly = case PolyG.view poly of
     --  =>
     --    var = - intercept / slope
     markChanged BindingChanged
-    updateConstraintSystem $ \cs -> cs {csVarBindF = Map.insert var (-intercept / slope) (csVarBindF cs), csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)}
+
+    updateConstraintSystem $ \cs ->
+      cs
+        { csVarEqF = UnionFind.bindToValue var (-intercept / slope) (csVarEqF cs),
+          -- csVarBindF = Map.insert var (-intercept / slope) (csVarBindF cs),
+          csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)
+        }
     return True
   (intercept, [(var1, slope1), (var2, slope2)]) -> do
     --    intercept + slope1 * var1 + slope2 * var2 = 0

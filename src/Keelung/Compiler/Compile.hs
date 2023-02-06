@@ -176,7 +176,7 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty mempty mempty UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty mempty UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -191,7 +191,7 @@ add = mapM_ addOne
     addOne (CVarBindF x c) = do
       cs <- get
       let csVarEqF' = UnionFind.bindToValue x c (csVarEqF cs)
-      put cs {csVarEqF = csVarEqF', csVarBindF = Map.insert x c (csVarBindF cs)}
+      put cs {csVarEqF = csVarEqF'}
     addOne (CVarBindB x c) = modify (\cs -> cs {csVarBindB = Map.insert x c (csVarBindB cs), csOccurrenceB = addOccurrences [x] (csOccurrenceB cs)})
     addOne (CVarBindU x c) = modify (\cs -> cs {csVarBindU = Map.insert x c (csVarBindU cs), csOccurrenceU = addOccurrences [x] (csOccurrenceU cs)})
     addOne (CVarEqF x y) = do
