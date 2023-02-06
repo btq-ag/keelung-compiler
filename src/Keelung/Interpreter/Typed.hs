@@ -21,7 +21,7 @@ import Keelung.Data.Bindings
 import qualified Keelung.Data.Bindings as Bindings
 import Keelung.Data.Struct
 import Keelung.Interpreter.Monad
-import Keelung.Syntax.Typed
+import Keelung.Syntax.Typed hiding (addF, addB, addU)
 
 --------------------------------------------------------------------------------
 
@@ -218,6 +218,7 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     Field e -> interpret e
     UInt e -> interpret e
     Array xs -> concat <$> mapM interpret xs
+    Misc _ -> return []
 
 --------------------------------------------------------------------------------
 
@@ -228,6 +229,7 @@ instance FreeVar Expr where
     Field e -> freeVars e
     UInt e -> freeVars e
     Array xs -> mconcat $ map freeVars (toList xs)
+    Misc _ -> mempty
 
 -- | Collect free variables of an elaborated program (that should also be present in the witness)
 instance FreeVar Elaborated where

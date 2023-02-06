@@ -118,6 +118,7 @@ eraseExprAndAllocOutputVar expr = case expr of
   T.Array exprs -> do
     exprss <- mapM eraseExprAndAllocOutputVar exprs
     return (concat exprss)
+  T.Misc _ -> return []
   where
     fresh :: VarSort -> VarType -> M n Var
     fresh sort kind = do
@@ -142,6 +143,7 @@ eraseExpr expr = case expr of
   T.Array exprs -> do
     exprss <- mapM eraseExpr exprs
     return (concat exprss)
+  T.Misc _ -> return []
 
 -- | Flatten and chain expressions with associative operator together when possible
 chainExprsOfAssocOpAddF :: ExprF n -> ExprF n -> ExprF n
