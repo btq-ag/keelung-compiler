@@ -28,7 +28,7 @@ module Test.PolyG () where
 -- import Data.Set qualified as Set
 -- import Data.Traversable (for)
 -- import Keelung hiding (compile, run)
--- import Keelung.Compiler.Constraint (RefB (..), RefF (..), substPolyG2)
+-- import Keelung.Compiler.Constraint (RefB (..), RefF (..), substPolyG)
 -- import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 -- import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 -- import Keelung.Data.PolyG (PolyG)
@@ -50,11 +50,11 @@ module Test.PolyG () where
 
 --         -- substPolyG (setupPolyGs setup) (setupUnionFind setup) `shouldBe` setupPolyGs setup
 --         let substituted = flip map (setupPolyGs setup) $ \polynomial -> do
---               case substPolyG2 (setupUnionFind setup) polynomial of
+--               case substPolyG (setupUnionFind setup) polynomial of
 --                 Nothing -> polynomial
 --                 Just (polynomial', _) -> polynomial'
 --         let substituted' = flip map substituted $ \polynomial -> do
---               case substPolyG2 (setupUnionFind setup) polynomial of
+--               case substPolyG (setupUnionFind setup) polynomial of
 --                 Nothing -> polynomial
 --                 Just (polynomial', _) -> polynomial'
 --         --  Maybe (PolyG ref n, UnionFind ref n, [ref])

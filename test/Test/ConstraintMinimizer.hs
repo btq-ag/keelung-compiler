@@ -56,8 +56,6 @@ tests = do
         xs <- inputs 1
         Poseidon.hash (toList xs)
 
-      print cs
-
       Map.toList (UnionFind.toMap (csVarEqF cs))
         `shouldContain` []
 
@@ -94,6 +92,17 @@ tests = do
 
       Map.toList (UnionFind.toMap (csVarEqF cs))
         `shouldContain` [(RefF 0, (1, RefFI 0, 1))]
+
+    -- it "Union Find 4" $ do
+    --   cs <- runTest 2 2 $ do
+    --     let x = 4
+    --     y <- reuse x
+    --     return (x + y :: Field)
+
+    --   print cs 
+
+    --   Map.toList (UnionFind.toMap (csVarEqF cs))
+    --     `shouldContain` [(RefFO 0, (4, RefFI 0, 0))]
 
     -- -- within the range of [0, 12289)
     -- it "Manual range check (< 12289)" $ do

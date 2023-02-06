@@ -17,7 +17,6 @@ module Keelung.Compiler.Constraint
     addOccurrences,
     removeOccurrences,
     substPolyG,
-    substPolyG2,
     cAddF,
     cAddB,
     cAddU,
@@ -230,41 +229,41 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 
 --------------------------------------------------------------------------------
 
--- | Normalize a polynomial by substituting roots
--- for the variables that appear in the polynomial.
--- substPoly :: (GaloisField n, Integral n) => UnionFind RefF -> PolyG RefF n -> Maybe (PolyG RefF n, UnionFind RefF)
-substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref n, [ref])
+-- -- | Normalize a polynomial by substituting roots
+-- -- for the variables that appear in the polynomial.
+-- -- substPoly :: (GaloisField n, Integral n) => UnionFind RefF -> PolyG RefF n -> Maybe (PolyG RefF n, UnionFind RefF)
+-- substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref n, [ref])
+-- substPolyG ctx poly = do
+--   let (c, xs) = PolyG.viewAsMap poly
+--   case Map.foldlWithKey' substPolyG_ (False, ctx, Nothing, []) xs of
+--     (False, _, _, _) -> Nothing
+--     (True, _, Nothing, _) -> Nothing
+--     (True, ctx', Just poly', substitutedRefs) -> Just (PolyG.addConstant c poly', ctx', substitutedRefs)
+
+-- -- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
+-- substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref n, Maybe (PolyG ref n), [ref]) -> ref -> n -> (Bool, UnionFind ref n, Maybe (PolyG ref n), [ref])
+-- substPolyG_ (changed, ctx, xs, substitutedRefs) ref coeff = case UnionFind.findMaybe ref ctx of
+--   Nothing -> case xs of
+--     Nothing -> (changed, ctx, Just $ PolyG.singleton 0 (ref, coeff), substitutedRefs)
+--     Just xs' -> (changed, ctx, Just $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
+--   Just ((slope, root, intercept), ctx') ->
+--     let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
+--      in case xs of
+--           -- ref = slope * root + intercept
+--           Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff), substitutedRefs')
+--           Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
+
+substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, [ref])
 substPolyG ctx poly = do
   let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' substPolyG_ (False, ctx, Nothing, []) xs of
-    (False, _, _, _) -> Nothing
-    (True, _, Nothing, _) -> Nothing
-    (True, ctx', Just poly', substitutedRefs) -> Just (PolyG.addConstant c poly', ctx', substitutedRefs)
-
--- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
-substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref n, Maybe (PolyG ref n), [ref]) -> ref -> n -> (Bool, UnionFind ref n, Maybe (PolyG ref n), [ref])
-substPolyG_ (changed, ctx, xs, substitutedRefs) ref coeff = case UnionFind.findMaybe ref ctx of
-  Nothing -> case xs of
-    Nothing -> (changed, ctx, Just $ PolyG.singleton 0 (ref, coeff), substitutedRefs)
-    Just xs' -> (changed, ctx, Just $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
-  Just ((slope, root, intercept), ctx') ->
-    let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
-     in case xs of
-          -- ref = slope * root + intercept
-          Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff), substitutedRefs')
-          Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
-
-substPolyG2 :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, [ref])
-substPolyG2 ctx poly = do
-  let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' (substPolyG2_ ctx) (False, Nothing, []) xs of
+  case Map.foldlWithKey' (substPolyG_ ctx) (False, Nothing, []) xs of
     (False, _, _) -> Nothing
     (True, Nothing, _) -> Nothing
     (True, Just poly', substitutedRefs) -> Just (PolyG.addConstant c poly', substitutedRefs)
 
 -- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
-substPolyG2_ :: (Integral n, Ord ref) => UnionFind ref n -> (Bool, Maybe (PolyG ref n), [ref]) -> ref -> n -> (Bool, Maybe (PolyG ref n), [ref])
-substPolyG2_ ctx (changed, xs, substitutedRefs) ref coeff =
+substPolyG_ :: (Integral n, Ord ref) => UnionFind ref n -> (Bool, Maybe (PolyG ref n), [ref]) -> ref -> n -> (Bool, Maybe (PolyG ref n), [ref])
+substPolyG_ ctx (changed, xs, substitutedRefs) ref coeff =
   let (isAlreadyRoot, slope, root, intercept) = UnionFind.lookup ref ctx
    in if isAlreadyRoot
         then case xs of
@@ -455,14 +454,14 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceF :: !(Map RefF Int),
     csOccurrenceB :: !(Map RefB Int),
     csOccurrenceU :: !(Map RefU Int),
-    -- when x == y (UnionFind)
-    csVarEqF :: UnionFind RefF n,
-    csVarEqB :: [(RefB, RefB)],
-    csVarEqU :: [(RefU, RefU)],
     -- when x = val
     csVarBindF :: Map RefF n,
     csVarBindB :: Map RefB n,
     csVarBindU :: Map RefU n,
+    -- when x == y (UnionFind)
+    csVarEqF :: UnionFind RefF n,
+    csVarEqB :: [(RefB, RefB)],
+    csVarEqU :: [(RefU, RefU)],
     -- addative constraints
     csAddF :: [PolyG RefF n],
     csAddB :: [PolyG RefB n],
@@ -480,12 +479,12 @@ data ConstraintSystem n = ConstraintSystem
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show cs =
     "ConstraintSystem {\n"
-      <> showVarEqF
-      <> showVarEqB
-      <> showVarEqU
       <> showVarBindF
       <> showVarBindB
       <> showVarBindU
+      <> showVarEqF
+      <> showVarEqB
+      <> showVarEqU
       <> showAddF
       <> showAddB
       <> showAddU

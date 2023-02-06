@@ -20,6 +20,9 @@ run cs =
         then run cs''
         else cs''
 
+-- goThroughUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> UnionFind RefF n
+-- goThroughUnionFindF unionFind = 
+
 goThroughAddFM :: (GaloisField n, Integral n) => [PolyG RefF n] -> PolyG RefF n -> AddM n [PolyG RefF n]
 goThroughAddFM acc poly = do
   unionFind <- gets (csVarEqF . snd)
@@ -27,7 +30,7 @@ goThroughAddFM acc poly = do
   if changed
     then return acc
     else do
-      case substPolyG2 unionFind poly of
+      case substPolyG unionFind poly of
         Nothing -> return (poly : acc)
         Just (poly', substitutedRefs) -> do
           markChanged AdditiveConstraintChanged
