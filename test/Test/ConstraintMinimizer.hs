@@ -6,6 +6,7 @@ module Test.ConstraintMinimizer (tests, run) where
 -- import Data.Foldable (toList)
 -- import Hash.Poseidon qualified as Poseidon
 
+import AggregateSignature.Util qualified as AggSig
 import Data.Foldable
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compileO0, run)
@@ -17,6 +18,9 @@ import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Compiler.Relocated qualified as Relocated
+import Keelung.Compiler.Syntax.Inputs qualified as Inputs
+import Keelung.Constraint.R1CS qualified as Compiler
+import Keelung.Interpreter.R1CS qualified as R1CS
 import Test.HUnit (assertFailure)
 import Test.Hspec
 
@@ -101,39 +105,25 @@ tests = do
         let x = 4
         y <- reuse x
         return (x + y :: Field)
-
+      -- print cs
+      -- print $ relocateConstraintSystem cs
       -- FO0 = 8
       snd (UnionFind.lookup (RefFO 0) (csVarEqF cs)) `shouldBe` (Nothing, 8)
 
---   print cs
+    it "Union Find 5" $ do
+      _cs <- runTest 2 2 $ do
+        x <- inputField
+        y <- reuse x
+        return (x * y :: Field)
+      return ()
+      -- print cs
+      -- print $ relocateConstraintSystem cs
 
---   Map.toList (UnionFind.toMap (csVarEqF cs))
---     `shouldContain` [(RefFO 0, (4, RefFI 0, 0))]
+  -- describe "Aggregate Signature" $ do
+  --   it "dim:1 sig:10" runAllKeelungAggSig
 
--- -- within the range of [0, 12289)
--- it "Manual range check (< 12289)" $ do
---   void $ runTest 49 49 $ do
---     value <- input
---     bits <- inputs 14
-
---     let summation = foldl (\acc k ->
---                           let bit = access bits k
---                               bitValue = fromIntegral (2 ^ k :: Integer)
---                               prod = BtoF bit * bitValue
---                           in  (acc + prod))  0 [0 .. 13]
---     assert (value `eq` summation)
-
---     let bit13 = access bits 13
---     let bit12 = access bits 12
---     let bit11to0 = foldl (\acc k ->
---                             let bit = access bits k
---                             in  acc + BtoF bit) 0 [0 .. 11]
-
---     let smallerThan12289 = BtoF bit13 * BtoF bit12 * bit11to0
---     assert (smallerThan12289 `eq` 0)
-
--- it "Fake range check on Field" $ do
---   void $ runTest 7 7 $ do
+-- it "Range check on Field (< 12289)" $ do
+--   cs <- runTest 6 5 $ do
 --     value <- inputField
 --     let dimension = 2
 --     bits <- inputs dimension
@@ -154,16 +144,62 @@ tests = do
 --     let smallerThan12289 = bit13 * bit12 * bit11to0
 --     assert (smallerThan12289 `eq` 0)
 
--- it "Basic.summation2" $ do
---   runTest 1 Basic.summation2
--- it "Basic.assertArraysEqual2" $ do
---   runTest 0 Basic.assertArraysEqual2
--- it "Basic.assert1" $ do
---   runTest 1 Basic.assert1
--- it "Basic.returnArray2" $ do
---   runTest 2 Basic.returnArray2
--- it "Poseidon Hash 1" $ do
---   _cs <- runTest 1665 $ do
---         x <- input
---         Poseidon.hash [x]
+--   print cs
+--   print $ relocateConstraintSystem cs
+
 --   return ()
+
+
+interpretCS :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
+interpretCS prog rawInputs = do
+  r1cs' <- Compiler.toR1CS . relocateConstraintSystem <$> Compiler.compileO1' prog
+  let inps = Inputs.deserialize (Compiler.r1csCounters r1cs') rawInputs
+  case R1CS.run r1cs' inps of
+    Left err -> Left (Compiler.InterpretError err)
+    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (Compiler.r1csCounters r1cs') outputs)
+
+testInterpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> IO ()
+testInterpret program rawInputs rawOutputs = do
+  interpretCS program rawInputs
+    `shouldBe` Right rawOutputs
+
+runAllKeelungAggSig :: IO ()
+runAllKeelungAggSig =
+  testInterpret
+    checkSize
+    [0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0 :: GF181]
+    []
+
+checkSize :: Comp ()
+checkSize = do
+  let signatures = [11324, 5247]
+  sigBitStrings <- inputs2 2 14
+  forM_ [0 .. 1] $ \i -> do
+    let signature = signatures !! i
+    let coeff = signature
+    -- within the range of [0, 16384)
+    let value =
+          foldl
+            ( \acc k ->
+                let bit = access2 sigBitStrings (i, k)
+                    bitValue = fromIntegral (2 ^ k :: Integer)
+                    prod = BtoF bit * bitValue
+                 in (acc + prod)
+            )
+            0
+            [0 .. 13]
+    assert (coeff `eq` value)
+
+    let bit13 = access2 sigBitStrings (i, 13)
+    let bit12 = access2 sigBitStrings (i, 12)
+    let bit11to0 =
+          foldl
+            ( \acc k ->
+                let bit = access2 sigBitStrings (i, k)
+                 in acc + BtoF bit
+            )
+            0
+            [0 .. 11]
+
+    let smallerThan12289 = BtoF bit13 * BtoF bit12 * bit11to0
+    assert (smallerThan12289 `eq` 0)

@@ -669,8 +669,8 @@ relocateConstraintSystem cs =
     shouldRemoveF occurrences var =
       csUseNewOptimizer cs
         && case Map.lookup var occurrences of
-          Nothing -> False
-          -- Nothing -> not (pinnedRefF var)
+          -- Nothing -> False
+          Nothing -> not (pinnedRefF var)
           Just 0 -> not (pinnedRefF var)
           Just _ -> False
 
