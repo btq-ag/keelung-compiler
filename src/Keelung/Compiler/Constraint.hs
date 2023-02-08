@@ -154,23 +154,23 @@ instance Show RefU where
 
 --------------------------------------------------------------------------------
 
-pinnedRefF :: RefF -> Bool
-pinnedRefF (RefFI _) = True
-pinnedRefF (RefFO _) = True
-pinnedRefF (RefBtoRefF ref) = pinnedRefB ref
-pinnedRefF _ = False
+-- pinnedRefF :: RefF -> Bool
+-- pinnedRefF (RefFI _) = True
+-- pinnedRefF (RefFO _) = True
+-- pinnedRefF (RefBtoRefF ref) = pinnedRefB ref
+-- pinnedRefF _ = False
 
-pinnedRefB :: RefB -> Bool
-pinnedRefB (RefBI _) = True
-pinnedRefB (RefBO _) = True
-pinnedRefB (RefUBit _ ref _) = pinnedRefU ref
-pinnedRefB _ = False
+-- pinnedRefB :: RefB -> Bool
+-- pinnedRefB (RefBI _) = True
+-- pinnedRefB (RefBO _) = True
+-- pinnedRefB (RefUBit _ ref _) = pinnedRefU ref
+-- pinnedRefB _ = False
 
-pinnedRefU :: RefU -> Bool
-pinnedRefU (RefUI _ _) = True
-pinnedRefU (RefUO _ _) = True
-pinnedRefU (RefBtoRefU ref) = pinnedRefB ref
-pinnedRefU _ = False
+-- pinnedRefU :: RefU -> Bool
+-- pinnedRefU (RefUI _ _) = True
+-- pinnedRefU (RefUO _ _) = True
+-- pinnedRefU (RefBtoRefU ref) = pinnedRefB ref
+-- pinnedRefU _ = False
 
 --------------------------------------------------------------------------------
 
@@ -667,12 +667,28 @@ relocateConstraintSystem cs =
 
     -- remove the constraint if it containts any variable that is not pinned and have occurrence count of 0
     shouldRemoveF occurrences var =
-      csUseNewOptimizer cs
-        && case Map.lookup var occurrences of
-          -- Nothing -> False
-          Nothing -> not (pinnedRefF var)
-          Just 0 -> not (pinnedRefF var)
+      csUseNewOptimizer cs && case var of
+        RefBtoRefF refB -> shouldRemoveB refB
+        RefFO _ -> False
+        RefFI _ -> False
+        RefF _ -> case Map.lookup var occurrences of
+          Nothing -> True
+          Just 0 -> True
           Just _ -> False
+
+    -- pinnedRefF :: RefF -> Bool
+    -- pinnedRefF (RefFI _) = True
+    -- pinnedRefF (RefFO _) = True
+    -- pinnedRefF (RefBtoRefF ref) = pinnedRefB ref
+    -- pinnedRefF _ = False
+    -- csUseNewOptimizer cs
+    --   && case Map.lookup var occurrences of
+    --     Nothing -> False
+    --     -- Nothing -> not (pinnedRefF var)
+    --     Just 0 -> not (pinnedRefF var)
+    --     Just _ -> False
+
+    shouldRemoveB _ = False
 
     fromUnionFindF :: (GaloisField n, Integral n) => Map RefF Int -> (RefF, (Maybe (n, RefF), n)) -> Maybe (Relocated.Constraint n)
     fromUnionFindF occurrences (var1, (Nothing, c)) =
