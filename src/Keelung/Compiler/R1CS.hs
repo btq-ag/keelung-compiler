@@ -6,25 +6,25 @@ module Keelung.Compiler.R1CS where
 import Control.DeepSeq (NFData)
 import Data.Either (lefts, rights)
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (Foldable (toList))
 import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
+import Data.IntSet qualified as IntSet
+import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Optimize (optimizeWithWitness)
 import Keelung.Compiler.Relocated hiding (numberOfConstraints)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import qualified Keelung.Compiler.Syntax.Inputs as Inputs
+import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Util
 import Keelung.Constraint.R1C (R1C (..))
-import qualified Keelung.Constraint.R1C as R1C
+import Keelung.Constraint.R1C qualified as R1C
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
 import Keelung.Field (N (..))
+import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Types
-import qualified Data.Sequence as Seq
-import Data.Foldable (Foldable(toList))
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
@@ -137,9 +137,13 @@ instance (GaloisField n, Integral n) => Show (ExecError n) where
       freeVarsOfR1Cs :: [R1C n] -> IntSet
       freeVarsOfR1Cs = IntSet.unions . map R1C.freeVars
   show (ExecInputUnmatchedError expected actual) =
-    "expecting " ++ show expected ++ " input(s) but got " ++ show actual
+    "expecting "
+      ++ show expected
+      ++ " input(s) but got "
+      ++ show actual
       ++ " input(s)"
   show (ExecVarUnassignedError vars witness) =
-    "these variables:\n " ++ show vars
+    "these variables:\n "
+      ++ show vars
       ++ "\n are not assigned in: \n"
       ++ showWitness (IntMap.restrictKeys witness (IntSet.fromList vars))

@@ -2,25 +2,25 @@
 
 module Main where
 
-import qualified Basic
+import Basic qualified
 -- import Control.Arrow (ArrowChoice (right), left)
 
 import Control.Arrow (ArrowChoice (..))
-import qualified Data.Sequence as Seq
+import Data.Sequence qualified as Seq
 import Keelung
 import Keelung.Compiler
-import qualified Keelung.Compiler as Compiler
+import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Relocated (cadd)
-import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (R1CS)
+import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Syntax.Counters
-import qualified Test.Compilation as Compilation
-import qualified Test.ConstraintMinimizer as ConstraintMinimizer
+import Test.Compilation qualified as Compilation
+import Test.ConstraintMinimizer qualified as ConstraintMinimizer
 import Test.Hspec
-import qualified Test.Interpreter as Interpreter
-import qualified Test.Optimization as Optimization
-import qualified Test.VarLayout as VarBookkeep
+import Test.Interpreter qualified as Interpreter
+import Test.Optimization qualified as Optimization
+import Test.VarLayout qualified as VarBookkeep
 
 main :: IO ()
 main = hspec $ do

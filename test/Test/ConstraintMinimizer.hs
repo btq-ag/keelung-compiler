@@ -24,9 +24,9 @@ import Test.Hspec
 compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
 compileO0 program = Compiler.erase program >>= return . Compiler.run True . ConstantPropagation.run
 
-runTest :: Encode t => Int -> Int -> Comp t -> IO (ConstraintSystem (N GF181))
+runTest :: Encode t => Int -> Int -> Comp t -> IO (ConstraintSystem GF181)
 runTest expectedBeforeSize expectedAfterSize program = do
-  cs <- case Compiler.asGF181N $ compileO0 program of
+  cs <- case Compiler.asGF181 $ compileO0 program of
     Left err -> assertFailure $ show err
     Right result -> return result
 
@@ -55,7 +55,7 @@ tests = do
   describe "Constraint minimization" $ do
     it "Poseidon" $ do
       _cs <- runTest 1537 855 $ do
-        xs <- inputs 1
+        xs <- inputList 1
         Poseidon.hash (toList xs)
       return ()
 
@@ -112,11 +112,12 @@ tests = do
         y <- reuse x
         return (x * y :: Field)
       return ()
-      -- print cs
-      -- print $ relocateConstraintSystem cs
 
-  -- describe "Aggregate Signature" $ do
-  --   it "dim:1 sig:10" runAllKeelungAggSig2
+-- print cs
+-- print $ relocateConstraintSystem cs
+
+-- describe "Aggregate Signature" $ do
+--   it "dim:1 sig:10" runAllKeelungAggSig2
 
 -- interpretCS :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 -- interpretCS prog rawInputs = do
@@ -132,7 +133,6 @@ tests = do
 
 --   cs <- runTest 7 7 checkSize2
 --   print cs
-
 
 -- checkSize2 :: Comp Field
 -- checkSize2 = do

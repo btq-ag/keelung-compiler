@@ -4,10 +4,10 @@ module Poseidon (run) where
 
 import Control.Monad (replicateM)
 import Criterion
-import qualified Hash.Poseidon as Poseidon
-import Keelung hiding (run, compileO0)
-import Keelung.Compiler hiding (elaborate)
 import Data.Foldable (toList)
+import Hash.Poseidon qualified as Poseidon
+import Keelung hiding (compileO0, run)
+import Keelung.Compiler
 import Keelung.Compiler.Constraint (relocateConstraintSystem)
 
 run :: Benchmark
@@ -20,8 +20,8 @@ run =
     ]
   where
     program :: Int -> Comp [Field]
-    program n = replicateM n $ do 
-      xs <- inputs 1 
+    program n = replicateM n $ do
+      xs <- inputList 1
       Poseidon.hash (toList xs)
 
     compilation :: Benchmark

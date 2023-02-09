@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
--- Interpreter for Keelung.Syntax.Typed
+-- Interpreter for Keelung.Syntax.Encode.Syntax
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -13,15 +13,15 @@ import Control.Monad.State
 import Data.Bits (Bits (..))
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
-import qualified Data.IntMap as IntMap
-import qualified Data.IntSet as IntSet
+import Data.IntMap qualified as IntMap
+import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Data.Bindings
-import qualified Keelung.Data.Bindings as Bindings
+import Keelung.Data.Bindings qualified as Bindings
 import Keelung.Data.Struct
 import Keelung.Interpreter.Monad
-import Keelung.Syntax.Typed
+import Keelung.Syntax.Encode.Syntax
 
 --------------------------------------------------------------------------------
 

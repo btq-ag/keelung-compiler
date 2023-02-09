@@ -10,17 +10,17 @@ import Data.Bifunctor (Bifunctor (..))
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
-import qualified Data.List as List
+import Data.IntSet qualified as IntSet
+import Data.List qualified as List
 import Data.Serialize (Serialize)
 import Data.Validation
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector
+import Data.Vector qualified as Vector
 import GHC.Generics (Generic)
+import Keelung.Data.N (N (N))
 import Keelung.Data.Struct
-import Keelung.Field.N (N (N))
 
 --------------------------------------------------------------------------------
 

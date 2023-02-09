@@ -53,15 +53,16 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Compiler.Relocated qualified as Relocated
-import Keelung.Constraint.Polynomial (Poly)
-import Keelung.Constraint.Polynomial qualified as Poly
+import Keelung.Compiler.Util (indent)
 import Keelung.Constraint.R1CS qualified as Constraint
 import Keelung.Data.Bindings (showList')
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Struct (Struct (..))
+import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Types
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)

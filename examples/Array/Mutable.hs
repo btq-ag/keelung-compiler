@@ -42,8 +42,8 @@ fullAdder as bs = do
 -- | "T" for top-level
 fullAdderT :: Int -> Comp (ArrM Boolean)
 fullAdderT width = do
-  xs <- inputs width >>= thaw
-  ys <- inputs width >>= thaw
+  xs <- inputList width >>= thaw
+  ys <- inputList width >>= thaw
   fullAdder xs ys
 
 --------------------------------------------------------------------------------
@@ -53,5 +53,5 @@ multiplier xs times = foldM fullAdder xs (replicate times xs)
 
 multiplierT :: Int -> Int -> Comp (ArrM Boolean)
 multiplierT width times = do
-  xs <- inputs width >>= thaw
+  xs <- inputList width >>= thaw
   multiplier xs times

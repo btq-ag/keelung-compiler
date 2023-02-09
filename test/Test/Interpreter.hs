@@ -30,13 +30,13 @@ run = hspec tests
 
 kinded :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> Either (Error n) [n]
 kinded prog rawInputs = do
-  elab <- left LangError (elaborate' prog)
+  elab <- left LangError (elaborate prog)
   let inps = Inputs.deserialize (compCounters (elabComp elab)) rawInputs
   left InterpretError (Kinded.run elab inps)
 
 typed :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 typed prog rawInputs = do
-  elab <- left LangError (elaborate prog)
+  elab <- left LangError (elaborateAndEncode prog)
   let inps = Inputs.deserializeElab elab rawInputs
   left InterpretError (Typed.run elab inps)
 
@@ -166,7 +166,7 @@ tests = do
     it "Rotate" $ do
       let program = do
             x <- inputUInt @4
-            return $ toArray [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
+            return [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
 
       runAll program [0 :: GF181] [0, 0, 0, 0, 0, 0, 0, 0, 0]
       runAll program [1 :: GF181] [1, 2, 4, 8, 1, 2, 4, 8, 1]
@@ -180,7 +180,7 @@ tests = do
     it "Shift" $ do
       let program = do
             x <- inputUInt @4
-            return $ toArray [shift x (-4), shift x (-3), shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
+            return [shift x (-4), shift x (-3), shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
 
       runAll program [0 :: GF181] [0, 0, 0, 0, 0, 0, 0, 0, 0]
       runAll program [1 :: GF181] [0, 0, 0, 0, 1, 2, 4, 8, 0]

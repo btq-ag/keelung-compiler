@@ -8,24 +8,24 @@ import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
+import Data.Sequence qualified as Seq
 import Data.Validation (toEither)
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector
+import Data.Vector qualified as Vector
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import qualified Keelung.Compiler.Syntax.Inputs as Inputs
-import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
+import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Bindings
+import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Interpreter.Monad (Constraint (..), Error (..))
-import Keelung.Syntax.BinRep (BinRep (..))
+import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Types
 
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) [n]
 run r1cs inputs = fst <$> run' r1cs inputs

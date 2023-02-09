@@ -2,8 +2,8 @@ module Keelung.Compiler.Util where
 
 import Data.Field.Galois
 import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
-import qualified Data.List as List
+import Data.IntMap qualified as IntMap
+import Data.List qualified as List
 import Keelung (N (N))
 
 -- A Witness is a mapping from variables to their values
@@ -14,3 +14,6 @@ showWitness xs =
   "["
     <> List.intercalate ", " (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList xs))
     <> "]"
+
+indent :: String -> String
+indent = unlines . map ("  " <>) . lines

@@ -2,7 +2,7 @@ module Test.VarLayout (tests) where
 
 import Keelung
 import Keelung.Compiler
-import qualified Keelung.Compiler as Compiler
+import Keelung.Compiler qualified as Compiler
 import Keelung.Syntax.Counters
 import Test.Hspec
 
@@ -183,7 +183,7 @@ tests = do
           y <- inputField
           z <- inputField
           return $ x + y + z
-    case asGF181N $ csCounters <$> Compiler.compile program of
+    case asGF181 $ csCounters <$> Compiler.compile program of
       Left err -> it "Erasure failure" $ expectationFailure (show err)
       Right counters -> do
         it "reindex" $ do
@@ -201,7 +201,7 @@ tests = do
           x <- inputField
           y <- inputBool
           return $ cond y x 0
-    case asGF181N $ csCounters <$> Compiler.compile program of
+    case asGF181 $ csCounters <$> Compiler.compile program of
       Left err -> it "Erasure failure" $ expectationFailure (show err)
       Right counters -> do
         it "reindex" $ do

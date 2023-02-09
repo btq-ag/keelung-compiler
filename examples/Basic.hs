@@ -4,9 +4,11 @@
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use head" #-}
+
 module Basic where
 
-import qualified AggregateSignature.Program
+import AggregateSignature.Program qualified
 import AggregateSignature.Util
 import Control.Monad (forM_)
 import Keelung
@@ -15,7 +17,7 @@ import Keelung.Compiler
     numberOfConstraints,
     optimizeWithInput,
   )
-import qualified Keelung.Compiler as Compiler
+import Keelung.Compiler qualified as Compiler
 
 --------------------------------------------------------------------------------
 
@@ -60,44 +62,44 @@ cond' = do
 
 summation :: Comp Field
 summation = do
-  arr <- inputs 4
+  arr <- inputList 4
   reduce 0 [0 .. 3] $ \accum i -> do
-    let x = access arr i
+    let x = arr !! i
     return $ accum + x
 
 summation2 :: Comp ()
 summation2 = do
-  arr <- inputs 4 :: Comp (Arr Field)
+  arr <- inputList 4 :: Comp [Field]
   sumA <- reduce 0 [0 .. 3] $ \accum i -> do
-    let x = access arr i
+    let x = arr !! i
     return $ accum + x
   sumB <- reduce 0 [3, 2, 1, 0] $ \accum i -> do
-    let x = access arr i
+    let x = arr !! i
     return $ accum + x
   assert $ sumA `eq` sumB
 
 assertArraysEqual :: Comp ()
 assertArraysEqual = do
-  arrA <- inputs 4 :: Comp (Arr Field)
-  arrB <- inputs 4
+  arrA <- inputList 4 :: Comp [Field]
+  arrB <- inputList 4
   forM_ [0 .. 3] $ \i -> do
-    let x = access arrA i
-    let y = access arrB i
+    let x = arrA !! i
+    let y = arrB !! i
     assert $ x `eq` y
 
 assertArraysEqual2 :: Comp ()
 assertArraysEqual2 = do
-  arr <- inputs2 2 4 :: Comp (Arr (Arr Field))
+  arr <- inputList2 2 4 :: Comp [[Field]]
   forM_ [0 .. 1] $ \i ->
     forM_ [0 .. 3] $ \j -> do
-      let x = access2 arr (i, j)
-      let y = access2 arr (i, j)
+      let x = arr !! i !! j
+      let y = arr !! i !! j
       assert $ x `eq` y
 
 every :: Comp Boolean
 every = do
-  arr <- inputs 4
-  return $ foldl And true (fromArray arr)
+  arr <- inputList 4
+  return $ foldl And true arr
 
 assert1 :: Comp ()
 assert1 = do
@@ -106,32 +108,32 @@ assert1 = do
 
 array1D :: Int -> Comp ()
 array1D n = do
-  xs <- inputs n :: Comp (Arr Field)
-  expected <- inputs n
-  mapM_ assert (zipWith eq (map (\x -> x * x) $ fromArray xs) (fromArray expected))
+  xs <- inputList n :: Comp [Field]
+  expected <- inputList n
+  mapM_ assert (zipWith eq (map (\x -> x * x) xs) expected)
 
 array2D :: Int -> Int -> Comp ()
 array2D n m = do
-  xs <- inputs2 n m :: Comp (Arr (Arr Field))
-  expected <- inputs2 n m
+  xs <- inputList2 n m :: Comp [[Field]]
+  expected <- inputList2 n m
 
   forM_ [0 .. n - 1] $ \i ->
     forM_ [0 .. m - 1] $ \j -> do
-      let x = access2 xs (i, j)
-      let x' = access2 expected (i, j)
+      let x = xs !! i !! j
+      let x' = expected !! i !! j
       assert (x' `eq` (x * x))
 
 toArray1 :: Comp ()
 toArray1 = do
-  xss <- inputs2 2 4 :: Comp (Arr (Arr Field))
-  let yss = toArray [toArray [0, 1, 2, 3], toArray [4, 5, 6, 7]]
+  xss <- inputList2 2 4 :: Comp [[Field]]
+  let yss = [[0, 1, 2, 3], [4, 5, 6, 7]]
 
   forM_ [0 .. 1] $ \i -> do
-    let xs = access xss i
-    let ys = access yss i
+    let xs = xss !! i
+    let ys = yss !! i
     forM_ [0 .. 3] $ \j -> do
-      let x = access xs j
-      let y = access ys j
+      let x = xs !! j
+      let y = ys !! j
       assert $ x `eq` y
 
 make :: Int -> Int -> Param GF181
@@ -146,8 +148,8 @@ aggSigInput dim n = map toInteger $ genInputFromParam (makeParam dim n 42 $ Sett
 p :: Param GF181
 p = makeParam 1 1 42 $ Settings False True False
 
--- inputs :: [GF181]
--- inputs = genInputFromParam p
+-- inputList :: [GF181]
+-- inputList = genInputFromParam p
 
 a1 :: Comp ()
 a1 = checkAgg 1 1
@@ -195,17 +197,17 @@ runAggSig dimension n = do
 
 xorLists :: Comp Boolean
 xorLists = do
-  let xs = toArray [false]
-  let ys = toArray [true]
-  let x = access xs 0
-  let y = access ys 0
-  let actual = toArray [x `Xor` y]
-  let expected = toArray [true]
+  let xs = [false]
+  let ys = [true]
+  let x = xs !! 0
+  let y = ys !! 0
+  let actual = [x `Xor` y]
+  let expected = [true]
   return $
     foldl
       ( \acc i ->
-          let a = access actual i
-              b = access expected i
+          let a = actual !! i
+              b = expected !! i
            in acc `And` (a `eq` b)
       )
       true
@@ -213,73 +215,67 @@ xorLists = do
 
 outOfBound :: Comp ()
 outOfBound = do
-  let xs = toArray [true]
-  let _ = access xs 2
+  let xs = [true]
+  let _ = xs !! 2
   return ()
 
 emptyArray :: Comp ()
 emptyArray = do
-  let _ = toArray [] :: Arr Boolean
+  let _ = [] :: [Boolean]
   return ()
 
 dupArray :: Comp Field
 dupArray = do
   x <- input
-  let xs = toArray [x, x]
-  return $ access xs 1
+  let xs = [x, x]
+  return $ xs !! 1
 
 dupList :: Comp [Field]
 dupList = do
   x <- input
   return [x, x]
 
-returnArray :: Comp (Arr Field)
+returnArray :: Comp [Field]
 returnArray = do
   x <- input
   y <- input
-  return $ toArray [x, y]
+  return [x, y]
 
-returnArray2 :: Comp (Arr Field)
+returnArray2 :: Comp [Field]
 returnArray2 = do
   x <- input
-  return $ toArray [x, x * 2]
+  return [x, x * 2]
 
 toArrayM1 :: Comp (ArrM Boolean)
 toArrayM1 = toArrayM [false]
 
 birthday :: Comp Boolean
 birthday = do
-  -- these inputs are private witnesses
+  -- these inputList are private witnesses
   _hiddenYear <- inputField
   hiddenMonth <- inputField
   hiddenDate <- inputField
-  -- these inputs are public inputs
+  -- these inputList are public inputList
   month <- input
   date <- input
 
   return $ (hiddenMonth `eq` month) `And` (hiddenDate `eq` date)
 
 chainingAND :: Int -> Comp Boolean
-chainingAND n = foldl And true <$> inputs n
+chainingAND n = foldl And true <$> inputList n
 
 chainingOR :: Int -> Comp Boolean
-chainingOR n = foldl Or false <$> inputs n
+chainingOR n = foldl Or false <$> inputList n
 
--- bits1 :: Comp (Arr Boolean)
--- bits1 = do
---   x <- inputField
---   y <- inputField
---   return $ toArray [(x !!! 0) `And` (y !!! (-1))]
-
-bitValueU :: Comp (Arr Boolean)
+bitValueU :: Comp [Boolean]
 bitValueU = do
   let c = 3 :: UInt 4
-  return $ toArray [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
+  return [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
 
-bitTestVarUI :: Comp (Arr Boolean)
+bitTestVarUI :: Comp [Boolean]
 bitTestVarUI = do
   x <- inputUInt @4
-  return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
+  return [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
 
 notU :: Comp (UInt 4)
 notU = do
@@ -300,14 +296,14 @@ bits2 = do
   w <- inputUInt @4
   return $ (x .&. y .&. z .&. w) !!! 0
 
-bitTestsOnBtoU :: Comp (Arr Boolean)
+bitTestsOnBtoU :: Comp [Boolean]
 bitTestsOnBtoU = do
   -- output | input | intermediate
   -- bb       b       rrrrrrrruu
   -- 01       2       3456789012
   x <- input
   let u = BtoU x :: UInt 4
-  return $ toArray [u !!! 0, u !!! 1]
+  return [u !!! 0, u !!! 1]
 
 -- Formula: (0°C × 9/5) + 32 = 32°F
 tempConvert :: Comp Field
@@ -338,17 +334,16 @@ mulU = do
   y <- inputUInt @4
   return $ x * y
 
-bitwise :: Comp (Arr Boolean)
+bitwise :: Comp [Boolean]
 bitwise = do
   x <- inputUInt @4
   y <- inputUInt @4
-  return $
-    toArray
-      [ (x .&. y) !!! 0,
-        (x .|. y) !!! 1,
-        (x .^. y) !!! 2,
-        complement x !!! 3
-      ]
+  return
+    [ (x .&. y) !!! 0,
+      (x .|. y) !!! 1,
+      (x .^. y) !!! 2,
+      complement x !!! 3
+    ]
 
 arithU0 :: Comp (UInt 4)
 arithU0 = do
@@ -356,28 +351,26 @@ arithU0 = do
   y <- inputUInt @4
   return $ x + y
 
-rotateAndBitTest :: Comp (Arr Boolean)
+rotateAndBitTest :: Comp [Boolean]
 rotateAndBitTest = do
   x <- inputUInt @4
   y <- inputUInt @4
-  return $
-    toArray
-      [ (x `rotate` 0) !!! 0,
-        (x `rotate` 1) !!! 1,
-        (x `rotate` (-1)) !!! 0,
-        ((x .^. y) `rotate` 1) !!! 1
-      ]
+  return
+    [ (x `rotate` 0) !!! 0,
+      (x `rotate` 1) !!! 1,
+      (x `rotate` (-1)) !!! 0,
+      ((x .^. y) `rotate` 1) !!! 1
+    ]
 
-rotateOnly :: Comp (Arr (UInt 4))
+rotateOnly :: Comp [UInt 4]
 rotateOnly = do
   x <- inputUInt @4
   let constant = 3 :: UInt 4
   -- y <- inputUInt @4
-  return $
-    toArray
-      [ x `rotate` 0,
-        constant `rotate` 3,
-        constant `rotate` (-2),
-        x `rotate` 1 `rotate` 1,
-        (x + x) `rotate` 1
-      ]
+  return
+    [ x `rotate` 0,
+      constant `rotate` 3,
+      constant `rotate` (-2),
+      x `rotate` 1 `rotate` 1,
+      (x + x) `rotate` 1
+    ]

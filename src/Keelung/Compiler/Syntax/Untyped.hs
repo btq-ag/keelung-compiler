@@ -21,16 +21,17 @@ where
 
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
+import Keelung.Compiler.Util (indent)
 import Keelung.Data.Bindings (toSubscript)
 import Keelung.Data.Struct (Struct (..))
-import qualified Keelung.Data.Struct as Struct
+import Keelung.Data.Struct qualified as Struct
 import Keelung.Field (N (..))
+import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
-import qualified Keelung.Syntax.Counters as Counters
-import Keelung.Types (Var, Width, indent)
+import Keelung.Syntax.Counters qualified as Counters
 
 --------------------------------------------------------------------------------
 
@@ -52,9 +53,9 @@ data ExprB n
   | EqB (ExprB n) (ExprB n)
   | EqF (ExprF n) (ExprF n)
   | EqU (ExprU n) (ExprU n)
-  -- | LTEU Width (ExprU n) (ExprU n)
+  | -- | LTEU Width (ExprU n) (ExprU n)
     -- bit tests on UInt
-  | BitU (ExprU n) Int
+    BitU (ExprU n) Int
   deriving (Functor, Eq)
 
 instance (Integral n, Show n) => Show (ExprB n) where
@@ -69,7 +70,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
     NotB x -> chain prec "¬ " 5 $ x :<| Empty
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    NEqB x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty 
+    NEqB x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
     NEqF x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
     NEqU x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
     EqB x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
@@ -125,11 +126,11 @@ data ExprU n
   | XorU Width (ExprU n) (ExprU n)
   | NotU Width (ExprU n)
   | IfU Width (ExprB n) (ExprU n) (ExprU n)
-    -- bit operators
-  | RoLU Width Int (ExprU n)
+  | -- bit operators
+    RoLU Width Int (ExprU n)
   | ShLU Width Int (ExprU n)
-    -- conversion operators
-  | BtoU Width (ExprB n)
+  | -- conversion operators
+    BtoU Width (ExprB n)
   deriving (Functor, Eq)
 
 instance (Show n, Integral n) => Show (ExprU n) where

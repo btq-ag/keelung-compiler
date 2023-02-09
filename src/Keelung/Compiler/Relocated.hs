@@ -9,17 +9,17 @@ import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
-import qualified Data.Map as Map
+import Data.IntSet qualified as IntSet
+import Data.Map qualified as Map
 import Data.Sequence (Seq)
 import GHC.Generics (Generic)
-import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..))
+import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
+import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
-import Keelung.Types
 
 --------------------------------------------------------------------------------
 
@@ -154,7 +154,8 @@ renumberConstraints cs =
         then case Map.lookup var variableMap of
           Nothing ->
             error
-              ( "can't find a mapping for variable " <> show var
+              ( "can't find a mapping for variable "
+                  <> show var
                   <> " \nmapping: "
                   <> show variableMap
                   <> " \nrenumbered vars: "

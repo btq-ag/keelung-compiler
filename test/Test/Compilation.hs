@@ -8,9 +8,9 @@ module Test.Compilation (run, tests) where
 import Control.Monad
 import Keelung hiding (run)
 import Keelung.Compiler qualified as Compiler
-import Keelung.Constraint.Polynomial qualified as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (toR1Cs)
+import Keelung.Data.Polynomial qualified as Poly
 import Test.Hspec
 
 run :: IO ()
@@ -20,34 +20,34 @@ tests :: SpecWith ()
 tests = do
   describe "Compilation" $ do
     describe "Assertion" $ do
-        it "Rewriting" $ do
-          let program = do
-                xs <- inputs 4
-                ys <- inputs 4
-                assert (sum xs `eq` sum (ys :: Arr Field))
-          case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-            Left err -> expectationFailure (show err)
-            Right r1cs -> do
-              toR1Cs r1cs
-                `shouldContain` [ R1C
-                                    (Poly.buildEither 0 [(0, 1), (1, 1), (2, 1), (3, 1), (8, -1)])
-                                    (Poly.buildEither 1 [])
-                                    (Poly.buildEither 0 [])
-                                ]
-              toR1Cs r1cs
-                `shouldContain` [ R1C
-                                    (Poly.buildEither 0 [(4, 1), (5, 1), (6, 1), (7, 1), (8, -1)])
-                                    (Poly.buildEither 1 [])
-                                    (Poly.buildEither 0 [])
-                                ]
+      it "Rewriting" $ do
+        let program = do
+              xs <- inputList 4
+              ys <- inputList 4
+              assert (sum xs `eq` sum (ys :: [Field]))
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(0, 1), (1, 1), (2, 1), (3, 1), (8, -1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(4, 1), (5, 1), (6, 1), (7, 1), (8, -1)])
+                                  (Poly.buildEither 1 [])
+                                  (Poly.buildEither 0 [])
+                              ]
 
     describe "Unsigned Integer" $ do
       it "Bit test / Value" $ do
         -- 0011
         let program = do
               let c = 3 :: UInt 4
-              return $ toArray [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+              return [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- c !!! (-1)
@@ -97,8 +97,8 @@ tests = do
         -- 01234567890
         let program = do
               x <- inputUInt @4
-              return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+              return [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- x !!! (-1) == x !!! (-3)
@@ -152,7 +152,7 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               return $ (x .&. y) !!! 0
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             toR1Cs r1cs
@@ -170,7 +170,7 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               return $ (x .|. y) !!! 0
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- (1 - x[0]) * y[0] = out[0] - x[0]
@@ -188,8 +188,8 @@ tests = do
         let program = do
               x <- input
               let u = BtoU x :: UInt 4
-              return $ toArray [u !!! 0, u !!! 1, u !!! 2, u !!! 3]
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+              return [u !!! 0, u !!! 1, u !!! 2, u !!! 3]
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- u !!! 0 == x
@@ -216,7 +216,7 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               return $ x .&. y
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- x[i] * y[i] = out[i]
@@ -236,7 +236,7 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               return $ x .&. y .&. x
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- x[i] * y[i] = temp[i]
@@ -264,7 +264,7 @@ tests = do
               let x = 3 :: UInt 4
               let y = 5 :: UInt 4
               return $ x .&. y
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- out[0] = 1 * 1
@@ -304,7 +304,7 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               return $ x .|. y
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- (1 - x[i]) * y[i] = out[i] - x[i]
@@ -324,7 +324,7 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               return $ x .|. y .|. x
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- (1 - x[i]) * y[i] = temp[i] - x[i]
@@ -352,7 +352,7 @@ tests = do
               x <- inputUInt @4
               let y = 3
               return $ x .|. y
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- (1 - x[0]) * 1 = out[0] - x[0] => out[0] = 1
@@ -393,7 +393,7 @@ tests = do
               y <- inputUInt @4
               z <- inputUInt @4
               return $ x .^. y .^. z
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- (1 - 2x[i]) * (1 + y[i]) = (1 + temp[i] - 3x[i])
@@ -420,7 +420,7 @@ tests = do
         let program = do
               let x = 3 :: UInt 4
               return $ complement x
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- 1 = out[i]
@@ -456,7 +456,7 @@ tests = do
         let program = do
               x <- inputUInt @4
               return $ complement x
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- 1 - x[i] = out[i]
@@ -476,7 +476,7 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               return $ x `eq` y
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             --  (x - y) * m = 1 - out
@@ -501,7 +501,7 @@ tests = do
         let program = do
               x <- inputUInt @4
               return $ x `eq` 3
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             --  (x - 3) * m = 1 - out
@@ -527,7 +527,7 @@ tests = do
       --         x <- inputUInt @4
       --         y <- inputUInt @4
       --         return $ x `neq` y
-      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --   case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
       --     Left err -> expectationFailure (show err)
       --     Right r1cs -> do
       --         --  (x - y) * m = out
@@ -562,7 +562,7 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               return (x + y)
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- (2ⁿ * xₙ₋₁) * (yₙ₋₁) = (out - x - y)
@@ -581,7 +581,7 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               return (x + y + x)
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- (2ⁿ * xₙ₋₁) * (yₙ₋₁) = (temp - x - y)
@@ -610,7 +610,7 @@ tests = do
               y <- inputUInt @4
               let z = 3
               return (x + y + z)
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- (2ⁿ * xₙ₋₁) * (yₙ₋₁) = (temp - x - y)
@@ -639,7 +639,7 @@ tests = do
               y <- inputUInt @4
               z <- inputUInt @4
               return (x - y - z)
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- (2ⁿ * xₙ₋₁) * (yₙ₋₁) = (temp - x + y)
@@ -666,7 +666,7 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               return (x * y)
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- x * y = out + 2ⁿ * quotient
@@ -686,7 +686,7 @@ tests = do
               y <- inputUInt @4
               z <- inputUInt @4
               return (x * y * z * 3)
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- x * y = temp1 + 2ⁿ * quotient1
@@ -720,7 +720,7 @@ tests = do
               y <- inputUInt @4
               z <- inputUInt @4
               return (x * y + z - 3)
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- x * y = temp1 + 2ⁿ * quotient
@@ -753,7 +753,7 @@ tests = do
         let program = do
               x <- inputUInt @4
               return $ rotate x 1
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- x[i] = out[i + i]
@@ -772,7 +772,7 @@ tests = do
         let program = do
               let x = 3 :: UInt 4
               return $ rotate x (-1)
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             toR1Cs r1cs
@@ -806,7 +806,7 @@ tests = do
         let program = do
               x <- inputUInt @4
               return $ rotate (rotate x (-1)) 1
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- x[i] = out[i]
@@ -825,7 +825,7 @@ tests = do
         let program = do
               x <- inputUInt @4
               return $ shift x 1
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- 0 = out[0]
@@ -850,8 +850,8 @@ tests = do
         -- 012345678901234
         let program = do
               let x = 3 :: UInt 4
-              return $ toArray [shift x 1, shift x (-1), shift x 3]
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+              return [shift x 1, shift x (-1), shift x 3]
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             toR1Cs r1cs
@@ -934,11 +934,11 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               performDivMod x y
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- dividend = divisor * quotient + remainder
-            -- $18 = $19 * $8 + $9
+            -- \$18 = $19 * $8 + $9
             toR1Cs r1cs
               `shouldContain` [ R1C
                                   (Poly.buildEither 0 [(19, 1)])
@@ -954,7 +954,7 @@ tests = do
                                   (Poly.buildEither 0 [(9, 1), (19, -1), (20, 1)])
                               ]
             -- diff != 0
-            -- $20 * $21 = 1
+            -- \$20 * $21 = 1
             toR1Cs r1cs
               `shouldContain` [ R1C
                                   (Poly.buildEither 0 [(20, 1)])
@@ -962,7 +962,7 @@ tests = do
                                   (Poly.buildEither 1 [])
                               ]
             -- divisor != 0
-            -- $22 * $19 = 1
+            -- \$22 * $19 = 1
             toR1Cs r1cs
               `shouldContain` [ R1C
                                   (Poly.buildEither 0 [(22, 1)])
@@ -977,11 +977,11 @@ tests = do
               x <- inputUInt @4
               y <- inputUInt @4
               assertDivMod x 2 7 y -- x = 2 * 7 + y
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+        case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
           Right r1cs -> do
             -- dividend = 2 * 7 + remainder
-            -- $18 = 14 + $9
+            -- \$18 = 14 + $9
             toR1Cs r1cs
               `shouldContain` [ R1C
                                   (Poly.buildEither 14 [(9, 1), (8, -1)])

@@ -5,20 +5,20 @@ module Keelung.Compiler.Optimize.MinimizeRelocatedConstraints (run, substConstra
 import Control.Monad
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
-import qualified Data.IntMap as IntMap
+import Data.IntMap qualified as IntMap
 import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
+import Data.Sequence qualified as Seq
 import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.Set qualified as Set
 import Keelung.Compiler.Optimize.Monad
 import Keelung.Compiler.Relocated (Constraint (..), cadd)
 import Keelung.Compiler.Syntax.FieldBits (toBits)
-import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
 import Keelung.Constraint.R1CS (CNEQ (..))
-import Keelung.Syntax.BinRep (BinRep (BinRep))
+import Keelung.Data.BinRep (BinRep (BinRep))
+import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
+import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
-import Keelung.Types (Var)
 
 run ::
   (GaloisField n, Integral n) =>
@@ -197,10 +197,14 @@ substConstraint !constraint = case constraint of
       -- (a + ax) * (b + bx) = c
       -- (a + ax) * (b + bx) = c + cx
       (Right (a, aX), Right (b, bX), Left c) -> do
-        CMul <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
+        CMul
+          <$> Poly.buildMaybe a aX
+          <*> Poly.buildMaybe b bX
           <*> pure (Left c)
       (Right (a, aX), Right (b, bX), Right (c, cX)) -> do
-        CMul <$> Poly.buildMaybe a aX <*> Poly.buildMaybe b bX
+        CMul
+          <$> Poly.buildMaybe a aX
+          <*> Poly.buildMaybe b bX
           <*> pure (Poly.buildEither c (IntMap.toList cX))
   CNEq (CNEQ x y m) -> do
     x' <- case x of

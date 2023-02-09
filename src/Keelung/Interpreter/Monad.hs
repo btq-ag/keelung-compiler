@@ -9,25 +9,26 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bifunctor (second)
-import qualified Data.Bits
+import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
+import Data.IntSet qualified as IntSet
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import qualified Keelung.Compiler.Syntax.Inputs as Inputs
+import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C (R1C)
 import Keelung.Constraint.R1CS (CNEQ)
+import Keelung.Data.BinRep (BinRep)
 import Keelung.Data.Bindings
 import Keelung.Data.Struct
-import Keelung.Syntax.BinRep (BinRep)
+import Keelung.Heap
+import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Types
 
 --------------------------------------------------------------------------------
 
@@ -164,11 +165,13 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "these variables have no bindings:\n  "
       ++ showList' (map (\var -> "$" <> show var) $ IntSet.toList unboundVariables)
   show (AssertionError expr bindings) =
-    "assertion failed: " <> expr
+    "assertion failed: "
+      <> expr
       <> "\nbindings of free variables in the assertion:\n"
       <> show bindings
   show (AssertionError' expr bindings) =
-    "assertion failed: " <> expr
+    "assertion failed: "
+      <> expr
       <> "\nbindings of free variables in the assertion:\n"
       <> showList' (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList bindings))
   show (R1CSStuckError constraint) =

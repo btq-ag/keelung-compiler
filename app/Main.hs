@@ -22,7 +22,7 @@ import Keelung.Compiler
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Util (Witness)
 import Keelung.Field
-import Keelung.Syntax.Typed
+import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
 import Option
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs

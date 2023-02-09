@@ -7,9 +7,9 @@ import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
+import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
-import qualified Keelung.Syntax.Typed as T
-import Keelung.Types
+import Keelung.Syntax.Encode.Syntax qualified as T
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =

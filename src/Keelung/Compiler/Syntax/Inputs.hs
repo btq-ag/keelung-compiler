@@ -5,14 +5,14 @@ module Keelung.Compiler.Syntax.Inputs where
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
+import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector
+import Data.Vector qualified as Vector
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Syntax.Counters
-import Keelung.Syntax.Typed (Computation (compCounters), Elaborated (elabComp))
+import Keelung.Syntax.Encode.Syntax (Computation (compCounters), Elaborated (elabComp))
 
 -- | Deserialise the outputs from the R1CS interpreter
 --   TODO: make it something like a proper inverse of Inputs.deserialize

@@ -2,17 +2,17 @@
 
 module AggSig (run) where
 
-import qualified AggregateSignature.Program as AggSig
+import AggregateSignature.Program qualified as AggSig
 import AggregateSignature.Util
 import Criterion
-import Keelung (Comp, GF181, elaborate)
-import Keelung.Compiler hiding (elaborate)
+import Keelung (Comp, GF181, elaborateAndEncode)
+import Keelung.Compiler hiding (elaborateAndEncode)
 
 run :: Benchmark
 run =
   bgroup
     "Aggregate Signature"
-    [ elaboration,
+    [ elaborationAndEncoding,
       compilation,
       constantPropagation,
       optimization1
@@ -31,11 +31,11 @@ run =
           setup = makeParam dimension numberOfSignatures 42 settings :: Param GF181
        in AggSig.aggregateSignature setup
 
-    elaboration :: Benchmark
-    elaboration =
+    elaborationAndEncoding :: Benchmark
+    elaborationAndEncoding =
       bgroup
-        "Elaboration"
-        $ map (\i -> bench (show i) $ nf elaborate $ program i) [1, 2, 4, 8]
+        "Elaboration + Encoding"
+        $ map (\i -> bench (show i) $ nf elaborateAndEncode $ program i) [1, 2, 4, 8]
 
     compilation :: Benchmark
     compilation =

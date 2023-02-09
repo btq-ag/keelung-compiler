@@ -8,21 +8,20 @@ module Keelung.Interpreter.Kinded (run, runAndOutputWitnesses) where
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
-import qualified Data.Bits
+import Data.Bits qualified
 import Data.Foldable (toList)
-import qualified Data.IntMap.Strict as IntMap
-import qualified Data.IntSet as IntSet
+import Data.IntMap.Strict qualified as IntMap
+import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
 import GHC.TypeLits (KnownNat)
-import Keelung hiding (inputs, interpret, run)
+import Keelung hiding (interpret, run)
 import Keelung.Compiler.Syntax.Inputs (Inputs (..))
 import Keelung.Data.Bindings
-import qualified Keelung.Data.Bindings as Bindings
+import Keelung.Data.Bindings qualified as Bindings
 import Keelung.Data.Struct
 import Keelung.Interpreter.Monad
 import Keelung.Interpreter.Typed ()
-import qualified Keelung.Syntax.Typed as Typed
-import Keelung.Types (ElemType (..))
+import Keelung.Syntax.Encode.Syntax qualified as Typed
 
 --------------------------------------------------------------------------------
 
@@ -164,10 +163,6 @@ instance GaloisField n => Interpret () n where
 instance (Interpret t n, GaloisField n) => Interpret [t] n where
   interpret xs = concat <$> mapM interpret xs
 
-instance (Interpret t n, GaloisField n) => Interpret (Arr t) n where
-  interpret val = case val of
-    Arr xs -> concat <$> mapM interpret xs
-
 instance (GaloisField n, Integral n) => Interpret (ArrM t) n where
   interpret val = case val of
     ArrayRef _elemType _len addr -> do
@@ -227,10 +222,6 @@ instance KnownNat w => FreeVar (UInt w) where
     ShLU _ _ x -> freeVars x
     IfU p x y -> freeVars p <> freeVars x <> freeVars y
     BtoU x -> freeVars x
-
-instance FreeVar t => FreeVar (Arr t) where
-  freeVars val = case val of
-    Arr xs -> mconcat $ map freeVars $ toList xs
 
 instance FreeVar () where
   freeVars expr = case expr of

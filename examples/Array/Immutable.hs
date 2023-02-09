@@ -7,22 +7,22 @@ import Data.Bits (Bits (testBit))
 import Data.Word (Word8)
 import Keelung
 
-fromWord8 :: Word8 -> Arr Boolean
-fromWord8 word = toArray $ Prelude.map (Boolean . testBit word) [0 .. 7]
+fromWord8 :: Word8 -> [Boolean]
+fromWord8 word = Prelude.map (Boolean . testBit word) [0 .. 7]
 
-fromChar :: Char -> Arr Boolean
+fromChar :: Char -> [Boolean]
 fromChar = fromWord8 . toEnum . fromEnum
 
-fromString :: String -> Arr (Arr Boolean)
-fromString = toArray . map fromChar
+fromString :: String -> [[Boolean]]
+fromString = map fromChar
 
 ------------------------------------------------------------------------------
 
-fullAdder :: Arr Boolean -> Arr Boolean -> Comp (Arr Boolean)
+fullAdder :: [Boolean] -> [Boolean] -> Comp [Boolean]
 fullAdder as bs = do
-  let zipped = zip (fromArray as) (fromArray bs)
+  let zipped = zip as bs
   (result, _) <- foldM f ([], false) zipped
-  return (toArray result)
+  return result
   where
     f :: ([Boolean], Boolean) -> (Boolean, Boolean) -> Comp ([Boolean], Boolean)
     f (acc, carry) (a, b) = do
@@ -33,23 +33,23 @@ fullAdder as bs = do
       return (acc ++ [value], nextCarry)
 
 -- | "T" for top-level
-fullAdderT :: Int -> Comp (Arr Boolean)
+fullAdderT :: Int -> Comp [Boolean]
 fullAdderT width = do
-  xs <- inputs width
-  ys <- inputs width
+  xs <- inputList width
+  ys <- inputList width
   fullAdder xs ys
 
 --------------------------------------------------------------------------------
 
-multiplier :: Arr Boolean -> Int -> Comp (Arr Boolean)
+multiplier :: [Boolean] -> Int -> Comp [Boolean]
 multiplier xs times =
   foldM
     fullAdder
-    (toArray (replicate (length xs) false))
+    (replicate (length xs) false)
     (replicate times xs)
 
 -- | "T" for top-level
-multiplierT :: Int -> Int -> Comp (Arr Boolean)
+multiplierT :: Int -> Int -> Comp [Boolean]
 multiplierT width times = do
-  xs <- inputs width
+  xs <- inputList width
   multiplier xs times

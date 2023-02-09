@@ -10,11 +10,11 @@ where
 
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
-import qualified Data.List as List
+import Data.IntMap qualified as IntMap
+import Data.List qualified as List
 import Data.Maybe (fromMaybe)
 import Keelung.Field (N (..))
-import Keelung.Types (Var)
+import Keelung.Syntax (Var)
 
 data UnionFind n = UnionFind
   { links :: IntMap Var,
@@ -94,11 +94,11 @@ mergeValues xs x y = case (IntMap.lookup x xs, IntMap.lookup y xs) of
 union :: GaloisField n => UnionFind n -> Var -> Var -> UnionFind n
 union xs x y
   | x < y =
-    union' xs x y
+      union' xs x y
   | x > y =
-    union' xs y x
+      union' xs y x
   | otherwise =
-    xs
+      xs
 
 -- | Choose the first argument as root on ties.
 -- Left-biased: if size x == size y, prefer x as root.

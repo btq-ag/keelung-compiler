@@ -14,11 +14,11 @@ where
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
-import qualified Data.IntMap.Lazy as Map
+import Data.IntMap.Lazy qualified as Map
 import Keelung.Compiler.Optimize.UnionFind (UnionFind (..))
-import qualified Keelung.Compiler.Optimize.UnionFind as UnionFind
+import Keelung.Compiler.Optimize.UnionFind qualified as UnionFind
 import Keelung.Compiler.Util (Witness)
-import Keelung.Types (Var)
+import Keelung.Syntax (Var)
 
 ----------------------------------------------------------------
 --                  Simplifier State Monad                    --
@@ -70,11 +70,11 @@ lookupVar x = do
 witnessOfVars :: GaloisField n => [Var] -> OptiM n (Witness n)
 witnessOfVars vars = do
   bindings <- mapM lookupVar vars
-  return $
-    Map.fromList $
-      concatMap
-        ( \(x, ec) -> case ec of
-            Root _ -> []
-            Value c -> [(x, c)]
-        )
-        $ zip vars bindings
+  return
+    $ Map.fromList
+    $ concatMap
+      ( \(x, ec) -> case ec of
+          Root _ -> []
+          Value c -> [(x, c)]
+      )
+    $ zip vars bindings

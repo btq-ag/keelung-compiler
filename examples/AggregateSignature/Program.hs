@@ -7,10 +7,7 @@ module AggregateSignature.Program where
 
 import AggregateSignature.Util
 import Control.Monad
-import Data.Array
-import Keelung.Compiler
-import Keelung.Monad
--- import Keelung.Syntax
+import Data.Vector (Vector, (!))
 import Keelung
 
 --    let S be the signature and P be the public key
@@ -41,9 +38,9 @@ checkAgg (Param dimension numOfSigs setup _) = do
   --    nT: coefficients of terms of signatures as input
   --    nT: remainders of product of signatures & public keys
   --    nT: quotients of product of signatures & public keys
-  sigs <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Field))
-  expectedRemainders <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Field))
-  expectedQuotients <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Field))
+  sigs <- inputVec2 numOfSigs dimension :: Comp (Vector (Vector Field))
+  expectedRemainders <- inputVec2 numOfSigs dimension :: Comp (Vector (Vector Field))
+  expectedQuotients <- inputVec2 numOfSigs dimension :: Comp (Vector (Vector Field))
 
   -- pairs for iterating through public keys with indices
   let publicKeyPairs = zip [0 ..] (setupPublicKeys setup)
@@ -52,24 +49,29 @@ checkAgg (Param dimension numOfSigs setup _) = do
     forM_ [0 .. dimension - 1] $ \i -> do
       rowSum <- reduce 0 [0 .. dimension - 1] $ \acc j -> do
         let indexForPublicKey = (i - j) `mod` dimension
-        let pk = publicKey Data.Array.! indexForPublicKey
+        let pk = publicKey ! indexForPublicKey
         let pk' =
               if i < j
                 then q - pk
                 else pk
-        let sig = access2 sigs (t, j)
+        let sig = sigs ! t ! j
         return $ acc + (sig * fromIntegral pk')
-      let remainder = access2 expectedRemainders (t, i)
-      let quotient = access2 expectedQuotients (t, i)
+      let remainder = expectedRemainders ! t ! i
+      let quotient = expectedQuotients ! t ! i
 
       -- assert the relation between rowSum, remainder and quotient
       assert $ rowSum `eq` (quotient * fromInteger q + remainder)
 
   forM_ [0 .. dimension - 1] $ \i -> do
-    let expected = setupAggSig setup Data.Array.! i
-    let actual = foldl (\acc t -> 
-                  let remainder = access2 expectedRemainders (t, i)
-                  in  acc + remainder) 0 [0 .. numOfSigs - 1] 
+    let expected = setupAggSig setup ! i
+    let actual =
+          foldl
+            ( \acc t ->
+                let remainder = expectedRemainders ! t ! i
+                 in acc + remainder
+            )
+            0
+            [0 .. numOfSigs - 1]
 
     -- assert that the sum of remainders forms a term of aggregate signature
     assert $ actual `eq` fromIntegral expected
@@ -78,57 +80,73 @@ checkSize :: (GaloisField n, Integral n) => Param n -> Comp ()
 checkSize (Param dimension numOfSigs setup _) = do
   let signatures = setupSignatures setup
 
-  sigBitStrings <- inputs3 numOfSigs dimension 14
+  sigBitStrings <- inputVec3 numOfSigs dimension 14
   forM_ [0 .. numOfSigs - 1] $ \i -> do
     let signature = signatures !! i
     forM_ [0 .. dimension - 1] $ \j -> do
-      let coeff = signature Data.Array.! j
+      let coeff = signature ! j
+      let sigBitString = sigBitStrings ! i ! j
 
       -- within the range of [0, 16384)
-      let value = foldl (\acc k ->
-                            let bit = access3 sigBitStrings (i, j, k)
-                                bitValue = fromIntegral (2 ^ k :: Integer)
-                                prod = BtoF bit * bitValue
-                            in  (acc + prod))  0 [0 .. 13]
+      let value =
+            foldl
+              ( \acc k ->
+                  let bit = sigBitString ! k
+                      bitValue = fromIntegral (2 ^ k :: Integer)
+                      prod = BtoF bit * bitValue
+                   in (acc + prod)
+              )
+              0
+              [0 .. 13]
       assert (fromIntegral coeff `eq` value)
 
-      let bit13 = access3 sigBitStrings (i, j, 13)
-      let bit12 = access3 sigBitStrings (i, j, 12)
-      let bit11to0 = foldl (\acc k ->
-                              let bit = access3 sigBitStrings (i, j, k)
-                              in  acc + BtoF bit) 0 [0 .. 11]
+      let bit13 = sigBitString ! 13
+      let bit12 = sigBitString ! 12
+      let bit11to0 =
+            foldl
+              ( \acc k ->
+                  let bit = sigBitString ! k
+                   in acc + BtoF bit
+              )
+              0
+              [0 .. 11]
 
       let smallerThan12289 = BtoF bit13 * BtoF bit12 * bit11to0
       assert (smallerThan12289 `eq` 0)
 
 checkLength :: (Integral n, GaloisField n) => Param n -> Comp ()
 checkLength (Param dimension numOfSigs _ _) = do
-  sigs <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Field))
+  sigs <- inputVec2 numOfSigs dimension :: Comp (Vector (Vector Field))
 
   -- expecting square of signatures as input
-  sigSquares <- inputs2 numOfSigs dimension :: Comp (Arr (Arr Field))
+  sigSquares <- inputVec2 numOfSigs dimension :: Comp (Vector (Vector Field))
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
     forM_ [0 .. dimension - 1] $ \i -> do
-      let sig = access2 sigs (t, i)
-      let square = access2 sigSquares (t, i)
+      let sig = sigs ! t ! i
+      let square = sigSquares ! t ! i
       assert (square `eq` (sig * sig))
 
   -- expecting remainders of length of signatures as input
-  sigLengthRemainders <- inputs numOfSigs
+  sigLengthRemainders <- inputVec numOfSigs
   -- expecting quotients of length of signatures as input
-  sigLengthQuotients <- inputs numOfSigs
+  sigLengthQuotients <- inputVec numOfSigs
 
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
-    let actualLength = foldl (\acc i -> 
-                                  let square = access2 sigSquares (t, i)
-                                  in acc + square) 0 [0 .. dimension - 1] 
+    let actualLength =
+          foldl
+            ( \acc i ->
+                let square = sigSquares ! t ! i
+                 in acc + square
+            )
+            0
+            [0 .. dimension - 1]
 
-    let remainder = access sigLengthRemainders t
-    let quotient = access sigLengthQuotients t
+    let remainder = sigLengthRemainders ! t
+    let quotient = sigLengthQuotients ! t
 
     -- assert the relation between actualLength, remainder and quotient
     assert $ actualLength `eq` (quotient * fromInteger q + remainder)

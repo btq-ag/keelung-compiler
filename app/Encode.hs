@@ -13,12 +13,12 @@ import Data.Field.Galois (GaloisField (char, deg))
 import qualified Data.IntMap as IntMap
 import Data.Proxy
 import Keelung.Compiler.Util (Witness)
-import Keelung.Constraint.Polynomial (Poly)
-import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Data.Polynomial (Poly)
+import qualified Keelung.Data.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
 import Keelung.Syntax.Counters hiding (reindex)
-import Keelung.Types
+import Keelung.Syntax
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf

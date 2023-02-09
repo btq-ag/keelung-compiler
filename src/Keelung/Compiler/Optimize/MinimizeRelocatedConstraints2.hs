@@ -12,13 +12,13 @@ import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
+import Data.IntSet qualified as IntSet
 import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
+import Data.Sequence qualified as Seq
 import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.Set qualified as Set
 import Keelung.Compiler.Relocated
-import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Data.Polynomial qualified as Poly
 
 --------------------------------------------------------------------------------
 

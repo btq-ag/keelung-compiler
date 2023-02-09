@@ -109,7 +109,6 @@ executable keelungc
       Keelung.Interpreter.Typed
       AggregateSignature.Program
       AggregateSignature.Util
-      Array
       Array.Immutable
       Array.Mutable
       Basic
@@ -183,7 +182,6 @@ test-suite keelung-test
       Keelung.Interpreter.Typed
       AggregateSignature.Program
       AggregateSignature.Util
-      Array
       Array.Immutable
       Array.Mutable
       Basic
@@ -257,7 +255,6 @@ benchmark keelung-bench
       Poseidon
       AggregateSignature.Program
       AggregateSignature.Util
-      Array
       Array.Immutable
       Array.Mutable
       Basic

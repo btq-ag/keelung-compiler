@@ -15,7 +15,7 @@ module Keelung.Compiler
     module Keelung.Compiler.R1CS,
     --
     erase,
-    elaborate,
+    elaborateAndEncode,
     interpret,
     genInputsOutputsWitnesses,
     compileOnly,
@@ -41,35 +41,35 @@ import Control.Arrow (left)
 import Data.Field.Galois (GaloisField)
 import Data.Semiring (Semiring (one, zero))
 import Keelung (Encode, N (..))
-import qualified Keelung as Lang
-import qualified Keelung.Compiler.Compile as Compile
+import Keelung qualified as Lang
+import Keelung.Compiler.Compile qualified as Compile
 import Keelung.Compiler.Constraint (ConstraintSystem, relocateConstraintSystem)
 import Keelung.Compiler.Error
-import qualified Keelung.Compiler.Optimize as Optimizer
-import qualified Keelung.Compiler.Optimize.ConstantPropagation as ConstantPropagation
+import Keelung.Compiler.Optimize qualified as Optimizer
+import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
 import Keelung.Compiler.R1CS
 import Keelung.Compiler.Relocated (RelocatedConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Syntax.Erase as Erase
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import qualified Keelung.Compiler.Syntax.Inputs as Inputs
+import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
-import qualified Keelung.Interpreter.Typed as Typed
+import Keelung.Interpreter.Typed qualified as Typed
 import Keelung.Monad (Comp)
-import Keelung.Syntax.Typed (Elaborated)
+import Keelung.Syntax.Encode.Syntax (Elaborated)
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
 
-elaborate :: Encode t => Comp t -> Either (Error n) Elaborated
-elaborate = left LangError . Lang.elaborate
+elaborateAndEncode :: Encode t => Comp t -> Either (Error n) Elaborated
+elaborateAndEncode = left LangError . Lang.elaborateAndEncode
 
 -- elaboration => interpretation
 interpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 interpret prog rawInputs = do
-  elab <- elaborate prog
+  elab <- elaborateAndEncode prog
   let inputs = Inputs.deserializeElab elab rawInputs
   left InterpretError (Typed.run elab inputs)
 
@@ -77,7 +77,7 @@ interpret prog rawInputs = do
 --   Generate (structured inputs, outputs, witness)
 genInputsOutputsWitnesses :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) (Inputs n, [n], Witness n)
 genInputsOutputsWitnesses prog rawInputs = do
-  elab <- elaborate prog
+  elab <- elaborateAndEncode prog
   outputs <- left InterpretError (Typed.run elab (Inputs.deserializeElab elab rawInputs))
   r1cs <- toR1CS <$> compileO1 prog
   let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
@@ -86,7 +86,7 @@ genInputsOutputsWitnesses prog rawInputs = do
 
 -- elaborate => rewrite => type erase
 erase :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (TypeErased n)
-erase prog = eraseElab <$> elaborate prog
+erase prog = eraseElab <$> elaborateAndEncode prog
 
 -- elaborate => rewrite => type erase => compile => relocate
 compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)

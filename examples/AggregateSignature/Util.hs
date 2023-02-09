@@ -1,18 +1,20 @@
 module AggregateSignature.Util where
 
-import Data.Array
 import Data.Bits (testBit)
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.Semiring (Semiring (..))
-import System.Random
+import Data.Vector (Vector, (!))
+import Data.Vector qualified as Vec
 import Keelung (GF181)
+import System.Random
 
 --------------------------------------------------------------------------------
 
 -- coefficients of terms of signatures
-type Signature n = Array Int n
+type Signature n = Vector n
 
-type PublicKey n = Array Int n
+type PublicKey n = Vector n
 
 --------------------------------------------------------------------------------
 
@@ -46,9 +48,9 @@ data Setup n = Setup
     -- | nT: Coefficients of terms of signatures
     setupSignatures :: [Signature n],
     -- | nT: "Remainders"
-    setupSigRemainders :: [Array Int n],
+    setupSigRemainders :: [Vector n],
     -- | nT: "Quotients"
-    setupSigQuotients :: [Array Int n],
+    setupSigQuotients :: [Vector n],
     -- | n: Coefficients of terms of Aggregate signature
     setupAggSig :: Signature n,
     -- | 14nT: Bit strings of signatures
@@ -111,15 +113,15 @@ makeParam dimension t seed settings =
     randomNumbers = take (dimension * t * 2) $ randoms (mkStdGen (succ seed))
 
     -- split random numbers into small arrays (of size `dimension`) for fake signatures & public keys
-    arraysForSignatures :: [Array Int Int]
-    arraysForPublicKeys :: [Array Int Int]
+    arraysForSignatures :: [Vector Int]
+    arraysForPublicKeys :: [Vector Int]
     (arraysForSignatures, arraysForPublicKeys) = splitAt t $ splitListIntoArrays dimension randomNumbers
 
-    aggSig = listArray (0, dimension - 1) $ map ithSum [0 .. dimension - 1]
+    aggSig = Vec.fromList $ map ithSum [0 .. dimension - 1]
       where
         ithSum i = sum $ map (! i) remainders
 
-    bisStrings = map (toBitStrings . elems) signatures
+    bisStrings = map (toBitStrings . toList) signatures
 
     toBitStrings :: GaloisField n => [Integer] -> [[n]]
     toBitStrings = map (toListLE . toInteger)
@@ -161,13 +163,13 @@ makeParam dimension t seed settings =
 --        └──────────────────────────  ...  ────────────────────┘
 
 -- Get an array of remainders and an array of quotients from a signature and a public key
-computeRemsAndQuots :: (Integral n, Num n, Show n) => Int -> [Signature n] -> [PublicKey n] -> ([Array Int n], [Array Int n])
+computeRemsAndQuots :: (Integral n, Num n, Show n) => Int -> [Signature n] -> [PublicKey n] -> ([Vector n], [Vector n])
 computeRemsAndQuots dimension signatures publicKeys = unzip $ zipWith (computeRemsAndQuot dimension) signatures publicKeys
 
-computeRemsAndQuot :: (Integral n, Num n, Show n) => Int -> Signature n -> PublicKey n -> (Array Int n, Array Int n)
+computeRemsAndQuot :: (Integral n, Num n, Show n) => Int -> Signature n -> PublicKey n -> (Vector n, Vector n)
 computeRemsAndQuot dimension signature publicKey =
   let (remainders, quotients) = unzip [handleRow i | i <- [0 .. dimension - 1]]
-   in (listArray (0, dimension - 1) remainders, listArray (0, dimension - 1) quotients)
+   in (Vec.fromList remainders, Vec.fromList quotients)
   where
     -- NOTE: forall x, y. x `mod` y = 0 on any Galois field
     -- we need to convert these numbers to Integers
@@ -205,9 +207,9 @@ genInputFromParam (Param _ _ setup settings) =
   let forAggChecking =
         if enableAggChecking settings
           then
-            (setupSignatures setup >>= elems)
-              ++ (setupSigRemainders setup >>= elems)
-              ++ (setupSigQuotients setup >>= elems)
+            (setupSignatures setup >>= toList)
+              ++ (setupSigRemainders setup >>= toList)
+              ++ (setupSigQuotients setup >>= toList)
           else []
 
       forSizeChecking =
@@ -218,12 +220,12 @@ genInputFromParam (Param _ _ setup settings) =
       forLengthChecking =
         if enableLengthChecking settings
           then
-            (setupSignatures setup >>= elems)
+            (setupSignatures setup >>= toList)
               <> sigSquares
               <> sigLengthRemainders
               <> sigLengthQuotients
           else []
-      sigSquares = concatMap elems (setupSigSquares setup)
+      sigSquares = concatMap toList (setupSigSquares setup)
       sigLengthRemainders = setupSigLengthRemainders setup
       sigLengthQuotients = setupSigLengthQuotients setup
    in forAggChecking
@@ -233,8 +235,8 @@ genInputFromParam (Param _ _ setup settings) =
 --------------------------------------------------------------------------------
 
 -- split a list into Arrays each of length n
-splitListIntoArrays :: Int -> [a] -> [Array Int a]
+splitListIntoArrays :: Int -> [a] -> [Vector a]
 splitListIntoArrays _ [] = mempty
-splitListIntoArrays n list = listArray (0, n - 1) first : splitListIntoArrays n rest
+splitListIntoArrays n list = Vec.fromList first : splitListIntoArrays n rest
   where
     (first, rest) = splitAt n list

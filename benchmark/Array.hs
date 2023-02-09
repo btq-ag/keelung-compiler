@@ -2,29 +2,29 @@
 
 module Array (fromString, fullAdder, multiplier) where
 
-import qualified Array.Immutable as I
+import Array.Immutable qualified as I
 import Criterion
-import Keelung (Arr, Boolean, Comp, elaborate)
-import Keelung.Compiler hiding (elaborate)
+import Keelung (Boolean, Comp, elaborateAndEncode)
+import Keelung.Compiler hiding (elaborateAndEncode)
 
 fromString :: Benchmark
 fromString =
   bgroup
     "fromString"
-    [ elaboration,
+    [ elaborationAndEncoding,
       compilation,
       constantPropagation,
       optimization1
     ]
   where
-    program :: Int -> Comp (Arr (Arr Boolean))
+    program :: Int -> Comp [[Boolean]]
     program n = return $ I.fromString (concat $ replicate (n * 100) "Hello world")
 
-    elaboration :: Benchmark
-    elaboration =
+    elaborationAndEncoding :: Benchmark
+    elaborationAndEncoding =
       bgroup
-        "Elaboration"
-        $ map (\i -> bench (show (i * 1000)) $ nf elaborate $ program i) [1, 2, 4, 8]
+        "Elaboration + Encoding"
+        $ map (\i -> bench (show (i * 1000)) $ nf elaborateAndEncode $ program i) [1, 2, 4, 8]
 
     compilation :: Benchmark
     compilation =
@@ -48,20 +48,20 @@ fullAdder :: Benchmark
 fullAdder =
   bgroup
     "fullAdder"
-    [ elaboration,
+    [ elaborationAndEncoding,
       compilation,
       constantPropagation,
       optimization1
     ]
   where
-    program :: Int -> Comp (Arr Boolean)
+    program :: Int -> Comp [Boolean]
     program n = I.fullAdderT (n * 10)
 
-    elaboration :: Benchmark
-    elaboration =
+    elaborationAndEncoding :: Benchmark
+    elaborationAndEncoding =
       bgroup
-        "Elaboration"
-        $ map (\i -> bench (show (i * 10)) $ nf elaborate $ program i) [1, 2, 4, 8]
+        "Elaboration + Encoding"
+        $ map (\i -> bench (show (i * 10)) $ nf elaborateAndEncode $ program i) [1, 2, 4, 8]
 
     compilation :: Benchmark
     compilation =
@@ -85,20 +85,20 @@ multiplier :: Benchmark
 multiplier =
   bgroup
     "multiplier"
-    [ elaboration,
+    [ elaborationAndEncoding,
       compilation,
       constantPropagation,
       optimization1
     ]
   where
-    program :: Int -> Comp (Arr Boolean)
+    program :: Int -> Comp [Boolean]
     program n = I.multiplierT n 4
 
-    elaboration :: Benchmark
-    elaboration =
+    elaborationAndEncoding :: Benchmark
+    elaborationAndEncoding =
       bgroup
-        "Elaboration"
-        $ map (\i -> bench (show i) $ nf elaborate $ program i) [1, 2, 4, 8]
+        "Elaboration + Encoding"
+        $ map (\i -> bench (show i) $ nf elaborateAndEncode $ program i) [1, 2, 4, 8]
 
     compilation :: Benchmark
     compilation =
