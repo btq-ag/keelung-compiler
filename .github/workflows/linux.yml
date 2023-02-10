@@ -89,6 +89,6 @@ jobs:
       with:
         files: keelungc-ubuntu.zip
         repository: btq-ag/keelung
-        token: ${{ secrets.KEELUNG }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         draft: true
         prerelease: true
