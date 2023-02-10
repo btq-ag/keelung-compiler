@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial with variables generalized (unliked Poly which is limited to only Int)
-module Keelung.Data.PolyG (PolyG, build, buildWithMap, unsafeBuild, view, viewAsMap, insert, addConstant, singleton) where
+module Keelung.Data.PolyG (PolyG, build, buildWithMap, unsafeBuild, view, viewAsMap, insert, addConstant, singleton, vars) where
 
 import Control.DeepSeq (NFData)
 import Data.Map.Strict (Map)
@@ -72,3 +72,6 @@ view (PolyG c xs) = (c, Map.toList xs)
 
 viewAsMap :: PolyG ref n -> (n, Map ref n)
 viewAsMap (PolyG c xs) = (c, xs)
+
+vars :: PolyG ref n -> [ref]
+vars (PolyG _ xs) = Map.keys xs

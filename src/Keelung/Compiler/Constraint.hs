@@ -44,6 +44,7 @@ import Control.DeepSeq (NFData)
 import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
+import Data.List qualified as List
 import Data.Map.Merge.Strict qualified as Map
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -724,26 +725,14 @@ relocateConstraintSystem cs =
     nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ Map.toList $ csNEqU cs
 
 addOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
-addOccurrencesWithPolyG poly occurrences =
-  Map.merge
-    (Map.traverseMissing (\_ count -> return count)) -- do nothing when it's not in the polynomial
-    (Map.traverseMissing (\_ _ -> return 1)) -- set the occurrence count to 1 when it's not in the occurrences map
-    (Map.zipWithAMatched (\_ count _ -> return (succ count))) -- increment the occurrence count when it's present in both
-    occurrences
-    (snd (PolyG.viewAsMap poly))
+addOccurrencesWithPolyG = addOccurrences . PolyG.vars
 
 addOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
 addOccurrences = flip $ foldl (\occurrences ref -> Map.insertWith (+) ref 1 occurrences)
 
 removeOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
-removeOccurrencesWithPolyG poly occurrences =
-  Map.merge
-    (Map.traverseMissing (\_ count -> return count)) -- do nothing when it's not in the polynomial
-    (Map.traverseMissing (\_ _ -> return 1)) -- do nothing when it's not in the occurrences map
-    (Map.zipWithAMatched (\_ count _ -> return (pred count `max` 0))) -- increment the occurrence count when it's present in both
-    occurrences
-    (snd (PolyG.viewAsMap poly))
-
+removeOccurrencesWithPolyG = removeOccurrences . PolyG.vars
+  
 removeOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
 removeOccurrences = flip $ foldl (flip (Map.adjust (\count -> pred count `max` 0)))
 
