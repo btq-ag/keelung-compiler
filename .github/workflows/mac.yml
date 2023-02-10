@@ -106,5 +106,3 @@ jobs:
         token: ${{ secrets.KEELUNG_RELEASE }}
         draft: true
         prerelease: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
