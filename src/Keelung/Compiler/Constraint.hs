@@ -44,8 +44,6 @@ import Control.DeepSeq (NFData)
 import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
-import Data.List qualified as List
-import Data.Map.Merge.Strict qualified as Map
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
@@ -494,13 +492,11 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceB :: !(Map RefB Int),
     csOccurrenceU :: !(Map RefU Int),
     -- when x = val
-    -- csVarBindF :: Map RefF n,
     csVarBindB :: Map RefB n,
-    csVarBindU :: Map RefU n,
     -- when x == y (UnionFind)
     csVarEqF :: UnionFind RefF n,
     csVarEqB :: [(RefB, RefB)],
-    csVarEqU :: [(RefU, RefU)],
+    csVarEqU :: UnionFind RefU n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
     csAddB :: [PolyG RefB n],
@@ -520,7 +516,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
     "ConstraintSystem {\n"
       -- <> showVarBindF
       <> showVarBindB
-      <> showVarBindU
+      -- <> showVarBindU
       <> showVarEqF
       <> showVarEqB
       <> showVarEqU
@@ -576,9 +572,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 
       showVarEqF = "  VarEqF:\n" <> indent (indent (show (csVarEqF cs)))
       showVarEqB = adapt "VarEqB" (csVarEqB cs) $ \(var, val) -> show var <> " = " <> show val
-      showVarEqU = adapt "VarEqU" (csVarEqU cs) $ \(var, val) -> show var <> " = " <> show val
+      showVarEqU = "  VarEqU:\n" <> indent (indent (show (csVarEqU cs)))
 
-      showVarBindU = adapt "VarBindU" (Map.toList $ csVarBindU cs) $ \(var, val) -> show var <> " = " <> show val
+      -- showVarBindU = adapt "VarBindU" (Map.toList $ csVarBindU cs) $ \(var, val) -> show var <> " = " <> show val
       -- showVarBindF = adapt "VarBindF" (Map.toList $ csVarBindF cs) $ \(var, val) -> show var <> " = " <> show val
       showVarBindB = adapt "VarBindB" (Map.toList $ csVarBindB cs) $ \(var, val) -> show var <> " = " <> show val
 
@@ -653,7 +649,7 @@ relocateConstraintSystem cs =
           <> varEqBs
           <> varEqUs
           <> varBindBs
-          <> varBindUs
+          -- <> varBindUs
           <> addFs
           <> addBs
           <> addUs
@@ -678,6 +674,15 @@ relocateConstraintSystem cs =
           Just 0 -> True
           Just _ -> False
 
+    shouldRemoveU occurrences var =
+      csUseNewOptimizer cs && case var of
+        RefBtoRefU refB -> shouldRemoveB refB
+        RefUO _ _ -> False
+        RefUI _ _ -> False
+        RefU _ _ -> case Map.lookup var occurrences of
+          Nothing -> True
+          Just 0 -> True
+          Just _ -> False
     -- pinnedRefF :: RefF -> Bool
     -- pinnedRefF (RefFI _) = True
     -- pinnedRefF (RefFO _) = True
@@ -709,12 +714,29 @@ relocateConstraintSystem cs =
             then Nothing
             else Just $ fromConstraint counters (CAddF poly)
 
-    varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindF (csOccurrenceF cs)) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
+    fromUnionFindU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, (Maybe (n, RefU), n)) -> Maybe (Relocated.Constraint n)
+    fromUnionFindU occurrences (var1, (Nothing, c)) =
+      if shouldRemoveU occurrences var1
+        then Nothing
+        else Just $ fromConstraint counters (CVarBindU var1 c)
+    fromUnionFindU occurrences (var1, (Just (1, var2), 0)) =
+      if shouldRemoveU occurrences var1 || shouldRemoveU occurrences var2
+        then Nothing
+        else Just $ fromConstraint counters (CVarEqU var1 var2)
+    fromUnionFindU occurrences (var1, (Just (slope2, var2), intercept2)) =
+      case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
+        Left _ -> Nothing
+        Right poly ->
+          if shouldRemoveU occurrences var1 || shouldRemoveU occurrences var2
+            then Nothing
+            else Just $ fromConstraint counters (CAddU poly)
 
+    varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindF (csOccurrenceF cs)) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
     varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
-    varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
+    varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UnionFind.toMap $ csVarEqU cs
+    -- varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
     varBindBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
-    varBindUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ csVarBindU cs
+    -- varBindUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ csVarBindU cs
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     addBs = Seq.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
     addUs = Seq.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs
@@ -732,7 +754,7 @@ addOccurrences = flip $ foldl (\occurrences ref -> Map.insertWith (+) ref 1 occu
 
 removeOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
 removeOccurrencesWithPolyG = removeOccurrences . PolyG.vars
-  
+
 removeOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
 removeOccurrences = flip $ foldl (flip (Map.adjust (\count -> pred count `max` 0)))
 
@@ -740,10 +762,10 @@ sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
   UnionFind.size (csVarEqF cs)
     + length (csVarEqB cs)
-    + length (csVarEqU cs)
+    + UnionFind.size (csVarEqU cs)
     -- + length (csVarBindF cs)
     + length (csVarBindB cs)
-    + length (csVarBindU cs)
+    -- + length (csVarBindU cs)
     + length (csAddF cs)
     + length (csAddB cs)
     + length (csAddU cs)

@@ -176,7 +176,7 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty mempty UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty UnionFind.new mempty UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -193,14 +193,23 @@ add = mapM_ addOne
       let csVarEqF' = UnionFind.bindToValue x c (csVarEqF cs)
       put cs {csVarEqF = csVarEqF'}
     addOne (CVarBindB x c) = modify (\cs -> cs {csVarBindB = Map.insert x c (csVarBindB cs), csOccurrenceB = addOccurrences [x] (csOccurrenceB cs)})
-    addOne (CVarBindU x c) = modify (\cs -> cs {csVarBindU = Map.insert x c (csVarBindU cs), csOccurrenceU = addOccurrences [x] (csOccurrenceU cs)})
+    -- addOne (CVarBindU x c) = modify (\cs -> cs {csVarBindU = Map.insert x c (csVarBindU cs), csOccurrenceU = addOccurrences [x] (csOccurrenceU cs)})
+    addOne (CVarBindU x c) = do
+      cs <- get
+      let csVarEqU' = UnionFind.bindToValue x c (csVarEqU cs)
+      put cs {csVarEqU = csVarEqU'}
     addOne (CVarEqF x y) = do
       cs <- get
       case UnionFind.relate x (1, y, 0) (csVarEqF cs) of
         Nothing -> return ()
         Just csVarEqF' -> put cs {csVarEqF = csVarEqF'}
     addOne (CVarEqB x y) = modify (\cs -> cs {csVarEqB = (x, y) : csVarEqB cs})
-    addOne (CVarEqU x y) = modify (\cs -> cs {csVarEqU = (x, y) : csVarEqU cs})
+    -- addOne (CVarEqU x y) = modify (\cs -> cs {csVarEqU = (x, y) : csVarEqU cs})
+    addOne (CVarEqU x y) = do
+      cs <- get
+      case UnionFind.relate x (1, y, 0) (csVarEqU cs) of
+        Nothing -> return ()
+        Just csVarEqU' -> put cs {csVarEqU = csVarEqU'}
     addOne (CMulF x y (Left c)) = modify (\cs -> cs {csMulF = (x, y, Left c) : csMulF cs, csOccurrenceF = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y (csOccurrenceF cs)})
     addOne (CMulF x y (Right z)) = modify (\cs -> cs {csMulF = (x, y, Right z) : csMulF cs, csOccurrenceF = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y $ addOccurrencesWithPolyG z (csOccurrenceF cs)})
     addOne (CMulB x y (Left c)) = modify (\cs -> cs {csMulB = (x, y, Left c) : csMulB cs, csOccurrenceB = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y (csOccurrenceB cs)})

@@ -40,7 +40,6 @@ goThroughAddFM acc poly = do
 
 data WhatChanged
   = NothingChanged
-  | BindingChanged
   | RelationChanged
   | AdditiveConstraintChanged
   deriving (Eq, Show)
@@ -48,8 +47,6 @@ data WhatChanged
 instance Semigroup WhatChanged where
   NothingChanged <> x = x
   x <> NothingChanged = x
-  BindingChanged <> _ = BindingChanged
-  _ <> BindingChanged = BindingChanged
   RelationChanged <> _ = RelationChanged
   _ <> RelationChanged = RelationChanged
   AdditiveConstraintChanged <> _ = AdditiveConstraintChanged
@@ -72,7 +69,8 @@ markChanged whatChanged = modify' $ \(_, cs) -> (whatChanged, cs)
 updateConstraintSystem :: (ConstraintSystem n -> ConstraintSystem n) -> AddM n ()
 updateConstraintSystem = modify' . second
 
--- | Decide whether to keep the Add constraint or not.
+-- | Go through additive constraints and classify them into relation constraints when possible.
+--   Returns 'True' if the constraint has been reduced.
 classifyAdd :: (GaloisField n, Integral n) => PolyG RefF n -> AddM n Bool
 classifyAdd poly = case PolyG.view poly of
   (_, []) -> error "[ panic ] Empty polynomial"
@@ -80,12 +78,11 @@ classifyAdd poly = case PolyG.view poly of
     --    intercept + slope * var = 0
     --  =>
     --    var = - intercept / slope
-    markChanged BindingChanged
+    markChanged RelationChanged
 
     updateConstraintSystem $ \cs ->
       cs
         { csVarEqF = UnionFind.bindToValue var (-intercept / slope) (csVarEqF cs),
-          -- csVarBindF = Map.insert var (-intercept / slope) (csVarBindF cs),
           csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)
         }
     return True
