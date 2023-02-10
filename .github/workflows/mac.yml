@@ -103,6 +103,6 @@ jobs:
       with:
         files: keelungc-macos.zip
         repository: btq-ag/keelung
-        token: ${{ secrets.KEELUNG_RELEASE }}
+        token: ${{ secrets.KEELUNG }}
         draft: true
         prerelease: true

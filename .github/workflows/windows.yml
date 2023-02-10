@@ -111,6 +111,6 @@ jobs:
       with:
         files: keelungc-windows.zip
         repository: btq-ag/keelung
-        token: ${{ secrets.KEELUNG_RELEASE }}
+        token: ${{ secrets.KEELUNG }}
         draft: true
         prerelease: true
