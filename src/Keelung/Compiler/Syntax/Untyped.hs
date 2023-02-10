@@ -23,13 +23,14 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Sequence (Seq (..))
-import Keelung.Compiler.Constraint2
+import Keelung.Compiler.Constraint
+import Keelung.Data.Bindings (toSubscript)
 import Keelung.Data.Struct (Struct (..))
 import qualified Keelung.Data.Struct as Struct
 import Keelung.Field (N (..))
 import Keelung.Syntax.Counters
 import qualified Keelung.Syntax.Counters as Counters
-import Keelung.Types (Var, Width)
+import Keelung.Types (Var, Width, indent)
 
 --------------------------------------------------------------------------------
 
@@ -51,6 +52,8 @@ data ExprB n
   | EqB (ExprB n) (ExprB n)
   | EqF (ExprF n) (ExprF n)
   | EqU (ExprU n) (ExprU n)
+  -- | LTEU Width (ExprU n) (ExprU n)
+    -- bit tests on UInt
   | BitU (ExprU n) Int
   deriving (Functor, Eq)
 
@@ -58,20 +61,21 @@ instance (Integral n, Show n) => Show (ExprB n) where
   showsPrec prec expr = case expr of
     ValB 0 -> showString "F"
     ValB _ -> showString "T"
-    VarB var -> showString "$B" . shows var
-    VarBO var -> showString "$BO" . shows var
-    VarBI var -> showString "$BI" . shows var
+    VarB var -> showString "B" . shows var
+    VarBO var -> showString "BO" . shows var
+    VarBI var -> showString "BI" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
     NotB x -> chain prec "¬ " 5 $ x :<| Empty
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    NEqB x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
-    NEqF x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
-    NEqU x0 x1 -> chain prec " != " 5 $ x0 :<| x1 :<| Empty
-    EqB x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
-    EqF x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
-    EqU x0 x1 -> chain prec " == " 5 $ x0 :<| x1 :<| Empty
+    NEqB x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty 
+    NEqF x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
+    NEqU x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
+    EqB x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
+    EqF x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
+    EqU x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
+    -- LTEU _ x y -> chain prec " ≤ " 5 $ x :<| y :<| Empty
     BitU x i -> showsPrec prec x . showString "[" . shows i . showString "]"
 
 --------------------------------------------------------------------------------
@@ -94,9 +98,9 @@ data ExprF n
 instance (Show n, Integral n) => Show (ExprF n) where
   showsPrec prec expr = case expr of
     ValF n -> shows n
-    VarF var -> showString "$N" . shows var
-    VarFO var -> showString "$NO" . shows var
-    VarFI var -> showString "$NI" . shows var
+    VarF var -> showString "F" . shows var
+    VarFO var -> showString "FO" . shows var
+    VarFI var -> showString "FI" . shows var
     SubF x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddF x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
     MulF x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -121,17 +125,19 @@ data ExprU n
   | XorU Width (ExprU n) (ExprU n)
   | NotU Width (ExprU n)
   | IfU Width (ExprB n) (ExprU n) (ExprU n)
+    -- bit operators
   | RoLU Width Int (ExprU n)
   | ShLU Width Int (ExprU n)
+    -- conversion operators
   | BtoU Width (ExprB n)
   deriving (Functor, Eq)
 
 instance (Show n, Integral n) => Show (ExprU n) where
   showsPrec prec expr = case expr of
     ValU _ n -> shows n
-    VarU _ var -> showString "$U" . shows var
-    VarUO _ var -> showString "$UO" . shows var
-    VarUI _ var -> showString "$UI" . shows var
+    VarU _ var -> showString "U" . shows var
+    VarUO _ var -> showString "UO" . shows var
+    VarUI _ var -> showString "UI" . shows var
     SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -216,20 +222,26 @@ data TypeErased n = TypeErased
     -- | Relations between variables and/or expressions
     erasedRelations :: !(Relations n),
     -- | Assertions after type erasure
-    erasedAssertions :: ![Expr n]
+    erasedAssertions :: ![Expr n],
+    -- | DivMod relations
+    erasedDivModRelsU :: IntMap (ExprU n, ExprU n, ExprU n, ExprU n) -- dividend = divisor * quotient + remainder
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ counters relations assertions) =
+  show (TypeErased expr _ counters relations assertions divModRelsU) =
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
-      <> show (map (fmap N. snd) expr)
+      <> show (map (fmap N . snd) expr)
       <> "\n"
       -- relations
-      <> show relations
+      <> indent (show relations)
       <> ( if length assertions < 20
              then "  assertions:\n    " <> show assertions <> "\n"
+             else ""
+         )
+      <> ( if length divModRelsU < 20
+             then "  div mod relations:\n    " <> show assertions <> "\n"
              else ""
          )
       <> Counters.prettyVariables counters
@@ -252,38 +264,36 @@ lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (structU 
 data Relations n = Relations
   { -- var = value
     valueBindings :: Struct (IntMap n) (IntMap n) (IntMap n),
-    valueBindingsI :: Struct (IntMap n) (IntMap n) (IntMap n),
     -- var = expression
-    exprBindings :: Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n)),
-    exprBindingsI :: Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n))
+    exprBindings :: Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n))
   }
 
 instance (Integral n, Show n) => Show (Relations n) where
-  show (Relations vb vbi eb ebi) =
+  show (Relations vb eb) =
     ( if Struct.empty vb
         then ""
-        else "Binding of intermediate variables to values:\n" <> show vb <> "\n"
+        else "Binding of intermediate variables to values:\n" <> indent (show vb) <> "\n"
     )
-      <> ( if Struct.empty vbi
-             then ""
-             else "Binding of input variables to values:\n" <> show vb <> "\n"
-         )
       <> ( if Struct.empty eb
              then ""
-             else "Binding of intermediate variables to expressions:\n" <> show eb <> "\n"
+             else "Binding of intermediate variables to expressions:\n" <> indent' (showExprBindings "" eb) <> "\n"
          )
-      <> ( if Struct.empty ebi
-             then ""
-             else "Binding of input variables to expressions:\n" <> show ebi <> "\n"
-         )
+    where
+      indent' = unlines . map ("  " <>)
+
+      showExprBinding prefix suffix (var, val) = prefix <> suffix <> show var <> " = " <> show val
+
+      showExprBindings :: (Integral n, Show n) => String -> Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n)) -> [String]
+      showExprBindings suffix (Struct f b u) =
+        map (showExprBinding "F" suffix) (IntMap.toList f)
+          <> map (showExprBinding "B" suffix) (IntMap.toList b)
+          <> concatMap (\(width, xs) -> map (showExprBinding ("U" <> toSubscript width) suffix) (IntMap.toList xs)) (IntMap.toList u)
 
 instance Semigroup (Relations n) where
-  Relations vb0 vbi0 eb0 ebi0 <> Relations vb1 vbi1 eb1 ebi1 =
+  Relations vb0 eb0 <> Relations vb1 eb1 =
     Relations
       (vb0 <> vb1)
-      (vbi0 <> vbi1)
       (eb0 <> eb1)
-      (ebi0 <> ebi1)
 
 instance Monoid (Relations n) where
-  mempty = Relations mempty mempty mempty mempty
+  mempty = Relations mempty mempty

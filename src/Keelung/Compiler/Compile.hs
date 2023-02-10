@@ -9,12 +9,11 @@ import Control.Monad
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
-import qualified Data.IntMap as IntMap
+import Data.IntMap qualified as IntMap
+import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
-import qualified Data.Set as Set
-import qualified Keelung.Compiler.Constraint as Constraint
-import Keelung.Compiler.Constraint2
-import qualified Keelung.Compiler.Constraint2 as Constraint2
+import Keelung.Compiler.Constraint
+import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
@@ -23,8 +22,8 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => TypeErased n -> Constraint.ConstraintSystem n
-run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ do
+run :: (GaloisField n, Integral n) => Bool -> TypeErased n -> ConstraintSystem n
+run useNewOptimizer (TypeErased untypedExprs _ counters relations assertions divModRelsU) = runM useNewOptimizer counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -43,110 +42,217 @@ run (TypeErased untypedExprs _ counters relations assertions) = runM counters $ 
   -- compile assertions to constraints
   mapM_ compileAssertion assertions
 
-  constraints <- gets envConstraints
-
-  -- get new counters because the output variables have been bumped
-  counters' <- gets envCounters
-
-  return
-    ( Constraint.ConstraintSystem
-        (Set.fromList $ map (Constraint2.fromConstraint counters') constraints)
-        counters'
-    )
+  -- compile DivMod relations to constraints
+  mapM_ (\(width, (dividend, divisor, quotient, remainder)) -> compileDivModU width dividend divisor quotient remainder) (IntMap.toList divModRelsU)
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
-compileAssertion expr = do
-  -- 1 = expr
-  case expr of
-    ExprB x -> do
-      out <- freshRefB
-      compileExprB out x
-      add $ cAddB 1 [(out, -1)]
-    ExprF x -> do
-      out <- freshRefF
-      compileExprF out x
-      add $ cAddF 1 [(out, -1)]
-    ExprU x -> do
-      out <- freshRefU (widthOfU x)
-      compileExprU out x
-      add $ cVarBindU out 1
+compileAssertion expr = case expr of
+  ExprB (EqB x y) -> compileAssertionEqB x y
+  ExprB (EqF x y) -> compileAssertionEqF x y
+  ExprB (EqU x y) -> compileAssertionEqU x y
+  ExprB x -> do
+    out <- freshRefB
+    compileExprB out x
+    add $ cVarBindB out 1 -- out = 1
+  ExprF x -> do
+    out <- freshRefF
+    compileExprF out x
+    add $ cVarBindF out 1
+  ExprU x -> do
+    out <- freshRefU (widthOfU x)
+    compileExprU out x
+    add $ cVarBindU out 1
+
+compileAssertionEqB :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> M n ()
+compileAssertionEqB (VarB a) (ValB b) = add $ cVarBindB (RefB a) b
+compileAssertionEqB (VarB a) (VarB b) = add $ cVarEqB (RefB a) (RefB b)
+compileAssertionEqB (VarB a) (VarBO b) = add $ cVarEqB (RefB a) (RefBO b)
+compileAssertionEqB (VarB a) (VarBI b) = add $ cVarEqB (RefB a) (RefBI b)
+compileAssertionEqB (VarB a) b = do
+  out <- freshRefB
+  compileExprB out b
+  add $ cVarEqB (RefB a) out
+compileAssertionEqB (VarBO a) (ValB b) = add $ cVarBindB (RefBO a) b
+compileAssertionEqB (VarBO a) (VarB b) = add $ cVarEqB (RefBO a) (RefB b)
+compileAssertionEqB (VarBO a) (VarBO b) = add $ cVarEqB (RefBO a) (RefBO b)
+compileAssertionEqB (VarBO a) (VarBI b) = add $ cVarEqB (RefBO a) (RefBI b)
+compileAssertionEqB (VarBO a) b = do
+  out <- freshRefB
+  compileExprB out b
+  add $ cVarEqB (RefBO a) out
+compileAssertionEqB (VarBI a) (ValB b) = add $ cVarBindB (RefBI a) b
+compileAssertionEqB (VarBI a) (VarB b) = add $ cVarEqB (RefBI a) (RefB b)
+compileAssertionEqB (VarBI a) (VarBO b) = add $ cVarEqB (RefBI a) (RefBO b)
+compileAssertionEqB (VarBI a) (VarBI b) = add $ cVarEqB (RefBI a) (RefBI b)
+compileAssertionEqB (VarBI a) b = do
+  out <- freshRefB
+  compileExprB out b
+  add $ cVarEqB (RefBI a) out
+compileAssertionEqB a b = do
+  a' <- freshRefB
+  b' <- freshRefB
+  compileExprB a' a
+  compileExprB b' b
+  add $ cVarEqB a' b'
+
+compileAssertionEqF :: (GaloisField n, Integral n) => ExprF n -> ExprF n -> M n ()
+compileAssertionEqF (VarF a) (ValF b) = add $ cVarBindF (RefF a) b
+compileAssertionEqF (VarF a) (VarF b) = add $ cVarEqF (RefF a) (RefF b)
+compileAssertionEqF (VarF a) (VarFO b) = add $ cVarEqF (RefF a) (RefFO b)
+compileAssertionEqF (VarF a) (VarFI b) = add $ cVarEqF (RefF a) (RefFI b)
+compileAssertionEqF (VarF a) b = do
+  out <- freshRefF
+  compileExprF out b
+  add $ cVarEqF (RefF a) out
+compileAssertionEqF (VarFO a) (ValF b) = add $ cVarBindF (RefFO a) b
+compileAssertionEqF (VarFO a) (VarF b) = add $ cVarEqF (RefFO a) (RefF b)
+compileAssertionEqF (VarFO a) (VarFO b) = add $ cVarEqF (RefFO a) (RefFO b)
+compileAssertionEqF (VarFO a) b = do
+  out <- freshRefF
+  compileExprF out b
+  add $ cVarEqF (RefFO a) out
+compileAssertionEqF (VarFI a) (ValF b) = add $ cVarBindF (RefFI a) b
+compileAssertionEqF (VarFI a) (VarF b) = add $ cVarEqF (RefFI a) (RefF b)
+compileAssertionEqF (VarFI a) (VarFO b) = add $ cVarEqF (RefFI a) (RefF b)
+compileAssertionEqF (VarFI a) b = do
+  out <- freshRefF
+  compileExprF out b
+  add $ cVarEqF (RefFI a) out
+compileAssertionEqF a b = do
+  a' <- freshRefF
+  b' <- freshRefF
+  compileExprF a' a
+  compileExprF b' b
+  add $ cVarEqF a' b'
+
+compileAssertionEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()
+compileAssertionEqU (VarU w a) (ValU _ b) = add $ cVarBindU (RefU w a) b
+compileAssertionEqU (VarU w a) (VarU _ b) = add $ cVarEqU (RefU w a) (RefU w b)
+compileAssertionEqU (VarU w a) (VarUO _ b) = add $ cVarEqU (RefU w a) (RefUO w b)
+compileAssertionEqU (VarU w a) (VarUI _ b) = add $ cVarEqU (RefU w a) (RefUI w b)
+compileAssertionEqU (VarU w a) b = do
+  out <- freshRefU w
+  compileExprU out b
+  add $ cVarEqU (RefU w a) out
+compileAssertionEqU (VarUO w a) (ValU _ b) = add $ cVarBindU (RefUO w a) b
+compileAssertionEqU (VarUO w a) (VarU _ b) = add $ cVarEqU (RefUO w a) (RefU w b)
+compileAssertionEqU (VarUO w a) (VarUO _ b) = add $ cVarEqU (RefUO w a) (RefUO w b)
+compileAssertionEqU (VarUO w a) b = do
+  out <- freshRefU w
+  compileExprU out b
+  add $ cVarEqU (RefUO w a) out
+compileAssertionEqU (VarUI w a) (ValU _ b) = add $ cVarBindU (RefUI w a) b
+compileAssertionEqU (VarUI w a) (VarU _ b) = add $ cVarEqU (RefUI w a) (RefU w b)
+compileAssertionEqU (VarUI w a) (VarUO _ b) = add $ cVarEqU (RefUI w a) (RefUO w b)
+compileAssertionEqU (VarUI w a) b = do
+  out <- freshRefU w
+  compileExprU out b
+  add $ cVarEqU (RefUI w a) out
+compileAssertionEqU a b = do
+  let width = widthOfU a
+  a' <- freshRefU width
+  b' <- freshRefU width
+  compileExprU a' a
+  compileExprU b' b
+  add $ cVarEqU a' b'
 
 compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
-compileRelations (Relations vb vbi eb ebi) = do
+compileRelations (Relations vb eb) = do
   -- intermediate variable bindings of values
-  forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cAddF val [(RefF var, -1)]
-  forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cAddB val [(RefB var, -1)]
+  forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cVarBindF (RefF var) val
+  forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cVarBindB (RefB var) val
   forM_ (IntMap.toList (structU vb)) $ \(width, bindings) ->
     forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefU width var) val
-  -- input variable bindings of values
-  forM_ (IntMap.toList (structF vbi)) $ \(var, val) -> add $ cAddF val [(RefFI var, -1)]
-  forM_ (IntMap.toList (structB vbi)) $ \(var, val) -> add $ cAddB val [(RefBI var, -1)]
-  forM_ (IntMap.toList (structU vbi)) $ \(width, bindings) ->
-    forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefUI width var) val
   -- intermediate variable bindings of expressions
   forM_ (IntMap.toList (structF eb)) $ \(var, val) -> compileExprF (RefF var) val
   forM_ (IntMap.toList (structB eb)) $ \(var, val) -> compileExprB (RefB var) val
   forM_ (IntMap.toList (structU eb)) $ \(width, bindings) ->
     forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefU width var) val
-  -- input variable bindings of expressions
-  forM_ (IntMap.toList (structF ebi)) $ \(var, val) -> compileExprF (RefFI var) val
-  forM_ (IntMap.toList (structB ebi)) $ \(var, val) -> compileExprB (RefBI var) val
-  forM_ (IntMap.toList (structU ebi)) $ \(width, bindings) ->
-    forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefUI width var) val
 
 --------------------------------------------------------------------------------
 
 -- | Monad for compilation
-data Env n = Env
-  { envCounters :: Counters,
-    envConstraints :: [Constraint n]
-  }
+type M n = State (ConstraintSystem n)
 
-type M n = State (Env n)
-
-runM :: GaloisField n => Counters -> M n a -> a
-runM counters program = evalState program (Env counters mempty)
+runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty mempty UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
-modifyCounter f = modify (\env -> env {envCounters = f (envCounters env)})
+modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
 
 add :: GaloisField n => [Constraint n] -> M n ()
-add cs =
-  modify (\env -> env {envConstraints = cs <> envConstraints env})
+add = mapM_ addOne
+  where
+    addOne :: GaloisField n => Constraint n -> M n ()
+    addOne (CAddF xs) = modify (\cs -> cs {csAddF = xs : csAddF cs, csOccurrenceF = addOccurrencesWithPolyG xs (csOccurrenceF cs)})
+    addOne (CAddB xs) = modify (\cs -> cs {csAddB = xs : csAddB cs, csOccurrenceB = addOccurrencesWithPolyG xs (csOccurrenceB cs)})
+    addOne (CAddU xs) = modify (\cs -> cs {csAddU = xs : csAddU cs, csOccurrenceU = addOccurrencesWithPolyG xs (csOccurrenceU cs)})
+    addOne (CVarBindF x c) = do
+      cs <- get
+      let csVarEqF' = UnionFind.bindToValue x c (csVarEqF cs)
+      put cs {csVarEqF = csVarEqF'}
+    addOne (CVarBindB x c) = modify (\cs -> cs {csVarBindB = Map.insert x c (csVarBindB cs), csOccurrenceB = addOccurrences [x] (csOccurrenceB cs)})
+    addOne (CVarBindU x c) = modify (\cs -> cs {csVarBindU = Map.insert x c (csVarBindU cs), csOccurrenceU = addOccurrences [x] (csOccurrenceU cs)})
+    addOne (CVarEqF x y) = do
+      cs <- get
+      case UnionFind.relate x (1, y, 0) (csVarEqF cs) of
+        Nothing -> return ()
+        Just csVarEqF' -> put cs {csVarEqF = csVarEqF'}
+    addOne (CVarEqB x y) = modify (\cs -> cs {csVarEqB = (x, y) : csVarEqB cs})
+    addOne (CVarEqU x y) = modify (\cs -> cs {csVarEqU = (x, y) : csVarEqU cs})
+    addOne (CMulF x y (Left c)) = modify (\cs -> cs {csMulF = (x, y, Left c) : csMulF cs, csOccurrenceF = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y (csOccurrenceF cs)})
+    addOne (CMulF x y (Right z)) = modify (\cs -> cs {csMulF = (x, y, Right z) : csMulF cs, csOccurrenceF = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y $ addOccurrencesWithPolyG z (csOccurrenceF cs)})
+    addOne (CMulB x y (Left c)) = modify (\cs -> cs {csMulB = (x, y, Left c) : csMulB cs, csOccurrenceB = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y (csOccurrenceB cs)})
+    addOne (CMulB x y (Right z)) = modify (\cs -> cs {csMulB = (x, y, Right z) : csMulB cs, csOccurrenceB = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y $ addOccurrencesWithPolyG z (csOccurrenceB cs)})
+    addOne (CMulU x y (Left c)) = modify (\cs -> cs {csMulU = (x, y, Left c) : csMulU cs, csOccurrenceU = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y (csOccurrenceU cs)})
+    addOne (CMulU x y (Right z)) = modify (\cs -> cs {csMulU = (x, y, Right z) : csMulU cs, csOccurrenceU = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y $ addOccurrencesWithPolyG z (csOccurrenceU cs)})
+    addOne (CNEqF x y m) = modify (\cs -> cs {csNEqF = Map.insert (x, y) m (csNEqF cs), csOccurrenceF = addOccurrences [x, y] (csOccurrenceF cs)})
+    addOne (CNEqU x y m) = modify (\cs -> cs {csNEqU = Map.insert (x, y) m (csNEqU cs), csOccurrenceU = addOccurrences [x, y] (csOccurrenceU cs)})
 
 freshRefF :: M n RefF
 freshRefF = do
-  counters <- gets envCounters
+  counters <- gets csCounters
   let index = getCount OfIntermediate OfField counters
   modifyCounter $ addCount OfIntermediate OfField 1
   return $ RefF index
 
 freshRefB :: M n RefB
 freshRefB = do
-  counters <- gets envCounters
+  counters <- gets csCounters
   let index = getCount OfIntermediate OfBoolean counters
   modifyCounter $ addCount OfIntermediate OfBoolean 1
   return $ RefB index
 
+-- freshVarB :: M n (ExprB n)
+-- freshVarB = do
+--   counters <- gets csCounters
+--   let index = getCount OfIntermediate OfBoolean counters
+--   modifyCounter $ addCount OfIntermediate OfBoolean 1
+--   return $ VarB index
+
 freshRefU :: Width -> M n RefU
 freshRefU width = do
-  counters <- gets envCounters
+  counters <- gets csCounters
   let index = getCount OfIntermediate (OfUInt width) counters
   modifyCounter $ addCount OfIntermediate (OfUInt width) 1
   return $ RefU width index
+
+freshVarU :: Width -> M n (ExprU n)
+freshVarU width = do
+  counters <- gets csCounters
+  let index = getCount OfIntermediate (OfUInt width) counters
+  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
+  return $ VarU width index
 
 ----------------------------------------------------------------
 
 compileExprB :: (GaloisField n, Integral n) => RefB -> ExprB n -> M n ()
 compileExprB out expr = case expr of
-  ValB val -> add $ cAddB val [(out, -1)] -- out = val
-  VarB var -> do
-    add $ cAddB 0 [(out, 1), (RefB var, -1)] -- out = var
-  VarBO var -> do
-    add $ cAddB 0 [(out, 1), (RefBO var, -1)] -- out = var
-  VarBI var -> do
-    add $ cAddB 0 [(out, 1), (RefBI var, -1)] -- out = var
+  ValB val -> add $ cVarBindB out val -- out = val
+  VarB var -> add $ cVarEqB out (RefB var) -- out = var
+  VarBO var -> add $ cVarEqB out (RefBO var) -- out = var
+  VarBI var -> add $ cVarEqB out (RefBI var) -- out = var
   AndB x0 x1 xs -> do
     a <- wireB x0
     b <- wireB x1
@@ -179,39 +285,14 @@ compileExprB out expr = case expr of
             (0, [(inv, 1)])
             (1, [(out, -1)])
   OrB x0 x1 xs -> do
-    a <- wireB x0
-    b <- wireB x1
-    vars <- mapM wireB xs
-    case vars of
-      Empty -> compileOrB out a b
-      (c :<| Empty) -> do
-        -- only 3 operands
-        aOrb <- freshRefB
-        compileOrB aOrb a b
-        compileOrB out aOrb c
-      _ -> do
-        -- more than 3 operands, rewrite it as an inequality instead:
-        --      if all operands are 0           then 0 else 1
-        --  =>  if the sum of operands is 0     then 0 else 1
-        --  =>  if the sum of operands is not 0 then 1 else 0
-        --  =>  the sum of operands is not 0
-        compileExprB
-          out
-          ( NEqF
-              (ValF 0)
-              ( AddF
-                  (BtoF x0)
-                  (BtoF x1)
-                  (fmap BtoF xs)
-              )
-          )
+    compileOrBs out x0 x1 xs
   XorB x y -> do
     x' <- wireB x
     y' <- wireB y
     compileXorB out x' y'
   NotB x -> do
     x' <- wireB x
-    add $ cAddB 1 [(x', -1), (out, -1)] -- out = 1 - x
+    add $ cAddB 1 [(x', -1), (out, -1)] -- out = 1 - x'
   IfB p x y -> do
     p' <- wireB p
     x' <- wireB x
@@ -246,19 +327,20 @@ compileExprB out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileEqualityU True out x' y'
+  -- LTEU w x y -> do
+  --   x' <- wireU x
+  --   y' <- wireU y
+  --   assertLTEU w out x' y'
   BitU x i -> do
     x' <- wireU x
-    add $ cAddB 0 [(out, 1), (RefUBit (widthOfU x) x' i, -1)] -- out = var
+    add $ cVarEqB out (RefUBit (widthOfU x) x' i) -- out = x'[i]
 
 compileExprF :: (GaloisField n, Integral n) => RefF -> ExprF n -> M n ()
 compileExprF out expr = case expr of
-  ValF val -> add $ cAddF val [(out, -1)] -- out = val
-  VarF var -> do
-    add $ cAddF 0 [(out, 1), (RefF var, -1)] -- out = var
-  VarFO var -> do
-    add $ cAddF 0 [(out, 1), (RefFO var, -1)] -- out = var
-  VarFI var -> do
-    add $ cAddF 0 [(out, 1), (RefFI var, -1)] -- out = var
+  ValF val -> add $ cVarBindF out val -- out = val
+  VarF var -> add $ cVarEqF out (RefF var) -- out = var
+  VarFO var -> add $ cVarEqF out (RefFO var) -- out = var
+  VarFI var -> add $ cVarEqF out (RefFI var) -- out = var
   SubF x y -> do
     x' <- toTerm x
     y' <- toTerm y
@@ -282,7 +364,7 @@ compileExprF out expr = case expr of
   BtoF x -> do
     result <- freshRefB
     compileExprB result x
-    add $ cAddF 0 [(out, 1), (RefBtoRefF result, -1)] -- out = var
+    add $ cVarEqF out (RefBtoRefF result) -- out = var
 
 compileExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compileExprU out expr = case expr of
@@ -292,14 +374,14 @@ compileExprU out expr = case expr of
     -- constraints for BinRep of UInt
     forM_ [0 .. width - 1] $ \i -> do
       let bit = testBit val i
-      add $ cAddB bit [(RefUBit width out i, -1)] -- out = var
+      add $ cVarBindB (RefUBit width out i) bit -- out[i] = bit
   VarU width var -> do
     let ref = RefU width var
     -- constraint for UInt : out = ref
     add $ cVarEqU out ref
     -- constraints for BinRep of UInt
     forM_ [0 .. width - 1] $ \i -> do
-      add $ cAddB 0 [(RefUBit width out i, -1), (RefUBit width ref i, 1)] -- out[i] = ref[i]
+      add $ cVarEqB (RefUBit width out i) (RefUBit width ref i) -- out[i] = ref[i]
   VarUO width var -> do
     add $ cVarEqU out (RefU width var) -- out = var
   VarUI width var -> do
@@ -308,7 +390,7 @@ compileExprU out expr = case expr of
     add $ cVarEqU out ref
     -- constraints for BinRep of UInt
     forM_ [0 .. width - 1] $ \i -> do
-      add $ cAddB 0 [(RefUBit width out i, -1), (RefUBit width ref i, 1)] -- out[i] = ref[i]
+      add $ cVarEqB (RefUBit width out i) (RefUBit width ref i) -- out[i] = ref[i]
   SubU w x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -350,7 +432,7 @@ compileExprU out expr = case expr of
     x' <- wireU x
     forM_ [0 .. w - 1] $ \i -> do
       let i' = (i - n) `mod` w
-      add $ cAddB 0 [(RefUBit w out i, 1), (RefUBit w x' i', -1)]
+      add $ cVarEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']
   ShLU w n x -> do
     x' <- wireU x
     case compare n 0 of
@@ -358,27 +440,27 @@ compileExprU out expr = case expr of
       GT -> do
         -- fill lower bits with 0s
         forM_ [0 .. n - 1] $ \i -> do
-          add $ cAddB 0 [(RefUBit w out i, 1)]
-        -- shift upper bits
+          add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
+          -- shift upper bits
         forM_ [n .. w - 1] $ \i -> do
           let i' = i - n
-          add $ cAddB 0 [(RefUBit w out i, 1), (RefUBit w x' i', -1)]
+          add $ cVarEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']
       LT -> do
         -- shift lower bits
         forM_ [0 .. w + n - 1] $ \i -> do
           let i' = i - n
-          add $ cAddB 0 [(RefUBit w out i, 1), (RefUBit w x' i', -1)]
-        -- fill upper bits with 0s
+          add $ cVarEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']
+          -- fill upper bits with 0s
         forM_ [w + n .. w - 1] $ \i -> do
-          add $ cAddB 0 [(RefUBit w out i, 1)]
+          add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
   BtoU w x -> do
     -- 1. wire 'out[ZERO]' to 'x'
     result <- freshRefB
     compileExprB result x
-    add $ cAddB 0 [(RefUBit w out 0, 1), (result, -1)]
+    add $ cVarEqB (RefUBit w out 0) result -- out[0] = x
     -- 2. wire 'out[SUCC _]' to '0' for all other bits
     forM_ [1 .. w - 1] $ \i ->
-      add $ cAddB 0 [(RefUBit w out i, 1)]
+      add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
 
 --------------------------------------------------------------------------------
 
@@ -425,7 +507,9 @@ negateTerm (Constant c) = Constant (negate c)
 compileTerms :: GaloisField n => RefF -> Seq (Term n) -> M n ()
 compileTerms out terms =
   let (constant, varsWithCoeffs) = foldl' go (0, []) terms
-   in add $ cAddF constant $ (out, -1) : varsWithCoeffs
+   in case varsWithCoeffs of
+        [] -> add $ cVarBindF out constant
+        _ -> add $ cAddF constant $ (out, -1) : varsWithCoeffs
   where
     go :: Num n => (n, [(RefF, n)]) -> Term n -> (n, [(RefF, n)])
     go (constant, pairs) (Constant n) = (constant + n, pairs)
@@ -565,10 +649,6 @@ compileEqualityF isEq out x y =
 --    C = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
 compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> RefU -> RefU -> M n ()
 compileAddOrSubU isSub width out x y = do
-  -- locate the binary representations of the operands
-  -- xBinRepStart <- lookupBinRep width x
-  -- yBinRepStart <- lookupBinRep width y
-
   let multiplier = 2 ^ width
   -- We can refactor
   --    out = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
@@ -637,6 +717,85 @@ compileOrB out x y = do
       (0, [(y, 1)])
       (0, [(x, -1), (out, 1)])
 
+-- assertOrB :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> ExprB n -> M n ()
+-- assertOrB (ValB 0) (ValB 0) (ValB 0) = return ()
+-- assertOrB (ValB 0) (ValB _) (ValB _) = error "[ error ] assertOrB: invalid constraint"
+-- assertOrB (ValB 1) (ValB 0) (ValB 0) = error "[ error ] assertOrB: invalid constraint"
+-- assertOrB (ValB 1) (ValB _) (ValB _) = return ()
+-- assertOrB out x y = do
+--   out' <- wireB out
+--   x' <- wireB x
+--   y' <- wireB y
+--   -- (1 - x) * y = (out - x)
+--   add $
+--     cMulB
+--       (1, [(x', -1)])
+--       (0, [(y', 1)])
+--       (0, [(x', -1), (out', 1)])
+
+compileOrBs :: (GaloisField n, Integral n) => RefB -> ExprB n -> ExprB n -> Seq (ExprB n) -> M n ()
+compileOrBs out x0 x1 xs = do
+  a <- wireB x0
+  b <- wireB x1
+  vars <- mapM wireB xs
+  case vars of
+    Empty -> compileOrB out a b
+    (c :<| Empty) -> do
+      -- only 3 operands
+      aOrb <- freshRefB
+      compileOrB aOrb a b
+      compileOrB out aOrb c
+    _ -> do
+      -- more than 3 operands, rewrite it as an inequality instead:
+      --      if all operands are 0           then 0 else 1
+      --  =>  if the sum of operands is 0     then 0 else 1
+      --  =>  if the sum of operands is not 0 then 1 else 0
+      --  =>  the sum of operands is not 0
+      compileExprB
+        out
+        ( NEqF
+            (ValF 0)
+            ( AddF
+                (BtoF x0)
+                (BtoF x1)
+                (fmap BtoF xs)
+            )
+        )
+
+-- assertOrBs :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> ExprB n -> Seq (ExprB n) -> M n ()
+-- assertOrBs out x0 x1 xs = case xs of
+--   Empty -> assertOrB out x0 x1
+--   (x2 :<| Empty) -> do
+--     -- only 3 operands
+--     aOrb <- freshVarB
+--     assertOrB aOrb x0 x1
+--     assertOrB out aOrb x2
+--   _ -> do
+--     -- more than 3 operands, rewrite it as an inequality instead:
+--     --      if all operands are 0           then 0 else 1
+--     --  =>  if the sum of operands is 0     then 0 else 1
+--     --  =>  if the sum of operands is not 0 then 1 else 0
+--     --  =>  the sum of operands is not 0
+
+--     let sumOfOperands = AddF (BtoF x0) (BtoF x1) (fmap BtoF xs)
+--     case out of
+--       -- if the output is 0, then the sum of operands must be 0
+--       ValB 0 -> assertExprF 0 sumOfOperands
+--       -- if the output is 1, then the sum of operands must not be 0
+--       ValB _ -> assertNotZeroF sumOfOperands
+--       _ -> do
+--         out' <- wireB out
+--         compileExprB
+--           out'
+--           ( NEqF
+--               (ValF 0)
+--               ( AddF
+--                   (BtoF x0)
+--                   (BtoF x1)
+--                   (fmap BtoF xs)
+--               )
+--           )
+
 compileXorB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> M n ()
 compileXorB out x y = do
   -- (1 - 2x) * (y + 1) = (1 + out - 3x)
@@ -645,3 +804,139 @@ compileXorB out x y = do
       (1, [(x, -2)])
       (1, [(y, 1)])
       (1, [(x, -3), (out, 1)])
+
+--------------------------------------------------------------------------------
+
+-- assertExprB :: (GaloisField n, Integral n) => Bool -> ExprB n -> M n ()
+-- assertExprB val expr = do
+--   ref <- wireB expr
+--   add [CVarBindB ref (if val then 1 else 0)]
+
+-- assertExprF :: (GaloisField n, Integral n) => n -> ExprF n -> M n ()
+-- assertExprF val expr = do
+--   ref <- wireF expr
+--   add [CVarBindF ref val]
+
+-- assertNotZeroF :: (GaloisField n, Integral n) => ExprF n -> M n ()
+-- assertNotZeroF expr = do
+--   ref <- wireF expr
+--   -- introduce a new variable m, such that `expr * m = 1`
+--   m <- freshRefF
+--   add $
+--     cMulF
+--       (0, [(ref, 1)])
+--       (0, [(m, 1)])
+--       (1, [])
+
+assertNotZeroU :: (GaloisField n, Integral n) => Width -> ExprU n -> M n ()
+assertNotZeroU width expr = do
+  ref <- wireU expr
+  -- introduce a new variable m, such that `expr * m = 1`
+  m <- freshRefU width
+  add $
+    cMulU
+      (0, [(ref, 1)])
+      (0, [(m, 1)])
+      (1, [])
+
+-- | Assert that x is less than or equal to y
+--
+-- TODO, replace with a more efficient implementation
+--  as in A.3.2.2 Range check in https://zips.z.cash/protocol/protocol.pdf
+-- assertLTEU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
+-- assertLTEU width x y = do
+--   --    x ≤ y
+--   --  =>
+--   --    0 ≤ y - x
+--   --  that is, there exists a BinRep of y - x
+--   difference <- freshRefU width
+--   compileSubU width difference y x
+assertLTU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
+assertLTU width x y = do
+  --    x < y
+  --  =>
+  --    0 < y - x
+  --  that is, there exists a non-zero BinRep of y - x
+  difference <- freshVarU width
+  difference' <- wireU difference
+  compileSubU width difference' y x
+  assertNotZeroU width difference
+
+-- -- | Assert that the BinRep of a UInt is non-zero
+-- assertBinRepNonZeroU :: (GaloisField n, Integral n) => Width -> ExprU n -> M n ()
+-- assertBinRepNonZeroU width x
+--   | width < 1 = error "[ panic ] assertBinRepNonZeroU: width of a UInt must be at least 1"
+--   | width == 1 = do
+--       --    x != 0
+--       --  =>
+--       --    x == 1
+--       --  =>
+--       --    x[0] == 1
+--       assertExprB True (BitU x 0)
+--   | width == 2 = do
+--       --    x != 0
+--       --  =>
+--       --    x[0] ∨ x[1] == 1
+--       --  =>
+--       --    (1 - x[0]) * x[1] = (1 - x[0])
+--       assertOrB (ValB 1) (BitU x 0) (BitU x 1)
+--   | width == 3 = do
+--       --    x != 0
+--       --  =>
+--       --    x[0] + x[1] + ... + x[n] != 0
+--       --  =>
+--       --    (1 - x[0]) * x[1] = (1 - x[0])
+--       --    (1 - x[0]) * x[2] = (1 - x[0])
+--       return ()
+
+--  = case compare width 1 of
+--   LT -> error "[ panic ] assertBinRepNonZeroU: width of a UInt must be at least 1"
+--   EQ -> do
+--       --    divisor != 0
+--       --  =>
+--       --    divisor == 1
+--       --  =>
+--       --    divisor[0] == 1
+--       add [CVarBindB (RefUBit width divisor 0) 1]
+--   GT -> do
+
+--         -- more than 3 operands, rewrite it as an inequality instead:
+--         --      if all operands are 0           then 0 else 1
+--         --  =>  if the sum of operands is 0     then 0 else 1
+--         --  =>  if the sum of operands is not 0 then 1 else 0
+--         --  =>  the sum of operands is not 0
+
+--   one <- freshRefU width
+--   compileSubU width one x (ValU width 1)
+--   GT -> do
+--     --    divisor != 0
+--     --  =>
+--     --    conjunction of all bits of divisor = 1
+--     compileOrBs
+--     -- add $ cGeqB (0, [(divisor, 1)]) (0, [(RefUtoRefB quotient, 2)])
+-- -- compileOrBs
+
+-- | Division with remainder on UInts
+--    1. dividend = divisor * quotient + remainder
+--    2. 0 ≤ remainder < divisor
+--    3. 0 < divisor
+compileDivModU :: (GaloisField n, Integral n) => Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
+compileDivModU width dividend divisor quotient remainder = do
+  --    dividend = divisor * quotient + remainder
+  --  =>
+  --    divisor * quotient = dividend - remainder
+  remainderRef <- wireU remainder
+  divisorRef <- wireU divisor
+  quotientRef <- wireU quotient
+  dividendRef <- wireU dividend
+  add $
+    cMulU
+      (0, [(divisorRef, 1)])
+      (0, [(quotientRef, 1)])
+      (0, [(dividendRef, 1), (remainderRef, -1)])
+  --    0 ≤ remainder < divisor
+  assertLTU width remainderRef divisorRef
+  -- --    0 < divisor
+  -- -- =>
+  -- --    divisor != 0
+  assertNotZeroU width divisor

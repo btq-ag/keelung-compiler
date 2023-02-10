@@ -5,7 +5,7 @@ module Keelung.Compiler.Optimize.ConstantPropagation (run) where
 
 import Data.Bifunctor (Bifunctor (second), bimap)
 import Data.Field.Galois (GaloisField)
-import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict qualified as IntMap
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.Struct (Struct (..))
 
@@ -15,11 +15,22 @@ import Keelung.Data.Struct (Struct (..))
 -- 2. Propagate constant in the output expression
 -- 3. Propagate constant in assertions
 run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
-run (TypeErased exprs fieldWidth counters oldRelations assertions) =
+run (TypeErased exprs fieldWidth counters oldRelations assertions divModRelsU) =
   let newRelations = propagateRelations oldRelations
       exprs' = map (second (propagateConstant newRelations)) exprs
       newAssertions = map (propagateConstant newRelations) assertions
-   in TypeErased exprs' fieldWidth counters newRelations newAssertions
+      newDivModRels =
+        fmap
+          -- dividend = divisor * quotient + remainder
+          ( \(dividend, divisor, quotient, remainder) ->
+              ( propagateExprU newRelations dividend,
+                propagateExprU newRelations divisor,
+                propagateExprU newRelations quotient,
+                propagateExprU newRelations remainder
+              )
+          )
+          divModRelsU
+   in TypeErased exprs' fieldWidth counters newRelations newAssertions newDivModRels
 
 -- | Propagate constants in the relations, and return the fixed point of constant propagation
 propagateRelations :: Relations n -> Relations n
@@ -31,15 +42,12 @@ propagateRelations before =
 
 -- | Seperate value bindings from expression bindings
 refineRelations :: Relations n -> (Relations n, Bool)
-refineRelations (Relations vals valsI exprs exprsI) =
+refineRelations (Relations vals exprs) =
   -- extract value bindings from expression bindings
   let (fsV, fsE) = IntMap.mapEither seperateF (structF exprs)
-      (fisV, fisE) = IntMap.mapEither seperateF (structF exprsI)
       (bsV, bsE) = IntMap.mapEither seperateB (structB exprs)
-      (bisV, bisE) = IntMap.mapEither seperateB (structB exprsI)
       (usV, usE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (structU exprs)
-      (uisV, uisE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (structU exprsI)
-      changed = not $ IntMap.null fsV || IntMap.null fisV || IntMap.null bsV || IntMap.null bisV || IntMap.null usV || IntMap.null uisV
+      changed = not $ IntMap.null fsV || IntMap.null bsV || IntMap.null usV
    in ( Relations
           ( vals
               { structF = structF vals <> fsV,
@@ -47,14 +55,7 @@ refineRelations (Relations vals valsI exprs exprsI) =
                 structU = structU vals <> usV
               }
           )
-          ( valsI
-              { structF = structF valsI <> fisV,
-                structB = structB valsI <> bisV,
-                structU = structU valsI <> uisV
-              }
-          )
-          (Struct fsE bsE usE)
-          (Struct fisE bisE uisE),
+          (Struct fsE bsE usE),
         changed
       )
   where
@@ -75,62 +76,62 @@ refineRelations (Relations vals valsI exprs exprsI) =
 
 -- constant propogation
 propagateConstant :: (GaloisField n, Integral n) => Relations n -> Expr n -> Expr n
-propagateConstant relations = propagate
-  where
-    propagateF e = case e of
-      ValF _ -> e
-      VarF var -> case lookupF var (valueBindings relations) of
-        Nothing -> e
-        Just val -> ValF val
-      VarFO _ -> e -- no constant propagation for output variables
-      VarFI _ -> e -- no constant propagation for input variables
-      SubF x y -> SubF (propagateF x) (propagateF y)
-      AddF x y xs -> AddF (propagateF x) (propagateF y) (fmap propagateF xs)
-      MulF x y -> MulF (propagateF x) (propagateF y)
-      DivF x y -> DivF (propagateF x) (propagateF y)
-      IfF p x y -> IfF (propagateB p) (propagateF x) (propagateF y)
-      BtoF x -> BtoF (propagateB x)
+propagateConstant relations (ExprB x) = ExprB (propagateExprB relations x)
+propagateConstant relations (ExprF x) = ExprF (propagateExprF relations x)
+propagateConstant relations (ExprU x) = ExprU (propagateExprU relations x)
 
-    propagateU e = case e of
-      ValU _ _ -> e
-      VarU w var -> case lookupU w var (valueBindings relations) of
-        Nothing -> e
-        Just val -> ValU w val
-      VarUO _ _ -> e -- no constant propagation for output variables
-      VarUI _ _ -> e -- no constant propagation for input variables
-      SubU w x y -> SubU w (propagateU x) (propagateU y)
-      AddU w x y -> AddU w (propagateU x) (propagateU y)
-      MulU w x y -> MulU w (propagateU x) (propagateU y)
-      AndU w x y xs -> AndU w (propagateU x) (propagateU y) (fmap propagateU xs)
-      OrU w x y xs -> OrU w (propagateU x) (propagateU y) (fmap propagateU xs)
-      XorU w x y -> XorU w (propagateU x) (propagateU y)
-      NotU w x -> NotU w (propagateU x)
-      IfU w p x y -> IfU w (propagateB p) (propagateU x) (propagateU y)
-      RoLU w i x -> RoLU w i (propagateU x)
-      ShLU w i x -> ShLU w i (propagateU x)
-      BtoU w x -> BtoU w (propagateB x)
+propagateExprF :: Relations n -> ExprF n -> ExprF n
+propagateExprF relations e = case e of
+  ValF _ -> e
+  VarF var -> case lookupF var (valueBindings relations) of
+    Nothing -> e
+    Just val -> ValF val
+  VarFO _ -> e -- no constant propagation for output variables
+  VarFI _ -> e -- no constant propagation for input variables
+  SubF x y -> SubF (propagateExprF relations x) (propagateExprF relations y)
+  AddF x y xs -> AddF (propagateExprF relations x) (propagateExprF relations y) (fmap (propagateExprF relations) xs)
+  MulF x y -> MulF (propagateExprF relations x) (propagateExprF relations y)
+  DivF x y -> DivF (propagateExprF relations x) (propagateExprF relations y)
+  IfF p x y -> IfF (propagateExprB relations p) (propagateExprF relations x) (propagateExprF relations y)
+  BtoF x -> BtoF (propagateExprB relations x)
 
-    propagateB e = case e of
-      ValB _ -> e
-      VarB var -> case lookupB var (valueBindings relations) of
-        Nothing -> e
-        Just val -> ValB val
-      VarBO _ -> e -- no constant propagation for output variables
-      VarBI _ -> e -- no constant propagation for input variables
-      AndB x y xs -> AndB (propagateB x) (propagateB y) (fmap propagateB xs)
-      OrB x y xs -> OrB (propagateB x) (propagateB y) (fmap propagateB xs)
-      XorB x y -> XorB (propagateB x) (propagateB y)
-      NotB x -> NotB (propagateB x)
-      IfB p x y -> IfB (propagateB p) (propagateB x) (propagateB y)
-      NEqB x y -> NEqB (propagateB x) (propagateB y)
-      NEqF x y -> NEqF (propagateF x) (propagateF y)
-      NEqU x y -> NEqU (propagateU x) (propagateU y)
-      EqB x y -> EqB (propagateB x) (propagateB y)
-      EqF x y -> EqF (propagateF x) (propagateF y)
-      EqU x y -> EqU (propagateU x) (propagateU y)
-      BitU x i -> BitU (propagateU x) i
+propagateExprU :: Relations n -> ExprU n -> ExprU n
+propagateExprU relations e = case e of
+  ValU _ _ -> e
+  VarU w var -> case lookupU w var (valueBindings relations) of
+    Nothing -> e
+    Just val -> ValU w val
+  VarUO _ _ -> e -- no constant propagation for output variables
+  VarUI _ _ -> e -- no constant propagation for input variables
+  SubU w x y -> SubU w (propagateExprU relations x) (propagateExprU relations y)
+  AddU w x y -> AddU w (propagateExprU relations x) (propagateExprU relations y)
+  MulU w x y -> MulU w (propagateExprU relations x) (propagateExprU relations y)
+  AndU w x y xs -> AndU w (propagateExprU relations x) (propagateExprU relations y) (fmap (propagateExprU relations) xs)
+  OrU w x y xs -> OrU w (propagateExprU relations x) (propagateExprU relations y) (fmap (propagateExprU relations) xs)
+  XorU w x y -> XorU w (propagateExprU relations x) (propagateExprU relations y)
+  NotU w x -> NotU w (propagateExprU relations x)
+  IfU w p x y -> IfU w (propagateExprB relations p) (propagateExprU relations x) (propagateExprU relations y)
+  RoLU w i x -> RoLU w i (propagateExprU relations x)
+  ShLU w i x -> ShLU w i (propagateExprU relations x)
+  BtoU w x -> BtoU w (propagateExprB relations x)
 
-    propagate e = case e of
-      ExprF x -> ExprF (propagateF x)
-      ExprU x -> ExprU (propagateU x)
-      ExprB x -> ExprB (propagateB x)
+propagateExprB :: Relations n -> ExprB n -> ExprB n
+propagateExprB relations e = case e of
+  ValB _ -> e
+  VarB var -> case lookupB var (valueBindings relations) of
+    Nothing -> e
+    Just val -> ValB val
+  VarBO _ -> e -- no constant propagation for output variables
+  VarBI _ -> e -- no constant propagation for input variables
+  AndB x y xs -> AndB (propagateExprB relations x) (propagateExprB relations y) (fmap (propagateExprB relations) xs)
+  OrB x y xs -> OrB (propagateExprB relations x) (propagateExprB relations y) (fmap (propagateExprB relations) xs)
+  XorB x y -> XorB (propagateExprB relations x) (propagateExprB relations y)
+  NotB x -> NotB (propagateExprB relations x)
+  IfB p x y -> IfB (propagateExprB relations p) (propagateExprB relations x) (propagateExprB relations y)
+  NEqB x y -> NEqB (propagateExprB relations x) (propagateExprB relations y)
+  NEqF x y -> NEqF (propagateExprF relations x) (propagateExprF relations y)
+  NEqU x y -> NEqU (propagateExprU relations x) (propagateExprU relations y)
+  EqB x y -> EqB (propagateExprB relations x) (propagateExprB relations y)
+  EqF x y -> EqF (propagateExprF relations x) (propagateExprF relations y)
+  EqU x y -> EqU (propagateExprU relations x) (propagateExprU relations y)
+  BitU x i -> BitU (propagateExprU relations x) i

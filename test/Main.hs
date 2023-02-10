@@ -4,27 +4,31 @@ module Main where
 
 import qualified Basic
 -- import Control.Arrow (ArrowChoice (right), left)
-import qualified Data.Set as Set
+
+import Control.Arrow (ArrowChoice (..))
+import qualified Data.Sequence as Seq
 import Keelung
 import Keelung.Compiler
 import qualified Keelung.Compiler as Compiler
-import Keelung.Compiler.Constraint (cadd)
+import Keelung.Compiler.Relocated (cadd)
 import Keelung.Constraint.Polynomial (Poly)
 import qualified Keelung.Constraint.Polynomial as Poly
+import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Syntax.Counters
 import qualified Test.Compilation as Compilation
+import qualified Test.ConstraintMinimizer as ConstraintMinimizer
 import Test.Hspec
 import qualified Test.Interpreter as Interpreter
 import qualified Test.Optimization as Optimization
 import qualified Test.VarLayout as VarBookkeep
-import Keelung.Constraint.R1CS (R1CS)
-import Control.Arrow (ArrowChoice(..))
 
 main :: IO ()
 main = hspec $ do
   describe "Interpreter" Interpreter.tests
 
   describe "Compilation" Compilation.tests
+
+  describe "Constraint Minimization" ConstraintMinimizer.tests
 
   describe "Optimization" Optimization.tests
 
@@ -37,9 +41,9 @@ main = hspec $ do
   describe "Constraint Generation" $ do
     it "assertToBe42" $
       let cs =
-            ConstraintSystem
+            RelocatedConstraintSystem
               { csConstraints =
-                  Set.fromList $
+                  Seq.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
                 csCounters = addCount OfInput OfField 1 mempty
               }
@@ -47,17 +51,17 @@ main = hspec $ do
 
   describe "Keelung `compile`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
-      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.outOfBound)
+      let expected = left show ((toR1CS :: RelocatedConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.outOfBound)
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.outOfBound
       actual `shouldBe` expected
 
     it "Program that throws ElabError.EmptyArrayError" $ do
-      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.emptyArray)
+      let expected = left show ((toR1CS :: RelocatedConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.emptyArray)
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.emptyArray
       actual `shouldBe` expected
 
     it "Program that compiles successfully" $ do
-      let expected = left show ((toR1CS :: ConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.identity)
+      let expected = left show ((toR1CS :: RelocatedConstraintSystem GF181 -> R1CS GF181) <$> Compiler.compile Basic.identity)
       actual <- right (fmap fromInteger) . left show <$> Keelung.compile GF181 Basic.identity
       actual `shouldBe` expected
 

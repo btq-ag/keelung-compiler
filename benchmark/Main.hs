@@ -1,7 +1,7 @@
 module Main where
 
-import qualified AggSig
-import qualified Array
+import qualified Poseidon
+-- import qualified Merkle
 import Criterion.Main
 import Criterion.Types
 
@@ -9,10 +9,10 @@ main :: IO ()
 main =
   defaultMainWith
     config
-    [ AggSig.run,
-      Array.fromString,
-      Array.fullAdder,
-      Array.multiplier
+    [ 
+      Poseidon.run
+      -- ,
+      -- Merkle.run
     ]
   where
     config :: Config

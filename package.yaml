@@ -26,6 +26,7 @@ dependencies:
 - cereal
 - containers
 - deepseq
+- equivalence
 - galois-field
 - keelung 
 - mtl
@@ -34,6 +35,9 @@ dependencies:
 - semirings
 - validation
 - vector
+
+default-extensions: 
+- ImportQualifiedPost
 
 library:
   source-dirs: src
@@ -62,24 +66,6 @@ executables:
       - -Werror=incomplete-patterns
       - -fno-warn-orphans
 
-  profile:
-    main:                Main.hs
-    source-dirs:        
-      - examples/
-      - profiling/
-      - src/
-    dependencies:
-    - keelung-compiler
-
-    ghc-options:
-      - -Wall
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
-      - -Werror=incomplete-patterns
-      - -fno-warn-orphans
-
-
 tests:
   keelung-test:
     main:                Main.hs
@@ -89,7 +75,10 @@ tests:
       - examples/
     dependencies:
     - keelung-compiler
+    # - keelung-examples
     - hspec
+    - hspec-expectations-lifted
+    - HUnit
     - QuickCheck
     - quickcheck-transformer
 

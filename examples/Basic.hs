@@ -228,6 +228,11 @@ dupArray = do
   let xs = toArray [x, x]
   return $ access xs 1
 
+dupList :: Comp [Field]
+dupList = do
+  x <- input
+  return [x, x]
+
 returnArray :: Comp (Arr Field)
 returnArray = do
   x <- input

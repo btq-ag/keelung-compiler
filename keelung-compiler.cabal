@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -28,32 +28,35 @@ library
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
-      Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
-      Keelung.Compiler.Interpret
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeConstraints2
+      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
+      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
+      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Relocated
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Keelung.Data.Bindings
+      Keelung.Data.PolyG
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Relocated
       Keelung.Interpreter.Typed
   other-modules:
       Paths_keelung_compiler
   hs-source-dirs:
       src
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       array
@@ -62,6 +65,7 @@ library
     , cereal
     , containers
     , deepseq
+    , equivalence
     , galois-field
     , keelung
     , mtl
@@ -80,27 +84,28 @@ executable keelungc
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
-      Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
-      Keelung.Compiler.Interpret
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeConstraints2
+      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
+      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
+      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Relocated
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Keelung.Data.Bindings
+      Keelung.Data.PolyG
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Relocated
       Keelung.Interpreter.Typed
       AggregateSignature.Program
       AggregateSignature.Util
@@ -108,11 +113,15 @@ executable keelungc
       Array.Immutable
       Array.Mutable
       Basic
+      Hash.Poseidon
+      Hash.Poseidon.Constant
       Paths_keelung_compiler
   hs-source-dirs:
       app/
       src/
       examples/
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       aeson
@@ -122,6 +131,7 @@ executable keelungc
     , cereal
     , containers
     , deepseq
+    , equivalence
     , galois-field
     , keelung
     , keelung-compiler
@@ -134,96 +144,42 @@ executable keelungc
     , with-utf8
   default-language: Haskell2010
 
-executable profile
-  main-is: Main.hs
-  other-modules:
-      AggregateSignature.Program
-      AggregateSignature.Util
-      Array
-      Array.Immutable
-      Array.Mutable
-      Basic
-      Keelung.Compiler
-      Keelung.Compiler.Compile
-      Keelung.Compiler.Constraint
-      Keelung.Compiler.Constraint2
-      Keelung.Compiler.Error
-      Keelung.Compiler.Interpret
-      Keelung.Compiler.Optimize
-      Keelung.Compiler.Optimize.ConstantPropagation
-      Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeConstraints2
-      Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.Rewriting
-      Keelung.Compiler.Optimize.UnionFind
-      Keelung.Compiler.R1CS
-      Keelung.Compiler.Syntax.Erase
-      Keelung.Compiler.Syntax.FieldBits
-      Keelung.Compiler.Syntax.Inputs
-      Keelung.Compiler.Syntax.Untyped
-      Keelung.Compiler.Util
-      Keelung.Data.Bindings
-      Keelung.Interpreter.Kinded
-      Keelung.Interpreter.Monad
-      Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS2
-      Keelung.Interpreter.Typed
-      Paths_keelung_compiler
-  hs-source-dirs:
-      examples/
-      profiling/
-      src/
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
-  build-depends:
-      array
-    , base >=4.7 && <5
-    , bytestring
-    , cereal
-    , containers
-    , deepseq
-    , galois-field
-    , keelung
-    , keelung-compiler
-    , mtl
-    , optparse-applicative
-    , random
-    , semirings
-    , validation
-    , vector
-  default-language: Haskell2010
-
 test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
       Test.Compilation
+      Test.ConstraintMinimizer
       Test.Interpreter
       Test.Optimization
+      Test.PolyG
+      Test.UnionFind
       Test.VarLayout
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
-      Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
-      Keelung.Compiler.Interpret
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeConstraints2
+      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
+      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
+      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Relocated
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Keelung.Data.Bindings
+      Keelung.Data.PolyG
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Relocated
       Keelung.Interpreter.Typed
       AggregateSignature.Program
       AggregateSignature.Util
@@ -231,22 +187,29 @@ test-suite keelung-test
       Array.Immutable
       Array.Mutable
       Basic
+      Hash.Poseidon
+      Hash.Poseidon.Constant
       Paths_keelung_compiler
   hs-source-dirs:
       test/
       src/
       examples/
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      QuickCheck
+      HUnit
+    , QuickCheck
     , array
     , base >=4.7 && <5
     , bytestring
     , cereal
     , containers
     , deepseq
+    , equivalence
     , galois-field
     , hspec
+    , hspec-expectations-lifted
     , keelung
     , keelung-compiler
     , mtl
@@ -265,41 +228,48 @@ benchmark keelung-bench
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
-      Keelung.Compiler.Constraint2
       Keelung.Compiler.Error
-      Keelung.Compiler.Interpret
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeConstraints2
+      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
+      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
+      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.Rewriting
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Relocated
       Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
       Keelung.Data.Bindings
+      Keelung.Data.PolyG
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS2
+      Keelung.Interpreter.Relocated
       Keelung.Interpreter.Typed
       AggSig
       Array
+      Merkle
+      Poseidon
       AggregateSignature.Program
       AggregateSignature.Util
       Array
       Array.Immutable
       Array.Mutable
       Basic
+      Hash.Poseidon
+      Hash.Poseidon.Constant
       Paths_keelung_compiler
   hs-source-dirs:
       src
       benchmark/
       examples/
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
       array
@@ -309,6 +279,7 @@ benchmark keelung-bench
     , containers
     , criterion >=1.0
     , deepseq
+    , equivalence
     , galois-field
     , keelung
     , keelung-compiler

@@ -35,8 +35,8 @@ instance (GaloisField n, Integral n) => Show (UnionFind n) where
       ++ showList' (map (\(x, y) -> "$" <> show x <> " = " <> show (N y)) (IntMap.toList $ values xs))
       ++ "\n"
       ++ "}"
-      where 
-        showList' ys = "[" <> List.intercalate ", " ys <> "]"
+    where
+      showList' ys = "[" <> List.intercalate ", " ys <> "]"
 
 new :: IntMap n -> UnionFind n
 new = UnionFind mempty mempty
@@ -104,21 +104,21 @@ union xs x y
 -- Left-biased: if size x == size y, prefer x as root.
 union' :: GaloisField n => UnionFind n -> Var -> Var -> UnionFind n
 union' xs x y =
-      let (rootOfX, xs2) = find xs x
-          (rootOfY, xs3) = find xs2 y
-          sizeOfRootX = size xs3 rootOfX
-          sizeOfRootY = size xs3 rootOfY
-       in if sizeOfRootX >= sizeOfRootY
-            then
-              xs3
-                { links = IntMap.insert y rootOfX (links xs3),
-                  sizes = IntMap.insert x (sizeOfRootX + sizeOfRootY) (sizes xs3)
-                }
-            else
-              xs3
-                { links = IntMap.insert x rootOfY (links xs3),
-                  sizes = IntMap.insert y (sizeOfRootX + sizeOfRootY) (sizes xs3)
-                }
+  let (rootOfX, xs2) = find xs x
+      (rootOfY, xs3) = find xs2 y
+      sizeOfRootX = size xs3 rootOfX
+      sizeOfRootY = size xs3 rootOfY
+   in if sizeOfRootX >= sizeOfRootY
+        then
+          xs3
+            { links = IntMap.insert y rootOfX (links xs3),
+              sizes = IntMap.insert x (sizeOfRootX + sizeOfRootY) (sizes xs3)
+            }
+        else
+          xs3
+            { links = IntMap.insert x rootOfY (links xs3),
+              sizes = IntMap.insert y (sizeOfRootX + sizeOfRootY) (sizes xs3)
+            }
 
 size :: UnionFind n -> Var -> Int
 size xs x = fromMaybe 1 $ IntMap.lookup x (sizes xs)

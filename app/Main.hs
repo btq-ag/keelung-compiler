@@ -10,7 +10,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize, decode, encode)
 import Encode (serializeInputAndWitness, serializeR1CS)
 import Keelung.Compiler
-  ( ConstraintSystem,
+  ( RelocatedConstraintSystem,
     Error (..),
     compileO0Elab,
     compileO1Elab,
@@ -22,7 +22,7 @@ import Keelung.Compiler
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Util (Witness)
 import Keelung.Field
-import Keelung.Syntax.Typed hiding (elaborate)
+import Keelung.Syntax.Typed
 import Main.Utf8 (withUtf8)
 import Option
 import qualified Keelung.Compiler.Syntax.Inputs as Inputs
@@ -99,19 +99,19 @@ main = withUtf8 $ do
                 (genInputsOutputsWitnessesElab elaborated (map fromInteger inputs :: [BN128]))
     Version -> putStrLn "Keelung v0.8.2"
   where
-    asB64 :: Either (Error B64) (ConstraintSystem B64) -> Either (Error B64) (ConstraintSystem B64)
+    asB64 :: Either (Error B64) (RelocatedConstraintSystem B64) -> Either (Error B64) (RelocatedConstraintSystem B64)
     asB64 = id
 
-    asGF181 :: Either (Error GF181) (ConstraintSystem GF181) -> Either (Error GF181) (ConstraintSystem GF181)
+    asGF181 :: Either (Error GF181) (RelocatedConstraintSystem GF181) -> Either (Error GF181) (RelocatedConstraintSystem GF181)
     asGF181 = id
 
-    asBN128 :: Either (Error BN128) (ConstraintSystem BN128) -> Either (Error BN128) (ConstraintSystem BN128)
+    asBN128 :: Either (Error BN128) (RelocatedConstraintSystem BN128) -> Either (Error BN128) (RelocatedConstraintSystem BN128)
     asBN128 = id
 
-    outputCircuit :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (ConstraintSystem n) -> IO ()
+    outputCircuit :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (RelocatedConstraintSystem n) -> IO ()
     outputCircuit cs = putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> cs))
 
-    outputCircuitAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (ConstraintSystem n) -> IO ()
+    outputCircuitAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (RelocatedConstraintSystem n) -> IO ()
     outputCircuitAndWriteFile cs = do
       outputCircuit cs
       case cs of

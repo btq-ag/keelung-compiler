@@ -16,11 +16,11 @@ import Data.Foldable (toList)
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Semiring (Semiring (..))
-import Keelung.Interpreter.Monad
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Data.Struct
 import Keelung.Data.Bindings
 import qualified Keelung.Data.Bindings as Bindings
+import Keelung.Data.Struct
+import Keelung.Interpreter.Monad
 import Keelung.Syntax.Typed
 
 --------------------------------------------------------------------------------
@@ -237,11 +237,8 @@ instance FreeVar Computation where
   freeVars context =
     mconcat
       [ mconcat $ map freeVars (toList (structF (compExprBindings context))),
-        mconcat $ map freeVars (toList (structF (compExprBindingsI context))),
         mconcat $ map freeVars (toList (structB (compExprBindings context))),
-        mconcat $ map freeVars (toList (structB (compExprBindingsI context))),
         mconcat $ concatMap (map freeVars . toList) (toList (structU (compExprBindings context))),
-        mconcat $ concatMap (map freeVars . toList) (toList (structU (compExprBindingsI context))),
         mconcat $ map freeVars (toList (compAssertions context))
       ]
 
