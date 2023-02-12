@@ -28,7 +28,7 @@ goThroughAddF = do
   where
     goThroughAddFM :: (GaloisField n, Integral n) => [PolyG RefF n] -> PolyG RefF n -> RoundM n [PolyG RefF n]
     goThroughAddFM acc poly = do
-      changed <- classifyAdd poly
+      changed <- learnFromAddF poly
       if changed
         then return acc
         else do
@@ -39,6 +39,32 @@ goThroughAddF = do
               markChanged AdditiveConstraintChanged
               modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG poly' (csOccurrenceF cs)}
               return (poly' : acc)
+
+-- type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
+
+-- goThroughMulF :: (GaloisField n, Integral n) => [MulF n] -> MulF n -> RoundM n [MulF n]
+-- goThroughMulF acc (a, b, Left c) = do
+--   unionFind <- gets csVarEqF
+--   case substPolyG unionFind a of
+--     Nothing -> return ((a, b, Left c) : acc)
+--     Just (a', substitutedRefs) -> do
+--       markChanged MultiplicativeConstraintChanged
+--       modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG a' (csOccurrenceF cs)}
+--       return ((a', b, Left c) : acc)
+-- goThroughMulF acc (a, b, Right c) = _
+
+-- do
+-- changed <- learnFromAddF poly
+-- if changed
+--   then return acc
+--   else do
+--     unionFind <- gets csVarEqF
+--     case substPolyG unionFind poly of
+--       Nothing -> return (poly : acc)
+--       Just (poly', substitutedRefs) -> do
+--         markChanged AdditiveConstraintChanged
+--         modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG poly' (csOccurrenceF cs)}
+--         return (poly' : acc)
 
 ------------------------------------------------------------------------------
 
@@ -78,8 +104,8 @@ markChanged = tell
 
 -- | Go through additive constraints and classify them into relation constraints when possible.
 --   Returns 'True' if the constraint has been reduced.
-classifyAdd :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n Bool
-classifyAdd poly = case PolyG.view poly of
+learnFromAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n Bool
+learnFromAddF poly = case PolyG.view poly of
   (_, []) -> error "[ panic ] Empty polynomial"
   (intercept, [(var, slope)]) -> do
     --    intercept + slope * var = 0
@@ -107,3 +133,27 @@ classifyAdd poly = case PolyG.view poly of
         modify' $ \cs' -> cs' {csVarEqF = unionFind', csOccurrenceF = removeOccurrences [var1, var2] (csOccurrenceF cs)}
         return True
   (_, _) -> return False
+
+-- learnFromMulF1 :: (GaloisField n, Integral n) => PolyG RefF n -> PolyG RefF n -> n -> RoundM n Bool
+-- learnFromMulF1 poly1 poly2 constant = case PolyG.view a of
+--   (_, []) -> error "[ panic ] Empty polynomial"
+--   (intercept, [(var, slope)]) -> do
+--     --    intercept + slope * var = 0
+--     --  =>
+--     --    var = - intercept / slope
+--     markChanged RelationChanged
+
+--     modify' $ \cs ->
+--       cs
+--         { csVarEqF = UnionFind.bindToValue var (-intercept / slope) (csVarEqF cs),
+--           csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)
+--         }
+--     return True
+
+-- cs <- get
+-- case UnionFind.relate a (c, b) (csVarEqF cs) of
+--   Nothing -> return False
+--   Just unionFind' -> do
+--     markChanged RelationChanged
+--     modify' $ \cs' -> cs' {csVarEqF = unionFind'}
+--     return True

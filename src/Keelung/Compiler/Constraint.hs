@@ -267,7 +267,7 @@ substPolyG_ ctx (changed, accPoly, substitutedRefs) ref coeff =
   case UnionFind.parentOf ctx ref of
     Nothing ->
       case accPoly of -- ref is :ralready a root
-        Left c -> (changed, Right $ PolyG.singleton c (ref, coeff), substitutedRefs)
+        Left c -> (changed, PolyG.singleton c (ref, coeff), substitutedRefs)
         Right xs -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
     Just (Nothing, intercept) ->
       -- ref = intercept
@@ -279,7 +279,7 @@ substPolyG_ ctx (changed, accPoly, substitutedRefs) ref coeff =
       let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
        in case accPoly of
             -- ref = slope * root + intercept
-            Left c -> (changed, Right $ PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
+            Left c -> (changed, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
             Right accPoly' -> (True, Right $ PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', substitutedRefs')
 
 -- let (isAlreadyRoot, (result, intercept)) = UnionFind.lookup ref ctx
