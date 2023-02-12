@@ -11,30 +11,34 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
-run cs =
-  let ((csAddF', changed), cs') = runOptiM cs $ do
-        runRoundM $ foldM goThroughAddFM [] (csAddF cs)
-      cs'' = cs' {csAddF = csAddF'}
-   in if changed == NothingChanged
-        then cs''
-        else run cs''
+run cs = run_ (RelationChanged, cs)
 
--- goThroughUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> UnionFind RefF n
--- goThroughUnionFindF unionFind =
+run_ :: (GaloisField n, Integral n) => (WhatChanged, ConstraintSystem n) -> ConstraintSystem n
+run_ (NothingChanged, cs) = cs
+run_ (RelationChanged, cs) = run_ $ runOptiM cs goThroughAddF
+run_ (AdditiveConstraintChanged, cs) = run_ $ runOptiM cs goThroughAddF
+run_ (MultiplicativeConstraintChanged, cs) = run_ $ runOptiM cs goThroughAddF
 
-goThroughAddFM :: (GaloisField n, Integral n) => [PolyG RefF n] -> PolyG RefF n -> RoundM n [PolyG RefF n]
-goThroughAddFM acc poly = do
-  changed <- classifyAdd poly
-  if changed
-    then return acc
-    else do
-      unionFind <- gets csVarEqF
-      case substPolyG unionFind poly of
-        Nothing -> return (poly : acc)
-        Just (poly', substitutedRefs) -> do
-          markChanged AdditiveConstraintChanged
-          modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG poly' (csOccurrenceF cs)}
-          return (poly' : acc)
+goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
+goThroughAddF = do
+  cs <- get
+  runRoundM $ do
+    csAddF' <- foldM goThroughAddFM [] (csAddF cs)
+    modify' $ \cs'' -> cs'' {csAddF = csAddF'}
+  where
+    goThroughAddFM :: (GaloisField n, Integral n) => [PolyG RefF n] -> PolyG RefF n -> RoundM n [PolyG RefF n]
+    goThroughAddFM acc poly = do
+      changed <- classifyAdd poly
+      if changed
+        then return acc
+        else do
+          unionFind <- gets csVarEqF
+          case substPolyG unionFind poly of
+            Nothing -> return (poly : acc)
+            Just (poly', substitutedRefs) -> do
+              markChanged AdditiveConstraintChanged
+              modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG poly' (csOccurrenceF cs)}
+              return (poly' : acc)
 
 ------------------------------------------------------------------------------
 
@@ -42,6 +46,7 @@ data WhatChanged
   = NothingChanged
   | RelationChanged
   | AdditiveConstraintChanged
+  | MultiplicativeConstraintChanged
   deriving (Eq, Show)
 
 instance Semigroup WhatChanged where
@@ -50,8 +55,8 @@ instance Semigroup WhatChanged where
   RelationChanged <> _ = RelationChanged
   _ <> RelationChanged = RelationChanged
   AdditiveConstraintChanged <> _ = AdditiveConstraintChanged
-
--- _ <> AdditiveConstraintChanged = AdditiveConstraintChanged
+  _ <> AdditiveConstraintChanged = AdditiveConstraintChanged
+  MultiplicativeConstraintChanged <> _ = MultiplicativeConstraintChanged
 
 instance Monoid WhatChanged where
   mempty = NothingChanged
@@ -65,8 +70,8 @@ type RoundM n = WriterT WhatChanged (OptiM n)
 runOptiM :: ConstraintSystem n -> OptiM n a -> (a, ConstraintSystem n)
 runOptiM cs m = runState m cs
 
-runRoundM :: RoundM n a -> OptiM n (a, WhatChanged)
-runRoundM = runWriterT
+runRoundM :: RoundM n a -> OptiM n WhatChanged
+runRoundM = execWriterT
 
 markChanged :: WhatChanged -> RoundM n ()
 markChanged = tell
