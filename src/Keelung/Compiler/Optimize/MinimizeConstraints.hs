@@ -3,7 +3,7 @@ module Keelung.Compiler.Optimize.MinimizeConstraints (run) where
 -- import Control.Monad.State
 
 import Control.Monad.State
-import Data.Bifunctor (second)
+import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
@@ -12,8 +12,8 @@ import Keelung.Data.PolyG qualified as PolyG
 
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 run cs =
-  let (csAddF', (changed, cs')) = runAddM cs $ do
-        foldM goThroughAddFM [] (csAddF cs)
+  let ((csAddF', changed), cs') = runOptiM cs $ do
+        runRoundM $ foldM goThroughAddFM [] (csAddF cs)
       cs'' = cs' {csAddF = csAddF'}
    in if changed == NothingChanged
         then cs''
@@ -22,18 +22,18 @@ run cs =
 -- goThroughUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> UnionFind RefF n
 -- goThroughUnionFindF unionFind =
 
-goThroughAddFM :: (GaloisField n, Integral n) => [PolyG RefF n] -> PolyG RefF n -> AddM n [PolyG RefF n]
+goThroughAddFM :: (GaloisField n, Integral n) => [PolyG RefF n] -> PolyG RefF n -> RoundM n [PolyG RefF n]
 goThroughAddFM acc poly = do
-  unionFind <- gets (csVarEqF . snd)
   changed <- classifyAdd poly
   if changed
     then return acc
     else do
+      unionFind <- gets csVarEqF
       case substPolyG unionFind poly of
         Nothing -> return (poly : acc)
         Just (poly', substitutedRefs) -> do
           markChanged AdditiveConstraintChanged
-          updateConstraintSystem $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG poly' (csOccurrenceF cs)}
+          modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG poly' (csOccurrenceF cs)}
           return (poly' : acc)
 
 ------------------------------------------------------------------------------
@@ -58,20 +58,22 @@ instance Monoid WhatChanged where
 
 ------------------------------------------------------------------------------
 
-type AddM n = State (WhatChanged, ConstraintSystem n)
+type OptiM n = State (ConstraintSystem n)
 
-runAddM :: ConstraintSystem n -> AddM n a -> (a, (WhatChanged, ConstraintSystem n))
-runAddM cs m = runState m (NothingChanged, cs)
+type RoundM n = WriterT WhatChanged (OptiM n)
 
-markChanged :: WhatChanged -> AddM n ()
-markChanged whatChanged = modify' $ \(_, cs) -> (whatChanged, cs)
+runOptiM :: ConstraintSystem n -> OptiM n a -> (a, ConstraintSystem n)
+runOptiM cs m = runState m cs
 
-updateConstraintSystem :: (ConstraintSystem n -> ConstraintSystem n) -> AddM n ()
-updateConstraintSystem = modify' . second
+runRoundM :: RoundM n a -> OptiM n (a, WhatChanged)
+runRoundM = runWriterT
+
+markChanged :: WhatChanged -> RoundM n ()
+markChanged = tell
 
 -- | Go through additive constraints and classify them into relation constraints when possible.
 --   Returns 'True' if the constraint has been reduced.
-classifyAdd :: (GaloisField n, Integral n) => PolyG RefF n -> AddM n Bool
+classifyAdd :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n Bool
 classifyAdd poly = case PolyG.view poly of
   (_, []) -> error "[ panic ] Empty polynomial"
   (intercept, [(var, slope)]) -> do
@@ -80,7 +82,7 @@ classifyAdd poly = case PolyG.view poly of
     --    var = - intercept / slope
     markChanged RelationChanged
 
-    updateConstraintSystem $ \cs ->
+    modify' $ \cs ->
       cs
         { csVarEqF = UnionFind.bindToValue var (-intercept / slope) (csVarEqF cs),
           csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)
@@ -92,11 +94,11 @@ classifyAdd poly = case PolyG.view poly of
     --    slope1 * var1 = - slope2 * var2 - intercept
     --  =>
     --    var1 = - slope2 * var2 / slope1 - intercept / slope1
-    cs <- gets snd
+    cs <- get
     case UnionFind.relate var1 (-slope2 / slope1, var2, -intercept / slope1) (csVarEqF cs) of
       Nothing -> return False
       Just unionFind' -> do
         markChanged RelationChanged
-        updateConstraintSystem $ \cs' -> cs' {csVarEqF = unionFind', csOccurrenceF = removeOccurrences [var1, var2] (csOccurrenceF cs)}
+        modify' $ \cs' -> cs' {csVarEqF = unionFind', csOccurrenceF = removeOccurrences [var1, var2] (csOccurrenceF cs)}
         return True
   (_, _) -> return False
