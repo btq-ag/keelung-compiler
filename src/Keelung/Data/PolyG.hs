@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial with variables generalized (unliked Poly which is limited to only Int)
-module Keelung.Data.PolyG (PolyG, View (..), build, buildWithMap, unsafeBuild, view, viewAsMap, insert, merge, addConstant, multiplyBy, singleton, vars) where
+module Keelung.Data.PolyG (PolyG, View (..), build, buildWithMap, view, viewAsMap, insert, merge, addConstant, multiplyBy, singleton, vars) where
 
 import Control.DeepSeq (NFData)
 import Data.Map.Strict (Map)
@@ -51,9 +51,9 @@ singleton :: (Ord ref, Num n, Eq n) => n -> (ref, n) -> Either n (PolyG ref n)
 singleton c (_, 0) = Left c
 singleton c (x, coeff) = Right $ PolyG c (Map.singleton x coeff)
 
-insert :: (Ord ref, Num n) => n -> (ref, n) -> PolyG ref n -> Either n (PolyG ref n)
+insert :: (Ord ref, Num n, Eq n) => n -> (ref, n) -> PolyG ref n -> Either n (PolyG ref n)
 insert c' (x, coeff) (PolyG c xs) =
-  let result = Map.insertWith (+) x coeff xs
+  let result = Map.filter (/= 0) $ Map.insertWith (+) x coeff xs
    in if Map.null result
         then Left (c + c')
         else Right $ PolyG (c + c') result
@@ -66,13 +66,6 @@ multiplyBy :: (Num n, Eq n) => n -> PolyG ref n -> Either n (PolyG ref n)
 multiplyBy 0 _ = Left 0
 multiplyBy m (PolyG c xs) = Right $ PolyG (m * c) (Map.map (m *) xs)
 
-unsafeBuild :: (Ord ref, Eq n, Num n) => n -> [(ref, n)] -> PolyG ref n
-unsafeBuild c xs =
-  let result = Map.filter (/= 0) $ Map.fromListWith (+) xs
-   in if Map.null result
-        then error "[ panic ] PolyG.unsafeBuild: empty polynomial"
-        else PolyG c result
-
 data View ref n = Monomial n (ref, n) | Binomial n (ref, n) (ref, n) | Polynomial n (Map ref n)
   deriving (Eq, Show)
 
@@ -82,11 +75,6 @@ view (PolyG c xs) = case Map.toList xs of
   [(x, c')] -> Monomial c (x, c')
   [(x, c'), (y, c'')] -> Binomial c (x, c') (y, c'')
   _ -> Polynomial c xs
-
---   (n, (ref, n), [(ref, n)])
--- view (PolyG c xs) = case Map.toList xs of
---   [] -> error "[ panic ] PolyG.view: empty polynomial"
---   (x' : xs') -> (c, x', xs')
 
 viewAsMap :: PolyG ref n -> (n, Map ref n)
 viewAsMap (PolyG c xs) = (c, xs)

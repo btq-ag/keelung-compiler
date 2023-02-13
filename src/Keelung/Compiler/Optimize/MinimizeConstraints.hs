@@ -9,15 +9,23 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+-- import Debug.Trace
+
+traceShowM :: (Show a, Monad m) => a -> m ()
+traceShowM = const (return ())
 
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 run cs = run_ (RelationChanged, cs)
 
 run_ :: (GaloisField n, Integral n) => (WhatChanged, ConstraintSystem n) -> ConstraintSystem n
 run_ (NothingChanged, cs) = cs
-run_ (RelationChanged, cs) = run_ $ runOptiM cs goThroughAddF
+run_ (RelationChanged, cs) = run_ $ 
+        let (changed, cs') = runOptiM cs goThroughAddF
+        in case changed of 
+                NothingChanged -> runOptiM cs' goThroughMulF
+                _ -> (changed, cs')
 run_ (AdditiveConstraintChanged, cs) = run_ $ runOptiM cs goThroughMulF
-run_ (MultiplicativeConstraintChanged, cs) = run_ $ runOptiM cs goThroughMulF
+run_ (MultiplicativeConstraintChanged, cs) =  run_ $ runOptiM cs goThroughMulF
 
 goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughAddF = do
@@ -42,11 +50,14 @@ foldMaybeM f = foldM $ \acc x -> do
 
 reduceAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n (Maybe (PolyG RefF n))
 reduceAddF poly = do
+  traceShowM ("reduceAddF", poly)
   changed <- learnFromAddF poly
   if changed
     then return Nothing
     else do
       unionFind <- gets csVarEqF
+      traceShowM ("substPolyG",  substPolyG unionFind poly)
+
       case substPolyG unionFind poly of
         Nothing -> return (Just poly) -- nothing changed
         Just (Left _constant, substitutedRefs) -> do
@@ -69,18 +80,15 @@ type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
 
 reduceMulF :: (GaloisField n, Integral n) => (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n)) -> RoundM n (Maybe (MulF n))
 reduceMulF (polyA, polyB, polyC) = do
+  () <- traceShowM ("reduceMulF", polyA, polyB, polyC)
   polyAResult <- substitutePoly MultiplicativeConstraintChanged polyA
   polyBResult <- substitutePoly MultiplicativeConstraintChanged polyB
   polyCResult <- case polyC of
     Left constantC -> return (Left constantC)
     Right polyC' -> substitutePoly MultiplicativeConstraintChanged polyC'
+  () <- traceShowM ("substitutePoly", polyAResult, polyBResult, polyCResult)
+
   reduceMulF_ polyAResult polyBResult polyCResult
-  -- result <- reduceMulF_ polyAResult polyBResult polyCResult
-  -- case result of
-  --   Nothing -> return Nothing
-  --   Just (polyA', polyB', polyC') -> do
-  --     markChanged MultiplicativeConstraintChanged
-  --     reduceMulF (polyA', polyB', polyC')
 
 substitutePoly :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefF n -> RoundM n (Either n (PolyG RefF n))
 substitutePoly typeOfChange polynomial = do

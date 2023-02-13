@@ -73,7 +73,6 @@ r1cs prog rawInputs = do
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
--- runAll :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Expectation
 runAll :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> IO ()
 runAll program rawInputs rawOutputs = do
   kinded program rawInputs
@@ -82,6 +81,10 @@ runAll program rawInputs rawOutputs = do
     `shouldBe` Right rawOutputs
   -- csOld program rawInputs
   --   `shouldBe` Right rawOutputs
+  -- let r1cs' = Compiler.compileO1' program :: Either (Error (N GF181)) (ConstraintSystem (N GF181))
+  -- print r1cs'
+  -- print (relocateConstraintSystem <$> r1cs')
+
   csNew program rawInputs
     `shouldBe` Right rawOutputs
   relocated program rawInputs
@@ -109,7 +112,9 @@ tests = do
         let expectedOutput = if inp == 3 then [1] else [0]
         runAll Basic.eq1 [inp :: GF181] expectedOutput
 
-    it "Basic.cond'" $
+    it "Basic.cond'" $ do
+      -- runAll Basic.cond' [0 :: GF181] [789]
+      -- runAll Basic.cond' [3 :: GF181] [12]
       property $ \inp -> do
         let expectedOutput = if inp == 3 then [12] else [789]
         runAll Basic.cond' [inp :: GF181] expectedOutput
@@ -210,7 +215,15 @@ tests = do
 
     describe "Poseidon" $ do
       it "[0]" $ do
-        runAll (Poseidon.hash [0]) [0 :: GF181] [969784935791658820122994814042437418105599415561111385]
+        runAll (Poseidon.hash [0]) [0 :: N GF181] [969784935791658820122994814042437418105599415561111385]
+
+    describe "Optimizer progression" $ do
+      it "0" $ do
+        let program msg = do
+              msg0 <- reuse msg
+              msg1 <- reuse (msg0 + 0)
+              reuse ((msg1 + 0) * (msg1 + 0))
+        runAll (program 0 :: Comp Field) [0 :: N GF181] [0]
   where
     runAllKeelungAggSig :: Int -> Int -> [GF181] -> IO ()
     runAllKeelungAggSig dimension numberOfSignatures outputs =
