@@ -142,7 +142,11 @@ shrinkCNEQ cneq@(CNEQ (Right a) (Left y) m) = do
     Nothing -> return $ Stuck cneq
     Just b -> shrinkCNEQ (CNEQ (Right a) (Right b) m)
 shrinkCNEQ (CNEQ (Right a) (Right b) m) = do
-  bindVar m (recip (a - b))
+  if a == b
+    then do
+      bindVar m 0
+    else do
+      bindVar m (recip (a - b))
   return Eliminated
 
 --------------------------------------------------------------------------------
@@ -205,9 +209,18 @@ shrinkR1C r1c = do
     R1C (Left a) (Right bs) (Left c) -> case substAndView bindings bs of
       Constant _ -> return Eliminated
       Uninomial b (var, coeff) -> do
-        -- a * (b + coeff var) = c
-        bindVar var ((c / a - b) / coeff)
-        return Eliminated
+        if a == 0
+          then return Eliminated
+          else do
+            -- a * (b + coeff var) = c
+            --    =>
+            -- a * b + a * coeff * var = c
+            --    =>
+            -- a * coeff * var = c - a * b
+            --    =>
+            -- var = (c - a * b) / (coeff * a)
+            bindVar var ((c - a * b) / (coeff * a))
+            return Eliminated
       Polynomial _ -> return $ Stuck r1c
     R1C (Left a) (Right bs) (Right cs) -> case (substAndView bindings bs, substAndView bindings cs) of
       (Constant _, Constant _) -> return Eliminated
@@ -216,10 +229,13 @@ shrinkR1C r1c = do
         bindVar var ((a * b - c) / coeff)
         return Eliminated
       (Constant _, Polynomial _) -> return $ Stuck r1c
-      (Uninomial b (var, coeff), Constant c) -> do
-        -- a * (b + coeff var) = c
-        bindVar var ((c - a * b) / (coeff * a))
-        return Eliminated
+      (Uninomial b (var, coeff), Constant c) ->
+        if a == 0
+          then return Eliminated
+          else do
+            -- a * (b + coeff var) = c
+            bindVar var ((c - a * b) / (coeff * a))
+            return Eliminated
       (Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
       (Uninomial _ _, Polynomial _) -> return $ Stuck r1c
       (Polynomial _, Constant _) -> return $ Stuck r1c
@@ -228,10 +244,13 @@ shrinkR1C r1c = do
     R1C (Right as) (Left b) (Left c) -> case substAndView bindings as of
       Constant _ -> return Eliminated
       Uninomial a (var, coeff) -> do
-        -- (a + coeff var) * b = c
-        -- var = (c - a * b) / (coeff * b)
-        bindVar var ((c - a * b) / (coeff * b))
-        return Eliminated
+        if b == 0
+          then return Eliminated
+          else do
+            -- (a + coeff var) * b = c
+            -- var = (c - a * b) / (coeff * b)
+            bindVar var ((c - a * b) / (coeff * b))
+            return Eliminated
       Polynomial _ -> return $ Stuck r1c
     R1C (Right as) (Left b) (Right cs) -> case (substAndView bindings as, substAndView bindings cs) of
       (Constant _, Constant _) -> return Eliminated
@@ -241,9 +260,12 @@ shrinkR1C r1c = do
         return Eliminated
       (Constant _, Polynomial _) -> return $ Stuck r1c
       (Uninomial a (var, coeff), Constant c) -> do
-        -- (a + coeff var) * b = c
-        bindVar var ((c - a * b) / (coeff * b))
-        return Eliminated
+        if b == 0
+          then return Eliminated
+          else do
+            -- (a + coeff var) * b = c
+            bindVar var ((c - a * b) / (coeff * b))
+            return Eliminated
       (Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
       (Uninomial _ _, Polynomial _) -> return $ Stuck r1c
       (Polynomial _, Constant _) -> return $ Stuck r1c
@@ -252,14 +274,26 @@ shrinkR1C r1c = do
     R1C (Right as) (Right bs) (Left c) -> case (substAndView bindings as, substAndView bindings bs) of
       (Constant _, Constant _) -> return Eliminated
       (Constant a, Uninomial b (var, coeff)) -> do
-        -- a * (b + coeff var) = c
-        bindVar var ((c / a - b) / coeff)
-        return Eliminated
+        if a == 0
+          then return Eliminated
+          else do
+            -- a * (b + coeff var) = c
+            --    =>
+            -- a * b + a * coeff * var = c
+            --    =>
+            -- a * coeff * var = c - a * b
+            --    =>
+            -- var = (c - a * b) / (coeff * a)
+            bindVar var ((c - a * b) / (coeff * a))
+            return Eliminated
       (Constant _, Polynomial _) -> return $ Stuck r1c
       (Uninomial a (var, coeff), Constant b) -> do
-        -- (a + coeff var) * b = c
-        bindVar var ((c - a * b) / (coeff * b))
-        return Eliminated
+        if b == 0
+          then return Eliminated
+          else do
+            -- (a + coeff var) * b = c
+            bindVar var ((c - a * b) / (coeff * b))
+            return Eliminated
       (Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
       (Uninomial _ _, Polynomial _) -> return $ Stuck r1c
       (Polynomial _, Constant _) -> return $ Stuck r1c
@@ -273,18 +307,30 @@ shrinkR1C r1c = do
         return Eliminated
       (Constant _, Constant _, Polynomial _) -> return $ Stuck r1c
       (Constant a, Uninomial b (var, coeff), Constant c) -> do
-        -- a * (b + coeff var) = c
-        bindVar var ((c / a - b) / coeff)
-        return Eliminated
+        if a == 0
+          then return Eliminated
+          else do
+            -- a * (b + coeff var) = c
+            --    =>
+            -- a * b + a * coeff * var = c
+            --    =>
+            -- a * coeff * var = c - a * b
+            --    =>
+            -- var = (c - a * b) / (coeff * a)
+            bindVar var ((c - a * b) / (coeff * a))
+            return Eliminated
       (Constant _, Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
       (Constant _, Uninomial _ _, Polynomial _) -> return $ Stuck r1c
       (Constant _, Polynomial _, Constant _) -> return $ Stuck r1c
       (Constant _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
       (Constant _, Polynomial _, Polynomial _) -> return $ Stuck r1c
       (Uninomial a (var, coeff), Constant b, Constant c) -> do
-        -- (a + coeff var) * b = c
-        bindVar var ((c - a * b) / (coeff * b))
-        return Eliminated
+        if b == 0
+          then return Eliminated
+          else do
+            -- (a + coeff var) * b = c
+            bindVar var ((c - a * b) / (coeff * b))
+            return Eliminated
       (Uninomial _ _, Constant _, Uninomial _ _) -> return $ Stuck r1c
       (Uninomial _ _, Constant _, Polynomial _) -> return $ Stuck r1c
       (Uninomial _ _, Uninomial _ _, Constant _) -> return $ Stuck r1c
