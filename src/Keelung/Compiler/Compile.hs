@@ -216,8 +216,8 @@ add = mapM_ addOne
     addOne (CMulB x y (Right z)) = modify (\cs -> cs {csMulB = (x, y, Right z) : csMulB cs, csOccurrenceB = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y $ addOccurrencesWithPolyG z (csOccurrenceB cs)})
     addOne (CMulU x y (Left c)) = modify (\cs -> cs {csMulU = (x, y, Left c) : csMulU cs, csOccurrenceU = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y (csOccurrenceU cs)})
     addOne (CMulU x y (Right z)) = modify (\cs -> cs {csMulU = (x, y, Right z) : csMulU cs, csOccurrenceU = addOccurrencesWithPolyG x $ addOccurrencesWithPolyG y $ addOccurrencesWithPolyG z (csOccurrenceU cs)})
-    addOne (CNEqF x y m) = modify (\cs -> cs {csNEqF = Map.insert (x, y) m (csNEqF cs), csOccurrenceF = addOccurrences [x, y] (csOccurrenceF cs)})
-    addOne (CNEqU x y m) = modify (\cs -> cs {csNEqU = Map.insert (x, y) m (csNEqU cs), csOccurrenceU = addOccurrences [x, y] (csOccurrenceU cs)})
+    addOne (CNEqF x y m) = modify (\cs -> cs {csNEqF = Map.insert (x, y) m (csNEqF cs), csOccurrenceF = addOccurrences [x, y, m] (csOccurrenceF cs)})
+    addOne (CNEqU x y m) = modify (\cs -> cs {csNEqU = Map.insert (x, y) m (csNEqU cs), csOccurrenceU = addOccurrences [x, y, m] (csOccurrenceU cs)})
 
 freshRefF :: M n RefF
 freshRefF = do
