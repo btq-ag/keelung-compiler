@@ -254,7 +254,7 @@ substPolyG_ ctx (changed, accPoly, substitutedRefs) ref coeff = case UnionFind.p
     -- ref is already a root
     case accPoly of
       Left c -> (changed, PolyG.singleton c (ref, coeff), substitutedRefs)
-      Right xs -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
+      Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
   Just (Nothing, intercept) ->
     -- ref = intercept
     let substitutedRefs' = ref : substitutedRefs -- add ref to substitutedRefs
@@ -268,14 +268,14 @@ substPolyG_ ctx (changed, accPoly, substitutedRefs) ref coeff = case UnionFind.p
           then -- ref = root, nothing changed
           case accPoly of
             Left c -> (changed, PolyG.singleton c (ref, coeff), substitutedRefs)
-            Right xs -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
+            Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
           else error "[ panic ] Invalid relation in UnionFind: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
       else
         let substitutedRefs' = ref : substitutedRefs
          in case accPoly of
               -- ref = slope * root + intercept
               Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
-              Right accPoly' -> (True, Right $ PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', substitutedRefs')
+              Right accPoly' -> (True, PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', substitutedRefs')
 
 -- let (isAlreadyRoot, (result, intercept)) = UnionFind.lookup ref ctx
 --  in if isAlreadyRoot

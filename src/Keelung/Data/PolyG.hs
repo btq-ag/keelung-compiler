@@ -51,12 +51,12 @@ singleton :: (Ord ref, Num n, Eq n) => n -> (ref, n) -> Either n (PolyG ref n)
 singleton c (_, 0) = Left c
 singleton c (x, coeff) = Right $ PolyG c (Map.singleton x coeff)
 
-insert :: (Ord ref, Num n) => n -> (ref, n) -> PolyG ref n -> PolyG ref n
+insert :: (Ord ref, Num n) => n -> (ref, n) -> PolyG ref n -> Either n (PolyG ref n)
 insert c' (x, coeff) (PolyG c xs) =
   let result = Map.insertWith (+) x coeff xs
    in if Map.null result
-        then error "[ panic ] PolyG.insert: empty polynomial"
-        else PolyG (c + c') result
+        then Left (c + c')
+        else Right $ PolyG (c + c') result
 
 addConstant :: Num n => n -> PolyG ref n -> PolyG ref n
 addConstant c' (PolyG c xs) = PolyG (c + c') xs

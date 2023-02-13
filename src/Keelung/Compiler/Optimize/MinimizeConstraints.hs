@@ -23,111 +23,154 @@ goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughAddF = do
   cs <- get
   runRoundM $ do
-    csAddF' <- foldM goThroughAddFM [] (csAddF cs)
+    csAddF' <- foldMaybeM goThroughAddFM [] (csAddF cs)
     modify' $ \cs'' -> cs'' {csAddF = csAddF'}
-  where
-    goThroughAddFM :: (GaloisField n, Integral n) => [PolyG RefF n] -> PolyG RefF n -> RoundM n [PolyG RefF n]
-    goThroughAddFM acc poly = do
-      changed <- learnFromAddF poly
-      if changed
-        then return acc
-        else do
-          unionFind <- gets csVarEqF
-          case substPolyG unionFind poly of
-            Nothing -> return (poly : acc) -- nothing changed
-            Just (Left _constant, substitutedRefs) -> do
-              -- when (constant /= 0) $
-              --   error "[ panic ] Additive reduced to some constant other than 0"
-              -- the polynomial has been reduced to nothing
-              markChanged AdditiveConstraintChanged
-              -- remove all variables in the polynomial from the occurrence list
-              modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
-              return acc
-            Just (Right poly', substitutedRefs) -> do
-              -- the polynomial has been reduced to something
-              markChanged AdditiveConstraintChanged
-              modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
-              return (poly' : acc)
 
--- type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
+foldMaybeM :: Monad m => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
+foldMaybeM f = foldM $ \acc x -> do
+  result <- f x
+  case result of
+    Nothing -> return acc
+    Just x' -> return (x' : acc)
 
--- goThroughMulF :: (GaloisField n, Integral n) => [MulF n] -> MulF n -> RoundM n [MulF n]
--- goThroughMulF acc (a, b, Left c) = do
---   unionFind <- gets csVarEqF
---   case substPolyG unionFind a of
---     Nothing -> return ((a, b, Left c) : acc)
---     Just (Left c, substitutedRefs) -> do
---       markChanged MultiplicativeConstraintChanged
---       modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG a' (csOccurrenceF cs)}
---       return ((Nothing, b, Left c) : acc)
---     Just (Right a', substitutedRefs) -> do
---       markChanged MultiplicativeConstraintChanged
---       modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG a' (csOccurrenceF cs)}
---       return ((a', b, Left c) : acc)
--- goThroughMulF acc (a, b, Right c) = _
+goThroughAddFM :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n (Maybe (PolyG RefF n))
+goThroughAddFM poly = do
+  changed <- learnFromAddF poly
+  if changed
+    then return Nothing
+    else do
+      unionFind <- gets csVarEqF
+      case substPolyG unionFind poly of
+        Nothing -> return (Just poly) -- nothing changed
+        Just (Left _constant, substitutedRefs) -> do
+          -- when (constant /= 0) $
+          --   error "[ panic ] Additive reduced to some constant other than 0"
+          -- the polynomial has been reduced to nothing
+          markChanged AdditiveConstraintChanged
+          -- remove all variables in the polynomial from the occurrence list
+          modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
+          return Nothing
+        Just (Right poly', substitutedRefs) -> do
+          -- the polynomial has been reduced to something
+          markChanged AdditiveConstraintChanged
+          modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
+          return (Just poly')
 
--- goThroughMulF_ :: (GaloisField n, Integral n) => Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> RoundM n (Maybe (MulF n))
--- goThroughMulF_ (Left _a) (Left _b) (Left _c) = return Nothing
--- goThroughMulF_ (Left a) (Left b) (Right c) =
---   let (constant, (var1, coeff1), xs) = PolyG.view c
---    in case xs of
---         [] -> do
---           -- a * b = constant + var1 * coeff1
---           --    =>
---           -- (a * b - constant) / coeff1 = var1
---           bindToValue var1 ((a * b - constant) / coeff1)
---           return Nothing
---         [(var2, coeff2)] -> do
---           -- a * b = constant + var1 * coeff1 + var2 * coeff2
---           --    =>
---           -- (a * b - constant - var2 * coeff2) / coeff1 = var1
---           --    =>
---           -- var1 = (a * b - constant) / coeff1 - (coeff2 * var2) / coeff1
---           _relationEstablished <- relate var1 (coeff2 / coeff1, var2, (a * b - constant) / coeff1)
---           return Nothing
---         _ -> do
---           -- a * b = constant + xs
---           --    =>
---           -- xs + constant - a * b = 0
---           cs <- get
---           markChanged AdditiveConstraintChanged
---           let newAddF = PolyG.addConstant (-a * b) c
---           modify' $ \cs'' -> cs'' {csAddF = newAddF : csAddF cs}
---           return Nothing
--- goThroughMulF_ (Left 0) (Right _) (Left _) = return Nothing
--- goThroughMulF_ (Left a) (Right b) (Left c) =
---   let (constant, (var1, coeff1), xs) = PolyG.view b
---    in case xs of
---         [] -> do
---           -- a * (constant + coeff1 * var1) = c
---           --    =>
---           -- a * coeff1 * var1 = c - a * constant
---           --    =>
---           -- var1 = (c - a * constant) / (a * coeff1)
---           bindToValue var1 ((c - a * constant) / (a * coeff1))
---           return Nothing
---         [(var2, coeff2)] -> do
---           -- a * (constant + coeff1 * var1 + coeff2 * var2) = c
---           --    =>
---           -- constant + coeff1 * var1 + coeff2 * var2 = c / a
---           --    =>
---           -- var1 = (c / a - constant - coeff2 * var2) / coeff1
---           _relationEstablished <- relate var1 (coeff2 / coeff1, var2, (c / a - constant) / coeff1)
---           return Nothing
---         _ -> do
---           -- a * (constant + xs) = c
---           --    =>
---           -- a * constant - c + a * xs = 0
---           cs <- get
---           markChanged AdditiveConstraintChanged
---           let newAddF = PolyG.addConstant (-c) $ PolyG.multiplyBy a b
---           modify' $ \cs'' -> cs'' {csAddF = newAddF : csAddF cs}
---           return Nothing
--- goThroughMulF_ (Left _a) (Right _b) (Right _c) = _
--- goThroughMulF_ (Right _a) (Left _b) (Left _c) = _
--- goThroughMulF_ (Right _a) (Left _b) (Right _c) = _
--- goThroughMulF_ (Right _a) (Right _b) (Left _c) = _
--- goThroughMulF_ (Right _a) (Right _b) (Right _c) = _
+-- data OccurrenceChange = OccurrenceChange
+--   { ocAdded :: [RefF]
+--   , ocRemoved :: [RefF]
+--   }
+
+type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
+
+-- | Trying to reduce a multiplicative constaint of (Constant / Constant / Polynomial)
+reduceMulFCCP :: (GaloisField n, Integral n) => n -> n -> PolyG RefF n -> RoundM n (Maybe (MulF n))
+reduceMulFCCP a b cs = case PolyG.view cs of
+  PolyG.Monomial constant (var1, coeff1) -> do
+    -- a * b = constant + var1 * coeff1
+    --    =>
+    -- (a * b - constant) / coeff1 = var1
+    bindToValue var1 ((a * b - constant) / coeff1)
+    return Nothing
+  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> do
+    -- a * b = constant + var1 * coeff1 + var2 * coeff2
+    --    =>
+    -- (a * b - constant - var2 * coeff2) / coeff1 = var1
+    --    =>
+    -- var1 = (a * b - constant) / coeff1 - (coeff2 * var2) / coeff1
+    _relationEstablished <- relate var1 (coeff2 / coeff1, var2, (a * b - constant) / coeff1)
+    return Nothing
+  PolyG.Polynomial _ _ -> do
+    -- a * b = constant + xs
+    --    =>
+    -- xs + constant - a * b = 0
+    addAddF (PolyG.addConstant (-a * b) cs)
+    return Nothing
+
+-- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Constant)
+reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG RefF n -> n -> RoundM n (Maybe (MulF n))
+reduceMulFCPC a bs c = case PolyG.view bs of
+  PolyG.Monomial constant (var1, coeff1) -> do
+    -- a * (constant + coeff1 * var1) = c
+    --    =>
+    -- a * coeff1 * var1 = c - a * constant
+    --    =>
+    -- var1 = (c - a * constant) / (a * coeff1)
+    bindToValue var1 ((c - a * constant) / (a * coeff1))
+    return Nothing
+  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> do
+    -- a * (constant + coeff1 * var1 + coeff2 * var2) = c
+    --    =>
+    -- constant + coeff1 * var1 + coeff2 * var2 = c / a
+    --    =>
+    -- var1 = (c / a - constant - coeff2 * var2) / coeff1
+    _relationEstablished <- relate var1 (coeff2 / coeff1, var2, (c / a - constant) / coeff1)
+    return Nothing
+  PolyG.Polynomial _ _ -> do
+    -- a * (constant + xs) = c
+    --    =>
+    -- a * constant - c + a * xs = 0
+    addAddF (PolyG.addConstant (-c) $ PolyG.multiplyBy a bs)
+    return Nothing
+
+-- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Polynomial)
+-- reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG RefF n -> PolyG RefF n -> RoundM n (Maybe (MulF n))
+-- reduceMulFCPP a bs cs = case (PolyG.view bs, PolyG.view cs) of
+--   (PolyG.Monomial constant1 (var1, coeff1), PolyG.Monomial constant2 (var2, coeff2)) -> do
+--     -- a * (constant1 + coeff1 * var1) = constant2 + coeff2 * var2
+--     --    =>
+--     -- a * constant1 + a * coeff1 * var1 = constant2 + coeff2 * var2
+--     --    =>
+--     -- var1 = (constant2 + coeff2 * var2 - a * constant1) / a * coeff1
+--     --    =>
+--     -- var1 = (constant2 - a * constant1) / a * coeff1 + (coeff2 * var2) / a * coeff1
+--     _ <- relate var1 (coeff2 / (a * coeff1), var2, (constant2 - a * constant1) / (a * coeff1))
+--     return Nothing
+--   (PolyG.Monomial constant1 (var1, coeff1), PolyG.Binomial constant2 (var2, coeff2) (var3, coeff3)) -> do
+--     -- a * (constant1 + coeff1 * var1) = constant2 + coeff2 * var2 + coeff3 * var3
+--     --    =>
+--     -- a * constant1 + a * coeff1 * var1 = constant2 + coeff2 * var2 + coeff3 * var3
+--     --    =>
+--     -- (a * constant1 - constant2) + a * coeff1 * var1 + coeff2 * var2 + coeff3 * var3 = 0
+--     case PolyG.build (a * constant1 - constant2) [(var1, a * coeff1), (var2, coeff2), (var3, coeff3)] of
+--       Left _constant -> return Nothing
+--       Right addF -> do
+--         addAddF addF
+--         return Nothing
+--   (PolyG.Monomial constant1 (var1, coeff1), _) -> do
+--     -- a * constant1 + a * coeff1 * var1 = cs 
+
+
+--   _ -> return Nothing
+
+-- PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> do
+--   -- a * (constant + coeff1 * var1 + coeff2 * var2) = c + xs
+--   --    =>
+--   -- constant + coeff1 * var1 + coeff2 * var2 = c / a + xs
+--   --    =>
+--   -- var1 = (c / a + xs - constant - coeff2 * var2) / coeff1
+--   _relationEstablished <- relate var1 (coeff2 / coeff1, var2, (c / a + xs - constant) / coeff1)
+--   return Nothing
+-- PolyG.Polynomial _ _ -> do
+--   -- a * (constant + xs) = c + ys
+--   --    =>
+--   -- a * constant - c + a * xs = ys
+--   cs <- get
+--   markChanged AdditiveConstraintChanged
+--   let newAddF = PolyG.addConstant (-c) $ PolyG.multiplyBy a b
+--   modify' $ \cs'' -> cs'' {csAddF = newAddF : csAddF cs}
+--   return Nothing
+
+reduceMulF :: (GaloisField n, Integral n) => Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> RoundM n (Maybe (MulF n))
+reduceMulF (Left _a) (Left _b) (Left _c) = return Nothing
+reduceMulF (Left a) (Left b) (Right c) = reduceMulFCCP a b c
+reduceMulF (Left 0) (Right _) (Left _) = return Nothing
+reduceMulF (Left a) (Right b) (Left c) = reduceMulFCPC a b c
+reduceMulF (Left a) (Right b) (Right c) = return Nothing -- reduceMulFCPP a b c
+reduceMulF (Right _a) (Left _b) (Left _c) = return Nothing
+reduceMulF (Right _a) (Left _b) (Right _c) = return Nothing
+reduceMulF (Right _a) (Right _b) (Left _c) = return Nothing
+reduceMulF (Right _a) (Right _b) (Right _c) = return Nothing
 
 -- bindToValue
 -- modify' $ \cs ->
@@ -224,3 +267,8 @@ relate var1 (slope, var2, intercept) = do
       markChanged RelationChanged
       modify' $ \cs' -> cs' {csVarEqF = unionFind', csOccurrenceF = removeOccurrences [var1, var2] (csOccurrenceF cs)}
       return True
+
+addAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n ()
+addAddF poly = do
+  markChanged AdditiveConstraintChanged
+  modify' $ \cs' -> cs' {csAddF = poly : csAddF cs'}
