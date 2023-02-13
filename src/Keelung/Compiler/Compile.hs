@@ -688,34 +688,44 @@ compileIfB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> RefB -> M n
 compileIfB out p x y = do
   --  out = p * x + (1 - p) * y
   --      =>
-  --  (out - x) = (1 - p) * (y - x)
+  --  out = p * x + y - p * y
+  --      =>
+  --  (out - y) = p * (x - y)
   add $
     cMulB
-      (1, [(p, -1)])
-      (0, [(x, -1), (y, 1)])
-      (0, [(x, -1), (out, 1)])
+      (0, [(p, 1)])
+      (0, [(x, 1), (y, -1)])
+      (0, [(y, -1), (out, 1)])
 
 compileIfF :: (GaloisField n, Integral n) => RefF -> RefB -> RefF -> RefF -> M n ()
 compileIfF out p x y = do
   --  out = p * x + (1 - p) * y
   --      =>
-  --  (out - x) = (1 - p) * (y - x)
+  --  out = p * x + y - p * y
+  --      =>
+  --  (out - y) = p * x - p * y
+  --      =>
+  --  (out - y) = p * (x - y)
   add $
     cMulF
-      (1, [(RefBtoRefF p, -1)])
-      (0, [(x, -1), (y, 1)])
-      (0, [(x, -1), (out, 1)])
+      (0, [(RefBtoRefF p, 1)])
+      (0, [(x, 1), (y, -1)])
+      (0, [(y, -1), (out, 1)])
 
 compileIfU :: (GaloisField n, Integral n) => RefU -> RefB -> RefU -> RefU -> M n ()
 compileIfU out p x y = do
   --  out = p * x + (1 - p) * y
   --      =>
-  --  (out - x) = (1 - p) * (y - x)
+  --  out = p * x + y - p * y
+  --      =>
+  --  (out - y) = p * x - p * y
+  --      =>
+  --  (out - y) = p * (x - y)
   add $
     cMulU
-      (1, [(RefBtoRefU p, -1)])
-      (0, [(x, -1), (y, 1)])
-      (0, [(x, -1), (out, 1)])
+      (0, [(RefBtoRefU p, 1)])
+      (0, [(x, 1), (y, -1)])
+      (0, [(y, -1), (out, 1)])
 
 compileOrB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> M n ()
 compileOrB out x y = do
