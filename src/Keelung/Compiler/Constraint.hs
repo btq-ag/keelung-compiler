@@ -204,13 +204,22 @@ reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 --------------------------------------------------------------------------------
 
 fromPolyF :: Integral n => Counters -> PolyG RefF n -> Either n (Poly n)
-fromPolyF counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefF counters)) xs)
+fromPolyF counters poly = case PolyG.view poly of
+  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRefF counters var, coeff)]
+  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRefF counters var1, coeff1), (reindexRefF counters var2, coeff2)]
+  PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRefF counters)) (Map.toList xs))
 
 fromPolyB :: Integral n => Counters -> PolyG RefB n -> Either n (Poly n)
-fromPolyB counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefB counters)) xs)
+fromPolyB counters poly = case PolyG.view poly of
+  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRefB counters var, coeff)]
+  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRefB counters var1, coeff1), (reindexRefB counters var2, coeff2)]
+  PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRefB counters)) (Map.toList xs))
 
 fromPolyU :: Integral n => Counters -> PolyG RefU n -> Either n (Poly n)
-fromPolyU counters poly = let (c, xs) = PolyG.view poly in Poly.buildEither c (map (first (reindexRefU counters)) xs)
+fromPolyU counters poly = case PolyG.view poly of
+  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRefU counters var, coeff)]
+  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRefU counters var1, coeff1), (reindexRefU counters var2, coeff2)]
+  PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRefU counters)) (Map.toList xs))
 
 fromPolyF_ :: Integral n => Counters -> PolyG RefF n -> Poly n
 fromPolyF_ counters xs = case fromPolyF counters xs of
@@ -231,13 +240,13 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 
 -- | Substitutes variables in a polynomial.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n, Ord ref, Show ref) => UnionFind ref n -> PolyG ref n -> Maybe (Maybe (PolyG ref n), [ref])
+substPolyG :: (GaloisField n, Integral n, Ord ref, Show ref) => UnionFind ref n -> PolyG ref n -> Maybe (Either n (PolyG ref n), [ref])
 substPolyG ctx poly = do
   let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' (substPolyG_ ctx) (False, Left c, []) xs of
     (False, _, _) -> Nothing -- nothing changed
-    (True, Left _constant, substitutedRefs) -> Just (Nothing, substitutedRefs) -- the polynomial has been reduced to a constant
-    (True, Right poly', substitutedRefs) -> Just (Just poly', substitutedRefs)
+    (True, Left constant, substitutedRefs) -> Just (Left constant, substitutedRefs) -- the polynomial has been reduced to a constant
+    (True, Right poly', substitutedRefs) -> Just (Right poly', substitutedRefs)
 
 substPolyG_ :: (Integral n, Ord ref, Show ref, GaloisField n) => UnionFind ref n -> (Bool, Either n (PolyG ref n), [ref]) -> ref -> n -> (Bool, Either n (PolyG ref n), [ref])
 substPolyG_ ctx (changed, accPoly, substitutedRefs) ref coeff = case UnionFind.parentOf ctx ref of

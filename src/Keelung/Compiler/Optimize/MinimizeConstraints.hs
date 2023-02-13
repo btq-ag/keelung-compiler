@@ -35,13 +35,15 @@ goThroughAddF = do
           unionFind <- gets csVarEqF
           case substPolyG unionFind poly of
             Nothing -> return (poly : acc) -- nothing changed
-            Just (Nothing, substitutedRefs) -> do
+            Just (Left _constant, substitutedRefs) -> do
+              -- when (constant /= 0) $
+              --   error "[ panic ] Additive reduced to some constant other than 0"
               -- the polynomial has been reduced to nothing
               markChanged AdditiveConstraintChanged
               -- remove all variables in the polynomial from the occurrence list
               modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
               return acc
-            Just (Just poly', substitutedRefs) -> do
+            Just (Right poly', substitutedRefs) -> do
               -- the polynomial has been reduced to something
               markChanged AdditiveConstraintChanged
               modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
@@ -54,11 +56,86 @@ goThroughAddF = do
 --   unionFind <- gets csVarEqF
 --   case substPolyG unionFind a of
 --     Nothing -> return ((a, b, Left c) : acc)
---     Just (a', substitutedRefs) -> do
+--     Just (Left c, substitutedRefs) -> do
+--       markChanged MultiplicativeConstraintChanged
+--       modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG a' (csOccurrenceF cs)}
+--       return ((Nothing, b, Left c) : acc)
+--     Just (Right a', substitutedRefs) -> do
 --       markChanged MultiplicativeConstraintChanged
 --       modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG a' (csOccurrenceF cs)}
 --       return ((a', b, Left c) : acc)
 -- goThroughMulF acc (a, b, Right c) = _
+
+-- goThroughMulF_ :: (GaloisField n, Integral n) => Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> RoundM n (Maybe (MulF n))
+-- goThroughMulF_ (Left _a) (Left _b) (Left _c) = return Nothing
+-- goThroughMulF_ (Left a) (Left b) (Right c) =
+--   let (constant, (var1, coeff1), xs) = PolyG.view c
+--    in case xs of
+--         [] -> do
+--           -- a * b = constant + var1 * coeff1
+--           --    =>
+--           -- (a * b - constant) / coeff1 = var1
+--           bindToValue var1 ((a * b - constant) / coeff1)
+--           return Nothing
+--         [(var2, coeff2)] -> do
+--           -- a * b = constant + var1 * coeff1 + var2 * coeff2
+--           --    =>
+--           -- (a * b - constant - var2 * coeff2) / coeff1 = var1
+--           --    =>
+--           -- var1 = (a * b - constant) / coeff1 - (coeff2 * var2) / coeff1
+--           _relationEstablished <- relate var1 (coeff2 / coeff1, var2, (a * b - constant) / coeff1)
+--           return Nothing
+--         _ -> do
+--           -- a * b = constant + xs
+--           --    =>
+--           -- xs + constant - a * b = 0
+--           cs <- get
+--           markChanged AdditiveConstraintChanged
+--           let newAddF = PolyG.addConstant (-a * b) c
+--           modify' $ \cs'' -> cs'' {csAddF = newAddF : csAddF cs}
+--           return Nothing
+-- goThroughMulF_ (Left 0) (Right _) (Left _) = return Nothing
+-- goThroughMulF_ (Left a) (Right b) (Left c) =
+--   let (constant, (var1, coeff1), xs) = PolyG.view b
+--    in case xs of
+--         [] -> do
+--           -- a * (constant + coeff1 * var1) = c
+--           --    =>
+--           -- a * coeff1 * var1 = c - a * constant
+--           --    =>
+--           -- var1 = (c - a * constant) / (a * coeff1)
+--           bindToValue var1 ((c - a * constant) / (a * coeff1))
+--           return Nothing
+--         [(var2, coeff2)] -> do
+--           -- a * (constant + coeff1 * var1 + coeff2 * var2) = c
+--           --    =>
+--           -- constant + coeff1 * var1 + coeff2 * var2 = c / a
+--           --    =>
+--           -- var1 = (c / a - constant - coeff2 * var2) / coeff1
+--           _relationEstablished <- relate var1 (coeff2 / coeff1, var2, (c / a - constant) / coeff1)
+--           return Nothing
+--         _ -> do
+--           -- a * (constant + xs) = c
+--           --    =>
+--           -- a * constant - c + a * xs = 0
+--           cs <- get
+--           markChanged AdditiveConstraintChanged
+--           let newAddF = PolyG.addConstant (-c) $ PolyG.multiplyBy a b
+--           modify' $ \cs'' -> cs'' {csAddF = newAddF : csAddF cs}
+--           return Nothing
+-- goThroughMulF_ (Left _a) (Right _b) (Right _c) = _
+-- goThroughMulF_ (Right _a) (Left _b) (Left _c) = _
+-- goThroughMulF_ (Right _a) (Left _b) (Right _c) = _
+-- goThroughMulF_ (Right _a) (Right _b) (Left _c) = _
+-- goThroughMulF_ (Right _a) (Right _b) (Right _c) = _
+
+-- bindToValue
+-- modify' $ \cs ->
+--   cs
+--     { csVarEqF = UnionFind.bindToValue var (-intercept / slope) (csVarEqF cs),
+--       csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)
+--     }
+-- return Nothing
 
 -- do
 -- changed <- learnFromAddF poly
@@ -113,54 +190,37 @@ markChanged = tell
 --   Returns 'True' if the constraint has been reduced.
 learnFromAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n Bool
 learnFromAddF poly = case PolyG.view poly of
-  (_, []) -> error "[ panic ] Empty polynomial"
-  (intercept, [(var, slope)]) -> do
+  PolyG.Monomial intercept (var, slope) -> do
     --    intercept + slope * var = 0
     --  =>
     --    var = - intercept / slope
-    markChanged RelationChanged
-
-    modify' $ \cs ->
-      cs
-        { csVarEqF = UnionFind.bindToValue var (-intercept / slope) (csVarEqF cs),
-          csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)
-        }
+    bindToValue var (-intercept / slope)
     return True
-  (intercept, [(var1, slope1), (var2, slope2)]) -> do
+  PolyG.Binomial intercept (var1, slope1) (var2, slope2) -> do
     --    intercept + slope1 * var1 + slope2 * var2 = 0
     --  =>
     --    slope1 * var1 = - slope2 * var2 - intercept
     --  =>
     --    var1 = - slope2 * var2 / slope1 - intercept / slope1
-    cs <- get
-    case UnionFind.relate var1 (-slope2 / slope1, var2, -intercept / slope1) (csVarEqF cs) of
-      Nothing -> return False
-      Just unionFind' -> do
-        markChanged RelationChanged
-        modify' $ \cs' -> cs' {csVarEqF = unionFind', csOccurrenceF = removeOccurrences [var1, var2] (csOccurrenceF cs)}
-        return True
-  (_, _) -> return False
+    relate var1 (-slope2 / slope1, var2, -intercept / slope1)
+  PolyG.Polynomial _ _ -> return False
 
--- learnFromMulF1 :: (GaloisField n, Integral n) => PolyG RefF n -> PolyG RefF n -> n -> RoundM n Bool
--- learnFromMulF1 poly1 poly2 constant = case PolyG.view a of
---   (_, []) -> error "[ panic ] Empty polynomial"
---   (intercept, [(var, slope)]) -> do
---     --    intercept + slope * var = 0
---     --  =>
---     --    var = - intercept / slope
---     markChanged RelationChanged
+bindToValue :: GaloisField n => RefF -> n -> RoundM n ()
+bindToValue var value = do
+  markChanged RelationChanged
+  modify' $ \cs ->
+    cs
+      { csVarEqF = UnionFind.bindToValue var value (csVarEqF cs),
+        csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)
+      }
 
---     modify' $ \cs ->
---       cs
---         { csVarEqF = UnionFind.bindToValue var (-intercept / slope) (csVarEqF cs),
---           csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)
---         }
---     return True
-
--- cs <- get
--- case UnionFind.relate a (c, b) (csVarEqF cs) of
---   Nothing -> return False
---   Just unionFind' -> do
---     markChanged RelationChanged
---     modify' $ \cs' -> cs' {csVarEqF = unionFind'}
---     return True
+-- | Relates two variables. Returns 'True' if a new relation has been established.
+relate :: GaloisField n => RefF -> (n, RefF, n) -> RoundM n Bool
+relate var1 (slope, var2, intercept) = do
+  cs <- get
+  case UnionFind.relate var1 (slope, var2, intercept) (csVarEqF cs) of
+    Nothing -> return False
+    Just unionFind' -> do
+      markChanged RelationChanged
+      modify' $ \cs' -> cs' {csVarEqF = unionFind', csOccurrenceF = removeOccurrences [var1, var2] (csOccurrenceF cs)}
+      return True

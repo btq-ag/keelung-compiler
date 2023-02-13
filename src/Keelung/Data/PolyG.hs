@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial with variables generalized (unliked Poly which is limited to only Int)
-module Keelung.Data.PolyG (PolyG, build, buildWithMap, unsafeBuild, view, viewAsMap, insert, addConstant, singleton, vars) where
+module Keelung.Data.PolyG (PolyG, View (..), build, buildWithMap, unsafeBuild, view, viewAsMap, insert, addConstant, multiplyBy, singleton, vars) where
 
 import Control.DeepSeq (NFData)
 import Data.Map.Strict (Map)
@@ -61,6 +61,11 @@ insert c' (x, coeff) (PolyG c xs) =
 addConstant :: Num n => n -> PolyG ref n -> PolyG ref n
 addConstant c' (PolyG c xs) = PolyG (c + c') xs
 
+-- | Multiply all coefficients and the constant by some non-zero number
+multiplyBy :: (Num n, Eq n) => n -> PolyG ref n -> PolyG ref n
+multiplyBy 0 _ = error "[ panic ] PolyG.multiplyBy: 0"
+multiplyBy m (PolyG c xs) = PolyG (m * c) (Map.map (m *) xs)
+
 unsafeBuild :: (Ord ref, Eq n, Num n) => n -> [(ref, n)] -> PolyG ref n
 unsafeBuild c xs =
   let result = Map.filter (/= 0) $ Map.fromListWith (+) xs
@@ -68,8 +73,20 @@ unsafeBuild c xs =
         then error "[ panic ] PolyG.unsafeBuild: empty polynomial"
         else PolyG c result
 
-view :: PolyG ref n -> (n, [(ref, n)])
-view (PolyG c xs) = (c, Map.toList xs)
+data View ref n = Monomial n (ref, n) | Binomial n (ref, n) (ref, n) | Polynomial n (Map ref n)
+  deriving (Eq, Show)
+
+view :: PolyG ref n -> View ref n
+view (PolyG c xs) = case Map.toList xs of
+  [] -> error "[ panic ] PolyG.view: empty polynomial"
+  [(x, c')] -> Monomial c (x, c')
+  [(x, c'), (y, c'')] -> Binomial c (x, c') (y, c'')
+  _ -> Polynomial c xs
+
+--   (n, (ref, n), [(ref, n)])
+-- view (PolyG c xs) = case Map.toList xs of
+--   [] -> error "[ panic ] PolyG.view: empty polynomial"
+--   (x' : xs') -> (c, x', xs')
 
 viewAsMap :: PolyG ref n -> (n, Map ref n)
 viewAsMap (PolyG c xs) = (c, xs)
