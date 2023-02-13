@@ -5,12 +5,13 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Test.Interpreter (tests, run) where
+module Test.Interpreter (tests, run, runAll) where
 
 import AggregateSignature.Program qualified as AggSig
 import AggregateSignature.Util qualified as AggSig
 import Basic qualified
 import Control.Arrow (left)
+import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), compile, toR1CS)
 import Keelung.Compiler qualified as Compiler
@@ -40,8 +41,16 @@ typed prog rawInputs = do
   let inps = Inputs.deserializeElab elab rawInputs
   left InterpretError (Typed.run elab inps)
 
-cs :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
-cs prog rawInputs = do
+-- csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
+-- csOld prog rawInputs = do
+--   r1cs' <- toR1CS <$> Compiler.compileO1 prog
+--   let inps = Inputs.deserialize (r1csCounters r1cs') rawInputs
+--   case R1CS.run r1cs' inps of
+--     Left err -> Left (InterpretError err)
+--     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
+
+csNew :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
+csNew prog rawInputs = do
   r1cs' <- toR1CS . relocateConstraintSystem <$> Compiler.compileO1' prog
   let inps = Inputs.deserialize (r1csCounters r1cs') rawInputs
   case R1CS.run r1cs' inps of
@@ -71,7 +80,9 @@ runAll program rawInputs rawOutputs = do
     `shouldBe` Right rawOutputs
   typed program rawInputs
     `shouldBe` Right rawOutputs
-  cs program rawInputs
+  -- csOld program rawInputs
+  --   `shouldBe` Right rawOutputs
+  csNew program rawInputs
     `shouldBe` Right rawOutputs
   relocated program rawInputs
     `shouldBe` Right rawOutputs
@@ -196,6 +207,10 @@ tests = do
         runAllKeelungAggSig 10 1 []
       it "dim:10 sig:10" $
         runAllKeelungAggSig 10 10 []
+
+    describe "Poseidon" $ do
+      it "[0]" $ do
+        runAll (Poseidon.hash [0]) [0 :: GF181] [969784935791658820122994814042437418105599415561111385]
   where
     runAllKeelungAggSig :: Int -> Int -> [GF181] -> IO ()
     runAllKeelungAggSig dimension numberOfSignatures outputs =

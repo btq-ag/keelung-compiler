@@ -24,9 +24,9 @@ import Test.Hspec
 compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
 compileO0 program = Compiler.erase program >>= return . Compiler.run True . ConstantPropagation.run
 
-runTest :: Encode t => Int -> Int -> Comp t -> IO (ConstraintSystem GF181)
+runTest :: Encode t => Int -> Int -> Comp t -> IO (ConstraintSystem (N GF181))
 runTest expectedBeforeSize expectedAfterSize program = do
-  cs <- case Compiler.asGF181 $ compileO0 program of
+  cs <- case Compiler.asGF181N $ compileO0 program of
     Left err -> assertFailure $ show err
     Right result -> return result
 
@@ -54,9 +54,13 @@ tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
     it "Poseidon" $ do
-      _cs <- runTest 1537 855 $ do
+      _cs <- runTest 1537 1424 $ do
         xs <- inputList 1
         Poseidon.hash (toList xs)
+
+      -- print _cs
+      -- print (relocateConstraintSystem _cs)
+
       return ()
 
     it "Union Find 1" $ do

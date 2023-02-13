@@ -229,58 +229,44 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 
 --------------------------------------------------------------------------------
 
--- -- | Normalize a polynomial by substituting roots
--- -- for the variables that appear in the polynomial.
--- -- substPoly :: (GaloisField n, Integral n) => UnionFind RefF -> PolyG RefF n -> Maybe (PolyG RefF n, UnionFind RefF)
--- substPolyG :: (GaloisField n, Integral n, Ord ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref n, [ref])
--- substPolyG ctx poly = do
---   let (c, xs) = PolyG.viewAsMap poly
---   case Map.foldlWithKey' substPolyG_ (False, ctx, Nothing, []) xs of
---     (False, _, _, _) -> Nothing
---     (True, _, Nothing, _) -> Nothing
---     (True, ctx', Just poly', substitutedRefs) -> Just (PolyG.addConstant c poly', ctx', substitutedRefs)
-
--- -- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
--- substPolyG_ :: (Integral n, Ord ref) => (Bool, UnionFind ref n, Maybe (PolyG ref n), [ref]) -> ref -> n -> (Bool, UnionFind ref n, Maybe (PolyG ref n), [ref])
--- substPolyG_ (changed, ctx, xs, substitutedRefs) ref coeff = case UnionFind.findMaybe ref ctx of
---   Nothing -> case xs of
---     Nothing -> (changed, ctx, Just $ PolyG.singleton 0 (ref, coeff), substitutedRefs)
---     Just xs' -> (changed, ctx, Just $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
---   Just ((slope, root, intercept), ctx') ->
---     let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
---      in case xs of
---           -- ref = slope * root + intercept
---           Nothing -> (changed, ctx, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff), substitutedRefs')
---           Just xs' -> (True, ctx', Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
-
-substPolyG :: (GaloisField n, Integral n, Ord ref, Show ref) => UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, [ref])
+-- | Substitutes variables in a polynomial.
+--   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
+substPolyG :: (GaloisField n, Integral n, Ord ref, Show ref) => UnionFind ref n -> PolyG ref n -> Maybe (Maybe (PolyG ref n), [ref])
 substPolyG ctx poly = do
   let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' (substPolyG_ ctx) (False, Left c, []) xs of
-    (False, _, _) -> Nothing
-    (True, Left _constant, _) -> Nothing
-    (True, Right poly', substitutedRefs) -> Just (poly', substitutedRefs)
+    (False, _, _) -> Nothing -- nothing changed
+    (True, Left _constant, substitutedRefs) -> Just (Nothing, substitutedRefs) -- the polynomial has been reduced to a constant
+    (True, Right poly', substitutedRefs) -> Just (Just poly', substitutedRefs)
 
--- substPolyG :: (Integral n, GaloisField n) => (Bool, UnionFind RefF, Map RefF n) -> RefF -> n -> (Bool, UnionFind RefF, Map RefF n)
 substPolyG_ :: (Integral n, Ord ref, Show ref, GaloisField n) => UnionFind ref n -> (Bool, Either n (PolyG ref n), [ref]) -> ref -> n -> (Bool, Either n (PolyG ref n), [ref])
-substPolyG_ ctx (changed, accPoly, substitutedRefs) ref coeff =
-  case UnionFind.parentOf ctx ref of
-    Nothing ->
-      case accPoly of -- ref is :ralready a root
-        Left c -> (changed, PolyG.singleton c (ref, coeff), substitutedRefs)
-        Right xs -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
-    Just (Nothing, intercept) ->
-      -- ref = intercept
-      let substitutedRefs' = ref : substitutedRefs
-       in case accPoly of
-            Left c -> (changed, Left (intercept + c), substitutedRefs')
-            Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', substitutedRefs')
-    Just (Just (slope, root), intercept) ->
-      let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
-       in case accPoly of
-            -- ref = slope * root + intercept
-            Left c -> (changed, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
-            Right accPoly' -> (True, Right $ PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', substitutedRefs')
+substPolyG_ ctx (changed, accPoly, substitutedRefs) ref coeff = case UnionFind.parentOf ctx ref of
+  Nothing ->
+    -- ref is already a root
+    case accPoly of
+      Left c -> (changed, PolyG.singleton c (ref, coeff), substitutedRefs)
+      Right xs -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
+  Just (Nothing, intercept) ->
+    -- ref = intercept
+    let substitutedRefs' = ref : substitutedRefs -- add ref to substitutedRefs
+     in case accPoly of
+          Left c -> (True, Left (intercept + c), substitutedRefs')
+          Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', substitutedRefs')
+  Just (Just (slope, root), intercept) ->
+    if root == ref
+      then
+        if slope == 1 && intercept == 0
+          then -- ref = root, nothing changed
+          case accPoly of
+            Left c -> (changed, PolyG.singleton c (ref, coeff), substitutedRefs)
+            Right xs -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
+          else error "[ panic ] Invalid relation in UnionFind: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
+      else
+        let substitutedRefs' = ref : substitutedRefs
+         in case accPoly of
+              -- ref = slope * root + intercept
+              Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
+              Right accPoly' -> (True, Right $ PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', substitutedRefs')
 
 -- let (isAlreadyRoot, (result, intercept)) = UnionFind.lookup ref ctx
 --  in if isAlreadyRoot

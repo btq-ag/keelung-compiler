@@ -34,10 +34,17 @@ goThroughAddF = do
         else do
           unionFind <- gets csVarEqF
           case substPolyG unionFind poly of
-            Nothing -> return (poly : acc)
-            Just (poly', substitutedRefs) -> do
+            Nothing -> return (poly : acc) -- nothing changed
+            Just (Nothing, substitutedRefs) -> do
+              -- the polynomial has been reduced to nothing
               markChanged AdditiveConstraintChanged
-              modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG poly' (csOccurrenceF cs)}
+              -- remove all variables in the polynomial from the occurrence list
+              modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
+              return acc
+            Just (Just poly', substitutedRefs) -> do
+              -- the polynomial has been reduced to something
+              markChanged AdditiveConstraintChanged
+              modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
               return (poly' : acc)
 
 -- type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
