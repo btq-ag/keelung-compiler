@@ -16,15 +16,22 @@ run cs = run_ (RelationChanged, cs)
 run_ :: (GaloisField n, Integral n) => (WhatChanged, ConstraintSystem n) -> ConstraintSystem n
 run_ (NothingChanged, cs) = cs
 run_ (RelationChanged, cs) = run_ $ runOptiM cs goThroughAddF
-run_ (AdditiveConstraintChanged, cs) = run_ $ runOptiM cs goThroughAddF
-run_ (MultiplicativeConstraintChanged, cs) = run_ $ runOptiM cs goThroughAddF
+run_ (AdditiveConstraintChanged, cs) = run_ $ runOptiM cs goThroughMulF
+run_ (MultiplicativeConstraintChanged, cs) = run_ $ runOptiM cs goThroughMulF
 
 goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughAddF = do
   cs <- get
   runRoundM $ do
-    csAddF' <- foldMaybeM goThroughAddFM [] (csAddF cs)
+    csAddF' <- foldMaybeM reduceAddF [] (csAddF cs)
     modify' $ \cs'' -> cs'' {csAddF = csAddF'}
+
+goThroughMulF :: (GaloisField n, Integral n) => OptiM n WhatChanged
+goThroughMulF = do
+  cs <- get
+  runRoundM $ do
+    csMulF' <- foldMaybeM reduceMulF [] (csMulF cs)
+    modify' $ \cs'' -> cs'' {csMulF = csMulF'}
 
 foldMaybeM :: Monad m => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
 foldMaybeM f = foldM $ \acc x -> do
@@ -33,8 +40,8 @@ foldMaybeM f = foldM $ \acc x -> do
     Nothing -> return acc
     Just x' -> return (x' : acc)
 
-goThroughAddFM :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n (Maybe (PolyG RefF n))
-goThroughAddFM poly = do
+reduceAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n (Maybe (PolyG RefF n))
+reduceAddF poly = do
   changed <- learnFromAddF poly
   if changed
     then return Nothing
@@ -53,14 +60,49 @@ goThroughAddFM poly = do
         Just (Right poly', substitutedRefs) -> do
           -- the polynomial has been reduced to something
           markChanged AdditiveConstraintChanged
+          -- remove variables that has been reduced in the polynomial from the occurrence list
           modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
-          return (Just poly')
+          -- keep reducing the reduced polynomial
+          reduceAddF poly'
 
 type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
 
+reduceMulF :: (GaloisField n, Integral n) => (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n)) -> RoundM n (Maybe (MulF n))
+reduceMulF (polyA, polyB, polyC) = do
+  polyAResult <- substitutePoly MultiplicativeConstraintChanged polyA
+  polyBResult <- substitutePoly MultiplicativeConstraintChanged polyB
+  polyCResult <- case polyC of
+    Left constantC -> return (Left constantC)
+    Right polyC' -> substitutePoly MultiplicativeConstraintChanged polyC'
+  reduceMulF_ polyAResult polyBResult polyCResult
+  -- result <- reduceMulF_ polyAResult polyBResult polyCResult
+  -- case result of
+  --   Nothing -> return Nothing
+  --   Just (polyA', polyB', polyC') -> do
+  --     markChanged MultiplicativeConstraintChanged
+  --     reduceMulF (polyA', polyB', polyC')
+
+substitutePoly :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefF n -> RoundM n (Either n (PolyG RefF n))
+substitutePoly typeOfChange polynomial = do
+  unionFind <- gets csVarEqF
+  case substPolyG unionFind polynomial of
+    Nothing -> return (Right polynomial) -- nothing changed
+    Just (Left constant, substitutedRefs) -> do
+      -- the polynomial has been reduced to nothing
+      markChanged typeOfChange
+      -- remove all variables in the polynomial from the occurrence list
+      modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
+      return (Left constant)
+    Just (Right reducePolynomial, substitutedRefs) -> do
+      -- the polynomial has been reduced to something
+      markChanged typeOfChange
+      -- remove all variables in the polynomial from the occurrence list
+      modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
+      return (Right reducePolynomial)
+
 -- | Trying to reduce a multiplicative constaint, returns the reduced constraint if it is reduced
-reduceMulF :: (GaloisField n, Integral n) => Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> RoundM n (Maybe (MulF n))
-reduceMulF polyA polyB polyC = case (polyA, polyB, polyC) of
+reduceMulF_ :: (GaloisField n, Integral n) => Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> RoundM n (Maybe (MulF n))
+reduceMulF_ polyA polyB polyC = case (polyA, polyB, polyC) of
   (Left _a, Left _b, Left _c) -> return Nothing
   (Left a, Left b, Right c) -> reduceMulFCCP a b c >> return Nothing
   (Left a, Right b, Left c) -> reduceMulFCPC a b c >> return Nothing
@@ -69,38 +111,40 @@ reduceMulF polyA polyB polyC = case (polyA, polyB, polyC) of
   (Right a, Left b, Right c) -> reduceMulFCPP b a c >> return Nothing
   (Right a, Right b, Left c) -> return (Just (a, b, Left c))
   (Right a, Right b, Right c) -> return (Just (a, b, Right c))
-  where
-    -- \| Trying to reduce a multiplicative constaint of (Constant / Constant / Polynomial)
-    --    a * b = cs
-    --      =>
-    --    cs - a * b = 0
-    reduceMulFCCP :: (GaloisField n, Integral n) => n -> n -> PolyG RefF n -> RoundM n ()
-    reduceMulFCCP a b cs = do
-      addAddF $ PolyG.addConstant (-a * b) cs
 
-    -- \| Trying to reduce a multiplicative constaint of (Constant / Polynomial / Constant)
-    --    a * bs = c
-    --      =>
-    --    c - a * bs = 0
-    reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG RefF n -> n -> RoundM n ()
-    reduceMulFCPC a bs c = do
-      case PolyG.multiplyBy (-a) bs of
-        Left _constant -> return ()
-        Right xs -> addAddF $ PolyG.addConstant c xs
+-- | Trying to reduce a multiplicative constaint of (Constant / Constant / Polynomial)
+--    a * b = cs
+--      =>
+--    cs - a * b = 0
+reduceMulFCCP :: (GaloisField n, Integral n) => n -> n -> PolyG RefF n -> RoundM n ()
+reduceMulFCCP a b cs = do
+  addAddF $ PolyG.addConstant (-a * b) cs
 
-    -- \| Trying to reduce a multiplicative constaint of (Constant / Polynomial / Polynomial)
-    --    a * bs = cs
-    --      =>
-    --    cs - a * bs = 0
-    reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG RefF n -> PolyG RefF n -> RoundM n ()
-    reduceMulFCPP a bs cs = do
-      case PolyG.multiplyBy (-a) bs of
-        Left _constant -> addAddF cs
-        Right xs -> do
-          case PolyG.merge cs xs of
-            Left _constant -> return ()
-            Right addF -> do
-              addAddF addF
+-- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Constant)
+--    a * bs = c
+--      =>
+--    c - a * bs = 0
+reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG RefF n -> n -> RoundM n ()
+reduceMulFCPC a bs c = do
+  case PolyG.multiplyBy (-a) bs of
+    Left _constant -> modify' $ \cs -> cs {csOccurrenceF = removeOccurrencesWithPolyG bs (csOccurrenceF cs)}
+    Right xs -> addAddF $ PolyG.addConstant c xs
+
+-- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Polynomial)
+--    a * bs = cs
+--      =>
+--    cs - a * bs = 0
+reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG RefF n -> PolyG RefF n -> RoundM n ()
+reduceMulFCPP a polyB polyC = do
+  case PolyG.multiplyBy (-a) polyB of
+    Left _constant -> do
+      modify' $ \cs -> cs {csOccurrenceF = removeOccurrencesWithPolyG polyB (csOccurrenceF cs)}
+      addAddF polyC
+    Right polyBa -> do
+      case PolyG.merge polyC polyBa of
+        Left _constant -> modify' $ \cs -> cs {csOccurrenceF = removeOccurrencesWithPolyG polyC (removeOccurrencesWithPolyG polyBa (csOccurrenceF cs))}
+        Right addF -> do
+          addAddF addF
 
 ------------------------------------------------------------------------------
 

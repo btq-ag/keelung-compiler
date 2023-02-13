@@ -54,7 +54,7 @@ tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
     it "Poseidon" $ do
-      _cs <- runTest 1537 1424 $ do
+      _cs <- runTest 1537 694 $ do
         xs <- inputList 1
         Poseidon.hash (toList xs)
 
@@ -69,6 +69,8 @@ tests = do
         y <- reuse x
         z <- reuse x
         return (x + y + z)
+
+      print cs
 
       -- FO0 = 3FI0
       UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (3, 0)
