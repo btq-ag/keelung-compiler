@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial with variables generalized (unliked Poly which is limited to only Int)
-module Keelung.Data.PolyG (PolyG, View (..), build, buildWithMap, unsafeBuild, view, viewAsMap, insert, addConstant, multiplyBy, singleton, vars) where
+module Keelung.Data.PolyG (PolyG, View (..), build, buildWithMap, unsafeBuild, view, viewAsMap, insert, merge, addConstant, multiplyBy, singleton, vars) where
 
 import Control.DeepSeq (NFData)
 import Data.Map.Strict (Map)
@@ -62,9 +62,9 @@ addConstant :: Num n => n -> PolyG ref n -> PolyG ref n
 addConstant c' (PolyG c xs) = PolyG (c + c') xs
 
 -- | Multiply all coefficients and the constant by some non-zero number
-multiplyBy :: (Num n, Eq n) => n -> PolyG ref n -> PolyG ref n
-multiplyBy 0 _ = error "[ panic ] PolyG.multiplyBy: 0"
-multiplyBy m (PolyG c xs) = PolyG (m * c) (Map.map (m *) xs)
+multiplyBy :: (Num n, Eq n) => n -> PolyG ref n -> Either n (PolyG ref n)
+multiplyBy 0 _ = Left 0
+multiplyBy m (PolyG c xs) = Right $ PolyG (m * c) (Map.map (m *) xs)
 
 unsafeBuild :: (Ord ref, Eq n, Num n) => n -> [(ref, n)] -> PolyG ref n
 unsafeBuild c xs =
@@ -93,3 +93,10 @@ viewAsMap (PolyG c xs) = (c, xs)
 
 vars :: PolyG ref n -> [ref]
 vars (PolyG _ xs) = Map.keys xs
+
+merge :: (Ord ref, Num n, Eq n) => PolyG ref n -> PolyG ref n -> Either n (PolyG ref n)
+merge (PolyG c1 xs1) (PolyG c2 xs2) =
+  let result = Map.filter (/= 0) $ Map.unionWith (+) xs1 xs2
+   in if Map.null result
+        then Left (c1 + c2)
+        else Right (PolyG (c1 + c2) result)

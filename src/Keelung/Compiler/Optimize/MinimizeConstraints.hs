@@ -56,142 +56,51 @@ goThroughAddFM poly = do
           modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
           return (Just poly')
 
--- data OccurrenceChange = OccurrenceChange
---   { ocAdded :: [RefF]
---   , ocRemoved :: [RefF]
---   }
-
 type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
 
--- | Trying to reduce a multiplicative constaint of (Constant / Constant / Polynomial)
-reduceMulFCCP :: (GaloisField n, Integral n) => n -> n -> PolyG RefF n -> RoundM n (Maybe (MulF n))
-reduceMulFCCP a b cs = case PolyG.view cs of
-  PolyG.Monomial constant (var1, coeff1) -> do
-    -- a * b = constant + var1 * coeff1
-    --    =>
-    -- (a * b - constant) / coeff1 = var1
-    bindToValue var1 ((a * b - constant) / coeff1)
-    return Nothing
-  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> do
-    -- a * b = constant + var1 * coeff1 + var2 * coeff2
-    --    =>
-    -- (a * b - constant - var2 * coeff2) / coeff1 = var1
-    --    =>
-    -- var1 = (a * b - constant) / coeff1 - (coeff2 * var2) / coeff1
-    _relationEstablished <- relate var1 (coeff2 / coeff1, var2, (a * b - constant) / coeff1)
-    return Nothing
-  PolyG.Polynomial _ _ -> do
-    -- a * b = constant + xs
-    --    =>
-    -- xs + constant - a * b = 0
-    addAddF (PolyG.addConstant (-a * b) cs)
-    return Nothing
-
--- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Constant)
-reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG RefF n -> n -> RoundM n (Maybe (MulF n))
-reduceMulFCPC a bs c = case PolyG.view bs of
-  PolyG.Monomial constant (var1, coeff1) -> do
-    -- a * (constant + coeff1 * var1) = c
-    --    =>
-    -- a * coeff1 * var1 = c - a * constant
-    --    =>
-    -- var1 = (c - a * constant) / (a * coeff1)
-    bindToValue var1 ((c - a * constant) / (a * coeff1))
-    return Nothing
-  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> do
-    -- a * (constant + coeff1 * var1 + coeff2 * var2) = c
-    --    =>
-    -- constant + coeff1 * var1 + coeff2 * var2 = c / a
-    --    =>
-    -- var1 = (c / a - constant - coeff2 * var2) / coeff1
-    _relationEstablished <- relate var1 (coeff2 / coeff1, var2, (c / a - constant) / coeff1)
-    return Nothing
-  PolyG.Polynomial _ _ -> do
-    -- a * (constant + xs) = c
-    --    =>
-    -- a * constant - c + a * xs = 0
-    addAddF (PolyG.addConstant (-c) $ PolyG.multiplyBy a bs)
-    return Nothing
-
--- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Polynomial)
--- reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG RefF n -> PolyG RefF n -> RoundM n (Maybe (MulF n))
--- reduceMulFCPP a bs cs = case (PolyG.view bs, PolyG.view cs) of
---   (PolyG.Monomial constant1 (var1, coeff1), PolyG.Monomial constant2 (var2, coeff2)) -> do
---     -- a * (constant1 + coeff1 * var1) = constant2 + coeff2 * var2
---     --    =>
---     -- a * constant1 + a * coeff1 * var1 = constant2 + coeff2 * var2
---     --    =>
---     -- var1 = (constant2 + coeff2 * var2 - a * constant1) / a * coeff1
---     --    =>
---     -- var1 = (constant2 - a * constant1) / a * coeff1 + (coeff2 * var2) / a * coeff1
---     _ <- relate var1 (coeff2 / (a * coeff1), var2, (constant2 - a * constant1) / (a * coeff1))
---     return Nothing
---   (PolyG.Monomial constant1 (var1, coeff1), PolyG.Binomial constant2 (var2, coeff2) (var3, coeff3)) -> do
---     -- a * (constant1 + coeff1 * var1) = constant2 + coeff2 * var2 + coeff3 * var3
---     --    =>
---     -- a * constant1 + a * coeff1 * var1 = constant2 + coeff2 * var2 + coeff3 * var3
---     --    =>
---     -- (a * constant1 - constant2) + a * coeff1 * var1 + coeff2 * var2 + coeff3 * var3 = 0
---     case PolyG.build (a * constant1 - constant2) [(var1, a * coeff1), (var2, coeff2), (var3, coeff3)] of
---       Left _constant -> return Nothing
---       Right addF -> do
---         addAddF addF
---         return Nothing
---   (PolyG.Monomial constant1 (var1, coeff1), _) -> do
---     -- a * constant1 + a * coeff1 * var1 = cs 
-
-
---   _ -> return Nothing
-
--- PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> do
---   -- a * (constant + coeff1 * var1 + coeff2 * var2) = c + xs
---   --    =>
---   -- constant + coeff1 * var1 + coeff2 * var2 = c / a + xs
---   --    =>
---   -- var1 = (c / a + xs - constant - coeff2 * var2) / coeff1
---   _relationEstablished <- relate var1 (coeff2 / coeff1, var2, (c / a + xs - constant) / coeff1)
---   return Nothing
--- PolyG.Polynomial _ _ -> do
---   -- a * (constant + xs) = c + ys
---   --    =>
---   -- a * constant - c + a * xs = ys
---   cs <- get
---   markChanged AdditiveConstraintChanged
---   let newAddF = PolyG.addConstant (-c) $ PolyG.multiplyBy a b
---   modify' $ \cs'' -> cs'' {csAddF = newAddF : csAddF cs}
---   return Nothing
-
+-- | Trying to reduce a multiplicative constaint, returns the reduced constraint if it is reduced
 reduceMulF :: (GaloisField n, Integral n) => Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> RoundM n (Maybe (MulF n))
-reduceMulF (Left _a) (Left _b) (Left _c) = return Nothing
-reduceMulF (Left a) (Left b) (Right c) = reduceMulFCCP a b c
-reduceMulF (Left 0) (Right _) (Left _) = return Nothing
-reduceMulF (Left a) (Right b) (Left c) = reduceMulFCPC a b c
-reduceMulF (Left a) (Right b) (Right c) = return Nothing -- reduceMulFCPP a b c
-reduceMulF (Right _a) (Left _b) (Left _c) = return Nothing
-reduceMulF (Right _a) (Left _b) (Right _c) = return Nothing
-reduceMulF (Right _a) (Right _b) (Left _c) = return Nothing
-reduceMulF (Right _a) (Right _b) (Right _c) = return Nothing
+reduceMulF polyA polyB polyC = case (polyA, polyB, polyC) of
+  (Left _a, Left _b, Left _c) -> return Nothing
+  (Left a, Left b, Right c) -> reduceMulFCCP a b c >> return Nothing
+  (Left a, Right b, Left c) -> reduceMulFCPC a b c >> return Nothing
+  (Left a, Right b, Right c) -> reduceMulFCPP a b c >> return Nothing
+  (Right a, Left b, Left c) -> reduceMulFCPC b a c >> return Nothing
+  (Right a, Left b, Right c) -> reduceMulFCPP b a c >> return Nothing
+  (Right a, Right b, Left c) -> return (Just (a, b, Left c))
+  (Right a, Right b, Right c) -> return (Just (a, b, Right c))
+  where
+    -- \| Trying to reduce a multiplicative constaint of (Constant / Constant / Polynomial)
+    --    a * b = cs
+    --      =>
+    --    cs - a * b = 0
+    reduceMulFCCP :: (GaloisField n, Integral n) => n -> n -> PolyG RefF n -> RoundM n ()
+    reduceMulFCCP a b cs = do
+      addAddF $ PolyG.addConstant (-a * b) cs
 
--- bindToValue
--- modify' $ \cs ->
---   cs
---     { csVarEqF = UnionFind.bindToValue var (-intercept / slope) (csVarEqF cs),
---       csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)
---     }
--- return Nothing
+    -- \| Trying to reduce a multiplicative constaint of (Constant / Polynomial / Constant)
+    --    a * bs = c
+    --      =>
+    --    c - a * bs = 0
+    reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG RefF n -> n -> RoundM n ()
+    reduceMulFCPC a bs c = do
+      case PolyG.multiplyBy (-a) bs of
+        Left _constant -> return ()
+        Right xs -> addAddF $ PolyG.addConstant c xs
 
--- do
--- changed <- learnFromAddF poly
--- if changed
---   then return acc
---   else do
---     unionFind <- gets csVarEqF
---     case substPolyG unionFind poly of
---       Nothing -> return (poly : acc)
---       Just (poly', substitutedRefs) -> do
---         markChanged AdditiveConstraintChanged
---         modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs $ removeOccurrencesWithPolyG poly' (csOccurrenceF cs)}
---         return (poly' : acc)
+    -- \| Trying to reduce a multiplicative constaint of (Constant / Polynomial / Polynomial)
+    --    a * bs = cs
+    --      =>
+    --    cs - a * bs = 0
+    reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG RefF n -> PolyG RefF n -> RoundM n ()
+    reduceMulFCPP a bs cs = do
+      case PolyG.multiplyBy (-a) bs of
+        Left _constant -> addAddF cs
+        Right xs -> do
+          case PolyG.merge cs xs of
+            Left _constant -> return ()
+            Right addF -> do
+              addAddF addF
 
 ------------------------------------------------------------------------------
 
@@ -269,6 +178,19 @@ relate var1 (slope, var2, intercept) = do
       return True
 
 addAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n ()
-addAddF poly = do
-  markChanged AdditiveConstraintChanged
-  modify' $ \cs' -> cs' {csAddF = poly : csAddF cs'}
+addAddF poly = case PolyG.view poly of
+  PolyG.Monomial constant (var1, coeff1) -> do
+    --    constant + coeff1 * var1 = 0
+    --      =>
+    --    var1 = - constant / coeff1
+    bindToValue var1 (-constant / coeff1)
+  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> do
+    --    constant + coeff1 * var1 + coeff2 * var2 = 0
+    --      =>
+    --    coeff1 * var1 = - coeff2 * var2 - constant
+    --      =>
+    --    var1 = - coeff2 * var2 / coeff1 - constant / coeff1
+    void $ relate var1 (-coeff2 / coeff1, var2, -constant / coeff1)
+  PolyG.Polynomial _ _ -> do
+    markChanged AdditiveConstraintChanged
+    modify' $ \cs' -> cs' {csAddF = poly : csAddF cs'}
