@@ -577,9 +577,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       showAddB = adapt "AddB" (csAddB cs) show
       showAddU = adapt "AddU" (csAddU cs) show
 
-      showMulF = adapt "MulF" (csMulF cs) $ \(a, b, c) -> show a <> " * " <> show b <> " = " <> show c
-      showMulB = adapt "MulB" (csMulB cs) $ \(a, b, c) -> show a <> " * " <> show b <> " = " <> show c
-      showMulU = adapt "MulU" (csMulU cs) $ \(a, b, c) -> show a <> " * " <> show b <> " = " <> show c
+      showMulF = adapt "MulF" (csMulF cs) showMul
+      showMulB = adapt "MulB" (csMulB cs) showMul
+      showMulU = adapt "MulU" (csMulU cs) showMul
 
       showNEqF = adapt "NEqF" (Map.toList $ csNEqF cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
       showNEqU = adapt "NEqU" (Map.toList $ csNEqU cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
@@ -596,6 +596,26 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
         if Map.null $ csOccurrenceU cs
           then ""
           else "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceU cs)))
+
+      showMul (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
+        where
+          showVec :: (Show n, Ord n, Eq n, Num n, Show ref) => Either n (PolyG ref n) -> String
+          showVec (Left c) = show c
+          showVec (Right xs) = show xs
+
+          -- wrap the string with parenthesis if it has more than 1 term
+          showVecWithParen :: (Show n, Ord n, Eq n, Num n, Show ref) => PolyG ref n -> String
+          showVecWithParen xs =
+            let termNumber = case PolyG.view xs of
+                  PolyG.Monomial 0 _ -> 1
+                  PolyG.Monomial _ _ -> 2
+                  PolyG.Binomial 0 _ _ -> 2
+                  PolyG.Binomial _ _ _ -> 3
+                  PolyG.Polynomial 0 xss -> Map.size xss
+                  PolyG.Polynomial _ xss -> 1 + Map.size xss
+             in if termNumber < 2
+                  then showVec (Right xs)
+                  else "(" ++ showVec (Right xs) ++ ")"
 
       showVariables :: String
       showVariables =
