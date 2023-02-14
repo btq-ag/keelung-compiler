@@ -15,7 +15,7 @@ import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), compile, toR1CS)
 import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.Constraint (relocateConstraintSystem)
+import Keelung.Compiler.Constraint (ConstraintSystem, relocateConstraintSystem)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Interpreter.Kinded qualified as Kinded
@@ -84,6 +84,7 @@ runAll program rawInputs rawOutputs = do
   -- let r1cs' = Compiler.compileO1' program :: Either (Error (N GF181)) (ConstraintSystem (N GF181))
   -- print r1cs'
   -- print (relocateConstraintSystem <$> r1cs')
+  -- print (toR1CS . relocateConstraintSystem <$> r1cs')
 
   csNew program rawInputs
     `shouldBe` Right rawOutputs
@@ -112,12 +113,12 @@ tests = do
         let expectedOutput = if inp == 3 then [1] else [0]
         runAll Basic.eq1 [inp :: GF181] expectedOutput
 
-    it "Basic.cond'" $ do
-      -- runAll Basic.cond' [0 :: GF181] [789]
-      -- runAll Basic.cond' [3 :: GF181] [12]
-      property $ \inp -> do
-        let expectedOutput = if inp == 3 then [12] else [789]
-        runAll Basic.cond' [inp :: GF181] expectedOutput
+    -- it "Basic.cond'" $ do
+    --   runAll Basic.cond' [0 :: GF181] [789]
+    --   runAll Basic.cond' [3 :: GF181] [12]
+    --   property $ \inp -> do
+    --     let expectedOutput = if inp == 3 then [12] else [789]
+    --     runAll Basic.cond' [inp :: GF181] expectedOutput
 
     it "Basic.assert1" $
       runAll Basic.assert1 [3 :: GF181] []

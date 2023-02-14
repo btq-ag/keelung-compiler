@@ -5,30 +5,51 @@ module Keelung.Compiler.Optimize.MinimizeConstraints (run) where
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
-import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 
--- import Debug.Trace
-
-traceShowM :: (Show a, Monad m) => a -> m ()
-traceShowM = const (return ())
-
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
-run cs = run_ (RelationChanged, cs)
+run = snd . optimizeAddF
 
-run_ :: (GaloisField n, Integral n) => (WhatChanged, ConstraintSystem n) -> ConstraintSystem n
-run_ (NothingChanged, cs) = cs
-run_ (RelationChanged, cs) =
-  run_ $
-    let (changed, cs') = runOptiM cs goThroughAddF
-     in case changed of
-          NothingChanged -> runOptiM cs' goThroughMulF
-          _ -> (changed, cs')
-run_ (AdditiveConstraintChanged, cs) = run_ $ runOptiM cs goThroughMulF
-run_ (MultiplicativeConstraintChanged, cs) = run_ $ runOptiM cs goThroughMulF
+-- run_ :: (GaloisField n, Integral n) => (WhatChanged, ConstraintSystem n) -> ConstraintSystem n
+-- run_ (NothingChanged, cs) = cs
+-- run_ (RelationChanged, cs) =
+--   run_ $
+--     let (changed, cs') = runOptiM cs goThroughAddF
+--      in case changed of
+--           NothingChanged -> runOptiM cs' goThroughMulF
+--           _ -> (changed, cs')
+-- run_ (AdditiveConstraintChanged, cs) = run_ $ runOptiM cs goThroughMulF
+-- run_ (MultiplicativeConstraintChanged, cs) = run_ $ runOptiM cs goThroughMulF
+
+optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
+optimizeAddF cs =
+  let (changed, cs') = runOptiM cs goThroughAddF
+   in case changed of
+        NothingChanged -> optimizeMulF cs
+        RelationChanged -> optimizeAddF cs'
+        AdditiveConstraintChanged -> optimizeMulF cs'
+        MultiplicativeConstraintChanged -> optimizeMulF cs'
+
+-- optimizeNEqF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
+-- optimizeNEqF cs =
+--   let (changed, cs') = runOptiM cs goThroughNEqF
+--    in case changed of
+--         NothingChanged -> optimizeMulF cs
+--         RelationChanged -> optimizeAddF cs'
+--         AdditiveConstraintChanged -> optimizeMulF cs'
+--         MultiplicativeConstraintChanged -> optimizeMulF cs'
+
+optimizeMulF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
+optimizeMulF cs =
+  let (changed, cs') = runOptiM cs goThroughMulF
+   in case changed of
+        NothingChanged -> (changed, cs')
+        RelationChanged -> optimizeAddF cs'
+        AdditiveConstraintChanged -> optimizeMulF cs'
+        MultiplicativeConstraintChanged -> optimizeMulF cs'
 
 goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughAddF = do
@@ -44,55 +65,55 @@ goThroughMulF = do
     csMulF' <- foldMaybeM reduceMulF [] (csMulF cs)
     modify' $ \cs'' -> cs'' {csMulF = csMulF'}
 
-goThroughNEqF :: (GaloisField n, Integral n) => OptiM n WhatChanged
-goThroughNEqF = do
-  cs <- get
-  runRoundM $ do
-    csNEqF' <- foldMaybeM reduceNEqF [] (Map.toList (csNEqF cs))
-    modify' $ \cs'' -> cs'' {csNEqF = Map.fromList csNEqF'}
+-- goThroughNEqF :: (GaloisField n, Integral n) => OptiM n WhatChanged
+-- goThroughNEqF = do
+--   cs <- get
+--   runRoundM $ do
+--     csNEqF' <- foldMaybeM reduceNEqF [] (Map.toList (csNEqF cs))
+--     modify' $ \cs'' -> cs'' {csNEqF = Map.fromList csNEqF'}
 
-type NEqF = ((RefF, RefF), RefF)
+-- type NEqF = ((RefF, RefF), RefF)
 
--- if (x - y) = 0 then m = 0 else m = recip (x - y)
-reduceNEqF :: (GaloisField n, Integral n) => NEqF -> RoundM n (Maybe NEqF)
-reduceNEqF ((x, y), m) = do
-  unionFind <- gets csVarEqF
-  let resultX = UnionFind.parentOf unionFind x
-  let resultY = UnionFind.parentOf unionFind y
-  let resultM = UnionFind.parentOf unionFind m
+-- -- if (x - y) = 0 then m = 0 else m = recip (x - y)
+-- reduceNEqF :: (GaloisField n, Integral n) => NEqF -> RoundM n (Maybe NEqF)
+-- reduceNEqF ((x, y), m) = do
+--   unionFind <- gets csVarEqF
+--   let resultX = UnionFind.parentOf unionFind x
+--   let resultY = UnionFind.parentOf unionFind y
+--   let resultM = UnionFind.parentOf unionFind m
 
-  case (resultX, resultY, resultM) of
-    (Just (Nothing, _), Just (Nothing, _), Just (Nothing, _)) -> return Nothing
-    (Just (Nothing, xVal), Just (Nothing, yVal), Just (Just (mSlope, mRoot), mIntercept)) ->
-      if (xVal - yVal) == 0
-        then do
-          -- m = 0 = mSlope * mRoot + mIntercept
-          --    =>
-          -- mRoot = - mIntercept / mSlope
-          bindToValue mRoot (-mIntercept / mSlope)
-          return Nothing
-        else do
-          -- mSlope * mRoot + mIntercept  = recip (xVal - yVal)
-          --    =>
-          -- mRoot = (recip (xVal - yVal) - mIntercept) / mSlope
-          bindToValue mRoot ((recip (xVal - yVal) - mIntercept) / mSlope)
-          return Nothing
-    (Nothing, Nothing, Just (Nothing, mVal)) ->
-      -- m == mVal
-      if mVal == 0
-        then do
-          -- x - y = 0
-          _ <- relate x (1, y, 0)
-          return Nothing
-        else do
-          -- m = 1 / (x - y)
-          --    =>
-          -- x - y = 1 / m
-          --    =>
-          -- x = 1 / m + y
-          _ <- relate x (1, y, recip mVal)
-          return Nothing
-    _ -> return (Just ((x, y), m)) -- cannot do anything
+--   case (resultX, resultY, resultM) of
+--     (Just (Nothing, _), Just (Nothing, _), Just (Nothing, _)) -> return Nothing
+--     (Just (Nothing, xVal), Just (Nothing, yVal), Just (Just (mSlope, mRoot), mIntercept)) ->
+--       if (xVal - yVal) == 0
+--         then do
+--           -- m = 0 = mSlope * mRoot + mIntercept
+--           --    =>
+--           -- mRoot = - mIntercept / mSlope
+--           bindToValue mRoot (-mIntercept / mSlope)
+--           return Nothing
+--         else do
+--           -- mSlope * mRoot + mIntercept  = recip (xVal - yVal)
+--           --    =>
+--           -- mRoot = (recip (xVal - yVal) - mIntercept) / mSlope
+--           bindToValue mRoot ((recip (xVal - yVal) - mIntercept) / mSlope)
+--           return Nothing
+--     (Nothing, Nothing, Just (Nothing, mVal)) ->
+--       -- m == mVal
+--       if mVal == 0
+--         then do
+--           -- x - y = 0
+--           _ <- relate x (1, y, 0)
+--           return Nothing
+--         else do
+--           -- m = 1 / (x - y)
+--           --    =>
+--           -- x - y = 1 / m
+--           --    =>
+--           -- x = 1 / m + y
+--           _ <- relate x (1, y, recip mVal)
+--           return Nothing
+--     _ -> return (Just ((x, y), m)) -- cannot do anything
 
 foldMaybeM :: Monad m => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
 foldMaybeM f = foldM $ \acc x -> do
@@ -130,13 +151,11 @@ type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
 
 reduceMulF :: (GaloisField n, Integral n) => (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n)) -> RoundM n (Maybe (MulF n))
 reduceMulF (polyA, polyB, polyC) = do
-  () <- traceShowM ("reduceMulF", polyA, polyB, polyC)
   polyAResult <- substitutePoly MultiplicativeConstraintChanged polyA
   polyBResult <- substitutePoly MultiplicativeConstraintChanged polyB
   polyCResult <- case polyC of
     Left constantC -> return (Left constantC)
     Right polyC' -> substitutePoly MultiplicativeConstraintChanged polyC'
-  () <- traceShowM ("substitutePoly", polyAResult, polyBResult, polyCResult)
 
   reduceMulF_ polyAResult polyBResult polyCResult
 

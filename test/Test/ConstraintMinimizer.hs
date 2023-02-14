@@ -32,7 +32,6 @@ runTest expectedBeforeSize expectedAfterSize program = do
 
   let cs' = Optimizer.optimize1' cs
 
-  -- let r1cs = Compiler.asGF181N $  Compiler.toR1CS <$> Compiler.compileO2 program
   -- print cs
   -- print cs'
 
