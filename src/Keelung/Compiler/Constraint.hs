@@ -259,7 +259,7 @@ substPolyG_ ctx (changed, accPoly, substitutedRefs) ref coeff = case UnionFind.p
     -- ref = intercept
     let substitutedRefs' = ref : substitutedRefs -- add ref to substitutedRefs
      in case accPoly of
-          Left c -> (True, Left (intercept + c), substitutedRefs')
+          Left c -> (True, Left (intercept * coeff + c), substitutedRefs')
           Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', substitutedRefs')
   Just (Just (slope, root), intercept) ->
     if root == ref
