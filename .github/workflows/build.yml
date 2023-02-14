@@ -42,6 +42,14 @@ jobs:
         key: ${{ runner.os }}-stack-work-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
         restore-keys: |
              ${{ runner.os }}-stack-work-${{ matrix.plan.ghc }}
+    - name: 💾 Cache dist-newstyle
+      id:   dist-newstyle
+      uses: actions/cache@v2
+      with:
+        path: dist-newstyle
+        key: ${{ runner.os }}-cabal-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-cabal-global-${{ matrix.plan.ghc }}
     - name: 💾 Cache keelung-compiler/.stack-work
       uses: actions/cache@v2
       with:
@@ -74,6 +82,7 @@ jobs:
         wget https://github.com/hasufell/stack2cabal/releases/download/v1.0.13/stack2cabal-linux
         chmod +x stack2cabal-linux
         ./stack2cabal-linux
+        cabal new-build
         wget https://github.com/haskell-hvr/cabal-plan/releases/download/v0.6.2.0/cabal-plan-0.6.2.0-x86_64-linux.xz
         xz -d cabal-plan-0.6.2.0-x86_64-linux.xz
         mv cabal-plan-0.6.2.0-x86_64-linux cabal-plan
