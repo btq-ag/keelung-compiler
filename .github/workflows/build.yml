@@ -201,6 +201,7 @@ jobs:
         # make a temporary directory for compresssing
         mkdir zip
         cp $executable zip/
+        cp LICENSES.md zip/
 
         # compress
         cd zip 
@@ -302,6 +303,7 @@ jobs:
         # make a temporary directory for compresssing
         mkdir zip
         cp $executable zip/
+        cp LICENSES.md zip/
         
         # compress
         cd zip 
