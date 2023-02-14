@@ -15,7 +15,7 @@ import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), compile, toR1CS)
 import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.Constraint (ConstraintSystem, relocateConstraintSystem)
+import Keelung.Compiler.Constraint (relocateConstraintSystem)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Interpreter.Kinded qualified as Kinded
@@ -79,19 +79,31 @@ runAll program rawInputs rawOutputs = do
     `shouldBe` Right rawOutputs
   typed program rawInputs
     `shouldBe` Right rawOutputs
-  -- csOld program rawInputs
-  --   `shouldBe` Right rawOutputs
-  -- let r1cs' = Compiler.compileO1' program :: Either (Error (N GF181)) (ConstraintSystem (N GF181))
-  -- print r1cs'
-  -- print (relocateConstraintSystem <$> r1cs')
-  -- print (toR1CS . relocateConstraintSystem <$> r1cs')
-
   csNew program rawInputs
     `shouldBe` Right rawOutputs
   relocated program rawInputs
     `shouldBe` Right rawOutputs
   r1cs program rawInputs
     `shouldBe` Right rawOutputs
+
+runAndCompare :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> IO ()
+runAndCompare program rawInputs = do
+  let expectedOutput = kinded program rawInputs
+  typed program rawInputs
+    `shouldBe` expectedOutput
+  -- let unoptimized = Compiler.asGF181N $ Compiler.compileO0' program
+  -- let optimized = Compiler.asGF181N $ Compiler.compileO1' program
+  -- print unoptimized
+  -- print "============="
+  -- print optimized
+  -- print (relocateConstraintSystem <$> optimized)
+  -- print (toR1CS . relocateConstraintSystem <$> r1cs')
+  csNew program rawInputs
+    `shouldBe` expectedOutput
+  relocated program rawInputs
+    `shouldBe` expectedOutput
+  r1cs program rawInputs
+    `shouldBe` expectedOutput
 
 tests :: SpecWith ()
 tests = do
@@ -113,12 +125,12 @@ tests = do
         let expectedOutput = if inp == 3 then [1] else [0]
         runAll Basic.eq1 [inp :: GF181] expectedOutput
 
-    -- it "Basic.cond'" $ do
-    --   runAll Basic.cond' [0 :: GF181] [789]
-    --   runAll Basic.cond' [3 :: GF181] [12]
-    --   property $ \inp -> do
-    --     let expectedOutput = if inp == 3 then [12] else [789]
-    --     runAll Basic.cond' [inp :: GF181] expectedOutput
+    it "Basic.cond'" $ do
+      runAll Basic.cond' [0 :: GF181] [789]
+      runAll Basic.cond' [3 :: GF181] [12]
+      -- property $ \inp -> do
+      --   let expectedOutput = if inp == 3 then [12] else [789]
+      --   runAll Basic.cond' [inp :: GF181] expectedOutput
 
     it "Basic.assert1" $
       runAll Basic.assert1 [3 :: GF181] []
@@ -218,13 +230,22 @@ tests = do
       it "[0]" $ do
         runAll (Poseidon.hash [0]) [0 :: N GF181] [969784935791658820122994814042437418105599415561111385]
 
-    describe "Optimizer progression" $ do
-      it "0" $ do
-        let program msg = do
-              msg0 <- reuse msg
-              msg1 <- reuse (msg0 + 0)
-              reuse ((msg1 + 0) * (msg1 + 0))
-        runAll (program 0 :: Comp Field) [0 :: N GF181] [0]
+  describe "Tests on the optimizer" $ do
+    it "Multiplicative 0" $ do
+      let program msg = do
+            msg0 <- reuse msg
+            msg1 <- reuse (msg0 + 1)
+            reuse ((msg1 + 1) * (msg1 + 1))
+      runAndCompare (program 0 :: Comp Field) [0 :: N GF181]
+    it "Multiplicative 1" $ do
+      let program = do
+            let initState = (2, 3)
+            let round' (a, b) = (a + b, a * a + b * 2)
+            state1 <- reuse (round' initState) -- (5, 10)
+            state2 <- reuse (round' state1) -- (15, 45)
+            state3 <- reuse (round' state2) -- (60, 2025)
+            return $ fst state3
+      runAndCompare (program :: Comp Field) [0 :: N GF181]
   where
     runAllKeelungAggSig :: Int -> Int -> [GF181] -> IO ()
     runAllKeelungAggSig dimension numberOfSignatures outputs =

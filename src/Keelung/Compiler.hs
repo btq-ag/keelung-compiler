@@ -21,6 +21,7 @@ module Keelung.Compiler
     compileOnly,
     compile,
     compileO0,
+    compileO0',
     compileO1,
     compileO1',
     compileO2,
@@ -95,6 +96,10 @@ compileOnly prog = erase prog >>= return . relocateConstraintSystem . Compile.ru
 -- elaborate => rewrite => type erase => constant propagation => compile => relocate
 compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)
 compileO0 prog = erase prog >>= return . relocateConstraintSystem . Compile.run False . ConstantPropagation.run
+
+-- elaborate => rewrite => type erase => constant propagation => compile
+compileO0' ::(GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0' prog = erase prog >>= return . Compile.run True . ConstantPropagation.run
 
 -- elaborate => rewrite => type erase => constant propagation => compile => relocate => optimisation I
 compileO1 ::

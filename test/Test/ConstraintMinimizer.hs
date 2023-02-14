@@ -52,76 +52,75 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
-    -- it "Poseidon" $ do
-    --   _cs <- runTest 1537 694 $ do
-    --     xs <- inputList 1
-    --     Poseidon.hash (toList xs)
+    it "Poseidon" $ do
+      _cs <- runTest 1537 694 $ do
+        xs <- inputList 1
+        Poseidon.hash (toList xs)
 
-    --   -- print _cs
-    --   -- print (relocateConstraintSystem _cs)
+      -- print _cs
+      -- print (relocateConstraintSystem _cs)
 
-    --   return ()
+      return ()
 
-    -- it "Union Find 1" $ do
-    --   cs <- runTest 3 1 $ do
-    --     x <- inputField
-    --     y <- reuse x
-    --     z <- reuse x
-    --     return (x + y + z)
+    it "Union Find 1" $ do
+      cs <- runTest 3 1 $ do
+        x <- inputField
+        y <- reuse x
+        z <- reuse x
+        return (x + y + z)
 
-    --   -- FO0 = 3FI0
-    --   UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (3, 0)
-    --   -- F0 (y) = FI0
-    --   UnionFind.relationBetween (RefF 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (1, 0)
-    --   -- F1 (z) = F0 (y)
-    --   UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+      -- FO0 = 3FI0
+      UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (3, 0)
+      -- F0 (y) = FI0
+      UnionFind.relationBetween (RefF 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+      -- F1 (z) = F0 (y)
+      UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (1, 0)
 
-    -- it "Union Find 2" $ do
-    --   cs <- runTest 3 1 $ do
-    --     x <- inputField
-    --     y <- reuse x
-    --     z <- reuse (x + y)
-    --     return (x + y + z)
+    it "Union Find 2" $ do
+      cs <- runTest 3 1 $ do
+        x <- inputField
+        y <- reuse x
+        z <- reuse (x + y)
+        return (x + y + z)
 
-    --   -- FO0 = 4FI0
-    --   UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (4, 0)
-    --   -- F0 (y) = FI0
-    --   UnionFind.relationBetween (RefF 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (1, 0)
-    --   -- F1 (z) = 2F0 (y)
-    --   UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (2, 0)
+      -- FO0 = 4FI0
+      UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (4, 0)
+      -- F0 (y) = FI0
+      UnionFind.relationBetween (RefF 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+      -- F1 (z) = 2F0 (y)
+      UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (2, 0)
 
-    -- it "Union Find 3" $ do
-    --   cs <- runTest 2 1 $ do
-    --     x <- inputField
-    --     y <- reuse (x + 1)
-    --     return (x + y)
+    it "Union Find 3" $ do
+      cs <- runTest 2 1 $ do
+        x <- inputField
+        y <- reuse (x + 1)
+        return (x + y)
 
-    --   -- FO0 = 2FI0 + 1
-    --   UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (2, 1)
+      -- FO0 = 2FI0 + 1
+      UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (2, 1)
 
-    -- it "Union Find 4" $ do
-    --   cs <- runTest 1 1 $ do
-    --     let x = 4
-    --     y <- reuse x
-    --     return (x + y :: Field)
-    --   -- print cs
-    --   -- print $ relocateConstraintSystem cs
-    --   -- FO0 = 8
-    --   snd (UnionFind.lookup (RefFO 0) (csVarEqF cs)) `shouldBe` (Nothing, 8)
+    it "Union Find 4" $ do
+      cs <- runTest 1 1 $ do
+        let x = 4
+        y <- reuse x
+        return (x + y :: Field)
+      -- print cs
+      -- print $ relocateConstraintSystem cs
+      -- FO0 = 8
+      snd (UnionFind.lookup (RefFO 0) (csVarEqF cs)) `shouldBe` (Nothing, 8)
 
-    -- it "Union Find 5" $ do
-    --   _cs <- runTest 2 1 $ do
-    --     x <- inputField
-    --     y <- reuse x
-    --     return (x * y :: Field)
-    --   return ()
+    it "Union Find 5" $ do
+      _cs <- runTest 2 1 $ do
+        x <- inputField
+        y <- reuse x
+        return (x * y :: Field)
+      return ()
 
     it "NEqF" $ do
       _cs <- runTest 7 5 $ do
         x <- inputField
         return $ cond (x `eq` 3) (12 :: Field) 789
 
-      print _cs
       return ()
 
 -- print cs

@@ -735,11 +735,11 @@ relocateConstraintSystem cs =
 
       case slope' of 
         Nothing -> 
-          if shouldRemoveF occurrences var1 && shouldRemoveF occurrences var2
+          if shouldRemoveF occurrences var1
             then Nothing
             else Just $ fromConstraint counters $ CVarBindF var1 intercept 
         Just (slope, root) -> 
-          if shouldRemoveF occurrences var1 && shouldRemoveF occurrences var2
+          if shouldRemoveF occurrences var1 || shouldRemoveF occurrences root
             then Nothing
             else case PolyG.build intercept [(var1, -1), (root, slope)] of
               Left _ -> Nothing

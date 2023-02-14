@@ -13,16 +13,14 @@ import Keelung.Data.PolyG qualified as PolyG
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 run = snd . optimizeAddF
 
--- run_ :: (GaloisField n, Integral n) => (WhatChanged, ConstraintSystem n) -> ConstraintSystem n
--- run_ (NothingChanged, cs) = cs
--- run_ (RelationChanged, cs) =
---   run_ $
---     let (changed, cs') = runOptiM cs goThroughAddF
---      in case changed of
---           NothingChanged -> runOptiM cs' goThroughMulF
---           _ -> (changed, cs')
--- run_ (AdditiveConstraintChanged, cs) = run_ $ runOptiM cs goThroughMulF
--- run_ (MultiplicativeConstraintChanged, cs) = run_ $ runOptiM cs goThroughMulF
+-- optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
+-- optimizeAddF cs =
+--   let (changed, cs') = runOptiM cs goThroughAddF
+--    in case changed of
+--         NothingChanged -> (NothingChanged, cs)
+--         RelationChanged -> optimizeAddF cs'
+--         AdditiveConstraintChanged -> optimizeAddF cs'
+--         MultiplicativeConstraintChanged -> optimizeAddF cs'
 
 optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
 optimizeAddF cs =
@@ -123,14 +121,14 @@ foldMaybeM f = foldM $ \acc x -> do
     Just x' -> return (x' : acc)
 
 reduceAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n (Maybe (PolyG RefF n))
-reduceAddF poly = do
-  changed <- learnFromAddF poly
+reduceAddF polynomial = do
+  changed <- learnFromAddF polynomial
   if changed
     then return Nothing
     else do
       unionFind <- gets csVarEqF
-      case substPolyG unionFind poly of
-        Nothing -> return (Just poly) -- nothing changed
+      case substPolyG unionFind polynomial of
+        Nothing -> return (Just polynomial) -- nothing changed
         Just (Left _constant, substitutedRefs) -> do
           -- when (constant /= 0) $
           --   error "[ panic ] Additive reduced to some constant other than 0"
@@ -139,13 +137,13 @@ reduceAddF poly = do
           -- remove all variables in the polynomial from the occurrence list
           modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
           return Nothing
-        Just (Right poly', substitutedRefs) -> do
+        Just (Right reducePolynomial, substitutedRefs) -> do
           -- the polynomial has been reduced to something
           markChanged AdditiveConstraintChanged
           -- remove variables that has been reduced in the polynomial from the occurrence list
           modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
           -- keep reducing the reduced polynomial
-          reduceAddF poly'
+          reduceAddF reducePolynomial
 
 type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
 
