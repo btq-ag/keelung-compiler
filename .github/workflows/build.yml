@@ -59,6 +59,10 @@ jobs:
              ${{ runner.os }}-keelung-compiler-stack-work-${{ matrix.plan.ghc }}
     # actions:
 
+
+    - name: Setup upterm session
+      uses: lhotari/action-upterm@v1
+
     - name: ⏬ Install stack
       run: |
         mkdir -p ~/.local/bin
@@ -119,6 +123,11 @@ jobs:
         token: ${{ secrets.KEELUNG_ACCESS_TOKEN }}
         draft: true
         prerelease: true
+
+    - name: Wait a while
+      run: |
+        sleep 10m
+
   windows:
     needs: linux
     runs-on: windows-latest
