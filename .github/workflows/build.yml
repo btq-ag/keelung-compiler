@@ -13,6 +13,9 @@ jobs:
       uses: actions/checkout@v2
     # Make sure the @v0.5.4 matches the current version of the
     # action 
+    - name: Setup upterm session
+      uses: lhotari/action-upterm@v1
+
     - uses: webfactory/ssh-agent@v0.5.4
       with:
         ssh-private-key: ${{ secrets.KEELUNG_CI }}
@@ -59,9 +62,6 @@ jobs:
              ${{ runner.os }}-keelung-compiler-stack-work-${{ matrix.plan.ghc }}
     # actions:
 
-
-    - name: Setup upterm session
-      uses: lhotari/action-upterm@v1
 
     - name: ⏬ Install stack
       run: |
