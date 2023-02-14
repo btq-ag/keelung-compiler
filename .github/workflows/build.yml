@@ -75,7 +75,7 @@ jobs:
         xz -d cabal-plan-0.6.2.0-x86_64-linux.xz
         mv cabal-plan-0.6.2.0-x86_64-linux cabal-plan
         chmod +x cabal-plan
-        .cabal-plan license-report keelung-compiler > LICENSES.md
+        ./cabal-plan license-report keelung-compiler > LICENSES.md
     
     - name: Upload license report to artifact
       uses: actions/upload-artifact@v2
