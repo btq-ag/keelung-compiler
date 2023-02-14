@@ -72,7 +72,7 @@ jobs:
     - name: Generate license report
       run: |
         cabal update
-        cabal install -f license-report cabal-plan
+        cabal install --global -f license-report cabal-plan
         cabal exec cabal-plan license-report keelung-compiler > LICENSES.md
     
     - name: Upload license report to artifact
