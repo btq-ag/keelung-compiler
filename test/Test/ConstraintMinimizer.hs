@@ -104,9 +104,6 @@ tests = do
         let x = 4
         y <- reuse x
         return (x + y :: Field)
-      -- print cs
-      -- print $ relocateConstraintSystem cs
-      -- FO0 = 8
       snd (UnionFind.lookup (RefFO 0) (csVarEqF cs)) `shouldBe` (Nothing, 8)
 
     it "Union Find 5" $ do
@@ -117,14 +114,12 @@ tests = do
       return ()
 
     it "NEqF" $ do
-      _cs <- runTest 7 5 $ do
+      _cs <- runTest 7 4 $ do
         x <- inputField
         return $ cond (x `eq` 3) (12 :: Field) 789
-
       return ()
 
 -- print cs
--- print $ relocateConstraintSystem cs
 
 -- describe "Aggregate Signature" $ do
 --   it "dim:1 sig:10" runAllKeelungAggSig2

@@ -47,6 +47,7 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
+import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
@@ -678,17 +679,6 @@ relocateConstraintSystem cs =
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
 
-    -- remove the constraint if it containts any variable that is not pinned and have occurrence count of 0
-    shouldRemoveF occurrences var =
-      csUseNewOptimizer cs && case var of
-        RefBtoRefF refB -> shouldRemoveB refB
-        RefFO _ -> False
-        RefFI _ -> False
-        RefF _ -> case Map.lookup var occurrences of
-          Nothing -> True
-          Just 0 -> True
-          Just _ -> False
-
     shouldRemoveU occurrences var =
       csUseNewOptimizer cs && case var of
         RefBtoRefU refB -> shouldRemoveB refB
@@ -698,52 +688,30 @@ relocateConstraintSystem cs =
           Nothing -> True
           Just 0 -> True
           Just _ -> False
-    -- pinnedRefF :: RefF -> Bool
-    -- pinnedRefF (RefFI _) = True
-    -- pinnedRefF (RefFO _) = True
-    -- pinnedRefF (RefBtoRefF ref) = pinnedRefB ref
-    -- pinnedRefF _ = False
-    -- csUseNewOptimizer cs
-    --   && case Map.lookup var occurrences of
-    --     Nothing -> False
-    --     -- Nothing -> not (pinnedRefF var)
-    --     Just 0 -> not (pinnedRefF var)
-    --     Just _ -> False
 
     shouldRemoveB _ = False
 
-    fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> (RefF, (Maybe (n, RefF), n)) -> Maybe (Relocated.Constraint n)
-    fromUnionFindF _ occurrences (var1, (Nothing, c)) =
-      if shouldRemoveF occurrences var1
-        then Nothing
-        else Just $ fromConstraint counters (CVarBindF var1 c)
-    fromUnionFindF unionFind occurrences (var1, (Just (slope2, var2), intercept2)) = do 
-      let (slope', intercept) = case UnionFind.parentOf unionFind var2 of 
-              Nothing -> 
-                -- var2 is already a root 
-                -- var1 = slope2 * var2 + intercept2
-                (Just (slope2, var2), intercept2)
-              Just (Nothing, intercept3) -> 
-                -- var2 = intercept3
-                -- var1 = slope2 * intercept3 + intercept2
-                (Nothing, intercept2 + slope2 * intercept3)
-              Just (Just (slope3, var3), intercept3) -> 
-                -- var2 = slope3 * var3 + intercept3
-                -- var1 = slope2 * (slope3 * var3 + intercept3) + intercept2
-                -- var1 = slope2 * slope3 * var3 + slope2 * intercept3 + intercept2
-                (Just (slope2 * slope3, var3), slope2 * intercept3 + intercept2)
-
-      case slope' of 
-        Nothing -> 
-          if shouldRemoveF occurrences var1
-            then Nothing
-            else Just $ fromConstraint counters $ CVarBindF var1 intercept 
-        Just (slope, root) -> 
-          if shouldRemoveF occurrences var1 || shouldRemoveF occurrences root
-            then Nothing
-            else case PolyG.build intercept [(var1, -1), (root, slope)] of
+    fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Seq (Relocated.Constraint n)
+    fromUnionFindF unionFind occurrences =
+      let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
+          inputVars = [RefFI i | i <- [0 .. getCount OfInput OfField counters - 1]]
+          occurredVars = Map.keys $ Map.filter (> 0) occurrences
+       in Seq.fromList (Maybe.mapMaybe toConstant outputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant inputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant occurredVars)
+      where
+        toConstant var = case UnionFind.parentOf unionFind var of
+          Nothing ->
+            -- var is already a root
+            Nothing
+          Just (Nothing, intercept) ->
+            -- var = intercept
+            Just $ fromConstraint counters $ CVarBindF var intercept
+          Just (Just (slope, root), intercept) ->
+            -- var = slope * root + intercept
+            case PolyG.build intercept [(var, -1), (root, slope)] of
               Left _ -> Nothing
-              Right poly -> Just $ fromConstraint counters (CAddF poly)
+              Right poly -> Just $ fromConstraint counters $ CAddF poly
 
     fromUnionFindU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, (Maybe (n, RefU), n)) -> Maybe (Relocated.Constraint n)
     fromUnionFindU occurrences (var1, (Nothing, c)) =
@@ -762,7 +730,7 @@ relocateConstraintSystem cs =
             then Nothing
             else Just $ fromConstraint counters (CAddU poly)
 
-    varEqFs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindF (csVarEqF cs) (csOccurrenceF cs)) $ Map.toList $ UnionFind.toMap $ csVarEqF cs
+    varEqFs = fromUnionFindF (csVarEqF cs) (csOccurrenceF cs)
     varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UnionFind.toMap $ csVarEqU cs
     -- varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
