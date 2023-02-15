@@ -74,6 +74,7 @@ library
     , semirings
     , validation
     , vector
+    , Cabal
   default-language: Haskell2010
 
 executable keelungc
