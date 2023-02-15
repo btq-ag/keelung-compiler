@@ -462,6 +462,13 @@ compileExprU out expr = case expr of
           -- fill upper bits with 0s
         forM_ [w + n .. w - 1] $ \i -> do
           add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
+  SetU w x j b -> do
+    x' <- wireU x
+    b' <- wireB b
+    forM_ [0 .. w - 1] $ \i -> do
+      if i == j
+        then add $ cVarEqB (RefUBit w out i) b' -- out[i] = b
+        else add $ cVarEqB (RefUBit w out i) (RefUBit w x' i) -- out[i] = x[i]
   BtoU w x -> do
     -- 1. wire 'out[ZERO]' to 'x'
     result <- freshRefB

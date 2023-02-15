@@ -113,6 +113,7 @@ propagateExprU relations e = case e of
   IfU w p x y -> IfU w (propagateExprB relations p) (propagateExprU relations x) (propagateExprU relations y)
   RoLU w i x -> RoLU w i (propagateExprU relations x)
   ShLU w i x -> ShLU w i (propagateExprU relations x)
+  SetU w x i b -> SetU w (propagateExprU relations x) i (propagateExprB relations b)
   BtoU w x -> BtoU w (propagateExprB relations x)
 
 propagateExprB :: Relations n -> ExprB n -> ExprB n
