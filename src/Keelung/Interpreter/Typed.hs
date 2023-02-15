@@ -204,6 +204,7 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
     NotU _ x -> map bitWiseNot <$> interpret x
     RoLU w i x -> map (bitWiseRotateL w i) <$> interpret x
     ShLU w i x -> map (bitWiseShiftL w i) <$> interpret x
+    SetU w x i y -> zipWith (\x' y' -> bitWiseSet w x' i y') <$> interpret x <*> interpret y
     IfU _ p x y -> do
       p' <- interpret p
       case p' of
@@ -284,5 +285,6 @@ instance FreeVar UInt where
     NotU _ x -> freeVars x
     RoLU _ _ x -> freeVars x
     ShLU _ _ x -> freeVars x
+    SetU _ x _ y -> freeVars x <> freeVars y
     IfU _ p x y -> freeVars p <> freeVars x <> freeVars y
     BtoU _ x -> freeVars x
