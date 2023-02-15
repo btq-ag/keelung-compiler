@@ -53,8 +53,7 @@ data ExprB n
   | EqB (ExprB n) (ExprB n)
   | EqF (ExprF n) (ExprF n)
   | EqU (ExprU n) (ExprU n)
-  | -- | LTEU Width (ExprU n) (ExprU n)
-    -- bit tests on UInt
+  | -- bit tests on UInt
     BitU (ExprU n) Int
   deriving (Functor, Eq)
 
@@ -129,6 +128,7 @@ data ExprU n
   | -- bit operators
     RoLU Width Int (ExprU n)
   | ShLU Width Int (ExprU n)
+  | SetU Width (ExprU n) Int (ExprB n)  -- set bit
   | -- conversion operators
     BtoU Width (ExprB n)
   deriving (Functor, Eq)
@@ -149,6 +149,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     RoLU _ n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
     ShLU _ n x -> showParen (prec > 8) $ showString "ShL " . showsPrec 9 n . showString " " . showsPrec 9 x
+    SetU _ x i b -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . showsPrec 9 i . showString "] := " . showsPrec 9 b
     BtoU _ x -> showString "B→U " . showsPrec prec x
 
 --------------------------------------------------------------------------------
@@ -191,6 +192,7 @@ widthOfU expr = case expr of
   IfU w _ _ _ -> w
   RoLU w _ _ -> w
   ShLU w _ _ -> w
+  SetU w _ _ _ -> w
   BtoU w _ -> w
 
 --------------------------------------------------------------------------------
