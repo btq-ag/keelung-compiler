@@ -109,31 +109,34 @@ fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (r
 
 --------------------------------------------------------------------------------
 
-data RefB = RefBO Var | RefBI Var | RefB Var | RefUBit Width RefU Int
+data RefB = RefBO Var | RefBI Var | RefBP Var | RefUBit Width RefU Int | RefB Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefB where
-  show (RefBI x) = "BI" ++ show x
   show (RefBO x) = "BO" ++ show x
+  show (RefBI x) = "BI" ++ show x
+  show (RefBP x) = "BP" ++ show x
   show (RefB x) = "B" ++ show x
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
-data RefF = RefFO Var | RefFI Var | RefBtoRefF RefB | RefF Var
+data RefF = RefFO Var | RefFI Var | RefFP Var | RefBtoRefF RefB  | RefF Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefF where
-  show (RefFI x) = "FI" ++ show x
   show (RefFO x) = "FO" ++ show x
+  show (RefFI x) = "FI" ++ show x
+  show (RefFP x) = "FP" ++ show x
   show (RefF x) = "F" ++ show x
   show (RefBtoRefF x) = show x
 
-data RefU = RefUO Width Var | RefUI Width Var | RefBtoRefU RefB | RefU Width Var
+data RefU = RefUO Width Var | RefUI Width Var | RefUP Width Var | RefBtoRefU RefB  | RefU Width Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefU where
   show ref = case ref of
-    RefUI w x -> "UI" ++ toSubscript w ++ show x
     RefUO w x -> "UO" ++ toSubscript w ++ show x
+    RefUI w x -> "UI" ++ toSubscript w ++ show x
+    RefUP w x -> "UP" ++ toSubscript w ++ show x
     RefU w x -> "U" ++ toSubscript w ++ show x
     RefBtoRefU x -> show x
     where
@@ -176,20 +179,23 @@ instance Show RefU where
 --------------------------------------------------------------------------------
 
 reindexRefF :: Counters -> RefF -> Var
-reindexRefF counters (RefFI x) = reindex counters OfInput OfField x
 reindexRefF counters (RefFO x) = reindex counters OfOutput OfField x
+reindexRefF counters (RefFI x) = reindex counters OfInput OfField x
+reindexRefF counters (RefFP x) = reindex counters OfInput OfField x
 reindexRefF counters (RefF x) = reindex counters OfIntermediate OfField x
 reindexRefF counters (RefBtoRefF x) = reindexRefB counters x
 
 reindexRefB :: Counters -> RefB -> Var
-reindexRefB counters (RefBI x) = reindex counters OfInput OfBoolean x
 reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
+reindexRefB counters (RefBI x) = reindex counters OfInput OfBoolean x
+reindexRefB counters (RefBP x) = reindex counters OfInput OfBoolean x
 reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
 reindexRefB counters (RefUBit w x i) =
   let i' = i `mod` w
    in case x of
-        RefUI _ x' -> reindex counters OfInput (OfUIntBinRep w) x' + i'
         RefUO _ x' -> reindex counters OfOutput (OfUIntBinRep w) x' + i'
+        RefUI _ x' -> reindex counters OfInput (OfUIntBinRep w) x' + i'
+        RefUP _ x' -> reindex counters OfInput (OfUIntBinRep w) x' + i'
         RefU _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
         RefBtoRefU x' ->
           if i' == 0
@@ -197,8 +203,9 @@ reindexRefB counters (RefUBit w x i) =
             else error "reindexRefB: RefUBit"
 
 reindexRefU :: Counters -> RefU -> Var
-reindexRefU counters (RefUI w x) = reindex counters OfInput (OfUInt w) x
 reindexRefU counters (RefUO w x) = reindex counters OfOutput (OfUInt w) x
+reindexRefU counters (RefUI w x) = reindex counters OfInput (OfUInt w) x
+reindexRefU counters (RefUP w x) = reindex counters OfInput (OfUInt w) x
 reindexRefU counters (RefU w x) = reindex counters OfIntermediate (OfUInt w) x
 reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 
@@ -684,6 +691,7 @@ relocateConstraintSystem cs =
         RefBtoRefU refB -> shouldRemoveB refB
         RefUO _ _ -> False
         RefUI _ _ -> False
+        RefUP _ _ -> False
         RefU _ _ -> case Map.lookup var occurrences of
           Nothing -> True
           Just 0 -> True

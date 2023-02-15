@@ -578,9 +578,10 @@ compileEqualityU isEq out x y =
       -- introduce a new variable m
       -- if diff = 0 then m = 0 else m = recip diff
       let width = case x of
-            RefU w _ -> w
-            RefUI w _ -> w
             RefUO w _ -> w
+            RefUI w _ -> w
+            RefUP w _ -> w
+            RefU w _ -> w
             RefBtoRefU _ -> 1 -- TODO: reexamine this
       m <- freshRefU width
 
