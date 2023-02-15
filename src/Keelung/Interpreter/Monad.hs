@@ -207,3 +207,10 @@ bitWiseShiftL w n x =
   if n < 0
     then fromInteger $ Data.Bits.shiftR (toInteger x) (-n)
     else fromInteger $ Data.Bits.shiftL (toInteger x) n Data.Bits..&. (2 ^ w - 1)
+
+bitWiseSet :: (GaloisField n, Integral n) => Width -> n -> Int -> n -> n
+bitWiseSet w x i b =
+  let i' = i `mod` w
+   in case toInteger b of 
+        0 -> fromInteger $ Data.Bits.clearBit (toInteger x) i'
+        _ -> fromInteger $ Data.Bits.setBit (toInteger x) i'
