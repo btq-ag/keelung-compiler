@@ -262,6 +262,7 @@ compileExprB out expr = case expr of
   VarB var -> add $ cVarEqB out (RefB var) -- out = var
   VarBO var -> add $ cVarEqB out (RefBO var) -- out = var
   VarBI var -> add $ cVarEqB out (RefBI var) -- out = var
+  VarBP var -> add $ cVarEqB out (RefBP var) -- out = var
   AndB x0 x1 xs -> do
     a <- wireB x0
     b <- wireB x1
@@ -350,6 +351,7 @@ compileExprF out expr = case expr of
   VarF var -> add $ cVarEqF out (RefF var) -- out = var
   VarFO var -> add $ cVarEqF out (RefFO var) -- out = var
   VarFI var -> add $ cVarEqF out (RefFI var) -- out = var
+  VarFP var -> add $ cVarEqF out (RefFP var) -- out = var
   SubF x y -> do
     x' <- toTerm x
     y' <- toTerm y
@@ -395,6 +397,13 @@ compileExprU out expr = case expr of
     add $ cVarEqU out (RefU width var) -- out = var
   VarUI width var -> do
     let ref = RefUI width var
+    -- constraint for UInt : out = ref
+    add $ cVarEqU out ref
+    -- constraints for BinRep of UInt
+    forM_ [0 .. width - 1] $ \i -> do
+      add $ cVarEqB (RefUBit width out i) (RefUBit width ref i) -- out[i] = ref[i]
+  VarUP width var -> do
+    let ref = RefUP width var
     -- constraint for UInt : out = ref
     add $ cVarEqU out ref
     -- constraints for BinRep of UInt

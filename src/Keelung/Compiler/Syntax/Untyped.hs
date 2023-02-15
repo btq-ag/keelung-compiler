@@ -40,6 +40,7 @@ data ExprB n
   | VarB Var
   | VarBO Var
   | VarBI Var
+  | VarBP Var
   | -- logical operators
     AndB (ExprB n) (ExprB n) (Seq (ExprB n))
   | OrB (ExprB n) (ExprB n) (Seq (ExprB n))
@@ -64,6 +65,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     VarB var -> showString "B" . shows var
     VarBO var -> showString "BO" . shows var
     VarBI var -> showString "BI" . shows var
+    VarBP var -> showString "BP" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
@@ -85,6 +87,7 @@ data ExprF n
   | VarF Var
   | VarFO Var
   | VarFI Var
+  | VarFP Var
   | -- arithmetic operators
     SubF (ExprF n) (ExprF n)
   | AddF (ExprF n) (ExprF n) (Seq (ExprF n))
@@ -101,6 +104,7 @@ instance (Show n, Integral n) => Show (ExprF n) where
     VarF var -> showString "F" . shows var
     VarFO var -> showString "FO" . shows var
     VarFI var -> showString "FI" . shows var
+    VarFP var -> showString "FP" . shows var
     SubF x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddF x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
     MulF x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -115,6 +119,7 @@ data ExprU n
   | VarU Width Var
   | VarUO Width Var
   | VarUI Width Var
+  | VarUP Width Var
   | -- arithmetic operators
     SubU Width (ExprU n) (ExprU n)
   | AddU Width (ExprU n) (ExprU n)
@@ -128,7 +133,7 @@ data ExprU n
   | -- bit operators
     RoLU Width Int (ExprU n)
   | ShLU Width Int (ExprU n)
-  | SetU Width (ExprU n) Int (ExprB n)  -- set bit
+  | SetU Width (ExprU n) Int (ExprB n) -- set bit
   | -- conversion operators
     BtoU Width (ExprB n)
   deriving (Functor, Eq)
@@ -139,6 +144,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     VarU _ var -> showString "U" . shows var
     VarUO _ var -> showString "UO" . shows var
     VarUI _ var -> showString "UI" . shows var
+    VarUP _ var -> showString "UP" . shows var
     SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -182,6 +188,7 @@ widthOfU expr = case expr of
   VarU w _ -> w
   VarUO w _ -> w
   VarUI w _ -> w
+  VarUP w _ -> w
   SubU w _ _ -> w
   AddU w _ _ -> w
   MulU w _ _ -> w
