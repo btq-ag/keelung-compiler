@@ -84,7 +84,7 @@ jobs:
         chmod +x stack2cabal-linux
         ./stack2cabal-linux
         cabal update
-        cabal install --user -f license-report cabal-plan
+        cabal install -f license-report cabal-plan
         export PATH=$HOME/.cabal/bin:$PATH
         cabal new-build
         cabal-plan license-report keelung-compiler > LICENSES.md
