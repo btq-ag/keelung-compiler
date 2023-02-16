@@ -50,7 +50,7 @@ instance Functor Constraint where
 -- | The interpreter monad
 type M n = ReaderT Heap (StateT (Partial n) (Except (Error n)))
 
-runM :: Heap -> Inputs n -> M n a -> Either (Error n) (a, Witness n)
+runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n a -> Either (Error n) (a, Witness n)
 runM heap inputs p = do
   partialBindings <- toPartialBindings inputs
   (result, partialBindings') <- runExcept (runStateT (runReaderT p heap) partialBindings)
@@ -60,9 +60,9 @@ runM heap inputs p = do
     Right bindings -> Right (result, bindings)
 
 -- | Construct partial Bindings from Inputs
-toPartialBindings :: Inputs n -> Either (Error n) (Partial n)
+toPartialBindings :: (GaloisField n, Integral n) => Inputs n -> Either (Error n) (Partial n)
 toPartialBindings inputs =
-  let counters = Inputs.varCounters inputs
+  let counters = Inputs.inputCounters inputs
       expectedInputSize = getCountBySort OfPublicInput counters
       actualInputSize = Inputs.size inputs
    in if expectedInputSize /= actualInputSize
@@ -74,13 +74,13 @@ toPartialBindings inputs =
                   Struct
                     { structF = (getCount OfOutput OfField counters, mempty),
                       structB = (getCount OfOutput OfBoolean counters, mempty),
-                      structU = IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
+                      structU = IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))
                     },
                 ofI =
                   Struct
-                    { structF = (getCount OfPublicInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.numInputs inputs))),
-                      structB = (getCount OfPublicInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.boolInputs inputs))),
-                      structU = IntMap.mapWithKey (\w bindings -> (getCount OfPublicInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.uintInputs inputs)
+                    { structF = (getCount OfPublicInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs)))),
+                      structB = (getCount OfPublicInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs)))),
+                      structU = IntMap.mapWithKey (\w bindings -> (getCount OfPublicInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPublic inputs))
                     },
                 ofP =
                   Struct
@@ -92,7 +92,7 @@ toPartialBindings inputs =
                   Struct
                     { structF = (getCount OfIntermediate OfField counters, mempty),
                       structB = (getCount OfIntermediate OfBoolean counters, mempty),
-                      structU = IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
+                      structU = IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))
                     }
               }
 

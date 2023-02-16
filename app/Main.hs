@@ -123,7 +123,7 @@ main = withUtf8 $ do
     outputInterpretedResult :: Serialize n => Either String [n] -> IO ()
     outputInterpretedResult = putStrLn . BSC.unpack . encode
 
-    outputInterpretedResultAndWriteFile :: (Serialize n, Integral n) => Either String (Inputs n, [n], Witness n) -> IO ()
+    outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Either String (Inputs n, [n], Witness n) -> IO ()
     outputInterpretedResultAndWriteFile result = do
       -- print outputs
       outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)

@@ -154,9 +154,9 @@ shrinkCNEQ (CNEQ (Right a) (Right b) m) = do
 -- | The interpreter monad
 type M n = StateT (IntMap n) (Except (Error n))
 
-runM :: Num n => Inputs n -> M n a -> Either (Error n) (Vector n)
+runM :: (GaloisField n, Integral n) => Inputs n -> M n a -> Either (Error n) (Vector n)
 runM inputs p =
-  let counters = Inputs.varCounters inputs
+  let counters = Inputs.inputCounters inputs
    in case runExcept (execStateT p (Inputs.toIntMap inputs)) of
         Left err -> Left err
         Right bindings -> case toEither $ toTotal' (getCountBySort OfPublicInput counters, bindings) of
