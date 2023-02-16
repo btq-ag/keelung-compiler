@@ -646,7 +646,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
                   '9' -> '₉'
                   _ -> c
             uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (OfUInt w)
-            showUInts (Counters o _ _ _ _ _) =
+            showUInts (Counters o _ _ _ _ _ _) =
               let xs = map uint (IntMap.keys (structU o))
                in if null xs then "\n    UInt            none          none              none" else mconcat xs
          in if totalSize == 0
