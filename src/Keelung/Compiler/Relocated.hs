@@ -131,7 +131,8 @@ renumberConstraints cs =
     }
   where
     counters = csCounters cs
-    pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
+    pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfOutput counters
+    -- pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters + getCountBySort OfOutput counters
 
     -- variables in constraints (that should be kept after renumbering!)
     vars = varsInConstraints (csConstraints cs)

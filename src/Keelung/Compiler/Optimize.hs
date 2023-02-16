@@ -28,7 +28,7 @@ optimizeWithWitness witness cs =
   -- Pinned vars are never optimized away.
 
   let counters = csCounters cs
-      pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
+      pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfOutput counters
       pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize - 1]
    in runOptiM witness $ do
         constraints <- MinimizeRelocatedConstraints.run counters (IntSet.toList pinnedVars) (csConstraints cs)
@@ -37,7 +37,7 @@ optimizeWithWitness witness cs =
 
 optimizeWithInput :: (GaloisField n, Integral n) => [n] -> RelocatedConstraintSystem n -> (Witness n, RelocatedConstraintSystem n)
 optimizeWithInput inputs cs =
-  let (start, end) = getInputVarRange (csCounters cs)
+  let (start, end) = getPublicInputVarRange (csCounters cs)
       inputVars = [start .. end - 1]
       witness = IntMap.fromList (zip inputVars inputs)
    in optimizeWithWitness witness cs
@@ -55,7 +55,8 @@ optimize2 rcs =
   --   - output vars
   -- Pinned vars are never optimized away.
   let counters = csCounters rcs
-      pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
+      pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfOutput counters
+      -- pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters + getCountBySort OfOutput counters
       pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize - 1]
       constraints = MinimizeRelocatedConstraints2.run pinnedVars (csConstraints rcs)
    in renumberConstraints $ rcs {csConstraints = constraints}

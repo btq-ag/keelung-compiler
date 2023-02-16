@@ -79,12 +79,12 @@ size = length . flatten
 
 toIntMap :: Inputs n -> IntMap n
 toIntMap inputs =
-  let (start, _) = getInputVarRange (varCounters inputs)
+  let (start, _) = getPublicInputVarRange (varCounters inputs)
    in IntMap.fromDistinctAscList (zip [start ..] (flatten inputs))
 
 toVector :: Inputs n -> Vector (Maybe n)
 toVector inputs =
-  let (start, end) = getInputVarRange (varCounters inputs)
+  let (start, end) = getPublicInputVarRange (varCounters inputs)
       totalCount = getTotalCount (varCounters inputs)
    in Vector.replicate start Nothing
         <> Vector.fromList (map Just (flatten inputs))

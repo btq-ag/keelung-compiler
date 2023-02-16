@@ -159,7 +159,7 @@ runM inputs p =
   let counters = Inputs.varCounters inputs
    in case runExcept (execStateT p (Inputs.toIntMap inputs)) of
         Left err -> Left err
-        Right bindings -> case toEither $ toTotal' (getCountBySort OfInput counters, bindings) of
+        Right bindings -> case toEither $ toTotal' (getCountBySort OfPublicInput counters, bindings) of
           Left unbound -> Left (VarUnassignedError' unbound)
           Right bindings' -> Right bindings'
 

@@ -180,9 +180,9 @@ tests = do
 
     it "Mixed 0" $ do
       let program = do
-            f <- inputField
-            u4 <- inputUInt @4
-            b <- inputBool
+            f <- inputField Public
+            u4 <- inputUInt @4 Public
+            b <- inputBool Public
             return $
               cond
                 (b .&. (u4 !!! 0))
@@ -194,7 +194,7 @@ tests = do
 
     it "Rotate" $ do
       let program = do
-            x <- inputUInt @4
+            x <- inputUInt @4 Public
             return [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
 
       runAll program [0 :: GF181] [0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -208,7 +208,7 @@ tests = do
 
     it "Shift" $ do
       let program = do
-            x <- inputUInt @4
+            x <- inputUInt @4 Public
             return [shift x (-4), shift x (-3), shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
 
       runAll program [0 :: GF181] [0, 0, 0, 0, 0, 0, 0, 0, 0]

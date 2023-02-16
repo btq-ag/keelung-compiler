@@ -27,6 +27,7 @@ import Keelung.Data.Struct
 data OIX n = OIX
   { ofO :: n,
     ofI :: n,
+    ofP :: n,
     ofX :: n
   }
   deriving (Eq, Show, NFData, Generic)
@@ -34,19 +35,23 @@ data OIX n = OIX
 instance Serialize n => Serialize (OIX n)
 
 instance (Semigroup n) => Semigroup (OIX n) where
-  OIX o1 i1 x1 <> OIX o2 i2 x2 = OIX (o1 <> o2) (i1 <> i2) (x1 <> x2)
+  OIX o1 i1 p1 x1 <> OIX o2 i2 p2 x2 =
+    OIX (o1 <> o2) (i1 <> i2) (p1 <> p2) (x1 <> x2)
 
 instance (Monoid n) => Monoid (OIX n) where
-  mempty = OIX mempty mempty mempty
+  mempty = OIX mempty mempty mempty mempty
 
 updateO :: (n -> n) -> OIX n -> OIX n
-updateO f (OIX o i x) = OIX (f o) i x
+updateO f (OIX o i p x) = OIX (f o) i p x
 
 updateI :: (n -> n) -> OIX n -> OIX n
-updateI f (OIX o i x) = OIX o (f i) x
+updateI f (OIX o i p x) = OIX o (f i) p x
+
+updateP :: (n -> n) -> OIX n -> OIX n
+updateP f (OIX o i p x) = OIX o i (f p) x
 
 updateX :: (n -> n) -> OIX n -> OIX n
-updateX f (OIX o i x) = OIX o i (f x)
+updateX f (OIX o i p x) = OIX o i p (f x)
 
 --------------------------------------------------------------------------------
 
@@ -62,9 +67,9 @@ showList' :: [String] -> String
 showList' xs = "[" <> List.intercalate ", " xs <> "]"
 
 instance {-# OVERLAPPING #-} Show (VarSet n) where
-  show (OIX o i x) =
+  show (OIX o i p x) =
     showList' $
-      showStruct "O" o <> showStruct "I" i <> showStruct "" x
+      showStruct "O" o <> showStruct "I" i <> showStruct "P" p <> showStruct "" x
     where
       showStruct :: String -> Struct IntSet IntSet IntSet -> [String]
       showStruct prefix (Struct f b u) =
@@ -97,7 +102,7 @@ type Partial n = OIX (Struct (PartialBinding n) (PartialBinding n) (PartialBindi
 type PartialBinding n = (Int, IntMap n)
 
 instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) where
-  show (OIX o i x) = showList' $ showStruct "O" o <> showStruct "I" i <> showStruct "" x
+  show (OIX o i p x) = showList' $ showStruct "O" o <> showStruct "I" i <> showStruct "P" p <> showStruct "" x
     where
       showPartialBinding :: (GaloisField n, Integral n) => String -> (Int, IntMap n) -> IntMap String
       showPartialBinding prefix (_size, bindings) = IntMap.mapWithKey (\k v -> prefix <> show k <> " := " <> show (N v)) bindings
@@ -110,12 +115,13 @@ instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) whe
 
 -- | Convert a partial binding to a total binding, or return the variables that are not bound
 toTotal :: Partial n -> Either (VarSet n) (Witness n)
-toTotal (OIX o i x) =
+toTotal (OIX o i p x) =
   toEither $
     OIX
-      <$> first (\struct -> OIX struct mempty mempty) (convertStruct o)
-      <*> first (\struct -> OIX mempty struct mempty) (convertStruct i)
-      <*> first (OIX mempty mempty) (convertStruct x)
+      <$> first (\struct -> OIX struct mempty mempty mempty) (convertStruct o)
+      <*> first (\struct -> OIX mempty struct mempty mempty) (convertStruct i)
+      <*> first (\struct -> OIX mempty mempty struct mempty) (convertStruct p)
+      <*> first (OIX mempty mempty mempty) (convertStruct x)
   where
     convertStruct ::
       Struct (Int, IntMap n) (Int, IntMap n) (Int, IntMap n) ->
@@ -130,7 +136,7 @@ toTotal (OIX o i x) =
     sequenceIntMap f = sequenceA . IntMap.mapWithKey (\width xs -> first (IntMap.singleton width) (f xs))
 
 toTotal' :: (Int, IntMap n) -> Validation IntSet (Vector n)
-toTotal' (size, xs) =
+toTotal' (size, xs) = 
   if IntMap.size xs < size
     then
       let completeIntSet = IntSet.fromDistinctAscList [0 .. size - 1]
@@ -138,10 +144,11 @@ toTotal' (size, xs) =
     else Success (Vector.fromList (toList xs))
 
 restrictVars :: Partial n -> VarSet n -> Partial n
-restrictVars (OIX o i x) (OIX o' i' x') =
+restrictVars (OIX o i p x) (OIX o' i' p' x') =
   OIX
     (restrictStruct o o')
     (restrictStruct i i')
+    (restrictStruct p p')
     (restrictStruct x x')
   where
     restrictStruct :: Struct (PartialBinding n) (PartialBinding n) (PartialBinding n) -> Struct IntSet IntSet IntSet -> Struct (PartialBinding n) (PartialBinding n) (PartialBinding n)

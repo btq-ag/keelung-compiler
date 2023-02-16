@@ -143,6 +143,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
     ValB b -> interpret b
     VarB var -> pure <$> lookupB var
     VarBI var -> pure <$> lookupBI var
+    VarBP var -> pure <$> lookupBP var
     AndB x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     OrB x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorB x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
@@ -179,6 +180,7 @@ instance (GaloisField n, Integral n) => Interpret Field n where
     ValFR n -> return [fromRational n]
     VarF var -> pure <$> lookupF var
     VarFI var -> pure <$> lookupFI var
+    VarFP var -> pure <$> lookupFP var
     AddF x y -> zipWith (+) <$> interpret x <*> interpret y
     SubF x y -> zipWith (-) <$> interpret x <*> interpret y
     MulF x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -195,6 +197,7 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
     ValU _ n -> return [fromIntegral n]
     VarU w var -> pure <$> lookupU w var
     VarUI w var -> pure <$> lookupUI w var
+    VarUP w var -> pure <$> lookupUP w var
     AddU _ x y -> zipWith (+) <$> interpret x <*> interpret y
     SubU _ x y -> zipWith (-) <$> interpret x <*> interpret y
     MulU _ x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -248,6 +251,7 @@ instance FreeVar Boolean where
     ValB _ -> mempty
     VarB var -> updateX (updateB (IntSet.insert var)) mempty
     VarBI var -> updateI (updateB (IntSet.insert var)) mempty
+    VarBP var -> updateP (updateB (IntSet.insert var)) mempty
     AndB x y -> freeVars x <> freeVars y
     OrB x y -> freeVars x <> freeVars y
     XorB x y -> freeVars x <> freeVars y
@@ -264,6 +268,7 @@ instance FreeVar Field where
     ValFR _ -> mempty
     VarF var -> updateX (updateF (IntSet.insert var)) mempty
     VarFI var -> updateI (updateF (IntSet.insert var)) mempty
+    VarFP var -> updateP (updateF (IntSet.insert var)) mempty
     AddF x y -> freeVars x <> freeVars y
     SubF x y -> freeVars x <> freeVars y
     MulF x y -> freeVars x <> freeVars y
@@ -276,6 +281,7 @@ instance FreeVar UInt where
     ValU _ _ -> mempty
     VarU w var -> updateX (updateU w (IntSet.insert var)) mempty
     VarUI w var -> updateI (updateU w (IntSet.insert var)) mempty
+    VarUP w var -> updateP (updateU w (IntSet.insert var)) mempty
     AddU _ x y -> freeVars x <> freeVars y
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y

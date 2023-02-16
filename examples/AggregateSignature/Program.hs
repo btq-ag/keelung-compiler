@@ -38,9 +38,9 @@ checkAgg (Param dimension numOfSigs setup _) = do
   --    nT: coefficients of terms of signatures as input
   --    nT: remainders of product of signatures & public keys
   --    nT: quotients of product of signatures & public keys
-  sigs <- inputVec2 numOfSigs dimension :: Comp (Vector (Vector Field))
-  expectedRemainders <- inputVec2 numOfSigs dimension :: Comp (Vector (Vector Field))
-  expectedQuotients <- inputVec2 numOfSigs dimension :: Comp (Vector (Vector Field))
+  sigs <- inputVec2 Public numOfSigs dimension :: Comp (Vector (Vector Field))
+  expectedRemainders <- inputVec2 Public numOfSigs dimension :: Comp (Vector (Vector Field))
+  expectedQuotients <- inputVec2 Public numOfSigs dimension :: Comp (Vector (Vector Field))
 
   -- pairs for iterating through public keys with indices
   let publicKeyPairs = zip [0 ..] (setupPublicKeys setup)
@@ -80,7 +80,7 @@ checkSize :: (GaloisField n, Integral n) => Param n -> Comp ()
 checkSize (Param dimension numOfSigs setup _) = do
   let signatures = setupSignatures setup
 
-  sigBitStrings <- inputVec3 numOfSigs dimension 14
+  sigBitStrings <- inputVec3 Public numOfSigs dimension 14
   forM_ [0 .. numOfSigs - 1] $ \i -> do
     let signature = signatures !! i
     forM_ [0 .. dimension - 1] $ \j -> do
@@ -116,10 +116,10 @@ checkSize (Param dimension numOfSigs setup _) = do
 
 checkLength :: (Integral n, GaloisField n) => Param n -> Comp ()
 checkLength (Param dimension numOfSigs _ _) = do
-  sigs <- inputVec2 numOfSigs dimension :: Comp (Vector (Vector Field))
+  sigs <- inputVec2 Public numOfSigs dimension :: Comp (Vector (Vector Field))
 
   -- expecting square of signatures as input
-  sigSquares <- inputVec2 numOfSigs dimension :: Comp (Vector (Vector Field))
+  sigSquares <- inputVec2 Public numOfSigs dimension :: Comp (Vector (Vector Field))
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do
     -- for each term of signature
@@ -129,9 +129,9 @@ checkLength (Param dimension numOfSigs _ _) = do
       assert (square `eq` (sig * sig))
 
   -- expecting remainders of length of signatures as input
-  sigLengthRemainders <- inputVec numOfSigs
+  sigLengthRemainders <- inputVec Public numOfSigs
   -- expecting quotients of length of signatures as input
-  sigLengthQuotients <- inputVec numOfSigs
+  sigLengthQuotients <- inputVec Public numOfSigs
 
   -- for each signature
   forM_ [0 .. numOfSigs - 1] $ \t -> do

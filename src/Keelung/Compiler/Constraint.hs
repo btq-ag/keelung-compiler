@@ -180,22 +180,22 @@ instance Show RefU where
 
 reindexRefF :: Counters -> RefF -> Var
 reindexRefF counters (RefFO x) = reindex counters OfOutput OfField x
-reindexRefF counters (RefFI x) = reindex counters OfInput OfField x
-reindexRefF counters (RefFP x) = reindex counters OfInput OfField x
+reindexRefF counters (RefFI x) = reindex counters OfPublicInput OfField x
+reindexRefF counters (RefFP x) = reindex counters OfPrivateInput OfField x
 reindexRefF counters (RefF x) = reindex counters OfIntermediate OfField x
 reindexRefF counters (RefBtoRefF x) = reindexRefB counters x
 
 reindexRefB :: Counters -> RefB -> Var
 reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
-reindexRefB counters (RefBI x) = reindex counters OfInput OfBoolean x
-reindexRefB counters (RefBP x) = reindex counters OfInput OfBoolean x
+reindexRefB counters (RefBI x) = reindex counters OfPublicInput OfBoolean x
+reindexRefB counters (RefBP x) = reindex counters OfPrivateInput OfBoolean x
 reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
 reindexRefB counters (RefUBit w x i) =
   let i' = i `mod` w
    in case x of
         RefUO _ x' -> reindex counters OfOutput (OfUIntBinRep w) x' + i'
-        RefUI _ x' -> reindex counters OfInput (OfUIntBinRep w) x' + i'
-        RefUP _ x' -> reindex counters OfInput (OfUIntBinRep w) x' + i'
+        RefUI _ x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + i'
+        RefUP _ x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + i'
         RefU _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
         RefBtoRefU x' ->
           if i' == 0
@@ -204,8 +204,8 @@ reindexRefB counters (RefUBit w x i) =
 
 reindexRefU :: Counters -> RefU -> Var
 reindexRefU counters (RefUO w x) = reindex counters OfOutput (OfUInt w) x
-reindexRefU counters (RefUI w x) = reindex counters OfInput (OfUInt w) x
-reindexRefU counters (RefUP w x) = reindex counters OfInput (OfUInt w) x
+reindexRefU counters (RefUI w x) = reindex counters OfPublicInput (OfUInt w) x
+reindexRefU counters (RefUP w x) = reindex counters OfPrivateInput (OfUInt w) x
 reindexRefU counters (RefU w x) = reindex counters OfIntermediate (OfUInt w) x
 reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 
@@ -630,7 +630,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
         let totalSize = getTotalCount counters
             padRight4 s = s <> replicate (4 - length s) ' '
             padLeft12 n = replicate (12 - length (show n)) ' ' <> show n
-            formLine typ = padLeft12 (getCount OfOutput typ counters) <> "  " <> padLeft12 (getCount OfInput typ counters) <> "      " <> padLeft12 (getCount OfIntermediate typ counters)
+            formLine typ = padLeft12 (getCount OfOutput typ counters) <> "  " <> padLeft12 (getCount OfPublicInput typ counters) <> "      " <> padLeft12 (getCount OfIntermediate typ counters)
             toSubscript = map go . show
               where
                 go c = case c of
@@ -646,7 +646,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
                   '9' -> '₉'
                   _ -> c
             uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (OfUInt w)
-            showUInts (Counters o _ _ _ _) =
+            showUInts (Counters o _ _ _ _ _) =
               let xs = map uint (IntMap.keys (structU o))
                in if null xs then "\n    UInt            none          none              none" else mconcat xs
          in if totalSize == 0
@@ -702,7 +702,7 @@ relocateConstraintSystem cs =
     fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Seq (Relocated.Constraint n)
     fromUnionFindF unionFind occurrences =
       let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
-          inputVars = [RefFI i | i <- [0 .. getCount OfInput OfField counters - 1]]
+          inputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
           occurredVars = Map.keys $ Map.filter (> 0) occurrences
        in Seq.fromList (Maybe.mapMaybe toConstant outputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant inputVars)

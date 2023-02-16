@@ -63,10 +63,10 @@ runM heap inputs p = do
 toPartialBindings :: Inputs n -> Either (Error n) (Partial n)
 toPartialBindings inputs =
   let counters = Inputs.varCounters inputs
-      expectedInputSize = getCountBySort OfInput counters
+      expectedInputSize = getCountBySort OfPublicInput counters
       actualInputSize = Inputs.size inputs
    in if expectedInputSize /= actualInputSize
-        then Left (InputSizeError (Inputs.size inputs) (getCount OfInput OfField counters))
+        then Left (InputSizeError (Inputs.size inputs) (getCount OfPublicInput OfField counters))
         else
           Right $
             OIX
@@ -78,9 +78,15 @@ toPartialBindings inputs =
                     },
                 ofI =
                   Struct
-                    { structF = (getCount OfInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.numInputs inputs))),
-                      structB = (getCount OfInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.boolInputs inputs))),
-                      structU = IntMap.mapWithKey (\w bindings -> (getCount OfInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.uintInputs inputs)
+                    { structF = (getCount OfPublicInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.numInputs inputs))),
+                      structB = (getCount OfPublicInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.boolInputs inputs))),
+                      structU = IntMap.mapWithKey (\w bindings -> (getCount OfPublicInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.uintInputs inputs)
+                    },
+                ofP =
+                  Struct
+                    { structF = (getCount OfPrivateInput OfField counters, IntMap.fromList $ zip [0 ..] mempty),
+                      structB = (getCount OfPrivateInput OfBoolean counters, IntMap.fromList $ zip [0 ..] mempty),
+                      structU = mempty
                     },
                 ofX =
                   Struct
@@ -112,17 +118,26 @@ lookupF = lookupVar "F" (structF . ofX)
 lookupFI :: Var -> M n n
 lookupFI = lookupVar "FI" (structF . ofI)
 
+lookupFP :: Var -> M n n
+lookupFP = lookupVar "FP" (structF . ofP)
+
 lookupB :: Var -> M n n
 lookupB = lookupVar "B" (structB . ofX)
 
 lookupBI :: Var -> M n n
 lookupBI = lookupVar "BI" (structB . ofI)
 
+lookupBP :: Var -> M n n
+lookupBP = lookupVar "BP" (structB . ofP)
+
 lookupU :: Width -> Var -> M n n
 lookupU w = lookupVar ("U" <> toSubscript w) (unsafeLookup w . structU . ofX)
 
 lookupUI :: Width -> Var -> M n n
 lookupUI w = lookupVar ("UI" <> toSubscript w) (unsafeLookup w . structU . ofI)
+
+lookupUP :: Width -> Var -> M n n
+lookupUP w = lookupVar ("UP" <> toSubscript w) (unsafeLookup w . structU . ofP)
 
 unsafeLookup :: Int -> IntMap a -> a
 unsafeLookup x y = case IntMap.lookup x y of

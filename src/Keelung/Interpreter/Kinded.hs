@@ -91,6 +91,7 @@ instance (GaloisField n, Integral n) => Interpret Field n where
     Rational n -> interpret n
     VarF var -> pure <$> lookupF var
     VarFI var -> pure <$> lookupFI var
+    VarFP var -> pure <$> lookupFP var
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
     Mul x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -107,6 +108,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
     Boolean b -> interpret b
     VarB var -> pure <$> lookupB var
     VarBI var -> pure <$> lookupBI var
+    VarBP var -> pure <$> lookupBP var
     And x y -> zipWith (*) <$> interpret x <*> interpret y
     Or x y -> zipWith (+) <$> interpret x <*> interpret y
     Xor x y -> zipWith (\x' y' -> x' + y' - 2 * (x' * y')) <$> interpret x <*> interpret y
@@ -139,6 +141,7 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
     UInt n -> interpret n
     VarU var -> pure <$> lookupU (widthOf val) var
     VarUI var -> pure <$> lookupUI (widthOf val) var
+    VarUP var -> pure <$> lookupUP (widthOf val) var
     AddU x y -> zipWith (+) <$> interpret x <*> interpret y
     SubU x y -> zipWith (-) <$> interpret x <*> interpret y
     MulU x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -185,6 +188,7 @@ instance FreeVar Field where
     Rational _ -> mempty
     VarF var -> updateX (updateF (IntSet.insert var)) mempty
     VarFI var -> updateI (updateF (IntSet.insert var)) mempty
+    VarFP var -> updateP (updateF (IntSet.insert var)) mempty
     Add x y -> freeVars x <> freeVars y
     Sub x y -> freeVars x <> freeVars y
     Mul x y -> freeVars x <> freeVars y
@@ -197,6 +201,7 @@ instance FreeVar Boolean where
     Boolean _ -> mempty
     VarB var -> updateX (updateB (IntSet.insert var)) mempty
     VarBI var -> updateI (updateB (IntSet.insert var)) mempty
+    VarBP var -> updateP (updateB (IntSet.insert var)) mempty
     And x y -> freeVars x <> freeVars y
     Or x y -> freeVars x <> freeVars y
     Xor x y -> freeVars x <> freeVars y
@@ -212,6 +217,7 @@ instance KnownNat w => FreeVar (UInt w) where
     UInt _ -> mempty
     VarU var -> updateX (updateU (widthOf val) (IntSet.insert var)) mempty
     VarUI var -> updateI (updateU (widthOf val) (IntSet.insert var)) mempty
+    VarUP var -> updateP (updateU (widthOf val) (IntSet.insert var)) mempty
     AddU x y -> freeVars x <> freeVars y
     SubU x y -> freeVars x <> freeVars y
     MulU x y -> freeVars x <> freeVars y

@@ -45,7 +45,7 @@ main = hspec $ do
               { csConstraints =
                   Seq.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
-                csCounters = addCount OfInput OfField 1 mempty
+                csCounters = addCount OfPublicInput OfField 1 mempty
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
 
