@@ -68,20 +68,21 @@ elaborateAndEncode :: Encode t => Comp t -> Either (Error n) Elaborated
 elaborateAndEncode = left LangError . Lang.elaborateAndEncode
 
 -- elaboration => interpretation
-interpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
-interpret prog rawInputs = do
+interpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
+interpret prog rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode prog
-  let inputs = Inputs.deserializeElab elab rawInputs
+  let inputs = Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs
   left InterpretError (Typed.run elab inputs)
 
--- | Given a Keelung program and a list of raw inputs
+-- | Given a Keelung program and a list of raw public inputs and private inputs,
 --   Generate (structured inputs, outputs, witness)
-genInputsOutputsWitnesses :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) (Inputs n, [n], Witness n)
-genInputsOutputsWitnesses prog rawInputs = do
+genInputsOutputsWitnesses :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) (Inputs n, [n], Witness n)
+genInputsOutputsWitnesses prog rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode prog
-  outputs <- left InterpretError (Typed.run elab (Inputs.deserializeElab elab rawInputs))
+  outputs <- left InterpretError (Typed.run elab (Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs))
+  -- generate another Inputs because the counters from r1cs are different from the ones from elab
   r1cs <- toR1CS <$> compileO1 prog
-  let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
+  let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
   witness <- left ExecError (witnessOfR1CS inputs r1cs)
   return (inputs, outputs, witness)
 
@@ -146,16 +147,17 @@ optimizeWithInput program inputs = do
 eraseElab :: (GaloisField n, Integral n) => Elaborated -> TypeErased n
 eraseElab = Erase.run
 
-interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String [n]
-interpretElab elab rawInputs =
-  let inputs = Inputs.deserializeElab elab rawInputs
+interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either String [n]
+interpretElab elab rawPublicInputs rawPrivateInputs =
+  let inputs = Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs
    in left (show . InterpretError) (Typed.run elab inputs)
 
-genInputsOutputsWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Either String (Inputs n, [n], Witness n)
-genInputsOutputsWitnessesElab elab rawInputs = do
-  outputs <- left (show . InterpretError) (Typed.run elab (Inputs.deserializeElab elab rawInputs))
+genInputsOutputsWitnessesElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either String (Inputs n, [n], Witness n)
+genInputsOutputsWitnessesElab elab rawPublicInputs rawPrivateInputs = do
+  outputs <- left (show . InterpretError) (Typed.run elab (Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs))
   r1cs <- toR1CS <$> left show (compileO1Elab elab)
-  let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
+  -- generate another Inputs because the counters from r1cs are different from the ones from elab
+  let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
   witness <- left (show . ExecError) (witnessOfR1CS inputs r1cs)
   return (inputs, outputs, witness)
 

@@ -24,42 +24,53 @@ removeBinRepsFromOutputs counters outputs =
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs
   { inputCounters :: Counters,
-    inputPublic :: InputSequence n
+    inputPublic :: InputSequence n,
+    inputPrivate :: InputSequence n
   }
   deriving (Eq, Show, Functor)
 
 -- | Parse raw inputs into structured inputs and populate corresponding binary representations
-deserialize :: (GaloisField n, Integral n) => Counters -> [n] -> Inputs n
-deserialize counters rawPublicInputs = do
+deserialize :: (GaloisField n, Integral n) => Counters -> [n] -> [n] -> Inputs n
+deserialize counters rawPublicInputs rawPrivateInputs = do
   -- go through all raw inputs
   -- sort and populate them with binary representation accordingly
   let publicInputSequence = new counters rawPublicInputs
-   in Inputs counters publicInputSequence
+      privateInputSequence = new counters rawPrivateInputs
+   in Inputs counters publicInputSequence privateInputSequence
 
 -- | Alternative version of 'deserialize' that accepts elaborated Keelung programs
-deserializeElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> Inputs n
+deserializeElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Inputs n
 deserializeElab elab = deserialize (compCounters (elabComp elab))
 
 -- | Concatenate all inputs into a single list
 flatten :: (GaloisField n, Integral n) => Inputs n -> [n]
-flatten (Inputs _ public) = flattenInputSequence public
+flatten (Inputs _ public private) = flattenInputSequence public <> flattenInputSequence private
 
 -- | Size of all inputs
 size :: (GaloisField n, Integral n) => Inputs n -> Int
-size = length . flatten
+size (Inputs counters _ _) =
+  let (startPublic, _endPublic) = getPublicInputVarRange counters
+      (_startPrivate, endPrivate) = getPrivateInputVarRange counters
+   in endPrivate - startPublic
 
 toIntMap :: (GaloisField n, Integral n) => Inputs n -> IntMap n
-toIntMap inputs =
-  let (start, _) = getPublicInputVarRange (inputCounters inputs)
-   in IntMap.fromDistinctAscList (zip [start ..] (flatten inputs))
+toIntMap (Inputs counters public private) =
+  let (startPublic, endPublic) = getPublicInputVarRange counters
+      (startPrivate, endPrivate) = getPrivateInputVarRange counters
+   in IntMap.fromDistinctAscList (zip [startPublic .. endPublic - 1] (flattenInputSequence public))
+        <> IntMap.fromDistinctAscList (zip [startPrivate .. endPrivate - 1] (flattenInputSequence private))
 
+-- | Assuming that the variables are ordered as follows:
+--      | output | public input | private input | intermediate
 toVector :: (GaloisField n, Integral n) => Inputs n -> Vector (Maybe n)
-toVector inputs =
-  let (start, end) = getPublicInputVarRange (inputCounters inputs)
-      totalCount = getTotalCount (inputCounters inputs)
-   in Vector.replicate start Nothing
-        <> Vector.fromList (map Just (flatten inputs))
-        <> Vector.replicate (totalCount - end) Nothing
+toVector (Inputs counters public private) =
+  let (startPublic, _endPublic) = getPublicInputVarRange counters
+      (_startPrivate, endPrivate) = getPrivateInputVarRange counters
+      totalCount = getTotalCount counters
+   in Vector.replicate startPublic Nothing
+        <> Vector.fromList (map Just (flattenInputSequence public))
+        <> Vector.fromList (map Just (flattenInputSequence private))
+        <> Vector.replicate (totalCount - endPrivate) Nothing
 
 --------------------------------------------------------------------------------
 
