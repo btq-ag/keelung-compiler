@@ -111,8 +111,8 @@ encodeVarCoeff (v, c) = list f [Left v, Right c]
 
 -- | Variables of a R1CS are re-indexed so that:
 --   index = 0:  reserved for the constant 1
---   index < 0:  reserved for the input & output variables
---   index > 0:  reserved for the all the other variables (witnesses)
+--   index < 0:  reserved for output variables and public inputs variables
+--   index > 0:  reserved for private input variables and all the other variables (witnesses)
 reindexR1C :: R1CS n -> R1C n -> R1C n
 reindexR1C r1cs (R1C a b c) =
   R1C

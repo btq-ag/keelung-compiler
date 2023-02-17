@@ -34,8 +34,8 @@ deserialize :: (GaloisField n, Integral n) => Counters -> [n] -> [n] -> Inputs n
 deserialize counters rawPublicInputs rawPrivateInputs = do
   -- go through all raw inputs
   -- sort and populate them with binary representation accordingly
-  let publicInputSequence = new counters rawPublicInputs
-      privateInputSequence = new counters rawPrivateInputs
+  let publicInputSequence = new (Seq.zip (getPublicInputSequence counters) (Seq.fromList rawPublicInputs))
+      privateInputSequence = new (Seq.zip (getPrivateInputSequence counters) (Seq.fromList rawPrivateInputs))
    in Inputs counters publicInputSequence privateInputSequence
 
 -- | Alternative version of 'deserialize' that accepts elaborated Keelung programs
@@ -93,8 +93,8 @@ instance Semigroup (InputSequence n) where
 instance Monoid (InputSequence n) where
   mempty = InputSequence mempty mempty mempty mempty
 
-new :: (GaloisField n, Integral n) => Counters -> [n] -> InputSequence n
-new counters rawInputs =
+new :: (GaloisField n, Integral n) => Seq ((VarType, b), n) -> InputSequence n
+new =
   foldl
     ( \inputSequence ((inputType, _index), rawInputValue) ->
         case inputType of
@@ -104,7 +104,6 @@ new counters rawInputs =
           OfUInt width -> addUInt width rawInputValue inputSequence
     )
     mempty
-    (Seq.zip (getPublicInputSequence counters) (Seq.fromList rawInputs))
 
 addField :: n -> InputSequence n -> InputSequence n
 addField x (InputSequence field bool uint uintBinRep) = InputSequence (field Seq.:|> x) bool uint uintBinRep
