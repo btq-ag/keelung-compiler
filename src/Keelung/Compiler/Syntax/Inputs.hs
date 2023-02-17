@@ -43,8 +43,8 @@ deserializeElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> In
 deserializeElab elab = deserialize (compCounters (elabComp elab))
 
 -- | Concatenate all inputs into a single list
-flatten :: (GaloisField n, Integral n) => Inputs n -> [n]
-flatten (Inputs _ public private) = flattenInputSequence public <> flattenInputSequence private
+flatten :: (GaloisField n, Integral n) => Inputs n -> ([n], [n])
+flatten (Inputs _ public private) = (flattenInputSequence public, flattenInputSequence private)
 
 -- | Size of all inputs
 size :: (GaloisField n, Integral n) => Inputs n -> Int

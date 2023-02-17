@@ -8,17 +8,17 @@ module Encode (serializeR1CS, serializeInputAndWitness) where
 import Data.Aeson
 import Data.Aeson.Encoding
 import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BS
+import Data.ByteString.Lazy qualified as BS
 import Data.Field.Galois (GaloisField (char, deg))
-import qualified Data.IntMap as IntMap
+import Data.IntMap qualified as IntMap
 import Data.Proxy
 import Keelung.Compiler.Util (Witness)
-import Keelung.Data.Polynomial (Poly)
-import qualified Keelung.Data.Polynomial as Poly
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
-import Keelung.Syntax.Counters hiding (reindex)
+import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Syntax
+import Keelung.Syntax.Counters hiding (reindex)
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
@@ -28,18 +28,18 @@ serializeR1CS :: (GaloisField n, Integral n) => R1CS n -> ByteString
 serializeR1CS = serializeR1CS2
 
 -- | Encodes inputs and witnesses in the JSON Lines text file format
---   the "inputs" field should contain both inputs and outputs
---   the "witnesses" field should contain rest of the witnesses
-serializeInputAndWitness :: Integral n => [n] -> [n] -> Witness n -> ByteString
-serializeInputAndWitness inputs outputs witnesses =
-  let instances = outputs <> inputs
+--   the "inputs" field should contain both outputs & public inputs
+--   the "witnesses" field should contain private inputs & rest of the witnesses
+serializeInputAndWitness :: Integral n => ([n], [n]) -> [n] -> Witness n -> ByteString
+serializeInputAndWitness (pubblicInputs, _) outputs witnesses =
+  let instances = outputs <> pubblicInputs
       instancesSize = length instances
-      -- remove the inputs and outputs from the witnesses
-      trimmedWitnesses = IntMap.elems $ IntMap.filterWithKey (\k _ -> k >= instancesSize) witnesses
+      -- remove the outputs & public inputs from the witnesses
+      privateInputsAndIntermediateVars = IntMap.elems $ IntMap.filterWithKey (\k _ -> k >= instancesSize) witnesses
    in encodingToLazyByteString $
         pairs $
           pairStr "inputs" (list (integerText . toInteger) instances)
-            <> pairStr "witnesses" (list (integerText . toInteger) trimmedWitnesses)
+            <> pairStr "witnesses" (list (integerText . toInteger) privateInputsAndIntermediateVars)
 
 --------------------------------------------------------------------------------
 
@@ -67,8 +67,8 @@ serializeR1CS2 r1cs =
             pairStr "version" (string "0.8.3")
               <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
               <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
-              <> pairStr "instances" (int (getCountBySort OfPublicInput counters + getCountBySort OfOutput counters)) -- inputs & outputs
-              <> pairStr "witness" (int (getCountBySort OfIntermediate counters)) -- other intermediate variables
+              <> pairStr "instances" (int (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters)) -- outputs & public inputs
+              <> pairStr "witness" (int (getCountBySort OfPrivateInput counters + getCountBySort OfIntermediate counters)) -- private inputs & other intermediate variables
               <> pairStr "constraints" (int (length r1cConstraints))
               <> pairStr "optimized" (bool True)
 
@@ -122,7 +122,7 @@ reindexR1C r1cs (R1C a b c) =
   where
     reindex :: Var -> Var
     reindex var
-      | isInputOrOutputVar var = -(var + 1) -- + 1 to avoid $0 the constant 1
+      | isPublicInputOrOutputVar var = -(var + 1) -- + 1 to avoid $0 the constant 1
       | otherwise = var + 1 -- + 1 to avoid $0 the constant 1
-    isInputOrOutputVar :: Var -> Bool
-    isInputOrOutputVar var = var < (getCountBySort OfPublicInput (r1csCounters r1cs) + getCountBySort OfOutput (r1csCounters r1cs))
+    isPublicInputOrOutputVar :: Var -> Bool
+    isPublicInputOrOutputVar var = var < (getCountBySort OfPublicInput (r1csCounters r1cs) + getCountBySort OfOutput (r1csCounters r1cs))
