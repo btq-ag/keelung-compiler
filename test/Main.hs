@@ -7,13 +7,17 @@ import Basic qualified
 
 import Control.Arrow (ArrowChoice (..))
 import Data.Sequence qualified as Seq
+import Data.Vector qualified as Vector
 import Keelung
 import Keelung.Compiler
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Relocated (cadd)
+import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS)
+import Keelung.Data.Bindings qualified as Bindings
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
+import Keelung.Data.Struct qualified as Bindings
 import Keelung.Syntax.Counters
 import Test.Compilation qualified as Compilation
 import Test.ConstraintMinimizer qualified as ConstraintMinimizer
@@ -48,6 +52,24 @@ main = hspec $ do
                 csCounters = addCount OfPublicInput OfField 1 mempty
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
+
+  describe "Witness generation" $ do
+    it "Program with public and private inputs" $ do
+      let program = do
+            x <- inputField Public
+            y <- inputField Private
+            return [x, y]
+      let actual = generateWitness program [1 :: GF181] [2]
+      let expected = do
+            cs <- Compiler.compile program
+            let witness =
+                  Bindings.OIX
+                    mempty
+                    (Bindings.Struct (Vector.fromList [1]) mempty mempty)
+                    (Bindings.Struct (Vector.fromList [2]) mempty mempty)
+                    mempty
+            return (Inputs.deserialize (csCounters cs) [1] [2], [1, 2], witness)
+      actual `shouldBe` expected
 
   describe "Keelung `compile`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
