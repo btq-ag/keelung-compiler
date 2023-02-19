@@ -14,10 +14,10 @@ import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Relocated (cadd)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS)
-import Keelung.Data.Bindings qualified as Bindings
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Data.Struct qualified as Bindings
+import Keelung.Data.Struct qualified as Witness
+import Keelung.Data.Witness qualified as Witness
 import Keelung.Syntax.Counters
 import Test.Compilation qualified as Compilation
 import Test.ConstraintMinimizer qualified as ConstraintMinimizer
@@ -54,7 +54,7 @@ main = hspec $ do
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
 
   describe "Witness generation" $ do
-    it "Program with public and private inputs" $ do
+    it "`generateWitness`" $ do
       let program = do
             x <- inputField Public
             y <- inputField Private
@@ -63,10 +63,10 @@ main = hspec $ do
       let expected = do
             cs <- Compiler.compile program
             let witness =
-                  Bindings.OIX
+                  Witness.OIX
                     mempty
-                    (Bindings.Struct (Vector.fromList [1]) mempty mempty)
-                    (Bindings.Struct (Vector.fromList [2]) mempty mempty)
+                    (Witness.HStruct $ Witness.Struct (Vector.fromList [1]) mempty mempty)
+                    (Witness.HStruct $ Witness.Struct (Vector.fromList [2]) mempty mempty)
                     mempty
             return (Inputs.deserialize (csCounters cs) [1] [2], [1, 2], witness)
       actual `shouldBe` expected

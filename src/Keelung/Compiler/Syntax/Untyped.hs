@@ -25,9 +25,9 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Util (indent)
-import Keelung.Data.Bindings (toSubscript)
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Data.Struct qualified as Struct
+import Keelung.Data.Witness (toSubscript)
 import Keelung.Field (N (..))
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters

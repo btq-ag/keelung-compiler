@@ -16,9 +16,9 @@ import Data.Semiring (Semiring (..))
 import GHC.TypeLits (KnownNat)
 import Keelung hiding (interpret, run)
 import Keelung.Compiler.Syntax.Inputs (Inputs (..))
-import Keelung.Data.Bindings
-import Keelung.Data.Bindings qualified as Bindings
 import Keelung.Data.Struct
+import Keelung.Data.Witness (Witness)
+import Keelung.Data.Witness qualified as Witness
 import Keelung.Interpreter.Monad
 import Keelung.Interpreter.Typed ()
 import Keelung.Syntax.Encode.Syntax qualified as Typed
@@ -69,7 +69,7 @@ runAndOutputWitnesses (Elaborated expr context) inputs = runM (compHeap context)
     values <- interpret e
     when (values /= [1]) $ do
       bindings <- get
-      let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
+      let bindingsInExpr = Witness.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e) bindingsInExpr
 
@@ -186,9 +186,9 @@ instance FreeVar Field where
   freeVars expr = case expr of
     Integer _ -> mempty
     Rational _ -> mempty
-    VarF var -> updateX (updateF (IntSet.insert var)) mempty
-    VarFI var -> updateI (updateF (IntSet.insert var)) mempty
-    VarFP var -> updateP (updateF (IntSet.insert var)) mempty
+    VarF var -> Witness.updateX (Witness.modifyF (IntSet.insert var)) mempty
+    VarFI var -> Witness.updateI (Witness.modifyF (IntSet.insert var)) mempty
+    VarFP var -> Witness.updateP (Witness.modifyF (IntSet.insert var)) mempty
     Add x y -> freeVars x <> freeVars y
     Sub x y -> freeVars x <> freeVars y
     Mul x y -> freeVars x <> freeVars y
@@ -199,9 +199,9 @@ instance FreeVar Field where
 instance FreeVar Boolean where
   freeVars expr = case expr of
     Boolean _ -> mempty
-    VarB var -> updateX (updateB (IntSet.insert var)) mempty
-    VarBI var -> updateI (updateB (IntSet.insert var)) mempty
-    VarBP var -> updateP (updateB (IntSet.insert var)) mempty
+    VarB var -> Witness.updateX (Witness.modifyB (IntSet.insert var)) mempty
+    VarBI var -> Witness.updateI (Witness.modifyB (IntSet.insert var)) mempty
+    VarBP var -> Witness.updateP (Witness.modifyB (IntSet.insert var)) mempty
     And x y -> freeVars x <> freeVars y
     Or x y -> freeVars x <> freeVars y
     Xor x y -> freeVars x <> freeVars y
@@ -215,9 +215,9 @@ instance FreeVar Boolean where
 instance KnownNat w => FreeVar (UInt w) where
   freeVars val = case val of
     UInt _ -> mempty
-    VarU var -> updateX (updateU (widthOf val) (IntSet.insert var)) mempty
-    VarUI var -> updateI (updateU (widthOf val) (IntSet.insert var)) mempty
-    VarUP var -> updateP (updateU (widthOf val) (IntSet.insert var)) mempty
+    VarU var -> Witness.updateX (Witness.modifyU (widthOf val) (IntSet.insert var)) mempty
+    VarUI var -> Witness.updateI (Witness.modifyU (widthOf val) (IntSet.insert var)) mempty
+    VarUP var -> Witness.updateP (Witness.modifyU (widthOf val) (IntSet.insert var)) mempty
     AddU x y -> freeVars x <> freeVars y
     SubU x y -> freeVars x <> freeVars y
     MulU x y -> freeVars x <> freeVars y

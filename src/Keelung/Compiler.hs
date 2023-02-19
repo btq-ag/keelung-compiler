@@ -17,7 +17,7 @@ module Keelung.Compiler
     erase,
     elaborateAndEncode,
     interpret,
-    genInputsOutputsWitnesses,
+    -- genInputsOutputsWitnesses,
     generateWitness,
     compileOnly,
     compile,
@@ -33,6 +33,7 @@ module Keelung.Compiler
     compileO2Elab,
     interpretElab,
     genInputsOutputsWitnessesElab,
+    generateWitnessElab,
     --
     asGF181N,
     asGF181,
@@ -57,7 +58,7 @@ import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1CS (R1CS (..))
-import Keelung.Data.Bindings qualified as Structured
+import Keelung.Data.Witness qualified as Witness
 import Keelung.Field (GF181)
 import Keelung.Interpreter.Typed qualified as Typed
 import Keelung.Monad (Comp)
@@ -78,17 +79,16 @@ interpret prog rawPublicInputs rawPrivateInputs = do
 
 -- | Given a Keelung program and a list of raw public inputs and private inputs,
 --   Generate (structured inputs, outputs, witness)
-genInputsOutputsWitnesses :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) (Inputs n, [n], Witness n)
-genInputsOutputsWitnesses prog rawPublicInputs rawPrivateInputs = do
-  elab <- elaborateAndEncode prog
-  outputs <- left InterpretError (Typed.run elab (Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs))
-  -- generate another Inputs because the counters from r1cs are different from the ones from elab
-  r1cs <- toR1CS <$> compileO1 prog
-  let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
-  witness <- left ExecError (witnessOfR1CS inputs r1cs)
-  return (inputs, outputs, witness)
-
-generateWitness :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) (Inputs n, [n], Structured.Witness n)
+-- genInputsOutputsWitnesses :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) (Inputs n, [n], Witness n)
+-- genInputsOutputsWitnesses prog rawPublicInputs rawPrivateInputs = do
+--   elab <- elaborateAndEncode prog
+--   outputs <- left InterpretError (Typed.run elab (Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs))
+--   -- generate another Inputs because the counters from r1cs are different from the ones from elab
+--   r1cs <- toR1CS <$> compileO1 prog
+--   let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
+--   witness <- left ExecError (witnessOfR1CS inputs r1cs)
+--   return (inputs, outputs, witness)
+generateWitness :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) (Inputs n, [n], Witness.Witness n)
 generateWitness program rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode program
   (outputs, witness) <- left InterpretError (Typed.runAndOutputWitnesses elab (Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs))
@@ -170,6 +170,14 @@ genInputsOutputsWitnessesElab elab rawPublicInputs rawPrivateInputs = do
   -- generate another Inputs because the counters from r1cs are different from the ones from elab
   let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
   witness <- left (show . ExecError) (witnessOfR1CS inputs r1cs)
+  return (inputs, outputs, witness)
+
+generateWitnessElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either (Error n) (Inputs n, [n], Witness.Witness n)
+generateWitnessElab elab rawPublicInputs rawPrivateInputs = do
+  (outputs, witness) <- left InterpretError (Typed.runAndOutputWitnesses elab (Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs))
+  -- generate another Inputs because the counters from r1cs are different from the ones from elab
+  r1cs <- toR1CS <$> compileO1Elab elab
+  let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
   return (inputs, outputs, witness)
 
 compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)

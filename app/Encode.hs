@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Encode (serializeR1CS, serializeInputAndWitness) where
+module Encode (serializeR1CS, serializeInputAndWitness, serializeInputAndWitness2) where
 
 -- import Data.Aeson.Encoding
 
@@ -17,8 +17,10 @@ import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
+import Keelung.Data.Witness qualified as Witness
 import Keelung.Syntax
 import Keelung.Syntax.Counters hiding (reindex)
+import Data.Foldable (Foldable(toList))
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
@@ -40,6 +42,21 @@ serializeInputAndWitness (pubblicInputs, _) outputs witnesses =
         pairs $
           pairStr "inputs" (list (integerText . toInteger) instances)
             <> pairStr "witnesses" (list (integerText . toInteger) privateInputsAndIntermediateVars)
+
+serializeInputAndWitness2 :: Integral n => ([n], [n]) -> [n] -> Witness.Witness n -> ByteString
+serializeInputAndWitness2 (_, _) outputs witness =
+  let -- instances = outputs <> pubblicInputs
+      --   instancesSize = length instances
+      -- remove the outputs & public inputs from the witnesses
+
+      publicInputs = concat $ toList $ fmap toList (Witness.ofI witness)
+      privateInputs = concat $ toList $ fmap toList (Witness.ofP witness)
+      intermediates = concat $ toList $ fmap toList (Witness.ofX witness)
+   in -- privateInputsAndIntermediateVars = IntMap.elems $ IntMap.filterWithKey (\k _ -> k >= instancesSize) witnesses
+      encodingToLazyByteString $
+        pairs $
+          pairStr "inputs" (list (integerText . toInteger) (outputs <> publicInputs))
+            <> pairStr "witnesses" (list (integerText . toInteger) (privateInputs <> intermediates))
 
 --------------------------------------------------------------------------------
 
