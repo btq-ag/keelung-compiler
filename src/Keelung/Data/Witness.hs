@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -28,23 +28,23 @@ import Keelung.Syntax (Width)
 --------------------------------------------------------------------------------
 
 -- | Homogeneous version of 'Struct'
-newtype HStruct a = HStruct (Struct a a a)
+data HStruct a = HStruct a a (IntMap a)
   deriving (Eq, Show, Generic)
 
 instance NFData a => NFData (HStruct a)
 
 instance Functor HStruct where
-  fmap func (HStruct (Struct f b u)) = HStruct $ Struct (func f) (func b) (fmap func u)
+  fmap func (HStruct f b u) = HStruct (func f) (func b) (fmap func u)
 
 instance Foldable HStruct where
-  foldMap func (HStruct (Struct f b u)) = func f <> func b <> foldMap func u
+  foldMap func (HStruct f b u) = func f <> func b <> foldMap func u
 
 instance Semigroup a => Semigroup (HStruct a) where
-  HStruct (Struct f1 b1 u1) <> HStruct (Struct f2 b2 u2) =
-    HStruct $ Struct (f1 <> f2) (b1 <> b2) (u1 <> u2)
+  HStruct f1 b1 u1 <> HStruct f2 b2 u2 =
+    HStruct (f1 <> f2) (b1 <> b2) (u1 <> u2)
 
 instance Monoid a => Monoid (HStruct a) where
-  mempty = HStruct $ Struct mempty mempty mempty
+  mempty = HStruct mempty mempty mempty
 
 instance Serialize n => Serialize (HStruct n)
 
@@ -56,9 +56,9 @@ class HasF a f | a -> f where
   modifyF :: (f -> f) -> a -> a
 
 instance HasF (HStruct f) f where
-  getF (HStruct (Struct f _ _)) = f
-  setF f (HStruct (Struct _ b u)) = HStruct $ Struct f b u
-  modifyF func (HStruct (Struct f b u)) = HStruct $ Struct (func f) b u
+  getF (HStruct f _ _) = f
+  setF f (HStruct _ b u) = HStruct f b u
+  modifyF func (HStruct f b u) = HStruct (func f) b u
 
 instance HasF (Struct f b u) f where
   getF (Struct f _ _) = f
@@ -73,9 +73,9 @@ class HasB a b | a -> b where
   modifyB :: (b -> b) -> a -> a
 
 instance HasB (HStruct b) b where
-  getB (HStruct (Struct _ b _)) = b
-  setB b (HStruct (Struct f _ u)) = HStruct $ Struct f b u
-  modifyB func (HStruct (Struct f b u)) = HStruct $ Struct f (func b) u
+  getB (HStruct _ b _) = b
+  setB b (HStruct f _ u) = HStruct f b u
+  modifyB func (HStruct f b u) = HStruct f (func b) u
 
 instance HasB (Struct f b u) b where
   getB (Struct _ b _) = b
@@ -90,13 +90,13 @@ class HasU a u | a -> u where
   modifyU :: Width -> (u -> u) -> a -> a
 
 instance HasU (HStruct u) u where
-  getU width (HStruct (Struct _ _ u)) = IntMap.lookup width u
-  setU width u (HStruct (Struct f b u')) = HStruct $ Struct f b (IntMap.insert width u u')
-  modifyU width func (HStruct (Struct f b u)) = HStruct $ Struct f b (IntMap.adjust func width u)
+  getU width (HStruct _ _ u) = IntMap.lookup width u
+  setU width u (HStruct f b u') = HStruct f b (IntMap.insert width u u')
+  modifyU width func (HStruct f b u) = HStruct f b (IntMap.adjust func width u)
 
 --------------------------------------------------------------------------------
 
-data OIX n = OIX
+data Rows n = Rows
   { ofO :: n,
     ofI :: n,
     ofP :: n,
@@ -104,51 +104,47 @@ data OIX n = OIX
   }
   deriving (Eq, Show, NFData, Generic, Functor)
 
-instance Serialize n => Serialize (OIX n)
+instance Serialize n => Serialize (Rows n)
 
-instance (Semigroup n) => Semigroup (OIX n) where
-  OIX o1 i1 p1 x1 <> OIX o2 i2 p2 x2 =
-    OIX (o1 <> o2) (i1 <> i2) (p1 <> p2) (x1 <> x2)
+instance (Semigroup n) => Semigroup (Rows n) where
+  Rows o1 i1 p1 x1 <> Rows o2 i2 p2 x2 =
+    Rows (o1 <> o2) (i1 <> i2) (p1 <> p2) (x1 <> x2)
 
-instance (Monoid n) => Monoid (OIX n) where
-  mempty = OIX mempty mempty mempty mempty
+instance (Monoid n) => Monoid (Rows n) where
+  mempty = Rows mempty mempty mempty mempty
 
-updateO :: (n -> n) -> OIX n -> OIX n
-updateO f (OIX o i p x) = OIX (f o) i p x
+updateO :: (n -> n) -> Rows n -> Rows n
+updateO f (Rows o i p x) = Rows (f o) i p x
 
-updateI :: (n -> n) -> OIX n -> OIX n
-updateI f (OIX o i p x) = OIX o (f i) p x
+updateI :: (n -> n) -> Rows n -> Rows n
+updateI f (Rows o i p x) = Rows o (f i) p x
 
-updateP :: (n -> n) -> OIX n -> OIX n
-updateP f (OIX o i p x) = OIX o i (f p) x
+updateP :: (n -> n) -> Rows n -> Rows n
+updateP f (Rows o i p x) = Rows o i (f p) x
 
-updateX :: (n -> n) -> OIX n -> OIX n
-updateX f (OIX o i p x) = OIX o i p (f x)
+updateX :: (n -> n) -> Rows n -> Rows n
+updateX f (Rows o i p x) = Rows o i p (f x)
 
 --------------------------------------------------------------------------------
 
-type Witness n = OIX (HStruct (Vector n))
-
-totalBindingStructToList :: Struct (TotalBinding n) (TotalBinding n) (TotalBinding n) -> [n]
-totalBindingStructToList (Struct f b u) =
-  toList b <> toList f <> concatMap (toList . snd) (IntMap.toList u)
+type Witness n = Rows (HStruct (Vector n))
 
 type TotalBinding n = Vector n
 
 --------------------------------------------------------------------------------
 
-type VarSet n = OIX (HStruct IntSet)
+type VarSet n = Rows (HStruct IntSet)
 
 showList' :: [String] -> String
 showList' xs = "[" <> List.intercalate ", " xs <> "]"
 
 instance {-# OVERLAPPING #-} Show (VarSet n) where
-  show (OIX o i p x) =
+  show (Rows o i p x) =
     showList' $
       showStruct "O" o <> showStruct "I" i <> showStruct "P" p <> showStruct "" x
     where
       showStruct :: String -> HStruct IntSet -> [String]
-      showStruct prefix (HStruct (Struct f b u)) =
+      showStruct prefix (HStruct f b u) =
         map (\var -> "B" <> prefix <> show var) (IntSet.toList b)
           <> map (\var -> "F" <> prefix <> show var) (IntSet.toList f)
           <> concatMap (\(width, xs) -> map (\var -> "U" <> toSubscript width <> prefix <> show var) (IntSet.toList xs)) (IntMap.toList u)
@@ -172,43 +168,41 @@ toSubscript = map go . show
 --------------------------------------------------------------------------------
 
 -- | Data structure for interpreters
-type Partial n = OIX (HStruct (PartialBinding n))
+type Partial n = Rows (HStruct (PartialBinding n))
 
 -- | Expected number of bindings and actual bindings
 type PartialBinding n = (Int, IntMap n)
 
 instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) where
-  show (OIX o i p x) = showList' $ showStruct "O" o <> showStruct "I" i <> showStruct "P" p <> showStruct "" x
+  show (Rows o i p x) = showList' $ showStruct "O" o <> showStruct "I" i <> showStruct "P" p <> showStruct "" x
     where
       showPartialBinding :: (GaloisField n, Integral n) => String -> (Int, IntMap n) -> IntMap String
       showPartialBinding prefix (_size, bindings) = IntMap.mapWithKey (\k v -> prefix <> show k <> " := " <> show (N v)) bindings
 
       showStruct :: (GaloisField n, Integral n) => String -> HStruct (PartialBinding n) -> [String]
-      showStruct suffix (HStruct (Struct f b u)) =
+      showStruct suffix (HStruct f b u) =
         toList (showPartialBinding ("F" <> suffix) f)
           <> toList (showPartialBinding ("B" <> suffix) b)
           <> concatMap (\(width, xs) -> toList (showPartialBinding ("U" <> suffix <> toSubscript width) xs)) (IntMap.toList u)
 
 -- | Convert a partial binding to a total binding, or return the variables that are not bound
 toTotal :: Partial n -> Either (VarSet n) (Witness n)
-toTotal (OIX o i p x) =
+toTotal (Rows o i p x) =
   toEither $
-    OIX
-      <$> first (\struct -> OIX struct mempty mempty mempty) (convertStruct o)
-      <*> first (\struct -> OIX mempty struct mempty mempty) (convertStruct i)
-      <*> first (\struct -> OIX mempty mempty struct mempty) (convertStruct p)
-      <*> first (OIX mempty mempty mempty) (convertStruct x)
+    Rows
+      <$> first (\struct -> Rows struct mempty mempty mempty) (convertStruct o)
+      <*> first (\struct -> Rows mempty struct mempty mempty) (convertStruct i)
+      <*> first (\struct -> Rows mempty mempty struct mempty) (convertStruct p)
+      <*> first (Rows mempty mempty mempty) (convertStruct x)
   where
     convertStruct ::
       HStruct (PartialBinding n) ->
       Validation (HStruct IntSet) (HStruct (Vector n))
-    convertStruct (HStruct (Struct f b u)) =
+    convertStruct (HStruct f b u) =
       HStruct
-        <$> ( Struct
-                <$> first (\set -> HStruct (Struct set mempty mempty)) (toTotal' f)
-                <*> first (\set -> HStruct (Struct mempty set mempty)) (toTotal' b)
-                <*> first (HStruct . Struct mempty mempty) (sequenceIntMap toTotal' u)
-            )
+        <$> first (\set -> HStruct set mempty mempty) (toTotal' f)
+        <*> first (\set -> HStruct mempty set mempty) (toTotal' b)
+        <*> first (HStruct mempty mempty) (sequenceIntMap toTotal' u)
 
     sequenceIntMap :: (a -> Validation b c) -> IntMap a -> Validation (IntMap b) (IntMap c)
     sequenceIntMap f = sequenceA . IntMap.mapWithKey (\width xs -> first (IntMap.singleton width) (f xs))
@@ -222,20 +216,19 @@ toTotal' (size, xs) =
     else Success (Vector.fromList (toList xs))
 
 restrictVars :: Partial n -> VarSet n -> Partial n
-restrictVars (OIX o i p x) (OIX o' i' p' x') =
-  OIX
+restrictVars (Rows o i p x) (Rows o' i' p' x') =
+  Rows
     (restrictStruct o o')
     (restrictStruct i i')
     (restrictStruct p p')
     (restrictStruct x x')
   where
     restrictStruct :: HStruct (PartialBinding n) -> HStruct IntSet -> HStruct (PartialBinding n)
-    restrictStruct (HStruct (Struct f b u)) (HStruct (Struct f' b' u')) =
-      HStruct $
-        Struct
-          (restrict f f')
-          (restrict b b')
-          (IntMap.intersectionWith restrict u u')
+    restrictStruct (HStruct f b u) (HStruct f' b' u') =
+      HStruct
+        (restrict f f')
+        (restrict b b')
+        (IntMap.intersectionWith restrict u u')
 
     restrict :: (Int, IntMap n) -> IntSet -> (Int, IntMap n)
     restrict (size, xs) set = (size, IntMap.restrictKeys xs set)

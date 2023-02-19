@@ -24,7 +24,6 @@ import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C (R1C)
 import Keelung.Constraint.R1CS (CNEQ)
 import Keelung.Data.BinRep (BinRep)
-import Keelung.Data.Struct
 import Keelung.Data.Witness
 import Keelung.Heap
 import Keelung.Syntax
@@ -69,35 +68,27 @@ toPartialBindings inputs =
         then Left (InputSizeError (Inputs.size inputs) expectedInputSize)
         else
           Right $
-            OIX
+            Rows
               { ofO =
-                  HStruct $
-                    Struct
-                      { structF = (getCount OfOutput OfField counters, mempty),
-                        structB = (getCount OfOutput OfBoolean counters, mempty),
-                        structU = IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))
-                      },
+                  HStruct
+                    (getCount OfOutput OfField counters, mempty)
+                    (getCount OfOutput OfBoolean counters, mempty)
+                    (IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))),
                 ofI =
-                  HStruct $
-                    Struct
-                      { structF = (getCount OfPublicInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs)))),
-                        structB = (getCount OfPublicInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs)))),
-                        structU = IntMap.mapWithKey (\w bindings -> (getCount OfPublicInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPublic inputs))
-                      },
+                  HStruct
+                    (getCount OfPublicInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
+                    (getCount OfPublicInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs))))
+                    (IntMap.mapWithKey (\w bindings -> (getCount OfPublicInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
                 ofP =
-                  HStruct $
-                    Struct
-                      { structF = (getCount OfPrivateInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs)))),
-                        structB = (getCount OfPrivateInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPrivate inputs)))),
-                        structU = IntMap.mapWithKey (\w bindings -> (getCount OfPrivateInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPrivate inputs))
-                      },
+                  HStruct
+                    (getCount OfPrivateInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
+                    (getCount OfPrivateInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPrivate inputs))))
+                    (IntMap.mapWithKey (\w bindings -> (getCount OfPrivateInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
                 ofX =
-                  HStruct $
-                    Struct
-                      { structF = (getCount OfIntermediate OfField counters, mempty),
-                        structB = (getCount OfIntermediate OfBoolean counters, mempty),
-                        structU = IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))
-                      }
+                  HStruct
+                    (getCount OfIntermediate OfField counters, mempty)
+                    (getCount OfIntermediate OfBoolean counters, mempty)
+                    (IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs)))
               }
 
 addF :: Var -> [n] -> M n ()
