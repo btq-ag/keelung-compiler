@@ -17,8 +17,8 @@ import Data.IntMap qualified as IntMap
 import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Data.Bindings
-import Keelung.Data.Bindings qualified as Bindings
+import Keelung.Data.VarGroup
+import Keelung.Data.VarGroup qualified as Bindings
 import Keelung.Data.Struct
 import Keelung.Interpreter.Monad
 import Keelung.Syntax.Encode.Syntax
@@ -74,59 +74,6 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
 
   -- lastly interpret the expression and return the result
   interpret expr
-
--- rawOutputs <- interpret expr
-
--- case expr of
---   Unit -> return ()
---   Boolean _ -> setBO rawOutputs
---   Field _ -> setFO rawOutputs
---   UInt x -> setUO (widthOfUInt x) rawOutputs
---   Array xs -> case toList xs of
---     [] -> return ()
---     (x : _) -> case x of
---       Boolean _ -> setBO rawOutputs
---       Field _ -> setFO rawOutputs
---       UInt x' -> setUO (widthOfUInt x') rawOutputs
---       _ -> error "impossible"
-
--- return rawOutputs
--- -- where
-
---   -- parse the interpreted outputs
---   -- and fill in the bindings of outputs
---   addBindingsOfOutputs :: Expr -> [n] -> M n ()
---   addBindingsOfOutputs expression values = case expression of
---     Unit -> return ()
---     Boolean _ -> addBO values
---     Field _ -> addFO values
---     UInt x -> addUO (widthOfUInt x) values
---     Array xs -> case toList xs of
---       [] -> return ()
---       (x : _) -> case x of
---         Unit -> return ()
---         Boolean _ -> setBO values
---         Field _ -> setFO values
---         UInt x' -> setUO (widthOfUInt x') values
---         Array xs -> _
-
---   -- Bit width of an UInt
---   widthOfUInt :: UInt -> Width
---   widthOfUInt uint = case uint of
---     ValU w _ -> w
---     VarU w _ -> w
---     VarUI w _ -> w
---     AddU w _ _ -> w
---     SubU w _ _ -> w
---     MulU w _ _ -> w
---     AndU w _ _ -> w
---     OrU w _ _ -> w
---     XorU w _ _ -> w
---     NotU w _ -> w
---     RoLU w _ _ -> w
---     ShLU w _ _ -> w
---     IfU w _ _ _ -> w
---     BtoU w _ -> w
 
 -- | Interpret a program with inputs.
 run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) [n]
@@ -249,9 +196,9 @@ instance FreeVar Computation where
 instance FreeVar Boolean where
   freeVars expr = case expr of
     ValB _ -> mempty
-    VarB var -> updateX (updateB (IntSet.insert var)) mempty
-    VarBI var -> updateI (updateB (IntSet.insert var)) mempty
-    VarBP var -> updateP (updateB (IntSet.insert var)) mempty
+    VarB var -> updateX (modifyB (IntSet.insert var)) mempty
+    VarBI var -> updateI (modifyB (IntSet.insert var)) mempty
+    VarBP var -> updateP (modifyB (IntSet.insert var)) mempty
     AndB x y -> freeVars x <> freeVars y
     OrB x y -> freeVars x <> freeVars y
     XorB x y -> freeVars x <> freeVars y
@@ -266,9 +213,9 @@ instance FreeVar Field where
   freeVars expr = case expr of
     ValF _ -> mempty
     ValFR _ -> mempty
-    VarF var -> updateX (updateF (IntSet.insert var)) mempty
-    VarFI var -> updateI (updateF (IntSet.insert var)) mempty
-    VarFP var -> updateP (updateF (IntSet.insert var)) mempty
+    VarF var -> updateX (modifyF (IntSet.insert var)) mempty
+    VarFI var -> updateI (modifyF (IntSet.insert var)) mempty
+    VarFP var -> updateP (modifyF (IntSet.insert var)) mempty
     AddF x y -> freeVars x <> freeVars y
     SubF x y -> freeVars x <> freeVars y
     MulF x y -> freeVars x <> freeVars y
@@ -279,9 +226,9 @@ instance FreeVar Field where
 instance FreeVar UInt where
   freeVars expr = case expr of
     ValU _ _ -> mempty
-    VarU w var -> updateX (updateU w (IntSet.insert var)) mempty
-    VarUI w var -> updateI (updateU w (IntSet.insert var)) mempty
-    VarUP w var -> updateP (updateU w (IntSet.insert var)) mempty
+    VarU w var -> updateX (modifyU w (IntSet.insert var)) mempty
+    VarUI w var -> updateI (modifyU w (IntSet.insert var)) mempty
+    VarUP w var -> updateP (modifyU w (IntSet.insert var)) mempty
     AddU _ x y -> freeVars x <> freeVars y
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y

@@ -111,21 +111,41 @@ runAndCompare program rawPublicInputs rawPrivateInputs = do
 tests :: SpecWith ()
 tests = do
   describe "Interpreters of different syntaxes should computes the same result" $ do
-    it "Basic.identity (public / Field)" $
+    it "identity (public / Field)" $
       property $ \inp -> do
         runAll Basic.identity [inp :: GF181] [] [inp]
 
-    it "Basic.identity (public / Boolean)" $ do
+    it "identity (public / Boolean)" $ do
       runAll Basic.identityB [1 :: GF181] [] [1]
       runAll Basic.identityB [0 :: GF181] [] [0]
 
-    it "Basic.identity (private)" $ do
+    it "identity (private)" $ do
       let program = inputField Private
       runAll program [] [1 :: GF181] [1]
 
-    it "Basic.add3" $ do
-      property $ \inp -> do
-        runAll Basic.add3 [inp :: GF181] [] [inp + 3]
+    it "Field arithmetics 1" $ do
+      let program = do 
+            x <- inputField Public
+            y <- inputField Public
+            return $ x * y + y * 2
+      property $ \(x, y) -> do
+        runAll program [x, y :: GF181] [] [x * y + y * 2]
+
+    it "Field arithmetics 2" $ do
+      let program = do 
+            x <- inputField Public
+            y <- inputField Private
+            return $ x * y + y * 2
+      property $ \(x, y) -> do
+        runAll program [x :: GF181] [y] [x * y + y * 2]
+
+    it "Field arithmetics 2" $ do
+      let program = do 
+            x <- inputField Private
+            y <- inputField Public
+            return $ x * y + y * 2
+      property $ \(x, y) -> do
+        runAll program [y :: GF181] [x] [x * y + y * 2]
 
     it "Basic.eq1" $
       property $ \inp -> do

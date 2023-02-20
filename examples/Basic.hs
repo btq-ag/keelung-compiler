@@ -44,11 +44,6 @@ identity = input Public
 identityB :: Comp Boolean
 identityB = input Public
 
-add3 :: Comp Field
-add3 = do
-  x <- inputField Public
-  return $ x + 3
-
 -- takes an input and see if its equal to 3
 eq1 :: Comp Boolean
 eq1 = do

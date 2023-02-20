@@ -55,12 +55,12 @@ import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as Unio
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
 import Keelung.Constraint.R1CS qualified as Constraint
-import Keelung.Data.Bindings (showList')
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Struct (Struct (..))
+import Keelung.Data.VarGroup (showList')
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
@@ -119,7 +119,7 @@ instance Show RefB where
   show (RefB x) = "B" ++ show x
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
-data RefF = RefFO Var | RefFI Var | RefFP Var | RefBtoRefF RefB  | RefF Var
+data RefF = RefFO Var | RefFI Var | RefFP Var | RefBtoRefF RefB | RefF Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefF where
@@ -129,7 +129,7 @@ instance Show RefF where
   show (RefF x) = "F" ++ show x
   show (RefBtoRefF x) = show x
 
-data RefU = RefUO Width Var | RefUI Width Var | RefUP Width Var | RefBtoRefU RefB  | RefU Width Var
+data RefU = RefUO Width Var | RefUI Width Var | RefUP Width Var | RefBtoRefU RefB | RefU Width Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefU where

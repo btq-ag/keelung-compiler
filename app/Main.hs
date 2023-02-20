@@ -4,28 +4,30 @@ module Main where
 
 import Control.Arrow (left)
 import Control.Monad.Except
-import qualified Data.ByteString.Char8 as BSC
-import qualified Data.ByteString.Lazy as BS
+import Data.ByteString.Char8 qualified as BSC
+import Data.ByteString.Lazy qualified as BS
 import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize, decode, encode)
-import Encode (serializeInputAndWitness, serializeR1CS)
+import Encode
 import Keelung.Compiler
-  ( RelocatedConstraintSystem,
-    Error (..),
+  ( Error (..),
+    RelocatedConstraintSystem,
     compileO0Elab,
     compileO1Elab,
     compileO2Elab,
     genInputsOutputsWitnessesElab,
+    generateWitnessElab,
     interpretElab,
     toR1CS,
   )
 import Keelung.Compiler.Syntax.Inputs (Inputs)
+import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Util (Witness)
+import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Field
 import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
 import Option
-import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 
 main :: IO ()
 main = withUtf8 $ do
@@ -92,8 +94,8 @@ main = withUtf8 $ do
               outputInterpretedResultAndWriteFile
                 (genInputsOutputsWitnessesElab elaborated (map fromInteger rawPublicInputs :: [B64]) (map fromInteger rawPrivateInputs :: [B64]))
             GF181 ->
-              outputInterpretedResultAndWriteFile
-                (genInputsOutputsWitnessesElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181]))
+              outputInterpretedResultAndWriteFile2
+                (left show (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181])))
             BN128 ->
               outputInterpretedResultAndWriteFile
                 (genInputsOutputsWitnessesElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128]))
@@ -132,6 +134,15 @@ main = withUtf8 $ do
         Left _ -> return ()
         Right (inputs, outputs, witness) -> do
           BS.writeFile "witness.jsonl" (serializeInputAndWitness (Inputs.flatten inputs) outputs witness)
+
+    outputInterpretedResultAndWriteFile2 :: (Serialize n, GaloisField n, Integral n) => Either String (Inputs n, [n], VarGroup.Witness n) -> IO ()
+    outputInterpretedResultAndWriteFile2 result = do
+      -- print outputs
+      outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
+      case result of
+        Left _ -> return ()
+        Right (inputs, outputs, witness) -> do
+          BS.writeFile "witness.jsonl" (serializeInputAndWitness2 (Inputs.flatten inputs) outputs witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do

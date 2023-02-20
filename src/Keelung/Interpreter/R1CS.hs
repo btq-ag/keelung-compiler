@@ -20,7 +20,7 @@ import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
 import Keelung.Data.BinRep (BinRep (..))
-import Keelung.Data.Bindings
+import Keelung.Data.VarGroup
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Interpreter.Monad (Constraint (..), Error (..))

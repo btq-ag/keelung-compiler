@@ -44,8 +44,8 @@ library
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
-      Keelung.Data.Bindings
       Keelung.Data.PolyG
+      Keelung.Data.VarGroup
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
@@ -100,8 +100,8 @@ executable keelungc
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
-      Keelung.Data.Bindings
       Keelung.Data.PolyG
+      Keelung.Data.VarGroup
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
@@ -173,8 +173,8 @@ test-suite keelung-test
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
-      Keelung.Data.Bindings
       Keelung.Data.PolyG
+      Keelung.Data.VarGroup
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
@@ -242,8 +242,8 @@ benchmark keelung-bench
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Untyped
       Keelung.Compiler.Util
-      Keelung.Data.Bindings
       Keelung.Data.PolyG
+      Keelung.Data.VarGroup
       Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
