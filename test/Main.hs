@@ -53,7 +53,7 @@ main = hspec $ do
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
 
   describe "Witness generation" $ do
-    it "`generateWitness`" $ do
+    it "`generateWitness` 1" $ do
       let program = do
             x <- inputField Public
             y <- inputField Private
@@ -68,6 +68,42 @@ main = hspec $ do
                     (Witness.HStruct (Vector.fromList [2]) mempty mempty)
                     mempty
             return (Inputs.deserialize (csCounters cs) [1] [2], [1, 2], witness)
+      actual `shouldBe` expected
+
+    it "`generateWitness` 2" $ do
+      let program = do
+            x1 <- inputField Public
+            x2 <- inputField Public
+            y1 <- inputField Private
+            return [x1 * y1, y1, x2 * y1]
+      let actual = generateWitness program [2, 3 :: GF181] [4]
+      let expected = do
+            cs <- Compiler.compile program
+            let witness =
+                  Witness.Rows
+                    mempty
+                    (Witness.HStruct (Vector.fromList [2, 3]) mempty mempty)
+                    (Witness.HStruct (Vector.fromList [4]) mempty mempty)
+                    mempty
+            return (Inputs.deserialize (csCounters cs) [2, 3] [4], [8, 4, 12], witness)
+      actual `shouldBe` expected
+
+    it "`generateWitness` 3" $ do
+      let program = do
+            p <- input Private
+            x <- inputField Public
+            y <- inputField Private
+            return $ cond p x y
+      let actual = generateWitness program [3 :: GF181] [1, 2]
+      let expected = do
+            cs <- Compiler.compile program
+            let witness =
+                  Witness.Rows
+                    mempty
+                    (Witness.HStruct (Vector.fromList [3]) mempty mempty)
+                    (Witness.HStruct (Vector.fromList [2]) (Vector.fromList [1]) mempty)
+                    mempty
+            return (Inputs.deserialize (csCounters cs) [3] [1, 2], [3], witness)
       actual `shouldBe` expected
 
   describe "Keelung `compile`" $ do
