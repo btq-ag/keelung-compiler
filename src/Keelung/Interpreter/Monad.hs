@@ -24,7 +24,8 @@ import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C (R1C)
 import Keelung.Constraint.R1CS (CNEQ)
 import Keelung.Data.BinRep (BinRep)
-import Keelung.Data.Witness
+import Keelung.Data.VarGroup
+import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Heap
 import Keelung.Syntax
 import Keelung.Syntax.Counters
@@ -49,7 +50,7 @@ instance Functor Constraint where
 -- | The interpreter monad
 type M n = ReaderT Heap (StateT (Partial n) (Except (Error n)))
 
-runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n a -> Either (Error n) (a, Witness n)
+runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n a -> Either (Error n) (a, VarGroup.Witness n)
 runM heap inputs p = do
   partialBindings <- toPartialBindings inputs
   (result, partialBindings') <- runExcept (runStateT (runReaderT p heap) partialBindings)
@@ -68,24 +69,24 @@ toPartialBindings inputs =
         then Left (InputSizeError (Inputs.size inputs) expectedInputSize)
         else
           Right $
-            Rows
+            VarGroups
               { ofO =
-                  HStruct
+                  VarGroup
                     (getCount OfOutput OfField counters, mempty)
                     (getCount OfOutput OfBoolean counters, mempty)
                     (IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))),
                 ofI =
-                  HStruct
+                  VarGroup
                     (getCount OfPublicInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
                     (getCount OfPublicInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs))))
                     (IntMap.mapWithKey (\w bindings -> (getCount OfPublicInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
                 ofP =
-                  HStruct
+                  VarGroup
                     (getCount OfPrivateInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
                     (getCount OfPrivateInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPrivate inputs))))
                     (IntMap.mapWithKey (\w bindings -> (getCount OfPrivateInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
                 ofX =
-                  HStruct
+                  VarGroup
                     (getCount OfIntermediate OfField counters, mempty)
                     (getCount OfIntermediate OfBoolean counters, mempty)
                     (IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs)))

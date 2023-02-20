@@ -27,7 +27,7 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.Util (indent)
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Data.Struct qualified as Struct
-import Keelung.Data.Witness (toSubscript)
+import Keelung.Data.VarGroup (toSubscript)
 import Keelung.Field (N (..))
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters

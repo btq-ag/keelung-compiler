@@ -60,7 +60,7 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Struct (Struct (..))
-import Keelung.Data.Witness (showList')
+import Keelung.Data.VarGroup (showList')
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 

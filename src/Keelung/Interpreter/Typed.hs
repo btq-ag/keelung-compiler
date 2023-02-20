@@ -17,8 +17,8 @@ import Data.IntMap qualified as IntMap
 import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Data.Witness
-import Keelung.Data.Witness qualified as Bindings
+import Keelung.Data.VarGroup
+import Keelung.Data.VarGroup qualified as Bindings
 import Keelung.Data.Struct
 import Keelung.Interpreter.Monad
 import Keelung.Syntax.Encode.Syntax

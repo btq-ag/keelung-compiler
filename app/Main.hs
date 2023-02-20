@@ -23,7 +23,7 @@ import Keelung.Compiler
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Util (Witness)
-import Keelung.Data.Witness qualified as Witness
+import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Field
 import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
@@ -135,7 +135,7 @@ main = withUtf8 $ do
         Right (inputs, outputs, witness) -> do
           BS.writeFile "witness.jsonl" (serializeInputAndWitness (Inputs.flatten inputs) outputs witness)
 
-    outputInterpretedResultAndWriteFile2 :: (Serialize n, GaloisField n, Integral n) => Either String (Inputs n, [n], Witness.Witness n) -> IO ()
+    outputInterpretedResultAndWriteFile2 :: (Serialize n, GaloisField n, Integral n) => Either String (Inputs n, [n], VarGroup.Witness n) -> IO ()
     outputInterpretedResultAndWriteFile2 result = do
       -- print outputs
       outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)

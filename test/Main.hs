@@ -16,7 +16,6 @@ import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Data.Witness qualified as Witness
 import Keelung.Syntax.Counters
 import Test.Compilation qualified as Compilation
 import Test.ConstraintMinimizer qualified as ConstraintMinimizer
@@ -24,6 +23,7 @@ import Test.Hspec
 import Test.Interpreter qualified as Interpreter
 import Test.Optimization qualified as Optimization
 import Test.VarLayout qualified as VarBookkeep
+import Keelung.Data.VarGroup (VarGroup(..), VarGroups (..))
 
 main :: IO ()
 main = hspec $ do
@@ -62,10 +62,10 @@ main = hspec $ do
       let expected = do
             cs <- Compiler.compile program
             let witness =
-                  Witness.Rows
+                  VarGroups
                     mempty
-                    (Witness.HStruct (Vector.fromList [1]) mempty mempty)
-                    (Witness.HStruct (Vector.fromList [2]) mempty mempty)
+                    (VarGroup (Vector.fromList [1]) mempty mempty)
+                    (VarGroup (Vector.fromList [2]) mempty mempty)
                     mempty
             return (Inputs.deserialize (csCounters cs) [1] [2], [1, 2], witness)
       actual `shouldBe` expected
@@ -80,10 +80,10 @@ main = hspec $ do
       let expected = do
             cs <- Compiler.compile program
             let witness =
-                  Witness.Rows
+                  VarGroups
                     mempty
-                    (Witness.HStruct (Vector.fromList [2, 3]) mempty mempty)
-                    (Witness.HStruct (Vector.fromList [4]) mempty mempty)
+                    (VarGroup (Vector.fromList [2, 3]) mempty mempty)
+                    (VarGroup (Vector.fromList [4]) mempty mempty)
                     mempty
             return (Inputs.deserialize (csCounters cs) [2, 3] [4], [8, 4, 12], witness)
       actual `shouldBe` expected
@@ -98,10 +98,10 @@ main = hspec $ do
       let expected = do
             cs <- Compiler.compile program
             let witness =
-                  Witness.Rows
+                  VarGroups
                     mempty
-                    (Witness.HStruct (Vector.fromList [3]) mempty mempty)
-                    (Witness.HStruct (Vector.fromList [2]) (Vector.fromList [1]) mempty)
+                    (VarGroup (Vector.fromList [3]) mempty mempty)
+                    (VarGroup (Vector.fromList [2]) (Vector.fromList [1]) mempty)
                     mempty
             return (Inputs.deserialize (csCounters cs) [3] [1, 2], [3], witness)
       actual `shouldBe` expected

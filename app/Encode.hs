@@ -17,7 +17,7 @@ import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Data.Witness qualified as Witness
+import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Syntax
 import Keelung.Syntax.Counters hiding (reindex)
 import Data.Foldable (Foldable(toList))
@@ -43,15 +43,15 @@ serializeInputAndWitness (pubblicInputs, _) outputs witnesses =
           pairStr "inputs" (list (integerText . toInteger) instances)
             <> pairStr "witnesses" (list (integerText . toInteger) privateInputsAndIntermediateVars)
 
-serializeInputAndWitness2 :: Integral n => ([n], [n]) -> [n] -> Witness.Witness n -> ByteString
+serializeInputAndWitness2 :: Integral n => ([n], [n]) -> [n] -> VarGroup.Witness n -> ByteString
 serializeInputAndWitness2 (_, _) outputs witness =
   let -- instances = outputs <> pubblicInputs
       --   instancesSize = length instances
       -- remove the outputs & public inputs from the witnesses
 
-      publicInputs = concat $ toList $ fmap toList (Witness.ofI witness)
-      privateInputs = concat $ toList $ fmap toList (Witness.ofP witness)
-      intermediates = concat $ toList $ fmap toList (Witness.ofX witness)
+      publicInputs = concat $ toList $ fmap toList (VarGroup.ofI witness)
+      privateInputs = concat $ toList $ fmap toList (VarGroup.ofP witness)
+      intermediates = concat $ toList $ fmap toList (VarGroup.ofX witness)
    in -- privateInputsAndIntermediateVars = IntMap.elems $ IntMap.filterWithKey (\k _ -> k >= instancesSize) witnesses
       encodingToLazyByteString $
         pairs $
