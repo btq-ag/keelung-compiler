@@ -11,10 +11,9 @@ import AggregateSignature.Program qualified as AggSig
 import AggregateSignature.Util qualified as AggSig
 import Basic qualified
 import Control.Arrow (left)
-import Debug.Trace
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile, run)
-import Keelung.Compiler (Error (..), compile, toR1CS)
+import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Constraint (relocateConstraintSystem)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
@@ -34,7 +33,6 @@ kinded :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] 
 kinded prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborate prog)
   let inputs = Inputs.deserialize (compCounters (elabComp elab)) rawPublicInputs rawPrivateInputs
-  traceShowM (compCounters (elabComp elab))
   left InterpretError (Kinded.run elab inputs)
 
 typed :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
@@ -61,7 +59,7 @@ csNew prog rawPublicInputs rawPrivateInputs = do
 
 relocated :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 relocated prog rawPublicInputs rawPrivateInputs = do
-  r1cs' <- toR1CS <$> compile prog
+  r1cs' <- toR1CS <$> Compiler.compile prog
   let inps = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
   case Relocated.run r1cs' inps of
     Left err -> Left (ExecError err)
@@ -79,15 +77,14 @@ runAll :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] 
 runAll program rawPublicInputs rawPrivateInputs rawOutputs = do
   kinded program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
-
--- typed program rawPublicInputs rawPrivateInputs
---   `shouldBe` Right rawOutputs
--- csNew program rawPublicInputs rawPrivateInputs
---   `shouldBe` Right rawOutputs
--- relocated program rawPublicInputs rawPrivateInputs
---   `shouldBe` Right rawOutputs
--- r1cs program rawPublicInputs rawPrivateInputs
---   `shouldBe` Right rawOutputs
+  typed program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
+  csNew program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
+  relocated program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
+  r1cs program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
 
 runAndCompare :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> IO ()
 runAndCompare program rawPublicInputs rawPrivateInputs = do

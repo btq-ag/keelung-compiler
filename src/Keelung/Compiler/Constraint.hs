@@ -49,7 +49,6 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind

@@ -48,7 +48,7 @@ optimize1 = snd . optimizeWithInput mempty
 optimize1' :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 optimize1' = MinimizeConstraints.run
 
-optimize2 :: GaloisField n => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
+optimize2 :: (GaloisField n, Integral n) => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
 optimize2 rcs =
   -- NOTE: Pinned vars include:
   --   - input vars
