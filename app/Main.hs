@@ -23,11 +23,11 @@ import Keelung.Compiler
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Util (Witness)
-import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Field
 import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
 import Option
+import Data.Vector (Vector)
 
 main :: IO ()
 main = withUtf8 $ do
@@ -135,14 +135,14 @@ main = withUtf8 $ do
         Right (inputs, outputs, witness) -> do
           BS.writeFile "witness.jsonl" (serializeInputAndWitness (Inputs.flatten inputs) outputs witness)
 
-    outputInterpretedResultAndWriteFile2 :: (Serialize n, GaloisField n, Integral n) => Either String (Inputs n, [n], VarGroup.Witness n) -> IO ()
+    outputInterpretedResultAndWriteFile2 :: (Serialize n, GaloisField n, Integral n) => Either String (Inputs n, [n], Vector n) -> IO ()
     outputInterpretedResultAndWriteFile2 result = do
       -- print outputs
       outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
       case result of
         Left _ -> return ()
         Right (inputs, outputs, witness) -> do
-          BS.writeFile "witness.jsonl" (serializeInputAndWitness2 (Inputs.flatten inputs) outputs witness)
+          BS.writeFile "witness.jsonl" (serializeInputAndWitness2 (Inputs.inputCounters inputs) (Inputs.flatten inputs) outputs witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do
