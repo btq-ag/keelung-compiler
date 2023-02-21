@@ -21,6 +21,7 @@ import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Syntax
 import Keelung.Syntax.Counters hiding (reindex)
 import Data.Foldable (Foldable(toList))
+import Data.Vector (Vector)
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
@@ -43,20 +44,21 @@ serializeInputAndWitness (pubblicInputs, _) outputs witnesses =
           pairStr "inputs" (list (integerText . toInteger) instances)
             <> pairStr "witnesses" (list (integerText . toInteger) privateInputsAndIntermediateVars)
 
-serializeInputAndWitness2 :: Integral n => ([n], [n]) -> [n] -> VarGroup.Witness n -> ByteString
-serializeInputAndWitness2 (_, _) outputs witness =
+serializeInputAndWitness2 :: (Integral n, Show n, GaloisField n) => Counters -> [n] -> Vector n -> ByteString
+serializeInputAndWitness2 counters outputs witness =
   let -- instances = outputs <> pubblicInputs
       --   instancesSize = length instances
       -- remove the outputs & public inputs from the witnesses
+      (instances, witnesses) = splitAt (getCountBySort OfPublicInput counters) $ toList witness
+      -- publicInputs = concat $ toList $ fmap  toList (VarGroup.ofI witness)
+      -- privateInputs = concat $ toList $ fmap toList (VarGroup.ofP witness)
+      -- intermediates = concat $ toList $ fmap toList (VarGroup.ofX witness)
 
-      publicInputs = concat $ toList $ fmap toList (VarGroup.ofI witness)
-      privateInputs = concat $ toList $ fmap toList (VarGroup.ofP witness)
-      intermediates = concat $ toList $ fmap toList (VarGroup.ofX witness)
    in -- privateInputsAndIntermediateVars = IntMap.elems $ IntMap.filterWithKey (\k _ -> k >= instancesSize) witnesses
       encodingToLazyByteString $
         pairs $
-          pairStr "inputs" (list (integerText . toInteger) (outputs <> publicInputs))
-            <> pairStr "witnesses" (list (integerText . toInteger) (privateInputs <> intermediates))
+          pairStr "inputs" (list (integerText . toInteger) (outputs <> instances))
+            <> pairStr "witnesses" (list (integerText . toInteger) witnesses)
 
 --------------------------------------------------------------------------------
 
@@ -85,7 +87,7 @@ serializeR1CS2 r1cs =
               <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
               <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
               <> pairStr "instances" (int (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters)) -- outputs & public inputs
-              <> pairStr "witness" (int (getCountBySort OfPrivateInput counters + getCountBySort OfIntermediate counters)) -- private inputs & other intermediate variables
+              <> pairStr "witness" (int (getTotalCount counters - getCountBySort OfOutput counters - getCountBySort OfPublicInput counters)) -- private inputs & other intermediate variables after optimization
               <> pairStr "constraints" (int (length r1cConstraints))
               <> pairStr "optimized" (bool True)
 

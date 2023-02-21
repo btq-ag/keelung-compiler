@@ -139,7 +139,7 @@ showList' xs = "[" <> List.intercalate ", " xs <> "]"
 instance {-# OVERLAPPING #-} Show (VarSet n) where
   show (VarGroups o i p x) =
     showList' $
-      showVarGroup "O" o <> showVarGroup "I" i <> showVarGroup "P" p <> showVarGroup "" x
+      showVarGroup "O" o <> showVarGroup "I" i <> showVarGroup "P" p <> showVarGroup "X" x
     where
       showVarGroup :: String -> VarGroup IntSet -> [String]
       showVarGroup prefix (VarGroup f b u) =

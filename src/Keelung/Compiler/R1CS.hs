@@ -43,6 +43,7 @@ generateWitness cs initWit =
       (witness, _) = optimizeWithWitness initWit cs'
    in if all (isMapped witness) variables
         then Right witness
+        --else error $ showWitness witness
         else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
   where
     isMapped witness var = IntMap.member var witness

@@ -63,6 +63,8 @@ import Keelung.Field (GF181)
 import Keelung.Interpreter.Typed qualified as Typed
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Encode.Syntax (Elaborated)
+import qualified Keelung.Interpreter.R1CS as R1CS
+import Data.Vector (Vector)
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
@@ -172,11 +174,11 @@ genInputsOutputsWitnessesElab elab rawPublicInputs rawPrivateInputs = do
   witness <- left (show . ExecError) (witnessOfR1CS inputs r1cs)
   return (inputs, outputs, witness)
 
-generateWitnessElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either (Error n) (Inputs n, [n], VarGroup.Witness n)
+generateWitnessElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either (Error n) (Inputs n, [n], Vector n)
 generateWitnessElab elab rawPublicInputs rawPrivateInputs = do
-  (outputs, witness) <- left InterpretError (Typed.runAndOutputWitnesses elab (Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs))
   -- generate another Inputs because the counters from r1cs are different from the ones from elab
   r1cs <- toR1CS <$> compileO1Elab elab
+  (outputs, witness) <- left InterpretError (R1CS.run' r1cs (Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs))
   let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
   return (inputs, outputs, witness)
 
