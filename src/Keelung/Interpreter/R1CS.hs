@@ -20,9 +20,9 @@ import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
 import Keelung.Data.BinRep (BinRep (..))
-import Keelung.Data.VarGroup
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
+import Keelung.Data.VarGroup
 import Keelung.Interpreter.Monad (Constraint (..), Error (..))
 import Keelung.Syntax
 import Keelung.Syntax.Counters
@@ -159,7 +159,7 @@ runM inputs p =
   let counters = Inputs.inputCounters inputs
    in case runExcept (execStateT p (Inputs.toIntMap inputs)) of
         Left err -> Left err
-        Right bindings -> case toEither $ toTotal' (getCountBySort OfPublicInput counters, bindings) of
+        Right bindings -> case toEither $ toTotal' (getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters, bindings) of
           Left unbound -> Left (VarUnassignedError' unbound)
           Right bindings' -> Right bindings'
 
