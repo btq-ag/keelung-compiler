@@ -300,54 +300,54 @@ shrinkR1C r1c = do
       (Polynomial _, Uninomial _ _) -> return $ Stuck r1c
       (Polynomial _, Polynomial _) -> return $ Stuck r1c
     R1C (Right as) (Right bs) (Right cs) -> case (substAndView bindings as, substAndView bindings bs, substAndView bindings cs) of
-      (Constant _, Constant _, Constant _) -> return Eliminated
-      (Constant a, Constant b, Uninomial c (var, coeff)) -> do
-        -- a * b - c = coeff var
-        bindVar var ((a * b - c) / coeff)
-        return Eliminated
-      (Constant _, Constant _, Polynomial _) -> return $ Stuck r1c
-      (Constant a, Uninomial b (var, coeff), Constant c) -> do
-        if a == 0
-          then return Eliminated
-          else do
-            -- a * (b + coeff var) = c
-            --    =>
-            -- a * b + a * coeff * var = c
-            --    =>
-            -- a * coeff * var = c - a * b
-            --    =>
-            -- var = (c - a * b) / (coeff * a)
-            bindVar var ((c - a * b) / (coeff * a))
-            return Eliminated
-      (Constant _, Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
-      (Constant _, Uninomial _ _, Polynomial _) -> return $ Stuck r1c
-      (Constant _, Polynomial _, Constant _) -> return $ Stuck r1c
-      (Constant _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
-      (Constant _, Polynomial _, Polynomial _) -> return $ Stuck r1c
-      (Uninomial a (var, coeff), Constant b, Constant c) -> do
-        if b == 0
-          then return Eliminated
-          else do
-            -- (a + coeff var) * b = c
-            bindVar var ((c - a * b) / (coeff * b))
-            return Eliminated
-      (Uninomial _ _, Constant _, Uninomial _ _) -> return $ Stuck r1c
-      (Uninomial _ _, Constant _, Polynomial _) -> return $ Stuck r1c
-      (Uninomial _ _, Uninomial _ _, Constant _) -> return $ Stuck r1c
-      (Uninomial _ _, Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
-      (Uninomial _ _, Uninomial _ _, Polynomial _) -> return $ Stuck r1c
-      (Uninomial _ _, Polynomial _, Constant _) -> return $ Stuck r1c
-      (Uninomial _ _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
-      (Uninomial _ _, Polynomial _, Polynomial _) -> return $ Stuck r1c
-      (Polynomial _, Constant _, Constant _) -> return $ Stuck r1c
-      (Polynomial _, Constant _, Uninomial _ _) -> return $ Stuck r1c
-      (Polynomial _, Constant _, Polynomial _) -> return $ Stuck r1c
-      (Polynomial _, Uninomial _ _, Constant _) -> return $ Stuck r1c
-      (Polynomial _, Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
-      (Polynomial _, Uninomial _ _, Polynomial _) -> return $ Stuck r1c
-      (Polynomial _, Polynomial _, Constant _) -> return $ Stuck r1c
-      (Polynomial _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
-      (Polynomial _, Polynomial _, Polynomial _) -> return $ Stuck r1c
+        (Constant _, Constant _, Constant _) -> return Eliminated
+        (Constant a, Constant b, Uninomial c (var, coeff)) -> do
+          -- a * b - c = coeff var
+          bindVar var ((a * b - c) / coeff)
+          return Eliminated
+        (Constant _, Constant _, Polynomial _) -> return $ Stuck r1c
+        (Constant a, Uninomial b (var, coeff), Constant c) -> do
+          if a == 0
+            then return Eliminated
+            else do
+              -- a * (b + coeff var) = c
+              --    =>
+              -- a * b + a * coeff * var = c
+              --    =>
+              -- a * coeff * var = c - a * b
+              --    =>
+              -- var = (c - a * b) / (coeff * a)
+              bindVar var ((c - a * b) / (coeff * a))
+              return Eliminated
+        (Constant _, Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
+        (Constant _, Uninomial _ _, Polynomial _) -> return $ Stuck r1c
+        (Constant _, Polynomial _, Constant _) -> return $ Stuck r1c
+        (Constant _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
+        (Constant _, Polynomial _, Polynomial _) -> return $ Stuck r1c
+        (Uninomial a (var, coeff), Constant b, Constant c) -> do
+          if b == 0
+            then return Eliminated
+            else do
+              -- (a + coeff var) * b = c
+              bindVar var ((c - a * b) / (coeff * b))
+              return Eliminated
+        (Uninomial _ _, Constant _, Uninomial _ _) -> return $ Stuck r1c
+        (Uninomial _ _, Constant _, Polynomial _) -> return $ Stuck r1c
+        (Uninomial _ _, Uninomial _ _, Constant _) -> return $ Stuck r1c
+        (Uninomial _ _, Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
+        (Uninomial _ _, Uninomial _ _, Polynomial _) -> return $ Stuck r1c
+        (Uninomial _ _, Polynomial _, Constant _) -> return $ Stuck r1c
+        (Uninomial _ _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
+        (Uninomial _ _, Polynomial _, Polynomial _) -> return $ Stuck r1c
+        (Polynomial _, Constant _, Constant _) -> return $ Stuck r1c
+        (Polynomial _, Constant _, Uninomial _ _) -> return $ Stuck r1c
+        (Polynomial _, Constant _, Polynomial _) -> return $ Stuck r1c
+        (Polynomial _, Uninomial _ _, Constant _) -> return $ Stuck r1c
+        (Polynomial _, Uninomial _ _, Uninomial _ _) -> return $ Stuck r1c
+        (Polynomial _, Uninomial _ _, Polynomial _) -> return $ Stuck r1c
+        (Polynomial _, Polynomial _, Constant _) -> return $ Stuck r1c
+        (Polynomial _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
+        (Polynomial _, Polynomial _, Polynomial _) -> return $ Stuck r1c
 
 -- | Substitute varaibles with values in a polynomial
 substAndView :: (Num n, Eq n) => IntMap n -> Poly n -> PolyResult n
@@ -367,3 +367,4 @@ data PolyResult n
   = Constant n
   | Uninomial n (Var, n)
   | Polynomial (Poly n)
+  deriving (Show, Eq, Ord, Functor)

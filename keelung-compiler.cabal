@@ -154,6 +154,7 @@ test-suite keelung-test
       Test.PolyG
       Test.UnionFind
       Test.VarLayout
+      Test.WitnessGeneration
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint

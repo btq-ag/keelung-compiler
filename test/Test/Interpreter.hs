@@ -25,6 +25,7 @@ import Keelung.Interpreter.Relocated qualified as Relocated
 import Keelung.Interpreter.Typed qualified as Typed
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
+import qualified Keelung.Syntax.Encode.Syntax as Encoded
 
 run :: IO ()
 run = hspec tests
@@ -38,7 +39,8 @@ kinded prog rawPublicInputs rawPrivateInputs = do
 typed :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 typed prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborateAndEncode prog)
-  let inputs = Inputs.deserializeElab elab rawPublicInputs rawPrivateInputs
+  let counters = Encoded.compCounters (Encoded.elabComp elab)
+  let inputs = Inputs.deserialize counters rawPublicInputs rawPrivateInputs
   left InterpretError (Typed.run elab inputs)
 
 -- csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]

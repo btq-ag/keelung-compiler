@@ -12,7 +12,6 @@ import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Syntax.Counters
-import Keelung.Syntax.Encode.Syntax (Computation (compCounters), Elaborated (elabComp))
 
 -- | Deserialise the outputs from the R1CS interpreter
 --   TODO: make it something like a proper inverse of Inputs.deserialize
@@ -37,10 +36,6 @@ deserialize counters rawPublicInputs rawPrivateInputs = do
   let publicInputSequence = new (Seq.zip (getPublicInputSequence counters) (Seq.fromList rawPublicInputs))
       privateInputSequence = new (Seq.zip (getPrivateInputSequence counters) (Seq.fromList rawPrivateInputs))
    in Inputs counters publicInputSequence privateInputSequence
-
--- | Alternative version of 'deserialize' that accepts elaborated Keelung programs
-deserializeElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Inputs n
-deserializeElab elab = deserialize (compCounters (elabComp elab))
 
 -- | Concatenate all inputs into a single list
 flatten :: (GaloisField n, Integral n) => Inputs n -> ([n], [n])

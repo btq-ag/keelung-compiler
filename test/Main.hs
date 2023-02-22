@@ -7,12 +7,10 @@ import Basic qualified
 
 import Control.Arrow (ArrowChoice (..))
 import Data.Sequence qualified as Seq
-import Data.Vector qualified as Vector
 import Keelung
 import Keelung.Compiler
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Relocated (cadd)
-import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
@@ -23,11 +21,13 @@ import Test.Hspec
 import Test.Interpreter qualified as Interpreter
 import Test.Optimization qualified as Optimization
 import Test.VarLayout qualified as VarBookkeep
-import Keelung.Data.VarGroup (VarGroup(..), VarGroups (..))
+import Test.WitnessGeneration qualified as WitnessGeneration
 
 main :: IO ()
 main = hspec $ do
   describe "Constraint Minimization" ConstraintMinimizer.tests
+
+  describe "Witness generation" WitnessGeneration.tests
 
   describe "Interpreter" Interpreter.tests
 
@@ -51,60 +51,6 @@ main = hspec $ do
                 csCounters = addCount OfPublicInput OfField 1 mempty
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
-
-  describe "Witness generation" $ do
-    it "`generateWitness` 1" $ do
-      let program = do
-            x <- inputField Public
-            y <- inputField Private
-            return [x, y]
-      let actual = generateWitness program [1 :: GF181] [2]
-      let expected = do
-            cs <- Compiler.compile program
-            let witness =
-                  VarGroups
-                    mempty
-                    (VarGroup (Vector.fromList [1]) mempty mempty)
-                    (VarGroup (Vector.fromList [2]) mempty mempty)
-                    mempty
-            return (Inputs.deserialize (csCounters cs) [1] [2], [1, 2], witness)
-      actual `shouldBe` expected
-
-    it "`generateWitness` 2" $ do
-      let program = do
-            x1 <- inputField Public
-            x2 <- inputField Public
-            y1 <- inputField Private
-            return [x1 * y1, y1, x2 * y1]
-      let actual = generateWitness program [2, 3 :: GF181] [4]
-      let expected = do
-            cs <- Compiler.compile program
-            let witness =
-                  VarGroups
-                    mempty
-                    (VarGroup (Vector.fromList [2, 3]) mempty mempty)
-                    (VarGroup (Vector.fromList [4]) mempty mempty)
-                    mempty
-            return (Inputs.deserialize (csCounters cs) [2, 3] [4], [8, 4, 12], witness)
-      actual `shouldBe` expected
-
-    it "`generateWitness` 3" $ do
-      let program = do
-            p <- input Private
-            x <- inputField Public
-            y <- inputField Private
-            return $ cond p x y
-      let actual = generateWitness program [3 :: GF181] [1, 2]
-      let expected = do
-            cs <- Compiler.compile program
-            let witness =
-                  VarGroups
-                    mempty
-                    (VarGroup (Vector.fromList [3]) mempty mempty)
-                    (VarGroup (Vector.fromList [2]) (Vector.fromList [1]) mempty)
-                    mempty
-            return (Inputs.deserialize (csCounters cs) [3] [1, 2], [3], witness)
-      actual `shouldBe` expected
 
   describe "Keelung `compile`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
