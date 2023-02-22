@@ -30,7 +30,8 @@ run counters pinnedVars constraints = do
   let set = Set.fromList $ toList constraints
   minimised <- minimiseManyTimes (set, getBinReps counters)
   pinned <- handlePinnedVars pinnedVars
-  return (Seq.fromList pinned <> Seq.fromList (Set.toList minimised))
+  let mixed = Set.fromList pinned <> minimised
+  return (Seq.fromList (Set.toList mixed))
 
 minimiseManyTimes ::
   (GaloisField n, Integral n) =>
