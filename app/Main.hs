@@ -20,10 +20,9 @@ import Keelung.Compiler
     interpretElab,
     toR1CS,
   )
-import Keelung.Compiler.Syntax.Inputs (Inputs (inputCounters))
+import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Util (Witness)
-import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Field
 import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
@@ -143,7 +142,7 @@ main = withUtf8 $ do
       case result of
         Left _ -> return ()
         Right (inputs, outputs, witness) -> do
-          BS.writeFile "witness.jsonl" (serializeInputAndWitness2 (inputCounters inputs) outputs witness)
+          BS.writeFile "witness.jsonl" (serializeInputAndWitness2 (Inputs.inputCounters inputs) (Inputs.flatten inputs) outputs witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do

@@ -10,18 +10,17 @@ import Data.Aeson.Encoding
 import Data.ByteString.Lazy (ByteString)
 import Data.ByteString.Lazy qualified as BS
 import Data.Field.Galois (GaloisField (char, deg))
+import Data.Foldable (Foldable (toList))
 import Data.IntMap qualified as IntMap
 import Data.Proxy
+import Data.Vector (Vector)
 import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Syntax
 import Keelung.Syntax.Counters hiding (reindex)
-import Data.Foldable (Foldable(toList))
-import Data.Vector (Vector)
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
@@ -44,20 +43,12 @@ serializeInputAndWitness (pubblicInputs, _) outputs witnesses =
           pairStr "inputs" (list (integerText . toInteger) instances)
             <> pairStr "witnesses" (list (integerText . toInteger) privateInputsAndIntermediateVars)
 
-serializeInputAndWitness2 :: (Integral n, Show n, GaloisField n) => Counters -> [n] -> Vector n -> ByteString
-serializeInputAndWitness2 counters outputs witness =
-  let -- instances = outputs <> pubblicInputs
-      --   instancesSize = length instances
-      -- remove the outputs & public inputs from the witnesses
-      (instances, witnesses) = splitAt (getCountBySort OfPublicInput counters) $ toList witness
-      -- publicInputs = concat $ toList $ fmap  toList (VarGroup.ofI witness)
-      -- privateInputs = concat $ toList $ fmap toList (VarGroup.ofP witness)
-      -- intermediates = concat $ toList $ fmap toList (VarGroup.ofX witness)
-
-   in -- privateInputsAndIntermediateVars = IntMap.elems $ IntMap.filterWithKey (\k _ -> k >= instancesSize) witnesses
-      encodingToLazyByteString $
+serializeInputAndWitness2 :: Integral n => Counters -> ([n], [n]) -> [n] -> Vector n -> ByteString
+serializeInputAndWitness2 counters (_, _) _ witness =
+  let (inputs, witnesses) = splitAt (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters) $ toList witness
+   in encodingToLazyByteString $
         pairs $
-          pairStr "inputs" (list (integerText . toInteger) (outputs <> instances))
+          pairStr "inputs" (list (integerText . toInteger) inputs)
             <> pairStr "witnesses" (list (integerText . toInteger) witnesses)
 
 --------------------------------------------------------------------------------

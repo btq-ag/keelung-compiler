@@ -702,10 +702,13 @@ relocateConstraintSystem cs =
     fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Seq (Relocated.Constraint n)
     fromUnionFindF unionFind occurrences =
       let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
-          inputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
+          publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
+          privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
           occurredVars = Map.keys $ Map.filter (> 0) occurrences
-       in Seq.fromList (Maybe.mapMaybe toConstant outputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant inputVars)
+       in Seq.fromList
+            (Maybe.mapMaybe toConstant outputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant publicInputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant privateInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant occurredVars)
       where
         toConstant var = case UnionFind.parentOf unionFind var of
