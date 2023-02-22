@@ -8,6 +8,7 @@ import Data.ByteString.Char8 qualified as BSC
 import Data.ByteString.Lazy qualified as BS
 import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize, decode, encode)
+import Data.Vector (Vector)
 import Encode
 import Keelung.Compiler
   ( Error (..),
@@ -15,19 +16,15 @@ import Keelung.Compiler
     compileO0Elab,
     compileO1Elab,
     compileO2Elab,
-    genInputsOutputsWitnessesElab,
     generateWitnessElab,
     interpretElab,
     toR1CS,
   )
-import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Compiler.Syntax.Inputs qualified as Inputs
-import Keelung.Compiler.Util (Witness)
 import Keelung.Field
+import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
 import Option
-import Data.Vector (Vector)
 
 main :: IO ()
 main = withUtf8 $ do
@@ -92,13 +89,13 @@ main = withUtf8 $ do
           case fieldType of
             B64 ->
               outputInterpretedResultAndWriteFile
-                (genInputsOutputsWitnessesElab elaborated (map fromInteger rawPublicInputs :: [B64]) (map fromInteger rawPrivateInputs :: [B64]))
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [B64]) (map fromInteger rawPrivateInputs :: [B64]))
             GF181 ->
-              outputInterpretedResultAndWriteFile2
-                (left show (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181])))
+              outputInterpretedResultAndWriteFile
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181]))
             BN128 ->
               outputInterpretedResultAndWriteFile
-                (genInputsOutputsWitnessesElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128]))
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128]))
     Version -> putStrLn "Keelung v0.8.3"
   where
     asB64 :: Either (Error B64) (RelocatedConstraintSystem B64) -> Either (Error B64) (RelocatedConstraintSystem B64)
@@ -122,27 +119,17 @@ main = withUtf8 $ do
           let r1cs = toR1CS cs'
           BS.writeFile "circuit.jsonl" (serializeR1CS r1cs)
 
-    outputInterpretedResult :: Serialize n => Either String [n] -> IO ()
+    outputInterpretedResult :: (Serialize a, Serialize n) => Either a [n] -> IO ()
     outputInterpretedResult = putStrLn . BSC.unpack . encode
 
-    outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Either String (Inputs n, [n], Witness n) -> IO ()
+    outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (Counters, [n], Vector n) -> IO ()
     outputInterpretedResultAndWriteFile result = do
       -- print outputs
       outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
-
       case result of
         Left _ -> return ()
-        Right (inputs, outputs, witness) -> do
-          BS.writeFile "witness.jsonl" (serializeInputAndWitness (Inputs.flatten inputs) outputs witness)
-
-    outputInterpretedResultAndWriteFile2 :: (Serialize n, GaloisField n, Integral n) => Either String (Inputs n, [n], Vector n) -> IO ()
-    outputInterpretedResultAndWriteFile2 result = do
-      -- print outputs
-      outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
-      case result of
-        Left _ -> return ()
-        Right (inputs, outputs, witness) -> do
-          BS.writeFile "witness.jsonl" (serializeInputAndWitness2 (Inputs.inputCounters inputs) (Inputs.flatten inputs) outputs witness)
+        Right (counters, _, witness) -> do
+          BS.writeFile "witness.jsonl" (serializeInputAndWitness counters witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do

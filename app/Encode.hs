@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Encode (serializeR1CS, serializeInputAndWitness, serializeInputAndWitness2) where
+module Encode (serializeR1CS, serializeInputAndWitness) where
 
 -- import Data.Aeson.Encoding
 
@@ -14,7 +14,6 @@ import Data.Foldable (Foldable (toList))
 import Data.IntMap qualified as IntMap
 import Data.Proxy
 import Data.Vector (Vector)
-import Keelung.Compiler.Util (Witness)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
 import Keelung.Data.Polynomial (Poly)
@@ -32,19 +31,8 @@ serializeR1CS = serializeR1CS2
 -- | Encodes inputs and witnesses in the JSON Lines text file format
 --   the "inputs" field should contain both outputs & public inputs
 --   the "witnesses" field should contain private inputs & rest of the witnesses
-serializeInputAndWitness :: Integral n => ([n], [n]) -> [n] -> Witness n -> ByteString
-serializeInputAndWitness (pubblicInputs, _) outputs witnesses =
-  let instances = outputs <> pubblicInputs
-      instancesSize = length instances
-      -- remove the outputs & public inputs from the witnesses
-      privateInputsAndIntermediateVars = IntMap.elems $ IntMap.filterWithKey (\k _ -> k >= instancesSize) witnesses
-   in encodingToLazyByteString $
-        pairs $
-          pairStr "inputs" (list (integerText . toInteger) instances)
-            <> pairStr "witnesses" (list (integerText . toInteger) privateInputsAndIntermediateVars)
-
-serializeInputAndWitness2 :: Integral n => Counters -> ([n], [n]) -> [n] -> Vector n -> ByteString
-serializeInputAndWitness2 counters (_, _) _ witness =
+serializeInputAndWitness :: Integral n => Counters -> Vector n -> ByteString
+serializeInputAndWitness counters witness =
   let (inputs, witnesses) = splitAt (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters) $ toList witness
    in encodingToLazyByteString $
         pairs $
