@@ -28,6 +28,7 @@ import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
 import Option
 import Data.Vector (Vector)
+import Data.Aeson.Encoding (encodingToLazyByteString, pairs)
 
 main :: IO ()
 main = withUtf8 $ do
@@ -142,7 +143,11 @@ main = withUtf8 $ do
       case result of
         Left _ -> return ()
         Right (inputs, outputs, witness) -> do
-          BS.writeFile "witness.jsonl" (serializeInputAndWitness2 (Inputs.inputCounters inputs) (Inputs.flatten inputs) outputs witness)
+          let (inputSeries, witnessSeries) = (serializeInputAndWitness2 (Inputs.inputCounters inputs) (Inputs.flatten inputs) outputs witness) 
+              inputJson = encodingToLazyByteString $ pairs inputSeries
+              allJson = encodingToLazyByteString $ pairs $ inputSeries <> witnessSeries
+          BS.writeFile "witness.jsonl" allJson
+          BS.writeFile "inputs.jsonl" inputJson
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do

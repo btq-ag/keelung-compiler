@@ -43,13 +43,11 @@ serializeInputAndWitness (pubblicInputs, _) outputs witnesses =
           pairStr "inputs" (list (integerText . toInteger) instances)
             <> pairStr "witnesses" (list (integerText . toInteger) privateInputsAndIntermediateVars)
 
-serializeInputAndWitness2 :: Integral n => Counters -> ([n], [n]) -> [n] -> Vector n -> ByteString
+serializeInputAndWitness2 :: Integral n => Counters -> ([n], [n]) -> [n] -> Vector n -> (Series, Series)
 serializeInputAndWitness2 counters (_, _) _ witness =
   let (inputs, witnesses) = splitAt (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters) $ toList witness
-   in encodingToLazyByteString $
-        pairs $
-          pairStr "inputs" (list (integerText . toInteger) inputs)
-            <> pairStr "witnesses" (list (integerText . toInteger) witnesses)
+   in (pairStr "inputs" (list (integerText . toInteger) inputs)
+       , pairStr "witnesses" (list (integerText . toInteger) witnesses))
 
 --------------------------------------------------------------------------------
 
