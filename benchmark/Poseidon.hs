@@ -21,7 +21,7 @@ run =
   where
     program :: Int -> Comp [Field]
     program n = replicateM n $ do
-      xs <- inputList 1
+      xs <- inputList Public 1
       Poseidon.hash (toList xs)
 
     compilation :: Benchmark
