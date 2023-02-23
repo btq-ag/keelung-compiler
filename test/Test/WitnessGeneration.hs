@@ -1,14 +1,15 @@
 module Test.WitnessGeneration (run, tests) where
 
 -- import Data.Vector qualified as Vector
+
+-- import Keelung.Data.VarGroup (VarGroup (..), VarGroups (VarGroups))
+
+-- import Data.Foldable (Foldable(toList))
+import Data.Vector qualified as Vec
 import Keelung hiding (run)
 import Keelung.Compiler (RelocatedConstraintSystem (..), generateWitness)
 import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.Syntax.Inputs qualified as Inputs
--- import Keelung.Data.VarGroup (VarGroup (..), VarGroups (VarGroups))
 import Test.Hspec
--- import Data.Foldable (Foldable(toList))
-import qualified Data.Vector as Vec
 
 run :: IO ()
 run = hspec tests
@@ -24,7 +25,7 @@ tests = do
       let actual = generateWitness program [1 :: GF181] [2]
       let expected = do
             cs <- Compiler.compile program
-            return (Inputs.deserialize (csCounters cs) [1] [2], [1, 2], Vec.fromList [1, 2, 1, 2])
+            return (csCounters cs, [1, 2], Vec.fromList [1, 2, 1, 2])
       actual `shouldBe` expected
 
     it "`generateWitness` 2" $ do
@@ -35,7 +36,7 @@ tests = do
       let actual = generateWitness program [2 :: GF181] [3]
       let expected = do
             cs <- Compiler.compile program
-            return (Inputs.deserialize (csCounters cs) [2] [3], [6], Vec.fromList [6, 2, 3])
+            return (csCounters cs, [6], Vec.fromList [6, 2, 3])
       actual `shouldBe` expected
 
     it "`generateWitness` 3" $ do
@@ -47,9 +48,8 @@ tests = do
       let actual = generateWitness program [2, 3 :: GF181] [4]
       let expected = do
             cs <- Compiler.compile program
-            return (Inputs.deserialize (csCounters cs) [2, 3] [4], [8, 4, 12], Vec.fromList [8, 4, 12, 2, 3, 4])
+            return (csCounters cs, [8, 4, 12], Vec.fromList [8, 4, 12, 2, 3, 4])
       actual `shouldBe` expected
-
 
     it "`generateWitness` 4" $ do
       let program = do
@@ -60,7 +60,7 @@ tests = do
       let actual = generateWitness program [3 :: GF181] [1, 2]
       let expected = do
             cs <- Compiler.compile program
-            return (Inputs.deserialize (csCounters cs) [3] [1, 2], [3], Vec.fromList [3, 3, 2, 1])
+            return (csCounters cs, [3], Vec.fromList [3, 3, 2, 1])
       actual `shouldBe` expected
 
     it "`generateWitness` 5" $ do
@@ -70,5 +70,5 @@ tests = do
       let actual = generateWitness program [] [0, 1, 2, 3 :: GF181]
       let expected = do
             cs <- Compiler.compile program
-            return (Inputs.deserialize (csCounters cs) [] [0, 1, 2, 3], [0], Vec.fromList [0, 0, 1, 2, 3])
+            return (csCounters cs, [0], Vec.fromList [0, 0, 1, 2, 3])
       actual `shouldBe` expected
