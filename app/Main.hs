@@ -96,7 +96,7 @@ main = withUtf8 $ do
             BN128 ->
               outputInterpretedResultAndWriteFile
                 (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128]))
-    Version -> putStrLn "Keelung v0.8.4"
+    Version -> putStrLn "Keelung v0.9.0"
   where
     asB64 :: Either (Error B64) (RelocatedConstraintSystem B64) -> Either (Error B64) (RelocatedConstraintSystem B64)
     asB64 = id

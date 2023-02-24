@@ -1,10 +1,10 @@
 name:                keelung-compiler
-version:             0.1.0.0
+version:             0.9.0.0
 github:              "btq-ag/keelung-compiler"
 license:             BSD3
-author:              "Ting-GIan LUA"
-maintainer:          "ty.lai@btq.li"
-copyright:           "2022 BTQ AG"
+author:              "BTQ AG"
+maintainer:          "BTQ AG"
+copyright:           "2022-2023 BTQ AG"
 
 extra-source-files:
 - README.md

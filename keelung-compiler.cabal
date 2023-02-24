@@ -5,13 +5,13 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           keelung-compiler
-version:        0.1.0.0
+version:        0.9.0.0
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung-compiler#readme>
 homepage:       https://github.com/btq-ag/keelung-compiler#readme
 bug-reports:    https://github.com/btq-ag/keelung-compiler/issues
-author:         Ting-GIan LUA
-maintainer:     ty.lai@btq.li
-copyright:      2022 BTQ AG
+author:         BTQ AG
+maintainer:     BTQ AG
+copyright:      2022-2023 BTQ AG
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
