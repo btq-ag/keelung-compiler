@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 haskell:8.10.7-slim as builder 
+FROM --platform=linux/amd64 haskell:9.2.5-slim as builder 
 # for accessing private repositories
 RUN  apt-get -yq update && \
      apt-get -yqq install ssh && \
@@ -7,9 +7,9 @@ RUN  apt-get -yq update && \
 # copy the content of the repository to the container
 COPY . . 
 # grant access right to private repositories during the build process
-RUN --mount=type=ssh stack install
+RUN stack install
 # multi-stage build
-FROM --platform=linux/amd64 haskell:8.10.7-slim
+FROM --platform=linux/amd64 haskell:9.2.5-slim
 # copy the built binary 
 COPY --from=builder /root/.local/bin/keelungc /usr/local/bin/
 ENTRYPOINT [ "keelungc" ]
