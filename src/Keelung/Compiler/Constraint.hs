@@ -44,6 +44,7 @@ import Control.DeepSeq (NFData)
 import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
+import Data.IntSet qualified as IntSet
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
@@ -60,7 +61,7 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Struct (Struct (..))
-import Keelung.Data.VarGroup (showList')
+import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
@@ -139,22 +140,6 @@ instance Show RefU where
     RefUP w x -> "UP" ++ toSubscript w ++ show x
     RefU w x -> "U" ++ toSubscript w ++ show x
     RefBtoRefU x -> show x
-    where
-      toSubscript :: Int -> String
-      toSubscript = map go . show
-        where
-          go c = case c of
-            '0' -> '₀'
-            '1' -> '₁'
-            '2' -> '₂'
-            '3' -> '₃'
-            '4' -> '₄'
-            '5' -> '₅'
-            '6' -> '₆'
-            '7' -> '₇'
-            '8' -> '₈'
-            '9' -> '₉'
-            _ -> c
 
 --------------------------------------------------------------------------------
 
@@ -630,37 +615,35 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
         let totalSize = getTotalCount counters
             padRight4 s = s <> replicate (4 - length s) ' '
             padLeft12 n = replicate (12 - length (show n)) ' ' <> show n
-            formLine typ = padLeft12 (getCount OfOutput typ counters) <> "  " <> padLeft12 (getCount OfPublicInput typ counters) <> "      " <> padLeft12 (getCount OfIntermediate typ counters)
-            toSubscript = map go . show
-              where
-                go c = case c of
-                  '0' -> '₀'
-                  '1' -> '₁'
-                  '2' -> '₂'
-                  '3' -> '₃'
-                  '4' -> '₄'
-                  '5' -> '₅'
-                  '6' -> '₆'
-                  '7' -> '₇'
-                  '8' -> '₈'
-                  '9' -> '₉'
-                  _ -> c
+            formLine typ =
+              padLeft12 (getCount OfOutput typ counters)
+                <> "    "
+                <> padLeft12 (getCount OfPublicInput typ counters)
+                <> "    "
+                <> padLeft12 (getCount OfPrivateInput typ counters)
+                <> "    "
+                <> padLeft12 (getCount OfIntermediate typ counters)
             uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (OfUInt w)
-            showUInts (Counters o _ _ _ _ _ _) =
-              let xs = map uint (IntMap.keys (structU o))
-               in if null xs then "\n    UInt            none          none              none" else mconcat xs
+            -- Bit widths existed in the system
+            uintWidthEnties (Counters o i p x _ _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
+            showUInts =
+              let entries = uintWidthEnties counters
+               in if IntSet.null entries
+                    then ""
+                    else mconcat $ fmap uint (IntSet.toList entries)
          in if totalSize == 0
               then ""
               else
                 "  Variables ("
                   <> show totalSize
                   <> "):\n"
-                  <> "                  output         input      intermediate\n"
+                  <> "                  output       pub input      priv input    intermediate\n"
+                  <> "    --------------------------------------------------------------------"
                   <> "\n    Field   "
                   <> formLine OfField
                   <> "\n    Boolean "
                   <> formLine OfBoolean
-                  <> showUInts counters
+                  <> showUInts
                   <> "\n"
 
 relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
