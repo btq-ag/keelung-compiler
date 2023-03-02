@@ -45,6 +45,13 @@ extra-deps:
   commit: d7d0da6b5df8045afdfb820ba8d08f34dc4c3e58
 - git: https://github.com/btq-ag/keelung.git
   commit: 930c265d6fa0ccfbce6aad473b7396a250ddb0d1
+
+# For cabal-plan to generate license report
+- cabal-install-parsers-0.5
+- Cabal-syntax-3.8.1.0@sha256:ed2d937ba6c6a20b75850349eedd41374885fc42369ef152d69e2ba70f44f593,7620
+- aeson-2.1.1.0@sha256:103ceb1421cd0ffa810bfb1acb1261d60addbde1a041fb5cce0056ff7d7dcdc2,5980
+- generically-0.1
+       
 # - git: git@github.com:btq-ag/keelung-examples.git
 #   commit: 7e45f20becf27654f8af35ef0df3390db28b8c10
 

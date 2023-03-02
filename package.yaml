@@ -35,6 +35,7 @@ dependencies:
 - semirings
 - validation
 - vector
+- cabal-install-parsers ^>= 0.5
 
 default-extensions: 
 - ImportQualifiedPost

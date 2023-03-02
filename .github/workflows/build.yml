@@ -60,7 +60,7 @@ jobs:
     # actions:
 
 
-    - name: ⏬ Install stack
+    - name: ⏬ Install GHCup & GHC & stack & cabal
       run: |
         mkdir -p ~/.local/bin
         export PATH=~/.ghcup/bin:~/.local/bin:$PATH
@@ -73,15 +73,17 @@ jobs:
     - name: 🔨 Build and run tests
       run: |
         stack test
+
+    - name: Build with cabal for license report
+      run: |
+        cabal new-build
+
+    - name: Install license report
+      run: |
+        stack install --flag cabal-plan:license-report cabal-plan
+
     - name: Generate license report
       run: |
-        wget https://github.com/hasufell/stack2cabal/releases/download/v1.0.13/stack2cabal-linux
-        chmod +x stack2cabal-linux
-        ./stack2cabal-linux
-        cabal update --user
-        cabal install --user -f license-report cabal-plan
-        export PATH=$HOME/.cabal/bin:$PATH
-        cabal new-build --user
         cabal-plan license-report keelung-compiler > LICENSES.md
     
     - name: Upload license report to artifact

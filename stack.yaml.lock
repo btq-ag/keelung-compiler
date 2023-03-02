@@ -26,6 +26,34 @@ packages:
   original:
     commit: 930c265d6fa0ccfbce6aad473b7396a250ddb0d1
     git: https://github.com/btq-ag/keelung.git
+- completed:
+    hackage: cabal-install-parsers-0.6@sha256:71ac9d554ae98e42aef9ef8146ba240c6381ad340a8535ff6e48f245bcd9afec,3935
+    pantry-tree:
+      sha256: bcc37297ffba3ab81ce1af4fa9eb3c665baac983482701768031c71e86c57069
+      size: 1148
+  original:
+    hackage: cabal-install-parsers-0.6
+- completed:
+    hackage: Cabal-syntax-3.8.1.0@sha256:ed2d937ba6c6a20b75850349eedd41374885fc42369ef152d69e2ba70f44f593,7620
+    pantry-tree:
+      sha256: ea286f643cc7b11dd7efe98982403515419e0c91909c48007927538358bfc4a3
+      size: 11052
+  original:
+    hackage: Cabal-syntax-3.8.1.0@sha256:ed2d937ba6c6a20b75850349eedd41374885fc42369ef152d69e2ba70f44f593,7620
+- completed:
+    hackage: aeson-2.1.1.0@sha256:103ceb1421cd0ffa810bfb1acb1261d60addbde1a041fb5cce0056ff7d7dcdc2,5980
+    pantry-tree:
+      sha256: 1bc76a80ce1638fb77e1a948ce7f1e1c89989edfc2413e5225ced36ae78d5a1a
+      size: 38895
+  original:
+    hackage: aeson-2.1.1.0@sha256:103ceb1421cd0ffa810bfb1acb1261d60addbde1a041fb5cce0056ff7d7dcdc2,5980
+- completed:
+    hackage: generically-0.1@sha256:16d54a08bcdf708395c2200a28ffcba55e90479dc96ed617dbb94f0411f7a7af,1024
+    pantry-tree:
+      sha256: 302b140ee5ccf6754ab96154486051f9ab989d3cbaa7c9674e1e9f0de7cdd07b
+      size: 232
+  original:
+    hackage: generically-0.1
 snapshots:
 - completed:
     sha256: 8bcce0b4f5671ea04691477f5af759b497b8892f998768d6eb01c64c58d41d7c
