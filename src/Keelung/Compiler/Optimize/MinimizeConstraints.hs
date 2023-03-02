@@ -6,6 +6,7 @@ import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
 import Keelung.Compiler.Constraint
+import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG

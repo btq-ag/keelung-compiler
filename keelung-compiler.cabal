@@ -28,6 +28,7 @@ library
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -84,6 +85,7 @@ executable keelungc
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -158,6 +160,7 @@ test-suite keelung-test
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -227,6 +230,7 @@ benchmark keelung-bench
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation

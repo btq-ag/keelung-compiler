@@ -46,7 +46,7 @@ import Data.Vector (Vector)
 import Keelung (Encode, N (..))
 import Keelung qualified as Lang
 import Keelung.Compiler.Compile qualified as Compile
-import Keelung.Compiler.Constraint (ConstraintSystem, relocateConstraintSystem)
+import Keelung.Compiler.ConstraintSystem (ConstraintSystem, relocateConstraintSystem)
 import Keelung.Compiler.Error
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
