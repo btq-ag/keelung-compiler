@@ -93,13 +93,13 @@ toPartialBindings inputs =
               }
 
 addF :: Var -> [n] -> M n ()
-addF var vals = modify (updateX (modifyF (second (IntMap.insert var (head vals)))))
+addF var vals = modify (modifyX (modifyF (second (IntMap.insert var (head vals)))))
 
 addB :: Var -> [n] -> M n ()
-addB var vals = modify (updateX (modifyB (second (IntMap.insert var (head vals)))))
+addB var vals = modify (modifyX (modifyB (second (IntMap.insert var (head vals)))))
 
 addU :: Width -> Var -> [n] -> M n ()
-addU width var vals = modify (updateX (modifyU width (second (IntMap.insert var (head vals)))))
+addU width var vals = modify (modifyX (modifyU width (second (IntMap.insert var (head vals)))))
 
 lookupVar :: (GaloisField n, Integral n) => String -> (Partial n -> (Int, IntMap n)) -> Int -> M n n
 lookupVar prefix selector var = do

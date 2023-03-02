@@ -16,6 +16,7 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.List qualified as List
+import Data.Maybe qualified as Maybe
 import Data.Serialize (Serialize)
 import Data.Validation
 import Data.Vector (Vector)
@@ -24,6 +25,7 @@ import GHC.Generics (Generic)
 import Keelung.Data.N (N (N))
 import Keelung.Data.Struct
 import Keelung.Syntax (Width)
+import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
@@ -54,6 +56,7 @@ class HasF a f | a -> f where
   getF :: a -> f
   putF :: f -> a -> a
   modifyF :: (f -> f) -> a -> a
+  modifyF f x = putF (f (getF x)) x
 
 instance HasF (VarGroup f) f where
   getF (VarGroup f _ _) = f
@@ -71,6 +74,7 @@ class HasB a b | a -> b where
   getB :: a -> b
   putB :: b -> a -> a
   modifyB :: (b -> b) -> a -> a
+  modifyB f x = putB (f (getB x)) x
 
 instance HasB (VarGroup b) b where
   getB (VarGroup _ b _) = b
@@ -82,17 +86,32 @@ instance HasB (Struct f b u) b where
   putB b (Struct f _ u) = Struct f b u
   modifyB func (Struct f b u) = Struct f (func b) u
 
---------------------------------------------------------------------------------
-
 class HasU a u | a -> u where
+  getUAll :: a -> IntMap u
+
   getU :: Width -> a -> Maybe u
+  getU width = IntMap.lookup width . getUAll
+
+  putUAll :: IntMap u -> a -> a
+
   putU :: Width -> u -> a -> a
+  putU width u x = putUAll (IntMap.insert width u (getUAll x)) x
+
   modifyU :: Width -> (u -> u) -> a -> a
+  modifyU width f x = case getU width x of
+    Nothing -> x
+    Just u -> putU width (f u) x
+
+  modifyUAll :: (IntMap u -> IntMap u) -> a -> a
+  modifyUAll f x = putUAll (f (getUAll x)) x
 
 instance HasU (VarGroup u) u where
-  getU width (VarGroup _ _ u) = IntMap.lookup width u
-  putU width u (VarGroup f b u') = VarGroup f b (IntMap.insert width u u')
-  modifyU width func (VarGroup f b u) = VarGroup f b (IntMap.adjust func width u)
+  getUAll (VarGroup _ _ u) = u
+  putUAll u (VarGroup f b _) = VarGroup f b u
+
+instance HasU (Struct n n n) n where
+  getUAll (Struct _ _ u) = u
+  putUAll u (Struct f b _) = Struct f b u
 
 --------------------------------------------------------------------------------
 
@@ -113,17 +132,53 @@ instance (Semigroup n) => Semigroup (VarGroups n) where
 instance (Monoid n) => Monoid (VarGroups n) where
   mempty = VarGroups mempty mempty mempty mempty
 
-updateO :: (n -> n) -> VarGroups n -> VarGroups n
-updateO f (VarGroups o i p x) = VarGroups (f o) i p x
+--------------------------------------------------------------------------------
 
-updateI :: (n -> n) -> VarGroups n -> VarGroups n
-updateI f (VarGroups o i p x) = VarGroups o (f i) p x
+class HasO a o | a -> o where
+  getO :: a -> o
+  putO :: o -> a -> a
+  modifyO :: (o -> o) -> a -> a
+  modifyO f x = putO (f (getO x)) x
 
-updateP :: (n -> n) -> VarGroups n -> VarGroups n
-updateP f (VarGroups o i p x) = VarGroups o i (f p) x
+instance HasO (VarGroups n) n where
+  getO (VarGroups o _ _ _) = o
+  putO o (VarGroups _ i p x) = VarGroups o i p x
 
-updateX :: (n -> n) -> VarGroups n -> VarGroups n
-updateX f (VarGroups o i p x) = VarGroups o i p (f x)
+--------------------------------------------------------------------------------
+
+class HasI a i | a -> i where
+  getI :: a -> i
+  putI :: i -> a -> a
+  modifyI :: (i -> i) -> a -> a
+  modifyI f x = putI (f (getI x)) x
+
+instance HasI (VarGroups n) n where
+  getI (VarGroups _ i _ _) = i
+  putI i (VarGroups o _ p x) = VarGroups o i p x
+
+--------------------------------------------------------------------------------
+
+class HasP a p | a -> p where
+  getP :: a -> p
+  putP :: p -> a -> a
+  modifyP :: (p -> p) -> a -> a
+  modifyP f x = putP (f (getP x)) x
+
+instance HasP (VarGroups n) n where
+  getP (VarGroups _ _ p _) = p
+  putP p (VarGroups o i _ x) = VarGroups o i p x
+
+--------------------------------------------------------------------------------
+
+class HasX a x | a -> x where
+  getX :: a -> x
+  putX :: x -> a -> a
+  modifyX :: (x -> x) -> a -> a
+  modifyX f x = putX (f (getX x)) x
+
+instance HasX (VarGroups n) n where
+  getX (VarGroups _ _ _ x) = x
+  putX x (VarGroups o i p _) = VarGroups o i p x
 
 --------------------------------------------------------------------------------
 
@@ -230,3 +285,78 @@ restrictVars (VarGroups o i p x) (VarGroups o' i' p' x') =
 
     restrict :: (Int, IntMap n) -> IntSet -> (Int, IntMap n)
     restrict (size, xs) set = (size, IntMap.restrictKeys xs set)
+
+----------------------------------------------------------------------------
+
+instance HasO Counters (Struct Int Int Int) where
+  getO = countOutput
+  putO x counters = counters {countOutput = x}
+  modifyO f counters = counters {countOutput = f (countOutput counters)}
+
+instance HasI Counters (Struct Int Int Int) where
+  getI = countPublicInput
+  putI x counters = counters {countPublicInput = x}
+  modifyI f counters = counters {countPublicInput = f (countPublicInput counters)}
+
+instance HasP Counters (Struct Int Int Int) where
+  getP = countPrivateInput
+  putP x counters = counters {countPrivateInput = x}
+  modifyP f counters = counters {countPrivateInput = f (countPrivateInput counters)}
+
+instance HasX Counters (Struct Int Int Int) where
+  getX = countIntermediate
+  putX x counters = counters {countIntermediate = x}
+  modifyX f counters = counters {countIntermediate = f (countIntermediate counters)}
+
+instance HasF Counters (VarGroups Int) where
+  getF counters = VarGroups (getF (getO counters)) (getF (getI counters)) (getF (getP counters)) (getF (getX counters))
+  putF x counters =
+    counters
+      { countOutput = putF (getO x) (getO counters),
+        countPublicInput = putF (getI x) (getI counters),
+        countPrivateInput = putF (getP x) (getP counters),
+        countIntermediate = putF (getX x) (getX counters)
+      }
+
+instance HasB Counters (VarGroups Int) where
+  getB counters = VarGroups (getB (getO counters)) (getB (getI counters)) (getB (getP counters)) (getB (getX counters))
+  putB x counters =
+    counters
+      { countOutput = putB (getO x) (getO counters),
+        countPublicInput = putB (getI x) (getI counters),
+        countPrivateInput = putB (getP x) (getP counters),
+        countIntermediate = putB (getX x) (getX counters)
+      }
+
+instance HasU Counters (VarGroups Int) where
+  getUAll counters = transpose $ VarGroups (getUAll (getO counters)) (getUAll (getI counters)) (getUAll (getP counters)) (getUAll (getX counters))
+    where
+      transpose :: VarGroups (IntMap Int) -> IntMap (VarGroups Int)
+      transpose (VarGroups o i p x) =
+        IntMap.filter (/= VarGroups 0 0 0 0) $
+          IntMap.fromList $
+            map
+              ( \w ->
+                  let result = VarGroups <$> IntMap.lookup w o <*> IntMap.lookup w i <*> IntMap.lookup w p <*> IntMap.lookup w x
+                   in (w, Maybe.fromMaybe (VarGroups 0 0 0 0) result)
+              )
+              (IntSet.toList $ IntMap.keysSet o <> IntMap.keysSet i <> IntMap.keysSet p <> IntMap.keysSet x)
+  putUAll xs counters =
+    let transposed = transpose xs
+     in counters
+          { countOutput = putUAll (getO transposed) (getO counters),
+            countPublicInput = putUAll (getI transposed) (getI counters),
+            countPrivateInput = putUAll (getP transposed) (getP counters),
+            countIntermediate = putUAll (getX transposed) (getX counters)
+          }
+    where
+      transpose :: IntMap (VarGroups Int) -> VarGroups (IntMap Int)
+      transpose = IntMap.foldlWithKey' go mempty
+
+      go :: VarGroups (IntMap Int) -> Width -> VarGroups Int -> VarGroups (IntMap Int)
+      go acc width (VarGroups o i p x) =
+        VarGroups
+          (IntMap.insertWith (+) width o (getO acc))
+          (IntMap.insertWith (+) width i (getI acc))
+          (IntMap.insertWith (+) width p (getP acc))
+          (IntMap.insertWith (+) width x (getX acc))

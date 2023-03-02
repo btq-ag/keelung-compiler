@@ -17,9 +17,9 @@ import Data.IntMap qualified as IntMap
 import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
+import Keelung.Data.Struct
 import Keelung.Data.VarGroup
 import Keelung.Data.VarGroup qualified as Bindings
-import Keelung.Data.Struct
 import Keelung.Interpreter.Monad
 import Keelung.Syntax.Encode.Syntax
 
@@ -196,9 +196,9 @@ instance FreeVar Computation where
 instance FreeVar Boolean where
   freeVars expr = case expr of
     ValB _ -> mempty
-    VarB var -> updateX (modifyB (IntSet.insert var)) mempty
-    VarBI var -> updateI (modifyB (IntSet.insert var)) mempty
-    VarBP var -> updateP (modifyB (IntSet.insert var)) mempty
+    VarB var -> modifyX (modifyB (IntSet.insert var)) mempty
+    VarBI var -> modifyI (modifyB (IntSet.insert var)) mempty
+    VarBP var -> modifyP (modifyB (IntSet.insert var)) mempty
     AndB x y -> freeVars x <> freeVars y
     OrB x y -> freeVars x <> freeVars y
     XorB x y -> freeVars x <> freeVars y
@@ -213,9 +213,9 @@ instance FreeVar Field where
   freeVars expr = case expr of
     ValF _ -> mempty
     ValFR _ -> mempty
-    VarF var -> updateX (modifyF (IntSet.insert var)) mempty
-    VarFI var -> updateI (modifyF (IntSet.insert var)) mempty
-    VarFP var -> updateP (modifyF (IntSet.insert var)) mempty
+    VarF var -> modifyX (modifyF (IntSet.insert var)) mempty
+    VarFI var -> modifyI (modifyF (IntSet.insert var)) mempty
+    VarFP var -> modifyP (modifyF (IntSet.insert var)) mempty
     AddF x y -> freeVars x <> freeVars y
     SubF x y -> freeVars x <> freeVars y
     MulF x y -> freeVars x <> freeVars y
@@ -226,9 +226,9 @@ instance FreeVar Field where
 instance FreeVar UInt where
   freeVars expr = case expr of
     ValU _ _ -> mempty
-    VarU w var -> updateX (modifyU w (IntSet.insert var)) mempty
-    VarUI w var -> updateI (modifyU w (IntSet.insert var)) mempty
-    VarUP w var -> updateP (modifyU w (IntSet.insert var)) mempty
+    VarU w var -> modifyX (modifyU w (IntSet.insert var)) mempty
+    VarUI w var -> modifyI (modifyU w (IntSet.insert var)) mempty
+    VarUP w var -> modifyP (modifyU w (IntSet.insert var)) mempty
     AddU _ x y -> freeVars x <> freeVars y
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y

@@ -186,9 +186,9 @@ instance FreeVar Field where
   freeVars expr = case expr of
     Integer _ -> mempty
     Rational _ -> mempty
-    VarF var -> VarGroup.updateX (VarGroup.modifyF (IntSet.insert var)) mempty
-    VarFI var -> VarGroup.updateI (VarGroup.modifyF (IntSet.insert var)) mempty
-    VarFP var -> VarGroup.updateP (VarGroup.modifyF (IntSet.insert var)) mempty
+    VarF var -> VarGroup.modifyX (VarGroup.modifyF (IntSet.insert var)) mempty
+    VarFI var -> VarGroup.modifyI (VarGroup.modifyF (IntSet.insert var)) mempty
+    VarFP var -> VarGroup.modifyP (VarGroup.modifyF (IntSet.insert var)) mempty
     Add x y -> freeVars x <> freeVars y
     Sub x y -> freeVars x <> freeVars y
     Mul x y -> freeVars x <> freeVars y
@@ -199,9 +199,9 @@ instance FreeVar Field where
 instance FreeVar Boolean where
   freeVars expr = case expr of
     Boolean _ -> mempty
-    VarB var -> VarGroup.updateX (VarGroup.modifyB (IntSet.insert var)) mempty
-    VarBI var -> VarGroup.updateI (VarGroup.modifyB (IntSet.insert var)) mempty
-    VarBP var -> VarGroup.updateP (VarGroup.modifyB (IntSet.insert var)) mempty
+    VarB var -> VarGroup.modifyX (VarGroup.modifyB (IntSet.insert var)) mempty
+    VarBI var -> VarGroup.modifyI (VarGroup.modifyB (IntSet.insert var)) mempty
+    VarBP var -> VarGroup.modifyP (VarGroup.modifyB (IntSet.insert var)) mempty
     And x y -> freeVars x <> freeVars y
     Or x y -> freeVars x <> freeVars y
     Xor x y -> freeVars x <> freeVars y
@@ -215,9 +215,9 @@ instance FreeVar Boolean where
 instance KnownNat w => FreeVar (UInt w) where
   freeVars val = case val of
     UInt _ -> mempty
-    VarU var -> VarGroup.updateX (VarGroup.modifyU (widthOf val) (IntSet.insert var)) mempty
-    VarUI var -> VarGroup.updateI (VarGroup.modifyU (widthOf val) (IntSet.insert var)) mempty
-    VarUP var -> VarGroup.updateP (VarGroup.modifyU (widthOf val) (IntSet.insert var)) mempty
+    VarU var -> VarGroup.modifyX (VarGroup.modifyU (widthOf val) (IntSet.insert var)) mempty
+    VarUI var -> VarGroup.modifyI (VarGroup.modifyU (widthOf val) (IntSet.insert var)) mempty
+    VarUP var -> VarGroup.modifyP (VarGroup.modifyU (widthOf val) (IntSet.insert var)) mempty
     AddU x y -> freeVars x <> freeVars y
     SubU x y -> freeVars x <> freeVars y
     MulU x y -> freeVars x <> freeVars y

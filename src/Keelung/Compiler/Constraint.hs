@@ -625,9 +625,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
                 <> padLeft12 (getCount OfIntermediate typ counters)
             uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (OfUInt w)
             -- Bit widths existed in the system
-            uintWidthEnties (Counters o i p x _ _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
+            uintWidthEntries (Counters o i p x _ _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
             showUInts =
-              let entries = uintWidthEnties counters
+              let entries = uintWidthEntries counters
                in if IntSet.null entries
                     then ""
                     else mconcat $ fmap uint (IntSet.toList entries)
