@@ -4,28 +4,27 @@ module Main where
 
 import Control.Arrow (left)
 import Control.Monad.Except
-import qualified Data.ByteString.Char8 as BSC
-import qualified Data.ByteString.Lazy as BS
+import Data.ByteString.Char8 qualified as BSC
+import Data.ByteString.Lazy qualified as BS
 import Data.Field.Galois (GaloisField)
 import Data.Serialize (Serialize, decode, encode)
-import Encode (serializeInputAndWitness, serializeR1CS)
+import Data.Vector (Vector)
+import Encode
 import Keelung.Compiler
-  ( RelocatedConstraintSystem,
-    Error (..),
+  ( Error (..),
+    RelocatedConstraintSystem,
     compileO0Elab,
     compileO1Elab,
     compileO2Elab,
-    genInputsOutputsWitnessesElab,
+    generateWitnessElab,
     interpretElab,
     toR1CS,
   )
-import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Compiler.Util (Witness)
 import Keelung.Field
+import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
 import Option
-import qualified Keelung.Compiler.Syntax.Inputs as Inputs
 
 main :: IO ()
 main = withUtf8 $ do
@@ -63,14 +62,14 @@ main = withUtf8 $ do
             BN128 -> outputCircuit (asBN128 $ compileO2Elab elaborated)
     Protocol Interpret -> do
       blob <- getContents
-      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer])
+      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
       case decoded of
         Left err -> print err
-        Right (fieldType, elaborated, inputs) -> do
+        Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> do
           case fieldType of
-            B64 -> outputInterpretedResult (interpretElab elaborated (map fromInteger inputs) :: Either String [B64])
-            GF181 -> outputInterpretedResult (interpretElab elaborated (map fromInteger inputs) :: Either String [GF181])
-            BN128 -> outputInterpretedResult (interpretElab elaborated (map fromInteger inputs) :: Either String [BN128])
+            B64 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [B64])
+            GF181 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [GF181])
+            BN128 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [BN128])
     Protocol GenCircuit -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -83,21 +82,21 @@ main = withUtf8 $ do
             BN128 -> outputCircuitAndWriteFile (asBN128 $ compileO1Elab elaborated)
     Protocol GenWitness -> do
       blob <- getContents
-      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer])
+      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
       case decoded of
         Left err -> print err
-        Right (fieldType, elaborated, inputs) -> do
+        Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> do
           case fieldType of
             B64 ->
               outputInterpretedResultAndWriteFile
-                (genInputsOutputsWitnessesElab elaborated (map fromInteger inputs :: [B64]))
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [B64]) (map fromInteger rawPrivateInputs :: [B64]))
             GF181 ->
               outputInterpretedResultAndWriteFile
-                (genInputsOutputsWitnessesElab elaborated (map fromInteger inputs :: [GF181]))
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181]))
             BN128 ->
               outputInterpretedResultAndWriteFile
-                (genInputsOutputsWitnessesElab elaborated (map fromInteger inputs :: [BN128]))
-    Version -> putStrLn "Keelung v0.8.2"
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128]))
+    Version -> putStrLn "Keelung v0.9.0"
   where
     asB64 :: Either (Error B64) (RelocatedConstraintSystem B64) -> Either (Error B64) (RelocatedConstraintSystem B64)
     asB64 = id
@@ -120,18 +119,17 @@ main = withUtf8 $ do
           let r1cs = toR1CS cs'
           BS.writeFile "circuit.jsonl" (serializeR1CS r1cs)
 
-    outputInterpretedResult :: Serialize n => Either String [n] -> IO ()
+    outputInterpretedResult :: (Serialize a, Serialize n) => Either a [n] -> IO ()
     outputInterpretedResult = putStrLn . BSC.unpack . encode
 
-    outputInterpretedResultAndWriteFile :: (Serialize n, Integral n) => Either String (Inputs n, [n], Witness n) -> IO ()
+    outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (Counters, [n], Vector n) -> IO ()
     outputInterpretedResultAndWriteFile result = do
       -- print outputs
       outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
-
       case result of
         Left _ -> return ()
-        Right (inputs, outputs, witness) -> do
-          BS.writeFile "witness.jsonl" (serializeInputAndWitness (Inputs.flatten inputs) outputs witness)
+        Right (counters, _, witness) -> do
+          BS.writeFile "witness.jsonl" (serializeInputAndWitness counters witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do

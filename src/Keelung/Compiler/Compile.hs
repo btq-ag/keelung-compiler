@@ -262,6 +262,7 @@ compileExprB out expr = case expr of
   VarB var -> add $ cVarEqB out (RefB var) -- out = var
   VarBO var -> add $ cVarEqB out (RefBO var) -- out = var
   VarBI var -> add $ cVarEqB out (RefBI var) -- out = var
+  VarBP var -> add $ cVarEqB out (RefBP var) -- out = var
   AndB x0 x1 xs -> do
     a <- wireB x0
     b <- wireB x1
@@ -350,6 +351,7 @@ compileExprF out expr = case expr of
   VarF var -> add $ cVarEqF out (RefF var) -- out = var
   VarFO var -> add $ cVarEqF out (RefFO var) -- out = var
   VarFI var -> add $ cVarEqF out (RefFI var) -- out = var
+  VarFP var -> add $ cVarEqF out (RefFP var) -- out = var
   SubF x y -> do
     x' <- toTerm x
     y' <- toTerm y
@@ -395,6 +397,13 @@ compileExprU out expr = case expr of
     add $ cVarEqU out (RefU width var) -- out = var
   VarUI width var -> do
     let ref = RefUI width var
+    -- constraint for UInt : out = ref
+    add $ cVarEqU out ref
+    -- constraints for BinRep of UInt
+    forM_ [0 .. width - 1] $ \i -> do
+      add $ cVarEqB (RefUBit width out i) (RefUBit width ref i) -- out[i] = ref[i]
+  VarUP width var -> do
+    let ref = RefUP width var
     -- constraint for UInt : out = ref
     add $ cVarEqU out ref
     -- constraints for BinRep of UInt
@@ -462,6 +471,13 @@ compileExprU out expr = case expr of
           -- fill upper bits with 0s
         forM_ [w + n .. w - 1] $ \i -> do
           add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
+  SetU w x j b -> do
+    x' <- wireU x
+    b' <- wireB b
+    forM_ [0 .. w - 1] $ \i -> do
+      if i == j
+        then add $ cVarEqB (RefUBit w out i) b' -- out[i] = b
+        else add $ cVarEqB (RefUBit w out i) (RefUBit w x' i) -- out[i] = x[i]
   BtoU w x -> do
     -- 1. wire 'out[ZERO]' to 'x'
     result <- freshRefB
@@ -571,9 +587,10 @@ compileEqualityU isEq out x y =
       -- introduce a new variable m
       -- if diff = 0 then m = 0 else m = recip diff
       let width = case x of
-            RefU w _ -> w
-            RefUI w _ -> w
             RefUO w _ -> w
+            RefUI w _ -> w
+            RefUP w _ -> w
+            RefU w _ -> w
             RefBtoRefU _ -> 1 -- TODO: reexamine this
       m <- freshRefU width
 

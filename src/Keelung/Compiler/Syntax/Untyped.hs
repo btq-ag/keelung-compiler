@@ -25,9 +25,9 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Util (indent)
-import Keelung.Data.Bindings (toSubscript)
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Data.Struct qualified as Struct
+import Keelung.Data.VarGroup (toSubscript)
 import Keelung.Field (N (..))
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
@@ -40,6 +40,7 @@ data ExprB n
   | VarB Var
   | VarBO Var
   | VarBI Var
+  | VarBP Var
   | -- logical operators
     AndB (ExprB n) (ExprB n) (Seq (ExprB n))
   | OrB (ExprB n) (ExprB n) (Seq (ExprB n))
@@ -53,8 +54,7 @@ data ExprB n
   | EqB (ExprB n) (ExprB n)
   | EqF (ExprF n) (ExprF n)
   | EqU (ExprU n) (ExprU n)
-  | -- | LTEU Width (ExprU n) (ExprU n)
-    -- bit tests on UInt
+  | -- bit tests on UInt
     BitU (ExprU n) Int
   deriving (Functor, Eq)
 
@@ -65,6 +65,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     VarB var -> showString "B" . shows var
     VarBO var -> showString "BO" . shows var
     VarBI var -> showString "BI" . shows var
+    VarBP var -> showString "BP" . shows var
     AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
@@ -86,6 +87,7 @@ data ExprF n
   | VarF Var
   | VarFO Var
   | VarFI Var
+  | VarFP Var
   | -- arithmetic operators
     SubF (ExprF n) (ExprF n)
   | AddF (ExprF n) (ExprF n) (Seq (ExprF n))
@@ -102,6 +104,7 @@ instance (Show n, Integral n) => Show (ExprF n) where
     VarF var -> showString "F" . shows var
     VarFO var -> showString "FO" . shows var
     VarFI var -> showString "FI" . shows var
+    VarFP var -> showString "FP" . shows var
     SubF x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddF x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
     MulF x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -116,6 +119,7 @@ data ExprU n
   | VarU Width Var
   | VarUO Width Var
   | VarUI Width Var
+  | VarUP Width Var
   | -- arithmetic operators
     SubU Width (ExprU n) (ExprU n)
   | AddU Width (ExprU n) (ExprU n)
@@ -129,6 +133,7 @@ data ExprU n
   | -- bit operators
     RoLU Width Int (ExprU n)
   | ShLU Width Int (ExprU n)
+  | SetU Width (ExprU n) Int (ExprB n) -- set bit
   | -- conversion operators
     BtoU Width (ExprB n)
   deriving (Functor, Eq)
@@ -139,6 +144,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     VarU _ var -> showString "U" . shows var
     VarUO _ var -> showString "UO" . shows var
     VarUI _ var -> showString "UI" . shows var
+    VarUP _ var -> showString "UP" . shows var
     SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
@@ -149,6 +155,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     RoLU _ n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
     ShLU _ n x -> showParen (prec > 8) $ showString "ShL " . showsPrec 9 n . showString " " . showsPrec 9 x
+    SetU _ x i b -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . showsPrec 9 i . showString "] := " . showsPrec 9 b
     BtoU _ x -> showString "B→U " . showsPrec prec x
 
 --------------------------------------------------------------------------------
@@ -181,6 +188,7 @@ widthOfU expr = case expr of
   VarU w _ -> w
   VarUO w _ -> w
   VarUI w _ -> w
+  VarUP w _ -> w
   SubU w _ _ -> w
   AddU w _ _ -> w
   MulU w _ _ -> w
@@ -191,6 +199,7 @@ widthOfU expr = case expr of
   IfU w _ _ _ -> w
   RoLU w _ _ -> w
   ShLU w _ _ -> w
+  SetU w _ _ _ -> w
   BtoU w _ -> w
 
 --------------------------------------------------------------------------------

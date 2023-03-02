@@ -63,15 +63,10 @@ jobs:
     - name: ⏬ Install stack
       run: |
         mkdir -p ~/.local/bin
-        export PATH=~/.local/bin:$PATH
+        export PATH=~/.ghcup/bin:~/.local/bin:$PATH
         # curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'; chmod a+x ~/.local/bin/stack
-        if [[ ! -x ~/.local/bin/stack ]]; then curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'; chmod a+x ~/.local/bin/stack; fi
+        if [[ ! -x ~/.ghcup/bin/stack ]]; then curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh; ghcup install ghc; ghcup install stack; ghcup install cabal; fi
         stack --version
-    - name: ⏬ Install GHC
-      run: |
-        df -h
-        stack setup --install-ghc
-        df -h
     - name: ⏬ Install dependencies
       run: |
         stack build --only-dependencies

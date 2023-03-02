@@ -8,17 +8,18 @@ module Encode (serializeR1CS, serializeInputAndWitness) where
 import Data.Aeson
 import Data.Aeson.Encoding
 import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BS
+import Data.ByteString.Lazy qualified as BS
 import Data.Field.Galois (GaloisField (char, deg))
-import qualified Data.IntMap as IntMap
+import Data.Foldable (Foldable (toList))
+import Data.IntMap qualified as IntMap
 import Data.Proxy
-import Keelung.Compiler.Util (Witness)
-import Keelung.Data.Polynomial (Poly)
-import qualified Keelung.Data.Polynomial as Poly
+import Data.Vector (Vector)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
-import Keelung.Syntax.Counters hiding (reindex)
+import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Syntax
+import Keelung.Syntax.Counters hiding (reindex)
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
@@ -28,18 +29,16 @@ serializeR1CS :: (GaloisField n, Integral n) => R1CS n -> ByteString
 serializeR1CS = serializeR1CS2
 
 -- | Encodes inputs and witnesses in the JSON Lines text file format
---   the "inputs" field should contain both inputs and outputs
---   the "witnesses" field should contain rest of the witnesses
-serializeInputAndWitness :: Integral n => [n] -> [n] -> Witness n -> ByteString
-serializeInputAndWitness inputs outputs witnesses =
-  let instances = outputs <> inputs
-      instancesSize = length instances
-      -- remove the inputs and outputs from the witnesses
-      trimmedWitnesses = IntMap.elems $ IntMap.filterWithKey (\k _ -> k >= instancesSize) witnesses
+--   the "inputs" field should contain both outputs & public inputs
+--   the "witnesses" field should contain private inputs & rest of the witnesses
+serializeInputAndWitness :: Integral n => Counters -> Vector n -> ByteString
+serializeInputAndWitness counters witness =
+  let (inputs, witnesses) = splitAt (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters) $ toList witness
    in encodingToLazyByteString $
         pairs $
-          pairStr "inputs" (list (integerText . toInteger) instances)
-            <> pairStr "witnesses" (list (integerText . toInteger) trimmedWitnesses)
+          pairStr "inputs" (list (integerText . toInteger) inputs)
+            <> pairStr "witnesses" (list (integerText . toInteger) witnesses)
+
 
 --------------------------------------------------------------------------------
 
@@ -64,11 +63,11 @@ serializeR1CS2 r1cs =
       pairs $
         pairStr "r1cs" $
           pairs $
-            pairStr "version" (string "0.8.2")
+            pairStr "version" (string "0.9.0")
               <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
               <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
-              <> pairStr "instances" (int (getCountBySort OfInput counters + getCountBySort OfOutput counters)) -- inputs & outputs
-              <> pairStr "witness" (int (getCountBySort OfIntermediate counters)) -- other intermediate variables
+              <> pairStr "instances" (int (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters)) -- outputs & public inputs
+              <> pairStr "witness" (int (getTotalCount counters - getCountBySort OfOutput counters - getCountBySort OfPublicInput counters)) -- private inputs & other intermediate variables after optimization
               <> pairStr "constraints" (int (length r1cConstraints))
               <> pairStr "optimized" (bool True)
 
@@ -111,8 +110,8 @@ encodeVarCoeff (v, c) = list f [Left v, Right c]
 
 -- | Variables of a R1CS are re-indexed so that:
 --   index = 0:  reserved for the constant 1
---   index < 0:  reserved for the input & output variables
---   index > 0:  reserved for the all the other variables (witnesses)
+--   index < 0:  reserved for output variables and public inputs variables
+--   index > 0:  reserved for private input variables and all the other variables (witnesses)
 reindexR1C :: R1CS n -> R1C n -> R1C n
 reindexR1C r1cs (R1C a b c) =
   R1C
@@ -122,7 +121,7 @@ reindexR1C r1cs (R1C a b c) =
   where
     reindex :: Var -> Var
     reindex var
-      | isInputOrOutputVar var = -(var + 1) -- + 1 to avoid $0 the constant 1
+      | isPublicInputOrOutputVar var = -(var + 1) -- + 1 to avoid $0 the constant 1
       | otherwise = var + 1 -- + 1 to avoid $0 the constant 1
-    isInputOrOutputVar :: Var -> Bool
-    isInputOrOutputVar var = var < (getCountBySort OfInput (r1csCounters r1cs) + getCountBySort OfOutput (r1csCounters r1cs))
+    isPublicInputOrOutputVar :: Var -> Bool
+    isPublicInputOrOutputVar var = var < (getCountBySort OfPublicInput (r1csCounters r1cs) + getCountBySort OfOutput (r1csCounters r1cs))

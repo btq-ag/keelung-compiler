@@ -16,9 +16,9 @@ import Data.Semiring (Semiring (..))
 import GHC.TypeLits (KnownNat)
 import Keelung hiding (interpret, run)
 import Keelung.Compiler.Syntax.Inputs (Inputs (..))
-import Keelung.Data.Bindings
-import Keelung.Data.Bindings qualified as Bindings
 import Keelung.Data.Struct
+import Keelung.Data.VarGroup (Witness)
+import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Interpreter.Monad
 import Keelung.Interpreter.Typed ()
 import Keelung.Syntax.Encode.Syntax qualified as Typed
@@ -69,7 +69,7 @@ runAndOutputWitnesses (Elaborated expr context) inputs = runM (compHeap context)
     values <- interpret e
     when (values /= [1]) $ do
       bindings <- get
-      let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
+      let bindingsInExpr = VarGroup.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e) bindingsInExpr
 
@@ -91,6 +91,7 @@ instance (GaloisField n, Integral n) => Interpret Field n where
     Rational n -> interpret n
     VarF var -> pure <$> lookupF var
     VarFI var -> pure <$> lookupFI var
+    VarFP var -> pure <$> lookupFP var
     Add x y -> zipWith (+) <$> interpret x <*> interpret y
     Sub x y -> zipWith (-) <$> interpret x <*> interpret y
     Mul x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -107,6 +108,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
     Boolean b -> interpret b
     VarB var -> pure <$> lookupB var
     VarBI var -> pure <$> lookupBI var
+    VarBP var -> pure <$> lookupBP var
     And x y -> zipWith (*) <$> interpret x <*> interpret y
     Or x y -> zipWith (+) <$> interpret x <*> interpret y
     Xor x y -> zipWith (\x' y' -> x' + y' - 2 * (x' * y')) <$> interpret x <*> interpret y
@@ -139,6 +141,7 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
     UInt n -> interpret n
     VarU var -> pure <$> lookupU (widthOf val) var
     VarUI var -> pure <$> lookupUI (widthOf val) var
+    VarUP var -> pure <$> lookupUP (widthOf val) var
     AddU x y -> zipWith (+) <$> interpret x <*> interpret y
     SubU x y -> zipWith (-) <$> interpret x <*> interpret y
     MulU x y -> zipWith (*) <$> interpret x <*> interpret y
@@ -149,6 +152,7 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
     NotU x -> map bitWiseNot <$> interpret x
     RoLU w n x -> map (bitWiseRotateL w n) <$> interpret x
     ShLU w n x -> map (bitWiseShiftL w n) <$> interpret x
+    SetU x i y -> zipWith (\x' y' -> bitWiseSet (widthOf x) x' i y') <$> interpret x <*> interpret y
     IfU p x y -> do
       p' <- interpret p
       case p' of
@@ -182,8 +186,9 @@ instance FreeVar Field where
   freeVars expr = case expr of
     Integer _ -> mempty
     Rational _ -> mempty
-    VarF var -> updateX (updateF (IntSet.insert var)) mempty
-    VarFI var -> updateI (updateF (IntSet.insert var)) mempty
+    VarF var -> VarGroup.updateX (VarGroup.modifyF (IntSet.insert var)) mempty
+    VarFI var -> VarGroup.updateI (VarGroup.modifyF (IntSet.insert var)) mempty
+    VarFP var -> VarGroup.updateP (VarGroup.modifyF (IntSet.insert var)) mempty
     Add x y -> freeVars x <> freeVars y
     Sub x y -> freeVars x <> freeVars y
     Mul x y -> freeVars x <> freeVars y
@@ -194,8 +199,9 @@ instance FreeVar Field where
 instance FreeVar Boolean where
   freeVars expr = case expr of
     Boolean _ -> mempty
-    VarB var -> updateX (updateB (IntSet.insert var)) mempty
-    VarBI var -> updateI (updateB (IntSet.insert var)) mempty
+    VarB var -> VarGroup.updateX (VarGroup.modifyB (IntSet.insert var)) mempty
+    VarBI var -> VarGroup.updateI (VarGroup.modifyB (IntSet.insert var)) mempty
+    VarBP var -> VarGroup.updateP (VarGroup.modifyB (IntSet.insert var)) mempty
     And x y -> freeVars x <> freeVars y
     Or x y -> freeVars x <> freeVars y
     Xor x y -> freeVars x <> freeVars y
@@ -209,8 +215,9 @@ instance FreeVar Boolean where
 instance KnownNat w => FreeVar (UInt w) where
   freeVars val = case val of
     UInt _ -> mempty
-    VarU var -> updateX (updateU (widthOf val) (IntSet.insert var)) mempty
-    VarUI var -> updateI (updateU (widthOf val) (IntSet.insert var)) mempty
+    VarU var -> VarGroup.updateX (VarGroup.modifyU (widthOf val) (IntSet.insert var)) mempty
+    VarUI var -> VarGroup.updateI (VarGroup.modifyU (widthOf val) (IntSet.insert var)) mempty
+    VarUP var -> VarGroup.updateP (VarGroup.modifyU (widthOf val) (IntSet.insert var)) mempty
     AddU x y -> freeVars x <> freeVars y
     SubU x y -> freeVars x <> freeVars y
     MulU x y -> freeVars x <> freeVars y
@@ -220,6 +227,7 @@ instance KnownNat w => FreeVar (UInt w) where
     NotU x -> freeVars x
     RoLU _ _ x -> freeVars x
     ShLU _ _ x -> freeVars x
+    SetU x _ y -> freeVars x <> freeVars y
     IfU p x y -> freeVars p <> freeVars x <> freeVars y
     BtoU x -> freeVars x
 

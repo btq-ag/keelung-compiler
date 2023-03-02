@@ -22,8 +22,8 @@ tests = do
     describe "Assertion" $ do
       it "Rewriting" $ do
         let program = do
-              xs <- inputList 4
-              ys <- inputList 4
+              xs <- inputList Public 4
+              ys <- inputList Public 4
               assert (sum xs `eq` sum (ys :: [Field]))
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -96,7 +96,7 @@ tests = do
         -- oooooobbbbi
         -- 01234567890
         let program = do
-              x <- inputUInt @4
+              x <- inputUInt @4 Public
               return [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -149,8 +149,8 @@ tests = do
         -- b        rrrrrrrruu
         -- 0        12345678901
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               return $ (x .&. y) !!! 0
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -167,8 +167,8 @@ tests = do
         -- b        rrrrrrrruu
         -- 0        12345678901
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               return $ (x .|. y) !!! 0
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -186,7 +186,7 @@ tests = do
         -- bbbb     b       rrrrrrrrrrrrrrrruuuu
         -- 0123     4       56789012345678901234
         let program = do
-              x <- input
+              x <- input Public
               let u = BtoU x :: UInt 4
               return [u !!! 0, u !!! 1, u !!! 2, u !!! 3]
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
@@ -213,8 +213,8 @@ tests = do
         -- rrrru    rrrrrrrruu
         -- 01234    5678901234
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               return $ x .&. y
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -233,8 +233,8 @@ tests = do
         -- rrrru    rrrrrrrruu   rrrru
         -- 01234    5678901234   56789
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               return $ x .&. y .&. x
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -301,8 +301,8 @@ tests = do
         -- rrrru    rrrrrrrruu
         -- 01234    5678901234
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               return $ x .|. y
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -321,8 +321,8 @@ tests = do
         -- rrrru    rrrrrrrruu   rrrru
         -- 01234    5678901234   56789
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               return $ x .|. y .|. x
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -349,7 +349,7 @@ tests = do
         -- rrrru    rrrru
         -- 01234    56789
         let program = do
-              x <- inputUInt @4
+              x <- inputUInt @4 Public
               let y = 3
               return $ x .|. y
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
@@ -389,9 +389,9 @@ tests = do
         -- rrrru    rrrrrrrrrrrruuu   rrrru
         -- 01234    567890123456789   01234
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              z <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              z <- inputUInt @4 Public
               return $ x .^. y .^. z
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -454,7 +454,7 @@ tests = do
         -- rrrru    rrrru
         -- 01234    56789
         let program = do
-              x <- inputUInt @4
+              x <- inputUInt @4 Public
               return $ complement x
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -473,8 +473,8 @@ tests = do
         -- b        rrrrrrrruu   m
         -- 0        1234567890   1
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               return $ x `eq` y
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -499,7 +499,7 @@ tests = do
         -- b        rrrru   m
         -- 0        12345   6
         let program = do
-              x <- inputUInt @4
+              x <- inputUInt @4 Public
               return $ x `eq` 3
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -524,8 +524,8 @@ tests = do
       --   -- b        rrrrrrrruu   m
       --   -- 0        1234567890   1
       --   let program = do
-      --         x <- inputUInt @4
-      --         y <- inputUInt @4
+      --         x <- inputUInt @4 Public
+      --         y <- inputUInt @4 Public
       --         return $ x `neq` y
       --   case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
       --     Left err -> expectationFailure (show err)
@@ -559,8 +559,8 @@ tests = do
         -- rrrru    rrrrrrrruu
         -- 01234    5678901234
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               return (x + y)
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -578,8 +578,8 @@ tests = do
         -- rrrru    rrrrrrrruu   rrrru
         -- 01234    5678901234   56789
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               return (x + y + x)
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -606,8 +606,8 @@ tests = do
         -- rrrru    rrrrrrrruu   rrrru
         -- 01234    5678901234   56789
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               let z = 3
               return (x + y + z)
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
@@ -635,9 +635,9 @@ tests = do
         -- rrrru    rrrrrrrrrrrruuu   rrrru
         -- 01234    567890123456789   01234
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              z <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              z <- inputUInt @4 Public
               return (x - y - z)
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -663,8 +663,8 @@ tests = do
         -- rrrru    rrrrrrrruu   u
         -- 01234    5678901234   5
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               return (x * y)
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -682,9 +682,9 @@ tests = do
         -- rrrru    rrrrrrrrrrrruuu   utqqq
         -- 01234    567890123456789   01234
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              z <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              z <- inputUInt @4 Public
               return (x * y * z * 3)
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -716,9 +716,9 @@ tests = do
         -- rrrru    rrrrrrrrrrrruuu   rutqr
         -- 01234    567890123456789   01234
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
-              z <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              z <- inputUInt @4 Public
               return (x * y + z - 3)
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -751,7 +751,7 @@ tests = do
         -- rrrru    rrrru
         -- 01234    56789
         let program = do
-              x <- inputUInt @4
+              x <- inputUInt @4 Public
               return $ rotate x 1
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -804,7 +804,7 @@ tests = do
         -- rrrru    rrrru
         -- 01234    56789
         let program = do
-              x <- inputUInt @4
+              x <- inputUInt @4 Public
               return $ rotate (rotate x (-1)) 1
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -823,7 +823,7 @@ tests = do
         -- rrrru    rrrru
         -- 01234    56789
         let program = do
-              x <- inputUInt @4
+              x <- inputUInt @4 Public
               return $ shift x 1
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -931,8 +931,8 @@ tests = do
         -- rrrrrrrruu   rrrrrrrruu
         -- 0123456789   0123456789
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               performDivMod x y
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)
@@ -974,8 +974,8 @@ tests = do
         -- rrrrrrrruu   rrrrrrrruu
         -- 0123456789   0123456789
         let program = do
-              x <- inputUInt @4
-              y <- inputUInt @4
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
               assertDivMod x 2 7 y -- x = 2 * 7 + y
         case Compiler.asGF181 $ Compiler.toR1CS <$> Compiler.compile program of
           Left err -> expectationFailure (show err)

@@ -24,8 +24,8 @@ import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C (R1C)
 import Keelung.Constraint.R1CS (CNEQ)
 import Keelung.Data.BinRep (BinRep)
-import Keelung.Data.Bindings
-import Keelung.Data.Struct
+import Keelung.Data.VarGroup
+import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Heap
 import Keelung.Syntax
 import Keelung.Syntax.Counters
@@ -50,7 +50,7 @@ instance Functor Constraint where
 -- | The interpreter monad
 type M n = ReaderT Heap (StateT (Partial n) (Except (Error n)))
 
-runM :: Heap -> Inputs n -> M n a -> Either (Error n) (a, Witness n)
+runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n a -> Either (Error n) (a, VarGroup.Witness n)
 runM heap inputs p = do
   partialBindings <- toPartialBindings inputs
   (result, partialBindings') <- runExcept (runStateT (runReaderT p heap) partialBindings)
@@ -60,74 +60,85 @@ runM heap inputs p = do
     Right bindings -> Right (result, bindings)
 
 -- | Construct partial Bindings from Inputs
-toPartialBindings :: Inputs n -> Either (Error n) (Partial n)
+toPartialBindings :: (GaloisField n, Integral n) => Inputs n -> Either (Error n) (Partial n)
 toPartialBindings inputs =
-  let counters = Inputs.varCounters inputs
-      expectedInputSize = getCountBySort OfInput counters
+  let counters = Inputs.inputCounters inputs
+      expectedInputSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters
       actualInputSize = Inputs.size inputs
    in if expectedInputSize /= actualInputSize
-        then Left (InputSizeError (Inputs.size inputs) (getCount OfInput OfField counters))
+        then Left (InputSizeError (Inputs.size inputs) expectedInputSize)
         else
           Right $
-            OIX
+            VarGroups
               { ofO =
-                  Struct
-                    { structF = (getCount OfOutput OfField counters, mempty),
-                      structB = (getCount OfOutput OfBoolean counters, mempty),
-                      structU = IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
-                    },
+                  VarGroup
+                    (getCount OfOutput OfField counters, mempty)
+                    (getCount OfOutput OfBoolean counters, mempty)
+                    (IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))),
                 ofI =
-                  Struct
-                    { structF = (getCount OfInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.numInputs inputs))),
-                      structB = (getCount OfInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.boolInputs inputs))),
-                      structU = IntMap.mapWithKey (\w bindings -> (getCount OfInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.uintInputs inputs)
-                    },
+                  VarGroup
+                    (getCount OfPublicInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
+                    (getCount OfPublicInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs))))
+                    (IntMap.mapWithKey (\w bindings -> (getCount OfPublicInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
+                ofP =
+                  VarGroup
+                    (getCount OfPrivateInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
+                    (getCount OfPrivateInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPrivate inputs))))
+                    (IntMap.mapWithKey (\w bindings -> (getCount OfPrivateInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
                 ofX =
-                  Struct
-                    { structF = (getCount OfIntermediate OfField counters, mempty),
-                      structB = (getCount OfIntermediate OfBoolean counters, mempty),
-                      structU = IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.uintInputs inputs)
-                    }
+                  VarGroup
+                    (getCount OfIntermediate OfField counters, mempty)
+                    (getCount OfIntermediate OfBoolean counters, mempty)
+                    (IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs)))
               }
 
 addF :: Var -> [n] -> M n ()
-addF var vals = modify (updateX (updateF (second (IntMap.insert var (head vals)))))
+addF var vals = modify (updateX (modifyF (second (IntMap.insert var (head vals)))))
 
 addB :: Var -> [n] -> M n ()
-addB var vals = modify (updateX (updateB (second (IntMap.insert var (head vals)))))
+addB var vals = modify (updateX (modifyB (second (IntMap.insert var (head vals)))))
 
 addU :: Width -> Var -> [n] -> M n ()
-addU width var vals = modify (updateX (updateU width (second (IntMap.insert var (head vals)))))
+addU width var vals = modify (updateX (modifyU width (second (IntMap.insert var (head vals)))))
 
-lookupVar :: String -> (Partial n -> (Int, IntMap a)) -> Int -> M n a
+lookupVar :: (GaloisField n, Integral n) => String -> (Partial n -> (Int, IntMap n)) -> Int -> M n n
 lookupVar prefix selector var = do
   (_, f) <- gets selector
   case IntMap.lookup var f of
     Nothing -> throwError $ VarUnboundError prefix var
     Just val -> return val
 
-lookupF :: Var -> M n n
-lookupF = lookupVar "F" (structF . ofX)
+lookupF :: (GaloisField n, Integral n) => Var -> M n n
+lookupF = lookupVar "F" (getF . ofX)
 
-lookupFI :: Var -> M n n
-lookupFI = lookupVar "FI" (structF . ofI)
+lookupFI :: (GaloisField n, Integral n) => Var -> M n n
+lookupFI = lookupVar "FI" (getF . ofI)
 
-lookupB :: Var -> M n n
-lookupB = lookupVar "B" (structB . ofX)
+lookupFP :: (GaloisField n, Integral n) => Var -> M n n
+lookupFP = lookupVar "FP" (getF . ofP)
 
-lookupBI :: Var -> M n n
-lookupBI = lookupVar "BI" (structB . ofI)
+lookupB :: (GaloisField n, Integral n) => Var -> M n n
+lookupB = lookupVar "B" (getB . ofX)
 
-lookupU :: Width -> Var -> M n n
-lookupU w = lookupVar ("U" <> toSubscript w) (unsafeLookup w . structU . ofX)
+lookupBI :: (GaloisField n, Integral n) => Var -> M n n
+lookupBI = lookupVar "BI" (getB . ofI)
 
-lookupUI :: Width -> Var -> M n n
-lookupUI w = lookupVar ("UI" <> toSubscript w) (unsafeLookup w . structU . ofI)
+lookupBP :: (GaloisField n, Integral n) => Var -> M n n
+lookupBP = lookupVar "BP" (getB . ofP)
 
-unsafeLookup :: Int -> IntMap a -> a
-unsafeLookup x y = case IntMap.lookup x y of
-  Nothing -> error "[ panic ] bit width not found"
-  Just z -> z
+lookupU :: (GaloisField n, Integral n) => Width -> Var -> M n n
+lookupU w = lookupVar ("U" <> toSubscript w) (unsafeLookup . getU w . ofX)
+
+lookupUI :: (GaloisField n, Integral n) => Width -> Var -> M n n
+lookupUI w = lookupVar ("UI" <> toSubscript w) (unsafeLookup . getU w . ofI)
+
+lookupUP :: (GaloisField n, Integral n) => Width -> Var -> M n n
+lookupUP w = lookupVar ("UP" <> toSubscript w) (unsafeLookup . getU w . ofP)
+
+-- | TODO: remove this
+unsafeLookup :: Maybe a -> a
+unsafeLookup Nothing = error "[ panic ] bit width not found"
+unsafeLookup (Just x) = x
 
 --------------------------------------------------------------------------------
 
@@ -157,7 +168,7 @@ instance Serialize n => Serialize (Error n)
 
 instance (GaloisField n, Integral n) => Show (Error n) where
   show (VarUnboundError prefix var) =
-    "unbound variable $" <> prefix <> show var
+    "unbound variable " <> prefix <> show var
   show (VarUnassignedError unboundVariables) =
     "these variables have no bindings:\n  "
       ++ show unboundVariables
@@ -207,3 +218,10 @@ bitWiseShiftL w n x =
   if n < 0
     then fromInteger $ Data.Bits.shiftR (toInteger x) (-n)
     else fromInteger $ Data.Bits.shiftL (toInteger x) n Data.Bits..&. (2 ^ w - 1)
+
+bitWiseSet :: (GaloisField n, Integral n) => Width -> n -> Int -> n -> n
+bitWiseSet w x i b =
+  let i' = i `mod` w
+   in case toInteger b of
+        0 -> fromInteger $ Data.Bits.clearBit (toInteger x) i'
+        _ -> fromInteger $ Data.Bits.setBit (toInteger x) i'

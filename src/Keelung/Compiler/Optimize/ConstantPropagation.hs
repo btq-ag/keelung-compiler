@@ -87,7 +87,8 @@ propagateExprF relations e = case e of
     Nothing -> e
     Just val -> ValF val
   VarFO _ -> e -- no constant propagation for output variables
-  VarFI _ -> e -- no constant propagation for input variables
+  VarFI _ -> e -- no constant propagation for public input variables
+  VarFP _ -> e -- no constant propagation for private input variables
   SubF x y -> SubF (propagateExprF relations x) (propagateExprF relations y)
   AddF x y xs -> AddF (propagateExprF relations x) (propagateExprF relations y) (fmap (propagateExprF relations) xs)
   MulF x y -> MulF (propagateExprF relations x) (propagateExprF relations y)
@@ -102,7 +103,8 @@ propagateExprU relations e = case e of
     Nothing -> e
     Just val -> ValU w val
   VarUO _ _ -> e -- no constant propagation for output variables
-  VarUI _ _ -> e -- no constant propagation for input variables
+  VarUI _ _ -> e -- no constant propagation for public input variables
+  VarUP _ _ -> e -- no constant propagation for private input variables
   SubU w x y -> SubU w (propagateExprU relations x) (propagateExprU relations y)
   AddU w x y -> AddU w (propagateExprU relations x) (propagateExprU relations y)
   MulU w x y -> MulU w (propagateExprU relations x) (propagateExprU relations y)
@@ -113,6 +115,7 @@ propagateExprU relations e = case e of
   IfU w p x y -> IfU w (propagateExprB relations p) (propagateExprU relations x) (propagateExprU relations y)
   RoLU w i x -> RoLU w i (propagateExprU relations x)
   ShLU w i x -> ShLU w i (propagateExprU relations x)
+  SetU w x i b -> SetU w (propagateExprU relations x) i (propagateExprB relations b)
   BtoU w x -> BtoU w (propagateExprB relations x)
 
 propagateExprB :: Relations n -> ExprB n -> ExprB n
@@ -122,7 +125,8 @@ propagateExprB relations e = case e of
     Nothing -> e
     Just val -> ValB val
   VarBO _ -> e -- no constant propagation for output variables
-  VarBI _ -> e -- no constant propagation for input variables
+  VarBI _ -> e -- no constant propagation for public input variables
+  VarBP _ -> e -- no constant propagation for private input variables
   AndB x y xs -> AndB (propagateExprB relations x) (propagateExprB relations y) (fmap (propagateExprB relations) xs)
   OrB x y xs -> OrB (propagateExprB relations x) (propagateExprB relations y) (fmap (propagateExprB relations) xs)
   XorB x y -> XorB (propagateExprB relations x) (propagateExprB relations y)

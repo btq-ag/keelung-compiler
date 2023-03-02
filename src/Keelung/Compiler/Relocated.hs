@@ -123,7 +123,7 @@ instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
 --   renumbered constraints, together with the total number of
 --   variables in the (renumbered) constraint set and the (possibly
 --   renumbered) in and out variables.
-renumberConstraints :: GaloisField n => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
+renumberConstraints :: (GaloisField n, Integral n) => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
 renumberConstraints cs =
   cs
     { csConstraints = fmap renumberConstraint (csConstraints cs),
@@ -131,14 +131,14 @@ renumberConstraints cs =
     }
   where
     counters = csCounters cs
-    pinnedVarSize = getCountBySort OfInput counters + getCountBySort OfOutput counters
+    pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters + getCountBySort OfOutput counters
 
     -- variables in constraints (that should be kept after renumbering!)
     vars = varsInConstraints (csConstraints cs)
-    -- numbers of variables reduced via renumbering
-    reducedCount = getTotalCount counters - IntSet.size vars
     -- variables in constraints excluding input & output variables
     newIntermediateVars = IntSet.filter (>= pinnedVarSize) vars
+    -- numbers of variables reduced via renumbering
+    reducedCount = getCountBySort OfIntermediate counters - IntSet.size newIntermediateVars
     -- new variables after renumbering (excluding input & output variables)
     renumberedIntermediateVars = [pinnedVarSize .. pinnedVarSize + IntSet.size newIntermediateVars - 1]
 

@@ -21,10 +21,13 @@ import Test.Hspec
 import Test.Interpreter qualified as Interpreter
 import Test.Optimization qualified as Optimization
 import Test.VarLayout qualified as VarBookkeep
+import Test.WitnessGeneration qualified as WitnessGeneration
 
 main :: IO ()
 main = hspec $ do
   describe "Constraint Minimization" ConstraintMinimizer.tests
+
+  describe "Witness generation" WitnessGeneration.tests
 
   describe "Interpreter" Interpreter.tests
 
@@ -45,7 +48,7 @@ main = hspec $ do
               { csConstraints =
                   Seq.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
-                csCounters = addCount OfInput OfField 1 mempty
+                csCounters = addCount OfPublicInput OfField 1 mempty
               }
        in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
 
@@ -67,21 +70,21 @@ main = hspec $ do
 
   describe "Keelung `interpret`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
-      let expected = left show (Compiler.interpret Basic.outOfBound ([] :: [GF181]))
-      actual <- left show <$> Keelung.interpret_ GF181 Basic.outOfBound []
+      let expected = left show (Compiler.interpret Basic.outOfBound ([] :: [GF181]) ([] :: [GF181]))
+      actual <- left show <$> Keelung.interpret_ GF181 Basic.outOfBound [] []
       actual `shouldBe` expected
 
     it "Program that throws ElabError.EmptyArrayError" $ do
-      let expected = left show (Compiler.interpret Basic.emptyArray ([] :: [GF181]))
-      actual <- left show <$> Keelung.interpret_ GF181 Basic.emptyArray []
+      let expected = left show (Compiler.interpret Basic.emptyArray ([] :: [GF181]) ([] :: [GF181]))
+      actual <- left show <$> Keelung.interpret_ GF181 Basic.emptyArray [] []
       actual `shouldBe` expected
 
     it "Basic.eq1 1" $ do
-      let expected = left show (Compiler.interpret Basic.eq1 ([0] :: [GF181]))
-      actual <- left show <$> Keelung.interpret_ GF181 Basic.eq1 [0]
+      let expected = left show (Compiler.interpret Basic.eq1 ([0] :: [GF181]) ([] :: [GF181]))
+      actual <- left show <$> Keelung.interpret_ GF181 Basic.eq1 [0] []
       actual `shouldBe` expected
 
     it "Basic.eq1 2" $ do
-      let expected = left show (Compiler.interpret Basic.eq1 ([3] :: [GF181]))
-      actual <- left show <$> Keelung.interpret_ GF181 Basic.eq1 [3]
+      let expected = left show (Compiler.interpret Basic.eq1 ([3] :: [GF181]) ([] :: [GF181]))
+      actual <- left show <$> Keelung.interpret_ GF181 Basic.eq1 [3] []
       actual `shouldBe` expected

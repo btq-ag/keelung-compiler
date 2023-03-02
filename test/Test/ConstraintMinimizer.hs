@@ -54,7 +54,7 @@ tests = do
   describe "Constraint minimization" $ do
     it "Poseidon" $ do
       _cs <- runTest 1537 694 $ do
-        xs <- inputList 1
+        xs <- inputList Public 1
         Poseidon.hash (toList xs)
 
       -- print _cs
@@ -64,7 +64,7 @@ tests = do
 
     it "Union Find 1" $ do
       cs <- runTest 3 1 $ do
-        x <- inputField
+        x <- inputField Public
         y <- reuse x
         z <- reuse x
         return (x + y + z)
@@ -78,7 +78,7 @@ tests = do
 
     it "Union Find 2" $ do
       cs <- runTest 3 1 $ do
-        x <- inputField
+        x <- inputField Public
         y <- reuse x
         z <- reuse (x + y)
         return (x + y + z)
@@ -92,7 +92,7 @@ tests = do
 
     it "Union Find 3" $ do
       cs <- runTest 2 1 $ do
-        x <- inputField
+        x <- inputField Public
         y <- reuse (x + 1)
         return (x + y)
 
@@ -108,14 +108,14 @@ tests = do
 
     it "Union Find 5" $ do
       _cs <- runTest 2 1 $ do
-        x <- inputField
+        x <- inputField Public
         y <- reuse x
         return (x * y :: Field)
       return ()
 
     it "NEqF" $ do
       _cs <- runTest 7 4 $ do
-        x <- inputField
+        x <- inputField Public
         return $ cond (x `eq` 3) (12 :: Field) 789
       return ()
 

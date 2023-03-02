@@ -35,8 +35,8 @@ fullAdder as bs = do
 -- | "T" for top-level
 fullAdderT :: Int -> Comp [Boolean]
 fullAdderT width = do
-  xs <- inputList width
-  ys <- inputList width
+  xs <- inputList Public width
+  ys <- inputList Public width
   fullAdder xs ys
 
 --------------------------------------------------------------------------------
@@ -51,5 +51,5 @@ multiplier xs times =
 -- | "T" for top-level
 multiplierT :: Int -> Int -> Comp [Boolean]
 multiplierT width times = do
-  xs <- inputList width
+  xs <- inputList Public width
   multiplier xs times

@@ -43,6 +43,7 @@ generateWitness cs initWit =
       (witness, _) = optimizeWithWitness initWit cs'
    in if all (isMapped witness) variables
         then Right witness
+        --else error $ showWitness witness
         else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
   where
     isMapped witness var = IntMap.member var witness
@@ -100,7 +101,7 @@ fromR1CS r1cs =
 -- | Computes an assignment for a R1CS with given inputs
 witnessOfR1CS :: (GaloisField n, Integral n) => Inputs n -> R1CS n -> Either (ExecError n) (Witness n)
 witnessOfR1CS inputs r1cs =
-  let inputSize = getCountBySort OfInput (r1csCounters r1cs)
+  let inputSize = getCountBySort OfPublicInput (r1csCounters r1cs) + getCountBySort OfPrivateInput (r1csCounters r1cs)
    in if inputSize /= Inputs.size inputs
         then Left $ ExecInputUnmatchedError inputSize (Inputs.size inputs)
         else generateWitness (fromR1CS r1cs) (Inputs.toIntMap inputs)

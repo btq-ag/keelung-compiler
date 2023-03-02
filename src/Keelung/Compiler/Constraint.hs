@@ -55,12 +55,12 @@ import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as Unio
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
 import Keelung.Constraint.R1CS qualified as Constraint
-import Keelung.Data.Bindings (showList')
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Struct (Struct (..))
+import Keelung.Data.VarGroup (showList')
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
@@ -109,31 +109,34 @@ fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (r
 
 --------------------------------------------------------------------------------
 
-data RefB = RefBO Var | RefBI Var | RefB Var | RefUBit Width RefU Int
+data RefB = RefBO Var | RefBI Var | RefBP Var | RefUBit Width RefU Int | RefB Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefB where
-  show (RefBI x) = "BI" ++ show x
   show (RefBO x) = "BO" ++ show x
+  show (RefBI x) = "BI" ++ show x
+  show (RefBP x) = "BP" ++ show x
   show (RefB x) = "B" ++ show x
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
-data RefF = RefFO Var | RefFI Var | RefBtoRefF RefB | RefF Var
+data RefF = RefFO Var | RefFI Var | RefFP Var | RefBtoRefF RefB | RefF Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefF where
-  show (RefFI x) = "FI" ++ show x
   show (RefFO x) = "FO" ++ show x
+  show (RefFI x) = "FI" ++ show x
+  show (RefFP x) = "FP" ++ show x
   show (RefF x) = "F" ++ show x
   show (RefBtoRefF x) = show x
 
-data RefU = RefUO Width Var | RefUI Width Var | RefBtoRefU RefB | RefU Width Var
+data RefU = RefUO Width Var | RefUI Width Var | RefUP Width Var | RefBtoRefU RefB | RefU Width Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefU where
   show ref = case ref of
-    RefUI w x -> "UI" ++ toSubscript w ++ show x
     RefUO w x -> "UO" ++ toSubscript w ++ show x
+    RefUI w x -> "UI" ++ toSubscript w ++ show x
+    RefUP w x -> "UP" ++ toSubscript w ++ show x
     RefU w x -> "U" ++ toSubscript w ++ show x
     RefBtoRefU x -> show x
     where
@@ -176,20 +179,23 @@ instance Show RefU where
 --------------------------------------------------------------------------------
 
 reindexRefF :: Counters -> RefF -> Var
-reindexRefF counters (RefFI x) = reindex counters OfInput OfField x
 reindexRefF counters (RefFO x) = reindex counters OfOutput OfField x
+reindexRefF counters (RefFI x) = reindex counters OfPublicInput OfField x
+reindexRefF counters (RefFP x) = reindex counters OfPrivateInput OfField x
 reindexRefF counters (RefF x) = reindex counters OfIntermediate OfField x
 reindexRefF counters (RefBtoRefF x) = reindexRefB counters x
 
 reindexRefB :: Counters -> RefB -> Var
-reindexRefB counters (RefBI x) = reindex counters OfInput OfBoolean x
 reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
+reindexRefB counters (RefBI x) = reindex counters OfPublicInput OfBoolean x
+reindexRefB counters (RefBP x) = reindex counters OfPrivateInput OfBoolean x
 reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
 reindexRefB counters (RefUBit w x i) =
   let i' = i `mod` w
    in case x of
-        RefUI _ x' -> reindex counters OfInput (OfUIntBinRep w) x' + i'
         RefUO _ x' -> reindex counters OfOutput (OfUIntBinRep w) x' + i'
+        RefUI _ x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + i'
+        RefUP _ x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + i'
         RefU _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
         RefBtoRefU x' ->
           if i' == 0
@@ -197,8 +203,9 @@ reindexRefB counters (RefUBit w x i) =
             else error "reindexRefB: RefUBit"
 
 reindexRefU :: Counters -> RefU -> Var
-reindexRefU counters (RefUI w x) = reindex counters OfInput (OfUInt w) x
 reindexRefU counters (RefUO w x) = reindex counters OfOutput (OfUInt w) x
+reindexRefU counters (RefUI w x) = reindex counters OfPublicInput (OfUInt w) x
+reindexRefU counters (RefUP w x) = reindex counters OfPrivateInput (OfUInt w) x
 reindexRefU counters (RefU w x) = reindex counters OfIntermediate (OfUInt w) x
 reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 
@@ -623,7 +630,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
         let totalSize = getTotalCount counters
             padRight4 s = s <> replicate (4 - length s) ' '
             padLeft12 n = replicate (12 - length (show n)) ' ' <> show n
-            formLine typ = padLeft12 (getCount OfOutput typ counters) <> "  " <> padLeft12 (getCount OfInput typ counters) <> "      " <> padLeft12 (getCount OfIntermediate typ counters)
+            formLine typ = padLeft12 (getCount OfOutput typ counters) <> "  " <> padLeft12 (getCount OfPublicInput typ counters) <> "      " <> padLeft12 (getCount OfIntermediate typ counters)
             toSubscript = map go . show
               where
                 go c = case c of
@@ -639,7 +646,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
                   '9' -> '₉'
                   _ -> c
             uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (OfUInt w)
-            showUInts (Counters o _ _ _ _) =
+            showUInts (Counters o _ _ _ _ _ _) =
               let xs = map uint (IntMap.keys (structU o))
                in if null xs then "\n    UInt            none          none              none" else mconcat xs
          in if totalSize == 0
@@ -684,6 +691,7 @@ relocateConstraintSystem cs =
         RefBtoRefU refB -> shouldRemoveB refB
         RefUO _ _ -> False
         RefUI _ _ -> False
+        RefUP _ _ -> False
         RefU _ _ -> case Map.lookup var occurrences of
           Nothing -> True
           Just 0 -> True
@@ -694,10 +702,13 @@ relocateConstraintSystem cs =
     fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Seq (Relocated.Constraint n)
     fromUnionFindF unionFind occurrences =
       let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
-          inputVars = [RefFI i | i <- [0 .. getCount OfInput OfField counters - 1]]
+          publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
+          privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
           occurredVars = Map.keys $ Map.filter (> 0) occurrences
-       in Seq.fromList (Maybe.mapMaybe toConstant outputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant inputVars)
+       in Seq.fromList
+            (Maybe.mapMaybe toConstant outputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant publicInputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant privateInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant occurredVars)
       where
         toConstant var = case UnionFind.parentOf unionFind var of

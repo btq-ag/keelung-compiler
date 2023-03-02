@@ -63,6 +63,7 @@ eraseExprB expr = case expr of
   T.ValB False -> return $ ValB 0
   T.VarB var -> return $ VarB var
   T.VarBI var -> return $ VarBI var
+  T.VarBP var -> return $ VarBP var
   T.AndB x y -> chainExprsOfAssocOpAndB <$> eraseExprB x <*> eraseExprB y
   T.OrB x y -> chainExprsOfAssocOpOrB <$> eraseExprB x <*> eraseExprB y
   T.XorB x y -> XorB <$> eraseExprB x <*> eraseExprB y
@@ -79,6 +80,7 @@ eraseExprF expr = case expr of
   T.ValFR x -> return $ ValF (fromRational x)
   T.VarF var -> return $ VarF var
   T.VarFI var -> return $ VarFI var
+  T.VarFP var -> return $ VarFP var
   T.AddF x y -> chainExprsOfAssocOpAddF <$> eraseExprF x <*> eraseExprF y
   T.SubF x y -> SubF <$> eraseExprF x <*> eraseExprF y
   T.MulF x y -> MulF <$> eraseExprF x <*> eraseExprF y
@@ -91,6 +93,7 @@ eraseExprU expr = case expr of
   T.ValU w n -> return $ ValU w (fromIntegral n)
   T.VarU w var -> return $ VarU w var
   T.VarUI w var -> return $ VarUI w var
+  T.VarUP w var -> return $ VarUP w var
   T.AddU w x y -> AddU w <$> eraseExprU x <*> eraseExprU y
   T.SubU w x y -> SubU w <$> eraseExprU x <*> eraseExprU y
   T.MulU w x y -> MulU w <$> eraseExprU x <*> eraseExprU y
@@ -100,6 +103,7 @@ eraseExprU expr = case expr of
   T.NotU w x -> NotU w <$> eraseExprU x
   T.RoLU w i x -> RoLU w i <$> eraseExprU x
   T.ShLU w i x -> ShLU w i <$> eraseExprU x
+  T.SetU w x i b -> SetU w <$> eraseExprU x <*> pure i <*> eraseExprB b
   T.IfU w p x y -> IfU w <$> eraseExprB p <*> eraseExprU x <*> eraseExprU y
   T.BtoU w x -> BtoU w <$> eraseExprB x
 
