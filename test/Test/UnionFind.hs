@@ -72,7 +72,7 @@ assertRelation var1 slope var2 intercept = do
 
 ------------------------------------------------------------------------
 
-instance (Arbitrary ref, Arbitrary n, GaloisField n, Ord ref) => Arbitrary (UnionFind ref n) where
+instance (Arbitrary ref, Arbitrary n, GaloisField n, Ord ref, UnionFind.HasFromRefB ref) => Arbitrary (UnionFind ref n) where
   arbitrary = do
     relations <- Arbitrary.vector 100
 

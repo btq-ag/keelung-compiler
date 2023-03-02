@@ -75,6 +75,7 @@ r1cs prog rawPublicInputs rawPrivateInputs = do
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
+
 runAll :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> [n] -> IO ()
 runAll program rawPublicInputs rawPrivateInputs rawOutputs = do
   kinded program rawPublicInputs rawPrivateInputs
@@ -82,12 +83,20 @@ runAll program rawPublicInputs rawPrivateInputs rawOutputs = do
   typed program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
 
-  let unoptimized = Compiler.asGF181N $ Compiler.compileO0' program
-  let optimized = Compiler.asGF181N $ Compiler.compileO1' program
-  -- print unoptimized
-  -- print "============="
-  print optimized
-  print (relocateConstraintSystem <$> optimized)
+  -- let oldO0 = Compiler.asGF181N $ Compiler.compileO0' program
+  -- let newO0 = Compiler.asGF181N $ Compiler.compileO0' program
+  -- let oldO1 = Compiler.asGF181N $ Compiler.compileO1 program
+  -- let newO1 = Compiler.asGF181N $ Compiler.compileO1' program
+  -- print "\n======oldO0=======\n"
+  -- print oldO0
+  -- print "\n======newO0=======\n"
+  -- print newO0
+  -- print "\n======oldO1=======\n"
+  -- print oldO1
+  -- print (toR1CS <$> oldO1)
+  -- print "\n======newO1=======\n"
+  -- print newO1
+  -- print (toR1CS . relocateConstraintSystem <$> optimized)
 
   csNew program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
@@ -118,188 +127,195 @@ runAndCompare program rawPublicInputs rawPrivateInputs = do
 tests :: SpecWith ()
 tests = do
   describe "Interpreters of different syntaxes should computes the same result" $ do
-    -- it "identity (public / Field)" $
-    --   property $ \inp -> do
-    --     runAll Basic.identity [inp :: GF181] [] [inp]
+    it "identity (public / Field)" $
+      property $ \inp -> do
+        runAll Basic.identity [inp :: GF181] [] [inp]
 
-    -- it "identity (public / Boolean)" $ do
-    --   runAll Basic.identityB [1 :: GF181] [] [1]
-    --   runAll Basic.identityB [0 :: GF181] [] [0]
+    it "identity (public / Boolean)" $ do
+      runAll Basic.identityB [1 :: GF181] [] [1]
+      runAll Basic.identityB [0 :: GF181] [] [0]
 
-    -- it "identity (private)" $ do
-    --   let program = inputField Private
-    --   runAll program [] [1 :: GF181] [1]
+    it "identity (private)" $ do
+      let program = inputField Private
+      runAll program [] [1 :: GF181] [1]
 
-    -- it "Field arithmetics 1" $ do
-    --   let program = do
-    --         x <- inputField Public
-    --         y <- inputField Public
-    --         return $ x * y + y * 2
-    --   property $ \(x, y) -> do
-    --     runAll program [x, y :: GF181] [] [x * y + y * 2]
+    it "Field arithmetics 1" $ do
+      let program = do
+            x <- inputField Public
+            y <- inputField Public
+            return $ x * y + y * 2
+      property $ \(x, y) -> do
+        runAll program [x, y :: GF181] [] [x * y + y * 2]
 
-    -- it "Field arithmetics 2" $ do
-    --   let program = do
-    --         x <- inputField Public
-    --         y <- inputField Private
-    --         return $ x * y + y * 2
-    --   property $ \(x, y) -> do
-    --     runAll program [x :: GF181] [y] [x * y + y * 2]
+    it "Field arithmetics 2" $ do
+      let program = do
+            x <- inputField Public
+            y <- inputField Private
+            return $ x * y + y * 2
+      property $ \(x, y) -> do
+        runAll program [x :: GF181] [y] [x * y + y * 2]
 
-    -- it "Field arithmetics 2" $ do
-    --   let program = do
-    --         x <- inputField Private
-    --         y <- inputField Public
-    --         return $ x * y + y * 2
-    --   property $ \(x, y) -> do
-    --     runAll program [y :: GF181] [x] [x * y + y * 2]
+    it "Field arithmetics 2" $ do
+      let program = do
+            x <- inputField Private
+            y <- inputField Public
+            return $ x * y + y * 2
+      property $ \(x, y) -> do
+        runAll program [y :: GF181] [x] [x * y + y * 2]
 
-    -- it "Basic.eq1" $
-    --   property $ \inp -> do
-    --     let expectedOutput = if inp == 3 then [1] else [0]
-    --     runAll Basic.eq1 [inp :: GF181] [] expectedOutput
+    it "Basic.eq1" $
+      property $ \inp -> do
+        let expectedOutput = if inp == 3 then [1] else [0]
+        runAll Basic.eq1 [inp :: GF181] [] expectedOutput
 
-    -- it "Basic.cond'" $ do
-    --   runAll Basic.cond' [0 :: GF181] [] [789]
-    --   runAll Basic.cond' [3 :: GF181] [] [12]
-    -- -- property $ \inp -> do
-    -- --   let expectedOutput = if inp == 3 then [12] else [789]
-    -- --   runAll Basic.cond' [inp :: GF181] expectedOutput
+    it "Basic.cond'" $ do
+      runAll Basic.cond' [0 :: GF181] [] [789]
+      runAll Basic.cond' [3 :: GF181] [] [12]
+    -- property $ \inp -> do
+    --   let expectedOutput = if inp == 3 then [12] else [789]
+    --   runAll Basic.cond' [inp :: GF181] expectedOutput
 
-    -- it "Basic.assert1" $
-    --   runAll Basic.assert1 [3 :: GF181] [] []
+    it "Basic.assert1" $
+      runAll Basic.assert1 [3 :: GF181] [] []
 
-    -- it "Basic.toArrayM1" $
-    --   runAll Basic.toArrayM1 [] [] [0 :: GF181]
+    it "Basic.toArrayM1" $
+      runAll Basic.toArrayM1 [] [] [0 :: GF181]
 
-    -- it "Basic.summation" $
-    --   forAll (vector 4) $ \inp -> do
-    --     let expectedOutput = [sum inp]
-    --     runAll Basic.summation (inp :: [GF181]) [] expectedOutput
+    it "Basic.summation" $
+      forAll (vector 4) $ \inp -> do
+        let expectedOutput = [sum inp]
+        runAll Basic.summation (inp :: [GF181]) [] expectedOutput
 
-    -- it "Basic.summation2" $
-    --   forAll (vector 4) $ \inp -> do
-    --     let expectedOutput = []
-    --     runAll Basic.summation2 (inp :: [GF181]) [] expectedOutput
+    it "Basic.summation2" $
+      forAll (vector 4) $ \inp -> do
+        let expectedOutput = []
+        runAll Basic.summation2 (inp :: [GF181]) [] expectedOutput
 
-    -- it "Basic.assertArraysEqual" $
-    --   runAll Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] [] []
+    it "Basic.assertArraysEqual" $
+      runAll Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] [] []
 
-    -- it "Basic.assertArraysEqual2" $
-    --   runAll Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] [] []
+    it "Basic.assertArraysEqual2" $
+      runAll Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] [] []
 
-    -- it "Basic.array1D" $
-    --   runAll (Basic.array1D 1) [2, 4 :: GF181] [] []
+    it "Basic.array1D" $
+      runAll (Basic.array1D 1) [2, 4 :: GF181] [] []
 
-    -- it "Basic.array2D 1" $
-    --   runAll (Basic.array2D 1 1) [2, 4 :: GF181] [] []
+    it "Basic.array2D 1" $
+      runAll (Basic.array2D 1 1) [2, 4 :: GF181] [] []
 
-    -- it "Basic.array2D 2" $
-    --   runAll (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9 :: GF181] [] []
+    it "Basic.array2D 2" $
+      runAll (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9 :: GF181] [] []
 
-    -- it "Basic.toArray1" $
-    --   runAll Basic.toArray1 [0 .. 7 :: GF181] [] []
+    it "Basic.toArray1" $
+      runAll Basic.toArray1 [0 .. 7 :: GF181] [] []
 
-    -- it "Basic.xorLists" $
-    --   runAll Basic.xorLists [] [] [1 :: GF181]
+    it "Basic.xorLists" $
+      runAll Basic.xorLists [] [] [1 :: GF181]
 
-    -- it "Basic.dupArray" $
-    --   runAll Basic.dupArray [1] [] [1 :: GF181]
+    it "Basic.dupArray" $
+      runAll Basic.dupArray [1] [] [1 :: GF181]
 
-    -- it "Basic.returnArray2" $
-    --   runAll Basic.returnArray2 [2] [] [2, 4 :: GF181]
+    it "Basic.returnArray2" $
+      runAll Basic.returnArray2 [2] [] [2, 4 :: GF181]
 
-    -- it "Basic.arithU0" $
-    --   runAll Basic.arithU0 [2, 3] [] [5 :: GF181]
+    it "Basic.arithU0" $
+      runAll Basic.arithU0 [2, 3] [] [5 :: GF181]
 
-    -- it "Mixed 0" $ do
-    --   let program = do
-    --         f <- inputField Public
-    --         u4 <- inputUInt @4 Public
-    --         b <- inputBool Public
-    --         return $
-    --           cond
-    --             (b .&. (u4 !!! 0))
-    --             (f + 1)
-    --             (f + 2)
+    it "BtoF" $ do
+      let program = do
+            x <- input Public
+            y <- input Private
+            return $ BtoF x * BtoF y
+      runAll program [1 :: GF181] [1] [1]
 
-    --   runAll program [100, 1, 1 :: GF181] [] [101]
-    --   runAll program [100, 0, 1 :: GF181] [] [102]
+    it "Mixed 0" $ do
+      let program = do
+            f <- inputField Public
+            u4 <- inputUInt @4 Public
+            b <- inputBool Public
+            return $
+              cond
+                (b .&. (u4 !!! 0))
+                (f + 1)
+                (f + 2)
 
-    -- it "Rotate" $ do
-    --   let program = do
-    --         x <- inputUInt @4 Public
-    --         return [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
+      runAll program [100, 1, 1 :: GF181] [] [101]
+      runAll program [100, 0, 1 :: GF181] [] [102]
 
-    --   runAll program [0 :: GF181] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
-    --   runAll program [1 :: GF181] [] [1, 2, 4, 8, 1, 2, 4, 8, 1]
-    --   runAll program [3 :: GF181] [] [3, 6, 12, 9, 3, 6, 12, 9, 3]
-    --   runAll program [5 :: GF181] [] [5, 10, 5, 10, 5, 10, 5, 10, 5]
+    it "Rotate" $ do
+      let program = do
+            x <- inputUInt @4 Public
+            return [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
 
-    -- it "Basic.rotateAndBitTest" $
-    --   -- 0011 0100211003
-    --   runAll Basic.rotateAndBitTest [2, 3] [] [0, 0, 1, 1 :: GF181]
+      runAll program [0 :: GF181] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
+      runAll program [1 :: GF181] [] [1, 2, 4, 8, 1, 2, 4, 8, 1]
+      runAll program [3 :: GF181] [] [3, 6, 12, 9, 3, 6, 12, 9, 3]
+      runAll program [5 :: GF181] [] [5, 10, 5, 10, 5, 10, 5, 10, 5]
 
-    -- it "Shift" $ do
-    --   let program = do
-    --         x <- inputUInt @4 Public
-    --         return [shift x (-4), shift x (-3), shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
+    it "Basic.rotateAndBitTest" $
+      -- 0011 0100211003
+      runAll Basic.rotateAndBitTest [2, 3] [] [0, 0, 1, 1 :: GF181]
 
-    --   runAll program [0 :: GF181] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
-    --   runAll program [1 :: GF181] [] [0, 0, 0, 0, 1, 2, 4, 8, 0]
-    --   runAll program [3 :: GF181] [] [0, 0, 0, 1, 3, 6, 12, 8, 0]
-    --   runAll program [5 :: GF181] [] [0, 0, 1, 2, 5, 10, 4, 8, 0]
+    it "Shift" $ do
+      let program = do
+            x <- inputUInt @4 Public
+            return [shift x (-4), shift x (-3), shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
 
-    -- describe "AggCheck" $ do
-    --   it "dim:1 sig:1" $
-    --     runAggCheck 1 1 []
-    --   it "dim:1 sig:10" $
-    --     runAggCheck 1 10 []
-    --   it "dim:10 sig:1" $
-    --     runAggCheck 10 1 []
-    --   it "dim:10 sig:10" $
-    --     runAggCheck 10 10 []
+      runAll program [0 :: GF181] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
+      runAll program [1 :: GF181] [] [0, 0, 0, 0, 1, 2, 4, 8, 0]
+      runAll program [3 :: GF181] [] [0, 0, 0, 1, 3, 6, 12, 8, 0]
+      runAll program [5 :: GF181] [] [0, 0, 1, 2, 5, 10, 4, 8, 0]
+
+    describe "AggCheck" $ do
+      it "dim:1 sig:1" $
+        runAggCheck 1 1 []
+      it "dim:1 sig:10" $
+        runAggCheck 1 10 []
+      it "dim:10 sig:1" $
+        runAggCheck 10 1 []
+      it "dim:10 sig:10" $
+        runAggCheck 10 10 []
 
     describe "LT12289" $ do
       it "dim:1 sig:1" $
         runLT12289 1 1 []
-      -- it "dim:1 sig:10" $
-      --   runLT12289 1 10 []
-      -- it "dim:10 sig:1" $
-      --   runLT12289 10 1 []
-      -- it "dim:10 sig:10" $
-      --   runLT12289 10 10 []
+      it "dim:1 sig:10" $
+        runLT12289 1 10 []
+      it "dim:10 sig:1" $
+        runLT12289 10 1 []
+      it "dim:10 sig:10" $
+        runLT12289 10 10 []
 
-  --   describe "LenCheck" $ do
-  --     it "dim:1 sig:1" $
-  --       runLenCheck 1 1 []
-  --     it "dim:1 sig:10" $
-  --       runLenCheck 1 10 []
-  --     it "dim:10 sig:1" $
-  --       runLenCheck 10 1 []
-  --     it "dim:10 sig:10" $
-  --       runLenCheck 10 10 []
+    describe "LenCheck" $ do
+      it "dim:1 sig:1" $
+        runLenCheck 1 1 []
+      it "dim:1 sig:10" $
+        runLenCheck 1 10 []
+      it "dim:10 sig:1" $
+        runLenCheck 10 1 []
+      it "dim:10 sig:10" $
+        runLenCheck 10 10 []
 
-  --   describe "Poseidon" $ do
-  --     it "[0]" $ do
-  --       runAll (Poseidon.hash [0]) [0 :: N GF181] [] [969784935791658820122994814042437418105599415561111385]
+    describe "Poseidon" $ do
+      it "[0]" $ do
+        runAll (Poseidon.hash [0]) [0 :: N GF181] [] [969784935791658820122994814042437418105599415561111385]
 
-  -- describe "Tests on the optimizer" $ do
-  --   it "Multiplicative 0" $ do
-  --     let program msg = do
-  --           msg0 <- reuse msg
-  --           msg1 <- reuse (msg0 + 1)
-  --           reuse ((msg1 + 1) * (msg1 + 1))
-  --     runAndCompare (program 0 :: Comp Field) [0 :: N GF181] []
-  --   it "Multiplicative 1" $ do
-  --     let program = do
-  --           let initState = (2, 3)
-  --           let round' (a, b) = (a + b, a * a + b * 2)
-  --           state1 <- reuse (round' initState) -- (5, 10)
-  --           state2 <- reuse (round' state1) -- (15, 45)
-  --           state3 <- reuse (round' state2) -- (60, 2025)
-  --           return $ fst state3
-  --     runAndCompare (program :: Comp Field) [0 :: N GF181] []
+  describe "Tests on the optimizer" $ do
+    it "Multiplicative 0" $ do
+      let program msg = do
+            msg0 <- reuse msg
+            msg1 <- reuse (msg0 + 1)
+            reuse ((msg1 + 1) * (msg1 + 1))
+      runAndCompare (program 0 :: Comp Field) [0 :: N GF181] []
+    it "Multiplicative 1" $ do
+      let program = do
+            let initState = (2, 3)
+            let round' (a, b) = (a + b, a * a + b * 2)
+            state1 <- reuse (round' initState) -- (5, 10)
+            state2 <- reuse (round' state1) -- (15, 45)
+            state3 <- reuse (round' state2) -- (60, 2025)
+            return $ fst state3
+      runAndCompare (program :: Comp Field) [0 :: N GF181] []
   where
     runAggCheck :: Int -> Int -> [GF181] -> IO ()
     runAggCheck dimension numberOfSignatures outputs =

@@ -219,7 +219,8 @@ add = mapM_ addOne
         Nothing -> return ()
         Just csVarEqU' -> put cs {csVarEqU = csVarEqU'}
     addOne (CMulF x y (Left c)) = modify (\cs -> addRefFOccurrences (PolyG.vars x) $ addRefFOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
-    addOne (CMulF x y (Right z)) = modify (\cs -> addRefFOccurrences (PolyG.vars x) $ addRefFOccurrences (PolyG.vars y) $ addRefFOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
+    addOne (CMulF x y (Right z)) = do
+      modify (\cs -> addRefFOccurrences (PolyG.vars x) $ addRefFOccurrences (PolyG.vars y) $ addRefFOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
     addOne (CMulB x y (Left c)) = modify (\cs -> addRefBOccurrences (PolyG.vars x) $ addRefBOccurrences (PolyG.vars y) $ cs {csMulB = (x, y, Left c) : csMulB cs})
     addOne (CMulB x y (Right z)) = modify (\cs -> addRefBOccurrences (PolyG.vars x) $ addRefBOccurrences (PolyG.vars y) $ addRefBOccurrences (PolyG.vars z) $ cs {csMulB = (x, y, Right z) : csMulB cs})
     addOne (CMulU x y (Left c)) = modify (\cs -> addRefUOccurrences (PolyG.vars x) $ addRefUOccurrences (PolyG.vars y) $ cs {csMulU = (x, y, Left c) : csMulU cs})

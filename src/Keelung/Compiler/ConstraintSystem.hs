@@ -24,7 +24,6 @@ import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
-import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
@@ -257,15 +256,14 @@ relocateConstraintSystem cs =
           publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
           privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
           occurredInF = Map.keys $ Map.filter (> 0) occurrencesF
-       in traceShow
-            (occurrencesF, occurredInF)
-            Seq.fromList
-            (Maybe.mapMaybe toConstant outputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant publicInputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant privateInputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant occurredInF)
+       in Seq.fromList
+            (Maybe.mapMaybe toConstraint outputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
+            <> Seq.fromList (Maybe.mapMaybe toConstraintRefB pairs)
       where
-        toConstant var = case UnionFind.parentOf unionFind var of
+        toConstraint var = case UnionFind.parentOf unionFind var of
           Nothing ->
             -- var is already a root
             Nothing
@@ -277,6 +275,14 @@ relocateConstraintSystem cs =
             case PolyG.build intercept [(var, -1), (root, slope)] of
               Left _ -> Nothing
               Right poly -> Just $ fromConstraint counters $ CAddF poly
+
+        pairs :: [(RefF, RefB)]
+        pairs = Set.toList (UnionFind.exportFromRefBPairs unionFind)
+
+        toConstraintRefB (refA, refB) =
+          case PolyG.build 0 [(refA, -1), (RefBtoRefF refB, 1)] of
+            Left _ -> Nothing
+            Right poly -> Just $ fromConstraint counters $ CAddF poly
 
     fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
     fromUnionFindB relations occurrencesF occurrencesB occurrencesU =
@@ -296,15 +302,15 @@ relocateConstraintSystem cs =
           occurredInF = Map.elems $ Map.mapMaybeWithKey findRefBInRefF occurrencesF
           occurredInU = Map.elems $ Map.mapMaybeWithKey findRefBInRefU occurrencesU
        in Seq.fromList
-            (Maybe.mapMaybe toConstant outputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant publicInputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant privateInputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant occurredInF)
-            <> Seq.fromList (Maybe.mapMaybe toConstant occurredInB)
-            <> Seq.fromList (Maybe.mapMaybe toConstant occurredInU)
-            <> Seq.fromList (Maybe.mapMaybe toConstant (Set.toList (BooleanRelations.exportPinnedBitTests relations)))
+            (Maybe.mapMaybe toConstraint outputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInB)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInU)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint (Set.toList (BooleanRelations.exportPinnedBitTests relations)))
       where
-        toConstant var = case BooleanRelations.parentOf relations var of
+        toConstraint var = case BooleanRelations.parentOf relations var of
           Nothing ->
             -- var is already a root
             Nothing

@@ -10,6 +10,8 @@ import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import qualified Data.Map.Strict as Map
+import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 run = snd . optimizeAddF
@@ -130,19 +132,19 @@ reduceAddF polynomial = do
       unionFind <- gets csVarEqF
       case substPolyG unionFind polynomial of
         Nothing -> return (Just polynomial) -- nothing changed
-        Just (Left _constant, substitutedRefs) -> do
+        Just (Left _constant, removedRefs, _) -> do
           -- when (constant /= 0) $
           --   error "[ panic ] Additive reduced to some constant other than 0"
           -- the polynomial has been reduced to nothing
           markChanged AdditiveConstraintChanged
           -- remove all variables in the polynomial from the occurrence list
-          modify' $ removeRefFOccurrences substitutedRefs
+          modify' $ removeRefFOccurrences removedRefs
           return Nothing
-        Just (Right reducePolynomial, substitutedRefs) -> do
+        Just (Right reducePolynomial, removedRefs, addedRefs) -> do
           -- the polynomial has been reduced to something
           markChanged AdditiveConstraintChanged
           -- remove variables that has been reduced in the polynomial from the occurrence list
-          modify' $ removeRefFOccurrences substitutedRefs
+          modify' $ removeRefFOccurrences removedRefs . addRefFOccurrences addedRefs
           -- keep reducing the reduced polynomial
           reduceAddF reducePolynomial
 
@@ -163,17 +165,17 @@ substitutePoly typeOfChange polynomial = do
   unionFind <- gets csVarEqF
   case substPolyG unionFind polynomial of
     Nothing -> return (Right polynomial) -- nothing changed
-    Just (Left constant, substitutedRefs) -> do
+    Just (Left constant, removedRefs, _) -> do
       -- the polynomial has been reduced to nothing
       markChanged typeOfChange
       -- remove all variables in the polynomial from the occurrence list
-      modify' $ removeRefFOccurrences substitutedRefs
+      modify' $ removeRefFOccurrences removedRefs
       return (Left constant)
-    Just (Right reducePolynomial, substitutedRefs) -> do
+    Just (Right reducePolynomial, removedRefs, addedRefs) -> do
       -- the polynomial has been reduced to something
       markChanged typeOfChange
       -- remove all variables in the polynomial from the occurrence list
-      modify' $ removeRefFOccurrences substitutedRefs
+      modify' $ removeRefFOccurrences removedRefs . addRefFOccurrences addedRefs
       return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative constaint, returns the reduced constraint if it is reduced
@@ -314,3 +316,45 @@ addAddF poly = case PolyG.view poly of
   PolyG.Polynomial _ _ -> do
     markChanged AdditiveConstraintChanged
     modify' $ \cs' -> cs' {csAddF = poly : csAddF cs'}
+
+--------------------------------------------------------------------------------
+
+-- | Substitutes variables in a polynomial.
+--   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
+substPolyG :: (GaloisField n, Integral n, Ord ref, Show ref) => UnionFind ref n -> PolyG ref n -> Maybe (Either n (PolyG ref n), [ref], [ref])
+substPolyG ctx poly = do
+  let (c, xs) = PolyG.viewAsMap poly
+  case Map.foldlWithKey' (substPolyG_ ctx) (False, Left c, [], []) xs of
+    (False, _, _, _) -> Nothing -- nothing changed
+    (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
+    (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs)
+
+substPolyG_ :: (Integral n, Ord ref, Show ref, GaloisField n) => UnionFind ref n -> (Bool, Either n (PolyG ref n), [ref], [ref]) -> ref -> n -> (Bool, Either n (PolyG ref n), [ref], [ref])
+substPolyG_ ctx (changed, accPoly, removedRefs, addedRefs) ref coeff = case UnionFind.parentOf ctx ref of
+  Nothing ->
+    -- ref is already a root
+    case accPoly of
+      Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
+      Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+  Just (Nothing, intercept) ->
+    -- ref = intercept
+    let removedRefs' = ref : removedRefs -- add ref to removedRefs
+     in case accPoly of
+          Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
+          Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', removedRefs', addedRefs)
+  Just (Just (slope, root), intercept) ->
+    if root == ref
+      then
+        if slope == 1 && intercept == 0
+          then -- ref = root, nothing changed
+          case accPoly of
+            Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
+            Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+          else error "[ panic ] Invalid relation in UnionFind: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
+      else
+        let removedRefs' = ref : removedRefs
+            addedRefs' = root : addedRefs
+         in case accPoly of
+              -- ref = slope * root + intercept
+              Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), removedRefs', addedRefs')
+              Right accPoly' -> (True, PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', removedRefs', addedRefs')

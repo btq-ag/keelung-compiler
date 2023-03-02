@@ -16,7 +16,6 @@ module Keelung.Compiler.Constraint
     -- removeOccurrencesWithPolyG,
     -- addOccurrences,
     -- removeOccurrences,
-    substPolyG,
     cAddF,
     cAddB,
     cAddU,
@@ -42,8 +41,6 @@ import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Constraint.R1CS qualified as Constraint
 import Keelung.Data.PolyG (PolyG)
@@ -218,46 +215,6 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
   Left _ -> error "[ panic ] fromPolyU_: Left"
   Right p -> p
 
---------------------------------------------------------------------------------
-
--- | Substitutes variables in a polynomial.
---   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n, Ord ref, Show ref) => UnionFind ref n -> PolyG ref n -> Maybe (Either n (PolyG ref n), [ref])
-substPolyG ctx poly = do
-  let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' (substPolyG_ ctx) (False, Left c, []) xs of
-    (False, _, _) -> Nothing -- nothing changed
-    (True, Left constant, substitutedRefs) -> Just (Left constant, substitutedRefs) -- the polynomial has been reduced to a constant
-    (True, Right poly', substitutedRefs) -> Just (Right poly', substitutedRefs)
-
-substPolyG_ :: (Integral n, Ord ref, Show ref, GaloisField n) => UnionFind ref n -> (Bool, Either n (PolyG ref n), [ref]) -> ref -> n -> (Bool, Either n (PolyG ref n), [ref])
-substPolyG_ ctx (changed, accPoly, substitutedRefs) ref coeff = case UnionFind.parentOf ctx ref of
-  Nothing ->
-    -- ref is already a root
-    case accPoly of
-      Left c -> (changed, PolyG.singleton c (ref, coeff), substitutedRefs)
-      Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
-  Just (Nothing, intercept) ->
-    -- ref = intercept
-    let substitutedRefs' = ref : substitutedRefs -- add ref to substitutedRefs
-     in case accPoly of
-          Left c -> (True, Left (intercept * coeff + c), substitutedRefs')
-          Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', substitutedRefs')
-  Just (Just (slope, root), intercept) ->
-    if root == ref
-      then
-        if slope == 1 && intercept == 0
-          then -- ref = root, nothing changed
-          case accPoly of
-            Left c -> (changed, PolyG.singleton c (ref, coeff), substitutedRefs)
-            Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, substitutedRefs)
-          else error "[ panic ] Invalid relation in UnionFind: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
-      else
-        let substitutedRefs' = ref : substitutedRefs
-         in case accPoly of
-              -- ref = slope * root + intercept
-              Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
-              Right accPoly' -> (True, PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', substitutedRefs')
 
 -- let (isAlreadyRoot, (result, intercept)) = UnionFind.lookup ref ctx
 --  in if isAlreadyRoot
