@@ -81,6 +81,14 @@ runAll program rawPublicInputs rawPrivateInputs rawOutputs = do
     `shouldBe` Right rawOutputs
   typed program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
+
+  -- let unoptimized = Compiler.asGF181N $ Compiler.compileO0' program
+  -- let optimized = Compiler.asGF181N $ Compiler.compileO1' program
+  -- print unoptimized
+  -- print "============="
+  -- print optimized
+  -- print (relocateConstraintSystem <$> optimized)
+
   csNew program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
   relocated program rawPublicInputs rawPrivateInputs

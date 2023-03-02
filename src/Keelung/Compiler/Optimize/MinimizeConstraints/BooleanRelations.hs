@@ -8,15 +8,18 @@ import Data.Field.Galois (GaloisField)
 import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
--- import Data.Maybe (fromMaybe)
-
+import Data.Set (Set)
+import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Constraint (RefB (..))
+import Keelung.Compiler.Constraint (RefB (..), RefU)
+import Keelung.Syntax (Width)
 import Prelude hiding (lookup)
 
 data BooleanRelations n = BooleanRelations
   { links :: Map RefB (Maybe (n, RefB), n),
-    sizes :: Map RefB Int
+    sizes :: Map RefB Int,
+    -- | Here stores bit tests on pinned UInt variables, so that we can export them as constraints later.
+    pinnedBitTests :: Set (Width, RefU, Int)
   }
   deriving (Eq, Generic, NFData)
 
@@ -26,6 +29,7 @@ instance (Show n, Eq n, Num n) => Show (BooleanRelations n) where
       ++ "  sizes = "
       ++ showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ sizes xs))
       ++ "\n\n"
+      ++ "  pinnedBitTests = " <> show (Set.toList (exportPinnedBitTests xs)) <> "\n\n"
       ++ mconcat (map showLink (Map.toList $ links xs))
       ++ "\n}"
     where
@@ -35,7 +39,7 @@ instance (Show n, Eq n, Num n) => Show (BooleanRelations n) where
       showLink (var, (Nothing, intercept)) = "  " <> show var <> " = " <> show intercept <> "\n"
 
 new :: BooleanRelations n
-new = BooleanRelations mempty mempty
+new = BooleanRelations mempty mempty mempty
 
 -- | Find the root of a variable, returns:
 --      1. if the variable is already a root
@@ -121,23 +125,30 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   ((False, (Nothing, _)), (False, (Just _, _))) -> Nothing -- var1 is a value
   ((False, (Nothing, _)), (False, (Nothing, _))) -> Nothing -- both are values
 
+-- | If the RefB is of RefUBit, remember it
+rememberPinnedBitTest :: RefB -> BooleanRelations n -> BooleanRelations n
+rememberPinnedBitTest (RefUBit width ref index) xs = xs {pinnedBitTests = Set.insert (width, ref, index) (pinnedBitTests xs)}
+rememberPinnedBitTest _ xs = xs
+
 -- | Bind a variable to a value
 bindToValue :: GaloisField n => RefB -> n -> BooleanRelations n -> BooleanRelations n
 bindToValue x value xs =
   case parentOf xs x of
     Nothing ->
       -- x does not have a parent, so it is its own root
-      xs
-        { links = Map.insert x (Nothing, value) (links xs),
-          sizes = Map.insert x 1 (sizes xs)
-        }
+      rememberPinnedBitTest x $
+        xs
+          { links = Map.insert x (Nothing, value) (links xs),
+            sizes = Map.insert x 1 (sizes xs)
+          }
     Just (Nothing, _oldValue) ->
       -- x is already a root with `_oldValue` as its value
       -- TODO: handle this kind of conflict in the future
       -- FOR NOW: overwrite the value of x with the new value
-      xs
-        { links = Map.insert x (Nothing, value) (links xs)
-        }
+      rememberPinnedBitTest x $
+        xs
+          { links = Map.insert x (Nothing, value) (links xs)
+          }
     Just (Just (slopeP, parent), interceptP) ->
       -- x is a child of `parent` with slope `slopeP` and intercept `interceptP`
       --  x = slopeP * parent + interceptP
@@ -147,13 +158,14 @@ bindToValue x value xs =
       --  value - interceptP = slopeP * parent
       -- =>
       --  parent = (value - interceptP) / slopeP
-      xs
-        { links =
-            Map.insert parent (Nothing, (value - interceptP) / slopeP) $
-              Map.insert x (Nothing, value) $
-                links xs,
-          sizes = Map.insert x 1 (sizes xs)
-        }
+      rememberPinnedBitTest x $
+        xs
+          { links =
+              Map.insert parent (Nothing, (value - interceptP) / slopeP) $
+                Map.insert x (Nothing, value) $
+                  links xs,
+            sizes = Map.insert x 1 (sizes xs)
+          }
 
 relate :: GaloisField n => RefB -> (n, RefB, n) -> BooleanRelations n -> Maybe (BooleanRelations n)
 relate x (0, _, intercept) xs = Just $ bindToValue x intercept xs
@@ -206,56 +218,25 @@ relate' x (slope, y, intercept) xs =
           -- =>
           --  x = slope * slopeY * rootOfY + slope * interceptY + intercept
           Just $
-            xs
-              { links = Map.insert x (Just (slope * slopeY, rootOfY), slope * interceptY + intercept) (links xs),
-                sizes = Map.insertWith (+) y 1 (sizes xs)
-              }
+            rememberPinnedBitTest x $
+              xs
+                { links = Map.insert x (Just (slope * slopeY, rootOfY), slope * interceptY + intercept) (links xs),
+                  sizes = Map.insertWith (+) y 1 (sizes xs)
+                }
         Nothing ->
           -- y does not have a parent, so it is its own root
           Just $
-            xs
-              { links = Map.insert x (Just (slope, y), intercept) (links xs),
-                sizes = Map.insertWith (+) y 1 (sizes xs)
-              }
-
--- let (_, slopeX, rootOfX, interceptX) = lookup x xs -- x = slopeX * rootOfX + interceptX
---     (_, slopeY, rootOfY, interceptY) = lookup y xs -- y = slopeY * rootOfY + interceptY
---     sizeOfRootX = sizeOf xs rootOfX
---     sizeOfRootY = sizeOf xs rootOfY
---  in if slope == slopeX && y == rootOfX && intercept == interceptX
---       then Nothing
---       else
---         if sizeOfRootX > sizeOfRootY
---           then --  x = slope * y + intercept
---           --    =>
---           --  y = (x - intercept) / slope
---           --    =>
---           --  y = (slopeX * rootOfX + interceptX - intercept) / slope
---           --    =>
---           --  y = slopeX * rootOfX / slope + (interceptX - intercept) / slope
-
---             Just $
---               xs
---                 { links = Map.insert y (slopeX / slope, rootOfX, (interceptX - intercept) / slope) (links xs),
---                   sizes = Map.insert x (sizeOfRootX + sizeOfRootY) (sizes xs)
---                 }
---           else --  x = slope * y + intercept
---           --    =>
---           --  x = slope * (slopeY * rootOfY + interceptY) + intercept
---           --    =>
---           --  x = slope * slopeY * rootOfY + slope * interceptY + intercept
-
---             Just $
---               xs
---                 { links = Map.insert x (slope * slopeY, rootOfY, slope * interceptY + intercept) (links xs),
---                   sizes = Map.insert y (sizeOfRootX + sizeOfRootY) (sizes xs)
---                 }
-
--- sizeOf :: Ord ref => BooleanRelations n -> ref -> Int
--- sizeOf xs x = fromMaybe 1 $ Map.lookup x (sizes xs)
+            rememberPinnedBitTest x $
+              xs
+                { links = Map.insert x (Just (slope, y), intercept) (links xs),
+                  sizes = Map.insertWith (+) y 1 (sizes xs)
+                }
 
 toMap :: BooleanRelations n -> Map RefB (Maybe (n, RefB), n)
 toMap = links
 
 size :: BooleanRelations n -> Int
 size = Map.size . links
+
+exportPinnedBitTests :: BooleanRelations n -> Set RefB
+exportPinnedBitTests = Set.map (\(w, ref, i) -> RefUBit w ref i) . pinnedBitTests

@@ -178,12 +178,12 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty UnionFind.new BooleanRelations.new UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new BooleanRelations.new UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
 
-add :: GaloisField n => [Constraint n] -> M n ()
+add :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 add = mapM_ addOne
   where
     addOne :: GaloisField n => Constraint n -> M n ()
@@ -194,8 +194,10 @@ add = mapM_ addOne
       cs <- get
       let csVarEqF' = UnionFind.bindToValue x c (csVarEqF cs)
       put cs {csVarEqF = csVarEqF'}
-    addOne (CVarBindB x c) = modify (\cs -> cs {csVarBindB = Map.insert x c (csVarBindB cs), csOccurrenceB = addOccurrences [x] (csOccurrenceB cs)})
-    -- addOne (CVarBindU x c) = modify (\cs -> cs {csVarBindU = Map.insert x c (csVarBindU cs), csOccurrenceU = addOccurrences [x] (csOccurrenceU cs)})
+    addOne (CVarBindB x c) = do
+      cs <- get
+      let csVarEqB' = BooleanRelations.bindToValue x c (csVarEqB cs)
+      put cs {csVarEqB = csVarEqB'}
     addOne (CVarBindU x c) = do
       cs <- get
       let csVarEqU' = UnionFind.bindToValue x c (csVarEqU cs)
@@ -534,7 +536,7 @@ negateTerm :: Num n => Term n -> Term n
 negateTerm (WithVars var c) = WithVars var (negate c)
 negateTerm (Constant c) = Constant (negate c)
 
-compileTerms :: GaloisField n => RefF -> Seq (Term n) -> M n ()
+compileTerms :: (GaloisField n, Integral n) => RefF -> Seq (Term n) -> M n ()
 compileTerms out terms =
   let (constant, varsWithCoeffs) = foldl' go (0, []) terms
    in case varsWithCoeffs of

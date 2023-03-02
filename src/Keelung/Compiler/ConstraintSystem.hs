@@ -17,6 +17,7 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
@@ -42,8 +43,6 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceF :: !(Map RefF Int),
     csOccurrenceB :: !(Map RefB Int),
     csOccurrenceU :: !(Map RefU Int),
-    -- when x = val
-    csVarBindB :: Map RefB n,
     -- when x == y (UnionFind)
     csVarEqF :: UnionFind RefF n,
     csVarEqB :: BooleanRelations n,
@@ -66,7 +65,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show cs =
     "ConstraintSystem {\n"
       -- <> showVarBindF
-      <> showVarBindB
+      -- <> showVarBindB
       -- <> showVarBindU
       <> showVarEqF
       <> showVarEqB
@@ -127,7 +126,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 
       -- showVarBindU = adapt "VarBindU" (Map.toList $ csVarBindU cs) $ \(var, val) -> show var <> " = " <> show val
       -- showVarBindF = adapt "VarBindF" (Map.toList $ csVarBindF cs) $ \(var, val) -> show var <> " = " <> show val
-      showVarBindB = adapt "VarBindB" (Map.toList $ csVarBindB cs) $ \(var, val) -> show var <> " = " <> show val
+      -- showVarBindB = adapt "VarBindB" (Map.toList $ csVarBindB cs) $ \(var, val) -> show var <> " = " <> show val
 
       showAddF = adapt "AddF" (csAddF cs) show
       showAddB = adapt "AddB" (csAddB cs) show
@@ -217,7 +216,7 @@ relocateConstraintSystem cs =
         varEqFs
           <> varEqBs
           <> varEqUs
-          <> varBindBs
+          -- <> varBindBs
           -- <> varBindUs
           <> addFs
           <> addBs
@@ -271,7 +270,7 @@ relocateConstraintSystem cs =
               Right poly -> Just $ fromConstraint counters $ CAddF poly
 
     fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations n -> Map RefB Int -> Seq (Relocated.Constraint n)
-    fromUnionFindB unionFind occurrences =
+    fromUnionFindB relations occurrences =
       let outputVars = [RefBO i | i <- [0 .. getCount OfOutput OfBoolean counters - 1]]
           publicInputVars = [RefBI i | i <- [0 .. getCount OfPublicInput OfBoolean counters - 1]]
           privateInputVars = [RefBP i | i <- [0 .. getCount OfPrivateInput OfBoolean counters - 1]]
@@ -281,8 +280,9 @@ relocateConstraintSystem cs =
             <> Seq.fromList (Maybe.mapMaybe toConstant publicInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant privateInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant occurredVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant (Set.toList (BooleanRelations.exportPinnedBitTests relations)))
       where
-        toConstant var = case BooleanRelations.parentOf unionFind var of
+        toConstant var = case BooleanRelations.parentOf relations var of
           Nothing ->
             -- var is already a root
             Nothing
@@ -317,7 +317,7 @@ relocateConstraintSystem cs =
     varEqBs = fromUnionFindB (csVarEqB cs) (csOccurrenceB cs)
     varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UnionFind.toMap $ csVarEqU cs
     -- varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
-    varBindBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
+    -- varBindBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
     -- varBindUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ csVarBindU cs
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     addBs = Seq.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
@@ -334,7 +334,7 @@ sizeOfConstraintSystem cs =
     + BooleanRelations.size (csVarEqB cs)
     + UnionFind.size (csVarEqU cs)
     -- + length (csVarBindF cs)
-    + length (csVarBindB cs)
+    -- + length (csVarBindB cs)
     -- + length (csVarBindU cs)
     + length (csAddF cs)
     + length (csAddB cs)
