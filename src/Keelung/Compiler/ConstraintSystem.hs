@@ -46,7 +46,7 @@ data ConstraintSystem n = ConstraintSystem
     csVarBindB :: Map RefB n,
     -- when x == y (UnionFind)
     csVarEqF :: UnionFind RefF n,
-    csVarEqB :: BooleanRelations RefB n,
+    csVarEqB :: BooleanRelations n,
     csVarEqU :: UnionFind RefU n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
@@ -270,7 +270,7 @@ relocateConstraintSystem cs =
               Left _ -> Nothing
               Right poly -> Just $ fromConstraint counters $ CAddF poly
 
-    fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations RefB n -> Map RefB Int -> Seq (Relocated.Constraint n)
+    fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations n -> Map RefB Int -> Seq (Relocated.Constraint n)
     fromUnionFindB unionFind occurrences =
       let outputVars = [RefBO i | i <- [0 .. getCount OfOutput OfBoolean counters - 1]]
           publicInputVars = [RefBI i | i <- [0 .. getCount OfPublicInput OfBoolean counters - 1]]

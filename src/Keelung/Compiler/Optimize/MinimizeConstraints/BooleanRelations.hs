@@ -11,15 +11,16 @@ import Data.Map.Strict qualified as Map
 -- import Data.Maybe (fromMaybe)
 
 import GHC.Generics (Generic)
+import Keelung.Compiler.Constraint (RefB (..))
 import Prelude hiding (lookup)
 
-data BooleanRelations ref n = BooleanRelations
-  { links :: Map ref (Maybe (n, ref), n),
-    sizes :: Map ref Int
+data BooleanRelations n = BooleanRelations
+  { links :: Map RefB (Maybe (n, RefB), n),
+    sizes :: Map RefB Int
   }
   deriving (Eq, Generic, NFData)
 
-instance (Show ref, Show n, Eq n, Num n) => Show (BooleanRelations ref n) where
+instance (Show n, Eq n, Num n) => Show (BooleanRelations n) where
   show xs =
     "BooleanRelations {\n"
       ++ "  sizes = "
@@ -33,7 +34,7 @@ instance (Show ref, Show n, Eq n, Num n) => Show (BooleanRelations ref n) where
       showLink (var, (Just (slope, root), intercept)) = "  " <> show var <> " = " <> (if slope == 1 then "" else show slope) <> show root <> (if intercept == 0 then "" else " + " <> show intercept) <> "\n"
       showLink (var, (Nothing, intercept)) = "  " <> show var <> " = " <> show intercept <> "\n"
 
-new :: Ord ref => BooleanRelations ref n
+new :: BooleanRelations n
 new = BooleanRelations mempty mempty
 
 -- | Find the root of a variable, returns:
@@ -41,14 +42,14 @@ new = BooleanRelations mempty mempty
 --      2. the slope
 --      3. the root
 --      4. the intercept
-lookup :: (Ord ref, Num n) => ref -> BooleanRelations ref n -> (Bool, (Maybe (n, ref), n))
+lookup :: Num n => RefB -> BooleanRelations n -> (Bool, (Maybe (n, RefB), n))
 lookup var xs = case parentOf xs var of
   Nothing -> (True, (Just (1, var), 0)) -- returns self as root
   Just (parent, intercept) -> (False, (parent, intercept))
 
 -- | Returns 'Nothing' if the variable is already a root.
 --   else returns 'Just (slope, root)'  where 'var = slope * root + intercept'
-parentOf :: (Ord ref, Num n) => BooleanRelations ref n -> ref -> Maybe (Maybe (n, ref), n)
+parentOf :: Num n => BooleanRelations n -> RefB -> Maybe (Maybe (n, RefB), n)
 parentOf xs var = case Map.lookup var (links xs) of
   Nothing -> Nothing -- var is a root
   Just (Nothing, intercept) -> Just (Nothing, intercept) -- var is a root
@@ -75,7 +76,7 @@ parentOf xs var = case Map.lookup var (links xs) of
 -- | Calculates the relation between two variables `var1` and `var2`
 --   Returns `Nothing` if the two variables are not related.
 --   Returns `Just (slope, intercept)` where `var1 = slope * var2 + intercept` if the two variables are related.
-relationBetween :: (Ord ref, GaloisField n) => ref -> ref -> BooleanRelations ref n -> Maybe (n, n)
+relationBetween :: GaloisField n => RefB -> RefB -> BooleanRelations n -> Maybe (n, n)
 relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   ((True, _), (True, _)) ->
     if var1 == var2
@@ -121,7 +122,7 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   ((False, (Nothing, _)), (False, (Nothing, _))) -> Nothing -- both are values
 
 -- | Bind a variable to a value
-bindToValue :: (Ord ref, GaloisField n) => ref -> n -> BooleanRelations ref n -> BooleanRelations ref n
+bindToValue :: GaloisField n => RefB -> n -> BooleanRelations n -> BooleanRelations n
 bindToValue x value xs =
   case parentOf xs x of
     Nothing ->
@@ -154,7 +155,7 @@ bindToValue x value xs =
           sizes = Map.insert x 1 (sizes xs)
         }
 
-relate :: (Ord ref, GaloisField n) => ref -> (n, ref, n) -> BooleanRelations ref n -> Maybe (BooleanRelations ref n)
+relate :: GaloisField n => RefB -> (n, RefB, n) -> BooleanRelations n -> Maybe (BooleanRelations n)
 relate x (0, _, intercept) xs = Just $ bindToValue x intercept xs
 relate x (slope, y, intercept) xs
   | x > y = relate' x (slope, y, intercept) xs -- x = slope * y + intercept
@@ -163,7 +164,7 @@ relate x (slope, y, intercept) xs
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
-relate' :: (Ord ref, GaloisField n) => ref -> (n, ref, n) -> BooleanRelations ref n -> Maybe (BooleanRelations ref n)
+relate' :: GaloisField n => RefB -> (n, RefB, n) -> BooleanRelations n -> Maybe (BooleanRelations n)
 relate' x (slope, y, intercept) xs =
   case parentOf xs x of
     Just (Nothing, interceptX) ->
@@ -250,11 +251,11 @@ relate' x (slope, y, intercept) xs =
 --                   sizes = Map.insert y (sizeOfRootX + sizeOfRootY) (sizes xs)
 --                 }
 
--- sizeOf :: Ord ref => BooleanRelations ref n -> ref -> Int
+-- sizeOf :: Ord ref => BooleanRelations n -> ref -> Int
 -- sizeOf xs x = fromMaybe 1 $ Map.lookup x (sizes xs)
 
-toMap :: BooleanRelations ref n -> Map ref (Maybe (n, ref), n)
+toMap :: BooleanRelations n -> Map RefB (Maybe (n, RefB), n)
 toMap = links
 
-size :: BooleanRelations ref n -> Int
+size :: BooleanRelations n -> Int
 size = Map.size . links
