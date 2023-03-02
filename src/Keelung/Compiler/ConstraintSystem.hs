@@ -5,6 +5,12 @@ module Keelung.Compiler.ConstraintSystem
   ( ConstraintSystem (..),
     relocateConstraintSystem,
     sizeOfConstraintSystem,
+    addRefFOccurrences,
+    addRefBOccurrences,
+    addRefUOccurrences,
+    removeRefFOccurrences,
+    removeRefBOccurrences,
+    removeRefUOccurrences,
   )
 where
 
@@ -18,6 +24,7 @@ import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
+import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
@@ -245,16 +252,18 @@ relocateConstraintSystem cs =
     shouldRemoveB _ = False
 
     fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Seq (Relocated.Constraint n)
-    fromUnionFindF unionFind occurrences =
+    fromUnionFindF unionFind occurrencesF =
       let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
           publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
           privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
-          occurredVars = Map.keys $ Map.filter (> 0) occurrences
-       in Seq.fromList
+          occurredInF = Map.keys $ Map.filter (> 0) occurrencesF
+       in traceShow
+            (occurrencesF, occurredInF)
+            Seq.fromList
             (Maybe.mapMaybe toConstant outputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant publicInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant privateInputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant occurredVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant occurredInF)
       where
         toConstant var = case UnionFind.parentOf unionFind var of
           Nothing ->
@@ -290,8 +299,8 @@ relocateConstraintSystem cs =
             (Maybe.mapMaybe toConstant outputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant publicInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant privateInputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant occurredInB)
             <> Seq.fromList (Maybe.mapMaybe toConstant occurredInF)
+            <> Seq.fromList (Maybe.mapMaybe toConstant occurredInB)
             <> Seq.fromList (Maybe.mapMaybe toConstant occurredInU)
             <> Seq.fromList (Maybe.mapMaybe toConstant (Set.toList (BooleanRelations.exportPinnedBitTests relations)))
       where
@@ -357,3 +366,105 @@ sizeOfConstraintSystem cs =
     + length (csMulU cs)
     + length (csNEqF cs)
     + length (csNEqU cs)
+
+addRefFOccurrences :: [RefF] -> ConstraintSystem n -> ConstraintSystem n
+addRefFOccurrences =
+  flip
+    ( foldl
+        ( \cs ref ->
+            case ref of
+              RefBtoRefF refB ->
+                cs
+                  { csOccurrenceB = Map.insertWith (+) refB 1 (csOccurrenceB cs)
+                  }
+              _ ->
+                cs
+                  { csOccurrenceF = Map.insertWith (+) ref 1 (csOccurrenceF cs)
+                  }
+        )
+    )
+
+addRefBOccurrences :: [RefB] -> ConstraintSystem n -> ConstraintSystem n
+addRefBOccurrences =
+  flip
+    ( foldl
+        ( \cs ref ->
+            case ref of
+              RefUBit _ refU _ ->
+                cs
+                  { csOccurrenceU = Map.insertWith (+) refU 1 (csOccurrenceU cs)
+                  }
+              _ ->
+                cs
+                  { csOccurrenceB = Map.insertWith (+) ref 1 (csOccurrenceB cs)
+                  }
+        )
+    )
+
+addRefUOccurrences :: [RefU] -> ConstraintSystem n -> ConstraintSystem n
+addRefUOccurrences =
+  flip
+    ( foldl
+        ( \cs ref ->
+            case ref of
+              RefBtoRefU refB ->
+                cs
+                  { csOccurrenceB = Map.insertWith (+) refB 1 (csOccurrenceB cs)
+                  }
+              _ ->
+                cs
+                  { csOccurrenceU = Map.insertWith (+) ref 1 (csOccurrenceU cs)
+                  }
+        )
+    )
+
+removeRefFOccurrences :: [RefF] -> ConstraintSystem n -> ConstraintSystem n
+removeRefFOccurrences =
+  flip
+    ( foldl
+        ( \cs ref ->
+            case ref of
+              RefBtoRefF refB ->
+                cs
+                  { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) refB (csOccurrenceB cs)
+                  }
+              _ ->
+                cs
+                  { csOccurrenceF = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceF cs)
+                  }
+        )
+    )
+
+removeRefBOccurrences :: [RefB] -> ConstraintSystem n -> ConstraintSystem n
+removeRefBOccurrences =
+  flip
+    ( foldl
+        ( \cs ref ->
+            case ref of
+              RefUBit _ refU _ ->
+                cs
+                  { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) refU (csOccurrenceU cs)
+                  }
+              _ ->
+                cs
+                  { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceB cs)
+                  }
+        )
+    )
+
+removeRefUOccurrences :: [RefU] -> ConstraintSystem n -> ConstraintSystem n
+removeRefUOccurrences =
+  flip
+    ( foldl
+        ( \cs ref ->
+            case ref of
+              RefBtoRefU refB ->
+                cs
+                  { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) refB (csOccurrenceB cs)
+                  }
+              _ ->
+                cs
+                  { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceU cs)
+                  }
+        )
+    )

@@ -12,10 +12,10 @@ module Keelung.Compiler.Constraint
     reindexRefB,
     reindexRefU,
     Constraint (..),
-    addOccurrencesWithPolyG,
-    removeOccurrencesWithPolyG,
-    addOccurrences,
-    removeOccurrences,
+    -- addOccurrencesWithPolyG,
+    -- removeOccurrencesWithPolyG,
+    -- addOccurrences,
+    -- removeOccurrences,
     substPolyG,
     cAddF,
     cAddB,
@@ -40,7 +40,6 @@ where
 import Control.DeepSeq (NFData)
 import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
-import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
@@ -459,14 +458,14 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
 
-addOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
-addOccurrencesWithPolyG = addOccurrences . PolyG.vars
+-- addOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
+-- addOccurrencesWithPolyG = addOccurrences . PolyG.vars
 
-addOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
-addOccurrences = flip $ foldl (\occurrences ref -> Map.insertWith (+) ref 1 occurrences)
+-- addOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
+-- addOccurrences = flip $ foldl (\occurrences ref -> Map.insertWith (+) ref 1 occurrences)
 
-removeOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
-removeOccurrencesWithPolyG = removeOccurrences . PolyG.vars
+-- removeOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
+-- removeOccurrencesWithPolyG = removeOccurrences . PolyG.vars
 
-removeOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
-removeOccurrences = flip $ foldl (flip (Map.adjust (\count -> pred count `max` 0)))
+-- removeOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
+-- removeOccurrences = flip $ foldl (flip (Map.adjust (\count -> pred count `max` 0)))

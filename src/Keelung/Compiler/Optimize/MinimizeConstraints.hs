@@ -136,13 +136,13 @@ reduceAddF polynomial = do
           -- the polynomial has been reduced to nothing
           markChanged AdditiveConstraintChanged
           -- remove all variables in the polynomial from the occurrence list
-          modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
+          modify' $ removeRefFOccurrences substitutedRefs
           return Nothing
         Just (Right reducePolynomial, substitutedRefs) -> do
           -- the polynomial has been reduced to something
           markChanged AdditiveConstraintChanged
           -- remove variables that has been reduced in the polynomial from the occurrence list
-          modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
+          modify' $ removeRefFOccurrences substitutedRefs
           -- keep reducing the reduced polynomial
           reduceAddF reducePolynomial
 
@@ -167,13 +167,13 @@ substitutePoly typeOfChange polynomial = do
       -- the polynomial has been reduced to nothing
       markChanged typeOfChange
       -- remove all variables in the polynomial from the occurrence list
-      modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
+      modify' $ removeRefFOccurrences substitutedRefs
       return (Left constant)
     Just (Right reducePolynomial, substitutedRefs) -> do
       -- the polynomial has been reduced to something
       markChanged typeOfChange
       -- remove all variables in the polynomial from the occurrence list
-      modify' $ \cs -> cs {csOccurrenceF = removeOccurrences substitutedRefs (csOccurrenceF cs)}
+      modify' $ removeRefFOccurrences substitutedRefs
       return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative constaint, returns the reduced constraint if it is reduced
@@ -203,7 +203,7 @@ reduceMulFCCP a b cs = do
 reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG RefF n -> n -> RoundM n ()
 reduceMulFCPC a bs c = do
   case PolyG.multiplyBy (-a) bs of
-    Left _constant -> modify' $ \cs -> cs {csOccurrenceF = removeOccurrencesWithPolyG bs (csOccurrenceF cs)}
+    Left _constant -> modify' $ removeRefFOccurrences (PolyG.vars bs)
     Right xs -> addAddF $ PolyG.addConstant c xs
 
 -- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Polynomial)
@@ -214,11 +214,11 @@ reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG RefF n -> PolyG RefF 
 reduceMulFCPP a polyB polyC = do
   case PolyG.multiplyBy (-a) polyB of
     Left _constant -> do
-      modify' $ \cs -> cs {csOccurrenceF = removeOccurrencesWithPolyG polyB (csOccurrenceF cs)}
+      modify' $ removeRefFOccurrences (PolyG.vars polyB)
       addAddF polyC
     Right polyBa -> do
       case PolyG.merge polyC polyBa of
-        Left _constant -> modify' $ \cs -> cs {csOccurrenceF = removeOccurrencesWithPolyG polyC (removeOccurrencesWithPolyG polyBa (csOccurrenceF cs))}
+        Left _constant -> modify' $ removeRefFOccurrences (PolyG.vars polyC) . removeRefFOccurrences (PolyG.vars polyBa)
         Right addF -> do
           addAddF addF
 
@@ -281,10 +281,10 @@ bindToValue :: GaloisField n => RefF -> n -> RoundM n ()
 bindToValue var value = do
   markChanged RelationChanged
   modify' $ \cs ->
-    cs
-      { csVarEqF = UnionFind.bindToValue var value (csVarEqF cs),
-        csOccurrenceF = removeOccurrences [var] (csOccurrenceF cs)
-      }
+    removeRefFOccurrences [var] $
+      cs
+        { csVarEqF = UnionFind.bindToValue var value (csVarEqF cs)
+        }
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relate :: GaloisField n => RefF -> (n, RefF, n) -> RoundM n Bool
@@ -294,7 +294,7 @@ relate var1 (slope, var2, intercept) = do
     Nothing -> return False
     Just unionFind' -> do
       markChanged RelationChanged
-      modify' $ \cs' -> cs' {csVarEqF = unionFind', csOccurrenceF = removeOccurrences [var1, var2] (csOccurrenceF cs)}
+      modify' $ \cs' -> removeRefFOccurrences [var1, var2] $ cs' {csVarEqF = unionFind'}
       return True
 
 addAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n ()
