@@ -28,7 +28,7 @@ jobs:
         restore-keys: |
              ${{ runner.os }}-ghcup-global-${{ matrix.plan.ghc }}
     - name: 💾 Cache stack global package db
-      id:   stack-global
+      id:   ghcup-global
       uses: actions/cache@v2
       with:
         path: ~/.stack
