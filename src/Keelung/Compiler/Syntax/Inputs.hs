@@ -88,10 +88,10 @@ instance Semigroup (InputSequence n) where
 instance Monoid (InputSequence n) where
   mempty = InputSequence mempty mempty mempty mempty
 
-new :: (GaloisField n, Integral n) => Seq ((VarType, b), n) -> InputSequence n
+new :: (GaloisField n, Integral n) => Seq (VarType, n) -> InputSequence n
 new =
   foldl
-    ( \inputSequence ((inputType, _index), rawInputValue) ->
+    ( \inputSequence (inputType, rawInputValue) ->
         case inputType of
           OfField -> addField rawInputValue inputSequence
           OfBoolean -> addBool rawInputValue inputSequence
