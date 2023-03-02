@@ -269,17 +269,30 @@ relocateConstraintSystem cs =
               Left _ -> Nothing
               Right poly -> Just $ fromConstraint counters $ CAddF poly
 
-    fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations n -> Map RefB Int -> Seq (Relocated.Constraint n)
-    fromUnionFindB relations occurrences =
+    fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    fromUnionFindB relations occurrencesF occurrencesB occurrencesU =
       let outputVars = [RefBO i | i <- [0 .. getCount OfOutput OfBoolean counters - 1]]
           publicInputVars = [RefBI i | i <- [0 .. getCount OfPublicInput OfBoolean counters - 1]]
           privateInputVars = [RefBP i | i <- [0 .. getCount OfPrivateInput OfBoolean counters - 1]]
-          occurredVars = Map.keys $ Map.filter (> 0) occurrences
+          occurredInB = Map.keys $ Map.filter (> 0) occurrencesB
+
+          findRefBInRefF (RefBtoRefF _) 0 = Nothing
+          findRefBInRefF (RefBtoRefF r) _ = Just r
+          findRefBInRefF _ _ = Nothing
+
+          findRefBInRefU (RefBtoRefU _) 0 = Nothing
+          findRefBInRefU (RefBtoRefU r) _ = Just r
+          findRefBInRefU _ _ = Nothing
+
+          occurredInF = Map.elems $ Map.mapMaybeWithKey findRefBInRefF occurrencesF
+          occurredInU = Map.elems $ Map.mapMaybeWithKey findRefBInRefU occurrencesU
        in Seq.fromList
             (Maybe.mapMaybe toConstant outputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant publicInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstant privateInputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstant occurredVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant occurredInB)
+            <> Seq.fromList (Maybe.mapMaybe toConstant occurredInF)
+            <> Seq.fromList (Maybe.mapMaybe toConstant occurredInU)
             <> Seq.fromList (Maybe.mapMaybe toConstant (Set.toList (BooleanRelations.exportPinnedBitTests relations)))
       where
         toConstant var = case BooleanRelations.parentOf relations var of
@@ -314,7 +327,7 @@ relocateConstraintSystem cs =
 
     varEqFs = fromUnionFindF (csVarEqF cs) (csOccurrenceF cs)
     -- varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
-    varEqBs = fromUnionFindB (csVarEqB cs) (csOccurrenceB cs)
+    varEqBs = fromUnionFindB (csVarEqB cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
     varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UnionFind.toMap $ csVarEqU cs
     -- varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
     -- varBindBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
