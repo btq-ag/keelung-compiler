@@ -19,6 +19,14 @@ jobs:
 
     # things to be cached/restored:
 
+    - name: 💾 Cache GHCup
+      id:   stack-global
+      uses: actions/cache@v2
+      with:
+        path: ~/.ghcup
+        key: ${{ runner.os }}-ghcup-global-${{ matrix.plan.ghc }}-${{ hashFiles('**.yaml') }}
+        restore-keys: |
+             ${{ runner.os }}-ghcup-global-${{ matrix.plan.ghc }}
     - name: 💾 Cache stack global package db
       id:   stack-global
       uses: actions/cache@v2
@@ -78,7 +86,7 @@ jobs:
       run: |
         cabal new-build
 
-    - name: Install license report
+    - name: Install cabal-plan
       run: |
         stack install --flag cabal-plan:license-report cabal-plan
 
