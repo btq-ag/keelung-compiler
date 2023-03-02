@@ -15,7 +15,7 @@ import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.Constraint (relocateConstraintSystem)
+import Keelung.Compiler.ConstraintSystem (relocateConstraintSystem)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Interpreter.Kinded qualified as Kinded
@@ -23,9 +23,9 @@ import Keelung.Interpreter.Monad hiding (Error)
 import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.Relocated qualified as Relocated
 import Keelung.Interpreter.Typed qualified as Typed
+import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
-import qualified Keelung.Syntax.Encode.Syntax as Encoded
 
 run :: IO ()
 run = hspec tests
@@ -123,7 +123,7 @@ tests = do
       runAll program [] [1 :: GF181] [1]
 
     it "Field arithmetics 1" $ do
-      let program = do 
+      let program = do
             x <- inputField Public
             y <- inputField Public
             return $ x * y + y * 2
@@ -131,7 +131,7 @@ tests = do
         runAll program [x, y :: GF181] [] [x * y + y * 2]
 
     it "Field arithmetics 2" $ do
-      let program = do 
+      let program = do
             x <- inputField Public
             y <- inputField Private
             return $ x * y + y * 2
@@ -139,7 +139,7 @@ tests = do
         runAll program [x :: GF181] [y] [x * y + y * 2]
 
     it "Field arithmetics 2" $ do
-      let program = do 
+      let program = do
             x <- inputField Private
             y <- inputField Public
             return $ x * y + y * 2

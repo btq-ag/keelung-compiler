@@ -6,12 +6,12 @@
 module Keelung.Compiler.Optimize where
 
 import Data.Field.Galois (GaloisField)
-import qualified Data.IntMap as IntMap
-import qualified Data.IntSet as IntSet
-import Keelung.Compiler.Constraint (ConstraintSystem)
-import qualified Keelung.Compiler.Optimize.MinimizeConstraints as MinimizeConstraints
-import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints as MinimizeRelocatedConstraints
-import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2 as MinimizeRelocatedConstraints2
+import Data.IntMap qualified as IntMap
+import Data.IntSet qualified as IntSet
+import Keelung.Compiler.ConstraintSystem (ConstraintSystem)
+import Keelung.Compiler.Optimize.MinimizeConstraints qualified as MinimizeConstraints
+import Keelung.Compiler.Optimize.MinimizeRelocatedConstraints qualified as MinimizeRelocatedConstraints
+import Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2 qualified as MinimizeRelocatedConstraints2
 import Keelung.Compiler.Optimize.Monad
 import Keelung.Compiler.Relocated
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))

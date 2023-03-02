@@ -28,10 +28,12 @@ library
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
       Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
@@ -84,10 +86,12 @@ executable keelungc
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
       Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
@@ -158,10 +162,12 @@ test-suite keelung-test
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
       Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
@@ -227,10 +233,12 @@ benchmark keelung-bench
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
       Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2

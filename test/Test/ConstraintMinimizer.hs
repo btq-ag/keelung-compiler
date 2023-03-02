@@ -12,6 +12,7 @@ import Keelung hiding (compileO0, run)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Compile qualified as Compiler
 import Keelung.Compiler.Constraint
+import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), relocateConstraintSystem)
 import Keelung.Compiler.Error (Error)
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
