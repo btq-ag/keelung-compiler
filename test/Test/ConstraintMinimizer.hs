@@ -62,7 +62,7 @@ tests = do
 
       return ()
 
-    it "Union Find 1" $ do
+    it "Field 1" $ do
       cs <- runTest 3 1 $ do
         x <- inputField Public
         y <- reuse x
@@ -76,7 +76,7 @@ tests = do
       -- F1 (z) = F0 (y)
       UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (1, 0)
 
-    it "Union Find 2" $ do
+    it "Field 2" $ do
       cs <- runTest 3 1 $ do
         x <- inputField Public
         y <- reuse x
@@ -90,7 +90,7 @@ tests = do
       -- F1 (z) = 2F0 (y)
       UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (2, 0)
 
-    it "Union Find 3" $ do
+    it "Field 3" $ do
       cs <- runTest 2 1 $ do
         x <- inputField Public
         y <- reuse (x + 1)
@@ -99,25 +99,41 @@ tests = do
       -- FO0 = 2FI0 + 1
       UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (2, 1)
 
-    it "Union Find 4" $ do
+    it "Field 4" $ do
       cs <- runTest 1 1 $ do
         let x = 4
         y <- reuse x
         return (x + y :: Field)
       snd (UnionFind.lookup (RefFO 0) (csVarEqF cs)) `shouldBe` (Nothing, 8)
 
-    it "Union Find 5" $ do
+    it "Field 5" $ do
       _cs <- runTest 2 1 $ do
         x <- inputField Public
         y <- reuse x
         return (x * y :: Field)
       return ()
 
-    it "NEqF" $ do
-      _cs <- runTest 7 4 $ do
-        x <- inputField Public
-        return $ cond (x `eq` 3) (12 :: Field) 789
-      return ()
+    it "Boolean 1" $ do
+      cs <- runTest 6 6 $ do
+        x <- inputBool Public
+        y <- reuse x
+        z <- reuse x
+        return (x .&. y .&. z)
+
+      print cs
+
+      -- BO0 = BI0 && BI0 && BI0
+      -- UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (3, 0)
+      -- F0 (y) = FI0
+      -- UnionFind.relationBetween (RefF 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+      -- F1 (z) = F0 (y)
+      -- UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+
+-- it "NEqF" $ do
+--   _cs <- runTest 7 4 $ do
+--     x <- inputField Public
+--     return $ cond (x `eq` 3) (12 :: Field) 789
+--   return ()
 
 -- print cs
 

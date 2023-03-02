@@ -13,6 +13,7 @@ import Data.IntMap qualified as IntMap
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
+import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
@@ -176,7 +177,7 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty UnionFind.new mempty UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty UnionFind.new BooleanRelations.new UnionFind.new mempty mempty mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -203,8 +204,11 @@ add = mapM_ addOne
       case UnionFind.relate x (1, y, 0) (csVarEqF cs) of
         Nothing -> return ()
         Just csVarEqF' -> put cs {csVarEqF = csVarEqF'}
-    addOne (CVarEqB x y) = modify (\cs -> cs {csVarEqB = (x, y) : csVarEqB cs})
-    -- addOne (CVarEqU x y) = modify (\cs -> cs {csVarEqU = (x, y) : csVarEqU cs})
+    addOne (CVarEqB x y) = do
+      cs <- get
+      case BooleanRelations.relate x (1, y, 0) (csVarEqB cs) of
+        Nothing -> return ()
+        Just boolRels -> put cs {csVarEqB = boolRels}
     addOne (CVarEqU x y) = do
       cs <- get
       case UnionFind.relate x (1, y, 0) (csVarEqU cs) of

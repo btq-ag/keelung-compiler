@@ -53,6 +53,9 @@ import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
+
+import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
+
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
 import Keelung.Constraint.R1CS qualified as Constraint
@@ -64,6 +67,7 @@ import Keelung.Data.Struct (Struct (..))
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax
 import Keelung.Syntax.Counters
+import qualified Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations as BooleanRelations
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)
@@ -483,7 +487,7 @@ data ConstraintSystem n = ConstraintSystem
     csVarBindB :: Map RefB n,
     -- when x == y (UnionFind)
     csVarEqF :: UnionFind RefF n,
-    csVarEqB :: [(RefB, RefB)],
+    csVarEqB :: BooleanRelations RefB n,
     csVarEqU :: UnionFind RefU n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
@@ -559,7 +563,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               <> "\n"
 
       showVarEqF = "  VarEqF:\n" <> indent (indent (show (csVarEqF cs)))
-      showVarEqB = adapt "VarEqB" (csVarEqB cs) $ \(var, val) -> show var <> " = " <> show val
+      showVarEqB = "  VarEqB:\n" <> indent (indent (show (csVarEqB cs)))
       showVarEqU = "  VarEqU:\n" <> indent (indent (show (csVarEqU cs)))
 
       -- showVarBindU = adapt "VarBindU" (Map.toList $ csVarBindU cs) $ \(var, val) -> show var <> " = " <> show val
@@ -707,6 +711,31 @@ relocateConstraintSystem cs =
               Left _ -> Nothing
               Right poly -> Just $ fromConstraint counters $ CAddF poly
 
+    fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations RefB n -> Map RefB Int -> Seq (Relocated.Constraint n)
+    fromUnionFindB unionFind occurrences =
+      let outputVars = [RefBO i | i <- [0 .. getCount OfOutput OfBoolean counters - 1]]
+          publicInputVars = [RefBI i | i <- [0 .. getCount OfPublicInput OfBoolean counters - 1]]
+          privateInputVars = [RefBP i | i <- [0 .. getCount OfPrivateInput OfBoolean counters - 1]]
+          occurredVars = Map.keys $ Map.filter (> 0) occurrences
+       in Seq.fromList
+            (Maybe.mapMaybe toConstant outputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant publicInputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant privateInputVars)
+            <> Seq.fromList (Maybe.mapMaybe toConstant occurredVars)
+      where
+        toConstant var = case BooleanRelations.parentOf unionFind var of
+          Nothing ->
+            -- var is already a root
+            Nothing
+          Just (Nothing, intercept) ->
+            -- var = intercept
+            Just $ fromConstraint counters $ CVarBindB var intercept
+          Just (Just (slope, root), intercept) ->
+            -- var = slope * root + intercept
+            case PolyG.build intercept [(var, -1), (root, slope)] of
+              Left _ -> Nothing
+              Right poly -> Just $ fromConstraint counters $ CAddB poly
+
     fromUnionFindU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, (Maybe (n, RefU), n)) -> Maybe (Relocated.Constraint n)
     fromUnionFindU occurrences (var1, (Nothing, c)) =
       if shouldRemoveU occurrences var1
@@ -725,7 +754,8 @@ relocateConstraintSystem cs =
             else Just $ fromConstraint counters (CAddU poly)
 
     varEqFs = fromUnionFindF (csVarEqF cs) (csOccurrenceF cs)
-    varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
+    -- varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
+    varEqBs = fromUnionFindB (csVarEqB cs) (csOccurrenceB cs)
     varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UnionFind.toMap $ csVarEqU cs
     -- varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
     varBindBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
@@ -754,7 +784,7 @@ removeOccurrences = flip $ foldl (flip (Map.adjust (\count -> pred count `max` 0
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
   UnionFind.size (csVarEqF cs)
-    + length (csVarEqB cs)
+  + BooleanRelations.size (csVarEqB cs)
     + UnionFind.size (csVarEqU cs)
     -- + length (csVarBindF cs)
     + length (csVarBindB cs)
