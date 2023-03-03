@@ -26,7 +26,7 @@ import Keelung.Syntax (Width)
 import Prelude hiding (lookup)
 
 data BooleanRelations n = BooleanRelations
-  { links :: Map RefB (Maybe (n, RefB), n),
+  { links :: Map RefB (Either (n, RefB) n),
     sizes :: Map RefB Int,
     -- | Here stores bit tests on pinned UInt variables, so that we can export them as constraints later.
     pinnedBitTests :: Set (Width, RefU, Int)
@@ -45,8 +45,8 @@ instance (Show n, Eq n, Num n) => Show (BooleanRelations n) where
     where
       showList' ys = "[" <> List.intercalate ", " ys <> "]"
 
-      showLink (var, (Just (slope, root), intercept)) = "  " <> show var <> " = " <> (if slope == 1 then "" else show slope) <> show root <> (if intercept == 0 then "" else " + " <> show intercept) <> "\n"
-      showLink (var, (Nothing, intercept)) = "  " <> show var <> " = " <> show intercept <> "\n"
+      showLink (var, Left (slope, root)) = "  " <> show var <> " = " <> (if slope == 1 then "" else show slope) <> show root <> "\n"
+      showLink (var, Right intercept) = "  " <> show var <> " = " <> show intercept <> "\n"
 
 new :: BooleanRelations n
 new = BooleanRelations mempty mempty mempty
@@ -56,47 +56,47 @@ new = BooleanRelations mempty mempty mempty
 --      2. the slope
 --      3. the root
 --      4. the intercept
-lookup :: Num n => RefB -> BooleanRelations n -> (Bool, (Maybe (n, RefB), n))
+lookup :: Num n => RefB -> BooleanRelations n -> (Bool, Either (n, RefB) n)
 lookup var xs = case parentOf xs var of
-  Nothing -> (True, (Just (1, var), 0)) -- returns self as root
-  Just (parent, intercept) -> (False, (parent, intercept))
+  Nothing -> (True, Left (1, var)) -- returns self as root
+  Just result -> (False, result)
 
 -- | Returns 'Nothing' if the variable is already a root.
 --   else returns 'Just (slope, root)'  where 'var = slope * root + intercept'
-parentOf :: Num n => BooleanRelations n -> RefB -> Maybe (Maybe (n, RefB), n)
+parentOf :: Num n => BooleanRelations n -> RefB -> Maybe (Either (n, RefB) n)
 parentOf xs var = case Map.lookup var (links xs) of
   Nothing -> Nothing -- var is a root
-  Just (Nothing, intercept) -> Just (Nothing, intercept) -- var is a root
-  Just (Just (slope, parent), intercept) -> case parentOf xs parent of
+  Just (Right intercept) -> Just (Right intercept) -- var is a root
+  Just (Left (slope, parent)) -> case parentOf xs parent of
     Nothing ->
       -- parent is a root
-      Just (Just (slope, parent), intercept)
-    Just (Nothing, intercept') ->
+      Just (Left (slope, parent))
+    Just (Right intercept') ->
       -- parent is a value
       -- var = slope * parent + intercept
       -- parent = intercept'
       --  =>
       -- var = slope * intercept' + intercept
-      Just (Nothing, slope * intercept' + intercept)
-    Just (Just (slope', grandparent), intercept') ->
+      Just (Right (slope * intercept'))
+    Just (Left (slope', grandparent)) ->
       -- var = slope * parent + intercept
       -- parent = slope' * grandparent + intercept'
       --  =>
       -- var = slope * (slope' * grandparent + intercept') + intercept
       --  =>
       -- var = slope * slope' * grandparent + slope * intercept' + intercept
-      Just (Just (slope * slope', grandparent), slope * intercept' + intercept)
+      Just (Left (slope * slope', grandparent))
 
 -- | Calculates the relation between two variables `var1` and `var2`
 --   Returns `Nothing` if the two variables are not related.
 --   Returns `Just (slope, intercept)` where `var1 = slope * var2 + intercept` if the two variables are related.
-relationBetween :: GaloisField n => RefB -> RefB -> BooleanRelations n -> Maybe (n, n)
+relationBetween :: GaloisField n => RefB -> RefB -> BooleanRelations n -> Maybe n
 relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   ((True, _), (True, _)) ->
     if var1 == var2
-      then Just (1, 0)
+      then Just 1
       else Nothing -- var1 and var2 are roots, but not the same one
-  ((True, _), (False, (Just (slope2, root2), intercept2))) ->
+  ((True, _), (False, Left (slope2, root2))) ->
     -- var2 = slope2 * root2 + intercept2
     --  =>
     -- root2 = (var2 - intercept2) / slope2
@@ -104,19 +104,19 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       then -- var1 = root2
       --  =>
       -- var1 = (var2 - intercept2) / slope2
-        Just (recip slope2, -intercept2 / slope2)
+        Just (recip slope2)
       else Nothing
-  ((True, _), (False, (Nothing, _))) -> Nothing -- var1 is a root, var2 is a value
-  ((False, (Just (slope1, root1), intercept1)), (True, _)) ->
+  ((True, _), (False, Right _)) -> Nothing -- var1 is a root, var2 is a value
+  ((False, Left (slope1, root1)), (True, _)) ->
     -- var1 = slope1 * root1 + intercept1
     if var2 == root1
       then -- var2 = root1
       --  =>
       -- var1 = slope1 * var2 + intercept1
-        Just (slope1, intercept1)
+        Just slope1
       else Nothing
-  ((False, (Nothing, _)), (True, _)) -> Nothing -- var1 is a value, var2 is a root
-  ((False, (Just (slope1, root1), intercept1)), (False, (Just (slope2, root2), intercept2))) ->
+  ((False, Right _), (True, _)) -> Nothing -- var1 is a value, var2 is a root
+  ((False, Left (slope1, root1)), (False, Left (slope2, root2))) ->
     -- var1 = slope1 * root1 + intercept1
     -- var2 = slope2 * root2 + intercept2
     if root1 == root2
@@ -129,11 +129,11 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       -- var1 = slope1 * ((var2 - intercept2) / slope2) + intercept1
       --  =>
       -- var1 = slope1 * var2 / slope2 - slope1 * intercept2 / slope2 + intercept1
-        Just (slope1 / slope2, -slope1 * intercept2 / slope2 + intercept1)
+        Just (slope1 / slope2)
       else Nothing
-  ((False, (Just _, _)), (False, (Nothing, _))) -> Nothing -- var2 is a value
-  ((False, (Nothing, _)), (False, (Just _, _))) -> Nothing -- var1 is a value
-  ((False, (Nothing, _)), (False, (Nothing, _))) -> Nothing -- both are values
+  ((False, Right _), (False, Left _)) -> Nothing -- var2 is a value
+  ((False, Left _), (False, Right _)) -> Nothing -- var1 is a value
+  ((False, Right _), (False, Right _)) -> Nothing -- both are values
 
 -- | If the RefB is of RefUBit, remember it
 rememberPinnedBitTest :: RefB -> BooleanRelations n -> BooleanRelations n
@@ -148,18 +148,18 @@ bindToValue x value xs =
       -- x does not have a parent, so it is its own root
       rememberPinnedBitTest x $
         xs
-          { links = Map.insert x (Nothing, value) (links xs),
+          { links = Map.insert x (Right value) (links xs),
             sizes = Map.insert x 1 (sizes xs)
           }
-    Just (Nothing, _oldValue) ->
+    Just (Right _oldValue) ->
       -- x is already a root with `_oldValue` as its value
       -- TODO: handle this kind of conflict in the future
       -- FOR NOW: overwrite the value of x with the new value
       rememberPinnedBitTest x $
         xs
-          { links = Map.insert x (Nothing, value) (links xs)
+          { links = Map.insert x (Right value) (links xs)
           }
-    Just (Just (slopeP, parent), interceptP) ->
+    Just (Left (slopeP, parent)) ->
       -- x is a child of `parent` with slope `slopeP` and intercept `interceptP`
       --  x = slopeP * parent + interceptP
       -- now since that x = value, we have
@@ -171,8 +171,8 @@ bindToValue x value xs =
       rememberPinnedBitTest x $
         xs
           { links =
-              Map.insert parent (Nothing, (value - interceptP) / slopeP) $
-                Map.insert x (Nothing, value) $
+              Map.insert parent (Right (value / slopeP)) $
+                Map.insert x (Right value) $
                   links xs,
             sizes = Map.insert x 1 (sizes xs)
           }
@@ -189,7 +189,7 @@ relate x (slope, y) xs
 relate' :: GaloisField n => RefB -> (n, RefB) -> BooleanRelations n -> Maybe (BooleanRelations n)
 relate' x (slope, y) xs =
   case parentOf xs x of
-    Just (Nothing, interceptX) ->
+    Just (Right interceptX) ->
       -- x is already a root with `interceptX` as its value
       --  x = slope * y + intercept
       --  x = interceptX
@@ -198,7 +198,7 @@ relate' x (slope, y) xs =
       -- =>
       --  y = (interceptX - intercept) / slope
       Just $ bindToValue y interceptX xs
-    Just (Just (slopeX, rootOfX), _) ->
+    Just (Left (slopeX, rootOfX)) ->
       -- x is a child of `rootOfX` with slope `slopeX` and intercept `interceptX`
       --  x = slopeX * rootOfX + interceptX
       --  x = slope * y + intercept
@@ -212,14 +212,14 @@ relate' x (slope, y) xs =
     Nothing ->
       -- x does not have a parent, so it is its own root
       case parentOf xs y of
-        Just (Nothing, interceptY) ->
+        Just (Right interceptY) ->
           -- y is already a root with `interceptY` as its value
           --  x = slope * y + intercept
           --  y = interceptY
           -- =>
           --  x = slope * interceptY + intercept
           Just $ bindToValue x (slope * interceptY) xs
-        Just (Just (slopeY, rootOfY), interceptY) ->
+        Just (Left (slopeY, rootOfY)) ->
           -- y is a child of `rootOfY` with slope `slopeY` and intercept `interceptY`
           --  y = slopeY * rootOfY + interceptY
           --  x = slope * y + intercept
@@ -230,7 +230,7 @@ relate' x (slope, y) xs =
           Just $
             rememberPinnedBitTest x $
               xs
-                { links = Map.insert x (Just (slope * slopeY, rootOfY), slope * interceptY) (links xs),
+                { links = Map.insert x (Left (slope * slopeY, rootOfY)) (links xs),
                   sizes = Map.insertWith (+) y 1 (sizes xs)
                 }
         Nothing ->
@@ -238,7 +238,7 @@ relate' x (slope, y) xs =
           Just $
             rememberPinnedBitTest x $
               xs
-                { links = Map.insert x (Just (slope, y), 0) (links xs),
+                { links = Map.insert x (Left (slope, y)) (links xs),
                   sizes = Map.insertWith (+) y 1 (sizes xs)
                 }
 

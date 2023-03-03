@@ -278,12 +278,12 @@ relocateConstraintSystem cs =
                 Nothing -> case PolyG.build intercept [(var, -1), (root, slope)] of
                   Left _ -> Nothing
                   Right poly -> Just $ fromConstraint counters $ CAddF poly
-                Just (Nothing, intercept') ->
+                Just (Right intercept') ->
                   -- root = intercept'
                   Just $ fromConstraint counters $ CVarBindF var (slope * intercept' + intercept)
-                Just (Just (slope', root'), intercept') ->
+                Just (Left (slope', root')) ->
                   -- root = slope' * root' + intercept'
-                  case PolyG.build (slope * intercept' + intercept) [(var, -1), (RefBtoRefF root', slope' * slope)] of
+                  case PolyG.build intercept [(var, -1), (RefBtoRefF root', slope' * slope)] of
                     Left _ -> Nothing
                     Right poly -> Just $ fromConstraint counters $ CAddF poly
               _ -> case PolyG.build intercept [(var, -1), (root, slope)] of
@@ -320,12 +320,12 @@ relocateConstraintSystem cs =
           Nothing ->
             -- var is already a root
             Nothing
-          Just (Nothing, intercept) ->
+          Just (Right intercept) ->
             -- var = intercept
             Just $ fromConstraint counters $ CVarBindB var intercept
-          Just (Just (slope, root), intercept) ->
+          Just (Left (slope, root)) ->
             -- var = slope * root + intercept
-            case PolyG.build intercept [(var, -1), (root, slope)] of
+            case PolyG.build 0 [(var, -1), (root, slope)] of
               Left _ -> Nothing
               Right poly -> Just $ fromConstraint counters $ CAddB poly
 
