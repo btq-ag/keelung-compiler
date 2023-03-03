@@ -1,7 +1,17 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations where
+module Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
+  ( BooleanRelations,
+    new,
+    parentOf,
+    bindToValue,
+    relate,
+    exportPinnedBitTests,
+    size,
+    relationBetween,
+  )
+where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
@@ -167,17 +177,17 @@ bindToValue x value xs =
             sizes = Map.insert x 1 (sizes xs)
           }
 
-relate :: GaloisField n => RefB -> (n, RefB, n) -> BooleanRelations n -> Maybe (BooleanRelations n)
-relate x (0, _, intercept) xs = Just $ bindToValue x intercept xs
-relate x (slope, y, intercept) xs
-  | x > y = relate' x (slope, y, intercept) xs -- x = slope * y + intercept
-  | x < y = relate' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+relate :: GaloisField n => RefB -> (n, RefB) -> BooleanRelations n -> Maybe (BooleanRelations n)
+relate x (0, _) xs = Just $ bindToValue x 0 xs
+relate x (slope, y) xs
+  | x > y = relate' x (slope, y) xs -- x = slope * y + intercept
+  | x < y = relate' y (recip slope, x) xs -- y = x / slope - intercept / slope
   | otherwise = Nothing
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
-relate' :: GaloisField n => RefB -> (n, RefB, n) -> BooleanRelations n -> Maybe (BooleanRelations n)
-relate' x (slope, y, intercept) xs =
+relate' :: GaloisField n => RefB -> (n, RefB) -> BooleanRelations n -> Maybe (BooleanRelations n)
+relate' x (slope, y) xs =
   case parentOf xs x of
     Just (Nothing, interceptX) ->
       -- x is already a root with `interceptX` as its value
@@ -187,8 +197,8 @@ relate' x (slope, y, intercept) xs =
       --  slope * y + intercept = interceptX
       -- =>
       --  y = (interceptX - intercept) / slope
-      Just $ bindToValue y (interceptX - intercept / slope) xs
-    Just (Just (slopeX, rootOfX), interceptX) ->
+      Just $ bindToValue y interceptX xs
+    Just (Just (slopeX, rootOfX), _) ->
       -- x is a child of `rootOfX` with slope `slopeX` and intercept `interceptX`
       --  x = slopeX * rootOfX + interceptX
       --  x = slope * y + intercept
@@ -198,7 +208,7 @@ relate' x (slope, y, intercept) xs =
       --  slopeX * rootOfX = slope * y + intercept - interceptX
       -- =>
       --  rootOfX = (slope * y + intercept - interceptX) / slopeX
-      relate rootOfX (slope / slopeX, y, intercept - interceptX / slopeX) xs
+      relate rootOfX (slope / slopeX, y) xs
     Nothing ->
       -- x does not have a parent, so it is its own root
       case parentOf xs y of
@@ -208,7 +218,7 @@ relate' x (slope, y, intercept) xs =
           --  y = interceptY
           -- =>
           --  x = slope * interceptY + intercept
-          Just $ bindToValue x (slope * interceptY + intercept) xs
+          Just $ bindToValue x (slope * interceptY) xs
         Just (Just (slopeY, rootOfY), interceptY) ->
           -- y is a child of `rootOfY` with slope `slopeY` and intercept `interceptY`
           --  y = slopeY * rootOfY + interceptY
@@ -220,7 +230,7 @@ relate' x (slope, y, intercept) xs =
           Just $
             rememberPinnedBitTest x $
               xs
-                { links = Map.insert x (Just (slope * slopeY, rootOfY), slope * interceptY + intercept) (links xs),
+                { links = Map.insert x (Just (slope * slopeY, rootOfY), slope * interceptY) (links xs),
                   sizes = Map.insertWith (+) y 1 (sizes xs)
                 }
         Nothing ->
@@ -228,12 +238,9 @@ relate' x (slope, y, intercept) xs =
           Just $
             rememberPinnedBitTest x $
               xs
-                { links = Map.insert x (Just (slope, y), intercept) (links xs),
+                { links = Map.insert x (Just (slope, y), 0) (links xs),
                   sizes = Map.insertWith (+) y 1 (sizes xs)
                 }
-
-toMap :: BooleanRelations n -> Map RefB (Maybe (n, RefB), n)
-toMap = links
 
 size :: BooleanRelations n -> Int
 size = Map.size . links

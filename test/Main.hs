@@ -15,11 +15,13 @@ import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Syntax.Counters
+import Test.BooleanRelations qualified as BooleanRelations
 import Test.Compilation qualified as Compilation
 import Test.ConstraintMinimizer qualified as ConstraintMinimizer
 import Test.Hspec
 import Test.Interpreter qualified as Interpreter
 import Test.Optimization qualified as Optimization
+import Test.UnionFind qualified as UnionFind
 import Test.VarLayout qualified as VarBookkeep
 import Test.WitnessGeneration qualified as WitnessGeneration
 
@@ -36,6 +38,10 @@ main = hspec $ do
   describe "Optimization" Optimization.tests
 
   describe "Variable Bookkeeping" VarBookkeep.tests
+
+  describe "Union Find" UnionFind.tests
+
+  describe "Boolean Relations" BooleanRelations.tests
 
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))
