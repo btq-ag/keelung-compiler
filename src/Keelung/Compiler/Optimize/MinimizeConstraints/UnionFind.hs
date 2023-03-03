@@ -1,9 +1,8 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Replace case with fromMaybe" #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
   ( UnionFind,
@@ -15,8 +14,6 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
     bindToValue,
     toMap,
     size,
-    exportFromRefBPairs,
-    HasFromRefB(..)
   )
 where
 
@@ -25,18 +22,12 @@ import Data.Field.Galois (GaloisField)
 import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
--- import Data.Maybe (fromMaybe)
-
-import Data.Set (Set)
-import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Constraint (RefB, RefF (..), RefU (..))
 import Prelude hiding (lookup)
 
 data UnionFind ref n = UnionFind
   { links :: Map ref (Maybe (n, ref), n),
-    sizes :: Map ref Int,
-    fromRefBPairs :: Set (ref, RefB)
+    sizes :: Map ref Int
   }
   deriving (Eq, Generic, NFData)
 
@@ -48,9 +39,6 @@ instance (Show ref, Show n, Eq n, Num n) => Show (UnionFind ref n) where
       ++ "\n"
       ++ "  sizes = "
       ++ showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ sizes xs))
-      ++ "\n"
-      ++ "  fromRefB = "
-      ++ showList' (map (\(var, n) -> show var <> " = " <> show n) (Set.toList $ fromRefBPairs xs))
       ++ "\n}"
     where
       showList' ys = "[" <> List.intercalate ", " ys <> "]"
@@ -59,7 +47,7 @@ instance (Show ref, Show n, Eq n, Num n) => Show (UnionFind ref n) where
       showLink (var, (Nothing, intercept)) = show var <> " = " <> show intercept
 
 new :: Ord ref => UnionFind ref n
-new = UnionFind mempty mempty mempty
+new = UnionFind mempty mempty
 
 -- | Find the root of a variable, returns:
 --      1. if the variable is already a root
@@ -179,7 +167,7 @@ bindToValue x value xs =
           sizes = Map.insert x 1 (sizes xs)
         }
 
-relate :: (Ord ref, GaloisField n, HasFromRefB ref) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
+relate :: (Ord ref, GaloisField n) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
 relate x (0, _, intercept) xs = Just $ bindToValue x intercept xs
 relate x (slope, y, intercept) xs
   | x > y = relate' x (slope, y, intercept) xs -- x = slope * y + intercept
@@ -188,7 +176,7 @@ relate x (slope, y, intercept) xs
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
-relate' :: (Ord ref, GaloisField n, HasFromRefB ref) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
+relate' :: (Ord ref, GaloisField n) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
 relate' x (slope, y, intercept) xs =
   case parentOf xs x of
     Just (Nothing, interceptX) ->
@@ -230,19 +218,17 @@ relate' x (slope, y, intercept) xs =
           -- =>
           --  x = slope * slopeY * rootOfY + slope * interceptY + intercept
           Just $
-            rememberFromRefBPairs x y $
-              xs
-                { links = Map.insert x (Just (slope * slopeY, rootOfY), slope * interceptY + intercept) (links xs),
-                  sizes = Map.insertWith (+) y 1 (sizes xs)
-                }
+            xs
+              { links = Map.insert x (Just (slope * slopeY, rootOfY), slope * interceptY + intercept) (links xs),
+                sizes = Map.insertWith (+) y 1 (sizes xs)
+              }
         Nothing ->
           -- y does not have a parent, so it is its own root
           Just $
-            rememberFromRefBPairs x y $
-              xs
-                { links = Map.insert x (Just (slope, y), intercept) (links xs),
-                  sizes = Map.insertWith (+) y 1 (sizes xs)
-                }
+            xs
+              { links = Map.insert x (Just (slope, y), intercept) (links xs),
+                sizes = Map.insertWith (+) y 1 (sizes xs)
+              }
 
 -- let (_, slopeX, rootOfX, interceptX) = lookup x xs -- x = slopeX * rootOfX + interceptX
 --     (_, slopeY, rootOfY, interceptY) = lookup y xs -- y = slopeY * rootOfY + interceptY
@@ -285,30 +271,3 @@ toMap = links
 
 size :: UnionFind ref n -> Int
 size = Map.size . links
-
---------
-
--- | HACK
-class HasFromRefB ref where
-  extractRefB :: ref -> Maybe RefB
-
-instance HasFromRefB RefF where
-  extractRefB (RefBtoRefF refB) = Just refB
-  extractRefB _ = Nothing
-
-instance HasFromRefB RefU where
-  extractRefB (RefBtoRefU refB) = Just refB
-  extractRefB _ = Nothing
-
-instance HasFromRefB String where 
-  extractRefB _ = Nothing
-
--- | If the RefB is of RefUBit, remember it
-rememberFromRefBPairs :: (HasFromRefB ref, Ord ref) => ref -> ref -> UnionFind ref n -> UnionFind ref n
-rememberFromRefBPairs ref1 ref2 xs = case (extractRefB ref1, extractRefB ref2) of
-  (Nothing, Nothing) -> xs
-  (Just refB, _) -> xs {fromRefBPairs = Set.insert (ref2, refB) (fromRefBPairs xs)}
-  (_, Just refB) -> xs {fromRefBPairs = Set.insert (ref1, refB) (fromRefBPairs xs)}
-
-exportFromRefBPairs :: UnionFind ref n -> Set (ref, RefB)
-exportFromRefBPairs = fromRefBPairs
