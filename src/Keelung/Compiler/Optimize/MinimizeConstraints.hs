@@ -5,13 +5,13 @@ module Keelung.Compiler.Optimize.MinimizeConstraints (run) where
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
+import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
+import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
-import qualified Data.Map.Strict as Map
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 run = snd . optimizeAddF

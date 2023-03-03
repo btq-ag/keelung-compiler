@@ -115,13 +115,13 @@ tests = do
       return ()
 
     it "Boolean 1" $ do
-      _cs <- runTest 6 6 $ do
+      _cs <- runTest 4 4 $ do
         x <- inputBool Public
         y <- reuse x
-        z <- reuse x
-        return (x .&. y .&. z)
+        return (x .|. y)
 
-    --   -- print cs
+      -- print _cs
+      -- print $ relocateConstraintSystem _cs
       return ()
 
       -- BO0 = BI0 && BI0 && BI0

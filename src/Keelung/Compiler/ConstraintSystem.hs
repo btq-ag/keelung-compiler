@@ -55,7 +55,6 @@ data ConstraintSystem n = ConstraintSystem
     csVarEqU :: UnionFind RefU n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
-    csAddB :: [PolyG RefB n],
     csAddU :: [PolyG RefU n],
     -- multiplicative constraints
     csMulF :: [(PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))],
@@ -77,7 +76,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showVarEqB
       <> showVarEqU
       <> showAddF
-      <> showAddB
       <> showAddU
       <> showMulF
       <> showMulB
@@ -135,7 +133,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       -- showVarBindB = adapt "VarBindB" (Map.toList $ csVarBindB cs) $ \(var, val) -> show var <> " = " <> show val
 
       showAddF = adapt "AddF" (csAddF cs) show
-      showAddB = adapt "AddB" (csAddB cs) show
       showAddU = adapt "AddU" (csAddU cs) show
 
       showMulF = adapt "MulF" (csMulF cs) showMul
@@ -372,7 +369,6 @@ sizeOfConstraintSystem cs =
     -- + length (csVarBindB cs)
     -- + length (csVarBindU cs)
     + length (csAddF cs)
-    + length (csAddB cs)
     + length (csAddU cs)
     + length (csMulF cs)
     + length (csMulB cs)
