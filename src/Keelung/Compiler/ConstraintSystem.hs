@@ -214,7 +214,6 @@ relocateConstraintSystem cs =
           <> addFs
           <> addUs
           <> mulFs
-          <> mulBs
           <> mulUs
           <> nEqFs
           <> nEqUs
@@ -344,7 +343,6 @@ relocateConstraintSystem cs =
     -- addBs = Seq.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
     addUs = Seq.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
-    mulBs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulB) $ csMulB cs
     mulUs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulU) $ csMulU cs
     nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
     nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ Map.toList $ csNEqU cs

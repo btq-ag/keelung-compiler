@@ -225,8 +225,6 @@ add = mapM_ addOne
     addOne (CMulF x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = do
       modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
-    addOne (CMulB x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulB = (x, y, Left c) : csMulB cs})
-    addOne (CMulB x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulB = (x, y, Right z) : csMulB cs})
     addOne (CMulU x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulU = (x, y, Left c) : csMulU cs})
     addOne (CMulU x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulU = (x, y, Right z) : csMulU cs})
     addOne (CNEqF x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
@@ -282,11 +280,11 @@ compileExprB out expr = case expr of
     vars <- mapM wireB xs
     case vars of
       Empty ->
-        add $ cMulSimpleB a b out -- out = a * b
+        add $ cMulSimpleF (RefBtoRefF a) (RefBtoRefF b) (RefBtoRefF out) -- out = a * b
       (c :<| Empty) -> do
         aAndb <- freshRefB
-        add $ cMulSimpleB a b aAndb -- aAndb = a * b
-        add $ cMulSimpleB aAndb c out -- out = aAndb * c
+        add $ cMulSimpleF (RefBtoRefF a) (RefBtoRefF b) (RefBtoRefF aAndb) -- aAndb = a * b
+        add $ cMulSimpleF (RefBtoRefF aAndb) (RefBtoRefF c) (RefBtoRefF out) -- out = aAndb * c
       _ -> do
         -- the number of operands
         let n = 2 + fromIntegral (length vars)

@@ -31,7 +31,6 @@ module Keelung.Compiler.Constraint
     cVarBindU,
     cMulF,
     cMulU,
-    cMulSimpleB,
     cMulSimpleF,
     cNEqF,
     cNEqU,
@@ -79,14 +78,6 @@ fromConstraint counters (CMulF as bs cs) =
     ( case cs of
         Left n -> Left n
         Right xs -> fromPolyF counters xs
-    )
-fromConstraint counters (CMulB as bs cs) =
-  Relocated.CMul
-    (fromPolyB_ counters as)
-    (fromPolyB_ counters bs)
-    ( case cs of
-        Left n -> Left n
-        Right xs -> fromPolyB counters xs
     )
 fromConstraint counters (CMulU as bs cs) =
   Relocated.CMul
@@ -193,12 +184,6 @@ fromPolyF counters poly = case PolyG.view poly of
   PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRefF counters var1, coeff1), (reindexRefF counters var2, coeff2)]
   PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRefF counters)) (Map.toList xs))
 
-fromPolyB :: Integral n => Counters -> PolyG RefB n -> Either n (Poly n)
-fromPolyB counters poly = case PolyG.view poly of
-  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRefB counters var, coeff)]
-  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRefB counters var1, coeff1), (reindexRefB counters var2, coeff2)]
-  PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRefB counters)) (Map.toList xs))
-
 fromPolyU :: Integral n => Counters -> PolyG RefU n -> Either n (Poly n)
 fromPolyU counters poly = case PolyG.view poly of
   PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRefU counters var, coeff)]
@@ -208,11 +193,6 @@ fromPolyU counters poly = case PolyG.view poly of
 fromPolyF_ :: Integral n => Counters -> PolyG RefF n -> Poly n
 fromPolyF_ counters xs = case fromPolyF counters xs of
   Left _ -> error "[ panic ] fromPolyF_: Left"
-  Right p -> p
-
-fromPolyB_ :: Integral n => Counters -> PolyG RefB n -> Poly n
-fromPolyB_ counters xs = case fromPolyB counters xs of
-  Left _ -> error "[ panic ] fromPolyB_: Left"
   Right p -> p
 
 fromPolyU_ :: Integral n => Counters -> PolyG RefU n -> Poly n
@@ -268,7 +248,6 @@ data Constraint n
   | CVarBindB RefB n -- when x = val
   | CVarBindU RefU n -- when x = val
   | CMulF !(PolyG RefF n) !(PolyG RefF n) !(Either n (PolyG RefF n))
-  | CMulB !(PolyG RefB n) !(PolyG RefB n) !(Either n (PolyG RefB n))
   | CMulU !(PolyG RefU n) !(PolyG RefU n) !(Either n (PolyG RefU n))
   | CNEqF RefF RefF RefF
   | CNEqU RefU RefU RefU
@@ -281,8 +260,6 @@ instance GaloisField n => Eq (Constraint n) where
     (CVarBindU x y, CVarBindU u v) -> x == u && y == v
     (CVarBindF x y, CVarBindF u v) -> x == u && y == v
     (CMulF x y z, CMulF u v w) ->
-      (x == u && y == v || x == v && y == u) && z == w
-    (CMulB x y z, CMulB u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CMulU x y z, CMulU u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
@@ -305,8 +282,6 @@ instance Functor Constraint where
   fmap f (CVarBindU x y) = CVarBindU x (f y)
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
-  fmap f (CMulB x y (Left z)) = CMulB (fmap f x) (fmap f y) (Left (f z))
-  fmap f (CMulB x y (Right z)) = CMulB (fmap f x) (fmap f y) (Right (fmap f z))
   fmap f (CMulU x y (Left z)) = CMulU (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulU x y (Right z)) = CMulU (fmap f x) (fmap f y) (Right (fmap f z))
   fmap _ (CNEqF x y z) = CNEqF x y z
@@ -370,9 +345,6 @@ cMulSimple ctor !x !y !z = case ( do
 cMulSimpleF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
 cMulSimpleF = cMulSimple CMulF
 
-cMulSimpleB :: GaloisField n => RefB -> RefB -> RefB -> [Constraint n]
-cMulSimpleB = cMulSimple CMulB
-
 -- | Smart constructor for the CMul constraint
 cMul ::
   (GaloisField n, Ord ref) =>
@@ -417,7 +389,6 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CVarBindB x n) = "BB " <> show x <> " = " <> show n
   show (CVarBindU x n) = "BU " <> show x <> " = " <> show n
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
-  show (CMulB aV bV cV) = "MB " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulU aV bV cV) = "MU " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m

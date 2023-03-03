@@ -8,8 +8,8 @@ import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
--- import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
--- import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
+import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
+import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Data.PolyG (PolyG)
@@ -132,7 +132,8 @@ reduceAddF polynomial = do
     then return Nothing
     else do
       unionFind <- gets csVarEqF
-      case substPolyG unionFind polynomial of
+      boolRels <- gets csVarEqB
+      case substPolyG unionFind boolRels polynomial of
         Nothing -> return (Just polynomial) -- nothing changed
         Just (Left _constant, removedRefs, _) -> do
           -- when (constant /= 0) $
@@ -165,7 +166,8 @@ reduceMulF (polyA, polyB, polyC) = do
 substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefF n -> RoundM n (Either n (PolyG RefF n))
 substitutePolyF typeOfChange polynomial = do
   unionFind <- gets csVarEqF
-  case substPolyG unionFind polynomial of
+  boolRels <- gets csVarEqB
+  case substPolyG unionFind boolRels polynomial of
     Nothing -> return (Right polynomial) -- nothing changed
     Just (Left constant, removedRefs, _) -> do
       -- the polynomial has been reduced to nothing
@@ -323,21 +325,52 @@ addAddF poly = case PolyG.view poly of
 
 -- | Substitutes variables in a polynomial.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n, Ord ref, Show ref) => UnionFind ref n -> PolyG ref n -> Maybe (Either n (PolyG ref n), [ref], [ref])
-substPolyG ctx poly = do
+substPolyG :: (GaloisField n, Integral n) => UnionFind RefF n -> BooleanRelations -> PolyG RefF n -> Maybe (Either n (PolyG RefF n), [RefF], [RefF])
+substPolyG ctx boolRels poly = do
   let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' (substPolyG_ ctx) (False, Left c, [], []) xs of
+  case Map.foldlWithKey' (substPolyG_ ctx boolRels) (False, Left c, [], []) xs of
     (False, _, _, _) -> Nothing -- nothing changed
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs)
 
-substPolyG_ :: (Integral n, Ord ref, Show ref, GaloisField n) => UnionFind ref n -> (Bool, Either n (PolyG ref n), [ref], [ref]) -> ref -> n -> (Bool, Either n (PolyG ref n), [ref], [ref])
-substPolyG_ ctx (changed, accPoly, removedRefs, addedRefs) ref coeff = case UnionFind.parentOf ctx ref of
-  Nothing ->
-    -- ref is already a root
-    case accPoly of
-      Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
-      Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+substPolyG_ :: (Integral n, GaloisField n) => UnionFind RefF n -> BooleanRelations -> (Bool, Either n (PolyG RefF n), [RefF], [RefF]) -> RefF -> n -> (Bool, Either n (PolyG RefF n), [RefF], [RefF])
+substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case UnionFind.parentOf ctx ref of
+  Nothing -> case ref of
+    RefBtoRefF refB ->
+      case BooleanRelations.lookup boolRels refB of
+        BooleanRelations.Root ->
+          case accPoly of
+            Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
+            Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+        BooleanRelations.Constant True ->
+          let removedRefs' = ref : removedRefs -- add ref to removedRefs
+           in case accPoly of
+                Left c -> (True, Left (c + coeff), removedRefs', addedRefs)
+                Right xs -> (True, Right $ PolyG.addConstant coeff xs, removedRefs', addedRefs)
+        BooleanRelations.Constant False ->
+          let removedRefs' = ref : removedRefs -- add ref to removedRefs
+           in case accPoly of
+                Left c -> (changed, Left c, removedRefs', addedRefs)
+                Right xs -> (changed, Right xs, removedRefs', addedRefs)
+        BooleanRelations.ChildOf True root ->
+          let removedRefs' = ref : removedRefs
+              addedRefs' = RefBtoRefF root : addedRefs
+           in case accPoly of
+                -- ref = root
+                Left c -> (True, PolyG.singleton c (RefBtoRefF root, coeff), removedRefs', addedRefs')
+                Right accPoly' -> (True, PolyG.insert 0 (RefBtoRefF root, coeff) accPoly', removedRefs', addedRefs')
+        BooleanRelations.ChildOf False root ->
+          let removedRefs' = ref : removedRefs
+              addedRefs' = RefBtoRefF root : addedRefs
+           in case accPoly of
+                -- ref = root
+                Left c -> (True, PolyG.singleton c (RefBtoRefF root, -coeff), removedRefs', addedRefs')
+                Right accPoly' -> (True, PolyG.insert 0 (RefBtoRefF root, -coeff) accPoly', removedRefs', addedRefs')
+    _ ->
+      -- ref is already a root
+      case accPoly of
+        Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
+        Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
   Just (Nothing, intercept) ->
     -- ref = intercept
     let removedRefs' = ref : removedRefs -- add ref to removedRefs
