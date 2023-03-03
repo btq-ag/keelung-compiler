@@ -2,7 +2,6 @@ module Test.BooleanRelations (tests, run) where
 
 import Control.Monad.State
 import Data.Maybe qualified as Maybe
-import Keelung hiding (run)
 import Keelung.Compiler.Constraint (RefB (..))
 import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
 import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
@@ -21,41 +20,41 @@ tests = do
     --   runM $ do
     --     RefB 0 `bindToValue` 1
 
-    --     assertRelation (RefB 0) 1 (RefB 1) 0
-    --     assertRelation (RefB 1) 1 (RefB 0) 0
+    --     assertRelation (RefB 0) True (RefB 1) 0
+    --     assertRelation (RefB 1) True (RefB 0) 0
 
     it "Relate (x = y)" $
       runM $ do
-        RefB 0 `relate` (1, RefB 1)
+        RefB 0 `relate` (True, RefB 1)
 
-        assertRelation (RefB 0) 1 (RefB 1)
-        assertRelation (RefB 1) 1 (RefB 0)
+        assertRelation (RefB 0) True (RefB 1)
+        assertRelation (RefB 1) True (RefB 0)
 
     it "Relate (x = y = z)" $
       runM $ do
-        RefB 0 `relate` (1, RefB 1)
-        RefB 1 `relate` (1, RefB 2)
+        RefB 0 `relate` (True, RefB 1)
+        RefB 1 `relate` (True, RefB 2)
 
-        assertRelation (RefB 0) 1 (RefB 1)
-        assertRelation (RefB 0) 1 (RefB 2)
-        assertRelation (RefB 1) 1 (RefB 0)
-        assertRelation (RefB 1) 1 (RefB 2)
-        assertRelation (RefB 2) 1 (RefB 0)
-        assertRelation (RefB 2) 1 (RefB 1)
+        assertRelation (RefB 0) True (RefB 1)
+        assertRelation (RefB 0) True (RefB 2)
+        assertRelation (RefB 1) True (RefB 0)
+        assertRelation (RefB 1) True (RefB 2)
+        assertRelation (RefB 2) True (RefB 0)
+        assertRelation (RefB 2) True (RefB 1)
 
     it "Relate (x = ¬y)" $
       runM $ do
-        RefB 0 `relate` (-1, RefB 1)
+        RefB 0 `relate` (False, RefB 1)
 
-        assertRelation (RefB 0) (-1) (RefB 1)
-        assertRelation (RefB 1) (-1) (RefB 0)
+        assertRelation (RefB 0) False (RefB 1)
+        assertRelation (RefB 1) False (RefB 0)
 
-type M = StateT (BooleanRelations GF181) IO
+type M = StateT BooleanRelations IO
 
 runM :: M a -> IO a
 runM p = evalStateT p BooleanRelations.new
 
-relate :: RefB -> (GF181, RefB) -> M ()
+relate :: RefB -> (Bool, RefB) -> M ()
 relate var val = do
   xs <- get
   forM_ (BooleanRelations.relate var val xs) put
@@ -65,7 +64,7 @@ relate var val = do
 --   modify' $ BooleanRelations.bindToValue var val
 
 -- | Assert that `var1 = slope * var2 + intercept`
-assertRelation :: RefB -> GF181 -> RefB -> M ()
+assertRelation :: RefB -> Bool -> RefB -> M ()
 assertRelation var1 slope var2 = do
   xs <- get
   BooleanRelations.relationBetween var1 var2 xs `shouldBe` Just slope
@@ -77,7 +76,7 @@ assertRelation var1 slope var2 = do
 
 ------------------------------------------------------------------------
 
-instance (Arbitrary n, GaloisField n) => Arbitrary (BooleanRelations n) where
+instance Arbitrary BooleanRelations where
   arbitrary = do
     relations <- Arbitrary.vector 100
 

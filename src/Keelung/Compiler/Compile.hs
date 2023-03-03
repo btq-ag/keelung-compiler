@@ -197,7 +197,7 @@ add = mapM_ addOne
       put cs {csVarEqF = csVarEqF'}
     addOne (CVarBindB x c) = do
       cs <- get
-      let csVarEqB' = BooleanRelations.bindToValue x c (csVarEqB cs)
+      let csVarEqB' = BooleanRelations.bindToValue x (c == 1) (csVarEqB cs)
       put cs {csVarEqB = csVarEqB'}
     addOne (CVarBindU x c) = do
       cs <- get
@@ -210,7 +210,7 @@ add = mapM_ addOne
         Just csVarEqF' -> put cs {csVarEqF = csVarEqF'}
     addOne (CVarEqB x y) = do
       cs <- get
-      case BooleanRelations.relate x (1, y) (csVarEqB cs) of
+      case BooleanRelations.relate x (True, y) (csVarEqB cs) of
         Nothing -> return ()
         Just boolRels -> put cs {csVarEqB = boolRels}
     addOne (CVarEqU x y) = do

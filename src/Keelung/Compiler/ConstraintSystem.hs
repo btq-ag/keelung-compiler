@@ -51,7 +51,7 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceU :: !(Map RefU Int),
     -- when x == y (UnionFind)
     csVarEqF :: UnionFind RefF n,
-    csVarEqB :: BooleanRelations n,
+    csVarEqB :: BooleanRelations,
     csVarEqU :: UnionFind RefU n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
@@ -250,7 +250,7 @@ relocateConstraintSystem cs =
 
     shouldRemoveB _ = False
 
-    fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> BooleanRelations n -> Map RefF Int -> Seq (Relocated.Constraint n)
+    fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> BooleanRelations -> Map RefF Int -> Seq (Relocated.Constraint n)
     fromUnionFindF unionFind boolRels occurrencesF =
       let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
           publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
@@ -280,17 +280,17 @@ relocateConstraintSystem cs =
                   Right poly -> Just $ fromConstraint counters $ CAddF poly
                 BooleanRelations.Constant intercept' ->
                   -- root = intercept'
-                  Just $ fromConstraint counters $ CVarBindF var (slope * intercept' + intercept)
+                  Just $ fromConstraint counters $ CVarBindF var (slope * (if intercept' then 1 else 0) + intercept)
                 BooleanRelations.ChildOf slope' root' ->
                   -- root = slope' * root' + intercept'
-                  case PolyG.build intercept [(var, -1), (RefBtoRefF root', slope' * slope)] of
+                  case PolyG.build intercept [(var, -1), (RefBtoRefF root', (if slope' then 1 else -1) * slope)] of
                     Left _ -> Nothing
                     Right poly -> Just $ fromConstraint counters $ CAddF poly
               _ -> case PolyG.build intercept [(var, -1), (root, slope)] of
                 Left _ -> Nothing
                 Right poly -> Just $ fromConstraint counters $ CAddF poly
 
-    fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
     fromUnionFindB relations occurrencesF occurrencesB occurrencesU =
       let outputVars = [RefBO i | i <- [0 .. getCount OfOutput OfBoolean counters - 1]]
           publicInputVars = [RefBI i | i <- [0 .. getCount OfPublicInput OfBoolean counters - 1]]
@@ -322,10 +322,10 @@ relocateConstraintSystem cs =
             Nothing
           BooleanRelations.Constant intercept ->
             -- var = intercept
-            Just $ fromConstraint counters $ CVarBindB var intercept
+            Just $ fromConstraint counters $ CVarBindB var (if intercept then 1 else 0)
           BooleanRelations.ChildOf slope root ->
             -- var = slope * root + intercept
-            case PolyG.build 0 [(var, -1), (root, slope)] of
+            case PolyG.build 0 [(var, -1), (root, if slope then 1 else -1)] of
               Left _ -> Nothing
               Right poly -> Just $ fromConstraint counters $ CAddB poly
 

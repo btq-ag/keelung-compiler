@@ -15,7 +15,6 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
 where
 
 import Control.DeepSeq (NFData)
-import Data.Field.Galois (GaloisField)
 import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -26,15 +25,15 @@ import Keelung.Compiler.Constraint (RefB (..), RefU)
 import Keelung.Syntax (Width)
 import Prelude hiding (lookup)
 
-data BooleanRelations n = BooleanRelations
-  { links :: Map RefB (Either (n, RefB) n),
+data BooleanRelations = BooleanRelations
+  { links :: Map RefB (Either (Bool, RefB) Bool),
     sizes :: Map RefB Int,
     -- | Here stores bit tests on pinned UInt variables, so that we can export them as constraints later.
     pinnedBitTests :: Set (Width, RefU, Int)
   }
   deriving (Eq, Generic, NFData)
 
-instance (Show n, Eq n, Num n) => Show (BooleanRelations n) where
+instance Show BooleanRelations where
   show xs =
     "BooleanRelations {\n"
       ++ "  sizes = "
@@ -46,20 +45,20 @@ instance (Show n, Eq n, Num n) => Show (BooleanRelations n) where
     where
       showList' ys = "[" <> List.intercalate ", " ys <> "]"
 
-      showLink (var, Left (slope, root)) = "  " <> show var <> " = " <> (if slope == 1 then "" else show slope) <> show root <> "\n"
+      showLink (var, Left (slope, root)) = "  " <> show var <> " = " <> (if slope then "" else show slope) <> show root <> "\n"
       showLink (var, Right intercept) = "  " <> show var <> " = " <> show intercept <> "\n"
 
-new :: BooleanRelations n
+new :: BooleanRelations
 new = BooleanRelations mempty mempty mempty
 
-data Relation n = Root | Constant n | ChildOf n RefB
+data Relation = Root | Constant Bool | ChildOf Bool RefB
 
 -- | Returns 'Nothing' if the variable is already a root.
 --   else returns 'Just (slope, root)'  where 'var = slope * root + intercept'
-lookup :: Num n => BooleanRelations n -> RefB -> Relation n
+lookup :: BooleanRelations -> RefB -> Relation
 lookup xs var = case Map.lookup var (links xs) of
   Nothing -> Root -- var is a root
-  Just (Right intercept) -> Constant intercept -- var is a root
+  Just (Right value) -> Constant value -- var is a root
   Just (Left (slope, parent)) -> case lookup xs parent of
     Root -> ChildOf slope parent
     Constant intercept' ->
@@ -68,7 +67,7 @@ lookup xs var = case Map.lookup var (links xs) of
       -- parent = intercept'
       --  =>
       -- var = slope * intercept' + intercept
-      Constant (slope * intercept')
+      Constant (slope && intercept')
     ChildOf slope' grandparent ->
       -- var = slope * parent + intercept
       -- parent = slope' * grandparent + intercept'
@@ -76,16 +75,16 @@ lookup xs var = case Map.lookup var (links xs) of
       -- var = slope * (slope' * grandparent + intercept') + intercept
       --  =>
       -- var = slope * slope' * grandparent + slope * intercept' + intercept
-      ChildOf (slope * slope') grandparent
+      ChildOf (slope && slope') grandparent
 
 -- | Calculates the relation between two variables `var1` and `var2`
 --   Returns `Nothing` if the two variables are not related.
 --   Returns `Just (slope, intercept)` where `var1 = slope * var2 + intercept` if the two variables are related.
-relationBetween :: GaloisField n => RefB -> RefB -> BooleanRelations n -> Maybe n
+relationBetween :: RefB -> RefB -> BooleanRelations -> Maybe Bool
 relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
   (Root, Root) ->
     if var1 == var2
-      then Just 1
+      then Just True
       else Nothing -- var1 and var2 are roots, but not the same one
   (Root, ChildOf slope2 root2) ->
     -- var2 = slope2 * root2 + intercept2
@@ -95,7 +94,7 @@ relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
       then -- var1 = root2
       --  =>
       -- var1 = (var2 - intercept2) / slope2
-        Just (recip slope2)
+        Just slope2
       else Nothing
   (Root, Constant _) -> Nothing -- var1 is a root, var2 is a value
   (ChildOf slope1 root1, Root) ->
@@ -120,19 +119,19 @@ relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
       -- var1 = slope1 * ((var2 - intercept2) / slope2) + intercept1
       --  =>
       -- var1 = slope1 * var2 / slope2 - slope1 * intercept2 / slope2 + intercept1
-        Just (slope1 / slope2)
+        Just (slope1 == slope2)
       else Nothing
   (Constant _, ChildOf _ _) -> Nothing -- var1 is a value
   (ChildOf _ _, Constant _) -> Nothing -- var2 is a value
   (Constant _, Constant _) -> Nothing -- both are values
 
 -- | If the RefB is of RefUBit, remember it
-rememberPinnedBitTest :: RefB -> BooleanRelations n -> BooleanRelations n
+rememberPinnedBitTest :: RefB -> BooleanRelations -> BooleanRelations
 rememberPinnedBitTest (RefUBit width ref index) xs = xs {pinnedBitTests = Set.insert (width, ref, index) (pinnedBitTests xs)}
 rememberPinnedBitTest _ xs = xs
 
 -- | Bind a variable to a value
-bindToValue :: GaloisField n => RefB -> n -> BooleanRelations n -> BooleanRelations n
+bindToValue :: RefB -> Bool -> BooleanRelations -> BooleanRelations
 bindToValue x value xs =
   case lookup xs x of
     Root ->
@@ -162,22 +161,21 @@ bindToValue x value xs =
       rememberPinnedBitTest x $
         xs
           { links =
-              Map.insert parent (Right (value / slopeP)) $
+              Map.insert parent (Right (value == slopeP)) $
                 Map.insert x (Right value) $
                   links xs,
             sizes = Map.insert x 1 (sizes xs)
           }
 
-relate :: GaloisField n => RefB -> (n, RefB) -> BooleanRelations n -> Maybe (BooleanRelations n)
-relate x (0, _) xs = Just $ bindToValue x 0 xs
+relate :: RefB -> (Bool, RefB) -> BooleanRelations -> Maybe BooleanRelations
 relate x (slope, y) xs
   | x > y = relate' x (slope, y) xs -- x = slope * y + intercept
-  | x < y = relate' y (recip slope, x) xs -- y = x / slope - intercept / slope
+  | x < y = relate' y (slope, x) xs -- y = x / slope - intercept / slope
   | otherwise = Nothing
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
-relate' :: GaloisField n => RefB -> (n, RefB) -> BooleanRelations n -> Maybe (BooleanRelations n)
+relate' :: RefB -> (Bool, RefB) -> BooleanRelations -> Maybe BooleanRelations
 relate' x (slope, y) xs =
   case lookup xs x of
     Constant interceptX ->
@@ -199,7 +197,7 @@ relate' x (slope, y) xs =
       --  slopeX * rootOfX = slope * y + intercept - interceptX
       -- =>
       --  rootOfX = (slope * y + intercept - interceptX) / slopeX
-      relate rootOfX (slope / slopeX, y) xs
+      relate rootOfX (slope == slopeX, y) xs
     Root ->
       -- x does not have a parent, so it is its own root
       case lookup xs y of
@@ -209,7 +207,7 @@ relate' x (slope, y) xs =
           --  y = interceptY
           -- =>
           --  x = slope * interceptY + intercept
-          Just $ bindToValue x (slope * interceptY) xs
+          Just $ bindToValue x (slope && interceptY) xs
         ChildOf slopeY rootOfY ->
           -- y is a child of `rootOfY` with slope `slopeY` and intercept `interceptY`
           --  y = slopeY * rootOfY + interceptY
@@ -221,7 +219,7 @@ relate' x (slope, y) xs =
           Just $
             rememberPinnedBitTest x $
               xs
-                { links = Map.insert x (Left (slope * slopeY, rootOfY)) (links xs),
+                { links = Map.insert x (Left (slope && slopeY, rootOfY)) (links xs),
                   sizes = Map.insertWith (+) y 1 (sizes xs)
                 }
         Root ->
@@ -233,8 +231,8 @@ relate' x (slope, y) xs =
                   sizes = Map.insertWith (+) y 1 (sizes xs)
                 }
 
-size :: BooleanRelations n -> Int
+size :: BooleanRelations -> Int
 size = Map.size . links
 
-exportPinnedBitTests :: BooleanRelations n -> Set RefB
+exportPinnedBitTests :: BooleanRelations -> Set RefB
 exportPinnedBitTests = Set.map (\(w, ref, i) -> RefUBit w ref i) . pinnedBitTests
