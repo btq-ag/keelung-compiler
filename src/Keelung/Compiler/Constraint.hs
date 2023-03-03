@@ -20,10 +20,11 @@ module Keelung.Compiler.Constraint
     -- addOccurrences,
     -- removeOccurrences,
     cAddF,
-    cAddB,
+    -- cAddB,
     cAddU,
     cVarEqF,
     cVarEqB,
+    cVarNEqB,
     cVarEqU,
     cVarBindF,
     cVarBindB,
@@ -55,7 +56,6 @@ import Keelung.Syntax
 import Keelung.Syntax.Counters
 
 fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
-fromConstraint counters (CAddB as) = Relocated.CAdd (fromPolyB_ counters as)
 fromConstraint counters (CAddF as) = Relocated.CAdd (fromPolyF_ counters as)
 fromConstraint counters (CAddU as) = Relocated.CAdd (fromPolyU_ counters as)
 fromConstraint counters (CVarEqF x y) = case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
@@ -63,6 +63,9 @@ fromConstraint counters (CVarEqF x y) = case Poly.buildEither 0 [(reindexRefF co
   Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarEqB x y) = case Poly.buildEither 0 [(reindexRefB counters x, 1), (reindexRefB counters y, -1)] of
   Left _ -> error "CVarEqB: two variables are the same"
+  Right xs -> Relocated.CAdd xs
+fromConstraint counters (CVarNEqB x y) = case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
+  Left _ -> error "CVarNEqB: two variables are the same"
   Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarEqU x y) = case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
   Left _ -> error "CVarEqU: two variables are the same"
@@ -218,7 +221,6 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
   Left _ -> error "[ panic ] fromPolyU_: Left"
   Right p -> p
 
-
 -- let (isAlreadyRoot, (result, intercept)) = UnionFind.lookup ref ctx
 --  in if isAlreadyRoot
 --       then case xs of
@@ -258,10 +260,10 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
   = CAddF !(PolyG RefF n)
-  | CAddB !(PolyG RefB n)
   | CAddU !(PolyG RefU n)
   | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y
+  | CVarNEqB RefB RefB -- when x = ¬ y
   | CVarEqU RefU RefU -- when x == y
   | CVarBindF RefF n -- when x = val
   | CVarBindB RefB n -- when x = val
@@ -275,7 +277,7 @@ data Constraint n
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAddF x, CAddF y) -> x == y
-    (CAddB x, CAddB y) -> x == y
+    -- (CAddB x, CAddB y) -> x == y
     (CVarEqU x y, CVarEqU u v) -> (x == u && y == v) || (x == v && y == u)
     (CVarBindU x y, CVarBindU u v) -> x == u && y == v
     (CVarBindF x y, CVarBindF u v) -> x == u && y == v
@@ -293,9 +295,10 @@ instance GaloisField n => Eq (Constraint n) where
 
 instance Functor Constraint where
   fmap f (CAddF x) = CAddF (fmap f x)
-  fmap f (CAddB x) = CAddB (fmap f x)
+  -- fmap f (CAddB x) = CAddB (fmap f x)
   fmap f (CAddU x) = CAddU (fmap f x)
   fmap _ (CVarEqF x y) = CVarEqF x y
+  fmap _ (CVarNEqB x y) = CVarNEqB x y
   fmap _ (CVarEqB x y) = CVarEqB x y
   fmap _ (CVarEqU x y) = CVarEqU x y
   fmap f (CVarBindF x y) = CVarBindF x (f y)
@@ -317,10 +320,10 @@ cAddF !c !xs = case PolyG.build c xs of
   Right xs' -> [CAddF xs']
 
 -- | Smart constructor for the CAddB constraint
-cAddB :: GaloisField n => n -> [(RefB, n)] -> [Constraint n]
-cAddB !c !xs = case PolyG.build c xs of
-  Left _ -> []
-  Right xs' -> [CAddB xs']
+-- cAddB :: GaloisField n => n -> [(RefB, n)] -> [Constraint n]
+-- cAddB !c !xs = case PolyG.build c xs of
+--   Left _ -> []
+--   Right xs' -> [CAddB xs']
 
 -- | Smart constructor for the CAddU constraint
 cAddU :: GaloisField n => n -> [(RefU, n)] -> [Constraint n]
@@ -335,6 +338,10 @@ cVarEqF x y = if x == y then [] else [CVarEqF x y]
 -- | Smart constructor for the CVarEqB constraint
 cVarEqB :: GaloisField n => RefB -> RefB -> [Constraint n]
 cVarEqB x y = if x == y then [] else [CVarEqB x y]
+
+-- | Smart constructor for the CVarNEqB constraint
+cVarNEqB :: GaloisField n => RefB -> RefB -> [Constraint n]
+cVarNEqB x y = if x == y then [] else [CVarNEqB x y]
 
 -- | Smart constructor for the CVarEqU constraint
 cVarEqU :: GaloisField n => RefU -> RefU -> [Constraint n]
@@ -404,10 +411,11 @@ cNEqU x y m = [CNEqU x y m]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddF xs) = "AF " <> show xs <> " = 0"
-  show (CAddB xs) = "AB " <> show xs <> " = 0"
+  -- show (CAddB xs) = "AB " <> show xs <> " = 0"
   show (CAddU xs) = "AU " <> show xs <> " = 0"
   show (CVarEqF x y) = "VF " <> show x <> " = " <> show y
   show (CVarEqB x y) = "VB " <> show x <> " = " <> show y
+  show (CVarNEqB x y) = "VN " <> show x <> " = ¬ " <> show y
   show (CVarEqU x y) = "VU " <> show x <> " = " <> show y
   show (CVarBindF x n) = "BF " <> show x <> " = " <> show n
   show (CVarBindB x n) = "BB " <> show x <> " = " <> show n

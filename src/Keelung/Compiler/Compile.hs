@@ -189,7 +189,7 @@ add = mapM_ addOne
   where
     addOne :: GaloisField n => Constraint n -> M n ()
     addOne (CAddF xs) = modify (\cs -> addRefFOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
-    addOne (CAddB xs) = modify (\cs -> addRefBOccurrences (PolyG.vars xs) $ cs {csAddB = xs : csAddB cs})
+    -- addOne (CAddB xs) = modify (\cs -> addRefBOccurrences (PolyG.vars xs) $ cs {csAddB = xs : csAddB cs})
     addOne (CAddU xs) = modify (\cs -> addRefUOccurrences (PolyG.vars xs) $ cs {csAddU = xs : csAddU cs})
     addOne (CVarBindF x c) = do
       cs <- get
@@ -211,6 +211,11 @@ add = mapM_ addOne
     addOne (CVarEqB x y) = do
       cs <- get
       case BooleanRelations.relate x (True, y) (csVarEqB cs) of
+        Nothing -> return ()
+        Just boolRels -> put cs {csVarEqB = boolRels}
+    addOne (CVarNEqB x y) = do
+      cs <- get
+      case BooleanRelations.relate x (False, y) (csVarEqB cs) of
         Nothing -> return ()
         Just boolRels -> put cs {csVarEqB = boolRels}
     addOne (CVarEqU x y) = do
@@ -311,7 +316,7 @@ compileExprB out expr = case expr of
     compileXorB out x' y'
   NotB x -> do
     x' <- wireB x
-    add $ cAddB 1 [(x', -1), (out, -1)] -- out = 1 - x'
+    add $ cVarNEqB x' out
   IfB p x y -> do
     p' <- wireB p
     x' <- wireB x

@@ -225,7 +225,7 @@ relocateConstraintSystem cs =
           -- <> varBindBs
           -- <> varBindUs
           <> addFs
-          <> addBs
+          -- <> addBs
           <> addUs
           <> mulFs
           <> mulBs
@@ -323,11 +323,12 @@ relocateConstraintSystem cs =
           BooleanRelations.Constant intercept ->
             -- var = intercept
             Just $ fromConstraint counters $ CVarBindB var (if intercept then 1 else 0)
-          BooleanRelations.ChildOf slope root ->
-            -- var = slope * root + intercept
-            case PolyG.build 0 [(var, -1), (root, if slope then 1 else -1)] of
-              Left _ -> Nothing
-              Right poly -> Just $ fromConstraint counters $ CAddB poly
+          BooleanRelations.ChildOf True root -> Just $ fromConstraint counters $ CVarEqB var root
+          BooleanRelations.ChildOf False root -> Just $ fromConstraint counters $ CVarNEqB var root
+            -- -- var = slope * root + intercept
+            -- case PolyG.build 0 [(var, -1), (root, if slope then 1 else -1)] of
+            --   Left _ -> Nothing
+            --   Right poly -> Just $ fromConstraint counters $ CAddB poly
 
     fromUnionFindU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, (Maybe (n, RefU), n)) -> Maybe (Relocated.Constraint n)
     fromUnionFindU occurrences (var1, (Nothing, c)) =
@@ -354,7 +355,7 @@ relocateConstraintSystem cs =
     -- varBindBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
     -- varBindUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ csVarBindU cs
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
-    addBs = Seq.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
+    -- addBs = Seq.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
     addUs = Seq.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
     mulBs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulB) $ csMulB cs
