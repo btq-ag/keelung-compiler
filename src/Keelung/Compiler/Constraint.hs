@@ -12,6 +12,9 @@ module Keelung.Compiler.Constraint
     reindexRefB,
     reindexRefU,
     Constraint (..),
+    pinnedRefF,
+    pinnedRefB,
+    pinnedRefU,
     -- addOccurrencesWithPolyG,
     -- removeOccurrencesWithPolyG,
     -- addOccurrences,
@@ -129,23 +132,23 @@ instance Show RefU where
 
 --------------------------------------------------------------------------------
 
--- pinnedRefF :: RefF -> Bool
--- pinnedRefF (RefFI _) = True
--- pinnedRefF (RefFO _) = True
--- pinnedRefF (RefBtoRefF ref) = pinnedRefB ref
--- pinnedRefF _ = False
+pinnedRefF :: RefF -> Bool
+pinnedRefF (RefFI _) = True
+pinnedRefF (RefFO _) = True
+pinnedRefF (RefBtoRefF ref) = pinnedRefB ref
+pinnedRefF _ = False
 
--- pinnedRefB :: RefB -> Bool
--- pinnedRefB (RefBI _) = True
--- pinnedRefB (RefBO _) = True
--- pinnedRefB (RefUBit _ ref _) = pinnedRefU ref
--- pinnedRefB _ = False
+pinnedRefB :: RefB -> Bool
+pinnedRefB (RefBI _) = True
+pinnedRefB (RefBO _) = True
+pinnedRefB (RefUBit _ ref _) = pinnedRefU ref
+pinnedRefB _ = False
 
--- pinnedRefU :: RefU -> Bool
--- pinnedRefU (RefUI _ _) = True
--- pinnedRefU (RefUO _ _) = True
--- pinnedRefU (RefBtoRefU ref) = pinnedRefB ref
--- pinnedRefU _ = False
+pinnedRefU :: RefU -> Bool
+pinnedRefU (RefUI _ _) = True
+pinnedRefU (RefUO _ _) = True
+pinnedRefU (RefBtoRefU ref) = pinnedRefB ref
+pinnedRefU _ = False
 
 --------------------------------------------------------------------------------
 

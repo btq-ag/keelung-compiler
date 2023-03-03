@@ -121,7 +121,7 @@ tests = do
         z <- reuse x
         return (x .&. y .&. z)
 
-      -- print cs
+    --   -- print cs
       return ()
 
       -- BO0 = BI0 && BI0 && BI0
