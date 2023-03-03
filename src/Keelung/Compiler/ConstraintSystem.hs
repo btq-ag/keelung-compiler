@@ -64,9 +64,6 @@ data ConstraintSystem n = ConstraintSystem
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show cs =
     "ConstraintSystem {\n"
-      -- <> showVarBindF
-      -- <> showVarBindB
-      -- <> showVarBindU
       <> showVarEqF
       <> showVarEqB
       <> showVarEqU
@@ -214,10 +211,7 @@ relocateConstraintSystem cs =
         varEqFs
           <> varEqBs
           <> varEqUs
-          -- <> varBindBs
-          -- <> varBindUs
           <> addFs
-          -- <> addBs
           <> addUs
           <> mulFs
           <> mulBs

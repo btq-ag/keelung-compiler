@@ -8,6 +8,8 @@ import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
+-- import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
+-- import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Data.PolyG (PolyG)
@@ -276,7 +278,7 @@ learnFromAddF poly = case PolyG.view poly of
     --    slope1 * var1 = - slope2 * var2 - intercept
     --  =>
     --    var1 = - slope2 * var2 / slope1 - intercept / slope1
-    relate var1 (-slope2 / slope1, var2, -intercept / slope1)
+    relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
   PolyG.Polynomial _ _ -> return False
 
 bindToValue :: GaloisField n => RefF -> n -> RoundM n ()
@@ -289,8 +291,8 @@ bindToValue var value = do
         }
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
-relate :: GaloisField n => RefF -> (n, RefF, n) -> RoundM n Bool
-relate var1 (slope, var2, intercept) = do
+relateF :: GaloisField n => RefF -> (n, RefF, n) -> RoundM n Bool
+relateF var1 (slope, var2, intercept) = do
   cs <- get
   case UnionFind.relate var1 (slope, var2, intercept) (csVarEqF cs) of
     Nothing -> return False
@@ -312,7 +314,7 @@ addAddF poly = case PolyG.view poly of
     --    coeff1 * var1 = - coeff2 * var2 - constant
     --      =>
     --    var1 = - coeff2 * var2 / coeff1 - constant / coeff1
-    void $ relate var1 (-coeff2 / coeff1, var2, -constant / coeff1)
+    void $ relateF var1 (-coeff2 / coeff1, var2, -constant / coeff1)
   PolyG.Polynomial _ _ -> do
     markChanged AdditiveConstraintChanged
     modify' $ \cs' -> cs' {csAddF = poly : csAddF cs'}
@@ -358,6 +360,46 @@ substPolyG_ ctx (changed, accPoly, removedRefs, addedRefs) ref coeff = case Unio
               -- ref = slope * root + intercept
               Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), removedRefs', addedRefs')
               Right accPoly' -> (True, PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', removedRefs', addedRefs')
+
+-- -- | Substitutes variables in a polynomial.
+-- --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
+-- substPolyGB :: (GaloisField n, Integral n) => BooleanRelations -> PolyG RefB n -> Maybe (Either n (PolyG RefB n), [RefB], [RefB])
+-- substPolyGB ctx poly = do
+--   let (c, xs) = PolyG.viewAsMap poly
+--   case Map.foldlWithKey' (substPolyGB_ ctx) (False, Left c, [], []) xs of
+--     (False, _, _, _) -> Nothing -- nothing changed
+--     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
+--     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs)
+
+-- substPolyGB_ :: (Integral n, GaloisField n) => BooleanRelations -> (Bool, Either n (PolyG RefB n), [RefB], [RefB]) -> RefB -> n -> (Bool, Either n (PolyG RefB n), [RefB], [RefB])
+-- substPolyGB_ ctx (changed, accPoly, removedRefs, addedRefs) ref coeff = case BooleanRelations.lookup ctx ref of
+--   BooleanRelations.Root ->
+--     -- ref is already a root
+--     case accPoly of
+--       Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
+--       Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+--   BooleanRelations.Constant value ->
+--     -- ref = value
+--     let removedRefs' = ref : removedRefs -- add ref to removedRefs
+--      in case accPoly of
+--           Left c -> (True, Left ((if value then 1 else 0) * coeff + c), removedRefs', addedRefs)
+--           Right accPoly' -> (True, Right $ PolyG.addConstant ((if value then 1 else 0) * coeff) accPoly', removedRefs', addedRefs)
+--   BooleanRelations.ChildOf relation root ->
+--     if root == ref
+--       then
+--         if relation
+--           then -- ref = root, nothing changed
+--           case accPoly of
+--             Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
+--             Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+--           else error "[ panic ] Invalid relation in BooleanRelations where ref = root, but relation == False"
+--       else
+--         let removedRefs' = ref : removedRefs
+--             addedRefs' = root : addedRefs
+--          in case accPoly of
+--               -- ref = slope * root
+--               Left c -> (True, PolyG.singleton c (root, (if relation then 1 else -1) * coeff), removedRefs', addedRefs')
+--               Right accPoly' -> (True, PolyG.insert coeff (root, (if relation then 1 else -1) * coeff) accPoly', removedRefs', addedRefs')
 
 --------------------------------------------------------------------------------
 
@@ -418,3 +460,75 @@ substPolyG_ ctx (changed, accPoly, removedRefs, addedRefs) ref coeff = case Unio
 --   (Right a, Left b, Right c) -> reduceMulFCPP b a c >> return Nothing
 --   (Right a, Right b, Left c) -> return (Just (a, b, Left c))
 --   (Right a, Right b, Right c) -> return (Just (a, b, Right c))
+
+-- substitutePolyB :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefB n -> RoundM n (Either n (PolyG RefB n))
+-- substitutePolyB typeOfChange polynomial = do
+--   booleanRelations <- gets csVarEqB
+--   case substPolyGB booleanRelations polynomial of
+--     Nothing -> return (Right polynomial) -- nothing changed
+--     Just (Left constant, removedRefs, _) -> do
+--       -- the polynomial has been reduced to nothing
+--       markChanged typeOfChange
+--       -- remove all variables in the polynomial from the occurrence list
+--       modify' $ removeOccurrences removedRefs
+--       return (Left constant)
+--     Just (Right reducePolynomial, removedRefs, addedRefs) -> do
+--       -- the polynomial has been reduced to something
+--       markChanged typeOfChange
+--       -- remove all variables in the polynomial from the occurrence list
+--       modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
+--       return (Right reducePolynomial)
+
+-- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Polynomial)
+--    a * bs = cs
+--      =>
+--    cs - a * bs = 0
+-- reduceMulBCPP :: (GaloisField n, Integral n) => n -> PolyG RefB n -> PolyG RefB n -> RoundM n ()
+-- reduceMulBCPP a polyB polyC = do
+--   case PolyG.multiplyBy (-a) polyB of
+--     Left _constant -> do
+--       modify' $ removeOccurrences (PolyG.vars polyB)
+--       addAddB polyC
+--     Right polyBa -> do
+--       case PolyG.merge polyC polyBa of
+--         Left _constant -> modify' $ removeOccurrences (PolyG.vars polyC) . removeOccurrences (PolyG.vars polyBa)
+--         Right addF -> do
+--           addAddB addF
+
+-- addAddB :: (GaloisField n, Integral n) => PolyG RefB n -> RoundM n ()
+-- addAddB poly = case PolyG.view poly of
+--   PolyG.Monomial constant (var1, coeff1) -> do
+--     --    constant + coeff1 * var1 = 0
+--     --      =>
+--     --    var1 = - constant / coeff1
+--     bindToValueB var1 (-constant / coeff1)
+--   PolyG.Binomial _constant (var1, coeff1) (var2, coeff2) -> do
+--     --    constant + coeff1 * var1 + coeff2 * var2 = 0
+--     --      =>
+--     --    coeff1 * var1 = - coeff2 * var2 - constant
+--     --      =>
+--     --    var1 = - coeff2 * var2 / coeff1 - constant / coeff1
+--     void $ relateB var1 (-coeff2 / coeff1, var2)
+--   PolyG.Polynomial _ _ -> do
+--     markChanged AdditiveConstraintChanged
+--     modify' $ \cs' -> cs' {csMulF = poly : csMulF cs'}
+
+-- bindToValueB :: GaloisField n => RefB -> n -> RoundM n ()
+-- bindToValueB var value = do
+--   markChanged RelationChanged
+--   modify' $ \cs ->
+--     removeOccurrences [var] $
+--       cs
+--         { csVarEqB = BooleanRelations.bindToValue var (value == 1) (csVarEqB cs)
+--         }
+
+-- -- | Relates two variables. Returns 'True' if a new relation has been established.
+-- relateB :: GaloisField n => RefB -> (n, RefB) -> RoundM n Bool
+-- relateB var1 (relation, var2) = do
+--   cs <- get
+--   case BooleanRelations.relate var1 (relation == 1, var2) (csVarEqB cs) of
+--     Nothing -> return False
+--     Just boolRels' -> do
+--       markChanged RelationChanged
+--       modify' $ \cs' -> removeOccurrences [var1, var2] $ cs' {csVarEqB = boolRels'}
+--       return True

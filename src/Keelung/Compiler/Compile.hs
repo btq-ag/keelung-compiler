@@ -291,22 +291,22 @@ compileExprB out expr = case expr of
         -- the number of operands
         let n = 2 + fromIntegral (length vars)
         -- polynomial = n - sum of operands
-        let polynomial = (n, (a, -1) : (b, -1) : [(v, -1) | v <- toList vars])
+        let polynomial = (n, (RefBtoRefF a, -1) : (RefBtoRefF b, -1) : [(RefBtoRefF v, -1) | v <- toList vars])
         -- if the answer is 1 then all operands must be 1
         --    (n - sum of operands) * out = 0
         add $
-          cMulB
+          cMulF
             polynomial
-            (0, [(out, 1)])
+            (0, [(RefBtoRefF out, 1)])
             (0, [])
         -- if the answer is 0 then not all operands must be 1:
         --    (n - sum of operands) * inv = 1 - out
         inv <- freshRefB
         add $
-          cMulB
+          cMulF
             polynomial
-            (0, [(inv, 1)])
-            (1, [(out, -1)])
+            (0, [(RefBtoRefF inv, 1)])
+            (1, [(RefBtoRefF out, -1)])
   OrB x0 x1 xs -> do
     compileOrBs out x0 x1 xs
   XorB x y -> do
@@ -338,10 +338,10 @@ compileExprB out expr = case expr of
     -- =>
     --    (1 - x) * (1 - 2y) = (out - y)
     add $
-      cMulB
-        (1, [(x', -1)])
-        (1, [(y', -2)])
-        (0, [(out, 1), (y', -1)])
+      cMulF
+        (1, [(RefBtoRefF x', -1)])
+        (1, [(RefBtoRefF y', -2)])
+        (0, [(RefBtoRefF out, 1), (RefBtoRefF y', -1)])
   EqF x y -> do
     x' <- wireF x
     y' <- wireF y
@@ -722,10 +722,10 @@ compileIfB out p x y = do
   --      =>
   --  (out - y) = p * (x - y)
   add $
-    cMulB
-      (0, [(p, 1)])
-      (0, [(x, 1), (y, -1)])
-      (0, [(y, -1), (out, 1)])
+    cMulF
+      (0, [(RefBtoRefF p, 1)])
+      (0, [(RefBtoRefF x, 1), (RefBtoRefF y, -1)])
+      (0, [(RefBtoRefF y, -1), (RefBtoRefF out, 1)])
 
 compileIfF :: (GaloisField n, Integral n) => RefF -> RefB -> RefF -> RefF -> M n ()
 compileIfF out p x y = do
@@ -761,26 +761,10 @@ compileOrB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> M n ()
 compileOrB out x y = do
   -- (1 - x) * y = (out - x)
   add $
-    cMulB
-      (1, [(x, -1)])
-      (0, [(y, 1)])
-      (0, [(x, -1), (out, 1)])
-
--- assertOrB :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> ExprB n -> M n ()
--- assertOrB (ValB 0) (ValB 0) (ValB 0) = return ()
--- assertOrB (ValB 0) (ValB _) (ValB _) = error "[ error ] assertOrB: invalid constraint"
--- assertOrB (ValB 1) (ValB 0) (ValB 0) = error "[ error ] assertOrB: invalid constraint"
--- assertOrB (ValB 1) (ValB _) (ValB _) = return ()
--- assertOrB out x y = do
---   out' <- wireB out
---   x' <- wireB x
---   y' <- wireB y
---   -- (1 - x) * y = (out - x)
---   add $
---     cMulB
---       (1, [(x', -1)])
---       (0, [(y', 1)])
---       (0, [(x', -1), (out', 1)])
+    cMulF
+      (1, [(RefBtoRefF x, -1)])
+      (0, [(RefBtoRefF y, 1)])
+      (0, [(RefBtoRefF x, -1), (RefBtoRefF out, 1)])
 
 compileOrBs :: (GaloisField n, Integral n) => RefB -> ExprB n -> ExprB n -> Seq (ExprB n) -> M n ()
 compileOrBs out x0 x1 xs = do
@@ -849,10 +833,10 @@ compileXorB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> M n ()
 compileXorB out x y = do
   -- (1 - 2x) * (y + 1) = (1 + out - 3x)
   add $
-    cMulB
-      (1, [(x, -2)])
-      (1, [(y, 1)])
-      (1, [(x, -3), (out, 1)])
+    cMulF
+      (1, [(RefBtoRefF x, -2)])
+      (1, [(RefBtoRefF y, 1)])
+      (1, [(RefBtoRefF x, -3), (RefBtoRefF out, 1)])
 
 --------------------------------------------------------------------------------
 

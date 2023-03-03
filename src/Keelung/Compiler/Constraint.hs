@@ -29,7 +29,6 @@ module Keelung.Compiler.Constraint
     cVarBindF,
     cVarBindB,
     cVarBindU,
-    cMulB,
     cMulF,
     cMulU,
     cMulSimpleB,
@@ -394,9 +393,6 @@ cMul ctor (a, xs) (b, ys) (c, zs) = case ( do
 cMulF :: GaloisField n => (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> [Constraint n]
 cMulF = cMul CMulF
 
--- | Smart constructor for the CMulB constraint
-cMulB :: GaloisField n => (n, [(RefB, n)]) -> (n, [(RefB, n)]) -> (n, [(RefB, n)]) -> [Constraint n]
-cMulB = cMul CMulB
 
 -- | Smart constructor for the CMulU constraint
 cMulU :: GaloisField n => (n, [(RefU, n)]) -> (n, [(RefU, n)]) -> (n, [(RefU, n)]) -> [Constraint n]
