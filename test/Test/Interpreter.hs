@@ -96,7 +96,7 @@ runAll program rawPublicInputs rawPrivateInputs rawOutputs = do
   -- print (toR1CS <$> oldO1)
   -- print "\n======newO1=======\n"
   -- print newO1
-  -- print (toR1CS . relocateConstraintSystem <$> optimized)
+  -- print (toR1CS . relocateConstraintSystem <$> newO1)
 
   csNew program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs

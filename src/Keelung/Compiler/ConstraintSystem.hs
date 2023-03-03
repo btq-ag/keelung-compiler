@@ -250,8 +250,8 @@ relocateConstraintSystem cs =
 
     shouldRemoveB _ = False
 
-    fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Seq (Relocated.Constraint n)
-    fromUnionFindF unionFind occurrencesF =
+    fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> BooleanRelations n -> Map RefF Int -> Seq (Relocated.Constraint n)
+    fromUnionFindF unionFind boolRels occurrencesF =
       let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
           publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
           privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
@@ -261,8 +261,9 @@ relocateConstraintSystem cs =
             <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
-            <> Seq.fromList (Maybe.mapMaybe toConstraintRefB pairs)
       where
+        -- <> Seq.fromList (Maybe.mapMaybe toConstraintRefB pairs)
+
         toConstraint var = case UnionFind.parentOf unionFind var of
           Nothing ->
             -- var is already a root
@@ -272,17 +273,22 @@ relocateConstraintSystem cs =
             Just $ fromConstraint counters $ CVarBindF var intercept
           Just (Just (slope, root), intercept) ->
             -- var = slope * root + intercept
-            case PolyG.build intercept [(var, -1), (root, slope)] of
-              Left _ -> Nothing
-              Right poly -> Just $ fromConstraint counters $ CAddF poly
-
-        pairs :: [(RefF, RefB)]
-        pairs = Set.toList (UnionFind.exportFromRefBPairs unionFind)
-
-        toConstraintRefB (refA, refB) =
-          case PolyG.build 0 [(refA, -1), (RefBtoRefF refB, 1)] of
-            Left _ -> Nothing
-            Right poly -> Just $ fromConstraint counters $ CAddF poly
+            case root of
+              RefBtoRefF refB -> case BooleanRelations.parentOf boolRels refB of
+                Nothing -> case PolyG.build intercept [(var, -1), (root, slope)] of
+                  Left _ -> Nothing
+                  Right poly -> Just $ fromConstraint counters $ CAddF poly
+                Just (Nothing, intercept') ->
+                  -- root = intercept'
+                  Just $ fromConstraint counters $ CVarBindF var (slope * intercept' + intercept)
+                Just (Just (slope', root'), intercept') ->
+                  -- root = slope' * root' + intercept'
+                  case PolyG.build (slope * intercept' + intercept) [(var, -1), (RefBtoRefF root', slope' * slope)] of
+                    Left _ -> Nothing
+                    Right poly -> Just $ fromConstraint counters $ CAddF poly
+              _ -> case PolyG.build intercept [(var, -1), (root, slope)] of
+                Left _ -> Nothing
+                Right poly -> Just $ fromConstraint counters $ CAddF poly
 
     fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
     fromUnionFindB relations occurrencesF occurrencesB occurrencesU =
@@ -340,7 +346,7 @@ relocateConstraintSystem cs =
             then Nothing
             else Just $ fromConstraint counters (CAddU poly)
 
-    varEqFs = fromUnionFindF (csVarEqF cs) (csOccurrenceF cs)
+    varEqFs = fromUnionFindF (csVarEqF cs) (csVarEqB cs) (csOccurrenceF cs)
     -- varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
     varEqBs = fromUnionFindB (csVarEqB cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
     varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UnionFind.toMap $ csVarEqU cs

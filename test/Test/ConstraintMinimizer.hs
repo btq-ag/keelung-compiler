@@ -115,13 +115,14 @@ tests = do
       return ()
 
     it "Boolean 1" $ do
-      cs <- runTest 6 6 $ do
+      _cs <- runTest 6 6 $ do
         x <- inputBool Public
         y <- reuse x
         z <- reuse x
         return (x .&. y .&. z)
 
-      print cs
+      -- print cs
+      return ()
 
       -- BO0 = BI0 && BI0 && BI0
       -- UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (3, 0)
