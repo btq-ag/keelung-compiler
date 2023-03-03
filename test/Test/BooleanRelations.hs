@@ -73,7 +73,7 @@ assertRelation var1 slope var2 = do
 -- assertBinding :: RefB -> GF181 -> M ()
 -- assertBinding var val = do
 --   xs <- get
---   BooleanRelations.parentOf var1 var2 xs `shouldBe` Just (0, val)
+--   BooleanRelations.lookup var1 var2 xs `shouldBe` Just (0, val)
 
 ------------------------------------------------------------------------
 

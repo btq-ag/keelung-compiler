@@ -274,14 +274,14 @@ relocateConstraintSystem cs =
           Just (Just (slope, root), intercept) ->
             -- var = slope * root + intercept
             case root of
-              RefBtoRefF refB -> case BooleanRelations.parentOf boolRels refB of
-                Nothing -> case PolyG.build intercept [(var, -1), (root, slope)] of
+              RefBtoRefF refB -> case BooleanRelations.lookup boolRels refB of
+                BooleanRelations.Root -> case PolyG.build intercept [(var, -1), (root, slope)] of
                   Left _ -> Nothing
                   Right poly -> Just $ fromConstraint counters $ CAddF poly
-                Just (Right intercept') ->
+                BooleanRelations.Constant intercept' ->
                   -- root = intercept'
                   Just $ fromConstraint counters $ CVarBindF var (slope * intercept' + intercept)
-                Just (Left (slope', root')) ->
+                BooleanRelations.ChildOf slope' root' ->
                   -- root = slope' * root' + intercept'
                   case PolyG.build intercept [(var, -1), (RefBtoRefF root', slope' * slope)] of
                     Left _ -> Nothing
@@ -316,14 +316,14 @@ relocateConstraintSystem cs =
             <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInU)
             <> Seq.fromList (Maybe.mapMaybe toConstraint (Set.toList (BooleanRelations.exportPinnedBitTests relations)))
       where
-        toConstraint var = case BooleanRelations.parentOf relations var of
-          Nothing ->
+        toConstraint var = case BooleanRelations.lookup relations var of
+          BooleanRelations.Root ->
             -- var is already a root
             Nothing
-          Just (Right intercept) ->
+          BooleanRelations.Constant intercept ->
             -- var = intercept
             Just $ fromConstraint counters $ CVarBindB var intercept
-          Just (Left (slope, root)) ->
+          BooleanRelations.ChildOf slope root ->
             -- var = slope * root + intercept
             case PolyG.build 0 [(var, -1), (root, slope)] of
               Left _ -> Nothing
