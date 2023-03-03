@@ -138,30 +138,30 @@ reduceAddF polynomial = do
           -- the polynomial has been reduced to nothing
           markChanged AdditiveConstraintChanged
           -- remove all variables in the polynomial from the occurrence list
-          modify' $ removeRefFOccurrences removedRefs
+          modify' $ removeOccurrences removedRefs
           return Nothing
         Just (Right reducePolynomial, removedRefs, addedRefs) -> do
           -- the polynomial has been reduced to something
           markChanged AdditiveConstraintChanged
           -- remove variables that has been reduced in the polynomial from the occurrence list
-          modify' $ removeRefFOccurrences removedRefs . addRefFOccurrences addedRefs
+          modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
           -- keep reducing the reduced polynomial
           reduceAddF reducePolynomial
 
 type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
 
-reduceMulF :: (GaloisField n, Integral n) => (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n)) -> RoundM n (Maybe (MulF n))
+reduceMulF :: (GaloisField n, Integral n) => MulF n -> RoundM n (Maybe (MulF n))
 reduceMulF (polyA, polyB, polyC) = do
-  polyAResult <- substitutePoly MultiplicativeConstraintChanged polyA
-  polyBResult <- substitutePoly MultiplicativeConstraintChanged polyB
+  polyAResult <- substitutePolyF MultiplicativeConstraintChanged polyA
+  polyBResult <- substitutePolyF MultiplicativeConstraintChanged polyB
   polyCResult <- case polyC of
     Left constantC -> return (Left constantC)
-    Right polyC' -> substitutePoly MultiplicativeConstraintChanged polyC'
+    Right polyC' -> substitutePolyF MultiplicativeConstraintChanged polyC'
 
   reduceMulF_ polyAResult polyBResult polyCResult
 
-substitutePoly :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefF n -> RoundM n (Either n (PolyG RefF n))
-substitutePoly typeOfChange polynomial = do
+substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefF n -> RoundM n (Either n (PolyG RefF n))
+substitutePolyF typeOfChange polynomial = do
   unionFind <- gets csVarEqF
   case substPolyG unionFind polynomial of
     Nothing -> return (Right polynomial) -- nothing changed
@@ -169,13 +169,13 @@ substitutePoly typeOfChange polynomial = do
       -- the polynomial has been reduced to nothing
       markChanged typeOfChange
       -- remove all variables in the polynomial from the occurrence list
-      modify' $ removeRefFOccurrences removedRefs
+      modify' $ removeOccurrences removedRefs
       return (Left constant)
     Just (Right reducePolynomial, removedRefs, addedRefs) -> do
       -- the polynomial has been reduced to something
       markChanged typeOfChange
       -- remove all variables in the polynomial from the occurrence list
-      modify' $ removeRefFOccurrences removedRefs . addRefFOccurrences addedRefs
+      modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
       return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative constaint, returns the reduced constraint if it is reduced
@@ -205,7 +205,7 @@ reduceMulFCCP a b cs = do
 reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG RefF n -> n -> RoundM n ()
 reduceMulFCPC a bs c = do
   case PolyG.multiplyBy (-a) bs of
-    Left _constant -> modify' $ removeRefFOccurrences (PolyG.vars bs)
+    Left _constant -> modify' $ removeOccurrences (PolyG.vars bs)
     Right xs -> addAddF $ PolyG.addConstant c xs
 
 -- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Polynomial)
@@ -216,11 +216,11 @@ reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG RefF n -> PolyG RefF 
 reduceMulFCPP a polyB polyC = do
   case PolyG.multiplyBy (-a) polyB of
     Left _constant -> do
-      modify' $ removeRefFOccurrences (PolyG.vars polyB)
+      modify' $ removeOccurrences (PolyG.vars polyB)
       addAddF polyC
     Right polyBa -> do
       case PolyG.merge polyC polyBa of
-        Left _constant -> modify' $ removeRefFOccurrences (PolyG.vars polyC) . removeRefFOccurrences (PolyG.vars polyBa)
+        Left _constant -> modify' $ removeOccurrences (PolyG.vars polyC) . removeOccurrences (PolyG.vars polyBa)
         Right addF -> do
           addAddF addF
 
@@ -283,7 +283,7 @@ bindToValue :: GaloisField n => RefF -> n -> RoundM n ()
 bindToValue var value = do
   markChanged RelationChanged
   modify' $ \cs ->
-    removeRefFOccurrences [var] $
+    removeOccurrences [var] $
       cs
         { csVarEqF = UnionFind.bindToValue var value (csVarEqF cs)
         }
@@ -296,7 +296,7 @@ relate var1 (slope, var2, intercept) = do
     Nothing -> return False
     Just unionFind' -> do
       markChanged RelationChanged
-      modify' $ \cs' -> removeRefFOccurrences [var1, var2] $ cs' {csVarEqF = unionFind'}
+      modify' $ \cs' -> removeOccurrences [var1, var2] $ cs' {csVarEqF = unionFind'}
       return True
 
 addAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n ()
@@ -358,3 +358,63 @@ substPolyG_ ctx (changed, accPoly, removedRefs, addedRefs) ref coeff = case Unio
               -- ref = slope * root + intercept
               Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), removedRefs', addedRefs')
               Right accPoly' -> (True, PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', removedRefs', addedRefs')
+
+--------------------------------------------------------------------------------
+
+-- optimizeMulB:: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
+-- optimizeMulB cs =
+--   let (changed, cs') = runOptiM cs goThroughMulB
+--    in case changed of
+--         NothingChanged -> (changed, cs')
+--         RelationChanged -> optimizeMulB cs'
+--         AdditiveConstraintChanged -> optimizeMulB cs'
+--         MultiplicativeConstraintChanged -> optimizeMulB cs'
+
+-- goThroughMulB :: (GaloisField n, Integral n) => OptiM n WhatChanged
+-- goThroughMulB = do
+--   cs <- get
+--   runRoundM $ do
+--     csMulB' <- foldMaybeM reduceMulB [] (csMulB cs)
+--     modify' $ \cs'' -> cs'' {csMulB = csMulB'}
+
+-- type MulB n = (PolyG RefB n, PolyG RefB n, Either n (PolyG RefB n))
+
+-- reduceMulB :: (GaloisField n, Integral n) => MulB n -> RoundM n (Maybe (MulB n))
+-- reduceMulB (polyA, polyB, polyC) = do
+--   polyAResult <- substitutePolyB MultiplicativeConstraintChanged polyA
+--   polyBResult <- substitutePolyB MultiplicativeConstraintChanged polyB
+--   polyCResult <- case polyC of
+--     Left constantC -> return (Left constantC)
+--     Right polyC' -> substitutePolyB MultiplicativeConstraintChanged polyC'
+
+--   reduceMulF_ polyAResult polyBResult polyCResult
+
+-- substitutePolyB :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefB n -> RoundM n (Either n (PolyG RefB n))
+-- substitutePolyB typeOfChange polynomial = do
+--   unionFind <- gets csVarEqF
+--   case substPolyG unionFind polynomial of
+--     Nothing -> return (Right polynomial) -- nothing changed
+--     Just (Left constant, removedRefs, _) -> do
+--       -- the polynomial has been reduced to nothing
+--       markChanged typeOfChange
+--       -- remove all variables in the polynomial from the occurrence list
+--       modify' $ removeOccurrences removedRefs
+--       return (Left constant)
+--     Just (Right reducePolynomial, removedRefs, addedRefs) -> do
+--       -- the polynomial has been reduced to something
+--       markChanged typeOfChange
+--       -- remove all variables in the polynomial from the occurrence list
+--       modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
+--       return (Right reducePolynomial)
+
+-- -- | Trying to reduce a multiplicative constaint, returns the reduced constraint if it is reduced
+-- reduceMulB_ :: (GaloisField n, Integral n) => Either n (PolyG RefB n) -> Either n (PolyG RefB n) -> Either n (PolyG RefB n) -> RoundM n (Maybe (RefB n))
+-- reduceMulB_ polyA polyB polyC = case (polyA, polyB, polyC) of
+--   (Left _a, Left _b, Left _c) -> return Nothing
+--   (Left a, Left b, Right c) -> reduceMulFCCP a b c >> return Nothing
+--   (Left a, Right b, Left c) -> reduceMulFCPC a b c >> return Nothing
+--   (Left a, Right b, Right c) -> reduceMulFCPP a b c >> return Nothing
+--   (Right a, Left b, Left c) -> reduceMulFCPC b a c >> return Nothing
+--   (Right a, Left b, Right c) -> reduceMulFCPP b a c >> return Nothing
+--   (Right a, Right b, Left c) -> return (Just (a, b, Left c))
+--   (Right a, Right b, Right c) -> return (Just (a, b, Right c))

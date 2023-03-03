@@ -188,9 +188,8 @@ add :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 add = mapM_ addOne
   where
     addOne :: GaloisField n => Constraint n -> M n ()
-    addOne (CAddF xs) = modify (\cs -> addRefFOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
-    -- addOne (CAddB xs) = modify (\cs -> addRefBOccurrences (PolyG.vars xs) $ cs {csAddB = xs : csAddB cs})
-    addOne (CAddU xs) = modify (\cs -> addRefUOccurrences (PolyG.vars xs) $ cs {csAddU = xs : csAddU cs})
+    addOne (CAddF xs) = modify (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
+    addOne (CAddU xs) = modify (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddU = xs : csAddU cs})
     addOne (CVarBindF x c) = do
       cs <- get
       let csVarEqF' = UnionFind.bindToValue x c (csVarEqF cs)
@@ -223,15 +222,15 @@ add = mapM_ addOne
       case UnionFind.relate x (1, y, 0) (csVarEqU cs) of
         Nothing -> return ()
         Just csVarEqU' -> put cs {csVarEqU = csVarEqU'}
-    addOne (CMulF x y (Left c)) = modify (\cs -> addRefFOccurrences (PolyG.vars x) $ addRefFOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
+    addOne (CMulF x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = do
-      modify (\cs -> addRefFOccurrences (PolyG.vars x) $ addRefFOccurrences (PolyG.vars y) $ addRefFOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
-    addOne (CMulB x y (Left c)) = modify (\cs -> addRefBOccurrences (PolyG.vars x) $ addRefBOccurrences (PolyG.vars y) $ cs {csMulB = (x, y, Left c) : csMulB cs})
-    addOne (CMulB x y (Right z)) = modify (\cs -> addRefBOccurrences (PolyG.vars x) $ addRefBOccurrences (PolyG.vars y) $ addRefBOccurrences (PolyG.vars z) $ cs {csMulB = (x, y, Right z) : csMulB cs})
-    addOne (CMulU x y (Left c)) = modify (\cs -> addRefUOccurrences (PolyG.vars x) $ addRefUOccurrences (PolyG.vars y) $ cs {csMulU = (x, y, Left c) : csMulU cs})
-    addOne (CMulU x y (Right z)) = modify (\cs -> addRefUOccurrences (PolyG.vars x) $ addRefUOccurrences (PolyG.vars y) $ addRefUOccurrences (PolyG.vars z) $ cs {csMulU = (x, y, Right z) : csMulU cs})
-    addOne (CNEqF x y m) = modify (\cs -> addRefFOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
-    addOne (CNEqU x y m) = modify (\cs -> addRefUOccurrences [x, y, m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
+      modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
+    addOne (CMulB x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulB = (x, y, Left c) : csMulB cs})
+    addOne (CMulB x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulB = (x, y, Right z) : csMulB cs})
+    addOne (CMulU x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulU = (x, y, Left c) : csMulU cs})
+    addOne (CMulU x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulU = (x, y, Right z) : csMulU cs})
+    addOne (CNEqF x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
+    addOne (CNEqU x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
 
 freshRefF :: M n RefF
 freshRefF = do

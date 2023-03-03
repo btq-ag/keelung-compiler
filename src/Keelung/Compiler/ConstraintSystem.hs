@@ -5,12 +5,7 @@ module Keelung.Compiler.ConstraintSystem
   ( ConstraintSystem (..),
     relocateConstraintSystem,
     sizeOfConstraintSystem,
-    addRefFOccurrences,
-    addRefBOccurrences,
-    addRefUOccurrences,
-    removeRefFOccurrences,
-    removeRefBOccurrences,
-    removeRefUOccurrences,
+    UpdateOccurrences (..),
   )
 where
 
@@ -322,10 +317,10 @@ relocateConstraintSystem cs =
             Just $ fromConstraint counters $ CVarBindB var (if intercept then 1 else 0)
           BooleanRelations.ChildOf True root -> Just $ fromConstraint counters $ CVarEqB var root
           BooleanRelations.ChildOf False root -> Just $ fromConstraint counters $ CVarNEqB var root
-            -- -- var = slope * root + intercept
-            -- case PolyG.build 0 [(var, -1), (root, if slope then 1 else -1)] of
-            --   Left _ -> Nothing
-            --   Right poly -> Just $ fromConstraint counters $ CAddB poly
+    -- -- var = slope * root + intercept
+    -- case PolyG.build 0 [(var, -1), (root, if slope then 1 else -1)] of
+    --   Left _ -> Nothing
+    --   Right poly -> Just $ fromConstraint counters $ CAddB poly
 
     fromUnionFindU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, (Maybe (n, RefU), n)) -> Maybe (Relocated.Constraint n)
     fromUnionFindU occurrences (var1, (Nothing, c)) =
@@ -376,104 +371,102 @@ sizeOfConstraintSystem cs =
     + length (csNEqF cs)
     + length (csNEqU cs)
 
-addRefFOccurrences :: [RefF] -> ConstraintSystem n -> ConstraintSystem n
-addRefFOccurrences =
-  flip
-    ( foldl
-        ( \cs ref ->
-            case ref of
-              RefBtoRefF refB ->
-                cs
-                  { csOccurrenceB = Map.insertWith (+) refB 1 (csOccurrenceB cs)
-                  }
-              _ ->
-                cs
-                  { csOccurrenceF = Map.insertWith (+) ref 1 (csOccurrenceF cs)
-                  }
-        )
-    )
+class UpdateOccurrences ref where
+  addOccurrences :: [ref] -> ConstraintSystem n -> ConstraintSystem n
+  removeOccurrences :: [ref] -> ConstraintSystem n -> ConstraintSystem n
 
-addRefBOccurrences :: [RefB] -> ConstraintSystem n -> ConstraintSystem n
-addRefBOccurrences =
-  flip
-    ( foldl
-        ( \cs ref ->
-            case ref of
-              RefUBit _ refU _ ->
-                cs
-                  { csOccurrenceU = Map.insertWith (+) refU 1 (csOccurrenceU cs)
-                  }
-              _ ->
-                cs
-                  { csOccurrenceB = Map.insertWith (+) ref 1 (csOccurrenceB cs)
-                  }
-        )
-    )
+instance UpdateOccurrences RefF where
+  addOccurrences =
+    flip
+      ( foldl
+          ( \cs ref ->
+              case ref of
+                RefBtoRefF refB ->
+                  cs
+                    { csOccurrenceB = Map.insertWith (+) refB 1 (csOccurrenceB cs)
+                    }
+                _ ->
+                  cs
+                    { csOccurrenceF = Map.insertWith (+) ref 1 (csOccurrenceF cs)
+                    }
+          )
+      )
+  removeOccurrences =
+    flip
+      ( foldl
+          ( \cs ref ->
+              case ref of
+                RefBtoRefF refB ->
+                  cs
+                    { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) refB (csOccurrenceB cs)
+                    }
+                _ ->
+                  cs
+                    { csOccurrenceF = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceF cs)
+                    }
+          )
+      )
 
-addRefUOccurrences :: [RefU] -> ConstraintSystem n -> ConstraintSystem n
-addRefUOccurrences =
-  flip
-    ( foldl
-        ( \cs ref ->
-            case ref of
-              RefBtoRefU refB ->
-                cs
-                  { csOccurrenceB = Map.insertWith (+) refB 1 (csOccurrenceB cs)
-                  }
-              _ ->
-                cs
-                  { csOccurrenceU = Map.insertWith (+) ref 1 (csOccurrenceU cs)
-                  }
-        )
-    )
+instance UpdateOccurrences RefB where
+  addOccurrences =
+    flip
+      ( foldl
+          ( \cs ref ->
+              case ref of
+                RefUBit _ refU _ ->
+                  cs
+                    { csOccurrenceU = Map.insertWith (+) refU 1 (csOccurrenceU cs)
+                    }
+                _ ->
+                  cs
+                    { csOccurrenceB = Map.insertWith (+) ref 1 (csOccurrenceB cs)
+                    }
+          )
+      )
+  removeOccurrences =
+    flip
+      ( foldl
+          ( \cs ref ->
+              case ref of
+                RefUBit _ refU _ ->
+                  cs
+                    { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) refU (csOccurrenceU cs)
+                    }
+                _ ->
+                  cs
+                    { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceB cs)
+                    }
+          )
+      )
 
-removeRefFOccurrences :: [RefF] -> ConstraintSystem n -> ConstraintSystem n
-removeRefFOccurrences =
-  flip
-    ( foldl
-        ( \cs ref ->
-            case ref of
-              RefBtoRefF refB ->
-                cs
-                  { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) refB (csOccurrenceB cs)
-                  }
-              _ ->
-                cs
-                  { csOccurrenceF = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceF cs)
-                  }
-        )
-    )
-
-removeRefBOccurrences :: [RefB] -> ConstraintSystem n -> ConstraintSystem n
-removeRefBOccurrences =
-  flip
-    ( foldl
-        ( \cs ref ->
-            case ref of
-              RefUBit _ refU _ ->
-                cs
-                  { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) refU (csOccurrenceU cs)
-                  }
-              _ ->
-                cs
-                  { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceB cs)
-                  }
-        )
-    )
-
-removeRefUOccurrences :: [RefU] -> ConstraintSystem n -> ConstraintSystem n
-removeRefUOccurrences =
-  flip
-    ( foldl
-        ( \cs ref ->
-            case ref of
-              RefBtoRefU refB ->
-                cs
-                  { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) refB (csOccurrenceB cs)
-                  }
-              _ ->
-                cs
-                  { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceU cs)
-                  }
-        )
-    )
+instance UpdateOccurrences RefU where
+  addOccurrences =
+    flip
+      ( foldl
+          ( \cs ref ->
+              case ref of
+                RefBtoRefU refB ->
+                  cs
+                    { csOccurrenceB = Map.insertWith (+) refB 1 (csOccurrenceB cs)
+                    }
+                _ ->
+                  cs
+                    { csOccurrenceU = Map.insertWith (+) ref 1 (csOccurrenceU cs)
+                    }
+          )
+      )
+  removeOccurrences =
+    flip
+      ( foldl
+          ( \cs ref ->
+              case ref of
+                RefBtoRefU refB ->
+                  cs
+                    { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) refB (csOccurrenceB cs)
+                    }
+                _ ->
+                  cs
+                    { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceU cs)
+                    }
+          )
+      )
