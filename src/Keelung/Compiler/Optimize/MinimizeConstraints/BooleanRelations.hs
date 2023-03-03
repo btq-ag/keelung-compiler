@@ -52,78 +52,47 @@ new :: BooleanRelations
 new = BooleanRelations mempty mempty mempty
 
 data Relation = Root | Constant Bool | ChildOf Bool RefB
+  deriving (Eq, Show)
 
--- | Returns 'Nothing' if the variable is already a root.
---   else returns 'Just (slope, root)'  where 'var = slope * root + intercept'
+-- | Returns the result of looking up a variable in the BooleanRelations
 lookup :: BooleanRelations -> RefB -> Relation
 lookup xs var = case Map.lookup var (links xs) of
-  Nothing -> Root -- var is a root
-  Just (Right value) -> Constant value -- var is a root
-  Just (Left (slope, parent)) -> case lookup xs parent of
-    Root -> ChildOf slope parent
-    Constant intercept' ->
-      -- parent is a value
-      -- var = slope * parent + intercept
-      -- parent = intercept'
-      --  =>
-      -- var = slope * intercept' + intercept
-      Constant (slope && intercept')
-    ChildOf slope' grandparent ->
-      -- var = slope * parent + intercept
-      -- parent = slope' * grandparent + intercept'
-      --  =>
-      -- var = slope * (slope' * grandparent + intercept') + intercept
-      --  =>
-      -- var = slope * slope' * grandparent + slope * intercept' + intercept
-      ChildOf (slope && slope') grandparent
+  Nothing -> Root -- 'var' is a root
+  Just (Right value) -> Constant value -- 'var' is a constant
+  Just (Left (relation1, parent)) -> case lookup xs parent of
+    Root -> ChildOf relation1 parent -- 'parent' is a root
+    Constant value ->
+      -- 'parent' is a constant
+      Constant (relation1 == value)
+    ChildOf relation2 grandparent ->
+      -- 'parent' is a child of 'grandparent'
+      ChildOf (relation1 == relation2) grandparent
 
 -- | Calculates the relation between two variables `var1` and `var2`
---   Returns `Nothing` if the two variables are not related.
---   Returns `Just (slope, intercept)` where `var1 = slope * var2 + intercept` if the two variables are related.
+--   Returns `Just relation` where `var1 = relation == var2` if the two variables are related.
 relationBetween :: RefB -> RefB -> BooleanRelations -> Maybe Bool
 relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
   (Root, Root) ->
     if var1 == var2
       then Just True
       else Nothing -- var1 and var2 are roots, but not the same one
-  (Root, ChildOf slope2 root2) ->
-    -- var2 = slope2 * root2 + intercept2
-    --  =>
-    -- root2 = (var2 - intercept2) / slope2
+  (Root, ChildOf relation2 root2) ->
     if var1 == root2
-      then -- var1 = root2
-      --  =>
-      -- var1 = (var2 - intercept2) / slope2
-        Just slope2
+      then Just relation2
       else Nothing
-  (Root, Constant _) -> Nothing -- var1 is a root, var2 is a value
-  (ChildOf slope1 root1, Root) ->
-    -- var1 = slope1 * root1 + intercept1
+  (Root, Constant _) -> Nothing -- var1 is a root, var2 is a constant
+  (ChildOf relation1 root1, Root) ->
     if var2 == root1
-      then -- var2 = root1
-      --  =>
-      -- var1 = slope1 * var2 + intercept1
-        Just slope1
+      then Just relation1
       else Nothing
-  (Constant _, Root) -> Nothing -- var1 is a value, var2 is a root
-  (ChildOf slope1 root1, ChildOf slope2 root2) ->
-    -- var1 = slope1 * root1 + intercept1
-    -- var2 = slope2 * root2 + intercept2
+  (Constant _, Root) -> Nothing -- var1 is a constant, var2 is a root
+  (ChildOf relation1 root1, ChildOf relation2 root2) ->
     if root1 == root2
-      then -- var2 = slope2 * root2 + intercept2
-      --  =>
-      -- root2 = (var2 - intercept2) / slope2 = root1
-      --  =>
-      -- var1 = slope1 * root1 + intercept1
-      --  =>
-      -- var1 = slope1 * ((var2 - intercept2) / slope2) + intercept1
-      --  =>
-      -- var1 = slope1 * var2 / slope2 - slope1 * intercept2 / slope2 + intercept1
-        Just (slope1 == slope2)
+      then Just (relation1 == relation2)
       else Nothing
-  (Constant _, ChildOf _ _) -> Nothing -- var1 is a value
-  (ChildOf _ _, Constant _) -> Nothing -- var2 is a value
-  (Constant _, Constant _) -> Nothing -- both are values
+  (Constant _, ChildOf _ _) -> Nothing -- var1 is a constant
+  (ChildOf _ _, Constant _) -> Nothing -- var2 is a constant
+  (Constant value1, Constant value2) -> if value1 == value2 then Just True else Just False
 
 -- | If the RefB is of RefUBit, remember it
 rememberPinnedBitTest :: RefB -> BooleanRelations -> BooleanRelations
@@ -149,77 +118,41 @@ bindToValue x value xs =
         xs
           { links = Map.insert x (Right value) (links xs)
           }
-    ChildOf slopeP parent ->
-      -- x is a child of `parent` with slope `slopeP` and intercept `interceptP`
-      --  x = slopeP * parent + interceptP
-      -- now since that x = value, we have
-      --  value = slopeP * parent + interceptP
-      -- =>
-      --  value - interceptP = slopeP * parent
-      -- =>
-      --  parent = (value - interceptP) / slopeP
+    ChildOf relation parent ->
       rememberPinnedBitTest x $
         xs
           { links =
-              Map.insert parent (Right (value == slopeP)) $
+              Map.insert parent (Right (value == relation)) $
                 Map.insert x (Right value) $
                   links xs,
             sizes = Map.insert x 1 (sizes xs)
           }
 
 relate :: RefB -> (Bool, RefB) -> BooleanRelations -> Maybe BooleanRelations
-relate x (slope, y) xs
-  | x > y = relate' x (slope, y) xs -- x = slope * y + intercept
-  | x < y = relate' y (slope, x) xs -- y = x / slope - intercept / slope
+relate x (relation, y) xs
+  | x > y = relate' x (relation, y) xs
+  | x < y = relate' y (relation, x) xs
   | otherwise = Nothing
 
--- | Establish the relation of 'x = slope * y + intercept'
+-- | Establish the relation of 'x = (relation == y)'
 --   Returns Nothing if the relation has already been established
 relate' :: RefB -> (Bool, RefB) -> BooleanRelations -> Maybe BooleanRelations
-relate' x (slope, y) xs =
+relate' x (relation, y) xs =
   case lookup xs x of
-    Constant interceptX ->
-      -- x is already a root with `interceptX` as its value
-      --  x = slope * y + intercept
-      --  x = interceptX
-      -- =>
-      --  slope * y + intercept = interceptX
-      -- =>
-      --  y = (interceptX - intercept) / slope
-      Just $ bindToValue y interceptX xs
-    ChildOf slopeX rootOfX ->
-      -- x is a child of `rootOfX` with slope `slopeX` and intercept `interceptX`
-      --  x = slopeX * rootOfX + interceptX
-      --  x = slope * y + intercept
-      -- =>
-      --  slopeX * rootOfX + interceptX = slope * y + intercept
-      -- =>
-      --  slopeX * rootOfX = slope * y + intercept - interceptX
-      -- =>
-      --  rootOfX = (slope * y + intercept - interceptX) / slopeX
-      relate rootOfX (slope == slopeX, y) xs
+    Constant constantX ->
+      Just $ bindToValue y (relation == constantX) xs
+    ChildOf relationX rootOfX ->
+      relate rootOfX (relation == relationX, y) xs
     Root ->
       -- x does not have a parent, so it is its own root
       case lookup xs y of
-        Constant interceptY ->
-          -- y is already a root with `interceptY` as its value
-          --  x = slope * y + intercept
-          --  y = interceptY
-          -- =>
-          --  x = slope * interceptY + intercept
-          Just $ bindToValue x (slope && interceptY) xs
-        ChildOf slopeY rootOfY ->
-          -- y is a child of `rootOfY` with slope `slopeY` and intercept `interceptY`
-          --  y = slopeY * rootOfY + interceptY
-          --  x = slope * y + intercept
-          -- =>
-          --  x = slope * (slopeY * rootOfY + interceptY) + intercept
-          -- =>
-          --  x = slope * slopeY * rootOfY + slope * interceptY + intercept
+        Constant constantY ->
+          Just $ bindToValue x (relation == constantY) xs
+        ChildOf relationY rootOfY ->
           Just $
             rememberPinnedBitTest x $
               xs
-                { links = Map.insert x (Left (slope && slopeY, rootOfY)) (links xs),
+                { links = Map.insert x (Left (relation == relationY, rootOfY)) (links xs),
                   sizes = Map.insertWith (+) y 1 (sizes xs)
                 }
         Root ->
@@ -227,7 +160,7 @@ relate' x (slope, y) xs =
           Just $
             rememberPinnedBitTest x $
               xs
-                { links = Map.insert x (Left (slope, y)) (links xs),
+                { links = Map.insert x (Left (relation, y)) (links xs),
                   sizes = Map.insertWith (+) y 1 (sizes xs)
                 }
 
@@ -236,3 +169,11 @@ size = Map.size . links
 
 exportPinnedBitTests :: BooleanRelations -> Set RefB
 exportPinnedBitTests = Set.map (\(w, ref, i) -> RefUBit w ref i) . pinnedBitTests
+
+-- Truth table:
+--  do-not-invert     value     reuslt
+-- ------------------------------------
+--    True            True      True
+--    True            False     False
+--    False           True      False
+--    False           False     True

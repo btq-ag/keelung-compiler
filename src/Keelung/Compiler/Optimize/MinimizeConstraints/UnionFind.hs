@@ -230,42 +230,6 @@ relate' x (slope, y, intercept) xs =
                 sizes = Map.insertWith (+) y 1 (sizes xs)
               }
 
--- let (_, slopeX, rootOfX, interceptX) = lookup x xs -- x = slopeX * rootOfX + interceptX
---     (_, slopeY, rootOfY, interceptY) = lookup y xs -- y = slopeY * rootOfY + interceptY
---     sizeOfRootX = sizeOf xs rootOfX
---     sizeOfRootY = sizeOf xs rootOfY
---  in if slope == slopeX && y == rootOfX && intercept == interceptX
---       then Nothing
---       else
---         if sizeOfRootX > sizeOfRootY
---           then --  x = slope * y + intercept
---           --    =>
---           --  y = (x - intercept) / slope
---           --    =>
---           --  y = (slopeX * rootOfX + interceptX - intercept) / slope
---           --    =>
---           --  y = slopeX * rootOfX / slope + (interceptX - intercept) / slope
-
---             Just $
---               xs
---                 { links = Map.insert y (slopeX / slope, rootOfX, (interceptX - intercept) / slope) (links xs),
---                   sizes = Map.insert x (sizeOfRootX + sizeOfRootY) (sizes xs)
---                 }
---           else --  x = slope * y + intercept
---           --    =>
---           --  x = slope * (slopeY * rootOfY + interceptY) + intercept
---           --    =>
---           --  x = slope * slopeY * rootOfY + slope * interceptY + intercept
-
---             Just $
---               xs
---                 { links = Map.insert x (slope * slopeY, rootOfY, slope * interceptY + intercept) (links xs),
---                   sizes = Map.insert y (sizeOfRootX + sizeOfRootY) (sizes xs)
---                 }
-
--- sizeOf :: Ord ref => UnionFind ref n -> ref -> Int
--- sizeOf xs x = fromMaybe 1 $ Map.lookup x (sizes xs)
-
 toMap :: UnionFind ref n -> Map ref (Maybe (n, ref), n)
 toMap = links
 

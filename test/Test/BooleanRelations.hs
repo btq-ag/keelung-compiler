@@ -16,38 +16,78 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "BooleanRelations" $ do
-    -- it "Relate (x = 1)" $
-    --   runM $ do
-    --     RefB 0 `bindToValue` 1
+    it "x = True" $
+      runM $ do
+        RefB 0 `bindToValue` True
 
-    --     assertRelation (RefB 0) True (RefB 1) 0
-    --     assertRelation (RefB 1) True (RefB 0) 0
+        assertBinding (RefB 0) (Just True)
 
-    it "Relate (x = y)" $
+    it "x = False" $
+      runM $ do
+        RefB 0 `bindToValue` False
+
+        assertBinding (RefB 0) (Just False)
+
+    it "x = y" $
       runM $ do
         RefB 0 `relate` (True, RefB 1)
 
-        assertRelation (RefB 0) True (RefB 1)
-        assertRelation (RefB 1) True (RefB 0)
+        assertRelation (RefB 0) (RefB 1) (Just True)
+        assertRelation (RefB 1) (RefB 0) (Just True)
 
-    it "Relate (x = y = z)" $
+    it "x = y = True" $
+      runM $ do
+        RefB 0 `relate` (True, RefB 1)
+        RefB 1 `bindToValue` True
+
+        assertRelation (RefB 0) (RefB 1) (Just True)
+        assertRelation (RefB 1) (RefB 0) (Just True)
+        assertBinding (RefB 0) (Just True)
+        assertBinding (RefB 1) (Just True)
+
+    it "x = y = z" $
       runM $ do
         RefB 0 `relate` (True, RefB 1)
         RefB 1 `relate` (True, RefB 2)
 
-        assertRelation (RefB 0) True (RefB 1)
-        assertRelation (RefB 0) True (RefB 2)
-        assertRelation (RefB 1) True (RefB 0)
-        assertRelation (RefB 1) True (RefB 2)
-        assertRelation (RefB 2) True (RefB 0)
-        assertRelation (RefB 2) True (RefB 1)
+        assertRelation (RefB 0) (RefB 1) (Just True)
+        assertRelation (RefB 0) (RefB 2) (Just True)
+        assertRelation (RefB 1) (RefB 0) (Just True)
+        assertRelation (RefB 1) (RefB 2) (Just True)
+        assertRelation (RefB 2) (RefB 0) (Just True)
+        assertRelation (RefB 2) (RefB 1) (Just True)
 
-    it "Relate (x = ¬y)" $
+    it "x = ¬y" $
       runM $ do
         RefB 0 `relate` (False, RefB 1)
 
-        assertRelation (RefB 0) False (RefB 1)
-        assertRelation (RefB 1) False (RefB 0)
+        assertRelation (RefB 0) (RefB 1) (Just False)
+        assertRelation (RefB 1) (RefB 0) (Just False)
+
+    it "x = ¬y = True" $
+      runM $ do
+        RefB 0 `relate` (False, RefB 1)
+        RefB 0 `bindToValue` True
+
+        assertRelation (RefB 0) (RefB 1) (Just False)
+        assertRelation (RefB 1) (RefB 0) (Just False)
+        assertBinding (RefB 0) (Just True)
+        assertBinding (RefB 1) (Just False)
+
+    it "x = ¬y, z = True" $
+      runM $ do
+        RefB 0 `relate` (False, RefB 1)
+        RefB 2 `bindToValue` True
+
+        assertRelation (RefB 0) (RefB 1) (Just False)
+        assertRelation (RefB 0) (RefB 2) Nothing
+        assertRelation (RefB 1) (RefB 0) (Just False)
+        assertRelation (RefB 1) (RefB 2) Nothing
+        assertRelation (RefB 2) (RefB 0) Nothing
+        assertRelation (RefB 2) (RefB 1) Nothing
+        assertBinding (RefB 0) Nothing
+        assertBinding (RefB 1) Nothing
+        assertBinding (RefB 2) (Just True)
 
 type M = StateT BooleanRelations IO
 
@@ -59,20 +99,22 @@ relate var val = do
   xs <- get
   forM_ (BooleanRelations.relate var val xs) put
 
--- bindToValue :: RefB -> GF181 -> M ()
--- bindToValue var val = do
---   modify' $ BooleanRelations.bindToValue var val
+bindToValue :: RefB -> Bool -> M ()
+bindToValue var val = do
+  modify' $ BooleanRelations.bindToValue var val
 
 -- | Assert that `var1 = slope * var2 + intercept`
-assertRelation :: RefB -> Bool -> RefB -> M ()
-assertRelation var1 slope var2 = do
+assertRelation :: RefB -> RefB -> Maybe Bool -> M ()
+assertRelation var1 var2 result = do
   xs <- get
-  BooleanRelations.relationBetween var1 var2 xs `shouldBe` Just slope
+  BooleanRelations.relationBetween var1 var2 xs `shouldBe` result
 
--- assertBinding :: RefB -> GF181 -> M ()
--- assertBinding var val = do
---   xs <- get
---   BooleanRelations.lookup var1 var2 xs `shouldBe` Just (0, val)
+assertBinding :: RefB -> Maybe Bool -> M ()
+assertBinding var val = do
+  xs <- get
+  case BooleanRelations.lookup xs var of
+    BooleanRelations.Constant value -> val `shouldBe` Just value
+    _ -> val `shouldBe` Nothing
 
 ------------------------------------------------------------------------
 
