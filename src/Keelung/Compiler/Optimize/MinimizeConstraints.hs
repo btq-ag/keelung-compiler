@@ -335,7 +335,7 @@ substPolyG ctx boolRels poly = do
 
 substPolyG_ :: (Integral n, GaloisField n) => UnionFind RefF n -> BooleanRelations -> (Bool, Either n (PolyG RefF n), [RefF], [RefF]) -> RefF -> n -> (Bool, Either n (PolyG RefF n), [RefF], [RefF])
 substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case UnionFind.parentOf ctx ref of
-  Nothing -> case ref of
+  UnionFind.Root -> case ref of
     RefBtoRefF refB ->
       case BooleanRelations.lookup boolRels refB of
         BooleanRelations.Root ->
@@ -371,13 +371,13 @@ substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = 
       case accPoly of
         Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
         Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
-  Just (Nothing, intercept) ->
+  UnionFind.Constant intercept ->
     -- ref = intercept
     let removedRefs' = ref : removedRefs -- add ref to removedRefs
      in case accPoly of
           Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
           Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', removedRefs', addedRefs)
-  Just (Just (slope, root), intercept) ->
+  UnionFind.ChildOf slope root intercept ->
     if root == ref
       then
         if slope == 1 && intercept == 0

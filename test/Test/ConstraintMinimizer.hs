@@ -105,7 +105,7 @@ tests = do
         let x = 4
         y <- reuse x
         return (x + y :: Field)
-      snd (UnionFind.lookup (RefFO 0) (csVarEqF cs)) `shouldBe` (Nothing, 8)
+      UnionFind.parentOf (csVarEqF cs) (RefFO 0) `shouldBe` UnionFind.Constant 8
 
     it "Field 5" $ do
       _cs <- runTest 2 1 $ do

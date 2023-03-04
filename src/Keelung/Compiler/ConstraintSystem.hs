@@ -250,13 +250,13 @@ relocateConstraintSystem cs =
         -- <> Seq.fromList (Maybe.mapMaybe toConstraintRefB pairs)
 
         toConstraint var = case UnionFind.parentOf unionFind var of
-          Nothing ->
+          UnionFind.Root ->
             -- var is already a root
             Nothing
-          Just (Nothing, intercept) ->
+          UnionFind.Constant intercept ->
             -- var = intercept
             Just $ fromConstraint counters $ CVarBindF var intercept
-          Just (Just (slope, root), intercept) ->
+          UnionFind.ChildOf slope root intercept ->
             -- var = slope * root + intercept
             case root of
               RefBtoRefF refB -> case BooleanRelations.lookup boolRels refB of
