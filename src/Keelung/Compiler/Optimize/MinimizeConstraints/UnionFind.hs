@@ -14,6 +14,8 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
     bindToValue,
     toMap,
     size,
+    bindBoolean,
+    relateBoolean,
   )
 where
 
@@ -23,17 +25,23 @@ import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
+import Keelung.Compiler.Constraint
+import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
+import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
 import Prelude hiding (lookup)
 
 data UnionFind ref n = UnionFind
   { links :: Map ref (Maybe (n, ref), n),
-    sizes :: Map ref Int
+    sizes :: Map ref Int,
+    booleanRelations :: BooleanRelations
   }
   deriving (Eq, Generic, NFData)
 
 instance (Show ref, Show n, Eq n, Num n) => Show (UnionFind ref n) where
   show xs =
-    "UnionFind {\n"
+    show (booleanRelations xs)
+      <> "\n"
+      <> "UnionFind {\n"
       ++ "  links = "
       ++ showList' (map showLink (Map.toList $ links xs))
       ++ "\n"
@@ -47,7 +55,7 @@ instance (Show ref, Show n, Eq n, Num n) => Show (UnionFind ref n) where
       showLink (var, (Nothing, intercept)) = show var <> " = " <> show intercept
 
 new :: Ord ref => UnionFind ref n
-new = UnionFind mempty mempty
+new = UnionFind mempty mempty BooleanRelations.new
 
 -- | Find the root of a variable, returns:
 --      1. if the variable is already a root
@@ -132,6 +140,14 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   ((False, (Just _, _)), (False, (Nothing, _))) -> Nothing -- var2 is a value
   ((False, (Nothing, _)), (False, (Just _, _))) -> Nothing -- var1 is a value
   ((False, (Nothing, _)), (False, (Nothing, _))) -> Nothing -- both are values
+
+bindBoolean :: RefB -> Bool -> UnionFind ref n -> UnionFind ref n
+bindBoolean ref val xs = xs {booleanRelations = BooleanRelations.bindToValue ref val (booleanRelations xs)}
+
+relateBoolean :: RefB -> (Bool, RefB) -> UnionFind ref n -> UnionFind ref n
+relateBoolean refA (same, refB) xs = case BooleanRelations.relate refA (same, refB) (booleanRelations xs) of
+  Nothing -> xs
+  Just boolRels -> xs {booleanRelations = boolRels}
 
 -- | Bind a variable to a value
 bindToValue :: (Ord ref, GaloisField n) => ref -> n -> UnionFind ref n -> UnionFind ref n

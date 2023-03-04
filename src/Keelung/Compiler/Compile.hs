@@ -197,7 +197,8 @@ add = mapM_ addOne
     addOne (CVarBindB x c) = do
       cs <- get
       let csVarEqB' = BooleanRelations.bindToValue x (c == 1) (csVarEqB cs)
-      put cs {csVarEqB = csVarEqB'}
+      let csVarEqF' = UnionFind.bindBoolean x (c == 1) (csVarEqF cs)
+      put cs {csVarEqB = csVarEqB', csVarEqF = csVarEqF'}
     addOne (CVarBindU x c) = do
       cs <- get
       let csVarEqU' = UnionFind.bindToValue x c (csVarEqU cs)
@@ -212,11 +213,15 @@ add = mapM_ addOne
       case BooleanRelations.relate x (True, y) (csVarEqB cs) of
         Nothing -> return ()
         Just boolRels -> put cs {csVarEqB = boolRels}
+      let csVarEqF' = UnionFind.relateBoolean x (True, y) (csVarEqF cs)
+      put cs {csVarEqF = csVarEqF'}
     addOne (CVarNEqB x y) = do
       cs <- get
       case BooleanRelations.relate x (False, y) (csVarEqB cs) of
         Nothing -> return ()
         Just boolRels -> put cs {csVarEqB = boolRels}
+      let csVarEqF' = UnionFind.relateBoolean x (False, y) (csVarEqF cs)
+      put cs {csVarEqF = csVarEqF'}
     addOne (CVarEqU x y) = do
       cs <- get
       case UnionFind.relate x (1, y, 0) (csVarEqU cs) of
