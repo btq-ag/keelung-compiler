@@ -110,7 +110,7 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
     VarBI var -> pure <$> lookupBI var
     VarBP var -> pure <$> lookupBP var
     And x y -> zipWith (*) <$> interpret x <*> interpret y
-    Or x y -> zipWith (+) <$> interpret x <*> interpret y
+    Or x y -> zipWith (\x' y' -> x' + y' - x' * y') <$> interpret x <*> interpret y
     Xor x y -> zipWith (\x' y' -> x' + y' - 2 * (x' * y')) <$> interpret x <*> interpret y
     Not x -> map (1 -) <$> interpret x
     IfB p x y -> do
