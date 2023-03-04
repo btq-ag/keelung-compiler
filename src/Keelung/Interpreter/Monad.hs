@@ -202,7 +202,9 @@ bitWiseXor :: (GaloisField n, Integral n) => n -> n -> n
 bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)
 
 bitWiseNot :: (GaloisField n, Integral n) => n -> n
-bitWiseNot x = fromInteger $ Data.Bits.complement (toInteger x)
+bitWiseNot x = case toInteger x of
+  0 -> 1
+  _ -> 0
 
 -- w is the bit width of the result
 -- n is the amount to shift left by
