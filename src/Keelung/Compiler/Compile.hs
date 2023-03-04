@@ -14,7 +14,6 @@ import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
 import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
@@ -179,7 +178,7 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new BooleanRelations.new UnionFind.new mempty mempty mempty mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new UnionFind.new mempty mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -196,10 +195,8 @@ add = mapM_ addOne
       put cs {csVarEqF = csVarEqF'}
     addOne (CVarBindB x c) = do
       cs <- get
-      let csVarEqB' = BooleanRelations.bindToValue x (c == 1) (csVarEqB cs)
-      -- let csVarEqF' = UnionFind.bindBoolean x (c == 1) (csVarEqF cs)
-      -- put cs {csVarEqB = csVarEqB', csVarEqF = csVarEqF'}
-      put cs {csVarEqB = csVarEqB'}
+      let csVarEqF' = UnionFind.bindBoolean x (c == 1) (csVarEqF cs)
+      put cs {csVarEqF = csVarEqF'}
     addOne (CVarBindU x c) = do
       cs <- get
       let csVarEqU' = UnionFind.bindToValue x c (csVarEqU cs)
@@ -210,19 +207,9 @@ add = mapM_ addOne
         Nothing -> return ()
         Just csVarEqF' -> put cs {csVarEqF = csVarEqF'}
     addOne (CVarEqB x y) = do
-      cs <- get
-      case BooleanRelations.relate x (True, y) (csVarEqB cs) of
-        Nothing -> return ()
-        Just boolRels -> put cs {csVarEqB = boolRels}
-      -- let csVarEqF' = UnionFind.relateBoolean x (True, y) (csVarEqF cs)
-      -- put cs {csVarEqF = csVarEqF'}
+      modify' $ \cs -> cs {csVarEqF = UnionFind.relateBoolean x (True, y) (csVarEqF cs)}
     addOne (CVarNEqB x y) = do
-      cs <- get
-      case BooleanRelations.relate x (False, y) (csVarEqB cs) of
-        Nothing -> return ()
-        Just boolRels -> put cs {csVarEqB = boolRels}
-      -- let csVarEqF' = UnionFind.relateBoolean x (False, y) (csVarEqF cs)
-      -- put cs {csVarEqF = csVarEqF'}
+      modify' $ \cs -> cs {csVarEqF = UnionFind.relateBoolean x (False, y) (csVarEqF cs)}
     addOne (CVarEqU x y) = do
       cs <- get
       case UnionFind.relate x (1, y, 0) (csVarEqU cs) of

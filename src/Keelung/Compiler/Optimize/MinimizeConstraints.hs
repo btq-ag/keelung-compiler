@@ -132,7 +132,7 @@ reduceAddF polynomial = do
     then return Nothing
     else do
       unionFind <- gets csVarEqF
-      boolRels <- gets csVarEqB
+      let boolRels = UnionFind.exportBooleanRelations unionFind
       case substPolyG unionFind boolRels polynomial of
         Nothing -> return (Just polynomial) -- nothing changed
         Just (Left _constant, removedRefs, _) -> do
@@ -166,7 +166,7 @@ reduceMulF (polyA, polyB, polyC) = do
 substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefF n -> RoundM n (Either n (PolyG RefF n))
 substitutePolyF typeOfChange polynomial = do
   unionFind <- gets csVarEqF
-  boolRels <- gets csVarEqB
+  let boolRels = UnionFind.exportBooleanRelations unionFind
   case substPolyG unionFind boolRels polynomial of
     Nothing -> return (Right polynomial) -- nothing changed
     Just (Left constant, removedRefs, _) -> do

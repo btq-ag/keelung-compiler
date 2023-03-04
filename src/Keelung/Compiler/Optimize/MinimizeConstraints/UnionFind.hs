@@ -17,6 +17,7 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
     relateBoolean,
     HasRefB,
     Lookup (..),
+    exportBooleanRelations
   )
 where
 
@@ -149,46 +150,52 @@ relateBoolean refA (same, refB) xs = case BooleanRelations.relate refA (same, re
 -- | Bind a variable to a value
 bindToValue :: (Ord ref, GaloisField n, HasRefB ref) => ref -> n -> UnionFind ref n -> UnionFind ref n
 bindToValue x value xs =
-  -- case extractRefB x of
-  --   Just refB -> bindBoolean refB (value == 1) xs
-  --   Nothing ->
-  case parentOf xs x of
-    Root ->
-      -- x does not have a parent, so it is its own root
-      xs
-        { links = Map.insert x (Nothing, value) (links xs),
-          sizes = Map.insert x 1 (sizes xs)
-        }
-    Constant _oldValue ->
-      -- x is already a root with `_oldValue` as its value
-      -- TODO: handle this kind of conflict in the future
-      -- FOR NOW: overwrite the value of x with the new value
-      xs
-        { links = Map.insert x (Nothing, value) (links xs)
-        }
-    ChildOf slopeP parent interceptP ->
-      -- x is a child of `parent` with slope `slopeP` and intercept `interceptP`
-      --  x = slopeP * parent + interceptP
-      -- now since that x = value, we have
-      --  value = slopeP * parent + interceptP
-      -- =>
-      --  value - interceptP = slopeP * parent
-      -- =>
-      --  parent = (value - interceptP) / slopeP
-      xs
-        { links =
-            Map.insert parent (Nothing, (value - interceptP) / slopeP) $
-              Map.insert x (Nothing, value) $
-                links xs,
-          sizes = Map.insert x 1 (sizes xs)
-        }
+  case extractRefB x of
+    Just refB -> bindBoolean refB (value == 1) xs
+    Nothing ->
+      case parentOf xs x of
+        Root ->
+          -- x does not have a parent, so it is its own root
+          xs
+            { links = Map.insert x (Nothing, value) (links xs),
+              sizes = Map.insert x 1 (sizes xs)
+            }
+        Constant _oldValue ->
+          -- x is already a root with `_oldValue` as its value
+          -- TODO: handle this kind of conflict in the future
+          -- FOR NOW: overwrite the value of x with the new value
+          xs
+            { links = Map.insert x (Nothing, value) (links xs)
+            }
+        ChildOf slopeP parent interceptP ->
+          -- x is a child of `parent` with slope `slopeP` and intercept `interceptP`
+          --  x = slopeP * parent + interceptP
+          -- now since that x = value, we have
+          --  value = slopeP * parent + interceptP
+          -- =>
+          --  value - interceptP = slopeP * parent
+          -- =>
+          --  parent = (value - interceptP) / slopeP
+          xs
+            { links =
+                Map.insert parent (Nothing, (value - interceptP) / slopeP) $
+                  Map.insert x (Nothing, value) $
+                    links xs,
+              sizes = Map.insert x 1 (sizes xs)
+            }
 
 relate :: (Ord ref, GaloisField n, HasRefB ref) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
-relate x (0, _, intercept) xs = Just $ bindToValue x intercept xs
-relate x (slope, y, intercept) xs
-  | x > y = relate' x (slope, y, intercept) xs -- x = slope * y + intercept
-  | x < y = relate' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
-  | otherwise = Nothing
+relate x (0, _, intercept) xs =
+  case extractRefB x of
+    Just refB -> Just $ bindBoolean refB (intercept == 1) xs
+    Nothing -> Just $ bindToValue x intercept xs
+relate x (slope, y, intercept) xs =
+  case (extractRefB x, extractRefB y) of
+    (Just refA, Just refB) -> Just $ relateBoolean refA (slope == 1, refB) xs
+    _ -> case compare x y of
+      GT -> relate' x (slope, y, intercept) xs -- x = slope * y + intercept
+      LT -> relate' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+      EQ -> Nothing
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
@@ -251,6 +258,11 @@ toMap = links
 
 size :: UnionFind ref n -> Int
 size = Map.size . links
+
+
+
+exportBooleanRelations :: UnionFind ref n -> BooleanRelations
+exportBooleanRelations = booleanRelations
 
 --------------------------------------------------------------------------------
 
