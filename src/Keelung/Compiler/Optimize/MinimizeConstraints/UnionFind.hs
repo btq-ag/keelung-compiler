@@ -16,6 +16,7 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
     size,
     bindBoolean,
     relateBoolean,
+    HasRefB,
   )
 where
 
@@ -150,40 +151,43 @@ relateBoolean refA (same, refB) xs = case BooleanRelations.relate refA (same, re
   Just boolRels -> xs {booleanRelations = boolRels}
 
 -- | Bind a variable to a value
-bindToValue :: (Ord ref, GaloisField n) => ref -> n -> UnionFind ref n -> UnionFind ref n
+bindToValue :: (Ord ref, GaloisField n, HasRefB ref) => ref -> n -> UnionFind ref n -> UnionFind ref n
 bindToValue x value xs =
-  case parentOf xs x of
+  case extractRefB x of
+    Just refB -> bindBoolean refB (value == 1) xs
     Nothing ->
-      -- x does not have a parent, so it is its own root
-      xs
-        { links = Map.insert x (Nothing, value) (links xs),
-          sizes = Map.insert x 1 (sizes xs)
-        }
-    Just (Nothing, _oldValue) ->
-      -- x is already a root with `_oldValue` as its value
-      -- TODO: handle this kind of conflict in the future
-      -- FOR NOW: overwrite the value of x with the new value
-      xs
-        { links = Map.insert x (Nothing, value) (links xs)
-        }
-    Just (Just (slopeP, parent), interceptP) ->
-      -- x is a child of `parent` with slope `slopeP` and intercept `interceptP`
-      --  x = slopeP * parent + interceptP
-      -- now since that x = value, we have
-      --  value = slopeP * parent + interceptP
-      -- =>
-      --  value - interceptP = slopeP * parent
-      -- =>
-      --  parent = (value - interceptP) / slopeP
-      xs
-        { links =
-            Map.insert parent (Nothing, (value - interceptP) / slopeP) $
-              Map.insert x (Nothing, value) $
-                links xs,
-          sizes = Map.insert x 1 (sizes xs)
-        }
+      case parentOf xs x of
+        Nothing ->
+          -- x does not have a parent, so it is its own root
+          xs
+            { links = Map.insert x (Nothing, value) (links xs),
+              sizes = Map.insert x 1 (sizes xs)
+            }
+        Just (Nothing, _oldValue) ->
+          -- x is already a root with `_oldValue` as its value
+          -- TODO: handle this kind of conflict in the future
+          -- FOR NOW: overwrite the value of x with the new value
+          xs
+            { links = Map.insert x (Nothing, value) (links xs)
+            }
+        Just (Just (slopeP, parent), interceptP) ->
+          -- x is a child of `parent` with slope `slopeP` and intercept `interceptP`
+          --  x = slopeP * parent + interceptP
+          -- now since that x = value, we have
+          --  value = slopeP * parent + interceptP
+          -- =>
+          --  value - interceptP = slopeP * parent
+          -- =>
+          --  parent = (value - interceptP) / slopeP
+          xs
+            { links =
+                Map.insert parent (Nothing, (value - interceptP) / slopeP) $
+                  Map.insert x (Nothing, value) $
+                    links xs,
+              sizes = Map.insert x 1 (sizes xs)
+            }
 
-relate :: (Ord ref, GaloisField n) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
+relate :: (Ord ref, GaloisField n, HasRefB ref) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
 relate x (0, _, intercept) xs = Just $ bindToValue x intercept xs
 relate x (slope, y, intercept) xs
   | x > y = relate' x (slope, y, intercept) xs -- x = slope * y + intercept
@@ -192,7 +196,7 @@ relate x (slope, y, intercept) xs
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
-relate' :: (Ord ref, GaloisField n) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
+relate' :: (Ord ref, GaloisField n, HasRefB ref) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
 relate' x (slope, y, intercept) xs =
   case parentOf xs x of
     Just (Nothing, interceptX) ->
@@ -251,3 +255,16 @@ toMap = links
 
 size :: UnionFind ref n -> Int
 size = Map.size . links
+
+--------------------------------------------------------------------------------
+
+class HasRefB ref where
+  extractRefB :: ref -> Maybe RefB
+
+instance HasRefB RefF where
+  extractRefB (RefBtoRefF ref) = Just ref
+  extractRefB _ = Nothing
+
+instance HasRefB RefU where
+  extractRefB (RefBtoRefU ref) = Just ref
+  extractRefB _ = Nothing
