@@ -1,6 +1,7 @@
+{-# HLINT ignore "Use <&>" #-}
+{-# LANGUAGE DataKinds #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use <&>" #-}
 module Test.ConstraintMinimizer (tests, run) where
 
 -- import Data.Foldable (toList)
@@ -119,46 +120,27 @@ tests = do
         x <- inputBool Public
         y <- reuse x
         return (x .|. y)
-
-      -- print _cs
-      -- print $ relocateConstraintSystem _cs
       return ()
 
-      -- BO0 = BI0 && BI0 && BI0
-      -- UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (3, 0)
-      -- F0 (y) = FI0
-      -- UnionFind.relationBetween (RefF 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (1, 0)
-      -- F1 (z) = F0 (y)
-      -- UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+    it "Boolean 2" $ do
+      _cs <- runTest 3 3 $ do
+        x <- inputBool Public
+        reuse x
+      return ()
 
--- it "NEqF" $ do
---   _cs <- runTest 7 4 $ do
+    -- it "UInt 1" $ do
+    --   _cs <- runTest 14 14 $ do
+    --     x <- inputUInt Public :: Comp (UInt 4)
+    --     reuse x
+    --   print _cs
+    --   print $ relocateConstraintSystem _cs
+    --   return ()
+
+-- it "Boolean 2" $ do
+--   _cs <- runTest 15 15 $ do
 --     x <- inputField Public
---     return $ cond (x `eq` 3) (12 :: Field) 789
+--     return (x `eq` 100 .|. x `eq` 200 .|. x `eq` 300)
+
+--   print _cs
+--   print $ relocateConstraintSystem _cs
 --   return ()
-
--- print cs
-
--- describe "Aggregate Signature" $ do
---   it "dim:1 sig:10" runAllKeelungAggSig2
-
--- interpretCS :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
--- interpretCS prog rawInputs = do
---   r1cs' <- Compiler.toR1CS . relocateConstraintSystem <$> Compiler.compileO1' prog
---   let inps = Inputs.deserialize (Compiler.r1csCounters r1cs') rawInputs
---   case R1CS.run r1cs' inps of
---     Left err -> Left (Compiler.InterpretError err)
---     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (Compiler.r1csCounters r1cs') outputs)
-
--- runAllKeelungAggSig2 :: IO ()
--- runAllKeelungAggSig2 = do
---   interpretCS checkSize2 [0, 1 :: GF181] `shouldBe` Right [0]
-
---   cs <- runTest 7 7 checkSize2
---   print cs
-
--- checkSize2 :: Comp Field
--- checkSize2 = do
---   x <- input
---   y <- input
---   return $ BtoF x * BtoF y

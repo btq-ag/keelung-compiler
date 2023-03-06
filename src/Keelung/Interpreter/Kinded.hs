@@ -142,9 +142,9 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
     VarU var -> pure <$> lookupU (widthOf val) var
     VarUI var -> pure <$> lookupUI (widthOf val) var
     VarUP var -> pure <$> lookupUP (widthOf val) var
-    AddU x y -> zipWith (+) <$> interpret x <*> interpret y
-    SubU x y -> zipWith (-) <$> interpret x <*> interpret y
-    MulU x y -> zipWith (*) <$> interpret x <*> interpret y
+    AddU x y -> wrapAround $ zipWith (+) <$> interpret x <*> interpret y
+    SubU x y -> wrapAround $ zipWith (-) <$> interpret x <*> interpret y
+    MulU x y -> wrapAround $ zipWith (*) <$> interpret x <*> interpret y
     -- UIntDiv x y -> zipWith (/) <$> interpret x <*> interpret y
     AndU x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     OrU x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
@@ -159,6 +159,12 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
         [0] -> interpret y
         _ -> interpret x
     BtoU x -> interpret x
+    where
+      upperBound :: Integer
+      upperBound = 2 ^ widthOf val
+
+      wrapAround :: (GaloisField n, Integral n) => M n [n] -> M n [n]
+      wrapAround = fmap (map (fromInteger . (`mod` upperBound) . toInteger))
 
 instance GaloisField n => Interpret () n where
   interpret val = case val of

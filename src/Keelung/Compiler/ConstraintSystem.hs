@@ -46,7 +46,6 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceU :: !(Map RefU Int),
     -- when x == y (UnionFind)
     csVarEqF :: UnionFind RefF n,
-    -- csVarEqB :: BooleanRelations,
     csVarEqU :: UnionFind RefU n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
