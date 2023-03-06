@@ -75,7 +75,6 @@ r1cs prog rawPublicInputs rawPrivateInputs = do
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
-
 runAll :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> [n] -> IO ()
 runAll program rawPublicInputs rawPrivateInputs rawOutputs = do
   kinded program rawPublicInputs rawPrivateInputs
@@ -127,64 +126,146 @@ runAndCompare program rawPublicInputs rawPrivateInputs = do
 tests :: SpecWith ()
 tests = do
   describe "Interpreters of different syntaxes should computes the same result" $ do
-    it "identity (public / Field)" $
-      property $ \inp -> do
-        runAll Basic.identity [inp :: GF181] [] [inp]
+    describe "Boolean" $ do
+      it "not 1" $ do
+        let program = return $ complement true
+        runAll program [] [] [0 :: GF181]
 
-    it "identity (public / Boolean)" $ do
-      runAll Basic.identityB [1 :: GF181] [] [1]
-      runAll Basic.identityB [0 :: GF181] [] [0]
+      it "not 2" $ do
+        let program = complement <$> inputBool Public
+        runAll program [0] [] [1 :: GF181]
+        runAll program [1] [] [0 :: GF181]
 
-    it "identity (private)" $ do
-      let program = inputField Private
-      runAll program [] [1 :: GF181] [1]
+      it "and 1" $ do
+        let program = return $ true `And` false
+        runAll program [] [] [0 :: GF181]
 
-    it "Field arithmetics 1" $ do
-      let program = do
-            x <- inputField Public
-            y <- inputField Public
-            return $ x * y + y * 2
-      property $ \(x, y) -> do
-        runAll program [x, y :: GF181] [] [x * y + y * 2]
+      it "and 2" $ do
+        let program = And <$> input Public <*> input Private
+        runAll program [1] [0] [0 :: GF181]
+        runAll program [1] [1] [1 :: GF181]
+        runAll program [0] [1] [0 :: GF181]
+        runAll program [1] [1] [1 :: GF181]
 
-    it "Field arithmetics 2" $ do
-      let program = do
-            x <- inputField Public
-            y <- inputField Private
-            return $ x * y + y * 2
-      property $ \(x, y) -> do
-        runAll program [x :: GF181] [y] [x * y + y * 2]
+      it "or 1" $ do
+        let program = return $ true `Or` false
+        runAll program [] [] [1 :: GF181]
 
-    it "Field arithmetics 2" $ do
-      let program = do
-            x <- inputField Private
-            y <- inputField Public
-            return $ x * y + y * 2
-      property $ \(x, y) -> do
-        runAll program [y :: GF181] [x] [x * y + y * 2]
+      it "or 2" $ do
+        let program = Or true <$> input Private
+        runAll program [] [0] [1 :: GF181]
+        runAll program [] [1] [1 :: GF181]
 
-    it "Basic.eq1" $
-      property $ \inp -> do
-        let expectedOutput = if inp == 3 then [1] else [0]
-        runAll Basic.eq1 [inp :: GF181] [] expectedOutput
+      it "xor 1" $ do
+        let program = return $ true `Xor` false
+        runAll program [] [] [1 :: GF181]
 
-    it "Basic.cond'" $ do
-      runAll Basic.cond' [0 :: GF181] [] [789]
-      runAll Basic.cond' [3 :: GF181] [] [12]
-    -- property $ \inp -> do
-    --   let expectedOutput = if inp == 3 then [12] else [789]
-    --   runAll Basic.cond' [inp :: GF181] expectedOutput
+      it "xor 2" $ do
+        let program = Xor <$> input Public <*> return true
+        runAll program [0] [] [1 :: GF181]
+        runAll program [1] [] [0 :: GF181]
 
-    it "Basic.assert1" $
-      runAll Basic.assert1 [3 :: GF181] [] []
+      it "mixed 1" $ do
+        let program = do
+              x <- input Public
+              y <- input Private
+              let z = true
+              return $ x `Or` y `And` z
+        runAll program [0] [0] [0 :: GF181]
+        runAll program [0] [1] [1 :: GF181]
+        runAll program [1] [0] [1 :: GF181]
+        runAll program [1] [1] [1 :: GF181]
 
-    it "Basic.toArrayM1" $
-      runAll Basic.toArrayM1 [] [] [0 :: GF181]
+      it "mixed 2" $ do
+        let program = do
+              x <- input Public
+              y <- input Private
+              let z = false
+              w <- reuse $ x `Or` y
+              return $ x `And` w `Or` z
+        runAll program [0] [0] [0 :: GF181]
+        runAll program [0] [1] [0 :: GF181]
+        runAll program [1] [0] [1 :: GF181]
+        runAll program [1] [1] [1 :: GF181]
 
-    it "Basic.summation" $
-      forAll (vector 4) $ \inp -> do
-        let expectedOutput = [sum inp]
-        runAll Basic.summation (inp :: [GF181]) [] expectedOutput
+      it "eq 1" $ do
+        -- takes an input and see if its equal to False
+        let program = do
+              x <- input Public
+              return $ x `eq` false
+
+        runAll program [0] [] [1 :: GF181]
+        runAll program [1] [] [0 :: GF181]
+
+      it "conditional" $ do
+        let program = do
+              x <- inputField Public
+              return $ cond (x `eq` 3) true false
+        property $ \x -> do
+          let expectedOutput = if x == 3 then [1] else [0]
+          runAll program [x :: GF181] [] expectedOutput
+
+    describe "Field" $ do
+      it "arithmetics 1" $ do
+        let program = do
+              x <- inputField Public
+              y <- inputField Public
+              return $ x * y + y * 2
+        property $ \(x, y) -> do
+          runAll program [x, y :: GF181] [] [x * y + y * 2]
+
+      it "arithmetics 2" $ do
+        let program = do
+              x <- inputField Public
+              y <- inputField Private
+              z <- reuse $ x * y + y * 2
+              return $ x * y - z
+        property $ \(x, y) -> do
+          runAll program [x :: GF181] [y] [-y * 2]
+
+      it "arithmetics 3" $ do
+        let program = do
+              x <- inputField Private
+              y <- inputField Public
+              let z = 3
+              return $ x * z + y * 2
+        property $ \(x, y) -> do
+          runAll program [y :: GF181] [x] [x * 3 + y * 2]
+
+      it "summation" $ do
+        let program = do
+              arr <- inputList Public 4
+              reduce 0 [0 .. 3] $ \accum i -> do
+                let x = arr !! i
+                return (accum + x :: Field)
+
+        forAll (vector 4) $ \xs -> do
+          runAll program (xs :: [GF181]) [] [sum xs]
+
+      it "eq 1" $ do
+        -- takes an input and see if its equal to 3
+        let program = do
+              x <- inputField Public
+              return $ x `eq` 3
+
+        property $ \x -> do
+          let expectedOutput = if x == 3 then [1] else [0]
+          runAll program [x :: GF181] [] expectedOutput
+
+      it "conditional" $ do
+        let program = do
+              x <- inputField Public
+              return $ cond (x `eq` 3) 4 (5 :: Field)
+        property $ \x -> do
+          let expectedOutput = if x == 3 then [4] else [5]
+          runAll program [x :: GF181] [] expectedOutput
+
+    describe "Statements" $ do
+      it "assert 1" $ do
+        let program = do
+              x <- inputField Public
+              assert (x `eq` 3)
+        runAll program [3 :: GF181] [] []
 
     it "Basic.summation2" $
       forAll (vector 4) $ \inp -> do
@@ -208,19 +289,6 @@ tests = do
 
     it "Basic.toArray1" $
       runAll Basic.toArray1 [0 .. 7 :: GF181] [] []
-
-    it "xor" $ do 
-      let program = return $ true `Xor` false
-      runAll program [] [] [1 :: GF181]
-
-    it "Basic.xorLists" $
-      runAll Basic.xorLists [] [] [1 :: GF181]
-
-    it "Basic.dupArray" $
-      runAll Basic.dupArray [1] [] [1 :: GF181]
-
-    it "Basic.returnArray2" $
-      runAll Basic.returnArray2 [2] [] [2, 4 :: GF181]
 
     it "Basic.arithU0" $
       runAll Basic.arithU0 [2, 3] [] [5 :: GF181]

@@ -190,24 +190,6 @@ runAggSig dimension n = do
   let settings = Settings True True True
   bench (aggSig dimension n) settings dimension n
 
-xorLists :: Comp Boolean
-xorLists = do
-  let xs = [false]
-  let ys = [true]
-  let x = xs !! 0
-  let y = ys !! 0
-  let actual = [x `Xor` y]
-  let expected = [true]
-  return $
-    foldl
-      ( \acc i ->
-          let a = actual !! i
-              b = expected !! i
-           in acc `And` (a `eq` b)
-      )
-      true
-      [0]
-
 outOfBound :: Comp ()
 outOfBound = do
   let xs = [true]
@@ -218,31 +200,6 @@ emptyArray :: Comp ()
 emptyArray = do
   let _ = [] :: [Boolean]
   return ()
-
-dupArray :: Comp Field
-dupArray = do
-  x <- input Public
-  let xs = [x, x]
-  return $ xs !! 1
-
-dupList :: Comp [Field]
-dupList = do
-  x <- input Public
-  return [x, x]
-
-returnArray :: Comp [Field]
-returnArray = do
-  x <- input Public
-  y <- input Public
-  return [x, y]
-
-returnArray2 :: Comp [Field]
-returnArray2 = do
-  x <- input Public
-  return [x, x * 2]
-
-toArrayM1 :: Comp (ArrM Boolean)
-toArrayM1 = toArrayM [false]
 
 birthday :: Comp Boolean
 birthday = do
