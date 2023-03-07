@@ -430,48 +430,48 @@ tests = do
               state3 <- reuse (round' state2) -- (60, 2025)
               return $ fst state3
         runAndCompare True (program :: Comp Field) [0 :: N GF181] []
-    where
-      runAggCheck :: Int -> Int -> [GF181] -> IO ()
-      runAggCheck dimension numberOfSignatures outputs =
-        let settings =
-              AggSig.Settings
-                { AggSig.enableAggChecking = True,
-                  AggSig.enableSizeChecking = False,
-                  AggSig.enableLengthChecking = False
-                }
-            param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
-        in runAll
-              (AggSig.checkAgg param :: Comp ())
-              (AggSig.genInputFromParam param)
-              []
-              outputs
+  where
+    runAggCheck :: Int -> Int -> [GF181] -> IO ()
+    runAggCheck dimension numberOfSignatures outputs =
+      let settings =
+            AggSig.Settings
+              { AggSig.enableAggChecking = True,
+                AggSig.enableSizeChecking = False,
+                AggSig.enableLengthChecking = False
+              }
+          param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
+       in runAll
+            (AggSig.checkAgg param :: Comp ())
+            (AggSig.genInputFromParam param)
+            []
+            outputs
 
-      runLT12289 :: Int -> Int -> [GF181] -> IO ()
-      runLT12289 dimension numberOfSignatures outputs =
-        let settings =
-              AggSig.Settings
-                { AggSig.enableAggChecking = False,
-                  AggSig.enableSizeChecking = True,
-                  AggSig.enableLengthChecking = False
-                }
-            param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
-        in runAll
-              (AggSig.checkSize param :: Comp ())
-              (AggSig.genInputFromParam param)
-              []
-              outputs
+    runLT12289 :: Int -> Int -> [GF181] -> IO ()
+    runLT12289 dimension numberOfSignatures outputs =
+      let settings =
+            AggSig.Settings
+              { AggSig.enableAggChecking = False,
+                AggSig.enableSizeChecking = True,
+                AggSig.enableLengthChecking = False
+              }
+          param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
+       in runAll
+            (AggSig.checkSize param :: Comp ())
+            (AggSig.genInputFromParam param)
+            []
+            outputs
 
-      runLenCheck :: Int -> Int -> [GF181] -> IO ()
-      runLenCheck dimension numberOfSignatures outputs =
-        let settings =
-              AggSig.Settings
-                { AggSig.enableAggChecking = False,
-                  AggSig.enableSizeChecking = False,
-                  AggSig.enableLengthChecking = True
-                }
-            param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
-        in runAll
-              (AggSig.checkLength param :: Comp ())
-              (AggSig.genInputFromParam param)
-              []
-              outputs
+    runLenCheck :: Int -> Int -> [GF181] -> IO ()
+    runLenCheck dimension numberOfSignatures outputs =
+      let settings =
+            AggSig.Settings
+              { AggSig.enableAggChecking = False,
+                AggSig.enableSizeChecking = False,
+                AggSig.enableLengthChecking = True
+              }
+          param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
+       in runAll
+            (AggSig.checkLength param :: Comp ())
+            (AggSig.genInputFromParam param)
+            []
+            outputs

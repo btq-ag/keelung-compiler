@@ -11,7 +11,6 @@ import Keelung
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem)
 import Keelung.Compiler.Optimize.MinimizeConstraints qualified as MinimizeConstraints
 import Keelung.Compiler.Optimize.MinimizeRelocatedConstraints qualified as MinimizeRelocatedConstraints
-import Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2 qualified as MinimizeRelocatedConstraints2
 import Keelung.Compiler.Optimize.Monad
 import Keelung.Compiler.Relocated
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
@@ -47,19 +46,6 @@ optimize1 = snd . optimizeWithInput mempty
 
 optimize1' :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 optimize1' = MinimizeConstraints.run
-
-optimize2 :: (GaloisField n, Integral n) => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
-optimize2 rcs =
-  -- NOTE: Pinned vars include:
-  --   - input vars
-  --   - output vars
-  -- Pinned vars are never optimized away.
-  let counters = csCounters rcs
-      pinnedVarSize = getCountBySort OfPrivateInput counters + getCountBySort OfPublicInput counters + getCountBySort OfOutput counters
-      -- pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters + getCountBySort OfOutput counters
-      pinnedVars = IntSet.fromDistinctAscList [0 .. pinnedVarSize - 1]
-      constraints = MinimizeRelocatedConstraints2.run pinnedVars (csConstraints rcs)
-   in renumberConstraints $ rcs {csConstraints = constraints}
 
 --------------------------------------------------------------------------------
 

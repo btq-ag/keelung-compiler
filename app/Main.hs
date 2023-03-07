@@ -15,7 +15,6 @@ import Keelung.Compiler
     RelocatedConstraintSystem,
     compileO0Elab,
     compileO1Elab,
-    compileO2Elab,
     generateWitnessElab,
     interpretElab,
     toR1CS,
@@ -57,9 +56,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> outputCircuit (asB64 $ compileO2Elab elaborated)
-            GF181 -> outputCircuit (asGF181 $ compileO2Elab elaborated)
-            BN128 -> outputCircuit (asBN128 $ compileO2Elab elaborated)
+            B64 -> outputCircuit (asB64 $ compileO1Elab elaborated)
+            GF181 -> outputCircuit (asGF181 $ compileO1Elab elaborated)
+            BN128 -> outputCircuit (asBN128 $ compileO1Elab elaborated)
     Protocol Interpret -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
