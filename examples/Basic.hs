@@ -297,23 +297,6 @@ bitwise = do
       complement x !!! 3
     ]
 
-arithU0 :: Comp (UInt 4)
-arithU0 = do
-  x <- inputUInt @4 Public
-  y <- inputUInt @4 Public
-  return $ x + y
-
-rotateAndBitTest :: Comp [Boolean]
-rotateAndBitTest = do
-  x <- inputUInt @4 Public
-  y <- inputUInt @4 Public
-  return
-    [ (x `rotate` 0) !!! 0,
-      (x `rotate` 1) !!! 1,
-      (x `rotate` (-1)) !!! 0,
-      ((x .^. y) `rotate` 1) !!! 1
-    ]
-
 rotateOnly :: Comp [UInt 4]
 rotateOnly = do
   x <- inputUInt @4 Public
