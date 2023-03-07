@@ -317,6 +317,14 @@ tests = do
 
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
 
+      it "eq 1" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return (x `eq` y)
+        runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [0]
+        runAllExceptForTheOldOptimizer program [4, 4 :: GF181] [] [1]
+
       it "rotate" $ do
         let program = do
               x <- inputUInt @4 Public

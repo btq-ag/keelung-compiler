@@ -178,7 +178,7 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new UnionFind.new mempty mempty mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new UnionFind.new mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -188,7 +188,6 @@ add = mapM_ addOne
   where
     addOne :: GaloisField n => Constraint n -> M n ()
     addOne (CAddF xs) = modify (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
-    addOne (CAddU xs) = modify (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddU = xs : csAddU cs})
     addOne (CVarBindF x c) = do
       cs <- get
       let csVarEqF' = UnionFind.bindToValue x c (csVarEqF cs)
@@ -218,8 +217,6 @@ add = mapM_ addOne
     addOne (CMulF x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = do
       modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
-    addOne (CMulU x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulU = (x, y, Left c) : csMulU cs})
-    addOne (CMulU x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulU = (x, y, Right z) : csMulU cs})
     addOne (CNEqF x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
     addOne (CNEqU x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
 
@@ -603,27 +600,27 @@ compileEqualityU isEq out x y =
           --  1. (x - y) * m = 1 - out
           --  2. (x - y) * out = 0
           add $
-            cMulU
-              (0, [(x, 1), (y, -1)])
-              (0, [(m, 1)])
-              (1, [(RefBtoRefU out, -1)])
+            cMulF
+              (0, [(RefUVal x, 1), (RefUVal y, -1)])
+              (0, [(RefUVal m, 1)])
+              (1, [(RefBtoRefF out, -1)])
           add $
-            cMulU
-              (0, [(x, 1), (y, -1)])
-              (0, [(RefBtoRefU out, 1)])
+            cMulF
+              (0, [(RefUVal x, 1), (RefUVal y, -1)])
+              (0, [(RefBtoRefF out, 1)])
               (0, [])
         else do
           --  1. (x - y) * m = out
           --  2. (x - y) * (1 - out) = 0
           add $
-            cMulU
-              (0, [(x, 1), (y, -1)])
-              (0, [(m, 1)])
-              (0, [(RefBtoRefU out, 1)])
+            cMulF
+              (0, [(RefUVal x, 1), (RefUVal y, -1)])
+              (0, [(RefUVal m, 1)])
+              (0, [(RefBtoRefF out, 1)])
           add $
-            cMulU
-              (0, [(x, 1), (y, -1)])
-              (1, [(RefBtoRefU out, -1)])
+            cMulF
+              (0, [(RefUVal x, 1), (RefUVal y, -1)])
+              (1, [(RefBtoRefF out, -1)])
               (0, [])
 
       --  keep track of the relation between (x - y) and m
@@ -685,7 +682,7 @@ compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> RefU
 compileAddOrSubU isSub width out a b = do
   c <- freshRefU (width + 1)
   -- C = A + B
-  add $ cAddU 0 [(a, 1), (b, if isSub then -1 else 1), (c, -1)]
+  add $ cAddF 0 [(RefUVal a, 1), (RefUVal b, if isSub then -1 else 1), (RefUVal c, -1)]
   -- copying bits from C to 'out'
   forM_ [0 .. width - 1] $ \i -> do
     -- Cᵢ = outᵢ
@@ -707,7 +704,7 @@ compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> RefU -> RefU -> M n
 compileMulU width out a b = do
   c <- freshRefU (width * 2)
   -- C = A * B
-  add $ cMulU (0, [(a, 1)]) (0, [(b, 1)]) (0, [(c, 1)])
+  add $ cMulF (0, [(RefUVal a, 1)]) (0, [(RefUVal b, 1)]) (0, [(RefUVal c, 1)])
   -- copying bits from C to 'out'
   forM_ [0 .. width - 1] $ \i -> do
     -- Cᵢ = outᵢ
@@ -752,10 +749,10 @@ compileIfU out p x y = do
   --      =>
   --  (out - y) = p * (x - y)
   add $
-    cMulU
-      (0, [(RefBtoRefU p, 1)])
-      (0, [(x, 1), (y, -1)])
-      (0, [(y, -1), (out, 1)])
+    cMulF
+      (0, [(RefBtoRefF p, 1)])
+      (0, [(RefUVal x, 1), (RefUVal y, -1)])
+      (0, [(RefUVal y, -1), (RefUVal out, 1)])
 
 compileOrB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> M n ()
 compileOrB out x y = do
@@ -867,9 +864,9 @@ assertNotZeroU width expr = do
   -- introduce a new variable m, such that `expr * m = 1`
   m <- freshRefU width
   add $
-    cMulU
-      (0, [(ref, 1)])
-      (0, [(m, 1)])
+    cMulF
+      (0, [(RefUVal  ref, 1)])
+      (0, [(RefUVal  m, 1)])
       (1, [])
 
 -- | Assert that x is less than or equal to y
@@ -963,10 +960,10 @@ compileDivModU width dividend divisor quotient remainder = do
   quotientRef <- wireU quotient
   dividendRef <- wireU dividend
   add $
-    cMulU
-      (0, [(divisorRef, 1)])
-      (0, [(quotientRef, 1)])
-      (0, [(dividendRef, 1), (remainderRef, -1)])
+    cMulF
+      (0, [(RefUVal divisorRef, 1)])
+      (0, [(RefUVal quotientRef, 1)])
+      (0, [(RefUVal dividendRef, 1), (RefUVal remainderRef, -1)])
   --    0 ≤ remainder < divisor
   assertLTU width remainderRef divisorRef
   -- --    0 < divisor

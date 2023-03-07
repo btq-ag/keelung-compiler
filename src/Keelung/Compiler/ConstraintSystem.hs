@@ -52,7 +52,6 @@ data ConstraintSystem n = ConstraintSystem
     csAddU :: [PolyG RefU n],
     -- multiplicative constraints
     csMulF :: [(PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))],
-    csMulU :: [(PolyG RefU n, PolyG RefU n, Either n (PolyG RefU n))],
     -- constraints for computing equality
     csNEqF :: Map (RefF, RefF) RefF,
     csNEqU :: Map (RefU, RefU) RefU
@@ -67,7 +66,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showAddF
       <> showAddU
       <> showMulF
-      <> showMulU
       <> showNEqF
       <> showNEqU
       <> showBooleanConstraints
@@ -119,7 +117,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       showAddU = adapt "AddU" (csAddU cs) show
 
       showMulF = adapt "MulF" (csMulF cs) showMul
-      showMulU = adapt "MulU" (csMulU cs) showMul
 
       showNEqF = adapt "NEqF" (Map.toList $ csNEqF cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
       showNEqU = adapt "NEqU" (Map.toList $ csNEqU cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
@@ -201,9 +198,7 @@ relocateConstraintSystem cs =
         varEqFs
           <> varEqUs
           <> addFs
-          <> addUs
           <> mulFs
-          <> mulUs
           <> nEqFs
           <> nEqUs
     }
@@ -324,19 +319,17 @@ relocateConstraintSystem cs =
         then Nothing
         else Just $ fromConstraint counters (CVarEqU var1 var2)
     fromUnionFindU occurrences (var1, (Just (slope2, var2), intercept2)) =
-      case PolyG.build intercept2 [(var1, -1), (var2, slope2)] of
+      case PolyG.build intercept2 [(RefUVal var1, -1), (RefUVal var2, slope2)] of
         Left _ -> Nothing
         Right poly ->
           if shouldRemoveU occurrences var1 || shouldRemoveU occurrences var2
             then Nothing
-            else Just $ fromConstraint counters (CAddU poly)
+            else Just $ fromConstraint counters (CAddF poly)
 
     varEqFs = fromUnionFindF (csVarEqF cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
     varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UnionFind.toMap $ csVarEqU cs
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
-    addUs = Seq.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
-    mulUs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulU) $ csMulU cs
     nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
     nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))) $ Map.toList $ csNEqU cs
 
@@ -351,7 +344,6 @@ sizeOfConstraintSystem cs =
     + length (csAddF cs)
     + length (csAddU cs)
     + length (csMulF cs)
-    + length (csMulU cs)
     + length (csNEqF cs)
     + length (csNEqU cs)
 
