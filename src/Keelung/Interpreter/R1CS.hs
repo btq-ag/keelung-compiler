@@ -107,7 +107,6 @@ shrinkBinRep binRep@(BinRep var width bitVarStart) = do
     Nothing -> do
       -- see if all bit variables are bound
       bitVal <- foldM go (Just 0) [bitVarStart + width - 1, bitVarStart + width - 2 .. bitVarStart]
-
       case bitVal of
         Nothing -> return $ Stuck binRep
         Just bitVal' -> do

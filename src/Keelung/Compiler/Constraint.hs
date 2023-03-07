@@ -60,7 +60,7 @@ fromConstraint counters (CVarEqF x y) = case Poly.buildEither 0 [(reindexRefF co
   Left _ -> error "CVarEqF: two variables are the same"
   Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarEqB x y) = case Poly.buildEither 0 [(reindexRefB counters x, 1), (reindexRefB counters y, -1)] of
-  Left _ -> error "CVarEqB: two variables are the same"
+  Left _ -> error $ "CVarEqB: two variables are the same" ++ show x ++ " " ++ show y
   Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarNEqB x y) = case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
   Left _ -> error "CVarNEqB: two variables are the same"
@@ -103,6 +103,7 @@ instance Show RefB where
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
 data RefF = RefFO Var | RefFI Var | RefFP Var | RefBtoRefF RefB | RefF Var
+  -- data RefF = RefFO Var | RefFI Var | RefFP Var | RefBtoRefF RefB | RefUVal RefU | RefF Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefF where
@@ -111,6 +112,8 @@ instance Show RefF where
   show (RefFP x) = "FP" ++ show x
   show (RefF x) = "F" ++ show x
   show (RefBtoRefF x) = show x
+
+-- show (RefUVal x) = show x
 
 data RefU = RefUO Width Var | RefUI Width Var | RefUP Width Var | RefBtoRefU RefB | RefU Width Var
   deriving (Eq, Ord, Generic, NFData)
@@ -157,17 +160,15 @@ reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
 reindexRefB counters (RefBI x) = reindex counters OfPublicInput OfBoolean x
 reindexRefB counters (RefBP x) = reindex counters OfPrivateInput OfBoolean x
 reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
-reindexRefB counters (RefUBit w x i) =
-  let i' = i `mod` w
-   in case x of
-        RefUO _ x' -> reindex counters OfOutput (OfUIntBinRep w) x' + i'
-        RefUI _ x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + i'
-        RefUP _ x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + i'
-        RefU _ x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + i'
-        RefBtoRefU x' ->
-          if i' == 0
-            then reindexRefB counters x'
-            else error "reindexRefB: RefUBit"
+reindexRefB counters (RefUBit _ x i) = case x of
+  RefUO w x' -> reindex counters OfOutput (OfUIntBinRep w) x' + (i `mod` w)
+  RefUI w x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + (i `mod` w)
+  RefUP w x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + (i `mod` w)
+  RefU w x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + (i `mod` w)
+  RefBtoRefU x' ->
+    if i == 0
+      then reindexRefB counters x'
+      else error "reindexRefB: RefUBit"
 
 reindexRefU :: Counters -> RefU -> Var
 reindexRefU counters (RefUO w x) = reindex counters OfOutput (OfUInt w) x
@@ -364,7 +365,6 @@ cMul ctor (a, xs) (b, ys) (c, zs) = case ( do
 -- | Smart constructor for the CMulF constraint
 cMulF :: GaloisField n => (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> [Constraint n]
 cMulF = cMul CMulF
-
 
 -- | Smart constructor for the CMulU constraint
 cMulU :: GaloisField n => (n, [(RefU, n)]) -> (n, [(RefU, n)]) -> (n, [(RefU, n)]) -> [Constraint n]

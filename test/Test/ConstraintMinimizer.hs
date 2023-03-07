@@ -129,9 +129,11 @@ tests = do
       return ()
 
     -- it "UInt 1" $ do
-    --   _cs <- runTest 14 14 $ do
+    --   _cs <- runTest 15 11 $ do
     --     x <- inputUInt Public :: Comp (UInt 4)
-    --     reuse x
+    --     y <- reuse x
+    --     -- z <- reuse x
+    --     return (x + y)
     --   print _cs
     --   print $ relocateConstraintSystem _cs
     --   return ()
