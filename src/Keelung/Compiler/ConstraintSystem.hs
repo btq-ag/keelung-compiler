@@ -301,6 +301,19 @@ relocateConstraintSystem cs =
           BooleanRelations.ChildOf True root -> Just $ fromConstraint counters $ CVarEqB var root
           BooleanRelations.ChildOf False root -> Just $ fromConstraint counters $ CVarNEqB var root
 
+    -- fromUnionFindU2 :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    -- fromUnionFindU2 unionFind occurrencesF occurrencesB occurrencesU =
+    --   let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
+    --       publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
+    --       privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
+    --       occurredInF = Map.keys $ Map.filterWithKey (\ref count -> count > 0 && not (pinnedRefF ref)) occurrencesF
+    --    in Seq.fromList
+    --         (Maybe.mapMaybe toConstraint outputVars)
+    --         <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
+    --         <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
+    --         <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
+    --         <> fromUnionFindB boolRels occurrencesF occurrencesB occurrencesU
+
     fromUnionFindU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, (Maybe (n, RefU), n)) -> Maybe (Relocated.Constraint n)
     fromUnionFindU occurrences (var1, (Nothing, c)) =
       if shouldRemoveU occurrences var1

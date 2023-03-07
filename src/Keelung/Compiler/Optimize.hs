@@ -5,9 +5,9 @@
 
 module Keelung.Compiler.Optimize where
 
-import Data.Field.Galois (GaloisField)
 import Data.IntMap qualified as IntMap
 import Data.IntSet qualified as IntSet
+import Keelung
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem)
 import Keelung.Compiler.Optimize.MinimizeConstraints qualified as MinimizeConstraints
 import Keelung.Compiler.Optimize.MinimizeRelocatedConstraints qualified as MinimizeRelocatedConstraints
@@ -33,7 +33,7 @@ optimizeWithWitness witness cs =
    in runOptiM witness $ do
         constraints <- MinimizeRelocatedConstraints.run counters (IntSet.toList pinnedVars) (csConstraints cs)
         witness' <- witnessOfVars [0 .. getTotalCount counters - 1]
-        return (witness', renumberConstraints $ cs {csConstraints = constraints})
+        return (witness', renumberConstraints (cs {csConstraints = constraints}))
 
 optimizeWithInput :: (GaloisField n, Integral n) => [n] -> RelocatedConstraintSystem n -> (Witness n, RelocatedConstraintSystem n)
 optimizeWithInput inputs cs =

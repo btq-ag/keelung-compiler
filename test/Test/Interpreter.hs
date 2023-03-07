@@ -46,61 +46,63 @@ typed prog rawPublicInputs rawPrivateInputs = do
 -- csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 -- csOld prog rawInputs = do
 --   r1cs' <- toR1CS <$> Compiler.compileO1 prog
---   let inps = Inputs.deserialize (r1csCounters r1cs') rawInputs
---   case R1CS.run r1cs' inps of
+--   let inputs = Inputs.deserialize (r1csCounters r1cs') rawInputs
+--   case R1CS.run r1cs' inputs of
 --     Left err -> Left (InterpretError err)
 --     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
 r1csNew :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csNew prog rawPublicInputs rawPrivateInputs = do
   r1cs' <- toR1CS . relocateConstraintSystem <$> Compiler.compileO1' prog
-  let inps = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
-  case R1CS.run r1cs' inps of
+  let inputs = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
+  case R1CS.run r1cs' inputs of
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
 r1csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csOld prog rawPublicInputs rawPrivateInputs = do
   r1cs' <- toR1CS <$> Compiler.compile prog
-  let inps = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
-  case Relocated.run r1cs' inps of
+  let inputs = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
+  case Relocated.run r1cs' inputs of
     Left err -> Left (ExecError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
 r1csO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csO0 prog rawPublicInputs rawPrivateInputs = do
   r1cs' <- toR1CS <$> Compiler.compileO0 prog
-  let inps = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
-  case R1CS.run r1cs' inps of
+  let inputs = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
+  case R1CS.run r1cs' inputs of
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
-runAll :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> [n] -> IO ()
+runAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
 runAll program rawPublicInputs rawPrivateInputs rawOutputs = do
-  kinded program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right rawOutputs
-  typed program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right rawOutputs
-
   -- let oldO0 = Compiler.asGF181N $ Compiler.compileO0' program
   -- let newO0 = Compiler.asGF181N $ Compiler.compileO0' program
-  -- let oldO1 = Compiler.asGF181N $ Compiler.compileO1 program
-  -- let newO1 = Compiler.asGF181N $ Compiler.compileO1' program
   -- print "\n======oldO0=======\n"
   -- print oldO0
   -- print "\n======newO0=======\n"
   -- print newO0
-  -- print "\n======oldO1=======\n"
-  -- print oldO1
+
+
+  -- print $ Compiler.asGF181N $ Compiler.compileO1 program
+
   -- print (toR1CS <$> oldO1)
   -- print "\n======newO1=======\n"
+  -- let newO1 = Compiler.asGF181N $ Compiler.compileO1' program
+  -- -- print $ elaborate program
+  -- -- print $ Compiler.asGF181N $ Compiler.elaborateAndEncode program
   -- print newO1
   -- print (toR1CS . relocateConstraintSystem <$> newO1)
 
+  kinded program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
+  typed program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
   r1csNew program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
-  -- r1csOld program rawPublicInputs rawPrivateInputs
-  --   `shouldBe` Right rawOutputs
+  r1csOld program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
   r1csO0 program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
 
@@ -304,13 +306,13 @@ tests = do
         runAll program [2, 5 :: GF181] [] [15]
         runAll program [15, 1 :: GF181] [] [0]
 
-      -- it "arithmetics 5" $ do
-      --   let program = do
-      --         x <- inputUInt @4 Public
-      --         y <- reuse x
-      --         return (x + y)
+      it "arithmetics 5" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- reuse x
+              return (x + y)
 
-      --   runAll program [5 :: GF181] [] [10]
+        runAll program [5 :: GF181] [] [10]
 
       it "rotate" $ do
         let program = do

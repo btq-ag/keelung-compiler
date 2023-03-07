@@ -15,6 +15,7 @@ import Data.Sequence (Seq)
 import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..))
+import Keelung.Data.BinRep qualified as BinRep
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
@@ -134,7 +135,7 @@ renumberConstraints cs =
     pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters + getCountBySort OfOutput counters
 
     -- variables in constraints (that should be kept after renumbering!)
-    vars = varsInConstraints (csConstraints cs)
+    vars = varsInConstraints (csConstraints cs) <> IntSet.fromList ([var | binRep <- getBinReps counters, var <- [BinRep.binRepBitStart binRep .. BinRep.binRepBitStart binRep + BinRep.binRepWidth binRep - 1]])
     -- variables in constraints excluding input & output variables
     newIntermediateVars = IntSet.filter (>= pinnedVarSize) vars
     -- numbers of variables reduced via renumbering
