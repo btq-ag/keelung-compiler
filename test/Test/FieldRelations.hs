@@ -1,15 +1,12 @@
 module Test.FieldRelations (tests, run) where
 
 import Control.Monad.State
-import Data.Maybe qualified as Maybe
 import Keelung hiding (run)
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations (HasRefB, FieldRelations)
+import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations (FieldRelations)
 import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
-import Test.QuickCheck (Arbitrary (arbitrary))
-import Test.QuickCheck.Arbitrary qualified as Arbitrary
 
 run :: IO ()
 run = hspec tests
@@ -55,7 +52,7 @@ tests = do
         -- z = 1/3y - 2/3
         assertRelation (RefF 2) (1 / 3) (RefF 1) (-2 / 3)
 
-type M = StateT (FieldRelations RefF GF181) IO
+type M = StateT (FieldRelations GF181) IO
 
 runM :: M a -> IO a
 runM p = evalStateT p FieldRelations.new
@@ -73,10 +70,10 @@ assertRelation var1 slope var2 intercept = do
 
 ------------------------------------------------------------------------
 
-instance (Arbitrary ref, Arbitrary n, GaloisField n, Ord ref, HasRefB ref) => Arbitrary (FieldRelations ref n) where
-  arbitrary = do
-    relations <- Arbitrary.vector 100
+-- instance (Arbitrary n, GaloisField n) => Arbitrary (FieldRelations n) where
+--   arbitrary = do
+--     relations <- Arbitrary.vector 100
 
-    return $ foldl go FieldRelations.new relations
-    where
-      go xs (var, slope, ref, intercept) = Maybe.fromMaybe xs (FieldRelations.relate var (slope, ref, intercept) xs)
+--     return $ foldl go FieldRelations.new relations
+--     where
+--       go xs (var, slope, ref, intercept) = Maybe.fromMaybe xs (FieldRelations.relate var (slope, ref, intercept) xs)

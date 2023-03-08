@@ -15,12 +15,12 @@ import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
+import Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
-import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations as UIntRelations
 
 --------------------------------------------------------------------------------
 
@@ -187,7 +187,7 @@ modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
 add :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 add = mapM_ addOne
   where
-    addOne :: GaloisField n => Constraint n -> M n ()
+    addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddF xs) = modify (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       cs <- get
@@ -866,8 +866,8 @@ assertNotZeroU width expr = do
   m <- freshRefU width
   add $
     cMulF
-      (0, [(RefUVal  ref, 1)])
-      (0, [(RefUVal  m, 1)])
+      (0, [(RefUVal ref, 1)])
+      (0, [(RefUVal m, 1)])
       (1, [])
 
 -- | Assert that x is less than or equal to y

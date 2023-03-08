@@ -283,7 +283,7 @@ learnFromAddF poly = case PolyG.view poly of
     relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
   PolyG.Polynomial _ _ -> return False
 
-bindToValue :: GaloisField n => RefF -> n -> RoundM n ()
+bindToValue :: (GaloisField n, Integral n) => RefF -> n -> RoundM n ()
 bindToValue var value = do
   markChanged RelationChanged
   modify' $ \cs ->
@@ -293,7 +293,7 @@ bindToValue var value = do
         }
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
-relateF :: GaloisField n => RefF -> (n, RefF, n) -> RoundM n Bool
+relateF :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cs <- get
   case FieldRelations.relate var1 (slope, var2, intercept) (csVarEqF cs) of
@@ -325,7 +325,7 @@ addAddF poly = case PolyG.view poly of
 
 -- | Substitutes variables in a polynomial.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n) => FieldRelations RefF n -> BooleanRelations -> PolyG RefF n -> Maybe (Either n (PolyG RefF n), [RefF], [RefF])
+substPolyG :: (GaloisField n, Integral n) => FieldRelations n -> BooleanRelations -> PolyG RefF n -> Maybe (Either n (PolyG RefF n), [RefF], [RefF])
 substPolyG ctx boolRels poly = do
   let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' (substPolyG_ ctx boolRels) (False, Left c, [], []) xs of
@@ -333,7 +333,7 @@ substPolyG ctx boolRels poly = do
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs)
 
-substPolyG_ :: (Integral n, GaloisField n) => FieldRelations RefF n -> BooleanRelations -> (Bool, Either n (PolyG RefF n), [RefF], [RefF]) -> RefF -> n -> (Bool, Either n (PolyG RefF n), [RefF], [RefF])
+substPolyG_ :: (Integral n, GaloisField n) => FieldRelations n -> BooleanRelations -> (Bool, Either n (PolyG RefF n), [RefF], [RefF]) -> RefF -> n -> (Bool, Either n (PolyG RefF n), [RefF], [RefF])
 substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case FieldRelations.parentOf ctx ref of
   FieldRelations.Root -> case ref of
     RefBtoRefF refB ->
