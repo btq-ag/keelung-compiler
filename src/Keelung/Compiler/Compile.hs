@@ -20,6 +20,7 @@ import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
+import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations as UIntRelations
 
 --------------------------------------------------------------------------------
 
@@ -178,7 +179,7 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new UnionFind.new mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new UIntRelations.new mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -198,7 +199,7 @@ add = mapM_ addOne
       put cs {csVarEqF = csVarEqF'}
     addOne (CVarBindU x c) = do
       cs <- get
-      let csVarEqU' = UnionFind.bindToValue x c (csVarEqU cs)
+      let csVarEqU' = UIntRelations.bindToValue x c (csVarEqU cs)
       put cs {csVarEqU = csVarEqU'}
     addOne (CVarEqF x y) = do
       cs <- get
@@ -211,7 +212,7 @@ add = mapM_ addOne
       modify' $ \cs -> cs {csVarEqF = UnionFind.relateBoolean x (False, y) (csVarEqF cs)}
     addOne (CVarEqU x y) = do
       cs <- get
-      case UnionFind.relate x (1, y, 0) (csVarEqU cs) of
+      case UIntRelations.relate x (True, y) (csVarEqU cs) of
         Nothing -> return ()
         Just csVarEqU' -> put cs {csVarEqU = csVarEqU'}
     addOne (CMulF x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})

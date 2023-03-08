@@ -33,6 +33,8 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax.Counters
+import Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations (UIntRelations)
+import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations as UIntRelations
 
 --------------------------------------------------------------------------------
 
@@ -46,7 +48,7 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceU :: !(Map RefU Int),
     -- when x == y (UnionFind)
     csVarEqF :: UnionFind RefF n,
-    csVarEqU :: UnionFind RefU n,
+    csVarEqU :: UIntRelations n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
     -- multiplicative constraints
@@ -306,25 +308,18 @@ relocateConstraintSystem cs =
     --         <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
     --         <> fromUnionFindB boolRels occurrencesF occurrencesB occurrencesU
 
-    fromUnionFindU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, (Maybe (n, RefU), n)) -> Maybe (Relocated.Constraint n)
-    fromUnionFindU occurrences (var1, (Nothing, c)) =
+    fromUnionFindU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, Either (Bool, RefU) n) -> Maybe (Relocated.Constraint n)
+    fromUnionFindU occurrences (var1, Right c) =
       if shouldRemoveU occurrences var1
         then Nothing
         else Just $ fromConstraint counters (CVarBindU var1 c)
-    fromUnionFindU occurrences (var1, (Just (1, var2), 0)) =
+    fromUnionFindU occurrences (var1, Left (_, var2)) =
       if shouldRemoveU occurrences var1 || shouldRemoveU occurrences var2
         then Nothing
         else Just $ fromConstraint counters (CVarEqU var1 var2)
-    fromUnionFindU occurrences (var1, (Just (slope2, var2), intercept2)) =
-      case PolyG.build intercept2 [(RefUVal var1, -1), (RefUVal var2, slope2)] of
-        Left _ -> Nothing
-        Right poly ->
-          if shouldRemoveU occurrences var1 || shouldRemoveU occurrences var2
-            then Nothing
-            else Just $ fromConstraint counters (CAddF poly)
 
     varEqFs = fromUnionFindF (csVarEqF cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
-    varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UnionFind.toMap $ csVarEqU cs
+    varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UIntRelations.toMap $ csVarEqU cs
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
     nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
@@ -334,7 +329,7 @@ sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
   UnionFind.size (csVarEqF cs)
     + BooleanRelations.size (UnionFind.exportBooleanRelations (csVarEqF cs))
-    + UnionFind.size (csVarEqU cs)
+    + UIntRelations.size (csVarEqU cs)
     + length (csAddF cs)
     + length (csMulF cs)
     + length (csNEqF cs)

@@ -10,6 +10,7 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
     relate,
     size,
     relationBetween,
+    toMap,
   )
 where
 
@@ -18,16 +19,16 @@ import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
-import Keelung.Compiler.Constraint (RefU (..), RefU)
+import Keelung.Compiler.Constraint (RefU (..))
 import Prelude hiding (lookup)
 
-data UIntRelations = UIntRelations
-  { links :: Map RefU (Either (Bool, RefU) Bool),
+data UIntRelations n = UIntRelations
+  { links :: Map RefU (Either (Bool, RefU) n),
     sizes :: Map RefU Int
   }
   deriving (Eq, Generic, NFData)
 
-instance Show UIntRelations where
+instance Show n => Show (UIntRelations n) where
   show xs =
     "UIntRelations {\n"
       ++ "  sizes = "
@@ -41,14 +42,14 @@ instance Show UIntRelations where
       showLink (var, Left (slope, root)) = "  " <> show var <> " = " <> (if slope then "" else show slope) <> show root <> "\n"
       showLink (var, Right intercept) = "  " <> show var <> " = " <> show intercept <> "\n"
 
-new :: UIntRelations
+new :: UIntRelations n
 new = UIntRelations mempty mempty
 
-data Relation = Root | Constant Bool | ChildOf Bool RefU
+data Relation n = Root | Constant n | ChildOf Bool RefU
   deriving (Eq, Show)
 
 -- | Returns the result of looking up a variable in the UIntRelations
-lookup :: UIntRelations -> RefU -> Relation
+lookup :: UIntRelations n -> RefU -> Relation n
 lookup xs var = case Map.lookup var (links xs) of
   Nothing -> Root -- 'var' is a root
   Just (Right value) -> Constant value -- 'var' is a constant
@@ -56,14 +57,14 @@ lookup xs var = case Map.lookup var (links xs) of
     Root -> ChildOf relation1 parent -- 'parent' is a root
     Constant value ->
       -- 'parent' is a constant
-      Constant (relation1 == value)
-    ChildOf relation2 grandparent ->
+      Constant value
+    ChildOf _ grandparent ->
       -- 'parent' is a child of 'grandparent'
-      ChildOf (relation1 == relation2) grandparent
+      ChildOf True grandparent
 
 -- | Calculates the relation between two variables `var1` and `var2`
 --   Returns `Just relation` where `var1 = relation == var2` if the two variables are related.
-relationBetween :: RefU -> RefU -> UIntRelations -> Maybe Bool
+relationBetween :: Eq n => RefU -> RefU -> UIntRelations n -> Maybe Bool
 relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
   (Root, Root) ->
     if var1 == var2
@@ -93,32 +94,32 @@ relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
 -- rememberPinnedBitTest _ xs = xs
 
 -- | Bind a variable to a value
-bindToValue :: RefU -> Bool -> UIntRelations -> UIntRelations
+bindToValue :: RefU -> n -> UIntRelations n -> UIntRelations n
 bindToValue x value xs =
   case lookup xs x of
     Root ->
       -- x does not have a parent, so it is its own root
-        xs
-          { links = Map.insert x (Right value) (links xs),
-            sizes = Map.insert x 1 (sizes xs)
-          }
+      xs
+        { links = Map.insert x (Right value) (links xs),
+          sizes = Map.insert x 1 (sizes xs)
+        }
     Constant _oldValue ->
       -- x is already a root with `_oldValue` as its value
       -- TODO: handle this kind of conflict in the future
       -- FOR NOW: overwrite the value of x with the new value
-        xs
-          { links = Map.insert x (Right value) (links xs)
-          }
-    ChildOf relation parent ->
-        xs
-          { links =
-              Map.insert parent (Right (value == relation)) $
-                Map.insert x (Right value) $
-                  links xs,
-            sizes = Map.insert x 1 (sizes xs)
-          }
+      xs
+        { links = Map.insert x (Right value) (links xs)
+        }
+    ChildOf _ parent ->
+      xs
+        { links =
+            Map.insert parent (Right value) $
+              Map.insert x (Right value) $
+                links xs,
+          sizes = Map.insert x 1 (sizes xs)
+        }
 
-relate :: RefU -> (Bool, RefU) -> UIntRelations -> Maybe UIntRelations
+relate :: RefU -> (Bool, RefU) -> UIntRelations n -> Maybe (UIntRelations n)
 relate x (relation, y) xs
   | x > y = relate' x (relation, y) xs
   | x < y = relate' y (relation, x) xs
@@ -126,31 +127,34 @@ relate x (relation, y) xs
 
 -- | Establish the relation of 'x = (relation == y)'
 --   Returns Nothing if the relation has already been established
-relate' :: RefU -> (Bool, RefU) -> UIntRelations -> Maybe UIntRelations
+relate' :: RefU -> (Bool, RefU) -> UIntRelations n -> Maybe (UIntRelations n)
 relate' x (relation, y) xs =
   case lookup xs x of
     Constant constantX ->
-      Just $ bindToValue y (relation == constantX) xs
+      Just $ bindToValue y constantX xs
     ChildOf relationX rootOfX ->
       relate rootOfX (relation == relationX, y) xs
     Root ->
       -- x does not have a parent, so it is its own root
       case lookup xs y of
         Constant constantY ->
-          Just $ bindToValue x (relation == constantY) xs
+          Just $ bindToValue x constantY xs
         ChildOf relationY rootOfY ->
           Just $
-              xs
-                { links = Map.insert x (Left (relation == relationY, rootOfY)) (links xs),
-                  sizes = Map.insertWith (+) y 1 (sizes xs)
-                }
+            xs
+              { links = Map.insert x (Left (relation == relationY, rootOfY)) (links xs),
+                sizes = Map.insertWith (+) y 1 (sizes xs)
+              }
         Root ->
           -- y does not have a parent, so it is its own root
           Just $
-              xs
-                { links = Map.insert x (Left (relation, y)) (links xs),
-                  sizes = Map.insertWith (+) y 1 (sizes xs)
-                }
+            xs
+              { links = Map.insert x (Left (relation, y)) (links xs),
+                sizes = Map.insertWith (+) y 1 (sizes xs)
+              }
 
-size :: UIntRelations -> Int
+size :: UIntRelations n -> Int
 size = Map.size . links
+
+toMap :: UIntRelations n -> Map RefU (Either (Bool, RefU) n)
+toMap = links
