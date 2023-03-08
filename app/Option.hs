@@ -35,8 +35,8 @@ data ProtocolOptions
   | CompileO1
   | CompileO2
   | Interpret
-  | GenCircuit
-  | GenWitness
+  | GenCircuit String
+  | GenWitness String
   deriving (Show)
 
 protocol :: Parser ProtocolOptions
@@ -77,7 +77,7 @@ protocol =
         <> command
           "toJSON"
           ( info
-              (pure GenCircuit <**> helper)
+              (GenCircuit <$> pathArg "circuit.jsonl" <**> helper)
               ( fullDesc
                   <> progDesc "Compile (-O1) a Keelung program to R1CS and output it as \"circuit.jsonl\""
               )
@@ -85,7 +85,7 @@ protocol =
         <> command
           "genCircuit"
           ( info
-              (pure GenCircuit <**> helper)
+              (GenCircuit <$> pathArg "circuit.jsonl" <**> helper)
               ( fullDesc
                   <> progDesc "Compile (-O1) a Keelung program to R1CS and output it as \"circuit.jsonl\""
               )
@@ -93,9 +93,13 @@ protocol =
         <> command
           "genWitness"
           ( info
-              (pure GenWitness <**> helper)
+              (GenWitness <$> pathArg "witness.jsonl" <**> helper)
               ( fullDesc
                   <> progDesc "Interpret (-O1) a Keelung program with inputs and output the witnesses it as \"witness.jsonl\""
               )
           )
     )
+
+pathArg :: String -> Parser String
+pathArg defaultPath = strOption
+  (long "filepath" <> value defaultPath <> metavar "FILEPATH" <> help "File path to store the circuit or witness")

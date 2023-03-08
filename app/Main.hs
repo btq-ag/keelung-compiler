@@ -70,17 +70,17 @@ main = withUtf8 $ do
             B64 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [B64])
             GF181 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [GF181])
             BN128 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [BN128])
-    Protocol GenCircuit -> do
+    Protocol (GenCircuit filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
       case decoded of
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> outputCircuitAndWriteFile (asB64 $ compileO1Elab elaborated)
-            GF181 -> outputCircuitAndWriteFile (asGF181 $ compileO1Elab elaborated)
-            BN128 -> outputCircuitAndWriteFile (asBN128 $ compileO1Elab elaborated)
-    Protocol GenWitness -> do
+            B64 -> outputCircuitAndWriteFile (asB64 $ compileO1Elab elaborated) filepath
+            GF181 -> outputCircuitAndWriteFile (asGF181 $ compileO1Elab elaborated) filepath
+            BN128 -> outputCircuitAndWriteFile (asBN128 $ compileO1Elab elaborated) filepath
+    Protocol (GenWitness filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
       case decoded of
@@ -89,13 +89,13 @@ main = withUtf8 $ do
           case fieldType of
             B64 ->
               outputInterpretedResultAndWriteFile
-                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [B64]) (map fromInteger rawPrivateInputs :: [B64]))
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [B64]) (map fromInteger rawPrivateInputs :: [B64])) filepath
             GF181 ->
               outputInterpretedResultAndWriteFile
-                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181]))
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181])) filepath
             BN128 ->
               outputInterpretedResultAndWriteFile
-                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128]))
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128])) filepath
     Version -> putStrLn "Keelung v0.9.0"
   where
     asB64 :: Either (Error B64) (RelocatedConstraintSystem B64) -> Either (Error B64) (RelocatedConstraintSystem B64)
@@ -110,26 +110,26 @@ main = withUtf8 $ do
     outputCircuit :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (RelocatedConstraintSystem n) -> IO ()
     outputCircuit cs = putStrLn $ BSC.unpack $ encode (left show (toR1CS <$> cs))
 
-    outputCircuitAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (RelocatedConstraintSystem n) -> IO ()
-    outputCircuitAndWriteFile cs = do
+    outputCircuitAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (RelocatedConstraintSystem n) -> FilePath -> IO ()
+    outputCircuitAndWriteFile cs filepath = do
       outputCircuit cs
       case cs of
         Left _ -> return ()
         Right cs' -> do
           let r1cs = toR1CS cs'
-          BS.writeFile "circuit.jsonl" (serializeR1CS r1cs)
+          BS.writeFile filepath (serializeR1CS r1cs)
 
     outputInterpretedResult :: (Serialize a, Serialize n) => Either a [n] -> IO ()
     outputInterpretedResult = putStrLn . BSC.unpack . encode
 
-    outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (Counters, [n], Vector n) -> IO ()
-    outputInterpretedResultAndWriteFile result = do
+    outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Either (Error n) (Counters, [n], Vector n) -> FilePath -> IO ()
+    outputInterpretedResultAndWriteFile result filepath = do
       -- print outputs
       outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
       case result of
         Left _ -> return ()
         Right (counters, _, witness) -> do
-          BS.writeFile "witness.jsonl" (serializeInputAndWitness counters witness)
+          BS.writeFile filepath (serializeInputAndWitness counters witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do
