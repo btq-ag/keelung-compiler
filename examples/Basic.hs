@@ -1,23 +1,7 @@
-{-# LANGUAGE DataKinds #-}
-{-# HLINT ignore "Use <&>" #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeApplications #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use head" #-}
-
 module Basic where
 
-import AggregateSignature.Program qualified
-import AggregateSignature.Util
 import Control.Monad (forM_)
 import Keelung
-import Keelung.Compiler
-  ( Error,
-    numberOfConstraints,
-    optimizeWithInput,
-  )
-import Keelung.Compiler qualified as Compiler
 
 --------------------------------------------------------------------------------
 
@@ -25,18 +9,6 @@ assertToBe42 :: Comp ()
 assertToBe42 = do
   x <- inputField Public
   assert $ x `eq` 42
-
--- | A program that expects the second input to be the square of the first input
--- This program returns no output
-assertSquare :: Comp ()
-assertSquare = do
-  x <- inputField Public
-  y <- input Public
-  assert ((x * x) `eq` y)
-
-constant1 :: Comp Field
-constant1 =
-  return $ 1 + 1
 
 identity :: Comp Field
 identity = input Public
@@ -49,18 +21,6 @@ eq1 :: Comp Boolean
 eq1 = do
   x <- inputField Public
   return $ x `eq` 3
-
-cond' :: Comp Field
-cond' = do
-  x <- inputField Public
-  return $ cond (x `eq` 3) 12 789
-
-summation :: Comp Field
-summation = do
-  arr <- inputList Public 4
-  reduce 0 [0 .. 3] $ \accum i -> do
-    let x = arr !! i
-    return $ accum + x
 
 summation2 :: Comp ()
 summation2 = do
@@ -91,15 +51,15 @@ assertArraysEqual2 = do
       let y = arr !! i !! j
       assert $ x `eq` y
 
-every :: Comp Boolean
-every = do
-  arr <- inputList Public 4
-  return $ foldl And true arr
+-- every :: Comp Boolean
+-- every = do
+--   arr <- inputList Public 4
+--   return $ foldl And true arr
 
-assert1 :: Comp ()
-assert1 = do
-  x <- inputField Public
-  assert (x `eq` 3)
+-- assert1 :: Comp ()
+-- assert1 = do
+--   x <- inputField Public
+--   assert (x `eq` 3)
 
 array1D :: Int -> Comp ()
 array1D n = do
@@ -131,65 +91,6 @@ toArray1 = do
       let y = ys !! j
       assert $ x `eq` y
 
-make :: Int -> Int -> Param GF181
-make dim n = makeParam dim n 42 $ Settings True True True
-
-aggSig :: Int -> Int -> Comp ()
-aggSig dim n = AggregateSignature.Program.aggregateSignature (make dim n)
-
-aggSigInput :: Int -> Int -> [Integer]
-aggSigInput dim n = map toInteger $ genInputFromParam (makeParam dim n 42 $ Settings True True True)
-
-p :: Param GF181
-p = makeParam 1 1 42 $ Settings False True False
-
--- inputList :: [GF181]
--- inputList = genInputFromParam p
-
-a1 :: Comp ()
-a1 = checkAgg 1 1
-
-a2 :: Comp ()
-a2 = checkSize 1 1
-
-a3 :: Comp ()
-a3 = checkLength 1 1
-
-agg :: Comp ()
-agg = a1 >> a2 >> a3
-
--- components of aggregate signature
-checkAgg :: Int -> Int -> Comp ()
-checkAgg dim n = AggregateSignature.Program.checkAgg (make dim n)
-
--- -- #2
-checkSize :: Int -> Int -> Comp ()
-checkSize dim n = AggregateSignature.Program.checkSize (make dim n)
-
--- -- #3
-checkLength :: Int -> Int -> Comp ()
-checkLength dim n = AggregateSignature.Program.checkLength (make dim n)
-
---------------------------------------------------------------------------------
-
-bench :: Encode t => Comp t -> Settings -> Int -> Int -> Either (Error GF181) (Int, Int, Int)
-bench program settings dimension n = do
-  let inputVal = genInputFromParam (makeParam dimension n 42 settings)
-  cs <- Compiler.compileO0 program -- before optimisation (only constant propagation)
-  cs' <- Compiler.compileO1 program -- after optimisation (constant propagation + constraint set reduction)
-  cs'' <- optimizeWithInput program inputVal -- after optimisation (constant propagation + constraint set reduction with input)
-  return
-    ( numberOfConstraints cs,
-      numberOfConstraints cs',
-      numberOfConstraints cs''
-    )
-
--- #1
-runAggSig :: Int -> Int -> Either (Error GF181) (Int, Int, Int)
-runAggSig dimension n = do
-  let settings = Settings True True True
-  bench (aggSig dimension n) settings dimension n
-
 outOfBound :: Comp ()
 outOfBound = do
   let xs = [true]
@@ -201,128 +102,8 @@ emptyArray = do
   let _ = [] :: [Boolean]
   return ()
 
-birthday :: Comp Boolean
-birthday = do
-  -- these inputList are private witnesses
-  _hiddenYear <- inputField Public
-  hiddenMonth <- inputField Public
-  hiddenDate <- inputField Public
-  -- these inputList are public inputList
-  month <- input Public
-  date <- input Public
-
-  return $ (hiddenMonth `eq` month) `And` (hiddenDate `eq` date)
-
 chainingAND :: Int -> Comp Boolean
 chainingAND n = foldl And true <$> inputList Public n
 
 chainingOR :: Int -> Comp Boolean
 chainingOR n = foldl Or false <$> inputList Public n
-
-bitValueU :: Comp [Boolean]
-bitValueU = do
-  let c = 3 :: UInt 4
-  return [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
-
-bitTestVarUI :: Comp [Boolean]
-bitTestVarUI = do
-  x <- inputUInt @4 Public
-  return [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
-
-notU :: Comp (UInt 4)
-notU = do
-  x <- inputUInt @4 Public
-  return $ complement x
-
-neqU :: Comp Boolean
-neqU = do
-  x <- inputUInt @4 Public
-  y <- inputUInt @4 Public
-  return $ x `neq` y
-
-bits2 :: Comp Boolean
-bits2 = do
-  x <- inputUInt @4 Public
-  y <- inputUInt @4 Public
-  z <- inputUInt @4 Public
-  w <- inputUInt @4 Public
-  return $ (x .&. y .&. z .&. w) !!! 0
-
-bitTestsOnBtoU :: Comp [Boolean]
-bitTestsOnBtoU = do
-  -- output | input | intermediate
-  -- bb       b       rrrrrrrruu
-  -- 01       2       3456789012
-  x <- input Public
-  let u = BtoU x :: UInt 4
-  return [u !!! 0, u !!! 1]
-
--- Formula: (0°C × 9/5) + 32 = 32°F
-tempConvert :: Comp Field
-tempConvert = do
-  toFahrenheit <- input Public
-  degree <- input Public
-  return $
-    cond
-      toFahrenheit
-      (degree * 9 / 5 + 32)
-      (degree - 32 * 5 / 9)
-
-mixed :: Comp Field
-mixed = do
-  boolean <- input Public 
-  number <- input Public 
-  return $ BtoF boolean + number * 2
-
-addU :: Comp (UInt 4)
-addU = do
-  x <- inputUInt @4 Public
-  y <- inputUInt @4 Public
-  return $ x + y + x
-
-mulU :: Comp (UInt 4)
-mulU = do
-  x <- inputUInt @4 Public
-  y <- inputUInt @4 Public
-  return $ x * y
-
-bitwise :: Comp [Boolean]
-bitwise = do
-  x <- inputUInt @4 Public
-  y <- inputUInt @4 Public
-  return
-    [ (x .&. y) !!! 0,
-      (x .|. y) !!! 1,
-      (x .^. y) !!! 2,
-      complement x !!! 3
-    ]
-
-arithU0 :: Comp (UInt 4)
-arithU0 = do
-  x <- inputUInt @4 Public
-  y <- inputUInt @4 Public
-  return $ x + y
-
-rotateAndBitTest :: Comp [Boolean]
-rotateAndBitTest = do
-  x <- inputUInt @4 Public
-  y <- inputUInt @4 Public
-  return
-    [ (x `rotate` 0) !!! 0,
-      (x `rotate` 1) !!! 1,
-      (x `rotate` (-1)) !!! 0,
-      ((x .^. y) `rotate` 1) !!! 1
-    ]
-
-rotateOnly :: Comp [UInt 4]
-rotateOnly = do
-  x <- inputUInt @4 Public
-  let constant = 3 :: UInt 4
-  -- y <- inputUInt @4
-  return
-    [ x `rotate` 0,
-      constant `rotate` 3,
-      constant `rotate` (-2),
-      x `rotate` 1 `rotate` 1,
-      (x + x) `rotate` 1
-    ]

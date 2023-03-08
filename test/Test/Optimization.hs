@@ -1,159 +1,145 @@
-module Test.Optimization (tests) where
+{-# HLINT ignore "Use <&>" #-}
+{-# LANGUAGE DataKinds #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-import qualified Basic
-import qualified Data.IntMap as IntMap
-import qualified Data.Sequence as Seq
-import Keelung (Comp, Encode, GF181)
-import Keelung.Compiler (asGF181, toR1CS)
-import qualified Keelung.Compiler as Compiler
+module Test.Optimization (tests, run) where
+
+import Data.Foldable
+import Hash.Poseidon qualified as Poseidon
+import Keelung hiding (compileO0, run)
+import Keelung.Compiler qualified as Compiler
+import Keelung.Compiler.Compile qualified as Compiler
+import Keelung.Compiler.Constraint
+import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), relocateConstraintSystem)
 import Keelung.Compiler.Error (Error)
-import Keelung.Compiler.Optimize
-import qualified Keelung.Compiler.Optimize.MinimizeRelocatedConstraints as O1
-import Keelung.Compiler.Optimize.Monad
-import Keelung.Compiler.Relocated
-import Keelung.Constraint.R1CS (toR1Cs)
+import Keelung.Compiler.Optimize qualified as Optimizer
+import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
+import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
+import Keelung.Compiler.Relocated qualified as Relocated
+import Test.HUnit (assertFailure)
 import Test.Hspec
+
+-- | elaborate => rewrite => type erase => constant propagation => compile
+compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0 program = Compiler.erase program >>= return . Compiler.run True . ConstantPropagation.run
+
+runTest :: Encode t => Int -> Int -> Comp t -> IO (ConstraintSystem (N GF181))
+runTest expectedBeforeSize expectedAfterSize program = do
+  cs <- case Compiler.asGF181N $ compileO0 program of
+    Left err -> assertFailure $ show err
+    Right result -> return result
+
+  let cs' = Optimizer.optimize1' cs
+
+  -- print cs
+  -- print cs'
+
+  -- var counters should remain the same
+  csCounters cs `shouldBe` csCounters cs'
+
+  -- compare the number of constraints
+  let actualBeforeSize = Relocated.numberOfConstraints (relocateConstraintSystem cs)
+  actualBeforeSize `shouldBe` expectedBeforeSize
+  let actualAfterSize = Relocated.numberOfConstraints (relocateConstraintSystem cs')
+  actualAfterSize `shouldBe` expectedAfterSize
+
+  return cs'
+
+run :: IO ()
+run = hspec tests
 
 tests :: SpecWith ()
 tests = do
-  describe "Constraint set reduction (O1)" $ do
-    it "$0 = $1" $
-      let constraint = head $ cadd 0 [(0, 1), (1, -1)]
-          links = IntMap.fromList [(1, 0)]
-          sizes = IntMap.fromList [(0, 2)]
-          go :: OptiM GF181 a -> a
-          go = runOptiM' links sizes mempty
-       in go (O1.substConstraint constraint)
-            `shouldBe` Nothing
+  describe "Constraint minimization" $ do
+    it "Poseidon" $ do
+      _cs <- runTest 1537 694 $ do
+        xs <- inputList Public 1
+        Poseidon.hash (toList xs)
 
-    it "should work 1" $
-      let cs =
-            RelocatedConstraintSystem
-              { csConstraints =
-                  Seq.fromList $
-                    concat
-                      [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
-                        cadd 0 [(0, 10582), (1, 7317), (17, -1)],
-                        cadd 0 [(2, 3853), (3, 4216), (15, -1)],
-                        cadd 0 [(2, 8073), (3, 3853), (14, -1)],
-                        cadd 0 [(4, 1), (8, 12289), (17, -1)],
-                        cadd 0 [(5, 1), (9, 12289), (16, -1)],
-                        cadd 0 [(6, 1), (10, 12289), (15, -1)],
-                        cadd 0 [(7, 1), (11, 12289), (14, -1)],
-                        cadd 0 [(4, 1), (6, 1), (13, -1)],
-                        cadd 0 [(5, 1), (7, 1), (12, -1)],
-                        cadd 10623 [(13, -1)],
-                        cadd 11179 [(12, -1)]
-                      ],
-                csCounters = mempty
-              }
-       in optimize1 (cs :: RelocatedConstraintSystem GF181) `shouldNotBe` cs
+      -- print _cs
+      -- print (relocateConstraintSystem _cs)
 
-  -- describe "Constraint merging (O2)" $ do
-  --   it "CAdd & CAdd" $
-  --     let cs =
-  --           ConstraintSystem
-  --             { csConstraints =
-  --                 Set.fromList $
-  --                   cadd 0 [(0, 1), (1, 1), (4, 1)]
-  --                     ++ cadd 0 [(2, 1), (3, 1), (4, 1)],
-  --               csNumBinReps = mempty,
-  --               csCustomBinReps = mempty,
-  --               csCounters = mempty
-  --             }
-  --         cs' =
-  --           ConstraintSystem
-  --             { csConstraints =
-  --                 Set.fromList $
-  --                   cadd 0 [(0, -1), (1, -1), (2, 1), (3, 1)],
-  --               csNumBinReps = mempty,
-  --               csCustomBinReps = mempty,
-  --               csCounters = mempty
-  --             }
-  --      in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+      return ()
 
-  --   it "CAdd & CMul 1" $
-  --     let cs =
-  --           ConstraintSystem
-  --             { csConstraints =
-  --                 Set.fromList $
-  --                   cmul [(3, 1)] [(2, 1)] (42, []) --- $3 * $2 = 42
-  --                     ++ cadd 0 [(3, 1), (0, 1), (1, 1)], --- 0 = $3 + $0 + $1
-  --               csNumBinReps = mempty,
-  --               csCustomBinReps = mempty,
-  --               csCounters = mempty
-  --             }
-  --         cs' =
-  --           ConstraintSystem
-  --             { csConstraints =
-  --                 Set.fromList (cmul [(0, -1), (1, -1)] [(2, 1)] (42, [])), -- (- $0 - $1) * $2 = 42
-  --               csNumBinReps = mempty,
-  --               csCustomBinReps = mempty,
-  --               csCounters = mempty
-  --             }
-  --      in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+    it "Field 1" $ do
+      cs <- runTest 3 1 $ do
+        x <- inputField Public
+        y <- reuse x
+        z <- reuse x
+        return (x + y + z)
 
-  --   it "CAdd & CMul 2" $
-  --     let cs =
-  --           ConstraintSystem
-  --             { csConstraints =
-  --                 Set.fromList $
-  --                   cadd 0 [(3, 1), (0, 1), (1, 1)] --- 0 = $3 + $0 + $1
-  --                     ++ cmul [(2, 1)] [(3, 1)] (42, []), --- $2 * $3 = 42
-  --               csNumBinReps = mempty,
-  --               csCustomBinReps = mempty,
-  --               csCounters = mempty
-  --             }
-  --         cs' =
-  --           ConstraintSystem
-  --             { csConstraints =
-  --                 Set.fromList (cmul [(2, 1)] [(0, -1), (1, -1)] (42, [])), -- (- $0 - $1) * $2 = 42
-  --               csNumBinReps = mempty,
-  --               csCustomBinReps = mempty,
-  --               csCounters = mempty
-  --             }
-  --      in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+      -- FO0 = 3FI0
+      UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (3, 0)
+      -- F0 (y) = FI0
+      UnionFind.relationBetween (RefF 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+      -- F1 (z) = F0 (y)
+      UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (1, 0)
 
-  --   it "CAdd & CMul 3" $
-  --     let cs =
-  --           ConstraintSystem
-  --             { csConstraints =
-  --                 Set.fromList $
-  --                   cadd 0 [(4, 1), (0, 1), (1, 1)] --- 0 = $4 + $0 + $1
-  --                     ++ cmul [(2, 1)] [(3, 1)] (0, [(4, 1)]), --- $2 * $3 = $4
-  --               csNumBinReps = mempty,
-  --               csCustomBinReps = mempty,
-  --               csCounters = mempty
-  --             }
-  --         cs' =
-  --           ConstraintSystem
-  --             { csConstraints =
-  --                 Set.fromList $
-  --                   cmul [(2, 1)] [(3, 1)] (0, [(0, -1), (1, -1)]), --- $2 * $3 = - $0 - $1
-  --               csNumBinReps = mempty,
-  --               csCustomBinReps = mempty,
-  --               csCounters = mempty
-  --             }
-  --      in optimize2 (cs :: ConstraintSystem GF181) `shouldBe` cs'
+    it "Field 2" $ do
+      cs <- runTest 3 1 $ do
+        x <- inputField Public
+        y <- reuse x
+        z <- reuse (x + y)
+        return (x + y + z)
 
-  describe "Constraint number counting" $ do
-    describe "AND Chaining" $ do
-      it "1 variable" $ count (Basic.chainingAND 1) `shouldBe` Right (2 + 1)
-      it "2 variables" $ count (Basic.chainingAND 2) `shouldBe` Right (3 + 1)
-      it "3 variables" $ count (Basic.chainingAND 3) `shouldBe` Right (4 + 2)
-      it "4 variables" $ count (Basic.chainingAND 4) `shouldBe` Right (5 + 2)
-      it "5 variables" $ count (Basic.chainingAND 5) `shouldBe` Right (6 + 2)
+      -- FO0 = 4FI0
+      UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (4, 0)
+      -- F0 (y) = FI0
+      UnionFind.relationBetween (RefF 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+      -- F1 (z) = 2F0 (y)
+      UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (2, 0)
 
-    describe "OR Chaining" $ do
-      it "1 variable" $ count (Basic.chainingOR 1) `shouldBe` Right 3
-      it "2 variables" $ count (Basic.chainingOR 2) `shouldBe` Right 4
-      it "3 variables" $ count (Basic.chainingOR 3) `shouldBe` Right (4 + 3)
-      it "4 variables" $ count (Basic.chainingOR 4) `shouldBe` Right (5 + 3)
-      it "5 variables" $ count (Basic.chainingOR 5) `shouldBe` Right (6 + 3)
-      it "6 variables" $ count (Basic.chainingOR 6) `shouldBe` Right (7 + 3)
-      it "7 variables" $ count (Basic.chainingOR 7) `shouldBe` Right (8 + 3)
-  where
-    count :: Encode t => Comp t -> Either (Error GF181) Int
-    count program = do
-      cs <- asGF181 (Compiler.compile program)
-      return $ length $ toR1Cs $ toR1CS cs
+    it "Field 3" $ do
+      cs <- runTest 2 1 $ do
+        x <- inputField Public
+        y <- reuse (x + 1)
+        return (x + y)
+
+      -- FO0 = 2FI0 + 1
+      UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (2, 1)
+
+    it "Field 4" $ do
+      cs <- runTest 1 1 $ do
+        let x = 4
+        y <- reuse x
+        return (x + y :: Field)
+      UnionFind.parentOf (csVarEqF cs) (RefFO 0) `shouldBe` UnionFind.Constant 8
+
+    it "Field 5" $ do
+      _cs <- runTest 2 1 $ do
+        x <- inputField Public
+        y <- reuse x
+        return (x * y :: Field)
+      return ()
+
+    it "Boolean 1" $ do
+      _cs <- runTest 4 3 $ do
+        x <- inputBool Public
+        y <- reuse x
+        return (x .|. y)
+      return ()
+
+    it "Boolean 2" $ do
+      _cs <- runTest 3 3 $ do
+        x <- inputBool Public
+        reuse x
+      return ()
+
+-- it "UInt 1" $ do
+--   _cs <- runTest 15 11 $ do
+--     x <- inputUInt Public :: Comp (UInt 4)
+--     y <- reuse x
+--     -- z <- reuse x
+--     return (x + y)
+--   print _cs
+--   print $ relocateConstraintSystem _cs
+--   return ()
+
+-- it "Boolean 2" $ do
+--   _cs <- runTest 15 15 $ do
+--     x <- inputField Public
+--     return (x `eq` 100 .|. x `eq` 200 .|. x `eq` 300)
+
+--   print _cs
+--   print $ relocateConstraintSystem _cs
+--   return ()

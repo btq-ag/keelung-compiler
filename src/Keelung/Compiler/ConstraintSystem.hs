@@ -52,7 +52,6 @@ data ConstraintSystem n = ConstraintSystem
     csAddU :: [PolyG RefU n],
     -- multiplicative constraints
     csMulF :: [(PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))],
-    csMulB :: [(PolyG RefB n, PolyG RefB n, Either n (PolyG RefB n))],
     csMulU :: [(PolyG RefU n, PolyG RefU n, Either n (PolyG RefU n))],
     -- constraints for computing equality
     csNEqF :: Map (RefF, RefF) RefF,
@@ -68,7 +67,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showAddF
       <> showAddU
       <> showMulF
-      <> showMulB
       <> showMulU
       <> showNEqF
       <> showNEqU
@@ -117,15 +115,10 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       showVarEqF = "  VarEqF:\n" <> indent (indent (show (csVarEqF cs)))
       showVarEqU = "  VarEqU:\n" <> indent (indent (show (csVarEqU cs)))
 
-      -- showVarBindU = adapt "VarBindU" (Map.toList $ csVarBindU cs) $ \(var, val) -> show var <> " = " <> show val
-      -- showVarBindF = adapt "VarBindF" (Map.toList $ csVarBindF cs) $ \(var, val) -> show var <> " = " <> show val
-      -- showVarBindB = adapt "VarBindB" (Map.toList $ csVarBindB cs) $ \(var, val) -> show var <> " = " <> show val
-
       showAddF = adapt "AddF" (csAddF cs) show
       showAddU = adapt "AddU" (csAddU cs) show
 
       showMulF = adapt "MulF" (csMulF cs) showMul
-      showMulB = adapt "MulB" (csMulB cs) showMul
       showMulU = adapt "MulU" (csMulU cs) showMul
 
       showNEqF = adapt "NEqF" (Map.toList $ csNEqF cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
@@ -231,22 +224,20 @@ relocateConstraintSystem cs =
 
     shouldRemoveB _ = False
 
-    fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Map RefB Int -> Map RefU Int ->  Seq (Relocated.Constraint n)
-    fromUnionFindF unionFind occurrencesF occurrencesB occurrencesU  =
+    fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    fromUnionFindF unionFind occurrencesF occurrencesB occurrencesU =
       let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
           publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
           privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
           occurredInF = Map.keys $ Map.filterWithKey (\ref count -> count > 0 && not (pinnedRefF ref)) occurrencesF
-
        in Seq.fromList
             (Maybe.mapMaybe toConstraint outputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
-            <> fromUnionFindB boolRels occurrencesF occurrencesB occurrencesU 
+            <> fromUnionFindB boolRels occurrencesF occurrencesB occurrencesU
       where
-        boolRels = UnionFind.exportBooleanRelations unionFind 
-        -- <> Seq.fromList (Maybe.mapMaybe toConstraintRefB pairs)
+        boolRels = UnionFind.exportBooleanRelations unionFind
 
         toConstraint var = case UnionFind.parentOf unionFind var of
           UnionFind.Root ->
@@ -309,10 +300,19 @@ relocateConstraintSystem cs =
             Just $ fromConstraint counters $ CVarBindB var (if intercept then 1 else 0)
           BooleanRelations.ChildOf True root -> Just $ fromConstraint counters $ CVarEqB var root
           BooleanRelations.ChildOf False root -> Just $ fromConstraint counters $ CVarNEqB var root
-    -- -- var = slope * root + intercept
-    -- case PolyG.build 0 [(var, -1), (root, if slope then 1 else -1)] of
-    --   Left _ -> Nothing
-    --   Right poly -> Just $ fromConstraint counters $ CAddB poly
+
+    -- fromUnionFindU2 :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    -- fromUnionFindU2 unionFind occurrencesF occurrencesB occurrencesU =
+    --   let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
+    --       publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
+    --       privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
+    --       occurredInF = Map.keys $ Map.filterWithKey (\ref count -> count > 0 && not (pinnedRefF ref)) occurrencesF
+    --    in Seq.fromList
+    --         (Maybe.mapMaybe toConstraint outputVars)
+    --         <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
+    --         <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
+    --         <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
+    --         <> fromUnionFindB boolRels occurrencesF occurrencesB occurrencesU
 
     fromUnionFindU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, (Maybe (n, RefU), n)) -> Maybe (Relocated.Constraint n)
     fromUnionFindU occurrences (var1, (Nothing, c)) =
@@ -332,14 +332,8 @@ relocateConstraintSystem cs =
             else Just $ fromConstraint counters (CAddU poly)
 
     varEqFs = fromUnionFindF (csVarEqF cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
-    -- varEqBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqB) $ csVarEqB cs
-    -- varEqBs = fromUnionFindB (csVarEqB cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
     varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UnionFind.toMap $ csVarEqU cs
-    -- varEqUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarEqU) $ csVarEqU cs
-    -- varBindBs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindB) $ Map.toList $ csVarBindB cs
-    -- varBindUs = Seq.fromList $ map (fromConstraint counters . uncurry CVarBindU) $ Map.toList $ csVarBindU cs
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
-    -- addBs = Seq.fromList $ map (fromConstraint counters . CAddB) $ csAddB cs
     addUs = Seq.fromList $ map (fromConstraint counters . CAddU) $ csAddU cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
     mulUs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulU) $ csMulU cs
@@ -357,7 +351,6 @@ sizeOfConstraintSystem cs =
     + length (csAddF cs)
     + length (csAddU cs)
     + length (csMulF cs)
-    + length (csMulB cs)
     + length (csMulU cs)
     + length (csNEqF cs)
     + length (csNEqU cs)

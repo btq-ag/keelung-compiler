@@ -1,10 +1,13 @@
-module Test.VarLayout (tests) where
+module Test.VarLayout (tests, run) where
 
-import Keelung
+import Keelung hiding (run)
 import Keelung.Compiler
 import Keelung.Compiler qualified as Compiler
 import Keelung.Syntax.Counters
 import Test.Hspec
+
+run :: IO ()
+run = hspec tests
 
 tests :: SpecWith ()
 tests = do
@@ -172,6 +175,25 @@ tests = do
       getCountByType OfBoolean counters `shouldBe` 0
       getCountByType (OfUIntBinRep undefined) counters `shouldBe` 16
       getCountByType (OfUInt undefined) counters `shouldBe` 4
+
+  describe "Variable indexing 3" $ do
+    --
+    --                F   B   BR  U4  U5  U8
+    --       output   0   0   0   0   0   0
+    --        input   0   0   0   0   0   0
+    -- intermediate   0   0   21  4   1   1
+    --
+    let counters =
+          ( addCount OfIntermediate (OfUInt 4) 2
+              . addCount OfIntermediate (OfUInt 5) 1
+              . addCount OfIntermediate (OfUInt 8) 1
+          )
+            mempty
+    it "reindex" $ do
+      reindex counters OfIntermediate (OfUIntBinRep 4) 0 `shouldBe` 0
+      reindex counters OfIntermediate (OfUIntBinRep 4) 1 `shouldBe` 4
+      reindex counters OfIntermediate (OfUIntBinRep 5) 0 `shouldBe` 8
+      reindex counters OfIntermediate (OfUIntBinRep 8) 0 `shouldBe` 13
 
   describe "Layout 0" $ do
     --                F   B   BR  U

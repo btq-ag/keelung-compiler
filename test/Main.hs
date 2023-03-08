@@ -17,25 +17,25 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Syntax.Counters
 import Test.BooleanRelations qualified as BooleanRelations
 import Test.Compilation qualified as Compilation
-import Test.ConstraintMinimizer qualified as ConstraintMinimizer
 import Test.Hspec
 import Test.Interpreter qualified as Interpreter
 import Test.Optimization qualified as Optimization
+import Test.OptimizationOld qualified as OptimizationOld
 import Test.UnionFind qualified as UnionFind
 import Test.VarLayout qualified as VarBookkeep
 import Test.WitnessGeneration qualified as WitnessGeneration
 
 main :: IO ()
 main = hspec $ do
-  describe "Constraint Minimization" ConstraintMinimizer.tests
-
   describe "Witness generation" WitnessGeneration.tests
 
   describe "Interpreter" Interpreter.tests
 
   describe "Compilation" Compilation.tests
 
-  describe "Optimization" Optimization.tests
+  describe "Optimization (old)" OptimizationOld.tests
+  
+  describe "Optimization (new)" Optimization.tests
 
   describe "Variable Bookkeeping" VarBookkeep.tests
 

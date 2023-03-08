@@ -36,7 +36,6 @@ library
       Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
       Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
-      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
@@ -94,7 +93,6 @@ executable keelungc
       Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
       Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
-      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
@@ -113,8 +111,6 @@ executable keelungc
       Keelung.Interpreter.Typed
       AggregateSignature.Program
       AggregateSignature.Util
-      Array.Immutable
-      Array.Mutable
       Basic
       Hash.Poseidon
       Hash.Poseidon.Constant
@@ -153,9 +149,9 @@ test-suite keelung-test
   other-modules:
       Test.BooleanRelations
       Test.Compilation
-      Test.ConstraintMinimizer
       Test.Interpreter
       Test.Optimization
+      Test.OptimizationOld
       Test.PolyG
       Test.UnionFind
       Test.VarLayout
@@ -171,7 +167,6 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
       Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
-      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints2
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
@@ -190,8 +185,6 @@ test-suite keelung-test
       Keelung.Interpreter.Typed
       AggregateSignature.Program
       AggregateSignature.Util
-      Array.Immutable
-      Array.Mutable
       Basic
       Hash.Poseidon
       Hash.Poseidon.Constant

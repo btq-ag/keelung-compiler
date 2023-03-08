@@ -25,12 +25,10 @@ module Keelung.Compiler
     compileO0',
     compileO1,
     compileO1',
-    compileO2,
     optimizeWithInput,
     --
     compileO0Elab,
     compileO1Elab,
-    compileO2Elab,
     interpretElab,
     generateWitnessElab,
     --
@@ -122,13 +120,6 @@ compile ::
   Either (Error n) (RelocatedConstraintSystem n)
 compile = compileO1
 
--- | elaboration => rewriting => type erasure => constant propagation => compilation => optimisation I + II
-compileO2 ::
-  (GaloisField n, Integral n, Encode t) =>
-  Comp t ->
-  Either (Error n) (RelocatedConstraintSystem n)
-compileO2 prog = compileO1 prog >>= return . Optimizer.optimize2
-
 -- with optimisation + partial evaluation with inputs
 optimizeWithInput ::
   (GaloisField n, Integral n, Encode t) =>
@@ -165,9 +156,6 @@ compileO0Elab = return . relocateConstraintSystem . Compile.run False . Constant
 
 compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
 compileO1Elab = return . Optimizer.optimize1 . relocateConstraintSystem . Compile.run False . ConstantPropagation.run . Erase.run
-
-compileO2Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO2Elab = return . Optimizer.optimize2 . Optimizer.optimize1 . relocateConstraintSystem . Compile.run False . ConstantPropagation.run . Erase.run
 
 --------------------------------------------------------------------------------
 

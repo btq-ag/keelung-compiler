@@ -11,6 +11,7 @@ import AggregateSignature.Program qualified as AggSig
 import AggregateSignature.Util qualified as AggSig
 import Basic qualified
 import Control.Arrow (left)
+import Control.Monad (when)
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), toR1CS)
@@ -46,66 +47,62 @@ typed prog rawPublicInputs rawPrivateInputs = do
 -- csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 -- csOld prog rawInputs = do
 --   r1cs' <- toR1CS <$> Compiler.compileO1 prog
---   let inps = Inputs.deserialize (r1csCounters r1cs') rawInputs
---   case R1CS.run r1cs' inps of
+--   let inputs = Inputs.deserialize (r1csCounters r1cs') rawInputs
+--   case R1CS.run r1cs' inputs of
 --     Left err -> Left (InterpretError err)
 --     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
-csNew :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
-csNew prog rawPublicInputs rawPrivateInputs = do
+r1csNew :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
+r1csNew prog rawPublicInputs rawPrivateInputs = do
   r1cs' <- toR1CS . relocateConstraintSystem <$> Compiler.compileO1' prog
-  let inps = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
-  case R1CS.run r1cs' inps of
+  let inputs = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
+  case R1CS.run r1cs' inputs of
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
-relocated :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
-relocated prog rawPublicInputs rawPrivateInputs = do
+r1csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
+r1csOld prog rawPublicInputs rawPrivateInputs = do
   r1cs' <- toR1CS <$> Compiler.compile prog
-  let inps = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
-  case Relocated.run r1cs' inps of
+  let inputs = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
+  case Relocated.run r1cs' inputs of
     Left err -> Left (ExecError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
-r1cs :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
-r1cs prog rawPublicInputs rawPrivateInputs = do
+r1csO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
+r1csO0 prog rawPublicInputs rawPrivateInputs = do
   r1cs' <- toR1CS <$> Compiler.compileO0 prog
-  let inps = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
-  case R1CS.run r1cs' inps of
+  let inputs = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
+  case R1CS.run r1cs' inputs of
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
 
-runAll :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> [n] -> IO ()
-runAll program rawPublicInputs rawPrivateInputs rawOutputs = do
+runAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
+runAll = runAll' True
+
+runAllExceptForTheOldOptimizer :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
+runAllExceptForTheOldOptimizer = runAll' False
+
+runAll' :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Bool -> Comp t -> [n] -> [n] -> [n] -> IO ()
+runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs rawOutputs = do
+  -- print $ Compiler.asGF181N $ Compiler.compileO0 program
+  -- print $ Compiler.asGF181N $ Compiler.compileO1 program
+  -- print $ Compiler.asGF181N $ Compiler.compileO1' program
+  -- print (Compiler.asGF181N $ toR1CS . relocateConstraintSystem <$> Compiler.compileO1' program)
+
   kinded program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
   typed program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
+  r1csNew program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
+  when enableOldOptimizer $
+    r1csOld program rawPublicInputs rawPrivateInputs
+      `shouldBe` Right rawOutputs
+  r1csO0 program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
 
-  -- let oldO0 = Compiler.asGF181N $ Compiler.compileO0' program
-  -- let newO0 = Compiler.asGF181N $ Compiler.compileO0' program
-  -- let oldO1 = Compiler.asGF181N $ Compiler.compileO1 program
-  -- let newO1 = Compiler.asGF181N $ Compiler.compileO1' program
-  -- print "\n======oldO0=======\n"
-  -- print oldO0
-  -- print "\n======newO0=======\n"
-  -- print newO0
-  -- print "\n======oldO1=======\n"
-  -- print oldO1
-  -- print (toR1CS <$> oldO1)
-  -- print "\n======newO1=======\n"
-  -- print newO1
-  -- print (toR1CS . relocateConstraintSystem <$> newO1)
-
-  -- csNew program rawPublicInputs rawPrivateInputs
-  --   `shouldBe` Right rawOutputs
-  -- relocated program rawPublicInputs rawPrivateInputs
-  --   `shouldBe` Right rawOutputs
-  -- r1cs program rawPublicInputs rawPrivateInputs
-  --   `shouldBe` Right rawOutputs
-
-runAndCompare :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> IO ()
-runAndCompare program rawPublicInputs rawPrivateInputs = do
+runAndCompare :: (GaloisField n, Integral n, Encode t, Interpret t n) => Bool -> Comp t -> [n] -> [n] -> IO ()
+runAndCompare enableOldOptimizer program rawPublicInputs rawPrivateInputs = do
   let expectedOutput = kinded program rawPublicInputs rawPrivateInputs
   typed program rawPublicInputs rawPrivateInputs
     `shouldBe` expectedOutput
@@ -116,11 +113,12 @@ runAndCompare program rawPublicInputs rawPrivateInputs = do
   -- print optimized
   -- print (relocateConstraintSystem <$> optimized)
   -- print (toR1CS . relocateConstraintSystem <$> r1cs')
-  csNew program rawPublicInputs rawPrivateInputs
+  r1csNew program rawPublicInputs rawPrivateInputs
     `shouldBe` expectedOutput
-  relocated program rawPublicInputs rawPrivateInputs
-    `shouldBe` expectedOutput
-  r1cs program rawPublicInputs rawPrivateInputs
+  when enableOldOptimizer $
+    r1csOld program rawPublicInputs rawPrivateInputs
+      `shouldBe` expectedOutput
+  r1csO0 program rawPublicInputs rawPrivateInputs
     `shouldBe` expectedOutput
 
 tests :: SpecWith ()
@@ -205,6 +203,13 @@ tests = do
           let expectedOutput = if x == 3 then [1] else [0]
           runAll program [x :: GF181] [] expectedOutput
 
+      it "BtoF" $ do
+        let program = do
+              x <- input Public
+              y <- input Private
+              return $ BtoF x * BtoF y
+        runAll program [1 :: GF181] [1] [1]
+
     describe "Field" $ do
       it "arithmetics 1" $ do
         let program = do
@@ -261,7 +266,6 @@ tests = do
           runAll program [x :: GF181] [] expectedOutput
 
     describe "Unsigned Integers" $ do
-
       it "arithmetics 1" $ do
         let program = do
               f <- inputField Public
@@ -286,6 +290,33 @@ tests = do
         runAll program [2, 5 :: GF181] [] [7]
         runAll program [15, 1 :: GF181] [] [0]
 
+      it "arithmetics 3" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return $ x * y
+
+        runAll program [2, 4 :: GF181] [] [8]
+        runAll program [5, 6 :: GF181] [] [14]
+
+      it "arithmetics 4" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return $ x * y + y
+
+        runAll program [5, 6 :: GF181] [] [4]
+        runAll program [2, 5 :: GF181] [] [15]
+        runAll program [15, 1 :: GF181] [] [0]
+
+      it "arithmetics 5" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- reuse x
+              return (x + y)
+
+        runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
+
       it "rotate" $ do
         let program = do
               x <- inputUInt @4 Public
@@ -306,6 +337,18 @@ tests = do
         runAll program [3 :: GF181] [] [0, 0, 0, 1, 3, 6, 12, 8, 0]
         runAll program [5 :: GF181] [] [0, 0, 1, 2, 5, 10, 4, 8, 0]
 
+      it "rotate + bit test" $ do
+        -- 0011 0100211003
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return
+                [ (x `rotate` 0) !!! 0,
+                  (x `rotate` 1) !!! 1,
+                  (x `rotate` (-1)) !!! 0,
+                  ((x .^. y) `rotate` 1) !!! 1
+                ]
+        runAllExceptForTheOldOptimizer program [2, 3] [] [0, 0, 1, 1 :: GF181]
 
     describe "Statements" $ do
       it "assert 1" $ do
@@ -314,93 +357,79 @@ tests = do
               assert (x `eq` 3)
         runAll program [3 :: GF181] [] []
 
-    it "Basic.summation2" $
-      forAll (vector 4) $ \inp -> do
-        let expectedOutput = []
-        runAll Basic.summation2 (inp :: [GF181]) [] expectedOutput
+      it "Basic.summation2" $
+        forAll (vector 4) $ \inp -> do
+          let expectedOutput = []
+          runAll Basic.summation2 (inp :: [GF181]) [] expectedOutput
 
-    it "Basic.assertArraysEqual" $
-      runAll Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] [] []
+      it "Basic.assertArraysEqual" $
+        runAll Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] [] []
 
-    it "Basic.assertArraysEqual2" $
-      runAll Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] [] []
+      it "Basic.assertArraysEqual2" $
+        runAll Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] [] []
 
-    it "Basic.array1D" $
-      runAll (Basic.array1D 1) [2, 4 :: GF181] [] []
+      it "Basic.array1D" $
+        runAll (Basic.array1D 1) [2, 4 :: GF181] [] []
 
-    it "Basic.array2D 1" $
-      runAll (Basic.array2D 1 1) [2, 4 :: GF181] [] []
+      it "Basic.array2D 1" $
+        runAll (Basic.array2D 1 1) [2, 4 :: GF181] [] []
 
-    it "Basic.array2D 2" $
-      runAll (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9 :: GF181] [] []
+      it "Basic.array2D 2" $
+        runAll (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9 :: GF181] [] []
 
-    it "Basic.toArray1" $
-      runAll Basic.toArray1 [0 .. 7 :: GF181] [] []
+      it "Basic.toArray1" $
+        runAll Basic.toArray1 [0 .. 7 :: GF181] [] []
 
-    it "Basic.arithU0" $
-      runAll Basic.arithU0 [2, 3] [] [5 :: GF181]
+      describe "AggCheck" $ do
+        it "dim:1 sig:1" $
+          runAggCheck 1 1 []
+        it "dim:1 sig:10" $
+          runAggCheck 1 10 []
+        it "dim:10 sig:1" $
+          runAggCheck 10 1 []
+        it "dim:10 sig:10" $
+          runAggCheck 10 10 []
 
-    it "BtoF" $ do
-      let program = do
-            x <- input Public
-            y <- input Private
-            return $ BtoF x * BtoF y
-      runAll program [1 :: GF181] [1] [1]
+      describe "LT12289" $ do
+        it "dim:1 sig:1" $
+          runLT12289 1 1 []
+        it "dim:1 sig:10" $
+          runLT12289 1 10 []
+        it "dim:10 sig:1" $
+          runLT12289 10 1 []
+        it "dim:10 sig:10" $
+          runLT12289 10 10 []
 
-    it "Basic.rotateAndBitTest" $
-      -- 0011 0100211003
-      runAll Basic.rotateAndBitTest [2, 3] [] [0, 0, 1, 1 :: GF181]
+      describe "LenCheck" $ do
+        it "dim:1 sig:1" $
+          runLenCheck 1 1 []
+        it "dim:1 sig:10" $
+          runLenCheck 1 10 []
+        it "dim:10 sig:1" $
+          runLenCheck 10 1 []
+        it "dim:10 sig:10" $
+          runLenCheck 10 10 []
 
-    describe "AggCheck" $ do
-      it "dim:1 sig:1" $
-        runAggCheck 1 1 []
-      it "dim:1 sig:10" $
-        runAggCheck 1 10 []
-      it "dim:10 sig:1" $
-        runAggCheck 10 1 []
-      it "dim:10 sig:10" $
-        runAggCheck 10 10 []
+      describe "Poseidon" $ do
+        it "[0]" $ do
+          runAll (Poseidon.hash [0]) [0 :: N GF181] [] [969784935791658820122994814042437418105599415561111385]
 
-    describe "LT12289" $ do
-      it "dim:1 sig:1" $
-        runLT12289 1 1 []
-      it "dim:1 sig:10" $
-        runLT12289 1 10 []
-      it "dim:10 sig:1" $
-        runLT12289 10 1 []
-      it "dim:10 sig:10" $
-        runLT12289 10 10 []
-
-    describe "LenCheck" $ do
-      it "dim:1 sig:1" $
-        runLenCheck 1 1 []
-      it "dim:1 sig:10" $
-        runLenCheck 1 10 []
-      it "dim:10 sig:1" $
-        runLenCheck 10 1 []
-      it "dim:10 sig:10" $
-        runLenCheck 10 10 []
-
-    describe "Poseidon" $ do
-      it "[0]" $ do
-        runAll (Poseidon.hash [0]) [0 :: N GF181] [] [969784935791658820122994814042437418105599415561111385]
-
-  describe "Tests on the optimizer" $ do
-    it "Multiplicative 0" $ do
-      let program msg = do
-            msg0 <- reuse msg
-            msg1 <- reuse (msg0 + 1)
-            reuse ((msg1 + 1) * (msg1 + 1))
-      runAndCompare (program 0 :: Comp Field) [0 :: N GF181] []
-    it "Multiplicative 1" $ do
-      let program = do
-            let initState = (2, 3)
-            let round' (a, b) = (a + b, a * a + b * 2)
-            state1 <- reuse (round' initState) -- (5, 10)
-            state2 <- reuse (round' state1) -- (15, 45)
-            state3 <- reuse (round' state2) -- (60, 2025)
-            return $ fst state3
-      runAndCompare (program :: Comp Field) [0 :: N GF181] []
+    describe "Tests on the optimizer" $ do
+      it "Multiplicative 0" $ do
+        let program msg = do
+              msg0 <- reuse msg
+              msg1 <- reuse (msg0 + 1)
+              reuse ((msg1 + 1) * (msg1 + 1))
+        runAndCompare True (program 0 :: Comp Field) [0 :: N GF181] []
+      it "Multiplicative 1" $ do
+        let program = do
+              let initState = (2, 3)
+              let round' (a, b) = (a + b, a * a + b * 2)
+              state1 <- reuse (round' initState) -- (5, 10)
+              state2 <- reuse (round' state1) -- (15, 45)
+              state3 <- reuse (round' state2) -- (60, 2025)
+              return $ fst state3
+        runAndCompare True (program :: Comp Field) [0 :: N GF181] []
   where
     runAggCheck :: Int -> Int -> [GF181] -> IO ()
     runAggCheck dimension numberOfSignatures outputs =

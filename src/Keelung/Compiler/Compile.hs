@@ -178,7 +178,7 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new UnionFind.new mempty mempty mempty mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new UnionFind.new mempty mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -676,19 +676,20 @@ compileEqualityF isEq out x y =
 --------------------------------------------------------------------------------
 
 -- | Encoding addition on UInts with multiple operands: O(1)
---    C = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
+--      A       =          2ⁿAₙ₋₁ + ... + 2A₁ + A₀
+--      B       =          2ⁿBₙ₋₁ + ... + 2B₁ + B₀
+--      C       = 2ⁿ⁺¹Cₙ + 2ⁿCₙ₋₁ + ... + 2C₁ + C₀
+--      Result  =          2ⁿCₙ₋₁ + ... + 2C₁ + C₀
+--      C       = A + B
 compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> RefU -> RefU -> M n ()
-compileAddOrSubU isSub width out x y = do
-  let multiplier = 2 ^ width
-  -- We can refactor
-  --    out = A + B - 2ⁿ * (Aₙ₋₁ * Bₙ₋₁)
-  -- into the form of
-  --    (-2ⁿ * Aₙ₋₁) * (Bₙ₋₁) = (out - A - B)
-  add $
-    cMulU
-      (0, [(RefBtoRefU (RefUBit width x (width - 1)), -multiplier)])
-      (0, [(RefBtoRefU (RefUBit width y (width - 1)), 1)])
-      (0, [(out, 1), (x, -1), (y, if isSub then 1 else -1)])
+compileAddOrSubU isSub width out a b = do
+  c <- freshRefU (width + 1)
+  -- C = A + B
+  add $ cAddU 0 [(a, 1), (b, if isSub then -1 else 1), (c, -1)]
+  -- copying bits from C to 'out'
+  forM_ [0 .. width - 1] $ \i -> do
+    -- Cᵢ = outᵢ
+    add $ cVarEqB (RefUBit width c i) (RefUBit width out i)
 
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
 compileAddU = compileAddOrSubU False
@@ -697,12 +698,20 @@ compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M
 compileSubU = compileAddOrSubU True
 
 -- | Encoding addition on UInts with multiple operands: O(2)
---    C + 2ⁿ * Q = A * B
+--      A       =   2ⁿAₙ₋₁ + ... + 2A₁ + A₀
+--      B       =   2ⁿBₙ₋₁ + ... + 2B₁ + B₀
+--      C       = 2²ⁿC₂ₙ₋₁ + ... + 2C₁ + C₀
+--      Result  =   2ⁿCₙ₋₁ + ... + 2C₁ + C₀
+--      C       = A * B
 compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> RefU -> RefU -> M n ()
 compileMulU width out a b = do
-  -- (a) * (b) = result + 2ⁿ * quotient
-  quotient <- freshRefU width
-  add $ cMulU (0, [(a, 1)]) (0, [(b, 1)]) (0, [(out, 1), (quotient, 2 ^ width)])
+  c <- freshRefU (width * 2)
+  -- C = A * B
+  add $ cMulU (0, [(a, 1)]) (0, [(b, 1)]) (0, [(c, 1)])
+  -- copying bits from C to 'out'
+  forM_ [0 .. width - 1] $ \i -> do
+    -- Cᵢ = outᵢ
+    add $ cVarEqB (RefUBit width c i) (RefUBit width out i)
 
 -- | An universal way of compiling a conditional
 compileIfB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> RefB -> M n ()
