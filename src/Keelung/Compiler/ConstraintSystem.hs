@@ -1,5 +1,8 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use lambda-case" #-}
 
 module Keelung.Compiler.ConstraintSystem
   ( ConstraintSystem (..),
@@ -61,7 +64,7 @@ data ConstraintSystem n = ConstraintSystem
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show cs =
-    "ConstraintSystem {\n"
+    "Constraint Module {\n"
       <> showVarEqF
       <> showVarEqU
       <> showAddF
@@ -261,8 +264,23 @@ relocateConstraintSystem cs =
           findRefBInRefU (RefBtoRefU r) _ = Just r
           findRefBInRefU _ _ = Nothing
 
+          findRefUValInRefF (RefUVal _) 0 = Nothing
+          findRefUValInRefF (RefUVal r) _ = Just r
+          findRefUValInRefF _ _ = Nothing
+
           occurredInF = Map.elems $ Map.mapMaybeWithKey findRefBInRefF occurrencesF
           occurredInU = Map.elems $ Map.mapMaybeWithKey findRefBInRefU occurrencesU
+
+          refUsOccurredInF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findRefUValInRefF occurrencesF
+
+          occurredBitTests =
+            Set.filter
+              ( \refB ->
+                  case refB of
+                    RefUBit _ ref _ -> ref `Set.member` refUsOccurredInF
+                    _ -> False
+              )
+              (BooleanRelations.exportPinnedBitTests relations)
        in Seq.fromList
             (Maybe.mapMaybe toConstraint outputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
@@ -270,7 +288,7 @@ relocateConstraintSystem cs =
             <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
             <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInB)
             <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInU)
-            <> Seq.fromList (Maybe.mapMaybe toConstraint (Set.toList (BooleanRelations.exportPinnedBitTests relations)))
+            <> Seq.fromList (Maybe.mapMaybe toConstraint (Set.toList occurredBitTests))
       where
         toConstraint var = case BooleanRelations.lookup relations var of
           BooleanRelations.Root ->
@@ -289,13 +307,16 @@ relocateConstraintSystem cs =
           publicInputVars = [RefUI w i | w <- bitWidths, i <- [0 .. getCount OfPublicInput (OfUInt w) counters - 1]]
           privateInputVars = [RefUP w i | w <- bitWidths, i <- [0 .. getCount OfPrivateInput (OfUInt w) counters - 1]]
        in -- occurredInF = Map.keys $ Map.filterWithKey (\ref count -> count > 0 && not (pinnedRefF ref)) occurrencesF
-          Seq.fromList (Maybe.mapMaybe toConstraint outputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
-            <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
+          convert outputVars
+            <> convert publicInputVars
+            <> convert privateInputVars
       where
-        -- <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
+        -- <> convert binRepConstraints
 
-        -- boolRels = UIntRelations.exportBooleanRelations fieldRels
+        convert = Seq.fromList . Maybe.mapMaybe toConstraint
+
+        -- generate a BinRep constraint for every UInt variable occurred in the module
+        -- binRepConstraints = Map.keys $ Map.filterWithKey (\ref count -> count > 0 && not (pinnedRefU ref)) occurrencesU
 
         toConstraint var = case UIntRelations.lookup uintRels var of
           UIntRelations.Root -> Nothing

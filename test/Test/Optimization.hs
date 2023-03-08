@@ -1,6 +1,5 @@
 {-# HLINT ignore "Use <&>" #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Test.Optimization (tests, run) where
@@ -127,22 +126,31 @@ tests = do
       return ()
 
     it "UInt eq 1" $ do
-      _cs <- runTest 19 19 $ do
+      _cs <- runTest 11 11 $ do
         x <- inputUInt Public :: Comp (UInt 4)
         reuse x
+      print _cs
+      print $ relocateConstraintSystem _cs
       return ()
 
-    it "UInt add 1" $ do
-      _cs <- runTest 40 40 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Public
-        z <- inputUInt @4 Public
-        w <- reuse $ x + y
-        return $ x + y + z + w
-      -- print _cs
-      -- print $ relocateConstraintSystem _cs
-      return ()
+    -- it "UInt add 1" $ do
+    --   _cs <- runTest 40 40 $ do
+    --     x <- inputUInt @4 Public
+    --     y <- inputUInt @4 Public
+    --     z <- inputUInt @4 Public
+    --     w <- reuse $ x + y
+    --     return $ x + y + z + w
+    --   -- print _cs
+    --   -- print $ relocateConstraintSystem _cs
+    --   return ()
 
+    -- it "UInt rotate 1" $ do
+    --   _cs <- runTest 23 23 $ do
+    --     x <- inputUInt @4 Public
+    --     return [rotate x 0, rotate x 1]
+    --   print _cs
+    --   print $ relocateConstraintSystem _cs
+    --   return ()
 -- it "UInt 1" $ do
 --   _cs <- runTest 15 11 $ do
 --     x <- inputUInt Public :: Comp (UInt 4)
