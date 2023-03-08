@@ -178,7 +178,7 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new UnionFind.new mempty mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new UnionFind.new mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})

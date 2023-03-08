@@ -49,7 +49,6 @@ data ConstraintSystem n = ConstraintSystem
     csVarEqU :: UnionFind RefU n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
-    csAddU :: [PolyG RefU n],
     -- multiplicative constraints
     csMulF :: [(PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))],
     -- constraints for computing equality
@@ -64,7 +63,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showVarEqF
       <> showVarEqU
       <> showAddF
-      <> showAddU
       <> showMulF
       <> showNEqF
       <> showNEqU
@@ -114,7 +112,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       showVarEqU = "  VarEqU:\n" <> indent (indent (show (csVarEqU cs)))
 
       showAddF = adapt "AddF" (csAddF cs) show
-      showAddU = adapt "AddU" (csAddU cs) show
 
       showMulF = adapt "MulF" (csMulF cs) showMul
 
@@ -338,11 +335,7 @@ sizeOfConstraintSystem cs =
   UnionFind.size (csVarEqF cs)
     + BooleanRelations.size (UnionFind.exportBooleanRelations (csVarEqF cs))
     + UnionFind.size (csVarEqU cs)
-    -- + length (csVarBindF cs)
-    -- + length (csVarBindB cs)
-    -- + length (csVarBindU cs)
     + length (csAddF cs)
-    + length (csAddU cs)
     + length (csMulF cs)
     + length (csNEqF cs)
     + length (csNEqU cs)
