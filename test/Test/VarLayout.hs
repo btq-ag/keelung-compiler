@@ -195,6 +195,44 @@ tests = do
       reindex counters OfIntermediate (OfUIntBinRep 5) 0 `shouldBe` 8
       reindex counters OfIntermediate (OfUIntBinRep 8) 0 `shouldBe` 13
 
+  describe "Variable indexing 4" $ do
+    --
+    --                F   B   BR  U4  U5
+    --       output   0   0   4   1   0
+    --        input   0   0   12  3   0
+    -- intermediate   0   0   0   3   4
+    --
+    let counters =
+          ( addCount OfIntermediate (OfUInt 4) 3
+              . addCount OfIntermediate (OfUInt 5) 4
+              . addCount OfOutput (OfUInt 4) 1
+              . addCount OfPublicInput (OfUInt 4) 3
+          )
+            mempty
+    it "reindex" $ do
+      reindex counters OfOutput (OfUIntBinRep 4) 0 `shouldBe` 0
+      reindex counters OfOutput (OfUInt 4) 0 `shouldBe` 4
+      reindex counters OfPublicInput (OfUIntBinRep 4) 0 `shouldBe` 5
+      reindex counters OfPublicInput (OfUIntBinRep 4) 1 `shouldBe` 9
+      reindex counters OfPublicInput (OfUIntBinRep 4) 2 `shouldBe` 13
+      reindex counters OfPublicInput (OfUInt 4) 0 `shouldBe` 17
+      reindex counters OfPublicInput (OfUInt 4) 1 `shouldBe` 18
+      reindex counters OfPublicInput (OfUInt 4) 2 `shouldBe` 19
+      reindex counters OfIntermediate (OfUIntBinRep 4) 0 `shouldBe` 20
+      reindex counters OfIntermediate (OfUIntBinRep 4) 1 `shouldBe` 24
+      reindex counters OfIntermediate (OfUIntBinRep 4) 2 `shouldBe` 28
+      reindex counters OfIntermediate (OfUIntBinRep 5) 0 `shouldBe` 32
+      reindex counters OfIntermediate (OfUIntBinRep 5) 1 `shouldBe` 37
+      reindex counters OfIntermediate (OfUIntBinRep 5) 2 `shouldBe` 42
+      reindex counters OfIntermediate (OfUIntBinRep 5) 3 `shouldBe` 47
+      reindex counters OfIntermediate (OfUInt 4) 0 `shouldBe` 52
+      reindex counters OfIntermediate (OfUInt 4) 1 `shouldBe` 53
+      reindex counters OfIntermediate (OfUInt 4) 2 `shouldBe` 54
+      reindex counters OfIntermediate (OfUInt 5) 0 `shouldBe` 55
+      reindex counters OfIntermediate (OfUInt 5) 1 `shouldBe` 56
+      reindex counters OfIntermediate (OfUInt 5) 2 `shouldBe` 57
+      reindex counters OfIntermediate (OfUInt 5) 3 `shouldBe` 58
+
   describe "Layout 0" $ do
     --                F   B   BR  U
     --       output   1   0   0   0

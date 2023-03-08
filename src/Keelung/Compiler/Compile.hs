@@ -21,7 +21,6 @@ import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
-
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
@@ -191,30 +190,30 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       cs <- get
-      let csVarEqF' = FieldRelations.bindToValue x c (csVarEqF cs)
-      put cs {csVarEqF = csVarEqF'}
+      let csFieldRelations' = FieldRelations.bindToValue x c (csFieldRelations cs)
+      put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindB x c) = do
       cs <- get
-      let csVarEqF' = FieldRelations.bindBoolean x (c == 1) (csVarEqF cs)
-      put cs {csVarEqF = csVarEqF'}
+      let csFieldRelations' = FieldRelations.bindBoolean x (c == 1) (csFieldRelations cs)
+      put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindU x c) = do
       cs <- get
-      let csVarEqU' = UIntRelations.bindToValue x c (csVarEqU cs)
-      put cs {csVarEqU = csVarEqU'}
+      let csUIntRelations' = UIntRelations.bindToValue x c (csUIntRelations cs)
+      put cs {csUIntRelations = csUIntRelations'}
     addOne (CVarEqF x y) = do
       cs <- get
-      case FieldRelations.relate x (1, y, 0) (csVarEqF cs) of
+      case FieldRelations.relate x (1, y, 0) (csFieldRelations cs) of
         Nothing -> return ()
-        Just csVarEqF' -> put cs {csVarEqF = csVarEqF'}
+        Just csFieldRelations' -> put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqB x y) = do
-      modify' $ \cs -> cs {csVarEqF = FieldRelations.relateBoolean x (True, y) (csVarEqF cs)}
+      modify' $ \cs -> cs {csFieldRelations = FieldRelations.relateBoolean x (True, y) (csFieldRelations cs)}
     addOne (CVarNEqB x y) = do
-      modify' $ \cs -> cs {csVarEqF = FieldRelations.relateBoolean x (False, y) (csVarEqF cs)}
+      modify' $ \cs -> cs {csFieldRelations = FieldRelations.relateBoolean x (False, y) (csFieldRelations cs)}
     addOne (CVarEqU x y) = do
       cs <- get
-      case UIntRelations.relate x (True, y) (csVarEqU cs) of
+      case UIntRelations.relate x (True, y) (csUIntRelations cs) of
         Nothing -> return ()
-        Just csVarEqU' -> put cs {csVarEqU = csVarEqU'}
+        Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
     addOne (CMulF x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = do
       modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})

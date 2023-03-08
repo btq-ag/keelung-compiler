@@ -80,7 +80,7 @@ goThroughMulF = do
 -- -- if (x - y) = 0 then m = 0 else m = recip (x - y)
 -- reduceNEqF :: (GaloisField n, Integral n) => NEqF -> RoundM n (Maybe NEqF)
 -- reduceNEqF ((x, y), m) = do
---   unionFind <- gets csVarEqF
+--   unionFind <- gets csFieldRelations
 --   let resultX = FieldRelations.parentOf unionFind x
 --   let resultY = FieldRelations.parentOf unionFind y
 --   let resultM = FieldRelations.parentOf unionFind m
@@ -131,7 +131,7 @@ reduceAddF polynomial = do
   if changed
     then return Nothing
     else do
-      unionFind <- gets csVarEqF
+      unionFind <- gets csFieldRelations
       let boolRels = FieldRelations.exportBooleanRelations unionFind
       case substPolyG unionFind boolRels polynomial of
         Nothing -> return (Just polynomial) -- nothing changed
@@ -165,7 +165,7 @@ reduceMulF (polyA, polyB, polyC) = do
 
 substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefF n -> RoundM n (Either n (PolyG RefF n))
 substitutePolyF typeOfChange polynomial = do
-  unionFind <- gets csVarEqF
+  unionFind <- gets csFieldRelations
   let boolRels = FieldRelations.exportBooleanRelations unionFind
   case substPolyG unionFind boolRels polynomial of
     Nothing -> return (Right polynomial) -- nothing changed
@@ -289,18 +289,18 @@ bindToValue var value = do
   modify' $ \cs ->
     removeOccurrences [var] $
       cs
-        { csVarEqF = FieldRelations.bindToValue var value (csVarEqF cs)
+        { csFieldRelations = FieldRelations.bindToValue var value (csFieldRelations cs)
         }
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cs <- get
-  case FieldRelations.relate var1 (slope, var2, intercept) (csVarEqF cs) of
+  case FieldRelations.relate var1 (slope, var2, intercept) (csFieldRelations cs) of
     Nothing -> return False
     Just unionFind' -> do
       markChanged RelationChanged
-      modify' $ \cs' -> removeOccurrences [var1, var2] $ cs' {csVarEqF = unionFind'}
+      modify' $ \cs' -> removeOccurrences [var1, var2] $ cs' {csFieldRelations = unionFind'}
       return True
 
 addAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n ()

@@ -46,7 +46,7 @@ import Keelung.Data.VarGroup (toSubscript)
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
-fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
+fromConstraint :: (GaloisField n, Integral n) => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddF as) = Relocated.CAdd (fromPolyF_ counters as)
 fromConstraint counters (CVarEqF x y) = case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
   Left _ -> error "CVarEqF: two variables are the same"
@@ -162,13 +162,13 @@ reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 
 --------------------------------------------------------------------------------
 
-fromPolyF :: Integral n => Counters -> PolyG RefF n -> Either n (Poly n)
+fromPolyF :: (Integral n, GaloisField n) => Counters -> PolyG RefF n -> Either n (Poly n)
 fromPolyF counters poly = case PolyG.view poly of
   PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRefF counters var, coeff)]
   PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRefF counters var1, coeff1), (reindexRefF counters var2, coeff2)]
   PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRefF counters)) (Map.toList xs))
 
-fromPolyF_ :: Integral n => Counters -> PolyG RefF n -> Poly n
+fromPolyF_ :: (Integral n, GaloisField n) => Counters -> PolyG RefF n -> Poly n
 fromPolyF_ counters xs = case fromPolyF counters xs of
   Left _ -> error "[ panic ] fromPolyF_: Left"
   Right p -> p
