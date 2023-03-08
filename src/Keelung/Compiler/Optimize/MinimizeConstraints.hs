@@ -10,8 +10,8 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
 import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
+import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations (FieldRelations)
+import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 
@@ -80,10 +80,10 @@ goThroughMulF = do
 -- -- if (x - y) = 0 then m = 0 else m = recip (x - y)
 -- reduceNEqF :: (GaloisField n, Integral n) => NEqF -> RoundM n (Maybe NEqF)
 -- reduceNEqF ((x, y), m) = do
---   unionFind <- gets csVarEqF
---   let resultX = UnionFind.parentOf unionFind x
---   let resultY = UnionFind.parentOf unionFind y
---   let resultM = UnionFind.parentOf unionFind m
+--   unionFind <- gets csFieldRelations
+--   let resultX = FieldRelations.parentOf unionFind x
+--   let resultY = FieldRelations.parentOf unionFind y
+--   let resultM = FieldRelations.parentOf unionFind m
 
 --   case (resultX, resultY, resultM) of
 --     (Just (Nothing, _), Just (Nothing, _), Just (Nothing, _)) -> return Nothing
@@ -131,8 +131,8 @@ reduceAddF polynomial = do
   if changed
     then return Nothing
     else do
-      unionFind <- gets csVarEqF
-      let boolRels = UnionFind.exportBooleanRelations unionFind
+      unionFind <- gets csFieldRelations
+      let boolRels = FieldRelations.exportBooleanRelations unionFind
       case substPolyG unionFind boolRels polynomial of
         Nothing -> return (Just polynomial) -- nothing changed
         Just (Left _constant, removedRefs, _) -> do
@@ -165,8 +165,8 @@ reduceMulF (polyA, polyB, polyC) = do
 
 substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefF n -> RoundM n (Either n (PolyG RefF n))
 substitutePolyF typeOfChange polynomial = do
-  unionFind <- gets csVarEqF
-  let boolRels = UnionFind.exportBooleanRelations unionFind
+  unionFind <- gets csFieldRelations
+  let boolRels = FieldRelations.exportBooleanRelations unionFind
   case substPolyG unionFind boolRels polynomial of
     Nothing -> return (Right polynomial) -- nothing changed
     Just (Left constant, removedRefs, _) -> do
@@ -283,24 +283,24 @@ learnFromAddF poly = case PolyG.view poly of
     relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
   PolyG.Polynomial _ _ -> return False
 
-bindToValue :: GaloisField n => RefF -> n -> RoundM n ()
+bindToValue :: (GaloisField n, Integral n) => RefF -> n -> RoundM n ()
 bindToValue var value = do
   markChanged RelationChanged
   modify' $ \cs ->
     removeOccurrences [var] $
       cs
-        { csVarEqF = UnionFind.bindToValue var value (csVarEqF cs)
+        { csFieldRelations = FieldRelations.bindToValue var value (csFieldRelations cs)
         }
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
-relateF :: GaloisField n => RefF -> (n, RefF, n) -> RoundM n Bool
+relateF :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cs <- get
-  case UnionFind.relate var1 (slope, var2, intercept) (csVarEqF cs) of
+  case FieldRelations.relate var1 (slope, var2, intercept) (csFieldRelations cs) of
     Nothing -> return False
     Just unionFind' -> do
       markChanged RelationChanged
-      modify' $ \cs' -> removeOccurrences [var1, var2] $ cs' {csVarEqF = unionFind'}
+      modify' $ \cs' -> removeOccurrences [var1, var2] $ cs' {csFieldRelations = unionFind'}
       return True
 
 addAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n ()
@@ -325,7 +325,7 @@ addAddF poly = case PolyG.view poly of
 
 -- | Substitutes variables in a polynomial.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n) => UnionFind RefF n -> BooleanRelations -> PolyG RefF n -> Maybe (Either n (PolyG RefF n), [RefF], [RefF])
+substPolyG :: (GaloisField n, Integral n) => FieldRelations n -> BooleanRelations -> PolyG RefF n -> Maybe (Either n (PolyG RefF n), [RefF], [RefF])
 substPolyG ctx boolRels poly = do
   let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' (substPolyG_ ctx boolRels) (False, Left c, [], []) xs of
@@ -333,9 +333,9 @@ substPolyG ctx boolRels poly = do
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs)
 
-substPolyG_ :: (Integral n, GaloisField n) => UnionFind RefF n -> BooleanRelations -> (Bool, Either n (PolyG RefF n), [RefF], [RefF]) -> RefF -> n -> (Bool, Either n (PolyG RefF n), [RefF], [RefF])
-substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case UnionFind.parentOf ctx ref of
-  UnionFind.Root -> case ref of
+substPolyG_ :: (Integral n, GaloisField n) => FieldRelations n -> BooleanRelations -> (Bool, Either n (PolyG RefF n), [RefF], [RefF]) -> RefF -> n -> (Bool, Either n (PolyG RefF n), [RefF], [RefF])
+substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case FieldRelations.parentOf ctx ref of
+  FieldRelations.Root -> case ref of
     RefBtoRefF refB ->
       case BooleanRelations.lookup boolRels refB of
         BooleanRelations.Root ->
@@ -371,13 +371,13 @@ substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = 
       case accPoly of
         Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
         Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
-  UnionFind.Constant intercept ->
+  FieldRelations.Constant intercept ->
     -- ref = intercept
     let removedRefs' = ref : removedRefs -- add ref to removedRefs
      in case accPoly of
           Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
           Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', removedRefs', addedRefs)
-  UnionFind.ChildOf slope root intercept ->
+  FieldRelations.ChildOf slope root intercept ->
     if root == ref
       then
         if slope == 1 && intercept == 0
@@ -385,7 +385,7 @@ substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = 
           case accPoly of
             Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
             Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
-          else error "[ panic ] Invalid relation in UnionFind: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
+          else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
       else
         let removedRefs' = ref : removedRefs
             addedRefs' = root : addedRefs

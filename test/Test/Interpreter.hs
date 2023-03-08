@@ -280,7 +280,7 @@ tests = do
         runAll program [100, 1, 1 :: GF181] [] [101]
         runAll program [100, 0, 1 :: GF181] [] [102]
 
-      it "arithmetics 2" $ do
+      it "add 1" $ do
         let program = do
               x <- inputUInt @4 Public
               y <- inputUInt @4 Public
@@ -290,7 +290,19 @@ tests = do
         runAll program [2, 5 :: GF181] [] [7]
         runAll program [15, 1 :: GF181] [] [0]
 
-      it "arithmetics 3" $ do
+      it "add 2" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              z <- inputUInt @4 Public
+              w <- reuse $ x + y
+              return $ x + y + z + w
+
+        -- runAll program [5, 6, 7 :: GF181] [] [13]
+        -- runAll program [2, 5, 3 :: GF181] [] [1]
+        runAll program [0, 1, 2 :: GF181] [] [4]
+
+      it "mul 3" $ do
         let program = do
               x <- inputUInt @4 Public
               y <- inputUInt @4 Public
@@ -316,6 +328,14 @@ tests = do
               return (x + y)
 
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
+
+      it "eq 1" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return (x `eq` y)
+        runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [0]
+        runAllExceptForTheOldOptimizer program [4, 4 :: GF181] [] [1]
 
       it "rotate" $ do
         let program = do

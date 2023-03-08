@@ -15,13 +15,7 @@ module Keelung.Compiler.Constraint
     pinnedRefF,
     pinnedRefB,
     pinnedRefU,
-    -- addOccurrencesWithPolyG,
-    -- removeOccurrencesWithPolyG,
-    -- addOccurrences,
-    -- removeOccurrences,
     cAddF,
-    -- cAddB,
-    cAddU,
     cVarEqF,
     cVarEqB,
     cVarNEqB,
@@ -30,7 +24,6 @@ module Keelung.Compiler.Constraint
     cVarBindB,
     cVarBindU,
     cMulF,
-    cMulU,
     cMulSimpleF,
     cNEqF,
     cNEqU,
@@ -53,9 +46,8 @@ import Keelung.Data.VarGroup (toSubscript)
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
-fromConstraint :: Integral n => Counters -> Constraint n -> Relocated.Constraint n
+fromConstraint :: (GaloisField n, Integral n) => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddF as) = Relocated.CAdd (fromPolyF_ counters as)
-fromConstraint counters (CAddU as) = Relocated.CAdd (fromPolyU_ counters as)
 fromConstraint counters (CVarEqF x y) = case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
   Left _ -> error "CVarEqF: two variables are the same"
   Right xs -> Relocated.CAdd xs
@@ -79,14 +71,6 @@ fromConstraint counters (CMulF as bs cs) =
         Left n -> Left n
         Right xs -> fromPolyF counters xs
     )
-fromConstraint counters (CMulU as bs cs) =
-  Relocated.CMul
-    (fromPolyU_ counters as)
-    (fromPolyU_ counters bs)
-    ( case cs of
-        Left n -> Left n
-        Right xs -> fromPolyU counters xs
-    )
 fromConstraint counters (CNEqF x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))
 fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))
 
@@ -102,8 +86,7 @@ instance Show RefB where
   show (RefB x) = "B" ++ show x
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
-data RefF = RefFO Var | RefFI Var | RefFP Var | RefBtoRefF RefB | RefF Var
-  -- data RefF = RefFO Var | RefFI Var | RefFP Var | RefBtoRefF RefB | RefUVal RefU | RefF Var
+data RefF = RefFO Var | RefFI Var | RefFP Var | RefBtoRefF RefB | RefUVal RefU | RefF Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefF where
@@ -112,8 +95,7 @@ instance Show RefF where
   show (RefFP x) = "FP" ++ show x
   show (RefF x) = "F" ++ show x
   show (RefBtoRefF x) = show x
-
--- show (RefUVal x) = show x
+  show (RefUVal x) = show x
 
 data RefU = RefUO Width Var | RefUI Width Var | RefUP Width Var | RefBtoRefU RefB | RefU Width Var
   deriving (Eq, Ord, Generic, NFData)
@@ -154,6 +136,7 @@ reindexRefF counters (RefFI x) = reindex counters OfPublicInput OfField x
 reindexRefF counters (RefFP x) = reindex counters OfPrivateInput OfField x
 reindexRefF counters (RefF x) = reindex counters OfIntermediate OfField x
 reindexRefF counters (RefBtoRefF x) = reindexRefB counters x
+reindexRefF counters (RefUVal x) = reindexRefU counters x
 
 reindexRefB :: Counters -> RefB -> Var
 reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
@@ -179,26 +162,15 @@ reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 
 --------------------------------------------------------------------------------
 
-fromPolyF :: Integral n => Counters -> PolyG RefF n -> Either n (Poly n)
+fromPolyF :: (Integral n, GaloisField n) => Counters -> PolyG RefF n -> Either n (Poly n)
 fromPolyF counters poly = case PolyG.view poly of
   PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRefF counters var, coeff)]
   PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRefF counters var1, coeff1), (reindexRefF counters var2, coeff2)]
   PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRefF counters)) (Map.toList xs))
 
-fromPolyU :: Integral n => Counters -> PolyG RefU n -> Either n (Poly n)
-fromPolyU counters poly = case PolyG.view poly of
-  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRefU counters var, coeff)]
-  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRefU counters var1, coeff1), (reindexRefU counters var2, coeff2)]
-  PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRefU counters)) (Map.toList xs))
-
-fromPolyF_ :: Integral n => Counters -> PolyG RefF n -> Poly n
+fromPolyF_ :: (Integral n, GaloisField n) => Counters -> PolyG RefF n -> Poly n
 fromPolyF_ counters xs = case fromPolyF counters xs of
   Left _ -> error "[ panic ] fromPolyF_: Left"
-  Right p -> p
-
-fromPolyU_ :: Integral n => Counters -> PolyG RefU n -> Poly n
-fromPolyU_ counters xs = case fromPolyU counters xs of
-  Left _ -> error "[ panic ] fromPolyU_: Left"
   Right p -> p
 
 -- let (isAlreadyRoot, (result, intercept)) = UnionFind.lookup ref ctx
@@ -240,7 +212,6 @@ fromPolyU_ counters xs = case fromPolyU counters xs of
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
   = CAddF !(PolyG RefF n)
-  | CAddU !(PolyG RefU n)
   | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y
   | CVarNEqB RefB RefB -- when x = ¬ y
@@ -249,7 +220,6 @@ data Constraint n
   | CVarBindB RefB n -- when x = val
   | CVarBindU RefU n -- when x = val
   | CMulF !(PolyG RefF n) !(PolyG RefF n) !(Either n (PolyG RefF n))
-  | CMulU !(PolyG RefU n) !(PolyG RefU n) !(Either n (PolyG RefU n))
   | CNEqF RefF RefF RefF
   | CNEqU RefU RefU RefU
 
@@ -262,8 +232,6 @@ instance GaloisField n => Eq (Constraint n) where
     (CVarBindF x y, CVarBindF u v) -> x == u && y == v
     (CMulF x y z, CMulF u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
-    (CMulU x y z, CMulU u v w) ->
-      (x == u && y == v || x == v && y == u) && z == w
     (CNEqF x y z, CNEqF u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CNEqU x y z, CNEqU u v w) ->
@@ -272,8 +240,6 @@ instance GaloisField n => Eq (Constraint n) where
 
 instance Functor Constraint where
   fmap f (CAddF x) = CAddF (fmap f x)
-  -- fmap f (CAddB x) = CAddB (fmap f x)
-  fmap f (CAddU x) = CAddU (fmap f x)
   fmap _ (CVarEqF x y) = CVarEqF x y
   fmap _ (CVarNEqB x y) = CVarNEqB x y
   fmap _ (CVarEqB x y) = CVarEqB x y
@@ -283,8 +249,6 @@ instance Functor Constraint where
   fmap f (CVarBindU x y) = CVarBindU x (f y)
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
-  fmap f (CMulU x y (Left z)) = CMulU (fmap f x) (fmap f y) (Left (f z))
-  fmap f (CMulU x y (Right z)) = CMulU (fmap f x) (fmap f y) (Right (fmap f z))
   fmap _ (CNEqF x y z) = CNEqF x y z
   fmap _ (CNEqU x y z) = CNEqU x y z
 
@@ -293,18 +257,6 @@ cAddF :: GaloisField n => n -> [(RefF, n)] -> [Constraint n]
 cAddF !c !xs = case PolyG.build c xs of
   Left _ -> []
   Right xs' -> [CAddF xs']
-
--- | Smart constructor for the CAddB constraint
--- cAddB :: GaloisField n => n -> [(RefB, n)] -> [Constraint n]
--- cAddB !c !xs = case PolyG.build c xs of
---   Left _ -> []
---   Right xs' -> [CAddB xs']
-
--- | Smart constructor for the CAddU constraint
-cAddU :: GaloisField n => n -> [(RefU, n)] -> [Constraint n]
-cAddU !c !xs = case PolyG.build c xs of
-  Left _ -> []
-  Right xs' -> [CAddU xs']
 
 -- | Smart constructor for the CVarEqF constraint
 cVarEqF :: GaloisField n => RefF -> RefF -> [Constraint n]
@@ -366,10 +318,6 @@ cMul ctor (a, xs) (b, ys) (c, zs) = case ( do
 cMulF :: GaloisField n => (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> [Constraint n]
 cMulF = cMul CMulF
 
--- | Smart constructor for the CMulU constraint
-cMulU :: GaloisField n => (n, [(RefU, n)]) -> (n, [(RefU, n)]) -> (n, [(RefU, n)]) -> [Constraint n]
-cMulU = cMul CMulU
-
 -- | Smart constructor for the CNEq constraint
 cNEqF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
 cNEqF x y m = [CNEqF x y m]
@@ -379,8 +327,6 @@ cNEqU x y m = [CNEqU x y m]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddF xs) = "AF " <> show xs <> " = 0"
-  -- show (CAddB xs) = "AB " <> show xs <> " = 0"
-  show (CAddU xs) = "AU " <> show xs <> " = 0"
   show (CVarEqF x y) = "VF " <> show x <> " = " <> show y
   show (CVarEqB x y) = "VB " <> show x <> " = " <> show y
   show (CVarNEqB x y) = "VN " <> show x <> " = ¬ " <> show y
@@ -389,7 +335,6 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CVarBindB x n) = "BB " <> show x <> " = " <> show n
   show (CVarBindU x n) = "BU " <> show x <> " = " <> show n
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
-  show (CMulU aV bV cV) = "MU " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
 

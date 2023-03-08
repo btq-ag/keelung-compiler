@@ -34,7 +34,8 @@ library
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
       Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
-      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
+      Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
+      Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind
@@ -91,7 +92,8 @@ executable keelungc
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
       Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
-      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
+      Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
+      Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind
@@ -149,11 +151,11 @@ test-suite keelung-test
   other-modules:
       Test.BooleanRelations
       Test.Compilation
+      Test.FieldRelations
       Test.Interpreter
       Test.Optimization
       Test.OptimizationOld
       Test.PolyG
-      Test.UnionFind
       Test.VarLayout
       Test.WitnessGeneration
       Keelung.Compiler
@@ -165,7 +167,8 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
       Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
-      Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
+      Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
+      Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind

@@ -1,5 +1,6 @@
 {-# HLINT ignore "Use <&>" #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Test.Optimization (tests, run) where
@@ -14,7 +15,7 @@ import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), relocateConstra
 import Keelung.Compiler.Error (Error)
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
+import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Relocated qualified as Relocated
 import Test.HUnit (assertFailure)
 import Test.Hspec
@@ -69,11 +70,11 @@ tests = do
         return (x + y + z)
 
       -- FO0 = 3FI0
-      UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (3, 0)
+      FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (3, 0)
       -- F0 (y) = FI0
-      UnionFind.relationBetween (RefF 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+      FieldRelations.relationBetween (RefF 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
       -- F1 (z) = F0 (y)
-      UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+      FieldRelations.relationBetween (RefF 1) (RefF 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
 
     it "Field 2" $ do
       cs <- runTest 3 1 $ do
@@ -83,11 +84,11 @@ tests = do
         return (x + y + z)
 
       -- FO0 = 4FI0
-      UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (4, 0)
+      FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (4, 0)
       -- F0 (y) = FI0
-      UnionFind.relationBetween (RefF 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (1, 0)
+      FieldRelations.relationBetween (RefF 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
       -- F1 (z) = 2F0 (y)
-      UnionFind.relationBetween (RefF 1) (RefF 0) (csVarEqF cs) `shouldBe` Just (2, 0)
+      FieldRelations.relationBetween (RefF 1) (RefF 0) (csFieldRelations cs) `shouldBe` Just (2, 0)
 
     it "Field 3" $ do
       cs <- runTest 2 1 $ do
@@ -96,14 +97,14 @@ tests = do
         return (x + y)
 
       -- FO0 = 2FI0 + 1
-      UnionFind.relationBetween (RefFO 0) (RefFI 0) (csVarEqF cs) `shouldBe` Just (2, 1)
+      FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (2, 1)
 
     it "Field 4" $ do
       cs <- runTest 1 1 $ do
         let x = 4
         y <- reuse x
         return (x + y :: Field)
-      UnionFind.parentOf (csVarEqF cs) (RefFO 0) `shouldBe` UnionFind.Constant 8
+      FieldRelations.parentOf (csFieldRelations cs) (RefFO 0) `shouldBe` FieldRelations.Constant 8
 
     it "Field 5" $ do
       _cs <- runTest 2 1 $ do
@@ -123,6 +124,23 @@ tests = do
       _cs <- runTest 3 3 $ do
         x <- inputBool Public
         reuse x
+      return ()
+
+    it "UInt eq 1" $ do
+      _cs <- runTest 19 19 $ do
+        x <- inputUInt Public :: Comp (UInt 4)
+        reuse x
+      return ()
+
+    it "UInt add 1" $ do
+      _cs <- runTest 40 40 $ do
+        x <- inputUInt @4 Public
+        y <- inputUInt @4 Public
+        z <- inputUInt @4 Public
+        w <- reuse $ x + y
+        return $ x + y + z + w
+      -- print _cs
+      -- print $ relocateConstraintSystem _cs
       return ()
 
 -- it "UInt 1" $ do

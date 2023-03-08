@@ -1,22 +1,19 @@
-module Test.UnionFind (tests, run) where
+module Test.FieldRelations (tests, run) where
 
 import Control.Monad.State
-import Data.Maybe qualified as Maybe
 import Keelung hiding (run)
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (HasRefB, UnionFind)
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
+import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations (FieldRelations)
+import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
-import Test.QuickCheck (Arbitrary (arbitrary))
-import Test.QuickCheck.Arbitrary qualified as Arbitrary
 
 run :: IO ()
 run = hspec tests
 
 tests :: SpecWith ()
 tests = do
-  describe "UnionFind" $ do
+  describe "FieldRelations" $ do
     it "Relate ($0 = $1)" $
       runM $ do
         RefF 0 `relate` (1, RefF 1, 0)
@@ -55,28 +52,28 @@ tests = do
         -- z = 1/3y - 2/3
         assertRelation (RefF 2) (1 / 3) (RefF 1) (-2 / 3)
 
-type M = StateT (UnionFind RefF GF181) IO
+type M = StateT (FieldRelations GF181) IO
 
 runM :: M a -> IO a
-runM p = evalStateT p UnionFind.new
+runM p = evalStateT p FieldRelations.new
 
 relate :: RefF -> (GF181, RefF, GF181) -> M ()
 relate var val = do
   xs <- get
-  forM_ (UnionFind.relate var val xs) put
+  forM_ (FieldRelations.relate var val xs) put
 
 -- | Assert that `var1 = slope * var2 + intercept`
 assertRelation :: RefF -> GF181 -> RefF -> GF181 -> M ()
 assertRelation var1 slope var2 intercept = do
   xs <- get
-  UnionFind.relationBetween var1 var2 xs `shouldBe` Just (slope, intercept)
+  FieldRelations.relationBetween var1 var2 xs `shouldBe` Just (slope, intercept)
 
 ------------------------------------------------------------------------
 
-instance (Arbitrary ref, Arbitrary n, GaloisField n, Ord ref, HasRefB ref) => Arbitrary (UnionFind ref n) where
-  arbitrary = do
-    relations <- Arbitrary.vector 100
+-- instance (Arbitrary n, GaloisField n) => Arbitrary (FieldRelations n) where
+--   arbitrary = do
+--     relations <- Arbitrary.vector 100
 
-    return $ foldl go UnionFind.new relations
-    where
-      go xs (var, slope, ref, intercept) = Maybe.fromMaybe xs (UnionFind.relate var (slope, ref, intercept) xs)
+--     return $ foldl go FieldRelations.new relations
+--     where
+--       go xs (var, slope, ref, intercept) = Maybe.fromMaybe xs (FieldRelations.relate var (slope, ref, intercept) xs)
