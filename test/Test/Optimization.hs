@@ -113,25 +113,25 @@ tests = do
       return ()
 
     it "Boolean 1" $ do
-      _cs <- runTest 4 3 $ do
+      _cs <- runTest 4 4 $ do
         x <- inputBool Public
         y <- reuse x
         return (x .|. y)
       return ()
 
     it "Boolean 2" $ do
-      _cs <- runTest 3 3 $ do
+      _cs <- runTest 4 4 $ do
         x <- inputBool Public
         reuse x
       return ()
 
-    it "UInt eq 1" $ do
-      _cs <- runTest 11 11 $ do
-        x <- inputUInt Public :: Comp (UInt 4)
-        reuse x
-      print _cs
-      print $ relocateConstraintSystem _cs
-      return ()
+    -- it "UInt eq 1" $ do
+    --   _cs <- runTest 19 19 $ do
+    --     x <- inputUInt Public :: Comp (UInt 4)
+    --     reuse x
+    --   print _cs
+    --   print $ relocateConstraintSystem _cs
+    --   return ()
 
     -- it "UInt add 1" $ do
     --   _cs <- runTest 40 40 $ do

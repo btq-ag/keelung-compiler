@@ -21,6 +21,7 @@ import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
+
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
@@ -219,6 +220,11 @@ add = mapM_ addOne
       modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
     addOne (CNEqF x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
     addOne (CNEqU x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
+    addOne (CRotateU x y n) = do
+      cs <- get
+      case UIntRelations.relate x (True, y) (csUIntRelations cs) of
+        Nothing -> return ()
+        Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
 
 freshRefF :: M n RefF
 freshRefF = do
@@ -449,6 +455,7 @@ compileExprU out expr = case expr of
     compileIfU out p' x' y'
   RoLU w n x -> do
     x' <- wireU x
+    -- add $ cRotateU out x' n
     forM_ [0 .. w - 1] $ \i -> do
       let i' = (i - n) `mod` w
       add $ cVarEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']

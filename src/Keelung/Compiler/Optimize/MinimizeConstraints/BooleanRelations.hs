@@ -11,6 +11,7 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
     exportPinnedBitTests,
     size,
     relationBetween,
+    toIntMap
   )
 where
 
@@ -170,10 +171,5 @@ size = Map.size . links
 exportPinnedBitTests :: BooleanRelations -> Set RefB
 exportPinnedBitTests = Set.map (\(w, ref, i) -> RefUBit w ref i) . pinnedBitTests
 
--- Truth table:
---  do-not-invert     value     reuslt
--- ------------------------------------
---    True            True      True
---    True            False     False
---    False           True      False
---    False           False     True
+toIntMap :: BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
+toIntMap = links
