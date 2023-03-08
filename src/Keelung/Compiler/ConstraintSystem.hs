@@ -23,8 +23,8 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
 import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
+import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations (FieldRelations)
+import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
 import Keelung.Constraint.R1CS qualified as Constraint
@@ -42,12 +42,12 @@ import qualified Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations as 
 data ConstraintSystem n = ConstraintSystem
   { csCounters :: !Counters,
     csUseNewOptimizer :: Bool,
-    -- for counting the occurences of variables in constraints (excluding the ones that are in UnionFind)
+    -- for counting the occurences of variables in constraints (excluding the ones that are in FieldRelations)
     csOccurrenceF :: !(Map RefF Int),
     csOccurrenceB :: !(Map RefB Int),
     csOccurrenceU :: !(Map RefU Int),
-    -- when x == y (UnionFind)
-    csVarEqF :: UnionFind RefF n,
+    -- when x == y (FieldRelations)
+    csVarEqF :: FieldRelations RefF n,
     csVarEqU :: UIntRelations n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
@@ -218,8 +218,8 @@ relocateConstraintSystem cs =
 
     shouldRemoveB _ = False
 
-    fromUnionFindF :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
-    fromUnionFindF unionFind occurrencesF occurrencesB occurrencesU =
+    fromFieldRelationsF :: (GaloisField n, Integral n) => FieldRelations RefF n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    fromFieldRelationsF fieldRels occurrencesF occurrencesB occurrencesU =
       let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
           publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
           privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
@@ -229,18 +229,18 @@ relocateConstraintSystem cs =
             <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
-            <> fromUnionFindB boolRels occurrencesF occurrencesB occurrencesU
+            <> fromFieldRelationsB boolRels occurrencesF occurrencesB occurrencesU
       where
-        boolRels = UnionFind.exportBooleanRelations unionFind
+        boolRels = FieldRelations.exportBooleanRelations fieldRels
 
-        toConstraint var = case UnionFind.parentOf unionFind var of
-          UnionFind.Root ->
+        toConstraint var = case FieldRelations.parentOf fieldRels var of
+          FieldRelations.Root ->
             -- var is already a root
             Nothing
-          UnionFind.Constant intercept ->
+          FieldRelations.Constant intercept ->
             -- var = intercept
             Just $ fromConstraint counters $ CVarBindF var intercept
-          UnionFind.ChildOf slope root intercept ->
+          FieldRelations.ChildOf slope root intercept ->
             -- var = slope * root + intercept
             case root of
               RefBtoRefF refB -> case BooleanRelations.lookup boolRels refB of
@@ -259,8 +259,8 @@ relocateConstraintSystem cs =
                 Left _ -> Nothing
                 Right poly -> Just $ fromConstraint counters $ CAddF poly
 
-    fromUnionFindB :: (GaloisField n, Integral n) => BooleanRelations -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
-    fromUnionFindB relations occurrencesF occurrencesB occurrencesU =
+    fromFieldRelationsB :: (GaloisField n, Integral n) => BooleanRelations -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    fromFieldRelationsB relations occurrencesF occurrencesB occurrencesU =
       let outputVars = [RefBO i | i <- [0 .. getCount OfOutput OfBoolean counters - 1]]
           publicInputVars = [RefBI i | i <- [0 .. getCount OfPublicInput OfBoolean counters - 1]]
           privateInputVars = [RefBP i | i <- [0 .. getCount OfPrivateInput OfBoolean counters - 1]]
@@ -295,8 +295,8 @@ relocateConstraintSystem cs =
           BooleanRelations.ChildOf True root -> Just $ fromConstraint counters $ CVarEqB var root
           BooleanRelations.ChildOf False root -> Just $ fromConstraint counters $ CVarNEqB var root
 
-    -- fromUnionFindU2 :: (GaloisField n, Integral n) => UnionFind RefF n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
-    -- fromUnionFindU2 unionFind occurrencesF occurrencesB occurrencesU =
+    -- fromFieldRelationsU2 :: (GaloisField n, Integral n) => FieldRelations RefF n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    -- fromFieldRelationsU2 fieldRels occurrencesF occurrencesB occurrencesU =
     --   let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
     --       publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
     --       privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
@@ -306,20 +306,20 @@ relocateConstraintSystem cs =
     --         <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
     --         <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
     --         <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
-    --         <> fromUnionFindB boolRels occurrencesF occurrencesB occurrencesU
+    --         <> fromFieldRelationsB boolRels occurrencesF occurrencesB occurrencesU
 
-    fromUnionFindU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, Either (Bool, RefU) n) -> Maybe (Relocated.Constraint n)
-    fromUnionFindU occurrences (var1, Right c) =
+    fromFieldRelationsU :: (GaloisField n, Integral n) => Map RefU Int -> (RefU, Either (Bool, RefU) n) -> Maybe (Relocated.Constraint n)
+    fromFieldRelationsU occurrences (var1, Right c) =
       if shouldRemoveU occurrences var1
         then Nothing
         else Just $ fromConstraint counters (CVarBindU var1 c)
-    fromUnionFindU occurrences (var1, Left (_, var2)) =
+    fromFieldRelationsU occurrences (var1, Left (_, var2)) =
       if shouldRemoveU occurrences var1 || shouldRemoveU occurrences var2
         then Nothing
         else Just $ fromConstraint counters (CVarEqU var1 var2)
 
-    varEqFs = fromUnionFindF (csVarEqF cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
-    varEqUs = Seq.fromList $ Maybe.mapMaybe (fromUnionFindU (csOccurrenceU cs)) $ Map.toList $ UIntRelations.toMap $ csVarEqU cs
+    varEqFs = fromFieldRelationsF (csVarEqF cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
+    varEqUs = Seq.fromList $ Maybe.mapMaybe (fromFieldRelationsU (csOccurrenceU cs)) $ Map.toList $ UIntRelations.toMap $ csVarEqU cs
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
     nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
@@ -327,8 +327,8 @@ relocateConstraintSystem cs =
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
-  UnionFind.size (csVarEqF cs)
-    + BooleanRelations.size (UnionFind.exportBooleanRelations (csVarEqF cs))
+  FieldRelations.size (csVarEqF cs)
+    + BooleanRelations.size (FieldRelations.exportBooleanRelations (csVarEqF cs))
     + UIntRelations.size (csVarEqU cs)
     + length (csAddF cs)
     + length (csMulF cs)

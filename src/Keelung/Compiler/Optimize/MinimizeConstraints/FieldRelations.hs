@@ -4,8 +4,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind
-  ( UnionFind,
+module Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
+  ( FieldRelations,
     relationBetween,
     new,
     parentOf,
@@ -32,18 +32,18 @@ import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRe
 import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
 import Prelude hiding (lookup)
 
-data UnionFind ref n = UnionFind
+data FieldRelations ref n = FieldRelations
   { links :: Map ref (Maybe (n, ref), n),
     sizes :: Map ref Int,
     booleanRelations :: BooleanRelations
   }
   deriving (Eq, Generic, NFData)
 
-instance (Show ref, Show n, Eq n, Num n) => Show (UnionFind ref n) where
+instance (Show ref, Show n, Eq n, Num n) => Show (FieldRelations ref n) where
   show xs =
     show (booleanRelations xs)
       <> "\n"
-      <> "UnionFind {\n"
+      <> "FieldRelations {\n"
       ++ "  links = "
       ++ showList' (map showLink (Map.toList $ links xs))
       ++ "\n"
@@ -56,15 +56,15 @@ instance (Show ref, Show n, Eq n, Num n) => Show (UnionFind ref n) where
       showLink (var, (Just (slope, root), intercept)) = show var <> " = " <> (if slope == 1 then "" else show slope) <> show root <> (if intercept == 0 then "" else " + " <> show intercept)
       showLink (var, (Nothing, intercept)) = show var <> " = " <> show intercept
 
-new :: Ord ref => UnionFind ref n
-new = UnionFind mempty mempty BooleanRelations.new
+new :: Ord ref => FieldRelations ref n
+new = FieldRelations mempty mempty BooleanRelations.new
 
 data Lookup ref n = Root | Constant n | ChildOf n ref n
   deriving (Eq, Show)
 
 -- | Returns 'Nothing' if the variable is already a root.
 --   else returns 'Just (slope, root)'  where 'var = slope * root + intercept'
-parentOf :: (Ord ref, Num n) => UnionFind ref n -> ref -> Lookup ref n
+parentOf :: (Ord ref, Num n) => FieldRelations ref n -> ref -> Lookup ref n
 parentOf xs var = case Map.lookup var (links xs) of
   Nothing -> Root -- var is a root
   Just (Nothing, intercept) -> Constant intercept -- var is a root
@@ -91,7 +91,7 @@ parentOf xs var = case Map.lookup var (links xs) of
 -- | Calculates the relation between two variables `var1` and `var2`
 --   Returns `Nothing` if the two variables are not related.
 --   Returns `Just (slope, intercept)` where `var1 = slope * var2 + intercept` if the two variables are related.
-relationBetween :: (Ord ref, GaloisField n) => ref -> ref -> UnionFind ref n -> Maybe (n, n)
+relationBetween :: (Ord ref, GaloisField n) => ref -> ref -> FieldRelations ref n -> Maybe (n, n)
 relationBetween var1 var2 xs = case (parentOf xs var1, parentOf xs var2) of
   (Root, Root) ->
     if var1 == var2
@@ -139,16 +139,16 @@ relationBetween var1 var2 xs = case (parentOf xs var1, parentOf xs var2) of
       then Just (1, 0)
       else Nothing -- var1 and var2 are values, but not the same one
 
-bindBoolean :: RefB -> Bool -> UnionFind ref n -> UnionFind ref n
+bindBoolean :: RefB -> Bool -> FieldRelations ref n -> FieldRelations ref n
 bindBoolean ref val xs = xs {booleanRelations = BooleanRelations.bindToValue ref val (booleanRelations xs)}
 
-relateBoolean :: RefB -> (Bool, RefB) -> UnionFind ref n -> UnionFind ref n
+relateBoolean :: RefB -> (Bool, RefB) -> FieldRelations ref n -> FieldRelations ref n
 relateBoolean refA (same, refB) xs = case BooleanRelations.relate refA (same, refB) (booleanRelations xs) of
   Nothing -> xs
   Just boolRels -> xs {booleanRelations = boolRels}
 
 -- | Bind a variable to a value
-bindToValue :: (Ord ref, GaloisField n, HasRefB ref) => ref -> n -> UnionFind ref n -> UnionFind ref n
+bindToValue :: (Ord ref, GaloisField n, HasRefB ref) => ref -> n -> FieldRelations ref n -> FieldRelations ref n
 bindToValue x value xs =
   case extractRefB x of
     Just refB -> bindBoolean refB (value == 1) xs
@@ -184,7 +184,7 @@ bindToValue x value xs =
               sizes = Map.insert x 1 (sizes xs)
             }
 
-relate :: (Ord ref, GaloisField n, HasRefB ref) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
+relate :: (Ord ref, GaloisField n, HasRefB ref) => ref -> (n, ref, n) -> FieldRelations ref n -> Maybe (FieldRelations ref n)
 relate x (0, _, intercept) xs =
   case extractRefB x of
     Just refB -> Just $ bindBoolean refB (intercept == 1) xs
@@ -199,7 +199,7 @@ relate x (slope, y, intercept) xs =
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
-relate' :: (Ord ref, GaloisField n, HasRefB ref) => ref -> (n, ref, n) -> UnionFind ref n -> Maybe (UnionFind ref n)
+relate' :: (Ord ref, GaloisField n, HasRefB ref) => ref -> (n, ref, n) -> FieldRelations ref n -> Maybe (FieldRelations ref n)
 relate' x (slope, y, intercept) xs =
   case parentOf xs x of
     Constant interceptX ->
@@ -253,15 +253,15 @@ relate' x (slope, y, intercept) xs =
                 sizes = Map.insertWith (+) y 1 (sizes xs)
               }
 
-toMap :: UnionFind ref n -> Map ref (Maybe (n, ref), n)
+toMap :: FieldRelations ref n -> Map ref (Maybe (n, ref), n)
 toMap = links
 
-size :: UnionFind ref n -> Int
+size :: FieldRelations ref n -> Int
 size = Map.size . links
 
 
 
-exportBooleanRelations :: UnionFind ref n -> BooleanRelations
+exportBooleanRelations :: FieldRelations ref n -> BooleanRelations
 exportBooleanRelations = booleanRelations
 
 --------------------------------------------------------------------------------

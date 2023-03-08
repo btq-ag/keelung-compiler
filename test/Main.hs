@@ -21,7 +21,7 @@ import Test.Hspec
 import Test.Interpreter qualified as Interpreter
 import Test.Optimization qualified as Optimization
 import Test.OptimizationOld qualified as OptimizationOld
-import Test.UnionFind qualified as UnionFind
+import Test.FieldRelations qualified as FieldRelations
 import Test.VarLayout qualified as VarBookkeep
 import Test.WitnessGeneration qualified as WitnessGeneration
 
@@ -39,7 +39,7 @@ main = hspec $ do
 
   describe "Variable Bookkeeping" VarBookkeep.tests
 
-  describe "Union Find" UnionFind.tests
+  describe "Field Relations" FieldRelations.tests
 
   describe "Boolean Relations" BooleanRelations.tests
 

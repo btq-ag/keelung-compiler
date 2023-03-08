@@ -14,7 +14,7 @@ import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
-import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
+import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
@@ -179,7 +179,7 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty UnionFind.new UIntRelations.new mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -191,11 +191,11 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       cs <- get
-      let csVarEqF' = UnionFind.bindToValue x c (csVarEqF cs)
+      let csVarEqF' = FieldRelations.bindToValue x c (csVarEqF cs)
       put cs {csVarEqF = csVarEqF'}
     addOne (CVarBindB x c) = do
       cs <- get
-      let csVarEqF' = UnionFind.bindBoolean x (c == 1) (csVarEqF cs)
+      let csVarEqF' = FieldRelations.bindBoolean x (c == 1) (csVarEqF cs)
       put cs {csVarEqF = csVarEqF'}
     addOne (CVarBindU x c) = do
       cs <- get
@@ -203,13 +203,13 @@ add = mapM_ addOne
       put cs {csVarEqU = csVarEqU'}
     addOne (CVarEqF x y) = do
       cs <- get
-      case UnionFind.relate x (1, y, 0) (csVarEqF cs) of
+      case FieldRelations.relate x (1, y, 0) (csVarEqF cs) of
         Nothing -> return ()
         Just csVarEqF' -> put cs {csVarEqF = csVarEqF'}
     addOne (CVarEqB x y) = do
-      modify' $ \cs -> cs {csVarEqF = UnionFind.relateBoolean x (True, y) (csVarEqF cs)}
+      modify' $ \cs -> cs {csVarEqF = FieldRelations.relateBoolean x (True, y) (csVarEqF cs)}
     addOne (CVarNEqB x y) = do
-      modify' $ \cs -> cs {csVarEqF = UnionFind.relateBoolean x (False, y) (csVarEqF cs)}
+      modify' $ \cs -> cs {csVarEqF = FieldRelations.relateBoolean x (False, y) (csVarEqF cs)}
     addOne (CVarEqU x y) = do
       cs <- get
       case UIntRelations.relate x (True, y) (csVarEqU cs) of
