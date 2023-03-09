@@ -127,26 +127,31 @@ tests = do
         return ()
 
     describe "Unsigned integers" $ do
-      it "UInt / Value" $ do
+      it "literal" $ do
         _cs <- runTest 10 10 $ do
           let x = 3 :: UInt 4
           return x
         return ()
 
-      it "UInt / Variable" $ do
+      it "input + reuse" $ do
         _cs <- runTest 11 11 $ do
           x <- inputUInt Public :: Comp (UInt 4)
           reuse x
         return ()
 
+      it "rotate" $ do
+        _cs <- runTest 14 14 $ do
+          x <- inputUInt @4 Public
+          return $ rotate x 1
+        print _cs
+        print $ relocateConstraintSystem _cs
+        return ()
 
-      it "UInt / Add 1" $ do
+      it "add 1" $ do
         _cs <- runTest 21 21 $ do
           x <- inputUInt Public :: Comp (UInt 4)
           y <- inputUInt Private :: Comp (UInt 4)
           return (x + y)
-        print _cs
-        print $ relocateConstraintSystem _cs
         return ()
 
 -- it "UInt add 1" $ do
@@ -160,13 +165,6 @@ tests = do
 --   -- print $ relocateConstraintSystem _cs
 --   return ()
 
--- it "UInt rotate 1" $ do
---   _cs <- runTest 23 23 $ do
---     x <- inputUInt @4 Public
---     return [rotate x 0, rotate x 1]
---   print _cs
---   print $ relocateConstraintSystem _cs
---   return ()
 -- it "UInt 1" $ do
 --   _cs <- runTest 15 11 $ do
 --     x <- inputUInt Public :: Comp (UInt 4)

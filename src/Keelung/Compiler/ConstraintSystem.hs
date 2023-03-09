@@ -323,7 +323,7 @@ relocateConstraintSystem cs =
               then Just $ CVarBindB var (if val then 1 else 0)
               else Nothing
           convert (var, Left (dontFlip, root)) =
-            if shouldKeep var 
+            if shouldKeep var
               then case BooleanRelations.lookup relations root of
                 BooleanRelations.Root ->
                   if shouldKeep root
@@ -359,15 +359,14 @@ relocateConstraintSystem cs =
             <> convert publicInputVars
             <> convert privateInputVars
       where
-
         convert = Seq.fromList . Maybe.mapMaybe toConstraint
 
         -- generate a BinRep constraint for every UInt variable occurred in the module
 
         toConstraint var = case UIntRelations.lookup uintRels var of
           UIntRelations.Root -> Nothing
-          UIntRelations.Constant value -> Just $ fromConstraint counters $ CVarBindU var value
-          UIntRelations.ChildOf _ root ->
+          UIntRelations.Value value -> Just $ fromConstraint counters $ CVarBindU var value
+          UIntRelations.RotateOf _ root ->
             case PolyG.build 0 [(RefUVal var, -1), (RefUVal root, 1)] of
               Left _ -> Nothing
               Right poly -> Just $ fromConstraint counters $ CAddF poly

@@ -212,7 +212,7 @@ add = mapM_ addOne
       modify' $ \cs -> cs {csFieldRelations = FieldRelations.relateBoolean x (False, y) (csFieldRelations cs)}
     addOne (CVarEqU x y) = do
       cs <- get
-      case UIntRelations.relate x (True, y) (csUIntRelations cs) of
+      case UIntRelations.assertEqual x y (csUIntRelations cs) of
         Nothing -> return ()
         Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
     addOne (CMulF x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})

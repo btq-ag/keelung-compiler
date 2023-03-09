@@ -3,11 +3,12 @@
 
 module Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
   ( UIntRelations,
-    Relation (..),
+    Lookup (..),
     new,
     lookup,
     bindToValue,
-    relate,
+    assertEqual,
+    -- rotate,
     size,
     relationBetween,
     toMap,
@@ -22,8 +23,16 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint (RefU (..))
 import Prelude hiding (lookup)
 
+-- | Relation between a variable and a value or another variable
+data Relation n
+  = -- | The variable is a rotation of another variable
+    Rotate Int RefU
+  | -- | The variable is a constant
+    Constant n
+  deriving (Eq, Show, Generic, NFData)
+
 data UIntRelations n = UIntRelations
-  { links :: Map RefU (Either (Bool, RefU) n),
+  { links :: Map RefU (Relation n),
     sizes :: Map RefU Int
   }
   deriving (Eq, Generic, NFData)
@@ -39,54 +48,54 @@ instance Show n => Show (UIntRelations n) where
     where
       showList' ys = "[" <> List.intercalate ", " ys <> "]"
 
-      showLink (var, Left (slope, root)) = "  " <> show var <> " = " <> (if slope then "" else show slope) <> show root <> "\n"
-      showLink (var, Right intercept) = "  " <> show var <> " = " <> show intercept <> "\n"
+      showLink (var, Rotate offset root) = "  " <> show var <> " = " <> show root <> " <<< " <> show offset <> "\n"
+      showLink (var, Constant value) = "  " <> show var <> " = " <> show value <> "\n"
 
 new :: UIntRelations n
 new = UIntRelations mempty mempty
 
-data Relation n = Root | Constant n | ChildOf Bool RefU
+data Lookup n = Root | Value n | RotateOf Int RefU
   deriving (Eq, Show)
 
 -- | Returns the result of looking up a variable in the UIntRelations
-lookup :: UIntRelations n -> RefU -> Relation n
+lookup :: UIntRelations n -> RefU -> Lookup n
 lookup xs var = case Map.lookup var (links xs) of
   Nothing -> Root -- 'var' is a root
-  Just (Right value) -> Constant value -- 'var' is a constant
-  Just (Left (relation1, parent)) -> case lookup xs parent of
-    Root -> ChildOf relation1 parent -- 'parent' is a root
-    Constant value ->
-      -- 'parent' is a constant
-      Constant value
-    ChildOf _ grandparent ->
+  Just (Constant value) -> Value value -- 'var' is a value
+  Just (Rotate offset parent) -> case lookup xs parent of
+    Root -> RotateOf offset parent -- 'parent' is a root
+    Value value ->
+      -- 'parent' is a value
+      Value value
+    RotateOf offset' grandparent ->
       -- 'parent' is a child of 'grandparent'
-      ChildOf True grandparent
+      RotateOf (offset + offset') grandparent
 
 -- | Calculates the relation between two variables `var1` and `var2`
---   Returns `Just relation` where `var1 = relation == var2` if the two variables are related.
+--   Returns `Just relation` where `var1 = relation == var2` if the two variables are rotated.
 relationBetween :: Eq n => RefU -> RefU -> UIntRelations n -> Maybe Bool
 relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
   (Root, Root) ->
     if var1 == var2
       then Just True
       else Nothing -- var1 and var2 are roots, but not the same one
-  (Root, ChildOf relation2 root2) ->
+  (Root, RotateOf rotate2 root2) ->
     if var1 == root2
-      then Just relation2
+      then Just (rotate2 == 0)
       else Nothing
-  (Root, Constant _) -> Nothing -- var1 is a root, var2 is a constant
-  (ChildOf relation1 root1, Root) ->
+  (Root, Value _) -> Nothing -- var1 is a root, var2 is a value
+  (RotateOf rotate1 root1, Root) ->
     if var2 == root1
-      then Just relation1
+      then Just (rotate1 == 0)
       else Nothing
-  (Constant _, Root) -> Nothing -- var1 is a constant, var2 is a root
-  (ChildOf relation1 root1, ChildOf relation2 root2) ->
+  (Value _, Root) -> Nothing -- var1 is a value, var2 is a root
+  (RotateOf relation1 root1, RotateOf relation2 root2) ->
     if root1 == root2
       then Just (relation1 == relation2)
       else Nothing
-  (Constant _, ChildOf _ _) -> Nothing -- var1 is a constant
-  (ChildOf _ _, Constant _) -> Nothing -- var2 is a constant
-  (Constant value1, Constant value2) -> if value1 == value2 then Just True else Just False
+  (Value _, RotateOf _ _) -> Nothing -- var1 is a value
+  (RotateOf _ _, Value _) -> Nothing -- var2 is a value
+  (Value value1, Value value2) -> if value1 == value2 then Just True else Just False
 
 -- | If the RefU is of RefUBit, remember it
 -- rememberPinnedBitTest :: RefU -> UIntRelations -> UIntRelations
@@ -100,61 +109,64 @@ bindToValue x value xs =
     Root ->
       -- x does not have a parent, so it is its own root
       xs
-        { links = Map.insert x (Right value) (links xs),
+        { links = Map.insert x (Constant value) (links xs),
           sizes = Map.insert x 1 (sizes xs)
         }
-    Constant _oldValue ->
+    Value _oldValue ->
       -- x is already a root with `_oldValue` as its value
       -- TODO: handle this kind of conflict in the future
       -- FOR NOW: overwrite the value of x with the new value
       xs
-        { links = Map.insert x (Right value) (links xs)
+        { links = Map.insert x (Constant value) (links xs)
         }
-    ChildOf _ parent ->
+    RotateOf _ parent ->
       xs
         { links =
-            Map.insert parent (Right value) $
-              Map.insert x (Right value) $
+            Map.insert parent (Constant value) $
+              Map.insert x (Constant value) $
                 links xs,
           sizes = Map.insert x 1 (sizes xs)
         }
 
-relate :: RefU -> (Bool, RefU) -> UIntRelations n -> Maybe (UIntRelations n)
-relate x (relation, y) xs
-  | x > y = relate' x (relation, y) xs
-  | x < y = relate' y (relation, x) xs
+-- | Assert that two variables are equal
+assertEqual :: RefU -> RefU -> UIntRelations n -> Maybe (UIntRelations n)
+assertEqual x y = rotate x (0, y)
+
+rotate :: RefU -> (Int, RefU) -> UIntRelations n -> Maybe (UIntRelations n)
+rotate x (rotation, y) xs
+  | x > y = rotate' x (rotation, y) xs
+  | x < y = rotate' y (rotation, x) xs
   | otherwise = Nothing
 
--- | Establish the relation of 'x = (relation == y)'
---   Returns Nothing if the relation has already been established
-relate' :: RefU -> (Bool, RefU) -> UIntRelations n -> Maybe (UIntRelations n)
-relate' x (relation, y) xs =
+-- | Returns Nothing if the relation has already been established
+rotate' :: RefU -> (Int, RefU) -> UIntRelations n -> Maybe (UIntRelations n)
+rotate' x (rotation, y) xs =
   case lookup xs x of
-    Constant constantX ->
-      Just $ bindToValue y constantX xs
-    ChildOf relationX rootOfX ->
-      relate rootOfX (relation == relationX, y) xs
+    Value valueX ->
+      Just $ bindToValue y valueX xs
+    RotateOf rotationX rootOfX ->
+      rotate rootOfX (rotation + rotationX, y) xs
     Root ->
       -- x does not have a parent, so it is its own root
       case lookup xs y of
-        Constant constantY ->
-          Just $ bindToValue x constantY xs
-        ChildOf relationY rootOfY ->
+        Value valueY ->
+          Just $ bindToValue x valueY xs
+        RotateOf rotationY rootOfY ->
           Just $
             xs
-              { links = Map.insert x (Left (relation == relationY, rootOfY)) (links xs),
+              { links = Map.insert x (Rotate (rotation + rotationY) rootOfY) (links xs),
                 sizes = Map.insertWith (+) y 1 (sizes xs)
               }
         Root ->
           -- y does not have a parent, so it is its own root
           Just $
             xs
-              { links = Map.insert x (Left (relation, y)) (links xs),
+              { links = Map.insert x (Rotate rotation y) (links xs),
                 sizes = Map.insertWith (+) y 1 (sizes xs)
               }
 
 size :: UIntRelations n -> Int
 size = Map.size . links
 
-toMap :: UIntRelations n -> Map RefU (Either (Bool, RefU) n)
+toMap :: UIntRelations n -> Map RefU (Relation n)
 toMap = links
