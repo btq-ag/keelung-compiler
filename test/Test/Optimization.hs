@@ -113,14 +113,14 @@ tests = do
       return ()
 
     it "Boolean 1" $ do
-      _cs <- runTest 4 4 $ do
+      _cs <- runTest 4 3 $ do
         x <- inputBool Public
         y <- reuse x
         return (x .|. y)
       return ()
 
     it "Boolean 2" $ do
-      _cs <- runTest 4 4 $ do
+      _cs <- runTest 3 3 $ do
         x <- inputBool Public
         reuse x
       return ()

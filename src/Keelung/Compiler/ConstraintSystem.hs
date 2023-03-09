@@ -333,13 +333,28 @@ relocateConstraintSystem cs =
             if shouldKeep var
               then Just $ CVarBindB var (if val then 1 else 0)
               else Nothing
-          convert (var, Left (True, root)) =
-            if shouldKeep var || shouldKeep root
-              then Just $ CVarEqB var root
-              else Nothing
-          convert (var, Left (False, root)) =
-            if shouldKeep var || shouldKeep root
-              then Just $ CVarNEqB var root
+          convert (var, Left (dontFlip, root)) =
+            if shouldKeep var
+              then case BooleanRelations.lookup relations root of
+                BooleanRelations.Root ->
+                  if shouldKeep root
+                    then if dontFlip then Just $ CVarEqB var root else Just $ CVarNEqB var root
+                    else Nothing
+                BooleanRelations.Constant value ->
+                  if shouldKeep var
+                    then
+                      Just $
+                        CVarBindB
+                          var
+                          ( if dontFlip
+                              then (if value then 0 else 1)
+                              else (if value then 1 else 0)
+                          )
+                    else Nothing
+                BooleanRelations.ChildOf dontFlip' root' ->
+                  if shouldKeep root'
+                    then if dontFlip == dontFlip' then Just $ CVarEqB var root' else Just $ CVarNEqB var root'
+                    else Nothing
               else Nothing
 
           result = Maybe.mapMaybe convert $ Map.toList $ BooleanRelations.toIntMap relations
