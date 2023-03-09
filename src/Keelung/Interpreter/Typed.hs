@@ -112,9 +112,9 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
-    BitU _ x i -> do
+    BitU width x i -> do
       xs <- interpret x
-      if testBit (toInteger (head xs)) i
+      if Data.Bits.testBit (toInteger (head xs)) (i `mod` width)
         then return [one]
         else return [zero]
 
