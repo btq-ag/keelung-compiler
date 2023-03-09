@@ -220,11 +220,13 @@ add = mapM_ addOne
       modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
     addOne (CNEqF x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
     addOne (CNEqU x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
-    addOne (CRotateU x y n) = do
+    addOne (CRotateU x y _n) = do
       cs <- get
       case UIntRelations.relate x (True, y) (csUIntRelations cs) of
         Nothing -> return ()
         Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
+    addOne (CTempAddOccurrencesU xs) = 
+       modify (addOccurrences xs)
 
 freshRefF :: M n RefF
 freshRefF = do
@@ -350,7 +352,8 @@ compileExprB out expr = case expr of
   --   assertLTEU w out x' y'
   BitU x i -> do
     x' <- wireU x
-    add $ cVarEqB out (RefUBit (widthOfU x) x' i) -- out = x'[i]
+    let width = widthOfU x
+    add $ cVarEqB out (RefUBit width x' (i `mod` width)) -- out = x'[i]
 
 compileExprF :: (GaloisField n, Integral n) => RefF -> ExprF n -> M n ()
 compileExprF out expr = case expr of
@@ -694,6 +697,8 @@ compileAddOrSubU isSub width out a b = do
   forM_ [0 .. width - 1] $ \i -> do
     -- Cᵢ = outᵢ
     add $ cVarEqB (RefUBit width c i) (RefUBit width out i)
+  -- HACK: add occurences of RefUs 
+  add $ cTempAddOccurrencesU [out, a, b, c]
 
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
 compileAddU = compileAddOrSubU False
@@ -716,6 +721,8 @@ compileMulU width out a b = do
   forM_ [0 .. width - 1] $ \i -> do
     -- Cᵢ = outᵢ
     add $ cVarEqB (RefUBit width c i) (RefUBit width out i)
+  -- HACK: add occurences of RefUs 
+  add $ cTempAddOccurrencesU [out, a, b, c]
 
 -- | An universal way of compiling a conditional
 compileIfB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> RefB -> M n ()

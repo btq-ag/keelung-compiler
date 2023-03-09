@@ -14,6 +14,7 @@ where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet qualified as IntSet
 import Data.Map.Strict (Map)
@@ -33,13 +34,12 @@ import Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations qualified as 
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
 import Keelung.Constraint.R1CS qualified as Constraint
+import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax.Counters
-import Keelung.Data.BinRep (BinRep(..))
-import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
@@ -74,7 +74,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showNEqF
       <> showNEqU
       <> showBooleanConstraints
-      <> showBinRepConstraints
       <> showOccurrencesF
       <> showOccurrencesB
       <> showOccurrencesU
@@ -83,7 +82,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
     where
       counters = csCounters cs
       -- sizes of constraint groups
-      totalBinRepConstraintSize = getBinRepConstraintSize counters
       booleanConstraintSize = getBooleanConstraintSize counters
 
       adapt :: String -> [a] -> (a -> String) -> String
@@ -105,15 +103,15 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               <> "\n"
 
       -- BinRep constraints
-      showBinRepConstraints =
-        if totalBinRepConstraintSize == 0
-          then ""
-          else
-            "  Binary representation constriants ("
-              <> show totalBinRepConstraintSize
-              <> "):\n\n"
-              <> unlines (map ("    " <>) (prettyBinRepConstraints counters))
-              <> "\n"
+      -- showBinRepConstraints =
+      --   if totalBinRepConstraintSize == 0
+      --     then ""
+      --     else
+      --       "  Binary representation constriants ("
+      --         <> show totalBinRepConstraintSize
+      --         <> "):\n\n"
+      --         <> unlines (map ("    " <>) (prettyBinRepConstraints counters))
+      --         <> "\n"
 
       showVarEqF = "  Field relations:\n" <> indent (indent (show (csFieldRelations cs)))
       showVarEqU = "  UInt relations:\n" <> indent (indent (show (csUIntRelations cs)))
@@ -212,10 +210,11 @@ relocateConstraintSystem cs =
     uncurry3 f (a, b, c) = f a b c
 
     binReps = generateBinReps counters (csOccurrenceU cs)
-    -- | Generate BinReps from the UIntRelations
+    -- \| Generate BinReps from the UIntRelations
     generateBinReps :: Counters -> Map RefU Int -> [BinRep]
-    generateBinReps (Counters o i1 i2 _ _ _ _) occurrences = toList $
-      fromSmallCounter OfOutput o <> fromSmallCounter OfPublicInput i1 <> fromSmallCounter OfPrivateInput i2 <> binRepsFromOccurredIntermediateVars
+    generateBinReps (Counters o i1 i2 _ _ _ _) occurrences =
+      toList $
+        fromSmallCounter OfOutput o <> fromSmallCounter OfPublicInput i1 <> fromSmallCounter OfPrivateInput i2 <> binRepsFromOccurredIntermediateVars
       where
         intermediateOccurredRefUs =
           Map.elems $
@@ -231,7 +230,7 @@ relocateConstraintSystem cs =
               ( \(width, var) ->
                   let varOffset = reindex counters OfIntermediate (OfUInt width) var
                       binRepOffset = reindex counters OfIntermediate (OfUIntBinRep width) var
-                  in BinRep varOffset width binRepOffset
+                   in BinRep varOffset width binRepOffset
               )
               intermediateOccurredRefUs
 
@@ -242,8 +241,7 @@ relocateConstraintSystem cs =
         fromPair sort (width, count) =
           let varOffset = reindex counters sort (OfUInt width) 0
               binRepOffset = reindex counters sort (OfUIntBinRep width) 0
-          in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
-
+           in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
 
     fromFieldRelations :: (GaloisField n, Integral n) => FieldRelations n -> UIntRelations n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
     fromFieldRelations fieldRels _uintRels occurrencesF occurrencesB occurrencesU =
@@ -293,44 +291,41 @@ relocateConstraintSystem cs =
           -- privateInputVars = [RefBP i | i <- [0 .. getCount OfPrivateInput OfBoolean counters - 1]]
           -- occurredInB = Map.keys $ Map.filter (> 0) occurrencesB
 
-          -- findRefBInRefF (RefBtoRefF _) 0 = Nothing
-          -- findRefBInRefF (RefBtoRefF r) _ = Just r
-          -- findRefBInRefF _ _ = Nothing
-
           -- findRefBInRefU (RefBtoRefU _) 0 = Nothing
           -- findRefBInRefU (RefBtoRefU r) _ = Just r
           -- findRefBInRefU _ _ = Nothing
 
           -- occurredInF = Map.elems $ Map.mapMaybeWithKey findRefBInRefF occurrencesF
 
-          -- | Export of UInt-related constriants
+          -- \| Export of UInt-related constriants
           refUsOccurredInF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findRefUValInRefF occurrencesF
           findRefUValInRefF (RefUVal _) 0 = Nothing
           findRefUValInRefF (RefUVal r) _ = Just r
           findRefUValInRefF _ _ = Nothing
 
-          refUsOccurredInB = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findBitTestInRefB occurrencesB
+          bitTestsOccurredInB = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findBitTestInRefB occurrencesB
           findBitTestInRefB (RefUBit {}) 0 = Nothing
           findBitTestInRefB (RefUBit _ ref _) _ = Just ref
           findBitTestInRefB _ _ = Nothing
 
-          refUsOccurredInU = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findRefBInRefU occurrencesU
+          refBsOccurredInU = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findRefBInRefU occurrencesU
           findRefBInRefU (RefBtoRefU _) 0 = Nothing
           findRefBInRefU (RefBtoRefU r) _ = Just r
           findRefBInRefU _ _ = Nothing
 
-          -- occurredBitTests =
-          --   Set.filter
-          --     ( \refB ->
-          --         case refB of
-          --           RefUBit _ ref _ -> ref `Set.member` refUsOccurredInF || ref `Set.member` refUsOccurredInB || pinnedRefU ref
-          --           _ -> False
-          --     )
-          --     (BooleanRelations.exportPinnedBitTests relations)
+          refBsOccurredInF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findRefBInRefF occurrencesF
+          findRefBInRefF (RefBtoRefF _) 0 = Nothing
+          findRefBInRefF (RefBtoRefF r) _ = Just r
+          findRefBInRefF _ _ = Nothing
+
+          refBsOccurredInB = Map.keysSet $ Map.filter (> 0) occurrencesB
 
           shouldKeep :: RefB -> Bool
-          shouldKeep (RefB ref) = RefB ref `Set.member` Map.keysSet (Map.filter (> 0) occurrencesB) || RefB ref `Set.member` refUsOccurredInU
-          shouldKeep (RefUBit _ ref _) = ref `Set.member` refUsOccurredInF || ref `Set.member` refUsOccurredInB || pinnedRefU ref
+          shouldKeep (RefB ref) =
+            RefB ref `Set.member` refBsOccurredInB
+              || RefB ref `Set.member` refBsOccurredInF
+              || RefB ref `Set.member` refBsOccurredInU
+          shouldKeep (RefUBit _ ref _) = ref `Set.member` refUsOccurredInF || ref `Set.member` bitTestsOccurredInB || pinnedRefU ref
           shouldKeep _ = True
 
           convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Maybe (Constraint n)
@@ -384,7 +379,6 @@ relocateConstraintSystem cs =
         convert = Seq.fromList . Maybe.mapMaybe toConstraint
 
         -- generate a BinRep constraint for every UInt variable occurred in the module
-        
 
         toConstraint var = case UIntRelations.lookup uintRels var of
           UIntRelations.Root -> Nothing

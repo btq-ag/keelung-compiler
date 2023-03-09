@@ -28,6 +28,7 @@ module Keelung.Compiler.Constraint
     cNEqF,
     cNEqU,
     cRotateU,
+    cTempAddOccurrencesU,
     fromConstraint,
   )
 where
@@ -74,32 +75,33 @@ fromConstraint counters (CMulF as bs cs) =
     )
 fromConstraint counters (CNEqF x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))
 fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))
-fromConstraint counters (CRotateU x y n) = error "dunno how"
+fromConstraint counters (CRotateU _x _y _n) = error "dunno how"
+fromConstraint counters (CTempAddOccurrencesU _xs) = error "dunno how"
 
 --------------------------------------------------------------------------------
 
 data RefB = RefBO Var | RefBI Var | RefBP Var | RefUBit Width RefU Int | RefB Var
-  deriving (Generic, NFData)
+  deriving (Eq, Ord, Generic, NFData)
 
-instance Eq RefB where
-  RefBO x == RefBO y = x == y
-  RefBI x == RefBI y = x == y
-  RefBP x == RefBP y = x == y
-  RefUBit w x i == RefUBit w' y j = w == w' && x == y && i `mod` w == j `mod` w
-  RefB x == RefB y = x == y
-  _ == _ = False
+-- instance Eq RefB where
+--   RefBO x == RefBO y = x == y
+--   RefBI x == RefBI y = x == y
+--   RefBP x == RefBP y = x == y
+--   RefUBit w x i == RefUBit w' y j = w == w' && x == y && i `mod` w == j `mod` w
+--   RefB x == RefB y = x == y
+--   _ == _ = False
 
-instance Ord RefB where
-  compare (RefBO x) (RefBO y) = compare x y
-  compare (RefBO _) _ = LT
-  compare (RefBI x) (RefBI y) = compare x y
-  compare (RefBI _) _ = LT
-  compare (RefBP x) (RefBP y) = compare x y
-  compare (RefBP _) _ = LT
-  compare (RefUBit w x i) (RefUBit w' y j) = compare (w, x, i `mod` w) (w', y, j `mod` w)
-  compare (RefUBit {}) _ = LT
-  compare (RefB x) (RefB y) = compare x y
-  compare (RefB _) _ = LT
+-- instance Ord RefB where
+--   compare (RefBO x) (RefBO y) = compare x y
+--   compare (RefBO _) _ = LT
+--   compare (RefBI x) (RefBI y) = compare x y
+--   compare (RefBI _) _ = LT
+--   compare (RefBP x) (RefBP y) = compare x y
+--   compare (RefBP _) _ = LT
+--   compare (RefUBit w x i) (RefUBit w' y j) = compare (w, x, i `mod` w) (w', y, j `mod` w)
+--   compare (RefUBit {}) _ = LT
+--   compare (RefB x) (RefB y) = compare x y
+--   compare (RefB _) _ = LT
 
 instance Show RefB where
   show (RefBO x) = "BO" ++ show x
@@ -166,17 +168,7 @@ reindexRefB counters (RefBI x) = reindex counters OfPublicInput OfBoolean x
 reindexRefB counters (RefBP x) = reindex counters OfPrivateInput OfBoolean x
 reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
 reindexRefB counters (RefUBit _ x i) =
-  if i == (-1)
-    then case x of
-      RefUO w x' -> reindex counters OfOutput (OfUIntBinRep w) x' + (i `mod` w)
-      RefUI w x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + (i `mod` w)
-      RefUP w x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + (i `mod` w)
-      RefU w x' -> error $ show (reindex counters OfIntermediate (OfUIntBinRep w) x', (i `mod` w))
-      RefBtoRefU x' ->
-        if i == 0
-          then reindexRefB counters x'
-          else error "reindexRefB: RefUBit"
-    else case x of
+   case x of
       RefUO w x' -> reindex counters OfOutput (OfUIntBinRep w) x' + (i `mod` w)
       RefUI w x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + (i `mod` w)
       RefUP w x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + (i `mod` w)
@@ -256,6 +248,7 @@ data Constraint n
   | CNEqF RefF RefF RefF
   | CNEqU RefU RefU RefU
   | CRotateU RefU RefU Int -- when x = y `rotateL` i
+  | CTempAddOccurrencesU [RefU]
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -286,6 +279,7 @@ instance Functor Constraint where
   fmap _ (CNEqF x y z) = CNEqF x y z
   fmap _ (CNEqU x y z) = CNEqU x y z
   fmap _ (CRotateU x y z) = CRotateU x y z
+  fmap _ (CTempAddOccurrencesU x) = CTempAddOccurrencesU x
 
 -- | Smart constructor for the CAddF constraint
 cAddF :: GaloisField n => n -> [(RefF, n)] -> [Constraint n]
@@ -311,6 +305,10 @@ cVarEqU x y = if x == y then [] else [CVarEqU x y]
 
 cRotateU :: GaloisField n => RefU -> RefU -> Int -> [Constraint n]
 cRotateU x y n = if x == y then [] else [CRotateU x y n]
+
+cTempAddOccurrencesU :: GaloisField n => [RefU] -> [Constraint n]
+cTempAddOccurrencesU = pure . CTempAddOccurrencesU
+
 
 -- | Smart constructor for the cVarBindF constraint
 cVarBindF :: GaloisField n => RefF -> n -> [Constraint n]
@@ -376,6 +374,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
   show (CRotateU x y m) = "RU " <> show x <> " " <> show y <> " " <> show m
+  show (CTempAddOccurrencesU xs) = "TO " <> show xs
 
 -- addOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
 -- addOccurrencesWithPolyG = addOccurrences . PolyG.vars
