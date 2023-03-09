@@ -50,10 +50,10 @@ run' r1cs inputs = do
 --   3. binary representation constraints
 --   4. CNEQ constraints
 fromOrdinaryConstraints :: (Num n, Eq n) => R1CS n -> Seq (Constraint n)
-fromOrdinaryConstraints (R1CS ordinaryConstraints counters cneqs) =
+fromOrdinaryConstraints (R1CS ordinaryConstraints binReps counters cneqs) =
   Seq.fromList (map R1CConstraint ordinaryConstraints)
     <> Seq.fromList booleanInputVarConstraints
-    <> Seq.fromList (map BinRepConstraint (getBinReps counters))
+    <> Seq.fromList (map BinRepConstraint binReps)
     <> Seq.fromList (map CNEQConstraint cneqs)
   where
     booleanInputVarConstraints =

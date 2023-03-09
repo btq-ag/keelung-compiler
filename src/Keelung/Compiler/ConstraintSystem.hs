@@ -38,7 +38,8 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax.Counters
-import Debug.Trace
+import Keelung.Data.BinRep (BinRep(..))
+import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
@@ -197,6 +198,7 @@ relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n ->
 relocateConstraintSystem cs =
   Relocated.RelocatedConstraintSystem
     { Relocated.csCounters = counters,
+      Relocated.csBinReps = binReps,
       Relocated.csConstraints =
         varEqFs
           <> varEqUs
@@ -208,6 +210,40 @@ relocateConstraintSystem cs =
   where
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
+
+    binReps = generateBinReps counters (csOccurrenceU cs)
+    -- | Generate BinReps from the UIntRelations
+    generateBinReps :: Counters -> Map RefU Int -> [BinRep]
+    generateBinReps (Counters o i1 i2 _ _ _ _) occurrences = toList $
+      fromSmallCounter OfOutput o <> fromSmallCounter OfPublicInput i1 <> fromSmallCounter OfPrivateInput i2 <> binRepsFromOccurredIntermediateVars
+      where
+        intermediateOccurredRefUs =
+          Map.elems $
+            Map.mapMaybeWithKey
+              ( \ref count -> case ref of
+                  RefU width var -> if count > 0 then Just (width, var) else Nothing
+                  _ -> Nothing
+              )
+              occurrences
+        binRepsFromOccurredIntermediateVars =
+          Seq.fromList $
+            map
+              ( \(width, var) ->
+                  let varOffset = reindex counters OfIntermediate (OfUInt width) var
+                      binRepOffset = reindex counters OfIntermediate (OfUIntBinRep width) var
+                  in BinRep varOffset width binRepOffset
+              )
+              intermediateOccurredRefUs
+
+        -- fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
+        fromSmallCounter sort (Struct _ _ u) = Seq.fromList $ concatMap (fromPair sort) (IntMap.toList u)
+
+        -- fromPair :: VarSort -> (Width, Int) -> [BinRep]
+        fromPair sort (width, count) =
+          let varOffset = reindex counters sort (OfUInt width) 0
+              binRepOffset = reindex counters sort (OfUIntBinRep width) 0
+          in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
+
 
     fromFieldRelations :: (GaloisField n, Integral n) => FieldRelations n -> UIntRelations n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
     fromFieldRelations fieldRels _uintRels occurrencesF occurrencesB occurrencesU =
@@ -348,7 +384,7 @@ relocateConstraintSystem cs =
         convert = Seq.fromList . Maybe.mapMaybe toConstraint
 
         -- generate a BinRep constraint for every UInt variable occurred in the module
-        -- binRepConstraints = Map.keys $ Map.filterWithKey (\ref count -> count > 0 && not (pinnedRefU ref)) occurrencesU
+        
 
         toConstraint var = case UIntRelations.lookup uintRels var of
           UIntRelations.Root -> Nothing

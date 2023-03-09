@@ -10,16 +10,22 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
     relate,
     size,
     relationBetween,
-    toMap,
+    toMap
   )
 where
 
 import Control.DeepSeq (NFData)
+import Data.IntMap.Strict qualified as IntMap
 import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint (RefU (..))
+import Keelung.Data.BinRep
+import Keelung.Data.Struct (Struct (..))
+import Keelung.Syntax.Counters
 import Prelude hiding (lookup)
 
 data UIntRelations n = UIntRelations

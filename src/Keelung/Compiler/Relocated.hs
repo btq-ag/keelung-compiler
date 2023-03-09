@@ -21,6 +21,7 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
+import Keelung.Data.BinRep (BinRep)
 
 --------------------------------------------------------------------------------
 
@@ -104,19 +105,20 @@ varsInConstraints = IntSet.unions . fmap varsInConstraint
 data RelocatedConstraintSystem n = RelocatedConstraintSystem
   { -- | Constraints
     csConstraints :: !(Seq (Constraint n)),
+    csBinReps :: [BinRep],
     csCounters :: Counters
   }
   deriving (Eq, Generic, NFData)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: RelocatedConstraintSystem n -> Int
-numberOfConstraints (RelocatedConstraintSystem cs counters) =
-  length cs + getBooleanConstraintSize counters + getBinRepConstraintSize counters
+numberOfConstraints (RelocatedConstraintSystem cs binReps counters) =
+  length cs + getBooleanConstraintSize counters + length binReps
 
 instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
-  show (RelocatedConstraintSystem constraints counters) =
+  show (RelocatedConstraintSystem constraints binReps counters) =
     "ConstraintSystem {\n"
-      <> prettyConstraints counters (toList constraints)
+      <> prettyConstraints counters (toList constraints) binReps
       <> prettyVariables counters
       <> "\n}"
 

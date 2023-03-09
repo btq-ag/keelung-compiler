@@ -64,6 +64,7 @@ toR1CS :: GaloisField n => RelocatedConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
     { r1csConstraints = rights convertedConstratins,
+      r1csBinReps = csBinReps cs,
       r1csCounters = csCounters cs,
       r1csCNEQs = lefts convertedConstratins
     }
@@ -87,6 +88,7 @@ fromR1CS r1cs =
     { csConstraints =
         Seq.fromList (map fromR1C (r1csConstraints r1cs))
           <> Seq.fromList (map CNEq (r1csCNEQs r1cs)),
+      csBinReps = r1csBinReps r1cs,
       csCounters = r1csCounters r1cs
     }
   where

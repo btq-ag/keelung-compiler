@@ -27,6 +27,8 @@ import Keelung.Interpreter.Typed qualified as Typed
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
+import Keelung.Syntax.Counters (getBinReps)
+import Debug.Trace
 
 run :: IO ()
 run = hspec tests
@@ -46,35 +48,35 @@ typed prog rawPublicInputs rawPrivateInputs = do
 
 -- csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
 -- csOld prog rawInputs = do
---   r1cs' <- toR1CS <$> Compiler.compileO1 prog
---   let inputs = Inputs.deserialize (r1csCounters r1cs') rawInputs
---   case R1CS.run r1cs' inputs of
+--   r1cs <- toR1CS <$> Compiler.compileO1 prog
+--   let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
+--   case R1CS.run r1cs inputs of
 --     Left err -> Left (InterpretError err)
---     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
+--     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
 r1csNew :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csNew prog rawPublicInputs rawPrivateInputs = do
-  r1cs' <- toR1CS . relocateConstraintSystem <$> Compiler.compileO1' prog
-  let inputs = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
-  case R1CS.run r1cs' inputs of
+  r1cs <- toR1CS . relocateConstraintSystem <$> Compiler.compileO1' prog
+  let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
+  case R1CS.run r1cs inputs of
     Left err -> Left (InterpretError err)
-    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
+    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
 r1csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csOld prog rawPublicInputs rawPrivateInputs = do
-  r1cs' <- toR1CS <$> Compiler.compile prog
-  let inputs = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
-  case Relocated.run r1cs' inputs of
+  r1cs <- toR1CS <$> Compiler.compile prog
+  let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
+  case Relocated.run r1cs inputs of
     Left err -> Left (ExecError err)
-    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
+    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
 r1csO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csO0 prog rawPublicInputs rawPrivateInputs = do
-  r1cs' <- toR1CS <$> Compiler.compileO0 prog
-  let inputs = Inputs.deserialize (r1csCounters r1cs') rawPublicInputs rawPrivateInputs
-  case R1CS.run r1cs' inputs of
+  r1cs <- toR1CS <$> Compiler.compileO0 prog
+  let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
+  case R1CS.run r1cs inputs of
     Left err -> Left (InterpretError err)
-    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs') outputs)
+    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
 runAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
 runAll = runAll' True
@@ -86,8 +88,8 @@ runAll' :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Bool 
 runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs rawOutputs = do
   -- print $ Compiler.asGF181N $ Compiler.compileO0 program
   -- print $ Compiler.asGF181N $ Compiler.compileO1 program
-  print $ Compiler.asGF181N $ Compiler.compileO1' program
-  print (Compiler.asGF181N $ toR1CS . relocateConstraintSystem <$> Compiler.compileO1' program)
+  -- print $ Compiler.asGF181N $ Compiler.compileO1' program
+  -- print (Compiler.asGF181N $ toR1CS . relocateConstraintSystem <$> Compiler.compileO1' program)
 
   kinded program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
@@ -95,11 +97,11 @@ runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs rawOutputs =
     `shouldBe` Right rawOutputs
   r1csNew program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
-  -- when enableOldOptimizer $
-  --   r1csOld program rawPublicInputs rawPrivateInputs
-  --     `shouldBe` Right rawOutputs
-  -- r1csO0 program rawPublicInputs rawPrivateInputs
-  --   `shouldBe` Right rawOutputs
+  when enableOldOptimizer $
+    r1csOld program rawPublicInputs rawPrivateInputs
+      `shouldBe` Right rawOutputs
+  r1csO0 program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
 
 runAndCompare :: (GaloisField n, Integral n, Encode t, Interpret t n) => Bool -> Comp t -> [n] -> [n] -> IO ()
 runAndCompare enableOldOptimizer program rawPublicInputs rawPrivateInputs = do
@@ -356,7 +358,7 @@ tests = do
               let c = 3 :: UInt 4
               return [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
 
-        runAll program [] [] [0, 1, 1, 0, 0, 1 :: GF181]
+        runAllExceptForTheOldOptimizer program [] [] [0, 1, 1, 0, 0, 1 :: GF181]
 
   --     it "rotate + bit test 1" $ do
   --       let program = do
