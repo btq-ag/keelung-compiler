@@ -27,8 +27,7 @@ module Keelung.Compiler.Constraint
     cMulSimpleF,
     cNEqF,
     cNEqU,
-    cRotateU,
-    cTempAddOccurrencesU,
+    -- cRotateU,
     fromConstraint,
   )
 where
@@ -75,8 +74,7 @@ fromConstraint counters (CMulF as bs cs) =
     )
 fromConstraint counters (CNEqF x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))
 fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))
-fromConstraint counters (CRotateU _x _y _n) = error "dunno how"
-fromConstraint counters (CTempAddOccurrencesU _xs) = error "dunno how"
+-- fromConstraint counters (CRotateU _x _y _n) = error "dunno how"
 
 --------------------------------------------------------------------------------
 
@@ -247,8 +245,7 @@ data Constraint n
   | CMulF !(PolyG RefF n) !(PolyG RefF n) !(Either n (PolyG RefF n))
   | CNEqF RefF RefF RefF
   | CNEqU RefU RefU RefU
-  | CRotateU RefU RefU Int -- when x = y `rotateL` i
-  | CTempAddOccurrencesU [RefU]
+  -- | CRotateU RefU RefU Int -- when x = y `rotateL` i
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -278,8 +275,7 @@ instance Functor Constraint where
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
   fmap _ (CNEqF x y z) = CNEqF x y z
   fmap _ (CNEqU x y z) = CNEqU x y z
-  fmap _ (CRotateU x y z) = CRotateU x y z
-  fmap _ (CTempAddOccurrencesU x) = CTempAddOccurrencesU x
+  -- fmap _ (CRotateU x y z) = CRotateU x y z
 
 -- | Smart constructor for the CAddF constraint
 cAddF :: GaloisField n => n -> [(RefF, n)] -> [Constraint n]
@@ -303,11 +299,8 @@ cVarNEqB x y = if x == y then [] else [CVarNEqB x y]
 cVarEqU :: GaloisField n => RefU -> RefU -> [Constraint n]
 cVarEqU x y = if x == y then [] else [CVarEqU x y]
 
-cRotateU :: GaloisField n => RefU -> RefU -> Int -> [Constraint n]
-cRotateU x y n = if x == y then [] else [CRotateU x y n]
-
-cTempAddOccurrencesU :: GaloisField n => [RefU] -> [Constraint n]
-cTempAddOccurrencesU = pure . CTempAddOccurrencesU
+-- cRotateU :: GaloisField n => RefU -> RefU -> Int -> [Constraint n]
+-- cRotateU x y n = if x == y then [] else [CRotateU x y n]
 
 
 -- | Smart constructor for the cVarBindF constraint
@@ -373,17 +366,4 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
-  show (CRotateU x y m) = "RU " <> show x <> " " <> show y <> " " <> show m
-  show (CTempAddOccurrencesU xs) = "TO " <> show xs
-
--- addOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
--- addOccurrencesWithPolyG = addOccurrences . PolyG.vars
-
--- addOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
--- addOccurrences = flip $ foldl (\occurrences ref -> Map.insertWith (+) ref 1 occurrences)
-
--- removeOccurrencesWithPolyG :: Ord ref => PolyG ref n -> Map ref Int -> Map ref Int
--- removeOccurrencesWithPolyG = removeOccurrences . PolyG.vars
-
--- removeOccurrences :: Ord ref => [ref] -> Map ref Int -> Map ref Int
--- removeOccurrences = flip $ foldl (flip (Map.adjust (\count -> pred count `max` 0)))
+  -- show (CRotateU x y m) = "RU " <> show x <> " " <> show y <> " " <> show m
