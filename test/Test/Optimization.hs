@@ -60,103 +60,113 @@ tests = do
       -- print (relocateConstraintSystem _cs)
 
       return ()
+    describe "Field" $ do
+      it "Field 1" $ do
+        cs <- runTest 3 1 $ do
+          x <- inputField Public
+          y <- reuse x
+          z <- reuse x
+          return (x + y + z)
 
-    it "Field 1" $ do
-      cs <- runTest 3 1 $ do
-        x <- inputField Public
-        y <- reuse x
-        z <- reuse x
-        return (x + y + z)
+        -- FO0 = 3FI0
+        FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (3, 0)
+        -- F0 (y) = FI0
+        FieldRelations.relationBetween (RefF 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
+        -- F1 (z) = F0 (y)
+        FieldRelations.relationBetween (RefF 1) (RefF 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
 
-      -- FO0 = 3FI0
-      FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (3, 0)
-      -- F0 (y) = FI0
-      FieldRelations.relationBetween (RefF 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
-      -- F1 (z) = F0 (y)
-      FieldRelations.relationBetween (RefF 1) (RefF 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
+      it "Field 2" $ do
+        cs <- runTest 3 1 $ do
+          x <- inputField Public
+          y <- reuse x
+          z <- reuse (x + y)
+          return (x + y + z)
 
-    it "Field 2" $ do
-      cs <- runTest 3 1 $ do
-        x <- inputField Public
-        y <- reuse x
-        z <- reuse (x + y)
-        return (x + y + z)
+        -- FO0 = 4FI0
+        FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (4, 0)
+        -- F0 (y) = FI0
+        FieldRelations.relationBetween (RefF 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
+        -- F1 (z) = 2F0 (y)
+        FieldRelations.relationBetween (RefF 1) (RefF 0) (csFieldRelations cs) `shouldBe` Just (2, 0)
 
-      -- FO0 = 4FI0
-      FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (4, 0)
-      -- F0 (y) = FI0
-      FieldRelations.relationBetween (RefF 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
-      -- F1 (z) = 2F0 (y)
-      FieldRelations.relationBetween (RefF 1) (RefF 0) (csFieldRelations cs) `shouldBe` Just (2, 0)
+      it "Field 3" $ do
+        cs <- runTest 2 1 $ do
+          x <- inputField Public
+          y <- reuse (x + 1)
+          return (x + y)
 
-    it "Field 3" $ do
-      cs <- runTest 2 1 $ do
-        x <- inputField Public
-        y <- reuse (x + 1)
-        return (x + y)
+        -- FO0 = 2FI0 + 1
+        FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (2, 1)
 
-      -- FO0 = 2FI0 + 1
-      FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (2, 1)
+      it "Field 4" $ do
+        cs <- runTest 1 1 $ do
+          let x = 4
+          y <- reuse x
+          return (x + y :: Field)
+        FieldRelations.parentOf (csFieldRelations cs) (RefFO 0) `shouldBe` FieldRelations.Constant 8
 
-    it "Field 4" $ do
-      cs <- runTest 1 1 $ do
-        let x = 4
-        y <- reuse x
-        return (x + y :: Field)
-      FieldRelations.parentOf (csFieldRelations cs) (RefFO 0) `shouldBe` FieldRelations.Constant 8
+      it "Field 5" $ do
+        _cs <- runTest 2 1 $ do
+          x <- inputField Public
+          y <- reuse x
+          return (x * y :: Field)
+        return ()
 
-    it "Field 5" $ do
-      _cs <- runTest 2 1 $ do
-        x <- inputField Public
-        y <- reuse x
-        return (x * y :: Field)
-      return ()
+    describe "Boolean" $ do
+      it "Boolean 1" $ do
+        _cs <- runTest 4 3 $ do
+          x <- inputBool Public
+          y <- reuse x
+          return (x .|. y)
+        return ()
 
-    it "Boolean 1" $ do
-      _cs <- runTest 4 3 $ do
-        x <- inputBool Public
-        y <- reuse x
-        return (x .|. y)
-      return ()
+      it "Boolean 2" $ do
+        _cs <- runTest 3 3 $ do
+          x <- inputBool Public
+          reuse x
+        return ()
 
-    it "Boolean 2" $ do
-      _cs <- runTest 3 3 $ do
-        x <- inputBool Public
-        reuse x
-      return ()
+    describe "Unsigned integers" $ do
+      it "UInt / Value" $ do
+        _cs <- runTest 10 10 $ do
+          let x = 3 :: UInt 4
+          return x
+        return ()
 
-    -- it "UInt / Value" $ do
-    --   _cs <- runTest 6 6 $ do
-    --     let x = 3 :: UInt 4
-    --     return x
-    --   print _cs
-    --   print $ relocateConstraintSystem _cs
-    --   return ()
+      it "UInt / Variable" $ do
+        _cs <- runTest 11 11 $ do
+          x <- inputUInt Public :: Comp (UInt 4)
+          reuse x
+        return ()
 
-    it "UInt / Variable" $ do
-      _cs <- runTest 11 11 $ do
-        x <- inputUInt Public :: Comp (UInt 4)
-        reuse x
-      return ()
 
-    -- it "UInt add 1" $ do
-    --   _cs <- runTest 40 40 $ do
-    --     x <- inputUInt @4 Public
-    --     y <- inputUInt @4 Public
-    --     z <- inputUInt @4 Public
-    --     w <- reuse $ x + y
-    --     return $ x + y + z + w
-    --   -- print _cs
-    --   -- print $ relocateConstraintSystem _cs
-    --   return ()
+      it "UInt / Add 1" $ do
+        _cs <- runTest 21 21 $ do
+          x <- inputUInt Public :: Comp (UInt 4)
+          y <- inputUInt Private :: Comp (UInt 4)
+          return (x + y)
+        print _cs
+        print $ relocateConstraintSystem _cs
+        return ()
 
-    -- it "UInt rotate 1" $ do
-    --   _cs <- runTest 23 23 $ do
-    --     x <- inputUInt @4 Public
-    --     return [rotate x 0, rotate x 1]
-    --   print _cs
-    --   print $ relocateConstraintSystem _cs
-    --   return ()
+-- it "UInt add 1" $ do
+--   _cs <- runTest 40 40 $ do
+--     x <- inputUInt @4 Public
+--     y <- inputUInt @4 Public
+--     z <- inputUInt @4 Public
+--     w <- reuse $ x + y
+--     return $ x + y + z + w
+--   -- print _cs
+--   -- print $ relocateConstraintSystem _cs
+--   return ()
+
+-- it "UInt rotate 1" $ do
+--   _cs <- runTest 23 23 $ do
+--     x <- inputUInt @4 Public
+--     return [rotate x 0, rotate x 1]
+--   print _cs
+--   print $ relocateConstraintSystem _cs
+--   return ()
 -- it "UInt 1" $ do
 --   _cs <- runTest 15 11 $ do
 --     x <- inputUInt Public :: Comp (UInt 4)

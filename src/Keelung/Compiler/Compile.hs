@@ -553,6 +553,7 @@ wireB :: (GaloisField n, Integral n) => ExprB n -> M n RefB
 wireB (VarB ref) = return (RefB ref)
 wireB (VarBO ref) = return (RefBO ref)
 wireB (VarBI ref) = return (RefBI ref)
+wireB (VarBP ref) = return (RefBP ref)
 wireB expr = do
   out <- freshRefB
   compileExprB out expr
@@ -562,6 +563,7 @@ wireF :: (GaloisField n, Integral n) => ExprF n -> M n RefF
 wireF (VarF ref) = return (RefF ref)
 wireF (VarFO ref) = return (RefFO ref)
 wireF (VarFI ref) = return (RefFI ref)
+wireF (VarFP ref) = return (RefFP ref)
 wireF expr = do
   out <- freshRefF
   compileExprF out expr
@@ -571,6 +573,7 @@ wireU :: (GaloisField n, Integral n) => ExprU n -> M n RefU
 wireU (VarU w ref) = return (RefU w ref)
 wireU (VarUO w ref) = return (RefUO w ref)
 wireU (VarUI w ref) = return (RefUI w ref)
+wireU (VarUP w ref) = return (RefUP w ref)
 wireU expr = do
   out <- freshRefU (widthOfU expr)
   compileExprU out expr

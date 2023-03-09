@@ -337,13 +337,20 @@ tests = do
         runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [0]
         runAllExceptForTheOldOptimizer program [4, 4 :: GF181] [] [1]
 
-      it "neq" $ do
+      it "neq 1" $ do
         let program = do
               x <- inputUInt @4 Public
               y <- inputUInt @4 Public
               return (x `neq` y)
         runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [1]
         runAllExceptForTheOldOptimizer program [4, 4 :: GF181] [] [0]
+
+      it "neq 2" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              return (x `neq` 3)
+        runAllExceptForTheOldOptimizer program [5 :: GF181] [] [1]
+        runAllExceptForTheOldOptimizer program [3 :: GF181] [] [0]
 
       it "rotate" $ do
         let program = do
