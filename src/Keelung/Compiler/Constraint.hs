@@ -49,18 +49,22 @@ import Keelung.Syntax.Counters
 
 fromConstraint :: (GaloisField n, Integral n) => Counters -> Constraint n -> Relocated.Constraint n
 fromConstraint counters (CAddF as) = Relocated.CAdd (fromPolyF_ counters as)
-fromConstraint counters (CVarEqF x y) = case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
-  Left _ -> error "CVarEqF: two variables are the same"
-  Right xs -> Relocated.CAdd xs
-fromConstraint counters (CVarEqB x y) = case Poly.buildEither 0 [(reindexRefB counters x, 1), (reindexRefB counters y, -1)] of
-  Left _ -> error $ "CVarEqB: two variables are the same" ++ show x ++ " " ++ show y
-  Right xs -> Relocated.CAdd xs
-fromConstraint counters (CVarNEqB x y) = case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
-  Left _ -> error "CVarNEqB: two variables are the same"
-  Right xs -> Relocated.CAdd xs
-fromConstraint counters (CVarEqU x y) = case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
-  Left _ -> error "CVarEqU: two variables are the same"
-  Right xs -> Relocated.CAdd xs
+fromConstraint counters (CVarEqF x y) =
+  case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
+    Left _ -> error "CVarEqF: two variables are the same"
+    Right xs -> Relocated.CAdd xs
+fromConstraint counters (CVarEqB x y) =
+  case Poly.buildEither 0 [(reindexRefB counters x, 1), (reindexRefB counters y, -1)] of
+    Left _ -> error $ "CVarEqB: two variables are the same" ++ show x ++ " " ++ show y
+    Right xs -> Relocated.CAdd xs
+fromConstraint counters (CVarNEqB x y) =
+  case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
+    Left _ -> error "CVarNEqB: two variables are the same"
+    Right xs -> Relocated.CAdd xs
+fromConstraint counters (CVarEqU x y) =
+  case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
+    Left _ -> error "CVarEqU: two variables are the same"
+    Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarBindF x n) = Relocated.CAdd (Poly.bind (reindexRefF counters x) n)
 fromConstraint counters (CVarBindB x n) = Relocated.CAdd (Poly.bind (reindexRefB counters x) n)
 fromConstraint counters (CVarBindU x n) = Relocated.CAdd (Poly.bind (reindexRefU counters x) n)
@@ -73,7 +77,8 @@ fromConstraint counters (CMulF as bs cs) =
         Right xs -> fromPolyF counters xs
     )
 fromConstraint counters (CNEqF x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))
-fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefU counters m))
+fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefF counters m))
+
 -- fromConstraint counters (CRotateU _x _y _n) = error "dunno how"
 
 --------------------------------------------------------------------------------
@@ -134,18 +139,21 @@ instance Show RefU where
 
 pinnedRefF :: RefF -> Bool
 pinnedRefF (RefFI _) = True
+pinnedRefF (RefFP _) = True
 pinnedRefF (RefFO _) = True
 pinnedRefF (RefBtoRefF ref) = pinnedRefB ref
 pinnedRefF _ = False
 
 pinnedRefB :: RefB -> Bool
 pinnedRefB (RefBI _) = True
+pinnedRefB (RefBP _) = True
 pinnedRefB (RefBO _) = True
 pinnedRefB (RefUBit _ ref _) = pinnedRefU ref
 pinnedRefB _ = False
 
 pinnedRefU :: RefU -> Bool
 pinnedRefU (RefUI _ _) = True
+pinnedRefU (RefUP _ _) = True
 pinnedRefU (RefUO _ _) = True
 pinnedRefU (RefBtoRefU ref) = pinnedRefB ref
 pinnedRefU _ = False
@@ -166,15 +174,15 @@ reindexRefB counters (RefBI x) = reindex counters OfPublicInput OfBoolean x
 reindexRefB counters (RefBP x) = reindex counters OfPrivateInput OfBoolean x
 reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
 reindexRefB counters (RefUBit _ x i) =
-   case x of
-      RefUO w x' -> reindex counters OfOutput (OfUIntBinRep w) x' + (i `mod` w)
-      RefUI w x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + (i `mod` w)
-      RefUP w x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + (i `mod` w)
-      RefU w x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + (i `mod` w)
-      RefBtoRefU x' ->
-        if i == 0
-          then reindexRefB counters x'
-          else error "reindexRefB: RefUBit"
+  case x of
+    RefUO w x' -> reindex counters OfOutput (OfUIntBinRep w) x' + (i `mod` w)
+    RefUI w x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + (i `mod` w)
+    RefUP w x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + (i `mod` w)
+    RefU w x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + (i `mod` w)
+    RefBtoRefU x' ->
+      if i == 0
+        then reindexRefB counters x'
+        else error "reindexRefB: RefUBit"
 
 reindexRefU :: Counters -> RefU -> Var
 reindexRefU counters (RefUO w x) = reindex counters OfOutput (OfUInt w) x
@@ -196,37 +204,6 @@ fromPolyF_ counters xs = case fromPolyF counters xs of
   Left _ -> error "[ panic ] fromPolyF_: Left"
   Right p -> p
 
--- let (isAlreadyRoot, (result, intercept)) = UnionFind.lookup ref ctx
---  in if isAlreadyRoot
---       then case xs of
---         Left c -> (changed, Right $ PolyG.singleton c (ref, coeff), substitutedRefs)
---         Right xs' -> (changed, Right $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
---       else case result of
---         Nothing ->
---           -- ref = intercept
---           let substitutedRefs' = ref : substitutedRefs
---            in case xs of
---                 Left c -> (changed, Left (intercept + c), substitutedRefs')
---                 Right xs' -> (True, Right $ PolyG.insert (intercept * coeff) (ref, 1) xs', substitutedRefs')
---         Just (slope, root) ->
---           let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
---            in case xs of
---                 -- ref = slope * root + intercept
---                 Left c -> (changed, Right $ PolyG.singleton (intercept * coeff + c) (root, slope * coeff), substitutedRefs')
---                 Right xs' -> (True, Right $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
-
--- let (isAlreadyRoot, slope, root, intercept) = UnionFind.lookup ref ctx
---  in if isAlreadyRoot
---       then case xs of
---         Nothing -> (changed, Just $ PolyG.singleton 0 (ref, coeff), substitutedRefs)
---         Just xs' -> (changed, Just $ PolyG.insert 0 (ref, coeff) xs', substitutedRefs)
---       else
---         let substitutedRefs' = if root == ref then substitutedRefs else ref : substitutedRefs
---          in case xs of
---               -- ref = slope * root + intercept
---               Nothing -> (changed, Just $ PolyG.singleton (intercept * coeff) (root, slope * coeff), substitutedRefs')
---               Just xs' -> (True, Just $ PolyG.insert (intercept * coeff) (root, slope * coeff) xs', substitutedRefs')
-
 --------------------------------------------------------------------------------
 
 -- | Constraint
@@ -244,8 +221,9 @@ data Constraint n
   | CVarBindU RefU n -- when x = val
   | CMulF !(PolyG RefF n) !(PolyG RefF n) !(Either n (PolyG RefF n))
   | CNEqF RefF RefF RefF
-  | CNEqU RefU RefU RefU
-  -- | CRotateU RefU RefU Int -- when x = y `rotateL` i
+  | CNEqU RefU RefU RefF
+
+-- \| CRotateU RefU RefU Int -- when x = y `rotateL` i
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -275,7 +253,6 @@ instance Functor Constraint where
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
   fmap _ (CNEqF x y z) = CNEqF x y z
   fmap _ (CNEqU x y z) = CNEqU x y z
-  -- fmap _ (CRotateU x y z) = CRotateU x y z
 
 -- | Smart constructor for the CAddF constraint
 cAddF :: GaloisField n => n -> [(RefF, n)] -> [Constraint n]
@@ -302,7 +279,6 @@ cVarEqU x y = if x == y then [] else [CVarEqU x y]
 -- cRotateU :: GaloisField n => RefU -> RefU -> Int -> [Constraint n]
 -- cRotateU x y n = if x == y then [] else [CRotateU x y n]
 
-
 -- | Smart constructor for the cVarBindF constraint
 cVarBindF :: GaloisField n => RefF -> n -> [Constraint n]
 cVarBindF x n = [CVarBindF x n]
@@ -327,31 +303,21 @@ cMulSimple ctor !x !y !z = case ( do
 cMulSimpleF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
 cMulSimpleF = cMulSimple CMulF
 
--- | Smart constructor for the CMul constraint
-cMul ::
-  (GaloisField n, Ord ref) =>
-  (PolyG ref n -> PolyG ref n -> Either n (PolyG ref n) -> Constraint n) ->
-  (n, [(ref, n)]) ->
-  (n, [(ref, n)]) ->
-  (n, [(ref, n)]) ->
-  [Constraint n]
-cMul ctor (a, xs) (b, ys) (c, zs) = case ( do
-                                             xs' <- PolyG.build a xs
-                                             ys' <- PolyG.build b ys
-                                             return $ ctor xs' ys' (PolyG.build c zs)
-                                         ) of
-  Left _ -> []
-  Right result -> [result]
-
 -- | Smart constructor for the CMulF constraint
 cMulF :: GaloisField n => (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> [Constraint n]
-cMulF = cMul CMulF
+cMulF (a, xs) (b, ys) (c, zs) = case ( do
+                                         xs' <- PolyG.build a xs
+                                         ys' <- PolyG.build b ys
+                                         return $ CMulF xs' ys' (PolyG.build c zs)
+                                     ) of
+  Left _ -> []
+  Right result -> [result]
 
 -- | Smart constructor for the CNEq constraint
 cNEqF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
 cNEqF x y m = [CNEqF x y m]
 
-cNEqU :: GaloisField n => RefU -> RefU -> RefU -> [Constraint n]
+cNEqU :: GaloisField n => RefU -> RefU -> RefF -> [Constraint n]
 cNEqU x y m = [CNEqU x y m]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
@@ -366,4 +332,5 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
   show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
-  -- show (CRotateU x y m) = "RU " <> show x <> " " <> show y <> " " <> show m
+
+-- show (CRotateU x y m) = "RU " <> show x <> " " <> show y <> " " <> show m

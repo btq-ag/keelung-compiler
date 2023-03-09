@@ -125,13 +125,19 @@ tests = do
         reuse x
       return ()
 
-    -- it "UInt eq 1" $ do
-    --   _cs <- runTest 19 19 $ do
-    --     x <- inputUInt Public :: Comp (UInt 4)
-    --     reuse x
+    -- it "UInt / Value" $ do
+    --   _cs <- runTest 6 6 $ do
+    --     let x = 3 :: UInt 4
+    --     return x
     --   print _cs
     --   print $ relocateConstraintSystem _cs
     --   return ()
+
+    it "UInt / Variable" $ do
+      _cs <- runTest 11 11 $ do
+        x <- inputUInt Public :: Comp (UInt 4)
+        reuse x
+      return ()
 
     -- it "UInt add 1" $ do
     --   _cs <- runTest 40 40 $ do

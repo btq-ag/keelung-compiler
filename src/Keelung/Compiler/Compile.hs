@@ -219,16 +219,16 @@ add = mapM_ addOne
     addOne (CMulF x y (Right z)) = do
       modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
     addOne (CNEqF x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
-    addOne (CNEqU x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
-    -- addOne (CRotateU x y _n) = do
-    --   cs <- get
-    --   case UIntRelations.relate x (True, y) (csUIntRelations cs) of
-    --     Nothing -> return ()
-    --     Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
+    addOne (CNEqU x y m) = modify (\cs -> addOccurrences [x, y] $ addOccurrences [m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
+
+-- addOne (CRotateU x y _n) = do
+--   cs <- get
+--   case UIntRelations.relate x (True, y) (csUIntRelations cs) of
+--     Nothing -> return ()
+--     Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
 
 addOccurrencesUTemp :: [RefU] -> M n ()
 addOccurrencesUTemp = modify' . addOccurrences
-
 
 freshRefF :: M n RefF
 freshRefF = do
@@ -399,12 +399,7 @@ compileExprU out expr = case expr of
       let bit = testBit val i
       add $ cVarBindB (RefUBit width out i) bit -- out[i] = bit
   VarU width var -> do
-    let ref = RefU width var
-    -- constraint for UInt : out = ref
-    add $ cVarEqU out ref
-    -- constraints for BinRep of UInt
-    forM_ [0 .. width - 1] $ \i -> do
-      add $ cVarEqB (RefUBit width out i) (RefUBit width ref i) -- out[i] = ref[i]
+    add $ cVarEqU out (RefU width var)
   VarUO width var -> do
     add $ cVarEqU out (RefU width var) -- out = var
   VarUI width var -> do
@@ -598,15 +593,7 @@ compileEqualityU isEq out x y =
         else compileExprB out (ValB 0)
     else do
       -- introduce a new variable m
-      -- if diff = 0 then m = 0 else m = recip diff
-      let width = case x of
-            RefUO w _ -> w
-            RefUI w _ -> w
-            RefUP w _ -> w
-            RefU w _ -> w
-            RefBtoRefU _ -> 1 -- TODO: reexamine this
-      m <- freshRefU width
-
+      m <- freshRefF
       if isEq
         then do
           --  1. (x - y) * m = 1 - out
@@ -614,7 +601,7 @@ compileEqualityU isEq out x y =
           add $
             cMulF
               (0, [(RefUVal x, 1), (RefUVal y, -1)])
-              (0, [(RefUVal m, 1)])
+              (0, [(m, 1)])
               (1, [(RefBtoRefF out, -1)])
           add $
             cMulF
@@ -627,7 +614,7 @@ compileEqualityU isEq out x y =
           add $
             cMulF
               (0, [(RefUVal x, 1), (RefUVal y, -1)])
-              (0, [(RefUVal m, 1)])
+              (0, [(m, 1)])
               (0, [(RefBtoRefF out, 1)])
           add $
             cMulF
@@ -699,7 +686,7 @@ compileAddOrSubU isSub width out a b = do
   forM_ [0 .. width - 1] $ \i -> do
     -- Cᵢ = outᵢ
     add $ cVarEqB (RefUBit width c i) (RefUBit width out i)
-  -- HACK: add occurences of RefUs 
+  -- HACK: add occurences of RefUs
   addOccurrencesUTemp [out, a, b, c]
 
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
@@ -723,7 +710,7 @@ compileMulU width out a b = do
   forM_ [0 .. width - 1] $ \i -> do
     -- Cᵢ = outᵢ
     add $ cVarEqB (RefUBit width c i) (RefUBit width out i)
-  -- HACK: add occurences of RefUs 
+  -- HACK: add occurences of RefUs
   addOccurrencesUTemp [out, a, b, c]
 
 -- | An universal way of compiling a conditional

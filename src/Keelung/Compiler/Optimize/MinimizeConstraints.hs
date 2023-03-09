@@ -68,56 +68,6 @@ goThroughMulF = do
     csMulF' <- foldMaybeM reduceMulF [] (csMulF cs)
     modify' $ \cs'' -> cs'' {csMulF = csMulF'}
 
--- goThroughNEqF :: (GaloisField n, Integral n) => OptiM n WhatChanged
--- goThroughNEqF = do
---   cs <- get
---   runRoundM $ do
---     csNEqF' <- foldMaybeM reduceNEqF [] (Map.toList (csNEqF cs))
---     modify' $ \cs'' -> cs'' {csNEqF = Map.fromList csNEqF'}
-
--- type NEqF = ((RefF, RefF), RefF)
-
--- -- if (x - y) = 0 then m = 0 else m = recip (x - y)
--- reduceNEqF :: (GaloisField n, Integral n) => NEqF -> RoundM n (Maybe NEqF)
--- reduceNEqF ((x, y), m) = do
---   unionFind <- gets csFieldRelations
---   let resultX = FieldRelations.parentOf unionFind x
---   let resultY = FieldRelations.parentOf unionFind y
---   let resultM = FieldRelations.parentOf unionFind m
-
---   case (resultX, resultY, resultM) of
---     (Just (Nothing, _), Just (Nothing, _), Just (Nothing, _)) -> return Nothing
---     (Just (Nothing, xVal), Just (Nothing, yVal), Just (Just (mSlope, mRoot), mIntercept)) ->
---       if (xVal - yVal) == 0
---         then do
---           -- m = 0 = mSlope * mRoot + mIntercept
---           --    =>
---           -- mRoot = - mIntercept / mSlope
---           bindToValue mRoot (-mIntercept / mSlope)
---           return Nothing
---         else do
---           -- mSlope * mRoot + mIntercept  = recip (xVal - yVal)
---           --    =>
---           -- mRoot = (recip (xVal - yVal) - mIntercept) / mSlope
---           bindToValue mRoot ((recip (xVal - yVal) - mIntercept) / mSlope)
---           return Nothing
---     (Nothing, Nothing, Just (Nothing, mVal)) ->
---       -- m == mVal
---       if mVal == 0
---         then do
---           -- x - y = 0
---           _ <- relate x (1, y, 0)
---           return Nothing
---         else do
---           -- m = 1 / (x - y)
---           --    =>
---           -- x - y = 1 / m
---           --    =>
---           -- x = 1 / m + y
---           _ <- relate x (1, y, recip mVal)
---           return Nothing
---     _ -> return (Just ((x, y), m)) -- cannot do anything
-
 foldMaybeM :: Monad m => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
 foldMaybeM f = foldM $ \acc x -> do
   result <- f x
@@ -363,9 +313,9 @@ substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = 
           let removedRefs' = ref : removedRefs
               addedRefs' = RefBtoRefF root : addedRefs
            in case accPoly of
-                -- ref = root
-                Left c -> (True, PolyG.singleton c (RefBtoRefF root, -coeff), removedRefs', addedRefs')
-                Right accPoly' -> (True, PolyG.insert 0 (RefBtoRefF root, -coeff) accPoly', removedRefs', addedRefs')
+                -- ref = 1 - root
+                Left c -> (True, PolyG.singleton (c + coeff) (RefBtoRefF root, -coeff), removedRefs', addedRefs')
+                Right accPoly' -> (True, PolyG.insert coeff (RefBtoRefF root, -coeff) accPoly', removedRefs', addedRefs')
     _ ->
       -- ref is already a root
       case accPoly of

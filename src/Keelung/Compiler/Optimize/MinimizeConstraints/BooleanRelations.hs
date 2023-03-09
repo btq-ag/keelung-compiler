@@ -46,7 +46,7 @@ instance Show BooleanRelations where
     where
       showList' ys = "[" <> List.intercalate ", " ys <> "]"
 
-      showLink (var, Left (slope, root)) = "  " <> show var <> " = " <> (if slope then "" else show slope) <> show root <> "\n"
+      showLink (var, Left (dontFlip, root)) = "  " <> show var <> " = " <> (if dontFlip then "" else "¬ ") <> show root <> "\n"
       showLink (var, Right intercept) = "  " <> show var <> " = " <> show intercept <> "\n"
 
 new :: BooleanRelations

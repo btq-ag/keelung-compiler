@@ -114,6 +114,13 @@ runAndCompare enableOldOptimizer program rawPublicInputs rawPrivateInputs = do
   r1csO0 program rawPublicInputs rawPrivateInputs
     `shouldBe` expectedOutput
 
+_debug :: Encode t => Comp t -> IO ()
+_debug program = do 
+  -- print $ Compiler.asGF181N $ Compiler.compileO0 program
+  -- print $ Compiler.asGF181N $ Compiler.compileO1 program
+  print $ Compiler.asGF181N $ Compiler.compileO1' program
+  print (Compiler.asGF181N $ toR1CS . relocateConstraintSystem <$> Compiler.compileO1' program)
+
 tests :: SpecWith ()
 tests = do
   describe "Interpreters of different syntaxes should computes the same result" $ do
@@ -322,13 +329,21 @@ tests = do
 
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
 
-      it "eq 1" $ do
+      it "eq" $ do
         let program = do
               x <- inputUInt @4 Public
               y <- inputUInt @4 Public
               return (x `eq` y)
         runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [0]
         runAllExceptForTheOldOptimizer program [4, 4 :: GF181] [] [1]
+
+      it "neq" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return (x `neq` y)
+        runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [1]
+        runAllExceptForTheOldOptimizer program [4, 4 :: GF181] [] [0]
 
       it "rotate" $ do
         let program = do
@@ -350,7 +365,7 @@ tests = do
         runAll program [3 :: GF181] [] [0, 0, 0, 1, 3, 6, 12, 8, 0]
         runAll program [5 :: GF181] [] [0, 0, 1, 2, 5, 10, 4, 8, 0]
 
-      it "bit test 1" $ do
+      it "Bit test / literal" $ do
         -- 0011
         let program = do
               let c = 3 :: UInt 4
@@ -358,13 +373,72 @@ tests = do
 
         runAllExceptForTheOldOptimizer program [] [] [0, 1, 1, 0, 0, 1 :: GF181]
 
-      it "rotate + bit test 1" $ do
+      it "Bit test / input var" $ do
+        let program = do
+              c <- input Private :: Comp (UInt 4)
+              return [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
+        runAllExceptForTheOldOptimizer program [] [3] [0, 1, 1, 0, 0, 1 :: GF181]
+        runAllExceptForTheOldOptimizer program [] [5] [0, 1, 0, 1, 0, 1 :: GF181]
+
+      it "Bit test / and 1" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Private
+              return $ (x .&. y) !!! 0
+        runAllExceptForTheOldOptimizer program [2] [3] [0 :: GF181]
+        runAllExceptForTheOldOptimizer program [3] [5] [1 :: GF181]
+
+      it "Bit test / and 2" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Private
+              z <- inputUInt @4 Public
+              return $ (x .&. y .&. z) !!! 0
+        runAllExceptForTheOldOptimizer program [2, 4] [3] [0 :: GF181]
+        runAllExceptForTheOldOptimizer program [3, 7] [5] [1 :: GF181]
+
+      it "Bit test / or 1" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Private
+              return $ (x .|. y) !!! 1
+        runAllExceptForTheOldOptimizer program [2] [3] [1 :: GF181]
+        runAllExceptForTheOldOptimizer program [3] [5] [1 :: GF181]
+        runAllExceptForTheOldOptimizer program [5] [9] [0 :: GF181]
+
+      it "Bit test / or 2" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              return $ (x .|. 3) !!! 2
+        runAllExceptForTheOldOptimizer program [2] [] [0 :: GF181]
+        runAllExceptForTheOldOptimizer program [3] [] [0 :: GF181]
+        runAllExceptForTheOldOptimizer program [5] [] [1 :: GF181]
+
+      it "Bit test / xor 1" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Private
+              z <- inputUInt @4 Public
+              w <- reuse $ x .^. y .^. z
+              return [w !!! 0, w !!! 1, w !!! 2, w !!! 3]
+        runAllExceptForTheOldOptimizer program [2, 4] [3] [1, 0, 1, 0 :: GF181]
+        runAllExceptForTheOldOptimizer program [3, 7] [5] [1, 0, 0, 0 :: GF181]
+
+      it "Bit test / BtoU" $ do
+        let program = do
+              x <- input Public
+              let u = BtoU x :: UInt 4
+              return [u !!! 0, u !!! 1, u !!! 2, u !!! 3]
+        runAllExceptForTheOldOptimizer program [0] [] [0, 0, 0, 0 :: GF181]
+        runAllExceptForTheOldOptimizer program [1] [] [1, 0, 0, 0 :: GF181]
+
+      it "Bit test / rotate 1" $ do
         let program = do
               x <- inputUInt @4 Public
               return $ (x `rotate` 0) !!! 0
         runAllExceptForTheOldOptimizer program [2] [] [0 :: GF181]
 
-      it "rotate + bit test 2" $ do
+      it "Bit test / rotate 2" $ do
         -- 0011 0100211003
         let program = do
               x <- inputUInt @4 Public
