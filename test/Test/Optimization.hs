@@ -141,7 +141,7 @@ tests = do
 
       it "rotate" $ do
         _cs <- runTest 14 14 $ do
-          x <- inputUInt @4 Public
+          x <- inputUInt Public :: Comp (UInt 4)
           return $ rotate x 1
         print _cs
         print $ relocateConstraintSystem _cs

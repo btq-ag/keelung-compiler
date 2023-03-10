@@ -285,7 +285,7 @@ relocateConstraintSystem cs =
                 Right poly -> Just $ fromConstraint counters $ CAddF poly
 
     fromBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
-    fromBooleanRelations relations occurrencesF occurrencesB occurrencesU =
+    fromBooleanRelations relations occurrencesF occurrencesB _occurrencesU =
       let -- \| Export of UInt-related constriants
           refUsOccurredInF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findRefUValInRefF occurrencesF
           findRefUValInRefF (RefUVal _) 0 = Nothing
@@ -296,11 +296,6 @@ relocateConstraintSystem cs =
           findBitTestInRefB (RefUBit {}) 0 = Nothing
           findBitTestInRefB (RefUBit _ ref _) _ = Just ref
           findBitTestInRefB _ _ = Nothing
-
-          refBsOccurredInU = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findRefBInRefU occurrencesU
-          findRefBInRefU (RefBtoRefU _) 0 = Nothing
-          findRefBInRefU (RefBtoRefU r) _ = Just r
-          findRefBInRefU _ _ = Nothing
 
           refBsOccurredInF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findRefBInRefF occurrencesF
           findRefBInRefF (RefBtoRefF _) 0 = Nothing
@@ -313,7 +308,6 @@ relocateConstraintSystem cs =
           shouldKeep (RefB ref) =
             RefB ref `Set.member` refBsOccurredInB
               || RefB ref `Set.member` refBsOccurredInF
-              || RefB ref `Set.member` refBsOccurredInU
           shouldKeep (RefUBit _ ref _) = ref `Set.member` refUsOccurredInF || ref `Set.member` bitTestsOccurredInB || pinnedRefU ref
           shouldKeep _ = True
 
@@ -461,14 +455,7 @@ instance UpdateOccurrences RefU where
   addOccurrences =
     flip
       ( foldl
-          ( \cs ref ->
-              case ref of
-                RefBtoRefU refB ->
-                  cs
-                    { csOccurrenceB = Map.insertWith (+) refB 1 (csOccurrenceB cs)
-                    }
-                _ ->
-                  cs
+          ( \cs ref -> cs
                     { csOccurrenceU = Map.insertWith (+) ref 1 (csOccurrenceU cs)
                     }
           )
@@ -476,14 +463,7 @@ instance UpdateOccurrences RefU where
   removeOccurrences =
     flip
       ( foldl
-          ( \cs ref ->
-              case ref of
-                RefBtoRefU refB ->
-                  cs
-                    { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) refB (csOccurrenceB cs)
-                    }
-                _ ->
-                  cs
+          ( \cs ref -> cs
                     { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceU cs)
                     }
           )

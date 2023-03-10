@@ -124,7 +124,7 @@ instance Show RefF where
   show (RefBtoRefF x) = show x
   show (RefUVal x) = show x
 
-data RefU = RefUO Width Var | RefUI Width Var | RefUP Width Var | RefBtoRefU RefB | RefU Width Var
+data RefU = RefUO Width Var | RefUI Width Var | RefUP Width Var | RefU Width Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefU where
@@ -133,7 +133,6 @@ instance Show RefU where
     RefUI w x -> "UI" ++ toSubscript w ++ show x
     RefUP w x -> "UP" ++ toSubscript w ++ show x
     RefU w x -> "U" ++ toSubscript w ++ show x
-    RefBtoRefU x -> show x
 
 --------------------------------------------------------------------------------
 
@@ -155,7 +154,6 @@ pinnedRefU :: RefU -> Bool
 pinnedRefU (RefUI _ _) = True
 pinnedRefU (RefUP _ _) = True
 pinnedRefU (RefUO _ _) = True
-pinnedRefU (RefBtoRefU ref) = pinnedRefB ref
 pinnedRefU _ = False
 
 --------------------------------------------------------------------------------
@@ -179,17 +177,12 @@ reindexRefB counters (RefUBit _ x i) =
     RefUI w x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + (i `mod` w)
     RefUP w x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + (i `mod` w)
     RefU w x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + (i `mod` w)
-    RefBtoRefU x' ->
-      if i == 0
-        then reindexRefB counters x'
-        else error "reindexRefB: RefUBit"
 
 reindexRefU :: Counters -> RefU -> Var
 reindexRefU counters (RefUO w x) = reindex counters OfOutput (OfUInt w) x
 reindexRefU counters (RefUI w x) = reindex counters OfPublicInput (OfUInt w) x
 reindexRefU counters (RefUP w x) = reindex counters OfPrivateInput (OfUInt w) x
 reindexRefU counters (RefU w x) = reindex counters OfIntermediate (OfUInt w) x
-reindexRefU counters (RefBtoRefU x) = reindexRefB counters x
 
 --------------------------------------------------------------------------------
 
