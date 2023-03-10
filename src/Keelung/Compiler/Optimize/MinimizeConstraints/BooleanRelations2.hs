@@ -22,6 +22,7 @@ import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint (RefB (..))
 import Prelude hiding (lookup)
+import Debug.Trace
 
 -- | Relation between a variable and a value or another variable
 data Relation = ParentIs Bool RefB | Constant Bool
@@ -92,12 +93,15 @@ assign ref value relations = case lookup ref relations of
   Value _ -> relations -- already assigned
   ChildOf polarity parent -> assign parent (polarity == value) relations
 
--- | Relates two variables, using the smaller one as the root, O(lg n)
+-- | Relates two variables, using the more "senior" one as the root, O(lg n)
 relate :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
-relate a polarity b relations
-  | a > b = relate' a polarity b relations
-  | a < b = relate' b polarity a relations
-  | otherwise = relations
+relate a polarity b relations = case compareSeniority a b of
+  LT -> relate' a polarity b relations
+  GT -> relate' b polarity a relations
+  EQ -> traceShow (a, b, childrenSizeOf a relations, childrenSizeOf b relations) $ case compare (childrenSizeOf a relations) (childrenSizeOf b relations) of
+    LT -> relate' a polarity b relations
+    GT -> relate' b polarity a relations
+    EQ -> relate' a polarity b relations
 
 -- | Relates a child to a parent
 relate' :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
@@ -156,79 +160,6 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   (ChildOf _ _, Value _) -> Nothing -- var2 is a constant value
   (Value value1, Value value2) -> Just (value1 == value2)
 
--- -- | Bind a variable to a value
--- bindToValue :: RefB -> Bool -> BooleanRelations -> BooleanRelations
--- bindToValue x value xs =
---   case lookup xs x of
---     Root ->
---       -- x does not have a parent, so it is its own root
---       rememberPinnedBitTest x $
---         xs
---           { links = Map.insert x (Right value) (links xs),
---             sizes = Map.insert x 1 (sizes xs)
---           }
---     Constant _oldValue ->
---       -- x is already a root with `_oldValue` as its value
---       -- TODO: handle this kind of conflict in the future
---       -- FOR NOW: overwrite the value of x with the new value
---       rememberPinnedBitTest x $
---         xs
---           { links = Map.insert x (Right value) (links xs)
---           }
---     ChildOf relation parent ->
---       rememberPinnedBitTest x $
---         xs
---           { links =
---               Map.insert parent (Right (value == relation)) $
---                 Map.insert x (Right value) $
---                   links xs,
---             sizes = Map.insert x 1 (sizes xs)
---           }
-
--- relate :: RefB -> (Bool, RefB) -> BooleanRelations -> Maybe BooleanRelations
--- relate x (relation, y) xs
---   | x > y = relate' x (relation, y) xs
---   | x < y = relate' y (relation, x) xs
---   | otherwise = Nothing
-
--- -- | Establish the relation of 'x = (relation == y)'
--- --   Returns Nothing if the relation has already been established
--- relate' :: RefB -> (Bool, RefB) -> BooleanRelations -> Maybe BooleanRelations
--- relate' x (relation, y) xs = case lookup xs x of
---   Constant constantX ->
---     Just $ bindToValue y (relation == constantX) xs
---   ChildOf relationX rootOfX ->
---     relate rootOfX (relation == relationX, y) xs
---   Root ->
---     -- x does not have a parent, so it is its own root
---     case lookup xs y of
---       Constant constantY ->
---         Just $ bindToValue x (relation == constantY) xs
---       ChildOf relationY rootOfY ->
---         Just $
---           rememberPinnedBitTest x $
---             xs
---               { links = Map.insert x (Left (relation == relationY, rootOfY)) (links xs),
---                 sizes = Map.insertWith (+) y 1 (sizes xs)
---               }
---       Root ->
---         -- y does not have a parent, so it is its own root
---         Just $
---           rememberPinnedBitTest x $
---             xs
---               { links = Map.insert x (Left (relation, y)) (links xs),
---                 sizes = Map.insertWith (+) y 1 (sizes xs)
---               }
-
--- size :: BooleanRelations -> Int
--- size = Map.size . links
-
--- exportPinnedBitTests :: BooleanRelations -> Set RefB
--- exportPinnedBitTests = Set.map (\(w, ref, i) -> RefUBit w ref i) . pinnedBitTests
-
--- toIntMap :: BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
--- toIntMap = links
-
 -- | Non-recursive version of `lookup`, for inspecting the internal relation between two variables
 lookupOneStep :: RefB -> BooleanRelations -> Lookup
 lookupOneStep var relations = case Map.lookup var (forwardLinks relations) of
@@ -239,3 +170,21 @@ lookupOneStep var relations = case Map.lookup var (forwardLinks relations) of
 -- | For inspecting the internal relation between two variables
 inspectChildrenOf :: RefB -> BooleanRelations -> Maybe (Either Bool (Map RefB Bool))
 inspectChildrenOf ref relations = Map.lookup ref (backwardLinks relations)
+
+
+childrenSizeOf :: RefB -> BooleanRelations -> Int
+childrenSizeOf ref relations = case Map.lookup ref (backwardLinks relations) of
+  Nothing -> 0
+  Just (Left _) -> 0
+  Just (Right xs) -> Map.size xs
+
+--------------------------------------------------------------------------------
+
+class Seniority a where
+  compareSeniority :: a -> a -> Ordering
+
+instance Seniority RefB where
+  compareSeniority (RefB _) (RefB _) = EQ
+  compareSeniority (RefB _) _ = LT
+  compareSeniority _ (RefB _) = GT
+  compareSeniority _ _ = EQ

@@ -96,6 +96,14 @@ tests = do
           assertBinding (RefB 2) (Just True)
 
     describe "ordering of roots" $ do
+      it "$0 = ¬$1 = $2" $
+        runM $ do
+          RefB 0 `relate` (False, RefB 1)
+          RefB 0 `relate` (True, RefB 2)
+
+          relations <- get
+          liftIO $ print relations
+
       it "$0 = ¬$1 = $2, $I0 overthrows $0" $
         runM $ do
           RefB 0 `relate` (False, RefB 1)
