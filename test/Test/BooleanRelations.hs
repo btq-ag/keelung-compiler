@@ -16,78 +16,80 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "BooleanRelations" $ do
-    it "x = True" $
-      runM $ do
-        RefB 0 `bindToValue` True
+    describe "bindToValue" $ do
+      it "x = True" $
+        runM $ do
+          RefB 0 `bindToValue` True
 
-        assertBinding (RefB 0) (Just True)
+          assertBinding (RefB 0) (Just True)
 
-    it "x = False" $
-      runM $ do
-        RefB 0 `bindToValue` False
+      it "x = False" $
+        runM $ do
+          RefB 0 `bindToValue` False
 
-        assertBinding (RefB 0) (Just False)
+          assertBinding (RefB 0) (Just False)
 
-    it "x = y" $
-      runM $ do
-        RefB 0 `relate` (True, RefB 1)
+    describe "relate" $ do
+      it "x = y" $
+        runM $ do
+          RefB 0 `relate` (True, RefB 1)
 
-        assertRelation (RefB 0) (RefB 1) (Just True)
-        assertRelation (RefB 1) (RefB 0) (Just True)
+          assertRelation (RefB 0) (RefB 1) (Just True)
+          assertRelation (RefB 1) (RefB 0) (Just True)
 
-    it "x = y = True" $
-      runM $ do
-        RefB 0 `relate` (True, RefB 1)
-        RefB 1 `bindToValue` True
+      it "x = y = True" $
+        runM $ do
+          RefB 0 `relate` (True, RefB 1)
+          RefB 1 `bindToValue` True
 
-        assertRelation (RefB 0) (RefB 1) (Just True)
-        assertRelation (RefB 1) (RefB 0) (Just True)
-        assertBinding (RefB 0) (Just True)
-        assertBinding (RefB 1) (Just True)
+          assertRelation (RefB 0) (RefB 1) (Just True)
+          assertRelation (RefB 1) (RefB 0) (Just True)
+          assertBinding (RefB 0) (Just True)
+          assertBinding (RefB 1) (Just True)
 
-    it "x = y = z" $
-      runM $ do
-        RefB 0 `relate` (True, RefB 1)
-        RefB 1 `relate` (True, RefB 2)
+      it "x = y = z" $
+        runM $ do
+          RefB 0 `relate` (True, RefB 1)
+          RefB 1 `relate` (True, RefB 2)
 
-        assertRelation (RefB 0) (RefB 1) (Just True)
-        assertRelation (RefB 0) (RefB 2) (Just True)
-        assertRelation (RefB 1) (RefB 0) (Just True)
-        assertRelation (RefB 1) (RefB 2) (Just True)
-        assertRelation (RefB 2) (RefB 0) (Just True)
-        assertRelation (RefB 2) (RefB 1) (Just True)
+          assertRelation (RefB 0) (RefB 1) (Just True)
+          assertRelation (RefB 0) (RefB 2) (Just True)
+          assertRelation (RefB 1) (RefB 0) (Just True)
+          assertRelation (RefB 1) (RefB 2) (Just True)
+          assertRelation (RefB 2) (RefB 0) (Just True)
+          assertRelation (RefB 2) (RefB 1) (Just True)
 
-    it "x = ¬y" $
-      runM $ do
-        RefB 0 `relate` (False, RefB 1)
+      it "x = ¬y" $
+        runM $ do
+          RefB 0 `relate` (False, RefB 1)
 
-        assertRelation (RefB 0) (RefB 1) (Just False)
-        assertRelation (RefB 1) (RefB 0) (Just False)
+          assertRelation (RefB 0) (RefB 1) (Just False)
+          assertRelation (RefB 1) (RefB 0) (Just False)
 
-    it "x = ¬y = True" $
-      runM $ do
-        RefB 0 `relate` (False, RefB 1)
-        RefB 0 `bindToValue` True
+      it "x = ¬y = True" $
+        runM $ do
+          RefB 0 `relate` (False, RefB 1)
+          RefB 0 `bindToValue` True
 
-        assertRelation (RefB 0) (RefB 1) (Just False)
-        assertRelation (RefB 1) (RefB 0) (Just False)
-        assertBinding (RefB 0) (Just True)
-        assertBinding (RefB 1) (Just False)
+          assertRelation (RefB 0) (RefB 1) (Just False)
+          assertRelation (RefB 1) (RefB 0) (Just False)
+          assertBinding (RefB 0) (Just True)
+          assertBinding (RefB 1) (Just False)
 
-    it "x = ¬y, z = True" $
-      runM $ do
-        RefB 0 `relate` (False, RefB 1)
-        RefB 2 `bindToValue` True
+      it "x = ¬y, z = True" $
+        runM $ do
+          RefB 0 `relate` (False, RefB 1)
+          RefB 2 `bindToValue` True
 
-        assertRelation (RefB 0) (RefB 1) (Just False)
-        assertRelation (RefB 0) (RefB 2) Nothing
-        assertRelation (RefB 1) (RefB 0) (Just False)
-        assertRelation (RefB 1) (RefB 2) Nothing
-        assertRelation (RefB 2) (RefB 0) Nothing
-        assertRelation (RefB 2) (RefB 1) Nothing
-        assertBinding (RefB 0) Nothing
-        assertBinding (RefB 1) Nothing
-        assertBinding (RefB 2) (Just True)
+          assertRelation (RefB 0) (RefB 1) (Just False)
+          assertRelation (RefB 0) (RefB 2) Nothing
+          assertRelation (RefB 1) (RefB 0) (Just False)
+          assertRelation (RefB 1) (RefB 2) Nothing
+          assertRelation (RefB 2) (RefB 0) Nothing
+          assertRelation (RefB 2) (RefB 1) Nothing
+          assertBinding (RefB 0) Nothing
+          assertBinding (RefB 1) Nothing
+          assertBinding (RefB 2) (Just True)
 
 type M = StateT BooleanRelations IO
 

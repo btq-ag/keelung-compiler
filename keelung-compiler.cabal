@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -34,6 +34,7 @@ library
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
       Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
+      Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations2
       Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
       Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
@@ -92,6 +93,7 @@ executable keelungc
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
       Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
+      Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations2
       Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
       Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
@@ -150,6 +152,7 @@ test-suite keelung-test
   main-is: Main.hs
   other-modules:
       Test.BooleanRelations
+      Test.BooleanRelations2
       Test.Compilation
       Test.FieldRelations
       Test.Interpreter
@@ -167,6 +170,7 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
       Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
+      Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations2
       Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
       Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints

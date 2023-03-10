@@ -11,7 +11,7 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
     exportPinnedBitTests,
     size,
     relationBetween,
-    toIntMap
+    toIntMap,
   )
 where
 
@@ -138,32 +138,31 @@ relate x (relation, y) xs
 -- | Establish the relation of 'x = (relation == y)'
 --   Returns Nothing if the relation has already been established
 relate' :: RefB -> (Bool, RefB) -> BooleanRelations -> Maybe BooleanRelations
-relate' x (relation, y) xs =
-  case lookup xs x of
-    Constant constantX ->
-      Just $ bindToValue y (relation == constantX) xs
-    ChildOf relationX rootOfX ->
-      relate rootOfX (relation == relationX, y) xs
-    Root ->
-      -- x does not have a parent, so it is its own root
-      case lookup xs y of
-        Constant constantY ->
-          Just $ bindToValue x (relation == constantY) xs
-        ChildOf relationY rootOfY ->
-          Just $
-            rememberPinnedBitTest x $
-              xs
-                { links = Map.insert x (Left (relation == relationY, rootOfY)) (links xs),
-                  sizes = Map.insertWith (+) y 1 (sizes xs)
-                }
-        Root ->
-          -- y does not have a parent, so it is its own root
-          Just $
-            rememberPinnedBitTest x $
-              xs
-                { links = Map.insert x (Left (relation, y)) (links xs),
-                  sizes = Map.insertWith (+) y 1 (sizes xs)
-                }
+relate' x (relation, y) xs = case lookup xs x of
+  Constant constantX ->
+    Just $ bindToValue y (relation == constantX) xs
+  ChildOf relationX rootOfX ->
+    relate rootOfX (relation == relationX, y) xs
+  Root ->
+    -- x does not have a parent, so it is its own root
+    case lookup xs y of
+      Constant constantY ->
+        Just $ bindToValue x (relation == constantY) xs
+      ChildOf relationY rootOfY ->
+        Just $
+          rememberPinnedBitTest x $
+            xs
+              { links = Map.insert x (Left (relation == relationY, rootOfY)) (links xs),
+                sizes = Map.insertWith (+) y 1 (sizes xs)
+              }
+      Root ->
+        -- y does not have a parent, so it is its own root
+        Just $
+          rememberPinnedBitTest x $
+            xs
+              { links = Map.insert x (Left (relation, y)) (links xs),
+                sizes = Map.insertWith (+) y 1 (sizes xs)
+              }
 
 size :: BooleanRelations -> Int
 size = Map.size . links
