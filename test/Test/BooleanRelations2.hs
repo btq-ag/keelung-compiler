@@ -19,11 +19,13 @@ tests = do
         runM $ do
           RefB 0 `assign` True
           assertBinding (RefB 0) (Just True)
+          isValid
 
       it "$1 = False" $
         runM $ do
           RefB 1 `assign` False
           assertBinding (RefB 1) (Just False)
+          isValid
 
       it "$I0 = $1, $1 = False" $
         runM $ do
@@ -32,6 +34,7 @@ tests = do
           assertBinding (RefB 1) (Just False)
           assertBinding (RefBI 0) (Just True)
           assertRelation (RefB 1) (RefBI 0) (Just False)
+          isValid
 
     describe "relate" $ do
       it "$1 = $0" $
@@ -40,6 +43,7 @@ tests = do
 
           assertRelation (RefB 0) (RefB 1) (Just True)
           assertRelation (RefB 1) (RefB 0) (Just True)
+          isValid
 
       it "$0 = $1 = True" $
         runM $ do
@@ -50,6 +54,7 @@ tests = do
           assertRelation (RefB 1) (RefB 0) (Just True)
           assertBinding (RefB 0) (Just True)
           assertBinding (RefB 1) (Just True)
+          isValid
 
       it "$0 = $1 = $2" $
         runM $ do
@@ -62,6 +67,7 @@ tests = do
           assertRelation (RefB 1) (RefB 2) (Just True)
           assertRelation (RefB 2) (RefB 0) (Just True)
           assertRelation (RefB 2) (RefB 1) (Just True)
+          isValid
 
       it "$0 = ¬$1" $
         runM $ do
@@ -69,6 +75,7 @@ tests = do
 
           assertRelation (RefB 0) (RefB 1) (Just False)
           assertRelation (RefB 1) (RefB 0) (Just False)
+          isValid
 
       it "$0 = ¬$1 = True" $
         runM $ do
@@ -79,6 +86,7 @@ tests = do
           assertRelation (RefB 1) (RefB 0) (Just False)
           assertBinding (RefB 0) (Just True)
           assertBinding (RefB 1) (Just False)
+          isValid
 
       it "$0 = ¬$1, $2 = True" $
         runM $ do
@@ -94,6 +102,7 @@ tests = do
           assertBinding (RefB 0) Nothing
           assertBinding (RefB 1) Nothing
           assertBinding (RefB 2) (Just True)
+          isValid
 
     describe "ordering of roots" $ do
       it "$0 = ¬$1 = $2" $
@@ -102,6 +111,7 @@ tests = do
           RefB 0 `relate` (True, RefB 2)
           relations <- get
           BooleanRelations.inspectChildrenOf (RefB 1) relations `shouldBe` Just (Right (Map.fromList [(RefB 0, False), (RefB 2, False)]))
+          isValid
 
       it "$0 = ¬$1 = $2, $I0 overthrows $0" $
         runM $ do
@@ -113,6 +123,7 @@ tests = do
           BooleanRelations.lookupOneStep (RefB 0) relations `shouldBe` BooleanRelations.ChildOf True (RefBI 0)
           BooleanRelations.lookupOneStep (RefB 1) relations `shouldBe` BooleanRelations.ChildOf False (RefBI 0)
           BooleanRelations.lookupOneStep (RefB 2) relations `shouldBe` BooleanRelations.ChildOf True (RefBI 0)
+          isValid
 
       it "$0 = ¬$1, $I0 = $0, $I0 = $O0" $
         runM $ do
@@ -148,6 +159,8 @@ tests = do
                       (RefB 2, True)
                     ]
               )
+          
+          isValid
 
 ------------------------------------------------------------------------
 
@@ -173,6 +186,11 @@ assertBinding var val = do
   case BooleanRelations.lookup var xs of
     BooleanRelations.Value value -> val `shouldBe` Just value
     _ -> val `shouldBe` Nothing
+
+isValid :: M ()
+isValid = do
+  xs <- get
+  BooleanRelations.isValid xs `shouldBe` True
 
 ------------------------------------------------------------------------
 

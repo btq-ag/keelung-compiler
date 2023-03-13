@@ -4,7 +4,6 @@
 
 module Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations2
   ( BooleanRelations,
-    Relation (..),
     Lookup (..),
     new,
     lookup,
@@ -13,26 +12,31 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations2
     relationBetween,
     lookupOneStep,
     inspectChildrenOf,
+    isValid
   )
 where
 
 import Control.DeepSeq (NFData)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Maybe qualified as Maybe
+import Data.Set (Set)
+import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint (RefB (..))
 import Prelude hiding (lookup)
 
 -- | Relation between a variable and a value or another variable
-data Relation = ParentIs Bool RefB | Constant Bool
+data Relation = RootIs Bool RefB | Constant Bool
   deriving (Eq, Show, Generic, NFData)
 
 -- | Relations between Boolean variables
 data BooleanRelations = BooleanRelations
   { -- from children to roots (roots are also in the keys)
-    forwardLinks :: Map RefB Relation,
-    -- from roots to children
-    backwardLinks :: Map RefB (Either Bool (Map RefB Bool))
+    toRoot :: Map RefB Relation,
+    -- from roots to children, invariant:
+    --    1. all "families" are disjoint
+    toChildren :: Map RefB (Either Bool (Map RefB Bool))
   }
   deriving (Eq, Generic, NFData)
 
@@ -58,7 +62,7 @@ instance Show BooleanRelations where
                   (\(child, polarity) -> if polarity then show child else "¬ " <> show child)
                   (Map.toList toChildren)
           )
-          (backwardLinks relations)
+          (toChildren relations)
 
 -- | Creates a new BooleanRelations, O(1)
 new :: BooleanRelations
@@ -70,10 +74,10 @@ data Lookup = Root | Value Bool | ChildOf Bool RefB
 
 -- | Returns the result of looking up a variable in the BooleanRelations, O(lg n)
 lookup :: RefB -> BooleanRelations -> Lookup
-lookup var relations = case Map.lookup var (forwardLinks relations) of
+lookup var relations = case Map.lookup var (toRoot relations) of
   Nothing -> Root
   Just (Constant value) -> Value value
-  Just (ParentIs polarity parent) -> case lookup parent relations of
+  Just (RootIs polarity parent) -> case lookup parent relations of
     Root -> ChildOf polarity parent
     Value value -> Value (polarity == value)
     ChildOf polarity' grandparent -> ChildOf (polarity == polarity') grandparent
@@ -83,21 +87,31 @@ assign :: RefB -> Bool -> BooleanRelations -> BooleanRelations
 assign ref value relations = case lookup ref relations of
   Root ->
     relations
-      { forwardLinks = Map.insert ref (Constant value) (forwardLinks relations),
-        backwardLinks = Map.insert ref (Left value) (backwardLinks relations)
+      { toRoot = Map.insert ref (Constant value) (toRoot relations),
+        toChildren = Map.insert ref (Left value) (toChildren relations)
       }
   Value _ -> relations -- already assigned
   ChildOf polarity parent -> assign parent (polarity == value) relations
 
--- | Relates two variables, using the more "senior" one as the root, O(lg n)
+-- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
 relate :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
 relate a polarity b relations = case compareSeniority a b of
   LT -> relate' a polarity b relations
   GT -> relate' b polarity a relations
-  EQ -> case compare (childrenSizeOf a relations) (childrenSizeOf b relations) of
+  EQ -> case compare (childrenSizeOf a) (childrenSizeOf b) of
     LT -> relate' a polarity b relations
     GT -> relate' b polarity a relations
     EQ -> relate' a polarity b relations
+    where
+      childrenSizeOf :: RefB -> Int
+      childrenSizeOf ref = case lookup ref relations of
+        Root ->
+          case Map.lookup ref (toChildren relations) of
+            Nothing -> 0
+            Just (Left _) -> 0
+            Just (Right xs) -> Map.size xs
+        Value _ -> 0
+        ChildOf _ parent -> childrenSizeOf parent
 
 -- | Relates a child to a parent
 relate' :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
@@ -115,7 +129,7 @@ relate' child polarity parent relations =
 relateRootToRoot :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
 relateRootToRoot child polarity parent relations =
   -- before assigning the child to the parent, we need to check if the child has any grandchildren
-  let result = case Map.lookup child (backwardLinks relations) of
+  let result = case Map.lookup child (toChildren relations) of
         Nothing -> Nothing
         Just (Left _) -> Nothing
         Just (Right xs) -> Just (Map.toList xs)
@@ -125,17 +139,17 @@ relateRootToRoot child polarity parent relations =
           removeRootFromBackwardLinks child $ addChild child polarity parent $ foldr (\(grandchild, polarity') -> addChild grandchild (polarity == polarity') parent) relations grandchildren
   where
     removeRootFromBackwardLinks :: RefB -> BooleanRelations -> BooleanRelations
-    removeRootFromBackwardLinks root xs = xs {backwardLinks = Map.delete root (backwardLinks xs)}
+    removeRootFromBackwardLinks root xs = xs {toChildren = Map.delete root (toChildren xs)}
 
 -- | Helper function for `relate'`
 addChild :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
 addChild child polarity parent relations =
   relations
-    { forwardLinks = Map.insert child (ParentIs polarity parent) (forwardLinks relations),
-      backwardLinks = case Map.lookup parent (backwardLinks relations) of
-        Nothing -> Map.insert parent (Right (Map.singleton child polarity)) (backwardLinks relations)
-        Just (Left _) -> backwardLinks relations
-        Just (Right xs) -> Map.insert parent (Right (Map.insert child polarity xs)) (backwardLinks relations)
+    { toRoot = Map.insert child (RootIs polarity parent) (toRoot relations),
+      toChildren = case Map.lookup parent (toChildren relations) of
+        Nothing -> Map.insert parent (Right (Map.singleton child polarity)) (toChildren relations)
+        Just (Left _) -> toChildren relations
+        Just (Right xs) -> Map.insert parent (Right (Map.insert child polarity xs)) (toChildren relations)
     }
 
 -- | Calculates the relation between two variables `var1` and `var2`
@@ -166,24 +180,34 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
 
 -- | Non-recursive version of `lookup`, for inspecting the internal relation between two variables
 lookupOneStep :: RefB -> BooleanRelations -> Lookup
-lookupOneStep var relations = case Map.lookup var (forwardLinks relations) of
+lookupOneStep var relations = case Map.lookup var (toRoot relations) of
   Nothing -> Root
   Just (Constant value) -> Value value
-  Just (ParentIs polarity parent) -> ChildOf polarity parent
+  Just (RootIs polarity parent) -> ChildOf polarity parent
 
 -- | For inspecting the internal relation between two variables
 inspectChildrenOf :: RefB -> BooleanRelations -> Maybe (Either Bool (Map RefB Bool))
-inspectChildrenOf ref relations = Map.lookup ref (backwardLinks relations)
+inspectChildrenOf ref relations = Map.lookup ref (toChildren relations)
 
-childrenSizeOf :: RefB -> BooleanRelations -> Int
-childrenSizeOf ref relations = case lookup ref relations of
-  Root ->
-    case Map.lookup ref (backwardLinks relations) of
-      Nothing -> 0
-      Just (Left _) -> 0
-      Just (Right xs) -> Map.size xs
-  Value _ -> 0
-  ChildOf _ parent -> childrenSizeOf parent relations
+-- | For testing the invariants:
+--   1. all "families" are disjoint
+isValid :: BooleanRelations -> Bool
+isValid = Maybe.isJust . Map.foldlWithKey' go (Just Set.empty) . toChildren
+  where
+    go :: Maybe (Set RefB) -> RefB -> Either Bool (Map RefB Bool) -> Maybe (Set RefB)
+    go Nothing _ _ = Nothing
+    go (Just set) root children = case toFamily root children of
+      Nothing -> Nothing
+      Just members -> if Set.intersection set members == Set.empty then Just (set <> members) else Nothing
+
+    -- return Nothing if the family is not valid, otherwise return the set of variables in the family
+    toFamily :: RefB -> Either Bool (Map RefB Bool) -> Maybe (Set RefB)
+    toFamily _ (Left _) = Just Set.empty
+    toFamily root (Right xs) =
+      let children = Map.keysSet xs
+       in if root `Set.member` children
+            then Nothing
+            else Just (Set.insert root children)
 
 --------------------------------------------------------------------------------
 
