@@ -19,6 +19,42 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "Compilation" $ do
+    describe "Boolean Constraints" $ do
+      it "echo / Boolean" $ do
+        let program = inputBool Private
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(0, 1)])
+                                  (Poly.buildEither 0 [(0, 1)])
+                                  (Poly.buildEither 0 [(0, 1)])
+                              ]
+            toR1Cs r1cs
+              `shouldContain` [ R1C
+                                  (Poly.buildEither 0 [(1, 1)])
+                                  (Poly.buildEither 0 [(1, 1)])
+                                  (Poly.buildEither 0 [(1, 1)])
+                              ]
+      it "echo / Field" $ do
+        let program = inputField Private
+        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+          Left err -> expectationFailure (show err)
+          Right r1cs -> do
+            toR1Cs r1cs
+              `shouldNotContain` [ R1C
+                                  (Poly.buildEither 0 [(0, 1)])
+                                  (Poly.buildEither 0 [(0, 1)])
+                                  (Poly.buildEither 0 [(0, 1)])
+                              ]
+            toR1Cs r1cs
+              `shouldNotContain` [ R1C
+                                  (Poly.buildEither 0 [(1, 1)])
+                                  (Poly.buildEither 0 [(1, 1)])
+                                  (Poly.buildEither 0 [(1, 1)])
+                              ]
+
     describe "Assertion" $ do
       it "Rewriting" $ do
         let program = do
