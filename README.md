@@ -49,3 +49,6 @@ stack exec --profile -- profile +RTS -p
 ```bash
 ghc-prof-flamegraph profile.prof
 ``` 
+
+# Notes for Releasing Binaries
+Binaries released to the [Keelung repo](https://github.com/btq-ag/keelung/releases) includes automatically generated licenses using [cabal-plan](https://github.com/haskell-hvr/cabal-plan), for Github Actions to work, `keelung` dependency in `cabal.project` must be updated to match its commit hash used in `stack.yaml` for the CI to build. This is only required when a major release is needed.
