@@ -90,7 +90,7 @@ jobs:
     - name: Install cabal-plan
       if: startsWith(github.ref, 'refs/tags/')
       run: |
-        cabal install cabal-plan -f license-report
+        cabal install cabal-plan --flags="exe license-report"
 
     - name: Generate license report
       if: startsWith(github.ref, 'refs/tags/')
