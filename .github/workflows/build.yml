@@ -71,7 +71,7 @@ jobs:
     - name: ⏬ Install GHCup & GHC & stack & cabal
       run: |
         mkdir -p ~/.local/bin
-        export PATH=~/.ghcup/bin:~/.local/bin:$PATH
+        export PATH=~/.stack/bin:~/.cabal/bin:~/.ghcup/bin:~/.local/bin:$PATH
         # curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'; chmod a+x ~/.local/bin/stack
         if [[ ! -x ~/.ghcup/bin/stack ]]; then curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh; ghcup install ghc; ghcup install stack; ghcup install cabal; fi
         stack --version
@@ -90,7 +90,7 @@ jobs:
     - name: Install cabal-plan
       if: startsWith(github.ref, 'refs/tags/')
       run: |
-        stack install --flag cabal-plan:license-report cabal-plan
+        cabal install cabal-plan -f license-report
 
     - name: Generate license report
       if: startsWith(github.ref, 'refs/tags/')
