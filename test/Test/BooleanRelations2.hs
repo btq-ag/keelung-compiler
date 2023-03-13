@@ -100,9 +100,8 @@ tests = do
         runM $ do
           RefB 0 `relate` (False, RefB 1)
           RefB 0 `relate` (True, RefB 2)
-
           relations <- get
-          liftIO $ print relations
+          BooleanRelations.inspectChildrenOf (RefB 1) relations `shouldBe` Just (Right (Map.fromList [(RefB 0, False), (RefB 2, False)]))
 
       it "$0 = ¬$1 = $2, $I0 overthrows $0" $
         runM $ do
@@ -115,21 +114,23 @@ tests = do
           BooleanRelations.lookupOneStep (RefB 1) relations `shouldBe` BooleanRelations.ChildOf False (RefBI 0)
           BooleanRelations.lookupOneStep (RefB 2) relations `shouldBe` BooleanRelations.ChildOf True (RefBI 0)
 
-      it "$0 = ¬$1 = $2, $I0 overthrows $0, $I0 = $O0" $
+      it "$0 = ¬$1, $I0 = $0, $I0 = $O0" $
         runM $ do
           RefB 0 `relate` (False, RefB 1)
           RefBI 0 `relate` (True, RefB 0)
           RefBI 0 `relate` (True, RefBO 0)
 
           relations <- get
+          -- liftIO $ print relations
 
-          BooleanRelations.inspectChildrenOf (RefBI 0) relations `shouldBe` Nothing
           BooleanRelations.inspectChildrenOf (RefB 0) relations `shouldBe` Nothing
-          BooleanRelations.inspectChildrenOf (RefBO 0) relations
+          BooleanRelations.inspectChildrenOf (RefB 1) relations `shouldBe` Nothing
+
+          BooleanRelations.inspectChildrenOf (RefBI 0) relations
             `shouldBe` Just
               ( Right $
                   Map.fromList
-                    [ (RefBI 0, True),
+                    [ (RefBO 0, True),
                       (RefB 0, True),
                       (RefB 1, False)
                     ]
@@ -137,11 +138,11 @@ tests = do
 
           RefB 0 `relate` (True, RefB 2)
           relations2 <- get
-          BooleanRelations.inspectChildrenOf (RefBO 0) relations2
+          BooleanRelations.inspectChildrenOf (RefBI 0) relations2
             `shouldBe` Just
               ( Right $
                   Map.fromList
-                    [ (RefBI 0, True),
+                    [ (RefBO 0, True),
                       (RefB 0, True),
                       (RefB 1, False),
                       (RefB 2, True)

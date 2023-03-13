@@ -22,7 +22,6 @@ import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint (RefB (..))
 import Prelude hiding (lookup)
-import Debug.Trace
 
 -- | Relation between a variable and a value or another variable
 data Relation = ParentIs Bool RefB | Constant Bool
@@ -41,9 +40,6 @@ instance Show BooleanRelations where
   show relations =
     "BooleanRelations\n"
       <> mconcat (map (<> "\n") (concatMap toString (Map.toList backwardLines)))
-      <> " backward links: "
-      <> show (backwardLinks relations)
-      <> "}"
     where
       showRoot :: RefB -> String
       showRoot root = let rootString = show root in "  " <> rootString <> replicate (8 - length rootString) ' '
@@ -98,27 +94,35 @@ relate :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
 relate a polarity b relations = case compareSeniority a b of
   LT -> relate' a polarity b relations
   GT -> relate' b polarity a relations
-  EQ -> traceShow (a, b, childrenSizeOf a relations, childrenSizeOf b relations) $ case compare (childrenSizeOf a relations) (childrenSizeOf b relations) of
+  EQ -> case compare (childrenSizeOf a relations) (childrenSizeOf b relations) of
     LT -> relate' a polarity b relations
     GT -> relate' b polarity a relations
     EQ -> relate' a polarity b relations
 
 -- | Relates a child to a parent
 relate' :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
-relate' child polarity parent relations = case lookup parent relations of
-  Root ->
-    -- before assigning the child to the parent, we need to check if the child has any grandchildren
-    let result = case Map.lookup child (backwardLinks relations) of
-          Nothing -> Nothing
-          Just (Left _) -> Nothing
-          Just (Right xs) -> Just (Map.toList xs)
-     in case result of
-          Nothing -> addChild child polarity parent relations
-          Just grandchildren ->
-            removeRootFromBackwardLinks child $ addChild child polarity parent $ foldr (\(grandchild, polarity') -> addChild grandchild polarity' parent) relations grandchildren
-  Value value -> assign child (polarity == value) relations
-  -- relate the child to the grandparent instead
-  ChildOf polarity' grandparent -> relate' child (polarity == polarity') grandparent relations
+relate' child polarity parent relations =
+  case lookup parent relations of
+    Root -> case lookup child relations of
+      Root -> relateRootToRoot child polarity parent relations
+      Value value -> assign parent (polarity == value) relations
+      ChildOf polarity' parent' -> relate' parent' (polarity == polarity') parent relations
+    Value value -> assign child (polarity == value) relations
+    ChildOf polarity' grandparent ->
+      relate' child (polarity == polarity') grandparent relations
+
+-- | Helper function for `relate'`
+relateRootToRoot :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
+relateRootToRoot child polarity parent relations =
+  -- before assigning the child to the parent, we need to check if the child has any grandchildren
+  let result = case Map.lookup child (backwardLinks relations) of
+        Nothing -> Nothing
+        Just (Left _) -> Nothing
+        Just (Right xs) -> Just (Map.toList xs)
+   in case result of
+        Nothing -> addChild child polarity parent relations
+        Just grandchildren ->
+          removeRootFromBackwardLinks child $ addChild child polarity parent $ foldr (\(grandchild, polarity') -> addChild grandchild (polarity == polarity') parent) relations grandchildren
   where
     removeRootFromBackwardLinks :: RefB -> BooleanRelations -> BooleanRelations
     removeRootFromBackwardLinks root xs = xs {backwardLinks = Map.delete root (backwardLinks xs)}
@@ -171,12 +175,15 @@ lookupOneStep var relations = case Map.lookup var (forwardLinks relations) of
 inspectChildrenOf :: RefB -> BooleanRelations -> Maybe (Either Bool (Map RefB Bool))
 inspectChildrenOf ref relations = Map.lookup ref (backwardLinks relations)
 
-
 childrenSizeOf :: RefB -> BooleanRelations -> Int
-childrenSizeOf ref relations = case Map.lookup ref (backwardLinks relations) of
-  Nothing -> 0
-  Just (Left _) -> 0
-  Just (Right xs) -> Map.size xs
+childrenSizeOf ref relations = case lookup ref relations of
+  Root ->
+    case Map.lookup ref (backwardLinks relations) of
+      Nothing -> 0
+      Just (Left _) -> 0
+      Just (Right xs) -> Map.size xs
+  Value _ -> 0
+  ChildOf _ parent -> childrenSizeOf parent relations
 
 --------------------------------------------------------------------------------
 
