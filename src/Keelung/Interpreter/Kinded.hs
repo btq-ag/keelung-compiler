@@ -20,7 +20,7 @@ import Keelung.Data.Struct
 import Keelung.Data.VarGroup (Witness)
 import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Interpreter.Monad
-import Keelung.Interpreter.Typed ()
+import Keelung.Interpreter.Typed (interpretDivMod)
 import Keelung.Syntax.Encode.Syntax qualified as Typed
 
 --------------------------------------------------------------------------------
@@ -73,12 +73,27 @@ runAndOutputWitnesses (Elaborated expr context) inputs = runM (compHeap context)
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e) bindingsInExpr
 
+  -- interpret div/mod statements
+  forM_ (IntMap.toList (compDivModRelsU context)) $ \(width, (dividendExpr, divisorExpr, quotientExpr, remainderExpr)) -> do
+    interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr)
+
   -- lastly interpret the expression and return the result
   interpret expr
 
 -- | Interpret a program with inputs.
 run :: (GaloisField n, Integral n, Interpret t n) => Elaborated t -> Inputs n -> Either (Error n) [n]
 run elab inputs = fst <$> runAndOutputWitnesses elab inputs
+
+-- analyzeUInt :: (GaloisField n, Integral n) => Typed.UInt -> M n (Either Var n)
+-- analyzeUInt = \case
+--   Typed.VarU w var -> catchError (Right <$> lookupU w var) $ \case
+--     VarUnboundError _ _ -> return (Left var)
+--     e -> throwError e
+--   x -> do
+--     xs <- interpret x
+--     case xs of
+--       (v : _) -> return (Right v)
+--       _ -> throwError $ ResultSizeError 1 (length xs)
 
 --------------------------------------------------------------------------------
 
@@ -170,6 +185,9 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
 instance GaloisField n => Interpret () n where
   interpret val = case val of
     () -> return []
+
+instance (Interpret t1 n, Interpret t2 n, GaloisField n) => Interpret (t1, t2) n where
+  interpret (a, b) = liftM2 (<>) (interpret a) (interpret b)
 
 instance (Interpret t n, GaloisField n) => Interpret [t] n where
   interpret xs = concat <$> mapM interpret xs

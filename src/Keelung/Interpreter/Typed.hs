@@ -1,12 +1,12 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 -- Interpreter for Keelung.Syntax.Encode.Syntax
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use lambda-case" #-}
-
-module Keelung.Interpreter.Typed (runAndOutputWitnesses, run) where
+module Keelung.Interpreter.Typed (runAndOutputWitnesses, run, interpretDivMod) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -21,7 +21,9 @@ import Keelung.Data.Struct
 import Keelung.Data.VarGroup
 import Keelung.Data.VarGroup qualified as Bindings
 import Keelung.Interpreter.Monad
+import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Encode.Syntax
+import qualified Data.Either as Either
 
 --------------------------------------------------------------------------------
 
@@ -72,12 +74,77 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e) bindingsInExpr
 
+  -- interpret div/mod statements
+  forM_ (IntMap.toList (compDivModRelsU comp)) $ \(width, (dividendExpr, divisorExpr, quotientExpr, remainderExpr)) -> do
+    interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr)
+
   -- lastly interpret the expression and return the result
   interpret expr
 
 -- | Interpret a program with inputs.
 run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) [n]
 run elab inputs = fst <$> runAndOutputWitnesses elab inputs
+
+--------------------------------------------------------------------------------
+
+-- | For handling div/mod statements
+-- we can solve a div/mod relation if we know:
+--    1. dividend & divisor
+--    1. dividend & quotient
+--    2. divisor & quotient & remainder
+interpretDivMod :: (GaloisField n, Integral n) => Width -> (UInt, UInt, UInt, UInt) -> M n ()
+interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) = do
+  dividend <- analyze dividendExpr
+  case dividend of
+    Left dividendVar -> do
+      -- now that we don't know the dividend, we can only solve the relation if we know the divisor, quotient, and remainder
+      divisor <- analyze divisorExpr
+      quotient <- analyze quotientExpr
+      remainder <- analyze remainderExpr
+      case (divisor, quotient, remainder) of
+        (Right divisorVal, Right quotientVal, Right remainderVal) -> do
+          let dividendVal = divisorVal * quotientVal + remainderVal
+          addU width dividendVar [dividendVal]
+        _ -> do
+          let unsolvedVars = dividendVar : Either.lefts [divisor, quotient, remainder]
+          throwError $ StuckError "" unsolvedVars
+    Right dividendVal -> do
+      -- now that we know the dividend, we can the relation if we know either the divisor or the quotient
+      divisor <- analyze divisorExpr
+      quotient <- analyze quotientExpr
+      remainder <- analyze remainderExpr
+      case (divisor, quotient, remainder) of
+        (Right divisorVal, Left quotientVar, Left remainderVar) -> do
+          let quotientVal = dividendVal `integerDiv` divisorVal
+              remainderVal = dividendVal `integerMod` divisorVal
+          addU width quotientVar [quotientVal]
+          addU width remainderVar [remainderVal]
+        (Right divisorVal, Left quotientVar, Right _) -> do
+          let quotientVal = dividendVal `integerDiv` divisorVal
+          addU width quotientVar [quotientVal]
+        (Left divisorVar, Right quotientVal, Left remainderVar) -> do
+          let divisorVal = dividendVal `integerDiv` quotientVal
+              remainderVal = dividendVal `integerMod` divisorVal
+          addU width divisorVar [divisorVal]
+          addU width remainderVar [remainderVal]
+        (Left divisorVar, Right quotientVal, Right _) -> do
+          let divisorVal = dividendVal `integerDiv` quotientVal
+          addU width divisorVar [divisorVal]
+        _ -> do
+          let unsolvedVars = Either.lefts [divisor, quotient, remainder]
+          throwError $ StuckError "" unsolvedVars
+
+  where 
+    analyze :: (GaloisField n, Integral n) => UInt -> M n (Either Var n)
+    analyze = \case
+      VarU w var -> catchError (Right <$> lookupU w var) $ \case
+        VarUnboundError _ _ -> return (Left var)
+        e -> throwError e
+      x -> do
+        xs <- interpret x
+        case xs of
+          (v : _) -> return (Right v)
+          _ -> throwError $ ResultSizeError 1 (length xs)
 
 --------------------------------------------------------------------------------
 

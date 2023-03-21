@@ -157,6 +157,8 @@ class FreeVar a where
 data Error n
   = VarUnboundError String Var
   | VarUnassignedError (VarSet n)
+  | ResultSizeError Int Int -- for syntax trees
+  | StuckError String [Var] -- for syntax trees
   | VarUnassignedError' IntSet -- R1CS
   | AssertionError String (Partial n)
   | AssertionError' String (IntMap n) -- R1CS
@@ -172,6 +174,13 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (VarUnassignedError unboundVariables) =
     "these variables have no bindings:\n  "
       ++ show unboundVariables
+  show (ResultSizeError expected actual) =
+    "expecting " <> show expected <> " result(s) but got " <> show actual <> " result(s)"
+  show (StuckError msg vars) =
+    "stuck because the value of "
+      <> show vars
+      <> " is not known"
+      <> msg
   show (VarUnassignedError' unboundVariables) =
     "these variables have no bindings:\n  "
       ++ showList' (map (\var -> "$" <> show var) $ IntSet.toList unboundVariables)
@@ -191,6 +200,12 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "expecting " <> show expected <> " input(s) but got " <> show actual <> " input(s)"
 
 --------------------------------------------------------------------------------
+
+integerDiv :: (GaloisField n, Integral n) => n -> n -> n
+integerDiv x y = fromInteger (toInteger x `div` toInteger y)
+
+integerMod :: (GaloisField n, Integral n) => n -> n -> n
+integerMod x y = fromInteger (toInteger x `mod` toInteger y)
 
 bitWiseAnd :: (GaloisField n, Integral n) => n -> n -> n
 bitWiseAnd x y = fromInteger $ (Data.Bits..&.) (toInteger x) (toInteger y)
