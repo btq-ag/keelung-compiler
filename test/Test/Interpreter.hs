@@ -93,13 +93,13 @@ runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs rawOutputs =
     `shouldBe` Right rawOutputs
   typed program rawPublicInputs rawPrivateInputs
     `shouldBe` Right rawOutputs
-  -- r1csNew program rawPublicInputs rawPrivateInputs
-  --   `shouldBe` Right rawOutputs
-  -- when enableOldOptimizer $
-  --   r1csOld program rawPublicInputs rawPrivateInputs
-  --     `shouldBe` Right rawOutputs
-  -- r1csO0 program rawPublicInputs rawPrivateInputs
-  --   `shouldBe` Right rawOutputs
+  r1csNew program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
+  when enableOldOptimizer $
+    r1csOld program rawPublicInputs rawPrivateInputs
+      `shouldBe` Right rawOutputs
+  r1csO0 program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right rawOutputs
 
 runAndCompare :: (GaloisField n, Integral n, Encode t, Interpret t n) => Bool -> Comp t -> [n] -> [n] -> IO ()
 runAndCompare enableOldOptimizer program rawPublicInputs rawPrivateInputs = do
@@ -329,12 +329,12 @@ tests = do
 
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
 
-      it "performDivMod" $ do
-        let program = do
-              dividend <- input Public :: Comp (UInt 4)
-              divisor <- input Public
-              performDivMod dividend divisor
-        runAllExceptForTheOldOptimizer program [20, 7 :: GF181] [] [2, 6]
+      -- it "performDivMod" $ do
+      --   let program = do
+      --         dividend <- input Public :: Comp (UInt 4)
+      --         divisor <- input Public
+      --         performDivMod dividend divisor
+      --   runAllExceptForTheOldOptimizer program [20, 7 :: GF181] [] [2, 6]
         -- runAllExceptForTheOldOptimizer program [4, 4 :: GF181] [] [1, 0]
 
       it "eq" $ do

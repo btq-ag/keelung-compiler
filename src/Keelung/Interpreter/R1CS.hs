@@ -79,7 +79,9 @@ goThroughManyTimes constraints = do
     Eliminated -> return ()
     NothingToDo -> return ()
     -- stuck
-    Stuck _ -> throwError (R1CSStuckError $ toList constraints)
+    Stuck _ -> do 
+      context <- get
+      throwError (R1CSStuckError context (toList constraints))
 
 -- Go through a sequence of constraints
 goThroughOnce :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n (Result (Seq (Constraint n)))

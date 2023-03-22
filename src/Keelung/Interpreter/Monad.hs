@@ -36,9 +36,14 @@ data Constraint n
   = R1CConstraint (R1C n)
   | CNEQConstraint (CNEQ n)
   | BinRepConstraint BinRep
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Constraint n)
+
+instance (GaloisField n, Integral n) => Show (Constraint n) where
+  show (R1CConstraint r1c) = show r1c
+  show (CNEQConstraint cneq) = "(CNEQ)    " <> show cneq
+  show (BinRepConstraint binRep) = "(BinRep)  " <> show binRep
 
 instance Functor Constraint where
   fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
@@ -162,7 +167,7 @@ data Error n
   | VarUnassignedError' IntSet -- R1CS
   | AssertionError String (Partial n)
   | AssertionError' String (IntMap n) -- R1CS
-  | R1CSStuckError [Constraint n] -- R1CS
+  | R1CSStuckError (IntMap n) [Constraint n] -- R1CS
   | InputSizeError Int Int
   deriving (Eq, Generic, NFData)
 
@@ -194,8 +199,11 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> expr
       <> "\nbindings of free variables in the assertion:\n"
       <> showList' (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList bindings))
-  show (R1CSStuckError constraint) =
-    "stuck at " <> show constraint
+  show (R1CSStuckError context constraints) =
+    "stuck when trying to solve these constraints: \n"
+      <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints
+      <> "while these variables have been solved: \n"
+      <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList context)
   show (InputSizeError expected actual) =
     "expecting " <> show expected <> " input(s) but got " <> show actual <> " input(s)"
 
