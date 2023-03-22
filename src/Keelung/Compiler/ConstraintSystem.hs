@@ -41,6 +41,7 @@ import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax.Counters
 
+
 --------------------------------------------------------------------------------
 
 -- | A constraint system is a collection of constraints
@@ -209,22 +210,35 @@ relocateConstraintSystem cs =
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
 
-    binReps = generateBinReps counters (csOccurrenceU cs)
+    binReps = generateBinReps counters (csOccurrenceU cs) (csOccurrenceF cs)
     -- \| Generate BinReps from the UIntRelations
-    generateBinReps :: Counters -> Map RefU Int -> [BinRep]
-    generateBinReps (Counters o i1 i2 _ _ _ _) occurrences =
+    generateBinReps :: Counters -> Map RefU Int -> Map RefF Int -> [BinRep]
+    generateBinReps (Counters o i1 i2 _ _ _ _) occurrencesU occurrencesF = 
       toList $
-        fromSmallCounter OfOutput o <> fromSmallCounter OfPublicInput i1 <> fromSmallCounter OfPrivateInput i2 <> binRepsFromOccurredIntermediateVars
+        fromSmallCounter OfOutput o
+          <> fromSmallCounter OfPublicInput i1
+          <> fromSmallCounter OfPrivateInput i2
+          <> binRepsFromIntermediateRefUsOccurredInUAndF
       where
-        intermediateOccurredRefUs =
-          Map.elems $
+        intermediateRefUsOccurredInU =
+          Set.fromList $ Map.elems $
             Map.mapMaybeWithKey
               ( \ref count -> case ref of
                   RefU width var -> if count > 0 then Just (width, var) else Nothing
                   _ -> Nothing
               )
-              occurrences
-        binRepsFromOccurredIntermediateVars =
+              occurrencesU
+
+        intermediateRefUsOccurredInF =
+          Set.fromList $ Map.elems $
+            Map.mapMaybeWithKey
+              ( \ref count -> case ref of
+                  RefUVal (RefU width var) -> if count > 0 then Just (width, var) else Nothing
+                  _ -> Nothing
+              )
+              occurrencesF
+
+        binRepsFromIntermediateRefUsOccurredInUAndF =
           Seq.fromList $
             map
               ( \(width, var) ->
@@ -232,7 +246,17 @@ relocateConstraintSystem cs =
                       binRepOffset = reindex counters OfIntermediate (OfUIntBinRep width) var
                    in BinRep varOffset width binRepOffset
               )
-              intermediateOccurredRefUs
+              $ Set.toList (intermediateRefUsOccurredInU <> intermediateRefUsOccurredInF)
+
+        -- binRepsFromIntermediateRefUsOccurredInF =
+        --   Seq.fromList $
+        --     map
+        --       ( \(width, var) ->
+        --           let varOffset = reindex counters OfIntermediate (OfUInt width) var
+        --               binRepOffset = reindex counters OfIntermediate (OfUIntBinRep width) var
+        --            in BinRep varOffset width binRepOffset
+        --       )
+        --       intermediateRefUsOccurredInF
 
         -- fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
         fromSmallCounter sort (Struct _ _ u) = Seq.fromList $ concatMap (fromPair sort) (IntMap.toList u)
@@ -344,15 +368,20 @@ relocateConstraintSystem cs =
        in Seq.fromList (map (fromConstraint counters) result)
 
     fromUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
-    fromUIntRelations uintRels _occurrencesF _occurrencesB _occurrencesU =
+    fromUIntRelations uintRels occurrencesF _occurrencesB _occurrencesU =
       let bitWidths = IntSet.toList $ IntMap.keysSet (structU (countOutput counters)) <> IntMap.keysSet (structU (countPublicInput counters)) <> IntMap.keysSet (structU (countPrivateInput counters)) <> IntMap.keysSet (structU (countIntermediate counters))
           outputVars = [RefUO w i | w <- bitWidths, i <- [0 .. getCount OfOutput (OfUInt w) counters - 1]]
           publicInputVars = [RefUI w i | w <- bitWidths, i <- [0 .. getCount OfPublicInput (OfUInt w) counters - 1]]
           privateInputVars = [RefUP w i | w <- bitWidths, i <- [0 .. getCount OfPrivateInput (OfUInt w) counters - 1]]
+          occurredInF = Map.elems $ Map.mapMaybeWithKey (\ref count -> if count > 0 then extracvtRefUVal ref else Nothing) occurrencesF
        in convert outputVars
             <> convert publicInputVars
             <> convert privateInputVars
+            <> convert occurredInF
       where
+        extracvtRefUVal (RefUVal ref) = Just ref
+        extracvtRefUVal _ = Nothing
+
         convert = Seq.fromList . Maybe.mapMaybe toConstraint
 
         -- generate a BinRep constraint for every UInt variable occurred in the module
@@ -455,16 +484,18 @@ instance UpdateOccurrences RefU where
   addOccurrences =
     flip
       ( foldl
-          ( \cs ref -> cs
-                    { csOccurrenceU = Map.insertWith (+) ref 1 (csOccurrenceU cs)
-                    }
+          ( \cs ref ->
+              cs
+                { csOccurrenceU = Map.insertWith (+) ref 1 (csOccurrenceU cs)
+                }
           )
       )
   removeOccurrences =
     flip
       ( foldl
-          ( \cs ref -> cs
-                    { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceU cs)
-                    }
+          ( \cs ref ->
+              cs
+                { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceU cs)
+                }
           )
       )
