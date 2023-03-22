@@ -46,7 +46,8 @@ tests = do
                         cadd 11179 [(12, -1)]
                       ],
                 csBinReps = mempty,
-                csCounters = mempty
+                csCounters = mempty,
+                csDivMods = mempty
               }
        in optimize1 (cs :: RelocatedConstraintSystem GF181) `shouldNotBe` cs
 

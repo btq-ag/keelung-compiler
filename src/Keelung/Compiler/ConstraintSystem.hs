@@ -41,7 +41,6 @@ import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax.Counters
 
-
 --------------------------------------------------------------------------------
 
 -- | A constraint system is a collection of constraints
@@ -61,7 +60,9 @@ data ConstraintSystem n = ConstraintSystem
     csMulF :: [(PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))],
     -- constraints for computing equality
     csNEqF :: Map (RefF, RefF) RefF,
-    csNEqU :: Map (RefU, RefU) RefF
+    csNEqU :: Map (RefU, RefU) RefF,
+    -- hints for generating witnesses for DivMod constraints
+    csDivMods :: [(RefU, RefU, RefU, RefU)]
   }
   deriving (Eq, Generic, NFData)
 
@@ -75,6 +76,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showNEqF
       <> showNEqU
       <> showBooleanConstraints
+      <> showDivModHints
       <> showOccurrencesF
       <> showOccurrencesB
       <> showOccurrencesU
@@ -102,6 +104,11 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               <> "):\n\n"
               <> unlines (map ("    " <>) (prettyBooleanConstraints counters))
               <> "\n"
+
+      showDivModHints = 
+        if null $ csDivMods cs
+          then ""
+          else "  DivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (csDivMods cs))))
 
       -- BinRep constraints
       -- showBinRepConstraints =
@@ -204,16 +211,18 @@ relocateConstraintSystem cs =
           <> addFs
           <> mulFs
           <> nEqFs
-          <> nEqUs
+          <> nEqUs,
+      Relocated.csDivMods = divMods
     }
   where
     counters = csCounters cs
     uncurry3 f (a, b, c) = f a b c
 
     binReps = generateBinReps counters (csOccurrenceU cs) (csOccurrenceF cs)
+
     -- \| Generate BinReps from the UIntRelations
     generateBinReps :: Counters -> Map RefU Int -> Map RefF Int -> [BinRep]
-    generateBinReps (Counters o i1 i2 _ _ _ _) occurrencesU occurrencesF = 
+    generateBinReps (Counters o i1 i2 _ _ _ _) occurrencesU occurrencesF =
       toList $
         fromSmallCounter OfOutput o
           <> fromSmallCounter OfPublicInput i1
@@ -221,32 +230,34 @@ relocateConstraintSystem cs =
           <> binRepsFromIntermediateRefUsOccurredInUAndF
       where
         intermediateRefUsOccurredInU =
-          Set.fromList $ Map.elems $
-            Map.mapMaybeWithKey
-              ( \ref count -> case ref of
-                  RefU width var -> if count > 0 then Just (width, var) else Nothing
-                  _ -> Nothing
-              )
-              occurrencesU
+          Set.fromList $
+            Map.elems $
+              Map.mapMaybeWithKey
+                ( \ref count -> case ref of
+                    RefU width var -> if count > 0 then Just (width, var) else Nothing
+                    _ -> Nothing
+                )
+                occurrencesU
 
         intermediateRefUsOccurredInF =
-          Set.fromList $ Map.elems $
-            Map.mapMaybeWithKey
-              ( \ref count -> case ref of
-                  RefUVal (RefU width var) -> if count > 0 then Just (width, var) else Nothing
-                  _ -> Nothing
-              )
-              occurrencesF
+          Set.fromList $
+            Map.elems $
+              Map.mapMaybeWithKey
+                ( \ref count -> case ref of
+                    RefUVal (RefU width var) -> if count > 0 then Just (width, var) else Nothing
+                    _ -> Nothing
+                )
+                occurrencesF
 
         binRepsFromIntermediateRefUsOccurredInUAndF =
-          Seq.fromList $
-            map
+          Seq.fromList
+            $ map
               ( \(width, var) ->
                   let varOffset = reindex counters OfIntermediate (OfUInt width) var
                       binRepOffset = reindex counters OfIntermediate (OfUIntBinRep width) var
                    in BinRep varOffset width binRepOffset
               )
-              $ Set.toList (intermediateRefUsOccurredInU <> intermediateRefUsOccurredInF)
+            $ Set.toList (intermediateRefUsOccurredInU <> intermediateRefUsOccurredInF)
 
         -- binRepsFromIntermediateRefUsOccurredInF =
         --   Seq.fromList $
@@ -401,6 +412,8 @@ relocateConstraintSystem cs =
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
     nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
     nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqU cs
+
+    divMods = map (\(a, b, q, r) -> (reindexRefU counters a, reindexRefU counters b, reindexRefU counters q, reindexRefU counters r)) $ csDivMods cs
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =

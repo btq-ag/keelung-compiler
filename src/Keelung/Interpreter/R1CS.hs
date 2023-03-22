@@ -24,7 +24,7 @@ import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.VarGroup
-import Keelung.Interpreter.Monad (Constraint (..), Error (..))
+import Keelung.Interpreter.Monad (Constraint (..), Error (..), integerDiv, integerMod)
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
@@ -50,11 +50,12 @@ run' r1cs inputs = do
 --   3. binary representation constraints
 --   4. CNEQ constraints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Seq (Constraint n)
-fromOrdinaryConstraints (R1CS ordinaryConstraints binReps counters cneqs) =
+fromOrdinaryConstraints (R1CS ordinaryConstraints binReps counters cneqs divMods) =
   Seq.fromList (map R1CConstraint ordinaryConstraints)
     <> Seq.fromList booleanInputVarConstraints
     <> Seq.fromList (map BinRepConstraint binReps)
     <> Seq.fromList (map CNEQConstraint cneqs)
+    <> Seq.fromList (map DivModConstaint divMods)
   where
     booleanInputVarConstraints =
       let generate (start, end) =
@@ -79,7 +80,7 @@ goThroughManyTimes constraints = do
     Eliminated -> return ()
     NothingToDo -> return ()
     -- stuck
-    Stuck _ -> do 
+    Stuck _ -> do
       context <- get
       throwError (R1CSStuckError context (toList constraints))
 
@@ -93,7 +94,52 @@ lookupVar var = gets (IntMap.lookup var)
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (R1CConstraint r1c) = fmap (pure . R1CConstraint) <$> shrinkR1C r1c
 shrink (CNEQConstraint cneq) = fmap (pure . CNEQConstraint) <$> shrinkCNEQ cneq
+shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
+
+-- | Trying to reduce a DivMod constraint
+shrinkDivMod :: (GaloisField n, Integral n) => (Var, Var, Var, Var) -> M n (Result (Var, Var, Var, Var))
+shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
+  -- check the value of the dividend first,
+  -- if it's unknown, then its value can only be determined from other variables
+  dividendResult <- lookupVar dividendVar
+  divisorResult <- lookupVar divisorVar
+  quotientResult <- lookupVar quotientVar
+  case dividendResult of
+    Just dividendVal -> do
+      case (divisorResult, quotientResult) of
+        -- divisor and quotient are known
+        (Just divisorVal, Just quotientVal) -> do
+          let remainderVal = dividendVal - divisorVal * quotientVal
+          bindVar remainderVar remainderVal
+          return Eliminated
+        -- divisor is known, quotient is unknown
+        (Just divisorVal, Nothing) -> do
+          let quotientVal = dividendVal `integerDiv` divisorVal
+          let remainderVal = dividendVal `integerMod` divisorVal
+          bindVar quotientVar quotientVal
+          bindVar remainderVar remainderVal
+          return Eliminated
+        -- divisor is unknown, quotient is known
+        (Nothing, Just quotientVal) -> do
+          let divisorVal = dividendVal `integerDiv` quotientVal
+          let remainderVal = dividendVal `integerMod` divisorVal
+          bindVar divisorVar divisorVal
+          bindVar remainderVar remainderVal
+          return Eliminated
+        -- divisor and quotient are unknown
+        (Nothing, Nothing) -> do
+          return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
+    Nothing -> do
+      remainderResult <- lookupVar remainderVar
+      case (divisorResult, quotientResult, remainderResult) of
+        -- divisor, quotient, and remainder are all known
+        (Just divisorVal, Just quotientVal, Just remainderVal) -> do
+          let dividendVal = divisorVal * quotientVal + remainderVal
+          bindVar dividendVar dividendVal
+          return Eliminated
+        _ -> do
+          return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
 
 -- | Trying to reduce a BinRep constraint
 shrinkBinRep :: (GaloisField n, Integral n) => BinRep -> M n (Result BinRep)

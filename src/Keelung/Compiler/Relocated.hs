@@ -15,13 +15,13 @@ import Data.Sequence (Seq)
 import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..))
+import Keelung.Data.BinRep (BinRep)
 import Keelung.Data.BinRep qualified as BinRep
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
-import Keelung.Data.BinRep (BinRep)
 
 --------------------------------------------------------------------------------
 
@@ -106,17 +106,18 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
   { -- | Constraints
     csConstraints :: !(Seq (Constraint n)),
     csBinReps :: [BinRep],
-    csCounters :: Counters
+    csCounters :: Counters,
+    csDivMods :: [(Var, Var, Var, Var)]
   }
   deriving (Eq, Generic, NFData)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: RelocatedConstraintSystem n -> Int
-numberOfConstraints (RelocatedConstraintSystem cs binReps counters) =
+numberOfConstraints (RelocatedConstraintSystem cs binReps counters _divMods) =
   length cs + getBooleanConstraintSize counters + length binReps
 
 instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
-  show (RelocatedConstraintSystem constraints binReps counters) =
+  show (RelocatedConstraintSystem constraints binReps counters _divMods) =
     "ConstraintSystem {\n"
       <> prettyConstraints counters (toList constraints) binReps
       <> prettyVariables counters

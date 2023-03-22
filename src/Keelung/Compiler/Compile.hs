@@ -179,7 +179,7 @@ compileRelations (Relations vb eb) = do
 type M n = State (ConstraintSystem n)
 
 runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty)
+runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty mempty)
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -229,6 +229,10 @@ add = mapM_ addOne
 
 addOccurrencesUTemp :: [RefU] -> M n ()
 addOccurrencesUTemp = modify' . addOccurrences
+
+addDivMod :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
+addDivMod x y q r = do
+  modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMods cs}
 
 freshRefF :: M n RefF
 freshRefF = do
@@ -965,6 +969,7 @@ compileDivModU width dividend divisor quotient remainder = do
   divisorRef <- wireU divisor
   quotientRef <- wireU quotient
   dividendRef <- wireU dividend
+  addDivMod dividendRef divisorRef quotientRef remainderRef
   add $
     cMulF
       (0, [(RefUVal divisorRef, 1)])

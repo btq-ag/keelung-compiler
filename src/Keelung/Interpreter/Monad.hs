@@ -35,6 +35,8 @@ import Keelung.Syntax.Counters
 data Constraint n
   = R1CConstraint (R1C n)
   | CNEQConstraint (CNEQ n)
+  | -- | Dividend, Divisor, Quotient, Remainder
+    DivModConstaint (Var, Var, Var, Var)
   | BinRepConstraint BinRep
   deriving (Eq, Generic, NFData)
 
@@ -43,11 +45,21 @@ instance Serialize n => Serialize (Constraint n)
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (R1CConstraint r1c) = show r1c
   show (CNEQConstraint cneq) = "(CNEQ)    " <> show cneq
+  show (DivModConstaint (dividend, divisor, quotient, remainder)) =
+    "(DivMod)  $"
+      <> show dividend
+      <> " = $"
+      <> show divisor
+      <> " * $"
+      <> show quotient
+      <> " + $"
+      <> show remainder
   show (BinRepConstraint binRep) = "(BinRep)  " <> show binRep
 
 instance Functor Constraint where
   fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
   fmap f (CNEQConstraint cneq) = CNEQConstraint (fmap f cneq)
+  fmap _ (DivModConstaint dm) = DivModConstaint dm
   fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
 
 --------------------------------------------------------------------------------
