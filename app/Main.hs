@@ -66,9 +66,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> do
           case fieldType of
-            B64 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [B64])
-            GF181 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [GF181])
-            BN128 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [BN128])
+            B64 -> outputInterpretedResult (left show $ interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [B64])
+            GF181 -> outputInterpretedResult (left show $ interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [GF181])
+            BN128 -> outputInterpretedResult (left show $ interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [BN128])
     Protocol (GenCircuit filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
