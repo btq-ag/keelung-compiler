@@ -342,21 +342,33 @@ tests = do
 
       it "performDivMod (quotient & remainder unknown)" $ do
         let program = do
-              dividend <- input Public :: Comp (UInt 4)
+              dividend <- input Private :: Comp (UInt 4)
               divisor <- input Public
               performDivMod dividend divisor
-        runAllExceptForTheOldOptimizer program [20, 7 :: GF181] [] [2, 6]
-        runAllExceptForTheOldOptimizer program [4, 4 :: GF181] [] [1, 0]
+        runAllExceptForTheOldOptimizer program [7 :: GF181] [20] [2, 6]
+        runAllExceptForTheOldOptimizer program [4 :: GF181] [4] [1, 0]
+
+      it "assertDivMod (multiple statements)" $ do
+        let program = do
+              a <- input Public :: Comp (UInt 5)
+              b <- input Public
+              c <- input Private
+              d <- input Public
+              (q0, r0) <- performDivMod a b
+              (q1, r1) <- performDivMod c d
+              return [q0, r0, q1, r1]
+        _debug program
+        runAllExceptForTheOldOptimizer program [20, 7, 8 :: GF181] [21] [2, 6, 2, 5]
 
       it "assertDivMod (dividend unknown)" $ do
         let program = do
               dividend <- freshVarUInt
               divisor <- input Public :: Comp (UInt 4)
               quotient <- input Public
-              remainder <- input Public
+              remainder <- input Private
               assertDivMod dividend divisor quotient remainder
               return dividend
-        runAllExceptForTheOldOptimizer program [7, 2, 6 :: GF181] [] [20]
+        runAllExceptForTheOldOptimizer program [7, 2 :: GF181] [6] [20]
 
       it "assertDivMod (divisor & remainder unknown)" $ do
         let program = do

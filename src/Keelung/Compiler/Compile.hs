@@ -46,7 +46,7 @@ run useNewOptimizer (TypeErased untypedExprs _ counters relations assertions div
   mapM_ compileAssertion assertions
 
   -- compile DivMod relations to constraints
-  mapM_ (\(width, (dividend, divisor, quotient, remainder)) -> compileDivModU width dividend divisor quotient remainder) (IntMap.toList divModRelsU)
+  mapM_ (\(width, xs) -> mapM (\(dividend, divisor, quotient, remainder) -> compileDivModU width dividend divisor quotient remainder) xs) (IntMap.toList divModRelsU)
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
@@ -231,8 +231,7 @@ addOccurrencesUTemp :: [RefU] -> M n ()
 addOccurrencesUTemp = modify' . addOccurrences
 
 addDivMod :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
-addDivMod x y q r = do
-  modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMods cs}
+addDivMod x y q r = modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMods cs}
 
 freshRefF :: M n RefF
 freshRefF = do
