@@ -359,6 +359,15 @@ tests = do
               return [q0, r0, q1, r1]
         runAllExceptForTheOldOptimizer program [20, 7, 8 :: GF181] [21] [2, 6, 2, 5]
 
+      it "assertDivMod (multiple statements chained together)" $ do
+        let program = do
+              a <- input Public :: Comp (UInt 5)
+              b <- input Public
+              (q0, r0) <- performDivMod a b
+              (q1, r1) <- performDivMod q0 b
+              return [q0, r0, q1, r1]
+        runAllExceptForTheOldOptimizer program [25, 3 :: GF181] [] [8, 1, 2, 2]
+
       it "assertDivMod (dividend unknown)" $ do
         let program = do
               dividend <- freshVarUInt

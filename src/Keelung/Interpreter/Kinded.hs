@@ -74,7 +74,8 @@ runAndOutputWitnesses (Elaborated expr context) inputs = runM (compHeap context)
       throwError $ AssertionError (show e) bindingsInExpr
 
   -- interpret div/mod statements
-  forM_ (IntMap.toList (compDivModRelsU context)) $ \(width, xs) -> forM_ xs (interpretDivMod width)
+  forM_ (IntMap.toList (compDivModRelsU context)) $ \(width, xs) ->
+    forM_ (reverse xs) (interpretDivMod width)
 
   -- lastly interpret the expression and return the result
   interpret expr

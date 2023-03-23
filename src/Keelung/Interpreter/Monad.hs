@@ -192,9 +192,9 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (ResultSizeError expected actual) =
     "expecting " <> show expected <> " result(s) but got " <> show actual <> " result(s)"
   show (StuckError msg vars) =
-    "stuck because the value of "
-      <> show vars
-      <> " is not known"
+    "stuck because the value of these variables "
+      <> showList' (map (\x -> "$" <> show x) vars)
+      <> " are not known "
       <> msg
   show (VarUnassignedError' unboundVariables) =
     "these variables have no bindings:\n  "
