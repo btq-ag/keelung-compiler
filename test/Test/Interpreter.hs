@@ -34,14 +34,13 @@ run = hspec tests
 kinded :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 kinded prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborate prog)
-  let inputs = Inputs.deserialize (compCounters (elabComp elab)) rawPublicInputs rawPrivateInputs
+  inputs <- left (InterpretError . InputError) (Inputs.deserialize (compCounters (elabComp elab)) rawPublicInputs rawPrivateInputs)
   left InterpretError (Kinded.run elab inputs)
 
 typed :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 typed prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborateAndEncode prog)
-  let counters = Encoded.compCounters (Encoded.elabComp elab)
-  let inputs = Inputs.deserialize counters rawPublicInputs rawPrivateInputs
+  inputs <- left (InterpretError . InputError) (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
   left InterpretError (Typed.run elab inputs)
 
 -- csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
@@ -55,7 +54,7 @@ typed prog rawPublicInputs rawPrivateInputs = do
 r1csNew :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csNew prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS . relocateConstraintSystem <$> Compiler.compileO1' prog
-  let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
+  inputs <- left (InterpretError . InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case R1CS.run r1cs inputs of
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
@@ -63,7 +62,7 @@ r1csNew prog rawPublicInputs rawPrivateInputs = do
 r1csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csOld prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> Compiler.compile prog
-  let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
+  inputs <- left (InterpretError . InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case Relocated.run r1cs inputs of
     Left err -> Left (ExecError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
@@ -71,18 +70,12 @@ r1csOld prog rawPublicInputs rawPrivateInputs = do
 r1csO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csO0 prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> Compiler.compileO0 prog
-  let inputs = Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
+  inputs <- left (InterpretError . InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case R1CS.run r1cs inputs of
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
-runAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
-runAll = runAll' True
-
-runAllExceptForTheOldOptimizer :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
-runAllExceptForTheOldOptimizer = runAll' False
-
-runAll' :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Bool -> Comp t -> [n] -> [n] -> [n] -> IO ()
+runAll' :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Bool -> Comp t -> [n] -> [n] -> Either (Error n) [n] -> IO ()
 runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs rawOutputs = do
   -- print $ Compiler.asGF181N $ Compiler.compileO0 program
   -- print $ Compiler.asGF181N $ Compiler.compileO1 program
@@ -90,16 +83,25 @@ runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs rawOutputs =
   -- print (Compiler.asGF181N $ toR1CS . relocateConstraintSystem <$> Compiler.compileO1' program)
 
   kinded program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right rawOutputs
+    `shouldBe` rawOutputs
   typed program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right rawOutputs
+    `shouldBe` rawOutputs
   r1csNew program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right rawOutputs
+    `shouldBe` rawOutputs
   when enableOldOptimizer $
     r1csOld program rawPublicInputs rawPrivateInputs
-      `shouldBe` Right rawOutputs
+      `shouldBe` rawOutputs
   r1csO0 program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right rawOutputs
+    `shouldBe` rawOutputs
+
+runAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
+runAll f i p o = runAll' True f i p (Right o)
+
+throwAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> Error n -> IO ()
+throwAll f i p e = runAll' True f i p (Left e)
+
+runAllExceptForTheOldOptimizer :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
+runAllExceptForTheOldOptimizer f i p o = runAll' False f i p (Right o)
 
 runAndCompare :: (GaloisField n, Integral n, Encode t, Interpret t n) => Bool -> Comp t -> [n] -> [n] -> IO ()
 runAndCompare enableOldOptimizer program rawPublicInputs rawPrivateInputs = do
@@ -124,6 +126,15 @@ _debug program = do
 tests :: SpecWith ()
 tests = do
   describe "Interpreters of different syntaxes should computes the same result" $ do
+    describe "Errors" $ do
+      it "missing 1 public input" $ do
+        let program = complement <$> inputBool Public
+        throwAll program [] [] (InterpretError (InputError (Inputs.PublicInputSizeMismatch 1 0)) :: Error GF181)
+
+      it "missing 1 private input" $ do
+        let program = complement <$> inputBool Private
+        throwAll program [] [] (InterpretError (InputError (Inputs.PrivateInputSizeMismatch 1 0)) :: Error GF181)
+
     describe "Boolean" $ do
       it "not 1" $ do
         let program = return $ complement true
@@ -350,9 +361,9 @@ tests = do
       it "assertDivMod (divisor & remainder unknown)" $ do
         let program = do
               dividend <- input Public :: Comp (UInt 4)
-              divisor <-  freshVarUInt
+              divisor <- freshVarUInt
               quotient <- input Public
-              remainder <-  freshVarUInt
+              remainder <- freshVarUInt
               assertDivMod dividend divisor quotient remainder
               return (divisor, remainder)
         runAllExceptForTheOldOptimizer program [7, 2 :: GF181] [] [3, 1]
@@ -360,9 +371,9 @@ tests = do
       it "assertDivMod (quotient & remainder unknown)" $ do
         let program = do
               dividend <- input Public :: Comp (UInt 4)
-              divisor <-  input Public
+              divisor <- input Public
               quotient <- freshVarUInt
-              remainder <-  freshVarUInt
+              remainder <- freshVarUInt
               assertDivMod dividend divisor quotient remainder
               return (quotient, remainder)
         runAllExceptForTheOldOptimizer program [34, 6 :: GF181] [] [5, 4]
@@ -558,7 +569,7 @@ tests = do
 
       describe "Poseidon" $ do
         it "[0]" $ do
-          runAll (Poseidon.hash [0]) [0 :: N GF181] [] [969784935791658820122994814042437418105599415561111385]
+          runAll (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385 :: GF181]
 
     describe "Tests on the optimizer" $ do
       it "Multiplicative 0" $ do

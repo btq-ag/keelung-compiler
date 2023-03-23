@@ -1,15 +1,19 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 
 module Keelung.Compiler.Syntax.Inputs where
 
+import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Data.Serialize (Serialize)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
+import GHC.Generics (Generic)
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Syntax.Counters
 
@@ -29,13 +33,22 @@ data Inputs n = Inputs
   deriving (Eq, Show, Functor)
 
 -- | Parse raw inputs into structured inputs and populate corresponding binary representations
-deserialize :: (GaloisField n, Integral n) => Counters -> [n] -> [n] -> Inputs n
+deserialize :: (GaloisField n, Integral n) => Counters -> [n] -> [n] -> Either Error (Inputs n)
 deserialize counters rawPublicInputs rawPrivateInputs = do
   -- go through all raw inputs
   -- sort and populate them with binary representation accordingly
   let publicInputSequence = new (Seq.zip (getPublicInputSequence counters) (Seq.fromList rawPublicInputs))
       privateInputSequence = new (Seq.zip (getPrivateInputSequence counters) (Seq.fromList rawPrivateInputs))
-   in Inputs counters publicInputSequence privateInputSequence
+      expectedPublicInputSize = length (getPublicInputSequence counters) -- getCountBySort OfPublicInput counters
+      expectedPrivateInputSize = length (getPrivateInputSequence counters) -- getCountBySort OfPrivateInput counters
+      actualPublicInputSize = length rawPublicInputs
+      actualPrivateInputSize = length rawPrivateInputs
+   in if expectedPublicInputSize /= actualPublicInputSize
+        then Left (PublicInputSizeMismatch expectedPublicInputSize actualPublicInputSize)
+        else
+          if expectedPrivateInputSize /= actualPrivateInputSize
+            then Left (PrivateInputSizeMismatch expectedPrivateInputSize actualPrivateInputSize)
+            else Right (Inputs counters publicInputSequence privateInputSequence)
 
 -- | Concatenate all inputs into a single list
 flatten :: (GaloisField n, Integral n) => Inputs n -> ([n], [n])
@@ -120,3 +133,22 @@ flattenInputSequence (InputSequence field bool uint uintBinRep) =
     ++ toList bool
     ++ concatMap toList (IntMap.elems uintBinRep)
     ++ concatMap toList (IntMap.elems uint)
+
+--------------------------------------------------------------------------------
+
+data Error = PublicInputSizeMismatch Int Int | PrivateInputSizeMismatch Int Int
+  deriving (Eq, Generic, NFData)
+
+instance Show Error where
+  show (PublicInputSizeMismatch expected actual) =
+    "public input size mismatch: expected "
+      ++ show expected
+      ++ " but got "
+      ++ show actual
+  show (PrivateInputSizeMismatch expected actual) =
+    "private input size mismatch: expected "
+      ++ show expected
+      ++ " but got "
+      ++ show actual
+
+instance Serialize Error

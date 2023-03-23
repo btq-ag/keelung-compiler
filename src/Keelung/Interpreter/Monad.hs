@@ -80,34 +80,32 @@ runM heap inputs p = do
 toPartialBindings :: (GaloisField n, Integral n) => Inputs n -> Either (Error n) (Partial n)
 toPartialBindings inputs =
   let counters = Inputs.inputCounters inputs
-      expectedInputSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters
-      actualInputSize = Inputs.size inputs
-   in if expectedInputSize /= actualInputSize
-        then Left (InputSizeError (Inputs.size inputs) expectedInputSize)
-        else
-          Right $
-            VarGroups
-              { ofO =
-                  VarGroup
-                    (getCount OfOutput OfField counters, mempty)
-                    (getCount OfOutput OfBoolean counters, mempty)
-                    (IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))),
-                ofI =
-                  VarGroup
-                    (getCount OfPublicInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
-                    (getCount OfPublicInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs))))
-                    (IntMap.mapWithKey (\w bindings -> (getCount OfPublicInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
-                ofP =
-                  VarGroup
-                    (getCount OfPrivateInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
-                    (getCount OfPrivateInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPrivate inputs))))
-                    (IntMap.mapWithKey (\w bindings -> (getCount OfPrivateInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
-                ofX =
-                  VarGroup
-                    (getCount OfIntermediate OfField counters, mempty)
-                    (getCount OfIntermediate OfBoolean counters, mempty)
-                    (IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs)))
-              }
+   in -- expectedInputSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters
+      -- actualInputSize = Inputs.size inputs
+
+      Right $
+        VarGroups
+          { ofO =
+              VarGroup
+                (getCount OfOutput OfField counters, mempty)
+                (getCount OfOutput OfBoolean counters, mempty)
+                (IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))),
+            ofI =
+              VarGroup
+                (getCount OfPublicInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
+                (getCount OfPublicInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs))))
+                (IntMap.mapWithKey (\w bindings -> (getCount OfPublicInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
+            ofP =
+              VarGroup
+                (getCount OfPrivateInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
+                (getCount OfPrivateInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPrivate inputs))))
+                (IntMap.mapWithKey (\w bindings -> (getCount OfPrivateInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
+            ofX =
+              VarGroup
+                (getCount OfIntermediate OfField counters, mempty)
+                (getCount OfIntermediate OfBoolean counters, mempty)
+                (IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs)))
+          }
 
 addF :: Var -> [n] -> M n ()
 addF var vals = modify (modifyX (modifyF (second (IntMap.insert var (head vals)))))
@@ -180,7 +178,7 @@ data Error n
   | AssertionError String (Partial n)
   | AssertionError' String (IntMap n) -- R1CS
   | R1CSStuckError (IntMap n) [Constraint n] -- R1CS
-  | InputSizeError Int Int
+  | InputError Inputs.Error
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -216,8 +214,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints
       <> "while these variables have been solved: \n"
       <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList context)
-  show (InputSizeError expected actual) =
-    "expecting " <> show expected <> " input(s) but got " <> show actual <> " input(s)"
+  show (InputError err) = show err
 
 --------------------------------------------------------------------------------
 

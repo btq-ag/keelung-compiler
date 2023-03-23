@@ -55,6 +55,7 @@ import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
+import Keelung.Interpreter.Monad qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.Typed qualified as Typed
 import Keelung.Monad (Comp)
@@ -73,7 +74,7 @@ interpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Ei
 interpret prog rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode prog
   let counters = Encoded.compCounters (Encoded.elabComp elab)
-  let inputs = Inputs.deserialize counters rawPublicInputs rawPrivateInputs
+  inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
   left InterpretError (Typed.run elab inputs)
 
 -- | Given a Keelung program and a list of raw public inputs and private inputs,
@@ -137,17 +138,17 @@ optimizeWithInput program inputs = do
 eraseElab :: (GaloisField n, Integral n) => Elaborated -> TypeErased n
 eraseElab = Erase.run
 
-interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either String [n]
-interpretElab elab rawPublicInputs rawPrivateInputs =
+interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either (Error n) [n]
+interpretElab elab rawPublicInputs rawPrivateInputs = do
   let counters = Encoded.compCounters (Encoded.elabComp elab)
-      inputs = Inputs.deserialize counters rawPublicInputs rawPrivateInputs
-   in left (show . InterpretError) (Typed.run elab inputs)
+  inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
+  left InterpretError (Typed.run elab inputs)
 
 generateWitnessElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either (Error n) (Counters, [n], Vector n)
 generateWitnessElab elab rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> compileO1Elab elab
   let counters = r1csCounters r1cs
-  let inputs = Inputs.deserialize counters rawPublicInputs rawPrivateInputs
+  inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
   (outputs, witness) <- left InterpretError (R1CS.run' r1cs inputs)
   return (counters, outputs, witness)
 
