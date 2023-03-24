@@ -203,7 +203,8 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
 relocateConstraintSystem cs =
   Relocated.RelocatedConstraintSystem
-    { Relocated.csCounters = counters,
+    { Relocated.csUseNewOptimizer = csUseNewOptimizer cs,
+      Relocated.csCounters = counters,
       Relocated.csBinReps = binReps,
       Relocated.csConstraints =
         varEqFs

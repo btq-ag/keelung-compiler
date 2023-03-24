@@ -29,7 +29,8 @@ tests = do
     it "should work 1" $
       let cs =
             RelocatedConstraintSystem
-              { csConstraints =
+              { csUseNewOptimizer = False,
+                csConstraints =
                   Seq.fromList $
                     concat
                       [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],

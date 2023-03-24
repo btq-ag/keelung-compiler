@@ -86,7 +86,8 @@ toR1CS cs =
 fromR1CS :: GaloisField n => R1CS n -> RelocatedConstraintSystem n
 fromR1CS r1cs =
   RelocatedConstraintSystem
-    { csConstraints =
+    { csUseNewOptimizer = False,
+      csConstraints =
         Seq.fromList (map fromR1C (r1csConstraints r1cs))
           <> Seq.fromList (map CNEq (r1csCNEQs r1cs)),
       csBinReps = r1csBinReps r1cs,
