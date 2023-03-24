@@ -82,17 +82,17 @@ runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs rawOutputs =
   -- print $ Compiler.asGF181N $ Compiler.compileO1' program
   -- print (Compiler.asGF181N $ toR1CS . relocateConstraintSystem <$> Compiler.compileO1' program)
 
-  -- kinded program rawPublicInputs rawPrivateInputs
-  --   `shouldBe` rawOutputs
-  -- typed program rawPublicInputs rawPrivateInputs
-  --   `shouldBe` rawOutputs
+  kinded program rawPublicInputs rawPrivateInputs
+    `shouldBe` rawOutputs
+  typed program rawPublicInputs rawPrivateInputs
+    `shouldBe` rawOutputs
   r1csNew program rawPublicInputs rawPrivateInputs
     `shouldBe` rawOutputs
-  -- when enableOldOptimizer $
-  --   r1csOld program rawPublicInputs rawPrivateInputs
-  --     `shouldBe` rawOutputs
-  -- r1csO0New program rawPublicInputs rawPrivateInputs
-  --   `shouldBe` rawOutputs
+  when enableOldOptimizer $
+    r1csOld program rawPublicInputs rawPrivateInputs
+      `shouldBe` rawOutputs
+  r1csO0New program rawPublicInputs rawPrivateInputs
+    `shouldBe` rawOutputs
 
 runAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
 runAll f i p o = runAll' True f i p (Right o)

@@ -162,7 +162,7 @@ compileO1OldElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n
 compileO1OldElab = return . Optimizer.optimizeOld . relocateConstraintSystem . Compile.run False . ConstantPropagation.run . Erase.run
 
 compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO1Elab = return . Relocated.renumberConstraints . relocateConstraintSystem . Optimizer.optimizeNew . Compile.run False . ConstantPropagation.run . Erase.run
+compileO1Elab = return . Relocated.renumberConstraints . relocateConstraintSystem . Optimizer.optimizeNew . Compile.run True . ConstantPropagation.run . Erase.run
 
 --------------------------------------------------------------------------------
 
