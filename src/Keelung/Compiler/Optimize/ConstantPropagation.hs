@@ -15,22 +15,34 @@ import Keelung.Data.Struct (Struct (..))
 -- 2. Propagate constant in the output expression
 -- 3. Propagate constant in assertions
 run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
-run (TypeErased exprs fieldWidth counters oldRelations assertions divModRelsU) =
+run (TypeErased exprs fieldWidth counters oldRelations assertions divModRelsU sideEffects) =
   let newRelations = propagateRelations oldRelations
       exprs' = map (second (propagateConstant newRelations)) exprs
       newAssertions = map (propagateConstant newRelations) assertions
       newDivModRels =
         fmap
           -- dividend = divisor * quotient + remainder
-          (fmap ( \(dividend, divisor, quotient, remainder) ->
-              ( propagateExprU newRelations dividend,
-                propagateExprU newRelations divisor,
-                propagateExprU newRelations quotient,
-                propagateExprU newRelations remainder
+          ( fmap
+              ( \(dividend, divisor, quotient, remainder) ->
+                  ( propagateExprU newRelations dividend,
+                    propagateExprU newRelations divisor,
+                    propagateExprU newRelations quotient,
+                    propagateExprU newRelations remainder
+                  )
               )
-          ))
+          )
           divModRelsU
-   in TypeErased exprs' fieldWidth counters newRelations newAssertions newDivModRels
+
+      newSideEffects = fmap (propagateSideEffect newRelations) sideEffects
+   in -- newSide
+      TypeErased exprs' fieldWidth counters newRelations newAssertions newDivModRels newSideEffects
+
+propagateSideEffect :: (Integral n, GaloisField n) => Relations n -> SideEffect n -> SideEffect n
+propagateSideEffect relations (AssignmentF2 var val) = AssignmentF2 var (propagateExprF relations val)
+propagateSideEffect relations (AssignmentB2 var val) = AssignmentB2 var (propagateExprB relations val)
+propagateSideEffect relations (AssignmentU2 width var val) = AssignmentU2 width var (propagateExprU relations val)
+propagateSideEffect relations (DivMod width dividend divisor quotient remainder) =
+  DivMod width (propagateExprU relations dividend) (propagateExprU relations divisor) (propagateExprU relations quotient) (propagateExprU relations remainder)
 
 -- | Propagate constants in the relations, and return the fixed point of constant propagation
 propagateRelations :: Relations n -> Relations n

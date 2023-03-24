@@ -28,6 +28,11 @@ import Keelung.Syntax.Encode.Syntax qualified as Typed
 -- | Interpret a program with inputs and return outputs along with the witness
 runAndOutputWitnesses :: (GaloisField n, Integral n, Interpret t n) => Elaborated t -> Inputs n -> Either (Error n) ([n], Witness n)
 runAndOutputWitnesses (Elaborated expr context) inputs = runM (compHeap context) inputs $ do
+
+  -- interpret div/mod statements
+  forM_ (IntMap.toList (compDivModRelsU context)) $ \(width, xs) ->
+    forM_ (reverse xs) (interpretDivMod width)
+
   -- interpret assignments of values first
   fs <-
     filterM
@@ -72,10 +77,6 @@ runAndOutputWitnesses (Elaborated expr context) inputs = runM (compHeap context)
       let bindingsInExpr = VarGroup.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e) bindingsInExpr
-
-  -- interpret div/mod statements
-  forM_ (IntMap.toList (compDivModRelsU context)) $ \(width, xs) ->
-    forM_ (reverse xs) (interpretDivMod width)
 
   -- lastly interpret the expression and return the result
   interpret expr

@@ -15,6 +15,7 @@ module Keelung.Compiler.Syntax.Untyped
     lookupB,
     lookupU,
     Relations (..),
+    SideEffect (..),
     -- sizeOfExpr,
   )
 where
@@ -234,11 +235,14 @@ data TypeErased n = TypeErased
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
     -- | DivMod relations
-    erasedDivModRelsU :: IntMap [(ExprU n, ExprU n, ExprU n, ExprU n)] -- dividend = divisor * quotient + remainder
+    erasedDivModRelsU :: IntMap [(ExprU n, ExprU n, ExprU n, ExprU n)], -- dividend = divisor * quotient + remainder
+
+    -- | Side effects
+    erasedSideEffects :: !(Seq (SideEffect n))
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ counters relations assertions divModRelsU) =
+  show (TypeErased expr _ counters relations assertions divModRelsU _sideEffects) =
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
@@ -254,9 +258,19 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
              then "  div mod relations:\n    " <> show assertions <> "\n"
              else ""
          )
+      -- side effects
       <> Counters.prettyVariables counters
       <> "\n\
          \}"
+
+--------------------------------------------------------------------------------
+
+data SideEffect n
+  = AssignmentF2 Var (ExprF n)
+  | AssignmentB2 Var (ExprB n)
+  | AssignmentU2 Width Var (ExprU n)
+  | DivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
+  deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 

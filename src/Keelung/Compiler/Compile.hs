@@ -26,7 +26,7 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => Bool -> TypeErased n -> ConstraintSystem n
-run useNewOptimizer (TypeErased untypedExprs _ counters relations assertions divModRelsU) = runM useNewOptimizer counters $ do
+run useNewOptimizer (TypeErased untypedExprs _ counters relations assertions divModRelsU sideEffects) = runM useNewOptimizer counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -45,8 +45,18 @@ run useNewOptimizer (TypeErased untypedExprs _ counters relations assertions div
   -- compile assertions to constraints
   mapM_ compileAssertion assertions
 
+  -- -- compile all side effects 
+  -- mapM_ compileSideEffect sideEffects
+
   -- compile DivMod relations to constraints
   mapM_ (\(width, xs) -> mapM (\(dividend, divisor, quotient, remainder) -> compileDivModU width dividend divisor quotient remainder) xs) (IntMap.toList divModRelsU)
+
+-- | Compile side effects
+compileSideEffect :: (GaloisField n, Integral n) => SideEffect n -> M n ()
+compileSideEffect (AssignmentB2 var val) = compileExprB (RefB var) val 
+compileSideEffect (AssignmentF2 var val) = compileExprF (RefF var) val
+compileSideEffect (AssignmentU2 width var val) = compileExprU (RefU width var) val
+compileSideEffect (DivMod width dividend divisor quotient remainder) = compileDivModU width dividend divisor quotient remainder
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()

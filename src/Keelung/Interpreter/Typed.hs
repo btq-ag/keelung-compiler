@@ -64,6 +64,9 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
   forM_ us $ \(width, xs) ->
     forM_ xs $ \(var, e) -> interpret e >>= addU width var
 
+  -- interpret div/mod statements
+  forM_ (IntMap.toList (compDivModRelsU comp)) $ \(width, xs) -> forM_ (reverse xs) (interpretDivMod width)
+
   -- interpret the assertions next
   -- throw error if any assertion fails
   forM_ (compAssertions comp) $ \e -> do
@@ -73,9 +76,6 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
       let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e) bindingsInExpr
-
-  -- interpret div/mod statements
-  forM_ (IntMap.toList (compDivModRelsU comp)) $ \(width, xs) -> forM_ (reverse xs) (interpretDivMod width)
 
   -- lastly interpret the expression and return the result
   interpret expr

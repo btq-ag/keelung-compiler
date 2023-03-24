@@ -13,7 +13,7 @@ import Keelung.Syntax.Encode.Syntax qualified as T
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation counters eb assertions divModRelsU = comp
+  let T.Computation counters eb assertions divModRelsU sideEffects = comp
       proxy = 0
       numBitWidth = bitSize proxy
    in runM counters numBitWidth $ do
@@ -33,6 +33,8 @@ run (T.Elaborated expr comp) =
 
         counters' <- get
 
+        sideEffects' <- mapM eraseSideEffect sideEffects
+
         return $
           TypeErased
             { erasedExpr = exprs,
@@ -40,7 +42,8 @@ run (T.Elaborated expr comp) =
               erasedCounters = counters',
               erasedRelations = relations,
               erasedAssertions = assertions',
-              erasedDivModRelsU = divModRelsU'
+              erasedDivModRelsU = divModRelsU',
+              erasedSideEffects = sideEffects'
             }
   where
     -- proxy trick for devising the bit width of field elements
@@ -54,6 +57,14 @@ type M n = StateT Counters (Reader Width)
 
 runM :: Counters -> Width -> M n a -> a
 runM counters width f = runReader (evalStateT f counters) width
+
+--------------------------------------------------------------------------------
+
+eraseSideEffect :: (GaloisField n, Integral n) => T.SideEffect -> M n (SideEffect n)
+eraseSideEffect (T.AssignmentF var val) = AssignmentF2 var <$> eraseExprF val
+eraseSideEffect (T.AssignmentB var val) = AssignmentB2 var <$> eraseExprB val
+eraseSideEffect (T.AssignmentU width var val) = AssignmentU2 width var <$> eraseExprU val
+eraseSideEffect (T.DivMod width dividend divisor quotient remainder) = DivMod width <$> eraseExprU dividend <*> eraseExprU divisor <*> eraseExprU quotient <*> eraseExprU remainder
 
 --------------------------------------------------------------------------------
 
