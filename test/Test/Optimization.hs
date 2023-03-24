@@ -29,7 +29,7 @@ runTest expectedBeforeSize expectedAfterSize program = do
     Left err -> assertFailure $ show err
     Right result -> return result
 
-  let cs' = Optimizer.optimize1' cs
+  let cs' = Optimizer.optimizeNew cs
 
   -- print cs
   -- print cs'

@@ -49,7 +49,7 @@ tests = do
                 csCounters = mempty,
                 csDivMods = mempty
               }
-       in optimize1 (cs :: RelocatedConstraintSystem GF181) `shouldNotBe` cs
+       in optimizeOld (cs :: RelocatedConstraintSystem GF181) `shouldNotBe` cs
 
   -- describe "Constraint merging (O2)" $ do
   --   it "CAdd & CAdd" $

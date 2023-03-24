@@ -16,7 +16,6 @@ import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.ConstraintSystem (relocateConstraintSystem)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Interpreter.Kinded qualified as Kinded
@@ -53,7 +52,7 @@ typed prog rawPublicInputs rawPrivateInputs = do
 
 r1csNew :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csNew prog rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS . relocateConstraintSystem <$> Compiler.compileO1' prog
+  r1cs <- toR1CS <$> Compiler.compileO1New prog
   inputs <- left (InterpretError . InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case R1CS.run r1cs inputs of
     Left err -> Left (InterpretError err)
@@ -120,8 +119,8 @@ _debug :: Encode t => Comp t -> IO ()
 _debug program = do
   -- print $ Compiler.asGF181N $ Compiler.compileO0 program
   -- print $ Compiler.asGF181N $ Compiler.compileO1 program
-  print $ Compiler.asGF181N $ Compiler.compileO1' program
-  print (Compiler.asGF181N $ toR1CS . relocateConstraintSystem <$> Compiler.compileO1' program)
+  print $ Compiler.asGF181N $ Compiler.compileO1New program
+  print (Compiler.asGF181N $ toR1CS <$> Compiler.compileO1New program)
 
 tests :: SpecWith ()
 tests = do

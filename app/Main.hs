@@ -14,7 +14,8 @@ import Keelung.Compiler
   ( Error (..),
     RelocatedConstraintSystem,
     compileO0Elab,
-    compileO1Elab,
+    compileO1OldElab,
+    compileO1NewElab,
     generateWitnessElab,
     interpretElab,
     toR1CS,
@@ -46,9 +47,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> outputCircuit (asB64 $ compileO1Elab elaborated)
-            GF181 -> outputCircuit (asGF181 $ compileO1Elab elaborated)
-            BN128 -> outputCircuit (asBN128 $ compileO1Elab elaborated)
+            B64 -> outputCircuit (asB64 $ compileO1OldElab elaborated)
+            GF181 -> outputCircuit (asGF181 $ compileO1OldElab elaborated)
+            BN128 -> outputCircuit (asBN128 $ compileO1OldElab elaborated)
     Protocol CompileO2 -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -56,9 +57,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> outputCircuit (asB64 $ compileO1Elab elaborated)
-            GF181 -> outputCircuit (asGF181 $ compileO1Elab elaborated)
-            BN128 -> outputCircuit (asBN128 $ compileO1Elab elaborated)
+            B64 -> outputCircuit (asB64 $ compileO1NewElab elaborated)
+            GF181 -> outputCircuit (asGF181 $ compileO1NewElab elaborated)
+            BN128 -> outputCircuit (asBN128 $ compileO1NewElab elaborated)
     Protocol Interpret -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
@@ -76,9 +77,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> outputCircuitAndWriteFile (asB64 $ compileO1Elab elaborated) filepath
-            GF181 -> outputCircuitAndWriteFile (asGF181 $ compileO1Elab elaborated) filepath
-            BN128 -> outputCircuitAndWriteFile (asBN128 $ compileO1Elab elaborated) filepath
+            B64 -> outputCircuitAndWriteFile (asB64 $ compileO1OldElab elaborated) filepath
+            GF181 -> outputCircuitAndWriteFile (asGF181 $ compileO1OldElab elaborated) filepath
+            BN128 -> outputCircuitAndWriteFile (asBN128 $ compileO1OldElab elaborated) filepath
     Protocol (GenWitness filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
