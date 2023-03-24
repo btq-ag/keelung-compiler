@@ -131,7 +131,9 @@ renumberConstraints :: (GaloisField n, Integral n) => RelocatedConstraintSystem 
 renumberConstraints cs =
   cs
     { csConstraints = fmap renumberConstraint (csConstraints cs),
-      csCounters = setReducedCount reducedCount counters
+      csBinReps = fmap renumberBinRep (csBinReps cs),
+      csCounters = setReducedCount reducedCount counters,
+      csDivMods = fmap renumberDivMod (csDivMods cs)
     }
   where
     counters = csCounters cs
@@ -180,3 +182,16 @@ renumberConstraints cs =
         CNEq (CNEQ (Right x) (Left (renumber y)) (renumber m))
       CNEq (CNEQ (Right x) (Right y) m) ->
         CNEq (CNEQ (Right x) (Right y) (renumber m))
+
+    renumberBinRep binRep =
+      binRep
+        { BinRep.binRepVar = renumber (BinRep.binRepVar binRep),
+          BinRep.binRepBitStart = renumber (BinRep.binRepBitStart binRep)
+        }
+
+    renumberDivMod (x, y, q, r) =
+      ( renumber x,
+        renumber y,
+        renumber q,
+        renumber r
+      )
