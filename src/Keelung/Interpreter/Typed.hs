@@ -1,9 +1,8 @@
+-- Interpreter for Keelung.Syntax.Encode.Syntax
 {-# LANGUAGE FlexibleInstances #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
--- Interpreter for Keelung.Syntax.Encode.Syntax
-{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Keelung.Interpreter.Typed (runAndOutputWitnesses, run, interpretDivMod) where
@@ -11,9 +10,9 @@ module Keelung.Interpreter.Typed (runAndOutputWitnesses, run, interpretDivMod) w
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Bits (Bits (..))
+import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
-import Data.IntMap qualified as IntMap
 import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
@@ -23,7 +22,6 @@ import Keelung.Data.VarGroup qualified as Bindings
 import Keelung.Interpreter.Monad
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Encode.Syntax
-import qualified Data.Either as Either
 
 --------------------------------------------------------------------------------
 
@@ -31,41 +29,44 @@ import qualified Data.Either as Either
 runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) ([n], Witness n)
 runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
   -- interpret assignments of values first
-  fs <-
-    filterM
-      ( \(var, e) -> case e of
-          ValF val -> interpret val >>= addF var >> return False
-          _ -> return True
-      )
-      (IntMap.toList (structF (compExprBindings comp)))
-  bs <-
-    filterM
-      ( \(var, e) -> case e of
-          ValB val -> interpret val >>= addB var >> return False
-          _ -> return True
-      )
-      (IntMap.toList (structB (compExprBindings comp)))
-  us <-
-    mapM
-      ( \(width, xs) ->
-          (width,)
-            <$> filterM
-              ( \(var, e) -> case e of
-                  ValU _ val -> interpret val >>= addU width var >> return False
-                  _ -> return True
-              )
-              (IntMap.toList xs)
-      )
-      (IntMap.toList (structU (compExprBindings comp)))
+  -- fs <-
+  --   filterM
+  --     ( \(var, e) -> case e of
+  --         ValF val -> interpret val >>= addF var >> return False
+  --         _ -> return True
+  --     )
+  --     (IntMap.toList (structF (compExprBindings comp)))
+  -- bs <-
+  --   filterM
+  --     ( \(var, e) -> case e of
+  --         ValB val -> interpret val >>= addB var >> return False
+  --         _ -> return True
+  --     )
+  --     (IntMap.toList (structB (compExprBindings comp)))
+  -- us <-
+  --   mapM
+  --     ( \(width, xs) ->
+  --         (width,)
+  --           <$> filterM
+  --             ( \(var, e) -> case e of
+  --                 ValU _ val -> interpret val >>= addU width var >> return False
+  --                 _ -> return True
+  --             )
+  --             (IntMap.toList xs)
+  --     )
+  --     (IntMap.toList (structU (compExprBindings comp)))
 
-  -- interpret the rest of the assignments
-  forM_ fs $ \(var, e) -> interpret e >>= addF var
-  forM_ bs $ \(var, e) -> interpret e >>= addB var
-  forM_ us $ \(width, xs) ->
-    forM_ xs $ \(var, e) -> interpret e >>= addU width var
+  -- -- interpret the rest of the assignments
+  -- forM_ fs $ \(var, e) -> interpret e >>= addF var
+  -- forM_ bs $ \(var, e) -> interpret e >>= addB var
+  -- forM_ us $ \(width, xs) ->
+  --   forM_ xs $ \(var, e) -> interpret e >>= addU width var
 
   -- interpret div/mod statements
-  forM_ (IntMap.toList (compDivModRelsU comp)) $ \(width, xs) -> forM_ (reverse xs) (interpretDivMod width)
+  -- forM_ (IntMap.toList (compDivModRelsU comp)) $ \(width, xs) -> forM_ (reverse xs) (interpretDivMod width)
+
+  -- interpret side-effects
+  forM_ (compSideEffects comp) $ \sideEffect -> void $ interpret sideEffect
 
   -- interpret the assertions next
   -- throw error if any assertion fails
@@ -132,8 +133,7 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
         _ -> do
           let unsolvedVars = Either.lefts [divisor, quotient, remainder]
           throwError $ StuckError "" unsolvedVars
-
-  where 
+  where
     analyze :: (GaloisField n, Integral n) => UInt -> M n (Either Var n)
     analyze = \case
       VarU w var -> catchError (Right <$> lookupU w var) $ \case
@@ -146,6 +146,20 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
           _ -> throwError $ ResultSizeError 1 (length xs)
 
 --------------------------------------------------------------------------------
+
+instance (GaloisField n, Integral n) => Interpret SideEffect n where
+  interpret (AssignmentB var val) = do
+    interpret val >>= addB var
+    return []
+  interpret (AssignmentF var val) = do
+    interpret val >>= addF var
+    return []
+  interpret (AssignmentU width var val) = do
+    interpret val >>= addU width var
+    return []
+  interpret (DivMod width dividend divisor quotient remainder) = do
+    interpretDivMod width (dividend, divisor, quotient, remainder)
+    return []
 
 instance GaloisField n => Interpret Bool n where
   interpret True = return [one]

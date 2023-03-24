@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TupleSections #-}
 
 module Keelung.Interpreter.Kinded (run, runAndOutputWitnesses) where
 
@@ -21,52 +20,53 @@ import Keelung.Data.VarGroup (Witness)
 import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Interpreter.Monad
 import Keelung.Interpreter.Typed (interpretDivMod)
-import Keelung.Syntax.Encode.Syntax qualified as Typed
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
 runAndOutputWitnesses :: (GaloisField n, Integral n, Interpret t n) => Elaborated t -> Inputs n -> Either (Error n) ([n], Witness n)
 runAndOutputWitnesses (Elaborated expr context) inputs = runM (compHeap context) inputs $ do
+  -- interpret assignments of values first
+  -- fs <-
+  --   filterM
+  --     ( \(var, e) -> case e of
+  --         Integer val -> interpret val >>= addF var >> return False
+  --         Rational val -> interpret val >>= addF var >> return False
+  --         _ -> return True
+  --     )
+  --     (IntMap.toList (structF (compExprBindings context)))
+  -- bs <-
+  --   filterM
+  --     ( \(var, e) -> case e of
+  --         Boolean val -> interpret val >>= addB var >> return False
+  --         _ -> return True
+  --     )
+  --     (IntMap.toList (structB (compExprBindings context)))
+  -- us <-
+  --   mapM
+  --     ( \(width, xs) ->
+  --         (width,)
+  --           <$> filterM
+  --             ( \(var, e) -> case e of
+  --                 Typed.ValU _ val -> interpret val >>= addU width var >> return False
+  --                 _ -> return True
+  --             )
+  --             (IntMap.toList xs)
+  --     )
+  --     (IntMap.toList (structU (compExprBindings context)))
+
+  -- interpret side-effects
+  forM_ (compSideEffects context) $ \sideEffect -> void $ interpret sideEffect
 
   -- interpret div/mod statements
-  forM_ (IntMap.toList (compDivModRelsU context)) $ \(width, xs) ->
-    forM_ (reverse xs) (interpretDivMod width)
+  -- forM_ (IntMap.toList (compDivModRelsU context)) $ \(width, xs) ->
+  --   forM_ (reverse xs) (interpretDivMod width)
 
-  -- interpret assignments of values first
-  fs <-
-    filterM
-      ( \(var, e) -> case e of
-          Integer val -> interpret val >>= addF var >> return False
-          Rational val -> interpret val >>= addF var >> return False
-          _ -> return True
-      )
-      (IntMap.toList (structF (compExprBindings context)))
-  bs <-
-    filterM
-      ( \(var, e) -> case e of
-          Boolean val -> interpret val >>= addB var >> return False
-          _ -> return True
-      )
-      (IntMap.toList (structB (compExprBindings context)))
-  us <-
-    mapM
-      ( \(width, xs) ->
-          (width,)
-            <$> filterM
-              ( \(var, e) -> case e of
-                  Typed.ValU _ val -> interpret val >>= addU width var >> return False
-                  _ -> return True
-              )
-              (IntMap.toList xs)
-      )
-      (IntMap.toList (structU (compExprBindings context)))
-
-  -- interpret the rest of the assignments
-  forM_ fs $ \(var, e) -> interpret e >>= addF var
-  forM_ bs $ \(var, e) -> interpret e >>= addB var
-  forM_ us $ \(width, xs) ->
-    forM_ xs $ \(var, e) -> interpret e >>= addU width var
+  -- -- interpret the rest of the assignments
+  -- forM_ fs $ \(var, e) -> interpret e >>= addF var
+  -- forM_ bs $ \(var, e) -> interpret e >>= addB var
+  -- forM_ us $ \(width, xs) ->
+  --   forM_ xs $ \(var, e) -> interpret e >>= addU width var
 
   -- interpret the assertions next
   -- throw error if any assertion fails
@@ -182,6 +182,22 @@ instance (GaloisField n, Integral n, KnownNat w) => Interpret (UInt w) n where
 
       wrapAround :: (GaloisField n, Integral n) => M n [n] -> M n [n]
       wrapAround = fmap (map (fromInteger . (`mod` upperBound) . toInteger))
+
+instance (GaloisField n, Integral n) => Interpret SideEffect n where
+  interpret (AssignmentB var val) = do
+    interpret val >>= addB var
+    return []
+  interpret (AssignmentF var val) = do
+    interpret val >>= addF var
+    return []
+  interpret (AssignmentU width var val) = do
+    interpret val >>= addU width var
+    return []
+  interpret (DivMod width dividend divisor quotient remainder) = do
+    interpretDivMod width (dividend, divisor, quotient, remainder)
+    return []
+
+--------------------------------------------------------------------------------
 
 instance GaloisField n => Interpret () n where
   interpret val = case val of

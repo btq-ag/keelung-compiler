@@ -43,9 +43,9 @@ packages:
 extra-deps:
 - git: https://github.com/btq-ag/galois-field.git
   commit: d7d0da6b5df8045afdfb820ba8d08f34dc4c3e58
-- ../keelung 
-# - git: https://github.com/btq-ag/keelung.git
-#   commit: 185c611c72de2e6caccd9dad7d83209327c06e8b
+# - ../keelung 
+- git: https://github.com/btq-ag/keelung.git
+  commit: 50da0f504d835c6748ce3c1fd2f90b2246ba7d61
 # - git: git@github.com:btq-ag/keelung-examples.git
 #   commit: 7e45f20becf27654f8af35ef0df3390db28b8c10
 

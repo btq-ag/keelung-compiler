@@ -9,7 +9,6 @@ import Control.Monad
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
-import Data.IntMap qualified as IntMap
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
@@ -19,14 +18,13 @@ import Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations qualified as 
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
-import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => Bool -> TypeErased n -> ConstraintSystem n
-run useNewOptimizer (TypeErased untypedExprs _ counters relations assertions divModRelsU sideEffects) = runM useNewOptimizer counters $ do
+run useNewOptimizer (TypeErased untypedExprs _ counters _ assertions _ sideEffects) = runM useNewOptimizer counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -39,21 +37,21 @@ run useNewOptimizer (TypeErased untypedExprs _ counters relations assertions div
         let out = RefUO (widthOfU x) var
         compileExprU out x
 
-  -- compile all relations to constraints
-  compileRelations relations
+  -- -- compile all relations to constraints
+  -- compileRelations relations
 
   -- compile assertions to constraints
   mapM_ compileAssertion assertions
 
-  -- -- compile all side effects 
-  -- mapM_ compileSideEffect sideEffects
+  -- compile all side effects
+  mapM_ compileSideEffect sideEffects
 
-  -- compile DivMod relations to constraints
-  mapM_ (\(width, xs) -> mapM (\(dividend, divisor, quotient, remainder) -> compileDivModU width dividend divisor quotient remainder) xs) (IntMap.toList divModRelsU)
+-- -- compile DivMod relations to constraints
+-- mapM_ (\(width, xs) -> mapM (\(dividend, divisor, quotient, remainder) -> compileDivModU width dividend divisor quotient remainder) xs) (IntMap.toList divModRelsU)
 
 -- | Compile side effects
 compileSideEffect :: (GaloisField n, Integral n) => SideEffect n -> M n ()
-compileSideEffect (AssignmentB2 var val) = compileExprB (RefB var) val 
+compileSideEffect (AssignmentB2 var val) = compileExprB (RefB var) val
 compileSideEffect (AssignmentF2 var val) = compileExprF (RefF var) val
 compileSideEffect (AssignmentU2 width var val) = compileExprU (RefU width var) val
 compileSideEffect (DivMod width dividend divisor quotient remainder) = compileDivModU width dividend divisor quotient remainder
@@ -170,18 +168,18 @@ compileAssertionEqU a b = do
   compileExprU b' b
   add $ cVarEqU a' b'
 
-compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
-compileRelations (Relations vb eb) = do
-  -- intermediate variable bindings of values
-  forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cVarBindF (RefF var) val
-  forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cVarBindB (RefB var) val
-  forM_ (IntMap.toList (structU vb)) $ \(width, bindings) ->
-    forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefU width var) val
-  -- intermediate variable bindings of expressions
-  forM_ (IntMap.toList (structF eb)) $ \(var, val) -> compileExprF (RefF var) val
-  forM_ (IntMap.toList (structB eb)) $ \(var, val) -> compileExprB (RefB var) val
-  forM_ (IntMap.toList (structU eb)) $ \(width, bindings) ->
-    forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefU width var) val
+-- compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
+-- compileRelations (Relations vb eb) = do
+--   -- intermediate variable bindings of values
+--   forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cVarBindF (RefF var) val
+--   forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cVarBindB (RefB var) val
+--   forM_ (IntMap.toList (structU vb)) $ \(width, bindings) ->
+--     forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefU width var) val
+--   -- intermediate variable bindings of expressions
+--   forM_ (IntMap.toList (structF eb)) $ \(var, val) -> compileExprF (RefF var) val
+--   forM_ (IntMap.toList (structB eb)) $ \(var, val) -> compileExprB (RefB var) val
+--   forM_ (IntMap.toList (structU eb)) $ \(width, bindings) ->
+--     forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefU width var) val
 
 --------------------------------------------------------------------------------
 
