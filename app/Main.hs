@@ -13,13 +13,14 @@ import Encode
 import Keelung.Compiler
   ( Error (..),
     RelocatedConstraintSystem,
-    compileO0Elab,
-    compileO1OldElab,
+    compileO0OldElab,
     compileO1NewElab,
+    compileO1OldElab,
     generateWitnessElab,
     interpretElab,
     toR1CS,
   )
+import Keelung.Compiler.ConstraintSystem qualified as Relocated
 import Keelung.Field
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax
@@ -37,9 +38,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> outputCircuit (asB64 $ compileO0Elab elaborated)
-            GF181 -> outputCircuit (asGF181 $ compileO0Elab elaborated)
-            BN128 -> outputCircuit (asBN128 $ compileO0Elab elaborated)
+            B64 -> outputCircuit (asB64 $ Relocated.relocateConstraintSystem <$> compileO0OldElab elaborated)
+            GF181 -> outputCircuit (asGF181 $ Relocated.relocateConstraintSystem <$> compileO0OldElab elaborated)
+            BN128 -> outputCircuit (asBN128 $ Relocated.relocateConstraintSystem <$> compileO0OldElab elaborated)
     Protocol CompileO1 -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -89,13 +90,16 @@ main = withUtf8 $ do
           case fieldType of
             B64 ->
               outputInterpretedResultAndWriteFile
-                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [B64]) (map fromInteger rawPrivateInputs :: [B64])) filepath
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [B64]) (map fromInteger rawPrivateInputs :: [B64]))
+                filepath
             GF181 ->
               outputInterpretedResultAndWriteFile
-                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181])) filepath
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181]))
+                filepath
             BN128 ->
               outputInterpretedResultAndWriteFile
-                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128])) filepath
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128]))
+                filepath
     Version -> putStrLn "Keelung v0.9.3"
   where
     asB64 :: Either (Error B64) (RelocatedConstraintSystem B64) -> Either (Error B64) (RelocatedConstraintSystem B64)

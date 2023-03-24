@@ -157,5 +157,5 @@ tests = do
   where
     count :: Encode t => Comp t -> Either (Error GF181) Int
     count program = do
-      cs <- asGF181 (Compiler.compile program)
+      cs <- asGF181 (Compiler.compileO1Old program)
       return $ length $ toR1Cs $ toR1CS cs

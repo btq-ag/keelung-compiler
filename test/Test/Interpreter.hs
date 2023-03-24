@@ -16,6 +16,7 @@ import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
+import Keelung.Compiler.ConstraintSystem qualified as Relocated
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Interpreter.Kinded qualified as Kinded
@@ -66,9 +67,9 @@ r1csOld prog rawPublicInputs rawPrivateInputs = do
     Left err -> Left (ExecError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
-r1csO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
-r1csO0 prog rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS <$> Compiler.compileO0 prog
+r1csO0New :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
+r1csO0New prog rawPublicInputs rawPrivateInputs = do
+  r1cs <- toR1CS . Relocated.relocateConstraintSystem <$> Compiler.compileO0New prog
   inputs <- left (InterpretError . InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case R1CS.run r1cs inputs of
     Left err -> Left (InterpretError err)
@@ -90,7 +91,7 @@ runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs rawOutputs =
   when enableOldOptimizer $
     r1csOld program rawPublicInputs rawPrivateInputs
       `shouldBe` rawOutputs
-  r1csO0 program rawPublicInputs rawPrivateInputs
+  r1csO0New program rawPublicInputs rawPrivateInputs
     `shouldBe` rawOutputs
 
 runAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
@@ -112,7 +113,7 @@ runAndCompare enableOldOptimizer program rawPublicInputs rawPrivateInputs = do
   when enableOldOptimizer $
     r1csOld program rawPublicInputs rawPrivateInputs
       `shouldBe` expectedOutput
-  r1csO0 program rawPublicInputs rawPrivateInputs
+  r1csO0New program rawPublicInputs rawPrivateInputs
     `shouldBe` expectedOutput
 
 _debug :: Encode t => Comp t -> IO ()
