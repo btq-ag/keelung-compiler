@@ -202,7 +202,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (AssertionError expr bindings) =
     "assertion failed: "
       <> expr
-      <> if isEmpty bindings
+      <> if partialIsEmpty bindings
         then ""
         else "\nbindings of free variables in the assertion:\n" <> show bindings
   show (AssertionError' expr bindings) =

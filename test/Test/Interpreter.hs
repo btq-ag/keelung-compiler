@@ -21,16 +21,21 @@ import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Interpreter.Kinded qualified as Kinded
 import Keelung.Interpreter.Monad hiding (Error)
+import Keelung.Interpreter.Monad qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.Relocated qualified as Relocated
 import Keelung.Interpreter.Typed qualified as Typed
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
+import qualified Keelung.Data.VarGroup as PartialBinding
 
 run :: IO ()
 run = hspec tests
 
+--------------------------------------------------------------------------------
+
+-- | syntax tree interpreters
 kinded :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 kinded prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborate prog)
@@ -43,14 +48,7 @@ typed prog rawPublicInputs rawPrivateInputs = do
   inputs <- left (InterpretError . InputError) (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
   left InterpretError (Typed.run elab inputs)
 
--- csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> Either (Error n) [n]
--- csOld prog rawInputs = do
---   r1cs <- toR1CS <$> Compiler.compileO1 prog
---   let inputs = Inputs.deserialize (r1csCounters r1cs) rawInputs
---   case R1CS.run r1cs inputs of
---     Left err -> Left (InterpretError err)
---     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
-
+-- | constraint system interpreters
 r1csNew :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csNew prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> Compiler.compileO1 prog
@@ -75,28 +73,46 @@ r1csO0New prog rawPublicInputs rawPrivateInputs = do
     Left err -> Left (InterpretError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
-runAll' :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Bool -> Comp t -> [n] -> [n] -> Either (Error n) [n] -> IO ()
-runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs rawOutputs = do
+--------------------------------------------------------------------------------
+
+-- | Expect all interpreters to return the same output
+runAll' :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Bool -> Comp t -> [n] -> [n] -> [n] -> IO ()
+runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs expected = do
+  -- syntax tree interpreters
   kinded program rawPublicInputs rawPrivateInputs
-    `shouldBe` rawOutputs
+    `shouldBe` Right expected
   typed program rawPublicInputs rawPrivateInputs
-    `shouldBe` rawOutputs
+    `shouldBe` Right expected
+  -- constraint system interpreters
   r1csNew program rawPublicInputs rawPrivateInputs
-    `shouldBe` rawOutputs
+    `shouldBe` Right expected
+  r1csO0New program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right expected
+  -- only enable testing the old optimizer when the flag is set
   when enableOldOptimizer $
     r1csOld program rawPublicInputs rawPrivateInputs
-      `shouldBe` rawOutputs
+      `shouldBe` Right expected
+
+-- | Expect all interpreters to throw an error
+throwAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> Interpreter.Error n -> Interpreter.Error n -> IO ()
+throwAll program rawPublicInputs rawPrivateInputs stError csError = do
+  -- syntax tree interpreters
+  kinded program rawPublicInputs rawPrivateInputs
+    `shouldBe` Left (InterpretError stError)
+  typed program rawPublicInputs rawPrivateInputs
+    `shouldBe` Left (InterpretError stError)
+  -- constraint system interpreters
+  r1csNew program rawPublicInputs rawPrivateInputs
+    `shouldBe` Left (InterpretError csError)
   r1csO0New program rawPublicInputs rawPrivateInputs
-    `shouldBe` rawOutputs
+    `shouldBe` Left (InterpretError csError)
 
+-- | Expect all interpreters to return the same output
 runAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
-runAll f i p o = runAll' True f i p (Right o)
-
-throwAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> Error n -> IO ()
-throwAll f i p e = runAll' True f i p (Left e)
+runAll = runAll' True
 
 runAllExceptForTheOldOptimizer :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
-runAllExceptForTheOldOptimizer f i p o = runAll' False f i p (Right o)
+runAllExceptForTheOldOptimizer = runAll' False
 
 runAndCompare :: (GaloisField n, Integral n, Encode t, Interpret t n) => Bool -> Comp t -> [n] -> [n] -> IO ()
 runAndCompare enableOldOptimizer program rawPublicInputs rawPrivateInputs = do
@@ -124,11 +140,31 @@ tests = do
     describe "Errors" $ do
       it "missing 1 public input" $ do
         let program = complement <$> inputBool Public
-        throwAll program [] [] (InterpretError (InputError (Inputs.PublicInputSizeMismatch 1 0)) :: Error GF181)
+        throwAll
+          program
+          []
+          []
+          (InputError (Inputs.PublicInputSizeMismatch 1 0) :: Interpreter.Error GF181)
+          (InputError (Inputs.PublicInputSizeMismatch 1 0) :: Interpreter.Error GF181)
 
       it "missing 1 private input" $ do
         let program = complement <$> inputBool Private
-        throwAll program [] [] (InterpretError (InputError (Inputs.PrivateInputSizeMismatch 1 0)) :: Error GF181)
+        throwAll
+          program
+          []
+          []
+          (InputError (Inputs.PrivateInputSizeMismatch 1 0) :: Interpreter.Error GF181)
+          (InputError (Inputs.PrivateInputSizeMismatch 1 0) :: Interpreter.Error GF181)
+
+      it "assert (1 = 2)" $ do
+        let program = do
+              assert (1 `eq` (2 :: Field))
+        throwAll
+          program
+          []
+          []
+          (AssertionError "1 = 2" PartialBinding.emptyPartial :: Interpreter.Error GF181)
+          (AssertionError' "" mempty :: Interpreter.Error GF181)
 
     describe "Boolean" $ do
       it "not 1" $ do
@@ -560,11 +596,6 @@ tests = do
       --         assert result
       --         return result
       --   runAllExceptForTheOldOptimizer program [0 :: GF181] [] [1]
-
-      it "assert (inconsistent)" $ do
-        let program = do
-              assert (1 `eq` (2 :: Field))
-        runAll program [] [] ([] :: [GF181])
 
       it "Basic.summation2" $
         forAll (vector 4) $ \inp -> do
