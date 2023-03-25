@@ -202,13 +202,17 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (AssertionError expr bindings) =
     "assertion failed: "
       <> expr
-      <> "\nbindings of free variables in the assertion:\n"
-      <> show bindings
+      <> if isEmpty bindings
+        then ""
+        else "\nbindings of free variables in the assertion:\n" <> show bindings
   show (AssertionError' expr bindings) =
     "assertion failed: "
       <> expr
-      <> "\nbindings of free variables in the assertion:\n"
-      <> showList' (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList bindings))
+      <> if IntMap.null bindings
+        then ""
+        else
+          "\nbindings of free variables in the assertion:\n"
+            <> showList' (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList bindings))
   show (R1CSStuckError context constraints) =
     "stuck when trying to solve these constraints: \n"
       <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints

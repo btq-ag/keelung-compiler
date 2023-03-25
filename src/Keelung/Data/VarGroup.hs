@@ -260,6 +260,11 @@ toTotal (VarGroups o i p x) =
     sequenceIntMap :: (a -> Validation b c) -> IntMap a -> Validation (IntMap b) (IntMap c)
     sequenceIntMap f = sequenceA . IntMap.mapWithKey (\width xs -> first (IntMap.singleton width) (f xs))
 
+isEmpty :: Eq n => Partial n -> Bool
+isEmpty (VarGroups o i p x) = isEmptyVarGroup o && isEmptyVarGroup i && isEmptyVarGroup p && isEmptyVarGroup x
+  where
+    isEmptyVarGroup (VarGroup f b u) = f == (0, mempty) && b == (0, mempty) && IntMap.null u
+
 toTotal' :: (Int, IntMap n) -> Validation IntSet (Vector n)
 toTotal' (size, xs) =
   if IntMap.size xs < size

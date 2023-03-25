@@ -77,11 +77,6 @@ r1csO0New prog rawPublicInputs rawPrivateInputs = do
 
 runAll' :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Bool -> Comp t -> [n] -> [n] -> Either (Error n) [n] -> IO ()
 runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs rawOutputs = do
-  -- print $ Compiler.asGF181N $ Compiler.compileO0 program
-  -- print $ Compiler.asGF181N $ Compiler.compileO1 program
-  -- print $ Compiler.asGF181N $ Compiler.compileO1' program
-  -- print (Compiler.asGF181N $ toR1CS . relocateConstraintSystem <$> Compiler.compileO1' program)
-
   kinded program rawPublicInputs rawPrivateInputs
     `shouldBe` rawOutputs
   typed program rawPublicInputs rawPrivateInputs
@@ -120,7 +115,7 @@ _debug :: Encode t => Comp t -> IO ()
 _debug program = do
   -- print $ Compiler.asGF181N $ Compiler.compileO0 program
   -- print $ Compiler.asGF181N $ Compiler.compileO1 program
-  print $ Compiler.asGF181N $ Compiler.compileO1 program
+  print $ Compiler.asGF181N $ Compiler.compileToModules program
   print (Compiler.asGF181N $ toR1CS <$> Compiler.compileO1 program)
 
 tests :: SpecWith ()
@@ -558,6 +553,19 @@ tests = do
               assert (x `eq` 3)
         runAll program [3 :: GF181] [] []
 
+      -- it "assert 2" $ do
+      --   let program = do
+      --         x <- inputUInt @4 Public
+      --         result <- reuse $ x `neq` 3
+      --         assert result
+      --         return result
+      --   runAllExceptForTheOldOptimizer program [0 :: GF181] [] [1]
+
+      it "assert (inconsistent)" $ do
+        let program = do
+              assert (1 `eq` (2 :: Field))
+        runAll program [] [] ([] :: [GF181])
+
       it "Basic.summation2" $
         forAll (vector 4) $ \inp -> do
           let expectedOutput = []
@@ -581,39 +589,39 @@ tests = do
       it "Basic.toArray1" $
         runAll Basic.toArray1 [0 .. 7 :: GF181] [] []
 
-      describe "AggCheck" $ do
-        it "dim:1 sig:1" $
-          runAggCheck 1 1 []
-        it "dim:1 sig:10" $
-          runAggCheck 1 10 []
-        it "dim:10 sig:1" $
-          runAggCheck 10 1 []
-        it "dim:10 sig:10" $
-          runAggCheck 10 10 []
+    describe "AggCheck" $ do
+      it "dim:1 sig:1" $
+        runAggCheck 1 1 []
+      it "dim:1 sig:10" $
+        runAggCheck 1 10 []
+      it "dim:10 sig:1" $
+        runAggCheck 10 1 []
+      it "dim:10 sig:10" $
+        runAggCheck 10 10 []
 
-      describe "LT12289" $ do
-        it "dim:1 sig:1" $
-          runLT12289 1 1 []
-        it "dim:1 sig:10" $
-          runLT12289 1 10 []
-        it "dim:10 sig:1" $
-          runLT12289 10 1 []
-        it "dim:10 sig:10" $
-          runLT12289 10 10 []
+    describe "LT12289" $ do
+      it "dim:1 sig:1" $
+        runLT12289 1 1 []
+      it "dim:1 sig:10" $
+        runLT12289 1 10 []
+      it "dim:10 sig:1" $
+        runLT12289 10 1 []
+      it "dim:10 sig:10" $
+        runLT12289 10 10 []
 
-      describe "LenCheck" $ do
-        it "dim:1 sig:1" $
-          runLenCheck 1 1 []
-        it "dim:1 sig:10" $
-          runLenCheck 1 10 []
-        it "dim:10 sig:1" $
-          runLenCheck 10 1 []
-        it "dim:10 sig:10" $
-          runLenCheck 10 10 []
+    describe "LenCheck" $ do
+      it "dim:1 sig:1" $
+        runLenCheck 1 1 []
+      it "dim:1 sig:10" $
+        runLenCheck 1 10 []
+      it "dim:10 sig:1" $
+        runLenCheck 10 1 []
+      it "dim:10 sig:10" $
+        runLenCheck 10 10 []
 
-      describe "Poseidon" $ do
-        it "[0]" $ do
-          runAll (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385 :: GF181]
+    describe "Poseidon" $ do
+      it "[0]" $ do
+        runAll (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385 :: GF181]
 
     describe "Tests on the optimizer" $ do
       it "Multiplicative 0" $ do
@@ -676,10 +684,17 @@ tests = do
             (AggSig.genInputFromParam param)
             []
             outputs
+
 -- program :: Comp ()
 -- program = do
---   a <- input Public
---   assert $ a `neq` (0 :: UInt 3)
+--   x <- input Public
+--   assert $ x `neq` (0 :: UInt 3)
+
+-- x <- input Public
+-- a <- reuse $ x `eq` (0 :: UInt 3)
+-- b <- reuse $ x `neq` 0
+-- return (a, b)
+
 -- program :: Comp (UInt 4, UInt 4)
 -- program = do
 --   dividend <- input Public

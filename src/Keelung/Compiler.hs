@@ -25,6 +25,7 @@ module Keelung.Compiler
     compileO0,
     compileO1Old,
     compileO1,
+    compileToModules,
     optimizeWithInput,
     --
     compileO0OldElab,
@@ -116,6 +117,13 @@ compileO1 ::
   Comp t ->
   Either (Error n) (RelocatedConstraintSystem n)
 compileO1 prog = elaborateAndEncode prog >>= compileO1Elab
+
+-- elaborate => rewrite => type erase => constant propagation => compile => optimisation (new)
+compileToModules ::
+  (GaloisField n, Integral n, Encode t) =>
+  Comp t ->
+  Either (Error n) (ConstraintSystem n)
+compileToModules prog = elaborateAndEncode prog >>= return . Optimizer.optimizeNew . Compile.run True . ConstantPropagation.run . Erase.run
 
 -- | 'compile' defaults to 'compileO1'
 compile ::
