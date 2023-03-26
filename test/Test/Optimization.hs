@@ -29,21 +29,19 @@ runTest expectedBeforeSize expectedAfterSize program = do
     Left err -> assertFailure $ show err
     Right result -> return result
 
-  let cs' = Optimizer.optimizeNew cs
+  case Optimizer.optimizeNew cs of
+    Left err -> assertFailure $ show err
+    Right cs' -> do
+      -- var counters should remain the same
+      csCounters cs `shouldBe` csCounters cs'
 
-  -- print cs
-  -- print cs'
+      -- compare the number of constraints
+      let actualBeforeSize = Relocated.numberOfConstraints (relocateConstraintSystem cs)
+      actualBeforeSize `shouldBe` expectedBeforeSize
+      let actualAfterSize = Relocated.numberOfConstraints (relocateConstraintSystem cs')
+      actualAfterSize `shouldBe` expectedAfterSize
 
-  -- var counters should remain the same
-  csCounters cs `shouldBe` csCounters cs'
-
-  -- compare the number of constraints
-  let actualBeforeSize = Relocated.numberOfConstraints (relocateConstraintSystem cs)
-  actualBeforeSize `shouldBe` expectedBeforeSize
-  let actualAfterSize = Relocated.numberOfConstraints (relocateConstraintSystem cs')
-  actualAfterSize `shouldBe` expectedAfterSize
-
-  return cs'
+      return cs'
 
 run :: IO ()
 run = hspec tests
