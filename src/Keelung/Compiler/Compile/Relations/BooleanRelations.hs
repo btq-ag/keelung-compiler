@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
+module Keelung.Compiler.Compile.Relations.BooleanRelations
   ( BooleanRelations,
     Relation (..),
     new,
@@ -11,7 +11,7 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
     exportPinnedBitTests,
     size,
     relationBetween,
-    toIntMap
+    toIntMap,
   )
 where
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
+module Keelung.Compiler.Compile.Relations.UIntRelations
   ( UIntRelations,
     Lookup (..),
     new,

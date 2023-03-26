@@ -24,13 +24,13 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
+import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
+import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
+import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
+import Keelung.Compiler.Compile.Relations.UIntRelations (UIntRelations)
+import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
-import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations (FieldRelations)
-import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
-import Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations (UIntRelations)
-import Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
 import Keelung.Constraint.R1CS qualified as Constraint
@@ -105,7 +105,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               <> unlines (map ("    " <>) (prettyBooleanConstraints counters))
               <> "\n"
 
-      showDivModHints = 
+      showDivModHints =
         if null $ csDivMods cs
           then ""
           else "  DivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (csDivMods cs))))

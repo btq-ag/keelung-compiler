@@ -27,15 +27,16 @@ library
   exposed-modules:
       Keelung.Compiler
       Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Error
+      Keelung.Compiler.Compile.Relations.BooleanRelations
+      Keelung.Compiler.Compile.Relations.FieldRelations
+      Keelung.Compiler.Compile.Relations.UIntRelations
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
-      Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
-      Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind
@@ -87,15 +88,16 @@ executable keelungc
       Option
       Keelung.Compiler
       Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Error
+      Keelung.Compiler.Compile.Relations.BooleanRelations
+      Keelung.Compiler.Compile.Relations.FieldRelations
+      Keelung.Compiler.Compile.Relations.UIntRelations
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
-      Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
-      Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind
@@ -164,15 +166,16 @@ test-suite keelung-test
       Test.WitnessGeneration
       Keelung.Compiler
       Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Error
+      Keelung.Compiler.Compile.Relations.BooleanRelations
+      Keelung.Compiler.Compile.Relations.FieldRelations
+      Keelung.Compiler.Compile.Relations.UIntRelations
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations
-      Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
-      Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind

@@ -5,16 +5,20 @@
 
 module Keelung.Compiler.Compile (run) where
 
+import Control.Arrow (left)
 import Control.Monad
+import Control.Monad.Except
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
+import Keelung.Compiler.Compile.Error qualified as Relations
+import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
+import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
-import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
-import Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations qualified as UIntRelations
+import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
@@ -23,8 +27,8 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => Bool -> TypeErased n -> ConstraintSystem n
-run useNewOptimizer (TypeErased untypedExprs _ counters _ assertions _ sideEffects) = runM useNewOptimizer counters $ do
+run :: (GaloisField n, Integral n) => Bool -> TypeErased n -> Either (Error n) (ConstraintSystem n)
+run useNewOptimizer (TypeErased untypedExprs _ counters _ assertions _ sideEffects) = left CompileError $ runM useNewOptimizer counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -184,10 +188,15 @@ compileAssertionEqU a b = do
 --------------------------------------------------------------------------------
 
 -- | Monad for compilation
-type M n = State (ConstraintSystem n)
+type M n = StateT (ConstraintSystem n) (Except (Relations.Error n))
 
-runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty mempty)
+runM :: GaloisField n => Bool -> Counters -> M n a -> Either (Relations.Error n) (ConstraintSystem n)
+runM useNewOptimizer counters program =
+  runExcept
+    ( execStateT
+        program
+        (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty mempty)
+    )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})

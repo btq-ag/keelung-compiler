@@ -6,12 +6,12 @@ import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
+import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
+import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
+import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
-import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations (FieldRelations)
-import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 

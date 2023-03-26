@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations
+module Keelung.Compiler.Compile.Relations.FieldRelations
   ( FieldRelations,
     relationBetween,
     new,
@@ -26,9 +26,9 @@ import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
+import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
 import Prelude hiding (lookup)
 
 data FieldRelations n = FieldRelations

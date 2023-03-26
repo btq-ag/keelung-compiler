@@ -2,9 +2,9 @@ module Test.FieldRelations (tests, run) where
 
 import Control.Monad.State
 import Keelung hiding (run)
+import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
+import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations (FieldRelations)
-import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
 

@@ -9,19 +9,19 @@ import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compileO0, run)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Compile qualified as Compiler
+import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), relocateConstraintSystem)
 import Keelung.Compiler.Error (Error)
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
-import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Relocated qualified as Relocated
 import Test.HUnit (assertFailure)
 import Test.Hspec
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
-compileO0 program = Compiler.erase program >>= return . Compiler.run True . ConstantPropagation.run
+compileO0 program = Compiler.erase program >>= Compiler.run True . ConstantPropagation.run
 
 runTest :: Encode t => Int -> Int -> Comp t -> IO (ConstraintSystem (N GF181))
 runTest expectedBeforeSize expectedAfterSize program = do

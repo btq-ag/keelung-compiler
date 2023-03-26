@@ -2,9 +2,9 @@ module Test.BooleanRelations (tests, run) where
 
 import Control.Monad.State
 import Data.Maybe qualified as Maybe
+import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
 import Keelung.Compiler.Constraint (RefB (..))
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations (BooleanRelations)
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations qualified as BooleanRelations
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
 import Test.QuickCheck (Arbitrary (arbitrary))
