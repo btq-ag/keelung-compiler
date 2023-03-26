@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -48,11 +48,10 @@ library
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
-      Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.Relocated
-      Keelung.Interpreter.Typed
+      Keelung.Interpreter.SyntaxTree
   other-modules:
       Paths_keelung_compiler
   hs-source-dirs:
@@ -106,11 +105,10 @@ executable keelungc
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
-      Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.Relocated
-      Keelung.Interpreter.Typed
+      Keelung.Interpreter.SyntaxTree
       AggregateSignature.Program
       AggregateSignature.Util
       Basic
@@ -181,11 +179,10 @@ test-suite keelung-test
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
-      Keelung.Interpreter.Kinded
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.Relocated
-      Keelung.Interpreter.Typed
+      Keelung.Interpreter.SyntaxTree
       AggregateSignature.Program
       AggregateSignature.Util
       Basic

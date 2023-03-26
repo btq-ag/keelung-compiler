@@ -61,7 +61,7 @@ import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
 import Keelung.Interpreter.Monad qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
-import Keelung.Interpreter.Typed qualified as Typed
+import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax (Elaborated)
@@ -79,7 +79,7 @@ interpret prog rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode prog
   let counters = Encoded.compCounters (Encoded.elabComp elab)
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
-  left InterpretError (Typed.run elab inputs)
+  left InterpretError (SyntaxTree.run elab inputs)
 
 -- | Given a Keelung program and a list of raw public inputs and private inputs,
 --   Generate (structured inputs, outputs, witness)
@@ -150,7 +150,7 @@ interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Eith
 interpretElab elab rawPublicInputs rawPrivateInputs = do
   let counters = Encoded.compCounters (Encoded.elabComp elab)
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
-  left InterpretError (Typed.run elab inputs)
+  left InterpretError (SyntaxTree.run elab inputs)
 
 generateWitnessElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either (Error n) (Counters, [n], Vector n)
 generateWitnessElab elab rawPublicInputs rawPrivateInputs = do

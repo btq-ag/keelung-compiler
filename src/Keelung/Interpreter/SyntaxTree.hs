@@ -5,7 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Keelung.Interpreter.Typed (runAndOutputWitnesses, run, interpretDivMod) where
+module Keelung.Interpreter.SyntaxTree (runAndOutputWitnesses, run, interpretDivMod) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -252,6 +252,31 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
     Field e -> interpret e
     UInt e -> interpret e
     Array xs -> concat <$> mapM interpret xs
+
+--------------------------------------------------------------------------------
+
+instance GaloisField n => Interpret () n where
+  interpret val = case val of
+    () -> return []
+
+instance (Interpret t1 n, Interpret t2 n, GaloisField n) => Interpret (t1, t2) n where
+  interpret (a, b) = liftM2 (<>) (interpret a) (interpret b)
+
+instance (Interpret t n, GaloisField n) => Interpret [t] n where
+  interpret xs = concat <$> mapM interpret xs
+
+-- instance (GaloisField n, Integral n) => Interpret (ArrM t) n where
+--   interpret val = case val of
+--     ArrayRef _elemType _len addr -> do
+--       heap <- ask
+--       case IntMap.lookup addr heap of
+--         Nothing -> error "[ panic ] address not found when trying to read heap"
+--         Just (elemType, vars) -> case elemType of
+--           ElemF -> interpret $ map VarF (toList vars)
+--           ElemB -> interpret $ map VarB (toList vars)
+--           ElemU width -> mapM (lookupU width) (toList vars)
+--           ElemArr elemType' len -> concat <$> mapM (interpret . ArrayRef elemType' len) (toList vars)
+--           EmptyArr -> return []
 
 --------------------------------------------------------------------------------
 

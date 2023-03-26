@@ -19,7 +19,7 @@ import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.ConstraintSystem qualified as Relocated
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
-import Keelung.Interpreter.Kinded qualified as Kinded
+import Keelung.Data.VarGroup qualified as PartialBinding
 import Keelung.Interpreter.Monad hiding (Error)
 import Keelung.Interpreter.Monad qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
@@ -28,22 +28,15 @@ import Keelung.Interpreter.Typed qualified as Typed
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
-import qualified Keelung.Data.VarGroup as PartialBinding
 
 run :: IO ()
 run = hspec tests
 
 --------------------------------------------------------------------------------
 
--- | syntax tree interpreters
-kinded :: (GaloisField n, Integral n, Encode t, Interpret t n) => Comp t -> [n] -> [n] -> Either (Error n) [n]
-kinded prog rawPublicInputs rawPrivateInputs = do
-  elab <- left LangError (elaborate prog)
-  inputs <- left (InterpretError . InputError) (Inputs.deserialize (compCounters (elabComp elab)) rawPublicInputs rawPrivateInputs)
-  left InterpretError (Kinded.run elab inputs)
-
-typed :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
-typed prog rawPublicInputs rawPrivateInputs = do
+-- | syntax tree interpreter
+interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
+interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborateAndEncode prog)
   inputs <- left (InterpretError . InputError) (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
   left InterpretError (Typed.run elab inputs)
@@ -76,12 +69,10 @@ r1csO0New prog rawPublicInputs rawPrivateInputs = do
 --------------------------------------------------------------------------------
 
 -- | Expect all interpreters to return the same output
-runAll' :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Bool -> Comp t -> [n] -> [n] -> [n] -> IO ()
+runAll' :: (GaloisField n, Integral n, Encode t, Show t) => Bool -> Comp t -> [n] -> [n] -> [n] -> IO ()
 runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs expected = do
-  -- syntax tree interpreters
-  kinded program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right expected
-  typed program rawPublicInputs rawPrivateInputs
+  -- syntax tree interpreter
+  interpretSyntaxTree program rawPublicInputs rawPrivateInputs
     `shouldBe` Right expected
   -- constraint system interpreters
   r1csNew program rawPublicInputs rawPrivateInputs
@@ -94,12 +85,10 @@ runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs expected = d
       `shouldBe` Right expected
 
 -- | Expect all interpreters to throw an error
-throwAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> Interpreter.Error n -> Interpreter.Error n -> IO ()
+throwAll :: (GaloisField n, Integral n, Encode t, Show t) => Comp t -> [n] -> [n] -> Interpreter.Error n -> Interpreter.Error n -> IO ()
 throwAll program rawPublicInputs rawPrivateInputs stError csError = do
   -- syntax tree interpreters
-  kinded program rawPublicInputs rawPrivateInputs
-    `shouldBe` Left (InterpretError stError)
-  typed program rawPublicInputs rawPrivateInputs
+  interpretSyntaxTree program rawPublicInputs rawPrivateInputs
     `shouldBe` Left (InterpretError stError)
   -- constraint system interpreters
   r1csNew program rawPublicInputs rawPrivateInputs
@@ -108,17 +97,15 @@ throwAll program rawPublicInputs rawPrivateInputs stError csError = do
     `shouldBe` Left (InterpretError csError)
 
 -- | Expect all interpreters to return the same output
-runAll :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
+runAll :: (GaloisField n, Integral n, Encode t, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
 runAll = runAll' True
 
-runAllExceptForTheOldOptimizer :: (GaloisField n, Integral n, Encode t, Interpret t n, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
+runAllExceptForTheOldOptimizer :: (GaloisField n, Integral n, Encode t, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
 runAllExceptForTheOldOptimizer = runAll' False
 
-runAndCompare :: (GaloisField n, Integral n, Encode t, Interpret t n) => Bool -> Comp t -> [n] -> [n] -> IO ()
+runAndCompare :: (GaloisField n, Integral n, Encode t) => Bool -> Comp t -> [n] -> [n] -> IO ()
 runAndCompare enableOldOptimizer program rawPublicInputs rawPrivateInputs = do
-  let expectedOutput = kinded program rawPublicInputs rawPrivateInputs
-  typed program rawPublicInputs rawPrivateInputs
-    `shouldBe` expectedOutput
+  let expectedOutput = interpretSyntaxTree program rawPublicInputs rawPrivateInputs
   r1csNew program rawPublicInputs rawPrivateInputs
     `shouldBe` expectedOutput
   when enableOldOptimizer $
