@@ -24,9 +24,10 @@ import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.VarGroup
-import Keelung.Interpreter.Monad (Constraint (..), Error (..), integerDiv, integerMod)
+import Keelung.Interpreter.Monad (Constraint (..), Error (..))
 import Keelung.Syntax
 import Keelung.Syntax.Counters
+import Keelung.Interpreter.Arithmetics
 
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) [n]
 run r1cs inputs = fst <$> run' r1cs inputs

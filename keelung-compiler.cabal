@@ -48,6 +48,7 @@ library
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
+      Keelung.Interpreter.Arithmetics
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.Relocated
@@ -105,6 +106,7 @@ executable keelungc
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
+      Keelung.Interpreter.Arithmetics
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.Relocated
@@ -179,6 +181,7 @@ test-suite keelung-test
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
+      Keelung.Interpreter.Arithmetics
       Keelung.Interpreter.Monad
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.Relocated

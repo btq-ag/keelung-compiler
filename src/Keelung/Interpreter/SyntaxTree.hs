@@ -22,6 +22,7 @@ import Keelung.Data.VarGroup qualified as Bindings
 import Keelung.Interpreter.Monad
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Encode.Syntax
+import Keelung.Interpreter.Arithmetics
 
 --------------------------------------------------------------------------------
 

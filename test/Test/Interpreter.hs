@@ -24,7 +24,7 @@ import Keelung.Interpreter.Monad hiding (Error)
 import Keelung.Interpreter.Monad qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.Relocated qualified as Relocated
-import Keelung.Interpreter.Typed qualified as Typed
+import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
@@ -39,7 +39,7 @@ interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] ->
 interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborateAndEncode prog)
   inputs <- left (InterpretError . InputError) (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
-  left InterpretError (Typed.run elab inputs)
+  left InterpretError (SyntaxTree.run elab inputs)
 
 -- | constraint system interpreters
 r1csNew :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
