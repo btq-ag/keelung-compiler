@@ -2,10 +2,12 @@ module Keelung.Compiler.Optimize.MinimizeConstraints (run) where
 
 -- import Control.Monad.State
 
+import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
+import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
 import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
@@ -15,8 +17,8 @@ import Keelung.Compiler.ConstraintSystem
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 
-run :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
-run = snd . optimizeAddF
+run :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (ConstraintSystem n)
+run cs = snd <$> optimizeAddF cs
 
 -- optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
 -- optimizeAddF cs =
@@ -27,14 +29,14 @@ run = snd . optimizeAddF
 --         AdditiveConstraintChanged -> optimizeAddF cs'
 --         MultiplicativeConstraintChanged -> optimizeAddF cs'
 
-optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
-optimizeAddF cs =
-  let (changed, cs') = runOptiM cs goThroughAddF
-   in case changed of
-        NothingChanged -> optimizeMulF cs
-        RelationChanged -> optimizeAddF cs'
-        AdditiveConstraintChanged -> optimizeMulF cs'
-        MultiplicativeConstraintChanged -> optimizeMulF cs'
+optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (WhatChanged, ConstraintSystem n)
+optimizeAddF cs = do
+  (changed, cs') <- runOptiM cs goThroughAddF
+  case changed of
+    NothingChanged -> optimizeMulF cs
+    RelationChanged -> optimizeAddF cs'
+    AdditiveConstraintChanged -> optimizeMulF cs'
+    MultiplicativeConstraintChanged -> optimizeMulF cs'
 
 -- optimizeNEqF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
 -- optimizeNEqF cs =
@@ -45,14 +47,14 @@ optimizeAddF cs =
 --         AdditiveConstraintChanged -> optimizeMulF cs'
 --         MultiplicativeConstraintChanged -> optimizeMulF cs'
 
-optimizeMulF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
-optimizeMulF cs =
-  let (changed, cs') = runOptiM cs goThroughMulF
-   in case changed of
-        NothingChanged -> (changed, cs')
-        RelationChanged -> optimizeAddF cs'
-        AdditiveConstraintChanged -> optimizeMulF cs'
-        MultiplicativeConstraintChanged -> optimizeMulF cs'
+optimizeMulF :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (WhatChanged, ConstraintSystem n)
+optimizeMulF cs = do
+  (changed, cs') <- runOptiM cs goThroughMulF
+  case changed of
+    NothingChanged -> return (changed, cs')
+    RelationChanged -> optimizeAddF cs'
+    AdditiveConstraintChanged -> optimizeMulF cs'
+    MultiplicativeConstraintChanged -> optimizeMulF cs'
 
 goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughAddF = do
@@ -201,12 +203,12 @@ instance Monoid WhatChanged where
 
 ------------------------------------------------------------------------------
 
-type OptiM n = State (ConstraintSystem n)
+type OptiM n = StateT (ConstraintSystem n) (Except (Compile.Error n))
 
 type RoundM n = WriterT WhatChanged (OptiM n)
 
-runOptiM :: ConstraintSystem n -> OptiM n a -> (a, ConstraintSystem n)
-runOptiM cs m = runState m cs
+runOptiM :: ConstraintSystem n -> OptiM n a -> Either (Compile.Error n) (a, ConstraintSystem n)
+runOptiM cs m = runExcept (runStateT m cs)
 
 runRoundM :: RoundM n a -> OptiM n WhatChanged
 runRoundM = execWriterT
@@ -236,17 +238,16 @@ learnFromAddF poly = case PolyG.view poly of
 bindToValue :: (GaloisField n, Integral n) => RefF -> n -> RoundM n ()
 bindToValue var value = do
   markChanged RelationChanged
-  modify' $ \cs ->
-    removeOccurrences [var] $
-      cs
-        { csFieldRelations = FieldRelations.bindToValue var value (csFieldRelations cs)
-        }
+  cs <- get
+  result <- lift $ lift $ FieldRelations.bindToValue var value (csFieldRelations cs)
+  put $ removeOccurrences [var] $ cs {csFieldRelations = result}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cs <- get
-  case FieldRelations.relate var1 (slope, var2, intercept) (csFieldRelations cs) of
+  result <- lift $ lift $ FieldRelations.relate var1 (slope, var2, intercept) (csFieldRelations cs)
+  case result of
     Nothing -> return False
     Just unionFind' -> do
       markChanged RelationChanged

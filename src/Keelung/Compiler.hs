@@ -124,7 +124,7 @@ compileToModules ::
   (GaloisField n, Integral n, Encode t) =>
   Comp t ->
   Either (Error n) (ConstraintSystem n)
-compileToModules prog = elaborateAndEncode prog >>= Compile.run True . ConstantPropagation.run . Erase.run >>= return . Optimizer.optimizeNew
+compileToModules prog = elaborateAndEncode prog >>= Compile.run True . ConstantPropagation.run . Erase.run >>= left CompileError . Optimizer.optimizeNew
 
 -- | 'compile' defaults to 'compileO1'
 compile ::
@@ -171,7 +171,7 @@ compileO1OldElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n
 compileO1OldElab = Compile.run False . ConstantPropagation.run . Erase.run >=> return . Optimizer.optimizeOld . relocateConstraintSystem
 
 compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO1Elab = Compile.run True . ConstantPropagation.run . Erase.run >=> return . Relocated.renumberConstraints . relocateConstraintSystem . Optimizer.optimizeNew
+compileO1Elab = Compile.run True . ConstantPropagation.run . Erase.run >=> left CompileError . Optimizer.optimizeNew >=> return . Relocated.renumberConstraints . relocateConstraintSystem
 
 --------------------------------------------------------------------------------
 

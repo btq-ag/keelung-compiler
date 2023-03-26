@@ -13,7 +13,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
-import Keelung.Compiler.Compile.Error qualified as Relations
+import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Constraint
@@ -188,9 +188,9 @@ compileAssertionEqU a b = do
 --------------------------------------------------------------------------------
 
 -- | Monad for compilation
-type M n = StateT (ConstraintSystem n) (Except (Relations.Error n))
+type M n = StateT (ConstraintSystem n) (Except (Compile.Error n))
 
-runM :: GaloisField n => Bool -> Counters -> M n a -> Either (Relations.Error n) (ConstraintSystem n)
+runM :: GaloisField n => Bool -> Counters -> M n a -> Either (Compile.Error n) (ConstraintSystem n)
 runM useNewOptimizer counters program =
   runExcept
     ( execStateT
@@ -208,7 +208,7 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       cs <- get
-      let csFieldRelations' = FieldRelations.bindToValue x c (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.bindToValue x c (csFieldRelations cs)
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindB x c) = do
       cs <- get
@@ -220,7 +220,8 @@ add = mapM_ addOne
       put cs {csUIntRelations = csUIntRelations'}
     addOne (CVarEqF x y) = do
       cs <- get
-      case FieldRelations.relate x (1, y, 0) (csFieldRelations cs) of
+      result <- lift $ FieldRelations.relate x (1, y, 0) (csFieldRelations cs)
+      case result of
         Nothing -> return ()
         Just csFieldRelations' -> put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqB x y) = do

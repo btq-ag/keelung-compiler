@@ -21,11 +21,13 @@ module Keelung.Compiler.Compile.Relations.FieldRelations
 where
 
 import Control.DeepSeq (NFData)
+import Control.Monad.Except
 import Data.Field.Galois (GaloisField)
 import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
+import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
 import Keelung.Compiler.Constraint
@@ -147,25 +149,27 @@ relateBoolean refA (same, refB) xs = case BooleanRelations.relate refA (same, re
   Just boolRels -> xs {booleanRelations = boolRels}
 
 -- | Bind a variable to a value
-bindToValue :: (GaloisField n, Integral n) => RefF -> n -> FieldRelations n -> FieldRelations n
+bindToValue :: (GaloisField n, Integral n) => RefF -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
 bindToValue x value xs =
   case x of
-    RefBtoRefF refB -> bindBoolean refB (value == 1) xs
+    RefBtoRefF refB -> return $ bindBoolean refB (value == 1) xs
     _ ->
       case parentOf xs x of
         Root ->
           -- x does not have a parent, so it is its own root
-          xs
-            { links = Map.insert x (Nothing, value) (links xs),
-              sizes = Map.insert x 1 (sizes xs)
-            }
-        Constant _oldValue ->
-          -- x is already a root with `_oldValue` as its value
-          -- TODO: handle this kind of conflict in the future
-          -- FOR NOW: overwrite the value of x with the new value
-          xs
-            { links = Map.insert x (Nothing, value) (links xs)
-            }
+          return $
+            xs
+              { links = Map.insert x (Nothing, value) (links xs),
+                sizes = Map.insert x 1 (sizes xs)
+              }
+        Constant oldValue ->
+          if oldValue == value
+            then
+              return $
+                xs
+                  { links = Map.insert x (Nothing, value) (links xs)
+                  }
+            else throwError $ ConflictingValuesF oldValue value
         ChildOf slopeP parent interceptP ->
           -- x is a child of `parent` with slope `slopeP` and intercept `interceptP`
           --  x = slopeP * parent + interceptP
@@ -175,30 +179,31 @@ bindToValue x value xs =
           --  value - interceptP = slopeP * parent
           -- =>
           --  parent = (value - interceptP) / slopeP
-          xs
-            { links =
-                Map.insert parent (Nothing, (value - interceptP) / slopeP) $
-                  Map.insert x (Nothing, value) $
-                    links xs,
-              sizes = Map.insert x 1 (sizes xs)
-            }
+          return $
+            xs
+              { links =
+                  Map.insert parent (Nothing, (value - interceptP) / slopeP) $
+                    Map.insert x (Nothing, value) $
+                      links xs,
+                sizes = Map.insert x 1 (sizes xs)
+              }
 
-relate :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Maybe (FieldRelations n)
+relate :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relate x (0, _, intercept) xs =
   case x of
-    RefBtoRefF refB -> Just $ bindBoolean refB (intercept == 1) xs
-    _ -> Just $ bindToValue x intercept xs
+    RefBtoRefF refB -> return $ Just $ bindBoolean refB (intercept == 1) xs
+    _ -> Just <$> bindToValue x intercept xs
 relate x (slope, y, intercept) xs =
   case (x, y) of
-    (RefBtoRefF refA, RefBtoRefF refB) -> Just $ relateBoolean refA (slope == 1, refB) xs
+    (RefBtoRefF refA, RefBtoRefF refB) -> return $ Just $ relateBoolean refA (slope == 1, refB) xs
     _ -> case compare x y of
       GT -> relate' x (slope, y, intercept) xs -- x = slope * y + intercept
       LT -> relate' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
-      EQ -> Nothing
+      EQ -> return Nothing
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
-relate' :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Maybe (FieldRelations n)
+relate' :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relate' x (slope, y, intercept) xs =
   case parentOf xs x of
     Constant interceptX ->
@@ -209,7 +214,7 @@ relate' x (slope, y, intercept) xs =
       --  slope * y + intercept = interceptX
       -- =>
       --  y = (interceptX - intercept) / slope
-      Just $ bindToValue y (interceptX - intercept / slope) xs
+      Just <$> bindToValue y (interceptX - intercept / slope) xs
     ChildOf slopeX rootOfX interceptX ->
       -- x is a child of `rootOfX` with slope `slopeX` and intercept `interceptX`
       --  x = slopeX * rootOfX + interceptX
@@ -230,7 +235,7 @@ relate' x (slope, y, intercept) xs =
           --  y = interceptY
           -- =>
           --  x = slope * interceptY + intercept
-          Just $ bindToValue x (slope * interceptY + intercept) xs
+          Just <$> bindToValue x (slope * interceptY + intercept) xs
         ChildOf slopeY rootOfY interceptY ->
           -- y is a child of `rootOfY` with slope `slopeY` and intercept `interceptY`
           --  y = slopeY * rootOfY + interceptY
@@ -239,18 +244,20 @@ relate' x (slope, y, intercept) xs =
           --  x = slope * (slopeY * rootOfY + interceptY) + intercept
           -- =>
           --  x = slope * slopeY * rootOfY + slope * interceptY + intercept
-          Just $
-            xs
-              { links = Map.insert x (Just (slope * slopeY, rootOfY), slope * interceptY + intercept) (links xs),
-                sizes = Map.insertWith (+) y 1 (sizes xs)
-              }
+          return $
+            Just $
+              xs
+                { links = Map.insert x (Just (slope * slopeY, rootOfY), slope * interceptY + intercept) (links xs),
+                  sizes = Map.insertWith (+) y 1 (sizes xs)
+                }
         Root ->
           -- y does not have a parent, so it is its own root
-          Just $
-            xs
-              { links = Map.insert x (Just (slope, y), intercept) (links xs),
-                sizes = Map.insertWith (+) y 1 (sizes xs)
-              }
+          return $
+            Just $
+              xs
+                { links = Map.insert x (Just (slope, y), intercept) (links xs),
+                  sizes = Map.insertWith (+) y 1 (sizes xs)
+                }
 
 toMap :: FieldRelations n -> Map RefF (Maybe (n, RefF), n)
 toMap = links

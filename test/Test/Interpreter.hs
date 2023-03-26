@@ -16,6 +16,7 @@ import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
+import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintSystem qualified as Relocated
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
@@ -84,16 +85,16 @@ runAll' enableOldOptimizer program rawPublicInputs rawPrivateInputs expected = d
       `shouldBe` Right expected
 
 -- | Expect all interpreters to throw an error
-throwAll :: (GaloisField n, Integral n, Encode t, Show t) => Comp t -> [n] -> [n] -> Interpreter.Error n -> Interpreter.Error n -> IO ()
+throwAll :: (GaloisField n, Integral n, Encode t, Show t) => Comp t -> [n] -> [n] -> Interpreter.Error n -> Error n -> IO ()
 throwAll program rawPublicInputs rawPrivateInputs stError csError = do
   -- syntax tree interpreters
   interpretSyntaxTree program rawPublicInputs rawPrivateInputs
     `shouldBe` Left (InterpretError stError)
   -- constraint system interpreters
   r1csNew program rawPublicInputs rawPrivateInputs
-    `shouldBe` Left (InterpretError csError)
+    `shouldBe` Left csError
   r1csO0New program rawPublicInputs rawPrivateInputs
-    `shouldBe` Left (InterpretError csError)
+    `shouldBe` Left csError
 
 -- | Expect all interpreters to return the same output
 runAll :: (GaloisField n, Integral n, Encode t, Show t) => Comp t -> [n] -> [n] -> [n] -> IO ()
@@ -131,7 +132,7 @@ tests = do
           []
           []
           (Interpreter.InputError (Inputs.PublicInputSizeMismatch 1 0) :: Interpreter.Error GF181)
-          (Interpreter.InputError (Inputs.PublicInputSizeMismatch 1 0) :: Interpreter.Error GF181)
+          (InterpretError (Interpreter.InputError (Inputs.PublicInputSizeMismatch 1 0)) :: Error GF181)
 
       it "missing 1 private input" $ do
         let program = complement <$> inputBool Private
@@ -140,9 +141,9 @@ tests = do
           []
           []
           (Interpreter.InputError (Inputs.PrivateInputSizeMismatch 1 0) :: Interpreter.Error GF181)
-          (Interpreter.InputError (Inputs.PrivateInputSizeMismatch 1 0) :: Interpreter.Error GF181)
+          (InterpretError (Interpreter.InputError (Inputs.PrivateInputSizeMismatch 1 0)) :: Error GF181)
 
-      it "assert (1 = 2)" $ do
+      it "assert (1 = 2) (Field)" $ do
         let program = do
               assert (1 `eq` (2 :: Field))
         throwAll
@@ -150,7 +151,7 @@ tests = do
           []
           []
           (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2" PartialBinding.emptyPartial :: Interpreter.Error GF181)
-          (Interpreter.R1CSError $ R1CS.AssertionError "" mempty :: Interpreter.Error GF181)
+          (CompileError (Compile.ConflictingValuesF 1 2) :: Error GF181)
 
     describe "Boolean" $ do
       it "not 1" $ do

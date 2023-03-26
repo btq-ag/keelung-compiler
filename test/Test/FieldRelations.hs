@@ -1,5 +1,6 @@
 module Test.FieldRelations (tests, run) where
 
+import Control.Monad.Except
 import Control.Monad.State
 import Keelung hiding (run)
 import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
@@ -60,7 +61,10 @@ runM p = evalStateT p FieldRelations.new
 relate :: RefF -> (GF181, RefF, GF181) -> M ()
 relate var val = do
   xs <- get
-  forM_ (FieldRelations.relate var val xs) put
+  case runExcept (FieldRelations.relate var val xs) of
+    Left err -> error $ show err
+    Right Nothing -> return ()
+    Right (Just result) -> put result
 
 -- | Assert that `var1 = slope * var2 + intercept`
 assertRelation :: RefF -> GF181 -> RefF -> GF181 -> M ()
