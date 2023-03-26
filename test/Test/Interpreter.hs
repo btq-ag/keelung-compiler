@@ -20,8 +20,7 @@ import Keelung.Compiler.ConstraintSystem qualified as Relocated
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Data.VarGroup qualified as PartialBinding
-import Keelung.Interpreter.Monad hiding (Error)
-import Keelung.Interpreter.Monad qualified as Interpreter
+import Keelung.Interpreter.Error qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.Relocated qualified as Relocated
 import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
@@ -38,22 +37,22 @@ run = hspec tests
 interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborateAndEncode prog)
-  inputs <- left (InterpretError . InputError) (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
-  left InterpretError (SyntaxTree.run elab inputs)
+  inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
+  left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
 -- | constraint system interpreters
 r1csNew :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csNew prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> Compiler.compileO1 prog
-  inputs <- left (InterpretError . InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
+  inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case R1CS.run r1cs inputs of
-    Left err -> Left (InterpretError err)
+    Left err -> Left (InterpretError $ Interpreter.R1CSError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
 r1csOld :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csOld prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> Compiler.compileO1Old prog
-  inputs <- left (InterpretError . InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
+  inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case Relocated.run r1cs inputs of
     Left err -> Left (ExecError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
@@ -61,9 +60,9 @@ r1csOld prog rawPublicInputs rawPrivateInputs = do
 r1csO0New :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
 r1csO0New prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS . Relocated.relocateConstraintSystem <$> Compiler.compileO0 prog
-  inputs <- left (InterpretError . InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
+  inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case R1CS.run r1cs inputs of
-    Left err -> Left (InterpretError err)
+    Left err -> Left (InterpretError $ Interpreter.R1CSError err)
     Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
 
 --------------------------------------------------------------------------------
@@ -131,8 +130,8 @@ tests = do
           program
           []
           []
-          (InputError (Inputs.PublicInputSizeMismatch 1 0) :: Interpreter.Error GF181)
-          (InputError (Inputs.PublicInputSizeMismatch 1 0) :: Interpreter.Error GF181)
+          (Interpreter.InputError (Inputs.PublicInputSizeMismatch 1 0) :: Interpreter.Error GF181)
+          (Interpreter.InputError (Inputs.PublicInputSizeMismatch 1 0) :: Interpreter.Error GF181)
 
       it "missing 1 private input" $ do
         let program = complement <$> inputBool Private
@@ -140,8 +139,8 @@ tests = do
           program
           []
           []
-          (InputError (Inputs.PrivateInputSizeMismatch 1 0) :: Interpreter.Error GF181)
-          (InputError (Inputs.PrivateInputSizeMismatch 1 0) :: Interpreter.Error GF181)
+          (Interpreter.InputError (Inputs.PrivateInputSizeMismatch 1 0) :: Interpreter.Error GF181)
+          (Interpreter.InputError (Inputs.PrivateInputSizeMismatch 1 0) :: Interpreter.Error GF181)
 
       it "assert (1 = 2)" $ do
         let program = do
@@ -150,8 +149,8 @@ tests = do
           program
           []
           []
-          (AssertionError "1 = 2" PartialBinding.emptyPartial :: Interpreter.Error GF181)
-          (AssertionError' "" mempty :: Interpreter.Error GF181)
+          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2" PartialBinding.emptyPartial :: Interpreter.Error GF181)
+          (Interpreter.R1CSError $ R1CS.AssertionError "" mempty :: Interpreter.Error GF181)
 
     describe "Boolean" $ do
       it "not 1" $ do

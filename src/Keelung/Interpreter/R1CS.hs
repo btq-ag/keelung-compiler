@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Interpreter.R1CS (run, run') where
+module Keelung.Interpreter.R1CS (run, run', Error (..)) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -12,22 +12,19 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Data.Validation (toEither)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Data.VarGroup
-import Keelung.Interpreter.Monad (Constraint (..), Error (..))
+import Keelung.Interpreter.Arithmetics
+import Keelung.Interpreter.R1CS.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Interpreter.Arithmetics
 
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) [n]
 run r1cs inputs = fst <$> run' r1cs inputs
@@ -83,7 +80,7 @@ goThroughManyTimes constraints = do
     -- stuck
     Stuck _ -> do
       context <- get
-      throwError (R1CSStuckError context (toList constraints))
+      throwError (StuckError context (toList constraints))
 
 -- Go through a sequence of constraints
 goThroughOnce :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n (Result (Seq (Constraint n)))
@@ -197,23 +194,6 @@ shrinkCNEQ (CNEQ (Right a) (Right b) m) = do
     else do
       bindVar m (recip (a - b))
   return Eliminated
-
---------------------------------------------------------------------------------
-
--- | The interpreter monad
-type M n = StateT (IntMap n) (Except (Error n))
-
-runM :: (GaloisField n, Integral n) => Inputs n -> M n a -> Either (Error n) (Vector n)
-runM inputs p =
-  let counters = Inputs.inputCounters inputs
-   in case runExcept (execStateT p (Inputs.toIntMap inputs)) of
-        Left err -> Left err
-        Right bindings -> case toEither $ toTotal' (getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters, bindings) of
-          Left unbound -> Left (VarUnassignedError' unbound)
-          Right bindings' -> Right bindings'
-
-bindVar :: Var -> n -> M n ()
-bindVar var val = modify' $ IntMap.insert var val
 
 --------------------------------------------------------------------------------
 

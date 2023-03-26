@@ -49,10 +49,12 @@ library
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
       Keelung.Interpreter.Arithmetics
-      Keelung.Interpreter.Monad
+      Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
+      Keelung.Interpreter.R1CS.Monad
       Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
+      Keelung.Interpreter.SyntaxTree.Monad
   other-modules:
       Paths_keelung_compiler
   hs-source-dirs:
@@ -107,10 +109,12 @@ executable keelungc
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
       Keelung.Interpreter.Arithmetics
-      Keelung.Interpreter.Monad
+      Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
+      Keelung.Interpreter.R1CS.Monad
       Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
+      Keelung.Interpreter.SyntaxTree.Monad
       AggregateSignature.Program
       AggregateSignature.Util
       Basic
@@ -182,10 +186,12 @@ test-suite keelung-test
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
       Keelung.Interpreter.Arithmetics
-      Keelung.Interpreter.Monad
+      Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
+      Keelung.Interpreter.R1CS.Monad
       Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
+      Keelung.Interpreter.SyntaxTree.Monad
       AggregateSignature.Program
       AggregateSignature.Util
       Basic

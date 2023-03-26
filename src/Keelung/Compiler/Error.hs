@@ -9,7 +9,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Compiler.R1CS (ExecError)
 import qualified Keelung.Error as Lang
-import qualified Keelung.Interpreter.Monad as Interpreter
+import qualified Keelung.Interpreter.Error as Interpreter
 
 data Error n
   = ExecError (ExecError n)

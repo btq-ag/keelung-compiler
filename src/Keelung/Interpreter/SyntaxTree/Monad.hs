@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Interpreter.Monad where
+module Keelung.Interpreter.SyntaxTree.Monad where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
@@ -13,53 +13,15 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
-import Data.IntSet (IntSet)
-import Data.IntSet qualified as IntSet
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
-import Keelung.Constraint.R1C (R1C)
-import Keelung.Constraint.R1CS (CNEQ)
-import Keelung.Data.BinRep (BinRep)
 import Keelung.Data.VarGroup
 import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Heap
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-
---------------------------------------------------------------------------------
-
-data Constraint n
-  = R1CConstraint (R1C n)
-  | CNEQConstraint (CNEQ n)
-  | -- | Dividend, Divisor, Quotient, Remainder
-    DivModConstaint (Var, Var, Var, Var)
-  | BinRepConstraint BinRep
-  deriving (Eq, Generic, NFData)
-
-instance Serialize n => Serialize (Constraint n)
-
-instance (GaloisField n, Integral n) => Show (Constraint n) where
-  show (R1CConstraint r1c) = show r1c
-  show (CNEQConstraint cneq) = "(CNEQ)    " <> show cneq
-  show (DivModConstaint (dividend, divisor, quotient, remainder)) =
-    "(DivMod)  $"
-      <> show dividend
-      <> " = $"
-      <> show divisor
-      <> " * $"
-      <> show quotient
-      <> " + $"
-      <> show remainder
-  show (BinRepConstraint binRep) = "(BinRep)  " <> show binRep
-
-instance Functor Constraint where
-  fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
-  fmap f (CNEQConstraint cneq) = CNEQConstraint (fmap f cneq)
-  fmap _ (DivModConstaint dm) = DivModConstaint dm
-  fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
 
 --------------------------------------------------------------------------------
 
@@ -171,13 +133,9 @@ class FreeVar a where
 data Error n
   = VarUnboundError String Var
   | VarUnassignedError (VarSet n)
-  | ResultSizeError Int Int -- for syntax trees
-  | StuckError String [Var] -- for syntax trees
-  | VarUnassignedError' IntSet -- R1CS
+  | ResultSizeError Int Int
+  | StuckError String [Var]
   | AssertionError String (Partial n)
-  | AssertionError' String (IntMap n) -- R1CS
-  | R1CSStuckError (IntMap n) [Constraint n] -- R1CS
-  | InputError Inputs.Error
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -195,26 +153,9 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> showList' (map (\x -> "$" <> show x) vars)
       <> " are not known "
       <> msg
-  show (VarUnassignedError' unboundVariables) =
-    "these variables have no bindings:\n  "
-      ++ showList' (map (\var -> "$" <> show var) $ IntSet.toList unboundVariables)
   show (AssertionError expr bindings) =
     "assertion failed: "
       <> expr
       <> if partialIsEmpty bindings
         then ""
         else "\nbindings of free variables in the assertion:\n" <> show bindings
-  show (AssertionError' expr bindings) =
-    "assertion failed: "
-      <> expr
-      <> if IntMap.null bindings
-        then ""
-        else
-          "\nbindings of free variables in the assertion:\n"
-            <> showList' (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList bindings))
-  show (R1CSStuckError context constraints) =
-    "stuck when trying to solve these constraints: \n"
-      <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints
-      <> "while these variables have been solved: \n"
-      <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList context)
-  show (InputError err) = show err
