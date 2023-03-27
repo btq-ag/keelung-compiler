@@ -231,7 +231,7 @@ data TypeErased n = TypeErased
     -- | Variable bookkeepung
     erasedCounters :: !Counters,
     -- | Relations between variables and/or expressions
-    erasedRelations :: !(Relations n),
+    -- erasedRelations :: !(Relations n),
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
     -- | Side effects
@@ -239,14 +239,14 @@ data TypeErased n = TypeErased
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ counters relations assertions _sideEffects) =
+  show (TypeErased expr _ counters  assertions _sideEffects) =
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
       <> show (map (fmap N . snd) expr)
       <> "\n"
       -- relations
-      <> indent (show relations)
+      -- <> indent (show relations)
       <> ( if length assertions < 20
              then "  assertions:\n    " <> show assertions <> "\n"
              else ""

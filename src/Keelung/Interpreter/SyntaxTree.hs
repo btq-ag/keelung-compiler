@@ -16,7 +16,6 @@ import Data.Foldable (toList)
 import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Data.Struct
 import Keelung.Data.VarGroup
 import Keelung.Data.VarGroup qualified as Bindings
 import Keelung.Interpreter.Arithmetics
@@ -271,11 +270,15 @@ instance FreeVar Elaborated where
 instance FreeVar Computation where
   freeVars context =
     mconcat
-      [ mconcat $ map freeVars (toList (structF (compExprBindings context))),
-        mconcat $ map freeVars (toList (structB (compExprBindings context))),
-        mconcat $ concatMap (map freeVars . toList) (toList (structU (compExprBindings context))),
+      [ mconcat $ map freeVars (toList (compSideEffects context)),
         mconcat $ map freeVars (toList (compAssertions context))
       ]
+
+instance FreeVar SideEffect where
+  freeVars (AssignmentF var field) = modifyX (modifyF (IntSet.insert var)) (freeVars field)
+  freeVars (AssignmentB var bool) = modifyX (modifyB (IntSet.insert var)) (freeVars bool)
+  freeVars (AssignmentU width var uint) = modifyX (modifyU width mempty (IntSet.insert var)) (freeVars uint)
+  freeVars (DivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
 
 instance FreeVar Boolean where
   freeVars expr = case expr of

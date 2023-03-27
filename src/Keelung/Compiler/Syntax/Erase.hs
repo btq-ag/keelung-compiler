@@ -6,14 +6,13 @@ import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
-import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax qualified as T
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation counters eb assertions _divModRelsU sideEffects = comp
+  let T.Computation counters assertions sideEffects = comp
       proxy = 0
       numBitWidth = bitSize proxy
    in runM counters numBitWidth $ do
@@ -21,13 +20,13 @@ run (T.Elaborated expr comp) =
         exprs <- eraseExprAndAllocOutputVar expr
         sameType proxy exprs
         assertions' <- concat <$> mapM eraseExpr assertions
-        relations <-
-          Relations mempty
-            <$> ( Struct
-                    <$> mapM eraseExprF (structF eb)
-                    <*> mapM eraseExprB (structB eb)
-                    <*> mapM (mapM eraseExprU) (structU eb)
-                )
+        -- relations <-
+        --   Relations mempty
+        --     <$> ( Struct
+        --             <$> mapM eraseExprF (structF eb)
+        --             <*> mapM eraseExprB (structB eb)
+        --             <*> mapM (mapM eraseExprU) (structU eb)
+        --         )
         counters' <- get
 
         sideEffects' <- mapM eraseSideEffect sideEffects
@@ -37,7 +36,7 @@ run (T.Elaborated expr comp) =
             { erasedExpr = exprs,
               erasedFieldBitWidth = numBitWidth,
               erasedCounters = counters',
-              erasedRelations = relations,
+              -- erasedRelations = relations,
               erasedAssertions = assertions',
               erasedSideEffects = sideEffects'
             }
