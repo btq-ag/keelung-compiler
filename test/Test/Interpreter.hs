@@ -622,13 +622,15 @@ tests = do
               assert (x `eq` 3)
         runAll program [3 :: GF181] [] []
 
-      -- it "assert 2" $ do
-      --   let program = do
-      --         x <- inputUInt @4 Public
-      --         result <- reuse $ x `neq` 3
-      --         assert result
-      --         return result
-      --   runAllExceptForTheOldOptimizer program [0 :: GF181] [] [1]
+      it "assertions intertwined with assignments" $ do
+        let program = do
+              xs <- thaw [0 :: Field]
+              x0 <- accessM xs 0
+              assert (x0 `eq` 0)
+              updateM xs 0 1
+              x1 <- accessM xs 0
+              assert (x1 `eq` 1)
+        runAll program [] [] ([] :: [GF181])
 
       it "Basic.summation2" $
         forAll (vector 4) $ \inp -> do

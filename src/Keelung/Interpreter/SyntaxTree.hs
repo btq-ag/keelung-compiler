@@ -29,43 +29,6 @@ import Keelung.Syntax.Encode.Syntax
 -- | Interpret a program with inputs and return outputs along with the witness
 runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) ([n], Witness n)
 runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
-  -- interpret assignments of values first
-  -- fs <-
-  --   filterM
-  --     ( \(var, e) -> case e of
-  --         ValF val -> interpret val >>= addF var >> return False
-  --         _ -> return True
-  --     )
-  --     (IntMap.toList (structF (compExprBindings comp)))
-  -- bs <-
-  --   filterM
-  --     ( \(var, e) -> case e of
-  --         ValB val -> interpret val >>= addB var >> return False
-  --         _ -> return True
-  --     )
-  --     (IntMap.toList (structB (compExprBindings comp)))
-  -- us <-
-  --   mapM
-  --     ( \(width, xs) ->
-  --         (width,)
-  --           <$> filterM
-  --             ( \(var, e) -> case e of
-  --                 ValU _ val -> interpret val >>= addU width var >> return False
-  --                 _ -> return True
-  --             )
-  --             (IntMap.toList xs)
-  --     )
-  --     (IntMap.toList (structU (compExprBindings comp)))
-
-  -- -- interpret the rest of the assignments
-  -- forM_ fs $ \(var, e) -> interpret e >>= addF var
-  -- forM_ bs $ \(var, e) -> interpret e >>= addB var
-  -- forM_ us $ \(width, xs) ->
-  --   forM_ xs $ \(var, e) -> interpret e >>= addU width var
-
-  -- interpret div/mod statements
-  -- forM_ (IntMap.toList (compDivModRelsU comp)) $ \(width, xs) -> forM_ (reverse xs) (interpretDivMod width)
-
   -- interpret side-effects
   forM_ (compSideEffects comp) $ \sideEffect -> void $ interpret sideEffect
 

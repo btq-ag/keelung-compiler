@@ -13,7 +13,7 @@ import Keelung.Syntax.Encode.Syntax qualified as T
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation counters eb assertions divModRelsU sideEffects = comp
+  let T.Computation counters eb assertions _divModRelsU sideEffects = comp
       proxy = 0
       numBitWidth = bitSize proxy
    in runM counters numBitWidth $ do
@@ -28,9 +28,6 @@ run (T.Elaborated expr comp) =
                     <*> mapM eraseExprB (structB eb)
                     <*> mapM (mapM eraseExprU) (structU eb)
                 )
-        -- divModRelsU' <- undefined
-        divModRelsU' <- mapM (mapM (\(dividend, divisor, quotient, remainder) -> (,,,) <$> eraseExprU dividend <*> eraseExprU divisor <*> eraseExprU quotient <*> eraseExprU remainder)) divModRelsU
-
         counters' <- get
 
         sideEffects' <- mapM eraseSideEffect sideEffects
@@ -42,7 +39,6 @@ run (T.Elaborated expr comp) =
               erasedCounters = counters',
               erasedRelations = relations,
               erasedAssertions = assertions',
-              erasedDivModRelsU = divModRelsU',
               erasedSideEffects = sideEffects'
             }
   where

@@ -28,7 +28,7 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => Bool -> TypeErased n -> Either (Error n) (ConstraintSystem n)
-run useNewOptimizer (TypeErased untypedExprs _ counters _ assertions _ sideEffects) = left CompileError $ runM useNewOptimizer counters $ do
+run useNewOptimizer (TypeErased untypedExprs _ counters _ assertions sideEffects) = left CompileError $ runM useNewOptimizer counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -41,17 +41,11 @@ run useNewOptimizer (TypeErased untypedExprs _ counters _ assertions _ sideEffec
         let out = RefUO (widthOfU x) var
         compileExprU out x
 
-  -- -- compile all relations to constraints
-  -- compileRelations relations
-
   -- compile assertions to constraints
   mapM_ compileAssertion assertions
 
   -- compile all side effects
   mapM_ compileSideEffect sideEffects
-
--- -- compile DivMod relations to constraints
--- mapM_ (\(width, xs) -> mapM (\(dividend, divisor, quotient, remainder) -> compileDivModU width dividend divisor quotient remainder) xs) (IntMap.toList divModRelsU)
 
 -- | Compile side effects
 compileSideEffect :: (GaloisField n, Integral n) => SideEffect n -> M n ()
