@@ -386,6 +386,14 @@ tests = do
         runAllExceptForTheOldOptimizer program [7 :: GF181] [20] [2, 6]
         runAllExceptForTheOldOptimizer program [4 :: GF181] [4] [1, 0]
 
+      it "performDivMod (on constants) (issue #18)" $ do
+        let program = performDivMod 7 (3 :: UInt 4)
+        runAllExceptForTheOldOptimizer program [] [] [2, 1 :: GF181]
+
+      -- it "assertDivMod (on constants) (issue #18)" $ do
+      --   let program = assertDivMod 7 (3 :: UInt 4) 2 1
+      --   runAllExceptForTheOldOptimizer program [] [] ([] :: [GF181])
+
       it "assertDivMod (multiple statements)" $ do
         let program = do
               a <- input Public :: Comp (UInt 5)

@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Keelung.Interpreter.SyntaxTree.Monad where
@@ -102,14 +103,23 @@ lookupBI = lookupVar "BI" (getB . ofI)
 lookupBP :: (GaloisField n, Integral n) => Var -> M n n
 lookupBP = lookupVar "BP" (getB . ofP)
 
+lookupVarU :: (GaloisField n, Integral n) => String -> (VarGroups (VarGroup (PartialBinding n)) -> VarGroup (PartialBinding n)) -> Width -> Var -> M n n
+lookupVarU prefix selector w var = do
+  gets (getU w . selector) >>= \case
+    Nothing -> throwError $ VarUnboundError prefix var
+    Just (_, f) -> do
+      case IntMap.lookup var f of
+        Nothing -> throwError $ VarUnboundError prefix var
+        Just val -> return val
+
 lookupU :: (GaloisField n, Integral n) => Width -> Var -> M n n
-lookupU w = lookupVar ("U" <> toSubscript w) (unsafeLookup . getU w . ofX)
+lookupU w = lookupVarU ("U" <> toSubscript w) ofX w
 
 lookupUI :: (GaloisField n, Integral n) => Width -> Var -> M n n
-lookupUI w = lookupVar ("UI" <> toSubscript w) (unsafeLookup . getU w . ofI)
+lookupUI w = lookupVarU ("UI" <> toSubscript w) ofI w
 
 lookupUP :: (GaloisField n, Integral n) => Width -> Var -> M n n
-lookupUP w = lookupVar ("UP" <> toSubscript w) (unsafeLookup . getU w . ofP)
+lookupUP w = lookupVarU ("UP" <> toSubscript w) ofP w
 
 -- | TODO: remove this
 unsafeLookup :: Maybe a -> a
