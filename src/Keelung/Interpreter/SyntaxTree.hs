@@ -15,6 +15,8 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
+import Debug.Trace
+import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup
@@ -77,7 +79,7 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
       bindings <- get
       let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
-      throwError $ AssertionError (show e) bindingsInExpr
+      throwError $ AssertionError bindingsInExpr (show e)
 
   -- lastly interpret the expression and return the result
   interpret expr
@@ -114,23 +116,39 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
       divisor <- analyze divisorExpr
       quotient <- analyze quotientExpr
       remainder <- analyze remainderExpr
+      traceShowM (dividendVal, divisor, quotient, remainder)
       case (divisor, quotient, remainder) of
+        (Right divisorVal, Right actualQuotientVal, Right actualRemainderVal) -> do
+          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          if expectedQuotientVal == actualQuotientVal
+            then return ()
+            else throwError $ DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
+          if expectedRemainderVal == actualRemainderVal
+            then return ()
+            else throwError $ DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
         (Right divisorVal, Left quotientVar, Left remainderVar) -> do
           let quotientVal = dividendVal `integerDiv` divisorVal
               remainderVal = dividendVal `integerMod` divisorVal
           addU width quotientVar [quotientVal]
           addU width remainderVar [remainderVal]
-        (Right divisorVal, Left quotientVar, Right _) -> do
+        (Right divisorVal, Left quotientVar, Right actualRemainderVal) -> do
           let quotientVal = dividendVal `integerDiv` divisorVal
-          addU width quotientVar [quotientVal]
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          if expectedRemainderVal == actualRemainderVal
+            then addU width quotientVar [quotientVal]
+            else throwError $ DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
         (Left divisorVar, Right quotientVal, Left remainderVar) -> do
           let divisorVal = dividendVal `integerDiv` quotientVal
               remainderVal = dividendVal `integerMod` divisorVal
           addU width divisorVar [divisorVal]
           addU width remainderVar [remainderVal]
-        (Left divisorVar, Right quotientVal, Right _) -> do
+        (Left divisorVar, Right quotientVal, Right actualRemainderVal) -> do
           let divisorVal = dividendVal `integerDiv` quotientVal
-          addU width divisorVar [divisorVal]
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          if expectedRemainderVal == actualRemainderVal
+            then addU width divisorVar [divisorVal]
+            else throwError $ DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
         _ -> do
           let unsolvedVars = Either.lefts [divisor, quotient, remainder]
           throwError $ StuckError "" unsolvedVars
@@ -335,9 +353,9 @@ instance FreeVar Field where
 instance FreeVar UInt where
   freeVars expr = case expr of
     ValU _ _ -> mempty
-    VarU w var -> modifyX (modifyU w (IntSet.insert var)) mempty
-    VarUI w var -> modifyI (modifyU w (IntSet.insert var)) mempty
-    VarUP w var -> modifyP (modifyU w (IntSet.insert var)) mempty
+    VarU w var -> modifyX (modifyU w mempty (IntSet.insert var)) mempty
+    VarUI w var -> modifyI (modifyU w mempty (IntSet.insert var)) mempty
+    VarUP w var -> modifyP (modifyU w mempty (IntSet.insert var)) mempty
     AddU _ x y -> freeVars x <> freeVars y
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y

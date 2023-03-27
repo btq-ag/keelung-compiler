@@ -16,6 +16,7 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Data.VarGroup
@@ -76,7 +77,7 @@ addB :: Var -> [n] -> M n ()
 addB var vals = modify (modifyX (modifyB (second (IntMap.insert var (head vals)))))
 
 addU :: Width -> Var -> [n] -> M n ()
-addU width var vals = modify (modifyX (modifyU width (second (IntMap.insert var (head vals)))))
+addU width var vals = modify (modifyX (modifyU width (0, mempty) (second (IntMap.insert var (head vals)))))
 
 lookupVar :: (GaloisField n, Integral n) => String -> (Partial n -> (Int, IntMap n)) -> Int -> M n n
 lookupVar prefix selector var = do
@@ -145,7 +146,9 @@ data Error n
   | VarUnassignedError (VarSet n)
   | ResultSizeError Int Int
   | StuckError String [Var]
-  | AssertionError String (Partial n)
+  | AssertionError (Partial n) String
+  | DivModQuotientError n n n n
+  | DivModRemainderError n n n n
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -163,9 +166,13 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> showList' (map (\x -> "$" <> show x) vars)
       <> " are not known "
       <> msg
-  show (AssertionError expr bindings) =
+  show (AssertionError bindings expr) =
     "assertion failed: "
       <> expr
       <> if partialIsEmpty bindings
         then ""
         else "\nbindings of free variables in the assertion:\n" <> show bindings
+  show (DivModQuotientError dividend divisor expected actual) =
+    "Expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
+  show (DivModRemainderError dividend divisor expected actual) =
+    "Expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"

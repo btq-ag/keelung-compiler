@@ -97,9 +97,9 @@ class HasU a u | a -> u where
   putU :: Width -> u -> a -> a
   putU width u x = putUAll (IntMap.insert width u (getUAll x)) x
 
-  modifyU :: Width -> (u -> u) -> a -> a
-  modifyU width f x = case getU width x of
-    Nothing -> x
+  modifyU :: Width -> u -> (u -> u) -> a -> a
+  modifyU width empty' f x = case getU width x of
+    Nothing -> putU width (f empty') x
     Just u -> putU width (f u) x
 
   modifyUAll :: (IntMap u -> IntMap u) -> a -> a
