@@ -15,8 +15,6 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
-import Debug.Trace
-import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup
@@ -98,12 +96,12 @@ run elab inputs = fst <$> runAndOutputWitnesses elab inputs
 interpretDivMod :: (GaloisField n, Integral n) => Width -> (UInt, UInt, UInt, UInt) -> M n ()
 interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) = do
   dividend <- analyze dividendExpr
+  divisor <- analyze divisorExpr
+  quotient <- analyze quotientExpr
+  remainder <- analyze remainderExpr
   case dividend of
     Left dividendVar -> do
       -- now that we don't know the dividend, we can only solve the relation if we know the divisor, quotient, and remainder
-      divisor <- analyze divisorExpr
-      quotient <- analyze quotientExpr
-      remainder <- analyze remainderExpr
       case (divisor, quotient, remainder) of
         (Right divisorVal, Right quotientVal, Right remainderVal) -> do
           let dividendVal = divisorVal * quotientVal + remainderVal
@@ -112,11 +110,7 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
           let unsolvedVars = dividendVar : Either.lefts [divisor, quotient, remainder]
           throwError $ StuckError "" unsolvedVars
     Right dividendVal -> do
-      -- now that we know the dividend, we can the relation if we know either the divisor or the quotient
-      divisor <- analyze divisorExpr
-      quotient <- analyze quotientExpr
-      remainder <- analyze remainderExpr
-      traceShowM (dividendVal, divisor, quotient, remainder)
+      -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisor, quotient, remainder) of
         (Right divisorVal, Right actualQuotientVal, Right actualRemainderVal) -> do
           let expectedQuotientVal = dividendVal `integerDiv` divisorVal

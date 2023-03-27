@@ -77,9 +77,13 @@ instance Functor Constraint where
 --------------------------------------------------------------------------------
 
 data Error n
-  = VarUnassignedError IntSet -- R1CS
-  | AssertionError String (IntMap n) -- R1CS
-  | StuckError (IntMap n) [Constraint n] -- R1CS
+  = VarUnassignedError IntSet
+  | AssertionError String (IntMap n)
+  | StuckError (IntMap n) [Constraint n]
+  | DivModQuotientError n n n n
+  | DivModRemainderError n n n n
+  -- | DivModMissingDivisorAndQuotientError n n
+  -- | DivModMissingDivisorAndQuotientAndRemainderError n
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -101,3 +105,11 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints
       <> "while these variables have been solved: \n"
       <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList context)
+  show (DivModQuotientError dividend divisor expected actual) =
+    "Expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
+  show (DivModRemainderError dividend divisor expected actual) =
+    "Expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
+  -- show (DivModMissingDivisorAndQuotientError dividend remainder) =
+  --   "Cannot solve the equation `" <> show (N dividend) <> " = $divisor * $quotient + `" <> show (N remainder) <> "` because both $divisor and $quotient are missing"
+  -- show (DivModMissingDivisorAndQuotientAndRemainderError dividend) =
+  --   "Cannot solve the equation `" <> show (N dividend) <> " = $divisor *  $quotient + $remainder` only the value of dividend is available"

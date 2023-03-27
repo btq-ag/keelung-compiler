@@ -95,7 +95,10 @@ shrink (CNEQConstraint cneq) = fmap (pure . CNEQConstraint) <$> shrinkCNEQ cneq
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
 
--- | Trying to reduce a DivMod constraint
+-- | Trying to reduce a DivMod constraint if any of these set of variables are known:
+--    1. dividend & divisor
+--    1. dividend & quotient
+--    2. divisor & quotient & remainder
 shrinkDivMod :: (GaloisField n, Integral n) => (Var, Var, Var, Var) -> M n (Result (Var, Var, Var, Var))
 shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
   -- check the value of the dividend first,
@@ -103,33 +106,60 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
   dividendResult <- lookupVar dividendVar
   divisorResult <- lookupVar divisorVar
   quotientResult <- lookupVar quotientVar
+  remainderResult <- lookupVar remainderVar
   case dividendResult of
     Just dividendVal -> do
-      case (divisorResult, quotientResult) of
-        -- divisor and quotient are known
-        (Just divisorVal, Just quotientVal) -> do
-          let remainderVal = dividendVal - divisorVal * quotientVal
-          bindVar remainderVar remainderVal
+      -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
+      case (divisorResult, quotientResult, remainderResult) of
+        (Just divisorVal, Just actualQuotientVal, Just actualRemainderVal) -> do
+          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          when (expectedQuotientVal /= actualQuotientVal) $
+            throwError $
+              DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
+          when (expectedRemainderVal /= actualRemainderVal) $
+            throwError $
+              DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
           return Eliminated
-        -- divisor is known, quotient is unknown
-        (Just divisorVal, Nothing) -> do
-          let quotientVal = dividendVal `integerDiv` divisorVal
-          let remainderVal = dividendVal `integerMod` divisorVal
-          bindVar quotientVar quotientVal
-          bindVar remainderVar remainderVal
+        (Just divisorVal, Just actualQuotientVal, Nothing) -> do
+          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          when (expectedQuotientVal /= actualQuotientVal) $
+            throwError $
+              DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
+          bindVar remainderVar expectedRemainderVal
           return Eliminated
-        -- divisor is unknown, quotient is known
-        (Nothing, Just quotientVal) -> do
-          let divisorVal = dividendVal `integerDiv` quotientVal
-          let remainderVal = dividendVal `integerMod` divisorVal
-          bindVar divisorVar divisorVal
-          bindVar remainderVar remainderVal
+        (Just divisorVal, Nothing, Just actualRemainderVal) -> do
+          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          when (expectedRemainderVal /= actualRemainderVal) $
+            throwError $
+              DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+          bindVar quotientVar expectedQuotientVal
           return Eliminated
-        -- divisor and quotient are unknown
-        (Nothing, Nothing) -> do
-          return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
+        (Just divisorVal, Nothing, Nothing) -> do
+          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          bindVar quotientVar expectedQuotientVal
+          bindVar remainderVar expectedRemainderVal
+          return Eliminated
+        (Nothing, Just actualQuotientVal, Just actualRemainderVal) -> do
+          let expectedDivisorVal = dividendVal `integerDiv` actualQuotientVal
+              expectedRemainderVal = dividendVal `integerMod` expectedDivisorVal
+          when (expectedRemainderVal /= actualRemainderVal) $
+            throwError $
+              DivModRemainderError dividendVal expectedDivisorVal expectedRemainderVal actualRemainderVal
+          bindVar divisorVar expectedDivisorVal
+          return Eliminated
+        (Nothing, Just actualQuotientVal, Nothing) -> do
+          let expectedDivisorVal = dividendVal `integerDiv` actualQuotientVal
+              expectedRemainderVal = dividendVal `integerMod` expectedDivisorVal
+          bindVar divisorVar expectedDivisorVal
+          bindVar remainderVar expectedRemainderVal
+          return Eliminated
+        _ -> return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
     Nothing -> do
-      remainderResult <- lookupVar remainderVar
+      -- we can only piece out the dividend if all of the divisor, quotient, and remainder are known
       case (divisorResult, quotientResult, remainderResult) of
         -- divisor, quotient, and remainder are all known
         (Just divisorVal, Just quotientVal, Just remainderVal) -> do
