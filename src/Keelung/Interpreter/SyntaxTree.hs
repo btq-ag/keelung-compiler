@@ -108,7 +108,7 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
           addU width dividendVar [dividendVal]
         _ -> do
           let unsolvedVars = dividendVar : Either.lefts [divisor, quotient, remainder]
-          throwError $ StuckError "" unsolvedVars
+          throwError $ DivModStuckError unsolvedVars
     Right dividendVal -> do
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisor, quotient, remainder) of
@@ -145,7 +145,7 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
             else throwError $ DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
         _ -> do
           let unsolvedVars = Either.lefts [divisor, quotient, remainder]
-          throwError $ StuckError "" unsolvedVars
+          throwError $ DivModStuckError unsolvedVars
   where
     analyze :: (GaloisField n, Integral n) => UInt -> M n (Either Var n)
     analyze = \case

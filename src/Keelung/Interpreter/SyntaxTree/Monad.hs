@@ -145,10 +145,10 @@ data Error n
   = VarUnboundError String Var
   | VarUnassignedError (VarSet n)
   | ResultSizeError Int Int
-  | StuckError String [Var]
   | AssertionError (Partial n) String
   | DivModQuotientError n n n n
   | DivModRemainderError n n n n
+  | DivModStuckError [Var]
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -161,11 +161,11 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       ++ show unboundVariables
   show (ResultSizeError expected actual) =
     "expecting " <> show expected <> " result(s) but got " <> show actual <> " result(s)"
-  show (StuckError msg vars) =
-    "stuck because the value of these variables "
-      <> showList' (map (\x -> "$" <> show x) vars)
-      <> " are not known "
-      <> msg
+  -- show (StuckError msg vars) =
+  --   "stuck because the value of these variables "
+  --     <> showList' (map (\x -> "$" <> show x) vars)
+  --     <> " are not known "
+  --     <> msg
   show (AssertionError bindings expr) =
     "assertion failed: "
       <> expr
@@ -173,6 +173,10 @@ instance (GaloisField n, Integral n) => Show (Error n) where
         then ""
         else "\nbindings of free variables in the assertion:\n" <> show bindings
   show (DivModQuotientError dividend divisor expected actual) =
-    "Expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
+    "expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
   show (DivModRemainderError dividend divisor expected actual) =
-    "Expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
+    "expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
+  show (DivModStuckError msg) =
+    "stuck when trying to perform Div/Mod operation because the value of these variables "
+      <> show msg
+      <> " are not known "
