@@ -212,11 +212,11 @@ add = mapM_ addOne
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindB x c) = do
       cs <- get
-      let csFieldRelations' = FieldRelations.bindBoolean x (c == 1) (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.bindBoolean x (c == 1) (csFieldRelations cs)
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindU x c) = do
       cs <- get
-      let csUIntRelations' = UIntRelations.bindToValue x c (csUIntRelations cs)
+      csUIntRelations' <- lift $ UIntRelations.bindToValue x c (csUIntRelations cs)
       put cs {csUIntRelations = csUIntRelations'}
     addOne (CVarEqF x y) = do
       cs <- get
@@ -225,12 +225,17 @@ add = mapM_ addOne
         Nothing -> return ()
         Just csFieldRelations' -> put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqB x y) = do
-      modify' $ \cs -> cs {csFieldRelations = FieldRelations.relateBoolean x (True, y) (csFieldRelations cs)}
+      cs <- get
+      csFieldRelations' <- lift $ FieldRelations.relateBoolean x (True, y) (csFieldRelations cs)
+      put $ cs {csFieldRelations = csFieldRelations'}
     addOne (CVarNEqB x y) = do
-      modify' $ \cs -> cs {csFieldRelations = FieldRelations.relateBoolean x (False, y) (csFieldRelations cs)}
+      cs <- get
+      csFieldRelations' <- lift $ FieldRelations.relateBoolean x (False, y) (csFieldRelations cs)
+      put $ cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqU x y) = do
       cs <- get
-      case UIntRelations.assertEqual x y (csUIntRelations cs) of
+      result <- lift $ UIntRelations.assertEqual x y (csUIntRelations cs)
+      case result of
         Nothing -> return ()
         Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
     addOne (CMulF x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})

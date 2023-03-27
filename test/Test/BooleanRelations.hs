@@ -1,10 +1,12 @@
 module Test.BooleanRelations (tests, run) where
 
+import Control.Monad.Except
 import Control.Monad.State
-import Data.Maybe qualified as Maybe
+import Keelung.Compiler.Compile.Error (Error)
 import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
 import Keelung.Compiler.Constraint (RefB (..))
+import Keelung.Field (GF181)
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
 import Test.QuickCheck (Arbitrary (arbitrary))
@@ -97,11 +99,17 @@ runM p = evalStateT p BooleanRelations.new
 relate :: RefB -> (Bool, RefB) -> M ()
 relate var val = do
   xs <- get
-  forM_ (BooleanRelations.relate var val xs) put
+  case runExcept (BooleanRelations.relate var val xs) of
+    Left err -> error $ show (err :: Error GF181)
+    Right Nothing -> return ()
+    Right (Just result) -> put result
 
 bindToValue :: RefB -> Bool -> M ()
 bindToValue var val = do
-  modify' $ BooleanRelations.bindToValue var val
+  xs <- get
+  case runExcept (BooleanRelations.bindToValue var val xs) of
+    Left err -> error $ show (err :: Error GF181)
+    Right result -> put result
 
 -- | Assert that `var1 = slope * var2 + intercept`
 assertRelation :: RefB -> RefB -> Maybe Bool -> M ()
@@ -124,7 +132,10 @@ instance Arbitrary BooleanRelations where
 
     return $ foldl go BooleanRelations.new relations
     where
-      go xs (var, slope, ref) = Maybe.fromMaybe xs (BooleanRelations.relate var (slope, ref) xs)
+      go xs (var, slope, ref) = case runExcept (BooleanRelations.relate var (slope, ref) xs) of
+        Left err -> error $ show (err :: Error GF181)
+        Right Nothing -> xs
+        Right (Just result) -> result
 
 instance Arbitrary RefB where
   arbitrary = RefB <$> arbitrary

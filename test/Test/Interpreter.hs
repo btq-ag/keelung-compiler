@@ -153,6 +153,26 @@ tests = do
           (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2" PartialBinding.emptyPartial :: Interpreter.Error GF181)
           (CompileError (Compile.ConflictingValuesF 1 2) :: Error GF181)
 
+      it "assert (true = false) (Boolean)" $ do
+        let program = do
+              assert (true `eq` false)
+        throwAll
+          program
+          []
+          []
+          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "True = False" PartialBinding.emptyPartial :: Interpreter.Error GF181)
+          (CompileError (Compile.ConflictingValuesB True False) :: Error GF181)
+
+      it "assert (1 = 2) (UInt)" $ do
+        let program = do
+              assert (1 `eq` (2 :: UInt 4))
+        throwAll
+          program
+          []
+          []
+          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2" PartialBinding.emptyPartial :: Interpreter.Error GF181)
+          (CompileError (Compile.ConflictingValuesU 1 2) :: Error GF181)
+
     describe "Boolean" $ do
       it "not 1" $ do
         let program = return $ complement true

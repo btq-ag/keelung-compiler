@@ -140,19 +140,23 @@ relationBetween var1 var2 xs = case (parentOf xs var1, parentOf xs var2) of
       then Just (1, 0)
       else Nothing -- var1 and var2 are values, but not the same one
 
-bindBoolean :: RefB -> Bool -> FieldRelations n -> FieldRelations n
-bindBoolean ref val xs = xs {booleanRelations = BooleanRelations.bindToValue ref val (booleanRelations xs)}
+bindBoolean :: RefB -> Bool -> FieldRelations n -> Except (Error n) (FieldRelations n)
+bindBoolean ref val xs = do
+  result <- BooleanRelations.bindToValue ref val (booleanRelations xs)
+  return $ xs {booleanRelations = result}
 
-relateBoolean :: RefB -> (Bool, RefB) -> FieldRelations n -> FieldRelations n
-relateBoolean refA (same, refB) xs = case BooleanRelations.relate refA (same, refB) (booleanRelations xs) of
-  Nothing -> xs
-  Just boolRels -> xs {booleanRelations = boolRels}
+relateBoolean :: RefB -> (Bool, RefB) -> FieldRelations n -> Except (Error n) (FieldRelations n)
+relateBoolean refA (same, refB) xs = do
+  result <- BooleanRelations.relate refA (same, refB) (booleanRelations xs)
+  case result of
+    Nothing -> return xs
+    Just boolRels -> return $ xs {booleanRelations = boolRels}
 
 -- | Bind a variable to a value
 bindToValue :: (GaloisField n, Integral n) => RefF -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
 bindToValue x value xs =
   case x of
-    RefBtoRefF refB -> return $ bindBoolean refB (value == 1) xs
+    RefBtoRefF refB -> bindBoolean refB (value == 1) xs
     _ ->
       case parentOf xs x of
         Root ->
@@ -191,11 +195,11 @@ bindToValue x value xs =
 relate :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relate x (0, _, intercept) xs =
   case x of
-    RefBtoRefF refB -> return $ Just $ bindBoolean refB (intercept == 1) xs
+    RefBtoRefF refB -> Just <$> bindBoolean refB (intercept == 1) xs
     _ -> Just <$> bindToValue x intercept xs
 relate x (slope, y, intercept) xs =
   case (x, y) of
-    (RefBtoRefF refA, RefBtoRefF refB) -> return $ Just $ relateBoolean refA (slope == 1, refB) xs
+    (RefBtoRefF refA, RefBtoRefF refB) -> Just <$> relateBoolean refA (slope == 1, refB) xs
     _ -> case compare x y of
       GT -> relate' x (slope, y, intercept) xs -- x = slope * y + intercept
       LT -> relate' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
