@@ -5,28 +5,30 @@
 
 module Keelung.Compiler.Compile (run) where
 
+import Control.Arrow (left)
 import Control.Monad
+import Control.Monad.Except
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
-import Data.IntMap qualified as IntMap
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
+import Keelung.Compiler.Compile.Error qualified as Compile
+import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
+import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
-import Keelung.Compiler.Optimize.MinimizeConstraints.FieldRelations qualified as FieldRelations
-import Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations qualified as UIntRelations
+import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
-import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => Bool -> TypeErased n -> ConstraintSystem n
-run useNewOptimizer (TypeErased untypedExprs _ counters relations assertions divModRelsU) = runM useNewOptimizer counters $ do
+run :: (GaloisField n, Integral n) => Bool -> TypeErased n -> Either (Error n) (ConstraintSystem n)
+run useNewOptimizer (TypeErased untypedExprs _ counters assertions sideEffects) = left CompileError $ runM useNewOptimizer counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -39,14 +41,18 @@ run useNewOptimizer (TypeErased untypedExprs _ counters relations assertions div
         let out = RefUO (widthOfU x) var
         compileExprU out x
 
-  -- compile all relations to constraints
-  compileRelations relations
-
   -- compile assertions to constraints
   mapM_ compileAssertion assertions
 
-  -- compile DivMod relations to constraints
-  mapM_ (\(width, (dividend, divisor, quotient, remainder)) -> compileDivModU width dividend divisor quotient remainder) (IntMap.toList divModRelsU)
+  -- compile all side effects
+  mapM_ compileSideEffect sideEffects
+
+-- | Compile side effects
+compileSideEffect :: (GaloisField n, Integral n) => SideEffect n -> M n ()
+compileSideEffect (AssignmentB2 var val) = compileExprB (RefB var) val
+compileSideEffect (AssignmentF2 var val) = compileExprF (RefF var) val
+compileSideEffect (AssignmentU2 width var val) = compileExprU (RefU width var) val
+compileSideEffect (DivMod width dividend divisor quotient remainder) = compileDivModU width dividend divisor quotient remainder
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
@@ -160,26 +166,31 @@ compileAssertionEqU a b = do
   compileExprU b' b
   add $ cVarEqU a' b'
 
-compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
-compileRelations (Relations vb eb) = do
-  -- intermediate variable bindings of values
-  forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cVarBindF (RefF var) val
-  forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cVarBindB (RefB var) val
-  forM_ (IntMap.toList (structU vb)) $ \(width, bindings) ->
-    forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefU width var) val
-  -- intermediate variable bindings of expressions
-  forM_ (IntMap.toList (structF eb)) $ \(var, val) -> compileExprF (RefF var) val
-  forM_ (IntMap.toList (structB eb)) $ \(var, val) -> compileExprB (RefB var) val
-  forM_ (IntMap.toList (structU eb)) $ \(width, bindings) ->
-    forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefU width var) val
+-- compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
+-- compileRelations (Relations vb eb) = do
+--   -- intermediate variable bindings of values
+--   forM_ (IntMap.toList (structF vb)) $ \(var, val) -> add $ cVarBindF (RefF var) val
+--   forM_ (IntMap.toList (structB vb)) $ \(var, val) -> add $ cVarBindB (RefB var) val
+--   forM_ (IntMap.toList (structU vb)) $ \(width, bindings) ->
+--     forM_ (IntMap.toList bindings) $ \(var, val) -> add $ cVarBindU (RefU width var) val
+--   -- intermediate variable bindings of expressions
+--   forM_ (IntMap.toList (structF eb)) $ \(var, val) -> compileExprF (RefF var) val
+--   forM_ (IntMap.toList (structB eb)) $ \(var, val) -> compileExprB (RefB var) val
+--   forM_ (IntMap.toList (structU eb)) $ \(width, bindings) ->
+--     forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefU width var) val
 
 --------------------------------------------------------------------------------
 
 -- | Monad for compilation
-type M n = State (ConstraintSystem n)
+type M n = StateT (ConstraintSystem n) (Except (Compile.Error n))
 
-runM :: GaloisField n => Bool -> Counters -> M n a -> ConstraintSystem n
-runM useNewOptimizer counters program = execState program (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty)
+runM :: GaloisField n => Bool -> Counters -> M n a -> Either (Compile.Error n) (ConstraintSystem n)
+runM useNewOptimizer counters program =
+  runExcept
+    ( execStateT
+        program
+        (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty mempty)
+    )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
@@ -191,28 +202,34 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       cs <- get
-      let csFieldRelations' = FieldRelations.bindToValue x c (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.bindToValue x c (csFieldRelations cs)
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindB x c) = do
       cs <- get
-      let csFieldRelations' = FieldRelations.bindBoolean x (c == 1) (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.bindBoolean x (c == 1) (csFieldRelations cs)
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindU x c) = do
       cs <- get
-      let csUIntRelations' = UIntRelations.bindToValue x c (csUIntRelations cs)
+      csUIntRelations' <- lift $ UIntRelations.bindToValue x c (csUIntRelations cs)
       put cs {csUIntRelations = csUIntRelations'}
     addOne (CVarEqF x y) = do
       cs <- get
-      case FieldRelations.relate x (1, y, 0) (csFieldRelations cs) of
+      result <- lift $ FieldRelations.relate x (1, y, 0) (csFieldRelations cs)
+      case result of
         Nothing -> return ()
         Just csFieldRelations' -> put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqB x y) = do
-      modify' $ \cs -> cs {csFieldRelations = FieldRelations.relateBoolean x (True, y) (csFieldRelations cs)}
+      cs <- get
+      csFieldRelations' <- lift $ FieldRelations.relateBoolean x (True, y) (csFieldRelations cs)
+      put $ cs {csFieldRelations = csFieldRelations'}
     addOne (CVarNEqB x y) = do
-      modify' $ \cs -> cs {csFieldRelations = FieldRelations.relateBoolean x (False, y) (csFieldRelations cs)}
+      cs <- get
+      csFieldRelations' <- lift $ FieldRelations.relateBoolean x (False, y) (csFieldRelations cs)
+      put $ cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqU x y) = do
       cs <- get
-      case UIntRelations.assertEqual x y (csUIntRelations cs) of
+      result <- lift $ UIntRelations.assertEqual x y (csUIntRelations cs)
+      case result of
         Nothing -> return ()
         Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
     addOne (CMulF x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
@@ -229,6 +246,9 @@ add = mapM_ addOne
 
 addOccurrencesUTemp :: [RefU] -> M n ()
 addOccurrencesUTemp = modify' . addOccurrences
+
+addDivMod :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
+addDivMod x y q r = modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMods cs}
 
 freshRefF :: M n RefF
 freshRefF = do
@@ -965,6 +985,7 @@ compileDivModU width dividend divisor quotient remainder = do
   divisorRef <- wireU divisor
   quotientRef <- wireU quotient
   dividendRef <- wireU dividend
+  addDivMod dividendRef divisorRef quotientRef remainderRef
   add $
     cMulF
       (0, [(RefUVal divisorRef, 1)])

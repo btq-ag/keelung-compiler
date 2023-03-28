@@ -6,14 +6,13 @@ import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
-import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax qualified as T
 
 run :: (GaloisField n, Integral n) => T.Elaborated -> TypeErased n
 run (T.Elaborated expr comp) =
-  let T.Computation counters eb assertions divModRelsU = comp
+  let T.Computation counters assertions sideEffects = comp
       proxy = 0
       numBitWidth = bitSize proxy
    in runM counters numBitWidth $ do
@@ -21,26 +20,25 @@ run (T.Elaborated expr comp) =
         exprs <- eraseExprAndAllocOutputVar expr
         sameType proxy exprs
         assertions' <- concat <$> mapM eraseExpr assertions
-        relations <-
-          Relations mempty
-            <$> ( Struct
-                    <$> mapM eraseExprF (structF eb)
-                    <*> mapM eraseExprB (structB eb)
-                    <*> mapM (mapM eraseExprU) (structU eb)
-                )
-
-        divModRelsU' <- mapM (\(dividend, divisor, quotient, remainder) -> (,,,) <$> eraseExprU dividend <*> eraseExprU divisor <*> eraseExprU quotient <*> eraseExprU remainder) divModRelsU
-
+        -- relations <-
+        --   Relations mempty
+        --     <$> ( Struct
+        --             <$> mapM eraseExprF (structF eb)
+        --             <*> mapM eraseExprB (structB eb)
+        --             <*> mapM (mapM eraseExprU) (structU eb)
+        --         )
         counters' <- get
+
+        sideEffects' <- mapM eraseSideEffect sideEffects
 
         return $
           TypeErased
             { erasedExpr = exprs,
               erasedFieldBitWidth = numBitWidth,
               erasedCounters = counters',
-              erasedRelations = relations,
+              -- erasedRelations = relations,
               erasedAssertions = assertions',
-              erasedDivModRelsU = divModRelsU'
+              erasedSideEffects = sideEffects'
             }
   where
     -- proxy trick for devising the bit width of field elements
@@ -54,6 +52,14 @@ type M n = StateT Counters (Reader Width)
 
 runM :: Counters -> Width -> M n a -> a
 runM counters width f = runReader (evalStateT f counters) width
+
+--------------------------------------------------------------------------------
+
+eraseSideEffect :: (GaloisField n, Integral n) => T.SideEffect -> M n (SideEffect n)
+eraseSideEffect (T.AssignmentF var val) = AssignmentF2 var <$> eraseExprF val
+eraseSideEffect (T.AssignmentB var val) = AssignmentB2 var <$> eraseExprB val
+eraseSideEffect (T.AssignmentU width var val) = AssignmentU2 width var <$> eraseExprU val
+eraseSideEffect (T.DivMod width dividend divisor quotient remainder) = DivMod width <$> eraseExprU dividend <*> eraseExprU divisor <*> eraseExprU quotient <*> eraseExprU remainder
 
 --------------------------------------------------------------------------------
 

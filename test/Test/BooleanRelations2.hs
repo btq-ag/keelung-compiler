@@ -3,8 +3,8 @@ module Test.BooleanRelations2 (tests, run) where
 import Control.Monad.State
 import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Constraint (RefB (..))
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations2 (BooleanRelations)
-import Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations2 qualified as BooleanRelations
+import Keelung.Compiler.Compile.Relations.BooleanRelations2 (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.BooleanRelations2 qualified as BooleanRelations
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
 

@@ -53,13 +53,15 @@ main = hspec $ do
     it "assertToBe42" $
       let cs =
             RelocatedConstraintSystem
-              { csConstraints =
+              { csUseNewOptimizer = False,
+                csConstraints =
                   Seq.fromList $
                     cadd (-42 :: GF181) [(0, 1)],
                 csBinReps = [],
-                csCounters = addCount OfPublicInput OfField 1 mempty
+                csCounters = addCount OfPublicInput OfField 1 mempty,
+                csDivMods = []
               }
-       in Compiler.compileOnly Basic.assertToBe42 `shouldBe` Right cs
+       in Compiler.compileWithoutConstProp Basic.assertToBe42 `shouldBe` Right cs
 
   describe "Keelung `compile`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do

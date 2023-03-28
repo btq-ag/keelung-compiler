@@ -97,9 +97,9 @@ class HasU a u | a -> u where
   putU :: Width -> u -> a -> a
   putU width u x = putUAll (IntMap.insert width u (getUAll x)) x
 
-  modifyU :: Width -> (u -> u) -> a -> a
-  modifyU width f x = case getU width x of
-    Nothing -> x
+  modifyU :: Width -> u -> (u -> u) -> a -> a
+  modifyU width empty' f x = case getU width x of
+    Nothing -> putU width (f empty') x
     Just u -> putU width (f u) x
 
   modifyUAll :: (IntMap u -> IntMap u) -> a -> a
@@ -259,6 +259,19 @@ toTotal (VarGroups o i p x) =
 
     sequenceIntMap :: (a -> Validation b c) -> IntMap a -> Validation (IntMap b) (IntMap c)
     sequenceIntMap f = sequenceA . IntMap.mapWithKey (\width xs -> first (IntMap.singleton width) (f xs))
+
+emptyPartial :: Partial n
+emptyPartial =
+  VarGroups
+    (VarGroup (0, mempty) (0, mempty) mempty)
+    (VarGroup (0, mempty) (0, mempty) mempty)
+    (VarGroup (0, mempty) (0, mempty) mempty)
+    (VarGroup (0, mempty) (0, mempty) mempty)
+
+partialIsEmpty :: Eq n => Partial n -> Bool
+partialIsEmpty (VarGroups o i p x) = isEmptyVarGroup o && isEmptyVarGroup i && isEmptyVarGroup p && isEmptyVarGroup x
+  where
+    isEmptyVarGroup (VarGroup f b u) = f == (0, mempty) && b == (0, mempty) && IntMap.null u
 
 toTotal' :: (Int, IntMap n) -> Validation IntSet (Vector n)
 toTotal' (size, xs) =

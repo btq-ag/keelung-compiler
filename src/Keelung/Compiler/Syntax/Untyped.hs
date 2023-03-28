@@ -15,6 +15,7 @@ module Keelung.Compiler.Syntax.Untyped
     lookupB,
     lookupU,
     Relations (..),
+    SideEffect (..),
     -- sizeOfExpr,
   )
 where
@@ -230,33 +231,39 @@ data TypeErased n = TypeErased
     -- | Variable bookkeepung
     erasedCounters :: !Counters,
     -- | Relations between variables and/or expressions
-    erasedRelations :: !(Relations n),
+    -- erasedRelations :: !(Relations n),
     -- | Assertions after type erasure
     erasedAssertions :: ![Expr n],
-    -- | DivMod relations
-    erasedDivModRelsU :: IntMap (ExprU n, ExprU n, ExprU n, ExprU n) -- dividend = divisor * quotient + remainder
+    -- | Side effects
+    erasedSideEffects :: !(Seq (SideEffect n))
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ counters relations assertions divModRelsU) =
+  show (TypeErased expr _ counters  assertions _sideEffects) =
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
       <> show (map (fmap N . snd) expr)
       <> "\n"
       -- relations
-      <> indent (show relations)
+      -- <> indent (show relations)
       <> ( if length assertions < 20
              then "  assertions:\n    " <> show assertions <> "\n"
              else ""
          )
-      <> ( if length divModRelsU < 20
-             then "  div mod relations:\n    " <> show assertions <> "\n"
-             else ""
-         )
+      -- side effects
       <> Counters.prettyVariables counters
       <> "\n\
          \}"
+
+--------------------------------------------------------------------------------
+
+data SideEffect n
+  = AssignmentF2 Var (ExprF n)
+  | AssignmentB2 Var (ExprB n)
+  | AssignmentU2 Width Var (ExprU n)
+  | DivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
+  deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 

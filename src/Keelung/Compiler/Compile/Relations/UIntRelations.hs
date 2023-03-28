@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
+module Keelung.Compiler.Compile.Relations.UIntRelations
   ( UIntRelations,
     Lookup (..),
     new,
@@ -16,10 +16,13 @@ module Keelung.Compiler.Optimize.MinimizeConstraints.UIntRelations
 where
 
 import Control.DeepSeq (NFData)
+import Control.Monad.Except
+import Data.Field.Galois (GaloisField)
 import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
+import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Constraint (RefU (..))
 import Prelude hiding (lookup)
 
@@ -103,67 +106,72 @@ relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
 -- rememberPinnedBitTest _ xs = xs
 
 -- | Bind a variable to a value
-bindToValue :: RefU -> n -> UIntRelations n -> UIntRelations n
+bindToValue :: (GaloisField n, Integral n) => RefU -> n -> UIntRelations n -> Except (Error n) (UIntRelations n)
 bindToValue x value xs =
   case lookup xs x of
     Root ->
       -- x does not have a parent, so it is its own root
-      xs
-        { links = Map.insert x (Constant value) (links xs),
-          sizes = Map.insert x 1 (sizes xs)
-        }
-    Value _oldValue ->
-      -- x is already a root with `_oldValue` as its value
-      -- TODO: handle this kind of conflict in the future
-      -- FOR NOW: overwrite the value of x with the new value
-      xs
-        { links = Map.insert x (Constant value) (links xs)
-        }
+      return $
+        xs
+          { links = Map.insert x (Constant value) (links xs),
+            sizes = Map.insert x 1 (sizes xs)
+          }
+    Value oldValue ->
+      if oldValue == value
+        then
+          return $
+            xs
+              { links = Map.insert x (Constant value) (links xs)
+              }
+        else throwError $ ConflictingValuesU oldValue value
     RotateOf _ parent ->
-      xs
-        { links =
-            Map.insert parent (Constant value) $
-              Map.insert x (Constant value) $
-                links xs,
-          sizes = Map.insert x 1 (sizes xs)
-        }
+      return $
+        xs
+          { links =
+              Map.insert parent (Constant value) $
+                Map.insert x (Constant value) $
+                  links xs,
+            sizes = Map.insert x 1 (sizes xs)
+          }
 
 -- | Assert that two variables are equal
-assertEqual :: RefU -> RefU -> UIntRelations n -> Maybe (UIntRelations n)
+assertEqual :: (GaloisField n, Integral n) => RefU -> RefU -> UIntRelations n -> Except (Error n) (Maybe (UIntRelations n))
 assertEqual x y = rotate x (0, y)
 
-rotate :: RefU -> (Int, RefU) -> UIntRelations n -> Maybe (UIntRelations n)
+rotate :: (GaloisField n, Integral n) => RefU -> (Int, RefU) -> UIntRelations n -> Except (Error n) (Maybe (UIntRelations n))
 rotate x (rotation, y) xs
   | x > y = rotate' x (rotation, y) xs
   | x < y = rotate' y (rotation, x) xs
-  | otherwise = Nothing
+  | otherwise = return Nothing
 
 -- | Returns Nothing if the relation has already been established
-rotate' :: RefU -> (Int, RefU) -> UIntRelations n -> Maybe (UIntRelations n)
+rotate' :: (GaloisField n, Integral n) => RefU -> (Int, RefU) -> UIntRelations n -> Except (Error n) (Maybe (UIntRelations n))
 rotate' x (rotation, y) xs =
   case lookup xs x of
     Value valueX ->
-      Just $ bindToValue y valueX xs
+      Just <$> bindToValue y valueX xs
     RotateOf rotationX rootOfX ->
       rotate rootOfX (rotation + rotationX, y) xs
     Root ->
       -- x does not have a parent, so it is its own root
       case lookup xs y of
         Value valueY ->
-          Just $ bindToValue x valueY xs
+          Just <$> bindToValue x valueY xs
         RotateOf rotationY rootOfY ->
-          Just $
-            xs
-              { links = Map.insert x (Rotate (rotation + rotationY) rootOfY) (links xs),
-                sizes = Map.insertWith (+) y 1 (sizes xs)
-              }
+          return $
+            Just $
+              xs
+                { links = Map.insert x (Rotate (rotation + rotationY) rootOfY) (links xs),
+                  sizes = Map.insertWith (+) y 1 (sizes xs)
+                }
         Root ->
           -- y does not have a parent, so it is its own root
-          Just $
-            xs
-              { links = Map.insert x (Rotate rotation y) (links xs),
-                sizes = Map.insertWith (+) y 1 (sizes xs)
-              }
+          return $
+            Just $
+              xs
+                { links = Map.insert x (Rotate rotation y) (links xs),
+                  sizes = Map.insertWith (+) y 1 (sizes xs)
+                }
 
 size :: UIntRelations n -> Int
 size = Map.size . links

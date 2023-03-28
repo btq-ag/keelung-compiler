@@ -2,10 +2,10 @@
 module Keelung.Interpreter.Relocated (run, run') where
 
 import Control.Monad.Except
-import qualified Data.Either as Either
+import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import Data.IntMap qualified as IntMap
 import Keelung.Compiler.R1CS (ExecError (..), witnessOfR1CS)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1CS

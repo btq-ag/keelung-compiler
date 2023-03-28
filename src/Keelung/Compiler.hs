@@ -19,15 +19,18 @@ module Keelung.Compiler
     interpret,
     -- genInputsOutputsWitnesses,
     generateWitness,
-    compileOnly,
+    compileWithoutConstProp,
     compile,
+    compileO0Old,
     compileO0,
-    compileO0',
+    compileO1Old,
     compileO1,
-    compileO1',
+    compileToModules,
     optimizeWithInput,
     --
+    compileO0OldElab,
     compileO0Elab,
+    compileO1OldElab,
     compileO1Elab,
     interpretElab,
     generateWitnessElab,
@@ -38,6 +41,7 @@ module Keelung.Compiler
 where
 
 import Control.Arrow (left)
+import Control.Monad ((>=>))
 import Data.Field.Galois (GaloisField)
 import Data.Semiring (Semiring (one, zero))
 import Data.Vector (Vector)
@@ -50,13 +54,15 @@ import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
 import Keelung.Compiler.R1CS hiding (generateWitness)
 import Keelung.Compiler.Relocated (RelocatedConstraintSystem (..), numberOfConstraints)
+import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Syntax.Erase as Erase
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Field (GF181)
+import Keelung.Interpreter.Error qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
-import Keelung.Interpreter.Typed qualified as Typed
+import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Keelung.Monad (Comp)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax (Elaborated)
@@ -73,8 +79,8 @@ interpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Ei
 interpret prog rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode prog
   let counters = Encoded.compCounters (Encoded.elabComp elab)
-  let inputs = Inputs.deserialize counters rawPublicInputs rawPrivateInputs
-  left InterpretError (Typed.run elab inputs)
+  inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
+  left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
 -- | Given a Keelung program and a list of raw public inputs and private inputs,
 --   Generate (structured inputs, outputs, witness)
@@ -85,33 +91,40 @@ generateWitness program rawPublicInputs rawPrivateInputs = do
 
 -- elaborate => rewrite => type erase
 erase :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (TypeErased n)
-erase prog = eraseElab <$> elaborateAndEncode prog
+erase prog = Erase.run <$> elaborateAndEncode prog
 
 -- elaborate => rewrite => type erase => compile => relocate
-compileOnly :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)
-compileOnly prog = erase prog >>= return . relocateConstraintSystem . Compile.run False
+compileWithoutConstProp :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)
+compileWithoutConstProp prog = elaborateAndEncode prog >>= compileO0OldElab >>= return . relocateConstraintSystem
 
 -- elaborate => rewrite => type erase => constant propagation => compile => relocate
-compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)
-compileO0 prog = erase prog >>= return . relocateConstraintSystem . Compile.run False . ConstantPropagation.run
+compileO0Old :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0Old prog = elaborateAndEncode prog >>= compileO0OldElab
 
--- elaborate => rewrite => type erase => constant propagation => compile
-compileO0' :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
-compileO0' prog = erase prog >>= return . Compile.run True . ConstantPropagation.run
+-- elaborate => rewrite => type erase => constant propagation => compile => relocate
+compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0 prog = elaborateAndEncode prog >>= compileO0Elab
 
--- elaborate => rewrite => type erase => constant propagation => compile => relocate => optimisation I
+-- elaborate => rewrite => type erase => constant propagation => compile => relocate => optimisation (old) => renumber
+compileO1Old ::
+  (GaloisField n, Integral n, Encode t) =>
+  Comp t ->
+  Either (Error n) (RelocatedConstraintSystem n)
+compileO1Old prog = elaborateAndEncode prog >>= compileO1OldElab
+
+-- elaborate => rewrite => type erase => constant propagation => compile => optimisation (new) => relocate => renumber
 compileO1 ::
   (GaloisField n, Integral n, Encode t) =>
   Comp t ->
   Either (Error n) (RelocatedConstraintSystem n)
-compileO1 prog = compileO0 prog >>= return . Optimizer.optimize1
+compileO1 prog = elaborateAndEncode prog >>= compileO1Elab
 
 -- elaborate => rewrite => type erase => constant propagation => compile => optimisation (new)
-compileO1' ::
+compileToModules ::
   (GaloisField n, Integral n, Encode t) =>
   Comp t ->
   Either (Error n) (ConstraintSystem n)
-compileO1' prog = erase prog >>= return . Optimizer.optimize1' . Compile.run True . ConstantPropagation.run
+compileToModules prog = elaborateAndEncode prog >>= Compile.run True . ConstantPropagation.run . Erase.run >>= left CompileError . Optimizer.optimizeNew
 
 -- | 'compile' defaults to 'compileO1'
 compile ::
@@ -134,28 +147,31 @@ optimizeWithInput program inputs = do
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
 
-eraseElab :: (GaloisField n, Integral n) => Elaborated -> TypeErased n
-eraseElab = Erase.run
-
-interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either String [n]
-interpretElab elab rawPublicInputs rawPrivateInputs =
+interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either (Error n) [n]
+interpretElab elab rawPublicInputs rawPrivateInputs = do
   let counters = Encoded.compCounters (Encoded.elabComp elab)
-      inputs = Inputs.deserialize counters rawPublicInputs rawPrivateInputs
-   in left (show . InterpretError) (Typed.run elab inputs)
+  inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
+  left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
 generateWitnessElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either (Error n) (Counters, [n], Vector n)
 generateWitnessElab elab rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS <$> compileO1Elab elab
+  r1cs <- toR1CS <$> compileO1OldElab elab
   let counters = r1csCounters r1cs
-  let inputs = Inputs.deserialize counters rawPublicInputs rawPrivateInputs
-  (outputs, witness) <- left InterpretError (R1CS.run' r1cs inputs)
+  inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
+  (outputs, witness) <- left (InterpretError . Interpreter.R1CSError) (R1CS.run' r1cs inputs)
   return (counters, outputs, witness)
 
-compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO0Elab = return . relocateConstraintSystem . Compile.run False . ConstantPropagation.run . Erase.run
+compileO0OldElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO0OldElab = Compile.run False . ConstantPropagation.run . Erase.run
+
+compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO0Elab = Compile.run True . ConstantPropagation.run . Erase.run
+
+compileO1OldElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
+compileO1OldElab = Compile.run False . ConstantPropagation.run . Erase.run >=> return . Optimizer.optimizeOld . relocateConstraintSystem
 
 compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO1Elab = return . Optimizer.optimize1 . relocateConstraintSystem . Compile.run False . ConstantPropagation.run . Erase.run
+compileO1Elab = Compile.run True . ConstantPropagation.run . Erase.run >=> left CompileError . Optimizer.optimizeNew >=> return . Relocated.renumberConstraints . relocateConstraintSystem
 
 --------------------------------------------------------------------------------
 

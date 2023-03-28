@@ -1,26 +1,24 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 -- Interpreter for Keelung.Syntax.Encode.Syntax
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use lambda-case" #-}
-
-module Keelung.Interpreter.Typed (runAndOutputWitnesses, run) where
+module Keelung.Interpreter.SyntaxTree (runAndOutputWitnesses, run, interpretDivMod, Error (..)) where
 
 import Control.Monad.Except
-import Control.Monad.State
 import Data.Bits (Bits (..))
+import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
-import Data.IntMap qualified as IntMap
 import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Data.Struct
 import Keelung.Data.VarGroup
-import Keelung.Data.VarGroup qualified as Bindings
-import Keelung.Interpreter.Monad
+import Keelung.Interpreter.Arithmetics
+import Keelung.Interpreter.SyntaxTree.Monad
+import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Encode.Syntax
 
 --------------------------------------------------------------------------------
@@ -28,49 +26,18 @@ import Keelung.Syntax.Encode.Syntax
 -- | Interpret a program with inputs and return outputs along with the witness
 runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) ([n], Witness n)
 runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
-  -- interpret assignments of values first
-  fs <-
-    filterM
-      ( \(var, e) -> case e of
-          ValF val -> interpret val >>= addF var >> return False
-          _ -> return True
-      )
-      (IntMap.toList (structF (compExprBindings comp)))
-  bs <-
-    filterM
-      ( \(var, e) -> case e of
-          ValB val -> interpret val >>= addB var >> return False
-          _ -> return True
-      )
-      (IntMap.toList (structB (compExprBindings comp)))
-  us <-
-    mapM
-      ( \(width, xs) ->
-          (width,)
-            <$> filterM
-              ( \(var, e) -> case e of
-                  ValU _ val -> interpret val >>= addU width var >> return False
-                  _ -> return True
-              )
-              (IntMap.toList xs)
-      )
-      (IntMap.toList (structU (compExprBindings comp)))
-
-  -- interpret the rest of the assignments
-  forM_ fs $ \(var, e) -> interpret e >>= addF var
-  forM_ bs $ \(var, e) -> interpret e >>= addB var
-  forM_ us $ \(width, xs) ->
-    forM_ xs $ \(var, e) -> interpret e >>= addU width var
+  -- interpret side-effects
+  forM_ (compSideEffects comp) $ \sideEffect -> void $ interpret sideEffect
 
   -- interpret the assertions next
   -- throw error if any assertion fails
   forM_ (compAssertions comp) $ \e -> do
     values <- interpret e
     when (values /= [1]) $ do
-      bindings <- get
-      let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
+      -- bindings <- get
+      -- let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
-      throwError $ AssertionError (show e) bindingsInExpr
+      throwError $ AssertionError (show e)
 
   -- lastly interpret the expression and return the result
   interpret expr
@@ -80,6 +47,92 @@ run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n)
 run elab inputs = fst <$> runAndOutputWitnesses elab inputs
 
 --------------------------------------------------------------------------------
+
+-- | For handling div/mod statements
+-- we can solve a div/mod relation if we know:
+--    1. dividend & divisor
+--    1. dividend & quotient
+--    2. divisor & quotient & remainder
+interpretDivMod :: (GaloisField n, Integral n) => Width -> (UInt, UInt, UInt, UInt) -> M n ()
+interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) = do
+  dividend <- analyze dividendExpr
+  divisor <- analyze divisorExpr
+  quotient <- analyze quotientExpr
+  remainder <- analyze remainderExpr
+  case dividend of
+    Left dividendVar -> do
+      -- now that we don't know the dividend, we can only solve the relation if we know the divisor, quotient, and remainder
+      case (divisor, quotient, remainder) of
+        (Right divisorVal, Right quotientVal, Right remainderVal) -> do
+          let dividendVal = divisorVal * quotientVal + remainderVal
+          addU width dividendVar [dividendVal]
+        _ -> do
+          let unsolvedVars = dividendVar : Either.lefts [divisor, quotient, remainder]
+          throwError $ DivModStuckError unsolvedVars
+    Right dividendVal -> do
+      -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
+      case (divisor, quotient, remainder) of
+        (Right divisorVal, Right actualQuotientVal, Right actualRemainderVal) -> do
+          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          if expectedQuotientVal == actualQuotientVal
+            then return ()
+            else throwError $ DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
+          if expectedRemainderVal == actualRemainderVal
+            then return ()
+            else throwError $ DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+        (Right divisorVal, Left quotientVar, Left remainderVar) -> do
+          let quotientVal = dividendVal `integerDiv` divisorVal
+              remainderVal = dividendVal `integerMod` divisorVal
+          addU width quotientVar [quotientVal]
+          addU width remainderVar [remainderVal]
+        (Right divisorVal, Left quotientVar, Right actualRemainderVal) -> do
+          let quotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          if expectedRemainderVal == actualRemainderVal
+            then addU width quotientVar [quotientVal]
+            else throwError $ DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+        (Left divisorVar, Right quotientVal, Left remainderVar) -> do
+          let divisorVal = dividendVal `integerDiv` quotientVal
+              remainderVal = dividendVal `integerMod` divisorVal
+          addU width divisorVar [divisorVal]
+          addU width remainderVar [remainderVal]
+        (Left divisorVar, Right quotientVal, Right actualRemainderVal) -> do
+          let divisorVal = dividendVal `integerDiv` quotientVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          if expectedRemainderVal == actualRemainderVal
+            then addU width divisorVar [divisorVal]
+            else throwError $ DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+        _ -> do
+          let unsolvedVars = Either.lefts [divisor, quotient, remainder]
+          throwError $ DivModStuckError unsolvedVars
+  where
+    analyze :: (GaloisField n, Integral n) => UInt -> M n (Either Var n)
+    analyze = \case
+      VarU w var -> catchError (Right <$> lookupU w var) $ \case
+        VarUnboundError _ _ -> return (Left var)
+        e -> throwError e
+      x -> do
+        xs <- interpret x
+        case xs of
+          (v : _) -> return (Right v)
+          _ -> throwError $ ResultSizeError 1 (length xs)
+
+--------------------------------------------------------------------------------
+
+instance (GaloisField n, Integral n) => Interpret SideEffect n where
+  interpret (AssignmentB var val) = do
+    interpret val >>= addB var
+    return []
+  interpret (AssignmentF var val) = do
+    interpret val >>= addF var
+    return []
+  interpret (AssignmentU width var val) = do
+    interpret val >>= addU width var
+    return []
+  interpret (DivMod width dividend divisor quotient remainder) = do
+    interpretDivMod width (dividend, divisor, quotient, remainder)
+    return []
 
 instance GaloisField n => Interpret Bool n where
   interpret True = return [one]
@@ -175,6 +228,31 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
 
 --------------------------------------------------------------------------------
 
+instance GaloisField n => Interpret () n where
+  interpret val = case val of
+    () -> return []
+
+instance (Interpret t1 n, Interpret t2 n, GaloisField n) => Interpret (t1, t2) n where
+  interpret (a, b) = liftM2 (<>) (interpret a) (interpret b)
+
+instance (Interpret t n, GaloisField n) => Interpret [t] n where
+  interpret xs = concat <$> mapM interpret xs
+
+-- instance (GaloisField n, Integral n) => Interpret (ArrM t) n where
+--   interpret val = case val of
+--     ArrayRef _elemType _len addr -> do
+--       heap <- ask
+--       case IntMap.lookup addr heap of
+--         Nothing -> error "[ panic ] address not found when trying to read heap"
+--         Just (elemType, vars) -> case elemType of
+--           ElemF -> interpret $ map VarF (toList vars)
+--           ElemB -> interpret $ map VarB (toList vars)
+--           ElemU width -> mapM (lookupU width) (toList vars)
+--           ElemArr elemType' len -> concat <$> mapM (interpret . ArrayRef elemType' len) (toList vars)
+--           EmptyArr -> return []
+
+--------------------------------------------------------------------------------
+
 instance FreeVar Expr where
   freeVars expr = case expr of
     Unit -> mempty
@@ -190,11 +268,15 @@ instance FreeVar Elaborated where
 instance FreeVar Computation where
   freeVars context =
     mconcat
-      [ mconcat $ map freeVars (toList (structF (compExprBindings context))),
-        mconcat $ map freeVars (toList (structB (compExprBindings context))),
-        mconcat $ concatMap (map freeVars . toList) (toList (structU (compExprBindings context))),
+      [ mconcat $ map freeVars (toList (compSideEffects context)),
         mconcat $ map freeVars (toList (compAssertions context))
       ]
+
+instance FreeVar SideEffect where
+  freeVars (AssignmentF var field) = modifyX (modifyF (IntSet.insert var)) (freeVars field)
+  freeVars (AssignmentB var bool) = modifyX (modifyB (IntSet.insert var)) (freeVars bool)
+  freeVars (AssignmentU width var uint) = modifyX (modifyU width mempty (IntSet.insert var)) (freeVars uint)
+  freeVars (DivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
 
 instance FreeVar Boolean where
   freeVars expr = case expr of
@@ -229,9 +311,9 @@ instance FreeVar Field where
 instance FreeVar UInt where
   freeVars expr = case expr of
     ValU _ _ -> mempty
-    VarU w var -> modifyX (modifyU w (IntSet.insert var)) mempty
-    VarUI w var -> modifyI (modifyU w (IntSet.insert var)) mempty
-    VarUP w var -> modifyP (modifyU w (IntSet.insert var)) mempty
+    VarU w var -> modifyX (modifyU w mempty (IntSet.insert var)) mempty
+    VarUI w var -> modifyI (modifyU w mempty (IntSet.insert var)) mempty
+    VarUP w var -> modifyP (modifyU w mempty (IntSet.insert var)) mempty
     AddU _ x y -> freeVars x <> freeVars y
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y

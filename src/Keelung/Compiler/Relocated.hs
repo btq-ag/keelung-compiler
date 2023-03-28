@@ -15,13 +15,13 @@ import Data.Sequence (Seq)
 import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (CNEQ (..))
+import Keelung.Data.BinRep (BinRep)
 import Keelung.Data.BinRep qualified as BinRep
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
-import Keelung.Data.BinRep (BinRep)
 
 --------------------------------------------------------------------------------
 
@@ -104,19 +104,21 @@ varsInConstraints = IntSet.unions . fmap varsInConstraint
 -- | Relocated Constraint System
 data RelocatedConstraintSystem n = RelocatedConstraintSystem
   { -- | Constraints
+    csUseNewOptimizer :: Bool,
     csConstraints :: !(Seq (Constraint n)),
     csBinReps :: [BinRep],
-    csCounters :: Counters
+    csCounters :: Counters,
+    csDivMods :: [(Var, Var, Var, Var)]
   }
   deriving (Eq, Generic, NFData)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: RelocatedConstraintSystem n -> Int
-numberOfConstraints (RelocatedConstraintSystem cs binReps counters) =
+numberOfConstraints (RelocatedConstraintSystem _ cs binReps counters _divMods) =
   length cs + getBooleanConstraintSize counters + length binReps
 
 instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
-  show (RelocatedConstraintSystem constraints binReps counters) =
+  show (RelocatedConstraintSystem _ constraints binReps counters _divMods) =
     "ConstraintSystem {\n"
       <> prettyConstraints counters (toList constraints) binReps
       <> prettyVariables counters
@@ -130,7 +132,9 @@ renumberConstraints :: (GaloisField n, Integral n) => RelocatedConstraintSystem 
 renumberConstraints cs =
   cs
     { csConstraints = fmap renumberConstraint (csConstraints cs),
-      csCounters = setReducedCount reducedCount counters
+      csBinReps = if csUseNewOptimizer cs then fmap renumberBinRep (csBinReps cs) else csBinReps cs,
+      csCounters = setReducedCount reducedCount counters,
+      csDivMods = fmap renumberDivMod (csDivMods cs)
     }
   where
     counters = csCounters cs
@@ -179,3 +183,16 @@ renumberConstraints cs =
         CNEq (CNEQ (Right x) (Left (renumber y)) (renumber m))
       CNEq (CNEQ (Right x) (Right y) m) ->
         CNEq (CNEQ (Right x) (Right y) (renumber m))
+
+    renumberBinRep binRep =
+      binRep
+        { BinRep.binRepVar = renumber (BinRep.binRepVar binRep),
+          BinRep.binRepBitStart = renumber (BinRep.binRepBitStart binRep)
+        }
+
+    renumberDivMod (x, y, q, r) =
+      ( renumber x,
+        renumber y,
+        renumber q,
+        renumber r
+      )

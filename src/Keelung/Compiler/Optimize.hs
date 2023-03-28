@@ -8,6 +8,7 @@ module Keelung.Compiler.Optimize where
 import Data.IntMap qualified as IntMap
 import Data.IntSet qualified as IntSet
 import Keelung
+import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem)
 import Keelung.Compiler.Optimize.MinimizeConstraints qualified as MinimizeConstraints
 import Keelung.Compiler.Optimize.MinimizeRelocatedConstraints qualified as MinimizeRelocatedConstraints
@@ -41,11 +42,11 @@ optimizeWithInput inputs cs =
       witness = IntMap.fromList (zip inputVars inputs)
    in optimizeWithWitness witness cs
 
-optimize1 :: (GaloisField n, Integral n) => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
-optimize1 = snd . optimizeWithInput mempty
+optimizeOld :: (GaloisField n, Integral n) => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
+optimizeOld = snd . optimizeWithInput mempty
 
-optimize1' :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
-optimize1' = MinimizeConstraints.run
+optimizeNew :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (ConstraintSystem n)
+optimizeNew = MinimizeConstraints.run
 
 --------------------------------------------------------------------------------
 

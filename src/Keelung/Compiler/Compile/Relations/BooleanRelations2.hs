@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Keelung.Compiler.Optimize.MinimizeConstraints.BooleanRelations2
+module Keelung.Compiler.Compile.Relations.BooleanRelations2
   ( BooleanRelations,
     Lookup (..),
     new,

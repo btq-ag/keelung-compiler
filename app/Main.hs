@@ -13,12 +13,14 @@ import Encode
 import Keelung.Compiler
   ( Error (..),
     RelocatedConstraintSystem,
-    compileO0Elab,
+    compileO0OldElab,
     compileO1Elab,
+    compileO1OldElab,
     generateWitnessElab,
     interpretElab,
     toR1CS,
   )
+import Keelung.Compiler.ConstraintSystem qualified as Relocated
 import Keelung.Field
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax
@@ -36,9 +38,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> outputCircuit (asB64 $ compileO0Elab elaborated)
-            GF181 -> outputCircuit (asGF181 $ compileO0Elab elaborated)
-            BN128 -> outputCircuit (asBN128 $ compileO0Elab elaborated)
+            B64 -> outputCircuit (asB64 $ Relocated.relocateConstraintSystem <$> compileO0OldElab elaborated)
+            GF181 -> outputCircuit (asGF181 $ Relocated.relocateConstraintSystem <$> compileO0OldElab elaborated)
+            BN128 -> outputCircuit (asBN128 $ Relocated.relocateConstraintSystem <$> compileO0OldElab elaborated)
     Protocol CompileO1 -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -56,9 +58,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> outputCircuit (asB64 $ compileO1Elab elaborated)
-            GF181 -> outputCircuit (asGF181 $ compileO1Elab elaborated)
-            BN128 -> outputCircuit (asBN128 $ compileO1Elab elaborated)
+            B64 -> outputCircuit (asB64 $ compileO1OldElab elaborated)
+            GF181 -> outputCircuit (asGF181 $ compileO1OldElab elaborated)
+            BN128 -> outputCircuit (asBN128 $ compileO1OldElab elaborated)
     Protocol Interpret -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
@@ -66,9 +68,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> do
           case fieldType of
-            B64 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [B64])
-            GF181 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [GF181])
-            BN128 -> outputInterpretedResult (interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [BN128])
+            B64 -> outputInterpretedResult (left show $ interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [B64])
+            GF181 -> outputInterpretedResult (left show $ interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [GF181])
+            BN128 -> outputInterpretedResult (left show $ interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either String [BN128])
     Protocol (GenCircuit filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -76,9 +78,9 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> do
           case fieldType of
-            B64 -> outputCircuitAndWriteFile (asB64 $ compileO1Elab elaborated) filepath
-            GF181 -> outputCircuitAndWriteFile (asGF181 $ compileO1Elab elaborated) filepath
-            BN128 -> outputCircuitAndWriteFile (asBN128 $ compileO1Elab elaborated) filepath
+            B64 -> outputCircuitAndWriteFile (asB64 $ compileO1OldElab elaborated) filepath
+            GF181 -> outputCircuitAndWriteFile (asGF181 $ compileO1OldElab elaborated) filepath
+            BN128 -> outputCircuitAndWriteFile (asBN128 $ compileO1OldElab elaborated) filepath
     Protocol (GenWitness filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
@@ -88,13 +90,16 @@ main = withUtf8 $ do
           case fieldType of
             B64 ->
               outputInterpretedResultAndWriteFile
-                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [B64]) (map fromInteger rawPrivateInputs :: [B64])) filepath
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [B64]) (map fromInteger rawPrivateInputs :: [B64]))
+                filepath
             GF181 ->
               outputInterpretedResultAndWriteFile
-                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181])) filepath
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [GF181]) (map fromInteger rawPrivateInputs :: [GF181]))
+                filepath
             BN128 ->
               outputInterpretedResultAndWriteFile
-                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128])) filepath
+                (generateWitnessElab elaborated (map fromInteger rawPublicInputs :: [BN128]) (map fromInteger rawPrivateInputs :: [BN128]))
+                filepath
     Version -> putStrLn "Keelung v0.9.3"
   where
     asB64 :: Either (Error B64) (RelocatedConstraintSystem B64) -> Either (Error B64) (RelocatedConstraintSystem B64)

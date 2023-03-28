@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Interpreter.R1CS (run, run') where
+module Keelung.Interpreter.R1CS (run, run', Error (..)) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -12,19 +12,17 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Data.Validation (toEither)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Data.VarGroup
-import Keelung.Interpreter.Monad (Constraint (..), Error (..))
+import Keelung.Interpreter.Arithmetics
+import Keelung.Interpreter.R1CS.Monad
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
@@ -50,11 +48,12 @@ run' r1cs inputs = do
 --   3. binary representation constraints
 --   4. CNEQ constraints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Seq (Constraint n)
-fromOrdinaryConstraints (R1CS ordinaryConstraints binReps counters cneqs) =
+fromOrdinaryConstraints (R1CS ordinaryConstraints binReps counters cneqs divMods) =
   Seq.fromList (map R1CConstraint ordinaryConstraints)
     <> Seq.fromList booleanInputVarConstraints
     <> Seq.fromList (map BinRepConstraint binReps)
     <> Seq.fromList (map CNEQConstraint cneqs)
+    <> Seq.fromList (map DivModConstaint divMods)
   where
     booleanInputVarConstraints =
       let generate (start, end) =
@@ -79,7 +78,9 @@ goThroughManyTimes constraints = do
     Eliminated -> return ()
     NothingToDo -> return ()
     -- stuck
-    Stuck _ -> throwError (R1CSStuckError $ toList constraints)
+    Stuck _ -> do
+      context <- get
+      throwError (StuckError context (toList constraints))
 
 -- Go through a sequence of constraints
 goThroughOnce :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n (Result (Seq (Constraint n)))
@@ -91,7 +92,82 @@ lookupVar var = gets (IntMap.lookup var)
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (R1CConstraint r1c) = fmap (pure . R1CConstraint) <$> shrinkR1C r1c
 shrink (CNEQConstraint cneq) = fmap (pure . CNEQConstraint) <$> shrinkCNEQ cneq
+shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
+
+-- | Trying to reduce a DivMod constraint if any of these set of variables are known:
+--    1. dividend & divisor
+--    1. dividend & quotient
+--    2. divisor & quotient & remainder
+shrinkDivMod :: (GaloisField n, Integral n) => (Var, Var, Var, Var) -> M n (Result (Var, Var, Var, Var))
+shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
+  -- check the value of the dividend first,
+  -- if it's unknown, then its value can only be determined from other variables
+  dividendResult <- lookupVar dividendVar
+  divisorResult <- lookupVar divisorVar
+  quotientResult <- lookupVar quotientVar
+  remainderResult <- lookupVar remainderVar
+  case dividendResult of
+    Just dividendVal -> do
+      -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
+      case (divisorResult, quotientResult, remainderResult) of
+        (Just divisorVal, Just actualQuotientVal, Just actualRemainderVal) -> do
+          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          when (expectedQuotientVal /= actualQuotientVal) $
+            throwError $
+              DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
+          when (expectedRemainderVal /= actualRemainderVal) $
+            throwError $
+              DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+          return Eliminated
+        (Just divisorVal, Just actualQuotientVal, Nothing) -> do
+          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          when (expectedQuotientVal /= actualQuotientVal) $
+            throwError $
+              DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
+          bindVar remainderVar expectedRemainderVal
+          return Eliminated
+        (Just divisorVal, Nothing, Just actualRemainderVal) -> do
+          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          when (expectedRemainderVal /= actualRemainderVal) $
+            throwError $
+              DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+          bindVar quotientVar expectedQuotientVal
+          return Eliminated
+        (Just divisorVal, Nothing, Nothing) -> do
+          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
+              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          bindVar quotientVar expectedQuotientVal
+          bindVar remainderVar expectedRemainderVal
+          return Eliminated
+        (Nothing, Just actualQuotientVal, Just actualRemainderVal) -> do
+          let expectedDivisorVal = dividendVal `integerDiv` actualQuotientVal
+              expectedRemainderVal = dividendVal `integerMod` expectedDivisorVal
+          when (expectedRemainderVal /= actualRemainderVal) $
+            throwError $
+              DivModRemainderError dividendVal expectedDivisorVal expectedRemainderVal actualRemainderVal
+          bindVar divisorVar expectedDivisorVal
+          return Eliminated
+        (Nothing, Just actualQuotientVal, Nothing) -> do
+          let expectedDivisorVal = dividendVal `integerDiv` actualQuotientVal
+              expectedRemainderVal = dividendVal `integerMod` expectedDivisorVal
+          bindVar divisorVar expectedDivisorVal
+          bindVar remainderVar expectedRemainderVal
+          return Eliminated
+        _ -> return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
+    Nothing -> do
+      -- we can only piece out the dividend if all of the divisor, quotient, and remainder are known
+      case (divisorResult, quotientResult, remainderResult) of
+        -- divisor, quotient, and remainder are all known
+        (Just divisorVal, Just quotientVal, Just remainderVal) -> do
+          let dividendVal = divisorVal * quotientVal + remainderVal
+          bindVar dividendVar dividendVal
+          return Eliminated
+        _ -> do
+          return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
 
 -- | Trying to reduce a BinRep constraint
 shrinkBinRep :: (GaloisField n, Integral n) => BinRep -> M n (Result BinRep)
@@ -148,23 +224,6 @@ shrinkCNEQ (CNEQ (Right a) (Right b) m) = do
     else do
       bindVar m (recip (a - b))
   return Eliminated
-
---------------------------------------------------------------------------------
-
--- | The interpreter monad
-type M n = StateT (IntMap n) (Except (Error n))
-
-runM :: (GaloisField n, Integral n) => Inputs n -> M n a -> Either (Error n) (Vector n)
-runM inputs p =
-  let counters = Inputs.inputCounters inputs
-   in case runExcept (execStateT p (Inputs.toIntMap inputs)) of
-        Left err -> Left err
-        Right bindings -> case toEither $ toTotal' (getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters, bindings) of
-          Left unbound -> Left (VarUnassignedError' unbound)
-          Right bindings' -> Right bindings'
-
-bindVar :: Var -> n -> M n ()
-bindVar var val = modify' $ IntMap.insert var val
 
 --------------------------------------------------------------------------------
 

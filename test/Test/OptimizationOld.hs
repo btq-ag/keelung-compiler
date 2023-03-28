@@ -29,7 +29,8 @@ tests = do
     it "should work 1" $
       let cs =
             RelocatedConstraintSystem
-              { csConstraints =
+              { csUseNewOptimizer = False,
+                csConstraints =
                   Seq.fromList $
                     concat
                       [ cadd 0 [(0, 4972), (1, 10582), (16, -1)],
@@ -46,9 +47,10 @@ tests = do
                         cadd 11179 [(12, -1)]
                       ],
                 csBinReps = mempty,
-                csCounters = mempty
+                csCounters = mempty,
+                csDivMods = mempty
               }
-       in optimize1 (cs :: RelocatedConstraintSystem GF181) `shouldNotBe` cs
+       in optimizeOld (cs :: RelocatedConstraintSystem GF181) `shouldNotBe` cs
 
   -- describe "Constraint merging (O2)" $ do
   --   it "CAdd & CAdd" $
@@ -156,5 +158,5 @@ tests = do
   where
     count :: Encode t => Comp t -> Either (Error GF181) Int
     count program = do
-      cs <- asGF181 (Compiler.compile program)
+      cs <- asGF181 (Compiler.compileO1Old program)
       return $ length $ toR1Cs $ toR1CS cs
