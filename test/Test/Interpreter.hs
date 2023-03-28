@@ -20,7 +20,6 @@ import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintSystem qualified as Relocated
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
-import Keelung.Data.VarGroup qualified as PartialBinding
 import Keelung.Interpreter.Error qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.Relocated qualified as Relocated
@@ -150,7 +149,7 @@ tests = do
           program
           ([] :: [GF181])
           []
-          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError PartialBinding.emptyPartial "1 = 2")
+          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2")
           (CompileError (Compile.ConflictingValuesF 1 2))
 
       it "assert (true = false) (Boolean)" $ do
@@ -160,7 +159,7 @@ tests = do
           program
           ([] :: [GF181])
           []
-          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError PartialBinding.emptyPartial "True = False")
+          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "True = False")
           (CompileError (Compile.ConflictingValuesB True False))
 
       it "assert (1 = 2) (UInt)" $ do
@@ -170,7 +169,7 @@ tests = do
           program
           ([] :: [GF181])
           []
-          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError PartialBinding.emptyPartial "1 = 2")
+          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2")
           (CompileError (Compile.ConflictingValuesU 1 2))
 
     describe "Boolean" $ do
@@ -508,6 +507,19 @@ tests = do
               return (x `neq` 3)
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] [1]
         runAllExceptForTheOldOptimizer program [3 :: GF181] [] [0]
+
+      it "neq 3" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              assert (x `neq` 3)
+        _debug program
+        runAllExceptForTheOldOptimizer program [5 :: GF181] [] []
+        throwAll
+          program
+          [3 :: GF181]
+          []
+          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ ($UI₄0 = 3)")
+          (CompileError (Compile.ConflictingValuesB True False))
 
       it "rotate" $ do
         let program = do

@@ -8,7 +8,6 @@
 module Keelung.Interpreter.SyntaxTree (runAndOutputWitnesses, run, interpretDivMod, Error (..)) where
 
 import Control.Monad.Except
-import Control.Monad.State
 import Data.Bits (Bits (..))
 import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
@@ -17,7 +16,6 @@ import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Data.VarGroup
-import Keelung.Data.VarGroup qualified as Bindings
 import Keelung.Interpreter.Arithmetics
 import Keelung.Interpreter.SyntaxTree.Monad
 import Keelung.Syntax (Var, Width)
@@ -36,10 +34,10 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
   forM_ (compAssertions comp) $ \e -> do
     values <- interpret e
     when (values /= [1]) $ do
-      bindings <- get
-      let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
+      -- bindings <- get
+      -- let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
-      throwError $ AssertionError bindingsInExpr (show e)
+      throwError $ AssertionError (show e)
 
   -- lastly interpret the expression and return the result
   interpret expr

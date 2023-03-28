@@ -145,7 +145,7 @@ data Error n
   = VarUnboundError String Var
   | VarUnassignedError (VarSet n)
   | ResultSizeError Int Int
-  | AssertionError (Partial n) String
+  | AssertionError String
   | DivModQuotientError n n n n
   | DivModRemainderError n n n n
   | DivModStuckError [Var]
@@ -166,12 +166,8 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   --     <> showList' (map (\x -> "$" <> show x) vars)
   --     <> " are not known "
   --     <> msg
-  show (AssertionError bindings expr) =
-    "assertion failed: "
-      <> expr
-      <> if partialIsEmpty bindings
-        then ""
-        else "\nbindings of free variables in the assertion:\n" <> show bindings
+  show (AssertionError expr) =
+    "assertion failed: " <> expr
   show (DivModQuotientError dividend divisor expected actual) =
     "expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
   show (DivModRemainderError dividend divisor expected actual) =
