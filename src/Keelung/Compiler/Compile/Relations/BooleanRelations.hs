@@ -6,7 +6,7 @@ module Keelung.Compiler.Compile.Relations.BooleanRelations
     Relation (..),
     new,
     lookup,
-    bindToValue,
+    assign,
     relate,
     exportPinnedBitTests,
     size,
@@ -54,19 +54,19 @@ instance Show BooleanRelations where
 new :: BooleanRelations
 new = BooleanRelations mempty mempty mempty
 
-data Relation = Root | Constant Bool | ChildOf Bool RefB
+data Relation = Root | Value Bool | ChildOf Bool RefB
   deriving (Eq, Show)
 
 -- | Returns the result of looking up a variable in the BooleanRelations
-lookup :: BooleanRelations -> RefB -> Relation
-lookup xs var = case Map.lookup var (links xs) of
+lookup :: RefB -> BooleanRelations -> Relation
+lookup var xs = case Map.lookup var (links xs) of
   Nothing -> Root -- 'var' is a root
-  Just (Right value) -> Constant value -- 'var' is a constant
-  Just (Left (relation1, parent)) -> case lookup xs parent of
+  Just (Right value) -> Value value -- 'var' is a constant
+  Just (Left (relation1, parent)) -> case lookup parent xs of
     Root -> ChildOf relation1 parent -- 'parent' is a root
-    Constant value ->
+    Value value ->
       -- 'parent' is a constant
-      Constant (relation1 == value)
+      Value (relation1 == value)
     ChildOf relation2 grandparent ->
       -- 'parent' is a child of 'grandparent'
       ChildOf (relation1 == relation2) grandparent
@@ -74,7 +74,7 @@ lookup xs var = case Map.lookup var (links xs) of
 -- | Calculates the relation between two variables `var1` and `var2`
 --   Returns `Just relation` where `var1 = relation == var2` if the two variables are related.
 relationBetween :: RefB -> RefB -> BooleanRelations -> Maybe Bool
-relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
+relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   (Root, Root) ->
     if var1 == var2
       then Just True
@@ -83,19 +83,19 @@ relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
     if var1 == root2
       then Just relation2
       else Nothing
-  (Root, Constant _) -> Nothing -- var1 is a root, var2 is a constant
+  (Root, Value _) -> Nothing -- var1 is a root, var2 is a constant
   (ChildOf relation1 root1, Root) ->
     if var2 == root1
       then Just relation1
       else Nothing
-  (Constant _, Root) -> Nothing -- var1 is a constant, var2 is a root
+  (Value _, Root) -> Nothing -- var1 is a constant, var2 is a root
   (ChildOf relation1 root1, ChildOf relation2 root2) ->
     if root1 == root2
       then Just (relation1 == relation2)
       else Nothing
-  (Constant _, ChildOf _ _) -> Nothing -- var1 is a constant
-  (ChildOf _ _, Constant _) -> Nothing -- var2 is a constant
-  (Constant value1, Constant value2) -> if value1 == value2 then Just True else Just False
+  (Value _, ChildOf _ _) -> Nothing -- var1 is a constant
+  (ChildOf _ _, Value _) -> Nothing -- var2 is a constant
+  (Value value1, Value value2) -> if value1 == value2 then Just True else Just False
 
 -- | If the RefB is of RefUBit, remember it
 rememberPinnedBitTest :: RefB -> BooleanRelations -> BooleanRelations
@@ -103,9 +103,9 @@ rememberPinnedBitTest (RefUBit width ref index) xs = xs {pinnedBitTests = Set.in
 rememberPinnedBitTest _ xs = xs
 
 -- | Bind a variable to a value
-bindToValue :: RefB -> Bool -> BooleanRelations -> Except (Error n) BooleanRelations
-bindToValue x value xs =
-  case lookup xs x of
+assign :: RefB -> Bool -> BooleanRelations -> Except (Error n) BooleanRelations
+assign x value xs =
+  case lookup x xs of
     Root ->
       -- x does not have a parent, so it is its own root
       return $
@@ -114,7 +114,7 @@ bindToValue x value xs =
             { links = Map.insert x (Right value) (links xs),
               sizes = Map.insert x 1 (sizes xs)
             }
-    Constant oldValue ->
+    Value oldValue ->
       if oldValue == value
         then
           return $
@@ -134,29 +134,28 @@ bindToValue x value xs =
               sizes = Map.insert x 1 (sizes xs)
             }
 
-relate :: RefB -> (Bool, RefB) -> BooleanRelations -> Except (Error n) (Maybe BooleanRelations)
-relate x (relation, y) xs
-  | x > y = relate' x (relation, y) xs
-  | x < y = relate' y (relation, x) xs
-  | otherwise = return Nothing
+relate :: RefB -> Bool -> RefB -> BooleanRelations -> Except (Error n) BooleanRelations
+relate x polarity y xs
+  | x > y = relate' x polarity y xs
+  | x < y = relate' y polarity x xs
+  | otherwise = return xs
 
 -- | Establish the relation of 'x = (relation == y)'
 --   Returns Nothing if the relation has already been established
-relate' :: RefB -> (Bool, RefB) -> BooleanRelations -> Except (Error n) (Maybe BooleanRelations)
-relate' x (relation, y) xs =
-  case lookup xs x of
-    Constant constantX ->
-      Just <$> bindToValue y (relation == constantX) xs
+relate' :: RefB -> Bool -> RefB -> BooleanRelations -> Except (Error n) BooleanRelations
+relate' x relation y xs =
+  case lookup x xs of
+    Value constantX ->
+      assign y (relation == constantX) xs
     ChildOf relationX rootOfX ->
-      relate rootOfX (relation == relationX, y) xs
+      relate rootOfX (relation == relationX) y xs
     Root ->
       -- x does not have a parent, so it is its own root
-      case lookup xs y of
-        Constant constantY ->
-          Just <$> bindToValue x (relation == constantY) xs
+      case lookup y xs of
+        Value constantY ->
+          assign x (relation == constantY) xs
         ChildOf relationY rootOfY ->
           return $
-            Just $
               rememberPinnedBitTest x $
                 xs
                   { links = Map.insert x (Left (relation == relationY, rootOfY)) (links xs),
@@ -165,7 +164,6 @@ relate' x (relation, y) xs =
         Root ->
           -- y does not have a parent, so it is its own root
           return $
-            Just $
               rememberPinnedBitTest x $
                 xs
                   { links = Map.insert x (Left (relation, y)) (links xs),

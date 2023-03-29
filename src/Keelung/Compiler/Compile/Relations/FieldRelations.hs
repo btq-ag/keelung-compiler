@@ -142,15 +142,16 @@ relationBetween var1 var2 xs = case (parentOf xs var1, parentOf xs var2) of
 
 bindBoolean :: RefB -> Bool -> FieldRelations n -> Except (Error n) (FieldRelations n)
 bindBoolean ref val xs = do
-  result <- BooleanRelations.bindToValue ref val (booleanRelations xs)
+  result <- BooleanRelations.assign ref val (booleanRelations xs)
   return $ xs {booleanRelations = result}
 
 relateBoolean :: RefB -> (Bool, RefB) -> FieldRelations n -> Except (Error n) (FieldRelations n)
 relateBoolean refA (same, refB) xs = do
-  result <- BooleanRelations.relate refA (same, refB) (booleanRelations xs)
-  case result of
-    Nothing -> return xs
-    Just boolRels -> return $ xs {booleanRelations = boolRels}
+  result <- BooleanRelations.relate refA same refB (booleanRelations xs)
+  return $ xs {booleanRelations = result}
+  -- case result of
+  --   Nothing -> return xs
+  --   Just boolRels -> return $ xs {booleanRelations = boolRels}
 
 -- | Bind a variable to a value
 bindToValue :: (GaloisField n, Integral n) => RefF -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)

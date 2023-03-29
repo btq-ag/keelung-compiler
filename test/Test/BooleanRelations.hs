@@ -99,17 +99,16 @@ runM :: M a -> IO a
 runM p = evalStateT p BooleanRelations.new
 
 relate :: RefB -> (Bool, RefB) -> M ()
-relate var val = do
+relate var (polarity, val) = do
   xs <- get
-  case runExcept (BooleanRelations.relate var val xs) of
+  case runExcept (BooleanRelations.relate var polarity val xs) of
     Left err -> error $ show (err :: Error GF181)
-    Right Nothing -> return ()
-    Right (Just result) -> put result
+    Right result -> put result
 
 bindToValue :: RefB -> Bool -> M ()
 bindToValue var val = do
   xs <- get
-  case runExcept (BooleanRelations.bindToValue var val xs) of
+  case runExcept (BooleanRelations.assign var val xs) of
     Left err -> error $ show (err :: Error GF181)
     Right result -> put result
 
@@ -122,8 +121,8 @@ assertRelation var1 var2 result = do
 assertBinding :: RefB -> Maybe Bool -> M ()
 assertBinding var val = do
   xs <- get
-  case BooleanRelations.lookup xs var of
-    BooleanRelations.Constant value -> val `shouldBe` Just value
+  case BooleanRelations.lookup var xs of
+    BooleanRelations.Value value -> val `shouldBe` Just value
     _ -> val `shouldBe` Nothing
 
 ------------------------------------------------------------------------
@@ -134,10 +133,9 @@ instance Arbitrary BooleanRelations where
 
     return $ foldl go BooleanRelations.new relations
     where
-      go xs (var, slope, ref) = case runExcept (BooleanRelations.relate var (slope, ref) xs) of
+      go xs (var, polarity, ref) = case runExcept (BooleanRelations.relate var polarity ref xs) of
         Left err -> error $ show (err :: Error GF181)
-        Right Nothing -> xs
-        Right (Just result) -> result
+        Right result -> result
 
 instance Arbitrary RefB where
   arbitrary = RefB <$> arbitrary

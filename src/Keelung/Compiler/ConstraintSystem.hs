@@ -304,11 +304,11 @@ relocateConstraintSystem cs =
           FieldRelations.ChildOf slope root intercept ->
             -- var = slope * root + intercept
             case root of
-              RefBtoRefF refB -> case BooleanRelations.lookup boolRels refB of
+              RefBtoRefF refB -> case BooleanRelations.lookup refB boolRels of
                 BooleanRelations.Root -> case PolyG.build intercept [(var, -1), (root, slope)] of
                   Left _ -> Nothing
                   Right poly -> Just $ fromConstraint counters $ CAddF poly
-                BooleanRelations.Constant intercept' ->
+                BooleanRelations.Value intercept' ->
                   -- root = intercept'
                   Just $ fromConstraint counters $ CVarBindF var (slope * (if intercept' then 1 else 0) + intercept)
                 BooleanRelations.ChildOf slope' root' ->
@@ -354,12 +354,12 @@ relocateConstraintSystem cs =
               else Nothing
           convert (var, Left (dontFlip, root)) =
             if shouldKeep var
-              then case BooleanRelations.lookup relations root of
+              then case BooleanRelations.lookup root relations of
                 BooleanRelations.Root ->
                   if shouldKeep root
                     then if dontFlip then Just $ CVarEqB var root else Just $ CVarNEqB var root
                     else Nothing
-                BooleanRelations.Constant value ->
+                BooleanRelations.Value value ->
                   if shouldKeep var
                     then
                       Just $

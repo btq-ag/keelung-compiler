@@ -1,10 +1,13 @@
 module Test.BooleanRelations2 (tests, run) where
 
+import Control.Monad.Except
 import Control.Monad.State
 import Data.Map.Strict qualified as Map
-import Keelung.Compiler.Constraint (RefB (..))
+import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.BooleanRelations2 (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.BooleanRelations2 qualified as BooleanRelations
+import Keelung.Compiler.Constraint (RefB (..))
+import Keelung.Field (GF181)
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
 
@@ -159,7 +162,7 @@ tests = do
                       (RefB 2, True)
                     ]
               )
-          
+
           isValid
 
 ------------------------------------------------------------------------
@@ -170,10 +173,20 @@ runM :: M a -> IO a
 runM p = evalStateT p BooleanRelations.new
 
 relate :: RefB -> (Bool, RefB) -> M ()
-relate a (polarity, b) = modify' $ BooleanRelations.relate a polarity b
+relate a (polarity, b) = do
+  xs <- get
+  case runExcept (BooleanRelations.relate a polarity b xs) of
+    Left err -> error $ show (err :: Error GF181)
+    Right result -> put result
+
+-- modify' $ BooleanRelations.relate a polarity b
 
 assign :: RefB -> Bool -> M ()
-assign var val = modify' $ BooleanRelations.assign var val
+assign var val = do 
+  xs <- get
+  case runExcept (BooleanRelations.assign var val xs) of
+    Left err -> error $ show (err :: Error GF181)
+    Right result -> put result
 
 assertRelation :: RefB -> RefB -> Maybe Bool -> M ()
 assertRelation var1 var2 result = do

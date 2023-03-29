@@ -512,7 +512,7 @@ tests = do
         let program = do
               x <- inputUInt @4 Public
               assert (x `neq` 3)
-        _debug program
+        -- _debug program
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] []
         throwAll
           program

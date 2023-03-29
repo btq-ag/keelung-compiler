@@ -12,17 +12,21 @@ module Keelung.Compiler.Compile.Relations.BooleanRelations2
     relationBetween,
     lookupOneStep,
     inspectChildrenOf,
-    isValid
+    isValid,
+    toIntMap,
+    size,
   )
 where
 
 import Control.DeepSeq (NFData)
+import Control.Monad.Except
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
+import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Constraint (RefB (..))
 import Prelude hiding (lookup)
 
@@ -83,18 +87,22 @@ lookup var relations = case Map.lookup var (toRoot relations) of
     ChildOf polarity' grandparent -> ChildOf (polarity == polarity') grandparent
 
 -- | Assigns a value to a variable, O(lg n)
-assign :: RefB -> Bool -> BooleanRelations -> BooleanRelations
+assign :: RefB -> Bool -> BooleanRelations -> Except (Error n) BooleanRelations
 assign ref value relations = case lookup ref relations of
   Root ->
-    relations
-      { toRoot = Map.insert ref (Constant value) (toRoot relations),
-        toChildren = Map.insert ref (Left value) (toChildren relations)
-      }
-  Value _ -> relations -- already assigned
+    return
+      relations
+        { toRoot = Map.insert ref (Constant value) (toRoot relations),
+          toChildren = Map.insert ref (Left value) (toChildren relations)
+        }
+  Value oldValue ->
+    if oldValue == value
+      then return relations -- already assigned
+      else throwError (ConflictingValuesB oldValue value)
   ChildOf polarity parent -> assign parent (polarity == value) relations
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
+relate :: RefB -> Bool -> RefB -> BooleanRelations -> Except (Error n) BooleanRelations
 relate a polarity b relations = case compareSeniority a b of
   LT -> relate' a polarity b relations
   GT -> relate' b polarity a relations
@@ -114,11 +122,11 @@ relate a polarity b relations = case compareSeniority a b of
         ChildOf _ parent -> childrenSizeOf parent
 
 -- | Relates a child to a parent
-relate' :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
+relate' :: RefB -> Bool -> RefB -> BooleanRelations -> Except (Error n) BooleanRelations
 relate' child polarity parent relations =
   case lookup parent relations of
     Root -> case lookup child relations of
-      Root -> relateRootToRoot child polarity parent relations
+      Root -> return $ relateRootToRoot child polarity parent relations
       Value value -> assign parent (polarity == value) relations
       ChildOf polarity' parent' -> relate' parent' (polarity == polarity') parent relations
     Value value -> assign child (polarity == value) relations
@@ -177,6 +185,17 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   (Value _, ChildOf _ _) -> Nothing -- var1 is a constant value
   (ChildOf _ _, Value _) -> Nothing -- var2 is a constant value
   (Value value1, Value value2) -> Just (value1 == value2)
+
+-- | Export the internal representation of the relations as a map from variables to their relations
+toIntMap :: BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
+toIntMap = fmap go . toRoot
+  where
+    go :: Relation -> Either (Bool, RefB) Bool
+    go (Constant value) = Right value
+    go (RootIs polarity parent) = Left (polarity, parent)
+
+size :: BooleanRelations -> Int
+size = Map.size . toRoot
 
 -- | Non-recursive version of `lookup`, for inspecting the internal relation between two variables
 lookupOneStep :: RefB -> BooleanRelations -> Lookup

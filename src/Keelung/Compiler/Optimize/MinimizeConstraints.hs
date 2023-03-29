@@ -288,17 +288,17 @@ substPolyG_ :: (Integral n, GaloisField n) => FieldRelations n -> BooleanRelatio
 substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case FieldRelations.parentOf ctx ref of
   FieldRelations.Root -> case ref of
     RefBtoRefF refB ->
-      case BooleanRelations.lookup boolRels refB of
+      case BooleanRelations.lookup refB boolRels of
         BooleanRelations.Root ->
           case accPoly of
             Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
             Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
-        BooleanRelations.Constant True ->
+        BooleanRelations.Value True ->
           let removedRefs' = ref : removedRefs -- add ref to removedRefs
            in case accPoly of
                 Left c -> (True, Left (c + coeff), removedRefs', addedRefs)
                 Right xs -> (True, Right $ PolyG.addConstant coeff xs, removedRefs', addedRefs)
-        BooleanRelations.Constant False ->
+        BooleanRelations.Value False ->
           let removedRefs' = ref : removedRefs -- add ref to removedRefs
            in case accPoly of
                 Left c -> (changed, Left c, removedRefs', addedRefs)
