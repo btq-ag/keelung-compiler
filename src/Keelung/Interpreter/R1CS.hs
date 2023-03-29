@@ -257,19 +257,19 @@ shrinkR1C :: (GaloisField n, Integral n) => R1C n -> M n (Result (R1C n))
 shrinkR1C r1c = do
   bindings <- get
   case r1c of
-    R1C (Left _) (Left _) (Left _) -> return Eliminated
+    R1C (Left a) (Left b) (Left c) -> eliminatedIfHold a b c
     R1C (Left a) (Left b) (Right cs) -> case substAndView bindings cs of
-      Constant _ -> return Eliminated
+      Constant c -> eliminatedIfHold a b c
       Uninomial c (var, coeff) -> do
         -- a * b - c = coeff var
         bindVar var ((a * b - c) / coeff)
         return Eliminated
       Polynomial _ -> return $ Stuck r1c
     R1C (Left a) (Right bs) (Left c) -> case substAndView bindings bs of
-      Constant _ -> return Eliminated
+      Constant b -> eliminatedIfHold a b c
       Uninomial b (var, coeff) -> do
         if a == 0
-          then return Eliminated
+          then eliminatedIfHold a b c
           else do
             -- a * (b + coeff var) = c
             --    =>
@@ -282,7 +282,7 @@ shrinkR1C r1c = do
             return Eliminated
       Polynomial _ -> return $ Stuck r1c
     R1C (Left a) (Right bs) (Right cs) -> case (substAndView bindings bs, substAndView bindings cs) of
-      (Constant _, Constant _) -> return Eliminated
+      (Constant b, Constant c) -> eliminatedIfHold a b c
       (Constant b, Uninomial c (var, coeff)) -> do
         -- a * b - c = coeff var
         bindVar var ((a * b - c) / coeff)
@@ -290,7 +290,7 @@ shrinkR1C r1c = do
       (Constant _, Polynomial _) -> return $ Stuck r1c
       (Uninomial b (var, coeff), Constant c) ->
         if a == 0
-          then return Eliminated
+          then eliminatedIfHold a b c
           else do
             -- a * (b + coeff var) = c
             bindVar var ((c - a * b) / (coeff * a))
@@ -301,10 +301,10 @@ shrinkR1C r1c = do
       (Polynomial _, Uninomial _ _) -> return $ Stuck r1c
       (Polynomial _, Polynomial _) -> return $ Stuck r1c
     R1C (Right as) (Left b) (Left c) -> case substAndView bindings as of
-      Constant _ -> return Eliminated
+      Constant a -> eliminatedIfHold a b c
       Uninomial a (var, coeff) -> do
         if b == 0
-          then return Eliminated
+          then eliminatedIfHold a b c
           else do
             -- (a + coeff var) * b = c
             -- var = (c - a * b) / (coeff * b)
@@ -312,7 +312,7 @@ shrinkR1C r1c = do
             return Eliminated
       Polynomial _ -> return $ Stuck r1c
     R1C (Right as) (Left b) (Right cs) -> case (substAndView bindings as, substAndView bindings cs) of
-      (Constant _, Constant _) -> return Eliminated
+      (Constant a, Constant c) -> eliminatedIfHold a b c
       (Constant a, Uninomial c (var, coeff)) -> do
         -- a * b - c = coeff var
         bindVar var ((a * b - c) / coeff)
@@ -320,7 +320,7 @@ shrinkR1C r1c = do
       (Constant _, Polynomial _) -> return $ Stuck r1c
       (Uninomial a (var, coeff), Constant c) -> do
         if b == 0
-          then return Eliminated
+          then eliminatedIfHold a b c
           else do
             -- (a + coeff var) * b = c
             bindVar var ((c - a * b) / (coeff * b))
@@ -331,10 +331,10 @@ shrinkR1C r1c = do
       (Polynomial _, Uninomial _ _) -> return $ Stuck r1c
       (Polynomial _, Polynomial _) -> return $ Stuck r1c
     R1C (Right as) (Right bs) (Left c) -> case (substAndView bindings as, substAndView bindings bs) of
-      (Constant _, Constant _) -> return Eliminated
+      (Constant a, Constant b) -> eliminatedIfHold a b c
       (Constant a, Uninomial b (var, coeff)) -> do
         if a == 0
-          then return Eliminated
+          then eliminatedIfHold a b c
           else do
             -- a * (b + coeff var) = c
             --    =>
@@ -348,7 +348,7 @@ shrinkR1C r1c = do
       (Constant _, Polynomial _) -> return $ Stuck r1c
       (Uninomial a (var, coeff), Constant b) -> do
         if b == 0
-          then return Eliminated
+          then eliminatedIfHold a b c
           else do
             -- (a + coeff var) * b = c
             bindVar var ((c - a * b) / (coeff * b))
@@ -359,7 +359,7 @@ shrinkR1C r1c = do
       (Polynomial _, Uninomial _ _) -> return $ Stuck r1c
       (Polynomial _, Polynomial _) -> return $ Stuck r1c
     R1C (Right as) (Right bs) (Right cs) -> case (substAndView bindings as, substAndView bindings bs, substAndView bindings cs) of
-      (Constant _, Constant _, Constant _) -> return Eliminated
+      (Constant a, Constant b, Constant c) -> eliminatedIfHold a b c
       (Constant a, Constant b, Uninomial c (var, coeff)) -> do
         -- a * b - c = coeff var
         bindVar var ((a * b - c) / coeff)
@@ -367,7 +367,7 @@ shrinkR1C r1c = do
       (Constant _, Constant _, Polynomial _) -> return $ Stuck r1c
       (Constant a, Uninomial b (var, coeff), Constant c) -> do
         if a == 0
-          then return Eliminated
+          then eliminatedIfHold a b c
           else do
             -- a * (b + coeff var) = c
             --    =>
@@ -385,7 +385,7 @@ shrinkR1C r1c = do
       (Constant _, Polynomial _, Polynomial _) -> return $ Stuck r1c
       (Uninomial a (var, coeff), Constant b, Constant c) -> do
         if b == 0
-          then return Eliminated
+          then eliminatedIfHold a b c
           else do
             -- (a + coeff var) * b = c
             bindVar var ((c - a * b) / (coeff * b))
@@ -407,6 +407,14 @@ shrinkR1C r1c = do
       (Polynomial _, Polynomial _, Constant _) -> return $ Stuck r1c
       (Polynomial _, Polynomial _, Uninomial _ _) -> return $ Stuck r1c
       (Polynomial _, Polynomial _, Polynomial _) -> return $ Stuck r1c
+  where
+    -- return Eliminated if the equation holds
+    -- else throw an error
+    eliminatedIfHold :: (Num n, Eq n) => n -> n -> n -> M n (Result (R1C n))
+    eliminatedIfHold a b c = do
+      if a * b == c
+        then return Eliminated
+        else throwError $ R1CInconsistentError a b c
 
 -- | Substitute varaibles with values in a polynomial
 substAndView :: (Num n, Eq n) => IntMap n -> Poly n -> PolyResult n

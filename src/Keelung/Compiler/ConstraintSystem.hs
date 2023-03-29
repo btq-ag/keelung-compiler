@@ -311,9 +311,9 @@ relocateConstraintSystem cs =
                 BooleanRelations.Value intercept' ->
                   -- root = intercept'
                   Just $ fromConstraint counters $ CVarBindF var (slope * (if intercept' then 1 else 0) + intercept)
-                BooleanRelations.ChildOf slope' root' ->
-                  -- root = slope' * root' + intercept'
-                  case PolyG.build intercept [(var, -1), (RefBtoRefF root', (if slope' then 1 else -1) * slope)] of
+                BooleanRelations.ChildOf polarity root' ->
+                  -- root = polarity * slope * root' + intercept'
+                  case PolyG.build intercept [(var, -1), (RefBtoRefF root', (if polarity then 1 else -1) * slope)] of
                     Left _ -> Nothing
                     Right poly -> Just $ fromConstraint counters $ CAddF poly
               _ -> case PolyG.build intercept [(var, -1), (root, slope)] of
@@ -366,8 +366,8 @@ relocateConstraintSystem cs =
                         CVarBindB
                           var
                           ( if dontFlip
-                              then (if value then 0 else 1)
-                              else (if value then 1 else 0)
+                              then (if value then 1 else 0)
+                              else (if value then 0 else 1)
                           )
                     else Nothing
                 BooleanRelations.ChildOf dontFlip' root' ->

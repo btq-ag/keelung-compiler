@@ -78,12 +78,10 @@ instance Functor Constraint where
 
 data Error n
   = VarUnassignedError IntSet
-  | AssertionError String (IntMap n)
+  | R1CInconsistentError n n n
   | StuckError (IntMap n) [Constraint n]
   | DivModQuotientError n n n n
   | DivModRemainderError n n n n
-  -- | DivModMissingDivisorAndQuotientError n n
-  -- | DivModMissingDivisorAndQuotientAndRemainderError n
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -92,14 +90,8 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (VarUnassignedError unboundVariables) =
     "these variables have no bindings:\n  "
       ++ showList' (map (\var -> "$" <> show var) $ IntSet.toList unboundVariables)
-  show (AssertionError expr bindings) =
-    "assertion failed: "
-      <> expr
-      <> if IntMap.null bindings
-        then ""
-        else
-          "\nbindings of free variables in the assertion:\n"
-            <> showList' (map (\(var, val) -> "$" <> show var <> " = " <> show (N val)) (IntMap.toList bindings))
+  show (R1CInconsistentError a b c) =
+    "equation doesn't hold: `" <> show (N a) <> " * " <> show (N b) <> " ≠ " <> show (N c) <> "`"
   show (StuckError context constraints) =
     "stuck when trying to solve these constraints: \n"
       <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints
@@ -109,7 +101,3 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "Expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
   show (DivModRemainderError dividend divisor expected actual) =
     "Expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
-  -- show (DivModMissingDivisorAndQuotientError dividend remainder) =
-  --   "Cannot solve the equation `" <> show (N dividend) <> " = $divisor * $quotient + `" <> show (N remainder) <> "` because both $divisor and $quotient are missing"
-  -- show (DivModMissingDivisorAndQuotientAndRemainderError dividend) =
-  --   "Cannot solve the equation `" <> show (N dividend) <> " = $divisor *  $quotient + $remainder` only the value of dividend is available"

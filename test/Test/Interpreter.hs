@@ -400,7 +400,8 @@ tests = do
           []
           ([] :: [GF181])
           (Interpreter.SyntaxTreeError (SyntaxTree.DivModQuotientError 7 3 2 3))
-          (InterpretError (Interpreter.R1CSError (R1CS.DivModQuotientError 7 3 2 3)))
+          (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 3 3 6)))
+          -- (InterpretError (Interpreter.R1CSError (R1CS.DivModQuotientError 7 3 2 3)))
 
       it "assertDivMod (with wrong remainder constant)" $ do
         let program = assertDivMod 7 (3 :: UInt 4) 2 0
@@ -409,7 +410,8 @@ tests = do
           []
           ([] :: [GF181])
           (Interpreter.SyntaxTreeError (SyntaxTree.DivModRemainderError 7 3 1 0))
-          (InterpretError (Interpreter.R1CSError (R1CS.DivModRemainderError 7 3 1 0)))
+          (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 3 2 7)))
+          -- (InterpretError (Interpreter.R1CSError (R1CS.DivModRemainderError 7 3 1 0)))
 
       it "assertDivMod (multiple statements)" $ do
         let program = do
@@ -511,15 +513,24 @@ tests = do
       it "neq 3" $ do
         let program = do
               x <- inputUInt @4 Public
-              assert (x `neq` 3)
-        -- _debug program
+              assert $ x `neq` 3
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] []
         throwAll
           program
           [3 :: GF181]
           []
           (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ ($UI₄0 = 3)")
-          (CompileError (Compile.ConflictingValuesB True False))
+          (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError 0 0 1))
+
+      it "neq 4" $ do
+        let program = do
+              assert $ 3 `neq` (3 :: UInt 4)
+        throwAll
+          program
+          []
+          ([] :: [GF181])
+          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ (3 = 3)")
+          (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError 0 0 1))
 
       it "rotate" $ do
         let program = do
