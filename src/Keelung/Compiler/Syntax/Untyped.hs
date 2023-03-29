@@ -14,9 +14,7 @@ module Keelung.Compiler.Syntax.Untyped
     lookupF,
     lookupB,
     lookupU,
-    Relations (..),
     SideEffect (..),
-    -- sizeOfExpr,
   )
 where
 
@@ -25,10 +23,7 @@ import Data.IntMap (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.Util (indent)
 import Keelung.Data.Struct (Struct (..))
-import Keelung.Data.Struct qualified as Struct
-import Keelung.Data.VarGroup (toSubscript)
 import Keelung.Field (N (..))
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
@@ -94,6 +89,7 @@ data ExprF n
   | AddF (ExprF n) (ExprF n) (Seq (ExprF n))
   | MulF (ExprF n) (ExprF n)
   | DivF (ExprF n) (ExprF n)
+  -- | MMIF (ExprF n) Int -- modular multiplicative inverse
   | -- logical operators
     IfF (ExprB n) (ExprF n) (ExprF n)
   | BtoF (ExprB n)
@@ -109,6 +105,7 @@ instance (Show n, Integral n) => Show (ExprF n) where
     SubF x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddF x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
     MulF x y -> chain prec " * " 7 $ x :<| y :<| Empty
+    -- MMIF x p -> showString "modInv " . showsPrec prec x . showString " " . shows p
     DivF x y -> chain prec " / " 7 $ x :<| y :<| Empty
     IfF p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoF x -> showString "B→F " . showsPrec prec x
@@ -149,6 +146,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
+    -- InvU _ x -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹"
     AndU _ x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrU _ x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorU _ x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
@@ -193,6 +191,7 @@ widthOfU expr = case expr of
   SubU w _ _ -> w
   AddU w _ _ -> w
   MulU w _ _ -> w
+  -- InvU w _ -> w
   AndU w _ _ _ -> w
   OrU w _ _ _ -> w
   XorU w _ _ -> w
@@ -239,7 +238,7 @@ data TypeErased n = TypeErased
   }
 
 instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ counters  assertions _sideEffects) =
+  show (TypeErased expr _ counters assertions _sideEffects) =
     "TypeErased {\n"
       -- expressions
       <> "  Expression: "
@@ -275,42 +274,3 @@ lookupB var = IntMap.lookup var . structB
 
 lookupU :: Width -> Var -> Struct a b (IntMap u) -> Maybe u
 lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (structU bindings)
-
---------------------------------------------------------------------------------
-
-data Relations n = Relations
-  { -- var = value
-    valueBindings :: Struct (IntMap n) (IntMap n) (IntMap n),
-    -- var = expression
-    exprBindings :: Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n))
-  }
-
-instance (Integral n, Show n) => Show (Relations n) where
-  show (Relations vb eb) =
-    ( if Struct.empty vb
-        then ""
-        else "Binding of intermediate variables to values:\n" <> indent (show vb) <> "\n"
-    )
-      <> ( if Struct.empty eb
-             then ""
-             else "Binding of intermediate variables to expressions:\n" <> indent' (showExprBindings "" eb) <> "\n"
-         )
-    where
-      indent' = unlines . map ("  " <>)
-
-      showExprBinding prefix suffix (var, val) = prefix <> suffix <> show var <> " = " <> show val
-
-      showExprBindings :: (Integral n, Show n) => String -> Struct (IntMap (ExprF n)) (IntMap (ExprB n)) (IntMap (ExprU n)) -> [String]
-      showExprBindings suffix (Struct f b u) =
-        map (showExprBinding "F" suffix) (IntMap.toList f)
-          <> map (showExprBinding "B" suffix) (IntMap.toList b)
-          <> concatMap (\(width, xs) -> map (showExprBinding ("U" <> toSubscript width) suffix) (IntMap.toList xs)) (IntMap.toList u)
-
-instance Semigroup (Relations n) where
-  Relations vb0 eb0 <> Relations vb1 eb1 =
-    Relations
-      (vb0 <> vb1)
-      (eb0 <> eb1)
-
-instance Monoid (Relations n) where
-  mempty = Relations mempty mempty

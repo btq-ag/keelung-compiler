@@ -9,6 +9,7 @@ import Control.Arrow (left)
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
 import Data.Map.Strict qualified as Map
@@ -278,8 +279,8 @@ freshRefU width = do
   modifyCounter $ addCount OfIntermediate (OfUInt width) 1
   return $ RefU width index
 
-freshVarU :: Width -> M n (ExprU n)
-freshVarU width = do
+freshExprU :: Width -> M n (ExprU n)
+freshExprU width = do
   counters <- gets csCounters
   let index = getCount OfIntermediate (OfUInt width) counters
   modifyCounter $ addCount OfIntermediate (OfUInt width) 1
@@ -399,6 +400,21 @@ compileExprF out expr = case expr of
     x' <- wireF x
     y' <- wireF y
     add $ cMulSimpleF y' out x'
+  -- MMIF x p -> do
+  --   -- See: https://github.com/btq-ag/keelung-compiler/issues/14
+  --   -- 1. x * x⁻¹ = np + 1
+  --   -- 2. n ≤ ⌈log₂p⌉
+
+  --   -- constraint: n ≤ ⌈log₂p⌉
+  --   let upperBoundOfN = ceiling (logBase 2 (fromIntegral p) :: Double) :: Integer
+  --   let bitWidthOfUIntThatCanStoreUpperBoundOfN = ceiling (logBase 2 (fromIntegral upperBoundOfN) :: Double) :: Int
+  --   n <- freshRefU bitWidthOfUIntThatCanStoreUpperBoundOfN
+  --   let diff = 2 ^ bitWidthOfUIntThatCanStoreUpperBoundOfN - upperBoundOfN
+
+  --   -- constraint: x * x⁻¹ = np + 1
+  --   x' <- wireF x
+  --   inv <- freshRefF
+  --   add $ cMulF (0, [(x', 1)]) (0, [(inv, -1)]) (1, [(RefUVal n, fromIntegral p)])
   IfF p x y -> do
     p' <- wireB p
     x' <- wireF x
@@ -448,6 +464,15 @@ compileExprU out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileMulU w out x' y'
+  -- InvU w a p -> do
+  --   -- See: https://github.com/btq-ag/keelung-compiler/issues/14
+  --   -- 1. a * a⁻¹ = np + 1
+  --   -- 2. n ≤ ⌈log₂p⌉
+  --   a' <- wireU a
+  --   inv <- freshRefU w
+  --   n <- freshRefU w
+  --   add $ cMulF (1, [(RefUVal a', 1)]) (1, [(RefUVal inv, -1)]) (1, [(RefU w n, 1)])
+
   AndU w x y xs -> do
     forM_ [0 .. w - 1] $ \i -> do
       compileExprB
@@ -913,7 +938,7 @@ assertLTU width x y = do
   --  =>
   --    0 < y - x
   --  that is, there exists a non-zero BinRep of y - x
-  difference <- freshVarU width
+  difference <- freshExprU width
   difference' <- wireU difference
   compileSubU width difference' y x
   assertNotZeroU width difference
@@ -997,3 +1022,37 @@ compileDivModU width dividend divisor quotient remainder = do
   -- -- =>
   -- --    divisor != 0
   assertNotZeroU width divisor
+
+--------------------------------------------------------------------------------
+
+-- | Assert that a UInt is smaller than or equal to another UInt
+rangeCheckLTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Int -> M n ()
+rangeCheckLTE width a c = do
+  ref <- wireU a
+  foldM_ (go ref) Nothing [width - 1 .. 0]
+  where
+    go :: (GaloisField n, Integral n) => RefU -> Maybe RefF -> Int -> M n (Maybe RefF)
+    go ref Nothing i =
+      let aBit = RefBtoRefF (RefUBit width ref i)
+       in -- have not found the first bit in 'c' that is 1 yet
+          if Data.Bits.testBit c i
+            then do
+              -- Boolean constraint on a[i]
+              add $ cMulF (0, [(aBit, 1)]) (0, [(aBit, 1)]) (0, [(aBit, 1)])
+              return $ Just aBit -- when found, return a[i] and a counter
+            else return Nothing -- otherwise, continue searching
+    go ref (Just acc) i =
+      let aBit = RefBtoRefF (RefUBit width ref i)
+       in if Data.Bits.testBit c i
+            then do
+              -- Boolean constraint on a[i]
+              add $ cMulF (0, [(aBit, 1)]) (0, [(aBit, 1)]) (0, [(aBit, 1)])
+              -- constraint for the next accumulator
+              acc' <- freshRefF
+              add $ cMulF (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(acc', 1)])
+              return $ Just acc'
+            else do
+              -- constraint on a[i]
+              add $ cMulF (1, [(acc, -1), (aBit, -1)]) (0, [(aBit, 1)]) (0, [])
+              -- pass down the accumulator
+              return $ Just acc
