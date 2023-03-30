@@ -54,6 +54,7 @@ compileSideEffect (AssignmentB2 var val) = compileExprB (RefB var) val
 compileSideEffect (AssignmentF2 var val) = compileExprF (RefF var) val
 compileSideEffect (AssignmentU2 width var val) = compileExprU (RefU width var) val
 compileSideEffect (DivMod width dividend divisor quotient remainder) = compileDivModU width dividend divisor quotient remainder
+compileSideEffect (AssertLTE width value bound) = assertLTE width value bound
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
@@ -200,7 +201,7 @@ add :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 add = mapM_ addOne
   where
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
-    addOne (CAddF xs) = modify (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
+    addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       cs <- get
       csFieldRelations' <- lift $ FieldRelations.bindToValue x c (csFieldRelations cs)
@@ -233,11 +234,11 @@ add = mapM_ addOne
       case result of
         Nothing -> return ()
         Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
-    addOne (CMulF x y (Left c)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
+    addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = do
       modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
-    addOne (CNEqF x y m) = modify (\cs -> addOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
-    addOne (CNEqU x y m) = modify (\cs -> addOccurrences [x, y] $ addOccurrences [m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
+    addOne (CNEqF x y m) = modify' (\cs -> addOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
+    addOne (CNEqU x y m) = modify' (\cs -> addOccurrences [x, y] $ addOccurrences [m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
 
 -- addOne (CRotateU x y _n) = do
 --   cs <- get
@@ -1026,10 +1027,10 @@ compileDivModU width dividend divisor quotient remainder = do
 --------------------------------------------------------------------------------
 
 -- | Assert that a UInt is smaller than or equal to another UInt
-rangeCheckLTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Int -> M n ()
-rangeCheckLTE width a c = do
+assertLTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
+assertLTE width a c = do
   ref <- wireU a
-  foldM_ (go ref) Nothing [width - 1 .. 0]
+  foldM_ (go ref) Nothing [width - 1, width - 2 .. 0]
   where
     go :: (GaloisField n, Integral n) => RefU -> Maybe RefF -> Int -> M n (Maybe RefF)
     go ref Nothing i =
@@ -1038,15 +1039,18 @@ rangeCheckLTE width a c = do
           if Data.Bits.testBit c i
             then do
               -- Boolean constraint on a[i]
-              add $ cMulF (0, [(aBit, 1)]) (0, [(aBit, 1)]) (0, [(aBit, 1)])
+              -- add $ cMulF (0, [(aBit, 1)]) (0, [(aBit, 1)]) (0, [(aBit, 1)])
               return $ Just aBit -- when found, return a[i] and a counter
-            else return Nothing -- otherwise, continue searching
+            else do
+              -- a[i] = 0
+              add $ cVarBindF aBit 0
+              return Nothing -- otherwise, continue searching
     go ref (Just acc) i =
       let aBit = RefBtoRefF (RefUBit width ref i)
        in if Data.Bits.testBit c i
             then do
               -- Boolean constraint on a[i]
-              add $ cMulF (0, [(aBit, 1)]) (0, [(aBit, 1)]) (0, [(aBit, 1)])
+              -- add $ cMulF (0, [(aBit, 1)]) (0, [(aBit, 1)]) (0, [(aBit, 1)])
               -- constraint for the next accumulator
               acc' <- freshRefF
               add $ cMulF (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(acc', 1)])

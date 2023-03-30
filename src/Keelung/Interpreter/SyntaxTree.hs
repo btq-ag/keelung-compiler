@@ -133,6 +133,13 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
   interpret (DivMod width dividend divisor quotient remainder) = do
     interpretDivMod width (dividend, divisor, quotient, remainder)
     return []
+  interpret (AssertLTE _ value bound) = do
+    value' <- interpret value
+    case value' of
+      [v] -> do
+        when (v > fromInteger bound) $ throwError $ AssertLTEError v bound
+        return []
+      _ -> throwError $ ResultSizeError 1 (length value')
 
 instance GaloisField n => Interpret Bool n where
   interpret True = return [one]
@@ -277,6 +284,7 @@ instance FreeVar SideEffect where
   freeVars (AssignmentB var bool) = modifyX (modifyB (IntSet.insert var)) (freeVars bool)
   freeVars (AssignmentU width var uint) = modifyX (modifyU width mempty (IntSet.insert var)) (freeVars uint)
   freeVars (DivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
+  freeVars (AssertLTE _width x _) = freeVars x
 
 instance FreeVar Boolean where
   freeVars expr = case expr of

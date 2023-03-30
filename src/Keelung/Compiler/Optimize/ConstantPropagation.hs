@@ -48,61 +48,13 @@ propagateSideEffect sideEffect = case sideEffect of
       ValU _ v -> modify' $ \bindings -> bindings {structU = IntMap.insertWith (<>) width (IntMap.singleton width v) (structU bindings)}
       _ -> return ()
     return $ AssignmentU2 width var val'
-  DivMod width dividend divisor quotient remainder -> do
-    dividend' <- propagateExprU dividend
-    divisor' <- propagateExprU divisor
-    quotient' <- propagateExprU quotient
-    remainder' <- propagateExprU remainder
-    return $ DivMod width dividend' divisor' quotient' remainder'
-
--- propagateSideEffect :: (Integral n, GaloisField n) => Relations n -> SideEffect n -> SideEffect n
--- propagateSideEffect relations (AssignmentF2 var val) = AssignmentF2 var (propagateExprF relations val)
--- propagateSideEffect relations (AssignmentB2 var val) = AssignmentB2 var (propagateExprB relations val)
--- propagateSideEffect relations (AssignmentU2 width var val) = AssignmentU2 width var (propagateExprU relations val)
--- propagateSideEffect relations (DivMod width dividend divisor quotient remainder) =
---   DivMod width (propagateExprU relations dividend) (propagateExprU relations divisor) (propagateExprU relations quotient) (propagateExprU relations remainder)
-
--- -- | Propagate constants in the relations, and return the fixed point of constant propagation
--- propagateRelations :: Relations n -> Relations n
--- propagateRelations before =
---   let (after, changed) = refineRelations before
---    in if changed
---         then propagateRelations after -- keep running
---         else after -- fixed point of 'refineResult'
-
--- | Seperate value bindings from expression bindings
--- refineRelations :: Relations n -> (Relations n, Bool)
--- refineRelations (Relations vals exprs) =
---   -- extract value bindings from expression bindings
---   let (fsV, fsE) = IntMap.mapEither seperateF (structF exprs)
---       (bsV, bsE) = IntMap.mapEither seperateB (structB exprs)
---       (usV, usE) = bimap IntMap.fromList IntMap.fromList $ unzip $ map (\(k, (a, b)) -> ((k, a), (k, b))) $ IntMap.toList $ fmap (IntMap.mapEither seperateU) (structU exprs)
---       changed = not $ IntMap.null fsV || IntMap.null bsV || IntMap.null usV
---    in ( Relations
---           ( vals
---               { structF = structF vals <> fsV,
---                 structB = structB vals <> bsV,
---                 structU = structU vals <> usV
---               }
---           )
---           (Struct fsE bsE usE),
---         changed
---       )
---   where
---     seperateF :: ExprF n -> Either n (ExprF n)
---     seperateF expr = case expr of
---       ValF val -> Left val
---       _ -> Right expr
-
---     seperateB :: ExprB n -> Either n (ExprB n)
---     seperateB expr = case expr of
---       ValB val -> Left val
---       _ -> Right expr
-
---     seperateU :: ExprU n -> Either n (ExprU n)
---     seperateU expr = case expr of
---       ValU _ val -> Left val
---       _ -> Right expr
+  DivMod width dividend divisor quotient remainder ->
+    DivMod width
+      <$> propagateExprU dividend
+      <*> propagateExprU divisor
+      <*> propagateExprU quotient
+      <*> propagateExprU remainder
+  AssertLTE width expr n -> AssertLTE width <$> propagateExprU expr <*> pure n
 
 -- constant propogation
 propagateExpr :: (GaloisField n, Integral n) => Expr n -> M n (Expr n)

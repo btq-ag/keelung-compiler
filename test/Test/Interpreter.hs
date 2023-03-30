@@ -376,116 +376,169 @@ tests = do
               return (x + y)
 
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
+      describe "DivMod" $ do
+        it "performDivMod (quotient & remainder unknown)" $ do
+          let program = do
+                dividend <- input Private :: Comp (UInt 4)
+                divisor <- input Public
+                performDivMod dividend divisor
+          runAllExceptForTheOldOptimizer program [7 :: GF181] [20] [2, 6]
+          runAllExceptForTheOldOptimizer program [4 :: GF181] [4] [1, 0]
 
-      it "performDivMod (quotient & remainder unknown)" $ do
-        let program = do
-              dividend <- input Private :: Comp (UInt 4)
-              divisor <- input Public
-              performDivMod dividend divisor
-        runAllExceptForTheOldOptimizer program [7 :: GF181] [20] [2, 6]
-        runAllExceptForTheOldOptimizer program [4 :: GF181] [4] [1, 0]
+        it "performDivMod (on constants) (issue #18)" $ do
+          let program = performDivMod 7 (3 :: UInt 4)
+          runAllExceptForTheOldOptimizer program [] [] [2, 1 :: GF181]
 
-      it "performDivMod (on constants) (issue #18)" $ do
-        let program = performDivMod 7 (3 :: UInt 4)
-        runAllExceptForTheOldOptimizer program [] [] [2, 1 :: GF181]
+        it "assertDivMod (on constants) (issue #18)" $ do
+          let program = assertDivMod 7 (3 :: UInt 4) 2 1
+          runAllExceptForTheOldOptimizer program [] [] ([] :: [GF181])
 
-      it "assertDivMod (on constants) (issue #18)" $ do
-        let program = assertDivMod 7 (3 :: UInt 4) 2 1
-        runAllExceptForTheOldOptimizer program [] [] ([] :: [GF181])
+        it "assertDivMod (with wrong quotient constant)" $ do
+          let program = assertDivMod 7 (3 :: UInt 4) 3 1
+          throwAll
+            program
+            []
+            ([] :: [GF181])
+            (Interpreter.SyntaxTreeError (SyntaxTree.DivModQuotientError 7 3 2 3))
+            (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 3 3 6)))
+        -- (InterpretError (Interpreter.R1CSError (R1CS.DivModQuotientError 7 3 2 3)))
 
-      it "assertDivMod (with wrong quotient constant)" $ do
-        let program = assertDivMod 7 (3 :: UInt 4) 3 1
-        throwAll
-          program
-          []
-          ([] :: [GF181])
-          (Interpreter.SyntaxTreeError (SyntaxTree.DivModQuotientError 7 3 2 3))
-          (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 3 3 6)))
-          -- (InterpretError (Interpreter.R1CSError (R1CS.DivModQuotientError 7 3 2 3)))
+        it "assertDivMod (with wrong remainder constant)" $ do
+          let program = assertDivMod 7 (3 :: UInt 4) 2 0
+          throwAll
+            program
+            []
+            ([] :: [GF181])
+            (Interpreter.SyntaxTreeError (SyntaxTree.DivModRemainderError 7 3 1 0))
+            (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 3 2 7)))
+        -- (InterpretError (Interpreter.R1CSError (R1CS.DivModRemainderError 7 3 1 0)))
 
-      it "assertDivMod (with wrong remainder constant)" $ do
-        let program = assertDivMod 7 (3 :: UInt 4) 2 0
-        throwAll
-          program
-          []
-          ([] :: [GF181])
-          (Interpreter.SyntaxTreeError (SyntaxTree.DivModRemainderError 7 3 1 0))
-          (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 3 2 7)))
-          -- (InterpretError (Interpreter.R1CSError (R1CS.DivModRemainderError 7 3 1 0)))
+        it "assertDivMod (multiple statements)" $ do
+          let program = do
+                a <- input Public :: Comp (UInt 5)
+                b <- input Public
+                c <- input Private
+                d <- input Public
+                (q0, r0) <- performDivMod a b
+                (q1, r1) <- performDivMod c d
+                return [q0, r0, q1, r1]
+          runAllExceptForTheOldOptimizer program [20, 7, 8 :: GF181] [21] [2, 6, 2, 5]
 
-      it "assertDivMod (multiple statements)" $ do
-        let program = do
-              a <- input Public :: Comp (UInt 5)
-              b <- input Public
-              c <- input Private
-              d <- input Public
-              (q0, r0) <- performDivMod a b
-              (q1, r1) <- performDivMod c d
-              return [q0, r0, q1, r1]
-        runAllExceptForTheOldOptimizer program [20, 7, 8 :: GF181] [21] [2, 6, 2, 5]
+        it "assertDivMod (multiple statements chained together)" $ do
+          let program = do
+                a <- input Public :: Comp (UInt 5)
+                b <- input Public
+                (q0, r0) <- performDivMod a b
+                (q1, r1) <- performDivMod q0 b
+                return [q0, r0, q1, r1]
+          runAllExceptForTheOldOptimizer program [25, 3 :: GF181] [] [8, 1, 2, 2]
 
-      it "assertDivMod (multiple statements chained together)" $ do
-        let program = do
-              a <- input Public :: Comp (UInt 5)
-              b <- input Public
-              (q0, r0) <- performDivMod a b
-              (q1, r1) <- performDivMod q0 b
-              return [q0, r0, q1, r1]
-        runAllExceptForTheOldOptimizer program [25, 3 :: GF181] [] [8, 1, 2, 2]
+        it "performDivMod (before assertions)" $ do
+          let program = do
+                a <- input Public :: Comp (UInt 5)
+                b <- input Public
+                (q, r) <- performDivMod a b
+                assert $ q `eq` r
+          runAllExceptForTheOldOptimizer program [10, 4 :: GF181] [] []
 
-      it "performDivMod (before assertions)" $ do
-        let program = do
-              a <- input Public :: Comp (UInt 5)
-              b <- input Public
-              (q, r) <- performDivMod a b
-              assert $ q `eq` r
-        runAllExceptForTheOldOptimizer program [10, 4 :: GF181] [] []
+        it "performDivMod (before reuse)" $ do
+          let program = do
+                a <- input Public :: Comp (UInt 5)
+                b <- input Public
+                (q, _) <- performDivMod a b
+                reuse q
+          runAllExceptForTheOldOptimizer program [10, 4 :: GF181] [] [2]
 
-      it "performDivMod (before reuse)" $ do
-        let program = do
-              a <- input Public :: Comp (UInt 5)
-              b <- input Public
-              (q, _) <- performDivMod a b
-              reuse q
-        runAllExceptForTheOldOptimizer program [10, 4 :: GF181] [] [2]
+        it "performDivMod (after reuse)" $ do
+          let program = do
+                a <- reuse =<< input Public :: Comp (UInt 5)
+                b <- input Public
+                (q, r) <- performDivMod a b
+                assert $ q `eq` r
+          runAllExceptForTheOldOptimizer program [10, 4 :: GF181] [] []
 
-      it "performDivMod (after reuse)" $ do
-        let program = do
-              a <- reuse =<< input Public :: Comp (UInt 5)
-              b <- input Public
-              (q, r) <- performDivMod a b
-              assert $ q `eq` r
-        runAllExceptForTheOldOptimizer program [10, 4 :: GF181] [] []
+        it "assertDivMod (dividend unknown)" $ do
+          let program = do
+                dividend <- freshVarUInt
+                divisor <- input Public :: Comp (UInt 4)
+                quotient <- input Public
+                remainder <- input Private
+                assertDivMod dividend divisor quotient remainder
+                return dividend
+          runAllExceptForTheOldOptimizer program [7, 2 :: GF181] [6] [20]
 
-      it "assertDivMod (dividend unknown)" $ do
-        let program = do
-              dividend <- freshVarUInt
-              divisor <- input Public :: Comp (UInt 4)
-              quotient <- input Public
-              remainder <- input Private
-              assertDivMod dividend divisor quotient remainder
-              return dividend
-        runAllExceptForTheOldOptimizer program [7, 2 :: GF181] [6] [20]
+        it "assertDivMod (divisor & remainder unknown)" $ do
+          let program = do
+                dividend <- input Public :: Comp (UInt 4)
+                divisor <- freshVarUInt
+                quotient <- input Public
+                remainder <- freshVarUInt
+                assertDivMod dividend divisor quotient remainder
+                return (divisor, remainder)
+          runAllExceptForTheOldOptimizer program [7, 2 :: GF181] [] [3, 1]
 
-      it "assertDivMod (divisor & remainder unknown)" $ do
-        let program = do
-              dividend <- input Public :: Comp (UInt 4)
-              divisor <- freshVarUInt
-              quotient <- input Public
-              remainder <- freshVarUInt
-              assertDivMod dividend divisor quotient remainder
-              return (divisor, remainder)
-        runAllExceptForTheOldOptimizer program [7, 2 :: GF181] [] [3, 1]
+        it "assertDivMod (quotient & remainder unknown)" $ do
+          let program = do
+                dividend <- input Public :: Comp (UInt 4)
+                divisor <- input Public
+                quotient <- freshVarUInt
+                remainder <- freshVarUInt
+                assertDivMod dividend divisor quotient remainder
+                return (quotient, remainder)
+          runAllExceptForTheOldOptimizer program [34, 6 :: GF181] [] [5, 4]
 
-      it "assertDivMod (quotient & remainder unknown)" $ do
-        let program = do
-              dividend <- input Public :: Comp (UInt 4)
-              divisor <- input Public
-              quotient <- freshVarUInt
-              remainder <- freshVarUInt
-              assertDivMod dividend divisor quotient remainder
-              return (quotient, remainder)
-        runAllExceptForTheOldOptimizer program [34, 6 :: GF181] [] [5, 4]
+      describe "Range Check" $ do
+        it "assertLTE (< 4)" $ do
+          let program = do
+                x <- inputUInt @4 Public
+                assertLTE x 3
+          runAllExceptForTheOldOptimizer program [0 :: GF181] [] []
+          runAllExceptForTheOldOptimizer program [1 :: GF181] [] []
+          runAllExceptForTheOldOptimizer program [2 :: GF181] [] []
+          runAllExceptForTheOldOptimizer program [3 :: GF181] [] []
+          _debug program
+
+          throwAll
+            program
+            [4 :: GF181]
+            []
+            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 4 3))
+            (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 1 (-1) 0)))
+          throwAll
+            program
+            [5 :: GF181]
+            []
+            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 5 3))
+            (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 1 (-1) 0)))
+
+        it "assertLTE (< 5)" $ do
+          let program = do
+                x <- inputUInt @3 Public
+                assertLTE x 4
+          runAllExceptForTheOldOptimizer program [0 :: GF181] [] []
+          runAllExceptForTheOldOptimizer program [1 :: GF181] [] []
+          runAllExceptForTheOldOptimizer program [2 :: GF181] [] []
+          runAllExceptForTheOldOptimizer program [3 :: GF181] [] []
+          runAllExceptForTheOldOptimizer program [4 :: GF181] [] []
+          throwAll
+            program
+            [5 :: GF181]
+            []
+            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 5 4))
+            (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError (-1) 1 0)))
+          throwAll
+            program
+            [6 :: GF181]
+            []
+            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 6 4))
+            (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError (-1) 1 0)))
+          throwAll
+            program
+            [7 :: GF181]
+            []
+            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 7 4))
+            (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError (-1) 1 0)))
+
 
       it "eq" $ do
         let program = do

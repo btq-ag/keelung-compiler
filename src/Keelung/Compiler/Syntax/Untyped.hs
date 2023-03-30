@@ -89,8 +89,9 @@ data ExprF n
   | AddF (ExprF n) (ExprF n) (Seq (ExprF n))
   | MulF (ExprF n) (ExprF n)
   | DivF (ExprF n) (ExprF n)
-  -- | MMIF (ExprF n) Int -- modular multiplicative inverse
   | -- logical operators
+
+    -- | MMIF (ExprF n) Int -- modular multiplicative inverse
     IfF (ExprB n) (ExprF n) (ExprF n)
   | BtoF (ExprB n)
   deriving (Functor, Eq)
@@ -262,6 +263,7 @@ data SideEffect n
   | AssignmentB2 Var (ExprB n)
   | AssignmentU2 Width Var (ExprU n)
   | DivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
+  | AssertLTE Width (ExprU n) Integer
   deriving (Show, Eq)
 
 --------------------------------------------------------------------------------

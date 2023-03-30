@@ -61,10 +61,10 @@ instance Show BooleanRelations where
         Map.map
           ( \case
               Left value -> [show value]
-              Right toChildren ->
+              Right xs ->
                 map
                   (\(child, polarity) -> if polarity then show child else "¬ " <> show child)
-                  (Map.toList toChildren)
+                  (Map.toList xs)
           )
           (toChildren relations)
 
