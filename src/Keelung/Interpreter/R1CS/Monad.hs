@@ -51,6 +51,8 @@ data Constraint n
   | -- | Dividend, Divisor, Quotient, Remainder
     DivModConstaint (Var, Var, Var, Var)
   | BinRepConstraint BinRep
+  | -- | (a, n, p) where modInv a * a = n * p + 1
+    ModInvConstraint (Var, Var, Integer)
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Constraint n)
@@ -69,6 +71,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
       <> " + $"
       <> show remainder
   show (BinRepConstraint binRep) = "(BinRep)  " <> show binRep
+  show (ModInvConstraint (var, _, p)) = "(ModInv)  $" <> show var <> "⁻¹ (mod " <> show p <> ")"
 
 instance Functor Constraint where
   fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
@@ -76,6 +79,7 @@ instance Functor Constraint where
   fmap f (CNEQConstraint cneq) = CNEQConstraint (fmap f cneq)
   fmap _ (DivModConstaint dm) = DivModConstaint dm
   fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
+  fmap _ (ModInvConstraint (a, n, p)) = ModInvConstraint (a, n, p)
 
 --------------------------------------------------------------------------------
 
@@ -86,6 +90,7 @@ data Error n
   | StuckError (IntMap n) [Constraint n]
   | DivModQuotientError n n n n
   | DivModRemainderError n n n n
+  | ModInvError Var n Integer
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -107,3 +112,5 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "Expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
   show (DivModRemainderError dividend divisor expected actual) =
     "Expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
+  show (ModInvError var val p) =
+    "Unable to calculate the inverse of $" <> show var <> " `" <> show (N val) <> "` (mod " <> show p <> ")"

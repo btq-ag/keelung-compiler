@@ -62,7 +62,9 @@ data ConstraintSystem n = ConstraintSystem
     csNEqF :: Map (RefF, RefF) RefF,
     csNEqU :: Map (RefU, RefU) RefF,
     -- hints for generating witnesses for DivMod constraints
-    csDivMods :: [(RefU, RefU, RefU, RefU)]
+    csDivMods :: [(RefU, RefU, RefU, RefU)],
+    -- hints for generating witnesses for ModInv constraints
+    csModInvs :: [(RefU, RefU, Integer)]
   }
   deriving (Eq, Generic, NFData)
 
@@ -77,6 +79,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showNEqU
       <> showBooleanConstraints
       <> showDivModHints
+      <> showModInvHints
       <> showOccurrencesF
       <> showOccurrencesB
       <> showOccurrencesU
@@ -109,6 +112,11 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
         if null $ csDivMods cs
           then ""
           else "  DivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (csDivMods cs))))
+
+      showModInvHints =
+        if null $ csModInvs cs
+          then ""
+          else "  ModInv hints:\n" <> indent (indent (showList' (map (\(x, _n, p) -> show x <> "⁻¹ = (mod " <> show p <> ")") (csModInvs cs))))
 
       -- BinRep constraints
       -- showBinRepConstraints =
@@ -213,7 +221,8 @@ relocateConstraintSystem cs =
           <> mulFs
           <> nEqFs
           <> nEqUs,
-      Relocated.csDivMods = divMods
+      Relocated.csDivMods = divMods,
+      Relocated.csModInvs = modDivs
     }
   where
     counters = csCounters cs
@@ -415,6 +424,7 @@ relocateConstraintSystem cs =
     nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqU cs
 
     divMods = map (\(a, b, q, r) -> (reindexRefU counters a, reindexRefU counters b, reindexRefU counters q, reindexRefU counters r)) $ csDivMods cs
+    modDivs = map (\(a, n, p) -> (reindexRefU counters a, reindexRefU counters n, p)) $ csModInvs cs
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =

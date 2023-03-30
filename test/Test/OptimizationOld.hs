@@ -48,7 +48,8 @@ tests = do
                       ],
                 csBinReps = mempty,
                 csCounters = mempty,
-                csDivMods = mempty
+                csDivMods = mempty,
+                csModInvs = mempty
               }
        in optimizeOld (cs :: RelocatedConstraintSystem GF181) `shouldNotBe` cs
 

@@ -212,7 +212,8 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
       x' <- map toInteger <$> interpret x
       case x' of
         [x''] -> case modInv x'' p of
-          Just v -> return [fromInteger v]
+          Just v -> do 
+            return [fromInteger v]
           _ -> throwError $ ModInvError x'' p
         _ -> throwError $ ResultSizeError 1 (length x')
     AndU _ x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y

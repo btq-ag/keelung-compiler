@@ -377,9 +377,9 @@ tests = do
 
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
 
-      -- it "modInv 123 2833" $ do
-      --   let program = return $ modInv (123 :: UInt 32) 2833
-      --   runAll program [] ([] :: [GF181]) [2119]
+      it "modInv 123 2833" $ do
+        let program = return $ modInv (123 :: UInt 32) 2833
+        runAllExceptForTheOldOptimizer program [] ([] :: [GF181]) [2119]
 
       describe "DivMod" $ do
         it "performDivMod (quotient & remainder unknown)" $ do

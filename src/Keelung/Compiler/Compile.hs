@@ -191,7 +191,7 @@ runM useNewOptimizer counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -249,8 +249,11 @@ add = mapM_ addOne
 addOccurrencesUTemp :: [RefU] -> M n ()
 addOccurrencesUTemp = modify' . addOccurrences
 
-addDivMod :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
-addDivMod x y q r = modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMods cs}
+addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
+addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMods cs}
+
+addModInvHint :: (GaloisField n, Integral n) => RefU -> RefU -> Integer -> M n ()
+addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (x, n, p) : csModInvs cs}
 
 freshRefF :: M n RefF
 freshRefF = do
@@ -470,11 +473,11 @@ compileExprU out expr = case expr of
     -- 1. a * a⁻¹ = np + 1
     -- 2. n ≤ ⌈log₂p⌉
     a' <- wireU a
-    inv <- freshRefU w
     n <- freshExprU w
     nRef <- wireU n
     let ceilingLg2P = ceiling (logBase 2 (fromInteger p) :: Double)
-    add $ cMulF (0, [(RefUVal a', 1)]) (0, [(RefUVal inv, 1)]) (1, [(RefUVal nRef, fromInteger p)])
+    add $ cMulF (0, [(RefUVal a', 1)]) (0, [(RefUVal out, 1)]) (1, [(RefUVal nRef, fromInteger p)])
+    addModInvHint a' nRef p
     assertLTE w n ceilingLg2P
   AndU w x y xs -> do
     forM_ [0 .. w - 1] $ \i -> do
@@ -1013,7 +1016,7 @@ compileDivModU width dividend divisor quotient remainder = do
   divisorRef <- wireU divisor
   quotientRef <- wireU quotient
   dividendRef <- wireU dividend
-  addDivMod dividendRef divisorRef quotientRef remainderRef
+  addDivModHint dividendRef divisorRef quotientRef remainderRef
   add $
     cMulF
       (0, [(RefUVal divisorRef, 1)])

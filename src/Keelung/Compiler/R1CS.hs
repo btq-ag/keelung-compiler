@@ -67,7 +67,8 @@ toR1CS cs =
       r1csBinReps = csBinReps cs,
       r1csCounters = csCounters cs,
       r1csCNEQs = lefts convertedConstratins,
-      r1csDivMods = csDivMods cs
+      r1csDivMods = csDivMods cs,
+      r1csModInvs = csModInvs cs
     }
   where
     convertedConstratins = map toR1C (toList (csConstraints cs))
@@ -92,7 +93,8 @@ fromR1CS r1cs =
           <> Seq.fromList (map CNEq (r1csCNEQs r1cs)),
       csBinReps = r1csBinReps r1cs,
       csCounters = r1csCounters r1cs,
-      csDivMods = r1csDivMods r1cs
+      csDivMods = r1csDivMods r1cs,
+      csModInvs = r1csModInvs r1cs
     }
   where
     fromR1C (R1C aX bX cX) =

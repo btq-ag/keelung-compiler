@@ -59,7 +59,8 @@ main = hspec $ do
                     cadd (-42 :: GF181) [(0, 1)],
                 csBinReps = [],
                 csCounters = addCount OfPublicInput OfField 1 mempty,
-                csDivMods = []
+                csDivMods = [],
+                csModInvs = []
               }
        in Compiler.compileWithoutConstProp Basic.assertToBe42 `shouldBe` Right cs
 
