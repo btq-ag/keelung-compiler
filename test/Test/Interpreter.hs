@@ -376,6 +376,12 @@ tests = do
               return (x + y)
 
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
+
+      -- it "modInv 123 2833" $ do
+      --   let program = do
+      --         return $ modInv
+
+
       describe "DivMod" $ do
         it "performDivMod (quotient & remainder unknown)" $ do
           let program = do

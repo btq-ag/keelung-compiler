@@ -465,15 +465,17 @@ compileExprU out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileMulU w out x' y'
-  -- InvU w a p -> do
-  --   -- See: https://github.com/btq-ag/keelung-compiler/issues/14
-  --   -- 1. a * a⁻¹ = np + 1
-  --   -- 2. n ≤ ⌈log₂p⌉
-  --   a' <- wireU a
-  --   inv <- freshRefU w
-  --   n <- freshRefU w
-  --   add $ cMulF (1, [(RefUVal a', 1)]) (1, [(RefUVal inv, -1)]) (1, [(RefU w n, 1)])
-
+  MMIU w a p -> do
+    -- See: https://github.com/btq-ag/keelung-compiler/issues/14
+    -- 1. a * a⁻¹ = np + 1
+    -- 2. n ≤ ⌈log₂p⌉
+    a' <- wireU a
+    inv <- freshRefU w
+    n <- freshExprU w
+    nRef <- wireU n
+    let ceilingLg2P = ceiling (logBase 2 (fromInteger p) :: Double)
+    add $ cMulF (0, [(RefUVal a', 1)]) (0, [(RefUVal inv, 1)]) (1, [(RefUVal nRef, fromInteger p)])
+    assertLTE w n ceilingLg2P
   AndU w x y xs -> do
     forM_ [0 .. w - 1] $ \i -> do
       compileExprB
@@ -1026,7 +1028,7 @@ compileDivModU width dividend divisor quotient remainder = do
 
 --------------------------------------------------------------------------------
 
--- | Assert that a UInt is smaller than or equal to another UInt
+-- | Assert that a UInt is smaller than or equal to some constant
 assertLTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
 assertLTE width a c = do
   ref <- wireU a

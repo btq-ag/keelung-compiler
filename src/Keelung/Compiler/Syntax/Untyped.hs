@@ -123,6 +123,7 @@ data ExprU n
     SubU Width (ExprU n) (ExprU n)
   | AddU Width (ExprU n) (ExprU n)
   | MulU Width (ExprU n) (ExprU n)
+  | MMIU Width (ExprU n) Integer -- modular multiplicative inverse
   | -- logical operators
     AndU Width (ExprU n) (ExprU n) (Seq (ExprU n))
   | OrU Width (ExprU n) (ExprU n) (Seq (ExprU n))
@@ -147,7 +148,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ x y -> chain prec " + " 6 $ x :<| y :<| Empty
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
-    -- InvU _ x -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹"
+    MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
     AndU _ x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
     OrU _ x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
     XorU _ x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
@@ -192,7 +193,7 @@ widthOfU expr = case expr of
   SubU w _ _ -> w
   AddU w _ _ -> w
   MulU w _ _ -> w
-  -- InvU w _ -> w
+  MMIU w _ _ -> w
   AndU w _ _ _ -> w
   OrU w _ _ _ -> w
   XorU w _ _ -> w

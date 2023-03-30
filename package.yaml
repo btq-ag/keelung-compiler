@@ -31,6 +31,7 @@ dependencies:
 - keelung 
 - mtl
 - optparse-applicative
+# - primes
 - random
 - semirings
 - validation

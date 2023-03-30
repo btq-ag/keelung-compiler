@@ -47,3 +47,19 @@ bitWiseSet w x i b =
    in case toInteger b of
         0 -> fromInteger $ Data.Bits.clearBit (toInteger x) i'
         _ -> fromInteger $ Data.Bits.setBit (toInteger x) i'
+
+-- Given m and a, return Just x such that ax = 1 mod m.  
+-- If there is no such x return Nothing.
+modInv :: Integer -> Integer -> Maybe Integer
+modInv x p =
+  let (i, _, g) = gcdExt x p
+   in if g == 1 then Just (makePositive i) else Nothing
+  where
+    makePositive y = if y < 0 then y + p else y
+    -- Extended Euclidean algorithm.  Given non-negative a and b, return x, y and g
+    -- such that ax + by = g, where g = gcd(a,b).  Note that x or y may be negative.
+    gcdExt a 0 = (1, 0, a)
+    gcdExt a b =
+      let (q, r) = a `quotRem` b
+          (s, t, g) = gcdExt b r
+       in (t, s - q * t, g)

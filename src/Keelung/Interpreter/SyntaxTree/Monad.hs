@@ -150,6 +150,7 @@ data Error n
   | DivModRemainderError n n n n
   | DivModStuckError [Var]
   | AssertLTEError n Integer
+  | ModInvError Integer Integer
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Error n)
@@ -179,3 +180,5 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> " are not known "
   show (AssertLTEError actual bound) =
     "`" <> show (N actual) <> "` is not less than or equal to `" <> show bound <> "`"
+  show (ModInvError a m) =
+    "no modular inverse of `" <> show a <> " (mod " <> show m <> ")`"

@@ -208,6 +208,13 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
     AddU w x y -> wrapAround w $ zipWith (+) <$> interpret x <*> interpret y
     SubU w x y -> wrapAround w $ zipWith (-) <$> interpret x <*> interpret y
     MulU w x y -> wrapAround w $ zipWith (*) <$> interpret x <*> interpret y
+    MMIU _ x p -> do
+      x' <- map toInteger <$> interpret x
+      case x' of
+        [x''] -> case modInv x'' p of
+          Just v -> return [fromInteger v]
+          _ -> throwError $ ModInvError x'' p
+        _ -> throwError $ ResultSizeError 1 (length x')
     AndU _ x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
     OrU _ x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
     XorU _ x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
@@ -325,6 +332,7 @@ instance FreeVar UInt where
     AddU _ x y -> freeVars x <> freeVars y
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y
+    MMIU _ x _ -> freeVars x
     AndU _ x y -> freeVars x <> freeVars y
     OrU _ x y -> freeVars x <> freeVars y
     XorU _ x y -> freeVars x <> freeVars y
