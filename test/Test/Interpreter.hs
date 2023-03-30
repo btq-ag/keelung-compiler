@@ -378,9 +378,8 @@ tests = do
         runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
 
       -- it "modInv 123 2833" $ do
-      --   let program = do
-      --         return $ modInv
-
+      --   let program = return $ modInv (123 :: UInt 32) 2833
+      --   runAll program [] ([] :: [GF181]) [2119]
 
       describe "DivMod" $ do
         it "performDivMod (quotient & remainder unknown)" $ do
@@ -502,8 +501,6 @@ tests = do
           runAllExceptForTheOldOptimizer program [1 :: GF181] [] []
           runAllExceptForTheOldOptimizer program [2 :: GF181] [] []
           runAllExceptForTheOldOptimizer program [3 :: GF181] [] []
-          _debug program
-
           throwAll
             program
             [4 :: GF181]
@@ -544,7 +541,6 @@ tests = do
             []
             (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 7 4))
             (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError (-1) 1 0)))
-
 
       it "eq" $ do
         let program = do

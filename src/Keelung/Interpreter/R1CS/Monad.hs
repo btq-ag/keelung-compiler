@@ -46,6 +46,7 @@ bindVar var val = modify' $ IntMap.insert var val
 
 data Constraint n
   = R1CConstraint (R1C n)
+  | BooleanConstraint Var
   | CNEQConstraint (CNEQ n)
   | -- | Dividend, Divisor, Quotient, Remainder
     DivModConstaint (Var, Var, Var, Var)
@@ -56,6 +57,7 @@ instance Serialize n => Serialize (Constraint n)
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (R1CConstraint r1c) = show r1c
+  show (BooleanConstraint var) = "(Boolean) $" <> show var <> " = $" <> show var <> " * $" <> show var
   show (CNEQConstraint cneq) = "(CNEQ)    " <> show cneq
   show (DivModConstaint (dividend, divisor, quotient, remainder)) =
     "(DivMod)  $"
@@ -70,6 +72,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 
 instance Functor Constraint where
   fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
+  fmap _ (BooleanConstraint var) = BooleanConstraint var
   fmap f (CNEQConstraint cneq) = CNEQConstraint (fmap f cneq)
   fmap _ (DivModConstaint dm) = DivModConstaint dm
   fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
@@ -79,6 +82,7 @@ instance Functor Constraint where
 data Error n
   = VarUnassignedError IntSet
   | R1CInconsistentError n n n
+  | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
   | DivModQuotientError n n n n
   | DivModRemainderError n n n n
@@ -92,6 +96,8 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       ++ showList' (map (\var -> "$" <> show var) $ IntSet.toList unboundVariables)
   show (R1CInconsistentError a b c) =
     "equation doesn't hold: `" <> show (N a) <> " * " <> show (N b) <> " ≠ " <> show (N c) <> "`"
+  show (BooleanConstraintError var val) =
+    "expected the value of $" <> show var <> " to be either 0 or 1, but got `" <> show (N val) <> "`"
   show (StuckError context constraints) =
     "stuck when trying to solve these constraints: \n"
       <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints

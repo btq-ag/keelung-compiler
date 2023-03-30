@@ -50,22 +50,13 @@ run' r1cs inputs = do
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Seq (Constraint n)
 fromOrdinaryConstraints (R1CS ordinaryConstraints binReps counters cneqs divMods) =
   Seq.fromList (map R1CConstraint ordinaryConstraints)
-    <> Seq.fromList booleanInputVarConstraints
+    <> Seq.fromList (map BooleanConstraint booleanInputVarConstraints)
     <> Seq.fromList (map BinRepConstraint binReps)
     <> Seq.fromList (map CNEQConstraint cneqs)
     <> Seq.fromList (map DivModConstaint divMods)
   where
     booleanInputVarConstraints =
-      let generate (start, end) =
-            map
-              ( \var ->
-                  R1CConstraint $
-                    R1C
-                      (Right (Poly.singleVar var))
-                      (Right (Poly.singleVar var))
-                      (Right (Poly.singleVar var))
-              )
-              [start .. end - 1]
+      let generate (start, end) = [start .. end - 1]
        in concatMap generate (getBooleanConstraintRanges counters)
 
 goThroughManyTimes :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n ()
@@ -91,6 +82,7 @@ lookupVar var = gets (IntMap.lookup var)
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (R1CConstraint r1c) = fmap (pure . R1CConstraint) <$> shrinkR1C r1c
+shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (CNEQConstraint cneq) = fmap (pure . CNEQConstraint) <$> shrinkCNEQ cneq
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
@@ -168,6 +160,17 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           return Eliminated
         _ -> do
           return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
+
+-- | Trying to reduce a Boolean constraint
+shrinkBooleanConstraint :: (GaloisField n, Integral n) => Var -> M n (Result Var)
+shrinkBooleanConstraint var = do
+  varResult <- lookupVar var
+  case varResult of
+    Just val ->
+      if val /= 0 && val /= 1
+        then throwError $ BooleanConstraintError var val
+        else return Eliminated
+    Nothing -> return $ Stuck var
 
 -- | Trying to reduce a BinRep constraint
 shrinkBinRep :: (GaloisField n, Integral n) => BinRep -> M n (Result BinRep)
