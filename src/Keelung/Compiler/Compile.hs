@@ -1032,19 +1032,31 @@ compileDivModU width dividend divisor quotient remainder = do
 --------------------------------------------------------------------------------
 
 -- | Assert that a UInt is smaller than or equal to some constant
+-- reference doc: A.3.2.2 Range Check https://zips.z.cash/protocol/protocol.pdf
 assertLTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
 assertLTE width a c = do
   ref <- wireU a
-  foldM_ (go ref) Nothing [width - 1, width - 2 .. 0]
+  -- because we don't have to execute the `go` function for trailing ones of `c`
+  -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
+  foldM_ (go ref) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
   where
+    -- for counting the number of trailing ones of `c`
+    countTrailingOnes :: Int
+    countTrailingOnes =
+      fst $
+        foldl
+          ( \(count, keepCounting) i ->
+              if keepCounting && Data.Bits.testBit c i then (count + 1, True) else (count, False)
+          )
+          (0, True)
+          [0 .. width - 1]
+
     go :: (GaloisField n, Integral n) => RefU -> Maybe RefF -> Int -> M n (Maybe RefF)
     go ref Nothing i =
       let aBit = RefBtoRefF (RefUBit width ref i)
        in -- have not found the first bit in 'c' that is 1 yet
           if Data.Bits.testBit c i
             then do
-              -- Boolean constraint on a[i]
-              -- add $ cMulF (0, [(aBit, 1)]) (0, [(aBit, 1)]) (0, [(aBit, 1)])
               return $ Just aBit -- when found, return a[i] and a counter
             else do
               -- a[i] = 0
@@ -1054,8 +1066,6 @@ assertLTE width a c = do
       let aBit = RefBtoRefF (RefUBit width ref i)
        in if Data.Bits.testBit c i
             then do
-              -- Boolean constraint on a[i]
-              -- add $ cMulF (0, [(aBit, 1)]) (0, [(aBit, 1)]) (0, [(aBit, 1)])
               -- constraint for the next accumulator
               acc' <- freshRefF
               add $ cMulF (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(acc', 1)])

@@ -3,6 +3,7 @@
 
 module Test.Interpreter.UInt (tests, run) where
 
+import Control.Monad (when)
 import Keelung hiding (compile, run)
 import Keelung.Compiler (Error (..))
 import Keelung.Interpreter.Error qualified as Interpreter
@@ -10,6 +11,7 @@ import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Test.Hspec
 import Test.Interpreter.Util
+import Test.QuickCheck hiding ((.&.))
 
 run :: IO ()
 run = hspec tests
@@ -19,72 +21,72 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "Unsigned Integers" $ do
-    it "arithmetics 1" $ do
-      let program = do
-            f <- inputField Public
-            u4 <- inputUInt @4 Public
-            b <- inputBool Public
-            return $
-              cond
-                (b .&. (u4 !!! 0))
-                (f + 1)
-                (f + 2)
+    describe "Arithmetics" $ do
+      it "arithmetics 1" $ do
+        let program = do
+              f <- inputField Public
+              u4 <- inputUInt @4 Public
+              b <- inputBool Public
+              return $
+                cond
+                  (b .&. (u4 !!! 0))
+                  (f + 1)
+                  (f + 2)
 
-      runAll program [100, 1, 1 :: GF181] [] [101]
-      runAll program [100, 0, 1 :: GF181] [] [102]
+        runAll program [100, 1, 1 :: GF181] [] [101]
+        runAll program [100, 0, 1 :: GF181] [] [102]
 
-    it "add 1" $ do
-      let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            return $ x + y
+      it "add 1" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return $ x + y
 
-      runAll program [5, 6 :: GF181] [] [11]
-      runAll program [2, 5 :: GF181] [] [7]
-      runAll program [15, 1 :: GF181] [] [0]
+        runAll program [5, 6 :: GF181] [] [11]
+        runAll program [2, 5 :: GF181] [] [7]
+        runAll program [15, 1 :: GF181] [] [0]
 
-    it "add 2" $ do
-      let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            z <- inputUInt @4 Public
-            w <- reuse $ x + y
-            return $ x + y + z + w
+      it "add 2" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              z <- inputUInt @4 Public
+              w <- reuse $ x + y
+              return $ x + y + z + w
 
-      runAll program [5, 6, 7 :: GF181] [] [13]
-      runAll program [2, 5, 3 :: GF181] [] [1]
-      runAll program [0, 1, 2 :: GF181] [] [4]
+        runAll program [5, 6, 7 :: GF181] [] [13]
+        runAll program [2, 5, 3 :: GF181] [] [1]
+        runAll program [0, 1, 2 :: GF181] [] [4]
 
-    it "mul 3" $ do
-      let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            return $ x * y
+      it "mul 3" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return $ x * y
 
-      runAll program [2, 4 :: GF181] [] [8]
-      runAll program [5, 6 :: GF181] [] [14]
+        runAll program [2, 4 :: GF181] [] [8]
+        runAll program [5, 6 :: GF181] [] [14]
 
-    it "arithmetics 4" $ do
-      let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            return $ x * y + y
+      it "arithmetics 4" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return $ x * y + y
 
-      runAll program [5, 6 :: GF181] [] [4]
-      runAll program [2, 5 :: GF181] [] [15]
-      runAll program [15, 1 :: GF181] [] [0]
+        runAll program [5, 6 :: GF181] [] [4]
+        runAll program [2, 5 :: GF181] [] [15]
+        runAll program [15, 1 :: GF181] [] [0]
 
-    it "arithmetics 5" $ do
-      let program = do
-            x <- inputUInt @4 Public
-            y <- reuse x
-            return (x + y)
+      it "arithmetics 5" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- reuse x
+              return (x + y)
+        runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
 
-      runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
-
-    it "modInv 123 2833" $ do
-      let program = return $ modInv (123 :: UInt 32) 2833
-      runAllExceptForTheOldOptimizer program [] ([] :: [GF181]) [2119]
+      it "modInv 123 2833" $ do
+        let program = return $ modInv (123 :: UInt 32) 2833
+        runAllExceptForTheOldOptimizer program [] ([] :: [GF181]) [2119]
 
     describe "DivMod" $ do
       it "performDivMod (quotient & remainder unknown)" $ do
@@ -200,7 +202,7 @@ tests = do
     describe "Range Check" $ do
       it "assertLTE (< 4)" $ do
         let program = do
-              x <- inputUInt @4 Public
+              x <- inputUInt @3 Public
               assertLTE x 3
         runAllExceptForTheOldOptimizer program [0 :: GF181] [] []
         runAllExceptForTheOldOptimizer program [1 :: GF181] [] []
@@ -217,6 +219,18 @@ tests = do
           [5 :: GF181]
           []
           (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 5 3))
+          (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 1 (-1) 0)))
+        throwAll
+          program
+          [6 :: GF181]
+          []
+          (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 6 3))
+          (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 1 (-1) 0)))
+        throwAll
+          program
+          [7 :: GF181]
+          []
+          (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 7 3))
           (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 1 (-1) 0)))
 
       it "assertLTE (< 5)" $ do
@@ -246,6 +260,25 @@ tests = do
           []
           (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 7 4))
           (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError (-1) 1 0)))
+
+      it "assertLTE (QuickCheck)" $ do
+        let program bound = do
+              x <- inputUInt @8 Public
+              assertLTE x bound
+        property $ \(x, b) -> do
+          when (x >= 0 && x < 256 && b >= 0 && b < 256 && x <= b) $ do
+            runAll (program b) [fromInteger x :: GF181] [] []
+            runAll (program b) [fromInteger b :: GF181] [] []
+
+    -- when x <= b
+    -- then runAll (program b) [fromInteger x :: GF181] [] []
+    -- else
+    --   throwAll
+    --     (program b)
+    --     [fromInteger x :: GF181]
+    --     []
+    --     (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError (fromInteger x) b))
+    --     (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError (-1) 1 0)))
 
     it "eq" $ do
       let program = do
