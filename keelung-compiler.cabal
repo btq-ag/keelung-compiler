@@ -162,6 +162,12 @@ test-suite keelung-test
       Test.Compilation
       Test.FieldRelations
       Test.Interpreter
+      Test.Interpreter.Boolean
+      Test.Interpreter.Field
+      Test.Interpreter.Misc
+      Test.Interpreter.Statement
+      Test.Interpreter.UInt
+      Test.Interpreter.Util
       Test.Optimization
       Test.OptimizationOld
       Test.PolyG
