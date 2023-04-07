@@ -96,6 +96,7 @@ jobs:
     - name: Generate license report
       if: startsWith(github.ref, 'refs/tags/')
       run: |
+        export PATH=/home/runner/.cabal/bin:$PATH
         cabal-plan license-report keelung-compiler > LICENSES.md
     
     - name: Upload license report to artifact
