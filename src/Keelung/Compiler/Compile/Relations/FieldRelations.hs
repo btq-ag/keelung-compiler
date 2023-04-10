@@ -29,6 +29,7 @@ import Data.Field.Galois (GaloisField)
 import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
@@ -213,7 +214,7 @@ bindField x value xs =
               }
 
 relateRefF :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
-relateRefF x (slope, y, intercept) xs =
+relateRefF x (slope, y, intercept) xs = do
   case (x, y, slope, intercept) of
     (RefBtoRefF refB, _, 0, value) -> Just <$> bindBoolean refB (value == 1) xs
     (RefUVal refU, _, 0, value) -> Just <$> bindUInt refU value xs
@@ -221,10 +222,67 @@ relateRefF x (slope, y, intercept) xs =
     (RefBtoRefF refA, RefBtoRefF refB, 1, 0) -> Just <$> relateBoolean refA (True, refB) xs
     (RefUVal refA, RefUVal refB, 1, 0) -> Just <$> assertEqualUInt refA refB xs
     (RefBtoRefF refA, RefBtoRefF refB, -1, 1) -> Just <$> relateBoolean refA (False, refB) xs
-    _ -> case compare x y of
+    _ ->  case compare x y of
       GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
       LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
       EQ -> return Nothing
+    -- (F refA, F refB, _, _) -> case compare x y of
+    --   GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
+    --   LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+    --   EQ -> return Nothing
+    -- (F _, RefBtoRefF refB, _, _) -> case (parentOf xs x, BooleanRelations.lookup refB (booleanRelations xs)) of
+    --   (Root, BooleanRelations.Root) ->
+    --     return $
+    --       Just $
+    --         xs
+    --           { links = Map.insert x (Just (slope, y), intercept) (links xs),
+    --             sizes = Map.insertWith (+) y 1 (sizes xs)
+    --           }
+    --   (Constant valueF, BooleanRelations.Root) -> Just <$> bindBoolean refB (valueF == 1) xs
+    --   (ChildOf slope rootF intercept, BooleanRelations.Root) -> relateRefF ()
+    --   (Root, BooleanRelations.Value valueB) -> _
+    --   (Constant valueF, BooleanRelations.Value valueB) -> _
+    --   (ChildOf slope rootF intercept, BooleanRelations.Value valueB) -> _
+    --   (Root, BooleanRelations.ChildOf polarity rootB) -> _
+    --   (Constant valueF, BooleanRelations.ChildOf polarity rootB) -> _
+    --   (ChildOf slope rootF intercept, BooleanRelations.ChildOf polarity rootB) -> _
+    -- -- case compare x y of
+    -- -- GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
+    -- -- LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+    -- -- EQ -> return Nothing
+    -- (F refA, RefUVal refB, _, _) -> case compare x y of
+    --   GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
+    --   LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+    --   EQ -> return Nothing
+    -- (RefBtoRefF refA, F refB, _, _) -> case compare x y of
+    --   GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
+    --   LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+    --   EQ -> return Nothing
+    -- (RefBtoRefF refA, RefBtoRefF refB, _, _) -> case compare x y of
+    --   GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
+    --   LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+    --   EQ -> return Nothing
+    -- (RefBtoRefF refA, RefUVal refB, _, _) -> case compare x y of
+    --   GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
+    --   LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+    --   EQ -> return Nothing
+    -- (RefUVal refA, F refB, _, _) -> case compare x y of
+    --   GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
+    --   LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+    --   EQ -> return Nothing
+    -- (RefUVal refA, RefBtoRefF refB, _, _) -> case compare x y of
+    --   GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
+    --   LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+    --   EQ -> return Nothing
+    -- (RefUVal refA, RefUVal refB, _, _) -> case compare x y of
+    --   GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
+    --   LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+    --   EQ -> return Nothing
+
+
+-- relateRefT :: (GaloisField n, Integral n) => RefT -> (n, RefT, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
+-- relateRefT x (slope, y, intercept) xs = 
+
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
