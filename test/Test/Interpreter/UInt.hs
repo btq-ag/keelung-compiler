@@ -270,15 +270,20 @@ tests = do
             runAll (program b) [fromInteger x :: GF181] [] []
             runAll (program b) [fromInteger b :: GF181] [] []
 
-    -- when x <= b
-    -- then runAll (program b) [fromInteger x :: GF181] [] []
-    -- else
-    --   throwAll
-    --     (program b)
-    --     [fromInteger x :: GF181]
-    --     []
-    --     (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError (fromInteger x) b))
-    --     (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError (-1) 1 0)))
+    describe "Conditionals" $ do 
+
+      it "with inputs" $ do
+        let program = do
+                  x <- input Public :: Comp (UInt 2)
+                  y <- input Public
+                  return $ cond true x y
+        runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [5]
+
+      -- it "with literals" $ do
+      --   let program = do
+      --             return $ cond true (3 :: UInt 2) 2
+      --   debug program
+      --   runAllExceptForTheOldOptimizer program [] [] [3 :: GF181]
 
     it "eq" $ do
       let program = do

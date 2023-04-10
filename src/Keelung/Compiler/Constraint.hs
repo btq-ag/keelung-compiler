@@ -141,20 +141,23 @@ pinnedRefF (RefFI _) = True
 pinnedRefF (RefFP _) = True
 pinnedRefF (RefFO _) = True
 pinnedRefF (RefBtoRefF ref) = pinnedRefB ref
-pinnedRefF _ = False
+pinnedRefF (RefUVal ref) = pinnedRefU ref
+pinnedRefF (RefF _) = False
+
+-- pinnedRefF _ = False
 
 pinnedRefB :: RefB -> Bool
 pinnedRefB (RefBI _) = True
 pinnedRefB (RefBP _) = True
 pinnedRefB (RefBO _) = True
 pinnedRefB (RefUBit _ ref _) = pinnedRefU ref
-pinnedRefB _ = False
+pinnedRefB (RefB _) = False
 
 pinnedRefU :: RefU -> Bool
 pinnedRefU (RefUI _ _) = True
 pinnedRefU (RefUP _ _) = True
 pinnedRefU (RefUO _ _) = True
-pinnedRefU _ = False
+pinnedRefU (RefU _ _) = False
 
 --------------------------------------------------------------------------------
 
