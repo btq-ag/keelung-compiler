@@ -30,8 +30,9 @@ jobs:
           images: |
             btqag/keelungc
           # generate Docker tags based on the following events/attributes
+          # currently not compatible with semver
           tags: |
-            type=semver,pattern={{raw}}
+            type=event,event=push tag
       -
         name: Login to DockerHub
         uses: docker/login-action@v2
