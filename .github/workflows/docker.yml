@@ -49,4 +49,4 @@ jobs:
           ssh: default
           platforms: linux/amd64,linux/arm64
           secrets: |
-            GIT_AUTH_TOKEN=${{ secrets.KEELUNG }}
+            GIT_AUTH_TOKEN=${{ secrets.KEELUNG_ACCESS_TOKEN }}
