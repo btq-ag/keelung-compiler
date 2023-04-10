@@ -40,6 +40,7 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax.Counters
+import Data.Set (Set)
 
 --------------------------------------------------------------------------------
 
@@ -53,14 +54,14 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceU :: !(Map RefU Int),
     -- when x == y (FieldRelations)
     csFieldRelations :: FieldRelations n,
-    csUIntRelations :: UIntRelations n,
+    -- csUIntRelations :: UIntRelations n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
     -- multiplicative constraints
     csMulF :: [(PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))],
     -- constraints for computing equality
-    csNEqF :: Map (RefF, RefF) RefF,
-    csNEqU :: Map (RefU, RefU) RefF,
+    csNEqF :: Map (RefT, RefT) RefT,
+    csNEqU :: Map (RefU, RefU) RefT,
     -- hints for generating witnesses for DivMod constraints
     csDivMods :: [(RefU, RefU, RefU, RefU)],
     -- hints for generating witnesses for ModInv constraints
@@ -72,7 +73,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show cs =
     "Constraint Module {\n"
       <> showVarEqF
-      <> showVarEqU
+      -- <> showVarEqU
       <> showAddF
       <> showMulF
       <> showNEqF
@@ -130,7 +131,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       --         <> "\n"
 
       showVarEqF = "  Field relations:\n" <> indent (indent (show (csFieldRelations cs)))
-      showVarEqU = "  UInt relations:\n" <> indent (indent (show (csUIntRelations cs)))
+      -- showVarEqU = "  UInt relations:\n" <> indent (indent (show (csUIntRelations cs)))
 
       showAddF = adapt "AddF" (csAddF cs) show
 
@@ -290,15 +291,30 @@ relocateConstraintSystem cs =
 
     fromFieldRelations :: (GaloisField n, Integral n) => FieldRelations n -> UIntRelations n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
     fromFieldRelations fieldRels _uintRels occurrencesF occurrencesB occurrencesU =
-      let outputVars = [RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
-          publicInputVars = [RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
-          privateInputVars = [RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
+      let outputVars = [F $ RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
+          publicInputVars = [F $ RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
+          privateInputVars = [F $ RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
           occurredInF = Map.keys $ Map.filterWithKey (\ref count -> count > 0 && not (pinnedRefF ref)) occurrencesF
-       in Seq.fromList
-            (Maybe.mapMaybe toConstraint outputVars)
+
+          bitWidths = IntSet.toList $ IntMap.keysSet (structU (countOutput counters)) <> IntMap.keysSet (structU (countPublicInput counters)) <> IntMap.keysSet (structU (countPrivateInput counters)) <> IntMap.keysSet (structU (countIntermediate counters))
+          outputVarsU = [RefUVal (RefUO w i) | w <- bitWidths, i <- [0 .. getCount OfOutput (OfUInt w) counters - 1]]
+          publicInputVarsU = [RefUVal (RefUI w i) | w <- bitWidths, i <- [0 .. getCount OfPublicInput (OfUInt w) counters - 1]]
+          privateInputVarsU = [RefUVal (RefUP w i) | w <- bitWidths, i <- [0 .. getCount OfPrivateInput (OfUInt w) counters - 1]]
+
+          outputVarsB = [RefBtoRefF (RefBO i) | i <- [0 .. getCount OfOutput OfBoolean counters - 1]]
+          publicInputVarsB = [RefBtoRefF (RefBI i) | i <- [0 .. getCount OfPublicInput OfBoolean counters - 1]]
+          privateInputVarsB = [RefBtoRefF (RefBP i) | i <- [0 .. getCount OfPrivateInput OfBoolean counters - 1]]
+
+       in Seq.fromList (Maybe.mapMaybe toConstraint outputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint outputVarsU)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVarsU)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVarsU)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint outputVarsB)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVarsB)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVarsB)
             <> fromBooleanRelations boolRels occurrencesF occurrencesB occurrencesU
       where
         boolRels = FieldRelations.exportBooleanRelations fieldRels
@@ -388,8 +404,8 @@ relocateConstraintSystem cs =
           result = Maybe.mapMaybe convert $ Map.toList $ BooleanRelations.toIntMap relations
        in Seq.fromList (map (fromConstraint counters) result)
 
-    fromUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
-    fromUIntRelations uintRels occurrencesF _occurrencesB _occurrencesU =
+    fromUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> FieldRelations n -> BooleanRelations -> Map RefF Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    fromUIntRelations uintRels _fieldRels _boolRels occurrencesF _occurrencesB _occurrencesU =
       let bitWidths = IntSet.toList $ IntMap.keysSet (structU (countOutput counters)) <> IntMap.keysSet (structU (countPublicInput counters)) <> IntMap.keysSet (structU (countPrivateInput counters)) <> IntMap.keysSet (structU (countIntermediate counters))
           outputVars = [RefUO w i | w <- bitWidths, i <- [0 .. getCount OfOutput (OfUInt w) counters - 1]]
           publicInputVars = [RefUI w i | w <- bitWidths, i <- [0 .. getCount OfPublicInput (OfUInt w) counters - 1]]
@@ -415,13 +431,13 @@ relocateConstraintSystem cs =
               Left _ -> Nothing
               Right poly -> Just $ fromConstraint counters $ CAddF poly
 
-    varEqFs = fromFieldRelations (csFieldRelations cs) (csUIntRelations cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
-    varEqUs = fromUIntRelations (csUIntRelations cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
+    varEqFs = fromFieldRelations (csFieldRelations cs) (FieldRelations.exportUIntRelations (csFieldRelations cs)) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
+    varEqUs = fromUIntRelations (FieldRelations.exportUIntRelations (csFieldRelations cs)) (csFieldRelations cs) (FieldRelations.exportBooleanRelations (csFieldRelations cs)) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
 
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
-    nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
-    nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqU cs
+    nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefT counters x)) (Left (reindexRefT counters y)) (reindexRefT counters m))) $ Map.toList $ csNEqF cs
+    nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefT counters m))) $ Map.toList $ csNEqU cs
 
     divMods = map (\(a, b, q, r) -> (reindexRefU counters a, reindexRefU counters b, reindexRefU counters q, reindexRefU counters r)) $ csDivMods cs
     modDivs = map (\(a, n, p) -> (reindexRefU counters a, reindexRefU counters n, p)) $ csModInvs cs
@@ -430,15 +446,15 @@ sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
   FieldRelations.size (csFieldRelations cs)
     + BooleanRelations.size (FieldRelations.exportBooleanRelations (csFieldRelations cs))
-    + UIntRelations.size (csUIntRelations cs)
+    + UIntRelations.size (FieldRelations.exportUIntRelations (csFieldRelations cs))
     + length (csAddF cs)
     + length (csMulF cs)
     + length (csNEqF cs)
     + length (csNEqU cs)
 
 class UpdateOccurrences ref where
-  addOccurrences :: [ref] -> ConstraintSystem n -> ConstraintSystem n
-  removeOccurrences :: [ref] -> ConstraintSystem n -> ConstraintSystem n
+  addOccurrences :: Set ref -> ConstraintSystem n -> ConstraintSystem n
+  removeOccurrences :: Set ref -> ConstraintSystem n -> ConstraintSystem n
 
 instance UpdateOccurrences RefF where
   addOccurrences =
@@ -469,6 +485,26 @@ instance UpdateOccurrences RefF where
                   cs
                     { csOccurrenceF = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceF cs)
                     }
+          )
+      )
+
+instance UpdateOccurrences RefT where
+  addOccurrences =
+    flip
+      ( foldl
+          ( \cs ref ->
+              cs
+                { csOccurrenceF = Map.insertWith (+) (F ref) 1 (csOccurrenceF cs)
+                }
+          )
+      )
+  removeOccurrences =
+    flip
+      ( foldl
+          ( \cs ref ->
+              cs
+                { csOccurrenceF = Map.adjust (\count -> pred count `max` 0) (F ref) (csOccurrenceF cs)
+                }
           )
       )
 

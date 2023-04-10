@@ -16,7 +16,6 @@ import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
-import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
@@ -24,6 +23,7 @@ import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
+import qualified Data.Set as Set
 
 --------------------------------------------------------------------------------
 
@@ -69,7 +69,7 @@ compileAssertion expr = case expr of
   ExprF x -> do
     out <- freshRefF
     compileExprF out x
-    add $ cVarBindF out 1
+    add $ cVarBindF (F out) 1
   ExprU x -> do
     out <- freshRefU (widthOfU x)
     compileExprU out x
@@ -108,7 +108,7 @@ compileAssertionEqB a b = do
   add $ cVarEqB a' b'
 
 compileAssertionEqF :: (GaloisField n, Integral n) => ExprF n -> ExprF n -> M n ()
-compileAssertionEqF (VarF a) (ValF b) = add $ cVarBindF (RefF a) b
+compileAssertionEqF (VarF a) (ValF b) = add $ cVarBindF (F $ RefF a) b
 compileAssertionEqF (VarF a) (VarF b) = add $ cVarEqF (RefF a) (RefF b)
 compileAssertionEqF (VarF a) (VarFO b) = add $ cVarEqF (RefF a) (RefFO b)
 compileAssertionEqF (VarF a) (VarFI b) = add $ cVarEqF (RefF a) (RefFI b)
@@ -116,14 +116,14 @@ compileAssertionEqF (VarF a) b = do
   out <- freshRefF
   compileExprF out b
   add $ cVarEqF (RefF a) out
-compileAssertionEqF (VarFO a) (ValF b) = add $ cVarBindF (RefFO a) b
+compileAssertionEqF (VarFO a) (ValF b) = add $ cVarBindF (F $ RefFO a) b
 compileAssertionEqF (VarFO a) (VarF b) = add $ cVarEqF (RefFO a) (RefF b)
 compileAssertionEqF (VarFO a) (VarFO b) = add $ cVarEqF (RefFO a) (RefFO b)
 compileAssertionEqF (VarFO a) b = do
   out <- freshRefF
   compileExprF out b
   add $ cVarEqF (RefFO a) out
-compileAssertionEqF (VarFI a) (ValF b) = add $ cVarBindF (RefFI a) b
+compileAssertionEqF (VarFI a) (ValF b) = add $ cVarBindF (F $ RefFI a) b
 compileAssertionEqF (VarFI a) (VarF b) = add $ cVarEqF (RefFI a) (RefF b)
 compileAssertionEqF (VarFI a) (VarFO b) = add $ cVarEqF (RefFI a) (RefF b)
 compileAssertionEqF (VarFI a) b = do
@@ -191,7 +191,7 @@ runM useNewOptimizer counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -204,7 +204,7 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       cs <- get
-      csFieldRelations' <- lift $ FieldRelations.bindToValue x c (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.bindField x c (csFieldRelations cs)
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindB x c) = do
       cs <- get
@@ -212,11 +212,18 @@ add = mapM_ addOne
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindU x c) = do
       cs <- get
-      csUIntRelations' <- lift $ UIntRelations.bindToValue x c (csUIntRelations cs)
-      put cs {csUIntRelations = csUIntRelations'}
+      csFieldRelations' <- lift $ FieldRelations.bindUInt x c (csFieldRelations cs)
+      put cs {csFieldRelations = csFieldRelations'}
+    -- put cs {csUIntRelations = csUIntRelations'}
+    addOne (CVarEq x y) = do
+      cs <- get
+      result <- lift $ FieldRelations.relateRefF x (1, y, 0) (csFieldRelations cs)
+      case result of
+        Nothing -> return ()
+        Just csFieldRelations' -> put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqF x y) = do
       cs <- get
-      result <- lift $ FieldRelations.relate x (1, y, 0) (csFieldRelations cs)
+      result <- lift $ FieldRelations.relateRefF (F x) (1, F y, 0) (csFieldRelations cs)
       case result of
         Nothing -> return ()
         Just csFieldRelations' -> put cs {csFieldRelations = csFieldRelations'}
@@ -230,15 +237,16 @@ add = mapM_ addOne
       put $ cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqU x y) = do
       cs <- get
-      result <- lift $ UIntRelations.assertEqual x y (csUIntRelations cs)
-      case result of
-        Nothing -> return ()
-        Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
+      csFieldRelations' <- lift $ FieldRelations.assertEqualUInt x y (csFieldRelations cs)
+      put $ cs {csFieldRelations = csFieldRelations'}
+    -- case result of
+    --   Nothing -> return ()
+    --   Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = do
       modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
-    addOne (CNEqF x y m) = modify' (\cs -> addOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
-    addOne (CNEqU x y m) = modify' (\cs -> addOccurrences [x, y] $ addOccurrences [m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
+    addOne (CNEqF x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y, m]) $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
+    addOne (CNEqU x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y])  $ addOccurrences (Set.singleton m)  $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
 
 -- addOne (CRotateU x y _n) = do
 --   cs <- get
@@ -246,8 +254,9 @@ add = mapM_ addOne
 --     Nothing -> return ()
 --     Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
 
+-- TODO: remove this
 addOccurrencesUTemp :: [RefU] -> M n ()
-addOccurrencesUTemp = modify' . addOccurrences
+addOccurrencesUTemp = modify' . addOccurrences . Set.fromList
 
 addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
 addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMods cs}
@@ -255,7 +264,7 @@ addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMod
 addModInvHint :: (GaloisField n, Integral n) => RefU -> RefU -> Integer -> M n ()
 addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (x, n, p) : csModInvs cs}
 
-freshRefF :: M n RefF
+freshRefF :: M n RefT
 freshRefF = do
   counters <- gets csCounters
   let index = getCount OfIntermediate OfField counters
@@ -382,9 +391,9 @@ compileExprB out expr = case expr of
     let width = widthOfU x
     add $ cVarEqB out (RefUBit width x' (i `mod` width)) -- out = x'[i]
 
-compileExprF :: (GaloisField n, Integral n) => RefF -> ExprF n -> M n ()
+compileExprF :: (GaloisField n, Integral n) => RefT -> ExprF n -> M n ()
 compileExprF out expr = case expr of
-  ValF val -> add $ cVarBindF out val -- out = val
+  ValF val -> add $ cVarBindF (F out) val -- out = val
   VarF var -> add $ cVarEqF out (RefF var) -- out = var
   VarFO var -> add $ cVarEqF out (RefFO var) -- out = var
   VarFI var -> add $ cVarEqF out (RefFI var) -- out = var
@@ -399,11 +408,11 @@ compileExprF out expr = case expr of
   MulF x y -> do
     x' <- wireF x
     y' <- wireF y
-    add $ cMulSimpleF x' y' out
+    add $ cMulSimpleF (F x') (F y') (F out)
   DivF x y -> do
     x' <- wireF x
     y' <- wireF y
-    add $ cMulSimpleF y' out x'
+    add $ cMulSimpleF (F y') (F out) (F x')
   -- MMIF x p -> do
   --   -- See: https://github.com/btq-ag/keelung-compiler/issues/14
   --   -- 1. x * x⁻¹ = np + 1
@@ -423,11 +432,11 @@ compileExprF out expr = case expr of
     p' <- wireB p
     x' <- wireF x
     y' <- wireF y
-    compileIfF out p' x' y'
+    compileIfF (F out) p' (F x') (F y')
   BtoF x -> do
     result <- freshRefB
     compileExprB result x
-    add $ cVarEqF out (RefBtoRefF result) -- out = var
+    add $ cVarEq (F out) (RefBtoRefF result) -- out = var
 
 compileExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compileExprU out expr = case expr of
@@ -550,7 +559,7 @@ compileExprU out expr = case expr of
 
 data Term n
   = Constant n -- c
-  | WithVars RefF n -- cx
+  | WithVars RefT n -- cx
 
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
@@ -588,16 +597,16 @@ negateTerm :: Num n => Term n -> Term n
 negateTerm (WithVars var c) = WithVars var (negate c)
 negateTerm (Constant c) = Constant (negate c)
 
-compileTerms :: (GaloisField n, Integral n) => RefF -> Seq (Term n) -> M n ()
+compileTerms :: (GaloisField n, Integral n) => RefT -> Seq (Term n) -> M n ()
 compileTerms out terms =
   let (constant, varsWithCoeffs) = foldl' go (0, []) terms
    in case varsWithCoeffs of
-        [] -> add $ cVarBindF out constant
-        _ -> add $ cAddF constant $ (out, -1) : varsWithCoeffs
+        [] -> add $ cVarBindF (F out) constant
+        _ -> add $ cAddF constant $ (F out, -1) : varsWithCoeffs
   where
     go :: Num n => (n, [(RefF, n)]) -> Term n -> (n, [(RefF, n)])
     go (constant, pairs) (Constant n) = (constant + n, pairs)
-    go (constant, pairs) (WithVars var coeff) = (constant, (var, coeff) : pairs)
+    go (constant, pairs) (WithVars var coeff) = (constant, (F var, coeff) : pairs)
 
 -- | If the expression is not already a variable, create a new variable
 wireB :: (GaloisField n, Integral n) => ExprB n -> M n RefB
@@ -610,7 +619,7 @@ wireB expr = do
   compileExprB out expr
   return out
 
-wireF :: (GaloisField n, Integral n) => ExprF n -> M n RefF
+wireF :: (GaloisField n, Integral n) => ExprF n -> M n RefT
 wireF (VarF ref) = return (RefF ref)
 wireF (VarFO ref) = return (RefFO ref)
 wireF (VarFI ref) = return (RefFI ref)
@@ -655,7 +664,7 @@ compileEqualityU isEq out x y =
           add $
             cMulF
               (0, [(RefUVal x, 1), (RefUVal y, -1)])
-              (0, [(m, 1)])
+              (0, [(F m, 1)])
               (1, [(RefBtoRefF out, -1)])
           add $
             cMulF
@@ -668,7 +677,7 @@ compileEqualityU isEq out x y =
           add $
             cMulF
               (0, [(RefUVal x, 1), (RefUVal y, -1)])
-              (0, [(m, 1)])
+              (0, [(F m, 1)])
               (0, [(RefBtoRefF out, 1)])
           add $
             cMulF
@@ -679,7 +688,7 @@ compileEqualityU isEq out x y =
       --  keep track of the relation between (x - y) and m
       add $ cNEqU x y m
 
-compileEqualityF :: (GaloisField n, Integral n) => Bool -> RefB -> RefF -> RefF -> M n ()
+compileEqualityF :: (GaloisField n, Integral n) => Bool -> RefB -> RefT -> RefT -> M n ()
 compileEqualityF isEq out x y =
   if x == y
     then do
@@ -698,12 +707,12 @@ compileEqualityF isEq out x y =
           --  2. (x - y) * out = 0
           add $
             cMulF
-              (0, [(x, 1), (y, -1)])
-              (0, [(m, 1)])
+              (0, [(F x, 1), (F y, -1)])
+              (0, [(F m, 1)])
               (1, [(RefBtoRefF out, -1)])
           add $
             cMulF
-              (0, [(x, 1), (y, -1)])
+              (0, [(F x, 1), (F y, -1)])
               (0, [(RefBtoRefF out, 1)])
               (0, [])
         else do
@@ -711,12 +720,12 @@ compileEqualityF isEq out x y =
           --  2. (x - y) * (1 - out) = 0
           add $
             cMulF
-              (0, [(x, 1), (y, -1)])
-              (0, [(m, 1)])
+              (0, [(F x, 1), (F y, -1)])
+              (0, [(F m, 1)])
               (0, [(RefBtoRefF out, 1)])
           add $
             cMulF
-              (0, [(x, 1), (y, -1)])
+              (0, [(F x, 1), (F y, -1)])
               (1, [(RefBtoRefF out, -1)])
               (0, [])
 
@@ -1053,14 +1062,14 @@ assertLTE width a c = do
 
     go :: (GaloisField n, Integral n) => RefU -> Maybe RefF -> Int -> M n (Maybe RefF)
     go ref Nothing i =
-      let aBit = RefBtoRefF (RefUBit width ref i)
+      let aBit = RefUBit width ref i
        in -- have not found the first bit in 'c' that is 1 yet
           if Data.Bits.testBit c i
             then do
-              return $ Just aBit -- when found, return a[i] and a counter
+              return $ Just (RefBtoRefF aBit) -- when found, return a[i] and a counter
             else do
               -- a[i] = 0
-              add $ cVarBindF aBit 0
+              add $ cVarBindB aBit 0
               return Nothing -- otherwise, continue searching
     go ref (Just acc) i =
       let aBit = RefBtoRefF (RefUBit width ref i)
@@ -1068,8 +1077,8 @@ assertLTE width a c = do
             then do
               -- constraint for the next accumulator
               acc' <- freshRefF
-              add $ cMulF (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(acc', 1)])
-              return $ Just acc'
+              add $ cMulF (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(F acc', 1)])
+              return $ Just (F acc')
             else do
               -- constraint on a[i]
               add $ cMulF (1, [(acc, -1), (aBit, -1)]) (0, [(aBit, 1)]) (0, [])

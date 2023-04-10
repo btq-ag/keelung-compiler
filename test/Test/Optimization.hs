@@ -2,7 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Test.Optimization (tests, run) where
+module Test.Optimization (tests, run, debug) where
 
 import Data.Foldable
 import Hash.Poseidon qualified as Poseidon
@@ -46,6 +46,11 @@ runTest expectedBeforeSize expectedAfterSize program = do
 run :: IO ()
 run = hspec tests
 
+debug :: ConstraintSystem (N GF181) -> IO ()
+debug cs = do
+  print cs
+  print (relocateConstraintSystem cs)
+
 tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
@@ -67,11 +72,11 @@ tests = do
           return (x + y + z)
 
         -- FO0 = 3FI0
-        FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (3, 0)
+        FieldRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (3, 0)
         -- F0 (y) = FI0
-        FieldRelations.relationBetween (RefF 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
+        FieldRelations.relationBetween (F $ RefF 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
         -- F1 (z) = F0 (y)
-        FieldRelations.relationBetween (RefF 1) (RefF 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
+        FieldRelations.relationBetween (F $ RefF 1) (F $ RefF 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
 
       it "Field 2" $ do
         cs <- runTest 3 1 $ do
@@ -81,11 +86,11 @@ tests = do
           return (x + y + z)
 
         -- FO0 = 4FI0
-        FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (4, 0)
+        FieldRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (4, 0)
         -- F0 (y) = FI0
-        FieldRelations.relationBetween (RefF 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
+        FieldRelations.relationBetween (F $ RefF 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
         -- F1 (z) = 2F0 (y)
-        FieldRelations.relationBetween (RefF 1) (RefF 0) (csFieldRelations cs) `shouldBe` Just (2, 0)
+        FieldRelations.relationBetween (F $ RefF 1) (F $ RefF 0) (csFieldRelations cs) `shouldBe` Just (2, 0)
 
       it "Field 3" $ do
         cs <- runTest 2 1 $ do
@@ -94,14 +99,14 @@ tests = do
           return (x + y)
 
         -- FO0 = 2FI0 + 1
-        FieldRelations.relationBetween (RefFO 0) (RefFI 0) (csFieldRelations cs) `shouldBe` Just (2, 1)
+        FieldRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (2, 1)
 
       it "Field 4" $ do
         cs <- runTest 1 1 $ do
           let x = 4
           y <- reuse x
           return (x + y :: Field)
-        FieldRelations.parentOf (csFieldRelations cs) (RefFO 0) `shouldBe` FieldRelations.Constant 8
+        FieldRelations.parentOf (csFieldRelations cs) (F $ RefFO 0) `shouldBe` FieldRelations.Constant 8
 
       it "Field 5" $ do
         _cs <- runTest 2 1 $ do

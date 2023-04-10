@@ -9,6 +9,7 @@ import Control.DeepSeq (NFData)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
+import Data.Set (Set)
 
 data PolyG ref n = PolyG n (Map ref n)
   deriving (Eq, Functor, Ord, Generic, NFData)
@@ -79,8 +80,8 @@ view (PolyG c xs) = case Map.toList xs of
 viewAsMap :: PolyG ref n -> (n, Map ref n)
 viewAsMap (PolyG c xs) = (c, xs)
 
-vars :: PolyG ref n -> [ref]
-vars (PolyG _ xs) = Map.keys xs
+vars :: PolyG ref n -> Set ref
+vars (PolyG _ xs) = Map.keysSet xs
 
 merge :: (Ord ref, Num n, Eq n) => PolyG ref n -> PolyG ref n -> Either n (PolyG ref n)
 merge (PolyG c1 xs1) (PolyG c2 xs2) =
