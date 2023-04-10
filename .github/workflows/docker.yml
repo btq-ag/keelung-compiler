@@ -48,3 +48,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           ssh: default
           platforms: linux/amd64,linux/arm64
+          secrets: |
+            GIT_AUTH_TOKEN=${{ secrets.KEELUNG }}
