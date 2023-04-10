@@ -7,6 +7,8 @@ import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
@@ -224,7 +226,7 @@ learnFromAddF poly = case PolyG.view poly of
     --    intercept + slope * var = 0
     --  =>
     --    var = - intercept / slope
-    bindToValue var (-intercept / slope)
+    assign var (-intercept / slope)
     return True
   PolyG.Binomial intercept (var1, slope1) (var2, slope2) -> do
     --    intercept + slope1 * var1 + slope2 * var2 = 0
@@ -235,23 +237,28 @@ learnFromAddF poly = case PolyG.view poly of
     relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
   PolyG.Polynomial _ _ -> return False
 
-bindToValue :: (GaloisField n, Integral n) => RefF -> n -> RoundM n ()
-bindToValue var value = do
+assign :: (GaloisField n, Integral n) => RefF -> n -> RoundM n ()
+assign (RefBtoRefF var) value = do
   markChanged RelationChanged
   cs <- get
-  result <- lift $ lift $ FieldRelations.bindToValue var value (csFieldRelations cs)
-  put $ removeOccurrences [var] $ cs {csFieldRelations = result}
+  result <- lift $ lift $ FieldRelations.bindBoolean var (value == 1) (csFieldRelations cs)
+  put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = result}
+assign var value = do
+  markChanged RelationChanged
+  cs <- get
+  result <- lift $ lift $ FieldRelations.bindField var value (csFieldRelations cs)
+  put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = result}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cs <- get
-  result <- lift $ lift $ FieldRelations.relate var1 (slope, var2, intercept) (csFieldRelations cs)
+  result <- lift $ lift $ FieldRelations.relateRefF var1 (slope, var2, intercept) (csFieldRelations cs)
   case result of
     Nothing -> return False
     Just unionFind' -> do
       markChanged RelationChanged
-      modify' $ \cs' -> removeOccurrences [var1, var2] $ cs' {csFieldRelations = unionFind'}
+      modify' $ \cs' -> removeOccurrences (Set.fromList [var1, var2]) $ cs' {csFieldRelations = unionFind'}
       return True
 
 addAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n ()
@@ -260,7 +267,7 @@ addAddF poly = case PolyG.view poly of
     --    constant + coeff1 * var1 = 0
     --      =>
     --    var1 = - constant / coeff1
-    bindToValue var1 (-constant / coeff1)
+    assign var1 (-constant / coeff1)
   PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> do
     --    constant + coeff1 * var1 + coeff2 * var2 = 0
     --      =>
@@ -276,15 +283,15 @@ addAddF poly = case PolyG.view poly of
 
 -- | Substitutes variables in a polynomial.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n) => FieldRelations n -> BooleanRelations -> PolyG RefF n -> Maybe (Either n (PolyG RefF n), [RefF], [RefF])
+substPolyG :: (GaloisField n, Integral n) => FieldRelations n -> BooleanRelations -> PolyG RefF n -> Maybe (Either n (PolyG RefF n), Set RefF, Set RefF)
 substPolyG ctx boolRels poly = do
   let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' (substPolyG_ ctx boolRels) (False, Left c, [], []) xs of
+  case Map.foldlWithKey' (substPolyG_ ctx boolRels) (False, Left c, mempty, mempty) xs of
     (False, _, _, _) -> Nothing -- nothing changed
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
-    (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs)
+    (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyG.vars poly)
 
-substPolyG_ :: (Integral n, GaloisField n) => FieldRelations n -> BooleanRelations -> (Bool, Either n (PolyG RefF n), [RefF], [RefF]) -> RefF -> n -> (Bool, Either n (PolyG RefF n), [RefF], [RefF])
+substPolyG_ :: (Integral n, GaloisField n) => FieldRelations n -> BooleanRelations -> (Bool, Either n (PolyG RefF n), Set RefF, Set RefF) -> RefF -> n -> (Bool, Either n (PolyG RefF n), Set RefF, Set RefF)
 substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case FieldRelations.parentOf ctx ref of
   FieldRelations.Root -> case ref of
     RefBtoRefF refB ->
@@ -294,25 +301,25 @@ substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = 
             Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
             Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
         BooleanRelations.Value True ->
-          let removedRefs' = ref : removedRefs -- add ref to removedRefs
+          let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
            in case accPoly of
                 Left c -> (True, Left (c + coeff), removedRefs', addedRefs)
                 Right xs -> (True, Right $ PolyG.addConstant coeff xs, removedRefs', addedRefs)
         BooleanRelations.Value False ->
-          let removedRefs' = ref : removedRefs -- add ref to removedRefs
+          let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
            in case accPoly of
                 Left c -> (changed, Left c, removedRefs', addedRefs)
                 Right xs -> (changed, Right xs, removedRefs', addedRefs)
         BooleanRelations.ChildOf True root ->
-          let removedRefs' = ref : removedRefs
-              addedRefs' = RefBtoRefF root : addedRefs
+          let removedRefs' = Set.insert ref removedRefs
+              addedRefs' = Set.insert (RefBtoRefF root) addedRefs
            in case accPoly of
                 -- ref = root
                 Left c -> (True, PolyG.singleton c (RefBtoRefF root, coeff), removedRefs', addedRefs')
                 Right accPoly' -> (True, PolyG.insert 0 (RefBtoRefF root, coeff) accPoly', removedRefs', addedRefs')
         BooleanRelations.ChildOf False root ->
-          let removedRefs' = ref : removedRefs
-              addedRefs' = RefBtoRefF root : addedRefs
+          let removedRefs' = Set.insert ref removedRefs
+              addedRefs' = Set.insert (RefBtoRefF root) addedRefs
            in case accPoly of
                 -- ref = 1 - root
                 Left c -> (True, PolyG.singleton (c + coeff) (RefBtoRefF root, -coeff), removedRefs', addedRefs')
@@ -324,7 +331,7 @@ substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = 
         Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
   FieldRelations.Constant intercept ->
     -- ref = intercept
-    let removedRefs' = ref : removedRefs -- add ref to removedRefs
+    let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
      in case accPoly of
           Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
           Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', removedRefs', addedRefs)
@@ -338,8 +345,8 @@ substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = 
             Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
           else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
       else
-        let removedRefs' = ref : removedRefs
-            addedRefs' = root : addedRefs
+        let removedRefs' = Set.insert ref removedRefs
+            addedRefs' = Set.insert root addedRefs
          in case accPoly of
               -- ref = slope * root + intercept
               Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), removedRefs', addedRefs')

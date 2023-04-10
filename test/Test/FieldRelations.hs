@@ -58,19 +58,19 @@ type M = StateT (FieldRelations GF181) IO
 runM :: M a -> IO a
 runM p = evalStateT p FieldRelations.new
 
-relate :: RefF -> (GF181, RefF, GF181) -> M ()
-relate var val = do
+relate :: RefT -> (GF181, RefT, GF181) -> M ()
+relate var (slope, val, intercept) = do
   xs <- get
-  case runExcept (FieldRelations.relate var val xs) of
+  case runExcept (FieldRelations.relateRefF (F var) (slope, F val, intercept) xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result
 
 -- | Assert that `var1 = slope * var2 + intercept`
-assertRelation :: RefF -> GF181 -> RefF -> GF181 -> M ()
+assertRelation :: RefT -> GF181 -> RefT -> GF181 -> M ()
 assertRelation var1 slope var2 intercept = do
   xs <- get
-  FieldRelations.relationBetween var1 var2 xs `shouldBe` Just (slope, intercept)
+  FieldRelations.relationBetween (F var1) (F var2) xs `shouldBe` Just (slope, intercept)
 
 ------------------------------------------------------------------------
 
