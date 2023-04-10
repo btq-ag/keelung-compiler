@@ -7,6 +7,7 @@ RUN  apt-get -yq update && \
 # copy the content of the repository to the container
 COPY . . 
 # grant access right to private repositories during the build process
+RUN stack update
 RUN stack install
 # multi-stage build
 FROM --platform=linux/amd64 haskell:9.2.5-slim
