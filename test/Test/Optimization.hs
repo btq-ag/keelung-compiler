@@ -2,7 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Test.Optimization (tests, run) where
+module Test.Optimization (tests, run, debug) where
 
 import Data.Foldable
 import Hash.Poseidon qualified as Poseidon
@@ -45,6 +45,11 @@ runTest expectedBeforeSize expectedAfterSize program = do
 
 run :: IO ()
 run = hspec tests
+
+debug :: ConstraintSystem (N GF181) -> IO ()
+debug cs = do
+  print cs
+  print (relocateConstraintSystem cs)
 
 tests :: SpecWith ()
 tests = do

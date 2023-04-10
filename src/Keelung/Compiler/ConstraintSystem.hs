@@ -40,7 +40,7 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax.Counters
-import Debug.Trace
+import Data.Set (Set)
 
 --------------------------------------------------------------------------------
 
@@ -301,21 +301,20 @@ relocateConstraintSystem cs =
           publicInputVarsU = [RefUVal (RefUI w i) | w <- bitWidths, i <- [0 .. getCount OfPublicInput (OfUInt w) counters - 1]]
           privateInputVarsU = [RefUVal (RefUP w i) | w <- bitWidths, i <- [0 .. getCount OfPrivateInput (OfUInt w) counters - 1]]
 
+          outputVarsB = [RefBtoRefF (RefBO i) | i <- [0 .. getCount OfOutput OfBoolean counters - 1]]
+          publicInputVarsB = [RefBtoRefF (RefBI i) | i <- [0 .. getCount OfPublicInput OfBoolean counters - 1]]
+          privateInputVarsB = [RefBtoRefF (RefBP i) | i <- [0 .. getCount OfPrivateInput OfBoolean counters - 1]]
 
-       in -- occurredInFU = Map.keys $ Map.filterWithKey (\ref count -> count > 0 && not (pinnedRefF ref)) occurrencesF
-          --     occurredInF = Map.elems $ Map.mapMaybeWithKey (\ref count -> if count > 0 then extracvtRefUVal ref else Nothing) occurrencesF
-          --  in convert outputVars
-          --       <> convert publicInputVars
-          --       <> convert privateInputVars
-          --       <> convert occurredInF
-
-          Seq.fromList (Maybe.mapMaybe toConstraint outputVars)
+       in Seq.fromList (Maybe.mapMaybe toConstraint outputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
-            <> Seq.fromList (traceShowId $ Maybe.mapMaybe toConstraint occurredInF)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
             <> Seq.fromList (Maybe.mapMaybe toConstraint outputVarsU)
             <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVarsU)
             <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVarsU)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint outputVarsB)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVarsB)
+            <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVarsB)
             <> fromBooleanRelations boolRels occurrencesF occurrencesB occurrencesU
       where
         boolRels = FieldRelations.exportBooleanRelations fieldRels
@@ -454,8 +453,8 @@ sizeOfConstraintSystem cs =
     + length (csNEqU cs)
 
 class UpdateOccurrences ref where
-  addOccurrences :: [ref] -> ConstraintSystem n -> ConstraintSystem n
-  removeOccurrences :: [ref] -> ConstraintSystem n -> ConstraintSystem n
+  addOccurrences :: Set ref -> ConstraintSystem n -> ConstraintSystem n
+  removeOccurrences :: Set ref -> ConstraintSystem n -> ConstraintSystem n
 
 instance UpdateOccurrences RefF where
   addOccurrences =

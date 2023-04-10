@@ -23,6 +23,7 @@ import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
+import qualified Data.Set as Set
 
 --------------------------------------------------------------------------------
 
@@ -244,8 +245,8 @@ add = mapM_ addOne
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = do
       modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
-    addOne (CNEqF x y m) = modify' (\cs -> addOccurrences [x, y, m] $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
-    addOne (CNEqU x y m) = modify' (\cs -> addOccurrences [x, y] $ addOccurrences [m] $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
+    addOne (CNEqF x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y, m]) $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
+    addOne (CNEqU x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y])  $ addOccurrences (Set.singleton m)  $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
 
 -- addOne (CRotateU x y _n) = do
 --   cs <- get
@@ -253,8 +254,9 @@ add = mapM_ addOne
 --     Nothing -> return ()
 --     Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
 
+-- TODO: remove this
 addOccurrencesUTemp :: [RefU] -> M n ()
-addOccurrencesUTemp = modify' . addOccurrences
+addOccurrencesUTemp = modify' . addOccurrences . Set.fromList
 
 addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
 addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMods cs}
