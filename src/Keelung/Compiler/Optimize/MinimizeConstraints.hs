@@ -239,7 +239,7 @@ bindToValue :: (GaloisField n, Integral n) => RefF -> n -> RoundM n ()
 bindToValue var value = do
   markChanged RelationChanged
   cs <- get
-  result <- lift $ lift $ FieldRelations.bindToValue var value (csFieldRelations cs)
+  result <- lift $ lift $ FieldRelations.bindField var value (csFieldRelations cs)
   put $ removeOccurrences [var] $ cs {csFieldRelations = result}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.

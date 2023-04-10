@@ -10,13 +10,16 @@ module Keelung.Compiler.Compile.Relations.FieldRelations
     new,
     parentOf,
     relate,
-    bindToValue,
+    bindField,
+    bindUInt,
+    assertEqualUInt,
     toMap,
     size,
     bindBoolean,
     relateBoolean,
     Lookup (..),
     exportBooleanRelations,
+    exportUIntRelations
   )
 where
 
@@ -30,13 +33,16 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
+import Keelung.Compiler.Compile.Relations.UIntRelations (UIntRelations)
+import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Constraint
 import Prelude hiding (lookup)
 
 data FieldRelations n = FieldRelations
   { links :: Map RefF (Maybe (n, RefF), n),
     sizes :: Map RefF Int,
-    booleanRelations :: BooleanRelations
+    booleanRelations :: BooleanRelations,
+    uintRelations :: UIntRelations n
   }
   deriving (Eq, Generic, NFData)
 
@@ -58,7 +64,7 @@ instance (GaloisField n, Integral n) => Show (FieldRelations n) where
       showLink (var, (Nothing, intercept)) = show var <> " = " <> show intercept
 
 new :: FieldRelations n
-new = FieldRelations mempty mempty BooleanRelations.new
+new = FieldRelations mempty mempty BooleanRelations.new UIntRelations.new
 
 data Lookup n = Root | Constant n | ChildOf n RefF n
   deriving (Eq, Show)
@@ -145,17 +151,36 @@ bindBoolean ref val xs = do
   result <- BooleanRelations.assign ref val (booleanRelations xs)
   return $ xs {booleanRelations = result}
 
+-- | Bind a variable to a value
+bindUInt :: (GaloisField n, Integral n) => RefU -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
+bindUInt ref val xs = do
+  result <- UIntRelations.bindToValue ref val (uintRelations xs)
+  return $ xs {uintRelations = result}
+
+assertEqualUInt :: (GaloisField n, Integral n) => RefU -> RefU -> FieldRelations n -> Except (Error n) (FieldRelations n)
+assertEqualUInt refA refB xs = do
+  result <- UIntRelations.assertEqual refA refB (uintRelations xs)
+  case result of
+    Nothing -> return xs
+    Just uintRels -> return $ xs {uintRelations = uintRels}
+
+-- rotateUInt :: (GaloisField n, Integral n) => RefU -> (Int, RefU) -> FieldRelations n -> Except (Error n) (FieldRelations n)
+-- rotateUInt refA (rotation, refB) xs = do
+--   result <- UIntRelations.rotate ref rotation root (uintRelations xs)
+--   return $ xs {uintRelations = result}
+
+-- rotateUInt :: (GaloisField n, Integral n) => RefU -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
+
 relateBoolean :: RefB -> (Bool, RefB) -> FieldRelations n -> Except (Error n) (FieldRelations n)
 relateBoolean refA (same, refB) xs = do
   result <- BooleanRelations.relate refA same refB (booleanRelations xs)
   return $ xs {booleanRelations = result}
-  -- case result of
-  --   Nothing -> return xs
-  --   Just boolRels -> return $ xs {booleanRelations = boolRels}
+
+-- relateUInt :: (GaloisField n, Integral n) => RefU -> (n, RefU) -> FieldRelations n -> Except (Error n) (FieldRelations n)
 
 -- | Bind a variable to a value
-bindToValue :: (GaloisField n, Integral n) => RefF -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
-bindToValue x value xs =
+bindField :: (GaloisField n, Integral n) => RefF -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
+bindField x value xs =
   case x of
     RefBtoRefF refB -> bindBoolean refB (value == 1) xs
     _ ->
@@ -197,10 +222,12 @@ relate :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations 
 relate x (0, _, intercept) xs =
   case x of
     RefBtoRefF refB -> Just <$> bindBoolean refB (intercept == 1) xs
-    _ -> Just <$> bindToValue x intercept xs
+    RefUVal refU -> Just <$> bindUInt refU intercept xs
+    _ -> Just <$> bindField x intercept xs
 relate x (slope, y, intercept) xs =
   case (x, y) of
     (RefBtoRefF refA, RefBtoRefF refB) -> Just <$> relateBoolean refA (slope == 1, refB) xs
+    (RefUVal refA, RefUVal refB) -> Just <$> assertEqualUInt refA refB xs
     _ -> case compare x y of
       GT -> relate' x (slope, y, intercept) xs -- x = slope * y + intercept
       LT -> relate' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
@@ -219,7 +246,7 @@ relate' x (slope, y, intercept) xs =
       --  slope * y + intercept = interceptX
       -- =>
       --  y = (interceptX - intercept) / slope
-      Just <$> bindToValue y (interceptX - intercept / slope) xs
+      Just <$> bindField y (interceptX - intercept / slope) xs
     ChildOf slopeX rootOfX interceptX ->
       -- x is a child of `rootOfX` with slope `slopeX` and intercept `interceptX`
       --  x = slopeX * rootOfX + interceptX
@@ -240,7 +267,7 @@ relate' x (slope, y, intercept) xs =
           --  y = interceptY
           -- =>
           --  x = slope * interceptY + intercept
-          Just <$> bindToValue x (slope * interceptY + intercept) xs
+          Just <$> bindField x (slope * interceptY + intercept) xs
         ChildOf slopeY rootOfY interceptY ->
           -- y is a child of `rootOfY` with slope `slopeY` and intercept `interceptY`
           --  y = slopeY * rootOfY + interceptY
@@ -272,3 +299,6 @@ size = Map.size . links
 
 exportBooleanRelations :: FieldRelations n -> BooleanRelations
 exportBooleanRelations = booleanRelations
+
+exportUIntRelations :: FieldRelations n -> UIntRelations n
+exportUIntRelations = uintRelations

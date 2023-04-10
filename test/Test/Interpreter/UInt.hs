@@ -279,11 +279,10 @@ tests = do
                   return $ cond true x y
         runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [5]
 
-      -- it "with literals" $ do
-      --   let program = do
-      --             return $ cond true (3 :: UInt 2) 2
-      --   debug program
-      --   runAllExceptForTheOldOptimizer program [] [] [3 :: GF181]
+      it "with literals" $ do
+        let program = do
+                  return $ cond true (3 :: UInt 2) 2
+        runAllExceptForTheOldOptimizer program [] [] [3 :: GF181]
 
     it "eq" $ do
       let program = do

@@ -53,7 +53,7 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceU :: !(Map RefU Int),
     -- when x == y (FieldRelations)
     csFieldRelations :: FieldRelations n,
-    csUIntRelations :: UIntRelations n,
+    -- csUIntRelations :: UIntRelations n,
     -- addative constraints
     csAddF :: [PolyG RefF n],
     -- multiplicative constraints
@@ -72,7 +72,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
   show cs =
     "Constraint Module {\n"
       <> showVarEqF
-      <> showVarEqU
+      -- <> showVarEqU
       <> showAddF
       <> showMulF
       <> showNEqF
@@ -130,7 +130,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       --         <> "\n"
 
       showVarEqF = "  Field relations:\n" <> indent (indent (show (csFieldRelations cs)))
-      showVarEqU = "  UInt relations:\n" <> indent (indent (show (csUIntRelations cs)))
+      -- showVarEqU = "  UInt relations:\n" <> indent (indent (show (csUIntRelations cs)))
 
       showAddF = adapt "AddF" (csAddF cs) show
 
@@ -430,8 +430,8 @@ relocateConstraintSystem cs =
               Left _ -> Nothing
               Right poly -> Just $ fromConstraint counters $ CAddF poly
 
-    varEqFs = fromFieldRelations (csFieldRelations cs) (csUIntRelations cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
-    varEqUs = fromUIntRelations (csUIntRelations cs) (csFieldRelations cs) (FieldRelations.exportBooleanRelations (csFieldRelations cs)) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
+    varEqFs = fromFieldRelations (csFieldRelations cs) (FieldRelations.exportUIntRelations (csFieldRelations cs)) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
+    varEqUs = fromUIntRelations (FieldRelations.exportUIntRelations (csFieldRelations cs)) (csFieldRelations cs) (FieldRelations.exportBooleanRelations (csFieldRelations cs)) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
 
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
@@ -445,7 +445,7 @@ sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
   FieldRelations.size (csFieldRelations cs)
     + BooleanRelations.size (FieldRelations.exportBooleanRelations (csFieldRelations cs))
-    + UIntRelations.size (csUIntRelations cs)
+    + UIntRelations.size (FieldRelations.exportUIntRelations (csFieldRelations cs))
     + length (csAddF cs)
     + length (csMulF cs)
     + length (csNEqF cs)

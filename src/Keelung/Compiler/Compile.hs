@@ -16,7 +16,6 @@ import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
-import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
@@ -191,7 +190,7 @@ runM useNewOptimizer counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new UIntRelations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -204,7 +203,7 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       cs <- get
-      csFieldRelations' <- lift $ FieldRelations.bindToValue x c (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.bindField x c (csFieldRelations cs)
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindB x c) = do
       cs <- get
@@ -212,8 +211,9 @@ add = mapM_ addOne
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindU x c) = do
       cs <- get
-      csUIntRelations' <- lift $ UIntRelations.bindToValue x c (csUIntRelations cs)
-      put cs {csUIntRelations = csUIntRelations'}
+      csFieldRelations' <- lift $ FieldRelations.bindUInt x c (csFieldRelations cs)
+      put cs {csFieldRelations = csFieldRelations'}
+    -- put cs {csUIntRelations = csUIntRelations'}
     addOne (CVarEqF x y) = do
       cs <- get
       result <- lift $ FieldRelations.relate x (1, y, 0) (csFieldRelations cs)
@@ -230,10 +230,11 @@ add = mapM_ addOne
       put $ cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqU x y) = do
       cs <- get
-      result <- lift $ UIntRelations.assertEqual x y (csUIntRelations cs)
-      case result of
-        Nothing -> return ()
-        Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
+      csFieldRelations' <- lift $ FieldRelations.assertEqualUInt x y (csFieldRelations cs)
+      put $ cs {csFieldRelations = csFieldRelations'}
+    -- case result of
+    --   Nothing -> return ()
+    --   Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = do
       modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
