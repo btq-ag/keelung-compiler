@@ -61,7 +61,7 @@ runM p = evalStateT p FieldRelations.new
 relate :: RefF -> (GF181, RefF, GF181) -> M ()
 relate var val = do
   xs <- get
-  case runExcept (FieldRelations.relate var val xs) of
+  case runExcept (FieldRelations.relateRefF var val xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result

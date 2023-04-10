@@ -216,7 +216,7 @@ add = mapM_ addOne
     -- put cs {csUIntRelations = csUIntRelations'}
     addOne (CVarEqF x y) = do
       cs <- get
-      result <- lift $ FieldRelations.relate x (1, y, 0) (csFieldRelations cs)
+      result <- lift $ FieldRelations.relateRefF x (1, y, 0) (csFieldRelations cs)
       case result of
         Nothing -> return ()
         Just csFieldRelations' -> put cs {csFieldRelations = csFieldRelations'}

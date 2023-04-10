@@ -9,17 +9,17 @@ module Keelung.Compiler.Compile.Relations.FieldRelations
     relationBetween,
     new,
     parentOf,
-    relate,
+    relateRefF,
     bindField,
     bindUInt,
+    bindBoolean,
     assertEqualUInt,
+    relateBoolean,
     toMap,
     size,
-    bindBoolean,
-    relateBoolean,
     Lookup (..),
     exportBooleanRelations,
-    exportUIntRelations
+    exportUIntRelations,
   )
 where
 
@@ -49,6 +49,8 @@ data FieldRelations n = FieldRelations
 instance (GaloisField n, Integral n) => Show (FieldRelations n) where
   show xs =
     show (booleanRelations xs)
+      <> "\n"
+      <> show (uintRelations xs)
       <> "\n"
       <> "FieldRelations {\n"
       ++ "  links = "
@@ -164,25 +166,17 @@ assertEqualUInt refA refB xs = do
     Nothing -> return xs
     Just uintRels -> return $ xs {uintRelations = uintRels}
 
--- rotateUInt :: (GaloisField n, Integral n) => RefU -> (Int, RefU) -> FieldRelations n -> Except (Error n) (FieldRelations n)
--- rotateUInt refA (rotation, refB) xs = do
---   result <- UIntRelations.rotate ref rotation root (uintRelations xs)
---   return $ xs {uintRelations = result}
-
--- rotateUInt :: (GaloisField n, Integral n) => RefU -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
-
 relateBoolean :: RefB -> (Bool, RefB) -> FieldRelations n -> Except (Error n) (FieldRelations n)
 relateBoolean refA (same, refB) xs = do
   result <- BooleanRelations.relate refA same refB (booleanRelations xs)
   return $ xs {booleanRelations = result}
-
--- relateUInt :: (GaloisField n, Integral n) => RefU -> (n, RefU) -> FieldRelations n -> Except (Error n) (FieldRelations n)
 
 -- | Bind a variable to a value
 bindField :: (GaloisField n, Integral n) => RefF -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
 bindField x value xs =
   case x of
     RefBtoRefF refB -> bindBoolean refB (value == 1) xs
+    RefUVal refU -> bindUInt refU value xs -- NOTE: unreachable
     _ ->
       case parentOf xs x of
         Root ->
@@ -218,25 +212,24 @@ bindField x value xs =
                 sizes = Map.insert x 1 (sizes xs)
               }
 
-relate :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
-relate x (0, _, intercept) xs =
-  case x of
-    RefBtoRefF refB -> Just <$> bindBoolean refB (intercept == 1) xs
-    RefUVal refU -> Just <$> bindUInt refU intercept xs
-    _ -> Just <$> bindField x intercept xs
-relate x (slope, y, intercept) xs =
-  case (x, y) of
-    (RefBtoRefF refA, RefBtoRefF refB) -> Just <$> relateBoolean refA (slope == 1, refB) xs
-    (RefUVal refA, RefUVal refB) -> Just <$> assertEqualUInt refA refB xs
+relateRefF :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
+relateRefF x (slope, y, intercept) xs =
+  case (x, y, slope, intercept) of
+    (RefBtoRefF refB, _, 0, value) -> Just <$> bindBoolean refB (value == 1) xs
+    (RefUVal refU, _, 0, value) -> Just <$> bindUInt refU value xs
+    (_, _, 0, value) -> Just <$> bindField x value xs
+    (RefBtoRefF refA, RefBtoRefF refB, 1, 0) -> Just <$> relateBoolean refA (True, refB) xs
+    (RefUVal refA, RefUVal refB, 1, 0) -> Just <$> assertEqualUInt refA refB xs
+    (RefBtoRefF refA, RefBtoRefF refB, -1, 1) -> Just <$> relateBoolean refA (False, refB) xs
     _ -> case compare x y of
-      GT -> relate' x (slope, y, intercept) xs -- x = slope * y + intercept
-      LT -> relate' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
+      GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
+      LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
       EQ -> return Nothing
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
-relate' :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
-relate' x (slope, y, intercept) xs =
+relateRefF' :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
+relateRefF' x (slope, y, intercept) xs =
   case parentOf xs x of
     Constant interceptX ->
       -- x is already a root with `interceptX` as its value
@@ -257,7 +250,7 @@ relate' x (slope, y, intercept) xs =
       --  slopeX * rootOfX = slope * y + intercept - interceptX
       -- =>
       --  rootOfX = (slope * y + intercept - interceptX) / slopeX
-      relate rootOfX (slope / slopeX, y, intercept - interceptX / slopeX) xs
+      relateRefF rootOfX (slope / slopeX, y, intercept - interceptX / slopeX) xs
     Root ->
       -- x does not have a parent, so it is its own root
       case parentOf xs y of

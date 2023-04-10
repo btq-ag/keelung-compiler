@@ -224,7 +224,7 @@ learnFromAddF poly = case PolyG.view poly of
     --    intercept + slope * var = 0
     --  =>
     --    var = - intercept / slope
-    bindToValue var (-intercept / slope)
+    assign var (-intercept / slope)
     return True
   PolyG.Binomial intercept (var1, slope1) (var2, slope2) -> do
     --    intercept + slope1 * var1 + slope2 * var2 = 0
@@ -235,8 +235,13 @@ learnFromAddF poly = case PolyG.view poly of
     relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
   PolyG.Polynomial _ _ -> return False
 
-bindToValue :: (GaloisField n, Integral n) => RefF -> n -> RoundM n ()
-bindToValue var value = do
+assign :: (GaloisField n, Integral n) => RefF -> n -> RoundM n ()
+assign (RefBtoRefF var) value = do
+  markChanged RelationChanged
+  cs <- get
+  result <- lift $ lift $ FieldRelations.bindBoolean var (value == 1) (csFieldRelations cs)
+  put $ removeOccurrences [var] $ cs {csFieldRelations = result}
+assign var value = do
   markChanged RelationChanged
   cs <- get
   result <- lift $ lift $ FieldRelations.bindField var value (csFieldRelations cs)
@@ -246,7 +251,7 @@ bindToValue var value = do
 relateF :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cs <- get
-  result <- lift $ lift $ FieldRelations.relate var1 (slope, var2, intercept) (csFieldRelations cs)
+  result <- lift $ lift $ FieldRelations.relateRefF var1 (slope, var2, intercept) (csFieldRelations cs)
   case result of
     Nothing -> return False
     Just unionFind' -> do
@@ -260,7 +265,7 @@ addAddF poly = case PolyG.view poly of
     --    constant + coeff1 * var1 = 0
     --      =>
     --    var1 = - constant / coeff1
-    bindToValue var1 (-constant / coeff1)
+    assign var1 (-constant / coeff1)
   PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> do
     --    constant + coeff1 * var1 + coeff2 * var2 = 0
     --      =>
