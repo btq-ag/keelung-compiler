@@ -47,6 +47,6 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           push: ${{ github.ref_type == 'tag' }}
-          tags: btqag/keelungc:${{ github.ref_name }}
+          tags: btqag/keelungc:${{ github.ref_name }} , btqag/keelungc:latest
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
