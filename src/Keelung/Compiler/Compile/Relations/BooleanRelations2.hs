@@ -234,7 +234,7 @@ class Seniority a where
   compareSeniority :: a -> a -> Ordering
 
 instance Seniority RefB where
-  compareSeniority (RefB _) (RefB _) = EQ
-  compareSeniority (RefB _) _ = LT
-  compareSeniority _ (RefB _) = GT
+  compareSeniority (RefBX _) (RefBX _) = EQ
+  compareSeniority (RefBX _) _ = LT
+  compareSeniority _ (RefBX _) = GT
   compareSeniority _ _ = EQ

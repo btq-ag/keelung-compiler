@@ -17,41 +17,41 @@ tests = do
   describe "FieldRelations" $ do
     it "Relate ($0 = $1)" $
       runM $ do
-        RefF 0 `relate` (1, RefF 1, 0)
+        RefFX 0 `relate` (1, RefFX 1, 0)
 
-        assertRelation (RefF 0) 1 (RefF 1) 0
-        assertRelation (RefF 1) 1 (RefF 0) 0
+        assertRelation (RefFX 0) 1 (RefFX 1) 0
+        assertRelation (RefFX 1) 1 (RefFX 0) 0
 
     it "Relate ($0 = 2$1)" $
       runM $ do
-        RefF 0 `relate` (2, RefF 1, 0) -- x = 2y
-        assertRelation (RefF 0) 2 (RefF 1) 0
-        assertRelation (RefF 0) 1 (RefF 0) 0
-        assertRelation (RefF 1) (1 / 2) (RefF 0) 0
-        assertRelation (RefF 1) 1 (RefF 1) 0
+        RefFX 0 `relate` (2, RefFX 1, 0) -- x = 2y
+        assertRelation (RefFX 0) 2 (RefFX 1) 0
+        assertRelation (RefFX 0) 1 (RefFX 0) 0
+        assertRelation (RefFX 1) (1 / 2) (RefFX 0) 0
+        assertRelation (RefFX 1) 1 (RefFX 1) 0
 
     it "Relate ($0 = 2$1 + 1)" $
       runM $ do
-        RefF 0 `relate` (2, RefF 1, 1) -- x = 2y + 1
-        assertRelation (RefF 0) 2 (RefF 1) 1
-        assertRelation (RefF 1) (1 / 2) (RefF 0) (-1 / 2) -- y = 1/2x - 1/2
+        RefFX 0 `relate` (2, RefFX 1, 1) -- x = 2y + 1
+        assertRelation (RefFX 0) 2 (RefFX 1) 1
+        assertRelation (RefFX 1) (1 / 2) (RefFX 0) (-1 / 2) -- y = 1/2x - 1/2
     it "Relate (x = 2y + 1 & y = 3z + 2)" $
       runM $ do
-        RefF 0 `relate` (2, RefF 1, 1) -- x = 2y + 1
-        RefF 1 `relate` (3, RefF 2, 2) -- y = 3z + 2
+        RefFX 0 `relate` (2, RefFX 1, 1) -- x = 2y + 1
+        RefFX 1 `relate` (3, RefFX 2, 2) -- y = 3z + 2
 
         -- x = 2y + 1
-        assertRelation (RefF 0) 2 (RefF 1) 1
+        assertRelation (RefFX 0) 2 (RefFX 1) 1
         -- y = 1/2x - 1/2
-        assertRelation (RefF 1) (1 / 2) (RefF 0) (-1 / 2)
+        assertRelation (RefFX 1) (1 / 2) (RefFX 0) (-1 / 2)
         -- x = 6z + 5
-        assertRelation (RefF 0) 6 (RefF 2) 5
+        assertRelation (RefFX 0) 6 (RefFX 2) 5
         -- z = 1/6x - 5/6
-        assertRelation (RefF 2) (1 / 6) (RefF 0) (-5 / 6)
+        assertRelation (RefFX 2) (1 / 6) (RefFX 0) (-5 / 6)
         -- y = 3z + 2
-        assertRelation (RefF 1) 3 (RefF 2) 2
+        assertRelation (RefFX 1) 3 (RefFX 2) 2
         -- z = 1/3y - 2/3
-        assertRelation (RefF 2) (1 / 3) (RefF 1) (-2 / 3)
+        assertRelation (RefFX 2) (1 / 3) (RefFX 1) (-2 / 3)
 
 type M = StateT (FieldRelations GF181) IO
 
@@ -61,7 +61,7 @@ runM p = evalStateT p FieldRelations.new
 relate :: RefT -> (GF181, RefT, GF181) -> M ()
 relate var (slope, val, intercept) = do
   xs <- get
-  case runExcept (FieldRelations.relateRefF (F var) (slope, F val, intercept) xs) of
+  case runExcept (FieldRelations.relateRef (F var) (slope, F val, intercept) xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result

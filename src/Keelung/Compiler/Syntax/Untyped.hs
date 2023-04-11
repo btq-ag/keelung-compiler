@@ -207,7 +207,7 @@ widthOfU expr = case expr of
 --------------------------------------------------------------------------------
 
 data Assignment n
-  = AssignmentF RefF (ExprF n)
+  = AssignmentF Ref (ExprF n)
   | AssignmentU RefU (ExprU n)
   | AssignmentB RefB (ExprB n)
 
