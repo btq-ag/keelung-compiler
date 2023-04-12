@@ -9,7 +9,7 @@ module Keelung.Compiler.Compile.Relations.FieldRelations
     relationBetween,
     new,
     parentOf,
-    relateRefF,
+    relateRef,
     bindField,
     bindUInt,
     bindBoolean,
@@ -39,8 +39,8 @@ import Keelung.Compiler.Constraint
 import Prelude hiding (lookup)
 
 data FieldRelations n = FieldRelations
-  { links :: Map RefF (Maybe (n, RefF), n),
-    sizes :: Map RefF Int,
+  { links :: Map Ref (Maybe (n, Ref), n),
+    sizes :: Map Ref Int,
     booleanRelations :: BooleanRelations,
     uintRelations :: UIntRelations n
   }
@@ -68,12 +68,12 @@ instance (GaloisField n, Integral n) => Show (FieldRelations n) where
 new :: FieldRelations n
 new = FieldRelations mempty mempty BooleanRelations.new UIntRelations.new
 
-data Lookup n = Root | Constant n | ChildOf n RefF n
+data Lookup n = Root | Constant n | ChildOf n Ref n
   deriving (Eq, Show)
 
 -- | Returns 'Nothing' if the variable is already a root.
 --   else returns 'Just (slope, root)'  where 'var = slope * root + intercept'
-parentOf :: Integral n => FieldRelations n -> RefF -> Lookup n
+parentOf :: Integral n => FieldRelations n -> Ref -> Lookup n
 parentOf xs var = case Map.lookup var (links xs) of
   Nothing -> Root -- var is a root
   Just (Nothing, intercept) -> Constant intercept -- var is a root
@@ -100,7 +100,7 @@ parentOf xs var = case Map.lookup var (links xs) of
 -- | Calculates the relation between two variables `var1` and `var2`
 --   Returns `Nothing` if the two variables are not related.
 --   Returns `Just (slope, intercept)` where `var1 = slope * var2 + intercept` if the two variables are related.
-relationBetween :: (GaloisField n, Integral n) => RefF -> RefF -> FieldRelations n -> Maybe (n, n)
+relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> FieldRelations n -> Maybe (n, n)
 relationBetween var1 var2 xs = case (parentOf xs var1, parentOf xs var2) of
   (Root, Root) ->
     if var1 == var2
@@ -172,11 +172,11 @@ relateBoolean refA (same, refB) xs = do
   return $ xs {booleanRelations = result}
 
 -- | Bind a variable to a value
-bindField :: (GaloisField n, Integral n) => RefF -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
+bindField :: (GaloisField n, Integral n) => Ref -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
 bindField x value xs =
   case x of
-    RefBtoRefF refB -> bindBoolean refB (value == 1) xs
-    RefUVal refU -> bindUInt refU value xs -- NOTE: unreachable
+    B refB -> bindBoolean refB (value == 1) xs
+    U refU -> bindUInt refU value xs -- NOTE: unreachable
     _ ->
       case parentOf xs x of
         Root ->
@@ -212,46 +212,46 @@ bindField x value xs =
                 sizes = Map.insert x 1 (sizes xs)
               }
 
-relateRefF :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
-relateRefF x (slope, y, intercept) xs = do
+relateRef :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
+relateRef x (slope, y, intercept) xs = do
   case (x, y, slope, intercept) of
-    (RefBtoRefF refB, _, 0, value) -> Just <$> bindBoolean refB (value == 1) xs
-    (RefUVal refU, _, 0, value) -> Just <$> bindUInt refU value xs
+    (B refB, _, 0, value) -> Just <$> bindBoolean refB (value == 1) xs
+    (U refU, _, 0, value) -> Just <$> bindUInt refU value xs
     (_, _, 0, value) -> Just <$> bindField x value xs
-    (RefBtoRefF refA, RefBtoRefF refB, 1, 0) -> Just <$> relateBoolean refA (True, refB) xs
-    (RefUVal refA, RefUVal refB, 1, 0) -> Just <$> assertEqualUInt refA refB xs
-    (RefBtoRefF refA, RefBtoRefF refB, -1, 1) -> Just <$> relateBoolean refA (False, refB) xs
+    (B refA, B refB, 1, 0) -> Just <$> relateBoolean refA (True, refB) xs
+    (U refA, U refB, 1, 0) -> Just <$> assertEqualUInt refA refB xs
+    (B refA, B refB, -1, 1) -> Just <$> relateBoolean refA (False, refB) xs
     (F _, F _, _, _) -> relateTwoRefs x (slope, y, intercept) xs
-    (F refA, RefBtoRefF refB, _, _) -> relateRefFwithRefB refA (slope, refB, intercept) xs
-    (F refA, RefUVal refB, _, _) -> relateRefFwithRefU refA (slope, refB, intercept) xs
-    (RefBtoRefF refA, F refB, _, _) -> relateRefFwithRefB refB (recip slope, refA, -intercept / slope) xs
-    (RefBtoRefF refA, RefBtoRefF refB, _, _) -> relateRefBwithRefB refA (slope, refB, intercept) xs
-    (RefBtoRefF refA, RefUVal refB, _, _) -> relateRefBwithRefU refA (slope, refB, intercept) xs
-    (RefUVal refA, F refB, _, _) -> relateRefFwithRefU refB (recip slope, refA, -intercept / slope) xs
-    (RefUVal refA, RefBtoRefF refB, _, _) -> relateRefBwithRefU refB (recip slope, refA, -intercept / slope) xs
-    (RefUVal refA, RefUVal refB, _, _) -> relateRefUwithRefU refA (slope, refB, intercept) xs
+    (F refA, B refB, _, _) -> relateRefFwithRefB refA (slope, refB, intercept) xs
+    (F refA, U refB, _, _) -> relateRefFwithRefUX refA (slope, refB, intercept) xs
+    (B refA, F refB, _, _) -> relateRefFwithRefB refB (recip slope, refA, -intercept / slope) xs
+    (B refA, B refB, _, _) -> relateRefBwithRefB refA (slope, refB, intercept) xs
+    (B refA, U refB, _, _) -> relateRefBwithRefUX refA (slope, refB, intercept) xs
+    (U refA, F refB, _, _) -> relateRefFwithRefUX refB (recip slope, refA, -intercept / slope) xs
+    (U refA, B refB, _, _) -> relateRefBwithRefUX refB (recip slope, refA, -intercept / slope) xs
+    (U refA, U refB, _, _) -> relateRefUwithRefUX refA (slope, refB, intercept) xs
 
 relateRefFwithRefB :: (GaloisField n, Integral n) => RefT -> (n, RefB, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relateRefFwithRefB refA (slope, refB, intercept) xs = case (parentOf xs (F refA), BooleanRelations.lookup refB (booleanRelations xs)) of
-  (Root, BooleanRelations.Root) -> relateTwoRefs (F refA) (slope, RefBtoRefF refB, intercept) xs
-  (Root, BooleanRelations.Value True) -> 
+  (Root, BooleanRelations.Root) -> relateTwoRefs (F refA) (slope, B refB, intercept) xs
+  (Root, BooleanRelations.Value True) ->
     -- refA = slope * 1 + intercept
     Just <$> bindField (F refA) (slope + intercept) xs
-  (Root, BooleanRelations.Value False) -> 
+  (Root, BooleanRelations.Value False) ->
     -- refA = slope * 0 + intercept
     Just <$> bindField (F refA) intercept xs
-  (Root, BooleanRelations.ChildOf True rootB) -> 
+  (Root, BooleanRelations.ChildOf True rootB) ->
     -- refA = slope * rootB + intercept
-    relateTwoRefs (F refA) (slope, RefBtoRefF rootB, intercept) xs
+    relateTwoRefs (F refA) (slope, B rootB, intercept) xs
   (Root, BooleanRelations.ChildOf False rootB) ->
     -- refA = slope * (1 - rootB) + intercept
     --      = - slope * rootB + slope + intercept
-    relateTwoRefs (F refA) (-slope, RefBtoRefF rootB, slope + intercept) xs
+    relateTwoRefs (F refA) (-slope, B rootB, slope + intercept) xs
   (Constant valueA, BooleanRelations.Root) ->
     -- valueA = slope * refB + intercept
-    -- => 
+    -- =>
     -- refB = (valueA - intercept) / slope
-    Just <$> bindField (RefBtoRefF refB) ((valueA - intercept) / slope) xs
+    Just <$> bindField (B refB) ((valueA - intercept) / slope) xs
   (Constant valueA, BooleanRelations.Value True) ->
     -- valueA = slope * 1 + intercept
     if valueA == slope + intercept
@@ -266,19 +266,19 @@ relateRefFwithRefB refA (slope, refB, intercept) xs = case (parentOf xs (F refA)
     -- valueA = slope * rootB + intercept
     -- =>
     -- rootB = (valueA - intercept) / slope
-    Just <$> bindField (RefBtoRefF rootB) ((valueA - intercept) / slope) xs
+    Just <$> bindField (B rootB) ((valueA - intercept) / slope) xs
   (Constant valueA, BooleanRelations.ChildOf False rootB) ->
     -- valueA = slope * (1 - rootB) + intercept
     -- =>
     -- rootB = (valueA - slope - intercept) / (-slope)
-    Just <$> bindField (RefBtoRefF rootB) ((valueA - slope - intercept) / (-slope)) xs
+    Just <$> bindField (B rootB) ((valueA - slope - intercept) / (-slope)) xs
   (ChildOf slopeA rootA interceptA, BooleanRelations.Root) ->
     -- slopeA * refA + interceptA = slope * refB + intercept
     -- =>
     -- slopeA * refA = slope * refB + intercept - interceptA
     -- =>
     -- refA = (slope * refB + intercept - interceptA) / slopeA
-    relateTwoRefs rootA (slope / slopeA, RefBtoRefF refB, (intercept - interceptA) / slopeA) xs
+    relateTwoRefs rootA (slope / slopeA, B refB, (intercept - interceptA) / slopeA) xs
   (ChildOf slopeA rootA interceptA, BooleanRelations.Value True) ->
     -- slopeA * refA + interceptA = slope * 1 + intercept
     -- =>
@@ -299,7 +299,7 @@ relateRefFwithRefB refA (slope, refB, intercept) xs = case (parentOf xs (F refA)
     -- slopeA * refA = slope * rootB + intercept - interceptA
     -- =>
     -- refA = (slope * rootB + intercept - interceptA) / slopeA
-    relateTwoRefs rootA (slope / slopeA, RefBtoRefF rootB, (intercept - interceptA) / slopeA) xs
+    relateTwoRefs rootA (slope / slopeA, B rootB, (intercept - interceptA) / slopeA) xs
   (ChildOf slopeA rootA interceptA, BooleanRelations.ChildOf False rootB) ->
     -- slopeA * refA + interceptA = slope * (1 - rootB) + intercept
     -- =>
@@ -308,24 +308,23 @@ relateRefFwithRefB refA (slope, refB, intercept) xs = case (parentOf xs (F refA)
     -- slopeA * refA = - slope * rootB + slope + intercept - interceptA
     -- =>
     -- refA = (- slope * rootB + slope + intercept - interceptA) / slopeA
-    relateTwoRefs rootA (-slope / slopeA, RefBtoRefF rootB, (slope + intercept - interceptA) / slopeA) xs
+    relateTwoRefs rootA (-slope / slopeA, B rootB, (slope + intercept - interceptA) / slopeA) xs
 
-
-relateRefFwithRefU :: (GaloisField n, Integral n) => RefT -> (n, RefU, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
-relateRefFwithRefU refA (slope, refB, intercept) xs = case (parentOf xs (F refA), UIntRelations.lookup (uintRelations xs) refB) of
-  (Root, UIntRelations.Root) -> relateTwoRefs (F refA) (slope, RefUVal refB, intercept) xs
+relateRefFwithRefUX :: (GaloisField n, Integral n) => RefT -> (n, RefU, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
+relateRefFwithRefUX refA (slope, refB, intercept) xs = case (parentOf xs (F refA), UIntRelations.lookup (uintRelations xs) refB) of
+  (Root, UIntRelations.Root) -> relateTwoRefs (F refA) (slope, U refB, intercept) xs
   (Root, UIntRelations.Value value) ->
     -- x = slope * value + intercept
     Just <$> bindField (F refA) (slope * value + intercept) xs
   (Root, UIntRelations.RotateOf 0 root) ->
     -- x = slope * root + intercept
-    relateTwoRefs (F refA) (slope, RefUVal root, intercept) xs
+    relateTwoRefs (F refA) (slope, U root, intercept) xs
   (Root, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a field element to a rotated UInt"
   (Constant value, UIntRelations.Root) ->
     -- value = slope * root + intercept
     -- =>
     -- root = (value - intercept) / slope
-    Just <$> bindField (RefUVal refB) ((value - intercept) / slope) xs
+    Just <$> bindField (U refB) ((value - intercept) / slope) xs
   (Constant valueA, UIntRelations.Value valueB) ->
     if valueA == slope * valueB + intercept
       then return Nothing
@@ -334,7 +333,7 @@ relateRefFwithRefU refA (slope, refB, intercept) xs = case (parentOf xs (F refA)
     -- value = slope * root + intercept
     -- =>
     -- root = (value - intercept) / slope
-    Just <$> bindField (RefUVal root) ((valueA - intercept) / slope) xs
+    Just <$> bindField (U root) ((valueA - intercept) / slope) xs
   (Constant _, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a field element to a rotated UInt"
   (ChildOf slopeA rootA interceptA, UIntRelations.Root) ->
     -- slopeA * rootA + interceptA = slope * root + intercept
@@ -342,7 +341,7 @@ relateRefFwithRefU refA (slope, refB, intercept) xs = case (parentOf xs (F refA)
     -- slopeA * rootA = slope * root + intercept - interceptA
     -- =>
     -- rootA = (slope * root + intercept - interceptA) / slopeA
-    relateTwoRefs rootA (slope / slopeA, RefUVal refB, (intercept - interceptA) / slopeA) xs
+    relateTwoRefs rootA (slope / slopeA, U refB, (intercept - interceptA) / slopeA) xs
   (ChildOf slopeA rootA interceptA, UIntRelations.Value valueB) ->
     -- slopeA * rootA + interceptA = slope * valueB + intercept
     -- =>
@@ -356,26 +355,24 @@ relateRefFwithRefU refA (slope, refB, intercept) xs = case (parentOf xs (F refA)
     -- slopeA * rootA = slope * rootB + intercept - interceptA
     -- =>
     -- rootA = (slope * rootB + intercept - interceptA) / slopeA
-    relateTwoRefs rootA (slope / slopeA, RefUVal rootB, (intercept - interceptA) / slopeA) xs
+    relateTwoRefs rootA (slope / slopeA, U rootB, (intercept - interceptA) / slopeA) xs
   (ChildOf {}, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a field element to a rotated UInt"
 
-  
-
-relateRefUwithRefU :: (GaloisField n, Integral n) => RefU -> (n, RefU, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
-relateRefUwithRefU refA (slope, refB, intercept) xs = case (UIntRelations.lookup (uintRelations xs) refA, UIntRelations.lookup (uintRelations xs) refB) of
-  (UIntRelations.Root, UIntRelations.Root) -> relateTwoRefs (RefUVal refA) (slope, RefUVal refB, intercept) xs
+relateRefUwithRefUX :: (GaloisField n, Integral n) => RefU -> (n, RefU, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
+relateRefUwithRefUX refA (slope, refB, intercept) xs = case (UIntRelations.lookup (uintRelations xs) refA, UIntRelations.lookup (uintRelations xs) refB) of
+  (UIntRelations.Root, UIntRelations.Root) -> relateTwoRefs (U refA) (slope, U refB, intercept) xs
   (UIntRelations.Root, UIntRelations.Value value) ->
     -- x = slope * value + intercept
-    Just <$> bindField (RefUVal refA) (slope * value + intercept) xs
+    Just <$> bindField (U refA) (slope * value + intercept) xs
   (UIntRelations.Root, UIntRelations.RotateOf 0 root) ->
     -- x = slope * root + intercept
-    relateTwoRefs (RefUVal refA) (slope, RefUVal root, intercept) xs
+    relateTwoRefs (U refA) (slope, U root, intercept) xs
   (UIntRelations.Root, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a field element to a rotated UInt"
   (UIntRelations.Value value, UIntRelations.Root) ->
     -- value = slope * rootB + intercept
     -- =>
     -- value - intercept = slope * rootB
-    Just <$> bindField (RefUVal refB) ((value - intercept) / slope) xs
+    Just <$> bindField (U refB) ((value - intercept) / slope) xs
   (UIntRelations.Value valueA, UIntRelations.Value valueB) ->
     -- valueA = slope * valueB + intercept
     if valueA == slope * valueB + intercept
@@ -383,29 +380,29 @@ relateRefUwithRefU refA (slope, refB, intercept) xs = case (UIntRelations.lookup
       else throwError $ ConflictingValuesF valueA (slope * valueB + intercept)
   (UIntRelations.Value value, UIntRelations.RotateOf 0 root) ->
     -- value = slope * root + intercept
-    Just <$> bindField (RefUVal root) ((value - intercept) / slope) xs
+    Just <$> bindField (U root) ((value - intercept) / slope) xs
   (UIntRelations.Value _, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a field element to a rotated UInt"
   (UIntRelations.RotateOf 0 root, UIntRelations.Root) ->
     -- rootA = slope * rootB + intercept
-    relateTwoRefs (RefUVal root) (slope, RefUVal refB, intercept) xs
+    relateTwoRefs (U root) (slope, U refB, intercept) xs
   (UIntRelations.RotateOf 0 rootA, UIntRelations.Value value) ->
     -- rootA = slope * value + intercept
-    Just <$> bindField (RefUVal rootA) (slope * value + intercept) xs
+    Just <$> bindField (U rootA) (slope * value + intercept) xs
   (UIntRelations.RotateOf 0 rootA, UIntRelations.RotateOf 0 rootB) ->
     -- rootA = slope * rootB + intercept
-    relateTwoRefs (RefUVal rootA) (slope, RefUVal rootB, intercept) xs
+    relateTwoRefs (U rootA) (slope, U rootB, intercept) xs
   (UIntRelations.RotateOf 0 _, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a field element to a rotated UInt"
   (UIntRelations.RotateOf _ _, _) -> error "[ panic ]: Don't know how to relate a field element to a rotated UInt"
 
-relateRefBwithRefU :: (GaloisField n, Integral n) => RefB -> (n, RefU, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
-relateRefBwithRefU refA (slope, refB, intercept) xs = case (BooleanRelations.lookup refA (booleanRelations xs), UIntRelations.lookup (uintRelations xs) refB) of
-  (BooleanRelations.Root, UIntRelations.Root) -> relateTwoRefs (RefBtoRefF refA) (slope, RefUVal refB, intercept) xs
+relateRefBwithRefUX :: (GaloisField n, Integral n) => RefB -> (n, RefU, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
+relateRefBwithRefUX refA (slope, refB, intercept) xs = case (BooleanRelations.lookup refA (booleanRelations xs), UIntRelations.lookup (uintRelations xs) refB) of
+  (BooleanRelations.Root, UIntRelations.Root) -> relateTwoRefs (B refA) (slope, U refB, intercept) xs
   (BooleanRelations.Root, UIntRelations.Value value) ->
     -- x = slope * value + intercept
-    Just <$> bindField (RefBtoRefF refA) (slope * value + intercept) xs
+    Just <$> bindField (B refA) (slope * value + intercept) xs
   (BooleanRelations.Root, UIntRelations.RotateOf 0 root) ->
     -- x = slope * root + intercept
-    relateTwoRefs (RefBtoRefF refA) (slope, RefUVal root, intercept) xs
+    relateTwoRefs (B refA) (slope, U root, intercept) xs
   (BooleanRelations.Root, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a Boolean to a rotated uint"
   (BooleanRelations.Value True, UIntRelations.Root) ->
     -- 1 = slope * rootB + intercept
@@ -421,7 +418,7 @@ relateRefBwithRefU refA (slope, refB, intercept) xs = case (BooleanRelations.loo
     -- 1 = slope * root + intercept
     -- =>
     -- root = (1 - intercept) / slope
-    Just <$> bindField (RefUVal root) ((1 - intercept) / slope) xs
+    Just <$> bindField (U root) ((1 - intercept) / slope) xs
   (BooleanRelations.Value True, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a Boolean to a rotated uint"
   (BooleanRelations.Value False, UIntRelations.Root) ->
     -- 0 = slope * rootB + intercept
@@ -437,17 +434,17 @@ relateRefBwithRefU refA (slope, refB, intercept) xs = case (BooleanRelations.loo
     -- 0 = slope * root + intercept
     -- =>
     -- root = - intercept / slope
-    Just <$> bindField (RefUVal root) (-intercept / slope) xs
+    Just <$> bindField (U root) (-intercept / slope) xs
   (BooleanRelations.Value False, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a Boolean to a rotated uint"
   (BooleanRelations.ChildOf True root, UIntRelations.Root) ->
     -- root = slope * rootB + intercept
-    relateTwoRefs (RefBtoRefF root) (slope, RefUVal refB, intercept) xs
+    relateTwoRefs (B root) (slope, U refB, intercept) xs
   (BooleanRelations.ChildOf True root, UIntRelations.Value value) ->
     -- root = slope * value + intercept
-    Just <$> bindField (RefBtoRefF root) (slope * value + intercept) xs
+    Just <$> bindField (B root) (slope * value + intercept) xs
   (BooleanRelations.ChildOf True rootA, UIntRelations.RotateOf 0 rootB) ->
     -- rootA = slope * rootB + intercept
-    relateTwoRefs (RefBtoRefF rootA) (slope, RefUVal rootB, intercept) xs
+    relateTwoRefs (B rootA) (slope, U rootB, intercept) xs
   (BooleanRelations.ChildOf True _, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a Boolean to a rotated uint"
   (BooleanRelations.ChildOf False rootA, UIntRelations.Root) ->
     -- rootA = 1 - x && x = slope * rootB + intercept
@@ -455,44 +452,44 @@ relateRefBwithRefU refA (slope, refB, intercept) xs = case (BooleanRelations.loo
     -- rootA = 1 - (slope * rootB + intercept)
     -- =>
     -- rootA = 1 - slope * rootB - intercept
-    relateTwoRefs (RefBtoRefF rootA) (-slope, RefUVal refB, 1 - intercept) xs
+    relateTwoRefs (B rootA) (-slope, U refB, 1 - intercept) xs
   (BooleanRelations.ChildOf False rootA, UIntRelations.Value value) ->
     -- rootA = 1 - x && x = slope * value + intercept
     -- =>
     -- rootA = 1 - (slope * value + intercept)
     -- =>
     -- rootA = 1 - slope * value - intercept
-    Just <$> bindField (RefBtoRefF rootA) (1 - slope * value - intercept) xs
+    Just <$> bindField (B rootA) (1 - slope * value - intercept) xs
   (BooleanRelations.ChildOf False rootA, UIntRelations.RotateOf 0 rootB) ->
     -- rootA = 1 - x && x = slope * rootB + intercept
     -- =>
     -- rootA = 1 - (slope * rootB + intercept)
     -- =>
     -- rootA = 1 - slope * rootB - intercept
-    relateTwoRefs (RefBtoRefF rootA) (-slope, RefUVal rootB, 1 - intercept) xs
+    relateTwoRefs (B rootA) (-slope, U rootB, 1 - intercept) xs
   (BooleanRelations.ChildOf False _, UIntRelations.RotateOf _ _) -> error "[ panic ]: Don't know how to relate a Boolean to a rotated uint"
 
 relateRefBwithRefB :: (GaloisField n, Integral n) => RefB -> (n, RefB, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relateRefBwithRefB refA (slope, refB, intercept) xs =
   case (BooleanRelations.lookup refA (booleanRelations xs), BooleanRelations.lookup refB (booleanRelations xs)) of
-    (BooleanRelations.Root, BooleanRelations.Root) -> relateTwoRefs (RefBtoRefF refA) (slope, RefBtoRefF refB, intercept) xs
+    (BooleanRelations.Root, BooleanRelations.Root) -> relateTwoRefs (B refA) (slope, B refB, intercept) xs
     (BooleanRelations.Root, BooleanRelations.Value True) ->
       -- x = slope * 1 + intercept
-      Just <$> bindField (RefBtoRefF refA) (slope + intercept) xs
+      Just <$> bindField (B refA) (slope + intercept) xs
     (BooleanRelations.Root, BooleanRelations.Value False) ->
       -- x = slope * 0 + intercept
-      Just <$> bindField (RefBtoRefF refA) intercept xs
+      Just <$> bindField (B refA) intercept xs
     (BooleanRelations.Root, BooleanRelations.ChildOf True root) ->
       -- x = slope * root + intercept
-      relateTwoRefs (RefBtoRefF refA) (slope, RefBtoRefF root, intercept) xs
+      relateTwoRefs (B refA) (slope, B root, intercept) xs
     (BooleanRelations.Root, BooleanRelations.ChildOf False root) ->
       -- x = slope * (1 - root) + intercept
-      relateTwoRefs (RefBtoRefF refA) (-slope, RefBtoRefF root, slope + intercept) xs
+      relateTwoRefs (B refA) (-slope, B root, slope + intercept) xs
     (BooleanRelations.Value True, BooleanRelations.Root) ->
       -- 1 = slope * root + intercept
       -- =>
       -- root = (intercept - 1) / slope
-      Just <$> bindField (RefBtoRefF refB) ((intercept - 1) / slope) xs
+      Just <$> bindField (B refB) ((intercept - 1) / slope) xs
     (BooleanRelations.Value True, BooleanRelations.Value True) ->
       if 1 == slope + intercept then return Nothing else throwError $ ConflictingValuesF 1 (slope + intercept)
     (BooleanRelations.Value True, BooleanRelations.Value False) ->
@@ -501,19 +498,19 @@ relateRefBwithRefB refA (slope, refB, intercept) xs =
       -- 1 = slope * root + intercept
       -- =>
       -- root = (1 - intercept) / slope
-      Just <$> bindField (RefBtoRefF root) ((1 - intercept) / slope) xs
+      Just <$> bindField (B root) ((1 - intercept) / slope) xs
     (BooleanRelations.Value True, BooleanRelations.ChildOf False root) ->
       -- 1 = slope * (1 - root) + intercept
       -- =>
       -- slope * root = slope + intercept - 1
       -- =>
       -- root = (slope + intercept - 1) / slope
-      Just <$> bindField (RefBtoRefF root) ((slope + intercept - 1) / slope) xs
+      Just <$> bindField (B root) ((slope + intercept - 1) / slope) xs
     (BooleanRelations.Value False, BooleanRelations.Root) ->
       -- 0 = slope * root + intercept
       -- =>
       -- root = - intercept / slope
-      Just <$> bindField (RefBtoRefF refB) (-intercept / slope) xs
+      Just <$> bindField (B refB) (-intercept / slope) xs
     (BooleanRelations.Value False, BooleanRelations.Value True) ->
       -- 0 = slope * 1 + intercept
       if 0 == slope + intercept then return Nothing else throwError $ ConflictingValuesF 0 (slope + intercept)
@@ -523,48 +520,48 @@ relateRefBwithRefB refA (slope, refB, intercept) xs =
       -- 0 = slope * root + intercept
       -- =>
       -- root = - intercept / slope
-      Just <$> bindField (RefBtoRefF root) (-intercept / slope) xs
+      Just <$> bindField (B root) (-intercept / slope) xs
     (BooleanRelations.Value False, BooleanRelations.ChildOf False root) ->
       -- 0 = slope * (1 - root) + intercept
       -- =>
       -- slope * root = slope + intercept
       -- =>
       -- root = 1 + intercept / slope
-      Just <$> bindField (RefBtoRefF root) (1 + intercept / slope) xs
+      Just <$> bindField (B root) (1 + intercept / slope) xs
     (BooleanRelations.ChildOf True rootA, BooleanRelations.Root) ->
       -- rootA = slope * rootB + intercept
-      relateTwoRefs (RefBtoRefF rootA) (slope, RefBtoRefF refB, intercept) xs
+      relateTwoRefs (B rootA) (slope, B refB, intercept) xs
     (BooleanRelations.ChildOf True rootA, BooleanRelations.Value True) ->
       -- rootA = slope * 1 + intercept
-      Just <$> bindField (RefBtoRefF rootA) (slope + intercept) xs
+      Just <$> bindField (B rootA) (slope + intercept) xs
     (BooleanRelations.ChildOf True rootA, BooleanRelations.Value False) ->
-      Just <$> bindField (RefBtoRefF rootA) intercept xs
+      Just <$> bindField (B rootA) intercept xs
     (BooleanRelations.ChildOf True rootA, BooleanRelations.ChildOf True rootB) ->
       -- rootA = slope * rootB + intercept
-      relateTwoRefs (RefBtoRefF rootA) (slope, RefBtoRefF rootB, intercept) xs
+      relateTwoRefs (B rootA) (slope, B rootB, intercept) xs
     (BooleanRelations.ChildOf True rootA, BooleanRelations.ChildOf False rootB) ->
       -- rootA = slope * (1 - rootB) + intercept
-      relateTwoRefs (RefBtoRefF rootA) (-slope, RefBtoRefF rootB, slope + intercept) xs
+      relateTwoRefs (B rootA) (-slope, B rootB, slope + intercept) xs
     (BooleanRelations.ChildOf False rootA, BooleanRelations.Root) ->
       -- rootA = 1 - x && x = slope * y + intercept
       -- =>
       -- rootA = 1 - slope * y - intercept
-      relateTwoRefs (RefBtoRefF rootA) (-slope, RefBtoRefF refB, 1 + intercept) xs
+      relateTwoRefs (B rootA) (-slope, B refB, 1 + intercept) xs
     (BooleanRelations.ChildOf False rootA, BooleanRelations.Value True) ->
       -- rootA = 1 - x && x = slope * 1 + intercept
       -- =>
       -- rootA = 1 - slope - intercept
-      Just <$> bindField (RefBtoRefF rootA) (1 - slope - intercept) xs
+      Just <$> bindField (B rootA) (1 - slope - intercept) xs
     (BooleanRelations.ChildOf False rootA, BooleanRelations.Value False) ->
       -- rootA = 1 - x && x = slope * 0 + intercept
       -- =>
       -- rootA = 1 - intercept
-      Just <$> bindField (RefBtoRefF rootA) (1 - intercept) xs
+      Just <$> bindField (B rootA) (1 - intercept) xs
     (BooleanRelations.ChildOf False rootA, BooleanRelations.ChildOf True rootB) ->
       -- rootA = 1 - x && x = slope * rootB + intercept
       -- =>
       -- rootA = 1 - slope * rootB - intercept
-      relateTwoRefs (RefBtoRefF rootA) (-slope, RefBtoRefF rootB, 1 + intercept) xs
+      relateTwoRefs (B rootA) (-slope, B rootB, 1 + intercept) xs
     (BooleanRelations.ChildOf False rootA, BooleanRelations.ChildOf False rootB) ->
       -- rootA = 1 - x && x = slope * (1 - rootB) + intercept
       -- =>
@@ -573,9 +570,9 @@ relateRefBwithRefB refA (slope, refB, intercept) xs =
       -- rootA = 1 - slope + slope * rootB - intercept
       -- =>
       -- rootA =  slope * rootB  - intercept + 1 - slope
-      relateTwoRefs (RefBtoRefF rootA) (slope, RefBtoRefF rootB, -intercept + 1 - slope) xs
+      relateTwoRefs (B rootA) (slope, B rootB, -intercept + 1 - slope) xs
 
-relateTwoRefs :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
+relateTwoRefs :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relateTwoRefs x (slope, y, intercept) xs = case compare x y of
   GT -> relateRefF' x (slope, y, intercept) xs -- x = slope * y + intercept
   LT -> relateRefF' y (recip slope, x, -intercept / slope) xs -- y = x / slope - intercept / slope
@@ -583,7 +580,7 @@ relateTwoRefs x (slope, y, intercept) xs = case compare x y of
 
 -- | Establish the relation of 'x = slope * y + intercept'
 --   Returns Nothing if the relation has already been established
-relateRefF' :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
+relateRefF' :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relateRefF' x (slope, y, intercept) xs =
   case parentOf xs x of
     Constant interceptX ->
@@ -605,7 +602,7 @@ relateRefF' x (slope, y, intercept) xs =
       --  slopeX * rootOfX = slope * y + intercept - interceptX
       -- =>
       --  rootOfX = (slope * y + intercept - interceptX) / slopeX
-      relateRefF rootOfX (slope / slopeX, y, intercept - interceptX / slopeX) xs
+      relateRef rootOfX (slope / slopeX, y, intercept - interceptX / slopeX) xs
     Root ->
       -- x does not have a parent, so it is its own root
       case parentOf xs y of
@@ -639,7 +636,7 @@ relateRefF' x (slope, y, intercept) xs =
                   sizes = Map.insertWith (+) y 1 (sizes xs)
                 }
 
-toMap :: FieldRelations n -> Map RefF (Maybe (n, RefF), n)
+toMap :: FieldRelations n -> Map Ref (Maybe (n, Ref), n)
 toMap = links
 
 size :: FieldRelations n -> Int

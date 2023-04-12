@@ -79,7 +79,7 @@ foldMaybeM f = foldM $ \acc x -> do
     Nothing -> return acc
     Just x' -> return (x' : acc)
 
-reduceAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n (Maybe (PolyG RefF n))
+reduceAddF :: (GaloisField n, Integral n) => PolyG Ref n -> RoundM n (Maybe (PolyG Ref n))
 reduceAddF polynomial = do
   changed <- learnFromAddF polynomial
   if changed
@@ -105,7 +105,7 @@ reduceAddF polynomial = do
           -- keep reducing the reduced polynomial
           reduceAddF reducePolynomial
 
-type MulF n = (PolyG RefF n, PolyG RefF n, Either n (PolyG RefF n))
+type MulF n = (PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))
 
 reduceMulF :: (GaloisField n, Integral n) => MulF n -> RoundM n (Maybe (MulF n))
 reduceMulF (polyA, polyB, polyC) = do
@@ -117,7 +117,7 @@ reduceMulF (polyA, polyB, polyC) = do
 
   reduceMulF_ polyAResult polyBResult polyCResult
 
-substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG RefF n -> RoundM n (Either n (PolyG RefF n))
+substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG Ref n -> RoundM n (Either n (PolyG Ref n))
 substitutePolyF typeOfChange polynomial = do
   unionFind <- gets csFieldRelations
   let boolRels = FieldRelations.exportBooleanRelations unionFind
@@ -137,7 +137,7 @@ substitutePolyF typeOfChange polynomial = do
       return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative constaint, returns the reduced constraint if it is reduced
-reduceMulF_ :: (GaloisField n, Integral n) => Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> Either n (PolyG RefF n) -> RoundM n (Maybe (MulF n))
+reduceMulF_ :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> Either n (PolyG Ref n) -> Either n (PolyG Ref n) -> RoundM n (Maybe (MulF n))
 reduceMulF_ polyA polyB polyC = case (polyA, polyB, polyC) of
   (Left _a, Left _b, Left _c) -> return Nothing
   (Left a, Left b, Right c) -> reduceMulFCCP a b c >> return Nothing
@@ -152,7 +152,7 @@ reduceMulF_ polyA polyB polyC = case (polyA, polyB, polyC) of
 --    a * b = cs
 --      =>
 --    cs - a * b = 0
-reduceMulFCCP :: (GaloisField n, Integral n) => n -> n -> PolyG RefF n -> RoundM n ()
+reduceMulFCCP :: (GaloisField n, Integral n) => n -> n -> PolyG Ref n -> RoundM n ()
 reduceMulFCCP a b cs = do
   addAddF $ PolyG.addConstant (-a * b) cs
 
@@ -160,7 +160,7 @@ reduceMulFCCP a b cs = do
 --    a * bs = c
 --      =>
 --    c - a * bs = 0
-reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG RefF n -> n -> RoundM n ()
+reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG Ref n -> n -> RoundM n ()
 reduceMulFCPC a bs c = do
   case PolyG.multiplyBy (-a) bs of
     Left _constant -> modify' $ removeOccurrences (PolyG.vars bs)
@@ -170,7 +170,7 @@ reduceMulFCPC a bs c = do
 --    a * bs = cs
 --      =>
 --    cs - a * bs = 0
-reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG RefF n -> PolyG RefF n -> RoundM n ()
+reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG Ref n -> PolyG Ref n -> RoundM n ()
 reduceMulFCPP a polyB polyC = do
   case PolyG.multiplyBy (-a) polyB of
     Left _constant -> do
@@ -220,7 +220,7 @@ markChanged = tell
 
 -- | Go through additive constraints and classify them into relation constraints when possible.
 --   Returns 'True' if the constraint has been reduced.
-learnFromAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n Bool
+learnFromAddF :: (GaloisField n, Integral n) => PolyG Ref n -> RoundM n Bool
 learnFromAddF poly = case PolyG.view poly of
   PolyG.Monomial intercept (var, slope) -> do
     --    intercept + slope * var = 0
@@ -237,8 +237,8 @@ learnFromAddF poly = case PolyG.view poly of
     relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
   PolyG.Polynomial _ _ -> return False
 
-assign :: (GaloisField n, Integral n) => RefF -> n -> RoundM n ()
-assign (RefBtoRefF var) value = do
+assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
+assign (B var) value = do
   markChanged RelationChanged
   cs <- get
   result <- lift $ lift $ FieldRelations.bindBoolean var (value == 1) (csFieldRelations cs)
@@ -250,10 +250,10 @@ assign var value = do
   put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = result}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
-relateF :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> RoundM n Bool
+relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cs <- get
-  result <- lift $ lift $ FieldRelations.relateRefF var1 (slope, var2, intercept) (csFieldRelations cs)
+  result <- lift $ lift $ FieldRelations.relateRef var1 (slope, var2, intercept) (csFieldRelations cs)
   case result of
     Nothing -> return False
     Just unionFind' -> do
@@ -261,7 +261,7 @@ relateF var1 (slope, var2, intercept) = do
       modify' $ \cs' -> removeOccurrences (Set.fromList [var1, var2]) $ cs' {csFieldRelations = unionFind'}
       return True
 
-addAddF :: (GaloisField n, Integral n) => PolyG RefF n -> RoundM n ()
+addAddF :: (GaloisField n, Integral n) => PolyG Ref n -> RoundM n ()
 addAddF poly = case PolyG.view poly of
   PolyG.Monomial constant (var1, coeff1) -> do
     --    constant + coeff1 * var1 = 0
@@ -283,7 +283,7 @@ addAddF poly = case PolyG.view poly of
 
 -- | Substitutes variables in a polynomial.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n) => FieldRelations n -> BooleanRelations -> PolyG RefF n -> Maybe (Either n (PolyG RefF n), Set RefF, Set RefF)
+substPolyG :: (GaloisField n, Integral n) => FieldRelations n -> BooleanRelations -> PolyG Ref n -> Maybe (Either n (PolyG Ref n), Set Ref, Set Ref)
 substPolyG ctx boolRels poly = do
   let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' (substPolyG_ ctx boolRels) (False, Left c, mempty, mempty) xs of
@@ -291,10 +291,10 @@ substPolyG ctx boolRels poly = do
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyG.vars poly)
 
-substPolyG_ :: (Integral n, GaloisField n) => FieldRelations n -> BooleanRelations -> (Bool, Either n (PolyG RefF n), Set RefF, Set RefF) -> RefF -> n -> (Bool, Either n (PolyG RefF n), Set RefF, Set RefF)
+substPolyG_ :: (Integral n, GaloisField n) => FieldRelations n -> BooleanRelations -> (Bool, Either n (PolyG Ref n), Set Ref, Set Ref) -> Ref -> n -> (Bool, Either n (PolyG Ref n), Set Ref, Set Ref)
 substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case FieldRelations.parentOf ctx ref of
   FieldRelations.Root -> case ref of
-    RefBtoRefF refB ->
+    B refB ->
       case BooleanRelations.lookup refB boolRels of
         BooleanRelations.Root ->
           case accPoly of
@@ -312,18 +312,18 @@ substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = 
                 Right xs -> (changed, Right xs, removedRefs', addedRefs)
         BooleanRelations.ChildOf True root ->
           let removedRefs' = Set.insert ref removedRefs
-              addedRefs' = Set.insert (RefBtoRefF root) addedRefs
+              addedRefs' = Set.insert (B root) addedRefs
            in case accPoly of
                 -- ref = root
-                Left c -> (True, PolyG.singleton c (RefBtoRefF root, coeff), removedRefs', addedRefs')
-                Right accPoly' -> (True, PolyG.insert 0 (RefBtoRefF root, coeff) accPoly', removedRefs', addedRefs')
+                Left c -> (True, PolyG.singleton c (B root, coeff), removedRefs', addedRefs')
+                Right accPoly' -> (True, PolyG.insert 0 (B root, coeff) accPoly', removedRefs', addedRefs')
         BooleanRelations.ChildOf False root ->
           let removedRefs' = Set.insert ref removedRefs
-              addedRefs' = Set.insert (RefBtoRefF root) addedRefs
+              addedRefs' = Set.insert (B root) addedRefs
            in case accPoly of
                 -- ref = 1 - root
-                Left c -> (True, PolyG.singleton (c + coeff) (RefBtoRefF root, -coeff), removedRefs', addedRefs')
-                Right accPoly' -> (True, PolyG.insert coeff (RefBtoRefF root, -coeff) accPoly', removedRefs', addedRefs')
+                Left c -> (True, PolyG.singleton (c + coeff) (B root, -coeff), removedRefs', addedRefs')
+                Right accPoly' -> (True, PolyG.insert coeff (B root, -coeff) accPoly', removedRefs', addedRefs')
     _ ->
       -- ref is already a root
       case accPoly of

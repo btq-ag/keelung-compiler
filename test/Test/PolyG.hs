@@ -79,7 +79,7 @@ module Test.PolyG () where
 --       [ RefFO <$> chooseInt (0, 99),
 --         RefFI <$> chooseInt (0, 99),
 --         RefF <$> chooseInt (0, 99)
---         -- RefBtoRefF <$> arbitrary
+--         -- RefB <$> arbitrary
 --       ]
 
 
@@ -96,13 +96,13 @@ module Test.PolyG () where
 --         --   RefUBit width <$> arbitrary <*> pure index
 --       ]
 
--- -- instance Arbitrary RefU where
+-- -- instance Arbitrary RefUX where
 -- --   arbitrary =
 -- --     oneof
 -- --       [ RefUO <$> arbitrary <*> arbitrary,
 -- --         RefUI <$> arbitrary <*> arbitrary,
--- --         RefU <$> arbitrary <*> arbitrary,
--- --         RefBtoRefU <$> arbitrary
+-- --         RefUX <$> arbitrary <*> arbitrary,
+-- --         RefBtoRefUX <$> arbitrary
 -- --       ]
 
 -- instance (Arbitrary var, Arbitrary n, GaloisField n, Ord var) => Arbitrary (Setup var n) where

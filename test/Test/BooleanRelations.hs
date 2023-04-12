@@ -21,77 +21,77 @@ tests = do
     describe "bindToValue" $ do
       it "x = True" $
         runM $ do
-          RefB 0 `bindToValue` True
+          RefBX 0 `bindToValue` True
 
-          assertBinding (RefB 0) (Just True)
+          assertBinding (RefBX 0) (Just True)
 
       it "x = False" $
         runM $ do
-          RefB 0 `bindToValue` False
+          RefBX 0 `bindToValue` False
 
-          assertBinding (RefB 0) (Just False)
+          assertBinding (RefBX 0) (Just False)
 
     describe "relate" $ do
       it "x = y" $
         runM $ do
-          RefB 0 `relate` (True, RefB 1)
+          RefBX 0 `relate` (True, RefBX 1)
 
-          assertRelation (RefB 0) (RefB 1) (Just True)
-          assertRelation (RefB 1) (RefB 0) (Just True)
+          assertRelation (RefBX 0) (RefBX 1) (Just True)
+          assertRelation (RefBX 1) (RefBX 0) (Just True)
 
       it "x = y = True" $
         runM $ do
-          RefB 0 `relate` (True, RefB 1)
-          RefB 1 `bindToValue` True
+          RefBX 0 `relate` (True, RefBX 1)
+          RefBX 1 `bindToValue` True
 
-          assertRelation (RefB 0) (RefB 1) (Just True)
-          assertRelation (RefB 1) (RefB 0) (Just True)
-          assertBinding (RefB 0) (Just True)
-          assertBinding (RefB 1) (Just True)
+          assertRelation (RefBX 0) (RefBX 1) (Just True)
+          assertRelation (RefBX 1) (RefBX 0) (Just True)
+          assertBinding (RefBX 0) (Just True)
+          assertBinding (RefBX 1) (Just True)
 
       it "x = y = z" $
         runM $ do
-          RefB 0 `relate` (True, RefB 1)
-          RefB 1 `relate` (True, RefB 2)
+          RefBX 0 `relate` (True, RefBX 1)
+          RefBX 1 `relate` (True, RefBX 2)
 
-          assertRelation (RefB 0) (RefB 1) (Just True)
-          assertRelation (RefB 0) (RefB 2) (Just True)
-          assertRelation (RefB 1) (RefB 0) (Just True)
-          assertRelation (RefB 1) (RefB 2) (Just True)
-          assertRelation (RefB 2) (RefB 0) (Just True)
-          assertRelation (RefB 2) (RefB 1) (Just True)
+          assertRelation (RefBX 0) (RefBX 1) (Just True)
+          assertRelation (RefBX 0) (RefBX 2) (Just True)
+          assertRelation (RefBX 1) (RefBX 0) (Just True)
+          assertRelation (RefBX 1) (RefBX 2) (Just True)
+          assertRelation (RefBX 2) (RefBX 0) (Just True)
+          assertRelation (RefBX 2) (RefBX 1) (Just True)
 
       it "x = ¬y" $
         runM $ do
-          RefB 0 `relate` (False, RefB 1)
+          RefBX 0 `relate` (False, RefBX 1)
 
-          assertRelation (RefB 0) (RefB 1) (Just False)
-          assertRelation (RefB 1) (RefB 0) (Just False)
+          assertRelation (RefBX 0) (RefBX 1) (Just False)
+          assertRelation (RefBX 1) (RefBX 0) (Just False)
 
       it "x = ¬y = True" $
         runM $ do
-          RefB 0 `relate` (False, RefB 1)
-          RefB 0 `bindToValue` True
+          RefBX 0 `relate` (False, RefBX 1)
+          RefBX 0 `bindToValue` True
 
-          assertRelation (RefB 0) (RefB 1) (Just False)
-          assertRelation (RefB 1) (RefB 0) (Just False)
-          assertBinding (RefB 0) (Just True)
-          assertBinding (RefB 1) (Just False)
+          assertRelation (RefBX 0) (RefBX 1) (Just False)
+          assertRelation (RefBX 1) (RefBX 0) (Just False)
+          assertBinding (RefBX 0) (Just True)
+          assertBinding (RefBX 1) (Just False)
 
       it "x = ¬y, z = True" $
         runM $ do
-          RefB 0 `relate` (False, RefB 1)
-          RefB 2 `bindToValue` True
+          RefBX 0 `relate` (False, RefBX 1)
+          RefBX 2 `bindToValue` True
 
-          assertRelation (RefB 0) (RefB 1) (Just False)
-          assertRelation (RefB 0) (RefB 2) Nothing
-          assertRelation (RefB 1) (RefB 0) (Just False)
-          assertRelation (RefB 1) (RefB 2) Nothing
-          assertRelation (RefB 2) (RefB 0) Nothing
-          assertRelation (RefB 2) (RefB 1) Nothing
-          assertBinding (RefB 0) Nothing
-          assertBinding (RefB 1) Nothing
-          assertBinding (RefB 2) (Just True)
+          assertRelation (RefBX 0) (RefBX 1) (Just False)
+          assertRelation (RefBX 0) (RefBX 2) Nothing
+          assertRelation (RefBX 1) (RefBX 0) (Just False)
+          assertRelation (RefBX 1) (RefBX 2) Nothing
+          assertRelation (RefBX 2) (RefBX 0) Nothing
+          assertRelation (RefBX 2) (RefBX 1) Nothing
+          assertBinding (RefBX 0) Nothing
+          assertBinding (RefBX 1) Nothing
+          assertBinding (RefBX 2) (Just True)
 
 type M = StateT BooleanRelations IO
 
@@ -138,4 +138,4 @@ instance Arbitrary BooleanRelations where
         Right result -> result
 
 instance Arbitrary RefB where
-  arbitrary = RefB <$> arbitrary
+  arbitrary = RefBX <$> arbitrary

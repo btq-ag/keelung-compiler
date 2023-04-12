@@ -74,9 +74,9 @@ tests = do
         -- FO0 = 3FI0
         FieldRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (3, 0)
         -- F0 (y) = FI0
-        FieldRelations.relationBetween (F $ RefF 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
+        FieldRelations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
         -- F1 (z) = F0 (y)
-        FieldRelations.relationBetween (F $ RefF 1) (F $ RefF 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
+        FieldRelations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
 
       it "Field 2" $ do
         cs <- runTest 3 1 $ do
@@ -88,9 +88,9 @@ tests = do
         -- FO0 = 4FI0
         FieldRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (4, 0)
         -- F0 (y) = FI0
-        FieldRelations.relationBetween (F $ RefF 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
+        FieldRelations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (csFieldRelations cs) `shouldBe` Just (1, 0)
         -- F1 (z) = 2F0 (y)
-        FieldRelations.relationBetween (F $ RefF 1) (F $ RefF 0) (csFieldRelations cs) `shouldBe` Just (2, 0)
+        FieldRelations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (csFieldRelations cs) `shouldBe` Just (2, 0)
 
       it "Field 3" $ do
         cs <- runTest 2 1 $ do

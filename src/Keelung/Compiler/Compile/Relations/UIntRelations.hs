@@ -100,11 +100,6 @@ relationBetween var1 var2 xs = case (lookup xs var1, lookup xs var2) of
   (RotateOf _ _, Value _) -> Nothing -- var2 is a value
   (Value value1, Value value2) -> if value1 == value2 then Just True else Just False
 
--- | If the RefU is of RefUBit, remember it
--- rememberPinnedBitTest :: RefU -> UIntRelations -> UIntRelations
--- rememberPinnedBitTest (RefUBit width ref index) xs = xs {pinnedBitTests = Set.insert (width, ref, index) (pinnedBitTests xs)}
--- rememberPinnedBitTest _ xs = xs
-
 -- | Bind a variable to a value
 bindToValue :: (GaloisField n, Integral n) => RefU -> n -> UIntRelations n -> Except (Error n) (UIntRelations n)
 bindToValue x value xs =
