@@ -113,6 +113,7 @@ tests = do
           x <- inputField Public
           y <- reuse x
           return (x * y :: Field)
+        -- debug _cs
         return ()
 
     describe "Boolean" $ do
