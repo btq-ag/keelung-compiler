@@ -318,14 +318,14 @@ relocateConstraintSystem cs =
       where
         boolRels = FieldRelations.exportBooleanRelations fieldRels
 
-        toConstraint var = case FieldRelations.parentOf fieldRels var of
-          FieldRelations.Root ->
+        toConstraint var = case FieldRelations.lookup var fieldRels of
+          FieldRelations.IsRoot _ ->
             -- var is already a root
             Nothing
-          FieldRelations.Constant intercept ->
+          FieldRelations.HasValue intercept ->
             -- var = intercept
             Just $ fromConstraint counters $ CVarBindF var intercept
-          FieldRelations.ChildOf slope root intercept ->
+          FieldRelations.IsChildOf slope root intercept ->
             -- var = slope * root + intercept
             case root of
               B refB -> case BooleanRelations.lookup refB boolRels of

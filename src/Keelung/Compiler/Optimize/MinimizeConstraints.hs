@@ -292,8 +292,8 @@ substPolyG ctx boolRels poly = do
     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyG.vars poly)
 
 substPolyG_ :: (Integral n, GaloisField n) => FieldRelations n -> BooleanRelations -> (Bool, Either n (PolyG Ref n), Set Ref, Set Ref) -> Ref -> n -> (Bool, Either n (PolyG Ref n), Set Ref, Set Ref)
-substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case FieldRelations.parentOf ctx ref of
-  FieldRelations.Root -> case ref of
+substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case FieldRelations.lookup ref ctx of
+  FieldRelations.IsRoot _ -> case ref of
     B refB ->
       case BooleanRelations.lookup refB boolRels of
         BooleanRelations.Root ->
@@ -329,13 +329,13 @@ substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = 
       case accPoly of
         Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
         Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
-  FieldRelations.Constant intercept ->
+  FieldRelations.HasValue intercept ->
     -- ref = intercept
     let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
      in case accPoly of
           Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
           Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', removedRefs', addedRefs)
-  FieldRelations.ChildOf slope root intercept ->
+  FieldRelations.IsChildOf slope root intercept ->
     if root == ref
       then
         if slope == 1 && intercept == 0

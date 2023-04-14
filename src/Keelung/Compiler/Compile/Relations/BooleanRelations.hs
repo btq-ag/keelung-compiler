@@ -3,7 +3,7 @@
 
 module Keelung.Compiler.Compile.Relations.BooleanRelations
   ( BooleanRelations,
-    Relation (..),
+    Lookup (..),
     new,
     lookup,
     assign,
@@ -54,11 +54,11 @@ instance Show BooleanRelations where
 new :: BooleanRelations
 new = BooleanRelations mempty mempty mempty
 
-data Relation = Root | Value Bool | ChildOf Bool RefB
+data Lookup = Root | Value Bool | ChildOf Bool RefB
   deriving (Eq, Show)
 
 -- | Returns the result of looking up a variable in the BooleanRelations
-lookup :: RefB -> BooleanRelations -> Relation
+lookup :: RefB -> BooleanRelations -> Lookup
 lookup var xs = case Map.lookup var (links xs) of
   Nothing -> Root -- 'var' is a root
   Just (Right value) -> Value value -- 'var' is a constant

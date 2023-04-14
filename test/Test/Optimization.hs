@@ -106,7 +106,7 @@ tests = do
           let x = 4
           y <- reuse x
           return (x + y :: Field)
-        FieldRelations.parentOf (csFieldRelations cs) (F $ RefFO 0) `shouldBe` FieldRelations.Constant 8
+        FieldRelations.lookup (F $ RefFO 0) (csFieldRelations cs) `shouldBe` FieldRelations.HasValue 8
 
       it "Field 5" $ do
         _cs <- runTest 2 1 $ do

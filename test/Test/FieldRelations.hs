@@ -35,13 +35,10 @@ tests = do
         RefFX 0 `relate` (2, RefFX 1, 1) -- x = 2y + 1
         assertRelation (RefFX 0) 2 (RefFX 1) 1
         assertRelation (RefFX 1) (1 / 2) (RefFX 0) (-1 / 2) -- y = 1/2x - 1/2
-    it "Relate (x = 2y + 1 & y = 3z + 2)" $
+    it "Relate ($0 = 2$1 + 1 & $1 = 3$2 + 2)" $
       runM $ do
         RefFX 0 `relate` (2, RefFX 1, 1) -- x = 2y + 1
         RefFX 1 `relate` (3, RefFX 2, 2) -- y = 3z + 2
-
-        xs <- get 
-        lift $ print xs 
 
         -- x = 2y + 1
         assertRelation (RefFX 0) 2 (RefFX 1) 1
