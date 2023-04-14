@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -29,7 +29,6 @@ library
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.BooleanRelations
-      Keelung.Compiler.Compile.Relations.BooleanRelations2
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.UIntRelations
       Keelung.Compiler.Constraint
@@ -91,7 +90,6 @@ executable keelungc
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.BooleanRelations
-      Keelung.Compiler.Compile.Relations.BooleanRelations2
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.UIntRelations
       Keelung.Compiler.Constraint
@@ -158,7 +156,6 @@ test-suite keelung-test
   main-is: Main.hs
   other-modules:
       Test.BooleanRelations
-      Test.BooleanRelations2
       Test.Compilation
       Test.FieldRelations
       Test.Interpreter
@@ -177,7 +174,6 @@ test-suite keelung-test
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.BooleanRelations
-      Keelung.Compiler.Compile.Relations.BooleanRelations2
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.UIntRelations
       Keelung.Compiler.Constraint

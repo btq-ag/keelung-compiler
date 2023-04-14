@@ -24,7 +24,6 @@ import Test.OptimizationOld qualified as OptimizationOld
 import Test.FieldRelations qualified as FieldRelations
 import Test.VarLayout qualified as VarBookkeep
 import Test.WitnessGeneration qualified as WitnessGeneration
-import qualified Test.BooleanRelations2 as BooleanRelations2
 
 main :: IO ()
 main = hspec $ do
@@ -43,7 +42,6 @@ main = hspec $ do
   describe "Field Relations" FieldRelations.tests
 
   describe "Boolean Relations" BooleanRelations.tests
-  describe "Boolean Relations 2" BooleanRelations2.tests
 
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))
