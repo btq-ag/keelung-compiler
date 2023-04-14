@@ -136,15 +136,16 @@ relate' child polarity parent relations =
 -- | Helper function for `relate'`
 relateRootToRoot :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
 relateRootToRoot child polarity parent relations =
-  -- before assigning the child to the parent, we need to check if the child has any grandchildren
-  let result = case Map.lookup child (toChildren relations) of
-        Nothing -> Nothing
-        Just (Left _) -> Nothing
-        Just (Right xs) -> Just (Map.toList xs)
-   in case result of
-        Nothing -> addChild child polarity parent relations
-        Just grandchildren ->
-          removeRootFromBackwardLinks child $ addChild child polarity parent $ foldr (\(grandchild, polarity') -> addChild grandchild (polarity == polarity') parent) relations grandchildren
+  if child == parent
+    then relations -- do nothing if the child is the same as the parent
+    else -- before assigning the child to the parent, we need to check if the child has any grandchildren
+      let result = case Map.lookup child (toChildren relations) of
+            Nothing -> Nothing
+            Just (Left _) -> Nothing
+            Just (Right xs) -> Just (Map.toList xs)
+       in case result of
+            Nothing -> addChild child polarity parent relations
+            Just grandchildren -> removeRootFromBackwardLinks child $ addChild child polarity parent $ foldr (\(grandchild, polarity') -> addChild grandchild (polarity == polarity') parent) relations grandchildren
   where
     removeRootFromBackwardLinks :: RefB -> BooleanRelations -> BooleanRelations
     removeRootFromBackwardLinks root xs = xs {toChildren = Map.delete root (toChildren xs)}
@@ -237,4 +238,7 @@ instance Seniority RefB where
   compareSeniority (RefBX _) (RefBX _) = EQ
   compareSeniority (RefBX _) _ = LT
   compareSeniority _ (RefBX _) = GT
+  compareSeniority (RefUBit {}) (RefUBit {}) = EQ
+  compareSeniority (RefUBit {}) _ = LT
+  compareSeniority _ (RefUBit {}) = GT
   compareSeniority _ _ = EQ

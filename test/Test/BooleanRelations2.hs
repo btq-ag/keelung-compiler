@@ -107,6 +107,13 @@ tests = do
           assertBinding (RefBX 2) (Just True)
           isValid
 
+      it "apply `relate` many times for form a cycle" $
+        runM $ do
+          RefBI 0 `relate` (True, RefBO 0)
+          RefBO 0 `relate` (True, RefBI 0)
+
+          get >>= lift . print
+
     describe "ordering of roots" $ do
       it "$0 = ¬$1 = $2" $
         runM $ do
@@ -164,6 +171,7 @@ tests = do
               )
 
           isValid
+
 
 ------------------------------------------------------------------------
 
