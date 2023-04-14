@@ -6,7 +6,7 @@ import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.BooleanRelations2 (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.BooleanRelations2 qualified as BooleanRelations
-import Keelung.Compiler.Constraint (RefB (..))
+import Keelung.Compiler.Constraint (RefB (..), RefU (RefUX))
 import Keelung.Field (GF181)
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
@@ -112,8 +112,6 @@ tests = do
           RefBI 0 `relate` (True, RefBO 0)
           RefBO 0 `relate` (True, RefBI 0)
 
-          get >>= lift . print
-
     describe "ordering of roots" $ do
       it "$0 = ¬$1 = $2" $
         runM $ do
@@ -169,6 +167,14 @@ tests = do
                       (RefBX 2, True)
                     ]
               )
+
+          isValid
+
+      it "UInt bits" $
+        runM $ do
+          let bit = RefUBit 4 (RefUX 4 0)
+          RefBO 0 `relate` (True, RefBX 0)
+          RefBX 0 `relate` (True, bit 0)
 
           isValid
 

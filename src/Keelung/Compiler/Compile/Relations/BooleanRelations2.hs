@@ -128,10 +128,10 @@ relate' child polarity parent relations =
     Root -> case lookup child relations of
       Root -> return $ relateRootToRoot child polarity parent relations
       Value value -> assign parent (polarity == value) relations
-      ChildOf polarity' parent' -> relate' parent' (polarity == polarity') parent relations
+      ChildOf polarity' parent' -> relate parent' (polarity == polarity') parent relations
     Value value -> assign child (polarity == value) relations
     ChildOf polarity' grandparent ->
-      relate' child (polarity == polarity') grandparent relations
+      relate child (polarity == polarity') grandparent relations
 
 -- | Helper function for `relate'`
 relateRootToRoot :: RefB -> Bool -> RefB -> BooleanRelations -> BooleanRelations
@@ -139,6 +139,7 @@ relateRootToRoot child polarity parent relations =
   if child == parent
     then relations -- do nothing if the child is the same as the parent
     else -- before assigning the child to the parent, we need to check if the child has any grandchildren
+
       let result = case Map.lookup child (toChildren relations) of
             Nothing -> Nothing
             Just (Left _) -> Nothing
@@ -211,23 +212,35 @@ inspectChildrenOf ref relations = Map.lookup ref (toChildren relations)
 
 -- | For testing the invariants:
 --   1. all "families" are disjoint
+--   2. the seniority of the root of a family is greater than equal the seniority of all its children
 isValid :: BooleanRelations -> Bool
-isValid = Maybe.isJust . Map.foldlWithKey' go (Just Set.empty) . toChildren
+isValid relations = allFamiliesAreDisjoint relations && rootsAreSenior relations
   where
-    go :: Maybe (Set RefB) -> RefB -> Either Bool (Map RefB Bool) -> Maybe (Set RefB)
-    go Nothing _ _ = Nothing
-    go (Just set) root children = case toFamily root children of
-      Nothing -> Nothing
-      Just members -> if Set.intersection set members == Set.empty then Just (set <> members) else Nothing
+    allFamiliesAreDisjoint :: BooleanRelations -> Bool
+    allFamiliesAreDisjoint = Maybe.isJust . Map.foldlWithKey' go (Just Set.empty) . toChildren
+      where
+        go :: Maybe (Set RefB) -> RefB -> Either Bool (Map RefB Bool) -> Maybe (Set RefB)
+        go Nothing _ _ = Nothing
+        go (Just set) root children = case toFamily root children of
+          Nothing -> Nothing
+          Just members -> if Set.intersection set members == Set.empty then Just (set <> members) else Nothing
 
-    -- return Nothing if the family is not valid, otherwise return the set of variables in the family
-    toFamily :: RefB -> Either Bool (Map RefB Bool) -> Maybe (Set RefB)
-    toFamily _ (Left _) = Just Set.empty
-    toFamily root (Right xs) =
-      let children = Map.keysSet xs
-       in if root `Set.member` children
-            then Nothing
-            else Just (Set.insert root children)
+        -- return Nothing if the family is not valid, otherwise return the set of variables in the family
+        toFamily :: RefB -> Either Bool (Map RefB Bool) -> Maybe (Set RefB)
+        toFamily _ (Left _) = Just Set.empty
+        toFamily root (Right xs) =
+          let children = Map.keysSet xs
+           in if root `Set.member` children
+                then Nothing
+                else Just (Set.insert root children)
+
+    rootsAreSenior :: BooleanRelations -> Bool
+    rootsAreSenior = Map.foldlWithKey' go True . toRoot
+      where
+        go :: Bool -> RefB -> Relation -> Bool
+        go False _ _ = False
+        go True ref (RootIs _ root) = compareSeniority root ref /= LT
+        go True _ _ = True
 
 --------------------------------------------------------------------------------
 
