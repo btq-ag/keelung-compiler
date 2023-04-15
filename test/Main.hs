@@ -17,11 +17,12 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Syntax.Counters
 import Test.BooleanRelations qualified as BooleanRelations
 import Test.Compilation qualified as Compilation
+import Test.FieldRelations qualified as FieldRelations
 import Test.Hspec
 import Test.Interpreter qualified as Interpreter
 import Test.Optimization qualified as Optimization
 import Test.OptimizationOld qualified as OptimizationOld
-import Test.FieldRelations qualified as FieldRelations
+import Test.UIntRelations qualified as UIntRelations
 import Test.VarLayout qualified as VarBookkeep
 import Test.WitnessGeneration qualified as WitnessGeneration
 
@@ -34,7 +35,7 @@ main = hspec $ do
   describe "Compilation" Compilation.tests
 
   describe "Optimization (old)" OptimizationOld.tests
-  
+
   describe "Optimization (new)" Optimization.tests
 
   describe "Variable Bookkeeping" VarBookkeep.tests
@@ -42,6 +43,8 @@ main = hspec $ do
   describe "Field Relations" FieldRelations.tests
 
   describe "Boolean Relations" BooleanRelations.tests
+
+  describe "UInt Relations" UIntRelations.tests
 
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))

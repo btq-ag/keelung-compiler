@@ -163,6 +163,12 @@ instance Show RefU where
     RefUP w x -> "UP" ++ toSubscript w ++ show x
     RefUX w x -> "U" ++ toSubscript w ++ show x
 
+instance HasWidth RefU where
+  widthOf (RefUO width _) = width
+  widthOf (RefUI width _) = width
+  widthOf (RefUP width _) = width
+  widthOf (RefUX width _) = width
+
 --------------------------------------------------------------------------------
 
 pinnedRef :: Ref -> Bool

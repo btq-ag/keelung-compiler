@@ -25,8 +25,10 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
+import Keelung.Compiler.Compile.Relations.Util
 import Keelung.Compiler.Constraint (RefB (..))
 import Prelude hiding (lookup)
 
@@ -36,7 +38,7 @@ data Relation = RootIs Bool RefB | Constant Bool
 
 -- | Relations between Boolean variables
 data BooleanRelations = BooleanRelations
-  { -- from children to roots (roots are also in the keys)
+  { -- from children to roots (roots are also in the keys), for fast parent-lookup.
     toRoot :: Map RefB Relation,
     -- from roots to children, invariant:
     --    1. all "families" are disjoint
@@ -90,11 +92,34 @@ lookup var relations = case Map.lookup var (toRoot relations) of
 assign :: RefB -> Bool -> BooleanRelations -> Except (Error n) BooleanRelations
 assign ref value relations = case lookup ref relations of
   Root ->
-    return
-      relations
-        { toRoot = Map.insert ref (Constant value) (toRoot relations),
-          toChildren = Map.insert ref (Left value) (toChildren relations)
-        }
+    case Map.lookup ref (toChildren relations) of
+      Nothing ->
+        return
+          relations
+            { toRoot = Map.insert ref (Constant value) (toRoot relations),
+              toChildren =
+                Map.insert ref (Left value) (toChildren relations)
+            }
+      Just (Left oldvalue) ->
+        if oldvalue == value
+          then return relations
+          else throwError (ConflictingValuesB oldvalue value)
+      Just (Right children) -> do
+        foldM
+          ( \rels (child, polarity) ->
+              return
+                rels
+                  { toRoot = Map.insert child (Constant (polarity == value)) (toRoot rels),
+                    toChildren =
+                      Map.insert child (Left (polarity == value)) (toChildren rels)
+                  }
+          )
+          ( BooleanRelations
+              { toRoot = Map.insert ref (Constant value) (toRoot relations),
+                toChildren = Map.insert ref (Left value) (toChildren relations)
+              }
+          )
+          (Map.toList children)
   Value oldValue ->
     if oldValue == value
       then return relations -- already assigned
@@ -163,7 +188,7 @@ addChild child polarity parent relations =
     }
 
 -- | Calculates the relation between two variables `var1` and `var2`
---   Returns `Just relation` where `var1 = polarity == var2` if the two variables are related.
+--   Returns `Just polarity` only when two variables are in the same equivalence class
 relationBetween :: RefB -> RefB -> BooleanRelations -> Maybe Bool
 relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   (Root, Root) ->
@@ -186,7 +211,8 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       else Nothing
   (Value _, ChildOf _ _) -> Nothing -- var1 is a constant value
   (ChildOf _ _, Value _) -> Nothing -- var2 is a constant value
-  (Value value1, Value value2) -> Just (value1 == value2)
+  (Value value1, Value value2) -> Nothing 
+    -- Just (value1 == value2)
 
 -- | Export the internal representation of the relations as a map from variables to their relations
 toIntMap :: BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
@@ -241,17 +267,3 @@ isValid relations = allFamiliesAreDisjoint relations && rootsAreSenior relations
         go False _ _ = False
         go True ref (RootIs _ root) = compareSeniority root ref /= LT
         go True _ _ = True
-
---------------------------------------------------------------------------------
-
-class Seniority a where
-  compareSeniority :: a -> a -> Ordering
-
-instance Seniority RefB where
-  compareSeniority (RefBX _) (RefBX _) = EQ
-  compareSeniority (RefBX _) _ = LT
-  compareSeniority _ (RefBX _) = GT
-  compareSeniority (RefUBit {}) (RefUBit {}) = EQ
-  compareSeniority (RefUBit {}) _ = LT
-  compareSeniority _ (RefUBit {}) = GT
-  compareSeniority _ _ = EQ

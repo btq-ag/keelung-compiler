@@ -1,4 +1,4 @@
-module Test.BooleanRelations (tests, run) where
+module Test.BooleanRelations (tests, run, debug) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -36,7 +36,7 @@ tests = do
           RefBX 1 `assign` False
           assertBinding (RefBX 1) (Just False)
           assertBinding (RefBI 0) (Just True)
-          assertRelation (RefBX 1) (RefBI 0) (Just False)
+          assertRelation (RefBX 1) (RefBI 0) Nothing
           isValid
 
     describe "relate" $ do
@@ -52,9 +52,8 @@ tests = do
         runM $ do
           RefBX 0 `relate` (True, RefBX 1)
           RefBX 1 `assign` True
-
-          assertRelation (RefBX 0) (RefBX 1) (Just True)
-          assertRelation (RefBX 1) (RefBX 0) (Just True)
+          assertRelation (RefBX 0) (RefBX 1) Nothing
+          assertRelation (RefBX 1) (RefBX 0) Nothing
           assertBinding (RefBX 0) (Just True)
           assertBinding (RefBX 1) (Just True)
           isValid
@@ -85,8 +84,8 @@ tests = do
           RefBX 0 `relate` (False, RefBX 1)
           RefBX 0 `assign` True
 
-          assertRelation (RefBX 0) (RefBX 1) (Just False)
-          assertRelation (RefBX 1) (RefBX 0) (Just False)
+          assertRelation (RefBX 0) (RefBX 1) Nothing
+          assertRelation (RefBX 1) (RefBX 0) Nothing
           assertBinding (RefBX 0) (Just True)
           assertBinding (RefBX 1) (Just False)
           isValid
@@ -178,7 +177,6 @@ tests = do
 
           isValid
 
-
 ------------------------------------------------------------------------
 
 type M = StateT BooleanRelations IO
@@ -220,6 +218,9 @@ isValid = do
   BooleanRelations.isValid xs `shouldBe` True
 
 ------------------------------------------------------------------------
+
+debug :: M ()
+debug = get >>= liftIO . print
 
 -- instance Arbitrary BooleanRelations where
 --   arbitrary = do
