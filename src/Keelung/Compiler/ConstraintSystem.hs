@@ -364,11 +364,19 @@ relocateConstraintSystem cs =
 
           refBsOccurredInB = Map.keysSet $ Map.filter (> 0) occurrencesB
 
+          -- \| Keep a variable if:
+          --    1. it's a pinned variable (e.g. a public input)
+          --    2. it's a Boolean intermediate variable that occurs in the circuit
+          --    3. it's a Bit test of a UInt intermediate variable that occurs in the circuit
           shouldKeep :: RefB -> Bool
           shouldKeep (RefBX ref) =
             RefBX ref `Set.member` refBsOccurredInB
               || RefBX ref `Set.member` refBsOccurredInF
-          shouldKeep (RefUBit _ ref _) = ref `Set.member` refUsOccurredInF || ref `Set.member` bitTestsOccurredInB || ref `Set.member` Map.keysSet occurrencesU || pinnedRefU ref
+          shouldKeep (RefUBit _ ref _) =
+            ref `Set.member` refUsOccurredInF
+              || ref `Set.member` bitTestsOccurredInB
+              || ref `Set.member` Map.keysSet occurrencesU
+              || pinnedRefU ref
           shouldKeep _ = True
 
           convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Maybe (Constraint n)
@@ -377,27 +385,11 @@ relocateConstraintSystem cs =
               then Just $ CVarBindB var (if val then 1 else 0)
               else Nothing
           convert (var, Left (dontFlip, root)) =
-            if shouldKeep var
-              then case BooleanRelations.lookup root relations of
-                BooleanRelations.Root ->
-                  if shouldKeep root
-                    then if dontFlip then Just $ CVarEqB var root else Just $ CVarNEqB var root
-                    else Nothing
-                BooleanRelations.Value value ->
-                  if shouldKeep var
-                    then
-                      Just $
-                        CVarBindB
-                          var
-                          ( if dontFlip
-                              then (if value then 1 else 0)
-                              else (if value then 0 else 1)
-                          )
-                    else Nothing
-                BooleanRelations.ChildOf dontFlip' root' ->
-                  if shouldKeep root'
-                    then if dontFlip == dontFlip' then Just $ CVarEqB var root' else Just $ CVarNEqB var root'
-                    else Nothing
+            if shouldKeep var && shouldKeep root
+              then
+                if dontFlip
+                  then Just $ CVarEqB var root
+                  else Just $ CVarNEqB var root
               else Nothing
 
           result = Maybe.mapMaybe convert $ Map.toList $ BooleanRelations.toIntMap relations
