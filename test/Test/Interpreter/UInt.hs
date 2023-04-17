@@ -58,35 +58,45 @@ tests = do
         runAll program [2, 5, 3 :: GF181] [] [1]
         runAll program [0, 1, 2 :: GF181] [] [4]
 
-      it "mul 3" $ do
-        let program = do
-              x <- inputUInt @4 Public
-              y <- inputUInt @4 Public
-              return $ x * y
+    it "add + assertion" $ do
+      let program = do
+            x <- inputUInt @4 Public
+            assert $ 2 `eq` (x + 1)
+      runAllExceptForTheOldOptimizer
+        program
+        [1]
+        ([] :: [GF181])
+        []
 
-        runAll program [2, 4 :: GF181] [] [8]
-        runAll program [5, 6 :: GF181] [] [14]
+    it "mul 3" $ do
+      let program = do
+            x <- inputUInt @4 Public
+            y <- inputUInt @4 Public
+            return $ x * y
 
-      it "arithmetics 4" $ do
-        let program = do
-              x <- inputUInt @4 Public
-              y <- inputUInt @4 Public
-              return $ x * y + y
+      runAll program [2, 4 :: GF181] [] [8]
+      runAll program [5, 6 :: GF181] [] [14]
 
-        runAll program [5, 6 :: GF181] [] [4]
-        runAll program [2, 5 :: GF181] [] [15]
-        runAll program [15, 1 :: GF181] [] [0]
+    it "arithmetics 4" $ do
+      let program = do
+            x <- inputUInt @4 Public
+            y <- inputUInt @4 Public
+            return $ x * y + y
 
-      it "arithmetics 5" $ do
-        let program = do
-              x <- inputUInt @4 Public
-              y <- reuse x
-              return (x + y)
-        runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
+      runAll program [5, 6 :: GF181] [] [4]
+      runAll program [2, 5 :: GF181] [] [15]
+      runAll program [15, 1 :: GF181] [] [0]
 
-      it "modInv 123 2833" $ do
-        let program = return $ modInv (123 :: UInt 32) 2833
-        runAllExceptForTheOldOptimizer program [] ([] :: [GF181]) [2119]
+    it "arithmetics 5" $ do
+      let program = do
+            x <- inputUInt @4 Public
+            y <- reuse x
+            return (x + y)
+      runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
+
+    it "modInv 123 2833" $ do
+      let program = return $ modInv (123 :: UInt 32) 2833
+      runAllExceptForTheOldOptimizer program [] ([] :: [GF181]) [2119]
 
     describe "DivMod" $ do
       it "performDivMod (quotient & remainder unknown)" $ do
@@ -270,18 +280,17 @@ tests = do
             runAll (program b) [fromInteger x :: GF181] [] []
             runAll (program b) [fromInteger b :: GF181] [] []
 
-    describe "Conditionals" $ do 
-
+    describe "Conditionals" $ do
       it "with inputs" $ do
         let program = do
-                  x <- input Public :: Comp (UInt 2)
-                  y <- input Public
-                  return $ cond true x y
+              x <- input Public :: Comp (UInt 2)
+              y <- input Public
+              return $ cond true x y
         runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [5]
 
       it "with literals" $ do
         let program = do
-                  return $ cond true (3 :: UInt 2) 2
+              return $ cond true (3 :: UInt 2) 2
         runAllExceptForTheOldOptimizer program [] [] [3 :: GF181]
 
     it "eq" $ do

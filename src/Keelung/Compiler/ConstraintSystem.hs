@@ -345,7 +345,7 @@ relocateConstraintSystem cs =
                 Right poly -> Just $ fromConstraint counters $ CAddF poly
 
     fromBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Map Ref Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
-    fromBooleanRelations relations occurrencesF occurrencesB _occurrencesU =
+    fromBooleanRelations relations occurrencesF occurrencesB occurrencesU =
       let -- \| Export of UInt-related constriants
           refUsOccurredInF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findUInRefF occurrencesF
           findUInRefF (U _) 0 = Nothing
@@ -368,7 +368,7 @@ relocateConstraintSystem cs =
           shouldKeep (RefBX ref) =
             RefBX ref `Set.member` refBsOccurredInB
               || RefBX ref `Set.member` refBsOccurredInF
-          shouldKeep (RefUBit _ ref _) = ref `Set.member` refUsOccurredInF || ref `Set.member` bitTestsOccurredInB || pinnedRefU ref
+          shouldKeep (RefUBit _ ref _) = ref `Set.member` refUsOccurredInF || ref `Set.member` bitTestsOccurredInB || ref `Set.member` Map.keysSet occurrencesU || pinnedRefU ref
           shouldKeep _ = True
 
           convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Maybe (Constraint n)

@@ -143,7 +143,11 @@ renumberConstraints cs =
     pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters + getCountBySort OfOutput counters
 
     -- variables in constraints (that should be kept after renumbering!)
-    vars = varsInConstraints (csConstraints cs) <> IntSet.fromList ([var | binRep <- getBinReps counters, var <- [BinRep.binRepBitStart binRep .. BinRep.binRepBitStart binRep + BinRep.binRepWidth binRep - 1]])
+    varsInBinReps =
+      IntSet.fromList $
+        concatMap (\binRep -> BinRep.binRepVar binRep : [BinRep.binRepBitStart binRep .. BinRep.binRepBitStart binRep + BinRep.binRepWidth binRep - 1]) (getBinReps counters)
+    -- ([var | binRep <- getBinReps counters, var <- [BinRep.binRepBitStart binRep .. BinRep.binRepBitStart binRep + BinRep.binRepWidth binRep - 1]])
+    vars = varsInConstraints (csConstraints cs) <> varsInBinReps
     -- variables in constraints excluding input & output variables
     newIntermediateVars = IntSet.filter (>= pinnedVarSize) vars
     -- numbers of variables reduced via renumbering
