@@ -209,8 +209,8 @@ assertBinding :: RefB -> Maybe Bool -> M ()
 assertBinding var val = do
   xs <- get
   case BooleanRelations.lookup var xs of
-    BooleanRelations.Value value -> val `shouldBe` Just value
-    _ -> val `shouldBe` Nothing
+    BooleanRelations.Value value -> Just value `shouldBe` val
+    _ -> Nothing `shouldBe` val
 
 isValid :: M ()
 isValid = do
