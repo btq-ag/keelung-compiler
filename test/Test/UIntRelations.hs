@@ -3,8 +3,8 @@ module Test.UIntRelations (tests, run, debug) where
 import Control.Monad.Except
 import Control.Monad.State
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.UIntRelations2 (UIntRelations)
-import Keelung.Compiler.Compile.Relations.UIntRelations2 qualified as UIntRelations
+import Keelung.Compiler.Compile.Relations.UIntRelations (UIntRelations)
+import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Constraint (RefU (..))
 import Keelung.Field (GF181)
 import Test.Hspec (SpecWith, describe, hspec, it)

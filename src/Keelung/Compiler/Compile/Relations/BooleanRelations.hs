@@ -25,7 +25,6 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
 import Data.Set (Set)
 import Data.Set qualified as Set
-import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.Util
@@ -211,8 +210,7 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       else Nothing
   (Value _, ChildOf _ _) -> Nothing -- var1 is a constant value
   (ChildOf _ _, Value _) -> Nothing -- var2 is a constant value
-  (Value value1, Value value2) -> Nothing 
-    -- Just (value1 == value2)
+  (Value _value1, Value _value2) -> Nothing
 
 -- | Export the internal representation of the relations as a map from variables to their relations
 toIntMap :: BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)

@@ -422,7 +422,7 @@ relocateConstraintSystem cs =
 
         -- generate a BinRep constraint for every UInt variable occurred in the module
 
-        toConstraint var = case UIntRelations.lookup uintRels var of
+        toConstraint var = case UIntRelations.lookup var uintRels of
           UIntRelations.Root -> Nothing
           UIntRelations.Value value -> Just $ fromConstraint counters $ CVarBindU var value
           UIntRelations.RotateOf _ root ->

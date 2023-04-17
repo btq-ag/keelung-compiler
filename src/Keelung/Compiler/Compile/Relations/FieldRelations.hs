@@ -153,7 +153,7 @@ bindBoolean ref val xs = do
 -- | Bind a variable to a value
 bindUInt :: (GaloisField n, Integral n) => RefU -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
 bindUInt ref val xs = do
-  result <- UIntRelations.bindToValue ref val (uintRelations xs)
+  result <- UIntRelations.assign ref val (uintRelations xs)
   return $ xs {uintRelations = result}
 
 assertEqualUInt :: (GaloisField n, Integral n) => RefU -> RefU -> FieldRelations n -> Except (Error n) (FieldRelations n)
@@ -410,12 +410,12 @@ relateRefBWithRefB refA (slope, refB, intercept) xs =
 
 relateRefFWithRefU :: (GaloisField n, Integral n) => RefT -> (n, RefU, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relateRefFWithRefU refA (slope, refB, intercept) xs =
-  composeLookup xs slope intercept (lookup (F refA) xs) (fromUIntLookup refB (UIntRelations.lookup (uintRelations xs) refB))
+  composeLookup xs slope intercept (lookup (F refA) xs) (fromUIntLookup refB (UIntRelations.lookup refB (uintRelations xs)))
 
 relateRefUWithRefU :: (GaloisField n, Integral n) => RefU -> (n, RefU, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relateRefUWithRefU refA (slope, refB, intercept) xs =
-  composeLookup xs slope intercept (fromUIntLookup refA (UIntRelations.lookup (uintRelations xs) refA)) (fromUIntLookup refB (UIntRelations.lookup (uintRelations xs) refB))
+  composeLookup xs slope intercept (fromUIntLookup refA (UIntRelations.lookup refA (uintRelations xs))) (fromUIntLookup refB (UIntRelations.lookup refB (uintRelations xs)))
 
 relateRefBWithRefU :: (GaloisField n, Integral n) => RefB -> (n, RefU, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relateRefBWithRefU refA (slope, refB, intercept) xs =
-  composeLookup xs slope intercept (fromBooleanLookup refA (BooleanRelations.lookup refA (booleanRelations xs))) (fromUIntLookup refB (UIntRelations.lookup (uintRelations xs) refB))
+  composeLookup xs slope intercept (fromBooleanLookup refA (BooleanRelations.lookup refA (booleanRelations xs))) (fromUIntLookup refB (UIntRelations.lookup refB (uintRelations xs)))
