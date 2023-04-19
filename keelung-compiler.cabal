@@ -29,6 +29,7 @@ library
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.BooleanRelations
+      Keelung.Compiler.Compile.Relations.BooleanRelations2
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UIntRelations
@@ -92,6 +93,7 @@ executable keelungc
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.BooleanRelations
+      Keelung.Compiler.Compile.Relations.BooleanRelations2
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UIntRelations
@@ -160,6 +162,7 @@ test-suite keelung-test
   main-is: Main.hs
   other-modules:
       Test.BooleanRelations
+      Test.BooleanRelations2
       Test.Compilation
       Test.FieldRelations
       Test.Interpreter
@@ -179,6 +182,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.BooleanRelations
+      Keelung.Compiler.Compile.Relations.BooleanRelations2
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UIntRelations

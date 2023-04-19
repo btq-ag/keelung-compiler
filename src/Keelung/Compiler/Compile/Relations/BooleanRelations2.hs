@@ -1,0 +1,79 @@
+module Keelung.Compiler.Compile.Relations.BooleanRelations2
+  ( BooleanRelations,
+    new,
+    assign,
+    relate,
+    relationBetween,
+    toIntMap,
+    size,
+    isValid,
+    lookup
+  )
+where
+
+import Control.Monad.Except
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+import Keelung.Compiler.Compile.Error
+import Keelung.Compiler.Compile.Relations.BooleanRelations (Lookup (..))
+import Keelung.Compiler.Compile.Relations.Relations qualified as Relations
+import Keelung.Compiler.Constraint
+import Prelude hiding (lookup)
+
+type BooleanRelations = Relations.Relations RefB Bool Polarity
+
+newtype Polarity = Polarity {unPolarity :: Bool}
+  deriving (Eq)
+
+instance Show Polarity where
+  show (Polarity True) = "P"
+  show (Polarity False) = "N"
+
+instance Semigroup Polarity where
+  Polarity a <> Polarity b = Polarity (a == b)
+
+instance Monoid Polarity where
+  mempty = Polarity True
+
+instance Relations.IsRelation RefB Bool Polarity where
+  relationToString (var, Polarity True) = show var
+  relationToString (var, Polarity False) = "¬" <> show var
+
+  execRel (Polarity True) value = value
+  execRel (Polarity False) value = not value
+
+  invertRel (Polarity x) = Polarity x
+
+liftError :: Except (Bool, Bool) a -> Except (Error n) a
+liftError = withExceptT (uncurry ConflictingValuesB)
+
+new :: BooleanRelations
+new = Relations.new
+
+assign :: RefB -> Bool -> BooleanRelations -> Except (Error n) BooleanRelations
+assign var val xs = liftError $ Relations.assign var val xs
+
+relate :: RefB -> Bool -> RefB -> BooleanRelations -> Except (Error n) BooleanRelations
+relate var1 polarity var2 xs = liftError $ Relations.relate var1 (Polarity polarity) var2 xs
+
+relationBetween :: RefB -> RefB -> BooleanRelations -> Maybe Bool
+relationBetween var1 var2 xs = unPolarity <$> Relations.relationBetween var1 var2 xs
+
+toIntMap :: BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
+toIntMap xs = Map.mapMaybe convert $ Relations.toMap xs
+  where
+    convert (Relations.IsConstant val) = Just (Right val)
+    convert (Relations.IsRoot _) = Nothing
+    convert (Relations.IsChildOf parent (Polarity polarity)) = Just $ Left (polarity, parent)
+
+size :: BooleanRelations -> Int
+size = Map.size . Relations.toMap
+
+isValid :: BooleanRelations -> Bool
+isValid = Relations.isValid
+
+lookup :: RefB -> BooleanRelations -> Lookup
+lookup var xs = case Relations.lookup var xs of
+  Relations.IsRoot _ -> Root
+  Relations.IsConstant val -> Value val
+  Relations.IsChildOf parent (Polarity polarity) -> ChildOf polarity parent
