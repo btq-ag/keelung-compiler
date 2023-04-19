@@ -31,8 +31,8 @@ import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
+import Keelung.Compiler.Compile.Relations.BooleanRelations2 (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.BooleanRelations2 qualified as BooleanRelations
 import Keelung.Compiler.Compile.Relations.UIntRelations (UIntRelations)
 import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
 import Keelung.Compiler.Constraint

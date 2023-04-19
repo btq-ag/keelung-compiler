@@ -1,10 +1,11 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Keelung.Compiler.Compile.Relations.Relations
   ( IsRelation (..),
     Relations,
-    VarType (..),
+    VarStatus (..),
     new,
     assign,
     relate,
@@ -24,6 +25,8 @@ import GHC.TypeLits
 import Keelung.Compiler.Compile.Relations.Util
 import Keelung.Data.N (N (..))
 import Prelude hiding (lookup)
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
@@ -40,10 +43,13 @@ class Monoid rel => IsRelation var n rel | rel -> var, rel -> n where
 
 --------------------------------------------------------------------------------
 
-data VarType var n rel = IsConstant n | IsRoot (Map var rel) | IsChildOf var rel
-  deriving (Show)
+data VarStatus var n rel = IsConstant n | IsRoot (Map var rel) | IsChildOf var rel
+  deriving (Show, Eq, Generic, NFData)
 
-newtype Relations var n rel = Relations {unRelations :: Map var (VarType var n rel)}
+newtype Relations var n rel = Relations {unRelations :: Map var (VarStatus var n rel)}
+  deriving (Eq, Generic)
+
+instance (NFData var, NFData n, NFData rel) => NFData (Relations var n rel)
 
 instance (Show var, IsRelation var n rel, Show n) => Show (Relations var n rel) where
   show (Relations relations) =
@@ -53,7 +59,7 @@ instance (Show var, IsRelation var n rel, Show n) => Show (Relations var n rel) 
       showVar :: var -> String
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
-      toString :: (var, VarType var n rel) -> [String]
+      toString :: (var, VarStatus var n rel) -> [String]
       toString (var, IsConstant value) = [showVar var <> " = " <> show value]
       toString (var, IsRoot children) = case map relationToString (Map.toList children) of
         [] -> [showVar var <> " = []"] -- should never happen
@@ -69,7 +75,7 @@ instance {-# OVERLAPPING #-} (KnownNat n, Show var, IsRelation var (Prime n) rel
       showVar :: var -> String
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
-      toString :: KnownNat n => (var, VarType var (Prime n) rel) -> [String]
+      toString :: KnownNat n => (var, VarStatus var (Prime n) rel) -> [String]
       toString (var, IsConstant value) = [showVar var <> " = " <> show (N value)]
       toString (var, IsRoot children) = case map relationToString (Map.toList children) of
         [] -> [showVar var <> " = []"] -- should never happen
@@ -85,7 +91,7 @@ instance {-# OVERLAPPING #-} (KnownNat n, Show var, IsRelation var (Binary n) re
       showVar :: var -> String
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
-      toString :: KnownNat n => (var, VarType var (Binary n) rel) -> [String]
+      toString :: KnownNat n => (var, VarStatus var (Binary n) rel) -> [String]
       toString (var, IsConstant value) = [showVar var <> " = " <> show (N value)]
       toString (var, IsRoot children) = case map relationToString (Map.toList children) of
         [] -> [showVar var <> " = []"]
@@ -97,7 +103,7 @@ new :: Ord var => Relations var n rel
 new = Relations mempty
 
 -- | Returns the result of looking up a variable in the UIntRelations, O(lg n)
-lookup :: (Ord var) => var -> Relations var n rel -> VarType var n rel
+lookup :: (Ord var) => var -> Relations var n rel -> VarStatus var n rel
 lookup var (Relations relations) = case Map.lookup var relations of
   Nothing -> IsRoot mempty
   Just result -> result
@@ -240,7 +246,7 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       else Nothing
 
 -- | Export the internal representation of the relations as a map from variables to their relations
-toMap :: Relations var n rel -> Map var (VarType var n rel)
+toMap :: Relations var n rel -> Map var (VarStatus var n rel)
 toMap = unRelations
 
 -- | Returns the number of variables in the Relations, O(1)
@@ -270,7 +276,7 @@ allChildrenRecognizeTheirParent relations =
 rootsAreSenior :: (Ord var, IsRelation var n rel, Eq rel, Seniority var) => Relations var n rel -> Bool
 rootsAreSenior = Map.foldlWithKey' go True . unRelations
   where
-    go :: Seniority var => Bool -> var -> VarType var n rel -> Bool
+    go :: Seniority var => Bool -> var -> VarStatus var n rel -> Bool
     go False _ _ = False
     go True _ (IsConstant _) = True
     go True var (IsRoot children) = all (\child -> compareSeniority var child /= LT) (Map.keys children)

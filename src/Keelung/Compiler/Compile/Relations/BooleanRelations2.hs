@@ -7,15 +7,17 @@ module Keelung.Compiler.Compile.Relations.BooleanRelations2
     toIntMap,
     size,
     isValid,
-    lookup
+    lookup,
+    Lookup (..),
   )
 where
 
+import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.BooleanRelations (Lookup (..))
 import Keelung.Compiler.Compile.Relations.Relations qualified as Relations
 import Keelung.Compiler.Constraint
 import Prelude hiding (lookup)
@@ -23,7 +25,7 @@ import Prelude hiding (lookup)
 type BooleanRelations = Relations.Relations RefB Bool Polarity
 
 newtype Polarity = Polarity {unPolarity :: Bool}
-  deriving (Eq)
+  deriving (Eq, NFData, Generic)
 
 instance Show Polarity where
   show (Polarity True) = "P"
@@ -71,6 +73,16 @@ size = Map.size . Relations.toMap
 
 isValid :: BooleanRelations -> Bool
 isValid = Relations.isValid
+
+-- lookup :: RefB -> BooleanRelations -> Relations.VarStatus RefB Bool Bool
+-- lookup var xs = case Relations.lookup var xs of
+--   Relations.IsRoot children -> Relations.IsRoot (fmap unPolarity children)
+--   Relations.IsConstant val -> Relations.IsConstant val
+--   Relations.IsChildOf parent (Polarity polarity) -> Relations.IsChildOf parent polarity
+
+-- | Result of looking up a variable in the BooleanRelations
+data Lookup = Root | Value Bool | ChildOf Bool RefB
+  deriving (Eq, Show)
 
 lookup :: RefB -> BooleanRelations -> Lookup
 lookup var xs = case Relations.lookup var xs of

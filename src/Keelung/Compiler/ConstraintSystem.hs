@@ -25,8 +25,8 @@ import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
+import Keelung.Compiler.Compile.Relations.BooleanRelations2 (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.BooleanRelations2 qualified as BooleanRelations
 import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
 import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Compile.Relations.UIntRelations (UIntRelations)

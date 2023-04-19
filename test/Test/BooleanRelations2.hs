@@ -3,7 +3,6 @@ module Test.BooleanRelations2 (tests, run, debug) where
 import Control.Monad.Except
 import Control.Monad.State
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.BooleanRelations (Lookup (..))
 import Keelung.Compiler.Compile.Relations.BooleanRelations2 (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.BooleanRelations2 qualified as BooleanRelations
 import Keelung.Compiler.Constraint (RefB (..), RefU (RefUX))
@@ -194,7 +193,7 @@ assertBinding :: RefB -> Maybe Bool -> M ()
 assertBinding var val = do
   xs <- get
   case BooleanRelations.lookup var xs of
-    Value value -> Just value `shouldBe` val
+    BooleanRelations.Value value -> Just value `shouldBe` val
     _ -> Nothing `shouldBe` val
 
 isValid :: M ()
