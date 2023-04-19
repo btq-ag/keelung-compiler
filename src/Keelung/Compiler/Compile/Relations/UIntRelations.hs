@@ -36,14 +36,14 @@ import Keelung.Interpreter.Arithmetics qualified as Arith
 import Keelung.Syntax (HasWidth (widthOf))
 import Prelude hiding (lookup)
 
--- | Relation between a variable and a value or another variable
-data Relation n = RootIs Int RefU | Constant n
+-- | Relation from a child to a root
+data RelToRoot n = RootIs Int RefU | Constant n
   deriving (Eq, Show, Generic, NFData)
 
 -- | Relations between UInt variables
 data UIntRelations n = UIntRelations
   { -- from children to roots (roots are also in the keys)
-    toRoot :: Map RefU (Relation n),
+    toRoot :: Map RefU (RelToRoot n),
     -- from roots to children, invariant:
     --    1. all "families" are disjoint
     toChildren :: Map RefU (Either n (Map RefU Int))
@@ -267,7 +267,7 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
 toIntMap :: UIntRelations n -> Map RefU (Either (Int, RefU) n)
 toIntMap = fmap go . toRoot
   where
-    go :: Relation n -> Either (Int, RefU) n
+    go :: RelToRoot n -> Either (Int, RefU) n
     go (Constant value) = Right value
     go (RootIs rotation parent) = Left (rotation, parent)
 
@@ -312,7 +312,7 @@ isValid relations = allFamiliesAreDisjoint relations && rootsAreSenior relations
     rootsAreSenior :: UIntRelations n -> Bool
     rootsAreSenior = Map.foldlWithKey' go True . toRoot
       where
-        go :: Bool -> RefU -> Relation n -> Bool
+        go :: Bool -> RefU -> RelToRoot n -> Bool
         go False _ _ = False
         go True ref (RootIs _ root) = compareSeniority root ref /= LT
         go True _ _ = True

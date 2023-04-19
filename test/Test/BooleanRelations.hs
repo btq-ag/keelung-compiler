@@ -191,8 +191,6 @@ relate a (polarity, b) = do
     Left err -> error $ show (err :: Error GF181)
     Right result -> put result
 
--- modify' $ BooleanRelations.relate a polarity b
-
 assign :: RefB -> Bool -> M ()
 assign var val = do
   xs <- get

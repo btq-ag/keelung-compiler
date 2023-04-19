@@ -3,6 +3,7 @@ module Test.FieldRelations (tests, run) where
 import Control.Monad.Except
 import Control.Monad.State
 import Keelung hiding (run)
+import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
 import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Constraint
@@ -15,6 +16,14 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "FieldRelations" $ do
+    describe "assign" $ do
+      it "$0 = 0" $
+        runM $ do
+          F (RefFX 0) `assign` 0
+          debug 
+    -- assertBinding (RefBX 0) (Just True)
+    -- isValid
+
     it "Relate ($0 = $1)" $
       runM $ do
         RefFX 0 `relate` (1, RefFX 1, 0)
@@ -58,6 +67,13 @@ type M = StateT (FieldRelations GF181) IO
 runM :: M a -> IO a
 runM p = evalStateT p FieldRelations.new
 
+assign :: Ref -> GF181 -> M ()
+assign var val = do
+  xs <- get
+  case runExcept (FieldRelations.bindField var val xs) of
+    Left err -> error $ show (err :: Error GF181)
+    Right result -> put result
+
 relate :: RefT -> (GF181, RefT, GF181) -> M ()
 relate var (slope, val, intercept) = do
   xs <- get
@@ -71,6 +87,11 @@ assertRelation :: RefT -> GF181 -> RefT -> GF181 -> M ()
 assertRelation var1 slope var2 intercept = do
   xs <- get
   FieldRelations.relationBetween (F var1) (F var2) xs `shouldBe` Just (slope, intercept)
+
+debug :: M ()
+debug = do
+  xs <- get
+  liftIO $ print xs
 
 ------------------------------------------------------------------------
 
