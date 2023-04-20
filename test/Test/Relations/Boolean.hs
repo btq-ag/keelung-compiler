@@ -1,11 +1,10 @@
-module Test.BooleanRelations (tests, run, debug) where
+module Test.Relations.Boolean (tests, run, debug) where
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.BooleanRelations (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.BooleanRelations qualified as BooleanRelations
+import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Constraint (RefB (..), RefU (RefUX))
 import Keelung.Field (GF181)
 import Test.Hspec (SpecWith, describe, hspec, it)
@@ -110,63 +109,8 @@ tests = do
         runM $ do
           RefBI 0 `relate` (True, RefBO 0)
           RefBO 0 `relate` (True, RefBI 0)
-
-    describe "ordering of roots" $ do
-      it "$0 = ¬$1 = $2" $
-        runM $ do
-          RefBX 0 `relate` (False, RefBX 1)
-          RefBX 0 `relate` (True, RefBX 2)
-          relations <- get
-          BooleanRelations.inspectChildrenOf (RefBX 1) relations `shouldBe` Just (Right (Map.fromList [(RefBX 0, False), (RefBX 2, False)]))
-          isValid
-
-      it "$0 = ¬$1 = $2, $I0 overthrows $0" $
-        runM $ do
-          RefBX 0 `relate` (False, RefBX 1)
-          RefBX 0 `relate` (True, RefBX 2)
-          RefBI 0 `relate` (True, RefBX 0)
-
-          relations <- get
-          BooleanRelations.lookupOneStep (RefBX 0) relations `shouldBe` BooleanRelations.ChildOf True (RefBI 0)
-          BooleanRelations.lookupOneStep (RefBX 1) relations `shouldBe` BooleanRelations.ChildOf False (RefBI 0)
-          BooleanRelations.lookupOneStep (RefBX 2) relations `shouldBe` BooleanRelations.ChildOf True (RefBI 0)
-          isValid
-
-      it "$0 = ¬$1, $I0 = $0, $I0 = $O0" $
-        runM $ do
-          RefBX 0 `relate` (False, RefBX 1)
-          RefBI 0 `relate` (True, RefBX 0)
-          RefBI 0 `relate` (True, RefBO 0)
-
-          relations <- get
-          -- liftIO $ print relations
-
-          BooleanRelations.inspectChildrenOf (RefBX 0) relations `shouldBe` Nothing
-          BooleanRelations.inspectChildrenOf (RefBX 1) relations `shouldBe` Nothing
-
-          BooleanRelations.inspectChildrenOf (RefBI 0) relations
-            `shouldBe` Just
-              ( Right $
-                  Map.fromList
-                    [ (RefBO 0, True),
-                      (RefBX 0, True),
-                      (RefBX 1, False)
-                    ]
-              )
-
-          RefBX 0 `relate` (True, RefBX 2)
-          relations2 <- get
-          BooleanRelations.inspectChildrenOf (RefBI 0) relations2
-            `shouldBe` Just
-              ( Right $
-                  Map.fromList
-                    [ (RefBO 0, True),
-                      (RefBX 0, True),
-                      (RefBX 1, False),
-                      (RefBX 2, True)
-                    ]
-              )
-
+          assertRelation (RefBO 0) (RefBI 0) (Just True)
+          assertRelation (RefBI 0) (RefBO 0) (Just True)
           isValid
 
       it "UInt bits" $
@@ -174,6 +118,48 @@ tests = do
           let bit = RefUBit 4 (RefUX 4 0)
           RefBO 0 `relate` (True, RefBX 0)
           RefBX 0 `relate` (True, bit 0)
+          assertRelation (RefBO 0) (RefBX 0) (Just True)
+          assertRelation (RefBO 0) (bit 0) (Just True)
+          assertRelation (bit 0) (RefBX 0) (Just True)
+          isValid
+
+    describe "ordering of roots" $ do
+      it "$0 = ¬$1 = $2" $
+        runM $ do
+          RefBX 0 `relate` (False, RefBX 1)
+          RefBX 0 `relate` (True, RefBX 2)
+          assertRelation (RefBX 0) (RefBX 1) (Just False)
+          assertRelation (RefBX 0) (RefBX 2) (Just True)
+          assertRelation (RefBX 1) (RefBX 2) (Just False)
+          isValid
+
+      it "$0 = ¬$1 = $2, $I0 overthrows $0" $
+        runM $ do
+          RefBX 0 `relate` (False, RefBX 1)
+          RefBX 0 `relate` (True, RefBX 2)
+          RefBI 0 `relate` (True, RefBX 0)
+          assertRelation (RefBX 0) (RefBX 1) (Just False)
+          assertRelation (RefBX 0) (RefBX 2) (Just True)
+          assertRelation (RefBX 1) (RefBX 2) (Just False)
+          assertRelation (RefBI 0) (RefBX 0) (Just True)
+          assertRelation (RefBI 0) (RefBX 1) (Just False)
+          assertRelation (RefBI 0) (RefBX 2) (Just True)
+          isValid
+
+      it "$0 = ¬$1, $I0 = $0, $I0 = $O0" $
+        runM $ do
+          RefBX 0 `relate` (False, RefBX 1)
+          RefBI 0 `relate` (True, RefBX 0)
+          RefBI 0 `relate` (True, RefBO 0)
+          assertRelation (RefBX 0) (RefBX 1) (Just False)
+          assertRelation (RefBI 0) (RefBX 0) (Just True)
+          assertRelation (RefBI 0) (RefBX 1) (Just False)
+
+          RefBX 0 `relate` (True, RefBX 2)
+
+          assertRelation (RefBX 0) (RefBX 2) (Just True)
+          assertRelation (RefBX 1) (RefBX 2) (Just False)
+          assertRelation (RefBI 0) (RefBX 2) (Just True)
 
           isValid
 
@@ -224,9 +210,9 @@ debug = get >>= liftIO . print
 --   arbitrary = do
 --     relations <- Arbitrary.vector 100
 
---     return $ foldl go BooleanRelations2.new relations
+--     return $ foldl go Boolean.new relations
 --     where
---       go xs (var, slope, ref) = Maybe.fromMaybe xs (BooleanRelations2.relate var (slope, ref) xs)
+--       go xs (var, slope, ref) = Maybe.fromMaybe xs (Boolean.relate var (slope, ref) xs)
 
 -- instance Arbitrary RefBX where
 --   arbitrary = RefBX <$> arbitrary

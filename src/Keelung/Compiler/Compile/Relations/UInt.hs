@@ -1,6 +1,9 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compiler.Compile.Relations.UIntRelations2
+module Keelung.Compiler.Compile.Relations.UInt
   ( UIntRelations,
     new,
     assign,
@@ -10,6 +13,7 @@ module Keelung.Compiler.Compile.Relations.UIntRelations2
     size,
     isValid,
     lookup,
+    assertEqual,
     Lookup (..),
   )
 where
@@ -61,7 +65,6 @@ instance (GaloisField n, Integral n) => Relations.ExecRelation n Rotation where
   execRel (Rotation w n) value = Arith.bitWiseRotateL w n value
   execRel NoRotation value = value
 
-
 liftError :: Except (n, n) a -> Except (Error n) a
 liftError = withExceptT (uncurry ConflictingValuesU)
 
@@ -72,10 +75,11 @@ assign :: (GaloisField n, Integral n) => RefU -> n -> UIntRelations n -> Except 
 assign var val xs = liftError $ Relations.assign var val xs
 
 relate :: (GaloisField n, Integral n) => RefU -> Int -> RefU -> UIntRelations n -> Except (Error n) (UIntRelations n)
+relate var1 0 var2 xs = liftError $ Relations.relate var1 NoRotation var2 xs
 relate var1 rotation var2 xs = liftError $ Relations.relate var1 (Rotation (widthOf var1) rotation) var2 xs
 
 relationBetween :: RefU -> RefU -> UIntRelations n -> Maybe Int
-relationBetween var1 var2 xs = case Relations.relationBetween var1 var2 xs of 
+relationBetween var1 var2 xs = case Relations.relationBetween var1 var2 xs of
   Nothing -> Nothing
   Just (Rotation _ n) -> Just n
   Just NoRotation -> Just 0
@@ -104,3 +108,6 @@ lookup var xs = case Relations.lookup var xs of
   Relations.IsConstant val -> Value val
   Relations.IsChildOf parent (Rotation _ rotation) -> ChildOf rotation parent
   Relations.IsChildOf parent NoRotation -> ChildOf 0 parent
+
+assertEqual :: (GaloisField n, Integral n) => RefU -> RefU -> UIntRelations n -> Except (Error n) (UIntRelations n)
+assertEqual var1 = relate var1 0

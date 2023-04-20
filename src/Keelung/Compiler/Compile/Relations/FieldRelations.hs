@@ -31,10 +31,10 @@ import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.BooleanRelations2 (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.BooleanRelations2 qualified as BooleanRelations
-import Keelung.Compiler.Compile.Relations.UIntRelations (UIntRelations)
-import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
+import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.Boolean qualified as BooleanRelations
+import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
+import Keelung.Compiler.Compile.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Constraint
 import Prelude hiding (lookup)
 
@@ -159,9 +159,7 @@ bindUInt ref val xs = do
 assertEqualUInt :: (GaloisField n, Integral n) => RefU -> RefU -> FieldRelations n -> Except (Error n) (FieldRelations n)
 assertEqualUInt refA refB xs = do
   result <- UIntRelations.assertEqual refA refB (uintRelations xs)
-  case result of
-    Nothing -> return xs
-    Just uintRels -> return $ xs {uintRelations = uintRels}
+  return $ xs {uintRelations = result}
 
 relateBoolean :: RefB -> (Bool, RefB) -> FieldRelations n -> Except (Error n) (FieldRelations n)
 relateBoolean refA (same, refB) xs = do
@@ -320,8 +318,8 @@ fromBooleanLookup ___ (BooleanRelations.ChildOf False root) = IsChildOf (-1) (B 
 fromUIntLookup :: (GaloisField n, Integral n) => RefU -> UIntRelations.Lookup n -> Lookup n
 fromUIntLookup ref UIntRelations.Root = IsRoot (U ref)
 fromUIntLookup ___ (UIntRelations.Value n) = HasValue n
-fromUIntLookup ___ (UIntRelations.RotateOf 0 root) = IsChildOf 1 (U root) 0
-fromUIntLookup ___ (UIntRelations.RotateOf _rotation _root) = error "[ panic ]: Don't know how to relate a field to a rotated UInt"
+fromUIntLookup ___ (UIntRelations.ChildOf 0 root) = IsChildOf 1 (U root) 0
+fromUIntLookup ___ (UIntRelations.ChildOf _rotation _root) = error "[ panic ]: Don't know how to relate a field to a rotated UInt"
 
 composeLookup :: (GaloisField n, Integral n) => FieldRelations n -> n -> n -> Lookup n -> Lookup n -> Except (Error n) (Maybe (FieldRelations n))
 composeLookup xs slope intercept relationA relationB = case (relationA, relationB) of

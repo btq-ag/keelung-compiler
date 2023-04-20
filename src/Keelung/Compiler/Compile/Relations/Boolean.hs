@@ -1,4 +1,7 @@
-module Keelung.Compiler.Compile.Relations.BooleanRelations2
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
+module Keelung.Compiler.Compile.Relations.Boolean
   ( BooleanRelations,
     new,
     assign,
@@ -25,7 +28,9 @@ import Prelude hiding (lookup)
 type BooleanRelations = Relations.Relations RefB Bool Polarity
 
 newtype Polarity = Polarity {unPolarity :: Bool}
-  deriving (Eq, NFData, Generic)
+  deriving (Eq, Generic)
+
+instance NFData Polarity
 
 instance Show Polarity where
   show (Polarity True) = "P"

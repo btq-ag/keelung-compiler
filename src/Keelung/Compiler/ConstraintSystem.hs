@@ -25,12 +25,12 @@ import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.Relations.BooleanRelations2 (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.BooleanRelations2 qualified as BooleanRelations
+import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
 import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
-import Keelung.Compiler.Compile.Relations.UIntRelations (UIntRelations)
-import Keelung.Compiler.Compile.Relations.UIntRelations qualified as UIntRelations
+import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
+import Keelung.Compiler.Compile.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
@@ -417,7 +417,7 @@ relocateConstraintSystem cs =
         toConstraint var = case UIntRelations.lookup var uintRels of
           UIntRelations.Root -> Nothing
           UIntRelations.Value value -> Just $ fromConstraint counters $ CVarBindU var value
-          UIntRelations.RotateOf _ root ->
+          UIntRelations.ChildOf _ root ->
             case PolyG.build 0 [(U var, -1), (U root, 1)] of
               Left _ -> Nothing
               Right poly -> Just $ fromConstraint counters $ CAddF poly

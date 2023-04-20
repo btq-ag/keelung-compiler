@@ -1,10 +1,10 @@
-module Test.UIntRelations2 (tests, run, debug) where
+module Test.Relations.UInt (tests, run, debug) where
 
 import Control.Monad.Except
 import Control.Monad.State
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.UIntRelations2 (UIntRelations)
-import Keelung.Compiler.Compile.Relations.UIntRelations2 qualified as UIntRelations
+import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
+import Keelung.Compiler.Compile.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Constraint (RefU (..))
 import Keelung.Field (GF181)
 import Test.Hspec (SpecWith, describe, hspec, it)
@@ -170,9 +170,9 @@ debug = get >>= liftIO . print
 --   arbitrary = do
 --     relations <- Arbitrary.vector 100
 
---     return $ foldl go UIntRelations2.new relations
+--     return $ foldl go UInt.new relations
 --     where
---       go xs (var, slope, ref) = Maybe.fromMaybe xs (UIntRelations2.relate var (slope, ref) xs)
+--       go xs (var, slope, ref) = Maybe.fromMaybe xs (UInt.relate var (slope, ref) xs)
 
 -- instance Arbitrary RefUX where
 --   arbitrary = RefUX <$> arbitrary

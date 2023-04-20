@@ -1,4 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Keelung.Compiler.Compile.Relations.Relations
   ( IsRelation (..),
@@ -71,10 +74,8 @@ instance {-# OVERLAPS #-} (KnownNat n, Show var, IsRelation rel) => Show (Relati
     "Relations\n"
       <> mconcat (map (<> "\n") (concatMap toString (Map.toList relations)))
     where
-      showVar :: var -> String
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
-      toString :: KnownNat n => (var, VarStatus var (Prime n) rel) -> [String]
       toString (var, IsConstant value) = [showVar var <> " = " <> show (N value)]
       toString (var, IsRoot children) = case map relationToString (Map.toList $ Map.mapKeys show children) of
         [] -> [showVar var <> " = []"] -- should never happen
@@ -87,10 +88,8 @@ instance {-# OVERLAPPING #-} (KnownNat n, Show var, IsRelation rel) => Show (Rel
     "Relations\n"
       <> mconcat (map (<> "\n") (concatMap toString (Map.toList relations)))
     where
-      showVar :: var -> String
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
-      toString :: KnownNat n => (var, VarStatus var (Binary n) rel) -> [String]
       toString (var, IsConstant value) = [showVar var <> " = " <> show (N value)]
       toString (var, IsRoot children) = case map relationToString (Map.toList $ Map.mapKeys show children) of
         [] -> [showVar var <> " = []"]
@@ -102,10 +101,8 @@ instance (Show var, IsRelation rel, Show n) => Show (Relations var n rel) where
     "Relations\n"
       <> mconcat (map (<> "\n") (concatMap toString (Map.toList relations)))
     where
-      showVar :: var -> String
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
-      toString :: (var, VarStatus var n rel) -> [String]
       toString (var, IsConstant value) = [showVar var <> " = " <> show value]
       toString (var, IsRoot children) = case map relationToString (Map.toList $ Map.mapKeys show children) of
         [] -> [showVar var <> " = []"] -- should never happen

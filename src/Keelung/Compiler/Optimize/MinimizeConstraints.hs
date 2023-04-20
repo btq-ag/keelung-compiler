@@ -10,8 +10,8 @@ import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
-import Keelung.Compiler.Compile.Relations.BooleanRelations2 (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.BooleanRelations2 qualified as BooleanRelations
+import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
 import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Constraint
