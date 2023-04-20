@@ -241,12 +241,12 @@ assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
   markChanged RelationChanged
   cs <- get
-  result <- lift $ lift $ FieldRelations.bindBoolean var (value == 1) (csFieldRelations cs)
+  result <- lift $ lift $ FieldRelations.assignB var (value == 1) (csFieldRelations cs)
   put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = result}
 assign var value = do
   markChanged RelationChanged
   cs <- get
-  result <- lift $ lift $ FieldRelations.bindField var value (csFieldRelations cs)
+  result <- lift $ lift $ FieldRelations.assignF var value (csFieldRelations cs)
   put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = result}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.

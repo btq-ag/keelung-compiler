@@ -70,7 +70,7 @@ runM p = evalStateT p FieldRelations.new
 assign :: Ref -> GF181 -> M ()
 assign var val = do
   xs <- get
-  case runExcept (FieldRelations.bindField var val xs) of
+  case runExcept (FieldRelations.assignF var val xs) of
     Left err -> error $ show (err :: Error GF181)
     Right result -> put result
 

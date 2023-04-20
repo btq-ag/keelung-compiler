@@ -10,11 +10,11 @@ module Keelung.Compiler.Compile.Relations.FieldRelations
     new,
     lookup,
     relateRef,
-    bindField,
-    bindUInt,
-    bindBoolean,
-    assertEqualUInt,
-    relateBoolean,
+    assignF,
+    assignU,
+    assignB,
+    assertEqualU,
+    relateB,
     toMap,
     size,
     Lookup (..),
@@ -145,33 +145,33 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       then Just (1, 0)
       else Nothing -- var1 and var2 are values, but not the same one
 
-bindBoolean :: RefB -> Bool -> FieldRelations n -> Except (Error n) (FieldRelations n)
-bindBoolean ref val xs = do
+assignB :: RefB -> Bool -> FieldRelations n -> Except (Error n) (FieldRelations n)
+assignB ref val xs = do
   result <- BooleanRelations.assign ref val (booleanRelations xs)
   return $ xs {booleanRelations = result}
 
 -- | Bind a variable to a value
-bindUInt :: (GaloisField n, Integral n) => RefU -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
-bindUInt ref val xs = do
+assignU :: (GaloisField n, Integral n) => RefU -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
+assignU ref val xs = do
   result <- UIntRelations.assign ref val (uintRelations xs)
   return $ xs {uintRelations = result}
 
-assertEqualUInt :: (GaloisField n, Integral n) => RefU -> RefU -> FieldRelations n -> Except (Error n) (FieldRelations n)
-assertEqualUInt refA refB xs = do
+assertEqualU :: (GaloisField n, Integral n) => RefU -> RefU -> FieldRelations n -> Except (Error n) (FieldRelations n)
+assertEqualU refA refB xs = do
   result <- UIntRelations.assertEqual refA refB (uintRelations xs)
   return $ xs {uintRelations = result}
 
-relateBoolean :: RefB -> (Bool, RefB) -> FieldRelations n -> Except (Error n) (FieldRelations n)
-relateBoolean refA (same, refB) xs = do
+relateB :: RefB -> (Bool, RefB) -> FieldRelations n -> Except (Error n) (FieldRelations n)
+relateB refA (same, refB) xs = do
   result <- BooleanRelations.relate refA same refB (booleanRelations xs)
   return $ xs {booleanRelations = result}
 
 -- | Bind a variable to a value
-bindField :: (GaloisField n, Integral n) => Ref -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
-bindField x value xs =
+assignF :: (GaloisField n, Integral n) => Ref -> n -> FieldRelations n -> Except (Error n) (FieldRelations n)
+assignF x value xs =
   case x of
-    B refB -> bindBoolean refB (value == 1) xs
-    U refU -> bindUInt refU value xs -- NOTE: unreachable
+    B refB -> assignB refB (value == 1) xs
+    U refU -> assignU refU value xs -- NOTE: unreachable
     _ ->
       case lookup x xs of
         IsRoot _ ->
@@ -210,12 +210,12 @@ bindField x value xs =
 relateRef :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> FieldRelations n -> Except (Error n) (Maybe (FieldRelations n))
 relateRef x (slope, y, intercept) xs = do
   case (x, y, slope, intercept) of
-    (B refB, _, 0, value) -> Just <$> bindBoolean refB (value == 1) xs
-    (U refU, _, 0, value) -> Just <$> bindUInt refU value xs
-    (_, _, 0, value) -> Just <$> bindField x value xs
-    (B refA, B refB, 1, 0) -> Just <$> relateBoolean refA (True, refB) xs
-    (U refA, U refB, 1, 0) -> Just <$> assertEqualUInt refA refB xs
-    (B refA, B refB, -1, 1) -> Just <$> relateBoolean refA (False, refB) xs
+    (B refB, _, 0, value) -> Just <$> assignB refB (value == 1) xs
+    (U refU, _, 0, value) -> Just <$> assignU refU value xs
+    (_, _, 0, value) -> Just <$> assignF x value xs
+    (B refA, B refB, 1, 0) -> Just <$> relateB refA (True, refB) xs
+    (U refA, U refB, 1, 0) -> Just <$> assertEqualU refA refB xs
+    (B refA, B refB, -1, 1) -> Just <$> relateB refA (False, refB) xs
     -- (F refA, F refB, _, _) -> relateRefFwithRefF refA (slope, refB, intercept) xs
     (F _, F _, _, _) -> relateTwoRefs x (slope, y, intercept) xs
     (F refA, B refB, _, _) -> relateRefFwithRefB'' refA (slope, refB, intercept) xs
@@ -246,7 +246,7 @@ relateRefF' x (slope, y, intercept) xs =
       --  slope * y + intercept = interceptX
       -- =>
       --  y = (interceptX - intercept) / slope
-      Just <$> bindField y (interceptX - intercept / slope) xs
+      Just <$> assignF y (interceptX - intercept / slope) xs
     IsChildOf slopeX rootOfX interceptX ->
       -- x is a child of `rootOfX` with slope `slopeX` and intercept `interceptX`
       --  x = slopeX * rootOfX + interceptX
@@ -267,7 +267,7 @@ relateRefF' x (slope, y, intercept) xs =
           --  y = interceptY
           -- =>
           --  x = slope * interceptY + intercept
-          Just <$> bindField x (slope * interceptY + intercept) xs
+          Just <$> assignF x (slope * interceptY + intercept) xs
         IsChildOf slopeY rootOfY interceptY ->
           -- y is a child of `rootOfY` with slope `slopeY` and intercept `interceptY`
           --  y = slopeY * rootOfY + interceptY
@@ -328,7 +328,7 @@ composeLookup xs slope intercept relationA relationB = case (relationA, relation
     return $ Just $ relateTwoRefs' rootA (slope, rootB, intercept) xs
   (IsRoot rootA, HasValue n) ->
     -- rootA = slope * n + intercept
-    Just <$> bindField rootA (slope * n + intercept) xs
+    Just <$> assignF rootA (slope * n + intercept) xs
   (IsRoot rootA, IsChildOf slopeB rootB interceptB) ->
     -- rootA = slope * refB + intercept && refB = slopeB * rootB + interceptB
     -- =>
@@ -340,7 +340,7 @@ composeLookup xs slope intercept relationA relationB = case (relationA, relation
     -- n = slope * rootB + intercept
     -- =>
     -- rootB = (n - intercept) / slope
-    Just <$> bindField rootB ((n - intercept) / slope) xs
+    Just <$> assignF rootB ((n - intercept) / slope) xs
   (HasValue n, HasValue m) ->
     -- n = slope * m + intercept
     -- =>
@@ -360,7 +360,7 @@ composeLookup xs slope intercept relationA relationB = case (relationA, relation
     -- slopeB * rootB = (n - intercept) / slope - interceptB
     -- =>
     -- rootB = ((n - intercept) / slope - interceptB) / slopeB
-    Just <$> bindField rootB (((n - intercept) / slope - interceptB) / slopeB) xs
+    Just <$> assignF rootB (((n - intercept) / slope - interceptB) / slopeB) xs
   (IsChildOf slopeA rootA interceptA, IsRoot rootB) ->
     -- refA = slopeA * rootA + interceptA = slope * rootB + intercept
     -- =>
@@ -370,7 +370,7 @@ composeLookup xs slope intercept relationA relationB = case (relationA, relation
     -- refA = slopeA * rootA + interceptA = slope * n + intercept
     -- =>
     -- rootA = (slope * n + intercept - interceptA) / slopeA
-    Just <$> bindField rootA ((slope * n + intercept - interceptA) / slopeA) xs
+    Just <$> assignF rootA ((slope * n + intercept - interceptA) / slopeA) xs
   (IsChildOf slopeA rootA interceptA, IsChildOf slopeB rootB interceptB) ->
     -- refA = slopeA * rootA + interceptA = slope * (slopeB * rootB + interceptB) + intercept
     -- =>

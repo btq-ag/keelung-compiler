@@ -29,6 +29,7 @@ library
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.Boolean
+      Keelung.Compiler.Compile.Relations.Field
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UInt
@@ -92,6 +93,7 @@ executable keelungc
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.Boolean
+      Keelung.Compiler.Compile.Relations.Field
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UInt
@@ -179,6 +181,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.Boolean
+      Keelung.Compiler.Compile.Relations.Field
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UInt

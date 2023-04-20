@@ -11,6 +11,7 @@ module Keelung.Compiler.Compile.Relations.Boolean
     size,
     isValid,
     lookup,
+    lookup',
     Lookup (..),
   )
 where
@@ -89,3 +90,9 @@ lookup var xs = case Relations.lookup var xs of
   Relations.IsRoot _ -> Root
   Relations.IsConstant val -> Value val
   Relations.IsChildOf parent (Polarity polarity) -> ChildOf polarity parent
+
+lookup' :: RefB -> BooleanRelations -> Relations.VarStatus RefB Bool Bool
+lookup' var xs = case Relations.lookup var xs of
+  Relations.IsRoot children -> Relations.IsRoot $ fmap unPolarity children
+  Relations.IsConstant val -> Relations.IsConstant val
+  Relations.IsChildOf parent (Polarity polarity) -> Relations.IsChildOf parent polarity

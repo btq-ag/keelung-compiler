@@ -21,3 +21,12 @@ instance Seniority RefU where
   compareSeniority (RefUX _ _) _ = LT
   compareSeniority _ (RefUX _ _) = GT
   compareSeniority _ _ = EQ
+
+instance Seniority RefT where
+  compareSeniority (RefFX _) (RefFX _) = EQ
+  compareSeniority (RefFX _) _ = LT
+  compareSeniority _ (RefFX _) = GT
+  compareSeniority _ _ = EQ
+
+instance Seniority Ref where
+  compareSeniority _ _ = EQ

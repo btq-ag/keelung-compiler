@@ -120,7 +120,7 @@ lookup var (Relations relations) = case Map.lookup var relations of
   Just result -> result
 
 -- | Assigns a value to a variable, O(lg n)
-assign :: (Ord var, IsRelation rel, Eq n, Show var, Show n, ExecRelation n rel) => var -> n -> Relations var n rel -> Except (n, n) (Relations var n rel)
+assign :: (Ord var, IsRelation rel, Eq n, ExecRelation n rel) => var -> n -> Relations var n rel -> Except (n, n) (Relations var n rel)
 assign var value (Relations relations) = case Map.lookup var relations of
   -- The variable is not in the map, so we add it as a constant
   Nothing -> return $ Relations $ Map.insert var (IsConstant value) relations
@@ -153,7 +153,7 @@ assign var value (Relations relations) = case Map.lookup var relations of
     assign root (execRel (invertRel relation) value) (Relations relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: (Seniority var, IsRelation rel, Ord var, Eq n, Show var, Show rel, Show n, ExecRelation n rel) => var -> rel -> var -> Relations var n rel -> Except (n, n) (Relations var n rel)
+relate :: (Seniority var, IsRelation rel, Ord var, Eq n, ExecRelation n rel) => var -> rel -> var -> Relations var n rel -> Except (n, n) (Relations var n rel)
 relate a relation b relations =
   case compareSeniority a b of
     LT -> relateChildToParent a relation b relations
@@ -169,7 +169,7 @@ relate a relation b relations =
           IsChildOf parent _ -> childrenSizeOf parent
 
 -- | Relates a child to a parent, O(lg n)
-relateChildToParent :: (Ord var, IsRelation rel, Eq n, Show var, Show rel, Show n, Seniority var, ExecRelation n rel) => var -> rel -> var -> Relations var n rel -> Except (n, n) (Relations var n rel)
+relateChildToParent :: (Ord var, IsRelation rel, Eq n, Seniority var, ExecRelation n rel) => var -> rel -> var -> Relations var n rel -> Except (n, n) (Relations var n rel)
 relateChildToParent child relation parent relations =
   if child == parent
     then return relations
@@ -224,7 +224,7 @@ relateChildToParent child relation parent relations =
       IsChildOf grandparent relationWithGrandparent -> relate child (relation <> relationWithGrandparent) grandparent relations
 
 -- | Calculates the relation between two variables, O(lg n)
-relationBetween :: (Ord var, IsRelation rel, Show var) => var -> var -> Relations var n rel -> Maybe rel
+relationBetween :: (Ord var, IsRelation rel) => var -> var -> Relations var n rel -> Maybe rel
 relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   (IsConstant _, _) -> Nothing
   (_, IsConstant _) -> Nothing

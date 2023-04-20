@@ -204,15 +204,15 @@ add = mapM_ addOne
     addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       cs <- get
-      csFieldRelations' <- lift $ FieldRelations.bindField x c (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.assignF x c (csFieldRelations cs)
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindB x c) = do
       cs <- get
-      csFieldRelations' <- lift $ FieldRelations.bindBoolean x (c == 1) (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.assignB x (c == 1) (csFieldRelations cs)
       put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarBindU x c) = do
       cs <- get
-      csFieldRelations' <- lift $ FieldRelations.bindUInt x c (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.assignU x c (csFieldRelations cs)
       put cs {csFieldRelations = csFieldRelations'}
     -- put cs {csUIntRelations = csUIntRelations'}
     addOne (CVarEq x y) = do
@@ -229,15 +229,15 @@ add = mapM_ addOne
         Just csFieldRelations' -> put cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqB x y) = do
       cs <- get
-      csFieldRelations' <- lift $ FieldRelations.relateBoolean x (True, y) (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.relateB x (True, y) (csFieldRelations cs)
       put $ cs {csFieldRelations = csFieldRelations'}
     addOne (CVarNEqB x y) = do
       cs <- get
-      csFieldRelations' <- lift $ FieldRelations.relateBoolean x (False, y) (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.relateB x (False, y) (csFieldRelations cs)
       put $ cs {csFieldRelations = csFieldRelations'}
     addOne (CVarEqU x y) = do
       cs <- get
-      csFieldRelations' <- lift $ FieldRelations.assertEqualUInt x y (csFieldRelations cs)
+      csFieldRelations' <- lift $ FieldRelations.assertEqualU x y (csFieldRelations cs)
       put $ cs {csFieldRelations = csFieldRelations'}
     -- case result of
     --   Nothing -> return ()

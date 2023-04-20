@@ -13,6 +13,7 @@ module Keelung.Compiler.Compile.Relations.UInt
     size,
     isValid,
     lookup,
+    lookup',
     assertEqual,
     Lookup (..),
   )
@@ -65,6 +66,10 @@ instance (GaloisField n, Integral n) => Relations.ExecRelation n Rotation where
   execRel (Rotation w n) value = Arith.bitWiseRotateL w n value
   execRel NoRotation value = value
 
+rotationAmount :: Rotation -> Int
+rotationAmount (Rotation _ n) = n
+rotationAmount NoRotation = 0
+
 liftError :: Except (n, n) a -> Except (Error n) a
 liftError = withExceptT (uncurry ConflictingValuesU)
 
@@ -81,16 +86,14 @@ relate var1 rotation var2 xs = liftError $ Relations.relate var1 (Rotation (widt
 relationBetween :: RefU -> RefU -> UIntRelations n -> Maybe Int
 relationBetween var1 var2 xs = case Relations.relationBetween var1 var2 xs of
   Nothing -> Nothing
-  Just (Rotation _ n) -> Just n
-  Just NoRotation -> Just 0
+  Just rotation -> Just (rotationAmount rotation)
 
 toIntMap :: UIntRelations n -> Map RefU (Either (Int, RefU) n)
 toIntMap xs = Map.mapMaybe convert $ Relations.toMap xs
   where
     convert (Relations.IsConstant val) = Just (Right val)
     convert (Relations.IsRoot _) = Nothing
-    convert (Relations.IsChildOf parent (Rotation _ amount)) = Just $ Left (amount, parent)
-    convert (Relations.IsChildOf parent NoRotation) = Just $ Left (0, parent)
+    convert (Relations.IsChildOf parent rotation) = Just $ Left (rotationAmount rotation, parent)
 
 size :: UIntRelations n -> Int
 size = Map.size . Relations.toMap
@@ -106,8 +109,13 @@ lookup :: RefU -> UIntRelations n -> Lookup n
 lookup var xs = case Relations.lookup var xs of
   Relations.IsRoot _ -> Root
   Relations.IsConstant val -> Value val
-  Relations.IsChildOf parent (Rotation _ rotation) -> ChildOf rotation parent
-  Relations.IsChildOf parent NoRotation -> ChildOf 0 parent
+  Relations.IsChildOf parent rotation -> ChildOf (rotationAmount rotation) parent
+
+lookup' :: RefU -> UIntRelations n -> Relations.VarStatus RefU n Int
+lookup' var xs = case Relations.lookup var xs of
+  Relations.IsRoot children -> Relations.IsRoot $ fmap rotationAmount children
+  Relations.IsConstant val -> Relations.IsConstant val
+  Relations.IsChildOf parent rotation -> Relations.IsChildOf parent (rotationAmount rotation)
 
 assertEqual :: (GaloisField n, Integral n) => RefU -> RefU -> UIntRelations n -> Except (Error n) (UIntRelations n)
 assertEqual var1 = relate var1 0
