@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Keelung.Compiler.Compile.Relations.Field
@@ -9,7 +10,7 @@ module Keelung.Compiler.Compile.Relations.Field
     assignF,
     assignB,
     assignU,
-    relate,
+    relateRefs,
     assertEqual,
     assertEqualU,
     relationBetween,
@@ -87,26 +88,91 @@ assignU ref val = updateRelationsU $ Relations.UInt.assign ref val
 relate :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelations n -> Relations.M (Error n) (AllRelations n)
 relate var1 slope var2 intercept = updateRelationsF $ Relations.relate var1 (LinRel slope intercept) var2
 
--- relate' :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> AllRelations n -> Except (Error n) (AllRelations n)
--- relate' x (slope, y, intercept) =
---   case (x, y, slope, intercept) of
---     (B refB, _, 0, value) -> Just <$> assignB refB (value == 1) xs
---     (U refU, _, 0, value) -> Just <$> assignU refU value xs
---     (_, _, 0, value) -> Just <$> assignF x value xs
---     (B refA, B refB, 1, 0) -> Just <$> relateB refA (True, refB) xs
---     (U refA, U refB, 1, 0) -> Just <$> assertEqualU refA refB xs
---     (B refA, B refB, -1, 1) -> Just <$> relateB refA (False, refB) xs
---     -- (F refA, F refB, _, _) -> relateRefFwithRefF refA (slope, refB, intercept) xs
---     (F _, F _, _, _) -> relateTwoRefs x (slope, y, intercept) xs
---     (F refA, B refB, _, _) -> relateRefFwithRefB'' refA (slope, refB, intercept) xs
---     (F refA, U refB, _, _) -> relateRefFWithRefU refA (slope, refB, intercept) xs
---     (B refA, F refB, _, _) -> relateRefFwithRefB'' refB (recip slope, refA, -intercept / slope) xs
---     (B refA, B refB, _, _) -> relateRefBWithRefB refA (slope, refB, intercept) xs
---     (B refA, U refB, _, _) -> relateRefBWithRefU refA (slope, refB, intercept) xs
---     (U refA, F refB, _, _) -> relateRefFWithRefU refB (recip slope, refA, -intercept / slope) xs
---     (U refA, B refB, _, _) -> relateRefBWithRefU refB (recip slope, refA, -intercept / slope) xs
---     (U refA, U refB, _, _) -> relateRefUWithRefU refA (slope, refB, intercept) xs
--- updateRelationsF $ Relations.relate (F var1) (LinRel slope intercept) (F var2)
+relateB :: RefB -> (Bool, RefB) -> AllRelations n -> Relations.M (Error n) (AllRelations n)
+relateB refA (polarity, refB) = updateRelationsB $ Relations.Boolean.relate refA polarity refB
+
+relateRefs :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelations n -> Relations.M (Error n) (AllRelations n)
+relateRefs x slope y intercept xs =
+  case (x, y, slope, intercept) of
+    (B refB, _, 0, value) -> assignB refB (value == 1) xs
+    (U refU, _, 0, value) -> assignU refU value xs
+    (_, _, 0, value) -> assignF x value xs
+    (B refA, B refB, 1, 0) -> relateB refA (True, refB) xs
+    (U refA, U refB, 1, 0) -> assertEqualU refA refB xs
+    (B refA, B refB, -1, 1) -> relateB refA (False, refB) xs
+    (F refA, F refB, _, _) -> relate (F refA) slope (F refB) intercept xs
+    (F refA, B refB, _, _) -> 
+      composeLookup
+        xs
+        (F refA)
+        (B refB)
+        slope
+        intercept
+        (Relations.lookup (F refA) (relationsF xs))
+        (fromBooleanLookup (Relations.Boolean.lookup' refB (relationsB xs)))
+    (F refA, U refB, _, _) ->
+      composeLookup
+        xs
+        (F refA)
+        (U refB)
+        slope
+        intercept
+        (Relations.lookup (F refA) (relationsF xs))
+        (fromUIntLookup (Relations.UInt.lookup' refB (relationsU xs)))
+    (B refA, F refB, _, _) -> 
+      composeLookup
+        xs
+        (F refB)
+        (B refA)
+        (recip slope)
+        (-intercept / slope)
+        (Relations.lookup (F refB) (relationsF xs))
+        (fromBooleanLookup (Relations.Boolean.lookup' refA (relationsB xs)))
+    (B refA, B refB, _, _) -> 
+      composeLookup
+        xs
+        (B refA)
+        (B refB)
+        slope
+        intercept
+        (fromBooleanLookup (Relations.Boolean.lookup' refA (relationsB xs)))
+        (fromBooleanLookup (Relations.Boolean.lookup' refB (relationsB xs)))
+    (B refA, U refB, _, _) -> 
+      composeLookup
+        xs
+        (B refA)
+        (U refB)
+        slope
+        intercept
+        (fromBooleanLookup (Relations.Boolean.lookup' refA (relationsB xs)))
+        (fromUIntLookup (Relations.UInt.lookup' refB (relationsU xs)))
+    (U refA, F refB, _, _) -> 
+      composeLookup
+        xs
+        (F refB)
+        (U refA)
+        (recip slope)
+        (-intercept / slope)
+        (Relations.lookup (F refB) (relationsF xs))
+        (fromUIntLookup (Relations.UInt.lookup' refA (relationsU xs)))
+    (U refA, B refB, _, _) -> 
+      composeLookup
+        xs
+        (U refA)
+        (B refB)
+        (recip slope)
+        (-intercept / slope)
+        (fromBooleanLookup (Relations.Boolean.lookup' refB (relationsB xs)))
+        (fromUIntLookup (Relations.UInt.lookup' refA (relationsU xs)))
+    (U refA, U refB, _, _) -> 
+      composeLookup
+        xs
+        (U refA)
+        (U refB)
+        slope
+        intercept
+        (fromUIntLookup (Relations.UInt.lookup' refA (relationsU xs)))
+        (fromUIntLookup (Relations.UInt.lookup' refB (relationsU xs)))
 
 assertEqual :: (GaloisField n, Integral n) => Ref -> Ref -> AllRelations n -> Relations.M (Error n) (AllRelations n)
 assertEqual var1 var2 = relate var1 1 var2 0
@@ -190,3 +256,84 @@ instance (Num n, Eq n, Show n, Fractional n) => Relations.IsRelation (LinRel n) 
 
 instance (GaloisField n, Integral n) => Relations.ExecRelation n (LinRel n) where
   execRel (LinRel a b) value = a * value + b
+
+--------------------------------------------------------------------------------
+
+fromBooleanLookup :: GaloisField n => Relations.VarStatus RefB Bool Bool -> Relations.VarStatus Ref n (LinRel n)
+fromBooleanLookup (Relations.IsRoot children) = Relations.IsRoot $ Map.mapKeys B $ Map.map (\b -> if b then LinRel 1 0 else LinRel (-1) 1) children
+fromBooleanLookup (Relations.IsConstant True) = Relations.IsConstant 1
+fromBooleanLookup (Relations.IsConstant False) = Relations.IsConstant 0
+fromBooleanLookup (Relations.IsChildOf parent True) = Relations.IsChildOf (B parent) (LinRel 1 0)
+fromBooleanLookup (Relations.IsChildOf parent False) = Relations.IsChildOf (B parent) (LinRel (-1) 1)
+
+fromUIntLookup :: GaloisField n => Relations.VarStatus RefU n Int -> Relations.VarStatus Ref n (LinRel n)
+fromUIntLookup (Relations.IsRoot children) =
+  Relations.IsRoot $
+    Map.mapKeys U $
+      Map.map
+        ( \case
+            0 -> LinRel 1 0
+            _ -> error "[ panic ]: Don't know how to relate a Field to a rotated UInt"
+        )
+        children
+fromUIntLookup (Relations.IsConstant n) = Relations.IsConstant n
+fromUIntLookup (Relations.IsChildOf parent 0) = Relations.IsChildOf (U parent) (LinRel 1 0)
+fromUIntLookup (Relations.IsChildOf _ _) = error "[ panic ]: Don't know how to relate a Field to a rotated UInt"
+
+composeLookup :: (GaloisField n, Integral n) => AllRelations n -> Ref -> Ref -> n -> n -> Relations.VarStatus Ref n (LinRel n) -> Relations.VarStatus Ref n (LinRel n) -> Relations.M (Error n) (AllRelations n)
+composeLookup xs refA refB slope intercept relationA relationB = case (relationA, relationB) of
+  (Relations.IsRoot _, Relations.IsRoot _) ->
+    -- rootA = slope * rootB + intercept
+    relate refA slope refB intercept xs
+  (Relations.IsRoot _, Relations.IsConstant n) ->
+    -- rootA = slope * n + intercept
+    assignF refA (slope * n + intercept) xs
+  (Relations.IsRoot _, Relations.IsChildOf rootB (LinRel slopeB interceptB)) ->
+    -- rootA = slope * refB + intercept && refB = slopeB * rootB + interceptB
+    -- =>
+    -- rootA = slope * (slopeB * rootB + interceptB) + intercept
+    -- =>
+    -- rootA = slope * slopeB * rootB + slope * interceptB + intercept
+    relate refA (slope * slopeB) rootB (slope * interceptB + intercept) xs
+  (Relations.IsConstant n, Relations.IsRoot _) ->
+    -- n = slope * rootB + intercept
+    -- =>
+    -- rootB = (n - intercept) / slope
+    assignF refB ((n - intercept) / slope) xs
+  (Relations.IsConstant n, Relations.IsConstant m) ->
+    -- n = slope * m + intercept
+    -- =>
+    -- n - intercept = slope * m
+    -- =>
+    -- m = (n - intercept) / slope
+    if m == (n - intercept) / slope
+      then return xs
+      else throwError $ ConflictingValuesF m ((n - intercept) / slope)
+  (Relations.IsConstant n, Relations.IsChildOf rootB (LinRel slopeB interceptB)) ->
+    -- n = slope * (slopeB * rootB + interceptB) + intercept
+    -- =>
+    -- slope * (slopeB * rootB + interceptB) = n - intercept
+    -- =>
+    -- slopeB * rootB + interceptB = (n - intercept) / slope
+    -- =>
+    -- slopeB * rootB = (n - intercept) / slope - interceptB
+    -- =>
+    -- rootB = ((n - intercept) / slope - interceptB) / slopeB
+    assignF rootB (((n - intercept) / slope - interceptB) / slopeB) xs
+  (Relations.IsChildOf rootA (LinRel slopeA interceptA), Relations.IsRoot _) ->
+    -- refA = slopeA * rootA + interceptA = slope * rootB + intercept
+    -- =>
+    -- rootA = (slope * rootB + intercept - interceptA) / slopeA
+    relate rootA (slope / slopeA) refB ((intercept - interceptA) / slopeA) xs
+  (Relations.IsChildOf rootA (LinRel slopeA interceptA), Relations.IsConstant n) ->
+    -- refA = slopeA * rootA + interceptA = slope * n + intercept
+    -- =>
+    -- rootA = (slope * n + intercept - interceptA) / slopeA
+    assignF rootA ((slope * n + intercept - interceptA) / slopeA) xs
+  (Relations.IsChildOf rootA (LinRel slopeA interceptA), Relations.IsChildOf rootB (LinRel slopeB interceptB)) ->
+    -- refA = slopeA * rootA + interceptA = slope * (slopeB * rootB + interceptB) + intercept
+    -- =>
+    -- slopeA * rootA = slope * slopeB * rootB + slope * interceptB + intercept - interceptA
+    -- =>
+    -- rootA = (slope * slopeB * rootB + slope * interceptB + intercept - interceptA) / slopeA
+    relate rootA (slope * slopeB / slopeA) rootB ((slope * interceptB + intercept - interceptA) / slopeA) xs
