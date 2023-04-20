@@ -17,6 +17,7 @@ module Keelung.Compiler.Compile.Relations.Field
     size,
     isValid,
     lookup,
+    lookup',
     Lookup (..),
   )
 where
@@ -45,37 +46,52 @@ data AllRelations n = AllRelations
 liftError :: Except (n, n) a -> Except (Error n) a
 liftError = withExceptT (uncurry ConflictingValuesU)
 
-updateRelationsF :: (FieldRelations n -> Except (n, n) (FieldRelations n)) -> AllRelations n -> Except (Error n) (AllRelations n)
+updateRelationsF ::
+  (FieldRelations n -> Except (n, n) (Maybe (FieldRelations n))) ->
+  AllRelations n ->
+  Except (Error n) (Maybe (AllRelations n))
 updateRelationsF f xs = liftError $ do
-  relationsF' <- f (relationsF xs)
-  return $ xs {relationsF = relationsF'}
+  result <- f (relationsF xs)
+  case result of
+    Nothing -> return Nothing
+    Just relations -> return $ Just $ xs {relationsF = relations}
 
-updateRelationsB :: (Relations.Boolean.BooleanRelations -> Except (Error n) Relations.Boolean.BooleanRelations) -> AllRelations n -> Except (Error n) (AllRelations n)
+updateRelationsB ::
+  (Relations.Boolean.BooleanRelations -> Except (Error n) (Maybe Relations.Boolean.BooleanRelations)) ->
+  AllRelations n ->
+  Except (Error n) (Maybe (AllRelations n))
 updateRelationsB f xs = do
-  relationsB' <- f (relationsB xs)
-  return $ xs {relationsB = relationsB'}
+  result <- f (relationsB xs)
+  case result of
+    Nothing -> return Nothing
+    Just relations -> return $ Just $ xs {relationsB = relations}
 
-updateRelationsU :: (Relations.UInt.UIntRelations n -> Except (Error n) (Relations.UInt.UIntRelations n)) -> AllRelations n -> Except (Error n) (AllRelations n)
+updateRelationsU ::
+  (Relations.UInt.UIntRelations n -> Except (Error n) (Maybe (Relations.UInt.UIntRelations n))) ->
+  AllRelations n ->
+  Except (Error n) (Maybe (AllRelations n))
 updateRelationsU f xs = do
-  relationsU' <- f (relationsU xs)
-  return $ xs {relationsU = relationsU'}
+  result <- f (relationsU xs)
+  case result of
+    Nothing -> return Nothing
+    Just relationsU' -> return $ Just $ xs {relationsU = relationsU'}
 
 --------------------------------------------------------------------------------
 
 new :: AllRelations n
 new = AllRelations Relations.new Relations.Boolean.new Relations.UInt.new
 
-assignF :: (GaloisField n, Integral n) => Ref -> n -> AllRelations n -> Except (Error n) (AllRelations n)
-assignF var val = updateRelationsF $ Relations.assign var val
+assignF :: (GaloisField n, Integral n) => Ref -> n -> AllRelations n -> Except (Error n) (Maybe (AllRelations n))
+assignF var val = updateRelationsF $ fmap Just . Relations.assign var val
 
-assignB :: RefB -> Bool -> AllRelations n -> Except (Error n) (AllRelations n)
+assignB :: RefB -> Bool -> AllRelations n -> Except (Error n) (Maybe (AllRelations n))
 assignB ref val = updateRelationsB $ Relations.Boolean.assign ref val
 
-assignU :: (GaloisField n, Integral n) => RefU -> n -> AllRelations n -> Except (Error n) (AllRelations n)
+assignU :: (GaloisField n, Integral n) => RefU -> n -> AllRelations n -> Except (Error n) (Maybe (AllRelations n))
 assignU ref val = updateRelationsU $ Relations.UInt.assign ref val
 
-relate :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelations n -> Except (Error n) (AllRelations n)
-relate var1 slope var2 intercept = updateRelationsF $ Relations.relate var1 (LinRel slope intercept) var2
+relate :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelations n -> Except (Error n) (Maybe (AllRelations n))
+relate var1 slope var2 intercept = updateRelationsF $ fmap Just . Relations.relate var1 (LinRel slope intercept) var2
 
 -- relate' :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> AllRelations n -> Except (Error n) (AllRelations n)
 -- relate' x (slope, y, intercept) =
@@ -98,10 +114,10 @@ relate var1 slope var2 intercept = updateRelationsF $ Relations.relate var1 (Lin
 --     (U refA, U refB, _, _) -> relateRefUWithRefU refA (slope, refB, intercept) xs
 -- updateRelationsF $ Relations.relate (F var1) (LinRel slope intercept) (F var2)
 
-assertEqual :: (GaloisField n, Integral n) => Ref -> Ref -> AllRelations n -> Except (Error n) (AllRelations n)
+assertEqual :: (GaloisField n, Integral n) => Ref -> Ref -> AllRelations n -> Except (Error n) (Maybe (AllRelations n))
 assertEqual var1 var2 = relate var1 1 var2 0
 
-assertEqualU :: (GaloisField n, Integral n) => RefU -> RefU -> AllRelations n -> Except (Error n) (AllRelations n)
+assertEqualU :: (GaloisField n, Integral n) => RefU -> RefU -> AllRelations n -> Except (Error n) (Maybe (AllRelations n))
 assertEqualU var1 var2 = updateRelationsU $ Relations.UInt.assertEqual var1 var2
 
 relationBetween :: (Eq n, Fractional n, Show n) => Ref -> Ref -> AllRelations n -> Maybe (n, n)

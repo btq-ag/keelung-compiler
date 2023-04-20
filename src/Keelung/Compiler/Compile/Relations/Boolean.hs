@@ -59,11 +59,11 @@ liftError = withExceptT (uncurry ConflictingValuesB)
 new :: BooleanRelations
 new = Relations.new
 
-assign :: RefB -> Bool -> BooleanRelations -> Except (Error n) BooleanRelations
-assign var val xs = liftError $ Relations.assign var val xs
+assign :: RefB -> Bool -> BooleanRelations -> Except (Error n) (Maybe BooleanRelations)
+assign var val xs = liftError $ Just <$> Relations.assign var val xs
 
-relate :: RefB -> Bool -> RefB -> BooleanRelations -> Except (Error n) BooleanRelations
-relate var1 polarity var2 xs = liftError $ Relations.relate var1 (Polarity polarity) var2 xs
+relate :: RefB -> Bool -> RefB -> BooleanRelations -> Except (Error n) (Maybe BooleanRelations)
+relate var1 polarity var2 xs = liftError $ Just <$> Relations.relate var1 (Polarity polarity) var2 xs
 
 relationBetween :: RefB -> RefB -> BooleanRelations -> Maybe Bool
 relationBetween var1 var2 xs = unPolarity <$> Relations.relationBetween var1 var2 xs

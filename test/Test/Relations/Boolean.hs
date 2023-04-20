@@ -175,14 +175,16 @@ relate a (polarity, b) = do
   xs <- get
   case runExcept (BooleanRelations.relate a polarity b xs) of
     Left err -> error $ show (err :: Error GF181)
-    Right result -> put result
+    Right Nothing -> return ()
+    Right (Just result) -> put result
 
 assign :: RefB -> Bool -> M ()
 assign var val = do
   xs <- get
   case runExcept (BooleanRelations.assign var val xs) of
     Left err -> error $ show (err :: Error GF181)
-    Right result -> put result
+    Right Nothing -> return ()
+    Right (Just result) -> put result
 
 assertRelation :: RefB -> RefB -> Maybe Bool -> M ()
 assertRelation var1 var2 result = do

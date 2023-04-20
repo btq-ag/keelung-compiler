@@ -16,6 +16,7 @@ import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
+import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
 import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
@@ -200,59 +201,28 @@ modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
 add :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 add = mapM_ addOne
   where
+    execRelations :: (FieldRelations n -> Except (Compile.Error n) (Maybe (FieldRelations n))) -> M n ()
+    execRelations f = do
+      cs <- get
+      result <- lift $ f (csFieldRelations cs)
+      case result of
+        Nothing -> return ()
+        Just relations -> put cs {csFieldRelations = relations}
+
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
-    addOne (CVarBindF x c) = do
-      cs <- get
-      csFieldRelations' <- lift $ FieldRelations.assignF x c (csFieldRelations cs)
-      put cs {csFieldRelations = csFieldRelations'}
-    addOne (CVarBindB x c) = do
-      cs <- get
-      csFieldRelations' <- lift $ FieldRelations.assignB x (c == 1) (csFieldRelations cs)
-      put cs {csFieldRelations = csFieldRelations'}
-    addOne (CVarBindU x c) = do
-      cs <- get
-      csFieldRelations' <- lift $ FieldRelations.assignU x c (csFieldRelations cs)
-      put cs {csFieldRelations = csFieldRelations'}
-    -- put cs {csUIntRelations = csUIntRelations'}
-    addOne (CVarEq x y) = do
-      cs <- get
-      result <- lift $ FieldRelations.relateRef x (1, y, 0) (csFieldRelations cs)
-      case result of
-        Nothing -> return ()
-        Just csFieldRelations' -> put cs {csFieldRelations = csFieldRelations'}
-    addOne (CVarEqF x y) = do
-      cs <- get
-      result <- lift $ FieldRelations.relateRef (F x) (1, F y, 0) (csFieldRelations cs)
-      case result of
-        Nothing -> return ()
-        Just csFieldRelations' -> put cs {csFieldRelations = csFieldRelations'}
-    addOne (CVarEqB x y) = do
-      cs <- get
-      csFieldRelations' <- lift $ FieldRelations.relateB x (True, y) (csFieldRelations cs)
-      put $ cs {csFieldRelations = csFieldRelations'}
-    addOne (CVarNEqB x y) = do
-      cs <- get
-      csFieldRelations' <- lift $ FieldRelations.relateB x (False, y) (csFieldRelations cs)
-      put $ cs {csFieldRelations = csFieldRelations'}
-    addOne (CVarEqU x y) = do
-      cs <- get
-      csFieldRelations' <- lift $ FieldRelations.assertEqualU x y (csFieldRelations cs)
-      put $ cs {csFieldRelations = csFieldRelations'}
-    -- case result of
-    --   Nothing -> return ()
-    --   Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
+    addOne (CVarBindF x c) = execRelations $ FieldRelations.assignF x c
+    addOne (CVarBindB x c) = execRelations $ FieldRelations.assignB x (c == 1)
+    addOne (CVarBindU x c) = execRelations $ FieldRelations.assignU x c
+    addOne (CVarEq x y) = execRelations $ FieldRelations.relateRef x (1, y, 0)
+    addOne (CVarEqF x y) = execRelations $ FieldRelations.relateRef (F x) (1, F y, 0)
+    addOne (CVarEqB x y) = execRelations $ FieldRelations.relateB x (True, y)
+    addOne (CVarNEqB x y) = execRelations $ FieldRelations.relateB x (False, y)
+    addOne (CVarEqU x y) = execRelations $ FieldRelations.assertEqualU x y
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
-    addOne (CMulF x y (Right z)) = do
-      modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
+    addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
     addOne (CNEqF x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y, m]) $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
     addOne (CNEqU x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y]) $ addOccurrences (Set.singleton m) $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
-
--- addOne (CRotateU x y _n) = do
---   cs <- get
---   case UIntRelations.relate x (True, y) (csUIntRelations cs) of
---     Nothing -> return ()
---     Just csUIntRelations' -> put cs {csUIntRelations = csUIntRelations'}
 
 -- TODO: remove this
 addOccurrencesUTemp :: [RefU] -> M n ()

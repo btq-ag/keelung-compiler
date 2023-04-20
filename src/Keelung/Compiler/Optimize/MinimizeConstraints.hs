@@ -242,12 +242,17 @@ assign (B var) value = do
   markChanged RelationChanged
   cs <- get
   result <- lift $ lift $ FieldRelations.assignB var (value == 1) (csFieldRelations cs)
-  put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = result}
+  case result of 
+    Nothing -> return ()
+    Just relations -> put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
 assign var value = do
   markChanged RelationChanged
   cs <- get
   result <- lift $ lift $ FieldRelations.assignF var value (csFieldRelations cs)
-  put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = result}
+  case result of 
+    Nothing -> return ()
+    Just relations -> do 
+      put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool

@@ -72,7 +72,8 @@ assign var val = do
   xs <- get
   case runExcept (FieldRelations.assignF var val xs) of
     Left err -> error $ show (err :: Error GF181)
-    Right result -> put result
+    Right Nothing -> return ()
+    Right (Just result) -> put result
 
 relate :: RefT -> (GF181, RefT, GF181) -> M ()
 relate var (slope, val, intercept) = do

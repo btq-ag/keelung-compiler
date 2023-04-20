@@ -135,14 +135,16 @@ relate a (rotation, b) = do
   xs <- get
   case runExcept (UIntRelations.relate a rotation b xs) of
     Left err -> error $ show (err :: Error GF181)
-    Right result -> put result
+    Right Nothing -> return ()
+    Right (Just result) -> put result
 
 assign :: RefU -> GF181 -> M ()
 assign var val = do
   xs <- get
   case runExcept (UIntRelations.assign var val xs) of
     Left err -> error $ show (err :: Error GF181)
-    Right result -> put result
+    Right Nothing -> return ()
+    Right (Just result) -> put result
 
 assertRelation :: RefU -> RefU -> Maybe Int -> M ()
 assertRelation var1 var2 result = do
