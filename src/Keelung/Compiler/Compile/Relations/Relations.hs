@@ -8,6 +8,10 @@ module Keelung.Compiler.Compile.Relations.Relations
     ExecRelation (..),
     Relations,
     VarStatus (..),
+    M,
+    runM,
+    mapError,
+    markChanged,
     new,
     assign,
     relate,
@@ -21,6 +25,7 @@ where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
+import Control.Monad.Writer
 import Data.Field.Galois (Binary, Prime)
 import Data.Map qualified as Map
 import Data.Map.Strict (Map)
@@ -53,6 +58,25 @@ class ExecRelation n rel where
 
   -- | Computes the inverse of a relation
   -- invertRel :: rel -> rel
+
+--------------------------------------------------------------------------------
+
+type M err = WriterT [()] (Except err)
+
+runM :: M err a -> Except err (Maybe a)
+runM xs = do
+  (x, changes) <- runWriterT xs
+  if null changes
+    then return Nothing
+    else return (Just x)
+
+markChanged :: M err ()
+markChanged = tell [()]
+
+mapError :: (err -> err') -> M err a -> M err' a
+mapError f xs = case runExcept (runWriterT xs) of
+  Left err -> throwError (f err)
+  Right (x, changes) -> tell changes >> return x
 
 --------------------------------------------------------------------------------
 
@@ -120,10 +144,12 @@ lookup var (Relations relations) = case Map.lookup var relations of
   Just result -> result
 
 -- | Assigns a value to a variable, O(lg n)
-assign :: (Ord var, IsRelation rel, Eq n, ExecRelation n rel) => var -> n -> Relations var n rel -> Except (n, n) (Relations var n rel)
+assign :: (Ord var, IsRelation rel, Eq n, ExecRelation n rel) => var -> n -> Relations var n rel -> M (n, n) (Relations var n rel)
 assign var value (Relations relations) = case Map.lookup var relations of
   -- The variable is not in the map, so we add it as a constant
-  Nothing -> return $ Relations $ Map.insert var (IsConstant value) relations
+  Nothing -> do
+    markChanged
+    return $ Relations $ Map.insert var (IsConstant value) relations
   -- The variable is already a constant, so we check if the value is the same
   Just (IsConstant oldValue) ->
     if oldValue == value
@@ -132,7 +158,8 @@ assign var value (Relations relations) = case Map.lookup var relations of
   -- The variable is already a root, so we:
   --    1. Make its children constants
   --    2. Make the root itself a constant
-  Just (IsRoot children) ->
+  Just (IsRoot children) -> do
+    markChanged
     return $
       Relations $
         foldl
@@ -153,7 +180,7 @@ assign var value (Relations relations) = case Map.lookup var relations of
     assign root (execRel (invertRel relation) value) (Relations relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: (Seniority var, IsRelation rel, Ord var, Eq n, ExecRelation n rel) => var -> rel -> var -> Relations var n rel -> Except (n, n) (Relations var n rel)
+relate :: (Seniority var, IsRelation rel, Ord var, Eq n, ExecRelation n rel) => var -> rel -> var -> Relations var n rel -> M (n, n) (Relations var n rel)
 relate a relation b relations =
   case compareSeniority a b of
     LT -> relateChildToParent a relation b relations
@@ -169,7 +196,7 @@ relate a relation b relations =
           IsChildOf parent _ -> childrenSizeOf parent
 
 -- | Relates a child to a parent, O(lg n)
-relateChildToParent :: (Ord var, IsRelation rel, Eq n, Seniority var, ExecRelation n rel) => var -> rel -> var -> Relations var n rel -> Except (n, n) (Relations var n rel)
+relateChildToParent :: (Ord var, IsRelation rel, Eq n, Seniority var, ExecRelation n rel) => var -> rel -> var -> Relations var n rel -> M (n, n) (Relations var n rel)
 relateChildToParent child relation parent relations =
   if child == parent
     then return relations
@@ -185,6 +212,7 @@ relateChildToParent child relation parent relations =
         --    * for the child: point the child to the parent and add the relation
         --    * for the grandchildren: point them to the new parent
         IsRoot grandchildren -> do
+          markChanged
           let newSiblings = Map.insert child relation $ Map.map (<> relation) grandchildren
           return $
             Relations $
@@ -211,11 +239,12 @@ relateChildToParent child relation parent relations =
             -- child = relationWithParent parent'
             -- => parent = (invertRel relation <> relationWithParent) parent'
               relate parent (invertRel relation <> relationWithParent) parent' relations
-            else --
-            -- child = relation parent
-            -- child = relationWithParent parent'
-            -- => parent' = (invertRel relationWithParent <> relation) parent
-
+            else do
+              --
+              -- child = relation parent
+              -- child = relationWithParent parent'
+              -- => parent' = (invertRel relationWithParent <> relation) parent
+              markChanged
               relate parent' (invertRel relationWithParent <> relation) parent $
                 Relations $
                   Map.insert child (IsChildOf parent relation) $

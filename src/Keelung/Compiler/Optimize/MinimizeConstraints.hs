@@ -18,6 +18,7 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import qualified Keelung.Compiler.Compile.Relations.Relations as Relations
 
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (ConstraintSystem n)
 run cs = snd <$> optimizeAddF cs
@@ -239,26 +240,27 @@ learnFromAddF poly = case PolyG.view poly of
 
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
-  markChanged RelationChanged
   cs <- get
-  result <- lift $ lift $ FieldRelations.assignB var (value == 1) (csFieldRelations cs)
-  case result of 
-    Nothing -> return ()
-    Just relations -> put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
-assign var value = do
-  markChanged RelationChanged
-  cs <- get
-  result <- lift $ lift $ FieldRelations.assignF var value (csFieldRelations cs)
+  result <- lift $ lift $ Relations.runM $ FieldRelations.assignB var (value == 1) (csFieldRelations cs)
   case result of 
     Nothing -> return ()
     Just relations -> do 
+      markChanged RelationChanged
+      put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
+assign var value = do
+  cs <- get
+  result <- lift $ lift $ Relations.runM $ FieldRelations.assignF var value (csFieldRelations cs)
+  case result of 
+    Nothing -> return ()
+    Just relations -> do 
+      markChanged RelationChanged
       put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cs <- get
-  result <- lift $ lift $ FieldRelations.relateRef var1 (slope, var2, intercept) (csFieldRelations cs)
+  result <- lift $ lift $ Relations.runM $ FieldRelations.relateRef var1 (slope, var2, intercept) (csFieldRelations cs)
   case result of
     Nothing -> return False
     Just unionFind' -> do

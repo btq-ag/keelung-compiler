@@ -3,6 +3,7 @@ module Test.Relations.UInt (tests, run, debug) where
 import Control.Monad.Except
 import Control.Monad.State
 import Keelung.Compiler.Compile.Error
+import Keelung.Compiler.Compile.Relations.Relations qualified as Relations
 import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Compile.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Constraint (RefU (..))
@@ -133,7 +134,7 @@ runM p = evalStateT p UIntRelations.new
 relate :: RefU -> (Int, RefU) -> M ()
 relate a (rotation, b) = do
   xs <- get
-  case runExcept (UIntRelations.relate a rotation b xs) of
+  case runExcept (Relations.runM $ UIntRelations.relate a rotation b xs) of
     Left err -> error $ show (err :: Error GF181)
     Right Nothing -> return ()
     Right (Just result) -> put result
@@ -141,7 +142,7 @@ relate a (rotation, b) = do
 assign :: RefU -> GF181 -> M ()
 assign var val = do
   xs <- get
-  case runExcept (UIntRelations.assign var val xs) of
+  case runExcept (Relations.runM $ UIntRelations.assign var val xs) of
     Left err -> error $ show (err :: Error GF181)
     Right Nothing -> return ()
     Right (Just result) -> put result

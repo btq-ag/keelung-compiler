@@ -9,6 +9,7 @@ import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelat
 import Keelung.Compiler.Constraint
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
+import qualified Keelung.Compiler.Compile.Relations.Relations as Relations
 
 run :: IO ()
 run = hspec tests
@@ -70,7 +71,7 @@ runM p = evalStateT p FieldRelations.new
 assign :: Ref -> GF181 -> M ()
 assign var val = do
   xs <- get
-  case runExcept (FieldRelations.assignF var val xs) of
+  case runExcept (Relations.runM $ FieldRelations.assignF var val xs) of
     Left err -> error $ show (err :: Error GF181)
     Right Nothing -> return ()
     Right (Just result) -> put result
@@ -78,7 +79,7 @@ assign var val = do
 relate :: RefT -> (GF181, RefT, GF181) -> M ()
 relate var (slope, val, intercept) = do
   xs <- get
-  case runExcept (FieldRelations.relateRef (F var) (slope, F val, intercept) xs) of
+  case runExcept (Relations.runM $ FieldRelations.relateRef (F var) (slope, F val, intercept) xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result

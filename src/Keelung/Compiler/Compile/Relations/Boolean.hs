@@ -53,17 +53,17 @@ instance Relations.ExecRelation Bool Polarity where
   execRel (Polarity True) value = value
   execRel (Polarity False) value = not value
 
-liftError :: Except (Bool, Bool) a -> Except (Error n) a
-liftError = withExceptT (uncurry ConflictingValuesB)
+mapError :: Relations.M (Bool, Bool) a -> Relations.M (Error n) a
+mapError = Relations.mapError (uncurry ConflictingValuesB)
 
 new :: BooleanRelations
 new = Relations.new
 
-assign :: RefB -> Bool -> BooleanRelations -> Except (Error n) (Maybe BooleanRelations)
-assign var val xs = liftError $ Just <$> Relations.assign var val xs
+assign :: RefB -> Bool -> BooleanRelations -> Relations.M (Error n) BooleanRelations
+assign var val xs = mapError $ Relations.assign var val xs
 
-relate :: RefB -> Bool -> RefB -> BooleanRelations -> Except (Error n) (Maybe BooleanRelations)
-relate var1 polarity var2 xs = liftError $ Just <$> Relations.relate var1 (Polarity polarity) var2 xs
+relate :: RefB -> Bool -> RefB -> BooleanRelations -> Relations.M (Error n) BooleanRelations
+relate var1 polarity var2 xs = mapError $ Relations.relate var1 (Polarity polarity) var2 xs
 
 relationBetween :: RefB -> RefB -> BooleanRelations -> Maybe Bool
 relationBetween var1 var2 xs = unPolarity <$> Relations.relationBetween var1 var2 xs

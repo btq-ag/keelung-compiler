@@ -25,6 +25,7 @@ import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
+import qualified Keelung.Compiler.Compile.Relations.Relations as Relations
 
 --------------------------------------------------------------------------------
 
@@ -201,10 +202,10 @@ modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
 add :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 add = mapM_ addOne
   where
-    execRelations :: (FieldRelations n -> Except (Compile.Error n) (Maybe (FieldRelations n))) -> M n ()
+    execRelations :: (FieldRelations n -> Relations.M (Compile.Error n) (FieldRelations n)) -> M n ()
     execRelations f = do
       cs <- get
-      result <- lift $ f (csFieldRelations cs)
+      result <- lift $ (Relations.runM . f) (csFieldRelations cs)
       case result of
         Nothing -> return ()
         Just relations -> put cs {csFieldRelations = relations}

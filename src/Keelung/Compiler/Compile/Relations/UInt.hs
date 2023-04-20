@@ -70,18 +70,21 @@ rotationAmount :: Rotation -> Int
 rotationAmount (Rotation _ n) = n
 rotationAmount NoRotation = 0
 
-liftError :: Except (n, n) a -> Except (Error n) a
-liftError = withExceptT (uncurry ConflictingValuesU)
+mapError :: Relations.M (n, n) a -> Relations.M (Error n) a
+mapError = Relations.mapError (uncurry ConflictingValuesU)
 
 new :: UIntRelations n
 new = Relations.new
 
-assign :: (GaloisField n, Integral n) => RefU -> n -> UIntRelations n -> Except (Error n) (Maybe (UIntRelations n))
-assign var val xs = liftError $ Just <$> Relations.assign var val xs
+assign :: (GaloisField n, Integral n) => RefU -> n -> UIntRelations n -> Relations.M (Error n) (UIntRelations n)
+assign var val xs = mapError $ Relations.assign var val xs
 
-relate :: (GaloisField n, Integral n) => RefU -> Int -> RefU -> UIntRelations n -> Except (Error n) (Maybe (UIntRelations n))
-relate var1 0 var2 xs = liftError $ Just <$> Relations.relate var1 NoRotation var2 xs
-relate var1 rotation var2 xs = liftError $ Just <$> Relations.relate var1 (Rotation (widthOf var1) rotation) var2 xs
+relate :: (GaloisField n, Integral n) => RefU -> Int -> RefU -> UIntRelations n -> Relations.M (Error n) (UIntRelations n)
+relate var1 0 var2 xs = mapError $ Relations.relate var1 NoRotation var2 xs
+relate var1 rotation var2 xs = mapError $ Relations.relate var1 (Rotation (widthOf var1) rotation) var2 xs
+
+assertEqual :: (GaloisField n, Integral n) => RefU -> RefU -> UIntRelations n -> Relations.M (Error n) (UIntRelations n)
+assertEqual var1 = relate var1 0
 
 relationBetween :: RefU -> RefU -> UIntRelations n -> Maybe Int
 relationBetween var1 var2 xs = case Relations.relationBetween var1 var2 xs of
@@ -116,6 +119,3 @@ lookup' var xs = case Relations.lookup var xs of
   Relations.IsRoot children -> Relations.IsRoot $ fmap rotationAmount children
   Relations.IsConstant val -> Relations.IsConstant val
   Relations.IsChildOf parent rotation -> Relations.IsChildOf parent (rotationAmount rotation)
-
-assertEqual :: (GaloisField n, Integral n) => RefU -> RefU -> UIntRelations n -> Except (Error n) (Maybe (UIntRelations n))
-assertEqual var1 = relate var1 0
