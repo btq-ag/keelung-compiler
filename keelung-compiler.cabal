@@ -33,6 +33,7 @@ library
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UIntRelations
+      Keelung.Compiler.Compile.Relations.UIntRelations2
       Keelung.Compiler.Compile.Relations.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
@@ -97,6 +98,7 @@ executable keelungc
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UIntRelations
+      Keelung.Compiler.Compile.Relations.UIntRelations2
       Keelung.Compiler.Compile.Relations.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
@@ -176,6 +178,7 @@ test-suite keelung-test
       Test.OptimizationOld
       Test.PolyG
       Test.UIntRelations
+      Test.UIntRelations2
       Test.VarLayout
       Test.WitnessGeneration
       Keelung.Compiler
@@ -186,6 +189,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UIntRelations
+      Keelung.Compiler.Compile.Relations.UIntRelations2
       Keelung.Compiler.Compile.Relations.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem

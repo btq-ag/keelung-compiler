@@ -37,14 +37,15 @@ instance Semigroup Polarity where
 instance Monoid Polarity where
   mempty = Polarity True
 
-instance Relations.IsRelation RefB Bool Polarity where
-  relationToString (var, Polarity True) = show var
-  relationToString (var, Polarity False) = "¬" <> show var
-
-  execRel (Polarity True) value = value
-  execRel (Polarity False) value = not value
+instance Relations.IsRelation Polarity where
+  relationToString (var, Polarity True) = var
+  relationToString (var, Polarity False) = "¬" <> var
 
   invertRel (Polarity x) = Polarity x
+
+instance Relations.ExecRelation Bool Polarity where
+  execRel (Polarity True) value = value
+  execRel (Polarity False) value = not value
 
 liftError :: Except (Bool, Bool) a -> Except (Error n) a
 liftError = withExceptT (uncurry ConflictingValuesB)
@@ -73,12 +74,6 @@ size = Map.size . Relations.toMap
 
 isValid :: BooleanRelations -> Bool
 isValid = Relations.isValid
-
--- lookup :: RefB -> BooleanRelations -> Relations.VarStatus RefB Bool Bool
--- lookup var xs = case Relations.lookup var xs of
---   Relations.IsRoot children -> Relations.IsRoot (fmap unPolarity children)
---   Relations.IsConstant val -> Relations.IsConstant val
---   Relations.IsChildOf parent (Polarity polarity) -> Relations.IsChildOf parent polarity
 
 -- | Result of looking up a variable in the BooleanRelations
 data Lookup = Root | Value Bool | ChildOf Bool RefB
