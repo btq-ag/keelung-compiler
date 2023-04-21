@@ -35,6 +35,7 @@ import Keelung.Compiler.Compile.Relations.Relations qualified as Relations
 import Keelung.Compiler.Compile.Relations.UInt qualified as Relations.UInt
 import Keelung.Compiler.Constraint
 import Prelude hiding (lookup)
+import Keelung (N(N))
 
 type FieldRelations n = Relations.Relations Ref n (LinRel n)
 
@@ -43,6 +44,9 @@ data AllRelations n = AllRelations
     relationsB :: Relations.Boolean.BooleanRelations,
     relationsU :: Relations.UInt.UIntRelations n
   }
+
+instance (GaloisField n, Integral n) => Show (AllRelations n) where
+  show (AllRelations f b u) = show f <> show b <> show u
 
 mapError :: Relations.M (n, n) a -> Relations.M (Error n) a
 mapError = Relations.mapError (uncurry ConflictingValuesU)
@@ -101,7 +105,7 @@ relateRefs x slope y intercept xs =
     (U refA, U refB, 1, 0) -> assertEqualU refA refB xs
     (B refA, B refB, -1, 1) -> relateB refA (False, refB) xs
     (F refA, F refB, _, _) -> relate (F refA) slope (F refB) intercept xs
-    (F refA, B refB, _, _) -> 
+    (F refA, B refB, _, _) ->
       composeLookup
         xs
         (F refA)
@@ -119,7 +123,7 @@ relateRefs x slope y intercept xs =
         intercept
         (Relations.lookup (F refA) (relationsF xs))
         (fromUIntLookup (Relations.UInt.lookup' refB (relationsU xs)))
-    (B refA, F refB, _, _) -> 
+    (B refA, F refB, _, _) ->
       composeLookup
         xs
         (F refB)
@@ -128,7 +132,7 @@ relateRefs x slope y intercept xs =
         (-intercept / slope)
         (Relations.lookup (F refB) (relationsF xs))
         (fromBooleanLookup (Relations.Boolean.lookup' refA (relationsB xs)))
-    (B refA, B refB, _, _) -> 
+    (B refA, B refB, _, _) ->
       composeLookup
         xs
         (B refA)
@@ -137,7 +141,7 @@ relateRefs x slope y intercept xs =
         intercept
         (fromBooleanLookup (Relations.Boolean.lookup' refA (relationsB xs)))
         (fromBooleanLookup (Relations.Boolean.lookup' refB (relationsB xs)))
-    (B refA, U refB, _, _) -> 
+    (B refA, U refB, _, _) ->
       composeLookup
         xs
         (B refA)
@@ -146,7 +150,7 @@ relateRefs x slope y intercept xs =
         intercept
         (fromBooleanLookup (Relations.Boolean.lookup' refA (relationsB xs)))
         (fromUIntLookup (Relations.UInt.lookup' refB (relationsU xs)))
-    (U refA, F refB, _, _) -> 
+    (U refA, F refB, _, _) ->
       composeLookup
         xs
         (F refB)
@@ -155,7 +159,7 @@ relateRefs x slope y intercept xs =
         (-intercept / slope)
         (Relations.lookup (F refB) (relationsF xs))
         (fromUIntLookup (Relations.UInt.lookup' refA (relationsU xs)))
-    (U refA, B refB, _, _) -> 
+    (U refA, B refB, _, _) ->
       composeLookup
         xs
         (U refA)
@@ -164,7 +168,7 @@ relateRefs x slope y intercept xs =
         (-intercept / slope)
         (fromBooleanLookup (Relations.Boolean.lookup' refB (relationsB xs)))
         (fromUIntLookup (Relations.UInt.lookup' refA (relationsU xs)))
-    (U refA, U refB, _, _) -> 
+    (U refA, U refB, _, _) ->
       composeLookup
         xs
         (U refA)
@@ -180,7 +184,7 @@ assertEqual var1 var2 = relate var1 1 var2 0
 assertEqualU :: (GaloisField n, Integral n) => RefU -> RefU -> AllRelations n -> Relations.M (Error n) (AllRelations n)
 assertEqualU var1 var2 = updateRelationsU $ Relations.UInt.assertEqual var1 var2
 
-relationBetween :: (Eq n, Fractional n, Show n) => Ref -> Ref -> AllRelations n -> Maybe (n, n)
+relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> AllRelations n -> Maybe (n, n)
 relationBetween var1 var2 xs = case Relations.relationBetween var1 var2 (relationsF xs) of
   Nothing -> Nothing
   Just (LinRel a b) -> Just (a, b)
@@ -195,7 +199,7 @@ toIntMap xs = Map.mapMaybe convert $ Relations.toMap (relationsF xs)
 size :: AllRelations n -> Int
 size = Map.size . Relations.toMap . relationsF
 
-isValid :: (Eq n, Fractional n, Show n) => AllRelations n -> Bool
+isValid :: (GaloisField n, Integral n) => AllRelations n -> Bool
 isValid = Relations.isValid . relationsF
 
 --------------------------------------------------------------------------------
@@ -238,15 +242,15 @@ instance Num n => Semigroup (LinRel n) where
 instance Num n => Monoid (LinRel n) where
   mempty = LinRel 1 0
 
-instance (Num n, Eq n, Show n, Fractional n) => Relations.IsRelation (LinRel n) where
+instance (GaloisField n, Integral n) => Relations.IsRelation (LinRel n) where
   relationToString (var, LinRel a b) =
     let slope = case a of
           1 -> var
           (-1) -> "-" <> var
-          _ -> show a <> var
+          _ -> show (N a) <> var
         intercept = case b of
           0 -> ""
-          _ -> " + " <> show b
+          _ -> " + " <> show (N b)
      in slope <> intercept
 
   -- x = ay + b

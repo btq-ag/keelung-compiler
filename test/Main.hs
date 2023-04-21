@@ -22,6 +22,7 @@ import Test.Optimization qualified as Optimization
 import Test.OptimizationOld qualified as OptimizationOld
 import Test.Relations.Boolean qualified as Relations.Boolean
 import Test.Relations.Field qualified as Relations.Field
+import Test.Relations.Field2 qualified as Relations.Field2
 import Test.Relations.UInt qualified as Relations.UInt
 import Test.VarLayout qualified as VarBookkeep
 import Test.WitnessGeneration qualified as WitnessGeneration
@@ -41,6 +42,7 @@ main = hspec $ do
   describe "Variable Bookkeeping" VarBookkeep.tests
 
   describe "Field Relations" Relations.Field.tests
+  describe "Field Relations" Relations.Field2.tests
 
   describe "Boolean Relations" Relations.Boolean.tests
 
