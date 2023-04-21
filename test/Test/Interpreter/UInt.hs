@@ -210,7 +210,7 @@ tests = do
         runAllExceptForTheOldOptimizer program [34, 6 :: GF181] [] [5, 4]
 
     describe "Range Check" $ do
-      it "assertLTE (< 4)" $ do
+      it "assertLTE (≤ 3)" $ do
         let program = do
               x <- inputUInt @3 Public
               assertLTE x 3
@@ -243,7 +243,7 @@ tests = do
           (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError 7 3))
           (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 1 (-1) 0)))
 
-      it "assertLTE (< 5)" $ do
+      it "assertLTE (≤ 4)" $ do
         let program = do
               x <- inputUInt @3 Public
               assertLTE x 4
@@ -279,6 +279,48 @@ tests = do
           when (x >= 0 && x < 256 && b >= 0 && b < 256 && x <= b) $ do
             runAll (program b) [fromInteger x :: GF181] [] []
             runAll (program b) [fromInteger b :: GF181] [] []
+
+      it "assertLT (< 4)" $ do
+        let bound = 4
+        let program = do
+              x <- inputUInt @3 Public
+              assertLT x bound
+        runAllExceptForTheOldOptimizer program [0 :: GF181] [] []
+        runAllExceptForTheOldOptimizer program [1 :: GF181] [] []
+        runAllExceptForTheOldOptimizer program [2 :: GF181] [] []
+        runAllExceptForTheOldOptimizer program [3 :: GF181] [] []
+        throwAll
+          program
+          [4 :: GF181]
+          []
+          (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTError 4 bound))
+          (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 1 (-1) 0)))
+        throwAll
+          program
+          [5 :: GF181]
+          []
+          (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTError 5 bound))
+          (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 1 (-1) 0)))
+        throwAll
+          program
+          [6 :: GF181]
+          []
+          (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTError 6 bound))
+          (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 1 (-1) 0)))
+        throwAll
+          program
+          [7 :: GF181]
+          []
+          (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTError 7 bound))
+          (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError 1 (-1) 0)))
+
+      it "assertLT (QuickCheck)" $ do
+        let program bound = do
+              x <- inputUInt @8 Public
+              assertLT x bound
+        property $ \(x, b) -> do
+          when (x >= 0 && x < 256 && b >= 0 && b < 256 && x < b) $ do
+            runAll (program b) [fromInteger x :: GF181] [] []
 
     describe "Conditionals" $ do
       it "with inputs" $ do

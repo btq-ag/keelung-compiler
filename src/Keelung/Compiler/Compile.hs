@@ -57,7 +57,7 @@ compileSideEffect (AssignmentF2 var val) = compileExprF (RefFX var) val
 compileSideEffect (AssignmentU2 width var val) = compileExprU (RefUX width var) val
 compileSideEffect (DivMod width dividend divisor quotient remainder) = compileDivModU width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = assertLTE width value bound
-compileSideEffect (AssertLT _ _ _) = return ()
+compileSideEffect (AssertLT width value bound) = assertLT width value bound
 compileSideEffect (AssertGTE _ _ _) = return ()
 compileSideEffect (AssertGT _ _ _) = return ()
 
@@ -1041,7 +1041,7 @@ assertLTE width a c = do
        in -- have not found the first bit in 'c' that is 1 yet
           if Data.Bits.testBit c i
             then do
-              return $ Just (B aBit) -- when found, return a[i] and a counter
+              return $ Just (B aBit) -- when found, return a[i]
             else do
               -- a[i] = 0
               add $ cVarBindB aBit 0
@@ -1051,56 +1051,18 @@ assertLTE width a c = do
        in if Data.Bits.testBit c i
             then do
               -- constraint for the next accumulator
+              -- acc * a[i] = acc' 
               acc' <- freshRefF
               add $ cMulF (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(F acc', 1)])
               return $ Just (F acc')
             else do
               -- constraint on a[i]
+              -- (1 - acc - a[i]) * a[i] = 0
               add $ cMulF (1, [(acc, -1), (aBit, -1)]) (0, [(aBit, 1)]) (0, [])
               -- pass down the accumulator
               return $ Just acc
 
 
--- | Assert that a UInt is greater than or equal to some constant
-assertGTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
-assertGTE width a c = do
-  ref <- wireU a
-  -- because we don't have to execute the `go` function for trailing ones of `c`
-  -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
-  foldM_ (go ref) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
-  where
-    -- for counting the number of trailing ones of `c`
-    countTrailingOnes :: Int
-    countTrailingOnes =
-      fst $
-        foldl
-          ( \(count, keepCounting) i ->
-              if keepCounting && Data.Bits.testBit c i then (count + 1, True) else (count, False)
-          )
-          (0, True)
-          [0 .. width - 1]
-
-    go :: (GaloisField n, Integral n) => RefU -> Maybe Ref -> Int -> M n (Maybe Ref)
-    go ref Nothing i =
-      let aBit = RefUBit width ref i
-       in -- have not found the first bit in 'c' that is 1 yet
-          if Data.Bits.testBit c i
-            then do
-              return $ Just (B aBit) -- when found, return a[i] and a counter
-            else do
-              -- a[i] = 0
-              add $ cVarBindB aBit 0
-              return Nothing -- otherwise, continue searching
-    go ref (Just acc) i =
-      let aBit = B (RefUBit width ref i)
-       in if Data.Bits.testBit c i
-            then do
-              -- constraint for the next accumulator
-              acc' <- freshRefF
-              add $ cMulF (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(F acc', 1)])
-              return $ Just (F acc')
-            else do
-              -- constraint on a[i]
-              add $ cMulF (1, [(acc, -1), (aBit, -1)]) (0, [(aBit, 1)]) (0, [])
-              -- pass down the accumulator
-              return $ Just acc
+-- | Assert that a UInt is lesser than some constant
+assertLT :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
+assertLT width a c = assertLTE width a (c - 1)
