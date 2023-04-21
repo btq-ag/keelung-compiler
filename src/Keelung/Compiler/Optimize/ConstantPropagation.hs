@@ -55,6 +55,9 @@ propagateSideEffect sideEffect = case sideEffect of
       <*> propagateExprU quotient
       <*> propagateExprU remainder
   AssertLTE width expr n -> AssertLTE width <$> propagateExprU expr <*> pure n
+  AssertLT width expr n -> AssertLT width <$> propagateExprU expr <*> pure n
+  AssertGTE width expr n -> AssertGTE width <$> propagateExprU expr <*> pure n
+  AssertGT width expr n -> AssertGT width <$> propagateExprU expr <*> pure n
 
 -- constant propogation
 propagateExpr :: (GaloisField n, Integral n) => Expr n -> M n (Expr n)

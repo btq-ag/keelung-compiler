@@ -140,6 +140,27 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
         when (v > fromInteger bound) $ throwError $ AssertLTEError v bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
+  interpret (AssertLT _ value bound) = do
+    value' <- interpret value
+    case value' of
+      [v] -> do
+        when (v >= fromInteger bound) $ throwError $ AssertLTError v bound
+        return []
+      _ -> throwError $ ResultSizeError 1 (length value')
+  interpret (AssertGTE _ value bound) = do
+    value' <- interpret value
+    case value' of
+      [v] -> do
+        when (v < fromInteger bound) $ throwError $ AssertGTEError v bound
+        return []
+      _ -> throwError $ ResultSizeError 1 (length value')
+  interpret (AssertGT _ value bound) = do
+    value' <- interpret value
+    case value' of
+      [v] -> do
+        when (v <= fromInteger bound) $ throwError $ AssertGTError v bound
+        return []
+      _ -> throwError $ ResultSizeError 1 (length value')
 
 instance GaloisField n => Interpret Bool n where
   interpret True = return [one]
@@ -293,6 +314,9 @@ instance FreeVar SideEffect where
   freeVars (AssignmentU width var uint) = modifyX (modifyU width mempty (IntSet.insert var)) (freeVars uint)
   freeVars (DivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
   freeVars (AssertLTE _width x _) = freeVars x
+  freeVars (AssertLT _width x _) = freeVars x
+  freeVars (AssertGTE _width x _) = freeVars x
+  freeVars (AssertGT _width x _) = freeVars x
 
 instance FreeVar Boolean where
   freeVars expr = case expr of

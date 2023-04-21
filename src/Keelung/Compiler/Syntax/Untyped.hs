@@ -265,6 +265,9 @@ data SideEffect n
   | AssignmentU2 Width Var (ExprU n)
   | DivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
   | AssertLTE Width (ExprU n) Integer
+  | AssertLT Width (ExprU n) Integer
+  | AssertGTE Width (ExprU n) Integer
+  | AssertGT Width (ExprU n) Integer
   deriving (Show, Eq)
 
 --------------------------------------------------------------------------------

@@ -150,6 +150,9 @@ data Error n
   | DivModRemainderError n n n n
   | DivModStuckError [Var]
   | AssertLTEError n Integer
+  | AssertLTError n Integer
+  | AssertGTEError n Integer
+  | AssertGTError n Integer
   | ModInvError Integer Integer
   deriving (Eq, Generic, NFData)
 
@@ -179,6 +182,12 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> show msg
       <> " are not known "
   show (AssertLTEError actual bound) =
-    "`" <> show (N actual) <> "` is not less than or equal to `" <> show bound <> "`"
+    "`" <> show (N actual) <> "` is not lesser than or equal to `" <> show bound <> "`"
+  show (AssertLTError actual bound) =
+    "`" <> show (N actual) <> "` is not lesser than `" <> show bound <> "`"
+  show (AssertGTEError actual bound) =
+    "`" <> show (N actual) <> "` is not greater than or equal to `" <> show bound <> "`"
+  show (AssertGTError actual bound) =
+    "`" <> show (N actual) <> "` is not greater than `" <> show bound <> "`"
   show (ModInvError a m) =
     "no modular inverse of `" <> show a <> " (mod " <> show m <> ")`"

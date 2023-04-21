@@ -23,26 +23,6 @@ import Test.Hspec
 compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
 compileO0 program = Compiler.erase program >>= Compiler.run True . ConstantPropagation.run
 
-runTest :: Encode t => Int -> Int -> Comp t -> IO (ConstraintSystem (N GF181))
-runTest expectedBeforeSize expectedAfterSize program = do
-  cs <- case Compiler.asGF181N $ compileO0 program of
-    Left err -> assertFailure $ show err
-    Right result -> return result
-
-  case Optimizer.optimizeNew cs of
-    Left err -> assertFailure $ show err
-    Right cs' -> do
-      -- var counters should remain the same
-      csCounters cs `shouldBe` csCounters cs'
-
-      -- compare the number of constraints
-      let actualBeforeSize = Relocated.numberOfConstraints (relocateConstraintSystem cs)
-      actualBeforeSize `shouldBe` expectedBeforeSize
-      let actualAfterSize = Relocated.numberOfConstraints (relocateConstraintSystem cs')
-      actualAfterSize `shouldBe` expectedAfterSize
-
-      return cs'
-
 -- | Returns the original and optimized constraint system
 execute :: Encode t => Comp t -> IO (ConstraintSystem (N GF181), ConstraintSystem (N GF181))
 execute program = do

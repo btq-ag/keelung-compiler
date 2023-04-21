@@ -61,6 +61,9 @@ eraseSideEffect (T.AssignmentB var val) = AssignmentB2 var <$> eraseExprB val
 eraseSideEffect (T.AssignmentU width var val) = AssignmentU2 width var <$> eraseExprU val
 eraseSideEffect (T.DivMod width dividend divisor quotient remainder) = DivMod width <$> eraseExprU dividend <*> eraseExprU divisor <*> eraseExprU quotient <*> eraseExprU remainder
 eraseSideEffect (T.AssertLTE width val bound) = AssertLTE width <$> eraseExprU val <*> pure bound
+eraseSideEffect (T.AssertLT width val bound) = AssertLT width <$> eraseExprU val <*> pure bound
+eraseSideEffect (T.AssertGTE width val bound) = AssertGTE width <$> eraseExprU val <*> pure bound
+eraseSideEffect (T.AssertGT width val bound) = AssertGT width <$> eraseExprU val <*> pure bound
 
 --------------------------------------------------------------------------------
 
