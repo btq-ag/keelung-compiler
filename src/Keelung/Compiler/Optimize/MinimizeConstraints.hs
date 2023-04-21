@@ -12,8 +12,8 @@ import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
-import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
+import Keelung.Compiler.Compile.Relations.Field (AllRelations)
+import Keelung.Compiler.Compile.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Data.PolyG (PolyG)
@@ -260,7 +260,7 @@ assign var value = do
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cs <- get
-  result <- lift $ lift $ Relations.runM $ FieldRelations.relateRef var1 (slope, var2, intercept) (csFieldRelations cs)
+  result <- lift $ lift $ Relations.runM $ FieldRelations.relateRefs var1 slope var2 intercept (csFieldRelations cs)
   case result of
     Nothing -> return False
     Just unionFind' -> do
@@ -290,7 +290,7 @@ addAddF poly = case PolyG.view poly of
 
 -- | Substitutes variables in a polynomial.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n) => FieldRelations n -> BooleanRelations -> PolyG Ref n -> Maybe (Either n (PolyG Ref n), Set Ref, Set Ref)
+substPolyG :: (GaloisField n, Integral n) => AllRelations n -> BooleanRelations -> PolyG Ref n -> Maybe (Either n (PolyG Ref n), Set Ref, Set Ref)
 substPolyG ctx boolRels poly = do
   let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' (substPolyG_ ctx boolRels) (False, Left c, mempty, mempty) xs of
@@ -298,9 +298,9 @@ substPolyG ctx boolRels poly = do
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyG.vars poly)
 
-substPolyG_ :: (Integral n, GaloisField n) => FieldRelations n -> BooleanRelations -> (Bool, Either n (PolyG Ref n), Set Ref, Set Ref) -> Ref -> n -> (Bool, Either n (PolyG Ref n), Set Ref, Set Ref)
+substPolyG_ :: (Integral n, GaloisField n) => AllRelations n -> BooleanRelations -> (Bool, Either n (PolyG Ref n), Set Ref, Set Ref) -> Ref -> n -> (Bool, Either n (PolyG Ref n), Set Ref, Set Ref)
 substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case FieldRelations.lookup ref ctx of
-  FieldRelations.IsRoot _ -> case ref of
+  FieldRelations.Root -> case ref of
     B refB ->
       case BooleanRelations.lookup refB boolRels of
         BooleanRelations.Root ->
@@ -336,13 +336,13 @@ substPolyG_ ctx boolRels (changed, accPoly, removedRefs, addedRefs) ref coeff = 
       case accPoly of
         Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
         Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
-  FieldRelations.HasValue intercept ->
+  FieldRelations.Value intercept ->
     -- ref = intercept
     let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
      in case accPoly of
           Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
           Right accPoly' -> (True, Right $ PolyG.addConstant (intercept * coeff) accPoly', removedRefs', addedRefs)
-  FieldRelations.IsChildOf slope root intercept ->
+  FieldRelations.ChildOf slope root intercept ->
     if root == ref
       then
         if slope == 1 && intercept == 0

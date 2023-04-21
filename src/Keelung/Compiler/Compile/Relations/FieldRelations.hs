@@ -9,7 +9,7 @@ module Keelung.Compiler.Compile.Relations.FieldRelations
     relationBetween,
     new,
     lookup,
-    relateRef,
+    relateRefs,
     assignF,
     assignU,
     assignB,
@@ -211,8 +211,8 @@ assignF x value xs =
                 sizes = Map.insert x 1 (sizes xs)
               }
 
-relateRef :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> FieldRelations n -> Relations.M (Error n) (FieldRelations n)
-relateRef x (slope, y, intercept) xs = do
+relateRefs :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> FieldRelations n -> Relations.M (Error n) (FieldRelations n)
+relateRefs x (slope, y, intercept) xs = do
   case (x, y, slope, intercept) of
     (B refB, _, 0, value) -> assignB refB (value == 1) xs
     (U refU, _, 0, value) -> assignU refU value xs
@@ -261,7 +261,7 @@ relateRefF' x (slope, y, intercept) xs =
       --  slopeX * rootOfX = slope * y + intercept - interceptX
       -- =>
       --  rootOfX = (slope * y + intercept - interceptX) / slopeX
-      relateRef rootOfX (slope / slopeX, y, intercept - interceptX / slopeX) xs
+      relateRefs rootOfX (slope / slopeX, y, intercept - interceptX / slopeX) xs
     IsRoot _ ->
       -- x does not have a parent, so it is its own root
       case lookup y xs of

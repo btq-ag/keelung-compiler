@@ -16,8 +16,8 @@ import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
-import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
-import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
+import Keelung.Compiler.Compile.Relations.Field (AllRelations)
+import Keelung.Compiler.Compile.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
@@ -202,7 +202,7 @@ modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
 add :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 add = mapM_ addOne
   where
-    execRelations :: (FieldRelations n -> Relations.M (Compile.Error n) (FieldRelations n)) -> M n ()
+    execRelations :: (AllRelations n -> Relations.M (Compile.Error n) (AllRelations n)) -> M n ()
     execRelations f = do
       cs <- get
       result <- lift $ (Relations.runM . f) (csFieldRelations cs)
@@ -215,8 +215,8 @@ add = mapM_ addOne
     addOne (CVarBindF x c) = execRelations $ FieldRelations.assignF x c
     addOne (CVarBindB x c) = execRelations $ FieldRelations.assignB x (c == 1)
     addOne (CVarBindU x c) = execRelations $ FieldRelations.assignU x c
-    addOne (CVarEq x y) = execRelations $ FieldRelations.relateRef x (1, y, 0)
-    addOne (CVarEqF x y) = execRelations $ FieldRelations.relateRef (F x) (1, F y, 0)
+    addOne (CVarEq x y) = execRelations $ FieldRelations.relateRefs x 1 y 0
+    addOne (CVarEqF x y) = execRelations $ FieldRelations.relateRefs (F x) 1 (F y) 0
     addOne (CVarEqB x y) = execRelations $ FieldRelations.relateB x (True, y)
     addOne (CVarNEqB x y) = execRelations $ FieldRelations.relateB x (False, y)
     addOne (CVarEqU x y) = execRelations $ FieldRelations.assertEqualU x y

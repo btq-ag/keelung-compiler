@@ -27,8 +27,8 @@ import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
-import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
+import Keelung.Compiler.Compile.Relations.Field (AllRelations)
+import Keelung.Compiler.Compile.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Compile.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Constraint
@@ -53,7 +53,7 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceB :: !(Map RefB Int),
     csOccurrenceU :: !(Map RefU Int),
     -- when x == y (FieldRelations)
-    csFieldRelations :: FieldRelations n,
+    csFieldRelations :: AllRelations n,
     -- csUIntRelations :: UIntRelations n,
     -- addative constraints
     csAddF :: [PolyG Ref n],
@@ -289,7 +289,7 @@ relocateConstraintSystem cs =
               binRepOffset = reindex counters sort (OfUIntBinRep width) 0
            in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
 
-    fromFieldRelations :: (GaloisField n, Integral n) => FieldRelations n -> UIntRelations n -> Map Ref Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    fromFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> UIntRelations n -> Map Ref Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
     fromFieldRelations fieldRels _uintRels occurrencesF occurrencesB occurrencesU =
       let outputVars = [F $ RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
           publicInputVars = [F $ RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
@@ -319,13 +319,13 @@ relocateConstraintSystem cs =
         boolRels = FieldRelations.exportBooleanRelations fieldRels
 
         toConstraint var = case FieldRelations.lookup var fieldRels of
-          FieldRelations.IsRoot _ ->
+          FieldRelations.Root ->
             -- var is already a root
             Nothing
-          FieldRelations.HasValue intercept ->
+          FieldRelations.Value intercept ->
             -- var = intercept
             Just $ fromConstraint counters $ CVarBindF var intercept
-          FieldRelations.IsChildOf slope root intercept ->
+          FieldRelations.ChildOf slope root intercept ->
             -- var = slope * root + intercept
             case root of
               B refB -> case BooleanRelations.lookup refB boolRels of
@@ -395,7 +395,7 @@ relocateConstraintSystem cs =
           result = Maybe.mapMaybe convert $ Map.toList $ BooleanRelations.toIntMap relations
        in Seq.fromList (map (fromConstraint counters) result)
 
-    fromUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> FieldRelations n -> BooleanRelations -> Map Ref Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
+    fromUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> AllRelations n -> BooleanRelations -> Map Ref Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
     fromUIntRelations uintRels _fieldRels _boolRels occurrencesF _occurrencesB _occurrencesU =
       let bitWidths = IntSet.toList $ IntMap.keysSet (structU (countOutput counters)) <> IntMap.keysSet (structU (countPublicInput counters)) <> IntMap.keysSet (structU (countPrivateInput counters)) <> IntMap.keysSet (structU (countIntermediate counters))
           outputVars = [RefUO w i | w <- bitWidths, i <- [0 .. getCount OfOutput (OfUInt w) counters - 1]]

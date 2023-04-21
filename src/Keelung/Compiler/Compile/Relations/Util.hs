@@ -29,4 +29,7 @@ instance Seniority RefT where
   compareSeniority _ _ = EQ
 
 instance Seniority Ref where
+  compareSeniority (F x) (F y) = compareSeniority x y
+  compareSeniority (B x) (B y) = compareSeniority x y
+  compareSeniority (U x) (U y) = compareSeniority x y
   compareSeniority _ _ = EQ

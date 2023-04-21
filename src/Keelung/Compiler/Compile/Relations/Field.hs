@@ -10,6 +10,7 @@ module Keelung.Compiler.Compile.Relations.Field
     assignF,
     assignB,
     assignU,
+    relateB,
     relateRefs,
     assertEqual,
     assertEqualU,
@@ -20,6 +21,8 @@ module Keelung.Compiler.Compile.Relations.Field
     lookup,
     lookup',
     Lookup (..),
+    exportBooleanRelations,
+    exportUIntRelations,
   )
 where
 
@@ -44,12 +47,13 @@ data AllRelations n = AllRelations
     relationsB :: Relations.Boolean.BooleanRelations,
     relationsU :: Relations.UInt.UIntRelations n
   }
+  deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (AllRelations n) where
   show (AllRelations f b u) = show f <> show b <> show u
 
 mapError :: Relations.M (n, n) a -> Relations.M (Error n) a
-mapError = Relations.mapError (uncurry ConflictingValuesU)
+mapError = Relations.mapError (uncurry ConflictingValuesF)
 
 updateRelationsF ::
   (FieldRelations n -> Relations.M (n, n) (FieldRelations n)) ->
@@ -341,3 +345,9 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     -- =>
     -- rootA = (slope * slopeB * rootB + slope * interceptB + intercept - interceptA) / slopeA
     relate rootA (slope * slopeB / slopeA) rootB ((slope * interceptB + intercept - interceptA) / slopeA) xs
+
+exportBooleanRelations :: AllRelations n -> Relations.Boolean.BooleanRelations
+exportBooleanRelations = relationsB
+
+exportUIntRelations :: AllRelations n -> Relations.UInt.UIntRelations n
+exportUIntRelations = relationsU

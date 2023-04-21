@@ -79,7 +79,7 @@ assign var val = do
 relate :: RefT -> (GF181, RefT, GF181) -> M ()
 relate var (slope, val, intercept) = do
   xs <- get
-  case runExcept (Relations.runM $ FieldRelations.relateRef (F var) (slope, F val, intercept) xs) of
+  case runExcept (Relations.runM $ FieldRelations.relateRefs (F var) (slope, F val, intercept) xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result
