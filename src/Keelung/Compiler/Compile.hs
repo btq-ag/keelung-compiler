@@ -18,6 +18,7 @@ import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Relations.Field (AllRelations)
 import Keelung.Compiler.Compile.Relations.Field qualified as FieldRelations
+import Keelung.Compiler.Compile.Relations.Relations qualified as Relations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
@@ -25,7 +26,6 @@ import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
-import qualified Keelung.Compiler.Compile.Relations.Relations as Relations
 
 --------------------------------------------------------------------------------
 
@@ -58,9 +58,8 @@ compileSideEffect (AssignmentU2 width var val) = compileExprU (RefUX width var) 
 compileSideEffect (DivMod width dividend divisor quotient remainder) = compileDivModU width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = assertLTE width value bound
 compileSideEffect (AssertLT width value bound) = assertLT width value bound
-compileSideEffect (AssertGTE _ _ _) = return ()
-compileSideEffect (AssertGT _ _ _) = return ()
-
+compileSideEffect (AssertGTE width value bound) = assertGTE width value bound
+compileSideEffect (AssertGT width value bound) = assertGT width value bound
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
@@ -933,60 +932,6 @@ assertLTU width x y = do
   compileSubU width difference' y x
   assertNotZeroU width difference
 
--- -- | Assert that the BinRep of a UInt is non-zero
--- assertBinRepNonZeroU :: (GaloisField n, Integral n) => Width -> ExprU n -> M n ()
--- assertBinRepNonZeroU width x
---   | width < 1 = error "[ panic ] assertBinRepNonZeroU: width of a UInt must be at least 1"
---   | width == 1 = do
---       --    x != 0
---       --  =>
---       --    x == 1
---       --  =>
---       --    x[0] == 1
---       assertExprB True (BitU x 0)
---   | width == 2 = do
---       --    x != 0
---       --  =>
---       --    x[0] ∨ x[1] == 1
---       --  =>
---       --    (1 - x[0]) * x[1] = (1 - x[0])
---       assertOrB (ValB 1) (BitU x 0) (BitU x 1)
---   | width == 3 = do
---       --    x != 0
---       --  =>
---       --    x[0] + x[1] + ... + x[n] != 0
---       --  =>
---       --    (1 - x[0]) * x[1] = (1 - x[0])
---       --    (1 - x[0]) * x[2] = (1 - x[0])
---       return ()
-
---  = case compare width 1 of
---   LT -> error "[ panic ] assertBinRepNonZeroU: width of a UInt must be at least 1"
---   EQ -> do
---       --    divisor != 0
---       --  =>
---       --    divisor == 1
---       --  =>
---       --    divisor[0] == 1
---       add [CVarBindB (RefUBit width divisor 0) 1]
---   GT -> do
-
---         -- more than 3 operands, rewrite it as an inequality instead:
---         --      if all operands are 0           then 0 else 1
---         --  =>  if the sum of operands is 0     then 0 else 1
---         --  =>  if the sum of operands is not 0 then 1 else 0
---         --  =>  the sum of operands is not 0
-
---   one <- freshRefUX width
---   compileSubU width one x (ValU width 1)
---   GT -> do
---     --    divisor != 0
---     --  =>
---     --    conjunction of all bits of divisor = 1
---     compileOrBs
---     -- add $ cGeqB (0, [(divisor, 1)]) (0, [(RefUtoRefB quotient, 2)])
--- -- compileOrBs
-
 -- | Division with remainder on UInts
 --    1. dividend = divisor * quotient + remainder
 --    2. 0 ≤ remainder < divisor
@@ -1051,18 +996,61 @@ assertLTE width a c = do
        in if Data.Bits.testBit c i
             then do
               -- constraint for the next accumulator
-              -- acc * a[i] = acc' 
+              -- acc * a[i] = acc'
+              -- such that if a[i] = 1
+              --    then acc' = acc
+              --    else acc' = 0
               acc' <- freshRefF
               add $ cMulF (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(F acc', 1)])
               return $ Just (F acc')
             else do
               -- constraint on a[i]
               -- (1 - acc - a[i]) * a[i] = 0
+              -- such that if acc = 0 then a[i] = 0 or 1 (don't care)
+              --           if acc = 1 then a[i] = 0
               add $ cMulF (1, [(acc, -1), (aBit, -1)]) (0, [(aBit, 1)]) (0, [])
               -- pass down the accumulator
               return $ Just acc
 
-
 -- | Assert that a UInt is lesser than some constant
 assertLT :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
-assertLT width a c = assertLTE width a (c - 1)
+assertLT width a c = do 
+  -- check that if the assertion is too restrictive
+  if c == 0
+    then throwError Compile.AssertLTTooRestrictiveError
+    else do
+      -- otherwise, assert that a <= c - 1
+      assertLTE width a (c - 1)
+  
+
+-- | Assert that a UInt is greater than or equal to some constant
+assertGTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
+assertGTE width a bound = do
+  ref <- wireU a
+  flag <- freshRefF
+  add $ cVarBindF (F flag) 1
+  foldM_ (go ref) (F flag) [width - 1, width - 2 .. 0]
+  where
+    go :: (GaloisField n, Integral n) => RefU -> Ref -> Int -> M n Ref
+    go ref flag i =
+      let aBit = RefUBit width ref i
+          bBit = Data.Bits.testBit bound i
+       in if bBit
+            then do
+              add $ cMulF (1, [(B aBit, -1), (flag, -1)]) (0, [(B aBit, 1)]) (0, [(flag, -1)])
+              return flag
+            else do
+              flag' <- freshRefF
+              -- flag' := flag * (1 - bit)
+              add $ cMulF (0, [(flag, 1)]) (1, [(B aBit, -1)]) (0, [(F flag', 1)])
+              return (F flag')
+
+-- | Assert that a UInt is greater than some constant
+assertGT :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
+assertGT width a c =
+  -- check that if the assertion is too restrictive
+  if c + 1 >= 2 ^ width
+    then throwError $ Compile.AssertGTTooRestrictiveError width
+    else do
+      -- otherwise, assert that a >= c + 1
+      assertGTE width a (c + 1)

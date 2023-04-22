@@ -85,7 +85,7 @@ instance Functor Constraint where
 
 data Error n
   = VarUnassignedError IntSet
-  | R1CInconsistentError n n n
+  | R1CInconsistentError (R1C n)
   | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
   | DivModQuotientError n n n n
@@ -99,8 +99,9 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (VarUnassignedError unboundVariables) =
     "these variables have no bindings:\n  "
       ++ showList' (map (\var -> "$" <> show var) $ IntSet.toList unboundVariables)
-  show (R1CInconsistentError a b c) =
-    "equation doesn't hold: `" <> show (N a) <> " * " <> show (N b) <> " ≠ " <> show (N c) <> "`"
+  show (R1CInconsistentError r1c) =
+    "equation doesn't hold: `" <> show (fmap N r1c)  <> "`"
+    -- " <> show (N a) <> " * " <> show (N b) <> " ≠ " <> show (N c) <> "`"
   show (BooleanConstraintError var val) =
     "expected the value of $" <> show var <> " to be either 0 or 1, but got `" <> show (N val) <> "`"
   show (StuckError context constraints) =

@@ -434,7 +434,7 @@ shrinkR1C r1c = do
     eliminatedIfHold a b c = do
       if a * b == c
         then return Eliminated
-        else throwError $ R1CInconsistentError a b c
+        else throwError $ R1CInconsistentError $ R1C (Left a) (Left b) (Left c)
 
 -- | Substitute varaibles with values in a polynomial
 substAndView :: (Num n, Eq n) => IntMap n -> Poly n -> PolyResult n
