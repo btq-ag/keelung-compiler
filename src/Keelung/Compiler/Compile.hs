@@ -964,6 +964,14 @@ compileDivModU width dividend divisor quotient remainder = do
 -- reference doc: A.3.2.2 Range Check https://zips.z.cash/protocol/protocol.pdf
 assertLTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
 assertLTE width a c = do
+  -- check if the bound is within the range of the UInt
+  when (c < 0) $
+    throwError $
+      Compile.AssertLTEBoundTooSmallError c
+  when (c >= 2 ^ width - 1) $
+    throwError $
+      Compile.AssertLTEBoundTooLargeError c width
+
   ref <- wireU a
   -- because we don't have to execute the `go` function for trailing ones of `c`
   -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
@@ -1012,20 +1020,30 @@ assertLTE width a c = do
               -- pass down the accumulator
               return $ Just acc
 
--- | Assert that a UInt is lesser than some constant
+-- | Assert that a UInt is less than some constant
 assertLT :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
-assertLT width a c = do 
-  -- check that if the assertion is too restrictive
-  if c == 0
-    then throwError Compile.AssertLTTooRestrictiveError
-    else do
-      -- otherwise, assert that a <= c - 1
-      assertLTE width a (c - 1)
-  
+assertLT width a c = do
+  -- check if the bound is within the range of the UInt
+  when (c < 1) $
+    throwError $
+      Compile.AssertLTBoundTooSmallError c
+  when (c >= 2 ^ width) $
+    throwError $
+      Compile.AssertLTBoundTooLargeError c width
+  -- otherwise, assert that a <= c - 1
+  assertLTE width a (c - 1)
 
 -- | Assert that a UInt is greater than or equal to some constant
 assertGTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
 assertGTE width a bound = do
+  -- check if the bound is within the range of the UInt
+  when (bound < 1) $
+    throwError $
+      Compile.AssertGTEBoundTooSmallError bound
+  when (bound >= 2 ^ width) $
+    throwError $
+      Compile.AssertGTEBoundTooLargeError bound width
+
   ref <- wireU a
   flag <- freshRefF
   add $ cVarBindF (F flag) 1
@@ -1047,10 +1065,13 @@ assertGTE width a bound = do
 
 -- | Assert that a UInt is greater than some constant
 assertGT :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
-assertGT width a c =
-  -- check that if the assertion is too restrictive
-  if c + 1 >= 2 ^ width
-    then throwError $ Compile.AssertGTTooRestrictiveError width
-    else do
-      -- otherwise, assert that a >= c + 1
-      assertGTE width a (c + 1)
+assertGT width a c = do
+  -- check if the bound is within the range of the UInt
+  when (c < 0) $
+    throwError $
+      Compile.AssertGTBoundTooSmallError c
+  when (c >= 2 ^ width - 1) $
+    throwError $
+      Compile.AssertGTBoundTooLargeError c width
+  -- otherwise, assert that a >= c + 1
+  assertGTE width a (c + 1)

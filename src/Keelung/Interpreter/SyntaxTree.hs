@@ -133,28 +133,56 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
   interpret (DivMod width dividend divisor quotient remainder) = do
     interpretDivMod width (dividend, divisor, quotient, remainder)
     return []
-  interpret (AssertLTE _ value bound) = do
+  interpret (AssertLTE width value bound) = do
+    -- check if the bound is within the range of the UInt
+    when (bound < 0) $
+      throwError $
+        AssertLTEBoundTooSmallError bound
+    when (bound >= 2 ^ width - 1) $
+      throwError $
+        AssertLTEBoundTooLargeError bound width
     value' <- interpret value
     case value' of
       [v] -> do
         when (v > fromInteger bound) $ throwError $ AssertLTEError v bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
-  interpret (AssertLT _ value bound) = do
+  interpret (AssertLT width value bound) = do
+    -- check if the bound is within the range of the UInt
+    when (bound < 1) $
+      throwError $
+        AssertLTBoundTooSmallError bound
+    when (bound >= 2 ^ width) $
+      throwError $
+        AssertLTBoundTooLargeError bound width
     value' <- interpret value
     case value' of
       [v] -> do
         when (v >= fromInteger bound) $ throwError $ AssertLTError v bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
-  interpret (AssertGTE _ value bound) = do
+  interpret (AssertGTE width value bound) = do
+    -- check if the bound is within the range of the UInt
+    when (bound < 1) $
+      throwError $
+        AssertGTEBoundTooSmallError bound
+    when (bound >= 2 ^ width) $
+      throwError $
+        AssertGTEBoundTooLargeError bound width
     value' <- interpret value
     case value' of
       [v] -> do
         when (v < fromInteger bound) $ throwError $ AssertGTEError v bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
-  interpret (AssertGT _ value bound) = do
+  interpret (AssertGT width value bound) = do
+    -- check if the bound is within the range of the UInt
+    when (bound < 0) $
+      throwError $
+        AssertGTBoundTooSmallError bound
+    when (bound >= 2 ^ width - 1) $
+      throwError $
+        AssertGTBoundTooLargeError bound width
     value' <- interpret value
     case value' of
       [v] -> do
@@ -233,7 +261,7 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
       x' <- map toInteger <$> interpret x
       case x' of
         [x''] -> case modInv x'' p of
-          Just v -> do 
+          Just v -> do
             return [fromInteger v]
           _ -> throwError $ ModInvError x'' p
         _ -> throwError $ ResultSizeError 1 (length x')

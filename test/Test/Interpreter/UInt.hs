@@ -211,11 +211,24 @@ tests = do
 
       describe "Range Check" $ do
         it "assertLTE (QuickCheck)" $ do
-          property $ \bound -> do
-            when (bound >= 0 && bound <= 15) $ do
-              let program = do
-                    x <- inputUInt @4 Public
-                    assertLTE x bound
+          -- `bound` ranges from `-50` to `50`
+          forAll (choose (-50, 50)) $ \bound -> do
+            let width = 4
+
+            let program = do
+                  x <- inputUInt @4 Public
+                  assertLTE x bound
+                  
+            when (bound < 0) $ do
+              forM_ [0 .. 15] $ \x -> do
+                throwAll
+                  program
+                  [fromInteger x :: GF181]
+                  []
+                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooSmallError bound))
+                  (CompileError (CompilerError.AssertLTEBoundTooSmallError bound))
+
+            when (bound >= 0 && bound < 15) $ do
               forM_ [0 .. 15] $ \x -> do
                 if x <= bound
                   then runAllExceptForTheOldOptimizer program [fromInteger x :: GF181] [] []
@@ -227,12 +240,35 @@ tests = do
                       (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError (fromInteger x) bound))
                       (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left (-1)) (Left 1) (Left 0))))
 
+            when (bound >= 15) $ do
+              forM_ [0 .. 15] $ \x -> do
+                throwAll
+                  program
+                  [fromInteger x :: GF181]
+                  []
+                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooLargeError bound width))
+                  (CompileError (CompilerError.AssertLTEBoundTooLargeError bound width))
+
+
         it "assertLT (QuickCheck)" $ do
-          property $ \bound -> do
-            when (bound > 0 && bound <= 15) $ do
-              let program = do
-                    x <- inputUInt @4 Public
-                    assertLT x bound
+          -- `bound` ranges from `-50` to `50`
+          forAll (choose (-50, 50)) $ \bound -> do
+            let width = 4
+
+            let program = do
+                  x <- inputUInt @4 Public
+                  assertLT x bound
+                  
+            when (bound < 1) $ do
+              forM_ [0 .. 15] $ \x -> do
+                throwAll
+                  program
+                  [fromInteger x :: GF181]
+                  []
+                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTBoundTooSmallError bound))
+                  (CompileError (CompilerError.AssertLTBoundTooSmallError bound))
+
+            when (bound >= 1 && bound < 16) $ do
               forM_ [0 .. 15] $ \x -> do
                 if x < bound
                   then runAllExceptForTheOldOptimizer program [fromInteger x :: GF181] [] []
@@ -244,24 +280,34 @@ tests = do
                       (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTError (fromInteger x) bound))
                       (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left (-1)) (Left 1) (Left 0))))
 
-        it "assertLT (out of bound)" $ do
-          let bound = 0
-          let program = do
-                x <- inputUInt @4 Public
-                assertLT x bound
-          throwAll
-            program
-            [0 :: GF181]
-            []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTError 0 bound))
-            (CompileError CompilerError.AssertLTTooRestrictiveError)
+            when (bound >= 16) $ do
+              forM_ [0 .. 15] $ \x -> do
+                throwAll
+                  program
+                  [fromInteger x :: GF181]
+                  []
+                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTBoundTooLargeError bound width))
+                  (CompileError (CompilerError.AssertLTBoundTooLargeError bound width))
 
         it "assertGTE (QuickCheck)" $ do
-          property $ \bound -> do
-            when (bound >= 0 && bound < 16) $ do
-              let program = do
-                    x <- inputUInt @4 Public
-                    assertGTE x bound
+          -- `bound` ranges from `-50` to `50`
+          forAll (choose (-50, 50)) $ \bound -> do
+            let width = 4
+
+            let program = do
+                  x <- inputUInt @4 Public
+                  assertGTE x bound
+                  
+            when (bound < 1) $ do
+              forM_ [0 .. 15] $ \x -> do
+                throwAll
+                  program
+                  [fromInteger x :: GF181]
+                  []
+                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEBoundTooSmallError bound))
+                  (CompileError (CompilerError.AssertGTEBoundTooSmallError bound))
+
+            when (bound >= 1 && bound < 16) $ do
               forM_ [0 .. 15] $ \x -> do
                 if x >= bound
                   then runAllExceptForTheOldOptimizer program [fromInteger x :: GF181] [] []
@@ -273,12 +319,36 @@ tests = do
                       (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEError (fromInteger x) bound))
                       (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left (-1)))))
 
+            when (bound >= 16) $ do
+              forM_ [0 .. 15] $ \x -> do
+                throwAll
+                  program
+                  [fromInteger x :: GF181]
+                  []
+                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEBoundTooLargeError bound width))
+                  (CompileError (CompilerError.AssertGTEBoundTooLargeError bound width))
+
+        
+
         it "assertGT (QuickCheck)" $ do
-          property $ \bound -> do
+          -- `bound` ranges from `-50` to `50`
+          forAll (choose (-50, 50)) $ \bound -> do
+            let width = 4
+
+            let program = do
+                  x <- inputUInt @4 Public
+                  assertGT x bound
+                  
+            when (bound < 0) $ do
+              forM_ [0 .. 15] $ \x -> do
+                throwAll
+                  program
+                  [fromInteger x :: GF181]
+                  []
+                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTBoundTooSmallError bound))
+                  (CompileError (CompilerError.AssertGTBoundTooSmallError bound))
+
             when (bound >= 0 && bound < 15) $ do
-              let program = do
-                    x <- inputUInt @4 Public
-                    assertGT x bound
               forM_ [0 .. 15] $ \x -> do
                 if x > bound
                   then runAllExceptForTheOldOptimizer program [fromInteger x :: GF181] [] []
@@ -290,17 +360,14 @@ tests = do
                       (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTError (fromInteger x) bound))
                       (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left (-1)))))
 
-        it "assertGT (out of bound)" $ do
-          let bound = 15
-          let program = do
-                x <- inputUInt @4 Public
-                assertGT x bound
-          throwAll
-            program
-            [15 :: GF181]
-            []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTError 15 bound))
-            (CompileError (CompilerError.AssertGTTooRestrictiveError 4))
+            when (bound >= 15) $ do
+              forM_ [0 .. 15] $ \x -> do
+                throwAll
+                  program
+                  [fromInteger x :: GF181]
+                  []
+                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTBoundTooLargeError bound width))
+                  (CompileError (CompilerError.AssertGTBoundTooLargeError bound width))
 
     describe "Conditionals" $ do
       it "with inputs" $ do
