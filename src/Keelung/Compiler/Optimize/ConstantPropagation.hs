@@ -130,4 +130,8 @@ propagateExprB e = do
     EqB x y -> EqB <$> propagateExprB x <*> propagateExprB y
     EqF x y -> EqF <$> propagateExprF x <*> propagateExprF y
     EqU x y -> EqU <$> propagateExprU x <*> propagateExprU y
+    LTU x y -> LTU <$> propagateExprU x <*> propagateExprU y
+    LTEU x y -> LTEU <$> propagateExprU x <*> propagateExprU y
+    GTU x y -> GTU <$> propagateExprU x <*> propagateExprU y
+    GTEU x y -> GTEU <$> propagateExprU x <*> propagateExprU y
     BitU x i -> BitU <$> propagateExprU x <*> pure i

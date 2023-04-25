@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -30,7 +30,6 @@ library
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.Boolean
       Keelung.Compiler.Compile.Relations.Field
-      Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UInt
       Keelung.Compiler.Compile.Relations.Util
@@ -94,7 +93,6 @@ executable keelungc
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.Boolean
       Keelung.Compiler.Compile.Relations.Field
-      Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UInt
       Keelung.Compiler.Compile.Relations.Util
@@ -174,7 +172,6 @@ test-suite keelung-test
       Test.PolyG
       Test.Relations.Boolean
       Test.Relations.Field
-      Test.Relations.Field2
       Test.Relations.UInt
       Test.VarLayout
       Test.WitnessGeneration
@@ -183,7 +180,6 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Relations.Boolean
       Keelung.Compiler.Compile.Relations.Field
-      Keelung.Compiler.Compile.Relations.FieldRelations
       Keelung.Compiler.Compile.Relations.Relations
       Keelung.Compiler.Compile.Relations.UInt
       Keelung.Compiler.Compile.Relations.Util

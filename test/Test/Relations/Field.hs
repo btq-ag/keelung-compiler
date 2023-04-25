@@ -1,11 +1,11 @@
-module Test.Relations.Field (tests, run) where
+module Test.Relations.Field (tests, run, debug) where
 
 import Control.Monad.Except
 import Control.Monad.State
 import Keelung hiding (run)
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.FieldRelations (FieldRelations)
-import Keelung.Compiler.Compile.Relations.FieldRelations qualified as FieldRelations
+import Keelung.Compiler.Compile.Relations.Field (AllRelations)
+import Keelung.Compiler.Compile.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Constraint
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
@@ -21,9 +21,6 @@ tests = do
       it "$0 = 0" $
         runM $ do
           F (RefFX 0) `assign` 0
-          debug 
-    -- assertBinding (RefBX 0) (Just True)
-    -- isValid
 
     it "Relate ($0 = $1)" $
       runM $ do
@@ -49,6 +46,7 @@ tests = do
       runM $ do
         RefFX 0 `relate` (2, RefFX 1, 1) -- x = 2y + 1
         RefFX 1 `relate` (3, RefFX 2, 2) -- y = 3z + 2
+        debug
 
         -- x = 2y + 1
         assertRelation (RefFX 0) 2 (RefFX 1) 1
@@ -63,7 +61,7 @@ tests = do
         -- z = 1/3y - 2/3
         assertRelation (RefFX 2) (1 / 3) (RefFX 1) (-2 / 3)
 
-type M = StateT (FieldRelations GF181) IO
+type M = StateT (AllRelations GF181) IO
 
 runM :: M a -> IO a
 runM p = evalStateT p FieldRelations.new
@@ -79,7 +77,7 @@ assign var val = do
 relate :: RefT -> (GF181, RefT, GF181) -> M ()
 relate var (slope, val, intercept) = do
   xs <- get
-  case runExcept (Relations.runM $ FieldRelations.relateRefs (F var) (slope, F val, intercept) xs) of
+  case runExcept (Relations.runM $ FieldRelations.relateRefs (F var) slope (F val) intercept xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result

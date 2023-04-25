@@ -221,6 +221,22 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
+    LTU _ x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' < y')
+    LTEU _ x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' <= y')
+    GTU _ x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' > y')
+    GTEU _ x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' >= y')
     BitU width x i -> do
       xs <- interpret x
       if Data.Bits.testBit (toInteger (head xs)) (i `mod` width)
@@ -360,6 +376,10 @@ instance FreeVar Boolean where
     EqB x y -> freeVars x <> freeVars y
     EqF x y -> freeVars x <> freeVars y
     EqU _ x y -> freeVars x <> freeVars y
+    LTU _ x y -> freeVars x <> freeVars y
+    LTEU _ x y -> freeVars x <> freeVars y
+    GTU _ x y -> freeVars x <> freeVars y
+    GTEU _ x y -> freeVars x <> freeVars y
     BitU _ x _ -> freeVars x
 
 instance FreeVar Field where

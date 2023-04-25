@@ -50,6 +50,10 @@ data ExprB n
   | EqB (ExprB n) (ExprB n)
   | EqF (ExprF n) (ExprF n)
   | EqU (ExprU n) (ExprU n)
+  | LTU (ExprU n) (ExprU n)
+  | LTEU (ExprU n) (ExprU n)
+  | GTU (ExprU n) (ExprU n)
+  | GTEU (ExprU n) (ExprU n)
   | -- bit tests on UInt
     BitU (ExprU n) Int
   deriving (Functor, Eq)
@@ -73,7 +77,10 @@ instance (Integral n, Show n) => Show (ExprB n) where
     EqB x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
     EqF x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
     EqU x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
-    -- LTEU _ x y -> chain prec " ≤ " 5 $ x :<| y :<| Empty
+    LTU x0 x1 -> chain prec " < " 5 $ x0 :<| x1 :<| Empty
+    LTEU x0 x1 -> chain prec " ≤ " 5 $ x0 :<| x1 :<| Empty
+    GTU x0 x1 -> chain prec " > " 5 $ x0 :<| x1 :<| Empty
+    GTEU x0 x1 -> chain prec " ≥ " 5 $ x0 :<| x1 :<| Empty
     BitU x i -> showsPrec prec x . showString "[" . shows i . showString "]"
 
 --------------------------------------------------------------------------------

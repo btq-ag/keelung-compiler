@@ -356,10 +356,10 @@ compileExprB out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileEqualityU True out x' y'
-  -- LTEU w x y -> do
-  --   x' <- wireU x
-  --   y' <- wireU y
-  --   assertLTEU w out x' y'
+  LTEU x y -> return ()
+  LTU x y -> return ()
+  GTEU x y -> return ()
+  GTU x y -> return ()
   BitU x i -> do
     x' <- wireU x
     let width = widthOfU x
