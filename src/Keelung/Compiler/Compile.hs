@@ -361,7 +361,10 @@ compileExprB out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileLTEU out x' y'
-  LTU x y -> return ()
+  LTU x y -> do 
+    x' <- wireU x
+    y' <- wireU y
+    compileLTU out x' y'
   GTEU x y -> return ()
   GTU x y -> return ()
   BitU x i -> do
@@ -1080,26 +1083,47 @@ assertGT width a c = do
   -- otherwise, assert that a >= c + 1
   assertGTE width a (c + 1)
 
+-- lastBit = if a 
+--    then if b then 1 else 0
+--    else if b then 1 else 1
 compileLTEU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
 compileLTEU out x y = do
   let width = widthOf x
   -- last bit
-  let xBit = RefUBit width x 0
-      yBit = RefUBit width y 0
+  let xBit = B (RefUBit width x 0)
+      yBit = B (RefUBit width y 0)
   -- xy = x[0] * y[0]
   xy <- freshRefF
-  add $ cMulF (0, [(B xBit, 1)]) (0, [(B yBit, 1)]) (0, [(F xy, 1)])
+  add $ cMulF (0, [(xBit, 1)]) (0, [(yBit, 1)]) (0, [(F xy, 1)])
   -- result = x[0] * y[0] - x[0] + 1
   result <- F <$> freshRefF
-  add $ cAddF 1 [(result, -1), (F xy, 1), (B xBit, -1)]
+  add $ cAddF 1 [(result, -1), (F xy, 1), (xBit, -1)]
 
   -- starting from the least significant bit
   result' <- foldM (compileLTEUPrim width x y) result [1 .. width - 1]
   add $ cVarEq (B out) result'
 
--- output = case a of 
---     1 -> bx
---     0 -> b + x - bx
+-- lastBit = if a 
+--    then if b then 0 else 0
+--    else if b then 1 else 0
+-- (b - lastBit) = (a)(b)
+compileLTU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
+compileLTU out x y = do
+  let width = widthOf x
+  -- last bit
+  let xBit = B (RefUBit width x 0)
+      yBit = B (RefUBit width y 0)
+  -- (b - lastBit) = (a)(b)
+  result <- F <$> freshRefF
+  add $ cMulF (0, [(xBit, 1)]) (0, [(yBit, 1)]) (0, [(result, -1), (yBit, 1)])
+
+  -- starting from the least significant bit
+  result' <- foldM (compileLTEUPrim width x y) result [1 .. width - 1]
+  add $ cVarEq (B out) result'
+
+-- output = if a 
+--    then if b then x else 0
+--    else if b then 1 else x
 -- output = 2abx + b + x - bx - ab - ax
 --  =>
 --  1. z = bx
@@ -1118,3 +1142,11 @@ compileLTEUPrim width x y acc i = do
   add $ cMulF (1, [(xBit, -1)]) (0, [(yBit, 1), (acc, 1), (yacc, -2)]) (0, [(result, 1), (yacc, -1)])
 
   return result
+
+
+-- output = if a 
+--    then if b then x else 0
+--    else if b then 1 else x
+-- lastBit = if a 
+--    then if b then 0 else 0
+--    else if b then 1 else 0

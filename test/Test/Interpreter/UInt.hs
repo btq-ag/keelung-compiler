@@ -379,6 +379,18 @@ tests = do
               then runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [1]
               else runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [0]
 
+        it "lt (QuickCheck)" $ do
+          let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+          let program = do
+                x <- inputUInt @4 Public
+                y <- inputUInt @4 Public
+                return $ x `lt` y
+
+          forAll genPair $ \(x, y) -> do
+            if x < y
+              then runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [1]
+              else runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [0]
+
     describe "Conditionals" $ do
       it "with inputs" $ do
         let program = do
