@@ -25,6 +25,7 @@ import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Syntax (widthOf)
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
 
 --------------------------------------------------------------------------------
@@ -356,7 +357,10 @@ compileExprB out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileEqualityU True out x' y'
-  LTEU x y -> return ()
+  LTEU x y -> do
+    x' <- wireU x
+    y' <- wireU y
+    compileLTEU out x' y'
   LTU x y -> return ()
   GTEU x y -> return ()
   GTU x y -> return ()
@@ -1075,3 +1079,42 @@ assertGT width a c = do
       Compile.AssertGTBoundTooLargeError c width
   -- otherwise, assert that a >= c + 1
   assertGTE width a (c + 1)
+
+compileLTEU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
+compileLTEU out x y = do
+  let width = widthOf x
+  -- last bit
+  let xBit = RefUBit width x 0
+      yBit = RefUBit width y 0
+  -- xy = x[0] * y[0]
+  xy <- freshRefF
+  add $ cMulF (0, [(B xBit, 1)]) (0, [(B yBit, 1)]) (0, [(F xy, 1)])
+  -- result = x[0] * y[0] - x[0] + 1
+  result <- F <$> freshRefF
+  add $ cAddF 1 [(result, -1), (F xy, 1), (B xBit, -1)]
+
+  -- starting from the least significant bit
+  result' <- foldM (compileLTEUPrim width x y) result [1 .. width - 1]
+  add $ cVarEq (B out) result'
+
+-- output = case a of 
+--     1 -> bx
+--     0 -> b + x - bx
+-- output = 2abx + b + x - bx - ab - ax
+--  =>
+--  1. z = bx
+--  2. output - z = (1-a)(b + x - 2z)
+compileLTEUPrim :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Ref -> Int -> M n Ref
+compileLTEUPrim width x y acc i = do
+  let xBit = B (RefUBit width x i)
+      yBit = B (RefUBit width y i)
+
+  -- yacc = y[i] * acc
+  yacc <- F <$> freshRefF
+  add $ cMulF (0, [(yBit, 1)]) (0, [(acc, 1)]) (0, [(yacc, 1)])
+
+  -- result - yacc = (1 - x[i]) * (y[i] + acc - 2 * yacc)
+  result <- F <$> freshRefF
+  add $ cMulF (1, [(xBit, -1)]) (0, [(yBit, 1), (acc, 1), (yacc, -2)]) (0, [(result, 1), (yacc, -1)])
+
+  return result

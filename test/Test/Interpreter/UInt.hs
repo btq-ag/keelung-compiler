@@ -14,6 +14,7 @@ import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
+import Debug.Trace
 
 run :: IO ()
 run = hspec tests
@@ -218,7 +219,7 @@ tests = do
             let program = do
                   x <- inputUInt @4 Public
                   assertLTE x bound
-                  
+
             when (bound < 0) $ do
               forM_ [0 .. 15] $ \x -> do
                 throwAll
@@ -249,7 +250,6 @@ tests = do
                   (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooLargeError bound width))
                   (CompileError (CompilerError.AssertLTEBoundTooLargeError bound width))
 
-
         it "assertLT (QuickCheck)" $ do
           -- `bound` ranges from `-50` to `50`
           forAll (choose (-50, 50)) $ \bound -> do
@@ -258,7 +258,7 @@ tests = do
             let program = do
                   x <- inputUInt @4 Public
                   assertLT x bound
-                  
+
             when (bound < 1) $ do
               forM_ [0 .. 15] $ \x -> do
                 throwAll
@@ -297,7 +297,7 @@ tests = do
             let program = do
                   x <- inputUInt @4 Public
                   assertGTE x bound
-                  
+
             when (bound < 1) $ do
               forM_ [0 .. 15] $ \x -> do
                 throwAll
@@ -328,8 +328,6 @@ tests = do
                   (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEBoundTooLargeError bound width))
                   (CompileError (CompilerError.AssertGTEBoundTooLargeError bound width))
 
-        
-
         it "assertGT (QuickCheck)" $ do
           -- `bound` ranges from `-50` to `50`
           forAll (choose (-50, 50)) $ \bound -> do
@@ -338,7 +336,7 @@ tests = do
             let program = do
                   x <- inputUInt @4 Public
                   assertGT x bound
-                  
+
             when (bound < 0) $ do
               forM_ [0 .. 15] $ \x -> do
                 throwAll
@@ -368,6 +366,18 @@ tests = do
                   []
                   (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTBoundTooLargeError bound width))
                   (CompileError (CompilerError.AssertGTBoundTooLargeError bound width))
+
+        it "lte (QuickCheck)" $ do
+          let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+          let program = do
+                x <- inputUInt @4 Public
+                y <- inputUInt @4 Public
+                return $ x `lte` y
+
+          forAll genPair $ \(x, y) -> do
+            if x <= y
+              then runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [1]
+              else runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [0]
 
     describe "Conditionals" $ do
       it "with inputs" $ do
