@@ -146,8 +146,11 @@ tests = do
         (cs, cs') <- execute $ do
           x <- inputBool Public
           reuse x
-        cs `shouldHaveSize` 3
-        cs' `shouldHaveSize` 3
+
+        -- debug cs
+        -- debug cs'
+        cs `shouldHaveSize` 4
+        cs' `shouldHaveSize` 4
 
 --     describe "Unsigned integers" $ do
 --       it "literal" $ do

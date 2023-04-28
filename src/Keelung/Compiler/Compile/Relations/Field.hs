@@ -32,13 +32,13 @@ import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
+import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.Boolean qualified as Relations.Boolean
 import Keelung.Compiler.Compile.Relations.Relations qualified as Relations
 import Keelung.Compiler.Compile.Relations.UInt qualified as Relations.UInt
 import Keelung.Compiler.Constraint
 import Prelude hiding (lookup)
-import Keelung (N(N))
 
 type FieldRelations n = Relations.Relations Ref n (LinRel n)
 
@@ -212,17 +212,30 @@ isValid = Relations.isValid . relationsF
 data Lookup n = Root | Value n | ChildOf n Ref n
   deriving (Eq, Show)
 
-lookup :: Ref -> AllRelations n -> Lookup n
-lookup var xs = case Relations.lookup var (relationsF xs) of
-  Relations.IsRoot _ -> Root
-  Relations.IsConstant val -> Value val
-  Relations.IsChildOf parent (LinRel slope intercept) -> ChildOf slope parent intercept
+lookup :: GaloisField n => Ref -> AllRelations n -> Lookup n
+lookup var xs = toLookup $ lookup' var xs
 
-lookup' :: Ref -> AllRelations n -> Relations.VarStatus Ref n (n, n)
-lookup' var xs = case Relations.lookup var (relationsF xs) of
-  Relations.IsRoot children -> Relations.IsRoot $ fmap (\(LinRel a b) -> (a, b)) children
-  Relations.IsConstant val -> Relations.IsConstant val
-  Relations.IsChildOf parent (LinRel a b) -> Relations.IsChildOf parent (a, b)
+toLookup :: Relations.VarStatus Ref n (n, n) -> Lookup n
+toLookup (Relations.IsRoot _) = Root
+toLookup (Relations.IsConstant val) = Value val
+toLookup (Relations.IsChildOf parent (slope, intercept)) = ChildOf slope parent intercept
+
+lookup' :: GaloisField n => Ref -> AllRelations n -> Relations.VarStatus Ref n (n, n)
+lookup' var xs = fromLinRel $ case Relations.lookup var (relationsF xs) of
+  Relations.IsRoot children -> case var of
+    F _ -> Relations.IsRoot children
+    B ref -> 
+      -- traceShowId $ 
+      -- Relations.IsRoot children
+      fromBooleanLookup (Relations.Boolean.lookup' ref (relationsB xs))
+    U _ref -> Relations.IsRoot children
+      -- fromUIntLookup (Relations.UInt.lookup' ref (relationsU xs))
+  others -> others
+
+fromLinRel :: Relations.VarStatus Ref n (LinRel n) -> Relations.VarStatus Ref n (n, n)
+fromLinRel (Relations.IsRoot children) = Relations.IsRoot $ fmap (\(LinRel a b) -> (a, b)) children
+fromLinRel (Relations.IsConstant val) = Relations.IsConstant val
+fromLinRel (Relations.IsChildOf parent (LinRel a b)) = Relations.IsChildOf parent (a, b)
 
 --------------------------------------------------------------------------------
 
@@ -233,7 +246,7 @@ data LinRel n
       -- ^ slope
       n
       -- ^ intercept
-  deriving (Eq, NFData, Generic)
+  deriving (Show, Eq, NFData, Generic)
 
 instance Num n => Semigroup (LinRel n) where
   -- x = a1 * y + b1
