@@ -18,6 +18,7 @@ import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropag
 import Keelung.Compiler.Relocated qualified as Relocated
 import Test.HUnit (assertFailure)
 import Test.Hspec
+import Test.Optimization.UInt qualified as Optimization.UInt
 
 -- | elaborate => rewrite => type erase => constant propagation => compile
 compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
@@ -32,10 +33,10 @@ execute program = do
 
   case Optimizer.optimizeNew cs of
     Left err -> assertFailure $ show err
-    Right cs' -> do 
-        -- var counters should remain the same
-        csCounters cs `shouldBe` csCounters cs'
-        return (cs, cs')
+    Right cs' -> do
+      -- var counters should remain the same
+      csCounters cs `shouldBe` csCounters cs'
+      return (cs, cs')
 
 shouldHaveSize :: ConstraintSystem (N GF181) -> Int -> IO ()
 shouldHaveSize cs expectedBeforeSize = do
@@ -54,6 +55,9 @@ debug cs = do
 tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
+    
+    Optimization.UInt.tests
+
     it "Poseidon" $ do
       (cs, cs') <- execute $ do
         xs <- inputList Public 1

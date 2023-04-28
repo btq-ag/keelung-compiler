@@ -20,7 +20,6 @@ import Keelung.Interpreter.Arithmetics
 import Keelung.Interpreter.SyntaxTree.Monad
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Encode.Syntax
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
