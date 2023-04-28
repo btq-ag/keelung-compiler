@@ -47,11 +47,11 @@ tests = do
         cs `shouldHaveSize` 19
         cs' `shouldHaveSize` 18
 
-      it "compute LTE" $ do
+      it "compute LTE (2 constants)" $ do
         (cs, cs') <- execute $ do
           return $ 0 `lte` (0  :: UInt 4)
         cs `shouldHaveSize` 18
-        cs' `shouldHaveSize` 6
+        cs' `shouldHaveSize` 5
 
 --------------------------------------------------------------------------------
 

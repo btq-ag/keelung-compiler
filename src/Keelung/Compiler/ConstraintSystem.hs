@@ -301,9 +301,6 @@ relocateConstraintSystem cs =
           publicInputVarsU = [U (RefUI w i) | w <- bitWidths, i <- [0 .. getCount OfPublicInput (OfUInt w) counters - 1]]
           privateInputVarsU = [U (RefUP w i) | w <- bitWidths, i <- [0 .. getCount OfPrivateInput (OfUInt w) counters - 1]]
 
-          outputVarsB = [B (RefBO i) | i <- [0 .. getCount OfOutput OfBoolean counters - 1]]
-          publicInputVarsB = [B (RefBI i) | i <- [0 .. getCount OfPublicInput OfBoolean counters - 1]]
-          privateInputVarsB = [B (RefBP i) | i <- [0 .. getCount OfPrivateInput OfBoolean counters - 1]]
        in Seq.fromList (Maybe.mapMaybe toConstraint outputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
             <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
@@ -311,9 +308,6 @@ relocateConstraintSystem cs =
             <> Seq.fromList (Maybe.mapMaybe toConstraint outputVarsU)
             <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVarsU)
             <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVarsU)
-            <> Seq.fromList (Maybe.mapMaybe toConstraint outputVarsB)
-            <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVarsB)
-            <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVarsB)
             <> fromBooleanRelations boolRels occurrencesF occurrencesB occurrencesU
       where
         boolRels = FieldRelations.exportBooleanRelations fieldRels
