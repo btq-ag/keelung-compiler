@@ -14,7 +14,6 @@ import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
-import Debug.Trace
 
 run :: IO ()
 run = hspec tests
@@ -388,6 +387,30 @@ tests = do
 
           forAll genPair $ \(x, y) -> do
             if x < y
+              then runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [1]
+              else runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [0]
+
+        it "gte (QuickCheck)" $ do
+          let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+          let program = do
+                x <- inputUInt @4 Public
+                y <- inputUInt @4 Public
+                return $ x `gte` y
+
+          forAll genPair $ \(x, y) -> do
+            if x >= y
+              then runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [1]
+              else runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [0]
+
+        it "gt (QuickCheck)" $ do
+          let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+          let program = do
+                x <- inputUInt @4 Public
+                y <- inputUInt @4 Public
+                return $ x `gt` y
+
+          forAll genPair $ \(x, y) -> do
+            if x > y
               then runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [1]
               else runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [0]
 

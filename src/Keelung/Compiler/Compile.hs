@@ -365,8 +365,14 @@ compileExprB out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileLTU out x' y'
-  GTEU x y -> return ()
-  GTU x y -> return ()
+  GTEU x y -> do 
+    x' <- wireU x
+    y' <- wireU y
+    compileGTEU out x' y'
+  GTU x y -> do 
+    x' <- wireU x
+    y' <- wireU y
+    compileGTU out x' y'
   BitU x i -> do
     x' <- wireU x
     let width = widthOfU x
@@ -1142,6 +1148,12 @@ compileLTEUPrim width x y acc i = do
   add $ cMulF (1, [(xBit, -1)]) (0, [(yBit, 1), (acc, 1), (yacc, -2)]) (0, [(result, 1), (yacc, -1)])
 
   return result
+
+compileGTU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
+compileGTU out x y = compileLTU out y x
+
+compileGTEU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
+compileGTEU out x y = compileLTEU out y x
 
 
 -- output = if a 
