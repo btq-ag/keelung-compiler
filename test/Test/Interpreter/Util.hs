@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Test.Interpreter.Util (runAll, runAllExceptForTheOldOptimizer, throwAll, runAndCompare, debug) where
+module Test.Interpreter.Util (runAll, runAllExceptForTheOldOptimizer, throwAll, throwAll', runAndCompare, debug) where
 
 import Control.Arrow (left)
 import Control.Monad (when)
@@ -82,6 +82,17 @@ throwAll program rawPublicInputs rawPrivateInputs stError csError = do
   -- constraint system interpreters
   r1csNew program rawPublicInputs rawPrivateInputs
     `shouldBe` Left csError
+  r1csO0New program rawPublicInputs rawPrivateInputs
+    `shouldBe` Left csError
+  
+throwAll' :: (GaloisField n, Integral n, Encode t, Show t) => Comp t -> [n] -> [n] -> Interpreter.Error n -> Error n -> Error n -> IO ()
+throwAll' program rawPublicInputs rawPrivateInputs stError csError optmError = do
+  -- syntax tree interpreters
+  interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+    `shouldBe` Left (InterpretError stError)
+  -- constraint system interpreters
+  r1csNew program rawPublicInputs rawPrivateInputs
+    `shouldBe` Left optmError
   r1csO0New program rawPublicInputs rawPrivateInputs
     `shouldBe` Left csError
 

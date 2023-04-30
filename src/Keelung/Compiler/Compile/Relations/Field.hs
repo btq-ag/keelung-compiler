@@ -224,12 +224,10 @@ lookup' :: GaloisField n => Ref -> AllRelations n -> Relations.VarStatus Ref n (
 lookup' var xs = fromLinRel $ case Relations.lookup var (relationsF xs) of
   Relations.IsRoot children -> case var of
     F _ -> Relations.IsRoot children
-    B ref -> 
-      -- traceShowId $ 
+    B ref -> fromBooleanLookup (Relations.Boolean.lookup' ref (relationsB xs))
+    U ref -> 
       -- Relations.IsRoot children
-      fromBooleanLookup (Relations.Boolean.lookup' ref (relationsB xs))
-    U _ref -> Relations.IsRoot children
-      -- fromUIntLookup (Relations.UInt.lookup' ref (relationsU xs))
+      fromUIntLookup (Relations.UInt.lookup' ref (relationsU xs))
   others -> others
 
 fromLinRel :: Relations.VarStatus Ref n (LinRel n) -> Relations.VarStatus Ref n (n, n)
