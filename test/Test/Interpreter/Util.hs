@@ -116,7 +116,7 @@ runAndCompare enableOldOptimizer program rawPublicInputs rawPrivateInputs = do
 
 debug :: Encode t => Comp t -> IO ()
 debug program = do
-  -- print $ Compiler.asGF181N $ Compiler.compileO0 program
+  print $ Compiler.asGF181N $ Compiler.compileO0 program
   -- print $ Compiler.asGF181N $ Compiler.compileO1 program
   print $ Compiler.asGF181N $ Compiler.compileToModules program
-  print (Compiler.asGF181N $ toR1CS <$> Compiler.compileO1 program)
+  -- print (Compiler.asGF181N $ toR1CS <$> Compiler.compileO1 program)

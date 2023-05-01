@@ -64,6 +64,7 @@ tests = do
         let program = do
               x <- inputUInt @4 Public
               assert $ 2 `eq` (x + 1)
+        -- debug program
         runAllExceptForTheOldOptimizer
           program
           [1]
@@ -465,7 +466,6 @@ tests = do
     it "neq 4" $ do
       let program = do
             assert $ 3 `neq` (3 :: UInt 4)
-      -- debug program
       throwAll'
         program
         []

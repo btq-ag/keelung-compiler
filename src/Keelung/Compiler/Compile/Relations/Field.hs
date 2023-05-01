@@ -99,6 +99,7 @@ relate var1 slope var2 intercept = updateRelationsF $ Relations.relate var1 (Lin
 relateB :: RefB -> (Bool, RefB) -> AllRelations n -> Relations.M (Error n) (AllRelations n)
 relateB refA (polarity, refB) = updateRelationsB $ Relations.Boolean.relate refA polarity refB
 
+-- var = slope * var2 + intercept
 relateRefs :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelations n -> Relations.M (Error n) (AllRelations n)
 relateRefs x slope y intercept xs =
   case (x, y, slope, intercept) of
@@ -221,14 +222,9 @@ toLookup (Relations.IsConstant val) = Value val
 toLookup (Relations.IsChildOf parent (slope, intercept)) = ChildOf slope parent intercept
 
 lookup' :: GaloisField n => Ref -> AllRelations n -> Relations.VarStatus Ref n (n, n)
-lookup' var xs = fromLinRel $ case Relations.lookup var (relationsF xs) of
-  Relations.IsRoot children -> case var of
-    F _ -> Relations.IsRoot children
-    B ref -> fromBooleanLookup (Relations.Boolean.lookup' ref (relationsB xs))
-    U ref -> 
-      -- Relations.IsRoot children
-      fromUIntLookup (Relations.UInt.lookup' ref (relationsU xs))
-  others -> others
+lookup' (U var) xs = fromLinRel $ fromUIntLookup $ Relations.UInt.lookup' var (relationsU xs)
+lookup' (B var) xs = fromLinRel $ fromBooleanLookup $ Relations.Boolean.lookup' var (relationsB xs)
+lookup' (F var) xs = fromLinRel $ Relations.lookup (F var) (relationsF xs)
 
 fromLinRel :: Relations.VarStatus Ref n (LinRel n) -> Relations.VarStatus Ref n (n, n)
 fromLinRel (Relations.IsRoot children) = Relations.IsRoot $ fmap (\(LinRel a b) -> (a, b)) children
@@ -258,15 +254,18 @@ instance Num n => Monoid (LinRel n) where
   mempty = LinRel 1 0
 
 instance (GaloisField n, Integral n) => Relations.IsRelation (LinRel n) where
-  relationToString (var, LinRel a b) =
-    let slope = case a of
-          1 -> var
-          (-1) -> "-" <> var
-          _ -> show (N a) <> var
-        intercept = case b of
-          0 -> ""
-          _ -> " + " <> show (N b)
-     in slope <> intercept
+  relationToString (var, LinRel x y) = f (Relations.invertRel $ LinRel x y)
+    where
+      f (LinRel a b) =
+        let slope = case a of
+              1 -> var
+              (-1) -> "-" <> var
+              _ -> show (N a) <> var
+            intercept = case b of
+              0 -> ""
+              -- -1 -> " - 1"
+              _ -> " + " <> show (N b)
+         in slope <> intercept
 
   -- x = ay + b
   -- =>

@@ -9,7 +9,6 @@ import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
-
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.Field (AllRelations)
@@ -177,13 +176,13 @@ reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG Ref n -> PolyG Ref n 
 reduceMulFCPP a polyB polyC = do
   case PolyG.multiplyBy (-a) polyB of
     Left constant ->
-      if constant == 0 
-        then do 
+      if constant == 0
+        then do
           -- a * bs = 0
           -- cs = 0
           modify' $ removeOccurrences (PolyG.vars polyB)
           addAddF polyC
-        else do 
+        else do
           -- a * bs = constant = cs
           -- => cs - constant = 0
           modify' $ removeOccurrences (PolyG.vars polyB)
@@ -261,7 +260,7 @@ assign (B var) value = do
     Just relations -> do
       markChanged RelationChanged
       put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
-assign (U var) value = do 
+assign (U var) value = do
   cs <- get
   result <- lift $ lift $ Relations.runM $ AllRelations.assignU var value (csFieldRelations cs)
   case result of
@@ -285,9 +284,9 @@ relateF var1 (slope, var2, intercept) = do
   result <- lift $ lift $ Relations.runM $ AllRelations.relateRefs var1 slope var2 intercept (csFieldRelations cs)
   case result of
     Nothing -> return False
-    Just unionFind' -> do
+    Just relations -> do
       markChanged RelationChanged
-      modify' $ \cs' -> removeOccurrences (Set.fromList [var1, var2]) $ cs' {csFieldRelations = unionFind'}
+      modify' $ \cs' -> removeOccurrences (Set.fromList [var1, var2]) $ cs' {csFieldRelations = relations}
       return True
 
 addAddF :: (GaloisField n, Integral n) => PolyG Ref n -> RoundM n ()

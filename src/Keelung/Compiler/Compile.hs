@@ -28,6 +28,7 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
 
+
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
