@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 module Test.Optimization.UInt (tests, run, debug) where
 
 import Keelung hiding (compileO0, run)
