@@ -64,7 +64,7 @@ tests = do
         let program = do
               x <- inputUInt @4 Public
               assert $ 2 `eq` (x + 1)
-        runAllExceptForTheOldOptimizer
+        runAll
           program
           [1]
           ([] :: [GF181])
@@ -94,11 +94,11 @@ tests = do
               x <- inputUInt @4 Public
               y <- reuse x
               return (x + y)
-        runAllExceptForTheOldOptimizer program [5 :: GF181] [] [10]
+        runAll program [5 :: GF181] [] [10]
 
       it "modInv 123 2833" $ do
         let program = return $ modInv (123 :: UInt 32) 2833
-        runAllExceptForTheOldOptimizer program [] ([] :: [GF181]) [2119]
+        runAll program [] ([] :: [GF181]) [2119]
 
       describe "DivMod" $ do
         it "performDivMod (quotient & remainder unknown)" $ do
@@ -106,17 +106,17 @@ tests = do
                 dividend <- input Private :: Comp (UInt 4)
                 divisor <- input Public
                 performDivMod dividend divisor
-          runAllExceptForTheOldOptimizer program [7 :: GF181] [20] [2, 6]
-          runAllExceptForTheOldOptimizer program [4 :: GF181] [4] [1, 0]
+          runAll program [7 :: GF181] [20] [2, 6]
+          runAll program [4 :: GF181] [4] [1, 0]
 
         it "performDivMod (on constants) (issue #18)" $ do
           -- 7 = 3 * 2 + 1 
           let program = performDivMod 7 (3 :: UInt 4)
-          runAllExceptForTheOldOptimizer program [] [] [2, 1 :: GF181]
+          runAll program [] [] [2, 1 :: GF181]
 
         it "assertDivMod (on constants) (issue #18)" $ do
           let program = assertDivMod 7 (3 :: UInt 4) 2 1
-          runAllExceptForTheOldOptimizer program [] [] ([] :: [GF181])
+          runAll program [] [] ([] :: [GF181])
 
         it "assertDivMod (with wrong quotient constant)" $ do
           let program = assertDivMod 7 (3 :: UInt 4) 3 1
@@ -145,7 +145,7 @@ tests = do
                 (q0, r0) <- performDivMod a b
                 (q1, r1) <- performDivMod c d
                 return [q0, r0, q1, r1]
-          runAllExceptForTheOldOptimizer program [20, 7, 8 :: GF181] [21] [2, 6, 2, 5]
+          runAll program [20, 7, 8 :: GF181] [21] [2, 6, 2, 5]
 
         it "assertDivMod (multiple statements chained together)" $ do
           let program = do
@@ -154,7 +154,7 @@ tests = do
                 (q0, r0) <- performDivMod a b
                 (q1, r1) <- performDivMod q0 b
                 return [q0, r0, q1, r1]
-          runAllExceptForTheOldOptimizer program [25, 3 :: GF181] [] [8, 1, 2, 2]
+          runAll program [25, 3 :: GF181] [] [8, 1, 2, 2]
 
         it "performDivMod (before assertions)" $ do
           let program = do
@@ -162,7 +162,7 @@ tests = do
                 b <- input Public
                 (q, r) <- performDivMod a b
                 assert $ q `eq` r
-          runAllExceptForTheOldOptimizer program [10, 4 :: GF181] [] []
+          runAll program [10, 4 :: GF181] [] []
 
         it "performDivMod (before reuse)" $ do
           let program = do
@@ -170,7 +170,7 @@ tests = do
                 b <- input Public
                 (q, _) <- performDivMod a b
                 reuse q
-          runAllExceptForTheOldOptimizer program [10, 4 :: GF181] [] [2]
+          runAll program [10, 4 :: GF181] [] [2]
 
         it "performDivMod (after reuse)" $ do
           let program = do
@@ -178,7 +178,7 @@ tests = do
                 b <- input Public
                 (q, r) <- performDivMod a b
                 assert $ q `eq` r
-          runAllExceptForTheOldOptimizer program [10, 4 :: GF181] [] []
+          runAll program [10, 4 :: GF181] [] []
 
         it "assertDivMod (dividend unknown)" $ do
           let program = do
@@ -188,7 +188,7 @@ tests = do
                 remainder <- input Private
                 assertDivMod dividend divisor quotient remainder
                 return dividend
-          runAllExceptForTheOldOptimizer program [7, 2 :: GF181] [6] [20]
+          runAll program [7, 2 :: GF181] [6] [20]
 
         it "assertDivMod (divisor & remainder unknown)" $ do
           let program = do
@@ -198,7 +198,7 @@ tests = do
                 remainder <- freshVarUInt
                 assertDivMod dividend divisor quotient remainder
                 return (divisor, remainder)
-          runAllExceptForTheOldOptimizer program [7, 2 :: GF181] [] [3, 1]
+          runAll program [7, 2 :: GF181] [] [3, 1]
 
         it "assertDivMod (quotient & remainder unknown)" $ do
           let program = do
@@ -208,7 +208,7 @@ tests = do
                 remainder <- freshVarUInt
                 assertDivMod dividend divisor quotient remainder
                 return (quotient, remainder)
-          runAllExceptForTheOldOptimizer program [34, 6 :: GF181] [] [5, 4]
+          runAll program [34, 6 :: GF181] [] [5, 4]
 
       describe "Range Check" $ do
         it "assertLTE (QuickCheck)" $ do
@@ -232,7 +232,7 @@ tests = do
             when (bound >= 0 && bound < 15) $ do
               forM_ [0 .. 15] $ \x -> do
                 if x <= bound
-                  then runAllExceptForTheOldOptimizer program [fromInteger x :: GF181] [] []
+                  then runAll program [fromInteger x :: GF181] [] []
                   else do
                     throwAll
                       program
@@ -271,7 +271,7 @@ tests = do
             when (bound >= 1 && bound < 16) $ do
               forM_ [0 .. 15] $ \x -> do
                 if x < bound
-                  then runAllExceptForTheOldOptimizer program [fromInteger x :: GF181] [] []
+                  then runAll program [fromInteger x :: GF181] [] []
                   else do
                     throwAll
                       program
@@ -310,7 +310,7 @@ tests = do
             when (bound >= 1 && bound < 16) $ do
               forM_ [0 .. 15] $ \x -> do
                 if x >= bound
-                  then runAllExceptForTheOldOptimizer program [fromInteger x :: GF181] [] []
+                  then runAll program [fromInteger x :: GF181] [] []
                   else do
                     throwAll
                       program
@@ -349,7 +349,7 @@ tests = do
             when (bound >= 0 && bound < 15) $ do
               forM_ [0 .. 15] $ \x -> do
                 if x > bound
-                  then runAllExceptForTheOldOptimizer program [fromInteger x :: GF181] [] []
+                  then runAll program [fromInteger x :: GF181] [] []
                   else do
                     throwAll
                       program
@@ -376,8 +376,8 @@ tests = do
 
           forAll genPair $ \(x, y) -> do
             if x <= y
-              then runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [1]
-              else runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [0]
+              then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
+              else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
 
         it "lt (QuickCheck)" $ do
           let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -388,8 +388,8 @@ tests = do
 
           forAll genPair $ \(x, y) -> do
             if x < y
-              then runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [1]
-              else runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [0]
+              then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
+              else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
 
         it "gte (QuickCheck)" $ do
           let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -400,8 +400,8 @@ tests = do
 
           forAll genPair $ \(x, y) -> do
             if x >= y
-              then runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [1]
-              else runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [0]
+              then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
+              else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
 
         it "gt (QuickCheck)" $ do
           let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -412,8 +412,8 @@ tests = do
 
           forAll genPair $ \(x, y) -> do
             if x > y
-              then runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [1]
-              else runAllExceptForTheOldOptimizer program [fromInteger x, fromInteger y :: GF181] [] [0]
+              then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
+              else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
 
     describe "Conditionals" $ do
       it "with inputs" $ do
@@ -421,41 +421,41 @@ tests = do
               x <- input Public :: Comp (UInt 2)
               y <- input Public
               return $ cond true x y
-        runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [5]
+        runAll program [5, 6 :: GF181] [] [5]
 
       it "with literals" $ do
         let program = do
               return $ cond true (3 :: UInt 2) 2
-        runAllExceptForTheOldOptimizer program [] [] [3 :: GF181]
+        runAll program [] [] [3 :: GF181]
 
     it "eq" $ do
       let program = do
             x <- inputUInt @4 Public
             y <- inputUInt @4 Public
             return (x `eq` y)
-      runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [0]
-      runAllExceptForTheOldOptimizer program [4, 4 :: GF181] [] [1]
+      runAll program [5, 6 :: GF181] [] [0]
+      runAll program [4, 4 :: GF181] [] [1]
 
     it "neq 1" $ do
       let program = do
             x <- inputUInt @4 Public
             y <- inputUInt @4 Public
             return (x `neq` y)
-      runAllExceptForTheOldOptimizer program [5, 6 :: GF181] [] [1]
-      runAllExceptForTheOldOptimizer program [4, 4 :: GF181] [] [0]
+      runAll program [5, 6 :: GF181] [] [1]
+      runAll program [4, 4 :: GF181] [] [0]
 
     it "neq 2" $ do
       let program = do
             x <- inputUInt @4 Public
             return (x `neq` 3)
-      runAllExceptForTheOldOptimizer program [5 :: GF181] [] [1]
-      runAllExceptForTheOldOptimizer program [3 :: GF181] [] [0]
+      runAll program [5 :: GF181] [] [1]
+      runAll program [3 :: GF181] [] [0]
 
     it "neq 3" $ do
       let program = do
             x <- inputUInt @4 Public
             assert $ x `neq` 3
-      runAllExceptForTheOldOptimizer program [5 :: GF181] [] []
+      runAll program [5 :: GF181] [] []
       throwAll
         program
         [3 :: GF181]
@@ -507,22 +507,22 @@ tests = do
             let c = 3 :: UInt 4
             return [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
 
-      runAllExceptForTheOldOptimizer program [] [] [0, 1, 1, 0, 0, 1 :: GF181]
+      runAll program [] [] [0, 1, 1, 0, 0, 1 :: GF181]
 
     it "Bit test / input var" $ do
       let program = do
             c <- input Private :: Comp (UInt 4)
             return [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
-      runAllExceptForTheOldOptimizer program [] [3] [0, 1, 1, 0, 0, 1 :: GF181]
-      runAllExceptForTheOldOptimizer program [] [5] [0, 1, 0, 1, 0, 1 :: GF181]
+      runAll program [] [3] [0, 1, 1, 0, 0, 1 :: GF181]
+      runAll program [] [5] [0, 1, 0, 1, 0, 1 :: GF181]
 
     it "Bit test / and 1" $ do
       let program = do
             x <- inputUInt @4 Public
             y <- inputUInt @4 Private
             return $ (x .&. y) !!! 0
-      runAllExceptForTheOldOptimizer program [2] [3] [0 :: GF181]
-      runAllExceptForTheOldOptimizer program [3] [5] [1 :: GF181]
+      runAll program [2] [3] [0 :: GF181]
+      runAll program [3] [5] [1 :: GF181]
 
     it "Bit test / and 2" $ do
       let program = do
@@ -530,25 +530,25 @@ tests = do
             y <- inputUInt @4 Private
             z <- inputUInt @4 Public
             return $ (x .&. y .&. z) !!! 0
-      runAllExceptForTheOldOptimizer program [2, 4] [3] [0 :: GF181]
-      runAllExceptForTheOldOptimizer program [3, 7] [5] [1 :: GF181]
+      runAll program [2, 4] [3] [0 :: GF181]
+      runAll program [3, 7] [5] [1 :: GF181]
 
     it "Bit test / or 1" $ do
       let program = do
             x <- inputUInt @4 Public
             y <- inputUInt @4 Private
             return $ (x .|. y) !!! 1
-      runAllExceptForTheOldOptimizer program [2] [3] [1 :: GF181]
-      runAllExceptForTheOldOptimizer program [3] [5] [1 :: GF181]
-      runAllExceptForTheOldOptimizer program [5] [9] [0 :: GF181]
+      runAll program [2] [3] [1 :: GF181]
+      runAll program [3] [5] [1 :: GF181]
+      runAll program [5] [9] [0 :: GF181]
 
     it "Bit test / or 2" $ do
       let program = do
             x <- inputUInt @4 Public
             return $ (x .|. 3) !!! 2
-      runAllExceptForTheOldOptimizer program [2] [] [0 :: GF181]
-      runAllExceptForTheOldOptimizer program [3] [] [0 :: GF181]
-      runAllExceptForTheOldOptimizer program [5] [] [1 :: GF181]
+      runAll program [2] [] [0 :: GF181]
+      runAll program [3] [] [0 :: GF181]
+      runAll program [5] [] [1 :: GF181]
 
     it "Bit test / xor 1" $ do
       let program = do
@@ -557,22 +557,22 @@ tests = do
             z <- inputUInt @4 Public
             w <- reuse $ x .^. y .^. z
             return [w !!! 0, w !!! 1, w !!! 2, w !!! 3]
-      runAllExceptForTheOldOptimizer program [2, 4] [3] [1, 0, 1, 0 :: GF181]
-      runAllExceptForTheOldOptimizer program [3, 7] [5] [1, 0, 0, 0 :: GF181]
+      runAll program [2, 4] [3] [1, 0, 1, 0 :: GF181]
+      runAll program [3, 7] [5] [1, 0, 0, 0 :: GF181]
 
     it "Bit test / BtoU" $ do
       let program = do
             x <- input Public
             let u = BtoU x :: UInt 4
             return [u !!! 0, u !!! 1, u !!! 2, u !!! 3]
-      runAllExceptForTheOldOptimizer program [0] [] [0, 0, 0, 0 :: GF181]
-      runAllExceptForTheOldOptimizer program [1] [] [1, 0, 0, 0 :: GF181]
+      runAll program [0] [] [0, 0, 0, 0 :: GF181]
+      runAll program [1] [] [1, 0, 0, 0 :: GF181]
 
     it "Bit test / rotate 1" $ do
       let program = do
             x <- inputUInt @4 Public
             return $ (x `rotate` 0) !!! 0
-      runAllExceptForTheOldOptimizer program [2] [] [0 :: GF181]
+      runAll program [2] [] [0 :: GF181]
 
     it "Bit test / rotate 2" $ do
       -- 0011 0100211003
@@ -585,4 +585,4 @@ tests = do
                 (x `rotate` (-1)) !!! 0,
                 ((x .^. y) `rotate` 1) !!! 1
               ]
-      runAllExceptForTheOldOptimizer program [2, 3] [] [0, 0, 1, 1 :: GF181]
+      runAll program [2, 3] [] [0, 0, 1, 1 :: GF181]
