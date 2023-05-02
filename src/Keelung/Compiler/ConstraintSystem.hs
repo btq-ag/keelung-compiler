@@ -19,7 +19,6 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet qualified as IntSet
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
@@ -336,86 +335,80 @@ relocateConstraintSystem cs =
 
     extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Relocated.Constraint n)
     extractFieldRelations relations =
-      let convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Maybe (Constraint n)
-          convert (var, Right val) =
-            if shouldKeep var
-              then Just $ CVarBindF var val
-              else Nothing
+      let convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Constraint n
+          convert (var, Right val) = CVarBindF var val
           convert (var, Left (slope, root, intercept)) =
-            if shouldKeep var && shouldKeep root
-              then case (slope, intercept) of
-                (0, _) -> Just $ CVarBindF var intercept
-                (1, 0) -> Just $ CVarEq var root
-                (_, _) -> case PolyG.build intercept [(var, -1), (root, slope)] of
-                  Left _ -> Nothing
-                  Right poly -> Just $ CAddF poly
-              else Nothing
+            case (slope, intercept) of
+              (0, _) -> CVarBindF var intercept
+              (1, 0) -> CVarEq var root
+              (_, _) -> case PolyG.build intercept [(var, -1), (root, slope)] of
+                Left _ -> error "[ panic ] extractFieldRelations: failed to build polynomial"
+                Right poly -> CAddF poly
 
-          result = Maybe.mapMaybe convert $ Map.toList $ AllRelations.toIntMap relations
+          result = map convert $ Map.toList $ AllRelations.toInt shouldBeKept relations
        in Seq.fromList (map (fromConstraint counters) result)
 
-    shouldKeep :: Ref -> Bool
-    shouldKeep (F (RefFX var)) =
-      -- it's a Field intermediate variable that occurs in the circuit
-      RefFX var `Set.member` refFsInOccurrencesF memberships
-    shouldKeep (F _) =
-      -- it's a pinned Field variable
-      True
-    shouldKeep (B (RefBX var)) =
-      --  it's a Boolean intermediate variable that occurs in the circuit
-      RefBX var `Set.member` refBsInOccurrencesB memberships
-        || RefBX var `Set.member` refBsInOccurrencesF memberships
-    shouldKeep (B (RefUBit _ var _)) =
-      --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
-      --  the UInt variable should be kept
-      var `Set.member` bitTestsInOccurrencesB memberships
-        || shouldKeep (U var)
-    shouldKeep (B _) =
-      -- it's a pinned Field variable
-      True
-    shouldKeep (U (RefUX width var)) =
-      -- it's a UInt intermediate variable that occurs in the circuit
-      RefUX width var `Set.member` refUsInOccurrencesF memberships
-        || RefUX width var `Set.member` refUsInOccurrencesU memberships
-    shouldKeep (U _) =
-      -- it's a pinned UInt variable
-      True
+    shouldBeKept :: Ref -> Bool
+    shouldBeKept (F ref) = refFShouldBeKept ref
+    shouldBeKept (B ref) = refBShouldBeKept ref
+    shouldBeKept (U ref) = refUShouldBeKept ref
+
+    refFShouldBeKept :: RefT -> Bool
+    refFShouldBeKept ref = case ref of
+      RefFX var ->
+        -- it's a Field intermediate variable that occurs in the circuit
+        RefFX var `Set.member` refFsInOccurrencesF memberships
+      _ ->
+        -- it's a pinned Field variable
+        True
+
+    refUShouldBeKept :: RefU -> Bool
+    refUShouldBeKept ref = case ref of
+      RefUX width var ->
+        -- it's a UInt intermediate variable that occurs in the circuit
+        RefUX width var `Set.member` refUsInOccurrencesF memberships
+          || RefUX width var `Set.member` refUsInOccurrencesU memberships
+      _ ->
+        -- it's a pinned UInt variable
+        True
+
+    refBShouldBeKept :: RefB -> Bool
+    refBShouldBeKept ref = case ref of
+      RefBX var ->
+        --  it's a Boolean intermediate variable that occurs in the circuit
+        RefBX var `Set.member` refBsInOccurrencesB memberships
+          || RefBX var `Set.member` refBsInOccurrencesF memberships
+      RefUBit _ var _ ->
+        --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
+        --  the UInt variable should be kept
+        var `Set.member` bitTestsInOccurrencesB memberships
+          || shouldBeKept (U var)
+      _ ->
+        -- it's a pinned Field variable
+        True
 
     extractBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Seq (Relocated.Constraint n)
     extractBooleanRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Maybe (Constraint n)
-          convert (var, Right val) =
-            if shouldKeep (B var)
-              then Just $ CVarBindB var (if val then 1 else 0)
-              else Nothing
+      let convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Constraint n
+          convert (var, Right val) = CVarBindB var (if val then 1 else 0)
           convert (var, Left (dontFlip, root)) =
-            if shouldKeep (B var) && shouldKeep (B root)
-              then
-                if dontFlip
-                  then Just $ CVarEqB var root
-                  else Just $ CVarNEqB var root
-              else Nothing
+            if dontFlip
+              then CVarEqB var root
+              else CVarNEqB var root
 
-          result = Maybe.mapMaybe convert $ Map.toList $ BooleanRelations.toIntMap relations
+          result = map convert $ Map.toList $ BooleanRelations.toMap2 refBShouldBeKept relations
        in Seq.fromList (map (fromConstraint counters) result)
 
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Seq (Relocated.Constraint n)
     extractUIntRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefU, Either (Int, RefU) n) -> Maybe (Constraint n)
-          convert (var, Right val) =
-            if shouldKeep (U var)
-              then Just $ CVarBindU var val
-              else Nothing
+      let convert :: (GaloisField n, Integral n) => (RefU, Either (Int, RefU) n) -> Constraint n
+          convert (var, Right val) = CVarBindU var val
           convert (var, Left (rotation, root)) =
-            if shouldKeep (U var) && shouldKeep (U root)
-              then
-                if rotation == 0
-                  then Just $ CVarEqU var root
-                  else error "[ panic ] Unexpected rotation in extractUIntRelations"
-              else -- Just $ CVarNEqB var root
-                Nothing
+            if rotation == 0
+              then CVarEqU var root
+              else error "[ panic ] Unexpected rotation in extractUIntRelations"
 
-          result = Maybe.mapMaybe convert $ Map.toList $ UIntRelations.toIntMap relations
+          result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
        in Seq.fromList (map (fromConstraint counters) result)
 
     -- varEqFs = fromFieldRelations (csFieldRelations cs) (FieldRelations.exportUIntRelations (csFieldRelations cs)) (csOccurrenceF cs)

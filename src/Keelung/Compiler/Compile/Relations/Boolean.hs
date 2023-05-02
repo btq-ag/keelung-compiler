@@ -7,7 +7,8 @@ module Keelung.Compiler.Compile.Relations.Boolean
     assign,
     relate,
     relationBetween,
-    toIntMap,
+    toMap,
+    toMap2,
     size,
     isValid,
     lookup,
@@ -68,12 +69,26 @@ relate var1 polarity var2 xs = mapError $ Relations.relate var1 (Polarity polari
 relationBetween :: RefB -> RefB -> BooleanRelations -> Maybe Bool
 relationBetween var1 var2 xs = unPolarity <$> Relations.relationBetween var1 var2 xs
 
-toIntMap :: BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
-toIntMap xs = Map.mapMaybe convert $ Relations.toMap xs
+toMap :: BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
+toMap xs = Map.mapMaybe convert $ Relations.toMap xs
   where
     convert (Relations.IsConstant val) = Just (Right val)
     convert (Relations.IsRoot _) = Nothing
     convert (Relations.IsChildOf parent (Polarity polarity)) = Just $ Left (polarity, parent)
+
+toMap2 :: (RefB -> Bool) -> BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
+toMap2 shouldBeKept xs = Map.mapMaybeWithKey convert $ Relations.toMap xs
+  where
+    convert var status = do
+      if shouldBeKept var
+        then case status of
+          Relations.IsConstant val -> Just (Right val)
+          Relations.IsRoot _ -> Nothing
+          Relations.IsChildOf parent (Polarity polarity) ->
+            if shouldBeKept parent
+              then Just $ Left (polarity, parent)
+              else Nothing
+        else Nothing
 
 size :: BooleanRelations -> Int
 size = Map.size . Relations.toMap

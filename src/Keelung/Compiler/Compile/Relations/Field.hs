@@ -15,7 +15,7 @@ module Keelung.Compiler.Compile.Relations.Field
     assertEqual,
     assertEqualU,
     relationBetween,
-    toIntMap,
+    toInt,
     size,
     isValid,
     lookup,
@@ -194,12 +194,19 @@ relationBetween var1 var2 xs = case Relations.relationBetween var1 var2 (relatio
   Nothing -> Nothing
   Just (LinRel a b) -> Just (a, b)
 
-toIntMap :: AllRelations n -> Map Ref (Either (n, Ref, n) n)
-toIntMap xs = Map.mapMaybe convert $ Relations.toMap (relationsF xs)
+toInt :: (Ref -> Bool) -> AllRelations n -> Map Ref (Either (n, Ref, n) n)
+toInt shouldBeKept xs = Map.mapMaybeWithKey convert $ Relations.toMap (relationsF xs)
   where
-    convert (Relations.IsConstant val) = Just (Right val)
-    convert (Relations.IsRoot _) = Nothing
-    convert (Relations.IsChildOf parent (LinRel slope intercept)) = Just $ Left (slope, parent, intercept)
+    convert var status = do
+      if shouldBeKept var
+        then case status of
+          Relations.IsConstant val -> Just (Right val)
+          Relations.IsRoot _ -> Nothing
+          Relations.IsChildOf parent (LinRel slope intercept) ->
+            if shouldBeKept parent
+              then Just $ Left (slope, parent, intercept)
+              else Nothing
+        else Nothing
 
 size :: AllRelations n -> Int
 size = Map.size . Relations.toMap . relationsF

@@ -9,7 +9,7 @@ module Keelung.Compiler.Compile.Relations.UInt
     assign,
     relate,
     relationBetween,
-    toIntMap,
+    toMap,
     size,
     isValid,
     lookup,
@@ -91,12 +91,19 @@ relationBetween var1 var2 xs = case Relations.relationBetween var1 var2 xs of
   Nothing -> Nothing
   Just rotation -> Just (rotationAmount rotation)
 
-toIntMap :: UIntRelations n -> Map RefU (Either (Int, RefU) n)
-toIntMap xs = Map.mapMaybe convert $ Relations.toMap xs
+toMap :: (RefU -> Bool) -> UIntRelations n -> Map RefU (Either (Int, RefU) n)
+toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ Relations.toMap xs
   where
-    convert (Relations.IsConstant val) = Just (Right val)
-    convert (Relations.IsRoot _) = Nothing
-    convert (Relations.IsChildOf parent rotation) = Just $ Left (rotationAmount rotation, parent)
+    convert var status = do
+      if shouldBeKept var
+        then case status of
+          Relations.IsConstant val -> Just (Right val)
+          Relations.IsRoot _ -> Nothing
+          Relations.IsChildOf parent rotation ->
+            if shouldBeKept parent
+              then Just $ Left (rotationAmount rotation, parent)
+              else Nothing
+        else Nothing
 
 size :: UIntRelations n -> Int
 size = Map.size . Relations.toMap
