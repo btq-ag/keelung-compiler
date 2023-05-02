@@ -28,7 +28,6 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
 
-
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
@@ -69,6 +68,15 @@ compileAssertion expr = case expr of
   ExprB (EqB x y) -> compileAssertionEqB x y
   ExprB (EqF x y) -> compileAssertionEqF x y
   ExprB (EqU x y) -> compileAssertionEqU x y
+  -- rewriting `assert (x <= y)` width `assertLTE x y`
+  ExprB (LTEU x (ValU width bound)) -> assertLTE width x (toInteger bound)
+  ExprB (LTEU (ValU width bound) x) -> assertGTE width x (toInteger bound)
+  ExprB (LTU x (ValU width bound)) -> assertLT width x (toInteger bound)
+  ExprB (LTU (ValU width bound) x) -> assertGT width x (toInteger bound)
+  ExprB (GTEU x (ValU width bound)) -> assertGTE width x (toInteger bound)
+  ExprB (GTEU (ValU width bound) x) -> assertLTE width x (toInteger bound)
+  ExprB (GTU x (ValU width bound)) -> assertGT width x (toInteger bound)
+  ExprB (GTU (ValU width bound) x) -> assertLT width x (toInteger bound)
   ExprB x -> do
     out <- freshRefB
     compileExprB out x
@@ -362,15 +370,15 @@ compileExprB out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileLTEU out x' y'
-  LTU x y -> do 
+  LTU x y -> do
     x' <- wireU x
     y' <- wireU y
     compileLTU out x' y'
-  GTEU x y -> do 
+  GTEU x y -> do
     x' <- wireU x
     y' <- wireU y
     compileGTEU out x' y'
-  GTU x y -> do 
+  GTU x y -> do
     x' <- wireU x
     y' <- wireU y
     compileGTU out x' y'
@@ -1090,7 +1098,7 @@ assertGT width a c = do
   -- otherwise, assert that a >= c + 1
   assertGTE width a (c + 1)
 
--- lastBit = if a 
+-- lastBit = if a
 --    then if b then 1 else 0
 --    else if b then 1 else 1
 compileLTEU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
@@ -1110,7 +1118,7 @@ compileLTEU out x y = do
   result' <- foldM (compileLTEUPrim width x y) result [1 .. width - 1]
   add $ cVarEq (B out) result'
 
--- lastBit = if a 
+-- lastBit = if a
 --    then if b then 0 else 0
 --    else if b then 1 else 0
 -- (b - lastBit) = (a)(b)
@@ -1128,7 +1136,7 @@ compileLTU out x y = do
   result' <- foldM (compileLTEUPrim width x y) result [1 .. width - 1]
   add $ cVarEq (B out) result'
 
--- output = if a 
+-- output = if a
 --    then if b then x else 0
 --    else if b then 1 else x
 -- output = 2abx + b + x - bx - ab - ax
@@ -1156,10 +1164,9 @@ compileGTU out x y = compileLTU out y x
 compileGTEU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
 compileGTEU out x y = compileLTEU out y x
 
-
--- output = if a 
+-- output = if a
 --    then if b then x else 0
 --    else if b then 1 else x
--- lastBit = if a 
+-- lastBit = if a
 --    then if b then 0 else 0
 --    else if b then 1 else 0

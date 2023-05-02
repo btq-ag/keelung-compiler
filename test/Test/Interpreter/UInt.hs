@@ -110,7 +110,7 @@ tests = do
           runAll program [4 :: GF181] [4] [1, 0]
 
         it "performDivMod (on constants) (issue #18)" $ do
-          -- 7 = 3 * 2 + 1 
+          -- 7 = 3 * 2 + 1
           let program = performDivMod 7 (3 :: UInt 4)
           runAll program [] [] [2, 1 :: GF181]
 
@@ -210,210 +210,234 @@ tests = do
                 return (quotient, remainder)
           runAll program [34, 6 :: GF181] [] [5, 4]
 
-      describe "Range Check" $ do
-        it "assertLTE (QuickCheck)" $ do
-          -- `bound` ranges from `-50` to `50`
-          forAll (choose (-50, 50)) $ \bound -> do
-            let width = 4
+    describe "Comparisons" $ do
+      it "assertLTE" $ do
+        -- `bound` ranges from `-50` to `50`
+        forAll (choose (-50, 50)) $ \bound -> do
+          let width = 4
 
-            let program = do
-                  x <- inputUInt @4 Public
-                  assertLTE x bound
-
-            when (bound < 0) $ do
-              forM_ [0 .. 15] $ \x -> do
-                throwAll
-                  program
-                  [fromInteger x :: GF181]
-                  []
-                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooSmallError bound))
-                  (CompileError (CompilerError.AssertLTEBoundTooSmallError bound))
-
-            when (bound >= 0 && bound < 15) $ do
-              forM_ [0 .. 15] $ \x -> do
-                if x <= bound
-                  then runAll program [fromInteger x :: GF181] [] []
-                  else do
-                    throwAll
-                      program
-                      [fromInteger x :: GF181]
-                      []
-                      (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError (fromInteger x) bound))
-                      (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left (-1)) (Left 1) (Left 0))))
-
-            when (bound >= 15) $ do
-              forM_ [0 .. 15] $ \x -> do
-                throwAll
-                  program
-                  [fromInteger x :: GF181]
-                  []
-                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooLargeError bound width))
-                  (CompileError (CompilerError.AssertLTEBoundTooLargeError bound width))
-
-        it "assertLT (QuickCheck)" $ do
-          -- `bound` ranges from `-50` to `50`
-          forAll (choose (-50, 50)) $ \bound -> do
-            let width = 4
-
-            let program = do
-                  x <- inputUInt @4 Public
-                  assertLT x bound
-
-            when (bound < 1) $ do
-              forM_ [0 .. 15] $ \x -> do
-                throwAll
-                  program
-                  [fromInteger x :: GF181]
-                  []
-                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTBoundTooSmallError bound))
-                  (CompileError (CompilerError.AssertLTBoundTooSmallError bound))
-
-            when (bound >= 1 && bound < 16) $ do
-              forM_ [0 .. 15] $ \x -> do
-                if x < bound
-                  then runAll program [fromInteger x :: GF181] [] []
-                  else do
-                    throwAll
-                      program
-                      [fromInteger x :: GF181]
-                      []
-                      (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTError (fromInteger x) bound))
-                      (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left (-1)) (Left 1) (Left 0))))
-
-            when (bound >= 16) $ do
-              forM_ [0 .. 15] $ \x -> do
-                throwAll
-                  program
-                  [fromInteger x :: GF181]
-                  []
-                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTBoundTooLargeError bound width))
-                  (CompileError (CompilerError.AssertLTBoundTooLargeError bound width))
-
-        it "assertGTE (QuickCheck)" $ do
-          -- `bound` ranges from `-50` to `50`
-          forAll (choose (-50, 50)) $ \bound -> do
-            let width = 4
-
-            let program = do
-                  x <- inputUInt @4 Public
-                  assertGTE x bound
-
-            when (bound < 1) $ do
-              forM_ [0 .. 15] $ \x -> do
-                throwAll
-                  program
-                  [fromInteger x :: GF181]
-                  []
-                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEBoundTooSmallError bound))
-                  (CompileError (CompilerError.AssertGTEBoundTooSmallError bound))
-
-            when (bound >= 1 && bound < 16) $ do
-              forM_ [0 .. 15] $ \x -> do
-                if x >= bound
-                  then runAll program [fromInteger x :: GF181] [] []
-                  else do
-                    throwAll
-                      program
-                      [fromInteger x :: GF181]
-                      []
-                      (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEError (fromInteger x) bound))
-                      (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left (-1)))))
-
-            when (bound >= 16) $ do
-              forM_ [0 .. 15] $ \x -> do
-                throwAll
-                  program
-                  [fromInteger x :: GF181]
-                  []
-                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEBoundTooLargeError bound width))
-                  (CompileError (CompilerError.AssertGTEBoundTooLargeError bound width))
-
-        it "assertGT (QuickCheck)" $ do
-          -- `bound` ranges from `-50` to `50`
-          forAll (choose (-50, 50)) $ \bound -> do
-            let width = 4
-
-            let program = do
-                  x <- inputUInt @4 Public
-                  assertGT x bound
-
-            when (bound < 0) $ do
-              forM_ [0 .. 15] $ \x -> do
-                throwAll
-                  program
-                  [fromInteger x :: GF181]
-                  []
-                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTBoundTooSmallError bound))
-                  (CompileError (CompilerError.AssertGTBoundTooSmallError bound))
-
-            when (bound >= 0 && bound < 15) $ do
-              forM_ [0 .. 15] $ \x -> do
-                if x > bound
-                  then runAll program [fromInteger x :: GF181] [] []
-                  else do
-                    throwAll
-                      program
-                      [fromInteger x :: GF181]
-                      []
-                      (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTError (fromInteger x) bound))
-                      (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left (-1)))))
-
-            when (bound >= 15) $ do
-              forM_ [0 .. 15] $ \x -> do
-                throwAll
-                  program
-                  [fromInteger x :: GF181]
-                  []
-                  (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTBoundTooLargeError bound width))
-                  (CompileError (CompilerError.AssertGTBoundTooLargeError bound width))
-
-        it "lte (QuickCheck)" $ do
-          let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
           let program = do
                 x <- inputUInt @4 Public
-                y <- inputUInt @4 Public
-                return $ x `lte` y
+                assertLTE x bound
 
-          forAll genPair $ \(x, y) -> do
-            if x <= y
-              then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
-              else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+          when (bound < 0) $ do
+            forM_ [0 .. 15] $ \x -> do
+              throwAll
+                program
+                [fromInteger x :: GF181]
+                []
+                (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooSmallError bound))
+                (CompileError (CompilerError.AssertLTEBoundTooSmallError bound))
 
-        it "lt (QuickCheck)" $ do
-          let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+          when (bound >= 0 && bound < 15) $ do
+            forM_ [0 .. 15] $ \x -> do
+              if x <= bound
+                then runAll program [fromInteger x :: GF181] [] []
+                else do
+                  throwAll
+                    program
+                    [fromInteger x :: GF181]
+                    []
+                    (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError (fromInteger x) bound))
+                    (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left (-1)) (Left 1) (Left 0))))
+
+          when (bound >= 15) $ do
+            forM_ [0 .. 15] $ \x -> do
+              throwAll
+                program
+                [fromInteger x :: GF181]
+                []
+                (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooLargeError bound width))
+                (CompileError (CompilerError.AssertLTEBoundTooLargeError bound width))
+
+      it "assertLT" $ do
+        -- `bound` ranges from `-50` to `50`
+        forAll (choose (-50, 50)) $ \bound -> do
+          let width = 4
+
           let program = do
                 x <- inputUInt @4 Public
-                y <- inputUInt @4 Public
-                return $ x `lt` y
+                assertLT x bound
 
-          forAll genPair $ \(x, y) -> do
-            if x < y
-              then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
-              else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+          when (bound < 1) $ do
+            forM_ [0 .. 15] $ \x -> do
+              throwAll
+                program
+                [fromInteger x :: GF181]
+                []
+                (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTBoundTooSmallError bound))
+                (CompileError (CompilerError.AssertLTBoundTooSmallError bound))
 
-        it "gte (QuickCheck)" $ do
-          let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+          when (bound >= 1 && bound < 16) $ do
+            forM_ [0 .. 15] $ \x -> do
+              if x < bound
+                then runAll program [fromInteger x :: GF181] [] []
+                else do
+                  throwAll
+                    program
+                    [fromInteger x :: GF181]
+                    []
+                    (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTError (fromInteger x) bound))
+                    (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left (-1)) (Left 1) (Left 0))))
+
+          when (bound >= 16) $ do
+            forM_ [0 .. 15] $ \x -> do
+              throwAll
+                program
+                [fromInteger x :: GF181]
+                []
+                (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTBoundTooLargeError bound width))
+                (CompileError (CompilerError.AssertLTBoundTooLargeError bound width))
+
+      it "assertGTE" $ do
+        -- `bound` ranges from `-50` to `50`
+        forAll (choose (-50, 50)) $ \bound -> do
+          let width = 4
+
           let program = do
                 x <- inputUInt @4 Public
-                y <- inputUInt @4 Public
-                return $ x `gte` y
+                assertGTE x bound
 
-          forAll genPair $ \(x, y) -> do
-            if x >= y
-              then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
-              else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+          when (bound < 1) $ do
+            forM_ [0 .. 15] $ \x -> do
+              throwAll
+                program
+                [fromInteger x :: GF181]
+                []
+                (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEBoundTooSmallError bound))
+                (CompileError (CompilerError.AssertGTEBoundTooSmallError bound))
 
-        it "gt (QuickCheck)" $ do
-          let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+          when (bound >= 1 && bound < 16) $ do
+            forM_ [0 .. 15] $ \x -> do
+              if x >= bound
+                then runAll program [fromInteger x :: GF181] [] []
+                else do
+                  throwAll
+                    program
+                    [fromInteger x :: GF181]
+                    []
+                    (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEError (fromInteger x) bound))
+                    (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left (-1)))))
+
+          when (bound >= 16) $ do
+            forM_ [0 .. 15] $ \x -> do
+              throwAll
+                program
+                [fromInteger x :: GF181]
+                []
+                (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEBoundTooLargeError bound width))
+                (CompileError (CompilerError.AssertGTEBoundTooLargeError bound width))
+
+      it "assertGT" $ do
+        -- `bound` ranges from `-50` to `50`
+        forAll (choose (-50, 50)) $ \bound -> do
+          let width = 4
+
           let program = do
                 x <- inputUInt @4 Public
-                y <- inputUInt @4 Public
-                return $ x `gt` y
+                assertGT x bound
 
-          forAll genPair $ \(x, y) -> do
-            if x > y
-              then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
-              else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+          when (bound < 0) $ do
+            forM_ [0 .. 15] $ \x -> do
+              throwAll
+                program
+                [fromInteger x :: GF181]
+                []
+                (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTBoundTooSmallError bound))
+                (CompileError (CompilerError.AssertGTBoundTooSmallError bound))
+
+          when (bound >= 0 && bound < 15) $ do
+            forM_ [0 .. 15] $ \x -> do
+              if x > bound
+                then runAll program [fromInteger x :: GF181] [] []
+                else do
+                  throwAll
+                    program
+                    [fromInteger x :: GF181]
+                    []
+                    (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTError (fromInteger x) bound))
+                    (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left (-1)))))
+
+          when (bound >= 15) $ do
+            forM_ [0 .. 15] $ \x -> do
+              throwAll
+                program
+                [fromInteger x :: GF181]
+                []
+                (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTBoundTooLargeError bound width))
+                (CompileError (CompilerError.AssertGTBoundTooLargeError bound width))
+
+      it "lte" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return $ x `lte` y
+
+        forAll genPair $ \(x, y) -> do
+          if x <= y
+            then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
+            else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+
+      it "lt" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return $ x `lt` y
+
+        forAll genPair $ \(x, y) -> do
+          if x < y
+            then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
+            else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+
+      it "gte" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return $ x `gte` y
+
+        forAll genPair $ \(x, y) -> do
+          if x >= y
+            then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
+            else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+
+      it "gt" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return $ x `gt` y
+
+        forAll genPair $ \(x, y) -> do
+          if x > y
+            then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
+            else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+
+      -- it "assert + lte" $ do
+      --   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+      --   let program y = do
+      --         x <- inputUInt @4 Public
+      --         assert $ x `lte` fromInteger y
+
+      --   forAll genPair $ \(x, y) -> do
+      --     if x > y
+      --       then
+      --         throwAll'
+      --           (program y)
+      --           [fromInteger x :: GF181]
+      --           []
+      --           (Interpreter.SyntaxTreeError (SyntaxTree.AssertionError ("$UI₄0 ≤ " <> show y)))
+      --           (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1))))
+      --       else runAll (program y) [fromInteger x :: GF181] [] []
+
+      -- it "assert + lte (size)" $ do
+      --   let program y = do
+      --         x <- inputUInt @4 Public
+      --         assert $ x `lte` fromInteger y
+      --   debug (program 1)
+      --   assertSize 8 (program 1)
 
     describe "Conditionals" $ do
       it "with inputs" $ do
@@ -428,58 +452,51 @@ tests = do
               return $ cond true (3 :: UInt 2) 2
         runAll program [] [] [3 :: GF181]
 
-    it "eq" $ do
-      let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            return (x `eq` y)
-      runAll program [5, 6 :: GF181] [] [0]
-      runAll program [4, 4 :: GF181] [] [1]
+    describe "Equalities" $ do
+      it "eq" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return (x `eq` y)
+        runAll program [5, 6 :: GF181] [] [0]
+        runAll program [4, 4 :: GF181] [] [1]
 
-    it "neq 1" $ do
-      let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            return (x `neq` y)
-      runAll program [5, 6 :: GF181] [] [1]
-      runAll program [4, 4 :: GF181] [] [0]
+      it "neq 1" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return (x `neq` y)
+        runAll program [5, 6 :: GF181] [] [1]
+        runAll program [4, 4 :: GF181] [] [0]
 
-    it "neq 2" $ do
-      let program = do
-            x <- inputUInt @4 Public
-            return (x `neq` 3)
-      runAll program [5 :: GF181] [] [1]
-      runAll program [3 :: GF181] [] [0]
+      it "neq 2" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              return (x `neq` 3)
+        runAll program [5 :: GF181] [] [1]
+        runAll program [3 :: GF181] [] [0]
 
-    it "neq 3" $ do
-      let program = do
-            x <- inputUInt @4 Public
-            assert $ x `neq` 3
-      runAll program [5 :: GF181] [] []
-      throwAll
-        program
-        [3 :: GF181]
-        []
-        (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ ($UI₄0 = 3)")
-        (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1)))
+      it "neq 3" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              assert $ x `neq` 3
+        runAll program [5 :: GF181] [] []
+        throwAll
+          program
+          [3 :: GF181]
+          []
+          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ ($UI₄0 = 3)")
+          (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1)))
 
-    it "neq 4" $ do
-      let program = do
-            assert $ 3 `neq` (3 :: UInt 4)
-      throwAll
-        program
-        []
-        ([] :: [GF181])
-        (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ (3 = 3)")
-        (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1)))
-        -- (CompileError (CompilerError.ConflictingValuesF 0 1))
-      -- throwAll'
-      --   program
-      --   []
-      --   ([] :: [GF181])
-      --   (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ (3 = 3)")
-      --   (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1)))
-      --   (CompileError (CompilerError.ConflictingValuesF 0 1))
+      it "neq 4" $ do
+        let program = do
+              assert $ 3 `neq` (3 :: UInt 4)
+        throwAll
+          program
+          []
+          ([] :: [GF181])
+          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ (3 = 3)")
+          (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1)))
 
     it "rotate" $ do
       let program = do

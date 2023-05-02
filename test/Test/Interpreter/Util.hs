@@ -1,4 +1,4 @@
-module Test.Interpreter.Util (runAll, throwAll, throwAll', runAndCompare, debug) where
+module Test.Interpreter.Util (runAll, throwAll, throwAll', runAndCompare, debug, assertSize) where
 
 import Control.Arrow (left)
 import Keelung hiding (compile, run)
@@ -12,6 +12,7 @@ import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
+import qualified Keelung.Compiler.Relocated as Relocated
 
 --------------------------------------------------------------------------------
 
@@ -93,5 +94,16 @@ debug program = do
   print $ Compiler.asGF181N $ Compiler.compileO0 program
   -- print $ Compiler.asGF181N $ Compiler.compileO1 program
   print $ Compiler.asGF181N $ Compiler.compileToModules program
+  print (Compiler.asGF181N $ toR1CS <$> Compiler.compileO1 program)
 
--- print (Compiler.asGF181N $ toR1CS <$> Compiler.compileO1 program)
+-- | 
+assertSize :: Encode t => Int -> Comp t -> IO ()
+assertSize afterSize program = do
+  -- case Compiler.asGF181N (Compiler.compileO0 program) of 
+  --   Left err -> print err
+  --   Right cs -> do
+  --     Relocated.numberOfConstraints (relocateConstraintSystem cs) `shouldBe` beforeSize
+  case Compiler.asGF181N (Compiler.compileO1 program) of 
+    Left err -> print err
+    Right cs -> do
+      Relocated.numberOfConstraints cs `shouldBe` afterSize
