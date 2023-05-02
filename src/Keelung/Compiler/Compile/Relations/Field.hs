@@ -222,9 +222,15 @@ toLookup (Relations.IsConstant val) = Value val
 toLookup (Relations.IsChildOf parent (slope, intercept)) = ChildOf slope parent intercept
 
 lookup' :: GaloisField n => Ref -> AllRelations n -> Relations.VarStatus Ref n (n, n)
-lookup' (U var) xs = fromLinRel $ fromUIntLookup $ Relations.UInt.lookup' var (relationsU xs)
-lookup' (B var) xs = fromLinRel $ fromBooleanLookup $ Relations.Boolean.lookup' var (relationsB xs)
-lookup' (F var) xs = fromLinRel $ Relations.lookup (F var) (relationsF xs)
+lookup' var xs = fromLinRel $ case Relations.lookup var (relationsF xs) of 
+  Relations.IsRoot children -> case var of 
+    B refB -> fromBooleanLookup $ Relations.Boolean.lookup' refB (relationsB xs)
+    _ -> Relations.IsRoot children
+  Relations.IsConstant val -> Relations.IsConstant val
+  Relations.IsChildOf parent (LinRel a b) -> Relations.IsChildOf parent (LinRel a b)
+-- lookup' (U var) xs = fromLinRel $ fromUIntLookup (Relations.UInt.lookup' var (relationsU xs))
+-- lookup' (B var) xs = fromLinRel $ fromBooleanLookup $ Relations.Boolean.lookup' var (relationsB xs)
+-- lookup' (F var) xs = fromLinRel $ Relations.lookup (F var) (relationsF xs)
 
 fromLinRel :: Relations.VarStatus Ref n (LinRel n) -> Relations.VarStatus Ref n (n, n)
 fromLinRel (Relations.IsRoot children) = Relations.IsRoot $ fmap (\(LinRel a b) -> (a, b)) children

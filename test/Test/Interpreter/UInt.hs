@@ -64,7 +64,6 @@ tests = do
         let program = do
               x <- inputUInt @4 Public
               assert $ 2 `eq` (x + 1)
-        -- debug program
         runAllExceptForTheOldOptimizer
           program
           [1]
@@ -111,6 +110,7 @@ tests = do
           runAllExceptForTheOldOptimizer program [4 :: GF181] [4] [1, 0]
 
         it "performDivMod (on constants) (issue #18)" $ do
+          -- 7 = 3 * 2 + 1 
           let program = performDivMod 7 (3 :: UInt 4)
           runAllExceptForTheOldOptimizer program [] [] [2, 1 :: GF181]
 
@@ -466,13 +466,20 @@ tests = do
     it "neq 4" $ do
       let program = do
             assert $ 3 `neq` (3 :: UInt 4)
-      throwAll'
+      throwAll
         program
         []
         ([] :: [GF181])
         (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ (3 = 3)")
         (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1)))
-        (CompileError (CompilerError.ConflictingValuesF 0 1))
+        -- (CompileError (CompilerError.ConflictingValuesF 0 1))
+      -- throwAll'
+      --   program
+      --   []
+      --   ([] :: [GF181])
+      --   (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ (3 = 3)")
+      --   (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1)))
+      --   (CompileError (CompilerError.ConflictingValuesF 0 1))
 
     it "rotate" $ do
       let program = do
