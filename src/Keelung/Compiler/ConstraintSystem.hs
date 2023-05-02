@@ -210,6 +210,8 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
                   <> showUInts
                   <> "\n"
 
+-------------------------------------------------------------------------------
+
 relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
 relocateConstraintSystem cs =
   Relocated.RelocatedConstraintSystem
@@ -232,6 +234,8 @@ relocateConstraintSystem cs =
     uncurry3 f (a, b, c) = f a b c
 
     binReps = generateBinReps counters (csOccurrenceU cs) (csOccurrenceF cs)
+
+    memberships = constructMemberships cs
 
     -- \| Generate BinReps from the UIntRelations
     generateBinReps :: Counters -> Map RefU Int -> Map Ref Int -> [BinRep]
@@ -330,31 +334,15 @@ relocateConstraintSystem cs =
     --             Left _ -> Nothing
     --             Right poly -> Just $ fromConstraint counters $ CAddF poly
 
-    extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Map Ref Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
-    extractFieldRelations relations occurrencesF occurrencesB occurrencesU =
-      let -- \| Keep a variable if:
-          --    1. it's a pinned variable (e.g. a public input)
-          --    2. it's a Boolean intermediate variable that occurs in the circuit
-          --    3. it's a Bit test of a UInt intermediate variable that occurs in the circuit
-          -- shouldKeep :: Ref -> Bool
-          -- -- shouldKeep :: RefB -> Bool
-          -- -- shouldKeep (RefBX ref) =
-          -- --   RefBX ref `Set.member` refBsOccurredInB
-          -- --     || RefBX ref `Set.member` refBsOccurredInF
-          -- -- shouldKeep (RefUBit _ ref _) =
-          -- --   ref `Set.member` refUsOccurredInF
-          -- --     || ref `Set.member` bitTestsOccurredInB
-          -- --     || ref `Set.member` Map.keysSet occurrencesU
-          -- --     || pinnedRefU ref
-          -- shouldKeep _ = True
-
-          convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Maybe (Constraint n)
+    extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Relocated.Constraint n)
+    extractFieldRelations relations =
+      let convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Maybe (Constraint n)
           convert (var, Right val) =
-            if shouldKeep occurrencesF occurrencesB occurrencesU var
+            if shouldKeep var
               then Just $ CVarBindF var val
               else Nothing
           convert (var, Left (slope, root, intercept)) =
-            if shouldKeep occurrencesF occurrencesB occurrencesU var && shouldKeep occurrencesF occurrencesB occurrencesU root
+            if shouldKeep var && shouldKeep root
               then case (slope, intercept) of
                 (0, _) -> Just $ CVarBindF var intercept
                 (1, 0) -> Just $ CVarEq var root
@@ -366,90 +354,42 @@ relocateConstraintSystem cs =
           result = Maybe.mapMaybe convert $ Map.toList $ AllRelations.toIntMap relations
        in Seq.fromList (map (fromConstraint counters) result)
 
-    --    1. it's a pinned variable (e.g. a public input)
-    --    2. it's a Boolean intermediate variable that occurs in the circuit
-    --    3. it's a Bit test of a UInt intermediate variable that occurs in the circuit
-    shouldKeep :: Map Ref Int -> Map RefB Int -> Map RefU Int -> Ref -> Bool
-    shouldKeep occurrencesF occurrencesB occurrencesU ref = 
-      case ref of
-        U var -> shouldKeepU occurrencesF occurrencesB occurrencesU var
-        B var -> shouldKeepB occurrencesF occurrencesB occurrencesU var
-        F var -> shouldKeepF occurrencesF occurrencesB occurrencesU var
-        
-    --    1. it's a pinned variable (e.g. a public input)
-    --    2. it's a Boolean intermediate variable that occurs in the circuit
-    --    3. it's a Bit test of a UInt intermediate variable that occurs in the circuit
-    shouldKeepF :: Map Ref Int -> Map RefB Int -> Map RefU Int -> RefT -> Bool
-    shouldKeepF occurrencesF _occurrencesB _occurrencesU ref = case ref of
-      RefFX var ->
-        RefFX var `Set.member` refFsOccurredInF
-      _ -> True
-      where
-        refFsOccurredInF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findFInRefF occurrencesF
-        findFInRefF (F _) 0 = Nothing
-        findFInRefF (F r) _ = Just r
-        findFInRefF _ _ = Nothing
+    shouldKeep :: Ref -> Bool
+    shouldKeep (F (RefFX var)) =
+      -- it's a Field intermediate variable that occurs in the circuit
+      RefFX var `Set.member` refFsInOccurrencesF memberships
+    shouldKeep (F _) =
+      -- it's a pinned Field variable
+      True
+    shouldKeep (B (RefBX var)) =
+      --  it's a Boolean intermediate variable that occurs in the circuit
+      RefBX var `Set.member` refBsInOccurrencesB memberships
+        || RefBX var `Set.member` refBsInOccurrencesF memberships
+    shouldKeep (B (RefUBit _ var _)) =
+      --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
+      --  the UInt variable should be kept
+      var `Set.member` bitTestsInOccurrencesB memberships
+        || shouldKeep (U var)
+    shouldKeep (B _) =
+      -- it's a pinned Field variable
+      True
+    shouldKeep (U (RefUX width var)) =
+      -- it's a UInt intermediate variable that occurs in the circuit
+      RefUX width var `Set.member` refUsInOccurrencesF memberships
+        || RefUX width var `Set.member` refUsInOccurrencesU memberships
+    shouldKeep (U _) =
+      -- it's a pinned UInt variable
+      True
 
-    -- \| Keep a variable if:
-    --    1. it's a pinned variable (e.g. a public input)
-    --    2. it's a Boolean intermediate variable that occurs in the circuit
-    --    3. it's a Bit test of a UInt intermediate variable that occurs in the circuit
-    shouldKeepB :: Map Ref Int -> Map RefB Int -> Map RefU Int -> RefB -> Bool
-    shouldKeepB occurrencesF occurrencesB occurrencesU ref =
-      case ref of
-        RefBX var ->
-          RefBX var `Set.member` refBsOccurredInB
-            || RefBX var `Set.member` refBsOccurredInF
-        RefUBit _ var _ ->
-          var `Set.member` refUsOccurredInF
-            || var `Set.member` bitTestsOccurredInB
-            || var `Set.member` Map.keysSet occurrencesU
-            || pinnedRefU var
-        _ -> True
-      where
-        refUsOccurredInF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findUInRefF occurrencesF
-        findUInRefF (U _) 0 = Nothing
-        findUInRefF (U r) _ = Just r
-        findUInRefF _ _ = Nothing
-
-        bitTestsOccurredInB = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findBitTestInRefB occurrencesB
-        findBitTestInRefB (RefUBit {}) 0 = Nothing
-        findBitTestInRefB (RefUBit _ r _) _ = Just r
-        findBitTestInRefB _ _ = Nothing
-
-        refBsOccurredInF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findRefBInRefF occurrencesF
-        findRefBInRefF (B _) 0 = Nothing
-        findRefBInRefF (B r) _ = Just r
-        findRefBInRefF _ _ = Nothing
-
-        refBsOccurredInB = Map.keysSet $ Map.filter (> 0) occurrencesB
-
-    -- \| Keep a variable if:
-    --    1. it's a pinned variable (e.g. a public input)
-    --    2. it's a UInt intermediate variable that occurs in the circuit
-    shouldKeepU :: Map Ref Int -> Map RefB Int -> Map RefU Int -> RefU -> Bool
-    shouldKeepU occurrencesF _occurrencesB occurrencesU ref =
-      case ref of
-        RefUX width var ->
-          RefUX width var `Set.member` refUsOccurredInF
-            || RefUX width var `Map.member` occurrencesU
-        _ -> True
-      where
-        -- \| Export of UInt-related constriants
-        refUsOccurredInF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findUInRefF occurrencesF
-        findUInRefF (U _) 0 = Nothing
-        findUInRefF (U r) _ = Just r
-        findUInRefF _ _ = Nothing
-
-    extractBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Map Ref Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
-    extractBooleanRelations relations occurrencesF occurrencesB occurrencesU =
+    extractBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Seq (Relocated.Constraint n)
+    extractBooleanRelations relations =
       let convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Maybe (Constraint n)
           convert (var, Right val) =
-            if shouldKeepB occurrencesF occurrencesB occurrencesU var
+            if shouldKeep (B var)
               then Just $ CVarBindB var (if val then 1 else 0)
               else Nothing
           convert (var, Left (dontFlip, root)) =
-            if shouldKeepB occurrencesF occurrencesB occurrencesU var && shouldKeepB occurrencesF occurrencesB occurrencesU root
+            if shouldKeep (B var) && shouldKeep (B root)
               then
                 if dontFlip
                   then Just $ CVarEqB var root
@@ -459,15 +399,15 @@ relocateConstraintSystem cs =
           result = Maybe.mapMaybe convert $ Map.toList $ BooleanRelations.toIntMap relations
        in Seq.fromList (map (fromConstraint counters) result)
 
-    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Map Ref Int -> Map RefB Int -> Map RefU Int -> Seq (Relocated.Constraint n)
-    extractUIntRelations relations occurrencesF occurrencesB occurrencesU =
+    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Seq (Relocated.Constraint n)
+    extractUIntRelations relations =
       let convert :: (GaloisField n, Integral n) => (RefU, Either (Int, RefU) n) -> Maybe (Constraint n)
           convert (var, Right val) =
-            if shouldKeepU occurrencesF occurrencesB occurrencesU var
+            if shouldKeep (U var)
               then Just $ CVarBindU var val
               else Nothing
           convert (var, Left (rotation, root)) =
-            if shouldKeepU occurrencesF occurrencesB occurrencesU var && shouldKeepU occurrencesF occurrencesB occurrencesU root
+            if shouldKeep (U var) && shouldKeep (U root)
               then
                 if rotation == 0
                   then Just $ CVarEqU var root
@@ -479,9 +419,9 @@ relocateConstraintSystem cs =
        in Seq.fromList (map (fromConstraint counters) result)
 
     -- varEqFs = fromFieldRelations (csFieldRelations cs) (FieldRelations.exportUIntRelations (csFieldRelations cs)) (csOccurrenceF cs)
-    varEqFs = extractFieldRelations (csFieldRelations cs) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
-    varEqUs = extractUIntRelations (FieldRelations.exportUIntRelations (csFieldRelations cs)) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
-    varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (csFieldRelations cs)) (csOccurrenceF cs) (csOccurrenceB cs) (csOccurrenceU cs)
+    varEqFs = extractFieldRelations (csFieldRelations cs)
+    varEqUs = extractUIntRelations (FieldRelations.exportUIntRelations (csFieldRelations cs))
+    varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (csFieldRelations cs))
 
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
@@ -608,3 +548,40 @@ instance UpdateOccurrences RefU where
                 }
           )
       )
+
+-------------------------------------------------------------------------------
+
+data Memberships = Memberships
+  { refFsInOccurrencesF :: !(Set RefT),
+    refBsInOccurrencesF :: !(Set RefB),
+    refUsInOccurrencesF :: !(Set RefU),
+    bitTestsInOccurrencesB :: !(Set RefU),
+    refBsInOccurrencesB :: !(Set RefB),
+    refUsInOccurrencesU :: !(Set RefU)
+  }
+
+constructMemberships :: ConstraintSystem n -> Memberships
+constructMemberships cs =
+  let findFInRef (F _) 0 = Nothing
+      findFInRef (F r) _ = Just r
+      findFInRef _ _ = Nothing
+
+      findUInRef (U _) 0 = Nothing
+      findUInRef (U r) _ = Just r
+      findUInRef _ _ = Nothing
+
+      findBitTestInRefB (RefUBit {}) 0 = Nothing
+      findBitTestInRefB (RefUBit _ r _) _ = Just r
+      findBitTestInRefB _ _ = Nothing
+
+      findBInRef (B _) 0 = Nothing
+      findBInRef (B r) _ = Just r
+      findBInRef _ _ = Nothing
+   in Memberships
+        { refFsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findFInRef (csOccurrenceF cs),
+          refBsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findBInRef (csOccurrenceF cs),
+          refUsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findUInRef (csOccurrenceF cs),
+          bitTestsInOccurrencesB = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findBitTestInRefB (csOccurrenceB cs),
+          refBsInOccurrencesB = Map.keysSet $ Map.filter (> 0) (csOccurrenceB cs),
+          refUsInOccurrencesU = Map.keysSet $ Map.filter (> 0) (csOccurrenceU cs)
+        }
