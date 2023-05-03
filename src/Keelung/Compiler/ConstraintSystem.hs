@@ -234,7 +234,7 @@ relocateConstraintSystem cs =
 
     binReps = generateBinReps counters (csOccurrenceU cs) (csOccurrenceF cs)
 
-    memberships = constructMemberships cs
+    occurences = constructOccurences cs
 
     -- \| Generate BinReps from the UIntRelations
     generateBinReps :: Counters -> Map RefU Int -> Map Ref Int -> [BinRep]
@@ -275,16 +275,6 @@ relocateConstraintSystem cs =
               )
             $ Set.toList (intermediateRefUsOccurredInU <> intermediateRefUsOccurredInF)
 
-        -- binRepsFromIntermediateRefUsOccurredInF =
-        --   Seq.fromList $
-        --     map
-        --       ( \(width, var) ->
-        --           let varOffset = reindex counters OfIntermediate (OfUInt width) var
-        --               binRepOffset = reindex counters OfIntermediate (OfUIntBinRep width) var
-        --            in BinRep varOffset width binRepOffset
-        --       )
-        --       intermediateRefUsOccurredInF
-
         -- fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
         fromSmallCounter sort (Struct _ _ u) = Seq.fromList $ concatMap (fromPair sort) (IntMap.toList u)
 
@@ -293,45 +283,6 @@ relocateConstraintSystem cs =
           let varOffset = reindex counters sort (OfUInt width) 0
               binRepOffset = reindex counters sort (OfUIntBinRep width) 0
            in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
-
-    -- fromFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> UIntRelations n -> Map Ref Int -> Seq (Relocated.Constraint n)
-    -- fromFieldRelations fieldRels _uintRels occurrencesF =
-    --   let outputVars = [F $ RefFO i | i <- [0 .. getCount OfOutput OfField counters - 1]]
-    --       publicInputVars = [F $ RefFI i | i <- [0 .. getCount OfPublicInput OfField counters - 1]]
-    --       privateInputVars = [F $ RefFP i | i <- [0 .. getCount OfPrivateInput OfField counters - 1]]
-    --       occurredInF = Map.keys $ Map.filterWithKey (\ref count -> count > 0 && not (pinnedRef ref)) occurrencesF
-    --    in Seq.fromList (Maybe.mapMaybe toConstraint outputVars)
-    --         <> Seq.fromList (Maybe.mapMaybe toConstraint publicInputVars)
-    --         <> Seq.fromList (Maybe.mapMaybe toConstraint privateInputVars)
-    --         <> Seq.fromList (Maybe.mapMaybe toConstraint occurredInF)
-    --   where
-    --     boolRels = FieldRelations.exportBooleanRelations fieldRels
-
-    --     toConstraint var = case FieldRelations.lookup var fieldRels of
-    --       FieldRelations.Root ->
-    --         -- var is already a root
-    --         Nothing
-    --       FieldRelations.Value intercept ->
-    --         -- var = intercept
-    --         Just $ fromConstraint counters $ CVarBindF var intercept
-    --       FieldRelations.ChildOf slope root intercept ->
-    --         -- var = slope * root + intercept
-    --         case root of
-    --           B refB -> case BooleanRelations.lookup refB boolRels of
-    --             BooleanRelations.Root -> case PolyG.build intercept [(var, -1), (root, slope)] of
-    --               Left _ -> Nothing
-    --               Right poly -> Just $ fromConstraint counters $ CAddF poly
-    --             BooleanRelations.Value intercept' ->
-    --               -- root = intercept'
-    --               Just $ fromConstraint counters $ CVarBindF var (slope * (if intercept' then 1 else 0) + intercept)
-    --             BooleanRelations.ChildOf polarity root' ->
-    --               -- root = polarity * slope * root' + intercept'
-    --               case PolyG.build intercept [(var, -1), (B root', (if polarity then 1 else -1) * slope)] of
-    --                 Left _ -> Nothing
-    --                 Right poly -> Just $ fromConstraint counters $ CAddF poly
-    --           _ -> case PolyG.build intercept [(var, -1), (root, slope)] of
-    --             Left _ -> Nothing
-    --             Right poly -> Just $ fromConstraint counters $ CAddF poly
 
     extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Relocated.Constraint n)
     extractFieldRelations relations =
@@ -357,7 +308,7 @@ relocateConstraintSystem cs =
     refFShouldBeKept ref = case ref of
       RefFX var ->
         -- it's a Field intermediate variable that occurs in the circuit
-        RefFX var `Set.member` refFsInOccurrencesF memberships
+        RefFX var `Set.member` refFsInOccurrencesF occurences
       _ ->
         -- it's a pinned Field variable
         True
@@ -366,8 +317,8 @@ relocateConstraintSystem cs =
     refUShouldBeKept ref = case ref of
       RefUX width var ->
         -- it's a UInt intermediate variable that occurs in the circuit
-        RefUX width var `Set.member` refUsInOccurrencesF memberships
-          || RefUX width var `Set.member` refUsInOccurrencesU memberships
+        RefUX width var `Set.member` refUsInOccurrencesF occurences
+          || RefUX width var `Set.member` refUsInOccurrencesU occurences
       _ ->
         -- it's a pinned UInt variable
         True
@@ -376,12 +327,12 @@ relocateConstraintSystem cs =
     refBShouldBeKept ref = case ref of
       RefBX var ->
         --  it's a Boolean intermediate variable that occurs in the circuit
-        RefBX var `Set.member` refBsInOccurrencesB memberships
-          || RefBX var `Set.member` refBsInOccurrencesF memberships
+        RefBX var `Set.member` refBsInOccurrencesB occurences
+          || RefBX var `Set.member` refBsInOccurrencesF occurences
       RefUBit _ var _ ->
         --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
         --  the UInt variable should be kept
-        var `Set.member` bitTestsInOccurrencesB memberships
+        var `Set.member` bitTestsInOccurrencesB occurences
           || shouldBeKept (U var)
       _ ->
         -- it's a pinned Field variable
@@ -544,7 +495,8 @@ instance UpdateOccurrences RefU where
 
 -------------------------------------------------------------------------------
 
-data Memberships = Memberships
+-- | Allow us to determine which relations should be extracted from the pool
+data Occurences = Occurences
   { refFsInOccurrencesF :: !(Set RefT),
     refBsInOccurrencesF :: !(Set RefB),
     refUsInOccurrencesF :: !(Set RefU),
@@ -553,8 +505,9 @@ data Memberships = Memberships
     refUsInOccurrencesU :: !(Set RefU)
   }
 
-constructMemberships :: ConstraintSystem n -> Memberships
-constructMemberships cs =
+-- | Smart constructor for 'Occurences'
+constructOccurences :: ConstraintSystem n -> Occurences
+constructOccurences cs =
   let findFInRef (F _) 0 = Nothing
       findFInRef (F r) _ = Just r
       findFInRef _ _ = Nothing
@@ -570,7 +523,7 @@ constructMemberships cs =
       findBInRef (B _) 0 = Nothing
       findBInRef (B r) _ = Just r
       findBInRef _ _ = Nothing
-   in Memberships
+   in Occurences
         { refFsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findFInRef (csOccurrenceF cs),
           refBsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findBInRef (csOccurrenceF cs),
           refUsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findUInRef (csOccurrenceF cs),
