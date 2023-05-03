@@ -49,7 +49,7 @@ data Constraint n
   | BooleanConstraint Var
   | CNEQConstraint (CNEQ n)
   | -- | Dividend, Divisor, Quotient, Remainder
-    DivModConstaint (Var, Var, Var, Var)
+    DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
   | BinRepConstraint BinRep
   | -- | (a, n, p) where modInv a * a = n * p + 1
     ModInvConstraint (Var, Var, Integer)
@@ -77,7 +77,7 @@ instance Functor Constraint where
   fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
   fmap _ (BooleanConstraint var) = BooleanConstraint var
   fmap f (CNEQConstraint cneq) = CNEQConstraint (fmap f cneq)
-  fmap _ (DivModConstaint dm) = DivModConstaint dm
+  fmap f (DivModConstaint (a, b, q, r)) = DivModConstaint (fmap f a, fmap f b, fmap f q, fmap f r)
   fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
   fmap _ (ModInvConstraint (a, n, p)) = ModInvConstraint (a, n, p)
 
@@ -100,8 +100,8 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "these variables have no bindings:\n  "
       ++ showList' (map (\var -> "$" <> show var) $ IntSet.toList unboundVariables)
   show (R1CInconsistentError r1c) =
-    "equation doesn't hold: `" <> show (fmap N r1c)  <> "`"
-    -- " <> show (N a) <> " * " <> show (N b) <> " ≠ " <> show (N c) <> "`"
+    "equation doesn't hold: `" <> show (fmap N r1c) <> "`"
+  -- " <> show (N a) <> " * " <> show (N b) <> " ≠ " <> show (N c) <> "`"
   show (BooleanConstraintError var val) =
     "expected the value of $" <> show var <> " to be either 0 or 1, but got `" <> show (N val) <> "`"
   show (StuckError context constraints) =

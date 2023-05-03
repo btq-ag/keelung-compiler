@@ -22,6 +22,7 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
+import Control.Arrow (left)
 
 --------------------------------------------------------------------------------
 
@@ -108,7 +109,7 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
     csConstraints :: !(Seq (Constraint n)),
     csBinReps :: [BinRep],
     csCounters :: Counters,
-    csDivMods :: [(Var, Var, Var, Var)],
+    csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
     csModInvs :: [(Var, Var, Integer)]
   }
   deriving (Eq, Generic, NFData)
@@ -197,10 +198,10 @@ renumberConstraints cs =
         }
 
     renumberDivMod (x, y, q, r) =
-      ( renumber x,
-        renumber y,
-        renumber q,
-        renumber r
+      ( left renumber x,
+        left renumber y,
+        left renumber q,
+        left renumber r
       )
 
     renumberModInv (x, n, p) = (renumber x, renumber n, p)

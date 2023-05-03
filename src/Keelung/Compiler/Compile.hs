@@ -239,7 +239,7 @@ add = mapM_ addOne
     addOne (CNEqU x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y]) $ addOccurrences (Set.singleton m) $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
 
 addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
-addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMods cs}
+addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (Left x, Left y, Left q, Left r) : csDivMods cs}
 
 addModInvHint :: (GaloisField n, Integral n) => RefU -> RefU -> Integer -> M n ()
 addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (x, n, p) : csModInvs cs}

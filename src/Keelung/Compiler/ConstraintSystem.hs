@@ -41,6 +41,7 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax.Counters
+import Control.Arrow (left)
 
 --------------------------------------------------------------------------------
 
@@ -63,7 +64,8 @@ data ConstraintSystem n = ConstraintSystem
     csNEqF :: Map (RefT, RefT) RefT,
     csNEqU :: Map (RefU, RefU) RefT,
     -- hints for generating witnesses for DivMod constraints
-    csDivMods :: [(RefU, RefU, RefU, RefU)],
+    -- a = b * q + r
+    csDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
     -- hints for generating witnesses for ModInv constraints
     csModInvs :: [(RefU, RefU, Integer)]
   }
@@ -372,7 +374,7 @@ relocateConstraintSystem cs =
     nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefT counters x)) (Left (reindexRefT counters y)) (reindexRefT counters m))) $ Map.toList $ csNEqF cs
     nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefT counters m))) $ Map.toList $ csNEqU cs
 
-    divMods = map (\(a, b, q, r) -> (reindexRefU counters a, reindexRefU counters b, reindexRefU counters q, reindexRefU counters r)) $ csDivMods cs
+    divMods = map (\(a, b, q, r) -> (left (reindexRefU counters) a, left (reindexRefU counters) b, left (reindexRefU counters) q, left (reindexRefU counters) r)) $ csDivMods cs
     modInvs = map (\(a, n, p) -> (reindexRefU counters a, reindexRefU counters n, p)) $ csModInvs cs
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int

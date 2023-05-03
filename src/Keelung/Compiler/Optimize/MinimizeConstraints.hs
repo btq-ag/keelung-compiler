@@ -20,17 +20,10 @@ import Keelung.Compiler.ConstraintSystem
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 
+-- | Order of optimization, if any of the former optimization pass changed the constraint system,
+-- the later optimization pass will be run again at that level
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (ConstraintSystem n)
-run cs = snd <$> optimizeAddF cs
-
--- optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
--- optimizeAddF cs =
---   let (changed, cs') = runOptiM cs goThroughAddF
---    in case changed of
---         NothingChanged -> (NothingChanged, cs)
---         RelationChanged -> optimizeAddF cs'
---         AdditiveConstraintChanged -> optimizeAddF cs'
---         MultiplicativeConstraintChanged -> optimizeAddF cs'
+run cs = goThroughDivMods . snd <$> optimizeAddF cs
 
 optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (WhatChanged, ConstraintSystem n)
 optimizeAddF cs = do
@@ -40,15 +33,6 @@ optimizeAddF cs = do
     RelationChanged -> optimizeAddF cs'
     AdditiveConstraintChanged -> optimizeMulF cs'
     MultiplicativeConstraintChanged -> optimizeMulF cs'
-
--- optimizeNEqF :: (GaloisField n, Integral n) => ConstraintSystem n -> (WhatChanged, ConstraintSystem n)
--- optimizeNEqF cs =
---   let (changed, cs') = runOptiM cs goThroughNEqF
---    in case changed of
---         NothingChanged -> optimizeMulF cs
---         RelationChanged -> optimizeAddF cs'
---         AdditiveConstraintChanged -> optimizeMulF cs'
---         MultiplicativeConstraintChanged -> optimizeMulF cs'
 
 optimizeMulF :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (WhatChanged, ConstraintSystem n)
 optimizeMulF cs = do
@@ -66,9 +50,18 @@ goThroughAddF = do
     csAddF' <- foldMaybeM reduceAddF [] (csAddF cs)
     modify' $ \cs'' -> cs'' {csAddF = csAddF'}
 
--- reduceDivMods :: (GaloisField n, Integral n) => (RefU, RefU, RefU, RefU) -> RoundM n (Maybe (RefU, RefU, RefU, RefU))
--- reduceDivMods (a, b, q, r) = do 
-  
+goThroughDivMods :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
+goThroughDivMods cs =
+  let relations = csFieldRelations cs
+      substDivMod (a, b, q, r) = (substVar relations a, substVar relations b, substVar relations q, substVar relations r)
+   in cs {csDivMods = map substDivMod (csDivMods cs)}
+  where
+    substVar _ (Right val) = Right val
+    substVar relations (Left ref) = case AllRelations.lookup (U ref) relations of
+      AllRelations.Root -> Left ref
+      AllRelations.Value val -> Right val
+      AllRelations.ChildOf 1 (U root) 0 -> Left root
+      AllRelations.ChildOf {} -> error "[ panic ] goThroughDivMods: ChildOf with non-1 coefficient"
 
 goThroughMulF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughMulF = do
