@@ -226,7 +226,7 @@ relocateConstraintSystem cs =
           <> nEqFs
           <> nEqUs,
       Relocated.csDivMods = divMods,
-      Relocated.csModInvs = modDivs
+      Relocated.csModInvs = modInvs
     }
   where
     counters = csCounters cs
@@ -373,7 +373,7 @@ relocateConstraintSystem cs =
     nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefT counters m))) $ Map.toList $ csNEqU cs
 
     divMods = map (\(a, b, q, r) -> (reindexRefU counters a, reindexRefU counters b, reindexRefU counters q, reindexRefU counters r)) $ csDivMods cs
-    modDivs = map (\(a, n, p) -> (reindexRefU counters a, reindexRefU counters n, p)) $ csModInvs cs
+    modInvs = map (\(a, n, p) -> (reindexRefU counters a, reindexRefU counters n, p)) $ csModInvs cs
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =
@@ -395,14 +395,18 @@ instance UpdateOccurrences Ref where
       ( foldl
           ( \cs ref ->
               case ref of
-                B refB ->
-                  cs
-                    { csOccurrenceB = Map.insertWith (+) refB 1 (csOccurrenceB cs)
-                    }
-                _ ->
-                  cs
-                    { csOccurrenceF = Map.insertWith (+) ref 1 (csOccurrenceF cs)
-                    }
+                F refF -> addOccurrences (Set.singleton refF) cs
+                -- cs
+                --   { csOccurrenceF = Map.insertWith (+) ref 1 (csOccurrenceF cs)
+                --   }
+                B refB -> addOccurrences (Set.singleton refB) cs
+                -- cs
+                --   { csOccurrenceB = Map.insertWith (+) refB 1 (csOccurrenceB cs)
+                --   }
+                U refU -> addOccurrences (Set.singleton refU) cs
+                -- cs
+                --   { csOccurrenceU = Map.insertWith (+) refU 1 (csOccurrenceU cs)
+                --   }
           )
       )
   removeOccurrences =
@@ -410,14 +414,20 @@ instance UpdateOccurrences Ref where
       ( foldl
           ( \cs ref ->
               case ref of
-                B refB ->
-                  cs
-                    { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) refB (csOccurrenceB cs)
-                    }
-                _ ->
-                  cs
-                    { csOccurrenceF = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceF cs)
-                    }
+                F refF -> removeOccurrences (Set.singleton refF) cs
+                B refB -> removeOccurrences (Set.singleton refB) cs
+                U refU -> removeOccurrences (Set.singleton refU) cs
+                -- cs
+                --   { csOccurrenceF = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceF cs)
+                --   }
+                -- B refB ->
+                --   cs
+                --     { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) refB (csOccurrenceB cs)
+                --     }
+                -- U refU ->
+                --   cs
+                --     { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) refU (csOccurrenceU cs)
+                --     }
           )
       )
 

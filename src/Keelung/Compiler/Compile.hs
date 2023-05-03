@@ -238,10 +238,6 @@ add = mapM_ addOne
     addOne (CNEqF x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y, m]) $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
     addOne (CNEqU x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y]) $ addOccurrences (Set.singleton m) $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
 
--- TODO: remove this
-addOccurrencesUTemp :: [RefU] -> M n ()
-addOccurrencesUTemp = modify' . addOccurrences . Set.fromList
-
 addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
 addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (x, y, q, r) : csDivMods cs}
 
@@ -746,7 +742,7 @@ compileAddOrSubU isSub width out a b = do
     -- Cᵢ = outᵢ
     add $ cVarEqB (RefUBit width c i) (RefUBit width out i)
   -- HACK: add occurences of RefUs
-  addOccurrencesUTemp [out, a, b, c]
+  -- addOccurrencesUTemp [out, a, b, c]
 
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
 compileAddU = compileAddOrSubU False
@@ -770,7 +766,7 @@ compileMulU width out a b = do
     -- Cᵢ = outᵢ
     add $ cVarEqB (RefUBit width c i) (RefUBit width out i)
   -- HACK: add occurences of RefUs
-  addOccurrencesUTemp [out, a, b, c]
+  -- addOccurrencesUTemp [out, a, b, c]
 
 -- | An universal way of compiling a conditional
 compileIfB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> RefB -> M n ()

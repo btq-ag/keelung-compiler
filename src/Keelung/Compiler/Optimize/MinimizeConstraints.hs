@@ -66,6 +66,10 @@ goThroughAddF = do
     csAddF' <- foldMaybeM reduceAddF [] (csAddF cs)
     modify' $ \cs'' -> cs'' {csAddF = csAddF'}
 
+-- reduceDivMods :: (GaloisField n, Integral n) => (RefU, RefU, RefU, RefU) -> RoundM n (Maybe (RefU, RefU, RefU, RefU))
+-- reduceDivMods (a, b, q, r) = do 
+  
+
 goThroughMulF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughMulF = do
   cs <- get
@@ -114,7 +118,6 @@ reduceMulF (polyA, polyB, polyC) = do
   polyCResult <- case polyC of
     Left constantC -> return (Left constantC)
     Right polyC' -> substitutePolyF MultiplicativeConstraintChanged polyC'
-
   reduceMulF_ polyAResult polyBResult polyCResult
 
 substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG Ref n -> RoundM n (Either n (PolyG Ref n))

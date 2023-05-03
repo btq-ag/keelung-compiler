@@ -415,30 +415,6 @@ tests = do
             then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
             else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
 
-      -- it "assert + lte" $ do
-      --   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
-      --   let program y = do
-      --         x <- inputUInt @4 Public
-      --         assert $ x `lte` fromInteger y
-
-      --   forAll genPair $ \(x, y) -> do
-      --     if x > y
-      --       then
-      --         throwAll'
-      --           (program y)
-      --           [fromInteger x :: GF181]
-      --           []
-      --           (Interpreter.SyntaxTreeError (SyntaxTree.AssertionError ("$UI₄0 ≤ " <> show y)))
-      --           (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1))))
-      --       else runAll (program y) [fromInteger x :: GF181] [] []
-
-      -- it "assert + lte (size)" $ do
-      --   let program y = do
-      --         x <- inputUInt @4 Public
-      --         assert $ x `lte` fromInteger y
-      --   debug (program 1)
-      --   assertSize 8 (program 1)
-
     describe "Conditionals" $ do
       it "with inputs" $ do
         let program = do
