@@ -12,6 +12,7 @@ module Keelung.Compiler.ConstraintSystem
   )
 where
 
+import Control.Arrow (left)
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
@@ -41,7 +42,6 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax.Counters
-import Control.Arrow (left)
 
 --------------------------------------------------------------------------------
 
@@ -53,6 +53,7 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceF :: !(Map Ref Int),
     csOccurrenceB :: !(Map RefB Int),
     csOccurrenceU :: !(Map RefU Int),
+    csBitTests :: !(Map RefU Int),
     -- when x == y (FieldRelations)
     csFieldRelations :: AllRelations n,
     -- csUIntRelations :: UIntRelations n,
@@ -267,6 +268,16 @@ relocateConstraintSystem cs =
                 )
                 occurrencesF
 
+        intermediateRefUsOccurredInBitTests =
+          Set.fromList $
+            Map.elems $
+              Map.mapMaybeWithKey
+                ( \ref count -> case ref of
+                    RefUX width var -> if count > 0 then Just (width, var) else Nothing
+                    _ -> Nothing
+                )
+                (csBitTests cs)
+
         binRepsFromIntermediateRefUsOccurredInUAndF =
           Seq.fromList
             $ map
@@ -275,7 +286,7 @@ relocateConstraintSystem cs =
                       binRepOffset = reindex counters OfIntermediate (OfUIntBinRep width) var
                    in BinRep varOffset width binRepOffset
               )
-            $ Set.toList (intermediateRefUsOccurredInU <> intermediateRefUsOccurredInF)
+            $ Set.toList (intermediateRefUsOccurredInU <> intermediateRefUsOccurredInF <> intermediateRefUsOccurredInBitTests)
 
         -- fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
         fromSmallCounter sort (Struct _ _ u) = Seq.fromList $ concatMap (fromPair sort) (IntMap.toList u)
@@ -321,6 +332,7 @@ relocateConstraintSystem cs =
         -- it's a UInt intermediate variable that occurs in the circuit
         RefUX width var `Set.member` refUsInOccurrencesF occurences
           || RefUX width var `Set.member` refUsInOccurrencesU occurences
+          || RefUX width var `Map.member` Map.filter (> 0) (csBitTests cs)
       _ ->
         -- it's a pinned UInt variable
         True
@@ -398,17 +410,8 @@ instance UpdateOccurrences Ref where
           ( \cs ref ->
               case ref of
                 F refF -> addOccurrences (Set.singleton refF) cs
-                -- cs
-                --   { csOccurrenceF = Map.insertWith (+) ref 1 (csOccurrenceF cs)
-                --   }
                 B refB -> addOccurrences (Set.singleton refB) cs
-                -- cs
-                --   { csOccurrenceB = Map.insertWith (+) refB 1 (csOccurrenceB cs)
-                --   }
                 U refU -> addOccurrences (Set.singleton refU) cs
-                -- cs
-                --   { csOccurrenceU = Map.insertWith (+) refU 1 (csOccurrenceU cs)
-                --   }
           )
       )
   removeOccurrences =
@@ -419,17 +422,6 @@ instance UpdateOccurrences Ref where
                 F refF -> removeOccurrences (Set.singleton refF) cs
                 B refB -> removeOccurrences (Set.singleton refB) cs
                 U refU -> removeOccurrences (Set.singleton refU) cs
-                -- cs
-                --   { csOccurrenceF = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceF cs)
-                --   }
-                -- B refB ->
-                --   cs
-                --     { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) refB (csOccurrenceB cs)
-                --     }
-                -- U refU ->
-                --   cs
-                --     { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) refU (csOccurrenceU cs)
-                --     }
           )
       )
 

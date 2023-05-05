@@ -206,7 +206,7 @@ runM useNewOptimizer counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem counters useNewOptimizer mempty mempty mempty FieldRelations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty FieldRelations.new mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -223,16 +223,37 @@ add = mapM_ addOne
         Nothing -> return ()
         Just relations -> put cs {csFieldRelations = relations}
 
+    addBitTestOccurrences :: (GaloisField n, Integral n) => Ref -> M n ()
+    addBitTestOccurrences (B (RefUBit _ ref _)) = do
+      modify' (\cs -> cs {csBitTests = Map.insertWith (+) ref 1 (csBitTests cs)})
+    addBitTestOccurrences _ = return ()
+
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
-    addOne (CVarBindF x c) = execRelations $ FieldRelations.assignF x c
-    addOne (CVarBindB x c) = execRelations $ FieldRelations.assignB x (c == 1)
-    addOne (CVarBindU x c) = execRelations $ FieldRelations.assignU x c
-    addOne (CVarEq x y) = execRelations $ FieldRelations.relateRefs x 1 y 0
-    addOne (CVarEqF x y) = execRelations $ FieldRelations.relateRefs (F x) 1 (F y) 0
-    addOne (CVarEqB x y) = execRelations $ FieldRelations.relateB x (True, y)
-    addOne (CVarNEqB x y) = execRelations $ FieldRelations.relateB x (False, y)
-    addOne (CVarEqU x y) = execRelations $ FieldRelations.assertEqualU x y
+    addOne (CVarBindF x c) = do
+      addBitTestOccurrences x
+      execRelations $ FieldRelations.assignF x c
+    addOne (CVarBindB x c) = do
+      addBitTestOccurrences (B x)
+      execRelations $ FieldRelations.assignB x (c == 1)
+    addOne (CVarBindU x c) = do
+      execRelations $ FieldRelations.assignU x c
+    addOne (CVarEq x y) = do
+      addBitTestOccurrences x
+      addBitTestOccurrences y
+      execRelations $ FieldRelations.relateRefs x 1 y 0
+    addOne (CVarEqF x y) = do
+      execRelations $ FieldRelations.relateRefs (F x) 1 (F y) 0
+    addOne (CVarEqB x y) = do
+      addBitTestOccurrences (B x)
+      addBitTestOccurrences (B y)
+      execRelations $ FieldRelations.relateB x (True, y)
+    addOne (CVarNEqB x y) = do
+      addBitTestOccurrences (B x)
+      addBitTestOccurrences (B y)
+      execRelations $ FieldRelations.relateB x (False, y)
+    addOne (CVarEqU x y) = do
+      execRelations $ FieldRelations.assertEqualU x y
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
     addOne (CNEqF x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y, m]) $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
@@ -741,8 +762,9 @@ compileAddOrSubU isSub width out a b = do
   forM_ [0 .. width - 1] $ \i -> do
     -- Cᵢ = outᵢ
     add $ cVarEqB (RefUBit width c i) (RefUBit width out i)
-  -- HACK: add occurences of RefUs
-  -- addOccurrencesUTemp [out, a, b, c]
+
+-- HACK: add occurences of RefUs
+-- addOccurrencesUTemp [out, a, b, c]
 
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
 compileAddU = compileAddOrSubU False
@@ -765,8 +787,9 @@ compileMulU width out a b = do
   forM_ [0 .. width - 1] $ \i -> do
     -- Cᵢ = outᵢ
     add $ cVarEqB (RefUBit width c i) (RefUBit width out i)
-  -- HACK: add occurences of RefUs
-  -- addOccurrencesUTemp [out, a, b, c]
+
+-- HACK: add occurences of RefUs
+-- addOccurrencesUTemp [out, a, b, c]
 
 -- | An universal way of compiling a conditional
 compileIfB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> RefB -> M n ()

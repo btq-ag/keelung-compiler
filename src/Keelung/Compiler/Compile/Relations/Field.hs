@@ -96,8 +96,8 @@ assignU ref val = updateRelationsU $ Relations.UInt.assign ref val
 relate :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelations n -> Relations.M (Error n) (AllRelations n)
 relate var1 slope var2 intercept = updateRelationsF $ Relations.relate var1 (LinRel slope intercept) var2
 
-relateB :: RefB -> (Bool, RefB) -> AllRelations n -> Relations.M (Error n) (AllRelations n)
-relateB refA (polarity, refB) = updateRelationsB $ Relations.Boolean.relate refA polarity refB
+relateB :: GaloisField n => RefB -> (Bool, RefB) -> AllRelations n -> Relations.M (Error n) (AllRelations n)
+relateB refA (polarity, refB) = updateRelationsB (Relations.Boolean.relate refA polarity refB)
 
 -- var = slope * var2 + intercept
 relateRefs :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelations n -> Relations.M (Error n) (AllRelations n)
