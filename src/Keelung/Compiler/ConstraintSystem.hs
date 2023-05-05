@@ -361,7 +361,7 @@ relocateConstraintSystem cs =
               then CVarEqB var root
               else CVarNEqB var root
 
-          result = map convert $ Map.toList $ BooleanRelations.toMap2 refBShouldBeKept relations
+          result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
        in Seq.fromList (map (fromConstraint counters) result)
 
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Seq (Relocated.Constraint n)

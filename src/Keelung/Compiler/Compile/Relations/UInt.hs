@@ -12,15 +12,12 @@ module Keelung.Compiler.Compile.Relations.UInt
     toMap,
     size,
     isValid,
-    lookup,
-    lookup',
     assertEqual,
-    Lookup (..),
+    Rotation (..)
   )
 where
 
 import Control.DeepSeq (NFData)
-import Control.Monad.Except
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -111,18 +108,18 @@ size = Map.size . EquivClass.toMap
 isValid :: UIntRelations n -> Bool
 isValid = EquivClass.isValid
 
--- \| Result of looking up a variable in the BooleanRelations
-data Lookup n = Root | Value n | ChildOf Int RefU
-  deriving (Eq, Show)
+-- -- \| Result of looking up a variable in the BooleanRelations
+-- data Lookup n = Root | Value n | ChildOf Int RefU
+--   deriving (Eq, Show)
 
-lookup :: RefU -> UIntRelations n -> Lookup n
-lookup var xs = case EquivClass.lookup var xs of
-  EquivClass.IsRoot _ -> Root
-  EquivClass.IsConstant val -> Value val
-  EquivClass.IsChildOf parent rotation -> ChildOf (rotationAmount rotation) parent
+-- lookup :: RefU -> UIntRelations n -> Lookup n
+-- lookup var xs = case EquivClass.lookup var xs of
+--   EquivClass.IsRoot _ -> Root
+--   EquivClass.IsConstant val -> Value val
+--   EquivClass.IsChildOf parent rotation -> ChildOf (rotationAmount rotation) parent
 
-lookup' :: RefU -> UIntRelations n -> EquivClass.VarStatus RefU n Int
-lookup' var xs = case EquivClass.lookup var xs of
-  EquivClass.IsRoot children -> EquivClass.IsRoot $ fmap rotationAmount children
-  EquivClass.IsConstant val -> EquivClass.IsConstant val
-  EquivClass.IsChildOf parent rotation -> EquivClass.IsChildOf parent (rotationAmount rotation)
+-- lookup' :: RefU -> UIntRelations n -> EquivClass.VarStatus RefU n Int
+-- lookup' var xs = case EquivClass.lookup var xs of
+--   EquivClass.IsRoot children -> EquivClass.IsRoot $ fmap rotationAmount children
+--   EquivClass.IsConstant val -> EquivClass.IsConstant val
+--   EquivClass.IsChildOf parent rotation -> EquivClass.IsChildOf parent (rotationAmount rotation)

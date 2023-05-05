@@ -8,17 +8,14 @@ module Keelung.Compiler.Compile.Relations.Boolean
     relate,
     relationBetween,
     toMap,
-    toMap2,
     size,
     isValid,
-    lookup,
-    lookup',
-    Lookup (..),
+    -- lookup',
+    Polarity(..),
   )
 where
 
 import Control.DeepSeq (NFData)
-import Control.Monad.Except
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
@@ -69,15 +66,8 @@ relate var1 polarity var2 xs = mapError $ EquivClass.relate var1 (Polarity polar
 relationBetween :: RefB -> RefB -> BooleanRelations -> Maybe Bool
 relationBetween var1 var2 xs = unPolarity <$> EquivClass.relationBetween var1 var2 xs
 
-toMap :: BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
-toMap xs = Map.mapMaybe convert $ EquivClass.toMap xs
-  where
-    convert (EquivClass.IsConstant val) = Just (Right val)
-    convert (EquivClass.IsRoot _) = Nothing
-    convert (EquivClass.IsChildOf parent (Polarity polarity)) = Just $ Left (polarity, parent)
-
-toMap2 :: (RefB -> Bool) -> BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
-toMap2 shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
+toMap :: (RefB -> Bool) -> BooleanRelations -> Map RefB (Either (Bool, RefB) Bool)
+toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
   where
     convert var status = do
       if shouldBeKept var
@@ -96,18 +86,18 @@ size = Map.size . EquivClass.toMap
 isValid :: BooleanRelations -> Bool
 isValid = EquivClass.isValid
 
--- | Result of looking up a variable in the BooleanRelations
-data Lookup = Root | Value Bool | ChildOf Bool RefB
-  deriving (Eq, Show)
+-- -- | Result of looking up a variable in the BooleanRelations
+-- data Lookup = Root | Value Bool | ChildOf Bool RefB
+--   deriving (Eq, Show)
 
-lookup :: RefB -> BooleanRelations -> Lookup
-lookup var xs = case EquivClass.lookup var xs of
-  EquivClass.IsRoot _ -> Root
-  EquivClass.IsConstant val -> Value val
-  EquivClass.IsChildOf parent (Polarity polarity) -> ChildOf polarity parent
+-- lookup :: RefB -> BooleanRelations -> Lookup
+-- lookup var xs = case EquivClass.lookup var xs of
+--   EquivClass.IsRoot _ -> Root
+--   EquivClass.IsConstant val -> Value val
+--   EquivClass.IsChildOf parent (Polarity polarity) -> ChildOf polarity parent
 
-lookup' :: RefB -> BooleanRelations -> EquivClass.VarStatus RefB Bool Bool
-lookup' var xs = case EquivClass.lookup var xs of
-  EquivClass.IsRoot children -> EquivClass.IsRoot $ fmap unPolarity children
-  EquivClass.IsConstant val -> EquivClass.IsConstant val
-  EquivClass.IsChildOf parent (Polarity polarity) -> EquivClass.IsChildOf parent polarity
+-- lookup' :: RefB -> BooleanRelations -> EquivClass.VarStatus RefB Bool Bool
+-- lookup' var xs = case EquivClass.lookup var xs of
+--   EquivClass.IsRoot children -> EquivClass.IsRoot $ fmap unPolarity children
+--   EquivClass.IsConstant val -> EquivClass.IsConstant val
+--   EquivClass.IsChildOf parent (Polarity polarity) -> EquivClass.IsChildOf parent polarity

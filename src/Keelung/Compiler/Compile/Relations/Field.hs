@@ -34,9 +34,9 @@ import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.Boolean qualified as Relations.Boolean
+import Keelung.Compiler.Compile.Relations.Boolean qualified as Boolean
 import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Compile.Relations.UInt qualified as Relations.UInt
+import Keelung.Compiler.Compile.Relations.UInt qualified as UInt
 import Keelung.Compiler.Constraint
 import Prelude hiding (lookup)
 
@@ -44,8 +44,8 @@ type FieldRelations n = EquivClass.EquivClass Ref n (LinRel n)
 
 data AllRelations n = AllRelations
   { relationsF :: FieldRelations n,
-    relationsB :: Relations.Boolean.BooleanRelations,
-    relationsU :: Relations.UInt.UIntRelations n
+    relationsB :: Boolean.BooleanRelations,
+    relationsU :: UInt.UIntRelations n
   }
   deriving (Eq, Generic, NFData)
 
@@ -64,7 +64,7 @@ updateRelationsF f xs = mapError $ do
   return $ xs {relationsF = relations}
 
 updateRelationsB ::
-  (Relations.Boolean.BooleanRelations -> EquivClass.M (Error n) Relations.Boolean.BooleanRelations) ->
+  (Boolean.BooleanRelations -> EquivClass.M (Error n) Boolean.BooleanRelations) ->
   AllRelations n ->
   EquivClass.M (Error n) (AllRelations n)
 updateRelationsB f xs = do
@@ -72,7 +72,7 @@ updateRelationsB f xs = do
   return $ xs {relationsB = relations}
 
 updateRelationsU ::
-  (Relations.UInt.UIntRelations n -> EquivClass.M (Error n) (Relations.UInt.UIntRelations n)) ->
+  (UInt.UIntRelations n -> EquivClass.M (Error n) (UInt.UIntRelations n)) ->
   AllRelations n ->
   EquivClass.M (Error n) (AllRelations n)
 updateRelationsU f xs = do
@@ -82,22 +82,22 @@ updateRelationsU f xs = do
 --------------------------------------------------------------------------------
 
 new :: AllRelations n
-new = AllRelations (EquivClass.new "Field") Relations.Boolean.new Relations.UInt.new
+new = AllRelations (EquivClass.new "Field") Boolean.new UInt.new
 
 assignF :: (GaloisField n, Integral n) => Ref -> n -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
 assignF var val = updateRelationsF $ EquivClass.assign var val
 
 assignB :: RefB -> Bool -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
-assignB ref val = updateRelationsB $ Relations.Boolean.assign ref val
+assignB ref val = updateRelationsB $ Boolean.assign ref val
 
 assignU :: (GaloisField n, Integral n) => RefU -> n -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
-assignU ref val = updateRelationsU $ Relations.UInt.assign ref val
+assignU ref val = updateRelationsU $ UInt.assign ref val
 
 relate :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
 relate var1 slope var2 intercept = updateRelationsF $ EquivClass.relate var1 (LinRel slope intercept) var2
 
 relateB :: GaloisField n => RefB -> (Bool, RefB) -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
-relateB refA (polarity, refB) = updateRelationsB (Relations.Boolean.relate refA polarity refB)
+relateB refA (polarity, refB) = updateRelationsB (Boolean.relate refA polarity refB)
 
 -- var = slope * var2 + intercept
 relateRefs :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
@@ -118,7 +118,7 @@ relateRefs x slope y intercept xs =
         slope
         intercept
         (EquivClass.lookup (F refA) (relationsF xs))
-        (fromBooleanLookup (Relations.Boolean.lookup' refB (relationsB xs)))
+        (fromBooleanLookup (EquivClass.lookup refB (relationsB xs)))
     (F refA, U refB, _, _) ->
       composeLookup
         xs
@@ -127,7 +127,7 @@ relateRefs x slope y intercept xs =
         slope
         intercept
         (EquivClass.lookup (F refA) (relationsF xs))
-        (fromUIntLookup (Relations.UInt.lookup' refB (relationsU xs)))
+        (fromUIntLookup (EquivClass.lookup refB (relationsU xs)))
     (B refA, F refB, _, _) ->
       composeLookup
         xs
@@ -136,7 +136,7 @@ relateRefs x slope y intercept xs =
         (recip slope)
         (-intercept / slope)
         (EquivClass.lookup (F refB) (relationsF xs))
-        (fromBooleanLookup (Relations.Boolean.lookup' refA (relationsB xs)))
+        (fromBooleanLookup (EquivClass.lookup refA (relationsB xs)))
     (B refA, B refB, _, _) ->
       composeLookup
         xs
@@ -144,8 +144,8 @@ relateRefs x slope y intercept xs =
         (B refB)
         slope
         intercept
-        (fromBooleanLookup (Relations.Boolean.lookup' refA (relationsB xs)))
-        (fromBooleanLookup (Relations.Boolean.lookup' refB (relationsB xs)))
+        (fromBooleanLookup (EquivClass.lookup refA (relationsB xs)))
+        (fromBooleanLookup (EquivClass.lookup refB (relationsB xs)))
     (B refA, U refB, _, _) ->
       composeLookup
         xs
@@ -153,8 +153,8 @@ relateRefs x slope y intercept xs =
         (U refB)
         slope
         intercept
-        (fromBooleanLookup (Relations.Boolean.lookup' refA (relationsB xs)))
-        (fromUIntLookup (Relations.UInt.lookup' refB (relationsU xs)))
+        (fromBooleanLookup (EquivClass.lookup refA (relationsB xs)))
+        (fromUIntLookup (EquivClass.lookup refB (relationsU xs)))
     (U refA, F refB, _, _) ->
       composeLookup
         xs
@@ -163,7 +163,7 @@ relateRefs x slope y intercept xs =
         (recip slope)
         (-intercept / slope)
         (EquivClass.lookup (F refB) (relationsF xs))
-        (fromUIntLookup (Relations.UInt.lookup' refA (relationsU xs)))
+        (fromUIntLookup (EquivClass.lookup refA (relationsU xs)))
     (U refA, B refB, _, _) ->
       composeLookup
         xs
@@ -171,8 +171,8 @@ relateRefs x slope y intercept xs =
         (B refB)
         (recip slope)
         (-intercept / slope)
-        (fromBooleanLookup (Relations.Boolean.lookup' refB (relationsB xs)))
-        (fromUIntLookup (Relations.UInt.lookup' refA (relationsU xs)))
+        (fromBooleanLookup (EquivClass.lookup refB (relationsB xs)))
+        (fromUIntLookup (EquivClass.lookup refA (relationsU xs)))
     (U refA, U refB, _, _) ->
       composeLookup
         xs
@@ -180,14 +180,14 @@ relateRefs x slope y intercept xs =
         (U refB)
         slope
         intercept
-        (fromUIntLookup (Relations.UInt.lookup' refA (relationsU xs)))
-        (fromUIntLookup (Relations.UInt.lookup' refB (relationsU xs)))
+        (fromUIntLookup (EquivClass.lookup refA (relationsU xs)))
+        (fromUIntLookup (EquivClass.lookup refB (relationsU xs)))
 
 assertEqual :: (GaloisField n, Integral n) => Ref -> Ref -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
 assertEqual var1 var2 = relate var1 1 var2 0
 
 assertEqualU :: (GaloisField n, Integral n) => RefU -> RefU -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
-assertEqualU var1 var2 = updateRelationsU $ Relations.UInt.assertEqual var1 var2
+assertEqualU var1 var2 = updateRelationsU $ UInt.assertEqual var1 var2
 
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> AllRelations n -> Maybe (n, n)
 relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 (relationsF xs) of
@@ -229,14 +229,8 @@ toLookup (EquivClass.IsConstant val) = Value val
 toLookup (EquivClass.IsChildOf parent (slope, intercept)) = ChildOf slope parent intercept
 
 lookup' :: GaloisField n => Ref -> AllRelations n -> EquivClass.VarStatus Ref n (n, n)
--- lookup' var xs = fromLinRel $ case EquivClass.lookup var (relationsF xs) of
---   EquivClass.IsRoot children -> case var of
---     B refB -> fromBooleanLookup $ Relations.Boolean.lookup' refB (relationsB xs)
---     _ -> EquivClass.IsRoot children
---   EquivClass.IsConstant val -> EquivClass.IsConstant val
---   EquivClass.IsChildOf parent (LinRel a b) -> EquivClass.IsChildOf parent (LinRel a b)
-lookup' (U var) xs = fromLinRel $ fromUIntLookup (Relations.UInt.lookup' var (relationsU xs))
-lookup' (B var) xs = fromLinRel $ fromBooleanLookup $ Relations.Boolean.lookup' var (relationsB xs)
+lookup' (U var) xs = fromLinRel $ fromUIntLookup (EquivClass.lookup var (relationsU xs))
+lookup' (B var) xs = fromLinRel $ fromBooleanLookup $ EquivClass.lookup var (relationsB xs)
 lookup' (F var) xs = fromLinRel $ EquivClass.lookup (F var) (relationsF xs)
 
 fromLinRel :: EquivClass.VarStatus Ref n (LinRel n) -> EquivClass.VarStatus Ref n (n, n)
@@ -290,25 +284,25 @@ instance (GaloisField n, Integral n) => EquivClass.ExecRelation n (LinRel n) whe
 
 --------------------------------------------------------------------------------
 
-fromBooleanLookup :: GaloisField n => EquivClass.VarStatus RefB Bool Bool -> EquivClass.VarStatus Ref n (LinRel n)
-fromBooleanLookup (EquivClass.IsRoot children) = EquivClass.IsRoot $ Map.mapKeys B $ Map.map (\b -> if b then LinRel 1 0 else LinRel (-1) 1) children
+fromBooleanLookup :: GaloisField n => EquivClass.VarStatus RefB Bool Boolean.Polarity -> EquivClass.VarStatus Ref n (LinRel n)
+fromBooleanLookup (EquivClass.IsRoot children) = EquivClass.IsRoot $ Map.mapKeys B $ Map.map (\b -> if Boolean.unPolarity b then LinRel 1 0 else LinRel (-1) 1) children
 fromBooleanLookup (EquivClass.IsConstant True) = EquivClass.IsConstant 1
 fromBooleanLookup (EquivClass.IsConstant False) = EquivClass.IsConstant 0
-fromBooleanLookup (EquivClass.IsChildOf parent True) = EquivClass.IsChildOf (B parent) (LinRel 1 0)
-fromBooleanLookup (EquivClass.IsChildOf parent False) = EquivClass.IsChildOf (B parent) (LinRel (-1) 1)
+fromBooleanLookup (EquivClass.IsChildOf parent (Boolean.Polarity True)) = EquivClass.IsChildOf (B parent) (LinRel 1 0)
+fromBooleanLookup (EquivClass.IsChildOf parent (Boolean.Polarity False)) = EquivClass.IsChildOf (B parent) (LinRel (-1) 1)
 
-fromUIntLookup :: GaloisField n => EquivClass.VarStatus RefU n Int -> EquivClass.VarStatus Ref n (LinRel n)
+fromUIntLookup :: GaloisField n => EquivClass.VarStatus RefU n UInt.Rotation -> EquivClass.VarStatus Ref n (LinRel n)
 fromUIntLookup (EquivClass.IsRoot children) =
   EquivClass.IsRoot $
     Map.mapKeys U $
       Map.map
         ( \case
-            0 -> LinRel 1 0
+            UInt.Rotation _ 0 -> LinRel 1 0
             _ -> error "[ panic ]: Don't know how to relate a Field to a rotated UInt"
         )
         children
 fromUIntLookup (EquivClass.IsConstant n) = EquivClass.IsConstant n
-fromUIntLookup (EquivClass.IsChildOf parent 0) = EquivClass.IsChildOf (U parent) (LinRel 1 0)
+fromUIntLookup (EquivClass.IsChildOf parent (UInt.Rotation _ 0)) = EquivClass.IsChildOf (U parent) (LinRel 1 0)
 fromUIntLookup (EquivClass.IsChildOf _ _) = error "[ panic ]: Don't know how to relate a Field to a rotated UInt"
 
 composeLookup :: (GaloisField n, Integral n) => AllRelations n -> Ref -> Ref -> n -> n -> EquivClass.VarStatus Ref n (LinRel n) -> EquivClass.VarStatus Ref n (LinRel n) -> EquivClass.M (Error n) (AllRelations n)
@@ -369,8 +363,8 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     -- rootA = (slope * slopeB * rootB + slope * interceptB + intercept - interceptA) / slopeA
     relate rootA (slope * slopeB / slopeA) rootB ((slope * interceptB + intercept - interceptA) / slopeA) xs
 
-exportBooleanRelations :: AllRelations n -> Relations.Boolean.BooleanRelations
+exportBooleanRelations :: AllRelations n -> Boolean.BooleanRelations
 exportBooleanRelations = relationsB
 
-exportUIntRelations :: AllRelations n -> Relations.UInt.UIntRelations n
+exportUIntRelations :: AllRelations n -> UInt.UIntRelations n
 exportUIntRelations = relationsU

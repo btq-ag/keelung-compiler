@@ -195,8 +195,8 @@ assertRelation var1 var2 result = do
 assertBinding :: RefB -> Maybe Bool -> M ()
 assertBinding var val = do
   xs <- get
-  case BooleanRelations.lookup var xs of
-    BooleanRelations.Value value -> Just value `shouldBe` val
+  case EquivClass.lookup var xs of
+    EquivClass.IsConstant value -> Just value `shouldBe` val
     _ -> Nothing `shouldBe` val
 
 isValid :: M ()

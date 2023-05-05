@@ -155,8 +155,8 @@ assertRelation var1 var2 result = do
 assertBinding :: RefU -> Maybe GF181 -> M ()
 assertBinding var val = do
   xs <- get
-  case UIntRelations.lookup var xs of
-    UIntRelations.Value value -> Just value `shouldBe` val
+  case EquivClass.lookup var xs of
+    EquivClass.IsConstant value -> Just value `shouldBe` val
     _ -> Nothing `shouldBe` val
 
 isValid :: M ()
