@@ -3,10 +3,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compiler.Compile.Relations.Relations
+module Keelung.Compiler.Compile.Relations.EquivClass
   ( IsRelation (..),
     ExecRelation (..),
-    Relations,
+    EquivClass,
     VarStatus (..),
     M,
     runM,
@@ -41,23 +41,13 @@ class Monoid rel => IsRelation rel where
   -- | Render a relation to some child as a string
   relationToString :: (String, rel) -> String
 
-  -- | Given `parent = rel child`, executes `rel` on `child`
-  --   such that if `child = n`, then `parent = execRelation rel n`
-  -- execRel :: rel -> n -> n
-
   -- | Computes the inverse of a relation
   invertRel :: rel -> rel
 
 class ExecRelation n rel where
-  -- | Render a relation to some child as a string
-  -- relationToString :: (String, rel) -> String
-
   -- | Given `parent = rel child`, executes `rel` on `child`
-  --   such that if `child = n`, then `parent = execRelation rel n`
+  --   such that if `child = n`, then `parent = execRel rel n`
   execRel :: rel -> n -> n
-
-  -- | Computes the inverse of a relation
-  -- invertRel :: rel -> rel
 
 --------------------------------------------------------------------------------
 
@@ -87,17 +77,17 @@ data VarStatus var n rel
     IsChildOf var rel
   deriving (Show, Eq, Generic, NFData)
 
-data Relations var n rel = Relations
+data EquivClass var n rel = EquivClass
   { eqPoolName :: String,
-    eqPoolRelations :: Map var (VarStatus var n rel)
+    eqPoolEquivClass :: Map var (VarStatus var n rel)
   }
   deriving (Eq, Generic)
 
-instance (NFData var, NFData n, NFData rel) => NFData (Relations var n rel)
+instance (NFData var, NFData n, NFData rel) => NFData (EquivClass var n rel)
 
--- | Instance for pretty-printing Relations with Galois fields as constant values
-instance {-# OVERLAPS #-} (KnownNat n, Show var, IsRelation rel) => Show (Relations var (Prime n) rel) where
-  show (Relations name relations) =
+-- | Instance for pretty-printing EquivClass with Galois fields as constant values
+instance {-# OVERLAPS #-} (KnownNat n, Show var, IsRelation rel) => Show (EquivClass var (Prime n) rel) where
+  show (EquivClass name relations) =
     name
       <> "\n"
       <> mconcat (map (<> "\n") (concatMap toString (Map.toList relations)))
@@ -110,9 +100,9 @@ instance {-# OVERLAPS #-} (KnownNat n, Show var, IsRelation rel) => Show (Relati
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
 
--- | Instance for pretty-printing Relations with Galois fields as constant values
-instance {-# OVERLAPPING #-} (KnownNat n, Show var, IsRelation rel) => Show (Relations var (Binary n) rel) where
-  show (Relations name relations) =
+-- | Instance for pretty-printing EquivClass with Galois fields as constant values
+instance {-# OVERLAPPING #-} (KnownNat n, Show var, IsRelation rel) => Show (EquivClass var (Binary n) rel) where
+  show (EquivClass name relations) =
     name
       <> "\n"
       <> mconcat (map (<> "\n") (concatMap toString (Map.toList relations)))
@@ -125,8 +115,8 @@ instance {-# OVERLAPPING #-} (KnownNat n, Show var, IsRelation rel) => Show (Rel
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
 
-instance (Show var, IsRelation rel, Show n) => Show (Relations var n rel) where
-  show (Relations name relations) =
+instance (Show var, IsRelation rel, Show n) => Show (EquivClass var n rel) where
+  show (EquivClass name relations) =
     name
       <> "\n"
       <> mconcat (map (<> "\n") (concatMap toString (Map.toList relations)))
@@ -139,27 +129,27 @@ instance (Show var, IsRelation rel, Show n) => Show (Relations var n rel) where
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
 
--- | Creates a new Relations, O(1)
-new :: Ord var => String -> Relations var n rel
-new name = Relations name mempty
+-- | Creates a new EquivClass, O(1)
+new :: Ord var => String -> EquivClass var n rel
+new name = EquivClass name mempty
 
--- | Returns the result of looking up a variable in the UIntRelations, O(lg n)
-lookup :: (Ord var) => var -> Relations var n rel -> VarStatus var n rel
-lookup var (Relations _ relations) = case Map.lookup var relations of
+-- | Returns the result of looking up a variable in the UIntEquivClass, O(lg n)
+lookup :: (Ord var) => var -> EquivClass var n rel -> VarStatus var n rel
+lookup var (EquivClass _ relations) = case Map.lookup var relations of
   Nothing -> IsRoot mempty
   Just result -> result
 
 -- | Assigns a value to a variable, O(lg n)
-assign :: (Ord var, IsRelation rel, Eq n, ExecRelation n rel) => var -> n -> Relations var n rel -> M (n, n) (Relations var n rel)
-assign var value (Relations name relations) = case Map.lookup var relations of
+assign :: (Ord var, IsRelation rel, Eq n, ExecRelation n rel) => var -> n -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
+assign var value (EquivClass name relations) = case Map.lookup var relations of
   -- The variable is not in the map, so we add it as a constant
   Nothing -> do
     markChanged
-    return $ Relations name $ Map.insert var (IsConstant value) relations
+    return $ EquivClass name $ Map.insert var (IsConstant value) relations
   -- The variable is already a constant, so we check if the value is the same
   Just (IsConstant oldValue) ->
     if oldValue == value
-      then return (Relations name relations)
+      then return (EquivClass name relations)
       else throwError (oldValue, value)
   -- The variable is already a root, so we:
   --    1. Make its children constants
@@ -167,7 +157,7 @@ assign var value (Relations name relations) = case Map.lookup var relations of
   Just (IsRoot children) -> do
     markChanged
     return $
-      Relations name $
+      EquivClass name $
         foldl
           ( \rels (child, relationWithParent) ->
               Map.insert
@@ -183,10 +173,10 @@ assign var value (Relations name relations) = case Map.lookup var relations of
   -- =>
   -- root = relation^-1 child
   Just (IsChildOf root relation) ->
-    assign root (execRel (invertRel relation) value) (Relations name relations)
+    assign root (execRel (invertRel relation) value) (EquivClass name relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: (Seniority var, IsRelation rel, Ord var, Eq n, ExecRelation n rel) => var -> rel -> var -> Relations var n rel -> M (n, n) (Relations var n rel)
+relate :: (Seniority var, IsRelation rel, Ord var, Eq n, ExecRelation n rel) => var -> rel -> var -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
 relate a relation b relations =
   case compareSeniority a b of
     LT -> relateChildToParent a relation b relations
@@ -202,7 +192,7 @@ relate a relation b relations =
           IsChildOf parent _ -> childrenSizeOf parent
 
 -- | Relates a child to a parent, O(lg n)
-relateChildToParent :: (Ord var, IsRelation rel, Eq n, Seniority var, ExecRelation n rel) => var -> rel -> var -> Relations var n rel -> M (n, n) (Relations var n rel)
+relateChildToParent :: (Ord var, IsRelation rel, Eq n, Seniority var, ExecRelation n rel) => var -> rel -> var -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
 relateChildToParent child relation parent relations =
   if child == parent
     then return relations
@@ -221,13 +211,13 @@ relateChildToParent child relation parent relations =
           markChanged
           let newSiblings = Map.insert child relation $ Map.map (<> relation) grandchildren
           return $
-            Relations (eqPoolName relations) $
+            EquivClass (eqPoolName relations) $
               Map.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
                 Map.insert child (IsChildOf parent relation) $ -- point the child to the parent
                   Map.foldlWithKey' -- point the grandchildren to the new parent
                     ( \rels grandchild rel -> Map.insert grandchild (IsChildOf parent (rel <> relation)) rels
                     )
-                    (eqPoolRelations relations)
+                    (eqPoolEquivClass relations)
                     grandchildren
         --
         -- The child is a constant, so we make the parent a constant, too:
@@ -252,14 +242,14 @@ relateChildToParent child relation parent relations =
               -- => parent' = (invertRel relationWithParent <> relation) parent
               markChanged
               relate parent' (invertRel relationWithParent <> relation) parent $
-                Relations (eqPoolName relations) $
+                EquivClass (eqPoolName relations) $
                   Map.insert child (IsChildOf parent relation) $
-                    eqPoolRelations relations
+                    eqPoolEquivClass relations
       -- The parent is a child of another variable, so we relate the child to the grandparent instead
       IsChildOf grandparent relationWithGrandparent -> relate child (relation <> relationWithGrandparent) grandparent relations
 
 -- | Calculates the relation between two variables, O(lg n)
-relationBetween :: (Ord var, IsRelation rel) => var -> var -> Relations var n rel -> Maybe rel
+relationBetween :: (Ord var, IsRelation rel) => var -> var -> EquivClass var n rel -> Maybe rel
 relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   (IsConstant _, _) -> Nothing
   (_, IsConstant _) -> Nothing
@@ -295,22 +285,22 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       else Nothing
 
 -- | Export the internal representation of the relations as a map from variables to their relations
-toMap :: Relations var n rel -> Map var (VarStatus var n rel)
-toMap = eqPoolRelations
+toMap :: EquivClass var n rel -> Map var (VarStatus var n rel)
+toMap = eqPoolEquivClass
 
--- | Returns the number of variables in the Relations, O(1)
-size :: Relations var n rel -> Int
-size = Map.size . eqPoolRelations
+-- | Returns the number of variables in the EquivClass, O(1)
+size :: EquivClass var n rel -> Int
+size = Map.size . eqPoolEquivClass
 
--- | A Relations is valid if:
+-- | A EquivClass is valid if:
 --          1. all children of a parent recognize the parent as their parent
-isValid :: (Ord var, IsRelation rel, Eq rel, Seniority var) => Relations var n rel -> Bool
+isValid :: (Ord var, IsRelation rel, Eq rel, Seniority var) => EquivClass var n rel -> Bool
 isValid relations = allChildrenRecognizeTheirParent relations && rootsAreSenior relations
 
--- | A Relations is valid if all children of a parent recognize the parent as their parent
-allChildrenRecognizeTheirParent :: (Ord var, IsRelation rel, Eq rel) => Relations var n rel -> Bool
+-- | A EquivClass is valid if all children of a parent recognize the parent as their parent
+allChildrenRecognizeTheirParent :: (Ord var, IsRelation rel, Eq rel) => EquivClass var n rel -> Bool
 allChildrenRecognizeTheirParent relations =
-  let families = Map.mapMaybe isParent (eqPoolRelations relations)
+  let families = Map.mapMaybe isParent (eqPoolEquivClass relations)
 
       isParent (IsRoot children) = Just children
       isParent _ = Nothing
@@ -321,9 +311,9 @@ allChildrenRecognizeTheirParent relations =
       childrenAllRecognizeParent parent = and . Map.elems . Map.mapWithKey (recognizeParent parent)
    in Map.foldlWithKey' (\acc parent children -> acc && childrenAllRecognizeParent parent children) True families
 
--- | A Relations is valid if the seniority of the root of a family is greater than equal the seniority of all its children
-rootsAreSenior :: (Ord var, IsRelation rel, Eq rel, Seniority var) => Relations var n rel -> Bool
-rootsAreSenior = Map.foldlWithKey' go True . eqPoolRelations
+-- | A EquivClass is valid if the seniority of the root of a family is greater than equal the seniority of all its children
+rootsAreSenior :: (Ord var, IsRelation rel, Eq rel, Seniority var) => EquivClass var n rel -> Bool
+rootsAreSenior = Map.foldlWithKey' go True . eqPoolEquivClass
   where
     go :: Seniority var => Bool -> var -> VarStatus var n rel -> Bool
     go False _ _ = False

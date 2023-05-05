@@ -5,7 +5,7 @@ import Control.Monad.State
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Compile.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Compile.Relations.Relations qualified as Relations
+import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Constraint (RefB (..), RefU (RefUX))
 import Keelung.Field (GF181)
 import Test.Hspec (SpecWith, describe, hspec, it)
@@ -174,7 +174,7 @@ runM p = evalStateT p BooleanRelations.new
 relate :: RefB -> (Bool, RefB) -> M ()
 relate a (polarity, b) = do
   xs <- get
-  case runExcept (Relations.runM $ BooleanRelations.relate a polarity b xs) of
+  case runExcept (EquivClass.runM $ BooleanRelations.relate a polarity b xs) of
     Left err -> error $ show (err :: Error GF181)
     Right Nothing -> return ()
     Right (Just result) -> put result
@@ -182,7 +182,7 @@ relate a (polarity, b) = do
 assign :: RefB -> Bool -> M ()
 assign var val = do
   xs <- get
-  case runExcept (Relations.runM $ BooleanRelations.assign var val xs) of
+  case runExcept (EquivClass.runM $ BooleanRelations.assign var val xs) of
     Left err -> error $ show (err :: Error GF181)
     Right Nothing -> return ()
     Right (Just result) -> put result

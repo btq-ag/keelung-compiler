@@ -16,9 +16,9 @@ import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
+import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Compile.Relations.Field (AllRelations)
-import Keelung.Compiler.Compile.Relations.Field qualified as FieldRelations
-import Keelung.Compiler.Compile.Relations.Relations qualified as Relations
+import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
@@ -206,7 +206,7 @@ runM useNewOptimizer counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty FieldRelations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -215,10 +215,10 @@ modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
 add :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 add = mapM_ addOne
   where
-    execRelations :: (AllRelations n -> Relations.M (Compile.Error n) (AllRelations n)) -> M n ()
+    execRelations :: (AllRelations n -> EquivClass.M (Compile.Error n) (AllRelations n)) -> M n ()
     execRelations f = do
       cs <- get
-      result <- lift $ (Relations.runM . f) (csFieldRelations cs)
+      result <- lift $ (EquivClass.runM . f) (csFieldRelations cs)
       case result of
         Nothing -> return ()
         Just relations -> put cs {csFieldRelations = relations}
@@ -231,24 +231,24 @@ add = mapM_ addOne
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
-      execRelations $ FieldRelations.assignF x c
+      execRelations $ AllRelations.assignF x c
     addOne (CVarBindB x c) = do
-      execRelations $ FieldRelations.assignB x (c == 1)
+      execRelations $ AllRelations.assignB x (c == 1)
     addOne (CVarBindU x c) = do
-      execRelations $ FieldRelations.assignU x c
+      execRelations $ AllRelations.assignU x c
     addOne (CVarEq x y) = do
       addBitTestOccurrences x y
-      execRelations $ FieldRelations.relateRefs x 1 y 0
+      execRelations $ AllRelations.relateRefs x 1 y 0
     addOne (CVarEqF x y) = do
-      execRelations $ FieldRelations.relateRefs (F x) 1 (F y) 0
+      execRelations $ AllRelations.relateRefs (F x) 1 (F y) 0
     addOne (CVarEqB x y) = do
       addBitTestOccurrences (B x) (B y)
-      execRelations $ FieldRelations.relateB x (True, y)
+      execRelations $ AllRelations.relateB x (True, y)
     addOne (CVarNEqB x y) = do
       addBitTestOccurrences (B x) (B y)
-      execRelations $ FieldRelations.relateB x (False, y)
+      execRelations $ AllRelations.relateB x (False, y)
     addOne (CVarEqU x y) = do
-      execRelations $ FieldRelations.assertEqualU x y
+      execRelations $ AllRelations.assertEqualU x y
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
     addOne (CNEqF x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y, m]) $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})

@@ -11,9 +11,9 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
+import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Compile.Relations.Field (AllRelations)
 import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
-import Keelung.Compiler.Compile.Relations.Relations qualified as Relations
 import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
@@ -64,7 +64,7 @@ goThroughDivMods cs =
       AllRelations.ChildOf {} -> error "[ panic ] goThroughDivMods: ChildOf with non-1 coefficient"
 
 goThroughModInvs :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
-goThroughModInvs cs = 
+goThroughModInvs cs =
   let relations = csFieldRelations cs
       substModInv (a, b, c) = (substVar relations a, substVar relations b, c)
    in cs {csModInvs = map substModInv (csModInvs cs)}
@@ -263,7 +263,7 @@ learnFromAddF poly = case PolyG.view poly of
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
   cs <- get
-  result <- lift $ lift $ Relations.runM $ AllRelations.assignB var (value == 1) (csFieldRelations cs)
+  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignB var (value == 1) (csFieldRelations cs)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -271,7 +271,7 @@ assign (B var) value = do
       put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
 assign (U var) value = do
   cs <- get
-  result <- lift $ lift $ Relations.runM $ AllRelations.assignU var value (csFieldRelations cs)
+  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignU var value (csFieldRelations cs)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -279,7 +279,7 @@ assign (U var) value = do
       put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
 assign (F var) value = do
   cs <- get
-  result <- lift $ lift $ Relations.runM $ AllRelations.assignF (F var) value (csFieldRelations cs)
+  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignF (F var) value (csFieldRelations cs)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -290,7 +290,7 @@ assign (F var) value = do
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cs <- get
-  result <- lift $ lift $ Relations.runM $ AllRelations.relateRefs var1 slope var2 intercept (csFieldRelations cs)
+  result <- lift $ lift $ EquivClass.runM $ AllRelations.relateRefs var1 slope var2 intercept (csFieldRelations cs)
   case result of
     Nothing -> return False
     Just relations -> do

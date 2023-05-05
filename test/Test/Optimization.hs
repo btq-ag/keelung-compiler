@@ -9,7 +9,7 @@ import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compileO0, run)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Compile qualified as Compiler
-import Keelung.Compiler.Compile.Relations.Field qualified as FieldRelations
+import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), relocateConstraintSystem)
 import Keelung.Compiler.Error (Error)
@@ -55,7 +55,6 @@ debug cs = do
 tests :: SpecWith ()
 tests = do
   describe "Constraint minimization" $ do
-    
     Optimization.UInt.tests
 
     it "Poseidon" $ do
@@ -79,11 +78,11 @@ tests = do
         cs' `shouldHaveSize` 1
 
         -- FO0 = 3FI0
-        FieldRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs') `shouldBe` Just (3, 0)
+        AllRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs') `shouldBe` Just (3, 0)
         -- F0 (y) = FI0
-        FieldRelations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (csFieldRelations cs') `shouldBe` Just (1, 0)
+        AllRelations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (csFieldRelations cs') `shouldBe` Just (1, 0)
         -- F1 (z) = F0 (y)
-        FieldRelations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (csFieldRelations cs') `shouldBe` Just (1, 0)
+        AllRelations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (csFieldRelations cs') `shouldBe` Just (1, 0)
 
       it "Field 2" $ do
         (cs, cs') <- execute $ do
@@ -96,11 +95,11 @@ tests = do
         cs' `shouldHaveSize` 1
 
         -- FO0 = 4FI0
-        FieldRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs') `shouldBe` Just (4, 0)
+        AllRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs') `shouldBe` Just (4, 0)
         -- F0 (y) = FI0
-        FieldRelations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (csFieldRelations cs') `shouldBe` Just (1, 0)
+        AllRelations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (csFieldRelations cs') `shouldBe` Just (1, 0)
         -- F1 (z) = 2F0 (y)
-        FieldRelations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (csFieldRelations cs') `shouldBe` Just (2, 0)
+        AllRelations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (csFieldRelations cs') `shouldBe` Just (2, 0)
 
       it "Field 3" $ do
         (cs, cs') <- execute $ do
@@ -112,7 +111,7 @@ tests = do
         cs' `shouldHaveSize` 1
 
         -- FO0 = 2FI0 + 1
-        FieldRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs') `shouldBe` Just (2, 1)
+        AllRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (csFieldRelations cs') `shouldBe` Just (2, 1)
 
       it "Field 4" $ do
         (cs, cs') <- execute $ do
@@ -122,7 +121,7 @@ tests = do
 
         cs `shouldHaveSize` 1
         cs' `shouldHaveSize` 1
-        FieldRelations.lookup (F $ RefFO 0) (csFieldRelations cs') `shouldBe` FieldRelations.Value 8
+        AllRelations.lookup (F $ RefFO 0) (csFieldRelations cs') `shouldBe` AllRelations.Value 8
 
       it "Field 5" $ do
         (cs, cs') <- execute $ do

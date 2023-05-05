@@ -4,12 +4,12 @@ import Control.Monad.Except
 import Control.Monad.State
 import Keelung hiding (run)
 import Keelung.Compiler.Compile.Error
+import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Compile.Relations.Field (AllRelations)
 import Keelung.Compiler.Compile.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Constraint
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
-import qualified Keelung.Compiler.Compile.Relations.Relations as Relations
 
 run :: IO ()
 run = hspec tests
@@ -68,7 +68,7 @@ runM p = evalStateT p FieldRelations.new
 assign :: Ref -> GF181 -> M ()
 assign var val = do
   xs <- get
-  case runExcept (Relations.runM $ FieldRelations.assignF var val xs) of
+  case runExcept (EquivClass.runM $ FieldRelations.assignF var val xs) of
     Left err -> error $ show (err :: Error GF181)
     Right Nothing -> return ()
     Right (Just result) -> put result
@@ -76,7 +76,7 @@ assign var val = do
 relate :: RefT -> (GF181, RefT, GF181) -> M ()
 relate var (slope, val, intercept) = do
   xs <- get
-  case runExcept (Relations.runM $ FieldRelations.relateRefs (F var) slope (F val) intercept xs) of
+  case runExcept (EquivClass.runM $ FieldRelations.relateRefs (F var) slope (F val) intercept xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result
