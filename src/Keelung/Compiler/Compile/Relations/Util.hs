@@ -1,6 +1,7 @@
-module Keelung.Compiler.Compile.Relations.Util where
+module Keelung.Compiler.Compile.Relations.Util (Seniority(..)) where
 
 import Keelung.Compiler.Constraint
+import Data.Function (on)
 
 --------------------------------------------------------------------------------
 
@@ -8,28 +9,36 @@ class Seniority a where
   compareSeniority :: a -> a -> Ordering
 
 instance Seniority RefB where
-  compareSeniority (RefBX _) (RefBX _) = EQ
-  compareSeniority (RefBX _) _ = LT
-  compareSeniority _ (RefBX _) = GT
-  compareSeniority (RefUBit {}) (RefUBit {}) = EQ
-  compareSeniority (RefUBit {}) _ = LT
-  compareSeniority _ (RefUBit {}) = GT
-  compareSeniority _ _ = EQ
+  compareSeniority = compare `on` hasLevel
 
 instance Seniority RefU where
-  compareSeniority (RefUX _ _) (RefUX _ _) = EQ
-  compareSeniority (RefUX _ _) _ = LT
-  compareSeniority _ (RefUX _ _) = GT
-  compareSeniority _ _ = EQ
+  compareSeniority = compare `on` hasLevel
 
 instance Seniority RefT where
-  compareSeniority (RefFX _) (RefFX _) = EQ
-  compareSeniority (RefFX _) _ = LT
-  compareSeniority _ (RefFX _) = GT
-  compareSeniority _ _ = EQ
+  compareSeniority = compare `on` hasLevel
 
 instance Seniority Ref where
-  compareSeniority (F x) (F y) = compareSeniority x y
-  compareSeniority (B x) (B y) = compareSeniority x y
-  compareSeniority (U x) (U y) = compareSeniority x y
-  compareSeniority _ _ = EQ
+  compareSeniority = compare `on` hasLevel
+
+--------------------------------------------------------------------------------
+
+class HasLevel a where
+  hasLevel :: a -> Int 
+
+instance HasLevel RefB where
+  hasLevel (RefBX _) = 0
+  hasLevel (RefUBit {}) = 99
+  hasLevel _ = 100
+
+instance HasLevel RefU where
+  hasLevel (RefUX _ _) = 0
+  hasLevel _ = 100
+
+instance HasLevel RefT where
+  hasLevel (RefFX _) = 0
+  hasLevel _ = 100
+
+instance HasLevel Ref where
+  hasLevel (F x) = hasLevel x
+  hasLevel (B x) = hasLevel x
+  hasLevel (U x) = hasLevel x
