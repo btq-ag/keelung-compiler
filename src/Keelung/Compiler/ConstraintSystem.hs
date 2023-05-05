@@ -68,7 +68,7 @@ data ConstraintSystem n = ConstraintSystem
     -- a = b * q + r
     csDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
     -- hints for generating witnesses for ModInv constraints
-    csModInvs :: [(RefU, RefU, Integer)]
+    csModInvs :: [(Either RefU n, Either RefU n, Integer)]
   }
   deriving (Eq, Generic, NFData)
 
@@ -387,7 +387,7 @@ relocateConstraintSystem cs =
     nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefT counters m))) $ Map.toList $ csNEqU cs
 
     divMods = map (\(a, b, q, r) -> (left (reindexRefU counters) a, left (reindexRefU counters) b, left (reindexRefU counters) q, left (reindexRefU counters) r)) $ csDivMods cs
-    modInvs = map (\(a, n, p) -> (reindexRefU counters a, reindexRefU counters n, p)) $ csModInvs cs
+    modInvs = map (\(a, n, p) -> (left (reindexRefU counters) a, left (reindexRefU counters) n, p)) $ csModInvs cs
 
 sizeOfConstraintSystem :: ConstraintSystem n -> Int
 sizeOfConstraintSystem cs =

@@ -23,7 +23,7 @@ import Keelung.Data.PolyG qualified as PolyG
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (ConstraintSystem n)
-run cs = goThroughDivMods . snd <$> optimizeAddF cs
+run cs = goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cs
 
 optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (WhatChanged, ConstraintSystem n)
 optimizeAddF cs = do
@@ -62,6 +62,19 @@ goThroughDivMods cs =
       AllRelations.Value val -> Right val
       AllRelations.ChildOf 1 (U root) 0 -> Left root
       AllRelations.ChildOf {} -> error "[ panic ] goThroughDivMods: ChildOf with non-1 coefficient"
+
+goThroughModInvs :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
+goThroughModInvs cs = 
+  let relations = csFieldRelations cs
+      substModInv (a, b, c) = (substVar relations a, substVar relations b, c)
+   in cs {csModInvs = map substModInv (csModInvs cs)}
+  where
+    substVar _ (Right val) = Right val
+    substVar relations (Left ref) = case AllRelations.lookup (U ref) relations of
+      AllRelations.Root -> Left ref
+      AllRelations.Value val -> Right val
+      AllRelations.ChildOf 1 (U root) 0 -> Left root
+      AllRelations.ChildOf {} -> error "[ panic ] goThroughModInvs: ChildOf with non-1 coefficient"
 
 goThroughMulF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughMulF = do

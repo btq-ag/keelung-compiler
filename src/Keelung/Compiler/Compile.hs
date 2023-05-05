@@ -223,34 +223,29 @@ add = mapM_ addOne
         Nothing -> return ()
         Just relations -> put cs {csFieldRelations = relations}
 
-    addBitTestOccurrences :: (GaloisField n, Integral n) => Ref -> M n ()
-    addBitTestOccurrences (B (RefUBit _ ref _)) = do
-      modify' (\cs -> cs {csBitTests = Map.insertWith (+) ref 1 (csBitTests cs)})
-    addBitTestOccurrences _ = return ()
+    addBitTestOccurrences :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
+    addBitTestOccurrences (B (RefUBit _ refA _)) (B (RefUBit _ refB _)) = do
+      modify' (\cs -> cs {csBitTests = Map.insertWith (+) refA 1 $ Map.insertWith (+) refB 1 (csBitTests cs)})
+    addBitTestOccurrences _ _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
-      addBitTestOccurrences x
       execRelations $ FieldRelations.assignF x c
     addOne (CVarBindB x c) = do
-      addBitTestOccurrences (B x)
       execRelations $ FieldRelations.assignB x (c == 1)
     addOne (CVarBindU x c) = do
       execRelations $ FieldRelations.assignU x c
     addOne (CVarEq x y) = do
-      addBitTestOccurrences x
-      addBitTestOccurrences y
+      addBitTestOccurrences x y
       execRelations $ FieldRelations.relateRefs x 1 y 0
     addOne (CVarEqF x y) = do
       execRelations $ FieldRelations.relateRefs (F x) 1 (F y) 0
     addOne (CVarEqB x y) = do
-      addBitTestOccurrences (B x)
-      addBitTestOccurrences (B y)
+      addBitTestOccurrences (B x) (B y)
       execRelations $ FieldRelations.relateB x (True, y)
     addOne (CVarNEqB x y) = do
-      addBitTestOccurrences (B x)
-      addBitTestOccurrences (B y)
+      addBitTestOccurrences (B x) (B y)
       execRelations $ FieldRelations.relateB x (False, y)
     addOne (CVarEqU x y) = do
       execRelations $ FieldRelations.assertEqualU x y
@@ -263,7 +258,7 @@ addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> 
 addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (Left x, Left y, Left q, Left r) : csDivMods cs}
 
 addModInvHint :: (GaloisField n, Integral n) => RefU -> RefU -> Integer -> M n ()
-addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (x, n, p) : csModInvs cs}
+addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (Left x, Left n, p) : csModInvs cs}
 
 freshRefF :: M n RefT
 freshRefF = do

@@ -110,7 +110,7 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
     csBinReps :: [BinRep],
     csCounters :: Counters,
     csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
-    csModInvs :: [(Var, Var, Integer)]
+    csModInvs :: [(Either Var n, Either Var n, Integer)]
   }
   deriving (Eq, Generic, NFData)
 
@@ -204,4 +204,4 @@ renumberConstraints cs =
         left renumber r
       )
 
-    renumberModInv (x, n, p) = (renumber x, renumber n, p)
+    renumberModInv (x, n, p) = (left renumber x, left renumber n, p)

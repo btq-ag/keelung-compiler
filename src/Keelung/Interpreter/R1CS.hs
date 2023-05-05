@@ -81,6 +81,10 @@ goThroughOnce constraints = mconcat <$> mapM shrink (toList constraints)
 lookupVar :: Var -> M n (Maybe n)
 lookupVar var = gets (IntMap.lookup var)
 
+lookupVarEither :: Either Var n -> M n (Maybe n)
+lookupVarEither (Left var) = lookupVar var
+lookupVarEither (Right val) = return (Just val)
+
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (R1CConstraint r1c) = fmap (pure . R1CConstraint) <$> shrinkR1C r1c
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
@@ -96,16 +100,12 @@ shrink (ModInvConstraint modInv) = fmap (pure . ModInvConstraint) <$> shrinkModI
 shrinkDivMod :: (GaloisField n, Integral n) => (Either Var n, Either Var n, Either Var n, Either Var n) -> M n (Result (Either Var n, Either Var n, Either Var n, Either Var n))
 shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
 
-  let lookupVar' (Left var) = lookupVar var
-      lookupVar' (Right val) = return (Just val)
-      bindVar' (Left var) val = bindVar var val
-      bindVar' (Right _) _ = return ()
   -- check the value of the dividend first,
   -- if it's unknown, then its value can only be determined from other variables
-  dividendResult <- lookupVar' dividendVar
-  divisorResult <- lookupVar' divisorVar
-  quotientResult <- lookupVar' quotientVar
-  remainderResult <- lookupVar' remainderVar
+  dividendResult <- lookupVarEither dividendVar
+  divisorResult <- lookupVarEither divisorVar
+  quotientResult <- lookupVarEither quotientVar
+  remainderResult <- lookupVarEither remainderVar
   case dividendResult of
     Just dividendVal -> do
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
@@ -126,7 +126,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError $
               DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
-          bindVar' remainderVar expectedRemainderVal
+          bindVarEither remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
           let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
@@ -134,13 +134,13 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError $
               DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
-          bindVar' quotientVar expectedQuotientVal
+          bindVarEither quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
           let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
               expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
-          bindVar' quotientVar expectedQuotientVal
-          bindVar' remainderVar expectedRemainderVal
+          bindVarEither quotientVar expectedQuotientVal
+          bindVarEither remainderVar expectedRemainderVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Just actualRemainderVal) -> do
           let expectedDivisorVal = dividendVal `Arithmetics.integerDiv` actualQuotientVal
@@ -148,13 +148,13 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError $
               DivModRemainderError dividendVal expectedDivisorVal expectedRemainderVal actualRemainderVal
-          bindVar' divisorVar expectedDivisorVal
+          bindVarEither divisorVar expectedDivisorVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Nothing) -> do
           let expectedDivisorVal = dividendVal `Arithmetics.integerDiv` actualQuotientVal
               expectedRemainderVal = dividendVal `Arithmetics.integerMod` expectedDivisorVal
-          bindVar' divisorVar expectedDivisorVal
-          bindVar' remainderVar expectedRemainderVal
+          bindVarEither divisorVar expectedDivisorVal
+          bindVarEither remainderVar expectedRemainderVal
           return Eliminated
         _ -> return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
     Nothing -> do
@@ -163,7 +163,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
         -- divisor, quotient, and remainder are all known
         (Just divisorVal, Just quotientVal, Just remainderVal) -> do
           let dividendVal = divisorVal * quotientVal + remainderVal
-          bindVar' dividendVar dividendVal
+          bindVarEither dividendVar dividendVal
           return Eliminated
         _ -> do
           return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
@@ -180,16 +180,16 @@ shrinkBooleanConstraint var = do
     Nothing -> return $ Stuck var
 
 -- | Trying to reduce a ModInv constraint
-shrinkModInv :: (GaloisField n, Integral n) => (Var, Var, Integer) -> M n (Result (Var, Var, Integer))
+shrinkModInv :: (GaloisField n, Integral n) => (Either Var n, Either Var n, Integer) -> M n (Result (Either Var n, Either Var n, Integer))
 shrinkModInv (aVar, nVar, p) = do
-  aResult <- lookupVar aVar
+  aResult <- lookupVarEither aVar
   case aResult of
     Just aVal -> do
       case Arithmetics.modInv (toInteger aVal) p of
         Just result -> do
           -- aVal * result = n * p + 1
           let nVal = (aVal * fromInteger result - 1) `Arithmetics.integerDiv` fromInteger p
-          bindVar nVar nVal
+          bindVarEither nVar nVal
           return Eliminated
         Nothing -> throwError $ ModInvError aVar aVal p
     Nothing -> return $ Stuck (aVar, nVar, p)
