@@ -58,7 +58,7 @@ mapError :: Relations.M (Bool, Bool) a -> Relations.M (Error n) a
 mapError = Relations.mapError (uncurry ConflictingValuesB)
 
 new :: BooleanRelations
-new = Relations.new
+new = Relations.new "Boolean"
 
 assign :: RefB -> Bool -> BooleanRelations -> Relations.M (Error n) BooleanRelations
 assign var val xs = mapError $ Relations.assign var val xs

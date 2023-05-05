@@ -74,7 +74,7 @@ mapError :: Relations.M (n, n) a -> Relations.M (Error n) a
 mapError = Relations.mapError (uncurry ConflictingValuesU)
 
 new :: UIntRelations n
-new = Relations.new
+new = Relations.new "UInt"
 
 assign :: (GaloisField n, Integral n) => RefU -> n -> UIntRelations n -> Relations.M (Error n) (UIntRelations n)
 assign var val xs = mapError $ Relations.assign var val xs

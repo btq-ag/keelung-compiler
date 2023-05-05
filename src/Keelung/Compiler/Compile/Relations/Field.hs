@@ -82,7 +82,7 @@ updateRelationsU f xs = do
 --------------------------------------------------------------------------------
 
 new :: AllRelations n
-new = AllRelations Relations.new Relations.Boolean.new Relations.UInt.new
+new = AllRelations (Relations.new "Field") Relations.Boolean.new Relations.UInt.new
 
 assignF :: (GaloisField n, Integral n) => Ref -> n -> AllRelations n -> Relations.M (Error n) (AllRelations n)
 assignF var val = updateRelationsF $ Relations.assign var val
