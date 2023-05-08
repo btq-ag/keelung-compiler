@@ -16,6 +16,22 @@ import Test.Hspec
 tests :: SpecWith ()
 tests = do
   describe "UInt" $ do
+    describe "Constants" $ do
+      it "`return 0`" $ do
+        (cs, cs') <- execute $ do
+          return (0  :: UInt 4)
+        cs `shouldHaveSize` 6
+        cs' `shouldHaveSize` 6
+
+      -- it "`return 0[3]`" $ do
+      --   (cs, cs') <- execute $ do
+      --     let a = 0  :: UInt 4
+      --     return $ a !!! 3
+      --   debug cs'
+      --   cs `shouldHaveSize` 2
+      --   cs' `shouldHaveSize` 2
+
+    describe "Comparison" $ do
       it "compute LTE" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
@@ -51,8 +67,10 @@ tests = do
       it "compute LTE (2 constants)" $ do
         (cs, cs') <- execute $ do
           return $ 0 `lte` (0  :: UInt 4)
-        cs `shouldHaveSize` 22
-        cs' `shouldHaveSize` 5
+        -- debug cs
+        -- debug cs'
+        cs `shouldHaveSize` 14
+        cs' `shouldHaveSize` 13
 
 --------------------------------------------------------------------------------
 

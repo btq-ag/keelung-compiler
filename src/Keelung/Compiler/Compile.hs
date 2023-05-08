@@ -22,7 +22,9 @@ import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
-import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
+-- import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
+
+import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Untyped
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
@@ -394,6 +396,14 @@ compileExprB out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileGTU out x' y'
+  BitU (ValU width val) i -> do
+    let index = i `mod` width
+    let bit = FieldBits.testBit val index
+    add $ cVarBindB out bit -- out[i] = bit
+    -- forM_ [0 .. width - 1] $ \i -> do
+    --   let bit = testBit val i
+    --   add $ cVarBindB (RefUBit width out i) bit -- out[i] = bit
+    -- error "compileExprB: BitU (ValU _ _) _"
   BitU x i -> do
     x' <- wireU x
     let width = widthOfU x
@@ -448,13 +458,8 @@ compileExprF out expr = case expr of
 
 compileExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compileExprU out expr = case expr of
-  ValU width val -> do
-    -- constraint for UInt : out = val
+  ValU _ val -> do
     add $ cVarBindU out val
-    -- constraints for BinRep of UInt
-    forM_ [0 .. width - 1] $ \i -> do
-      let bit = testBit val i
-      add $ cVarBindB (RefUBit width out i) bit -- out[i] = bit
   VarU width var -> do
     add $ cVarEqU out (RefUX width var)
   VarUO width var -> do
