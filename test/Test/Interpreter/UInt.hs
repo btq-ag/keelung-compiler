@@ -370,7 +370,7 @@ tests = do
                 (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTBoundTooLargeError bound width))
                 (CompileError (CompilerError.AssertGTBoundTooLargeError bound width))
 
-      it "lte" $ do
+      it "lte (variable / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
         let program = do
               x <- inputUInt @4 Public
@@ -382,7 +382,39 @@ tests = do
             then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
             else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
 
-      it "lt" $ do
+      it "lte (variable / constant)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program y = do
+              x <- inputUInt @4 Public
+              return $ x `lte` y
+
+        forAll genPair $ \(x, y) -> do
+          if x <= y
+            then runAll (program (fromInteger y)) [fromInteger x :: GF181] [] [1]
+            else runAll (program (fromInteger y)) [fromInteger x :: GF181] [] [0]
+
+      it "lte (constant / variable)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program x = do
+              y <- inputUInt @4 Public
+              return $ x `lte` y
+
+        forAll genPair $ \(x, y) -> do
+          if x <= y
+            then runAll (program (fromInteger x)) [fromInteger y :: GF181] [] [1]
+            else runAll (program (fromInteger x)) [fromInteger y :: GF181] [] [0]
+
+      it "lte (constant / constant)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program x y = do
+              return $ x `lte` (y :: UInt 4)
+
+        forAll genPair $ \(x, y) -> do
+          if x <= y
+            then runAll (program (fromInteger x) (fromInteger y)) [] [] ([1] :: [GF181])
+            else runAll (program (fromInteger x) (fromInteger y)) [] [] ([0] :: [GF181])
+
+      it "lt (variable / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
         let program = do
               x <- inputUInt @4 Public
@@ -393,8 +425,40 @@ tests = do
           if x < y
             then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
             else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+      
+      it "lt (variable / constant)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program y = do
+              x <- inputUInt @4 Public
+              return $ x `lt` y
 
-      it "gte" $ do
+        forAll genPair $ \(x, y) -> do
+          if x < y
+            then runAll (program (fromInteger y)) [fromInteger x :: GF181] [] [1]
+            else runAll (program (fromInteger y)) [fromInteger x :: GF181] [] [0]
+
+      it "lt (constant / variable)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program x = do
+              y <- inputUInt @4 Public
+              return $ x `lt` y
+
+        forAll genPair $ \(x, y) -> do
+          if x < y
+            then runAll (program (fromInteger x)) [fromInteger y :: GF181] [] [1]
+            else runAll (program (fromInteger x)) [fromInteger y :: GF181] [] [0]
+
+      it "lt (constant / constant)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program x y = do
+              return $ x `lt` (y :: UInt 4)
+
+        forAll genPair $ \(x, y) -> do
+          if x < y
+            then runAll (program (fromInteger x) (fromInteger y)) [] [] ([1] :: [GF181])
+            else runAll (program (fromInteger x) (fromInteger y)) [] [] ([0] :: [GF181])
+
+      it "gte (variable / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
         let program = do
               x <- inputUInt @4 Public
@@ -405,8 +469,40 @@ tests = do
           if x >= y
             then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
             else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+      
+      it "gte (variable / constant)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program y = do
+              x <- inputUInt @4 Public
+              return $ x `gte` y
 
-      it "gt" $ do
+        forAll genPair $ \(x, y) -> do
+          if x >= y
+            then runAll (program (fromInteger y)) [fromInteger x :: GF181] [] [1]
+            else runAll (program (fromInteger y)) [fromInteger x :: GF181] [] [0]
+
+      it "gte (constant / variable)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program x = do
+              y <- inputUInt @4 Public
+              return $ x `gte` y
+
+        forAll genPair $ \(x, y) -> do
+          if x >= y
+            then runAll (program (fromInteger x)) [fromInteger y :: GF181] [] [1]
+            else runAll (program (fromInteger x)) [fromInteger y :: GF181] [] [0]
+
+      it "gte (constant / constant)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program x y = do
+              return $ x `gte` (y :: UInt 4)
+
+        forAll genPair $ \(x, y) -> do
+          if x >= y
+            then runAll (program (fromInteger x) (fromInteger y)) [] [] ([1] :: [GF181])
+            else runAll (program (fromInteger x) (fromInteger y)) [] [] ([0] :: [GF181])
+
+      it "gt (variable / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
         let program = do
               x <- inputUInt @4 Public
@@ -417,6 +513,38 @@ tests = do
           if x > y
             then runAll program [fromInteger x, fromInteger y :: GF181] [] [1]
             else runAll program [fromInteger x, fromInteger y :: GF181] [] [0]
+
+      it "gt (variable / constant)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program y = do
+              x <- inputUInt @4 Public
+              return $ x `gt` y
+
+        forAll genPair $ \(x, y) -> do
+          if x > y
+            then runAll (program (fromInteger y)) [fromInteger x :: GF181] [] [1]
+            else runAll (program (fromInteger y)) [fromInteger x :: GF181] [] [0]
+
+      it "gt (constant / variable)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program x = do
+              y <- inputUInt @4 Public
+              return $ x `gt` y
+
+        forAll genPair $ \(x, y) -> do
+          if x > y
+            then runAll (program (fromInteger x)) [fromInteger y :: GF181] [] [1]
+            else runAll (program (fromInteger x)) [fromInteger y :: GF181] [] [0]
+
+      it "gt (constant / constant)" $ do
+        let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
+        let program x y = do
+              return $ x `gt` (y :: UInt 4)
+
+        forAll genPair $ \(x, y) -> do
+          if x > y
+            then runAll (program (fromInteger x) (fromInteger y)) [] [] ([1] :: [GF181])
+            else runAll (program (fromInteger x) (fromInteger y)) [] [] ([0] :: [GF181])
 
     describe "Conditionals" $ do
       it "with inputs" $ do

@@ -32,13 +32,33 @@ tests = do
       --   cs' `shouldHaveSize` 2
 
     describe "Comparison" $ do
-      it "compute LTE" $ do
+      it "compute LTE (variable / variable)" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           return $ x `lte` y
         cs `shouldHaveSize` 20
         cs' `shouldHaveSize` 19
+
+      it "compute LTE (constant / constant)" $ do
+        (cs, cs') <- execute $ do
+          return $ 0 `lte` (0  :: UInt 4)
+        cs `shouldHaveSize` 2
+        cs' `shouldHaveSize` 2
+
+      it "compute LTE (constant / variable)" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          return $ x `lte` (0  :: UInt 4)
+        cs `shouldHaveSize` 11
+        cs' `shouldHaveSize` 9
+
+      it "compute LTE (variable / constant)" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          return $ (0  :: UInt 4) `lte` x
+        cs `shouldHaveSize` 11
+        cs' `shouldHaveSize` 7
 
       it "compute LT" $ do
         (cs, cs') <- execute $ do
@@ -63,14 +83,6 @@ tests = do
           return $ x `gt` y
         cs `shouldHaveSize` 19
         cs' `shouldHaveSize` 18
-
-      it "compute LTE (2 constants)" $ do
-        (cs, cs') <- execute $ do
-          return $ 0 `lte` (0  :: UInt 4)
-        -- debug cs
-        -- debug cs'
-        cs `shouldHaveSize` 14
-        cs' `shouldHaveSize` 13
 
 --------------------------------------------------------------------------------
 

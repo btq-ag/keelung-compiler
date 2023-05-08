@@ -381,21 +381,37 @@ compileExprB out expr = case expr of
     y' <- wireU y
     compileEqualityU True out x' y'
   LTEU x y -> do
-    x' <- wireU x
-    y' <- wireU y
-    compileLTEU out x' y'
+    x' <- wireU' x
+    y' <- wireU' y
+    case (x', y') of
+      (Left xVar, Left yVar) -> compileLTEUVarVar out xVar yVar
+      (Left xVar, Right yVal) -> compileLTEUVarConst out xVar yVal
+      (Right xVal, Left yVar) -> compileLTEUConstVar out xVal yVar
+      (Right xVal, Right yVal) -> if xVal <= yVal then add $ cVarBindB out 1 else add $ cVarBindB out 0
   LTU x y -> do
-    x' <- wireU x
-    y' <- wireU y
-    compileLTU out x' y'
+    x' <- wireU' x
+    y' <- wireU' y
+    case (x', y') of
+      (Left xVar, Left yVar) -> compileLTUVarVar out xVar yVar
+      (Left xVar, Right yVal) -> compileLTUVarConst out xVar yVal
+      (Right xVal, Left yVar) -> compileLTUConstVar out xVal yVar
+      (Right xVal, Right yVal) -> if xVal < yVal then add $ cVarBindB out 1 else add $ cVarBindB out 0
   GTEU x y -> do
-    x' <- wireU x
-    y' <- wireU y
-    compileGTEU out x' y'
+    x' <- wireU' x
+    y' <- wireU' y
+    case (x', y') of
+      (Left xVar, Left yVar) -> compileLTEUVarVar out yVar xVar
+      (Left xVar, Right yVal) -> compileLTEUConstVar out yVal xVar
+      (Right xVal, Left yVar) -> compileLTEUVarConst out yVar xVal
+      (Right xVal, Right yVal) -> if xVal >= yVal then add $ cVarBindB out 1 else add $ cVarBindB out 0
   GTU x y -> do
-    x' <- wireU x
-    y' <- wireU y
-    compileGTU out x' y'
+    x' <- wireU' x
+    y' <- wireU' y
+    case (x', y') of
+      (Left xVar, Left yVar) -> compileLTUVarVar out yVar xVar
+      (Left xVar, Right yVal) -> compileLTUConstVar out yVal xVar
+      (Right xVal, Left yVar) -> compileLTUVarConst out yVar xVal
+      (Right xVal, Right yVal) -> if xVal > yVal then add $ cVarBindB out 1 else add $ cVarBindB out 0
   BitU (ValU width val) i -> do
     let index = i `mod` width
     let bit = FieldBits.testBit val index
@@ -651,6 +667,10 @@ wireU expr = do
   out <- freshRefUX (widthOfU expr)
   compileExprU out expr
   return out
+
+wireU' :: (GaloisField n, Integral n) => ExprU n -> M n (Either RefU n)
+wireU' (ValU _ val) = return (Right val)
+wireU' others = Left <$> wireU others
 
 --------------------------------------------------------------------------------
 
@@ -1117,11 +1137,12 @@ assertGT width a c = do
   -- otherwise, assert that a >= c + 1
   assertGTE width a (c + 1)
 
+-- Compiling a ≤ b, where a and b are both variables
 -- lastBit = if a
 --    then if b then 1 else 0
 --    else if b then 1 else 1
-compileLTEU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
-compileLTEU out x y = do
+compileLTEUVarVar :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
+compileLTEUVarVar out x y = do
   let width = widthOf x
   -- last bit
   let xBit = B (RefUBit width x 0)
@@ -1134,26 +1155,82 @@ compileLTEU out x y = do
   add $ cAddF 1 [(result, -1), (F xy, 1), (xBit, -1)]
 
   -- starting from the least significant bit
-  result' <- foldM (compileLTEUPrim width x y) result [1 .. width - 1]
+  result' <- foldM (compileLTEUVarVarPrim width x y) result [1 .. width - 1]
   add $ cVarEq (B out) result'
 
+compileLTEUVarConst :: (GaloisField n, Integral n) => RefB -> RefU -> n -> M n ()
+compileLTEUVarConst out x y = do
+  let width = widthOf x
+  -- last bit
+  let xBit = B (RefUBit width x 0)
+      yBit = FieldBits.testBit y 0
+  -- result = x[0] * y[0] - x[0] + 1
+  result <- F <$> freshRefF
+  add $ cAddF 1 [(result, -1), (xBit, yBit), (xBit, -1)]
+
+  -- starting from the least significant bit
+  result' <- foldM (compileLTEUVarConstPrim width x y) result [1 .. width - 1]
+  add $ cVarEq (B out) result'
+
+compileLTEUConstVar :: (GaloisField n, Integral n) => RefB -> n -> RefU -> M n ()
+compileLTEUConstVar out x y = do
+  let width = widthOf y
+  -- last bit
+  let xBit = FieldBits.testBit x 0
+      yBit = B (RefUBit width y 0)
+  -- result = x[0] * y[0] - x[0] + 1
+  result <- F <$> freshRefF
+  add $ cAddF (1 - xBit) [(result, -1), (yBit, xBit)]
+
+  -- starting from the least significant bit
+  result' <- foldM (compileLTEUConstVarPrim width x y) result [1 .. width - 1]
+  add $ cVarEq (B out) result'
+
+-- Compiling a < b, where a and b are both variables
 -- lastBit = if a
 --    then if b then 0 else 0
 --    else if b then 1 else 0
 -- (b - lastBit) = (a)(b)
-compileLTU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
-compileLTU out x y = do
+compileLTUVarVar :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
+compileLTUVarVar out x y = do
   let width = widthOf x
   -- last bit
   let xBit = B (RefUBit width x 0)
       yBit = B (RefUBit width y 0)
-  -- (b - lastBit) = (a)(b)
-  result <- F <$> freshRefF
-  add $ cMulF (0, [(xBit, 1)]) (0, [(yBit, 1)]) (0, [(result, -1), (yBit, 1)])
+  -- (y - lastBit) = (x)(y)
+  lastBit <- F <$> freshRefF
+  add $ cMulF (0, [(xBit, 1)]) (0, [(yBit, 1)]) (0, [(lastBit, -1), (yBit, 1)])
 
   -- starting from the least significant bit
-  result' <- foldM (compileLTEUPrim width x y) result [1 .. width - 1]
-  add $ cVarEq (B out) result'
+  result <- foldM (compileLTEUVarVarPrim width x y) lastBit [1 .. width - 1]
+  add $ cVarEq (B out) result
+
+compileLTUVarConst :: (GaloisField n, Integral n) => RefB -> RefU -> n -> M n ()
+compileLTUVarConst out x y = do
+  let width = widthOf x
+  -- last bit
+  let xBit = B (RefUBit width x 0)
+      yBit = FieldBits.testBit y 0
+  -- (y - lastBit - yx) = 0
+  lastBit <- F <$> freshRefF
+  add $ cAddF yBit [(lastBit, -1), (xBit, -yBit)]
+
+  -- starting from the least significant bit
+  result <- foldM (compileLTEUVarConstPrim width x y) lastBit [1 .. width - 1]
+  add $ cVarEq (B out) result
+
+compileLTUConstVar :: (GaloisField n, Integral n) => RefB -> n -> RefU -> M n ()
+compileLTUConstVar out x y = do
+  let width = widthOf y
+  -- last bit
+  let xBit = FieldBits.testBit x 0
+      yBit = B (RefUBit width y 0)
+  -- (lastBit + (x - 1)y) = 0
+  lastBit <- F <$> freshRefF
+  add $ cAddF 0 [(lastBit, 1), (yBit, xBit - 1)]
+  -- starting from the least significant bit
+  result <- foldM (compileLTEUConstVarPrim width x y) lastBit [1 .. width - 1]
+  add $ cVarEq (B out) result
 
 -- output = if a
 --    then if b then x else 0
@@ -1162,8 +1239,8 @@ compileLTU out x y = do
 --  =>
 --  1. z = bx
 --  2. output - z = (1-a)(b + x - 2z)
-compileLTEUPrim :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Ref -> Int -> M n Ref
-compileLTEUPrim width x y acc i = do
+compileLTEUVarVarPrim :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Ref -> Int -> M n Ref
+compileLTEUVarVarPrim width x y acc i = do
   let xBit = B (RefUBit width x i)
       yBit = B (RefUBit width y i)
 
@@ -1177,15 +1254,22 @@ compileLTEUPrim width x y acc i = do
 
   return result
 
-compileGTU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
-compileGTU out x y = compileLTU out y x
+compileLTEUVarConstPrim :: (GaloisField n, Integral n) => Width -> RefU -> n -> Ref -> Int -> M n Ref
+compileLTEUVarConstPrim width x y acc i = do
+  let xBit = B (RefUBit width x i)
+      yBit = FieldBits.testBit y i
+  -- result - y[i] * acc = (1 - x[i]) * (y[i] + (1 - 2 * y[i]) * acc)
+  result <- F <$> freshRefF
+  add $ cMulF (1, [(xBit, -1)]) (yBit, [(acc, 1 - 2 * yBit)]) (0, [(result, 1), (acc, -yBit)])
+  return result
 
-compileGTEU :: (GaloisField n, Integral n) => RefB -> RefU -> RefU -> M n ()
-compileGTEU out x y = compileLTEU out y x
-
--- output = if a
---    then if b then x else 0
---    else if b then 1 else x
--- lastBit = if a
---    then if b then 0 else 0
---    else if b then 1 else 0
+compileLTEUConstVarPrim :: (GaloisField n, Integral n) => Width -> n -> RefU -> Ref -> Int -> M n Ref
+compileLTEUConstVarPrim width x y acc i = do
+  let xBit = FieldBits.testBit x i
+      yBit = B (RefUBit width y i)
+  let c = 1 - xBit
+  -- let c = 1 - x
+  -- (1 - 2c) * Y * ACC = RESULT - c * Y - c * ACC
+  result <- F <$> freshRefF
+  add $ cMulF (0, [(yBit, 1 - 2 * c)]) (0, [(acc, 1)]) (0, [(result, 1), (yBit, -c), (acc, -c)])
+  return result
