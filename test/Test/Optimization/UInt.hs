@@ -40,25 +40,39 @@ tests = do
         cs `shouldHaveSize` 20
         cs' `shouldHaveSize` 19
 
-      it "compute LTE (constant / constant)" $ do
+      it "compute LTE 1 (variable / constant)" $ do
         (cs, cs') <- execute $ do
-          return $ 0 `lte` (0  :: UInt 4)
-        cs `shouldHaveSize` 2
-        cs' `shouldHaveSize` 2
+          x <- inputUInt @4 Public
+          return $ (0  :: UInt 4) `lte` x
+        cs `shouldHaveSize` 7
+        cs' `shouldHaveSize` 7
 
-      it "compute LTE (constant / variable)" $ do
+      it "compute LTE 2 (variable / constant)" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          return $ (1  :: UInt 4) `lte` x
+        cs `shouldHaveSize` 10
+        cs' `shouldHaveSize` 9
+
+      it "compute LTE 1 (constant / variable)" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           return $ x `lte` (0  :: UInt 4)
         cs `shouldHaveSize` 11
         cs' `shouldHaveSize` 9
 
-      it "compute LTE (variable / constant)" $ do
+      it "compute LTE 2 (constant / variable)" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
-          return $ (0  :: UInt 4) `lte` x
-        cs `shouldHaveSize` 11
-        cs' `shouldHaveSize` 7
+          return $ x `lte` (1  :: UInt 4)
+        cs `shouldHaveSize` 10
+        cs' `shouldHaveSize` 8
+
+      it "compute LTE (constant / constant)" $ do
+        (cs, cs') <- execute $ do
+          return $ 0 `lte` (0  :: UInt 4)
+        cs `shouldHaveSize` 2
+        cs' `shouldHaveSize` 2
 
       it "compute LT" $ do
         (cs, cs') <- execute $ do
