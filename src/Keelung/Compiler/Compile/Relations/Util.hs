@@ -14,7 +14,7 @@ instance Seniority RefB where
 instance Seniority RefU where
   compareSeniority = compare `on` hasLevel
 
-instance Seniority RefT where
+instance Seniority RefF where
   compareSeniority = compare `on` hasLevel
 
 instance Seniority Ref where
@@ -34,7 +34,7 @@ instance HasLevel RefU where
   hasLevel (RefUX _ _) = 0
   hasLevel _ = 100
 
-instance HasLevel RefT where
+instance HasLevel RefF where
   hasLevel (RefFX _) = 0
   hasLevel _ = 100
 

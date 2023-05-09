@@ -262,7 +262,7 @@ addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (Left x, Left y, Left q
 addModInvHint :: (GaloisField n, Integral n) => RefU -> RefU -> Integer -> M n ()
 addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (Left x, Left n, p) : csModInvs cs}
 
-freshRefF :: M n RefT
+freshRefF :: M n RefF
 freshRefF = do
   counters <- gets csCounters
   let index = getCount OfIntermediate OfField counters
@@ -425,7 +425,7 @@ compileExprB out expr = case expr of
     let width = widthOf x
     add $ cVarEqB out (RefUBit width x' (i `mod` width)) -- out = x'[i]
 
-compileExprF :: (GaloisField n, Integral n) => RefT -> ExprF n -> M n ()
+compileExprF :: (GaloisField n, Integral n) => RefF -> ExprF n -> M n ()
 compileExprF out expr = case expr of
   ValF val -> add $ cVarBindF (F out) val -- out = val
   VarF var -> add $ cVarEqF out (RefFX var) -- out = var
@@ -588,7 +588,7 @@ compileExprU out expr = case expr of
 
 data Term n
   = Constant n -- c
-  | WithVars RefT n -- cx
+  | WithVars RefF n -- cx
 
 -- Avoid having to introduce new multiplication gates
 -- for multiplication by constant scalars.
@@ -626,7 +626,7 @@ negateTerm :: Num n => Term n -> Term n
 negateTerm (WithVars var c) = WithVars var (negate c)
 negateTerm (Constant c) = Constant (negate c)
 
-compileTerms :: (GaloisField n, Integral n) => RefT -> Seq (Term n) -> M n ()
+compileTerms :: (GaloisField n, Integral n) => RefF -> Seq (Term n) -> M n ()
 compileTerms out terms =
   let (constant, varsWithCoeffs) = foldl' go (0, []) terms
    in case varsWithCoeffs of
@@ -648,7 +648,7 @@ wireB expr = do
   compileExprB out expr
   return out
 
-wireF :: (GaloisField n, Integral n) => ExprF n -> M n RefT
+wireF :: (GaloisField n, Integral n) => ExprF n -> M n RefF
 wireF (VarF ref) = return (RefFX ref)
 wireF (VarFO ref) = return (RefFO ref)
 wireF (VarFI ref) = return (RefFI ref)
@@ -721,7 +721,7 @@ compileEqualityU isEq out x y =
       --  keep track of the relation between (x - y) and m
       add $ cNEqU x y m
 
-compileEqualityF :: (GaloisField n, Integral n) => Bool -> RefB -> RefT -> RefT -> M n ()
+compileEqualityF :: (GaloisField n, Integral n) => Bool -> RefB -> RefF -> RefF -> M n ()
 compileEqualityF isEq out x y =
   if x == y
     then do
