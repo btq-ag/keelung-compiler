@@ -37,8 +37,8 @@ tests = do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           return $ x `lte` y
-        cs `shouldHaveSize` 20
-        cs' `shouldHaveSize` 19
+        cs `shouldHaveSize` 19
+        cs' `shouldHaveSize` 18
 
       it "compute LTE 1 (variable / constant)" $ do
         (cs, cs') <- execute $ do
@@ -87,8 +87,8 @@ tests = do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           return $ x `gte` y
-        cs `shouldHaveSize` 20
-        cs' `shouldHaveSize` 19
+        cs `shouldHaveSize` 19
+        cs' `shouldHaveSize` 18
 
       it "compute GT" $ do
         (cs, cs') <- execute $ do

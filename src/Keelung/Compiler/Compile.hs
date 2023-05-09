@@ -1147,13 +1147,9 @@ compileLTEUVarVar out x y = do
   -- last bit
   let xBit = B (RefUBit width x 0)
       yBit = B (RefUBit width y 0)
-  -- xy = x[0] * y[0]
-  xy <- freshRefB
-  add $ cMulF (0, [(xBit, 1)]) (0, [(yBit, 1)]) (0, [(B xy, 1)])
-  -- result = x[0] * y[0] - x[0] + 1
+  -- x[0] * y[0] = result + x[0] - 1
   result <- freshRefB
-  add $ cAddF 1 [(B result, -1), (B xy, 1), (xBit, -1)]
-
+  add $ cMulF (0, [(xBit, 1)]) (0, [(yBit, 1)]) (-1, [(B result, 1), (xBit, 1)])
   -- starting from the least significant bit
   result' <- foldM (compileLTEUVarVarPrim width x y) result [1 .. width - 1]
   add $ cVarEqB out result'
@@ -1161,48 +1157,24 @@ compileLTEUVarVar out x y = do
 compileLTEUVarConst :: (GaloisField n, Integral n) => RefB -> RefU -> n -> M n ()
 compileLTEUVarConst out x y = do
   let width = widthOf x
-  -- last bit
-  let xBit = RefUBit width x 0
-      yBit = FieldBits.testBit y 0
-
-  if yBit == 1
-    then do
-      -- lastBit = 1
-      -- starting from the least significant bit
-      result <- foldM (compileLTEUVarConstPrim width x y) (Right 1) [1 .. width - 1]
-      case result of
-        Left var -> add $ cVarEqB out var
-        Right val -> add $ cVarBindF (B out) val
-    else do
-      -- lastBit = - x[0] + 1
-      lastBit <- freshRefB
-      add $ cVarNEqB lastBit xBit
-      -- starting from the least significant bit
-      result <- foldM (compileLTEUVarConstPrim width x y) (Left lastBit) [1 .. width - 1]
-      case result of
-        Left var -> add $ cVarEqB out var
-        Right val -> add $ cVarBindF (B out) val
+  -- starting from the least significant bit
+  let pairs = [(RefUBit width x i, FieldBits.testBit' y i) | i <- [0 .. width - 1]]
+  result <- foldM compileLTEUVarConstPrim (Right True) pairs
+  case result of
+    Left var -> add $ cVarEqB out var
+    Right True -> add $ cVarBindB out 1
+    Right False -> add $ cVarBindB out 0
 
 compileLTEUConstVar :: (GaloisField n, Integral n) => RefB -> n -> RefU -> M n ()
 compileLTEUConstVar out x y = do
   let width = widthOf y
-  -- last bit
-  let xBit = FieldBits.testBit x 0
-      yBit = RefUBit width y 0
-
-  if xBit == 1
-    then do
-      -- starting from the least significant bit
-      result <- foldM (compileLTEUConstVarPrim width x y) (Left yBit) [1 .. width - 1]
-      case result of
-        Left var -> add $ cVarEqB out var
-        Right val -> add $ cVarBindF (B out) val
-    else do
-      -- starting from the least significant bit
-      result <- foldM (compileLTEUConstVarPrim width x y) (Right 1) [1 .. width - 1]
-      case result of
-        Left var -> add $ cVarEqB out var
-        Right val -> add $ cVarBindF (B out) val
+  -- starting from the least significant bit
+  let pairs = [(FieldBits.testBit' x i, RefUBit width y i) | i <- [0 .. width - 1]]
+  result <- foldM compileLTEUConstVarPrim (Right True) pairs
+  case result of
+    Left var -> add $ cVarEqB out var
+    Right True -> add $ cVarBindB out 1
+    Right False -> add $ cVarBindB out 0
 
 -- Compiling a < b, where a and b are both variables
 -- lastBit = if a
@@ -1218,58 +1190,9 @@ compileLTUVarVar out x y = do
   -- (y - lastBit) = (x)(y)
   lastBit <- freshRefB
   add $ cMulF (0, [(xBit, 1)]) (0, [(yBit, 1)]) (0, [(B lastBit, -1), (yBit, 1)])
-
   -- starting from the least significant bit
   result <- foldM (compileLTEUVarVarPrim width x y) lastBit [1 .. width - 1]
   add $ cVarEqB out result
-
-compileLTUVarConst :: (GaloisField n, Integral n) => RefB -> RefU -> n -> M n ()
-compileLTUVarConst out x y = do
-  let width = widthOf x
-  -- last bitå
-  let xBit = RefUBit width x 0
-      yBit = FieldBits.testBit y 0
-
-  if yBit == 1
-    then do
-      -- 1 = lastBit + x
-      lastBit <- freshRefB
-      add $ cVarNEqB lastBit xBit
-      -- starting from the least significant bit
-      result <- foldM (compileLTEUVarConstPrim width x y) (Left lastBit) [1 .. width - 1]
-      case result of
-        Left var -> add $ cVarEqB out var
-        Right val -> add $ cVarBindF (B out) val
-    else do
-      -- lastBit = 0
-      -- starting from the least significant bit
-      result <- foldM (compileLTEUVarConstPrim width x y) (Right 0) [1 .. width - 1]
-      case result of
-        Left var -> add $ cVarEqB out var
-        Right val -> add $ cVarBindF (B out) val
-
-compileLTUConstVar :: (GaloisField n, Integral n) => RefB -> n -> RefU -> M n ()
-compileLTUConstVar out x y = do
-  let width = widthOf y
-  -- last bit
-  let xBit = FieldBits.testBit x 0
-      yBit = RefUBit width y 0
-
-  if xBit == 1
-    then do
-      -- lastBit = 0
-      -- starting from the least significant bit
-      result <- foldM (compileLTEUConstVarPrim width x y) (Right 0) [1 .. width - 1]
-      case result of
-        Left var -> add $ cVarEqB out var
-        Right val -> add $ cVarBindF (B out) val
-    else do
-      -- lastBit = y
-      -- starting from the least significant bit
-      result <- foldM (compileLTEUConstVarPrim width x y) (Left yBit) [1 .. width - 1]
-      case result of
-        Left var -> add $ cVarEqB out var
-        Right val -> add $ cVarBindF (B out) val
 
 -- output = if a
 --    then if b then x else 0
@@ -1293,65 +1216,62 @@ compileLTEUVarVarPrim width x y acc i = do
 
   return result
 
-compileLTEUVarConstPrim :: (GaloisField n, Integral n) => Width -> RefU -> n -> Either RefB n -> Int -> M n (Either RefB n)
-compileLTEUVarConstPrim width x y (Left acc) i = do
-  let xBit = B (RefUBit width x i)
-      yBit = FieldBits.testBit y i
-  if yBit == 1
-    then do
-      -- result - acc = (1 - x[i]) * (1 - acc)
-      result <- freshRefB
-      add $ cMulF (1, [(xBit, -1)]) (1, [(B acc, -1)]) (0, [(B result, 1), (B acc, -yBit)])
-      return $ Left result
-    else do
-      -- result = (1 - x[i]) * acc
-      result <- freshRefB
-      add $ cMulF (1, [(xBit, -1)]) (0, [(B acc, 1)]) (0, [(B result, 1)])
-      return $ Left result
-compileLTEUVarConstPrim width x y (Right acc) i = do
-  let xBit = RefUBit width x i
-      yBit = FieldBits.testBit y i
+compileLTUVarConst :: (GaloisField n, Integral n) => RefB -> RefU -> n -> M n ()
+compileLTUVarConst out x y = do
+  let width = widthOf x
+  -- starting from the least significant bit
+  let pairs = [(RefUBit width x i, FieldBits.testBit' y i) | i <- [0 .. width - 1]]
+  result <- foldM compileLTEUVarConstPrim (Right False) pairs
+  case result of
+    Left var -> add $ cVarEqB out var
+    Right True -> add $ cVarBindB out 1
+    Right False -> add $ cVarBindB out 0
 
-  if yBit == 1
-    then
-      if acc == 1
-        then return $ Right 1
-        else do
-          result <- freshRefB
-          add $ cVarNEqB result xBit
-          return $ Left result
-    else
-      if acc == 1
-        then do
-          result <- freshRefB
-          add $ cVarNEqB result xBit
-          return $ Left result
-        else return $ Right 0
+compileLTUConstVar :: (GaloisField n, Integral n) => RefB -> n -> RefU -> M n ()
+compileLTUConstVar out x y = do
+  let width = widthOf y
+  -- starting from the least significant bit
+  let pairs = [(FieldBits.testBit' x i, RefUBit width y i) | i <- [0 .. width - 1]]
+  result <- foldM compileLTEUConstVarPrim (Right False) pairs
+  case result of
+    Left var -> add $ cVarEqB out var
+    Right True -> add $ cVarBindB out 1
+    Right False -> add $ cVarBindB out 0
 
-compileLTEUConstVarPrim :: (GaloisField n, Integral n) => Width -> n -> RefU -> Either RefB n -> Int -> M n (Either RefB n)
-compileLTEUConstVarPrim width x y (Left acc) i = do
-  let xBit = FieldBits.testBit x i
-      yBit = B (RefUBit width y i)
-  if xBit == 1
-    then do
-      -- y[i] * acc = result
-      result <- freshRefB
-      add $ cMulF (0, [(yBit, 1)]) (0, [(B acc, 1)]) (0, [(B result, 1)])
-      return $ Left result
-    else do
-      -- - y[i] * acc = result - y[i] - acc
-      result <- freshRefB
-      add $ cMulF (0, [(yBit, -1)]) (0, [(B acc, 1)]) (0, [(B result, 1), (yBit, -1), (B acc, -1)])
-      return $ Left result
-compileLTEUConstVarPrim width x y (Right acc) i = do
-  let xBit = FieldBits.testBit x i
-      yBit = RefUBit width y i
-  if xBit == 1
-    then
-      if acc == 1
-        then return $ Left yBit
-        else return $ Right 0
-    else
-      if acc == 1
-        then return $ Right 1
-        else return $ Left yBit
+compileLTEUVarConstPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (RefB, Bool) -> M n (Either RefB Bool)
+compileLTEUVarConstPrim (Left acc) (x, True) = do
+  -- result - acc = (1 - x[i]) * (1 - acc)
+  result <- freshRefB
+  add $ cMulF (1, [(B x, -1)]) (1, [(B acc, -1)]) (0, [(B result, 1), (B acc, -1)])
+  return $ Left result
+compileLTEUVarConstPrim (Left acc) (x, False) = do
+  -- result = (1 - x[i]) * acc
+  result <- freshRefB
+  add $ cMulF (1, [(B x, -1)]) (0, [(B acc, 1)]) (0, [(B result, 1)])
+  return $ Left result
+compileLTEUVarConstPrim (Right True) (_, True) = return $ Right True
+compileLTEUVarConstPrim (Right True) (x, False) = do
+  result <- freshRefB
+  add $ cVarNEqB result x
+  return $ Left result
+compileLTEUVarConstPrim (Right False) (x, True) = do
+  result <- freshRefB
+  add $ cVarNEqB result x
+  return $ Left result
+compileLTEUVarConstPrim (Right False) (_, False) = return $ Right False
+
+compileLTEUConstVarPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (Bool, RefB) -> M n (Either RefB Bool)
+compileLTEUConstVarPrim (Left acc) (True, y) = do
+  -- y[i] * acc = result
+  result <- freshRefB
+  add $ cMulF (0, [(B y, 1)]) (0, [(B acc, 1)]) (0, [(B result, 1)])
+  return $ Left result
+compileLTEUConstVarPrim (Left acc) (_, y) = do
+  -- - y[i] * acc = result - y[i] - acc
+  result <- freshRefB
+  add $ cMulF (0, [(B y, -1)]) (0, [(B acc, 1)]) (0, [(B result, 1), (B y, -1), (B acc, -1)])
+  return $ Left result
+compileLTEUConstVarPrim (Right True) (True, y) = return $ Left y
+compileLTEUConstVarPrim (Right True) (False, _) = return $ Right True
+compileLTEUConstVarPrim (Right False) (True, _) = return $ Right False
+compileLTEUConstVarPrim (Right False) (False, y) = return $ Left y
