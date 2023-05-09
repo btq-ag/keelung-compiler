@@ -20,9 +20,9 @@ import Test.HUnit (assertFailure)
 import Test.Hspec
 import Test.Optimization.UInt qualified as Optimization.UInt
 
--- | elaborate => rewrite => type erase => constant propagation => compile
+-- | elaborate => rewrite => to internal syntax => constant propagation => compile
 compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
-compileO0 program = Compiler.erase program >>= Compiler.run True . ConstantPropagation.run
+compileO0 program = Compiler.convertToInternal program >>= Compiler.run True . ConstantPropagation.run
 
 -- | Returns the original and optimized constraint system
 execute :: Encode t => Comp t -> IO (ConstraintSystem (N GF181), ConstraintSystem (N GF181))

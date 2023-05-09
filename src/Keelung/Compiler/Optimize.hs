@@ -14,7 +14,7 @@ import Keelung.Compiler.Optimize.MinimizeConstraints qualified as MinimizeConstr
 import Keelung.Compiler.Optimize.MinimizeRelocatedConstraints qualified as MinimizeRelocatedConstraints
 import Keelung.Compiler.Optimize.Monad
 import Keelung.Compiler.Relocated
-import Keelung.Compiler.Syntax.Untyped (TypeErased (..))
+import Keelung.Compiler.Syntax.Internal (Internal (..))
 import Keelung.Compiler.Util (Witness)
 import Keelung.Syntax.Counters
 
@@ -61,10 +61,9 @@ data Result = Result
   }
   deriving (Eq, Ord, Show)
 
-compareTypeErased :: TypeErased n -> TypeErased n -> Result
-compareTypeErased x y =
+compareInternal :: Internal n -> Internal n -> Result
+compareInternal x y =
   Result
     { resultConstraintReduction = 0,
-      resultVariableReduction = getTotalCount (erasedCounters x) - getTotalCount (erasedCounters y)
-      -- resultAssignmentReduction = length (erasedAssignments x) - length (erasedAssignments y)
+      resultVariableReduction = getTotalCount (internalCounters x) - getTotalCount (internalCounters y)
     }

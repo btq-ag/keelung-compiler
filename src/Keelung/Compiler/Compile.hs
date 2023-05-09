@@ -25,7 +25,7 @@ import Keelung.Compiler.Error
 -- import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
-import Keelung.Compiler.Syntax.Untyped
+import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
@@ -33,8 +33,8 @@ import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => Bool -> TypeErased n -> Either (Error n) (ConstraintSystem n)
-run useNewOptimizer (TypeErased untypedExprs _ counters assertions sideEffects) = left CompileError $ runM useNewOptimizer counters $ do
+run :: (GaloisField n, Integral n) => Bool -> Internal n -> Either (Error n) (ConstraintSystem n)
+run useNewOptimizer (Internal untypedExprs _ counters assertions sideEffects) = left CompileError $ runM useNewOptimizer counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -44,7 +44,7 @@ run useNewOptimizer (TypeErased untypedExprs _ counters assertions sideEffects) 
         let out = RefFO var
         compileExprF out x
       ExprU x -> do
-        let out = RefUO (widthOfU x) var
+        let out = RefUO (widthOf x) var
         compileExprU out x
 
   -- compile assertions to constraints
@@ -55,9 +55,9 @@ run useNewOptimizer (TypeErased untypedExprs _ counters assertions sideEffects) 
 
 -- | Compile side effects
 compileSideEffect :: (GaloisField n, Integral n) => SideEffect n -> M n ()
-compileSideEffect (AssignmentB2 var val) = compileExprB (RefBX var) val
-compileSideEffect (AssignmentF2 var val) = compileExprF (RefFX var) val
-compileSideEffect (AssignmentU2 width var val) = compileExprU (RefUX width var) val
+compileSideEffect (AssignmentB var val) = compileExprB (RefBX var) val
+compileSideEffect (AssignmentF var val) = compileExprF (RefFX var) val
+compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
 compileSideEffect (DivMod width dividend divisor quotient remainder) = compileDivModU width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = assertLTE width value bound
 compileSideEffect (AssertLT width value bound) = assertLT width value bound
@@ -88,7 +88,7 @@ compileAssertion expr = case expr of
     compileExprF out x
     add $ cVarBindF (F out) 1
   ExprU x -> do
-    out <- freshRefUX (widthOfU x)
+    out <- freshRefUX (widthOf x)
     compileExprU out x
     add $ cVarBindU out 1
 
@@ -178,7 +178,7 @@ compileAssertionEqU (VarUI w a) b = do
   compileExprU out b
   add $ cVarEqU (RefUI w a) out
 compileAssertionEqU a b = do
-  let width = widthOfU a
+  let width = widthOf a
   a' <- freshRefUX width
   b' <- freshRefUX width
   compileExprU a' a
@@ -422,7 +422,7 @@ compileExprB out expr = case expr of
     -- error "compileExprB: BitU (ValU _ _) _"
   BitU x i -> do
     x' <- wireU x
-    let width = widthOfU x
+    let width = widthOf x
     add $ cVarEqB out (RefUBit width x' (i `mod` width)) -- out = x'[i]
 
 compileExprF :: (GaloisField n, Integral n) => RefT -> ExprF n -> M n ()
@@ -664,7 +664,7 @@ wireU (VarUO w ref) = return (RefUO w ref)
 wireU (VarUI w ref) = return (RefUI w ref)
 wireU (VarUP w ref) = return (RefUP w ref)
 wireU expr = do
-  out <- freshRefUX (widthOfU expr)
+  out <- freshRefUX (widthOf expr)
   compileExprU out expr
   return out
 

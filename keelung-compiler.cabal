@@ -44,10 +44,10 @@ library
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relocated
-      Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
-      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
@@ -107,10 +107,10 @@ executable keelungc
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relocated
-      Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
-      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
@@ -195,10 +195,10 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relocated
-      Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
-      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup

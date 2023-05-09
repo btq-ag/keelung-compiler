@@ -6,15 +6,16 @@ import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import Data.IntMap.Strict qualified as IntMap
-import Keelung.Compiler.Syntax.Untyped
+import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Struct (Struct (..))
+import Keelung.Syntax (Var)
 
 --------------------------------------------------------------------------------
 
-run :: (Integral n, GaloisField n) => TypeErased n -> TypeErased n
-run (TypeErased exprs fieldWidth counters assertions sideEffects) = runM $ do
+run :: (Integral n, GaloisField n) => Internal n -> Internal n
+run (Internal exprs fieldWidth counters assertions sideEffects) = runM $ do
   sideEffects' <- mapM propagateSideEffect sideEffects
-  TypeErased
+  Internal
     <$> mapM (\(var, expr) -> (var,) <$> propagateExpr expr) exprs
     <*> pure fieldWidth
     <*> pure counters
@@ -30,24 +31,24 @@ runM program = evalState program mempty
 
 propagateSideEffect :: (Integral n, GaloisField n) => SideEffect n -> M n (SideEffect n)
 propagateSideEffect sideEffect = case sideEffect of
-  AssignmentF2 var val -> do
+  AssignmentF var val -> do
     val' <- propagateExprF val
     case val' of
       ValF v -> modify' $ \bindings -> bindings {structF = IntMap.insert var v (structF bindings)}
       _ -> return ()
-    return $ AssignmentF2 var val'
-  AssignmentB2 var val -> do
+    return $ AssignmentF var val'
+  AssignmentB var val -> do
     val' <- propagateExprB val
     case val' of
       ValB v -> modify' $ \bindings -> bindings {structB = IntMap.insert var v (structB bindings)}
       _ -> return ()
-    return $ AssignmentB2 var val'
-  AssignmentU2 width var val -> do
+    return $ AssignmentB var val'
+  AssignmentU width var val -> do
     val' <- propagateExprU val
     case val' of
       ValU _ v -> modify' $ \bindings -> bindings {structU = IntMap.insertWith (<>) width (IntMap.singleton width v) (structU bindings)}
       _ -> return ()
-    return $ AssignmentU2 width var val'
+    return $ AssignmentU width var val'
   DivMod width dividend divisor quotient remainder ->
     DivMod width
       <$> propagateExprU dividend
@@ -82,6 +83,9 @@ propagateExprF e = do
     DivF x y -> DivF <$> propagateExprF x <*> propagateExprF y
     IfF p x y -> IfF <$> propagateExprB p <*> propagateExprF x <*> propagateExprF y
     BtoF x -> BtoF <$> propagateExprB x
+  where
+    lookupF :: Var -> Struct (IntMap f) b u -> Maybe f
+    lookupF var = IntMap.lookup var . structF
 
 propagateExprU :: ExprU n -> M n (ExprU n)
 propagateExprU e = do
@@ -107,6 +111,9 @@ propagateExprU e = do
     ShLU w i x -> ShLU w i <$> propagateExprU x
     SetU w x i b -> SetU w <$> propagateExprU x <*> pure i <*> propagateExprB b
     BtoU w x -> BtoU w <$> propagateExprB x
+  where
+    lookupU :: Width -> Var -> Struct a b (IntMap u) -> Maybe u
+    lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (structU bindings)
 
 propagateExprB :: ExprB n -> M n (ExprB n)
 propagateExprB e = do
@@ -135,3 +142,6 @@ propagateExprB e = do
     GTU x y -> GTU <$> propagateExprU x <*> propagateExprU y
     GTEU x y -> GTEU <$> propagateExprU x <*> propagateExprU y
     BitU x i -> BitU <$> propagateExprU x <*> pure i
+  where
+    lookupB :: Var -> Struct a (IntMap b) u -> Maybe b
+    lookupB var = IntMap.lookup var . structB
