@@ -73,7 +73,8 @@ fromConstraint counters (CVarEqU x y) =
     Left _ -> error "CVarEqU: two variables are the same"
     Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarBindF x n) = Relocated.CAdd (Poly.bind (reindexRef counters x) n)
-fromConstraint counters (CVarBindB x n) = Relocated.CAdd (Poly.bind (reindexRefB counters x) n)
+fromConstraint counters (CVarBindB x True) = Relocated.CAdd (Poly.bind (reindexRefB counters x) 1)
+fromConstraint counters (CVarBindB x False) = Relocated.CAdd (Poly.bind (reindexRefB counters x) 0)
 fromConstraint counters (CVarBindU x n) = Relocated.CAdd (Poly.bind (reindexRefU counters x) n)
 fromConstraint counters (CMulF as bs cs) =
   Relocated.CMul
@@ -251,7 +252,7 @@ data Constraint n
   | CVarNEqB RefB RefB -- when x = ¬ y
   | CVarEqU RefU RefU -- when x == y
   | CVarBindF Ref n -- when x = val
-  | CVarBindB RefB n -- when x = val
+  | CVarBindB RefB Bool -- when x = val
   | CVarBindU RefU n -- when x = val
   | CMulF !(PolyG Ref n) !(PolyG Ref n) !(Either n (PolyG Ref n))
   | CNEqF RefF RefF RefF
@@ -280,7 +281,7 @@ instance Functor Constraint where
   fmap _ (CVarEqB x y) = CVarEqB x y
   fmap _ (CVarEqU x y) = CVarEqU x y
   fmap f (CVarBindF x y) = CVarBindF x (f y)
-  fmap f (CVarBindB x y) = CVarBindB x (f y)
+  fmap _ (CVarBindB x y) = CVarBindB x y
   fmap f (CVarBindU x y) = CVarBindU x (f y)
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
@@ -321,7 +322,7 @@ cVarBindF :: GaloisField n => Ref -> n -> [Constraint n]
 cVarBindF x n = [CVarBindF x n]
 
 -- | Smart constructor for the cVarBindB constraint
-cVarBindB :: GaloisField n => RefB -> n -> [Constraint n]
+cVarBindB :: GaloisField n => RefB -> Bool -> [Constraint n]
 cVarBindB x n = [CVarBindB x n]
 
 -- | Smart constructor for the cVarBindU constraint

@@ -57,8 +57,7 @@ convertSideEffect (T.AssertGT width val bound) = AssertGT width <$> convertExprU
 
 convertExprB :: (GaloisField n, Integral n) => T.Boolean -> M n (ExprB n)
 convertExprB expr = case expr of
-  T.ValB True -> return $ ValB 1
-  T.ValB False -> return $ ValB 0
+  T.ValB val -> return $ ValB val
   T.VarB var -> return $ VarB var
   T.VarBI var -> return $ VarBI var
   T.VarBP var -> return $ VarBP var

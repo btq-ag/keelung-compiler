@@ -355,7 +355,7 @@ relocateConstraintSystem cs =
     extractBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Seq (Relocated.Constraint n)
     extractBooleanRelations relations =
       let convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Constraint n
-          convert (var, Right val) = CVarBindB var (if val then 1 else 0)
+          convert (var, Right val) = CVarBindB var val
           convert (var, Left (dontFlip, root)) =
             if dontFlip
               then CVarEqB var root

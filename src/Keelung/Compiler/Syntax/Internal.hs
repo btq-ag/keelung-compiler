@@ -83,7 +83,7 @@ instance (Show n, Integral n) => Show (ExprF n) where
 
 -- | Boolean expressions
 data ExprB n
-  = ValB n
+  = ValB Bool
   | VarB Var
   | VarBO Var
   | VarBI Var
@@ -111,8 +111,8 @@ data ExprB n
 
 instance (Integral n, Show n) => Show (ExprB n) where
   showsPrec prec expr = case expr of
-    ValB 0 -> showString "F"
-    ValB _ -> showString "T"
+    ValB True -> showString "T"
+    ValB False -> showString "F"
     VarB var -> showString "B" . shows var
     VarBO var -> showString "BO" . shows var
     VarBI var -> showString "BI" . shows var

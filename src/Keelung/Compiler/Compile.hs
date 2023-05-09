@@ -82,7 +82,7 @@ compileAssertion expr = case expr of
   ExprB x -> do
     out <- freshRefB
     compileExprB out x
-    add $ cVarBindB out 1 -- out = 1
+    add $ cVarBindB out True -- out = 1
   ExprF x -> do
     out <- freshRefF
     compileExprF out x
@@ -235,7 +235,7 @@ add = mapM_ addOne
     addOne (CVarBindF x c) = do
       execRelations $ AllRelations.assignF x c
     addOne (CVarBindB x c) = do
-      execRelations $ AllRelations.assignB x (c == 1)
+      execRelations $ AllRelations.assignB x c
     addOne (CVarBindU x c) = do
       execRelations $ AllRelations.assignU x c
     addOne (CVarEq x y) = do
@@ -387,7 +387,7 @@ compileExprB out expr = case expr of
       (Left xVar, Left yVar) -> compileLTEUVarVar out xVar yVar
       (Left xVar, Right yVal) -> compileLTEUVarConst out xVar yVal
       (Right xVal, Left yVar) -> compileLTEUConstVar out xVal yVar
-      (Right xVal, Right yVal) -> if xVal <= yVal then add $ cVarBindB out 1 else add $ cVarBindB out 0
+      (Right xVal, Right yVal) ->  add $ cVarBindB out (xVal <= yVal)
   LTU x y -> do
     x' <- wireU' x
     y' <- wireU' y
@@ -395,7 +395,7 @@ compileExprB out expr = case expr of
       (Left xVar, Left yVar) -> compileLTUVarVar out xVar yVar
       (Left xVar, Right yVal) -> compileLTUVarConst out xVar yVal
       (Right xVal, Left yVar) -> compileLTUConstVar out xVal yVar
-      (Right xVal, Right yVal) -> if xVal < yVal then add $ cVarBindB out 1 else add $ cVarBindB out 0
+      (Right xVal, Right yVal) ->  add $ cVarBindB out (xVal < yVal)
   GTEU x y -> do
     x' <- wireU' x
     y' <- wireU' y
@@ -403,7 +403,7 @@ compileExprB out expr = case expr of
       (Left xVar, Left yVar) -> compileLTEUVarVar out yVar xVar
       (Left xVar, Right yVal) -> compileLTEUConstVar out yVal xVar
       (Right xVal, Left yVar) -> compileLTEUVarConst out yVar xVal
-      (Right xVal, Right yVal) -> if xVal >= yVal then add $ cVarBindB out 1 else add $ cVarBindB out 0
+      (Right xVal, Right yVal) ->  add $ cVarBindB out (xVal >= yVal)
   GTU x y -> do
     x' <- wireU' x
     y' <- wireU' y
@@ -411,10 +411,10 @@ compileExprB out expr = case expr of
       (Left xVar, Left yVar) -> compileLTUVarVar out yVar xVar
       (Left xVar, Right yVal) -> compileLTUConstVar out yVal xVar
       (Right xVal, Left yVar) -> compileLTUVarConst out yVar xVal
-      (Right xVal, Right yVal) -> if xVal > yVal then add $ cVarBindB out 1 else add $ cVarBindB out 0
+      (Right xVal, Right yVal) -> add $ cVarBindB out (xVal > yVal)
   BitU (ValU width val) i -> do
     let index = i `mod` width
-    let bit = FieldBits.testBit val index
+    let bit = FieldBits.testBit' val index
     add $ cVarBindB out bit -- out[i] = bit
     -- forM_ [0 .. width - 1] $ \i -> do
     --   let bit = testBit val i
@@ -555,7 +555,7 @@ compileExprU out expr = case expr of
       GT -> do
         -- fill lower bits with 0s
         forM_ [0 .. n - 1] $ \i -> do
-          add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
+          add $ cVarBindB (RefUBit w out i) False -- out[i] = 0
           -- shift upper bits
         forM_ [n .. w - 1] $ \i -> do
           let i' = i - n
@@ -567,7 +567,7 @@ compileExprU out expr = case expr of
           add $ cVarEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']
           -- fill upper bits with 0s
         forM_ [w + n .. w - 1] $ \i -> do
-          add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
+          add $ cVarBindB (RefUBit w out i) False -- out[i] = 0
   SetU w x j b -> do
     x' <- wireU x
     b' <- wireB b
@@ -582,7 +582,7 @@ compileExprU out expr = case expr of
     add $ cVarEqB (RefUBit w out 0) result -- out[0] = x
     -- 2. wire 'out[SUCC _]' to '0' for all other bits
     forM_ [1 .. w - 1] $ \i ->
-      add $ cVarBindB (RefUBit w out i) 0 -- out[i] = 0
+      add $ cVarBindB (RefUBit w out i) False -- out[i] = 0
 
 --------------------------------------------------------------------------------
 
@@ -684,9 +684,7 @@ compileEqualityU isEq out x y =
   if x == y
     then do
       -- in this case, the variable x and y happend to be the same
-      if isEq
-        then compileExprB out (ValB 1)
-        else compileExprB out (ValB 0)
+      compileExprB out (ValB isEq)
     else do
       -- introduce a new variable m
       m <- freshRefF
@@ -726,9 +724,7 @@ compileEqualityF isEq out x y =
   if x == y
     then do
       -- in this case, the variable x and y happend to be the same
-      if isEq
-        then compileExprB out (ValB 1)
-        else compileExprB out (ValB 0)
+      compileExprB out (ValB isEq)
     else do
       -- introduce a new variable m
       -- if diff = 0 then m = 0 else m = recip diff
@@ -1058,7 +1054,7 @@ assertLTE width a c = do
               return $ Just (B aBit) -- when found, return a[i]
             else do
               -- a[i] = 0
-              add $ cVarBindB aBit 0
+              add $ cVarBindB aBit False
               return Nothing -- otherwise, continue searching
     go ref (Just acc) i =
       let aBit = B (RefUBit width ref i)
@@ -1162,8 +1158,7 @@ compileLTEUVarConst out x y = do
   result <- foldM compileLTEUVarConstPrim (Right True) pairs
   case result of
     Left var -> add $ cVarEqB out var
-    Right True -> add $ cVarBindB out 1
-    Right False -> add $ cVarBindB out 0
+    Right val -> add $ cVarBindB out val
 
 compileLTEUConstVar :: (GaloisField n, Integral n) => RefB -> n -> RefU -> M n ()
 compileLTEUConstVar out x y = do
@@ -1173,8 +1168,7 @@ compileLTEUConstVar out x y = do
   result <- foldM compileLTEUConstVarPrim (Right True) pairs
   case result of
     Left var -> add $ cVarEqB out var
-    Right True -> add $ cVarBindB out 1
-    Right False -> add $ cVarBindB out 0
+    Right val -> add $ cVarBindB out val
 
 -- Compiling a < b, where a and b are both variables
 -- lastBit = if a
@@ -1224,8 +1218,7 @@ compileLTUVarConst out x y = do
   result <- foldM compileLTEUVarConstPrim (Right False) pairs
   case result of
     Left var -> add $ cVarEqB out var
-    Right True -> add $ cVarBindB out 1
-    Right False -> add $ cVarBindB out 0
+    Right val -> add $ cVarBindB out val
 
 compileLTUConstVar :: (GaloisField n, Integral n) => RefB -> n -> RefU -> M n ()
 compileLTUConstVar out x y = do
@@ -1235,8 +1228,7 @@ compileLTUConstVar out x y = do
   result <- foldM compileLTEUConstVarPrim (Right False) pairs
   case result of
     Left var -> add $ cVarEqB out var
-    Right True -> add $ cVarBindB out 1
-    Right False -> add $ cVarBindB out 0
+    Right val -> add $ cVarBindB out val
 
 compileLTEUVarConstPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (RefB, Bool) -> M n (Either RefB Bool)
 compileLTEUVarConstPrim (Left acc) (x, True) = do

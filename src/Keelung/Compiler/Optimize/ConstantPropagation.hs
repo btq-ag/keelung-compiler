@@ -40,7 +40,8 @@ propagateSideEffect sideEffect = case sideEffect of
   AssignmentB var val -> do
     val' <- propagateExprB val
     case val' of
-      ValB v -> modify' $ \bindings -> bindings {structB = IntMap.insert var v (structB bindings)}
+      ValB True -> modify' $ \bindings -> bindings {structB = IntMap.insert var 1 (structB bindings)}
+      ValB False -> modify' $ \bindings -> bindings {structB = IntMap.insert var 0 (structB bindings)}
       _ -> return ()
     return $ AssignmentB var val'
   AssignmentU width var val -> do
@@ -66,7 +67,7 @@ propagateExpr (ExprB x) = ExprB <$> propagateExprB x
 propagateExpr (ExprF x) = ExprF <$> propagateExprF x
 propagateExpr (ExprU x) = ExprU <$> propagateExprU x
 
-propagateExprF :: ExprF n -> M n (ExprF n)
+propagateExprF :: (Eq n, Num n) => ExprF n -> M n (ExprF n)
 propagateExprF e = do
   bindings <- get
   case e of
@@ -87,7 +88,7 @@ propagateExprF e = do
     lookupF :: Var -> Struct (IntMap f) b u -> Maybe f
     lookupF var = IntMap.lookup var . structF
 
-propagateExprU :: ExprU n -> M n (ExprU n)
+propagateExprU :: (Eq n, Num n) => ExprU n -> M n (ExprU n)
 propagateExprU e = do
   bindings <- get
   case e of
@@ -115,14 +116,15 @@ propagateExprU e = do
     lookupU :: Width -> Var -> Struct a b (IntMap u) -> Maybe u
     lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (structU bindings)
 
-propagateExprB :: ExprB n -> M n (ExprB n)
+propagateExprB :: (Eq n, Num n) => ExprB n -> M n (ExprB n)
 propagateExprB e = do
   bindings <- get
   case e of
     ValB _ -> return e
     VarB var -> case lookupB var bindings of
       Nothing -> return e
-      Just val -> return (ValB val)
+      Just 1 -> return (ValB True)
+      Just _ -> return (ValB False)
     VarBO _ -> return e -- no constant propagation for output variables
     VarBI _ -> return e -- no constant propagation for public input variables
     VarBP _ -> return e -- no constant propagation for private input variables
