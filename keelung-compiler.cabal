@@ -159,7 +159,6 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Test.Compilation
       Test.Interpreter
       Test.Interpreter.Boolean
       Test.Interpreter.Field
@@ -169,7 +168,6 @@ test-suite keelung-test
       Test.Interpreter.Util
       Test.Optimization
       Test.Optimization.UInt
-      Test.OptimizationOld
       Test.PolyG
       Test.Relations.Boolean
       Test.Relations.Field

@@ -1,10 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 
 module Keelung.Compiler.Relocated where
 
+import Control.Arrow (left)
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
@@ -22,7 +24,6 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
-import Control.Arrow (left)
 
 --------------------------------------------------------------------------------
 
@@ -105,6 +106,7 @@ varsInConstraints = IntSet.unions . fmap varsInConstraint
 -- | Relocated Constraint System
 data RelocatedConstraintSystem n = RelocatedConstraintSystem
   { -- | Constraints
+    csField :: (FieldType, Integer, Integer),
     csUseNewOptimizer :: Bool,
     csConstraints :: !(Seq (Constraint n)),
     csBinReps :: [BinRep],
@@ -112,15 +114,15 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
     csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
     csModInvs :: [(Either Var n, Either Var n, Integer)]
   }
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: RelocatedConstraintSystem n -> Int
-numberOfConstraints (RelocatedConstraintSystem _ cs binReps counters _divMods _modInvs) =
+numberOfConstraints (RelocatedConstraintSystem _ _ cs binReps counters _divMods _modInvs) =
   length cs + getBooleanConstraintSize counters + length binReps
 
 instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
-  show (RelocatedConstraintSystem _ constraints binReps counters _divMods _modInvs) =
+  show (RelocatedConstraintSystem _ _ constraints binReps counters _divMods _modInvs) =
     "ConstraintSystem {\n"
       <> prettyConstraints counters (toList constraints) binReps
       <> prettyVariables counters

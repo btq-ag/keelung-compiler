@@ -27,14 +27,15 @@ import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Field (FieldType)
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax.Counters (Counters, VarSort (..), VarType (..), addCount, getCount)
 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => Bool -> Internal n -> Either (Error n) (ConstraintSystem n)
-run useNewOptimizer (Internal untypedExprs _ counters assertions sideEffects) = left CompileError $ runM useNewOptimizer counters $ do
+run :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Bool -> Internal n -> Either (Error n) (ConstraintSystem n)
+run fieldInfo useNewOptimizer (Internal untypedExprs _ counters assertions sideEffects) = left CompileError $ runM fieldInfo useNewOptimizer counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
@@ -203,12 +204,12 @@ compileAssertionEqU a b = do
 -- | Monad for compilation
 type M n = StateT (ConstraintSystem n) (Except (Compile.Error n))
 
-runM :: GaloisField n => Bool -> Counters -> M n a -> Either (Compile.Error n) (ConstraintSystem n)
-runM useNewOptimizer counters program =
+runM :: GaloisField n => (FieldType, Integer, Integer) -> Bool -> Counters -> M n a -> Either (Compile.Error n) (ConstraintSystem n)
+runM fieldInfo useNewOptimizer counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem counters useNewOptimizer mempty mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintSystem fieldInfo counters useNewOptimizer mempty mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -387,7 +388,7 @@ compileExprB out expr = case expr of
       (Left xVar, Left yVar) -> compileLTEUVarVar out xVar yVar
       (Left xVar, Right yVal) -> compileLTEUVarConst out xVar yVal
       (Right xVal, Left yVar) -> compileLTEUConstVar out xVal yVar
-      (Right xVal, Right yVal) ->  add $ cVarBindB out (xVal <= yVal)
+      (Right xVal, Right yVal) -> add $ cVarBindB out (xVal <= yVal)
   LTU x y -> do
     x' <- wireU' x
     y' <- wireU' y
@@ -395,7 +396,7 @@ compileExprB out expr = case expr of
       (Left xVar, Left yVar) -> compileLTUVarVar out xVar yVar
       (Left xVar, Right yVal) -> compileLTUVarConst out xVar yVal
       (Right xVal, Left yVar) -> compileLTUConstVar out xVal yVar
-      (Right xVal, Right yVal) ->  add $ cVarBindB out (xVal < yVal)
+      (Right xVal, Right yVal) -> add $ cVarBindB out (xVal < yVal)
   GTEU x y -> do
     x' <- wireU' x
     y' <- wireU' y
@@ -403,7 +404,7 @@ compileExprB out expr = case expr of
       (Left xVar, Left yVar) -> compileLTEUVarVar out yVar xVar
       (Left xVar, Right yVal) -> compileLTEUConstVar out yVal xVar
       (Right xVal, Left yVar) -> compileLTEUVarConst out yVar xVal
-      (Right xVal, Right yVal) ->  add $ cVarBindB out (xVal >= yVal)
+      (Right xVal, Right yVal) -> add $ cVarBindB out (xVal >= yVal)
   GTU x y -> do
     x' <- wireU' x
     y' <- wireU' y

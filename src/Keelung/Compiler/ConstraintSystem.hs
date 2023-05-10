@@ -41,13 +41,15 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
+import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
 -- | A constraint system is a collection of constraints
 data ConstraintSystem n = ConstraintSystem
-  { csCounters :: !Counters,
+  { csField :: (FieldType, Integer, Integer),
+    csCounters :: !Counters,
     csUseNewOptimizer :: Bool,
     -- for counting the occurences of variables in constraints (excluding the ones that are in FieldRelations)
     csOccurrenceF :: !(Map Ref Int),
@@ -217,7 +219,8 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
 relocateConstraintSystem cs =
   Relocated.RelocatedConstraintSystem
-    { Relocated.csUseNewOptimizer = csUseNewOptimizer cs,
+    { Relocated.csField = csField cs,
+      Relocated.csUseNewOptimizer = csUseNewOptimizer cs,
       Relocated.csCounters = counters,
       Relocated.csBinReps = binReps,
       Relocated.csConstraints =

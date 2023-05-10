@@ -26,6 +26,7 @@ tests = do
       it "missing 1 public input" $ do
         let program = complement <$> inputBool Public
         throwAll
+          gf181Info
           program
           ([] :: [GF181])
           []
@@ -35,6 +36,7 @@ tests = do
       it "missing 1 private input" $ do
         let program = complement <$> inputBool Private
         throwAll
+          gf181Info
           program
           ([] :: [GF181])
           []
@@ -45,6 +47,7 @@ tests = do
         let program = do
               assert (1 `eq` (2 :: Field))
         throwAll
+          gf181Info
           program
           ([] :: [GF181])
           []
@@ -55,6 +58,7 @@ tests = do
         let program = do
               assert (true `eq` false)
         throwAll
+          gf181Info
           program
           ([] :: [GF181])
           []
@@ -65,6 +69,7 @@ tests = do
         let program = do
               assert (1 `eq` (2 :: UInt 4))
         throwAll
+          gf181Info
           program
           ([] :: [GF181])
           []
@@ -103,7 +108,7 @@ tests = do
 
     describe "Poseidon" $ do
       it "[0]" $ do
-        runAll (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385 :: GF181]
+        runAll gf181Info (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385 :: GF181]
 
     describe "Tests on the optimizer" $ do
       it "Multiplicative 0" $ do
@@ -111,7 +116,7 @@ tests = do
               msg0 <- reuse msg
               msg1 <- reuse (msg0 + 1)
               reuse ((msg1 + 1) * (msg1 + 1))
-        runAndCompare (program 0 :: Comp Field) [0 :: N GF181] []
+        runAndCompare gf181Info (program 0 :: Comp Field) [0 :: N GF181] []
       it "Multiplicative 1" $ do
         let program = do
               let initState = (2, 3)
@@ -120,7 +125,7 @@ tests = do
               state2 <- reuse (round' state1) -- (15, 45)
               state3 <- reuse (round' state2) -- (60, 2025)
               return $ fst state3
-        runAndCompare (program :: Comp Field) [0 :: N GF181] []
+        runAndCompare gf181Info (program :: Comp Field) [0 :: N GF181] []
   where
     runAggCheck :: Int -> Int -> [GF181] -> IO ()
     runAggCheck dimension numberOfSignatures outputs =
@@ -132,6 +137,7 @@ tests = do
               }
           param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
        in runAll
+            gf181Info
             (AggSig.checkAgg param :: Comp ())
             (AggSig.genInputFromParam param)
             []
@@ -147,6 +153,7 @@ tests = do
               }
           param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
        in runAll
+            gf181Info
             (AggSig.checkSize param :: Comp ())
             (AggSig.genInputFromParam param)
             []
@@ -162,29 +169,8 @@ tests = do
               }
           param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
        in runAll
+            gf181Info
             (AggSig.checkLength param :: Comp ())
             (AggSig.genInputFromParam param)
             []
             outputs
-
--- program :: Comp ()
--- program = do
---   x <- input Public
---   assert $ x `neq` (0 :: UInt 3)
-
--- x <- input Public
--- a <- reuse $ x `eq` (0 :: UInt 3)
--- b <- reuse $ x `neq` 0
--- return (a, b)
-
--- program :: Comp (UInt 4, UInt 4)
--- program = do
---   dividend <- input Public
---   divisor <- input Public
---   performDivMod dividend divisor
-
--- go :: (Encode t, Interpret t GF181) => Comp t -> [GF181] -> [GF181] -> Either (Error GF181) [GF181]
--- go prog rawPublicInputs rawPrivateInputs = do
---   elab <- left LangError (elaborate prog)
---   let inputs = Inputs.deserialize (compCounters (elabComp elab)) rawPublicInputs rawPrivateInputs
---   left InterpretError (Kinded.run elab inputs)

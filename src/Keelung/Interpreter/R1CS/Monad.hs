@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Interpreter.R1CS.Monad where
@@ -95,7 +96,7 @@ data Error n
   | DivModQuotientError n n n n
   | DivModRemainderError n n n n
   | ModInvError (Either Var n) n Integer
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
 

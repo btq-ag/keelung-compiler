@@ -45,7 +45,7 @@ extra-deps:
   commit: d7d0da6b5df8045afdfb820ba8d08f34dc4c3e58
 # - ../keelung
 - git: https://github.com/btq-ag/keelung.git
-  commit: 0f82bd5bf0275e1971295be23588a070e8b7eee7
+  commit: 78fb82d69c16934ad4889755063ff2e3d5ad603e
 # - git: git@github.com:btq-ag/keelung-examples.git
 #   commit: 7e45f20becf27654f8af35ef0df3390db28b8c10
 

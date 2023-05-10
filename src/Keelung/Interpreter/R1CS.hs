@@ -48,7 +48,7 @@ run' r1cs inputs = do
 --   3. binary representation constraints
 --   4. CNEQ constraints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Seq (Constraint n)
-fromOrdinaryConstraints (R1CS ordinaryConstraints binReps counters cneqs divMods modInvs) =
+fromOrdinaryConstraints (R1CS _ ordinaryConstraints binReps counters cneqs divMods modInvs) =
   Seq.fromList (map R1CConstraint ordinaryConstraints)
     <> Seq.fromList (map BooleanConstraint booleanInputVarConstraints)
     <> Seq.fromList (map BinRepConstraint binReps)
@@ -99,7 +99,6 @@ shrink (ModInvConstraint modInv) = fmap (pure . ModInvConstraint) <$> shrinkModI
 --    2. divisor & quotient & remainder
 shrinkDivMod :: (GaloisField n, Integral n) => (Either Var n, Either Var n, Either Var n, Either Var n) -> M n (Result (Either Var n, Either Var n, Either Var n, Either Var n))
 shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
-
   -- check the value of the dividend first,
   -- if it's unknown, then its value can only be determined from other variables
   dividendResult <- lookupVarEither dividendVar

@@ -55,11 +55,11 @@ import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropag
 import Keelung.Compiler.R1CS hiding (generateWitness)
 import Keelung.Compiler.Relocated (RelocatedConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Relocated qualified as Relocated
-import Keelung.Compiler.Syntax.ToInternal as ToInternal
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Syntax.Internal (Internal (..))
+import Keelung.Compiler.Syntax.ToInternal as ToInternal
 import Keelung.Constraint.R1CS (R1CS (..))
-import Keelung.Field (GF181)
+import Keelung.Field (FieldType, GF181)
 import Keelung.Interpreter.Error qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
@@ -84,51 +84,55 @@ interpret prog rawPublicInputs rawPrivateInputs = do
 
 -- | Given a Keelung program and a list of raw public inputs and private inputs,
 --   Generate (structured inputs, outputs, witness)
-generateWitness :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) (Counters, [n], Vector n)
-generateWitness program rawPublicInputs rawPrivateInputs = do
+generateWitness :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Either (Error n) (Counters, [n], Vector n)
+generateWitness fieldInfo program rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode program
-  generateWitnessElab elab rawPublicInputs rawPrivateInputs
+  generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs
 
 -- elaborate => rewrite => to internal syntax
 convertToInternal :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (Internal n)
 convertToInternal prog = ToInternal.run <$> elaborateAndEncode prog
 
 -- elaborate => rewrite => to internal syntax => compile => relocate
-compileWithoutConstProp :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (RelocatedConstraintSystem n)
-compileWithoutConstProp prog = elaborateAndEncode prog >>= compileO0OldElab >>= return . relocateConstraintSystem
+compileWithoutConstProp :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> Either (Error n) (RelocatedConstraintSystem n)
+compileWithoutConstProp fieldInfo prog = elaborateAndEncode prog >>= compileO0OldElab fieldInfo >>= return . relocateConstraintSystem
 
 -- elaborate => rewrite => to internal syntax => constant propagation => compile => relocate
-compileO0Old :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
-compileO0Old prog = elaborateAndEncode prog >>= compileO0OldElab
+compileO0Old :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0Old fieldInfo prog = elaborateAndEncode prog >>= compileO0OldElab fieldInfo
 
 -- elaborate => rewrite => to internal syntax => constant propagation => compile => relocate
-compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
-compileO0 prog = elaborateAndEncode prog >>= compileO0Elab
+compileO0 :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo
 
 -- elaborate => rewrite => to internal syntax => constant propagation => compile => relocate => optimisation (old) => renumber
 compileO1Old ::
   (GaloisField n, Integral n, Encode t) =>
+  (FieldType, Integer, Integer) ->
   Comp t ->
   Either (Error n) (RelocatedConstraintSystem n)
-compileO1Old prog = elaborateAndEncode prog >>= compileO1OldElab
+compileO1Old fieldInfo prog = elaborateAndEncode prog >>= compileO1OldElab fieldInfo
 
 -- elaborate => rewrite => to internal syntax => constant propagation => compile => optimisation (new) => relocate => renumber
 compileO1 ::
   (GaloisField n, Integral n, Encode t) =>
+  (FieldType, Integer, Integer) ->
   Comp t ->
   Either (Error n) (RelocatedConstraintSystem n)
-compileO1 prog = elaborateAndEncode prog >>= compileO1Elab
+compileO1 fieldInfo prog = elaborateAndEncode prog >>= compileO1Elab fieldInfo
 
 -- elaborate => rewrite => to internal syntax => constant propagation => compile => optimisation (new)
 compileToModules ::
   (GaloisField n, Integral n, Encode t) =>
+  (FieldType, Integer, Integer) ->
   Comp t ->
   Either (Error n) (ConstraintSystem n)
-compileToModules prog = elaborateAndEncode prog >>= Compile.run True . ConstantPropagation.run . ToInternal.run >>= left CompileError . Optimizer.optimizeNew
+compileToModules fieldInfo prog = elaborateAndEncode prog >>= Compile.run fieldInfo True . ConstantPropagation.run . ToInternal.run >>= left CompileError . Optimizer.optimizeNew
 
 -- | 'compile' defaults to 'compileO1'
 compile ::
   (GaloisField n, Integral n, Encode t) =>
+  (FieldType, Integer, Integer) ->
   Comp t ->
   Either (Error n) (RelocatedConstraintSystem n)
 compile = compileO1
@@ -136,11 +140,12 @@ compile = compileO1
 -- with optimisation + partial evaluation with inputs
 optimizeWithInput ::
   (GaloisField n, Integral n, Encode t) =>
+  (FieldType, Integer, Integer) ->
   Comp t ->
   [n] ->
   Either (Error n) (RelocatedConstraintSystem n)
-optimizeWithInput program inputs = do
-  cs <- compile program
+optimizeWithInput fieldType program inputs = do
+  cs <- compile fieldType program
   let (_, cs') = Optimizer.optimizeWithInput inputs cs
   return cs'
 
@@ -153,25 +158,25 @@ interpretElab elab rawPublicInputs rawPrivateInputs = do
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
   left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
-generateWitnessElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either (Error n) (Counters, [n], Vector n)
-generateWitnessElab elab rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS <$> compileO1OldElab elab
+generateWitnessElab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> [n] -> [n] -> Either (Error n) (Counters, [n], Vector n)
+generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
+  r1cs <- toR1CS <$> compileO1OldElab fieldInfo elab
   let counters = r1csCounters r1cs
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
   (outputs, witness) <- left (InterpretError . Interpreter.R1CSError) (R1CS.run' r1cs inputs)
   return (counters, outputs, witness)
 
-compileO0OldElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
-compileO0OldElab = Compile.run False . ConstantPropagation.run . ToInternal.run
+compileO0OldElab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO0OldElab fieldInfo = Compile.run fieldInfo False . ConstantPropagation.run . ToInternal.run
 
-compileO0Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (ConstraintSystem n)
-compileO0Elab = Compile.run True . ConstantPropagation.run . ToInternal.run
+compileO0Elab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO0Elab fieldInfo = Compile.run fieldInfo True . ConstantPropagation.run . ToInternal.run
 
-compileO1OldElab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO1OldElab = Compile.run False . ConstantPropagation.run . ToInternal.run >=> return . Optimizer.optimizeOld . relocateConstraintSystem
+compileO1OldElab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
+compileO1OldElab fieldInfo = Compile.run fieldInfo False . ConstantPropagation.run . ToInternal.run >=> return . Optimizer.optimizeOld . relocateConstraintSystem
 
-compileO1Elab :: (GaloisField n, Integral n) => Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO1Elab = Compile.run True . ConstantPropagation.run . ToInternal.run >=> left CompileError . Optimizer.optimizeNew >=> return . Relocated.renumberConstraints . relocateConstraintSystem
+compileO1Elab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
+compileO1Elab fieldInfo = Compile.run fieldInfo True . ConstantPropagation.run . ToInternal.run >=> left CompileError . Optimizer.optimizeNew >=> return . Relocated.renumberConstraints . relocateConstraintSystem
 
 --------------------------------------------------------------------------------
 

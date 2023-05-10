@@ -16,7 +16,7 @@ tests = describe "Field" $ do
           y <- inputField Public
           return $ x * y + y * 2
     property $ \(x, y) -> do
-      runAll program [x, y :: GF181] [] [x * y + y * 2]
+      runAll gf181Info program [x, y :: GF181] [] [x * y + y * 2]
 
   it "arithmetics 2" $ do
     let program = do
@@ -25,7 +25,7 @@ tests = describe "Field" $ do
           z <- reuse $ x * y + y * 2
           return $ x * y - z
     property $ \(x, y) -> do
-      runAll program [x :: GF181] [y] [-y * 2]
+      runAll gf181Info program [x :: GF181] [y] [-y * 2]
 
   it "arithmetics 3" $ do
     let program = do
@@ -33,9 +33,9 @@ tests = describe "Field" $ do
           y <- inputField Public
           let z = 3
           return $ x * z + y * 2
-    
+
     property $ \(x, y) -> do
-      runAll program [y :: GF181] [x] [x * 3 + y * 2]
+      runAll gf181Info program [y :: GF181] [x] [x * 3 + y * 2]
 
   it "summation" $ do
     let program = do
@@ -45,7 +45,7 @@ tests = describe "Field" $ do
             return (accum + x :: Field)
 
     forAll (vector 4) $ \xs -> do
-      runAll program (xs :: [GF181]) [] [sum xs]
+      runAll gf181Info program (xs :: [GF181]) [] [sum xs]
 
   it "eq 1" $ do
     -- takes an input and see if its equal to 3
@@ -55,7 +55,7 @@ tests = describe "Field" $ do
 
     property $ \x -> do
       let expectedOutput = if x == 3 then [1] else [0]
-      runAll program [x :: GF181] [] expectedOutput
+      runAll gf181Info program [x :: GF181] [] expectedOutput
 
   it "conditional" $ do
     let program = do
@@ -63,4 +63,4 @@ tests = describe "Field" $ do
           return $ cond (x `eq` 3) 4 (5 :: Field)
     property $ \x -> do
       let expectedOutput = if x == 3 then [4] else [5]
-      runAll program [x :: GF181] [] expectedOutput
+      runAll gf181Info program [x :: GF181] [] expectedOutput

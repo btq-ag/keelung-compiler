@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Compiler.R1CS where
@@ -63,7 +64,8 @@ satisfyR1CS witness r1cs =
 toR1CS :: GaloisField n => RelocatedConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
-    { r1csConstraints = rights convertedConstratins,
+    { r1csField = csField cs,
+      r1csConstraints = rights convertedConstratins,
       r1csBinReps = csBinReps cs,
       r1csCounters = csCounters cs,
       r1csCNEQs = lefts convertedConstratins,
@@ -87,7 +89,8 @@ toR1CS cs =
 fromR1CS :: GaloisField n => R1CS n -> RelocatedConstraintSystem n
 fromR1CS r1cs =
   RelocatedConstraintSystem
-    { csUseNewOptimizer = False,
+    { csField = r1csField r1cs,
+      csUseNewOptimizer = False,
       csConstraints =
         Seq.fromList (map fromR1C (r1csConstraints r1cs))
           <> Seq.fromList (map CNEq (r1csCNEQs r1cs)),
@@ -120,7 +123,7 @@ data ExecError n
   | ExecR1CUnsatisfiableError [R1C n] (IntMap n)
   | ExecInputUnmatchedError Int Int
   | ExecVarUnassignedError [Var] (IntMap n)
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (ExecError n)
 

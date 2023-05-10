@@ -9,10 +9,9 @@ import Data.Aeson
 import Data.Aeson.Encoding
 import Data.ByteString.Lazy (ByteString)
 import Data.ByteString.Lazy qualified as BS
-import Data.Field.Galois (GaloisField (char, deg))
+import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.IntMap qualified as IntMap
-import Data.Proxy
 import Data.Vector (Vector)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
@@ -23,10 +22,6 @@ import Keelung.Syntax.Counters hiding (reindex)
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
-
--- | Encodes a R1CS in the JSON Lines text file format
-serializeR1CS :: (GaloisField n, Integral n) => R1CS n -> ByteString
-serializeR1CS = serializeR1CS2
 
 -- | Encodes inputs and witnesses in the JSON Lines text file format
 --   the "inputs" field should contain both outputs & public inputs
@@ -39,24 +34,21 @@ serializeInputAndWitness counters witness =
           pairStr "inputs" (list (integerText . toInteger) inputs)
             <> pairStr "witnesses" (list (integerText . toInteger) witnesses)
 
-
 --------------------------------------------------------------------------------
 
-serializeR1CS2 :: (GaloisField n, Integral n) => R1CS n -> ByteString
-serializeR1CS2 r1cs =
+-- | Encodes a R1CS in the JSON Lines text file format
+serializeR1CS :: (GaloisField n, Integral n) => R1CS n -> ByteString
+serializeR1CS r1cs =
   BS.intercalate "\n" $
     map encodingToLazyByteString $
       header : map toEncoding r1cConstraints
   where
-    fieldNumberProxy :: GaloisField n => R1CS n -> n
-    fieldNumberProxy _ = asProxyTypeOf 0 Proxy
-
-    fieldNumber = fieldNumberProxy r1cs
-
     -- the constraints are reindexed and all field numbers are converted to Integer
     r1cConstraints = map (fmap toInteger . reindexR1C r1cs) (toR1Cs r1cs)
 
     counters = r1csCounters r1cs
+
+    (_, characteristic, degree) = r1csField r1cs
 
     header :: Encoding
     header =
@@ -64,8 +56,8 @@ serializeR1CS2 r1cs =
         pairStr "r1cs" $
           pairs $
             pairStr "version" (string "0.9.5")
-              <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
-              <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
+              <> pairStr "field_characteristic" (integerText characteristic)
+              <> pairStr "extension_degree" (integerText degree)
               <> pairStr "instances" (int (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters)) -- outputs & public inputs
               <> pairStr "witness" (int (getTotalCount counters - getCountBySort OfOutput counters - getCountBySort OfPublicInput counters)) -- private inputs & other intermediate variables after optimization
               <> pairStr "constraints" (int (length r1cConstraints))

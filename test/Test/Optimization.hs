@@ -8,26 +8,20 @@ import Data.Foldable
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compileO0)
 import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.Compile qualified as Compiler
 import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), relocateConstraintSystem)
-import Keelung.Compiler.Error (Error)
 import Keelung.Compiler.Optimize qualified as Optimizer
-import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
 import Keelung.Compiler.Relocated qualified as Relocated
 import Test.HUnit (assertFailure)
 import Test.Hspec
+import Test.Interpreter.Util (gf181Info)
 import Test.Optimization.UInt qualified as Optimization.UInt
-
--- | elaborate => rewrite => to internal syntax => constant propagation => compile
-compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
-compileO0 program = Compiler.convertToInternal program >>= Compiler.run True . ConstantPropagation.run
 
 -- | Returns the original and optimized constraint system
 execute :: Encode t => Comp t -> IO (ConstraintSystem (N GF181), ConstraintSystem (N GF181))
 execute program = do
-  cs <- case Compiler.asGF181N $ compileO0 program of
+  cs <- case Compiler.compileO0 gf181Info program of
     Left err -> assertFailure $ show err
     Right result -> return result
 

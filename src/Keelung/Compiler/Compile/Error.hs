@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Compiler.Compile.Error where
@@ -22,7 +23,7 @@ data Error n
   | AssertGTEBoundTooLargeError Integer Width
   | AssertGTBoundTooSmallError Integer
   | AssertGTBoundTooLargeError Integer Width
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
 
