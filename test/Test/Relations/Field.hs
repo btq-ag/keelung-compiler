@@ -2,7 +2,7 @@ module Test.Relations.Field (tests, run, debug) where
 
 import Control.Monad.Except
 import Control.Monad.State
-import Keelung hiding (run)
+import Keelung
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Compile.Relations.Field (AllRelations)

@@ -6,7 +6,7 @@ module Test.Optimization (tests, run, debug) where
 
 import Data.Foldable
 import Hash.Poseidon qualified as Poseidon
-import Keelung hiding (compileO0, run)
+import Keelung hiding (compileO0)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Compile qualified as Compiler
 import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations

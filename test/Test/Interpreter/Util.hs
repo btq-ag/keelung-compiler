@@ -1,7 +1,7 @@
 module Test.Interpreter.Util (runAll, throwAll, throwAll', runAndCompare, debug, assertSize) where
 
 import Control.Arrow (left)
-import Keelung hiding (compile, run)
+import Keelung hiding (compile)
 import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.ConstraintSystem qualified as Relocated

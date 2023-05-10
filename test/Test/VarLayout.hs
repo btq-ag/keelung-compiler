@@ -1,6 +1,6 @@
 module Test.VarLayout (tests, run) where
 
-import Keelung hiding (run)
+import Keelung
 import Keelung.Compiler
 import Keelung.Compiler qualified as Compiler
 import Keelung.Syntax.Counters

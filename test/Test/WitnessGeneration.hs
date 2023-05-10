@@ -6,7 +6,7 @@ module Test.WitnessGeneration (run, tests) where
 
 -- import Data.Foldable (Foldable(toList))
 import Data.Vector qualified as Vec
-import Keelung hiding (run)
+import Keelung
 import Keelung.Compiler (RelocatedConstraintSystem (..), generateWitness)
 import Keelung.Compiler qualified as Compiler
 import Test.Hspec

@@ -1,7 +1,7 @@
 module Test.Interpreter.Statement (tests, run) where
 
 import Basic qualified
-import Keelung hiding (compile, run)
+import Keelung hiding (compile)
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))

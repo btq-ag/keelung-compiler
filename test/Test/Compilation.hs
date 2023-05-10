@@ -4,7 +4,7 @@ module Test.Compilation (run, tests) where
 
 -- import qualified Basic
 
-import Keelung hiding (run)
+import Keelung
 import Keelung.Compiler qualified as Compiler
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (toR1Cs)

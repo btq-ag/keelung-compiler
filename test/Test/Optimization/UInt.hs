@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Test.Optimization.UInt (tests, run, debug) where
 
-import Keelung hiding (compileO0, run)
+import Keelung hiding (compileO0)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.Compile qualified as Compiler
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), relocateConstraintSystem)

@@ -4,7 +4,7 @@
 module Test.Interpreter.UInt (tests, run) where
 
 import Control.Monad (forM_, when)
-import Keelung hiding (compile, run)
+import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as CompilerError
 import Keelung.Constraint.R1C (R1C (R1C))

@@ -5,7 +5,7 @@ module Test.Interpreter.Misc (tests, run) where
 import AggregateSignature.Program qualified as AggSig
 import AggregateSignature.Util qualified as AggSig
 import Hash.Poseidon qualified as Poseidon
-import Keelung hiding (compile, run)
+import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
