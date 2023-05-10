@@ -33,6 +33,7 @@ tests = describe "Field" $ do
           y <- inputField Public
           let z = 3
           return $ x * z + y * 2
+    
     property $ \(x, y) -> do
       runAll program [y :: GF181] [x] [x * 3 + y * 2]
 

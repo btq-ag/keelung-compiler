@@ -133,11 +133,60 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
   interpret (DivMod width dividend divisor quotient remainder) = do
     interpretDivMod width (dividend, divisor, quotient, remainder)
     return []
-  interpret (AssertLTE _ value bound) = do
+  interpret (AssertLTE width value bound) = do
+    -- check if the bound is within the range of the UInt
+    when (bound < 0) $
+      throwError $
+        AssertLTEBoundTooSmallError bound
+    when (bound >= 2 ^ width - 1) $
+      throwError $
+        AssertLTEBoundTooLargeError bound width
     value' <- interpret value
     case value' of
       [v] -> do
         when (v > fromInteger bound) $ throwError $ AssertLTEError v bound
+        return []
+      _ -> throwError $ ResultSizeError 1 (length value')
+  interpret (AssertLT width value bound) = do
+    -- check if the bound is within the range of the UInt
+    when (bound < 1) $
+      throwError $
+        AssertLTBoundTooSmallError bound
+    when (bound >= 2 ^ width) $
+      throwError $
+        AssertLTBoundTooLargeError bound width
+    value' <- interpret value
+    case value' of
+      [v] -> do
+        when (v >= fromInteger bound) $ throwError $ AssertLTError v bound
+        return []
+      _ -> throwError $ ResultSizeError 1 (length value')
+  interpret (AssertGTE width value bound) = do
+    -- check if the bound is within the range of the UInt
+    when (bound < 1) $
+      throwError $
+        AssertGTEBoundTooSmallError bound
+    when (bound >= 2 ^ width) $
+      throwError $
+        AssertGTEBoundTooLargeError bound width
+    value' <- interpret value
+    case value' of
+      [v] -> do
+        when (v < fromInteger bound) $ throwError $ AssertGTEError v bound
+        return []
+      _ -> throwError $ ResultSizeError 1 (length value')
+  interpret (AssertGT width value bound) = do
+    -- check if the bound is within the range of the UInt
+    when (bound < 0) $
+      throwError $
+        AssertGTBoundTooSmallError bound
+    when (bound >= 2 ^ width - 1) $
+      throwError $
+        AssertGTBoundTooLargeError bound width
+    value' <- interpret value
+    case value' of
+      [v] -> do
+        when (v <= fromInteger bound) $ throwError $ AssertGTError v bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
 
@@ -172,6 +221,22 @@ instance (GaloisField n, Integral n) => Interpret Boolean n where
       x' <- interpret x
       y' <- interpret y
       interpret (x' == y')
+    LTU _ x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' < y')
+    LTEU _ x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' <= y')
+    GTU _ x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' > y')
+    GTEU _ x y -> do
+      x' <- interpret x
+      y' <- interpret y
+      interpret (x' >= y')
     BitU width x i -> do
       xs <- interpret x
       if Data.Bits.testBit (toInteger (head xs)) (i `mod` width)
@@ -212,7 +277,7 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
       x' <- map toInteger <$> interpret x
       case x' of
         [x''] -> case modInv x'' p of
-          Just v -> do 
+          Just v -> do
             return [fromInteger v]
           _ -> throwError $ ModInvError x'' p
         _ -> throwError $ ResultSizeError 1 (length x')
@@ -293,6 +358,9 @@ instance FreeVar SideEffect where
   freeVars (AssignmentU width var uint) = modifyX (modifyU width mempty (IntSet.insert var)) (freeVars uint)
   freeVars (DivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
   freeVars (AssertLTE _width x _) = freeVars x
+  freeVars (AssertLT _width x _) = freeVars x
+  freeVars (AssertGTE _width x _) = freeVars x
+  freeVars (AssertGT _width x _) = freeVars x
 
 instance FreeVar Boolean where
   freeVars expr = case expr of
@@ -308,6 +376,10 @@ instance FreeVar Boolean where
     EqB x y -> freeVars x <> freeVars y
     EqF x y -> freeVars x <> freeVars y
     EqU _ x y -> freeVars x <> freeVars y
+    LTU _ x y -> freeVars x <> freeVars y
+    LTEU _ x y -> freeVars x <> freeVars y
+    GTU _ x y -> freeVars x <> freeVars y
+    GTEU _ x y -> freeVars x <> freeVars y
     BitU _ x _ -> freeVars x
 
 instance FreeVar Field where

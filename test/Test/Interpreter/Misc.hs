@@ -49,7 +49,7 @@ tests = do
           ([] :: [GF181])
           []
           (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2")
-          (CompileError (Compile.ConflictingValuesF 1 2))
+          (CompileError (Compile.ConflictingValuesF 2 1))
 
       it "assert (true = false) (Boolean)" $ do
         let program = do
@@ -111,7 +111,7 @@ tests = do
               msg0 <- reuse msg
               msg1 <- reuse (msg0 + 1)
               reuse ((msg1 + 1) * (msg1 + 1))
-        runAndCompare True (program 0 :: Comp Field) [0 :: N GF181] []
+        runAndCompare (program 0 :: Comp Field) [0 :: N GF181] []
       it "Multiplicative 1" $ do
         let program = do
               let initState = (2, 3)
@@ -120,7 +120,7 @@ tests = do
               state2 <- reuse (round' state1) -- (15, 45)
               state3 <- reuse (round' state2) -- (60, 2025)
               return $ fst state3
-        runAndCompare True (program :: Comp Field) [0 :: N GF181] []
+        runAndCompare (program :: Comp Field) [0 :: N GF181] []
   where
     runAggCheck :: Int -> Int -> [GF181] -> IO ()
     runAggCheck dimension numberOfSignatures outputs =

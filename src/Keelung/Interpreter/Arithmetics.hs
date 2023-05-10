@@ -26,15 +26,16 @@ bitWiseNot x = case toInteger x of
   0 -> 1
   _ -> 0
 
--- w is the bit width of the result
--- n is the amount to shift left by
--- x is the value to shift
+-- | w is the bit width of the result
+--   n is the amount to rotate left by
+--   x is the value to be rotated
 bitWiseRotateL :: (GaloisField n, Integral n) => Width -> Int -> n -> n
 bitWiseRotateL w n x =
   fromInteger $
     (toInteger x `Data.Bits.shiftL` fromIntegral (n `mod` w) Data.Bits..&. (2 ^ w - 1))
       Data.Bits..|. (toInteger x `Data.Bits.shiftR` fromIntegral (w - (n `mod` w)))
 
+-- | This function shifts left if n is positive and shifts right if n is negative
 bitWiseShiftL :: (GaloisField n, Integral n) => Width -> Int -> n -> n
 bitWiseShiftL w n x =
   if n < 0
@@ -48,7 +49,7 @@ bitWiseSet w x i b =
         0 -> fromInteger $ Data.Bits.clearBit (toInteger x) i'
         _ -> fromInteger $ Data.Bits.setBit (toInteger x) i'
 
--- Given m and a, return Just x such that ax = 1 mod m.  
+-- Given m and a, return Just x such that ax = 1 mod m.
 -- If there is no such x return Nothing.
 modInv :: Integer -> Integer -> Maybe Integer
 modInv x p =

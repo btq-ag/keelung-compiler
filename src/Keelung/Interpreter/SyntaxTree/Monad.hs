@@ -150,6 +150,17 @@ data Error n
   | DivModRemainderError n n n n
   | DivModStuckError [Var]
   | AssertLTEError n Integer
+  | AssertLTEBoundTooSmallError Integer
+  | AssertLTEBoundTooLargeError Integer Width
+  | AssertLTError n Integer
+  | AssertLTBoundTooSmallError Integer
+  | AssertLTBoundTooLargeError Integer Width
+  | AssertGTEError n Integer
+  | AssertGTEBoundTooSmallError Integer
+  | AssertGTEBoundTooLargeError Integer Width
+  | AssertGTError n Integer
+  | AssertGTBoundTooSmallError Integer
+  | AssertGTBoundTooLargeError Integer Width
   | ModInvError Integer Integer
   deriving (Eq, Generic, NFData)
 
@@ -163,11 +174,6 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       ++ show unboundVariables
   show (ResultSizeError expected actual) =
     "expecting " <> show expected <> " result(s) but got " <> show actual <> " result(s)"
-  -- show (StuckError msg vars) =
-  --   "stuck because the value of these variables "
-  --     <> showList' (map (\x -> "$" <> show x) vars)
-  --     <> " are not known "
-  --     <> msg
   show (AssertionError expr) =
     "assertion failed: " <> expr
   show (DivModQuotientError dividend divisor expected actual) =
@@ -180,5 +186,47 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> " are not known "
   show (AssertLTEError actual bound) =
     "`" <> show (N actual) <> "` is not less than or equal to `" <> show bound <> "`"
+  show (AssertLTEBoundTooSmallError bound) = "assertLTE: the bound `" <> show bound <> "` is too restrictive, no UInt can be less than or equal to it"
+  show (AssertLTEBoundTooLargeError bound width) =
+    "assertLTE: the bound `"
+      <> show bound
+      <> "` is too large, since all UInt of bit width `"
+      <> show width
+      <> "` are less than`"
+      <> show ((2 ^ width) :: Integer)
+      <> "`"
+  show (AssertLTError actual bound) =
+    "`" <> show (N actual) <> "` is not less than `" <> show bound <> "`"
+  show (AssertLTBoundTooSmallError bound) = "assertLT: the bound `" <> show bound <> "` is too restrictive, no UInt can be less than it"
+  show (AssertLTBoundTooLargeError bound width) =
+    "assertLT: the bound `"
+      <> show bound
+      <> "` is too large, since all UInt of bit width `"
+      <> show width
+      <> "` are less than `"
+      <> show ((2 ^ width) :: Integer)
+      <> "`"
+  show (AssertGTEError actual bound) =
+    "`" <> show (N actual) <> "` is not greater than or equal to `" <> show bound <> "`"
+  show (AssertGTEBoundTooSmallError bound) = "assertGTE: the bound `" <> show bound <> "` is too small, all UInt are greater than or equal to it"
+  show (AssertGTEBoundTooLargeError bound width) =
+    "assertGTE: the bound `"
+      <> show bound
+      <> "` is too restrictive, since all UInt of bit width `"
+      <> show width
+      <> "` are less than `"
+      <> show ((2 ^ width) :: Integer)
+      <> "`"
+  show (AssertGTError actual bound) =
+    "`" <> show (N actual) <> "` is not greater than `" <> show bound <> "`"
+  show (AssertGTBoundTooSmallError bound) = "assertGT: the bound `" <> show bound <> "` is too small, all UInt are greater than it"
+  show (AssertGTBoundTooLargeError bound width) =
+    "assertGT: the bound `"
+      <> show bound
+      <> "` is too restrictive, since all UInt of bit width `"
+      <> show width
+      <> "` are less than `"
+      <> show ((2 ^ width) :: Integer)
+      <> "`"
   show (ModInvError a m) =
     "no modular inverse of `" <> show a <> " (mod " <> show m <> ")`"

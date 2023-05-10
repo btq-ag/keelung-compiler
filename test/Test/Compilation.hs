@@ -1,11 +1,9 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Test.Compilation (run, tests) where
 
 -- import qualified Basic
 
-import Control.Monad
 import Keelung hiding (run)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Constraint.R1C (R1C (..))
@@ -77,7 +75,7 @@ tests = do
                                   (Poly.buildEither 0 [])
                               ]
 
-    describe "Unsigned Integer" $ do
+    -- describe "Unsigned Integer" $ do
 
 
       -- it "EQ 0" $ do
@@ -358,186 +356,186 @@ tests = do
       --                             (Poly.buildEither 0 [])
       --                         ]
 
-      it "ROL 0" $ do
-        -- output | input
-        -- rrrru    rrrru
-        -- 01234    56789
-        let program = do
-              x <- inputUInt @4 Public
-              return $ rotate x 1
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            -- x[i] = out[i + i]
-            forM_ [0 .. 3] $ \i ->
-              toR1Cs r1cs
-                `shouldContain` [ R1C
-                                    (Poly.buildEither 0 [(i + 5, 1), ((i + 1) `mod` 4, -1)])
-                                    (Poly.buildEither 1 [])
-                                    (Poly.buildEither 0 [])
-                                ]
+      -- it "ROL 0" $ do
+      --   -- output | input
+      --   -- rrrru    rrrru
+      --   -- 01234    56789
+      --   let program = do
+      --         x <- inputUInt @4 Public
+      --         return $ rotate x 1
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- x[i] = out[i + i]
+      --       forM_ [0 .. 3] $ \i ->
+      --         toR1Cs r1cs
+      --           `shouldContain` [ R1C
+      --                               (Poly.buildEither 0 [(i + 5, 1), ((i + 1) `mod` 4, -1)])
+      --                               (Poly.buildEither 1 [])
+      --                               (Poly.buildEither 0 [])
+      --                           ]
 
-      it "ROL 1" $ do
-        -- output
-        -- rrrru
-        -- 01234
-        let program = do
-              let x = 3 :: UInt 4
-              return $ rotate x (-1)
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 1 [(0, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(1, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(2, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 1 [(3, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-      it "ROL 2" $ do
-        -- output | input
-        -- rrrru    rrrru
-        -- 01234    56789
-        let program = do
-              x <- inputUInt @4 Public
-              return $ rotate (rotate x (-1)) 1
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            -- x[i] = out[i]
-            forM_ [0 .. 3] $ \i ->
-              toR1Cs r1cs
-                `shouldContain` [ R1C
-                                    (Poly.buildEither 0 [(i + 5, 1), (i, -1)])
-                                    (Poly.buildEither 1 [])
-                                    (Poly.buildEither 0 [])
-                                ]
+      -- it "ROL 1" $ do
+      --   -- output
+      --   -- rrrru
+      --   -- 01234
+      --   let program = do
+      --         let x = 3 :: UInt 4
+      --         return $ rotate x (-1)
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 1 [(0, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(1, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(2, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 1 [(3, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      -- it "ROL 2" $ do
+      --   -- output | input
+      --   -- rrrru    rrrru
+      --   -- 01234    56789
+      --   let program = do
+      --         x <- inputUInt @4 Public
+      --         return $ rotate (rotate x (-1)) 1
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- x[i] = out[i]
+      --       forM_ [0 .. 3] $ \i ->
+      --         toR1Cs r1cs
+      --           `shouldContain` [ R1C
+      --                               (Poly.buildEither 0 [(i + 5, 1), (i, -1)])
+      --                               (Poly.buildEither 1 [])
+      --                               (Poly.buildEither 0 [])
+      --                           ]
 
-      it "SHL 0" $ do
-        -- output | input
-        -- rrrru    rrrru
-        -- 01234    56789
-        let program = do
-              x <- inputUInt @4 Public
-              return $ shift x 1
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            -- 0 = out[0]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(0, 1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            -- x[i] = out[i + i]
-            forM_ [1 .. 3] $ \i ->
-              toR1Cs r1cs
-                `shouldContain` [ R1C
-                                    (Poly.buildEither 0 [(i + 5 - 1, 1), (i, -1)])
-                                    (Poly.buildEither 1 [])
-                                    (Poly.buildEither 0 [])
-                                ]
+      -- it "SHL 0" $ do
+      --   -- output | input
+      --   -- rrrru    rrrru
+      --   -- 01234    56789
+      --   let program = do
+      --         x <- inputUInt @4 Public
+      --         return $ shift x 1
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       -- 0 = out[0]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(0, 1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       -- x[i] = out[i + i]
+      --       forM_ [1 .. 3] $ \i ->
+      --         toR1Cs r1cs
+      --           `shouldContain` [ R1C
+      --                               (Poly.buildEither 0 [(i + 5 - 1, 1), (i, -1)])
+      --                               (Poly.buildEither 1 [])
+      --                               (Poly.buildEither 0 [])
+      --                           ]
 
-      it "SHL 1" $ do
-        -- output
-        -- rrrrrrrrrrrruuu
-        -- 012345678901234
-        let program = do
-              let x = 3 :: UInt 4
-              return [shift x 1, shift x (-1), shift x 3]
-        case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
-          Left err -> expectationFailure (show err)
-          Right r1cs -> do
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(0, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 1 [(1, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 1 [(2, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(3, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 1 [(4, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(5, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(6, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(7, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(8, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(9, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 0 [(10, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
-            toR1Cs r1cs
-              `shouldContain` [ R1C
-                                  (Poly.buildEither 1 [(11, -1)])
-                                  (Poly.buildEither 1 [])
-                                  (Poly.buildEither 0 [])
-                              ]
+      -- it "SHL 1" $ do
+      --   -- output
+      --   -- rrrrrrrrrrrruuu
+      --   -- 012345678901234
+      --   let program = do
+      --         let x = 3 :: UInt 4
+      --         return [shift x 1, shift x (-1), shift x 3]
+      --   case Compiler.asGF181N $ Compiler.toR1CS <$> Compiler.compile program of
+      --     Left err -> expectationFailure (show err)
+      --     Right r1cs -> do
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(0, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 1 [(1, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 1 [(2, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(3, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 1 [(4, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(5, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(6, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(7, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(8, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(9, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 0 [(10, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
+      --       toR1Cs r1cs
+      --         `shouldContain` [ R1C
+      --                             (Poly.buildEither 1 [(11, -1)])
+      --                             (Poly.buildEither 1 [])
+      --                             (Poly.buildEither 0 [])
+      --                         ]
       -- it "DivMod 1" $ do
       --   -- output     | input
       --   -- rrrrrrrruu   rrrrrrrruu

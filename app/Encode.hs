@@ -63,7 +63,7 @@ serializeR1CS2 r1cs =
       pairs $
         pairStr "r1cs" $
           pairs $
-            pairStr "version" (string "0.9.4")
+            pairStr "version" (string "0.9.5")
               <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
               <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
               <> pairStr "instances" (int (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters)) -- outputs & public inputs

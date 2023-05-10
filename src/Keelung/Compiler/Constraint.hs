@@ -5,16 +5,16 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Keelung.Compiler.Constraint
-  ( RefF (..),
+  ( Ref (..),
     RefT (..),
     RefB (..),
     RefU (..),
-    reindexRefF,
+    reindexRef,
     reindexRefT,
     reindexRefB,
     reindexRefU,
     Constraint (..),
-    pinnedRefF,
+    pinnedRef,
     pinnedRefB,
     pinnedRefU,
     cAddF,
@@ -51,9 +51,9 @@ import Keelung.Syntax
 import Keelung.Syntax.Counters
 
 fromConstraint :: (GaloisField n, Integral n) => Counters -> Constraint n -> Relocated.Constraint n
-fromConstraint counters (CAddF as) = Relocated.CAdd (fromPolyF_ counters as)
+fromConstraint counters (CAddF as) = Relocated.CAdd (fromPoly_ counters as)
 fromConstraint counters (CVarEq x y) =
-  case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
+  case Poly.buildEither 0 [(reindexRef counters x, 1), (reindexRef counters y, -1)] of
     Left _ -> error "CVarEq: two variables are the same"
     Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarEqF x y) =
@@ -72,16 +72,16 @@ fromConstraint counters (CVarEqU x y) =
   case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
     Left _ -> error "CVarEqU: two variables are the same"
     Right xs -> Relocated.CAdd xs
-fromConstraint counters (CVarBindF x n) = Relocated.CAdd (Poly.bind (reindexRefF counters x) n)
+fromConstraint counters (CVarBindF x n) = Relocated.CAdd (Poly.bind (reindexRef counters x) n)
 fromConstraint counters (CVarBindB x n) = Relocated.CAdd (Poly.bind (reindexRefB counters x) n)
 fromConstraint counters (CVarBindU x n) = Relocated.CAdd (Poly.bind (reindexRefU counters x) n)
 fromConstraint counters (CMulF as bs cs) =
   Relocated.CMul
-    (fromPolyF_ counters as)
-    (fromPolyF_ counters bs)
+    (fromPoly_ counters as)
+    (fromPoly_ counters bs)
     ( case cs of
         Left n -> Left n
-        Right xs -> fromPolyF counters xs
+        Right xs -> fromPoly counters xs
     )
 fromConstraint counters (CNEqF x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefT counters x)) (Left (reindexRefT counters y)) (reindexRefT counters m))
 fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefT counters m))
@@ -90,54 +90,70 @@ fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (r
 
 --------------------------------------------------------------------------------
 
-data RefB = RefBO Var | RefBI Var | RefBP Var | RefUBit Width RefU Int | RefB Var
+-- | For representing mixed variables in constraints
+data Ref
+  = -- | Field variable
+    F RefT
+  | -- | Boolean variable
+    B RefB
+  | -- | UInt variable
+    U RefU
   deriving (Eq, Ord, Generic, NFData)
 
--- instance Eq RefB where
---   RefBO x == RefBO y = x == y
---   RefBI x == RefBI y = x == y
---   RefBP x == RefBP y = x == y
---   RefUBit w x i == RefUBit w' y j = w == w' && x == y && i `mod` w == j `mod` w
---   RefB x == RefB y = x == y
---   _ == _ = False
+instance Show Ref where
+  show (F x) = show x
+  show (B x) = show x
+  show (U x) = show x
 
--- instance Ord RefB where
---   compare (RefBO x) (RefBO y) = compare x y
---   compare (RefBO _) _ = LT
---   compare (RefBI x) (RefBI y) = compare x y
---   compare (RefBI _) _ = LT
---   compare (RefBP x) (RefBP y) = compare x y
---   compare (RefBP _) _ = LT
---   compare (RefUBit w x i) (RefUBit w' y j) = compare (w, x, i `mod` w) (w', y, j `mod` w)
---   compare (RefUBit {}) _ = LT
---   compare (RefB x) (RefB y) = compare x y
---   compare (RefB _) _ = LT
+-- | For representing Boolean variables in constraints
+data RefB
+  = -- | Boolean output variable
+    RefBO Var
+  | -- | Boolean public input variable
+    RefBI Var
+  | -- | Boolean private input variable
+    RefBP Var
+  | -- | Boolean intermediate variable
+    RefBX Var
+  | -- | UInt bit variable
+    RefUBit Width RefU Int
+  deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefB where
   show (RefBO x) = "BO" ++ show x
   show (RefBI x) = "BI" ++ show x
   show (RefBP x) = "BP" ++ show x
-  show (RefB x) = "B" ++ show x
+  show (RefBX x) = "B" ++ show x
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
-data RefF = F RefT | RefBtoRefF RefB | RefUVal RefU
-  deriving (Eq, Ord, Generic, NFData)
-
-instance Show RefF where
-  show (F x) = show x
-  show (RefBtoRefF x) = show x
-  show (RefUVal x) = show x
-
-data RefT = RefFO Var | RefFI Var | RefFP Var | RefF Var
+-- | For representing Field variables in constraints
+data RefT
+  = -- | Field output variable
+    RefFO Var
+  | -- | Field public input variable
+    RefFI Var
+  | -- | Field private input variable
+    RefFP Var
+  | -- | Field intermediate variable
+    RefFX Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefT where
   show (RefFO x) = "FO" ++ show x
   show (RefFI x) = "FI" ++ show x
   show (RefFP x) = "FP" ++ show x
-  show (RefF x) = "F" ++ show x
+  show (RefFX x) = "F" ++ show x
 
-data RefU = RefUO Width Var | RefUI Width Var | RefUP Width Var | RefU Width Var
+-- | For representing UInt variables in constraints
+data RefU
+  = -- | UInt output variable
+    RefUO Width Var
+  | -- | UInt public input variable
+    RefUI Width Var
+  | -- | UInt private input variable
+    RefUP Width Var
+  | -- | UInt intermediate variable
+    RefUX Width Var
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefU where
@@ -145,72 +161,82 @@ instance Show RefU where
     RefUO w x -> "UO" ++ toSubscript w ++ show x
     RefUI w x -> "UI" ++ toSubscript w ++ show x
     RefUP w x -> "UP" ++ toSubscript w ++ show x
-    RefU w x -> "U" ++ toSubscript w ++ show x
+    RefUX w x -> "U" ++ toSubscript w ++ show x
+
+instance HasWidth RefU where
+  widthOf (RefUO width _) = width
+  widthOf (RefUI width _) = width
+  widthOf (RefUP width _) = width
+  widthOf (RefUX width _) = width
 
 --------------------------------------------------------------------------------
 
-pinnedRefF :: RefF -> Bool
-pinnedRefF (RefBtoRefF ref) = pinnedRefB ref
-pinnedRefF (RefUVal ref) = pinnedRefU ref
-pinnedRefF (F _) = False
+pinnedRef :: Ref -> Bool
+pinnedRef (B ref) = pinnedRefB ref
+pinnedRef (U ref) = pinnedRefU ref
+pinnedRef (F ref) = pinnedRefF ref
 
--- pinnedRefF _ = False
+pinnedRefF :: RefT -> Bool
+pinnedRefF (RefFO _) = True
+pinnedRefF (RefFI _) = True
+pinnedRefF (RefFP _) = True
+pinnedRefF (RefFX _) = False
 
 pinnedRefB :: RefB -> Bool
 pinnedRefB (RefBI _) = True
 pinnedRefB (RefBP _) = True
 pinnedRefB (RefBO _) = True
 pinnedRefB (RefUBit _ ref _) = pinnedRefU ref
-pinnedRefB (RefB _) = False
+pinnedRefB (RefBX _) = False
 
 pinnedRefU :: RefU -> Bool
 pinnedRefU (RefUI _ _) = True
 pinnedRefU (RefUP _ _) = True
 pinnedRefU (RefUO _ _) = True
-pinnedRefU (RefU _ _) = False
+pinnedRefU (RefUX _ _) = False
 
 --------------------------------------------------------------------------------
 
-reindexRefF :: Counters -> RefF -> Var
-reindexRefF counters (F x) = reindexRefT counters x
-reindexRefF counters (RefBtoRefF x) = reindexRefB counters x
-reindexRefF counters (RefUVal x) = reindexRefU counters x
+reindexRef :: Counters -> Ref -> Var
+reindexRef counters (F x) = reindexRefT counters x
+reindexRef counters (B x) = reindexRefB counters x
+reindexRef counters (U x) = reindexRefU counters x
 
 reindexRefT :: Counters -> RefT -> Var
 reindexRefT counters (RefFO x) = reindex counters OfOutput OfField x
 reindexRefT counters (RefFI x) = reindex counters OfPublicInput OfField x
 reindexRefT counters (RefFP x) = reindex counters OfPrivateInput OfField x
-reindexRefT counters (RefF x) = reindex counters OfIntermediate OfField x
+reindexRefT counters (RefFX x) = reindex counters OfIntermediate OfField x
 
 reindexRefB :: Counters -> RefB -> Var
 reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
 reindexRefB counters (RefBI x) = reindex counters OfPublicInput OfBoolean x
 reindexRefB counters (RefBP x) = reindex counters OfPrivateInput OfBoolean x
-reindexRefB counters (RefB x) = reindex counters OfIntermediate OfBoolean x
+reindexRefB counters (RefBX x) = reindex counters OfIntermediate OfBoolean x
 reindexRefB counters (RefUBit _ x i) =
   case x of
     RefUO w x' -> reindex counters OfOutput (OfUIntBinRep w) x' + (i `mod` w)
     RefUI w x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + (i `mod` w)
     RefUP w x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + (i `mod` w)
-    RefU w x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + (i `mod` w)
+    RefUX w x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + (i `mod` w)
 
 reindexRefU :: Counters -> RefU -> Var
 reindexRefU counters (RefUO w x) = reindex counters OfOutput (OfUInt w) x
 reindexRefU counters (RefUI w x) = reindex counters OfPublicInput (OfUInt w) x
 reindexRefU counters (RefUP w x) = reindex counters OfPrivateInput (OfUInt w) x
-reindexRefU counters (RefU w x) = reindex counters OfIntermediate (OfUInt w) x
+reindexRefU counters (RefUX w x) = reindex counters OfIntermediate (OfUInt w) x
 
 --------------------------------------------------------------------------------
 
-fromPolyF :: (Integral n, GaloisField n) => Counters -> PolyG RefF n -> Either n (Poly n)
-fromPolyF counters poly = case PolyG.view poly of
-  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRefF counters var, coeff)]
-  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRefF counters var1, coeff1), (reindexRefF counters var2, coeff2)]
-  PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRefF counters)) (Map.toList xs))
+fromPoly :: (Integral n, GaloisField n) => Counters -> PolyG Ref n -> Either n (Poly n)
+fromPoly counters poly = case PolyG.view poly of
+  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRef counters var, coeff)]
+  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRef counters var1, coeff1), (reindexRef counters var2, coeff2)]
+  PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRef counters)) (Map.toList xs))
 
-fromPolyF_ :: (Integral n, GaloisField n) => Counters -> PolyG RefF n -> Poly n
-fromPolyF_ counters xs = case fromPolyF counters xs of
-  Left _ -> error "[ panic ] fromPolyF_: Left"
+fromPoly_ :: (Integral n, GaloisField n) => Counters -> PolyG Ref n -> Poly n
+fromPoly_ counters xs = case fromPoly counters xs of
+  Left _ -> error "[ panic ] fromPoly_: Left"
   Right p -> p
 
 --------------------------------------------------------------------------------
@@ -220,20 +246,20 @@ fromPolyF_ counters xs = case fromPolyF counters xs of
 --      CMul: ax * by = c or ax * by = cz
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
-  = CAddF !(PolyG RefF n)
-  | CVarEq RefF RefF -- when x == y
+  = CAddF !(PolyG Ref n)
+  | CVarEq Ref Ref -- when x == y
   | CVarEqF RefT RefT -- when x == y
   | CVarEqB RefB RefB -- when x == y
   | CVarNEqB RefB RefB -- when x = ¬ y
   | CVarEqU RefU RefU -- when x == y
-  | CVarBindF RefF n -- when x = val
+  | CVarBindF Ref n -- when x = val
   | CVarBindB RefB n -- when x = val
   | CVarBindU RefU n -- when x = val
-  | CMulF !(PolyG RefF n) !(PolyG RefF n) !(Either n (PolyG RefF n))
+  | CMulF !(PolyG Ref n) !(PolyG Ref n) !(Either n (PolyG Ref n))
   | CNEqF RefT RefT RefT
   | CNEqU RefU RefU RefT
 
--- \| CRotateU RefU RefU Int -- when x = y `rotateL` i
+-- \| CRotateU RefUX RefUX Int -- when x = y `rotateL` i
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -266,13 +292,13 @@ instance Functor Constraint where
   fmap _ (CNEqU x y z) = CNEqU x y z
 
 -- | Smart constructor for the CAddF constraint
-cAddF :: GaloisField n => n -> [(RefF, n)] -> [Constraint n]
+cAddF :: GaloisField n => n -> [(Ref, n)] -> [Constraint n]
 cAddF !c !xs = case PolyG.build c xs of
   Left _ -> []
   Right xs' -> [CAddF xs']
 
 -- | Smart constructor for the CVarEqF constraint
-cVarEq :: GaloisField n => RefF -> RefF -> [Constraint n]
+cVarEq :: GaloisField n => Ref -> Ref -> [Constraint n]
 cVarEq x y = if x == y then [] else [CVarEq x y]
 
 -- | Smart constructor for the CVarEqT constraint
@@ -295,7 +321,7 @@ cVarEqU x y = if x == y then [] else [CVarEqU x y]
 -- cRotateU x y n = if x == y then [] else [CRotateU x y n]
 
 -- | Smart constructor for the cVarBindF constraint
-cVarBindF :: GaloisField n => RefF -> n -> [Constraint n]
+cVarBindF :: GaloisField n => Ref -> n -> [Constraint n]
 cVarBindF x n = [CVarBindF x n]
 
 -- | Smart constructor for the cVarBindB constraint
@@ -315,11 +341,11 @@ cMulSimple ctor !x !y !z = case ( do
   Left _ -> []
   Right result -> [result]
 
-cMulSimpleF :: GaloisField n => RefF -> RefF -> RefF -> [Constraint n]
+cMulSimpleF :: GaloisField n => Ref -> Ref -> Ref -> [Constraint n]
 cMulSimpleF = cMulSimple CMulF
 
 -- | Smart constructor for the CMulF constraint
-cMulF :: GaloisField n => (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> (n, [(RefF, n)]) -> [Constraint n]
+cMulF :: GaloisField n => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> [Constraint n]
 cMulF (a, xs) (b, ys) (c, zs) = case ( do
                                          xs' <- PolyG.build a xs
                                          ys' <- PolyG.build b ys

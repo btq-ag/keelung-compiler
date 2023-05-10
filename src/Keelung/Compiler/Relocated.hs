@@ -22,6 +22,7 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
+import Control.Arrow (left)
 
 --------------------------------------------------------------------------------
 
@@ -108,8 +109,8 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
     csConstraints :: !(Seq (Constraint n)),
     csBinReps :: [BinRep],
     csCounters :: Counters,
-    csDivMods :: [(Var, Var, Var, Var)],
-    csModInvs :: [(Var, Var, Integer)]
+    csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
+    csModInvs :: [(Either Var n, Either Var n, Integer)]
   }
   deriving (Eq, Generic, NFData)
 
@@ -143,7 +144,11 @@ renumberConstraints cs =
     pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters + getCountBySort OfOutput counters
 
     -- variables in constraints (that should be kept after renumbering!)
-    vars = varsInConstraints (csConstraints cs) <> IntSet.fromList ([var | binRep <- getBinReps counters, var <- [BinRep.binRepBitStart binRep .. BinRep.binRepBitStart binRep + BinRep.binRepWidth binRep - 1]])
+    varsInBinReps =
+      IntSet.fromList $
+        concatMap (\binRep -> BinRep.binRepVar binRep : [BinRep.binRepBitStart binRep .. BinRep.binRepBitStart binRep + BinRep.binRepWidth binRep - 1]) (getBinReps counters)
+    -- ([var | binRep <- getBinReps counters, var <- [BinRep.binRepBitStart binRep .. BinRep.binRepBitStart binRep + BinRep.binRepWidth binRep - 1]])
+    vars = varsInConstraints (csConstraints cs) <> varsInBinReps
     -- variables in constraints excluding input & output variables
     newIntermediateVars = IntSet.filter (>= pinnedVarSize) vars
     -- numbers of variables reduced via renumbering
@@ -193,10 +198,10 @@ renumberConstraints cs =
         }
 
     renumberDivMod (x, y, q, r) =
-      ( renumber x,
-        renumber y,
-        renumber q,
-        renumber r
+      ( left renumber x,
+        left renumber y,
+        left renumber q,
+        left renumber r
       )
 
-    renumberModInv (x, n, p) = (renumber x, renumber n, p)
+    renumberModInv (x, n, p) = (left renumber x, left renumber n, p)

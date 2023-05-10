@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           keelung-compiler
-version:        0.9.4.0
+version:        0.9.5.0
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung-compiler#readme>
 homepage:       https://github.com/btq-ag/keelung-compiler#readme
 bug-reports:    https://github.com/btq-ag/keelung-compiler/issues
@@ -28,10 +28,11 @@ library
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
-      Keelung.Compiler.Compile.Relations.BooleanRelations
-      Keelung.Compiler.Compile.Relations.BooleanRelations2
-      Keelung.Compiler.Compile.Relations.FieldRelations
-      Keelung.Compiler.Compile.Relations.UIntRelations
+      Keelung.Compiler.Compile.Relations.Boolean
+      Keelung.Compiler.Compile.Relations.EquivClass
+      Keelung.Compiler.Compile.Relations.Field
+      Keelung.Compiler.Compile.Relations.UInt
+      Keelung.Compiler.Compile.Relations.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
@@ -90,10 +91,11 @@ executable keelungc
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
-      Keelung.Compiler.Compile.Relations.BooleanRelations
-      Keelung.Compiler.Compile.Relations.BooleanRelations2
-      Keelung.Compiler.Compile.Relations.FieldRelations
-      Keelung.Compiler.Compile.Relations.UIntRelations
+      Keelung.Compiler.Compile.Relations.Boolean
+      Keelung.Compiler.Compile.Relations.EquivClass
+      Keelung.Compiler.Compile.Relations.Field
+      Keelung.Compiler.Compile.Relations.UInt
+      Keelung.Compiler.Compile.Relations.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
@@ -157,10 +159,7 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Test.BooleanRelations
-      Test.BooleanRelations2
       Test.Compilation
-      Test.FieldRelations
       Test.Interpreter
       Test.Interpreter.Boolean
       Test.Interpreter.Field
@@ -169,17 +168,22 @@ test-suite keelung-test
       Test.Interpreter.UInt
       Test.Interpreter.Util
       Test.Optimization
+      Test.Optimization.UInt
       Test.OptimizationOld
       Test.PolyG
+      Test.Relations.Boolean
+      Test.Relations.Field
+      Test.Relations.UInt
       Test.VarLayout
       Test.WitnessGeneration
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
-      Keelung.Compiler.Compile.Relations.BooleanRelations
-      Keelung.Compiler.Compile.Relations.BooleanRelations2
-      Keelung.Compiler.Compile.Relations.FieldRelations
-      Keelung.Compiler.Compile.Relations.UIntRelations
+      Keelung.Compiler.Compile.Relations.Boolean
+      Keelung.Compiler.Compile.Relations.EquivClass
+      Keelung.Compiler.Compile.Relations.Field
+      Keelung.Compiler.Compile.Relations.UInt
+      Keelung.Compiler.Compile.Relations.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error

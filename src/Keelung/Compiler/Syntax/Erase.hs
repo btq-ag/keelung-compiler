@@ -61,6 +61,9 @@ eraseSideEffect (T.AssignmentB var val) = AssignmentB2 var <$> eraseExprB val
 eraseSideEffect (T.AssignmentU width var val) = AssignmentU2 width var <$> eraseExprU val
 eraseSideEffect (T.DivMod width dividend divisor quotient remainder) = DivMod width <$> eraseExprU dividend <*> eraseExprU divisor <*> eraseExprU quotient <*> eraseExprU remainder
 eraseSideEffect (T.AssertLTE width val bound) = AssertLTE width <$> eraseExprU val <*> pure bound
+eraseSideEffect (T.AssertLT width val bound) = AssertLT width <$> eraseExprU val <*> pure bound
+eraseSideEffect (T.AssertGTE width val bound) = AssertGTE width <$> eraseExprU val <*> pure bound
+eraseSideEffect (T.AssertGT width val bound) = AssertGT width <$> eraseExprU val <*> pure bound
 
 --------------------------------------------------------------------------------
 
@@ -79,6 +82,10 @@ eraseExprB expr = case expr of
   T.EqB x y -> EqB <$> eraseExprB x <*> eraseExprB y
   T.EqF x y -> EqF <$> eraseExprF x <*> eraseExprF y
   T.EqU _ x y -> EqU <$> eraseExprU x <*> eraseExprU y
+  T.LTU _ x y -> LTU <$> eraseExprU x <*> eraseExprU y
+  T.LTEU _ x y -> LTEU <$> eraseExprU x <*> eraseExprU y
+  T.GTU _ x y -> GTU <$> eraseExprU x <*> eraseExprU y
+  T.GTEU _ x y -> GTEU <$> eraseExprU x <*> eraseExprU y 
   T.BitU _ x i -> BitU <$> eraseExprU x <*> pure i
 
 eraseExprF :: (GaloisField n, Integral n) => T.Field -> M n (ExprF n)
