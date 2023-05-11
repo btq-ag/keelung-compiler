@@ -4,6 +4,7 @@ import Keelung hiding (compile)
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
+import qualified Data.Bits
 
 run :: IO ()
 run = hspec tests
@@ -47,6 +48,16 @@ tests = describe "Boolean" $ do
     let program = Xor <$> input Public <*> return true
     runAll gf181Info program [0] [] [1 :: GF181]
     runAll gf181Info program [1] [] [0 :: GF181]
+
+  it "xor" $ do
+    let program = do
+          x <- inputBool Public
+          y <- inputBool Public
+          return $ x .^. y
+    let genPair = (,) <$> choose (0, 1) <*> choose (0, 1)
+    forAll genPair $ \(x :: Int, y) -> do
+      let expectedOutput = [fromIntegral $ x `Data.Bits.xor` y]
+      runAll gf181Info program [fromIntegral x, fromIntegral y :: GF181] [] expectedOutput
 
   it "mixed 1" $ do
     let program = do

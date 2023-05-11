@@ -59,7 +59,7 @@ compileSideEffect :: (GaloisField n, Integral n) => SideEffect n -> M n ()
 compileSideEffect (AssignmentB var val) = compileExprB (RefBX var) val
 compileSideEffect (AssignmentF var val) = compileExprF (RefFX var) val
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
-compileSideEffect (DivMod width dividend divisor quotient remainder) = compileDivModU width dividend divisor quotient remainder
+compileSideEffect (DivMod width dividend divisor quotient remainder) = assertDivModU width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = assertLTE width value bound
 compileSideEffect (AssertLT width value bound) = assertLT width value bound
 compileSideEffect (AssertGTE width value bound) = assertGTE width value bound
@@ -341,9 +341,12 @@ compileExprB out expr = case expr of
   OrB x0 x1 xs -> do
     compileOrBs out x0 x1 xs
   XorB x y -> do
-    x' <- wireB x
-    y' <- wireB y
-    compileXorB out x' y'
+    x' <- wireB' x
+    y' <- wireB' y
+    result <- xorB x' y'
+    case result of
+      Left var -> addC $ cVarEqB out var
+      Right val -> addC $ cVarBindB out val
   NotB x -> do
     x' <- wireB x
     addC $ cVarNEqB x' out
@@ -647,6 +650,10 @@ wireB expr = do
   compileExprB out expr
   return out
 
+wireB' :: (GaloisField n, Integral n) => ExprB n -> M n (Either RefB Bool)
+wireB' (ValB val) = return (Right val)
+wireB' others = Left <$> wireB others
+
 wireF :: (GaloisField n, Integral n) => ExprF n -> M n RefF
 wireF (VarF ref) = return (RefFX ref)
 wireF (VarFO ref) = return (RefFO ref)
@@ -922,37 +929,29 @@ compileOrBs out x0 x1 xs = do
 --               )
 --           )
 
-compileXorB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> M n ()
-compileXorB out x y = do
+xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
+xorB (Left x) (Left y) = do
   -- (1 - 2x) * (y + 1) = (1 + out - 3x)
+  out <- freshRefB
   addC $
     cMulF
       (1, [(B x, -2)])
       (1, [(B y, 1)])
       (1, [(B x, -3), (B out, 1)])
+  return $ Left out
+xorB (Left x) (Right True) = do 
+  out <- freshRefB
+  addC $ cVarNEqB out x
+  return $ Left out
+xorB (Left x) (Right False) = do 
+  return $ Left x
+xorB (Right val) (Left y) = xorB (Left y) (Right val)
+xorB (Right True) (Right True) = return $ Right False
+xorB (Right False) (Right False) = return $ Right False
+xorB (Right True) (Right False) = return $ Right True
+xorB (Right False) (Right True) = return $ Right True
 
 --------------------------------------------------------------------------------
-
--- assertExprB :: (GaloisField n, Integral n) => Bool -> ExprB n -> M n ()
--- assertExprB val expr = do
---   ref <- wireB expr
---   addC [CVarBindB ref (if val then 1 else 0)]
-
--- assertExprF :: (GaloisField n, Integral n) => n -> ExprF n -> M n ()
--- assertExprF val expr = do
---   ref <- wireF expr
---   addC [CVarBindF ref val]
-
--- assertNotZeroF :: (GaloisField n, Integral n) => ExprF n -> M n ()
--- assertNotZeroF expr = do
---   ref <- wireF expr
---   -- introduce a new variable m, such that `expr * m = 1`
---   m <- freshRefF
---   addC $
---     cMulF
---       (0, [(ref, 1)])
---       (0, [(m, 1)])
---       (1, [])
 
 assertNotZeroU :: (GaloisField n, Integral n) => Width -> ExprU n -> M n ()
 assertNotZeroU width expr = do
@@ -992,8 +991,8 @@ assertLTU width x y = do
 --    1. dividend = divisor * quotient + remainder
 --    2. 0 ≤ remainder < divisor
 --    3. 0 < divisor
-compileDivModU :: (GaloisField n, Integral n) => Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
-compileDivModU width dividend divisor quotient remainder = do
+assertDivModU :: (GaloisField n, Integral n) => Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
+assertDivModU width dividend divisor quotient remainder = do
   --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder

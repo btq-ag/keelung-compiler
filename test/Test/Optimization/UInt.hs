@@ -18,14 +18,6 @@ tests = do
         cs `shouldHaveSize` 6
         cs' `shouldHaveSize` 6
 
-    -- it "`return 0[3]`" $ do
-    --   (cs, cs') <- execute $ do
-    --     let a = 0  :: UInt 4
-    --     return $ a !!! 3
-    --   debug cs'
-    --   cs `shouldHaveSize` 2
-    --   cs' `shouldHaveSize` 2
-
     describe "Comparison" $ do
       it "compute LTE (variable / variable)" $ do
         (cs, cs') <- execute $ do
