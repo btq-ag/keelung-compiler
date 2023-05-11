@@ -226,29 +226,38 @@ addC = mapM_ addOne
         Nothing -> return ()
         Just relations -> put cs {csFieldRelations = relations}
 
-    addBitTestOccurrences :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
-    addBitTestOccurrences (B (RefUBit _ refA _)) (B (RefUBit _ refB _)) = do
-      modify' (\cs -> cs {csBitTests = Map.insertWith (+) refA 1 $ Map.insertWith (+) refB 1 (csBitTests cs)})
-    addBitTestOccurrences _ _ = return ()
+    -- addBitTestOccurrences :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
+    -- addBitTestOccurrences (B (RefUBit _ refA _)) (B (RefUBit _ refB _)) = do
+    --   modify' (\cs -> cs {csBitTests = Map.insertWith (+) refA 1 $ Map.insertWith (+) refB 1 (csBitTests cs)})
+    -- addBitTestOccurrences _ _ = return ()
+
+    addBitTestOccurrences' :: (GaloisField n, Integral n) => Ref -> M n ()
+    addBitTestOccurrences' (B (RefUBit _ ref _)) = do
+      modify' (\cs -> cs {csBitTests = Map.insertWith (+) ref 1 (csBitTests cs)})
+    addBitTestOccurrences' _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       execRelations $ AllRelations.assignF x c
     addOne (CVarBindB x c) = do
+      addBitTestOccurrences' (B x)
       execRelations $ AllRelations.assignB x c
     addOne (CVarBindU x c) = do
       execRelations $ AllRelations.assignU x c
     addOne (CVarEq x y) = do
-      addBitTestOccurrences x y
+      addBitTestOccurrences' x
+      addBitTestOccurrences' y
       execRelations $ AllRelations.relateRefs x 1 y 0
     addOne (CVarEqF x y) = do
       execRelations $ AllRelations.relateRefs (F x) 1 (F y) 0
     addOne (CVarEqB x y) = do
-      addBitTestOccurrences (B x) (B y)
+      addBitTestOccurrences' (B x)
+      addBitTestOccurrences' (B y)
       execRelations $ AllRelations.relateB x (True, y)
     addOne (CVarNEqB x y) = do
-      addBitTestOccurrences (B x) (B y)
+      addBitTestOccurrences' (B x)
+      addBitTestOccurrences' (B y)
       execRelations $ AllRelations.relateB x (False, y)
     addOne (CVarEqU x y) = do
       execRelations $ AllRelations.assertEqualU x y
@@ -928,6 +937,38 @@ compileOrBs out x0 x1 xs = do
 --                   (fmap BtoF xs)
 --               )
 --           )
+
+-- xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
+-- xorB (Left x) (Left y) = do
+--   -- (1 - 2x) * (y + 1) = (1 + out - 3x)
+--   out <- freshRefB
+--   addC $
+--     cMulF
+--       (1, [(B x, -2)])
+--       (1, [(B y, 1)])
+--       (1, [(B x, -3), (B out, 1)])
+--   return $ Left out
+-- xorB (Left x) (Right True) = do 
+--   out <- freshRefB
+--   addC $
+--     cMulF
+--       (1, [(B x, -2)])
+--       (2, [])
+--       (1, [(B x, -3), (B out, 1)])
+--   return $ Left out
+-- xorB (Left x) (Right False) = do 
+--   out <- freshRefB
+--   addC $
+--     cMulF
+--       (1, [(B x, -2)])
+--       (1, [])
+--       (1, [(B x, -3), (B out, 1)])
+--   return $ Left out
+-- xorB (Right val) (Left y) = xorB (Left y) (Right val)
+-- xorB (Right True) (Right True) = return $ Right False
+-- xorB (Right False) (Right False) = return $ Right False
+-- xorB (Right True) (Right False) = return $ Right True
+-- xorB (Right False) (Right True) = return $ Right True
 
 xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 xorB (Left x) (Left y) = do

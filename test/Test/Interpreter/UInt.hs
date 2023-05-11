@@ -692,6 +692,14 @@ tests = do
         runAll gf181Info program [3] [] [0 :: GF181]
         runAll gf181Info program [5] [] [1 :: GF181]
 
+      it "Bit test / xor 0" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Private
+              let w = x .^. y .^. 0
+              return [w !!! 0]
+        runAll gf181Info program [2] [3] [1 :: GF181]
+
       it "Bit test / xor 1" $ do
         let program = do
               x <- inputUInt @4 Public
