@@ -3,13 +3,15 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial with variables generalized (unliked Poly which is limited to only Int)
-module Keelung.Data.PolyG (PolyG, View (..), build, buildWithMap, view, viewAsMap, insert, merge, addConstant, multiplyBy, singleton, vars) where
+module Keelung.Data.PolyG (PolyG, View (..), build, buildWithMap, view, viewAsMap, insert, merge, addConstant, multiplyBy, negate, singleton, vars) where
 
 import Control.DeepSeq (NFData)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import GHC.Generics (Generic)
 import Data.Set (Set)
+import GHC.Generics (Generic)
+import Prelude hiding (negate)
+import Prelude qualified
 
 data PolyG ref n = PolyG n (Map ref n)
   deriving (Eq, Functor, Ord, Generic, NFData)
@@ -66,6 +68,10 @@ addConstant c' (PolyG c xs) = PolyG (c + c') xs
 multiplyBy :: (Num n, Eq n) => n -> PolyG ref n -> Either n (PolyG ref n)
 multiplyBy 0 _ = Left 0
 multiplyBy m (PolyG c xs) = Right $ PolyG (m * c) (Map.map (m *) xs)
+
+-- | Negate a polynomial
+negate :: (Num n, Eq n) => PolyG ref n -> PolyG ref n
+negate (PolyG c xs) = PolyG (-c) (fmap Prelude.negate xs)
 
 data View ref n = Monomial n (ref, n) | Binomial n (ref, n) (ref, n) | Polynomial n (Map ref n)
   deriving (Eq, Show)

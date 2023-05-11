@@ -33,6 +33,7 @@ library
       Keelung.Compiler.Compile.Relations.Field
       Keelung.Compiler.Compile.Relations.UInt
       Keelung.Compiler.Compile.Relations.Util
+      Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
@@ -95,6 +96,7 @@ executable keelungc
       Keelung.Compiler.Compile.Relations.Field
       Keelung.Compiler.Compile.Relations.UInt
       Keelung.Compiler.Compile.Relations.Util
+      Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
@@ -183,6 +185,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Relations.Field
       Keelung.Compiler.Compile.Relations.UInt
       Keelung.Compiler.Compile.Relations.Util
+      Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error

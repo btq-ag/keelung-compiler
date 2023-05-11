@@ -350,9 +350,7 @@ compileExprB out expr = case expr of
   OrB x0 x1 xs -> do
     compileOrBs out x0 x1 xs
   XorB x y -> do
-    x' <- wireB' x
-    y' <- wireB' y
-    result <- xorB x' y'
+    result <- xorB x y
     case result of
       Left var -> addC $ cVarEqB out var
       Right val -> addC $ cVarBindB out val
@@ -938,59 +936,28 @@ compileOrBs out x0 x1 xs = do
 --               )
 --           )
 
--- xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
--- xorB (Left x) (Left y) = do
---   -- (1 - 2x) * (y + 1) = (1 + out - 3x)
---   out <- freshRefB
---   addC $
---     cMulF
---       (1, [(B x, -2)])
---       (1, [(B y, 1)])
---       (1, [(B x, -3), (B out, 1)])
---   return $ Left out
--- xorB (Left x) (Right True) = do 
---   out <- freshRefB
---   addC $
---     cMulF
---       (1, [(B x, -2)])
---       (2, [])
---       (1, [(B x, -3), (B out, 1)])
---   return $ Left out
--- xorB (Left x) (Right False) = do 
---   out <- freshRefB
---   addC $
---     cMulF
---       (1, [(B x, -2)])
---       (1, [])
---       (1, [(B x, -3), (B out, 1)])
---   return $ Left out
--- xorB (Right val) (Left y) = xorB (Left y) (Right val)
--- xorB (Right True) (Right True) = return $ Right False
--- xorB (Right False) (Right False) = return $ Right False
--- xorB (Right True) (Right False) = return $ Right True
--- xorB (Right False) (Right True) = return $ Right True
-
-xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
-xorB (Left x) (Left y) = do
+xorB :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> M n (Either RefB Bool)
+xorB (ValB True) (ValB True) = return $ Right False
+xorB (ValB True) (ValB False) = return $ Right True
+xorB (ValB False) (ValB True) = return $ Right True
+xorB (ValB False) (ValB False) = return $ Right False
+xorB (ValB True) y = do
+  y' <- wireB y
+  out <- freshRefB
+  addC $ cVarNEqB out y'
+  return $ Left out
+xorB (ValB False) y = wireB' y
+xorB x y = do
+  x' <- wireB x
+  y' <- wireB y
   -- (1 - 2x) * (y + 1) = (1 + out - 3x)
   out <- freshRefB
   addC $
     cMulF
-      (1, [(B x, -2)])
-      (1, [(B y, 1)])
-      (1, [(B x, -3), (B out, 1)])
+      (1, [(B x', -2)])
+      (1, [(B y', 1)])
+      (1, [(B x', -3), (B out, 1)])
   return $ Left out
-xorB (Left x) (Right True) = do 
-  out <- freshRefB
-  addC $ cVarNEqB out x
-  return $ Left out
-xorB (Left x) (Right False) = do 
-  return $ Left x
-xorB (Right val) (Left y) = xorB (Left y) (Right val)
-xorB (Right True) (Right True) = return $ Right False
-xorB (Right False) (Right False) = return $ Right False
-xorB (Right True) (Right False) = return $ Right True
-xorB (Right False) (Right True) = return $ Right True
 
 --------------------------------------------------------------------------------
 
