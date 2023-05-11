@@ -15,38 +15,34 @@ import Data.IntSet qualified as IntSet
 import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Compiler.Optimize (optimizeWithWitness)
 import Keelung.Compiler.Relocated hiding (numberOfConstraints)
-import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Util
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1C qualified as R1C
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
 import Keelung.Field (N (..))
 import Keelung.Syntax
-import Keelung.Syntax.Counters
 
 -- | Starting from an initial partial assignment, solve the
 -- constraints and return the resulting complete assignment.
 -- Return `Left String` if the constraints are unsolvable.
-generateWitness ::
-  (GaloisField n, Integral n) =>
-  -- | Constraints to be solved
-  RelocatedConstraintSystem n ->
-  -- | Initial assignment
-  Witness n ->
-  -- | Resulting assignment
-  Either (ExecError n) (Witness n)
-generateWitness cs initWit =
-  let cs' = renumberConstraints cs
-      variables = [0 .. getTotalCount (csCounters cs) - 1]
-      (witness, _) = optimizeWithWitness initWit cs'
-   in if all (isMapped witness) variables
-        then Right witness
-        else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
-  where
-    isMapped witness var = IntMap.member var witness
+-- generateWitness ::
+--   (GaloisField n, Integral n) =>
+--   -- | Constraints to be solved
+--   RelocatedConstraintSystem n ->
+--   -- | Initial assignment
+--   Witness n ->
+--   -- | Resulting assignment
+--   Either (ExecError n) (Witness n)
+-- generateWitness cs initWit =
+--   let cs' = renumberConstraints cs
+--       variables = [0 .. getTotalCount (csCounters cs) - 1]
+--       (witness, _) = optimizeWithWitness initWit cs'
+--    in if all (isMapped witness) variables
+--         then Right witness
+--         else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
+--   where
+--     isMapped witness var = IntMap.member var witness
 
 --------------------------------------------------------------------------------
 
@@ -108,12 +104,12 @@ fromR1CS r1cs =
         _ -> error "fromR1C: invalid R1C"
 
 -- | Computes an assignment for a R1CS with given inputs
-witnessOfR1CS :: (GaloisField n, Integral n) => Inputs n -> R1CS n -> Either (ExecError n) (Witness n)
-witnessOfR1CS inputs r1cs =
-  let inputSize = getCountBySort OfPublicInput (r1csCounters r1cs) + getCountBySort OfPrivateInput (r1csCounters r1cs)
-   in if inputSize /= Inputs.size inputs
-        then Left $ ExecInputUnmatchedError inputSize (Inputs.size inputs)
-        else generateWitness (fromR1CS r1cs) (Inputs.toIntMap inputs)
+-- witnessOfR1CS :: (GaloisField n, Integral n) => Inputs n -> R1CS n -> Either (ExecError n) (Witness n)
+-- witnessOfR1CS inputs r1cs =
+--   let inputSize = getCountBySort OfPublicInput (r1csCounters r1cs) + getCountBySort OfPrivateInput (r1csCounters r1cs)
+--    in if inputSize /= Inputs.size inputs
+--         then Left $ ExecInputUnmatchedError inputSize (Inputs.size inputs)
+--         else generateWitness (fromR1CS r1cs) (Inputs.toIntMap inputs)
 
 --------------------------------------------------------------------------------
 

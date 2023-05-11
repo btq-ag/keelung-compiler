@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Test.Optimization.UInt (tests, run, debug) where
+module Test.Optimization.UInt (tests, run, debug, execute, shouldHaveSize) where
 
 import Keelung hiding (compileO0)
 import Keelung.Compiler qualified as Compiler
@@ -106,7 +106,7 @@ execute program = do
     Left err -> assertFailure $ show err
     Right result -> return result
 
-  case Optimizer.optimizeNew cs of
+  case Optimizer.run cs of
     Left err -> assertFailure $ show err
     Right cs' -> do
       -- var counters should remain the same

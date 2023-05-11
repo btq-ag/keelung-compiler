@@ -17,9 +17,8 @@ import Encode
 import GHC.TypeLits
 import Keelung.Compiler
   ( Error (..),
-    compileO0OldElab,
+    compileO0Elab,
     compileO1Elab,
-    compileO1OldElab,
     generateWitnessElab,
     interpretElab,
     toR1CS,
@@ -125,8 +124,8 @@ main = withUtf8 $ do
           adapter
             outputCircuit
             outputCircuit
-            (\fieldInfo -> left show $ toR1CS . Relocated.relocateConstraintSystem <$> compileO0OldElab fieldInfo elaborated)
-            (\fieldInfo -> left show $ toR1CS . Relocated.relocateConstraintSystem <$> compileO0OldElab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS . Relocated.relocateConstraintSystem <$> compileO0Elab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS . Relocated.relocateConstraintSystem <$> compileO0Elab fieldInfo elaborated)
             fieldType
     Protocol CompileO1 -> do
       blob <- getContents
@@ -149,8 +148,8 @@ main = withUtf8 $ do
           adapter
             outputCircuit
             outputCircuit
-            (\fieldInfo -> left show $ toR1CS <$> compileO1OldElab fieldInfo elaborated)
-            (\fieldInfo -> left show $ toR1CS <$> compileO1OldElab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS <$> compileO1Elab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS <$> compileO1Elab fieldInfo elaborated)
             fieldType
     Protocol Interpret -> do
       blob <- getContents
@@ -173,8 +172,8 @@ main = withUtf8 $ do
           adapter
             (outputCircuitAndWriteFile filepath)
             (outputCircuitAndWriteFile filepath)
-            (\fieldInfo -> left show $ toR1CS <$> compileO1OldElab fieldInfo elaborated)
-            (\fieldInfo -> left show $ toR1CS <$> compileO1OldElab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS <$> compileO1Elab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS <$> compileO1Elab fieldInfo elaborated)
             fieldType
     Protocol (GenWitness filepath) -> do
       blob <- getContents

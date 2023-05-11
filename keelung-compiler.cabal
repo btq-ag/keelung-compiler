@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -55,7 +55,6 @@ library
       Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
   other-modules:
@@ -118,7 +117,6 @@ executable keelungc
       Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
       AggregateSignature.Program
@@ -204,7 +202,6 @@ test-suite keelung-test
       Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
       AggregateSignature.Program

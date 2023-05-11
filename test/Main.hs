@@ -6,15 +6,12 @@ import Basic qualified
 -- import Control.Arrow (ArrowChoice (right), left)
 
 import Control.Arrow (ArrowChoice (..))
-import Data.Sequence qualified as Seq
 import Keelung
 import Keelung.Compiler
 import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.Relocated (cadd)
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Syntax.Counters
 import Test.Hspec
 import Test.Interpreter qualified as Interpreter
 import Test.Interpreter.Util (gf181Info)
@@ -44,22 +41,6 @@ main = hspec $ do
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))
     it "instance Eq 2" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither (-42) [(1, -1)] :: Either GF181 (Poly GF181))
-
-  describe "Constraint Generation" $ do
-    it "assertToBe42" $
-      let cs =
-            RelocatedConstraintSystem
-              { csField = gf181Info,
-                csUseNewOptimizer = False,
-                csConstraints =
-                  Seq.fromList $
-                    cadd (-42 :: GF181) [(0, 1)],
-                csBinReps = [],
-                csCounters = addCount OfPublicInput OfField 1 mempty,
-                csDivMods = [],
-                csModInvs = []
-              }
-       in Compiler.compileWithoutConstProp gf181Info Basic.assertToBe42 `shouldBe` Right cs
 
   describe "Keelung `compile`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
