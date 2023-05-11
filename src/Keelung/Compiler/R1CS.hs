@@ -12,7 +12,6 @@ import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Relocated hiding (numberOfConstraints)
@@ -22,27 +21,6 @@ import Keelung.Constraint.R1C qualified as R1C
 import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
 import Keelung.Field (N (..))
 import Keelung.Syntax
-
--- | Starting from an initial partial assignment, solve the
--- constraints and return the resulting complete assignment.
--- Return `Left String` if the constraints are unsolvable.
--- generateWitness ::
---   (GaloisField n, Integral n) =>
---   -- | Constraints to be solved
---   RelocatedConstraintSystem n ->
---   -- | Initial assignment
---   Witness n ->
---   -- | Resulting assignment
---   Either (ExecError n) (Witness n)
--- generateWitness cs initWit =
---   let cs' = renumberConstraints cs
---       variables = [0 .. getTotalCount (csCounters cs) - 1]
---       (witness, _) = optimizeWithWitness initWit cs'
---    in if all (isMapped witness) variables
---         then Right witness
---         else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
---   where
---     isMapped witness var = IntMap.member var witness
 
 --------------------------------------------------------------------------------
 
@@ -60,7 +38,8 @@ satisfyR1CS witness r1cs =
 toR1CS :: GaloisField n => RelocatedConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
-    { r1csField = csField cs,
+    { 
+      r1csField = csField cs,
       r1csConstraints = rights convertedConstratins,
       r1csBinReps = csBinReps cs,
       r1csCounters = csCounters cs,
@@ -82,26 +61,26 @@ toR1CS cs =
       Right $ R1C (Right aX) (Right bX) cX
     toR1C (CNEq x) = Left x
 
-fromR1CS :: GaloisField n => R1CS n -> RelocatedConstraintSystem n
-fromR1CS r1cs =
-  RelocatedConstraintSystem
-    { csField = r1csField r1cs,
-      csUseNewOptimizer = False,
-      csConstraints =
-        Seq.fromList (map fromR1C (r1csConstraints r1cs))
-          <> Seq.fromList (map CNEq (r1csCNEQs r1cs)),
-      csBinReps = r1csBinReps r1cs,
-      csCounters = r1csCounters r1cs,
-      csDivMods = r1csDivMods r1cs,
-      csModInvs = r1csModInvs r1cs
-    }
-  where
-    fromR1C (R1C aX bX cX) =
-      case (aX, bX, cX) of
-        (Left 1, Right xs, Left 0) -> CAdd xs
-        (Right xs, Left 1, Left 0) -> CAdd xs
-        (Right xs, Right ys, _) -> CMul xs ys cX
-        _ -> error "fromR1C: invalid R1C"
+-- fromR1CS :: GaloisField n => R1CS n -> RelocatedConstraintSystem n
+-- fromR1CS r1cs =
+--   RelocatedConstraintSystem
+--     { csField = r1csField r1cs,
+--       csUseNewOptimizer = False,
+--       csConstraints =
+--         Seq.fromList (map fromR1C (r1csConstraints r1cs))
+--           <> Seq.fromList (map CNEq (r1csCNEQs r1cs)),
+--       csBinReps = r1csBinReps r1cs,
+--       csCounters = r1csCounters r1cs,
+--       csDivMods = r1csDivMods r1cs,
+--       csModInvs = r1csModInvs r1cs
+--     }
+--   where
+--     fromR1C (R1C aX bX cX) =
+--       case (aX, bX, cX) of
+--         (Left 1, Right xs, Left 0) -> CAdd xs
+--         (Right xs, Left 1, Left 0) -> CAdd xs
+--         (Right xs, Right ys, _) -> CMul xs ys cX
+--         _ -> error "fromR1C: invalid R1C"
 
 -- | Computes an assignment for a R1CS with given inputs
 -- witnessOfR1CS :: (GaloisField n, Integral n) => Inputs n -> R1CS n -> Either (ExecError n) (Witness n)

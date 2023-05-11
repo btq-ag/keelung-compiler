@@ -18,7 +18,7 @@ sbox f p r = mapI go
     go 0 = fullSBox
     go _ = if r < f `div` 2 || r >= f `div` 2 + p then fullSBox else id
     -- Full S-box of x⁵
-    fullSBox x = x * x * x * x * x
+    fullSBox x = x `pow` 5
 
 -- | "MixLayer"
 mix :: Vector (Vector Field) -> [Field] -> [Field]

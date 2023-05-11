@@ -85,6 +85,7 @@ convertExprF expr = case expr of
   T.AddF x y -> chainExprsOfAssocOpAddF <$> convertExprF x <*> convertExprF y
   T.SubF x y -> SubF <$> convertExprF x <*> convertExprF y
   T.MulF x y -> MulF <$> convertExprF x <*> convertExprF y
+  T.ExpF x n -> ExpF <$> convertExprF x <*> pure n
   T.DivF x y -> DivF <$> convertExprF x <*> convertExprF y
   T.IfF p x y -> IfF <$> convertExprB p <*> convertExprF x <*> convertExprF y
   T.BtoF x -> BtoF <$> convertExprB x

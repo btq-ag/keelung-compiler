@@ -444,6 +444,12 @@ compileExprF out expr = case expr of
     x' <- wireF x
     y' <- wireF y
     add $ cMulSimpleF (F x') (F y') (F out)
+  ExpF x n -> do
+    base <- wireF x
+    result <- compileFastExp base (Right 1) n
+    case result of
+      Left var -> add $ cVarEqF out var
+      Right val -> add $ cVarBindF (F out) val
   DivF x y -> do
     x' <- wireF x
     y' <- wireF y
@@ -1268,3 +1274,28 @@ compileLTEUConstVarPrim (Right True) (True, y) = return $ Left y
 compileLTEUConstVarPrim (Right True) (False, _) = return $ Right True
 compileLTEUConstVarPrim (Right False) (True, _) = return $ Right False
 compileLTEUConstVarPrim (Right False) (False, y) = return $ Left y
+
+computeMul :: (GaloisField n, Integral n) => Either RefF n -> Either RefF n -> M n (Either RefF n)
+computeMul (Left x) (Left y) = do
+  out <- freshRefF
+  add $ cMulSimpleF (F x) (F y) (F out)
+  return $ Left out
+computeMul (Left x) (Right y) = do
+  out <- freshRefF
+  add $ cAddF 0 [(F x, fromIntegral y), (F out, -1)]
+  return $ Left out
+computeMul (Right x) (Left y) = computeMul (Left y) (Right x)
+computeMul (Right x) (Right y) = return $ Right (x * y)
+
+-- | Fast exponentiation on field
+compileFastExp :: (GaloisField n, Integral n) => RefF -> Either RefF n -> Integer -> M n (Either RefF n)
+compileFastExp _ acc 0 = return acc
+compileFastExp base acc e =
+  let (q, r) = e `divMod` 2
+   in if r == 1
+        then do
+          result <- compileFastExp base acc (e - 1)
+          computeMul result (Left base)
+        else do
+          result <- compileFastExp base acc q
+          computeMul result result

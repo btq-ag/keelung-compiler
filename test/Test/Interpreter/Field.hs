@@ -64,3 +64,12 @@ tests = describe "Field" $ do
     property $ \x -> do
       let expectedOutput = if x == 3 then [4] else [5]
       runAll gf181Info program [x :: GF181] [] expectedOutput
+
+  it "exponentiation" $ do
+    let program = do
+          x <- inputField Public
+          return (x `pow` 5)
+    property $ \x -> do
+      let expectedOutput = [x ^ (5 :: Int)]
+      runAll gf181Info program [x :: GF181] [] expectedOutput
+

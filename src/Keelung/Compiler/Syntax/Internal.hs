@@ -56,6 +56,7 @@ data ExprF n
     SubF (ExprF n) (ExprF n)
   | AddF (ExprF n) (ExprF n) (Seq (ExprF n))
   | MulF (ExprF n) (ExprF n)
+  | ExpF (ExprF n) Integer
   | DivF (ExprF n) (ExprF n)
   | -- logical operators
 
@@ -74,7 +75,7 @@ instance (Show n, Integral n) => Show (ExprF n) where
     SubF x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddF x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
     MulF x y -> chain prec " * " 7 $ x :<| y :<| Empty
-    -- MMIF x p -> showString "modInv " . showsPrec prec x . showString " " . shows p
+    ExpF x n -> showParen (prec > 7) $ showsPrec 8 x . showString " ^ " . showsPrec 8 n
     DivF x y -> chain prec " / " 7 $ x :<| y :<| Empty
     IfF p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     BtoF x -> showString "B→F " . showsPrec prec x

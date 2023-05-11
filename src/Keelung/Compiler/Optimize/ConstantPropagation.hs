@@ -81,6 +81,7 @@ propagateExprF e = do
     SubF x y -> SubF <$> propagateExprF x <*> propagateExprF y
     AddF x y xs -> AddF <$> propagateExprF x <*> propagateExprF y <*> mapM propagateExprF xs
     MulF x y -> MulF <$> propagateExprF x <*> propagateExprF y
+    ExpF x n -> ExpF <$> propagateExprF x <*> pure n
     DivF x y -> DivF <$> propagateExprF x <*> propagateExprF y
     IfF p x y -> IfF <$> propagateExprB p <*> propagateExprF x <*> propagateExprF y
     BtoF x -> BtoF <$> propagateExprB x

@@ -256,6 +256,7 @@ instance (GaloisField n, Integral n) => Interpret Field n where
     AddF x y -> zipWith (+) <$> interpret x <*> interpret y
     SubF x y -> zipWith (-) <$> interpret x <*> interpret y
     MulF x y -> zipWith (*) <$> interpret x <*> interpret y
+    ExpF x n -> map (^ n) <$> interpret x
     DivF x y -> zipWith (/) <$> interpret x <*> interpret y
     IfF p x y -> do
       p' <- interpret p
@@ -392,6 +393,7 @@ instance FreeVar Field where
     AddF x y -> freeVars x <> freeVars y
     SubF x y -> freeVars x <> freeVars y
     MulF x y -> freeVars x <> freeVars y
+    ExpF x _ -> freeVars x
     DivF x y -> freeVars x <> freeVars y
     IfF p x y -> freeVars p <> freeVars x <> freeVars y
     BtoF x -> freeVars x

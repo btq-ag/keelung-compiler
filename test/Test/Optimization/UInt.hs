@@ -1,16 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Test.Optimization.UInt (tests, run, debug, execute, shouldHaveSize) where
+module Test.Optimization.UInt (tests, run) where
 
 import Keelung hiding (compileO0)
-import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), relocateConstraintSystem)
-import Keelung.Compiler.Optimize qualified as Optimizer
-import Keelung.Compiler.Relocated qualified as Relocated
-import Test.HUnit (assertFailure)
 import Test.Hspec
-import Test.Interpreter.Util (gf181Info)
+import Test.Optimization.Util (execute, shouldHaveSize)
+
 
 tests :: SpecWith ()
 tests = do
@@ -97,32 +93,5 @@ tests = do
         cs `shouldHaveSize` 19
         cs' `shouldHaveSize` 18
 
---------------------------------------------------------------------------------
-
--- | Returns the original and optimized constraint system
-execute :: Encode t => Comp t -> IO (ConstraintSystem (N GF181), ConstraintSystem (N GF181))
-execute program = do
-  cs <- case Compiler.compileO0 gf181Info program of
-    Left err -> assertFailure $ show err
-    Right result -> return result
-
-  case Optimizer.run cs of
-    Left err -> assertFailure $ show err
-    Right cs' -> do
-      -- var counters should remain the same
-      csCounters cs `shouldBe` csCounters cs'
-      return (cs, cs')
-
-shouldHaveSize :: ConstraintSystem (N GF181) -> Int -> IO ()
-shouldHaveSize cs expectedBeforeSize = do
-  -- compare the number of constraints
-  let actualBeforeSize = Relocated.numberOfConstraints (relocateConstraintSystem cs)
-  actualBeforeSize `shouldBe` expectedBeforeSize
-
 run :: IO ()
 run = hspec tests
-
-debug :: ConstraintSystem (N GF181) -> IO ()
-debug cs = do
-  print cs
-  print (relocateConstraintSystem cs)

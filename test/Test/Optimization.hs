@@ -12,7 +12,7 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
 import Test.Hspec
 import Test.Optimization.UInt qualified as Optimization.UInt
-import Test.Optimization.UInt (execute, shouldHaveSize)
+import Test.Optimization.Util (execute, shouldHaveSize)
 
 run :: IO ()
 run = hspec tests
@@ -27,8 +27,10 @@ tests = do
         xs <- inputList Public 1
         Poseidon.hash (toList xs)
 
-      cs `shouldHaveSize` 1537
-      cs' `shouldHaveSize` 694
+      -- cs before `pow`: 1537
+      cs `shouldHaveSize` 1105
+      -- cs' before `pow`: 552
+      cs' `shouldHaveSize` 552
 
       return ()
     describe "Field" $ do
