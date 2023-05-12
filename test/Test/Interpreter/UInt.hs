@@ -614,14 +614,13 @@ tests = do
       it "neq 4" $ do
         let program = do
               assert $ 3 `neq` (3 :: UInt 4)
-        throwAll'
+        throwAll
           gf181Info
           program
           []
           ([] :: [GF181])
           (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ (3 = 3)")
-          (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1)))
-          (CompileError (Compiler.ConflictingValuesF 0 1))
+          (CompileError (Compiler.ConflictingValuesB False True))
 
     describe "Bitwise" $ do
       it "rotate" $ do

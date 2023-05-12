@@ -55,22 +55,14 @@ goThroughEqs :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintS
 goThroughEqs cs =
   let relations = csFieldRelations cs
    in cs
-        { csNEqU =
+        { csEqs =
             Map.fromList
               $ mapMaybe
-                ( \(k, v) -> case substKey (substVarU relations) k of
+                ( \(k, v) -> case substKey (substVar relations) k of
                     Just k' -> Just (k', v)
                     Nothing -> Nothing
                 )
-              $ Map.toList (csNEqU cs), 
-          csNEqF =
-            Map.fromList
-              $ mapMaybe
-                ( \(k, v) -> case substKey (substVarF relations) k of
-                    Just k' -> Just (k', v)
-                    Nothing -> Nothing
-                )
-              $ Map.toList (csNEqF cs)
+              $ Map.toList (csEqs cs)
         }
   where
     substKey subst (x, Left y) = case subst x of
@@ -82,16 +74,10 @@ goThroughEqs cs =
       Left x' -> Just (x', Right y)
       Right _ -> Nothing
 
-    substVarU relations ref = case AllRelations.lookup (U ref) relations of
+    substVar relations ref = case AllRelations.lookup ref relations of
       AllRelations.Root -> Left ref
       AllRelations.Value val -> Right val
-      AllRelations.ChildOf 1 (U root) 0 -> Left root
-      AllRelations.ChildOf {} -> Left ref -- TODO: handle this case
-
-    substVarF relations ref = case AllRelations.lookup (F ref) relations of
-      AllRelations.Root -> Left ref
-      AllRelations.Value val -> Right val
-      AllRelations.ChildOf 1 (F root) 0 -> Left root
+      AllRelations.ChildOf 1 root 0 -> Left root
       AllRelations.ChildOf {} -> Left ref -- TODO: handle this case
 
 goThroughDivMods :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
