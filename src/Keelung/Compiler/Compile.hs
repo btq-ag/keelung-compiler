@@ -275,9 +275,12 @@ compileExprB out expr = case expr of
     compileIfB out p' x' y'
   NEqB x y -> compileExprB out (XorB x y)
   NEqF x y -> do
-    x' <- wireF x
-    y' <- wireF y
-    compileEqualityF False out x' y'
+    x' <- wireF' x
+    y' <- wireF' y
+    result <- eqF False x' y'
+    case result of
+      Left var -> addC $ cVarEqB out var
+      Right val -> addC $ cVarBindB out val
   NEqU x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -295,9 +298,12 @@ compileExprB out expr = case expr of
         (1, [(B y', -2)])
         (0, [(B out, 1), (B y', -1)])
   EqF x y -> do
-    x' <- wireF x
-    y' <- wireF y
-    compileEqualityF True out x' y'
+    x' <- wireF' x
+    y' <- wireF' y
+    result <- eqF True x' y'
+    case result of
+      Left var -> addC $ cVarEqB out var
+      Right val -> addC $ cVarBindB out val
   EqU x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -582,6 +588,10 @@ wireF expr = do
   compileExprF out expr
   return out
 
+wireF' :: (GaloisField n, Integral n) => ExprF n -> M n (Either RefF n)
+wireF' (ValF val) = return (Right val)
+wireF' others = Left <$> wireF others
+
 wireU :: (GaloisField n, Integral n) => ExprU n -> M n RefU
 wireU (VarU w ref) = return (RefUX w ref)
 wireU (VarUO w ref) = return (RefUO w ref)
@@ -643,94 +653,76 @@ compileEqualityU isEq out x y =
       --  keep track of the relation between (x - y) and m
       addEqHintU x (Left y) m
 
--- -- | Equalities are compiled with inequalities and inequalities with CNEQ constraints.
--- --    introduce a new variable m
--- --    if diff = 0 then m = 0 else m = recip diff
--- --    Equality:
--- --      (x - y) * m = 1 - out
--- --      (x - y) * out = 0
--- --    Inequality:
--- --      (x - y) * m = out
--- --      (x - y) * (1 - out) = 0
--- eqF :: (GaloisField n, Integral n) => Bool -> Either RefF n -> Either RefF n -> M n (Either RefB Bool)
--- eqF isEq (Right x) (Right y) = return $ Right $ if isEq then x == y else x /= y
--- eqF isEq (Right x) (Left y) = do
---       m <- freshRefF
---       out <- freshRefB
---       if isEq
---         then do
---           --  1. (x - y) * m = 1 - out
---           --  2. (x - y) * out = 0
---           addC $
---             cMulF
---               (x, [(F y, -1)])
---               (0, [(F m, 1)])
---               (1, [(B out, -1)])
---           addC $
---             cMulF
---               (x, [(F y, -1)])
---               (0, [(B out, 1)])
---               (0, [])
---         else do
---           --  1. (x - y) * m = out
---           --  2. (x - y) * (1 - out) = 0
---           addC $
---             cMulF
---               (x, [(F y, -1)])
---               (0, [(F m, 1)])
---               (0, [(B out, 1)])
---           addC $
---             cMulF
---               (x, [(F y, -1)])
---               (1, [(B out, -1)])
---               (0, [])
---       --  keep track of the relation between (x - y) and m
---       addC $ cNEqF x y m
---       return (Left out)
--- eqF isEq (Left x) (Right y) = eqF isEq (Right y) (Left x)
--- eqF isEq (Left x) (Left y) = _
-
-compileEqualityF :: (GaloisField n, Integral n) => Bool -> RefB -> RefF -> RefF -> M n ()
-compileEqualityF isEq out x y =
-  if x == y
+-- | Equalities are compiled with inequalities and inequalities with CNEQ constraints.
+--    introduce a new variable m
+--    if diff = 0 then m = 0 else m = recip diff
+--    Equality:
+--      (x - y) * m = 1 - out
+--      (x - y) * out = 0
+--    Inequality:
+--      (x - y) * m = out
+--      (x - y) * (1 - out) = 0
+eqF :: (GaloisField n, Integral n) => Bool -> Either RefF n -> Either RefF n -> M n (Either RefB Bool)
+eqF isEq (Right x) (Right y) = return $ Right $ if isEq then x == y else x /= y
+eqF isEq (Right x) (Left y) = do
+  m <- freshRefF
+  out <- freshRefB
+  if isEq
     then do
-      -- in this case, the variable x and y happend to be the same
-      compileExprB out (ValB isEq)
+      --  1. (x - y) * m = 1 - out
+      --  2. (x - y) * out = 0
+      writeMul
+          (x, [(F y, -1)])
+          (0, [(F m, 1)])
+          (1, [(B out, -1)])
+      writeMul
+          (x, [(F y, -1)])
+          (0, [(B out, 1)])
+          (0, [])
     else do
-      -- introduce a new variable m
-      -- if diff = 0 then m = 0 else m = recip diff
-      m <- freshRefF
-
-      if isEq
-        then do
-          --  1. (x - y) * m = 1 - out
-          --  2. (x - y) * out = 0
-          addC $
-            cMulF
-              (0, [(F x, 1), (F y, -1)])
-              (0, [(F m, 1)])
-              (1, [(B out, -1)])
-          addC $
-            cMulF
-              (0, [(F x, 1), (F y, -1)])
-              (0, [(B out, 1)])
-              (0, [])
-        else do
-          --  1. (x - y) * m = out
-          --  2. (x - y) * (1 - out) = 0
-          addC $
-            cMulF
-              (0, [(F x, 1), (F y, -1)])
-              (0, [(F m, 1)])
-              (0, [(B out, 1)])
-          addC $
-            cMulF
-              (0, [(F x, 1), (F y, -1)])
-              (1, [(B out, -1)])
-              (0, [])
-
-      --  keep track of the relation between (x - y) and m
-      addEqHintF x (Left y) m
+      --  1. (x - y) * m = out
+      --  2. (x - y) * (1 - out) = 0
+      writeMul
+          (x, [(F y, -1)])
+          (0, [(F m, 1)])
+          (0, [(B out, 1)])
+      writeMul
+          (x, [(F y, -1)])
+          (1, [(B out, -1)])
+          (0, [])
+  --  keep track of the relation between (x - y) and m
+  addEqHintF y (Right x) m
+  return (Left out)
+eqF isEq (Left x) (Right y) = eqF isEq (Right y) (Left x)
+eqF isEq (Left x) (Left y) = do
+  m <- freshRefF
+  out <- freshRefB
+  if isEq
+    then do
+      --  1. (x - y) * m = 1 - out
+      --  2. (x - y) * out = 0
+      writeMul
+          (0, [(F x, 1), (F y, -1)])
+          (0, [(F m, 1)])
+          (1, [(B out, -1)])
+      writeMul
+          (0, [(F x, 1), (F y, -1)])
+          (0, [(B out, 1)])
+          (0, [])
+    else do
+      --  1. (x - y) * m = out
+      --  2. (x - y) * (1 - out) = 0
+      writeMul
+          (0, [(F x, 1), (F y, -1)])
+          (0, [(F m, 1)])
+          (0, [(B out, 1)])
+      writeMul
+          (0, [(F x, 1), (F y, -1)])
+          (1, [(B out, -1)])
+          (0, [])
+  --  keep track of the relation between (x - y) and m
+  addEqHintF x (Left y) m
+  return (Left out)
 
 --------------------------------------------------------------------------------
 

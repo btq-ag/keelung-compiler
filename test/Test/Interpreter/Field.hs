@@ -1,5 +1,6 @@
 module Test.Interpreter.Field (tests, run) where
 
+import Control.Monad
 import Keelung hiding (compile)
 import Test.Hspec
 import Test.Interpreter.Util
@@ -47,28 +48,62 @@ tests = describe "Field" $ do
     forAll (vector 4) $ \xs -> do
       runAll gf181Info program (xs :: [GF181]) [] [sum xs]
 
-  it "eq 1" $ do
-    -- takes an input and see if its equal to 3
+  it "eq (variable / variable)" $ do
     let program = do
           x <- inputField Public
-          return $ x `eq` 3
-    property $ \x -> do
-      let expectedOutput = if x == 3 then [1] else [0]
-      runAll gf181Info program [x :: GF181] [] expectedOutput
+          y <- inputField Public
+          return $ x `eq` y
+    property $ \(x', y') -> do
+      let x = x' `mod` 4
+          y = y' `mod` 4
+      let expectedOutput = if x == y then [1] else [0]
+      runAll gf181Info program [x, y :: GF181] [] expectedOutput
 
-  it "conditional" $ do
-    let program = do
+  it "eq (variable / constant)" $ do
+    let program y = do
           x <- inputField Public
-          return $ cond (x `eq` 3) 4 (5 :: Field)
-    property $ \x -> do
-      let expectedOutput = if x == 3 then [4] else [5]
-      runAll gf181Info program [x :: GF181] [] expectedOutput
+          return $ x `eq` fromInteger y
+    property $ \(x', y') -> do
+      let x = x' `mod` 4
+          y = y' `mod` 4
+      let expectedOutput = if x == y then [1] else [0]
+      runAll gf181Info (program y) [fromInteger x :: GF181] [] expectedOutput
 
-  it "exponentiation" $ do
+  it "eq (constant / constant)" $ do
+    let program x y = do
+          return $ fromInteger x `eq` (fromInteger y :: Field)
+
+    property $ \(x', y') -> do
+      let x = x' `mod` 4
+          y = y' `mod` 4
+      let expectedOutput = if x == y then [1] else [0]
+      runAll gf181Info (program x y) ([] :: [GF181]) [] expectedOutput
+
+  it "conditional (variable)" $ do
     let program = do
-          x <- inputField Public
-          return (x `pow` 5)
-    property $ \x -> do
-      let expectedOutput = [x ^ (5 :: Int)]
-      runAll gf181Info program [x :: GF181] [] expectedOutput
+          x <- inputBool Public
+          y <- inputField Public
+          return $ cond x y (5 :: Field)
 
+    property $ \(x', y') -> do
+      let x = x' `mod` 4
+          y = y' `mod` 4
+      let expectedOutput = if (x `mod` 2) == 1 then [y] else [5]
+      runAll gf181Info program [x `mod` 2, y :: GF181] [] expectedOutput
+
+  it "exponentiation (variable base)" $ do
+    let program i = do
+          x <- inputField Public
+          return (x `pow` i)
+    property $ \(x, i) -> do
+      when (i >= 0) $ do
+        let expectedOutput = [x ^ (i :: Integer)]
+        runAll gf181Info (program i) [x :: GF181] [] expectedOutput
+
+  it "exponentiation (constant base)" $ do
+    let program x i = do
+          return (fromIntegral x `pow` i)
+    property $ \(x, i) -> do
+      when (i >= 0) $ do
+        let expectedOutput = [x ^ (i :: Integer)]
+        runAll gf181Info (program (x :: GF181) i) [] [] expectedOutput
