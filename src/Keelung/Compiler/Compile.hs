@@ -10,10 +10,11 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Bits qualified
-import Data.Field.Galois (GaloisField)
-import Data.Foldable (Foldable (foldl'), toList)
 -- import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 
+import Data.Either (partitionEithers)
+import Data.Field.Galois (GaloisField)
+import Data.Foldable (Foldable (foldl'), toList)
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Compile.Error qualified as Compile
@@ -223,38 +224,51 @@ compileExprB out expr = case expr of
   VarBI var -> addC $ cVarEqB out (RefBI var) -- out = var
   VarBP var -> addC $ cVarEqB out (RefBP var) -- out = var
   AndB x0 x1 xs -> do
-    a <- wireB x0
-    b <- wireB x1
-    vars <- mapM wireB xs
-    case vars of
-      Empty ->
-        addC $ cMulSimpleF (B a) (B b) (B out) -- out = a * b
-      (c :<| Empty) -> do
-        aAndb <- freshRefB
-        addC $ cMulSimpleF (B a) (B b) (B aAndb) -- aAndb = a * b
-        addC $ cMulSimpleF (B aAndb) (B c) (B out) -- out = aAndb * c
-      _ -> do
-        -- the number of operands
-        let n = 2 + fromIntegral (length vars)
-        -- polynomial = n - sum of operands
-        let polynomial = (n, (B a, -1) : (B b, -1) : [(B v, -1) | v <- toList vars])
-        -- if the answer is 1 then all operands must be 1
-        --    (n - sum of operands) * out = 0
-        addC $
-          cMulF
-            polynomial
-            (0, [(B out, 1)])
-            (0, [])
-        -- if the answer is 0 then not all operands must be 1:
-        --    (n - sum of operands) * inv = 1 - out
-        inv <- freshRefB
-        addC $
-          cMulF
-            polynomial
-            (0, [(B inv, 1)])
-            (1, [(B out, -1)])
+    x0' <- wireB' x0
+    x1' <- wireB' x1
+    xs' <- mapM wireB' xs
+    result <- andBs x0' x1' xs'
+    case result of
+      Left var -> addC $ cVarEqB out var
+      Right val -> addC $ cVarBindB out val
+    -- a <- wireB x0
+    -- b <- wireB x1
+    -- vars <- mapM wireB xs
+    -- case vars of
+    --   Empty ->
+    --     addC $ cMulSimpleF (B a) (B b) (B out) -- out = a * b
+    --   (c :<| Empty) -> do
+    --     aAndb <- freshRefB
+    --     addC $ cMulSimpleF (B a) (B b) (B aAndb) -- aAndb = a * b
+    --     addC $ cMulSimpleF (B aAndb) (B c) (B out) -- out = aAndb * c
+    --   _ -> do
+    --     -- the number of operands
+    --     let n = 2 + fromIntegral (length vars)
+    --     -- polynomial = n - sum of operands
+    --     let polynomial = (n, (B a, -1) : (B b, -1) : [(B v, -1) | v <- toList vars])
+    --     -- if the answer is 1 then all operands must be 1
+    --     --    (n - sum of operands) * out = 0
+    --     addC $
+    --       cMulF
+    --         polynomial
+    --         (0, [(B out, 1)])
+    --         (0, [])
+    --     -- if the answer is 0 then not all operands must be 1:
+    --     --    (n - sum of operands) * inv = 1 - out
+    --     inv <- freshRefB
+    --     addC $
+    --       cMulF
+    --         polynomial
+    --         (0, [(B inv, 1)])
+    --         (1, [(B out, -1)])
   OrB x0 x1 xs -> do
-    compileOrBs out x0 x1 xs
+    x0' <- wireB' x0
+    x1' <- wireB' x1
+    xs' <- mapM wireB' xs
+    result <- orBs x0' x1' xs'
+    case result of
+      Left var -> addC $ cVarEqB out var
+      Right val -> addC $ cVarBindB out val
   XorB x y -> do
     x' <- wireB' x
     y' <- wireB' y
@@ -810,41 +824,59 @@ compileOrBs out x0 x1 xs = do
             )
         )
 
--- orBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
--- orBs (Right True) _ _ = return $ Right True
--- orBs _ (Right True) _ = return $ Right True
--- orBs (Right False) x Empty = return x
--- orBs (Right False) x0 (x1 :<| xs) = orBs x0 x1 xs
--- orBs (Left x) (Right False) Empty = return $ Left x
--- orBs (Left x0) (Right False) (x1 :<| xs) = orBs (Left x0) x1 xs
--- orBs (Left x0) (Left x1) Empty = do
---   -- two operands only
---   -- (1 - x) * y = (out - x)
---   out <- freshRefB
---   writeMul
---     (1, [(B x0, -1)])
---     (0, [(B x1, 1)])
---     (0, [(B x0, -1), (B out, 1)])
---   return $ Left out
--- orBs (Left x0) (Left x1) (x2 :<| xs) = do
---   -- more than 2 operands, rewrite it as an inequality instead:
---   --      if all operands are 0           then 0 else 1
---   --  =>  if the sum of operands is 0     then 0 else 1
---   --  =>  if the sum of operands is not 0 then 1 else 0
---   --  =>  the sum of operands is not 0
---   out <- freshRefB
--- compileEqualityF False out (ValF 0) y'
--- compileExprB
---   out
---   ( NEqF
---       (ValF 0)
---       ( AddF
---           (BtoF x0)
---           (BtoF x1)
---           (fmap BtoF xs)
---       )
---   )
--- return $ Left out
+fromB :: Num n => Either RefB Bool -> Either Ref n
+fromB (Right True) = Right 1
+fromB (Right False) = Right 0
+fromB (Left x) = Left $ B x
+
+andBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
+andBs (Right False) _ _ = return $ Right False
+andBs _ (Right False) _ = return $ Right False
+andBs (Right True) x Empty = return x
+andBs (Right True) x0 (x1 :<| xs) = andBs x0 x1 xs
+andBs (Left x) (Right True) Empty = return $ Left x
+andBs (Left x0) (Right True) (x1 :<| xs) = andBs (Left x0) x1 xs
+andBs (Left x0) (Left x1) Empty = do
+  -- 2 operands only
+  -- x * y = out
+  out <- freshRefB
+  writeMul
+    (0, [(B x0, 1)])
+    (0, [(B x1, 1)])
+    (0, [(B out, 1)])
+  return $ Left out
+andBs (Left x0) (Left x1) (x2 :<| xs) = do
+  -- more than 2 operands, rewrite it as an equality instead:
+  --      if all operands are 1           then 1 else 0
+  --  =>  if the sum of operands is N     then 1 else 0
+  --  =>  the sum of operands is N
+  sumOfOperands <- add ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
+  eqFU True (Right (fromIntegral (3 + length xs))) sumOfOperands
+
+orBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
+orBs (Right True) _ _ = return $ Right True
+orBs _ (Right True) _ = return $ Right True
+orBs (Right False) x Empty = return x
+orBs (Right False) x0 (x1 :<| xs) = orBs x0 x1 xs
+orBs (Left x) (Right False) Empty = return $ Left x
+orBs (Left x0) (Right False) (x1 :<| xs) = orBs (Left x0) x1 xs
+orBs (Left x0) (Left x1) Empty = do
+  -- 2 operands only
+  -- (1 - x) * y = (out - x)
+  out <- freshRefB
+  writeMul
+    (1, [(B x0, -1)])
+    (0, [(B x1, 1)])
+    (0, [(B x0, -1), (B out, 1)])
+  return $ Left out
+orBs (Left x0) (Left x1) (x2 :<| xs) = do
+  -- more than 2 operands, rewrite it as an inequality instead:
+  --      if all operands are 0           then 0 else 1
+  --  =>  if the sum of operands is 0     then 0 else 1
+  --  =>  if the sum of operands is not 0 then 1 else 0
+  --  =>  the sum of operands is not 0
+  sumOfOperands <- add ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
+  eqFU False (Right 0) sumOfOperands
 
 xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 xorB (Right True) (Right True) = return $ Right False
@@ -1179,6 +1211,29 @@ compileLTEUConstVarPrim (Right False) (False, y) = return $ Left y
 --   return $ Left (F out)
 -- add (Right x) (Left y) = add (Left y) (Right x)
 -- add (Right x) (Right y) = return $ Right (x + y)
+
+-- | Compute the addition of two variables
+add :: (GaloisField n, Integral n) => Either Ref n -> Either Ref n -> Seq (Either Ref n) -> M n (Either Ref n)
+add x0 x1 xs = do
+  out <- freshRefF
+  let (variables, constants) = partitionEithers (x0 : x1 : toList xs)
+  addC $ cAddF (sum constants) $ (F out, -1) : [(x, 1) | x <- variables]
+  return $ Left (F out)
+
+-- add (Left x) (Left y) Empty = do
+--   out <- freshRefF
+--   addC $ cAddF 0 [(x, 1), (y, 1), (F out, -1)]
+--   return $ Left (F out)
+-- add (Left x) (Left y) (z :<| xs) = _
+-- add (Left x) (Right y) Empty = do
+--   out <- freshRefF
+--   addC $ cAddF y [(x, 1), (F out, -1)]
+--   return $ Left (F out)
+-- add (Left x) (Right y) (z :<| xs) = _
+-- add (Right x) (Left y) Empty = add (Left y) (Right x) Empty
+-- add (Right x) (Left y) (z :<| xs) = _
+-- add (Right x) (Right y) Empty = return $ Right (x + y)
+-- add (Right x) (Right y) (z :<| xs) = _
 
 -- | Compute the multiplication of two variables
 mul :: (GaloisField n, Integral n) => Either Ref n -> Either Ref n -> M n (Either Ref n)

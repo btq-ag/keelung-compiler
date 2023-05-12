@@ -1,13 +1,43 @@
 module Test.Interpreter.Boolean (tests, run) where
 
+import Data.Bits qualified
 import Keelung hiding (compile)
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
-import qualified Data.Bits
 
 run :: IO ()
 run = hspec tests
+
+toGF181 :: Bool -> GF181
+toGF181 True = 1
+toGF181 False = 0
+
+makeProgram :: (Boolean -> Boolean -> Boolean) -> Int -> Boolean -> Boolean -> [Boolean] -> Comp Boolean
+makeProgram op mode a b cs = case mode `mod` 4 of
+  0 -> do
+    x <- inputBool Public
+    y <- inputBool Public
+    return $ foldl op (x `op` y) cs
+  1 -> do
+    y <- inputBool Public
+    return $ foldl op (a `op` y) cs
+  2 -> do
+    x <- inputBool Public
+    return $ foldl op (x `op` b) cs
+  _ -> do
+    return $ foldl op (a `op` b) cs
+
+testProgram :: (Bool -> Bool -> Bool) -> (Boolean -> Boolean -> Boolean) -> Property
+testProgram opH opK = do
+  property $ \(mode, a, b, cs) -> do
+    let expectedOutput = [toGF181 (foldl opH (a `opH` b) cs)]
+    let inputs = case mode `mod` 4 of
+          0 -> [toGF181 a, toGF181 b]
+          1 -> [toGF181 b]
+          2 -> [toGF181 a]
+          _ -> []
+    runAll gf181Info (makeProgram opK (mode `mod` 4 :: Int) (Boolean a) (Boolean b) (map Boolean cs)) inputs ([] :: [GF181]) expectedOutput
 
 tests :: SpecWith ()
 tests = describe "Boolean" $ do
@@ -20,44 +50,9 @@ tests = describe "Boolean" $ do
     runAll gf181Info program [0] [] [1 :: GF181]
     runAll gf181Info program [1] [] [0 :: GF181]
 
-  it "and 1" $ do
-    let program = return $ true `And` false
-    runAll gf181Info program [] [] [0 :: GF181]
-
-  it "and 2" $ do
-    let program = And <$> input Public <*> input Private
-    runAll gf181Info program [1] [0] [0 :: GF181]
-    runAll gf181Info program [1] [1] [1 :: GF181]
-    runAll gf181Info program [0] [1] [0 :: GF181]
-    runAll gf181Info program [1] [1] [1 :: GF181]
-
-  it "or 1" $ do
-    let program = return $ true `Or` false
-    runAll gf181Info program [] [] [1 :: GF181]
-
-  it "or 2" $ do
-    let program = Or true <$> input Private
-    runAll gf181Info program [] [0] [1 :: GF181]
-    runAll gf181Info program [] [1] [1 :: GF181]
-
-  it "xor 1" $ do
-    let program = return $ true `Xor` false
-    runAll gf181Info program [] [] [1 :: GF181]
-
-  it "xor 2" $ do
-    let program = Xor <$> input Public <*> return true
-    runAll gf181Info program [0] [] [1 :: GF181]
-    runAll gf181Info program [1] [] [0 :: GF181]
-
-  it "xor" $ do
-    let program = do
-          x <- inputBool Public
-          y <- inputBool Public
-          return $ x .^. y
-    let genPair = (,) <$> choose (0, 1) <*> choose (0, 1)
-    forAll genPair $ \(x, y) -> do
-      let expectedOutput = [fromIntegral $ x `Data.Bits.xor` (y :: Int)]
-      runAll gf181Info program [fromIntegral x, fromIntegral y :: GF181] [] expectedOutput
+  it "and" $ testProgram (&&) And
+  it "or" $ testProgram (||) Or
+  it "xor" $ testProgram Data.Bits.xor Xor
 
   it "mixed 1" $ do
     let program = do

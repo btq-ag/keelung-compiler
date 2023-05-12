@@ -12,7 +12,7 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
 import Test.Hspec
 import Test.Optimization.UInt qualified as Optimization.UInt
-import Test.Optimization.Util (execute, shouldHaveSize)
+import Test.Optimization.Util
 
 run :: IO ()
 run = hspec tests
@@ -105,7 +105,7 @@ tests = do
           x <- inputBool Public
           y <- reuse x
           return (x .|. y)
-        cs `shouldHaveSize` 4
+        cs `shouldHaveSize` 5
         cs' `shouldHaveSize` 3
 
       it "Boolean 2" $ do
