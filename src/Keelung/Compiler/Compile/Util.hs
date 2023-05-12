@@ -6,7 +6,6 @@ import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
-import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Compile.Relations.Field (AllRelations)
@@ -58,28 +57,6 @@ freshRefU width = do
 
 --------------------------------------------------------------------------------
 
-compileExpr ::
-  (GaloisField n, Integral n) =>
-  (RefF -> ExprF n -> M n ()) ->
-  (RefB -> ExprB n -> M n ()) ->
-  (RefU -> ExprU n -> M n ()) ->
-  Expr n ->
-  M n (Either Ref n)
-compileExpr compileExprF _ _ (ExprF expr) = do
-  out <- freshRefF
-  compileExprF out expr
-  return $ Left (F out)
-compileExpr _ compileExprB _ (ExprB expr) = do
-  out <- freshRefB
-  compileExprB out expr
-  return $ Left (B out)
-compileExpr _ _ compileExprU (ExprU expr) = do
-  out <- freshRefU (widthOf expr)
-  compileExprU out expr
-  return $ Left (U out)
-
---------------------------------------------------------------------------------
-
 -- | Compile a linear combination of expressions into a polynomial
 toPoly :: (GaloisField n, Integral n) => (Expr n -> M n (Either Ref n)) -> (n, [(Expr n, n)]) -> M n (Either n (PolyG Ref n))
 toPoly compile (c, xs) = do
@@ -92,44 +69,36 @@ toPoly compile (c, xs) = do
         Left variable -> return $ Right (variable, coeff)
         Right constant -> return $ Left (constant * coeff)
 
-writeMul :: (GaloisField n, Integral n) => (Expr n -> M n (Either Ref n)) -> (n, [(Expr n, n)]) -> (n, [(Expr n, n)]) -> (n, [(Expr n, n)]) -> M n ()
-writeMul compile as bs cs = do
-  as' <- toPoly compile as
-  bs' <- toPoly compile bs
-  cs' <- toPoly compile cs
-  go as' bs' cs'
-  where
-    go as' bs' cs' = case (as', bs', cs') of
-      (Left _, Left _, Left _) -> return ()
-      (Left x, Left y, Right zs) ->
-        -- z - x * y = 0
-        addC [CAddF $ PolyG.addConstant (-x * y) zs]
-      (Left x, Right ys, Left z) ->
-        -- x * ys = z
-        -- x * ys - z = 0
-        case PolyG.multiplyBy x ys of
-          Left _ -> return ()
-          Right poly -> addC [CAddF $ PolyG.addConstant (-z) poly]
-      (Left x, Right ys, Right zs) -> do
-        -- x * ys = zs
-        -- x * ys - zs = 0
-        case PolyG.multiplyBy x ys of
-          Left c ->
-            -- c - zs = 0
-            addC [CAddF $ PolyG.addConstant (-c) zs]
-          Right ys' -> case PolyG.merge ys' (PolyG.negate zs) of
-            Left _ -> return ()
-            Right poly -> addC [CAddF poly]
-      (Right xs, Left y, Left z) -> go (Left y) (Right xs) (Left z)
-      (Right xs, Left y, Right zs) -> go (Left y) (Right xs) (Right zs)
-      (Right xs, Right ys, _) -> addC [CMulF xs ys cs']
+writeMulWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> Either n (PolyG Ref n) -> Either n (PolyG Ref n) -> M n ()
+writeMulWithPoly as bs cs = case (as, bs, cs) of
+  (Left _, Left _, Left _) -> return ()
+  (Left x, Left y, Right zs) ->
+    -- z - x * y = 0
+    addC [CAddF $ PolyG.addConstant (-x * y) zs]
+  (Left x, Right ys, Left z) ->
+    -- x * ys = z
+    -- x * ys - z = 0
+    case PolyG.multiplyBy x ys of
+      Left _ -> return ()
+      Right poly -> addC [CAddF $ PolyG.addConstant (-z) poly]
+  (Left x, Right ys, Right zs) -> do
+    -- x * ys = zs
+    -- x * ys - zs = 0
+    case PolyG.multiplyBy x ys of
+      Left c ->
+        -- c - zs = 0
+        addC [CAddF $ PolyG.addConstant (-c) zs]
+      Right ys' -> case PolyG.merge ys' (PolyG.negate zs) of
+        Left _ -> return ()
+        Right poly -> addC [CAddF poly]
+  (Right xs, Left y, Left z) -> writeMulWithPoly (Left y) (Right xs) (Left z)
+  (Right xs, Left y, Right zs) -> writeMulWithPoly (Left y) (Right xs) (Right zs)
+  (Right xs, Right ys, _) -> addC [CMulF xs ys cs]
 
-writeAdd :: (GaloisField n, Integral n) => (Expr n -> M n (Either Ref n)) -> (n, [(Expr n, n)]) -> M n ()
-writeAdd compile xs = do
-  result <- toPoly compile xs
-  case result of
-    Left _ -> return ()
-    Right poly -> addC [CAddF poly]
+writeAddWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> M n ()
+writeAddWithPoly xs = case xs of
+  Left _ -> return ()
+  Right poly -> addC [CAddF poly]
 
 addC :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 addC = mapM_ addOne
@@ -182,13 +151,16 @@ addC = mapM_ addOne
     addOne (CNEqF x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y, m]) $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
     addOne (CNEqU x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y]) $ addOccurrences (Set.singleton m) $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
 
---     addC $ cMulF (a, zip xs' (repeat (-1))) (b, zip ys' (repeat (-1))) (c, zip zs' (repeat 1))
+--------------------------------------------------------------------------------
 
---     where
---       convert :: (GaloisField n, Integral n) =>  (n, [(Expr n, n)]) -> Either n (PolyG Ref n)
+writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
+writeMul as bs cs = writeMulWithPoly (uncurry PolyG.build as) (uncurry PolyG.build bs) (uncurry PolyG.build cs)
 
--- case ( do
---                                          xs' <- PolyG.build a xs
---                                          ys' <- PolyG.build b ys
---                                          return $ CMulF xs' ys' (PolyG.build c zs)
---                                      ) of
+writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
+writeAdd c as = writeAddWithPoly (PolyG.build c as)
+
+writeEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
+writeEqB a b = addC [CVarEqB a b]
+
+writeNEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
+writeNEqB a b = addC [CVarNEqB a b]
