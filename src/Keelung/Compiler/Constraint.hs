@@ -28,14 +28,11 @@ module Keelung.Compiler.Constraint
     cVarBindU,
     cMulF,
     cMulSimpleF,
-    cNEqF,
-    cNEqU,
     -- cRotateU,
     fromConstraint,
   )
 where
 
-import Control.Arrow (left)
 import Control.DeepSeq (NFData)
 import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
@@ -84,8 +81,6 @@ fromConstraint counters (CMulF as bs cs) =
         Left n -> Left n
         Right xs -> fromPoly counters xs
     )
-fromConstraint counters (CNEqF x y m) = Relocated.CNEq (reindexRefF counters x) (left (reindexRefF counters) y) (reindexRefF counters m)
-fromConstraint counters (CNEqU x y m) = Relocated.CNEq (reindexRefU counters x) (left (reindexRefU counters) y) (reindexRefF counters m)
 
 --------------------------------------------------------------------------------
 
@@ -255,8 +250,6 @@ data Constraint n
   | CVarBindB RefB Bool -- when x = val
   | CVarBindU RefU n -- when x = val
   | CMulF !(PolyG Ref n) !(PolyG Ref n) !(Either n (PolyG Ref n))
-  | CNEqF RefF (Either RefF n) RefF
-  | CNEqU RefU (Either RefU n) RefF
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -267,14 +260,6 @@ instance GaloisField n => Eq (Constraint n) where
     (CVarBindF x y, CVarBindF u v) -> x == u && y == v
     (CMulF x y z, CMulF u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
-    (CNEqF x (Left y) z, CNEqF u (Left v) w) ->
-      (x == u && y == v || x == v && y == u) && z == w
-    (CNEqF x (Right y) z, CNEqF u (Right v) w) ->
-      x == u && y == v && z == w
-    (CNEqU x (Left y) z, CNEqU u (Left v) w) ->
-      (x == u && y == v || x == v && y == u) && z == w
-    (CNEqU x (Right y) z, CNEqU u (Right v) w) ->
-      x == u && y == v && z == w
     _ -> False
 
 instance Functor Constraint where
@@ -289,8 +274,6 @@ instance Functor Constraint where
   fmap f (CVarBindU x y) = CVarBindU x (f y)
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
-  fmap f (CNEqF x y z) = CNEqF x (fmap f y) z
-  fmap f (CNEqU x y z) = CNEqU x (fmap f y) z
 
 -- | Smart constructor for the CAddF constraint
 cAddF :: GaloisField n => n -> [(Ref, n)] -> [Constraint n]
@@ -355,12 +338,12 @@ cMulF (a, xs) (b, ys) (c, zs) = case ( do
   Left _ -> []
   Right result -> [result]
 
--- | Smart constructor for the CNEq constraint
-cNEqF :: GaloisField n => RefF -> Either RefF n -> RefF -> [Constraint n]
-cNEqF x y m = [CNEqF x y m]
+-- -- | Smart constructor for the CNEq constraint
+-- cNEqF :: GaloisField n => RefF -> Either RefF n -> RefF -> [Constraint n]
+-- cNEqF x y m = [CNEqF x y m]
 
-cNEqU :: GaloisField n => RefU -> Either RefU n -> RefF -> [Constraint n]
-cNEqU x y m = [CNEqU x y m]
+-- cNEqU :: GaloisField n => RefU -> Either RefU n -> RefF -> [Constraint n]
+-- cNEqU x y m = [CNEqU x y m]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddF xs) = "AF " <> show xs <> " = 0"
@@ -373,5 +356,3 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CVarBindB x n) = "BB " <> show x <> " = " <> show n
   show (CVarBindU x n) = "BU " <> show x <> " = " <> show n
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
-  show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
-  show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m

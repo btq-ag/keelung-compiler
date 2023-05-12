@@ -5,7 +5,6 @@
 module Keelung.Compiler.R1CS where
 
 import Control.DeepSeq (NFData)
-import Data.Either (lefts, rights)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.IntMap (IntMap)
@@ -39,55 +38,17 @@ toR1CS :: GaloisField n => RelocatedConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
     { r1csField = csField cs,
-      r1csConstraints = rights convertedConstratins,
+      r1csConstraints = map toR1C (toList (csConstraints cs)),
       r1csBinReps = csBinReps cs,
       r1csCounters = csCounters cs,
-      r1csEqs = lefts convertedConstratins,
+      r1csEqs = csEqs cs,
       r1csDivMods = csDivMods cs,
       r1csModInvs = csModInvs cs
     }
   where
-    convertedConstratins = map toR1C (toList (csConstraints cs))
-
-    toR1C :: GaloisField n => Constraint n -> Either (Var, Either Var n, Var) (R1C n)
-    toR1C (CAdd xs) =
-      Right $
-        R1C
-          (Left 1)
-          (Right xs)
-          (Left 0)
-    toR1C (CMul aX bX cX) =
-      Right $ R1C (Right aX) (Right bX) cX
-    toR1C (CNEq x y m) = Left (x, y, m)
-
--- fromR1CS :: GaloisField n => R1CS n -> RelocatedConstraintSystem n
--- fromR1CS r1cs =
---   RelocatedConstraintSystem
---     { csField = r1csField r1cs,
---       csUseNewOptimizer = False,
---       csConstraints =
---         Seq.fromList (map fromR1C (r1csConstraints r1cs))
---           <> Seq.fromList (map CNEq (r1csCNEQs r1cs)),
---       csBinReps = r1csBinReps r1cs,
---       csCounters = r1csCounters r1cs,
---       csDivMods = r1csDivMods r1cs,
---       csModInvs = r1csModInvs r1cs
---     }
---   where
---     fromR1C (R1C aX bX cX) =
---       case (aX, bX, cX) of
---         (Left 1, Right xs, Left 0) -> CAdd xs
---         (Right xs, Left 1, Left 0) -> CAdd xs
---         (Right xs, Right ys, _) -> CMul xs ys cX
---         _ -> error "fromR1C: invalid R1C"
-
--- | Computes an assignment for a R1CS with given inputs
--- witnessOfR1CS :: (GaloisField n, Integral n) => Inputs n -> R1CS n -> Either (ExecError n) (Witness n)
--- witnessOfR1CS inputs r1cs =
---   let inputSize = getCountBySort OfPublicInput (r1csCounters r1cs) + getCountBySort OfPrivateInput (r1csCounters r1cs)
---    in if inputSize /= Inputs.size inputs
---         then Left $ ExecInputUnmatchedError inputSize (Inputs.size inputs)
---         else generateWitness (fromR1CS r1cs) (Inputs.toIntMap inputs)
+    toR1C :: GaloisField n => Constraint n -> R1C n
+    toR1C (CAdd xs) = R1C (Left 1) (Right xs) (Left 0)
+    toR1C (CMul aX bX cX) = R1C (Right aX) (Right bX) cX
 
 --------------------------------------------------------------------------------
 

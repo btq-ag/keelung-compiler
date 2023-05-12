@@ -12,10 +12,11 @@ import Control.Monad.State
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
-import Data.Sequence (Seq (..))
-import Keelung.Compiler.Compile.Error qualified as Compile
 -- import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 
+import Data.Map.Strict qualified as Map
+import Data.Sequence (Seq (..))
+import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
@@ -195,6 +196,12 @@ compileAssertionEqU a b = do
 --     forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefUX width var) val
 
 --------------------------------------------------------------------------------
+
+addEqHintF :: (GaloisField n, Integral n) => RefF -> Either RefF n -> RefF -> M n ()
+addEqHintF x y z = modify' $ \cs -> cs {csNEqF = Map.insert (x, y) z (csNEqF cs)}
+
+addEqHintU :: (GaloisField n, Integral n) => RefU -> Either RefU n -> RefF -> M n ()
+addEqHintU x y z = modify' $ \cs -> cs {csNEqU = Map.insert (x, y) z (csNEqU cs)}
 
 addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
 addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (Left x, Left y, Left q, Left r) : csDivMods cs}
@@ -634,7 +641,7 @@ compileEqualityU isEq out x y =
               (0, [])
 
       --  keep track of the relation between (x - y) and m
-      addC $ cNEqU x (Left y) m
+      addEqHintU x (Left y) m
 
 -- -- | Equalities are compiled with inequalities and inequalities with CNEQ constraints.
 -- --    introduce a new variable m
@@ -723,7 +730,7 @@ compileEqualityF isEq out x y =
               (0, [])
 
       --  keep track of the relation between (x - y) and m
-      addC $ cNEqF x (Left y) m
+      addEqHintF x (Left y) m
 
 --------------------------------------------------------------------------------
 

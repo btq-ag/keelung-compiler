@@ -52,7 +52,6 @@ tests = describe "Field" $ do
     let program = do
           x <- inputField Public
           return $ x `eq` 3
-
     property $ \x -> do
       let expectedOutput = if x == 3 then [1] else [0]
       runAll gf181Info program [x :: GF181] [] expectedOutput

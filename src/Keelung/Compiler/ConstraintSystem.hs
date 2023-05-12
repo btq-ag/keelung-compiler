@@ -62,7 +62,7 @@ data ConstraintSystem n = ConstraintSystem
     csAddF :: [PolyG Ref n],
     -- multiplicative constraints
     csMulF :: [(PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))],
-    -- constraints for computing equality
+    -- hits for computing equality
     csNEqF :: Map (RefF, Either RefF n) RefF,
     csNEqU :: Map (RefU, Either RefU n) RefF,
     -- hints for generating witnesses for DivMod constraints
@@ -227,9 +227,8 @@ relocateConstraintSystem cs =
           <> varEqBs
           <> varEqUs
           <> addFs
-          <> mulFs
-          <> nEqFs
-          <> nEqUs,
+          <> mulFs,
+      Relocated.csEqs = toList eqs,
       Relocated.csDivMods = divMods,
       Relocated.csModInvs = modInvs
     }
@@ -385,8 +384,9 @@ relocateConstraintSystem cs =
 
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
-    nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (reindexRefF counters x) (left (reindexRefF counters) y) (reindexRefF counters m)) $ Map.toList $ csNEqF cs
-    nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (reindexRefU counters x) (left (reindexRefU counters) y) (reindexRefF counters m)) $ Map.toList $ csNEqU cs
+    eqFs = Seq.fromList $ map (\((x, y), m) -> (reindexRefF counters x, left (reindexRefF counters) y, reindexRefF counters m)) $ Map.toList $ csNEqF cs
+    eqUs = Seq.fromList $ map (\((x, y), m) -> (reindexRefU counters x, left (reindexRefU counters) y, reindexRefF counters m)) $ Map.toList $ csNEqU cs
+    eqs = eqFs <> eqUs
 
     divMods = map (\(a, b, q, r) -> (left (reindexRefU counters) a, left (reindexRefU counters) b, left (reindexRefU counters) q, left (reindexRefU counters) r)) $ csDivMods cs
     modInvs = map (\(a, n, p) -> (left (reindexRefU counters) a, left (reindexRefU counters) n, p)) $ csModInvs cs

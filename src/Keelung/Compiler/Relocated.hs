@@ -33,7 +33,6 @@ import Keelung.Syntax.Counters
 data Constraint n
   = CAdd !(Poly n)
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
-  | CNEq Var (Either Var n) Var -- x y m
   deriving (Generic, NFData)
 
 instance GaloisField n => Eq (Constraint n) where
@@ -41,14 +40,12 @@ instance GaloisField n => Eq (Constraint n) where
     (CAdd x, CAdd y) -> x == y
     (CMul x y z, CMul u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
-    (CNEq x y m, CNEq u v n) -> x == u && y == v && m == n
     _ -> False
 
 instance Functor Constraint where
   fmap f (CAdd x) = CAdd (fmap f x)
   fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
-  fmap f (CNEq x y m) = CNEq x (fmap f y) m
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
@@ -69,8 +66,6 @@ cmul !xs !ys (c, zs) = case ( do
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"
   show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
-  show (CNEq x (Left y) m) = "Q $" <> show x <> " $" <> show y <> " $" <> show m
-  show (CNEq x (Right y) m) = "Q $" <> show x <> " " <> show y <> " $" <> show m
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
@@ -81,10 +76,6 @@ instance GaloisField n => Ord (Constraint n) where
   compare CMul {} _ = GT
   -- CAdd
   compare (CAdd xs) (CAdd ys) = compare xs ys
-  -- CNEq
-  compare CNEq {} CNEq {} = EQ
-  compare CNEq {} _ = LT
-  compare _ CNEq {} = GT
 
 --------------------------------------------------------------------------------
 
@@ -93,8 +84,6 @@ varsInConstraint :: Constraint a -> IntSet
 varsInConstraint (CAdd xs) = Poly.vars xs
 varsInConstraint (CMul aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
 varsInConstraint (CMul aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
-varsInConstraint (CNEq x (Left y) m) = IntSet.fromList [x, y, m]
-varsInConstraint (CNEq x _ m) = IntSet.fromList [x, m]
 
 varsInConstraints :: Seq (Constraint a) -> IntSet
 varsInConstraints = IntSet.unions . fmap varsInConstraint
@@ -109,6 +98,7 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
     csConstraints :: !(Seq (Constraint n)),
     csBinReps :: [BinRep],
     csCounters :: Counters,
+    csEqs :: [(Var, Either Var n, Var)],
     csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
     csModInvs :: [(Either Var n, Either Var n, Integer)]
   }
@@ -116,11 +106,11 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: RelocatedConstraintSystem n -> Int
-numberOfConstraints (RelocatedConstraintSystem _ _ cs binReps counters _divMods _modInvs) =
+numberOfConstraints (RelocatedConstraintSystem _ _ cs binReps counters _eqs _divMods _modInvs) =
   length cs + getBooleanConstraintSize counters + length binReps
 
 instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
-  show (RelocatedConstraintSystem _ _ constraints binReps counters _divMods _modInvs) =
+  show (RelocatedConstraintSystem _ _ constraints binReps counters _eqs _divMods _modInvs) =
     "ConstraintSystem {\n"
       <> prettyConstraints counters (toList constraints) binReps
       <> prettyVariables counters
@@ -132,10 +122,13 @@ instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
 --   renumbered) in and out variables.
 renumberConstraints :: (GaloisField n, Integral n) => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
 renumberConstraints cs =
-  cs
-    { csConstraints = fmap renumberConstraint (csConstraints cs),
+  RelocatedConstraintSystem
+    { csField = csField cs,
+      csUseNewOptimizer = csUseNewOptimizer cs,
+      csConstraints = fmap renumberConstraint (csConstraints cs),
       csBinReps = if csUseNewOptimizer cs then fmap renumberBinRep (csBinReps cs) else csBinReps cs,
       csCounters = setReducedCount reducedCount counters,
+      csEqs = fmap renumberEq (csEqs cs),
       csDivMods = fmap renumberDivMod (csDivMods cs),
       csModInvs = fmap renumberModInv (csModInvs cs)
     }
@@ -182,16 +175,14 @@ renumberConstraints cs =
         CAdd $ Poly.renumberVars renumber xs
       CMul aV bV cV ->
         CMul (Poly.renumberVars renumber aV) (Poly.renumberVars renumber bV) (Poly.renumberVars renumber <$> cV)
-      CNEq x (Left y) m ->
-        CNEq (renumber x) (Left (renumber y)) (renumber m)
-      CNEq x (Right y) m ->
-        CNEq (renumber x) (Right y) (renumber m)
 
     renumberBinRep binRep =
       binRep
         { BinRep.binRepVar = renumber (BinRep.binRepVar binRep),
           BinRep.binRepBitStart = renumber (BinRep.binRepBitStart binRep)
         }
+
+    renumberEq (x, y, z) = (renumber x, left renumber y, renumber z)
 
     renumberDivMod (x, y, q, r) =
       ( left renumber x,
