@@ -1,13 +1,21 @@
 module Test.VarLayout (tests, run) where
 
-import Keelung hiding (run)
+import Keelung
 import Keelung.Compiler
 import Keelung.Compiler qualified as Compiler
 import Keelung.Syntax.Counters
+import Test.HUnit (assertFailure)
 import Test.Hspec
+import Test.Interpreter.Util (gf181Info)
 
 run :: IO ()
 run = hspec tests
+
+execute :: Encode t => Comp t -> IO Counters
+execute program = do
+  case Compiler.compile gf181Info program of
+    Left err -> assertFailure $ show (err :: Error GF181)
+    Right relocated -> return $ csCounters relocated
 
 tests :: SpecWith ()
 tests = do
@@ -243,14 +251,13 @@ tests = do
           y <- inputField Public
           z <- inputField Public
           return $ x + y + z
-    case asGF181 $ csCounters <$> Compiler.compile program of
-      Left err -> it "Erasure failure" $ expectationFailure (show err)
-      Right counters -> do
-        it "reindex" $ do
-          reindex counters OfOutput OfField 0 `shouldBe` 0
-          reindex counters OfPublicInput OfField 0 `shouldBe` 1
-          reindex counters OfPublicInput OfField 1 `shouldBe` 2
-          reindex counters OfPublicInput OfField 2 `shouldBe` 3
+
+    it "reindex" $ do
+      counters <- execute program
+      reindex counters OfOutput OfField 0 `shouldBe` 0
+      reindex counters OfPublicInput OfField 0 `shouldBe` 1
+      reindex counters OfPublicInput OfField 1 `shouldBe` 2
+      reindex counters OfPublicInput OfField 2 `shouldBe` 3
 
   describe "Layout 1" $ do
     --                F   B   BR  U
@@ -261,10 +268,8 @@ tests = do
           x <- inputField Public
           y <- inputBool Public
           return $ cond y x 0
-    case asGF181 $ csCounters <$> Compiler.compile program of
-      Left err -> it "Erasure failure" $ expectationFailure (show err)
-      Right counters -> do
-        it "reindex" $ do
-          reindex counters OfOutput OfField 0 `shouldBe` 0
-          reindex counters OfPublicInput OfField 0 `shouldBe` 1
-          reindex counters OfPublicInput OfBoolean 0 `shouldBe` 2
+    it "reindex" $ do
+      counters <- execute program
+      reindex counters OfOutput OfField 0 `shouldBe` 0
+      reindex counters OfPublicInput OfField 0 `shouldBe` 1
+      reindex counters OfPublicInput OfBoolean 0 `shouldBe` 2

@@ -7,6 +7,7 @@ import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
+import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
@@ -23,7 +24,7 @@ import Keelung.Data.PolyG qualified as PolyG
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (ConstraintSystem n)
-run cs = goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cs
+run cs = goThroughEqs . goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cs
 
 optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (WhatChanged, ConstraintSystem n)
 optimizeAddF cs = do
@@ -50,6 +51,49 @@ goThroughAddF = do
     csAddF' <- foldMaybeM reduceAddF [] (csAddF cs)
     modify' $ \cs'' -> cs'' {csAddF = csAddF'}
 
+goThroughEqs :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
+goThroughEqs cs =
+  let relations = csFieldRelations cs
+   in cs
+        { csNEqU =
+            Map.fromList
+              $ mapMaybe
+                ( \(k, v) -> case substKey (substVarU relations) k of
+                    Just k' -> Just (k', v)
+                    Nothing -> Nothing
+                )
+              $ Map.toList (csNEqU cs), 
+          csNEqF =
+            Map.fromList
+              $ mapMaybe
+                ( \(k, v) -> case substKey (substVarF relations) k of
+                    Just k' -> Just (k', v)
+                    Nothing -> Nothing
+                )
+              $ Map.toList (csNEqF cs)
+        }
+  where
+    substKey subst (x, Left y) = case subst x of
+      Left x' -> Just (x', subst y)
+      Right x' -> case subst y of 
+        Left y' -> Just (y', Right x')
+        Right _ -> Nothing
+    substKey subst (x, Right y) = case subst x of
+      Left x' -> Just (x', Right y)
+      Right _ -> Nothing
+
+    substVarU relations ref = case AllRelations.lookup (U ref) relations of
+      AllRelations.Root -> Left ref
+      AllRelations.Value val -> Right val
+      AllRelations.ChildOf 1 (U root) 0 -> Left root
+      AllRelations.ChildOf {} -> Left ref -- TODO: handle this case
+
+    substVarF relations ref = case AllRelations.lookup (F ref) relations of
+      AllRelations.Root -> Left ref
+      AllRelations.Value val -> Right val
+      AllRelations.ChildOf 1 (F root) 0 -> Left root
+      AllRelations.ChildOf {} -> Left ref -- TODO: handle this case
+
 goThroughDivMods :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 goThroughDivMods cs =
   let relations = csFieldRelations cs
@@ -61,7 +105,7 @@ goThroughDivMods cs =
       AllRelations.Root -> Left ref
       AllRelations.Value val -> Right val
       AllRelations.ChildOf 1 (U root) 0 -> Left root
-      AllRelations.ChildOf {} -> error "[ panic ] goThroughDivMods: ChildOf with non-1 coefficient"
+      AllRelations.ChildOf {} -> Left ref
 
 goThroughModInvs :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 goThroughModInvs cs =
@@ -74,7 +118,7 @@ goThroughModInvs cs =
       AllRelations.Root -> Left ref
       AllRelations.Value val -> Right val
       AllRelations.ChildOf 1 (U root) 0 -> Left root
-      AllRelations.ChildOf {} -> error "[ panic ] goThroughModInvs: ChildOf with non-1 coefficient"
+      AllRelations.ChildOf {} -> Left ref
 
 goThroughMulF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughMulF = do

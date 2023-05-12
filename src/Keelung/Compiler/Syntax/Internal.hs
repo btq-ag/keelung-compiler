@@ -2,37 +2,89 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 
-module Keelung.Compiler.Syntax.Untyped
+module Keelung.Compiler.Syntax.Internal
   ( Width,
-    widthOfU,
     Expr (..),
     ExprB (..),
     ExprF (..),
     ExprU (..),
-    TypeErased (..),
-    Assignment (..),
-    lookupF,
-    lookupB,
-    lookupU,
+    Internal (..),
     SideEffect (..),
   )
 where
 
 import Data.Field.Galois (GaloisField)
-import Data.IntMap (IntMap)
-import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq (..))
-import Keelung.Compiler.Constraint
-import Keelung.Data.Struct (Struct (..))
 import Keelung.Field (N (..))
-import Keelung.Syntax (Var, Width)
-import Keelung.Syntax.Counters
+import Keelung.Syntax (Var, Width, HasWidth(..))
+import Keelung.Syntax.Counters (Counters)
 import Keelung.Syntax.Counters qualified as Counters
 
 --------------------------------------------------------------------------------
 
+-- | The "Internal" syntax tree
+data Expr n
+  = ExprB (ExprB n) -- Boolean expression
+  | ExprF (ExprF n) -- Field expression
+  | ExprU (ExprU n) -- UInt expression
+  deriving (Functor)
+
+chain :: Show n => Int -> String -> Int -> Seq n -> ShowS
+chain prec delim n = showParen (prec > n) . go
+  where
+    go :: Show n => Seq n -> String -> String
+    go Empty = showString ""
+    go (x :<| Empty) = showsPrec (succ n) x
+    go (x :<| xs') = showsPrec (succ n) x . showString delim . go xs'
+
+instance (Integral n, Show n) => Show (Expr n) where
+  showsPrec _prec expr = case expr of
+    ExprB x -> shows x
+    ExprF x -> shows x
+    ExprU x -> shows x
+
+--------------------------------------------------------------------------------
+
+-- | Field expressions 
+data ExprF n
+  = ValF n
+  | VarF Var
+  | VarFO Var
+  | VarFI Var
+  | VarFP Var
+  | -- arithmetic operators
+    SubF (ExprF n) (ExprF n)
+  | AddF (ExprF n) (ExprF n) (Seq (ExprF n))
+  | MulF (ExprF n) (ExprF n)
+  | ExpF (ExprF n) Integer
+  | DivF (ExprF n) (ExprF n)
+  | -- logical operators
+
+    -- | MMIF (ExprF n) Int -- modular multiplicative inverse
+    IfF (ExprB n) (ExprF n) (ExprF n)
+  | BtoF (ExprB n)
+  deriving (Functor, Eq)
+
+instance (Show n, Integral n) => Show (ExprF n) where
+  showsPrec prec expr = case expr of
+    ValF n -> shows n
+    VarF var -> showString "F" . shows var
+    VarFO var -> showString "FO" . shows var
+    VarFI var -> showString "FI" . shows var
+    VarFP var -> showString "FP" . shows var
+    SubF x y -> chain prec " - " 6 $ x :<| y :<| Empty
+    AddF x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
+    MulF x y -> chain prec " * " 7 $ x :<| y :<| Empty
+    ExpF x n -> showParen (prec > 7) $ showsPrec 8 x . showString " ^ " . showsPrec 8 n
+    DivF x y -> chain prec " / " 7 $ x :<| y :<| Empty
+    IfF p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
+    BtoF x -> showString "B→F " . showsPrec prec x
+
+--------------------------------------------------------------------------------
+
+-- | Boolean expressions
 data ExprB n
-  = ValB n
+  = ValB Bool
   | VarB Var
   | VarBO Var
   | VarBI Var
@@ -60,8 +112,8 @@ data ExprB n
 
 instance (Integral n, Show n) => Show (ExprB n) where
   showsPrec prec expr = case expr of
-    ValB 0 -> showString "F"
-    ValB _ -> showString "T"
+    ValB True -> showString "T"
+    ValB False -> showString "F"
     VarB var -> showString "B" . shows var
     VarBO var -> showString "BO" . shows var
     VarBI var -> showString "BI" . shows var
@@ -85,41 +137,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
 
 --------------------------------------------------------------------------------
 
-data ExprF n
-  = ValF n
-  | VarF Var
-  | VarFO Var
-  | VarFI Var
-  | VarFP Var
-  | -- arithmetic operators
-    SubF (ExprF n) (ExprF n)
-  | AddF (ExprF n) (ExprF n) (Seq (ExprF n))
-  | MulF (ExprF n) (ExprF n)
-  | DivF (ExprF n) (ExprF n)
-  | -- logical operators
-
-    -- | MMIF (ExprF n) Int -- modular multiplicative inverse
-    IfF (ExprB n) (ExprF n) (ExprF n)
-  | BtoF (ExprB n)
-  deriving (Functor, Eq)
-
-instance (Show n, Integral n) => Show (ExprF n) where
-  showsPrec prec expr = case expr of
-    ValF n -> shows n
-    VarF var -> showString "F" . shows var
-    VarFO var -> showString "FO" . shows var
-    VarFI var -> showString "FI" . shows var
-    VarFP var -> showString "FP" . shows var
-    SubF x y -> chain prec " - " 6 $ x :<| y :<| Empty
-    AddF x0 x1 xs -> chain prec " + " 6 $ x0 :<| x1 :<| xs
-    MulF x y -> chain prec " * " 7 $ x :<| y :<| Empty
-    -- MMIF x p -> showString "modInv " . showsPrec prec x . showString " " . shows p
-    DivF x y -> chain prec " / " 7 $ x :<| y :<| Empty
-    IfF p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
-    BtoF x -> showString "B→F " . showsPrec prec x
-
---------------------------------------------------------------------------------
-
+-- | UInt expressions
 data ExprU n
   = ValU Width n
   | VarU Width Var
@@ -166,95 +184,68 @@ instance (Show n, Integral n) => Show (ExprU n) where
     SetU _ x i b -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . showsPrec 9 i . showString "] := " . showsPrec 9 b
     BtoU _ x -> showString "B→U " . showsPrec prec x
 
---------------------------------------------------------------------------------
+instance HasWidth (ExprU n) where
+  widthOf expr = case expr of
+    ValU w _ -> w
+    VarU w _ -> w
+    VarUO w _ -> w
+    VarUI w _ -> w
+    VarUP w _ -> w
+    SubU w _ _ -> w
+    AddU w _ _ -> w
+    MulU w _ _ -> w
+    MMIU w _ _ -> w
+    AndU w _ _ _ -> w
+    OrU w _ _ _ -> w
+    XorU w _ _ -> w
+    NotU w _ -> w
+    IfU w _ _ _ -> w
+    RoLU w _ _ -> w
+    ShLU w _ _ -> w
+    SetU w _ _ _ -> w
+    BtoU w _ -> w
 
--- | "Untyped" expression
-data Expr n
-  = ExprB (ExprB n) -- Boolean expression
-  | ExprF (ExprF n) -- Field expression
-  | ExprU (ExprU n) -- UInt expression
-  deriving (Functor)
 
-chain :: Show n => Int -> String -> Int -> Seq n -> ShowS
-chain prec delim n = showParen (prec > n) . go
-  where
-    go :: Show n => Seq n -> String -> String
-    go Empty = showString ""
-    go (x :<| Empty) = showsPrec (succ n) x
-    go (x :<| xs') = showsPrec (succ n) x . showString delim . go xs'
+-- --------------------------------------------------------------------------------
 
-instance (Integral n, Show n) => Show (Expr n) where
-  showsPrec _prec expr = case expr of
-    ExprB x -> shows x
-    ExprF x -> shows x
-    ExprU x -> shows x
+-- data Assignment n
+--   = AssignmentF Ref (ExprF n)
+--   | AssignmentU RefU (ExprU n)
+--   | AssignmentB RefB (ExprB n)
 
--- | Bit width of a unsigned integer expression
-widthOfU :: ExprU n -> Width
-widthOfU expr = case expr of
-  ValU w _ -> w
-  VarU w _ -> w
-  VarUO w _ -> w
-  VarUI w _ -> w
-  VarUP w _ -> w
-  SubU w _ _ -> w
-  AddU w _ _ -> w
-  MulU w _ _ -> w
-  MMIU w _ _ -> w
-  AndU w _ _ _ -> w
-  OrU w _ _ _ -> w
-  XorU w _ _ -> w
-  NotU w _ -> w
-  IfU w _ _ _ -> w
-  RoLU w _ _ -> w
-  ShLU w _ _ -> w
-  SetU w _ _ _ -> w
-  BtoU w _ -> w
+-- instance (Integral n, Show n) => Show (Assignment n) where
+--   show (AssignmentF var expr) = show var ++ " := " ++ show expr
+--   show (AssignmentU var expr) = show var ++ " := " ++ show expr
+--   show (AssignmentB var expr) = show var ++ " := " ++ show expr
+
+-- instance Functor Assignment where
+--   fmap f (AssignmentF var expr) = AssignmentF var (fmap f expr)
+--   fmap f (AssignmentU var expr) = AssignmentU var (fmap f expr)
+--   fmap f (AssignmentB var expr) = AssignmentB var (fmap f expr)
 
 --------------------------------------------------------------------------------
 
-data Assignment n
-  = AssignmentF Ref (ExprF n)
-  | AssignmentU RefU (ExprU n)
-  | AssignmentB RefB (ExprB n)
-
-instance (Integral n, Show n) => Show (Assignment n) where
-  show (AssignmentF var expr) = show var ++ " := " ++ show expr
-  show (AssignmentU var expr) = show var ++ " := " ++ show expr
-  show (AssignmentB var expr) = show var ++ " := " ++ show expr
-
-instance Functor Assignment where
-  fmap f (AssignmentF var expr) = AssignmentF var (fmap f expr)
-  fmap f (AssignmentU var expr) = AssignmentU var (fmap f expr)
-  fmap f (AssignmentB var expr) = AssignmentB var (fmap f expr)
-
---------------------------------------------------------------------------------
-
--- | The result after type erasure
-data TypeErased n = TypeErased
+-- | Context for the internal syntax tree
+data Internal n = Internal
   { -- | The expression after type erasure
-    erasedExpr :: ![(Var, Expr n)],
+    internalExpr :: ![(Var, Expr n)],
     -- | Bit width of the chosen field
-    erasedFieldBitWidth :: !Width,
+    internalFieldBitWidth :: !Width,
     -- | Variable bookkeepung
-    erasedCounters :: !Counters,
-    -- | Relations between variables and/or expressions
-    -- erasedRelations :: !(Relations n),
+    internalCounters :: !Counters,
     -- | Assertions after type erasure
-    erasedAssertions :: ![Expr n],
+    internalAssertions :: ![Expr n],
     -- | Side effects
-    erasedSideEffects :: !(Seq (SideEffect n))
+    internalSideEffects :: !(Seq (SideEffect n))
   }
 
-instance (GaloisField n, Integral n) => Show (TypeErased n) where
-  show (TypeErased expr _ counters assertions _sideEffects) =
-    "TypeErased {\n"
+instance (GaloisField n, Integral n) => Show (Internal n) where
+  show (Internal expr _ counters assertions _sideEffects) =
+    "Interal {\n"
       -- expressions
       <> "  Expression: "
       <> show (map (fmap N . snd) expr)
       <> "\n"
-      -- relations
-      -- <> indent (show relations)
       <> ( if length assertions < 20
              then "  assertions:\n    " <> show assertions <> "\n"
              else ""
@@ -267,23 +258,12 @@ instance (GaloisField n, Integral n) => Show (TypeErased n) where
 --------------------------------------------------------------------------------
 
 data SideEffect n
-  = AssignmentF2 Var (ExprF n)
-  | AssignmentB2 Var (ExprB n)
-  | AssignmentU2 Width Var (ExprU n)
+  = AssignmentF Var (ExprF n)
+  | AssignmentB Var (ExprB n)
+  | AssignmentU Width Var (ExprU n)
   | DivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
   | AssertLTE Width (ExprU n) Integer
   | AssertLT Width (ExprU n) Integer
   | AssertGTE Width (ExprU n) Integer
   | AssertGT Width (ExprU n) Integer
   deriving (Show, Eq)
-
---------------------------------------------------------------------------------
-
-lookupF :: Var -> Struct (IntMap f) b u -> Maybe f
-lookupF var = IntMap.lookup var . structF
-
-lookupB :: Var -> Struct a (IntMap b) u -> Maybe b
-lookupB var = IntMap.lookup var . structB
-
-lookupU :: Width -> Var -> Struct a b (IntMap u) -> Maybe u
-lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (structU bindings)

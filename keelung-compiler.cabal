@@ -33,6 +33,7 @@ library
       Keelung.Compiler.Compile.Relations.Field
       Keelung.Compiler.Compile.Relations.UInt
       Keelung.Compiler.Compile.Relations.Util
+      Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
@@ -44,10 +45,10 @@ library
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relocated
-      Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
-      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
@@ -55,7 +56,6 @@ library
       Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
   other-modules:
@@ -96,6 +96,7 @@ executable keelungc
       Keelung.Compiler.Compile.Relations.Field
       Keelung.Compiler.Compile.Relations.UInt
       Keelung.Compiler.Compile.Relations.Util
+      Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
@@ -107,10 +108,10 @@ executable keelungc
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relocated
-      Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
-      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
@@ -118,7 +119,6 @@ executable keelungc
       Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
       AggregateSignature.Program
@@ -159,7 +159,6 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Test.Compilation
       Test.Interpreter
       Test.Interpreter.Boolean
       Test.Interpreter.Field
@@ -168,8 +167,10 @@ test-suite keelung-test
       Test.Interpreter.UInt
       Test.Interpreter.Util
       Test.Optimization
+      Test.Optimization.Boolean
+      Test.Optimization.Field
       Test.Optimization.UInt
-      Test.OptimizationOld
+      Test.Optimization.Util
       Test.PolyG
       Test.Relations.Boolean
       Test.Relations.Field
@@ -184,6 +185,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Relations.Field
       Keelung.Compiler.Compile.Relations.UInt
       Keelung.Compiler.Compile.Relations.Util
+      Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
@@ -195,10 +197,10 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relocated
-      Keelung.Compiler.Syntax.Erase
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
-      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
@@ -206,7 +208,6 @@ test-suite keelung-test
       Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
       AggregateSignature.Program

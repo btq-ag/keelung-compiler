@@ -13,7 +13,6 @@ import Data.Set qualified as Set
 import Keelung.Compiler.Optimize.Monad
 import Keelung.Compiler.Relocated (Constraint (..), cadd)
 import Keelung.Compiler.Syntax.FieldBits (toBits)
-import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Data.BinRep (BinRep (BinRep))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
@@ -207,35 +206,35 @@ substConstraint !constraint = case constraint of
           <$> Poly.buildMaybe a aX
           <*> Poly.buildMaybe b bX
           <*> pure (Poly.buildEither c (IntMap.toList cX))
-  CNEq (CNEQ x y m) -> do
-    x' <- case x of
-      Left var -> lookupVar var
-      Right val -> return $ Value val
-    y' <- case y of
-      Left var -> lookupVar var
-      Right val -> return $ Value val
-    case (x', y') of
-      (Root xR, Root yR) -> return $ Just $ CNEq $ CNEQ (Left xR) (Left yR) m
-      (Value xV, Root yR) -> return $ Just $ CNEq $ CNEQ (Right xV) (Left yR) m
-      (Root xR, Value yV) -> return $ Just $ CNEq $ CNEQ (Left xR) (Right yV) m
-      (Value xV, Value yV) -> do
-        let diff = xV - yV
-        if diff == 0
-          then do
-            bindVar m 0
-            return Nothing
-          else do
-            bindVar m (recip diff)
-            return Nothing
+
+-- CNEq x y m -> do
+--   x' <- lookupVar x
+--   y' <- case y of
+--     Left var -> lookupVar var
+--     Right val -> return $ Value val
+--   case (x', y') of
+--     (Root xR, Root yR) -> return $ Just $ CNEq xR (Left yR) m
+--     (Value xV, Root yR) -> return $ Just $ CNEq yR (Right xV) m
+--     (Root xR, Value yV) -> return $ Just $ CNEq xR (Right yV) m
+--     (Value xV, Value yV) -> do
+--       let diff = xV - yV
+--       if diff == 0
+--         then do
+--           bindVar m 0
+--           return Nothing
+--         else do
+--           bindVar m (recip diff)
+--           return Nothing
 
 -- | Is a constriant of `0 = 0` or "x * n = nx" or "m * n = mn" ?
 isTautology :: GaloisField n => Constraint n -> OptiM n Bool
 isTautology constraint = case constraint of
   CAdd _ -> return False
   CMul {} -> return False
-  -- we assume that the variables in CNEQ has all been substituted with values when possible
-  -- so that we can just check if the values are equal
-  CNEq {} -> return False
+
+-- we assume that the variables in CNEQ has all been substituted with values when possible
+-- so that we can just check if the values are equal
+-- CNEq {} -> return False
 
 -- | Learn bindings and variable equalities from a constraint
 learn :: (GaloisField n, Integral n) => Constraint n -> OptiM n ()

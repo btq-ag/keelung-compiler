@@ -2,7 +2,7 @@ module Test.Relations.Field (tests, run, debug) where
 
 import Control.Monad.Except
 import Control.Monad.State
-import Keelung hiding (run)
+import Keelung
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Compile.Relations.Field (AllRelations)
@@ -73,7 +73,7 @@ assign var val = do
     Right Nothing -> return ()
     Right (Just result) -> put result
 
-relate :: RefT -> (GF181, RefT, GF181) -> M ()
+relate :: RefF -> (GF181, RefF, GF181) -> M ()
 relate var (slope, val, intercept) = do
   xs <- get
   case runExcept (EquivClass.runM $ FieldRelations.relateRefs (F var) slope (F val) intercept xs) of
@@ -82,7 +82,7 @@ relate var (slope, val, intercept) = do
     Right (Just result) -> put result
 
 -- | Assert that `var1 = slope * var2 + intercept`
-assertRelation :: RefT -> GF181 -> RefT -> GF181 -> M ()
+assertRelation :: RefF -> GF181 -> RefF -> GF181 -> M ()
 assertRelation var1 slope var2 intercept = do
   xs <- get
   FieldRelations.relationBetween (F var1) (F var2) xs `shouldBe` Just (slope, intercept)

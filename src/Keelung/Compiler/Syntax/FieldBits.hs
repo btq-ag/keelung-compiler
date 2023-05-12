@@ -4,7 +4,7 @@
 -- | Like `Data.Bits` but with `Boolean` instead of `Bool`
 module Keelung.Compiler.Syntax.FieldBits where
 
-import qualified Data.Bits
+import Data.Bits qualified
 import Data.Field.Galois
 import Keelung
 
@@ -12,8 +12,11 @@ class (Integral a) => FieldBits a where
   {-# MINIMAL bitSize #-}
   bitSize :: a -> Int
 
+  testBit' :: a -> Int -> Bool
+  testBit' x i = Data.Bits.testBit (toInteger x) (i `mod` bitSize x)
+
   testBit :: a -> Int -> a
-  testBit x i = if Data.Bits.testBit (toInteger x) (i `mod` bitSize x) then 1 else 0
+  testBit x i = if testBit' x i then 1 else 0
 
 -- and :: a -> a -> a
 -- and x y = fromInteger $ (Data.Bits..&.) (toInteger x) (toInteger y)

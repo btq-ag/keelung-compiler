@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Interpreter.Error where
@@ -17,7 +18,7 @@ data Error n
   = SyntaxTreeError (SyntaxTree.Error n)
   | R1CSError (R1CS.Error n)
   | InputError Inputs.Error
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
 

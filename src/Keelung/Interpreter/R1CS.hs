@@ -48,11 +48,11 @@ run' r1cs inputs = do
 --   3. binary representation constraints
 --   4. CNEQ constraints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Seq (Constraint n)
-fromOrdinaryConstraints (R1CS ordinaryConstraints binReps counters cneqs divMods modInvs) =
+fromOrdinaryConstraints (R1CS _ ordinaryConstraints binReps counters cneqs divMods modInvs) =
   Seq.fromList (map R1CConstraint ordinaryConstraints)
     <> Seq.fromList (map BooleanConstraint booleanInputVarConstraints)
     <> Seq.fromList (map BinRepConstraint binReps)
-    <> Seq.fromList (map CNEQConstraint cneqs)
+    <> Seq.fromList (map EqConstraint cneqs)
     <> Seq.fromList (map DivModConstaint divMods)
     <> Seq.fromList (map ModInvConstraint modInvs)
   where
@@ -88,7 +88,7 @@ lookupVarEither (Right val) = return (Just val)
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (R1CConstraint r1c) = fmap (pure . R1CConstraint) <$> shrinkR1C r1c
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
-shrink (CNEQConstraint cneq) = fmap (pure . CNEQConstraint) <$> shrinkCNEQ cneq
+shrink (EqConstraint cneq) = fmap (pure . EqConstraint) <$> shrinkEq cneq
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
 shrink (ModInvConstraint modInv) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInv
@@ -99,7 +99,6 @@ shrink (ModInvConstraint modInv) = fmap (pure . ModInvConstraint) <$> shrinkModI
 --    2. divisor & quotient & remainder
 shrinkDivMod :: (GaloisField n, Integral n) => (Either Var n, Either Var n, Either Var n, Either Var n) -> M n (Result (Either Var n, Either Var n, Either Var n, Either Var n))
 shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
-
   -- check the value of the dividend first,
   -- if it's unknown, then its value can only be determined from other variables
   dividendResult <- lookupVarEither dividendVar
@@ -223,32 +222,32 @@ shrinkBinRep binRep@(BinRep var width bitVarStart) = do
           Just bit -> return (Just (accVal * 2 + bit))
 
 -- if (x - y) = 0 then m = 0 else m = recip (x - y)
-shrinkCNEQ :: (GaloisField n, Integral n) => CNEQ n -> M n (Result (CNEQ n))
-shrinkCNEQ cneq@(CNEQ (Left x) (Left y) m) = do
+shrinkEq :: (GaloisField n, Integral n) => (Var, Either Var n, Var) -> M n (Result (Var, Either Var n, Var))
+shrinkEq cneq@(x, Left y, m) = do
   resultX <- lookupVar x
   resultY <- lookupVar y
   case (resultX, resultY) of
     (Nothing, Nothing) -> return $ Stuck cneq
-    (Just a, Nothing) -> return $ Shrinked (CNEQ (Right a) (Left y) m)
-    (Nothing, Just b) -> return $ Shrinked (CNEQ (Left x) (Right b) m)
-    (Just a, Just b) -> shrinkCNEQ (CNEQ (Right a) (Right b) m)
-shrinkCNEQ cneq@(CNEQ (Left x) (Right b) m) = do
+    (Just a, Nothing) -> return $ Shrinked (y, Right a, m)
+    (Nothing, Just b) -> return $ Shrinked (x, Right b, m)
+    (Just a, Just b) -> do
+      if a == b
+        then do
+          bindVar m 0
+        else do
+          bindVar m (recip (a - b))
+      return Eliminated
+shrinkEq cneq@(x, Right y, m) = do
   result <- lookupVar x
   case result of
     Nothing -> return $ Stuck cneq
-    Just a -> shrinkCNEQ (CNEQ (Right a) (Right b) m)
-shrinkCNEQ cneq@(CNEQ (Right a) (Left y) m) = do
-  result <- lookupVar y
-  case result of
-    Nothing -> return $ Stuck cneq
-    Just b -> shrinkCNEQ (CNEQ (Right a) (Right b) m)
-shrinkCNEQ (CNEQ (Right a) (Right b) m) = do
-  if a == b
-    then do
-      bindVar m 0
-    else do
-      bindVar m (recip (a - b))
-  return Eliminated
+    Just a -> do
+      if a == y
+        then do
+          bindVar m 0
+        else do
+          bindVar m (recip (a - y))
+      return Eliminated
 
 --------------------------------------------------------------------------------
 

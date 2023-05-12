@@ -35,19 +35,20 @@ import Keelung.Compiler.Compile.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
-import Keelung.Constraint.R1CS qualified as Constraint
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
+import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
 -- | A constraint system is a collection of constraints
 data ConstraintSystem n = ConstraintSystem
-  { csCounters :: !Counters,
+  { csField :: (FieldType, Integer, Integer),
+    csCounters :: !Counters,
     csUseNewOptimizer :: Bool,
     -- for counting the occurences of variables in constraints (excluding the ones that are in FieldRelations)
     csOccurrenceF :: !(Map Ref Int),
@@ -61,9 +62,9 @@ data ConstraintSystem n = ConstraintSystem
     csAddF :: [PolyG Ref n],
     -- multiplicative constraints
     csMulF :: [(PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))],
-    -- constraints for computing equality
-    csNEqF :: Map (RefT, RefT) RefT,
-    csNEqU :: Map (RefU, RefU) RefT,
+    -- hits for computing equality
+    csNEqF :: Map (RefF, Either RefF n) RefF,
+    csNEqU :: Map (RefU, Either RefU n) RefF,
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
     csDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
@@ -217,7 +218,8 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
 relocateConstraintSystem cs =
   Relocated.RelocatedConstraintSystem
-    { Relocated.csUseNewOptimizer = csUseNewOptimizer cs,
+    { Relocated.csField = csField cs,
+      Relocated.csUseNewOptimizer = csUseNewOptimizer cs,
       Relocated.csCounters = counters,
       Relocated.csBinReps = binReps,
       Relocated.csConstraints =
@@ -225,9 +227,8 @@ relocateConstraintSystem cs =
           <> varEqBs
           <> varEqUs
           <> addFs
-          <> mulFs
-          <> nEqFs
-          <> nEqUs,
+          <> mulFs,
+      Relocated.csEqs = toList eqs,
       Relocated.csDivMods = divMods,
       Relocated.csModInvs = modInvs
     }
@@ -317,7 +318,7 @@ relocateConstraintSystem cs =
     shouldBeKept (B ref) = refBShouldBeKept ref
     shouldBeKept (U ref) = refUShouldBeKept ref
 
-    refFShouldBeKept :: RefT -> Bool
+    refFShouldBeKept :: RefF -> Bool
     refFShouldBeKept ref = case ref of
       RefFX var ->
         -- it's a Field intermediate variable that occurs in the circuit
@@ -355,7 +356,7 @@ relocateConstraintSystem cs =
     extractBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Seq (Relocated.Constraint n)
     extractBooleanRelations relations =
       let convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Constraint n
-          convert (var, Right val) = CVarBindB var (if val then 1 else 0)
+          convert (var, Right val) = CVarBindB var val
           convert (var, Left (dontFlip, root)) =
             if dontFlip
               then CVarEqB var root
@@ -383,8 +384,9 @@ relocateConstraintSystem cs =
 
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
-    nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefT counters x)) (Left (reindexRefT counters y)) (reindexRefT counters m))) $ Map.toList $ csNEqF cs
-    nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefT counters m))) $ Map.toList $ csNEqU cs
+    eqFs = Seq.fromList $ map (\((x, y), m) -> (reindexRefF counters x, left (reindexRefF counters) y, reindexRefF counters m)) $ Map.toList $ csNEqF cs
+    eqUs = Seq.fromList $ map (\((x, y), m) -> (reindexRefU counters x, left (reindexRefU counters) y, reindexRefF counters m)) $ Map.toList $ csNEqU cs
+    eqs = eqFs <> eqUs
 
     divMods = map (\(a, b, q, r) -> (left (reindexRefU counters) a, left (reindexRefU counters) b, left (reindexRefU counters) q, left (reindexRefU counters) r)) $ csDivMods cs
     modInvs = map (\(a, n, p) -> (left (reindexRefU counters) a, left (reindexRefU counters) n, p)) $ csModInvs cs
@@ -425,7 +427,7 @@ instance UpdateOccurrences Ref where
           )
       )
 
-instance UpdateOccurrences RefT where
+instance UpdateOccurrences RefF where
   addOccurrences =
     flip
       ( foldl
@@ -501,7 +503,7 @@ instance UpdateOccurrences RefU where
 
 -- | Allow us to determine which relations should be extracted from the pool
 data Occurences = Occurences
-  { refFsInOccurrencesF :: !(Set RefT),
+  { refFsInOccurrencesF :: !(Set RefF),
     refBsInOccurrencesF :: !(Set RefB),
     refUsInOccurrencesF :: !(Set RefU),
     bitTestsInOccurrencesB :: !(Set RefU),

@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Interpreter.R1CS.Monad where
@@ -19,7 +20,6 @@ import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
-import Keelung.Constraint.R1CS
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.VarGroup
 import Keelung.Syntax
@@ -51,7 +51,7 @@ bindVarEither (Right _) _ = return ()
 data Constraint n
   = R1CConstraint (R1C n)
   | BooleanConstraint Var
-  | CNEQConstraint (CNEQ n)
+  | EqConstraint (Var, Either Var n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
     DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
   | BinRepConstraint BinRep
@@ -63,10 +63,10 @@ instance Serialize n => Serialize (Constraint n)
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (R1CConstraint r1c) = show r1c
-  show (BooleanConstraint var) = "(Boolean) $" <> show var <> " = $" <> show var <> " * $" <> show var
-  show (CNEQConstraint cneq) = "(CNEQ)    " <> show cneq
+  show (BooleanConstraint var) = "(Boolean)   $" <> show var <> " = $" <> show var <> " * $" <> show var
+  show (EqConstraint cneq) = "(Equality)  " <> show cneq
   show (DivModConstaint (dividend, divisor, quotient, remainder)) =
-    "(DivMod)  $"
+    "(DivMod)    $"
       <> show dividend
       <> " = $"
       <> show divisor
@@ -74,13 +74,13 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
       <> show quotient
       <> " + $"
       <> show remainder
-  show (BinRepConstraint binRep) = "(BinRep)  " <> show binRep
-  show (ModInvConstraint (var, _, p)) = "(ModInv)  $" <> show var <> "⁻¹ (mod " <> show p <> ")"
+  show (BinRepConstraint binRep) = "(BinRep)    " <> show binRep
+  show (ModInvConstraint (var, _, p)) = "(ModInv)    $" <> show var <> "⁻¹ (mod " <> show p <> ")"
 
 instance Functor Constraint where
   fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
   fmap _ (BooleanConstraint var) = BooleanConstraint var
-  fmap f (CNEQConstraint cneq) = CNEQConstraint (fmap f cneq)
+  fmap f (EqConstraint (x, y, m)) = EqConstraint (x, fmap f y, m)
   fmap f (DivModConstaint (a, b, q, r)) = DivModConstaint (fmap f a, fmap f b, fmap f q, fmap f r)
   fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
   fmap f (ModInvConstraint (a, n, p)) = ModInvConstraint (fmap f a, fmap f n, p)
@@ -95,7 +95,7 @@ data Error n
   | DivModQuotientError n n n n
   | DivModRemainderError n n n n
   | ModInvError (Either Var n) n Integer
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
 

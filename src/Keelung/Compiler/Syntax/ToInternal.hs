@@ -1,0 +1,210 @@
+module Keelung.Compiler.Syntax.ToInternal (run) where
+
+import Control.Monad.Reader
+import Control.Monad.State
+import Data.Field.Galois (GaloisField)
+import Data.Sequence (Seq (..), (|>))
+import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
+import Keelung.Compiler.Syntax.Internal
+import Keelung.Syntax (HasWidth (widthOf), Var)
+import Keelung.Syntax.Counters
+import Keelung.Syntax.Encode.Syntax qualified as T
+
+run :: (GaloisField n, Integral n) => T.Elaborated -> Internal n
+run (T.Elaborated expr comp) =
+  let T.Computation counters assertions sideEffects = comp
+      proxy = 0
+      numBitWidth = bitSize proxy
+   in runM counters numBitWidth $ do
+        exprs <- sameType proxy <$> convertExprAndAllocOutputVar expr
+        assertions' <- concat <$> mapM convertExpr assertions
+        counters' <- get
+        sideEffects' <- mapM convertSideEffect sideEffects
+        return $
+          Internal
+            { internalExpr = exprs,
+              internalFieldBitWidth = numBitWidth,
+              internalCounters = counters',
+              internalAssertions = assertions',
+              internalSideEffects = sideEffects'
+            }
+  where
+    -- proxy trick for devising the bit width of field elements
+    sameType :: n -> [(Var, Expr n)] -> [(Var, Expr n)]
+    sameType _ = id
+
+--------------------------------------------------------------------------------
+
+-- monad for collecting boolean vars along the way
+type M n = StateT Counters (Reader Width)
+
+runM :: Counters -> Width -> M n a -> a
+runM counters width f = runReader (evalStateT f counters) width
+
+--------------------------------------------------------------------------------
+
+convertSideEffect :: (GaloisField n, Integral n) => T.SideEffect -> M n (SideEffect n)
+convertSideEffect (T.AssignmentF var val) = AssignmentF var <$> convertExprF val
+convertSideEffect (T.AssignmentB var val) = AssignmentB var <$> convertExprB val
+convertSideEffect (T.AssignmentU width var val) = AssignmentU width var <$> convertExprU val
+convertSideEffect (T.DivMod width dividend divisor quotient remainder) = DivMod width <$> convertExprU dividend <*> convertExprU divisor <*> convertExprU quotient <*> convertExprU remainder
+convertSideEffect (T.AssertLTE width val bound) = AssertLTE width <$> convertExprU val <*> pure bound
+convertSideEffect (T.AssertLT width val bound) = AssertLT width <$> convertExprU val <*> pure bound
+convertSideEffect (T.AssertGTE width val bound) = AssertGTE width <$> convertExprU val <*> pure bound
+convertSideEffect (T.AssertGT width val bound) = AssertGT width <$> convertExprU val <*> pure bound
+
+--------------------------------------------------------------------------------
+
+convertExprB :: (GaloisField n, Integral n) => T.Boolean -> M n (ExprB n)
+convertExprB expr = case expr of
+  T.ValB val -> return $ ValB val
+  T.VarB var -> return $ VarB var
+  T.VarBI var -> return $ VarBI var
+  T.VarBP var -> return $ VarBP var
+  T.AndB x y -> chainExprsOfAssocOpAndB <$> convertExprB x <*> convertExprB y
+  T.OrB x y -> chainExprsOfAssocOpOrB <$> convertExprB x <*> convertExprB y
+  T.XorB x y -> XorB <$> convertExprB x <*> convertExprB y
+  T.NotB x -> NotB <$> convertExprB x
+  T.IfB p x y -> IfB <$> convertExprB p <*> convertExprB x <*> convertExprB y
+  T.EqB x y -> EqB <$> convertExprB x <*> convertExprB y
+  T.EqF x y -> EqF <$> convertExprF x <*> convertExprF y
+  T.EqU _ x y -> EqU <$> convertExprU x <*> convertExprU y
+  T.LTU _ x y -> LTU <$> convertExprU x <*> convertExprU y
+  T.LTEU _ x y -> LTEU <$> convertExprU x <*> convertExprU y
+  T.GTU _ x y -> GTU <$> convertExprU x <*> convertExprU y
+  T.GTEU _ x y -> GTEU <$> convertExprU x <*> convertExprU y
+  T.BitU _ x i -> BitU <$> convertExprU x <*> pure i
+
+convertExprF :: (GaloisField n, Integral n) => T.Field -> M n (ExprF n)
+convertExprF expr = case expr of
+  T.ValF x -> return $ ValF (fromInteger x)
+  T.ValFR x -> return $ ValF (fromRational x)
+  T.VarF var -> return $ VarF var
+  T.VarFI var -> return $ VarFI var
+  T.VarFP var -> return $ VarFP var
+  T.AddF x y -> chainExprsOfAssocOpAddF <$> convertExprF x <*> convertExprF y
+  T.SubF x y -> SubF <$> convertExprF x <*> convertExprF y
+  T.MulF x y -> MulF <$> convertExprF x <*> convertExprF y
+  T.ExpF x n -> ExpF <$> convertExprF x <*> pure n
+  T.DivF x y -> DivF <$> convertExprF x <*> convertExprF y
+  T.IfF p x y -> IfF <$> convertExprB p <*> convertExprF x <*> convertExprF y
+  T.BtoF x -> BtoF <$> convertExprB x
+
+convertExprU :: (GaloisField n, Integral n) => T.UInt -> M n (ExprU n)
+convertExprU expr = case expr of
+  T.ValU w n -> return $ ValU w (fromIntegral n)
+  T.VarU w var -> return $ VarU w var
+  T.VarUI w var -> return $ VarUI w var
+  T.VarUP w var -> return $ VarUP w var
+  T.AddU w x y -> AddU w <$> convertExprU x <*> convertExprU y
+  T.SubU w x y -> SubU w <$> convertExprU x <*> convertExprU y
+  T.MulU w x y -> MulU w <$> convertExprU x <*> convertExprU y
+  T.MMIU w x p -> MMIU w <$> convertExprU x <*> pure p
+  T.AndU w x y -> chainExprsOfAssocOpAndU w <$> convertExprU x <*> convertExprU y
+  T.OrU w x y -> chainExprsOfAssocOpOrU w <$> convertExprU x <*> convertExprU y
+  T.XorU w x y -> XorU w <$> convertExprU x <*> convertExprU y
+  T.NotU w x -> NotU w <$> convertExprU x
+  T.RoLU w i x -> RoLU w i <$> convertExprU x
+  T.ShLU w i x -> ShLU w i <$> convertExprU x
+  T.SetU w x i b -> SetU w <$> convertExprU x <*> pure i <*> convertExprB b
+  T.IfU w p x y -> IfU w <$> convertExprB p <*> convertExprU x <*> convertExprU y
+  T.BtoU w x -> BtoU w <$> convertExprB x
+
+convertExprAndAllocOutputVar :: (GaloisField n, Integral n) => T.Expr -> M n [(Var, Expr n)]
+convertExprAndAllocOutputVar expr = case expr of
+  T.Unit -> return []
+  T.Boolean x -> do
+    var <- fresh OfOutput OfBoolean
+    x' <- convertExprB x
+    return [(var, ExprB x')]
+  T.Field x -> do
+    var <- fresh OfOutput OfField
+    x' <- convertExprF x
+    return [(var, ExprF x')]
+  T.UInt x -> do
+    x' <- convertExprU x
+    var <- fresh OfOutput (OfUInt (widthOf x'))
+    return [(var, ExprU x')]
+  T.Array exprs -> do
+    exprss <- mapM convertExprAndAllocOutputVar exprs
+    return (concat exprss)
+  where
+    fresh :: VarSort -> VarType -> M n Var
+    fresh sort kind = do
+      counters <- get
+      let index = getCount sort kind counters
+      modify $ addCount sort kind 1
+      return index
+
+convertExpr :: (GaloisField n, Integral n) => T.Expr -> M n [Expr n]
+convertExpr expr = case expr of
+  T.Unit -> return []
+  T.Boolean x -> do
+    x' <- convertExprB x
+    return [ExprB x']
+  T.Field x -> do
+    x' <- convertExprF x
+    return [ExprF x']
+  T.UInt x -> do
+    x' <- convertExprU x
+    return [ExprU x']
+  -- T.Var ref -> pure <$> convertRef3 ref
+  T.Array exprs -> do
+    exprss <- mapM convertExpr exprs
+    return (concat exprss)
+
+-- | Flatten and chain expressions with associative operator together when possible
+chainExprsOfAssocOpAddF :: ExprF n -> ExprF n -> ExprF n
+chainExprsOfAssocOpAddF x y = case (x, y) of
+  (AddF x0 x1 xs, AddF y0 y1 ys) ->
+    AddF x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (AddF x0 x1 xs, _) ->
+    AddF x0 x1 (xs |> y)
+  (_, AddF y0 y1 ys) ->
+    AddF x y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> AddF x y mempty
+
+chainExprsOfAssocOpAndB :: ExprB n -> ExprB n -> ExprB n
+chainExprsOfAssocOpAndB x y = case (x, y) of
+  (AndB x0 x1 xs, AndB y0 y1 ys) ->
+    AndB x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (AndB x0 x1 xs, _) ->
+    AndB x0 x1 (xs |> y)
+  (_, AndB y0 y1 ys) ->
+    AndB x y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> AndB x y mempty
+
+chainExprsOfAssocOpAndU :: Width -> ExprU n -> ExprU n -> ExprU n
+chainExprsOfAssocOpAndU w x y = case (x, y) of
+  (AndU _ x0 x1 xs, AndU _ y0 y1 ys) ->
+    AndU w x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (AndU _ x0 x1 xs, _) ->
+    AndU w x0 x1 (xs |> y)
+  (_, AndU _ y0 y1 ys) ->
+    AndU w x y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> AndU w x y mempty
+
+chainExprsOfAssocOpOrB :: ExprB n -> ExprB n -> ExprB n
+chainExprsOfAssocOpOrB x y = case (x, y) of
+  (OrB x0 x1 xs, OrB y0 y1 ys) ->
+    OrB x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (OrB x0 x1 xs, _) ->
+    OrB x0 x1 (xs |> y)
+  (_, OrB y0 y1 ys) ->
+    OrB x y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> OrB x y mempty
+
+chainExprsOfAssocOpOrU :: Width -> ExprU n -> ExprU n -> ExprU n
+chainExprsOfAssocOpOrU w x y = case (x, y) of
+  (OrU _ x0 x1 xs, OrU _ y0 y1 ys) ->
+    OrU w x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (OrU _ x0 x1 xs, _) ->
+    OrU w x0 x1 (xs |> y)
+  (_, OrU _ y0 y1 ys) ->
+    OrU w x y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> OrU w x y mempty

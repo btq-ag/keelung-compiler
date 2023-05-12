@@ -6,11 +6,11 @@
 
 module Keelung.Compiler.Constraint
   ( Ref (..),
-    RefT (..),
+    RefF (..),
     RefB (..),
     RefU (..),
     reindexRef,
-    reindexRefT,
+    reindexRefF,
     reindexRefB,
     reindexRefU,
     Constraint (..),
@@ -28,8 +28,6 @@ module Keelung.Compiler.Constraint
     cVarBindU,
     cMulF,
     cMulSimpleF,
-    cNEqF,
-    cNEqU,
     -- cRotateU,
     fromConstraint,
   )
@@ -41,7 +39,6 @@ import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung.Compiler.Relocated qualified as Relocated
-import Keelung.Constraint.R1CS qualified as Constraint
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
@@ -57,7 +54,7 @@ fromConstraint counters (CVarEq x y) =
     Left _ -> error "CVarEq: two variables are the same"
     Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarEqF x y) =
-  case Poly.buildEither 0 [(reindexRefT counters x, 1), (reindexRefT counters y, -1)] of
+  case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
     Left _ -> error "CVarEqF: two variables are the same"
     Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarEqB x y) =
@@ -73,7 +70,8 @@ fromConstraint counters (CVarEqU x y) =
     Left _ -> error "CVarEqU: two variables are the same"
     Right xs -> Relocated.CAdd xs
 fromConstraint counters (CVarBindF x n) = Relocated.CAdd (Poly.bind (reindexRef counters x) n)
-fromConstraint counters (CVarBindB x n) = Relocated.CAdd (Poly.bind (reindexRefB counters x) n)
+fromConstraint counters (CVarBindB x True) = Relocated.CAdd (Poly.bind (reindexRefB counters x) 1)
+fromConstraint counters (CVarBindB x False) = Relocated.CAdd (Poly.bind (reindexRefB counters x) 0)
 fromConstraint counters (CVarBindU x n) = Relocated.CAdd (Poly.bind (reindexRefU counters x) n)
 fromConstraint counters (CMulF as bs cs) =
   Relocated.CMul
@@ -83,17 +81,13 @@ fromConstraint counters (CMulF as bs cs) =
         Left n -> Left n
         Right xs -> fromPoly counters xs
     )
-fromConstraint counters (CNEqF x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefT counters x)) (Left (reindexRefT counters y)) (reindexRefT counters m))
-fromConstraint counters (CNEqU x y m) = Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefT counters m))
-
--- fromConstraint counters (CRotateU _x _y _n) = error "dunno how"
 
 --------------------------------------------------------------------------------
 
 -- | For representing mixed variables in constraints
 data Ref
   = -- | Field variable
-    F RefT
+    F RefF
   | -- | Boolean variable
     B RefB
   | -- | UInt variable
@@ -127,7 +121,7 @@ instance Show RefB where
   show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
 
 -- | For representing Field variables in constraints
-data RefT
+data RefF
   = -- | Field output variable
     RefFO Var
   | -- | Field public input variable
@@ -138,7 +132,7 @@ data RefT
     RefFX Var
   deriving (Eq, Ord, Generic, NFData)
 
-instance Show RefT where
+instance Show RefF where
   show (RefFO x) = "FO" ++ show x
   show (RefFI x) = "FI" ++ show x
   show (RefFP x) = "FP" ++ show x
@@ -176,7 +170,7 @@ pinnedRef (B ref) = pinnedRefB ref
 pinnedRef (U ref) = pinnedRefU ref
 pinnedRef (F ref) = pinnedRefF ref
 
-pinnedRefF :: RefT -> Bool
+pinnedRefF :: RefF -> Bool
 pinnedRefF (RefFO _) = True
 pinnedRefF (RefFI _) = True
 pinnedRefF (RefFP _) = True
@@ -198,15 +192,15 @@ pinnedRefU (RefUX _ _) = False
 --------------------------------------------------------------------------------
 
 reindexRef :: Counters -> Ref -> Var
-reindexRef counters (F x) = reindexRefT counters x
+reindexRef counters (F x) = reindexRefF counters x
 reindexRef counters (B x) = reindexRefB counters x
 reindexRef counters (U x) = reindexRefU counters x
 
-reindexRefT :: Counters -> RefT -> Var
-reindexRefT counters (RefFO x) = reindex counters OfOutput OfField x
-reindexRefT counters (RefFI x) = reindex counters OfPublicInput OfField x
-reindexRefT counters (RefFP x) = reindex counters OfPrivateInput OfField x
-reindexRefT counters (RefFX x) = reindex counters OfIntermediate OfField x
+reindexRefF :: Counters -> RefF -> Var
+reindexRefF counters (RefFO x) = reindex counters OfOutput OfField x
+reindexRefF counters (RefFI x) = reindex counters OfPublicInput OfField x
+reindexRefF counters (RefFP x) = reindex counters OfPrivateInput OfField x
+reindexRefF counters (RefFX x) = reindex counters OfIntermediate OfField x
 
 reindexRefB :: Counters -> RefB -> Var
 reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
@@ -248,18 +242,14 @@ fromPoly_ counters xs = case fromPoly counters xs of
 data Constraint n
   = CAddF !(PolyG Ref n)
   | CVarEq Ref Ref -- when x == y
-  | CVarEqF RefT RefT -- when x == y
+  | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y
   | CVarNEqB RefB RefB -- when x = ¬ y
   | CVarEqU RefU RefU -- when x == y
   | CVarBindF Ref n -- when x = val
-  | CVarBindB RefB n -- when x = val
+  | CVarBindB RefB Bool -- when x = val
   | CVarBindU RefU n -- when x = val
   | CMulF !(PolyG Ref n) !(PolyG Ref n) !(Either n (PolyG Ref n))
-  | CNEqF RefT RefT RefT
-  | CNEqU RefU RefU RefT
-
--- \| CRotateU RefUX RefUX Int -- when x = y `rotateL` i
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -269,10 +259,6 @@ instance GaloisField n => Eq (Constraint n) where
     (CVarBindU x y, CVarBindU u v) -> x == u && y == v
     (CVarBindF x y, CVarBindF u v) -> x == u && y == v
     (CMulF x y z, CMulF u v w) ->
-      (x == u && y == v || x == v && y == u) && z == w
-    (CNEqF x y z, CNEqF u v w) ->
-      (x == u && y == v || x == v && y == u) && z == w
-    (CNEqU x y z, CNEqU u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     _ -> False
 
@@ -284,12 +270,10 @@ instance Functor Constraint where
   fmap _ (CVarEqB x y) = CVarEqB x y
   fmap _ (CVarEqU x y) = CVarEqU x y
   fmap f (CVarBindF x y) = CVarBindF x (f y)
-  fmap f (CVarBindB x y) = CVarBindB x (f y)
+  fmap _ (CVarBindB x y) = CVarBindB x y
   fmap f (CVarBindU x y) = CVarBindU x (f y)
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
-  fmap _ (CNEqF x y z) = CNEqF x y z
-  fmap _ (CNEqU x y z) = CNEqU x y z
 
 -- | Smart constructor for the CAddF constraint
 cAddF :: GaloisField n => n -> [(Ref, n)] -> [Constraint n]
@@ -302,7 +286,7 @@ cVarEq :: GaloisField n => Ref -> Ref -> [Constraint n]
 cVarEq x y = if x == y then [] else [CVarEq x y]
 
 -- | Smart constructor for the CVarEqT constraint
-cVarEqF :: GaloisField n => RefT -> RefT -> [Constraint n]
+cVarEqF :: GaloisField n => RefF -> RefF -> [Constraint n]
 cVarEqF x y = if x == y then [] else [CVarEqF x y]
 
 -- | Smart constructor for the CVarEqB constraint
@@ -325,7 +309,7 @@ cVarBindF :: GaloisField n => Ref -> n -> [Constraint n]
 cVarBindF x n = [CVarBindF x n]
 
 -- | Smart constructor for the cVarBindB constraint
-cVarBindB :: GaloisField n => RefB -> n -> [Constraint n]
+cVarBindB :: GaloisField n => RefB -> Bool -> [Constraint n]
 cVarBindB x n = [CVarBindB x n]
 
 -- | Smart constructor for the cVarBindU constraint
@@ -354,12 +338,12 @@ cMulF (a, xs) (b, ys) (c, zs) = case ( do
   Left _ -> []
   Right result -> [result]
 
--- | Smart constructor for the CNEq constraint
-cNEqF :: GaloisField n => RefT -> RefT -> RefT -> [Constraint n]
-cNEqF x y m = [CNEqF x y m]
+-- -- | Smart constructor for the CNEq constraint
+-- cNEqF :: GaloisField n => RefF -> Either RefF n -> RefF -> [Constraint n]
+-- cNEqF x y m = [CNEqF x y m]
 
-cNEqU :: GaloisField n => RefU -> RefU -> RefT -> [Constraint n]
-cNEqU x y m = [CNEqU x y m]
+-- cNEqU :: GaloisField n => RefU -> Either RefU n -> RefF -> [Constraint n]
+-- cNEqU x y m = [CNEqU x y m]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddF xs) = "AF " <> show xs <> " = 0"
@@ -372,7 +356,3 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CVarBindB x n) = "BB " <> show x <> " = " <> show n
   show (CVarBindU x n) = "BU " <> show x <> " = " <> show n
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
-  show (CNEqF x y m) = "QF " <> show x <> " " <> show y <> " " <> show m
-  show (CNEqU x y m) = "QU " <> show x <> " " <> show y <> " " <> show m
-
--- show (CRotateU x y m) = "RU " <> show x <> " " <> show y <> " " <> show m
