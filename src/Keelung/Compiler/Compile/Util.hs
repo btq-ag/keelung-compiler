@@ -148,8 +148,10 @@ addC = mapM_ addOne
       execRelations $ AllRelations.assertEqualU x y
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
     addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
-    addOne (CNEqF x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y, m]) $ cs {csNEqF = Map.insert (x, y) m (csNEqF cs)})
-    addOne (CNEqU x y m) = modify' (\cs -> addOccurrences (Set.fromList [x, y]) $ addOccurrences (Set.singleton m) $ cs {csNEqU = Map.insert (x, y) m (csNEqU cs)})
+    addOne (CNEqF x (Left y) m) = modify' (\cs -> addOccurrences (Set.fromList [x, y, m]) $ cs {csNEqF = Map.insert (x, Left y) m (csNEqF cs)})
+    addOne (CNEqF x (Right y) m) = modify' (\cs -> addOccurrences (Set.fromList [x, m]) $ cs {csNEqF = Map.insert (x, Right y) m (csNEqF cs)})
+    addOne (CNEqU x (Left y) m) = modify' (\cs -> addOccurrences (Set.fromList [x, y]) $ addOccurrences (Set.singleton m) $ cs {csNEqU = Map.insert (x, Left y) m (csNEqU cs)})
+    addOne (CNEqU x (Right y) m) = modify' (\cs -> addOccurrences (Set.fromList [x]) $ addOccurrences (Set.singleton m) $ cs {csNEqU = Map.insert (x, Right y) m (csNEqU cs)})
 
 --------------------------------------------------------------------------------
 

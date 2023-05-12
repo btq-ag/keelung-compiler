@@ -634,12 +634,12 @@ compileEqualityU isEq out x y =
               (0, [])
 
       --  keep track of the relation between (x - y) and m
-      addC $ cNEqU x y m
+      addC $ cNEqU x (Left y) m
 
 -- -- | Equalities are compiled with inequalities and inequalities with CNEQ constraints.
 -- --    introduce a new variable m
 -- --    if diff = 0 then m = 0 else m = recip diff
--- --    Equality: 
+-- --    Equality:
 -- --      (x - y) * m = 1 - out
 -- --      (x - y) * out = 0
 -- --    Inequality:
@@ -647,7 +647,7 @@ compileEqualityU isEq out x y =
 -- --      (x - y) * (1 - out) = 0
 -- eqF :: (GaloisField n, Integral n) => Bool -> Either RefF n -> Either RefF n -> M n (Either RefB Bool)
 -- eqF isEq (Right x) (Right y) = return $ Right $ if isEq then x == y else x /= y
--- eqF isEq (Right x) (Left y) = do 
+-- eqF isEq (Right x) (Left y) = do
 --       m <- freshRefF
 --       out <- freshRefB
 --       if isEq
@@ -682,7 +682,6 @@ compileEqualityU isEq out x y =
 --       return (Left out)
 -- eqF isEq (Left x) (Right y) = eqF isEq (Right y) (Left x)
 -- eqF isEq (Left x) (Left y) = _
-
 
 compileEqualityF :: (GaloisField n, Integral n) => Bool -> RefB -> RefF -> RefF -> M n ()
 compileEqualityF isEq out x y =
@@ -724,7 +723,7 @@ compileEqualityF isEq out x y =
               (0, [])
 
       --  keep track of the relation between (x - y) and m
-      addC $ cNEqF x y m
+      addC $ cNEqF x (Left y) m
 
 --------------------------------------------------------------------------------
 
@@ -870,25 +869,25 @@ compileOrBs out x0 x1 xs = do
 --     (0, [(B x1, 1)])
 --     (0, [(B x0, -1), (B out, 1)])
 --   return $ Left out
--- orBs (Left x0) (Left x1) (x2 :<| xs) = do 
+-- orBs (Left x0) (Left x1) (x2 :<| xs) = do
 --   -- more than 2 operands, rewrite it as an inequality instead:
 --   --      if all operands are 0           then 0 else 1
 --   --  =>  if the sum of operands is 0     then 0 else 1
 --   --  =>  if the sum of operands is not 0 then 1 else 0
 --   --  =>  the sum of operands is not 0
 --   out <- freshRefB
-  -- compileEqualityF False out (ValF 0) y'
-  -- compileExprB
-  --   out
-  --   ( NEqF
-  --       (ValF 0)
-  --       ( AddF
-  --           (BtoF x0)
-  --           (BtoF x1)
-  --           (fmap BtoF xs)
-  --       )
-  --   )
-  -- return $ Left out
+-- compileEqualityF False out (ValF 0) y'
+-- compileExprB
+--   out
+--   ( NEqF
+--       (ValF 0)
+--       ( AddF
+--           (BtoF x0)
+--           (BtoF x1)
+--           (fmap BtoF xs)
+--       )
+--   )
+-- return $ Left out
 
 xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 xorB (Right True) (Right True) = return $ Right False

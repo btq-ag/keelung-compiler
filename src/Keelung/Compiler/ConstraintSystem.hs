@@ -35,7 +35,6 @@ import Keelung.Compiler.Compile.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
-import Keelung.Constraint.R1CS qualified as Constraint
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
@@ -64,8 +63,8 @@ data ConstraintSystem n = ConstraintSystem
     -- multiplicative constraints
     csMulF :: [(PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))],
     -- constraints for computing equality
-    csNEqF :: Map (RefF, RefF) RefF,
-    csNEqU :: Map (RefU, RefU) RefF,
+    csNEqF :: Map (RefF, Either RefF n) RefF,
+    csNEqU :: Map (RefU, Either RefU n) RefF,
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
     csDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
@@ -386,8 +385,8 @@ relocateConstraintSystem cs =
 
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
-    nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefF counters x)) (Left (reindexRefF counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqF cs
-    nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefF counters m))) $ Map.toList $ csNEqU cs
+    nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (reindexRefF counters x) (left (reindexRefF counters) y) (reindexRefF counters m)) $ Map.toList $ csNEqF cs
+    nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (reindexRefU counters x) (left (reindexRefU counters) y) (reindexRefF counters m)) $ Map.toList $ csNEqU cs
 
     divMods = map (\(a, b, q, r) -> (left (reindexRefU counters) a, left (reindexRefU counters) b, left (reindexRefU counters) q, left (reindexRefU counters) r)) $ csDivMods cs
     modInvs = map (\(a, n, p) -> (left (reindexRefU counters) a, left (reindexRefU counters) n, p)) $ csModInvs cs

@@ -18,7 +18,7 @@ import Keelung.Compiler.Relocated hiding (numberOfConstraints)
 import Keelung.Compiler.Util
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1C qualified as R1C
-import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
+import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
 import Keelung.Field (N (..))
 import Keelung.Syntax
 
@@ -38,19 +38,18 @@ satisfyR1CS witness r1cs =
 toR1CS :: GaloisField n => RelocatedConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
-    { 
-      r1csField = csField cs,
+    { r1csField = csField cs,
       r1csConstraints = rights convertedConstratins,
       r1csBinReps = csBinReps cs,
       r1csCounters = csCounters cs,
-      r1csCNEQs = lefts convertedConstratins,
+      r1csEqs = lefts convertedConstratins,
       r1csDivMods = csDivMods cs,
       r1csModInvs = csModInvs cs
     }
   where
     convertedConstratins = map toR1C (toList (csConstraints cs))
 
-    toR1C :: GaloisField n => Constraint n -> Either (CNEQ n) (R1C n)
+    toR1C :: GaloisField n => Constraint n -> Either (Var, Either Var n, Var) (R1C n)
     toR1C (CAdd xs) =
       Right $
         R1C
@@ -59,7 +58,7 @@ toR1CS cs =
           (Left 0)
     toR1C (CMul aX bX cX) =
       Right $ R1C (Right aX) (Right bX) cX
-    toR1C (CNEq x) = Left x
+    toR1C (CNEq x y m) = Left (x, y, m)
 
 -- fromR1CS :: GaloisField n => R1CS n -> RelocatedConstraintSystem n
 -- fromR1CS r1cs =

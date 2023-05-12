@@ -16,7 +16,6 @@ import Data.Map qualified as Map
 import Data.Sequence (Seq)
 import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
-import Keelung.Constraint.R1CS (CNEQ (..))
 import Keelung.Data.BinRep (BinRep)
 import Keelung.Data.BinRep qualified as BinRep
 import Keelung.Data.Polynomial (Poly)
@@ -34,7 +33,7 @@ import Keelung.Syntax.Counters
 data Constraint n
   = CAdd !(Poly n)
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
-  | CNEq (CNEQ n) -- x y m
+  | CNEq Var (Either Var n) Var -- x y m
   deriving (Generic, NFData)
 
 instance GaloisField n => Eq (Constraint n) where
@@ -42,14 +41,14 @@ instance GaloisField n => Eq (Constraint n) where
     (CAdd x, CAdd y) -> x == y
     (CMul x y z, CMul u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
-    (CNEq x, CNEq y) -> x == y
+    (CNEq x y m, CNEq u v n) -> x == u && y == v && m == n
     _ -> False
 
 instance Functor Constraint where
   fmap f (CAdd x) = CAdd (fmap f x)
   fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
-  fmap f (CNEq x) = CNEq (fmap f x)
+  fmap f (CNEq x y m) = CNEq x (fmap f y) m
 
 -- | Smart constructor for the CAdd constraint
 cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
@@ -70,7 +69,8 @@ cmul !xs !ys (c, zs) = case ( do
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = "A " <> show xs <> " = 0"
   show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
-  show (CNEq x) = show x
+  show (CNEq x (Left y) m) = "Q $" <> show x <> " $" <> show y <> " $" <> show m
+  show (CNEq x (Right y) m) = "Q $" <> show x <> " " <> show y <> " $" <> show m
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
@@ -93,10 +93,8 @@ varsInConstraint :: Constraint a -> IntSet
 varsInConstraint (CAdd xs) = Poly.vars xs
 varsInConstraint (CMul aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
 varsInConstraint (CMul aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
-varsInConstraint (CNEq (CNEQ (Left x) (Left y) m)) = IntSet.fromList [x, y, m]
-varsInConstraint (CNEq (CNEQ (Left x) _ m)) = IntSet.fromList [x, m]
-varsInConstraint (CNEq (CNEQ _ (Left y) m)) = IntSet.fromList [y, m]
-varsInConstraint (CNEq (CNEQ _ _ m)) = IntSet.fromList [m]
+varsInConstraint (CNEq x (Left y) m) = IntSet.fromList [x, y, m]
+varsInConstraint (CNEq x _ m) = IntSet.fromList [x, m]
 
 varsInConstraints :: Seq (Constraint a) -> IntSet
 varsInConstraints = IntSet.unions . fmap varsInConstraint
@@ -184,14 +182,10 @@ renumberConstraints cs =
         CAdd $ Poly.renumberVars renumber xs
       CMul aV bV cV ->
         CMul (Poly.renumberVars renumber aV) (Poly.renumberVars renumber bV) (Poly.renumberVars renumber <$> cV)
-      CNEq (CNEQ (Left x) (Left y) m) ->
-        CNEq (CNEQ (Left (renumber x)) (Left (renumber y)) (renumber m))
-      CNEq (CNEQ (Left x) (Right y) m) ->
-        CNEq (CNEQ (Left (renumber x)) (Right y) (renumber m))
-      CNEq (CNEQ (Right x) (Left y) m) ->
-        CNEq (CNEQ (Right x) (Left (renumber y)) (renumber m))
-      CNEq (CNEQ (Right x) (Right y) m) ->
-        CNEq (CNEQ (Right x) (Right y) (renumber m))
+      CNEq x (Left y) m ->
+        CNEq (renumber x) (Left (renumber y)) (renumber m)
+      CNEq x (Right y) m ->
+        CNEq (renumber x) (Right y) (renumber m)
 
     renumberBinRep binRep =
       binRep
