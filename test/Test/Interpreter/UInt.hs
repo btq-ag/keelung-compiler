@@ -620,7 +620,7 @@ tests = do
           []
           ([] :: [GF181])
           (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ (3 = 3)")
-          (CompileError (Compiler.ConflictingValuesB False True))
+          (CompileError (Compiler.ConflictingValuesB True False))
 
     describe "Bitwise" $ do
       it "rotate" $ do

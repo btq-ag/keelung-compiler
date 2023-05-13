@@ -16,6 +16,7 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
+import Keelung (HasWidth(widthOf))
 
 --------------------------------------------------------------------------------
 
@@ -39,6 +40,24 @@ freshRefF = do
   let index = getCount OfIntermediate OfField counters
   modifyCounter $ addCount OfIntermediate OfField 1
   return $ RefFX index
+
+freshRefForU :: Ref -> M n Ref
+freshRefForU (F _) = do
+  counters <- gets csCounters
+  let index = getCount OfIntermediate OfField counters
+  modifyCounter $ addCount OfIntermediate OfField 1
+  return $ F $ RefFX index
+freshRefForU (B _) = do
+  counters <- gets csCounters
+  let index = getCount OfIntermediate OfBoolean counters
+  modifyCounter $ addCount OfIntermediate OfBoolean 1
+  return $ B $ RefBX index
+freshRefForU (U ref) = do
+  let width = widthOf ref
+  counters <- gets csCounters
+  let index = getCount OfIntermediate (OfUInt width) counters
+  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
+  return $ U $ RefUX width index
 
 freshRefB :: M n RefB
 freshRefB = do
@@ -159,8 +178,14 @@ writeAdd c as = writeAddWithPoly (PolyG.build c as)
 writeValB :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
 writeValB a x = addC [CVarBindB a x]
 
+writeValU :: (GaloisField n, Integral n) => RefU -> n -> M n ()
+writeValU a x = addC [CVarBindU a x]
+
 writeEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
 writeEqB a b = addC [CVarEqB a b]
 
 writeNEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
 writeNEqB a b = addC [CVarNEqB a b]
+
+writeEqU :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
+writeEqU a b = addC [CVarEqU a b]
