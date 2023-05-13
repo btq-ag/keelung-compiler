@@ -37,7 +37,10 @@ run fieldInfo useNewOptimizer (Internal untypedExprs _ counters assertions sideE
     case expr of
       ExprB x -> do
         let out = RefBO var
-        compileExprB out x
+        result <- compileExprB x
+        case result of
+          Left var' -> writeEqB out var'
+          Right val -> writeValB out val
       ExprF x -> do
         let out = RefFO var
         compileExprF out x
@@ -53,7 +56,11 @@ run fieldInfo useNewOptimizer (Internal untypedExprs _ counters assertions sideE
 
 -- | Compile side effects
 compileSideEffect :: (GaloisField n, Integral n) => SideEffect n -> M n ()
-compileSideEffect (AssignmentB var val) = compileExprB (RefBX var) val
+compileSideEffect (AssignmentB var val) = do
+  result <- compileExprB val
+  case result of
+    Left var' -> writeEqB (RefBX var) var'
+    Right val' -> writeValB (RefBX var) val'
 compileSideEffect (AssignmentF var val) = compileExprF (RefFX var) val
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
 compileSideEffect (DivMod width dividend divisor quotient remainder) = assertDivModU width dividend divisor quotient remainder
@@ -78,9 +85,12 @@ compileAssertion expr = case expr of
   ExprB (GTU x (ValU width bound)) -> assertGT width x (toInteger bound)
   ExprB (GTU (ValU width bound) x) -> assertLT width x (toInteger bound)
   ExprB x -> do
-    out <- freshRefB
-    compileExprB out x
-    addC $ cVarBindB out True -- out = 1
+    -- out <- freshRefB
+    result <- compileExprB x
+    case result of
+      Left var -> writeValB var True
+      Right True -> return ()
+      Right val -> throwError $ Compile.ConflictingValuesB True val
   ExprF x -> do
     out <- freshRefF
     compileExprF out x
@@ -96,31 +106,36 @@ compileAssertionEqB (VarB a) (VarB b) = addC $ cVarEqB (RefBX a) (RefBX b)
 compileAssertionEqB (VarB a) (VarBO b) = addC $ cVarEqB (RefBX a) (RefBO b)
 compileAssertionEqB (VarB a) (VarBI b) = addC $ cVarEqB (RefBX a) (RefBI b)
 compileAssertionEqB (VarB a) b = do
-  out <- freshRefB
-  compileExprB out b
-  addC $ cVarEqB (RefBX a) out
+  result <- compileExprB b
+  case result of
+    Left var -> writeEqB (RefBX a) var
+    Right val -> writeValB (RefBX a) val
 compileAssertionEqB (VarBO a) (ValB b) = addC $ cVarBindB (RefBO a) b
 compileAssertionEqB (VarBO a) (VarB b) = addC $ cVarEqB (RefBO a) (RefBX b)
 compileAssertionEqB (VarBO a) (VarBO b) = addC $ cVarEqB (RefBO a) (RefBO b)
 compileAssertionEqB (VarBO a) (VarBI b) = addC $ cVarEqB (RefBO a) (RefBI b)
 compileAssertionEqB (VarBO a) b = do
-  out <- freshRefB
-  compileExprB out b
-  addC $ cVarEqB (RefBO a) out
+  result <- compileExprB b
+  case result of
+    Left var -> writeEqB (RefBO a) var
+    Right val -> writeValB (RefBO a) val
 compileAssertionEqB (VarBI a) (ValB b) = addC $ cVarBindB (RefBI a) b
 compileAssertionEqB (VarBI a) (VarB b) = addC $ cVarEqB (RefBI a) (RefBX b)
 compileAssertionEqB (VarBI a) (VarBO b) = addC $ cVarEqB (RefBI a) (RefBO b)
 compileAssertionEqB (VarBI a) (VarBI b) = addC $ cVarEqB (RefBI a) (RefBI b)
 compileAssertionEqB (VarBI a) b = do
-  out <- freshRefB
-  compileExprB out b
-  addC $ cVarEqB (RefBI a) out
+  result <- compileExprB b
+  case result of
+    Left var -> writeEqB (RefBI a) var
+    Right val -> writeValB (RefBI a) val
 compileAssertionEqB a b = do
-  a' <- freshRefB
-  b' <- freshRefB
-  compileExprB a' a
-  compileExprB b' b
-  addC $ cVarEqB a' b'
+  a' <- compileExprB a
+  b' <- compileExprB b
+  case (a', b') of
+    (Left varA, Left varB) -> writeEqB varA varB
+    (Left varA, Right valB) -> writeValB varA valB
+    (Right valA, Left varB) -> writeValB varB valA
+    (Right valA, Right valB) -> when (valA /= valB) $ throwError $ Compile.ConflictingValuesB valA valB
 
 compileAssertionEqF :: (GaloisField n, Integral n) => ExprF n -> ExprF n -> M n ()
 compileAssertionEqF (VarF a) (ValF b) = addC $ cVarBindF (F $ RefFX a) b
@@ -216,151 +231,87 @@ freshExprU width = do
 
 ----------------------------------------------------------------
 
-compileExprB :: (GaloisField n, Integral n) => RefB -> ExprB n -> M n ()
-compileExprB out expr = case expr of
-  ValB val -> addC $ cVarBindB out val -- out = val
-  VarB var -> addC $ cVarEqB out (RefBX var) -- out = var
-  VarBO var -> addC $ cVarEqB out (RefBO var) -- out = var
-  VarBI var -> addC $ cVarEqB out (RefBI var) -- out = var
-  VarBP var -> addC $ cVarEqB out (RefBP var) -- out = var
+compileExprB :: (GaloisField n, Integral n) => ExprB n -> M n (Either RefB Bool)
+compileExprB expr = case expr of
+  ValB val -> return $ Right val -- out = val
+  VarB var -> return $ Left (RefBX var) -- out = var
+  VarBO var -> return $ Left (RefBO var) -- out = var
+  VarBI var -> return $ Left (RefBI var) -- out = var
+  VarBP var -> return $ Left (RefBP var) -- out = var
   AndB x0 x1 xs -> do
     x0' <- wireB' x0
     x1' <- wireB' x1
     xs' <- mapM wireB' xs
-    result <- andBs x0' x1' xs'
-    case result of
-      Left var -> addC $ cVarEqB out var
-      Right val -> addC $ cVarBindB out val
-    -- a <- wireB x0
-    -- b <- wireB x1
-    -- vars <- mapM wireB xs
-    -- case vars of
-    --   Empty ->
-    --     addC $ cMulSimpleF (B a) (B b) (B out) -- out = a * b
-    --   (c :<| Empty) -> do
-    --     aAndb <- freshRefB
-    --     addC $ cMulSimpleF (B a) (B b) (B aAndb) -- aAndb = a * b
-    --     addC $ cMulSimpleF (B aAndb) (B c) (B out) -- out = aAndb * c
-    --   _ -> do
-    --     -- the number of operands
-    --     let n = 2 + fromIntegral (length vars)
-    --     -- polynomial = n - sum of operands
-    --     let polynomial = (n, (B a, -1) : (B b, -1) : [(B v, -1) | v <- toList vars])
-    --     -- if the answer is 1 then all operands must be 1
-    --     --    (n - sum of operands) * out = 0
-    --     addC $
-    --       cMulF
-    --         polynomial
-    --         (0, [(B out, 1)])
-    --         (0, [])
-    --     -- if the answer is 0 then not all operands must be 1:
-    --     --    (n - sum of operands) * inv = 1 - out
-    --     inv <- freshRefB
-    --     addC $
-    --       cMulF
-    --         polynomial
-    --         (0, [(B inv, 1)])
-    --         (1, [(B out, -1)])
+    andBs x0' x1' xs'
   OrB x0 x1 xs -> do
     x0' <- wireB' x0
     x1' <- wireB' x1
     xs' <- mapM wireB' xs
-    result <- orBs x0' x1' xs'
-    case result of
-      Left var -> addC $ cVarEqB out var
-      Right val -> addC $ cVarBindB out val
+    orBs x0' x1' xs'
   XorB x y -> do
     x' <- wireB' x
     y' <- wireB' y
-    result <- xorB x' y'
-    case result of
-      Left var -> addC $ cVarEqB out var
-      Right val -> addC $ cVarBindB out val
+    xorB x' y'
   NotB x -> do
-    x' <- wireB x
-    addC $ cVarNEqB x' out
+    x' <- wireB' x
+    case x' of
+      Left var -> do
+        out <- freshRefB
+        writeNEqB var out
+        return $ Left out
+      Right val -> return $ Right (not val)
   IfB p x y -> do
-    p' <- wireB p
-    x' <- wireB x
-    y' <- wireB y
-    compileIfB out p' x' y'
-  NEqB x y -> compileExprB out (XorB x y)
+    p' <- wireB' p
+    x' <- wireB' x
+    y' <- wireB' y
+    compileIfB p' x' y'
+  NEqB x y -> compileExprB (XorB x y)
   NEqF x y -> do
     x' <- wireF' x
     y' <- wireF' y
-    result <- eqFU False (left F x') (left F y')
-    case result of
-      Left var -> addC $ cVarEqB out var
-      Right val -> addC $ cVarBindB out val
+    eqFU False (left F x') (left F y')
   NEqU x y -> do
     x' <- wireU' x
     y' <- wireU' y
-    result <- eqFU False (left U x') (left U y')
-    case result of
-      Left var -> addC $ cVarEqB out var
-      Right val -> addC $ cVarBindB out val
+    eqFU False (left U x') (left U y')
   EqB x y -> do
-    x' <- wireB x
-    y' <- wireB y
-    -- Constraint 'x == y = out' ASSUMING x, y are boolean.
-    --     x * y + (1 - x) * (1 - y) = out
-    -- =>
-    --    (1 - x) * (1 - 2y) = (out - y)
-    addC $
-      cMulF
-        (1, [(B x', -1)])
-        (1, [(B y', -2)])
-        (0, [(B out, 1), (B y', -1)])
+    x' <- wireB' x
+    y' <- wireB' y
+    eqB x' y'
   EqF x y -> do
     x' <- wireF' x
     y' <- wireF' y
-    result <- eqFU True (left F x') (left F y')
-    case result of
-      Left var -> addC $ cVarEqB out var
-      Right val -> addC $ cVarBindB out val
+    eqFU True (left F x') (left F y')
   EqU x y -> do
     x' <- wireU' x
     y' <- wireU' y
-    result <- eqFU True (left U x') (left U y')
-    case result of
-      Left var -> addC $ cVarEqB out var
-      Right val -> addC $ cVarBindB out val
+    eqFU True (left U x') (left U y')
   LTEU x y -> do
     x' <- wireU' x
     y' <- wireU' y
-    result <- case (x', y') of
+    case (x', y') of
       (Left xVar, Left yVar) -> computeLTEUVarVar xVar yVar
       (Left xVar, Right yVal) -> computeLTEUVarConst xVar yVal
       (Right xVal, Left yVar) -> computeLTEUConstVar xVal yVar
       (Right xVal, Right yVal) -> return $ Right (xVal <= yVal)
-    case result of
-      Left var -> addC $ cVarEqB out var
-      Right val -> addC $ cVarBindB out val
   LTU x y -> do
     x' <- wireU' x
     y' <- wireU' y
-    result <- case (x', y') of
+    case (x', y') of
       (Left xVar, Left yVar) -> computeLTUVarVar xVar yVar
       (Left xVar, Right yVal) -> computeLTUVarConst xVar yVal
       (Right xVal, Left yVar) -> computeLTUConstVar xVal yVar
       (Right xVal, Right yVal) -> return $ Right (xVal < yVal)
-    case result of
-      Left var -> addC $ cVarEqB out var
-      Right val -> addC $ cVarBindB out val
-  GTEU x y -> compileExprB out (LTEU y x)
-  GTU x y -> compileExprB out (LTU y x)
+  GTEU x y -> compileExprB (LTEU y x)
+  GTU x y -> compileExprB (LTU y x)
   BitU (ValU width val) i -> do
     let index = i `mod` width
     let bit = FieldBits.testBit' val index
-    addC $ cVarBindB out bit -- out[i] = bit
-    -- forM_ [0 .. width - 1] $ \i -> do
-    --   let bit = testBit val i
-    --   addC $ cVarBindB (RefUBit width out i) bit -- out[i] = bit
-    -- error "compileExprB: BitU (ValU _ _) _"
+    return $ Right bit
   BitU x i -> do
     x' <- wireU x
     let width = widthOf x
-    addC $ cVarEqB out (RefUBit width x' (i `mod` width)) -- out = x'[i]
+    return $ Left (RefUBit width x' (i `mod` width)) -- out = x'[i]
 
 compileExprF :: (GaloisField n, Integral n) => RefF -> ExprF n -> M n ()
 compileExprF out expr = case expr of
@@ -406,14 +357,19 @@ compileExprF out expr = case expr of
   --   inv <- freshRefF
   --   addC $ cMulF (0, [(x', 1)]) (0, [(inv, -1)]) (1, [(U n, fromIntegral p)])
   IfF p x y -> do
-    p' <- wireB p
-    x' <- wireF x
-    y' <- wireF y
-    compileIfF (F out) p' (F x') (F y')
+    p' <- wireB' p
+    x' <- wireF' x
+    y' <- wireF' y
+    result <- compileIfF p' x' y'
+    case result of
+      Left var -> addC $ cVarEq (F out) (F var)
+      Right val -> addC $ cVarBindF (F out) val
   BtoF x -> do
-    result <- freshRefB
-    compileExprB result x
-    addC $ cVarEq (F out) (B result) -- out = var
+    result <- compileExprB x
+    case result of
+      Left var -> addC $ cVarEq (F out) (B var) -- out = var
+      Right True -> addC $ cVarBindF (F out) 1
+      Right False -> addC $ cVarBindF (F out) 0
 
 compileExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compileExprU out expr = case expr of
@@ -462,24 +418,28 @@ compileExprU out expr = case expr of
     assertLTE w n ceilingLg2P
   AndU w x y xs -> do
     forM_ [0 .. w - 1] $ \i -> do
-      compileExprB
-        (RefUBit w out i)
-        (AndB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
+      result <- compileExprB (AndB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
+      case result of
+        Left var -> writeEqB (RefUBit w out i) var
+        Right val -> writeValB (RefUBit w out i) val
   OrU w x y xs -> do
     forM_ [0 .. w - 1] $ \i -> do
-      compileExprB
-        (RefUBit w out i)
-        (OrB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
+      result <- compileExprB (OrB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
+      case result of
+        Left var -> writeEqB (RefUBit w out i) var
+        Right val -> writeValB (RefUBit w out i) val
   XorU w x y -> do
     forM_ [0 .. w - 1] $ \i -> do
-      compileExprB
-        (RefUBit w out i)
-        (XorB (BitU x i) (BitU y i))
+      result <- compileExprB (XorB (BitU x i) (BitU y i))
+      case result of
+        Left var -> writeEqB (RefUBit w out i) var
+        Right val -> writeValB (RefUBit w out i) val
   NotU w x -> do
     forM_ [0 .. w - 1] $ \i -> do
-      compileExprB
-        (RefUBit w out i)
-        (NotB (BitU x i))
+      result <- compileExprB (NotB (BitU x i))
+      case result of
+        Left var -> writeEqB (RefUBit w out i) var
+        Right val -> writeValB (RefUBit w out i) val
   IfU _ p x y -> do
     p' <- wireB p
     x' <- wireU x
@@ -520,10 +480,12 @@ compileExprU out expr = case expr of
         else addC $ cVarEqB (RefUBit w out i) (RefUBit w x' i) -- out[i] = x[i]
   BtoU w x -> do
     -- 1. wire 'out[ZERO]' to 'x'
-    result <- freshRefB
-    compileExprB result x
-    addC $ cVarEqB (RefUBit w out 0) result -- out[0] = x
-    -- 2. wire 'out[SUCC _]' to '0' for all other bits
+    result <- compileExprB x
+
+    case result of
+      Left var -> writeEqB (RefUBit w out 0) var -- out[0] = x
+      Right val -> writeValB (RefUBit w out 0) val -- out[0] = x
+      -- 2. wire 'out[SUCC _]' to '0' for all other bits
     forM_ [1 .. w - 1] $ \i ->
       addC $ cVarBindB (RefUBit w out i) False -- out[i] = 0
 
@@ -587,9 +549,13 @@ wireB (VarBO ref) = return (RefBO ref)
 wireB (VarBI ref) = return (RefBI ref)
 wireB (VarBP ref) = return (RefBP ref)
 wireB expr = do
-  out <- freshRefB
-  compileExprB out expr
-  return out
+  result <- compileExprB expr
+  case result of
+    Left var -> return var
+    Right val -> do
+      out <- freshRefB
+      writeValB out val
+      return out
 
 wireB' :: (GaloisField n, Integral n) => ExprB n -> M n (Either RefB Bool)
 wireB' (ValB val) = return (Right val)
@@ -696,6 +662,25 @@ eqFU isEq (Left x) (Left y) = do
   addEqHint y (Left x) m
   return (Left out)
 
+eqB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
+eqB (Right x) (Right y) = return $ Right $ x == y
+eqB (Right True) (Left y) = return $ Left y
+eqB (Right False) (Left y) = do
+  out <- freshRefB
+  writeNEqB out y
+  return $ Left out
+eqB (Left x) (Right y) = eqB (Right y) (Left x)
+eqB (Left x) (Left y) = do
+  --     x * y + (1 - x) * (1 - y) = out
+  -- =>
+  --    (1 - x) * (1 - 2y) = (out - y)
+  out <- freshRefB
+  writeMul
+    (1, [(B x, -1)])
+    (1, [(B y, -2)])
+    (0, [(B out, 1), (B y, -1)])
+  return (Left out)
+
 --------------------------------------------------------------------------------
 
 -- | Encoding addition on UInts with multiple operands: O(1)
@@ -742,34 +727,101 @@ compileMulU width out a b = do
 -- HACK: addC occurences of RefUs
 -- addOccurrencesUTemp [out, a, b, c]
 
--- | An universal way of compiling a conditional
-compileIfB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> RefB -> M n ()
-compileIfB out p x y = do
-  --  out = p * x + (1 - p) * y
-  --      =>
-  --  out = p * x + y - p * y
-  --      =>
-  --  (out - y) = p * (x - y)
-  addC $
-    cMulF
-      (0, [(B p, 1)])
-      (0, [(B x, 1), (B y, -1)])
-      (0, [(B y, -1), (B out, 1)])
+-- | Conditional
+--  out = p * x + (1 - p) * y
+--      =>
+--  out = p * x + y - p * y
+--      =>
+--  (out - y) = p * (x - y)
+compileIfF :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefF n -> Either RefF n -> M n (Either RefF n)
+compileIfF (Right True) x _ = return x
+compileIfF (Right False) _ y = return y
+compileIfF (Left p) (Right x) (Right y) = do
+  if x == y
+    then return $ Right x
+    else do
+      out <- freshRefF
+      -- (x - y) * p - out + y = 0
+      writeAdd y [(B p, x - y), (F out, -1)]
+      return $ Left out
+compileIfF (Left p) (Right x) (Left y) = do
+  out <- freshRefF
+  -- (out - y) = p * (x - y)
+  writeMul
+    (0, [(B p, 1)])
+    (x, [(F y, -1)])
+    (0, [(F y, -1), (F out, 1)])
+  return $ Left out
+compileIfF (Left p) (Left x) (Right y) = do
+  out <- freshRefF
+  -- (out - y) = p * (x - y)
+  writeMul
+    (0, [(B p, 1)])
+    (-y, [(F x, 1)])
+    (-y, [(F out, 1)])
+  return $ Left out
+compileIfF (Left p) (Left x) (Left y) = do
+  out <- freshRefF
+  -- (out - y) = p * (x - y)
+  writeMul
+    (0, [(B p, 1)])
+    (0, [(F x, 1), (F y, -1)])
+    (0, [(F y, -1), (F out, 1)])
+  return $ Left out
 
-compileIfF :: (GaloisField n, Integral n) => Ref -> RefB -> Ref -> Ref -> M n ()
-compileIfF out p x y = do
-  --  out = p * x + (1 - p) * y
-  --      =>
-  --  out = p * x + y - p * y
-  --      =>
-  --  (out - y) = p * x - p * y
-  --      =>
-  --  (out - y) = p * (x - y)
-  addC $
-    cMulF
-      (0, [(B p, 1)])
-      (0, [(x, 1), (y, -1)])
-      (0, [(y, -1), (out, 1)])
+-- | Conditional
+--  out = p * x + (1 - p) * y
+--      =>
+--  out = p * x + y - p * y
+--      =>
+--  (out - y) = p * (x - y)
+compileIfB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
+compileIfB (Right True) x _ = return x
+compileIfB (Right False) _ y = return y
+compileIfB (Left _) (Right True) (Right True) = return $ Right True
+compileIfB (Left p) (Right True) (Right False) = return $ Left p
+compileIfB (Left p) (Right False) (Right True) = do
+  out <- freshRefB
+  writeNEqB p out
+  return $ Left out
+compileIfB (Left _) (Right False) (Right False) = return $ Right False
+compileIfB (Left p) (Right x) (Left y) = do
+  out <- freshRefB
+  -- (out - y) = p * (x - y)
+  writeMul
+    (0, [(B p, 1)])
+    (if x then 1 else 0, [(B y, -1)])
+    (0, [(B y, -1), (B out, 1)])
+  return $ Left out
+compileIfB (Left p) (Left x) (Right y) = do
+  out <- freshRefB
+  -- (out - y) = p * (x - y)
+  writeMul
+    (0, [(B p, 1)])
+    (if y then -1 else 0, [(B x, 1)])
+    (if y then -1 else 0, [(B out, 1)])
+  return $ Left out
+compileIfB (Left p) (Left x) (Left y) = do
+  out <- freshRefB
+  -- (out - y) = p * (x - y)
+  writeMul
+    (0, [(B p, 1)])
+    (0, [(B x, 1), (B y, -1)])
+    (0, [(B y, -1), (B out, 1)])
+  return $ Left out
+
+-- compileIfB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> RefB -> M n ()
+-- compileIfB out p x y = do
+--   --  out = p * x + (1 - p) * y
+--   --      =>
+--   --  out = p * x + y - p * y
+--   --      =>
+--   --  (out - y) = p * (x - y)
+--   addC $
+--     cMulF
+--       (0, [(B p, 1)])
+--       (0, [(B x, 1), (B y, -1)])
+--       (0, [(B y, -1), (B out, 1)])
 
 compileIfU :: (GaloisField n, Integral n) => RefU -> RefB -> RefU -> RefU -> M n ()
 compileIfU out p x y = do
@@ -785,44 +837,6 @@ compileIfU out p x y = do
       (0, [(B p, 1)])
       (0, [(U x, 1), (U y, -1)])
       (0, [(U y, -1), (U out, 1)])
-
-compileOrB :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> M n ()
-compileOrB out x y = do
-  -- (1 - x) * y = (out - x)
-  addC $
-    cMulF
-      (1, [(B x, -1)])
-      (0, [(B y, 1)])
-      (0, [(B x, -1), (B out, 1)])
-
-compileOrBs :: (GaloisField n, Integral n) => RefB -> ExprB n -> ExprB n -> Seq (ExprB n) -> M n ()
-compileOrBs out x0 x1 xs = do
-  a <- wireB x0
-  b <- wireB x1
-  vars <- mapM wireB xs
-  case vars of
-    Empty -> compileOrB out a b
-    (c :<| Empty) -> do
-      -- only 3 operands
-      aOrb <- freshRefB
-      compileOrB aOrb a b
-      compileOrB out aOrb c
-    _ -> do
-      -- more than 3 operands, rewrite it as an inequality instead:
-      --      if all operands are 0           then 0 else 1
-      --  =>  if the sum of operands is 0     then 0 else 1
-      --  =>  if the sum of operands is not 0 then 1 else 0
-      --  =>  the sum of operands is not 0
-      compileExprB
-        out
-        ( NEqF
-            (ValF 0)
-            ( AddF
-                (BtoF x0)
-                (BtoF x1)
-                (fmap BtoF xs)
-            )
-        )
 
 fromB :: Num n => Either RefB Bool -> Either Ref n
 fromB (Right True) = Right 1

@@ -156,6 +156,9 @@ writeMul as bs cs = writeMulWithPoly (uncurry PolyG.build as) (uncurry PolyG.bui
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPoly (PolyG.build c as)
 
+writeValB :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
+writeValB a x = addC [CVarBindB a x]
+
 writeEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
 writeEqB a b = addC [CVarEqB a b]
 
