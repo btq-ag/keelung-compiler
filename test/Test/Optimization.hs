@@ -28,8 +28,8 @@ tests = do
         Poseidon.hash (toList xs)
 
       -- cs before `pow`: 1537
-      cs `shouldHaveSize` 961
-      -- cs' before `pow`: 552
+      cs `shouldHaveSize` 555
+      -- cs' before `pow`: 694
       cs' `shouldHaveSize` 552
 
       return ()

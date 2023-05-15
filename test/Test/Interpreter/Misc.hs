@@ -50,7 +50,7 @@ tests = do
           ([] :: [GF181])
           []
           (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2")
-          (CompileError (Compile.ConflictingValuesF 2 1))
+          (CompileError (Compile.ConflictingValuesF 1 2))
 
       it "assert (true = false) (Boolean)" $ do
         let program = do
