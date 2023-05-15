@@ -28,11 +28,6 @@ library
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
-      Keelung.Compiler.Compile.Relations.Boolean
-      Keelung.Compiler.Compile.Relations.EquivClass
-      Keelung.Compiler.Compile.Relations.Field
-      Keelung.Compiler.Compile.Relations.UInt
-      Keelung.Compiler.Compile.Relations.Util
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
@@ -44,6 +39,11 @@ library
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Relations.Boolean
+      Keelung.Compiler.Relations.EquivClass
+      Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.UInt
+      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Relocated
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
@@ -91,11 +91,6 @@ executable keelungc
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
-      Keelung.Compiler.Compile.Relations.Boolean
-      Keelung.Compiler.Compile.Relations.EquivClass
-      Keelung.Compiler.Compile.Relations.Field
-      Keelung.Compiler.Compile.Relations.UInt
-      Keelung.Compiler.Compile.Relations.Util
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
@@ -107,6 +102,11 @@ executable keelungc
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Relations.Boolean
+      Keelung.Compiler.Relations.EquivClass
+      Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.UInt
+      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Relocated
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
@@ -180,11 +180,6 @@ test-suite keelung-test
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Error
-      Keelung.Compiler.Compile.Relations.Boolean
-      Keelung.Compiler.Compile.Relations.EquivClass
-      Keelung.Compiler.Compile.Relations.Field
-      Keelung.Compiler.Compile.Relations.UInt
-      Keelung.Compiler.Compile.Relations.Util
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
@@ -196,6 +191,11 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
+      Keelung.Compiler.Relations.Boolean
+      Keelung.Compiler.Relations.EquivClass
+      Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.UInt
+      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Relocated
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs

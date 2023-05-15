@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.Relations.Util (Seniority(..)) where
+module Keelung.Compiler.Relations.Util (Seniority(..)) where
 
 import Keelung.Compiler.Constraint
 import Data.Function (on)

@@ -11,11 +11,11 @@ import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
-import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Compile.Relations.Field (AllRelations)
-import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
-import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
+import Keelung.Compiler.Relations.Boolean (BooleanRelations)
+import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.Field (AllRelations)
+import Keelung.Compiler.Relations.Field qualified as AllRelations
+import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Data.PolyG (PolyG)

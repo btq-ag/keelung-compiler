@@ -4,7 +4,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compiler.Compile.Relations.Field
+module Keelung.Compiler.Relations.Field
   ( AllRelations,
     new,
     assignF,
@@ -33,9 +33,9 @@ import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.Boolean qualified as Boolean
-import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Compile.Relations.UInt qualified as UInt
+import Keelung.Compiler.Relations.Boolean qualified as Boolean
+import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Compiler.Constraint
 import Prelude hiding (lookup)
 

@@ -7,7 +7,7 @@ module Test.Optimization (tests, run) where
 import Data.Foldable
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compileO0)
-import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
+import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
 import Test.Hspec

@@ -3,9 +3,9 @@ module Test.Relations.UInt (tests, run, debug) where
 import Control.Monad.Except
 import Control.Monad.State
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
-import Keelung.Compiler.Compile.Relations.UInt qualified as UIntRelations
+import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.UInt (UIntRelations)
+import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Constraint (RefU (..))
 import Keelung.Field (GF181)
 import Test.Hspec (SpecWith, describe, hspec, it)

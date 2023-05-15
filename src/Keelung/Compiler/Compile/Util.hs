@@ -7,9 +7,9 @@ import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Compile.Relations.Field (AllRelations)
-import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
+import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.Field (AllRelations)
+import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Syntax.Internal

@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compiler.Compile.Relations.UInt
+module Keelung.Compiler.Relations.UInt
   ( UIntRelations,
     new,
     assign,
@@ -23,7 +23,7 @@ import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Constraint
 import Keelung.Interpreter.Arithmetics qualified as Arith
 import Keelung.Syntax (HasWidth (widthOf), Width)

@@ -26,13 +26,13 @@ import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Compile.Relations.Field (AllRelations)
-import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
-import Keelung.Compiler.Compile.Relations.Field qualified as FieldRelations
-import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
-import Keelung.Compiler.Compile.Relations.UInt qualified as UIntRelations
+import Keelung.Compiler.Relations.Boolean (BooleanRelations)
+import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
+import Keelung.Compiler.Relations.Field (AllRelations)
+import Keelung.Compiler.Relations.Field qualified as AllRelations
+import Keelung.Compiler.Relations.Field qualified as FieldRelations
+import Keelung.Compiler.Relations.UInt (UIntRelations)
+import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
