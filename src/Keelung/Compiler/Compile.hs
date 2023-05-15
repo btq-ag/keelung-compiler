@@ -18,6 +18,7 @@ import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Compile.Boolean qualified as Compile.Boolean
 import Keelung.Compiler.Compile.Error qualified as Compile
+import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
@@ -170,11 +171,11 @@ compileAssertionEqF a b = do
   resultB <- compileExprF b
 
   case (resultA, resultB) of
-    (Left valA, _) -> do
+    (Constant valA, _) -> do
       assertLC valA resultB
-    (Right as, Left valB) -> do
-      assertLC valB (Right as)
-    (Right as, Right bs) -> do
+    (Polynomial as, Constant valB) -> do
+      assertLC valB (Polynomial as)
+    (Polynomial as, Polynomial bs) -> do
       writeAddWithPoly $ PolyG.merge as bs
 
 -- compileExprF a' a
@@ -241,26 +242,25 @@ compileExprB = Compile.Boolean.compileExprB wireU' compileExprF
 
 compileExprF :: (GaloisField n, Integral n) => ExprF n -> M n (LC n)
 compileExprF expr = case expr of
-  ValF val -> return $ Left val
-  VarF var -> return $ PolyG.singleton 0 (F (RefFX var), 1)
-  VarFO var -> return $ PolyG.singleton 0 (F (RefFO var), 1)
-  VarFI var -> return $ PolyG.singleton 0 (F (RefFI var), 1)
-  VarFP var -> return $ PolyG.singleton 0 (F (RefFP var), 1)
+  ValF val -> return $ Constant val
+  VarF var -> return $ 1 @ F (RefFX var)
+  VarFO var -> return $ 1 @ F (RefFO var)
+  VarFI var -> return $ 1 @ F (RefFI var)
+  VarFP var -> return $ 1 @ F (RefFP var)
   SubF x y -> do
     x' <- toLC x
-    y' <- fmap (fmap PolyG.negate) (toLC y)
-    let operands = [x', y']
-    return $ foldl mergeLC (Left 0) operands
+    y' <- toLC y
+    return $ x' <> neg y'
   AddF x y rest -> do
     operands <- mapM toLC (toList (x :<| y :<| rest))
-    return $ foldl mergeLC (Left 0) operands
+    return $ mconcat operands
   MulF x y -> do
     x' <- toLC x
     y' <- toLC y
     out' <- freshRefF
-    let polynomial = PolyG.singleton 0 (F out', 1)
-    writeMulWithPoly x' y' polynomial
-    return polynomial
+    let result = 1 @ F out'
+    writeMulWithLC x' y' result
+    return result
   ExpF x n -> do
     base <- toLC x
     fastExp base 1 n
@@ -268,9 +268,9 @@ compileExprF expr = case expr of
     x' <- toLC x
     y' <- toLC y
     out' <- freshRefF
-    let polynomial = PolyG.singleton 0 (F out', 1)
-    writeMulWithPoly y' polynomial x'
-    return polynomial
+    let result = 1 @ F out'
+    writeMulWithLC y' result x'
+    return result
   IfF p x y -> do
     p' <- compileExprB p
     x' <- toLC x
@@ -279,9 +279,9 @@ compileExprF expr = case expr of
   BtoF x -> do
     result <- compileExprB x
     case result of
-      Left var -> return $ PolyG.singleton 0 (B var, 1)
-      Right True -> return $ Left 1
-      Right False -> return $ Left 0
+      Left var -> return $ 1 @ B var
+      Right True -> return $ Constant 1
+      Right False -> return $ Constant 0
 
 compileExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compileExprU out expr = case expr of
@@ -490,42 +490,42 @@ compileMulU width out a b = do
 compileIfF :: (GaloisField n, Integral n) => Either RefB Bool -> LC n -> LC n -> M n (LC n)
 compileIfF (Right True) x _ = return x
 compileIfF (Right False) _ y = return y
-compileIfF (Left p) (Left x) (Left y) = do
+compileIfF (Left p) (Constant x) (Constant y) = do
   if x == y
-    then return $ Left x
+    then return $ Constant x
     else do
       out <- freshRefF
       -- (x - y) * p - out + y = 0
-      writeAdd y [(B p, x - y), (F out, -1)]
-      return $ PolyG.singleton 0 (F out, 1)
-compileIfF (Left p) (Left x) (Right y) = do
+      let result = 1 @ F out
+      writeAddWithLC $ (x - y) @ B p <> result <> Constant y
+      return result
+compileIfF (Left p) (Constant x) (Polynomial y) = do
   out <- freshRefF
   -- p * (x - y) = (out - y)
-  let negatedY = PolyG.negate y
-  writeMulWithPoly
-    (PolyG.singleton 0 (B p, 1)) -- p
-    (Right $ PolyG.addConstant x negatedY) -- (x - y)
-    (PolyG.insert 0 (F out, 1) negatedY) -- (out - y)
-  return $ PolyG.singleton 0 (F out, 1)
-compileIfF (Left p) (Right x) (Left y) = do
+  let result = 1 @ F out
+  writeMulWithLC
+    (1 @ B p) -- p
+    (Constant x <> neg (Polynomial y)) -- (x - y)
+    (result <> neg (Polynomial y)) -- (out - y)
+  return result
+compileIfF (Left p) (Polynomial x) (Constant y) = do
   out <- freshRefF
   -- p * (x - y) = (out - y)
-  writeMulWithPoly
-    (PolyG.singleton 0 (B p, 1)) -- p
-    (Right $ PolyG.addConstant (-y) x) -- (x - y)
-    (PolyG.singleton (-y) (F out, 1)) -- (out - y)
-  return $ PolyG.singleton 0 (F out, 1)
-compileIfF (Left p) (Right x) (Right y) = do
-  out <- do
-    r <- freshRefF
-    return $ PolyG.singleton 0 (F r, 1)
+  let result = 1 @ F out
+  writeMulWithLC
+    (1 @ B p) -- p
+    (Polynomial x <> neg (Constant y)) -- (x - y)
+    (result <> neg (Constant y)) -- (out - y)
+  return result
+compileIfF (Left p) (Polynomial x) (Polynomial y) = do
+  out <- freshRefF
   -- p * (x - y) = out - y
-  let negatedY = PolyG.negate y
-  writeMulWithPoly
-    (PolyG.singleton 0 (B p, 1)) -- p
-    (PolyG.merge x negatedY) -- (x - y)
-    (mergeLC out (Right negatedY)) -- (out - y)
-  return out
+  let result = 1 @ F out
+  writeMulWithLC
+    (1 @ B p) -- p
+    (Polynomial x <> neg (Polynomial y)) -- (x - y)
+    (result <> neg (Polynomial y)) -- (out - y)
+  return result
 
 -- | Conditional
 --  out = p * x + (1 - p) * y
@@ -751,46 +751,46 @@ assertGT width a c = do
 
 -- | Fast exponentiation on field
 fastExp :: (GaloisField n, Integral n) => LC n -> n -> Integer -> M n (LC n)
-fastExp _ acc 0 = return $ Left acc
-fastExp (Left base) acc e = return $ Left $ (base ^ e) * acc
-fastExp (Right base) acc e =
+fastExp _ acc 0 = return $ Constant acc
+fastExp (Constant base) acc e = return $ Constant $ (base ^ e) * acc
+fastExp (Polynomial base) acc e =
   let (q, r) = e `divMod` 2
    in if r == 1
         then do
-          result <- fastExp (Right base) acc (e - 1)
-          mul result (Right base)
+          result <- fastExp (Polynomial base) acc (e - 1)
+          mul result (Polynomial base)
         else do
-          result <- fastExp (Right base) acc q
+          result <- fastExp (Polynomial base) acc q
           mul result result
   where
     -- \| Compute the multiplication of two variables
     mul :: (GaloisField n, Integral n) => LC n -> LC n -> M n (LC n)
-    mul (Left x) (Left y) = return $ Left (x * y)
-    mul (Left x) (Right ys) = return $ PolyG.multiplyBy x ys
-    mul (Right xs) (Left y) = return $ PolyG.multiplyBy y xs
-    mul (Right xs) (Right ys) = do
+    mul (Constant x) (Constant y) = return $ Constant (x * y)
+    mul (Constant x) (Polynomial ys) = return $ fromEither $ PolyG.multiplyBy x ys
+    mul (Polynomial xs) (Constant y) = return $ fromEither $ PolyG.multiplyBy y xs
+    mul (Polynomial xs) (Polynomial ys) = do
       out <- freshRefF
-      let result = PolyG.build 0 [(F out, 1)]
-      writeMulWithPoly (Right xs) (Right ys) result
+      let result = 1 @ F out
+      writeMulWithLC (Polynomial xs) (Polynomial ys) result
       return result
 
 --------------------------------------------------------------------------------
 
 -- | Temporary adapter for the LC type
 handleLC :: (GaloisField n, Integral n) => Ref -> LC n -> M n ()
-handleLC out (Left val) = writeVal out val
-handleLC out (Right poly) = case PolyG.view poly of
+handleLC out (Constant val) = writeVal out val
+handleLC out (Polynomial poly) = case PolyG.view poly of
   PolyG.Monomial 0 (x, 1) -> writeEq x out
   PolyG.Monomial c (x, a) -> writeAdd c [(out, -1), (x, a)]
   PolyG.Binomial c (x, a) (y, b) -> writeAdd c [(out, -1), (x, a), (y, b)]
   PolyG.Polynomial c xs -> writeAdd c $ (out, -1) : Map.toList xs
 
 assertLC :: (GaloisField n, Integral n) => n -> LC n -> M n ()
-assertLC val (Left val') =
+assertLC val (Constant val') =
   if val == val'
     then return ()
     else throwError $ Compile.ConflictingValuesF val val'
-assertLC val (Right poly) = case PolyG.view poly of
+assertLC val (Polynomial poly) = case PolyG.view poly of
   PolyG.Monomial c (x, a) ->
     -- c + ax = val => x = (val - c) / a
     writeVal x ((val - c) / a)
@@ -802,25 +802,25 @@ assertLC val (Right poly) = case PolyG.view poly of
     writeAdd (c - val) (Map.toList xs)
 
 toLC :: (GaloisField n, Integral n) => ExprF n -> M n (LC n)
-toLC (MulF (ValF m) (ValF n)) = return $ Left (m * n)
-toLC (MulF (VarF var) (ValF n)) = return $ PolyG.build 0 [(F (RefFX var), n)]
-toLC (MulF (VarFI var) (ValF n)) = return $ PolyG.build 0 [(F (RefFI var), n)]
-toLC (MulF (VarFO var) (ValF n)) = return $ PolyG.build 0 [(F (RefFO var), n)]
-toLC (MulF (ValF n) (VarF var)) = return $ PolyG.build 0 [(F (RefFX var), n)]
-toLC (MulF (ValF n) (VarFI var)) = return $ PolyG.build 0 [(F (RefFI var), n)]
-toLC (MulF (ValF n) (VarFO var)) = return $ PolyG.build 0 [(F (RefFO var), n)]
+toLC (MulF (ValF m) (ValF n)) = return $ Constant (m * n)
+toLC (MulF (VarF var) (ValF n)) = return $ n @ F (RefFX var)
+toLC (MulF (VarFI var) (ValF n)) = return $ n @ F (RefFI var)
+toLC (MulF (VarFO var) (ValF n)) = return $ n @ F (RefFX var)
+toLC (MulF (ValF n) (VarF var)) = return $ n @ F (RefFX var)
+toLC (MulF (ValF n) (VarFI var)) = return $ n @ F (RefFI var)
+toLC (MulF (ValF n) (VarFO var)) = return $ n @ F (RefFO var)
 toLC (MulF (ValF n) expr) = do
   result <- compileExprF expr
   case result of
-    Left val -> return $ Left (val * n)
-    Right poly -> return $ PolyG.multiplyBy n poly
+    Constant val -> return $ Constant (val * n)
+    Polynomial poly -> return $ scale n (Polynomial poly)
 toLC (MulF expr (ValF n)) = do
   result <- compileExprF expr
   case result of
-    Left val -> return $ Left (val * n)
-    Right poly -> return $ PolyG.multiplyBy n poly
-toLC (ValF n) = return $ Left n
-toLC (VarF var) = return $ PolyG.build 0 [(F (RefFX var), 1)]
-toLC (VarFI var) = return $ PolyG.build 0 [(F (RefFI var), 1)]
-toLC (VarFO var) = return $ PolyG.build 0 [(F (RefFO var), 1)]
+    Constant val -> return $ Constant (val * n)
+    Polynomial poly -> return $ scale n (Polynomial poly)
+toLC (ValF n) = return $ Constant n
+toLC (VarF var) = return $ 1 @ F (RefFX var)
+toLC (VarFI var) = return $ 1 @ F (RefFI var)
+toLC (VarFO var) = return $ 1 @ F (RefFO var)
 toLC expr = compileExprF expr

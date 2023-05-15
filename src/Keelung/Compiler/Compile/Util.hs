@@ -4,11 +4,10 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
 import Data.Map.Strict qualified as Map
-import Data.Sequence (Seq (..))
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
+import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
@@ -77,11 +76,6 @@ freshRefU width = do
 
 --------------------------------------------------------------------------------
 
--- | Linear combination of variables and constants.
-type LC n = Either n (PolyG Ref n)
-
---------------------------------------------------------------------------------
-
 -- | Compile a linear combination of expressions into a polynomial
 toPoly :: (GaloisField n, Integral n) => (Expr n -> M n (Either Ref n)) -> (n, [(Expr n, n)]) -> M n (Either n (PolyG Ref n))
 toPoly compile (c, xs) = do
@@ -94,19 +88,19 @@ toPoly compile (c, xs) = do
         Left variable -> return $ Right (variable, coeff)
         Right constant -> return $ Left (constant * coeff)
 
-writeMulWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> Either n (PolyG Ref n) -> Either n (PolyG Ref n) -> M n ()
-writeMulWithPoly as bs cs = case (as, bs, cs) of
-  (Left _, Left _, Left _) -> return ()
-  (Left x, Left y, Right zs) ->
+writeMulWithLC :: (GaloisField n, Integral n) => LC n -> LC n -> LC n -> M n ()
+writeMulWithLC as bs cs = case (as, bs, cs) of
+  (Constant _, Constant _, Constant _) -> return ()
+  (Constant x, Constant y, Polynomial zs) ->
     -- z - x * y = 0
     addC [CAddF $ PolyG.addConstant (-x * y) zs]
-  (Left x, Right ys, Left z) ->
+  (Constant x, Polynomial ys, Constant z) ->
     -- x * ys = z
     -- x * ys - z = 0
     case PolyG.multiplyBy x ys of
       Left _ -> return ()
       Right poly -> addC [CAddF $ PolyG.addConstant (-z) poly]
-  (Left x, Right ys, Right zs) -> do
+  (Constant x, Polynomial ys, Polynomial zs) -> do
     -- x * ys = zs
     -- x * ys - zs = 0
     case PolyG.multiplyBy x ys of
@@ -116,14 +110,19 @@ writeMulWithPoly as bs cs = case (as, bs, cs) of
       Right ys' -> case PolyG.merge ys' (PolyG.negate zs) of
         Left _ -> return ()
         Right poly -> addC [CAddF poly]
-  (Right xs, Left y, Left z) -> writeMulWithPoly (Left y) (Right xs) (Left z)
-  (Right xs, Left y, Right zs) -> writeMulWithPoly (Left y) (Right xs) (Right zs)
-  (Right xs, Right ys, _) -> addC [CMulF xs ys cs]
+  (Polynomial xs, Constant y, Constant z) -> writeMulWithLC (Constant y) (Polynomial xs) (Constant z)
+  (Polynomial xs, Constant y, Polynomial zs) -> writeMulWithLC (Constant y) (Polynomial xs) (Polynomial zs)
+  (Polynomial xs, Polynomial ys, _) -> addC [CMulF xs ys (toEither cs)]
 
 writeAddWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> M n ()
 writeAddWithPoly xs = case xs of
   Left _ -> return ()
   Right poly -> addC [CAddF poly]
+
+writeAddWithLC :: (GaloisField n, Integral n) => LC n -> M n ()
+writeAddWithLC xs = case xs of
+  Constant _ -> return ()
+  Polynomial poly -> addC [CAddF poly]
 
 addC :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 addC = mapM_ addOne
@@ -177,7 +176,7 @@ addC = mapM_ addOne
 --------------------------------------------------------------------------------
 
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
-writeMul as bs cs = writeMulWithPoly (uncurry PolyG.build as) (uncurry PolyG.build bs) (uncurry PolyG.build cs)
+writeMul as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.build as) (fromEither $ uncurry PolyG.build bs) (fromEither $ uncurry PolyG.build cs)
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPoly (PolyG.build c as)
@@ -225,11 +224,6 @@ addEqZeroHintWithPoly (Left 0) m = writeValF m 0
 addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
 
--- addEqZeroHintWithPoly c xs m = case PolyG.build c xs of
---   Left 0 -> writeValF m 0
---   Left constant -> writeValF m (recip constant)
---   Right poly -> modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
-
 addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
 addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (Left x, Left y, Left q, Left r) : csDivMods cs}
 
@@ -248,42 +242,29 @@ addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (Left x, Left n, p) : csM
 --      polynomial * m = out
 --      polynomial * (1 - out) = 0
 eqZero :: (GaloisField n, Integral n) => Bool -> LC n -> M n (Either RefB Bool)
-eqZero isEq (Left constant) = return $ Right $ if isEq then constant == 0 else constant /= 0
-eqZero isEq (Right polynomial) = do
+eqZero isEq (Constant constant) = return $ Right $ if isEq then constant == 0 else constant /= 0
+eqZero isEq (Polynomial polynomial) = do
   m <- freshRefF
   out <- freshRefB
   if isEq
     then do
-      writeMulWithPoly
-        (Right polynomial)
-        (PolyG.singleton 0 (F m, 1))
-        (PolyG.singleton 1 (B out, -1))
-      writeMulWithPoly
-        (Right polynomial)
-        (PolyG.singleton 0 (B out, 1))
-        (PolyG.build 0 [])
+      writeMulWithLC
+        (Polynomial polynomial)
+        (1 @ F m)
+        (Constant 1 <> neg (1 @ B out))
+      writeMulWithLC
+        (Polynomial polynomial)
+        (1 @ B out)
+        mempty
     else do
-      writeMulWithPoly
-        (Right polynomial)
-        (PolyG.singleton 0 (F m, 1))
-        (PolyG.singleton 0 (B out, 1))
-      writeMulWithPoly
-        (Right polynomial)
-        (PolyG.singleton 1 (B out, -1))
-        (PolyG.build 0 [])
+      writeMulWithLC
+        (Polynomial polynomial)
+        (1 @ F m)
+        (1 @ B out)
+      writeMulWithLC
+        (Polynomial polynomial)
+        (Constant 1 <> neg (1 @ B out))
+        mempty
   --  keep track of the relation between (x - y) and m
   addEqZeroHintWithPoly (Right polynomial) m
   return (Left out)
-
---------------------------------------------------------------------------------
-
-buildLCwithOperands :: (GaloisField n, Integral n) => Either Ref n -> Either Ref n -> Seq (Either Ref n) -> Either n (PolyG Ref n)
-buildLCwithOperands x0 x1 xs = do
-  let (variables, constants) = partitionEithers (x0 : x1 : toList xs)
-   in PolyG.build (sum constants) [(x, 1) | x <- variables]
-
-mergeLC :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> Either n (PolyG Ref n) -> Either n (PolyG Ref n)
-mergeLC (Left c) (Left d) = Left (c + d)
-mergeLC (Left c) (Right ys) = Right $ PolyG.addConstant c ys
-mergeLC (Right xs) (Left d) = Right $ PolyG.addConstant d xs
-mergeLC (Right xs) (Right ys) = PolyG.merge xs ys

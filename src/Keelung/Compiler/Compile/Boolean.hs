@@ -10,7 +10,8 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
-import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Compiler.Compile.LC
+import Data.Foldable (toList)
 
 compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU n)) -> (ExprF n -> M n (LC n)) -> ExprB n -> M n (Either RefB Bool)
 compileExprB compileU compileF expr =
@@ -52,8 +53,7 @@ compileExprB compileU compileF expr =
         NEqF x y -> do
           x' <- compileF x
           y' <- compileF y
-          let polynomial = mergeLC x' (PolyG.negate <$> y')
-          eqZero False polynomial
+          eqZero False (x' <> neg y')
         NEqU x y -> do
           x' <- compileU x
           y' <- compileU y
@@ -65,8 +65,7 @@ compileExprB compileU compileF expr =
         EqF x y -> do
           x' <- compileF x
           y' <- compileF y
-          let polynomial = mergeLC x' (PolyG.negate <$> y')
-          eqZero True polynomial
+          eqZero True (x' <> neg y')
         EqU x y -> do
           x' <- compileU x
           y' <- compileU y
@@ -140,10 +139,10 @@ compileIfB (Left p) (Left x) (Left y) = do
     (0, [(B y, -1), (B out, 1)])
   return $ Left out
 
-fromB :: Num n => Either RefB Bool -> Either Ref n
-fromB (Right True) = Right 1
-fromB (Right False) = Right 0
-fromB (Left x) = Left $ B x
+fromB :: GaloisField n => Either RefB Bool -> LC n
+fromB (Right True) = Constant 1
+fromB (Right False) = Constant 0
+fromB (Left x) = 1 @ B x
 
 andBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
 andBs (Right False) _ _ = return $ Right False
@@ -166,8 +165,8 @@ andBs (Left x0) (Left x1) (x2 :<| xs) = do
   --      if all operands are 1           then 1 else 0
   --  =>  if the sum of operands is N     then 1 else 0
   --  =>  the sum of operands is N
-  let arity = fromIntegral (3 + length xs)
-  let polynomal = PolyG.addConstant (-arity) <$> buildLCwithOperands ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
+  let arity = Constant (fromIntegral (3 + length xs))
+  let polynomal = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs))) <> neg arity
   eqZero True polynomal
 
 orBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
@@ -192,8 +191,10 @@ orBs (Left x0) (Left x1) (x2 :<| xs) = do
   --  =>  if the sum of operands is 0     then 0 else 1
   --  =>  if the sum of operands is not 0 then 1 else 0
   --  =>  the sum of operands is not 0
-  let polynomal = buildLCwithOperands ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
-  eqZero False polynomal
+  let polynomal = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs)))
+  eqZero False $ 1 @ B x0 <> 1 @ B x1 <> polynomal
+  
+  --  polynomal
 
 xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 xorB (Right True) (Right True) = return $ Right False
