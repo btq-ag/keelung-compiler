@@ -13,7 +13,8 @@ import Data.Bits qualified
 -- import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (Foldable (foldl'))
+import Data.Foldable (toList)
+import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Compile.Boolean qualified as Compile.Boolean
 import Keelung.Compiler.Compile.Error qualified as Compile
@@ -22,6 +23,8 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.PolyG (PolyG)
+import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax.Counters (VarSort (..), VarType (..), addCount, getCount)
@@ -231,24 +234,21 @@ compileExprF out expr = case expr of
   VarFI var -> addC $ cVarEqF out (RefFI var) -- out = var
   VarFP var -> addC $ cVarEqF out (RefFP var) -- out = var
   SubF x y -> do
-    x' <- toTerm x
-    y' <- toTerm y
-    compileTerms out (x' :<| negateTerm y' :<| Empty)
+    x' <- toLC x
+    y' <- fmap (fmap PolyG.negate) (toLC y)
+    let operands = [x', y']
+    handleLC (F out) (foldl mergeLC (Left 0) operands) 
   AddF x y rest -> do
-    terms <- mapM toTerm (x :<| y :<| rest)
-    compileTerms out terms
+    operands <- mapM toLC (toList (x :<| y :<| rest))
+    handleLC (F out) (foldl mergeLC (Left 0) operands) 
   MulF x y -> do
     x' <- wireF x
     y' <- wireF y
     addC $ cMulSimpleF (F x') (F y') (F out)
   ExpF x n -> do
     base <- wireF x
-    result <- fastExp base (Right 1) n
-    case result of
-      WithVars _ 0 -> return ()
-      WithVars var 1 -> writeEqF var out
-      WithVars var coeff -> writeAdd 0 [(F out, -1), (F var, coeff)]
-      Constant val -> writeValF out val
+    result <- fastExp base (Left 1) n
+    handleLC (F out) result
   DivF x y -> do
     x' <- wireF x
     y' <- wireF y
@@ -390,57 +390,6 @@ compileExprU out expr = case expr of
       addC $ cVarBindB (RefUBit w out i) False -- out[i] = 0
 
 --------------------------------------------------------------------------------
-
-data Term n
-  = Constant n -- c
-  | WithVars RefF n -- cx
-
--- Avoid having to introduce new multiplication gates
--- for multiplication by constant scalars.
-toTerm :: (GaloisField n, Integral n) => ExprF n -> M n (Term n)
-toTerm (MulF (ValF m) (ValF n)) = return $ Constant (m * n)
-toTerm (MulF (VarF var) (ValF n)) = return $ WithVars (RefFX var) n
-toTerm (MulF (VarFI var) (ValF n)) = return $ WithVars (RefFI var) n
-toTerm (MulF (VarFO var) (ValF n)) = return $ WithVars (RefFO var) n
-toTerm (MulF (ValF n) (VarF var)) = return $ WithVars (RefFX var) n
-toTerm (MulF (ValF n) (VarFI var)) = return $ WithVars (RefFI var) n
-toTerm (MulF (ValF n) (VarFO var)) = return $ WithVars (RefFO var) n
-toTerm (MulF (ValF n) expr) = do
-  out <- freshRefF
-  compileExprF out expr
-  return $ WithVars out n
-toTerm (MulF expr (ValF n)) = do
-  out <- freshRefF
-  compileExprF out expr
-  return $ WithVars out n
-toTerm (ValF n) =
-  return $ Constant n
-toTerm (VarF var) =
-  return $ WithVars (RefFX var) 1
-toTerm (VarFI var) =
-  return $ WithVars (RefFI var) 1
-toTerm (VarFO var) =
-  return $ WithVars (RefFO var) 1
-toTerm expr = do
-  out <- freshRefF
-  compileExprF out expr
-  return $ WithVars out 1
-
--- | Negate a Term
-negateTerm :: Num n => Term n -> Term n
-negateTerm (WithVars var c) = WithVars var (negate c)
-negateTerm (Constant c) = Constant (negate c)
-
-compileTerms :: (GaloisField n, Integral n) => RefF -> Seq (Term n) -> M n ()
-compileTerms out terms =
-  let (constant, varsWithCoeffs) = foldl' go (0, []) terms
-   in case varsWithCoeffs of
-        [] -> addC $ cVarBindF (F out) constant
-        _ -> addC $ cAddF constant $ (F out, -1) : varsWithCoeffs
-  where
-    go :: Num n => (n, [(Ref, n)]) -> Term n -> (n, [(Ref, n)])
-    go (constant, pairs) (Constant n) = (constant + n, pairs)
-    go (constant, pairs) (WithVars var coeff) = (constant, (F var, coeff) : pairs)
 
 -- | If the expression is not already a variable, create a new variable
 wireB :: (GaloisField n, Integral n) => ExprB n -> M n RefB
@@ -796,28 +745,64 @@ assertGT width a c = do
   assertGTE width a (c + 1)
 
 -- | Fast exponentiation on field
-fastExp :: (GaloisField n, Integral n) => RefF -> Either RefF n -> Integer -> M n (Term n)
-fastExp _ (Left var) 0 = return (WithVars var 1)
-fastExp _ (Right val) 0 = return (Constant val)
+fastExp :: (GaloisField n, Integral n) => RefF -> LC n -> Integer -> M n (LC n)
+fastExp _ acc 0 = return acc
 fastExp base acc e =
   let (q, r) = e `divMod` 2
    in if r == 1
         then do
           result <- fastExp base acc (e - 1)
-          mul result (WithVars base 1)
+          mul result (PolyG.build 0 [(F base, 1)])
         else do
           result <- fastExp base acc q
           mul result result
   where
     -- \| Compute the multiplication of two variables
-    mul :: (GaloisField n, Integral n) => Term n -> Term n -> M n (Term n)
-    mul (WithVars x c) (WithVars y d) = do
+    mul :: (GaloisField n, Integral n) => LC n -> LC n -> M n (LC n)
+    mul (Left x) (Left y) = return $ Left (x * y)
+    mul (Left x) (Right ys) = return $ PolyG.multiplyBy x ys
+    mul (Right xs) (Left y) = return $ PolyG.multiplyBy y xs
+    mul (Right xs) (Right ys) = do
       out <- freshRefF
-      writeMul (0, [(F x, c)]) (0, [(F y, d)]) (0, [(F out, 1)])
-      return $ WithVars out 1
-    mul (WithVars x c) (Constant y) = do
-      out <- freshRefF
-      writeAdd 0 [(F x, c * fromIntegral y), (F out, -1)]
-      return $ WithVars out 1
-    mul (Constant x) (WithVars y d) = mul (WithVars y d) (Constant x)
-    mul (Constant x) (Constant y) = return $ Constant (x * y)
+      let result = PolyG.build 0 [(F out, 1)]
+      writeMulWithPoly (Right xs) (Right ys) result
+      return result
+
+--------------------------------------------------------------------------------
+
+-- | Linear combination of variables and constants.
+type LC n = Either n (PolyG Ref n)
+
+-- | Temporary adapter for the LC type
+handleLC :: (GaloisField n, Integral n) => Ref -> LC n -> M n ()
+handleLC out (Left val) = writeVal out val
+handleLC out (Right poly) = case PolyG.view poly of
+  PolyG.Monomial 0 (x, 1) -> writeEq x out
+  PolyG.Monomial c (x, a) -> writeAdd c [(out, -1), (x, a)]
+  PolyG.Binomial c (x, a) (y, b) -> writeAdd c [(out, -1), (x, a), (y, b)]
+  PolyG.Polynomial c xs -> writeAdd c $ (out, -1) : Map.toList xs
+
+toLC :: (GaloisField n, Integral n) => ExprF n -> M n (LC n)
+toLC (MulF (ValF m) (ValF n)) = return $ Left (m * n)
+toLC (MulF (VarF var) (ValF n)) = return $ PolyG.build 0 [(F (RefFX var), n)]
+toLC (MulF (VarFI var) (ValF n)) = return $ PolyG.build 0 [(F (RefFI var), n)]
+toLC (MulF (VarFO var) (ValF n)) = return $ PolyG.build 0 [(F (RefFO var), n)]
+toLC (MulF (ValF n) (VarF var)) = return $ PolyG.build 0 [(F (RefFX var), n)]
+toLC (MulF (ValF n) (VarFI var)) = return $ PolyG.build 0 [(F (RefFI var), n)]
+toLC (MulF (ValF n) (VarFO var)) = return $ PolyG.build 0 [(F (RefFO var), n)]
+toLC (MulF (ValF n) expr) = do
+  out <- freshRefF
+  compileExprF out expr
+  return $ PolyG.build 0 [(F out, n)]
+toLC (MulF expr (ValF n)) = do
+  out <- freshRefF
+  compileExprF out expr
+  return $ PolyG.build 0 [(F out, n)]
+toLC (ValF n) = return $ Left n
+toLC (VarF var) = return $ PolyG.build 0 [(F (RefFX var), 1)]
+toLC (VarFI var) = return $ PolyG.build 0 [(F (RefFI var), 1)]
+toLC (VarFO var) = return $ PolyG.build 0 [(F (RefFO var), 1)]
+toLC expr = do
+  out <- freshRefF
+  compileExprF out expr
+  return $ PolyG.build 0 [(F out, 1)]

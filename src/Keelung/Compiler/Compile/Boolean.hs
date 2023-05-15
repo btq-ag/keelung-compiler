@@ -2,9 +2,7 @@ module Keelung.Compiler.Compile.Boolean where
 
 import Control.Arrow (left)
 import Control.Monad (foldM)
-import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
 import Data.Sequence (Seq (..))
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Field
@@ -12,7 +10,6 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
-import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 
 compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU n)) -> (ExprF n -> M n (Either RefF n)) -> ExprB n -> M n (Either RefB Bool)
@@ -168,7 +165,7 @@ andBs (Left x0) (Left x1) (x2 :<| xs) = do
   --  =>  if the sum of operands is N     then 1 else 0
   --  =>  the sum of operands is N
   let arity = fromIntegral (3 + length xs)
-  let polynomal = PolyG.addConstant (-arity) <$> add' ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
+  let polynomal = PolyG.addConstant (-arity) <$> buildLCwithOperands ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
   eqZero True polynomal
 
 orBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
@@ -193,7 +190,7 @@ orBs (Left x0) (Left x1) (x2 :<| xs) = do
   --  =>  if the sum of operands is 0     then 0 else 1
   --  =>  if the sum of operands is not 0 then 1 else 0
   --  =>  the sum of operands is not 0
-  let polynomal = add' ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
+  let polynomal = buildLCwithOperands ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
   eqZero False polynomal
 
 xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
@@ -359,8 +356,3 @@ compileLTEUConstVarPrim (Right False) (True, _) = return $ Right False
 compileLTEUConstVarPrim (Right False) (False, y) = return $ Left y
 
 --------------------------------------------------------------------------------
-
-add' :: (GaloisField n, Integral n) => Either Ref n -> Either Ref n -> Seq (Either Ref n) -> Either n (PolyG Ref n)
-add' x0 x1 xs = do
-  let (variables, constants) = partitionEithers (x0 : x1 : toList xs)
-   in PolyG.build (sum constants) [(x, 1) | x <- variables]

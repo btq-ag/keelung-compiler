@@ -4,7 +4,9 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.Map.Strict qualified as Map
+import Data.Sequence (Seq (..))
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Constraint
@@ -175,6 +177,11 @@ writeMul as bs cs = writeMulWithPoly (uncurry PolyG.build as) (uncurry PolyG.bui
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPoly (PolyG.build c as)
 
+writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
+writeVal (F a) x = writeValF a x
+writeVal (B a) x = writeValB a (x /= 0)
+writeVal (U a) x = writeValU a x
+
 writeValF :: (GaloisField n, Integral n) => RefF -> n -> M n ()
 writeValF a x = addC [CVarBindF (F a) x]
 
@@ -183,6 +190,9 @@ writeValB a x = addC [CVarBindB a x]
 
 writeValU :: (GaloisField n, Integral n) => RefU -> n -> M n ()
 writeValU a x = addC [CVarBindU a x]
+
+writeEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
+writeEq a b = addC [CVarEq a b]
 
 writeEqF :: (GaloisField n, Integral n) => RefF -> RefF -> M n ()
 writeEqF a b = addC [CVarEqF a b]
@@ -259,3 +269,16 @@ eqZero isEq (Right polynomial) = do
   --  keep track of the relation between (x - y) and m
   addEqZeroHintWithPoly (Right polynomial) m
   return (Left out)
+
+--------------------------------------------------------------------------------
+
+buildLCwithOperands :: (GaloisField n, Integral n) => Either Ref n -> Either Ref n -> Seq (Either Ref n) -> Either n (PolyG Ref n)
+buildLCwithOperands x0 x1 xs = do
+  let (variables, constants) = partitionEithers (x0 : x1 : toList xs)
+   in PolyG.build (sum constants) [(x, 1) | x <- variables]
+
+mergeLC :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> Either n (PolyG Ref n) -> Either n (PolyG Ref n)
+mergeLC (Left c) (Left d) = Left (c + d)
+mergeLC (Left c) (Right ys) = Right $ PolyG.addConstant c ys
+mergeLC (Right xs) (Left d) = Right $ PolyG.addConstant d xs
+mergeLC (Right xs) (Right ys) = PolyG.merge xs ys
