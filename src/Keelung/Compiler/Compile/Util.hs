@@ -77,6 +77,11 @@ freshRefU width = do
 
 --------------------------------------------------------------------------------
 
+-- | Linear combination of variables and constants.
+type LC n = Either n (PolyG Ref n)
+
+--------------------------------------------------------------------------------
+
 -- | Compile a linear combination of expressions into a polynomial
 toPoly :: (GaloisField n, Integral n) => (Expr n -> M n (Either Ref n)) -> (n, [(Expr n, n)]) -> M n (Either n (PolyG Ref n))
 toPoly compile (c, xs) = do
@@ -242,7 +247,7 @@ addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (Left x, Left n, p) : csM
 --    Inequality:
 --      polynomial * m = out
 --      polynomial * (1 - out) = 0
-eqZero :: (GaloisField n, Integral n) => Bool -> Either n (PolyG Ref n) -> M n (Either RefB Bool)
+eqZero :: (GaloisField n, Integral n) => Bool -> LC n -> M n (Either RefB Bool)
 eqZero isEq (Left constant) = return $ Right $ if isEq then constant == 0 else constant /= 0
 eqZero isEq (Right polynomial) = do
   m <- freshRefF

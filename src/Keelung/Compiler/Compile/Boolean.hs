@@ -12,7 +12,7 @@ import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 
-compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU n)) -> (ExprF n -> M n (Either RefF n)) -> ExprB n -> M n (Either RefB Bool)
+compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU n)) -> (ExprF n -> M n (LC n)) -> ExprB n -> M n (Either RefB Bool)
 compileExprB compileU compileF expr =
   let compile = compileExprB compileU compileF
    in case expr of
@@ -52,7 +52,8 @@ compileExprB compileU compileF expr =
         NEqF x y -> do
           x' <- compileF x
           y' <- compileF y
-          eqFU False (left F x') (left F y')
+          let polynomial = mergeLC x' (PolyG.negate <$> y')
+          eqZero False polynomial
         NEqU x y -> do
           x' <- compileU x
           y' <- compileU y
@@ -64,7 +65,8 @@ compileExprB compileU compileF expr =
         EqF x y -> do
           x' <- compileF x
           y' <- compileF y
-          eqFU True (left F x') (left F y')
+          let polynomial = mergeLC x' (PolyG.negate <$> y')
+          eqZero True polynomial
         EqU x y -> do
           x' <- compileU x
           y' <- compileU y

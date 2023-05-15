@@ -23,7 +23,6 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.Internal
-import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax (widthOf)
@@ -238,7 +237,7 @@ freshExprU width = do
 ----------------------------------------------------------------
 
 compileExprB :: (GaloisField n, Integral n) => ExprB n -> M n (Either RefB Bool)
-compileExprB = Compile.Boolean.compileExprB wireU' wireF'
+compileExprB = Compile.Boolean.compileExprB wireU' compileExprF
 
 compileExprF :: (GaloisField n, Integral n) => ExprF n -> M n (LC n)
 compileExprF expr = case expr of
@@ -421,20 +420,6 @@ wireB expr = do
       out <- freshRefB
       writeValB out val
       return out
-
-wireF :: (GaloisField n, Integral n) => ExprF n -> M n RefF
-wireF (VarF ref) = return (RefFX ref)
-wireF (VarFO ref) = return (RefFO ref)
-wireF (VarFI ref) = return (RefFI ref)
-wireF (VarFP ref) = return (RefFP ref)
-wireF expr = do
-  out <- freshRefF
-  compileExprF expr >>= handleLC (F out)
-  return out
-
-wireF' :: (GaloisField n, Integral n) => ExprF n -> M n (Either RefF n)
-wireF' (ValF val) = return (Right val)
-wireF' others = Left <$> wireF others
 
 wireU :: (GaloisField n, Integral n) => ExprU n -> M n RefU
 wireU (VarU w ref) = return (RefUX w ref)
@@ -790,9 +775,6 @@ fastExp (Right base) acc e =
       return result
 
 --------------------------------------------------------------------------------
-
--- | Linear combination of variables and constants.
-type LC n = Either n (PolyG Ref n)
 
 -- | Temporary adapter for the LC type
 handleLC :: (GaloisField n, Integral n) => Ref -> LC n -> M n ()
