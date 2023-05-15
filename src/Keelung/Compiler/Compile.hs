@@ -243,29 +243,16 @@ compileExprF out expr = case expr of
     addC $ cMulSimpleF (F x') (F y') (F out)
   ExpF x n -> do
     base <- wireF x
-    result <- fastExp (F base) (Right 1) n
+    result <- fastExp base (Right 1) n
     case result of
-      Left var -> addC $ cVarEq (F out) var
-      Right val -> addC $ cVarBindF (F out) val
+      WithVars _ 0 -> return ()
+      WithVars var 1 -> writeEqF var out
+      WithVars var coeff -> writeAdd 0 [(F out, -1), (F var, coeff)]
+      Constant val -> writeValF out val
   DivF x y -> do
     x' <- wireF x
     y' <- wireF y
     addC $ cMulSimpleF (F y') (F out) (F x')
-  -- MMIF x p -> do
-  --   -- See: https://github.com/btq-ag/keelung-compiler/issues/14
-  --   -- 1. x * x⁻¹ = np + 1
-  --   -- 2. n ≤ ⌈log₂p⌉
-
-  --   -- constraint: n ≤ ⌈log₂p⌉
-  --   let upperBoundOfN = ceiling (logBase 2 (fromIntegral p) :: Double) :: Integer
-  --   let bitWidthOfUIntThatCanStoreUpperBoundOfN = ceiling (logBase 2 (fromIntegral upperBoundOfN) :: Double) :: Int
-  --   n <- freshRefU  bitWidthOfUIntThatCanStoreUpperBoundOfN
-  --   let diff = 2 ^ bitWidthOfUIntThatCanStoreUpperBoundOfN - upperBoundOfN
-
-  --   -- constraint: x * x⁻¹ = np + 1
-  --   x' <- wireF x
-  --   inv <- freshRefF
-  --   addC $ cMulF (0, [(x', 1)]) (0, [(inv, -1)]) (1, [(U n, fromIntegral p)])
   IfF p x y -> do
     p' <- compileExprB p
     x' <- wireF' x
@@ -808,28 +795,29 @@ assertGT width a c = do
   -- otherwise, assert that a >= c + 1
   assertGTE width a (c + 1)
 
--- | Compute the multiplication of two variables
-mul :: (GaloisField n, Integral n) => Either Ref n -> Either Ref n -> M n (Either Ref n)
-mul (Left x) (Left y) = do
-  out <- freshRefF
-  writeMul (0, [(x, 1)]) (0, [(y, 1)]) (0, [(F out, 1)])
-  return $ Left (F out)
-mul (Left x) (Right y) = do
-  out <- freshRefF
-  writeAdd 0 [(x, fromIntegral y), (F out, -1)]
-  return $ Left (F out)
-mul (Right x) (Left y) = mul (Left y) (Right x)
-mul (Right x) (Right y) = return $ Right (x * y)
-
 -- | Fast exponentiation on field
-fastExp :: (GaloisField n, Integral n) => Ref -> Either Ref n -> Integer -> M n (Either Ref n)
-fastExp _ acc 0 = return acc
+fastExp :: (GaloisField n, Integral n) => RefF -> Either RefF n -> Integer -> M n (Term n)
+fastExp _ (Left var) 0 = return (WithVars var 1)
+fastExp _ (Right val) 0 = return (Constant val)
 fastExp base acc e =
   let (q, r) = e `divMod` 2
    in if r == 1
         then do
           result <- fastExp base acc (e - 1)
-          mul result (Left base)
+          mul result (WithVars base 1)
         else do
           result <- fastExp base acc q
           mul result result
+  where
+    -- \| Compute the multiplication of two variables
+    mul :: (GaloisField n, Integral n) => Term n -> Term n -> M n (Term n)
+    mul (WithVars x c) (WithVars y d) = do
+      out <- freshRefF
+      writeMul (0, [(F x, c)]) (0, [(F y, d)]) (0, [(F out, 1)])
+      return $ WithVars out 1
+    mul (WithVars x c) (Constant y) = do
+      out <- freshRefF
+      writeAdd 0 [(F x, c * fromIntegral y), (F out, -1)]
+      return $ WithVars out 1
+    mul (Constant x) (WithVars y d) = mul (WithVars y d) (Constant x)
+    mul (Constant x) (Constant y) = return $ Constant (x * y)

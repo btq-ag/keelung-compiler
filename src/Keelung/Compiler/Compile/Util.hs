@@ -184,6 +184,9 @@ writeValB a x = addC [CVarBindB a x]
 writeValU :: (GaloisField n, Integral n) => RefU -> n -> M n ()
 writeValU a x = addC [CVarBindU a x]
 
+writeEqF :: (GaloisField n, Integral n) => RefF -> RefF -> M n ()
+writeEqF a b = addC [CVarEqF a b]
+
 writeEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
 writeEqB a b = addC [CVarEqB a b]
 
