@@ -30,6 +30,7 @@ module Keelung.Compiler.Constraint
     cMulSimpleF,
     -- cRotateU,
     fromConstraint,
+    fromPoly_,
   )
 where
 

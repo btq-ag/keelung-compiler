@@ -98,7 +98,7 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
     csConstraints :: !(Seq (Constraint n)),
     csBinReps :: [BinRep],
     csCounters :: Counters,
-    csEqs :: [(Var, Either Var n, Var)],
+    csEqZeros :: [(Poly n, Var)],
     csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
     csModInvs :: [(Either Var n, Either Var n, Integer)]
   }
@@ -128,7 +128,7 @@ renumberConstraints cs =
       csConstraints = fmap renumberConstraint (csConstraints cs),
       csBinReps = if csUseNewOptimizer cs then fmap renumberBinRep (csBinReps cs) else csBinReps cs,
       csCounters = setReducedCount reducedCount counters,
-      csEqs = fmap renumberEq (csEqs cs),
+      csEqZeros = fmap renumberEqZero (csEqZeros cs),
       csDivMods = fmap renumberDivMod (csDivMods cs),
       csModInvs = fmap renumberModInv (csModInvs cs)
     }
@@ -182,7 +182,7 @@ renumberConstraints cs =
           BinRep.binRepBitStart = renumber (BinRep.binRepBitStart binRep)
         }
 
-    renumberEq (x, y, z) = (renumber x, left renumber y, renumber z)
+    renumberEqZero (xs, m) = (Poly.renumberVars renumber xs, renumber m)
 
     renumberDivMod (x, y, q, r) =
       ( left renumber x,

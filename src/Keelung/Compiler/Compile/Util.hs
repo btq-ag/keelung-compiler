@@ -5,6 +5,7 @@ import Control.Monad.State
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
+import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Compile.Relations.Field (AllRelations)
@@ -16,7 +17,6 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
-import Keelung (HasWidth(widthOf))
 
 --------------------------------------------------------------------------------
 
@@ -174,6 +174,9 @@ writeMul as bs cs = writeMulWithPoly (uncurry PolyG.build as) (uncurry PolyG.bui
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPoly (PolyG.build c as)
+
+writeValF :: (GaloisField n, Integral n) => RefF -> n -> M n ()
+writeValF a x = addC [CVarBindF (F a) x]
 
 writeValB :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
 writeValB a x = addC [CVarBindB a x]

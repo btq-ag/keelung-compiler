@@ -48,11 +48,11 @@ run' r1cs inputs = do
 --   3. binary representation constraints
 --   4. CNEQ constraints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Seq (Constraint n)
-fromOrdinaryConstraints (R1CS _ ordinaryConstraints binReps counters cneqs divMods modInvs) =
+fromOrdinaryConstraints (R1CS _ ordinaryConstraints binReps counters eqZeros divMods modInvs) =
   Seq.fromList (map R1CConstraint ordinaryConstraints)
     <> Seq.fromList (map BooleanConstraint booleanInputVarConstraints)
     <> Seq.fromList (map BinRepConstraint binReps)
-    <> Seq.fromList (map EqConstraint cneqs)
+    <> Seq.fromList (map EqZeroConstraint eqZeros)
     <> Seq.fromList (map DivModConstaint divMods)
     <> Seq.fromList (map ModInvConstraint modInvs)
   where
@@ -88,7 +88,7 @@ lookupVarEither (Right val) = return (Just val)
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (R1CConstraint r1c) = fmap (pure . R1CConstraint) <$> shrinkR1C r1c
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
-shrink (EqConstraint cneq) = fmap (pure . EqConstraint) <$> shrinkEq cneq
+shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
 shrink (ModInvConstraint modInv) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInv
@@ -222,32 +222,23 @@ shrinkBinRep binRep@(BinRep var width bitVarStart) = do
           Just bit -> return (Just (accVal * 2 + bit))
 
 -- if (x - y) = 0 then m = 0 else m = recip (x - y)
-shrinkEq :: (GaloisField n, Integral n) => (Var, Either Var n, Var) -> M n (Result (Var, Either Var n, Var))
-shrinkEq cneq@(x, Left y, m) = do
-  resultX <- lookupVar x
-  resultY <- lookupVar y
-  case (resultX, resultY) of
-    (Nothing, Nothing) -> return $ Stuck cneq
-    (Just a, Nothing) -> return $ Shrinked (y, Right a, m)
-    (Nothing, Just b) -> return $ Shrinked (x, Right b, m)
-    (Just a, Just b) -> do
-      if a == b
-        then do
-          bindVar m 0
-        else do
-          bindVar m (recip (a - b))
+shrinkEqZero :: (GaloisField n, Integral n) => (Poly n, Var) -> M n (Result (Poly n, Var))
+shrinkEqZero eqZero@(xs, m) = do
+  bindings <- get
+  case substAndView bindings xs of
+    Constant 0 -> do
+      bindVar m 0
       return Eliminated
-shrinkEq cneq@(x, Right y, m) = do
-  result <- lookupVar x
-  case result of
-    Nothing -> return $ Stuck cneq
-    Just a -> do
-      if a == y
-        then do
-          bindVar m 0
-        else do
-          bindVar m (recip (a - y))
+    Constant c -> do
+      bindVar m (recip c)
       return Eliminated
+    Uninomial c (var, coeff) ->
+      if Poly.varSize xs == 1
+        then return $ Stuck eqZero
+        else case Poly.buildEither c [(var, coeff)] of
+          Left _ -> return Eliminated
+          Right xs' -> return $ Shrinked (xs', m)
+    Polynomial xs' -> return $ Shrinked (xs', m)
 
 --------------------------------------------------------------------------------
 

@@ -15,7 +15,6 @@ import Data.Bits qualified
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (foldl'), toList)
-import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.Util
@@ -24,6 +23,7 @@ import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax (widthOf)
 import Keelung.Syntax.Counters (VarSort (..), VarType (..), addCount, getCount)
@@ -213,8 +213,11 @@ compileAssertionEqU a b = do
 
 --------------------------------------------------------------------------------
 
-addEqHint :: (GaloisField n, Integral n) => Ref -> Either Ref n -> RefF -> M n ()
-addEqHint x y z = modify' $ \cs -> cs {csEqs = Map.insert (x, y) z (csEqs cs)}
+addEqZeroHint :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> RefF -> M n ()
+addEqZeroHint c xs m = case PolyG.build c xs of
+  Left 0 -> writeValF m 0
+  Left constant -> writeValF m (recip constant)
+  Right poly -> modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
 
 addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
 addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (Left x, Left y, Left q, Left r) : csDivMods cs}
@@ -628,7 +631,7 @@ eqFU isEq (Right x) (Left y) = do
         (1, [(B out, -1)])
         (0, [])
   --  keep track of the relation between (x - y) and m
-  addEqHint y (Right x) m
+  addEqZeroHint x [(y, -1)] m
   return (Left out)
 eqFU isEq (Left x) (Right y) = eqFU isEq (Right y) (Left x)
 eqFU isEq (Left x) (Left y) = do
@@ -658,7 +661,7 @@ eqFU isEq (Left x) (Left y) = do
         (1, [(B out, -1)])
         (0, [])
   --  keep track of the relation between (x - y) and m
-  addEqHint y (Left x) m
+  addEqZeroHint 0 [(x, 1), (y, -1)] m
   return (Left out)
 
 eqB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)

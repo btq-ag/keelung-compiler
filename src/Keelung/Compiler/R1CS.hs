@@ -41,7 +41,7 @@ toR1CS cs =
       r1csConstraints = map toR1C (toList (csConstraints cs)),
       r1csBinReps = csBinReps cs,
       r1csCounters = csCounters cs,
-      r1csEqs = csEqs cs,
+      r1csEqZeros = csEqZeros cs,
       r1csDivMods = csDivMods cs,
       r1csModInvs = csModInvs cs
     }

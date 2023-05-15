@@ -21,6 +21,7 @@ import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
 import Keelung.Data.BinRep (BinRep (..))
+import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.VarGroup
 import Keelung.Syntax
 import Keelung.Syntax.Counters
@@ -51,7 +52,7 @@ bindVarEither (Right _) _ = return ()
 data Constraint n
   = R1CConstraint (R1C n)
   | BooleanConstraint Var
-  | EqConstraint (Var, Either Var n, Var)
+  | EqZeroConstraint (Poly n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
     DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
   | BinRepConstraint BinRep
@@ -64,7 +65,7 @@ instance Serialize n => Serialize (Constraint n)
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (R1CConstraint r1c) = show r1c
   show (BooleanConstraint var) = "(Boolean)   $" <> show var <> " = $" <> show var <> " * $" <> show var
-  show (EqConstraint cneq) = "(Equality)  " <> show cneq
+  show (EqZeroConstraint eqZero) = "(EqZero)     " <> show eqZero
   show (DivModConstaint (dividend, divisor, quotient, remainder)) =
     "(DivMod)    $"
       <> show dividend
@@ -80,7 +81,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
 instance Functor Constraint where
   fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
   fmap _ (BooleanConstraint var) = BooleanConstraint var
-  fmap f (EqConstraint (x, y, m)) = EqConstraint (x, fmap f y, m)
+  fmap f (EqZeroConstraint (xs, m)) = EqZeroConstraint (fmap f xs, m)
   fmap f (DivModConstaint (a, b, q, r)) = DivModConstaint (fmap f a, fmap f b, fmap f q, fmap f r)
   fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
   fmap f (ModInvConstraint (a, n, p)) = ModInvConstraint (fmap f a, fmap f n, p)

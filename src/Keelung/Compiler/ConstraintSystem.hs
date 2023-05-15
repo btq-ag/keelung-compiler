@@ -14,6 +14,7 @@ where
 
 import Control.Arrow (left)
 import Control.DeepSeq (NFData)
+import Data.Bifunctor (bimap)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
@@ -40,7 +41,7 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
-import Keelung.Field (FieldType, N (N))
+import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
@@ -63,7 +64,7 @@ data ConstraintSystem n = ConstraintSystem
     -- multiplicative constraints
     csMulF :: [(PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))],
     -- hits for computing equality
-    csEqs :: Map (Ref, Either Ref n) RefF,
+    csEqZeros :: [(PolyG Ref n, RefF)],
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
     csDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
@@ -139,10 +140,8 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 
       showMulF = adapt "MulF" (csMulF cs) showMul
 
-      showEqs = adapt "Eqs" (Map.toList $ csEqs cs) $ \((x, y), m) ->
-        case y of
-          Left y' -> "Eqs " <> show x <> " " <> show y' <> " " <> show m
-          Right y' -> "Eqs " <> show x <> " " <> show (N y') <> " " <> show m
+      showEqs = adapt "Eqs" (csEqZeros cs) $ \(poly, m) ->
+        "Eqs " <> show poly <> " / " <> show m
 
       showOccurrencesF =
         if Map.null $ csOccurrenceF cs
@@ -228,7 +227,7 @@ relocateConstraintSystem cs =
           <> varEqUs
           <> addFs
           <> mulFs,
-      Relocated.csEqs = toList eqs,
+      Relocated.csEqZeros = toList eqZeros,
       Relocated.csDivMods = divMods,
       Relocated.csModInvs = modInvs
     }
@@ -384,7 +383,7 @@ relocateConstraintSystem cs =
 
     addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
     mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
-    eqs = Seq.fromList $ map (\((x, y), m) -> (reindexRef counters x, left (reindexRef counters) y, reindexRefF counters m)) $ Map.toList $ csEqs cs
+    eqZeros = Seq.fromList $ map (bimap (fromPoly_ counters) (reindexRefF counters)) $ csEqZeros cs
 
     divMods = map (\(a, b, q, r) -> (left (reindexRefU counters) a, left (reindexRefU counters) b, left (reindexRefU counters) q, left (reindexRefU counters) r)) $ csDivMods cs
     modInvs = map (\(a, n, p) -> (left (reindexRefU counters) a, left (reindexRefU counters) n, p)) $ csModInvs cs
@@ -397,7 +396,7 @@ sizeOfConstraintSystem cs =
     + UIntRelations.size (FieldRelations.exportUIntRelations (csFieldRelations cs))
     + length (csAddF cs)
     + length (csMulF cs)
-    + length (csEqs cs)
+    + length (csEqZeros cs)
 
 class UpdateOccurrences ref where
   addOccurrences :: Set ref -> ConstraintSystem n -> ConstraintSystem n

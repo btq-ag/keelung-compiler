@@ -24,7 +24,7 @@ import Keelung.Data.PolyG qualified as PolyG
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
 run :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (ConstraintSystem n)
-run cs = goThroughEqs . goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cs
+run cs = goThroughEqZeros . goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cs
 
 optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (WhatChanged, ConstraintSystem n)
 optimizeAddF cs = do
@@ -51,34 +51,16 @@ goThroughAddF = do
     csAddF' <- foldMaybeM reduceAddF [] (csAddF cs)
     modify' $ \cs'' -> cs'' {csAddF = csAddF'}
 
-goThroughEqs :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
-goThroughEqs cs =
+goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
+goThroughEqZeros cs =
   let relations = csFieldRelations cs
-   in cs
-        { csEqs =
-            Map.fromList
-              $ mapMaybe
-                ( \(k, v) -> case substKey (substVar relations) k of
-                    Just k' -> Just (k', v)
-                    Nothing -> Nothing
-                )
-              $ Map.toList (csEqs cs)
-        }
+   in cs {csEqZeros = mapMaybe (reduceEqZeros relations) (csEqZeros cs)}
   where
-    substKey subst (x, Left y) = case subst x of
-      Left x' -> Just (x', subst y)
-      Right x' -> case subst y of 
-        Left y' -> Just (y', Right x')
-        Right _ -> Nothing
-    substKey subst (x, Right y) = case subst x of
-      Left x' -> Just (x', Right y)
-      Right _ -> Nothing
-
-    substVar relations ref = case AllRelations.lookup ref relations of
-      AllRelations.Root -> Left ref
-      AllRelations.Value val -> Right val
-      AllRelations.ChildOf 1 root 0 -> Left root
-      AllRelations.ChildOf {} -> Left ref -- TODO: handle this case
+    reduceEqZeros :: (GaloisField n, Integral n) => AllRelations n -> (PolyG Ref n, RefF) -> Maybe (PolyG Ref n, RefF)
+    reduceEqZeros relations (polynomial, m) = case substPolyG relations polynomial of
+      Nothing -> Just (polynomial, m) -- nothing changed
+      Just (Left _constant, _, _) -> Nothing
+      Just (Right reducePolynomial, _, _) -> Just (reducePolynomial, m)
 
 goThroughDivMods :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 goThroughDivMods cs =
