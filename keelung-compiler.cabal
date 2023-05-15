@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -125,8 +125,6 @@ executable keelungc
       Keelung.Interpreter.R1CS.Monad
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
-      AggregateSignature.Program
-      AggregateSignature.Util
       Basic
       Hash.Poseidon
       Hash.Poseidon.Constant
@@ -216,8 +214,6 @@ test-suite keelung-test
       Keelung.Interpreter.R1CS.Monad
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
-      AggregateSignature.Program
-      AggregateSignature.Util
       Basic
       Hash.Poseidon
       Hash.Poseidon.Constant

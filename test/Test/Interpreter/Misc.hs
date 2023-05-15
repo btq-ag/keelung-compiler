@@ -2,8 +2,6 @@
 
 module Test.Interpreter.Misc (tests, run) where
 
-import AggregateSignature.Program qualified as AggSig
-import AggregateSignature.Util qualified as AggSig
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
@@ -76,36 +74,6 @@ tests = do
           (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2")
           (CompileError (Compile.ConflictingValuesU 1 2))
 
-    describe "AggCheck" $ do
-      it "dim:1 sig:1" $
-        runAggCheck 1 1 []
-      it "dim:1 sig:10" $
-        runAggCheck 1 10 []
-      it "dim:10 sig:1" $
-        runAggCheck 10 1 []
-      it "dim:10 sig:10" $
-        runAggCheck 10 10 []
-
-    describe "LT12289" $ do
-      it "dim:1 sig:1" $
-        runLT12289 1 1 []
-      it "dim:1 sig:10" $
-        runLT12289 1 10 []
-      it "dim:10 sig:1" $
-        runLT12289 10 1 []
-      it "dim:10 sig:10" $
-        runLT12289 10 10 []
-
-    describe "LenCheck" $ do
-      it "dim:1 sig:1" $
-        runLenCheck 1 1 []
-      it "dim:1 sig:10" $
-        runLenCheck 1 10 []
-      it "dim:10 sig:1" $
-        runLenCheck 10 1 []
-      it "dim:10 sig:10" $
-        runLenCheck 10 10 []
-
     describe "Poseidon" $ do
       it "[0]" $ do
         runAll gf181Info (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385 :: GF181]
@@ -126,51 +94,3 @@ tests = do
               state3 <- reuse (round' state2) -- (60, 2025)
               return $ fst state3
         runAndCompare gf181Info (program :: Comp Field) [0 :: N GF181] []
-  where
-    runAggCheck :: Int -> Int -> [GF181] -> IO ()
-    runAggCheck dimension numberOfSignatures outputs =
-      let settings =
-            AggSig.Settings
-              { AggSig.enableAggChecking = True,
-                AggSig.enableSizeChecking = False,
-                AggSig.enableLengthChecking = False
-              }
-          param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
-       in runAll
-            gf181Info
-            (AggSig.checkAgg param :: Comp ())
-            (AggSig.genInputFromParam param)
-            []
-            outputs
-
-    runLT12289 :: Int -> Int -> [GF181] -> IO ()
-    runLT12289 dimension numberOfSignatures outputs =
-      let settings =
-            AggSig.Settings
-              { AggSig.enableAggChecking = False,
-                AggSig.enableSizeChecking = True,
-                AggSig.enableLengthChecking = False
-              }
-          param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
-       in runAll
-            gf181Info
-            (AggSig.checkSize param :: Comp ())
-            (AggSig.genInputFromParam param)
-            []
-            outputs
-
-    runLenCheck :: Int -> Int -> [GF181] -> IO ()
-    runLenCheck dimension numberOfSignatures outputs =
-      let settings =
-            AggSig.Settings
-              { AggSig.enableAggChecking = False,
-                AggSig.enableSizeChecking = False,
-                AggSig.enableLengthChecking = True
-              }
-          param = AggSig.makeParam dimension numberOfSignatures 42 settings :: AggSig.Param GF181
-       in runAll
-            gf181Info
-            (AggSig.checkLength param :: Comp ())
-            (AggSig.genInputFromParam param)
-            []
-            outputs
