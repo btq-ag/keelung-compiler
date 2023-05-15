@@ -23,6 +23,7 @@ import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax (widthOf)
@@ -218,6 +219,16 @@ addEqZeroHint c xs m = case PolyG.build c xs of
   Left 0 -> writeValF m 0
   Left constant -> writeValF m (recip constant)
   Right poly -> modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
+
+addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> RefF -> M n ()
+addEqZeroHintWithPoly (Left 0) m = writeValF m 0
+addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
+addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
+
+-- addEqZeroHintWithPoly c xs m = case PolyG.build c xs of
+--   Left 0 -> writeValF m 0
+--   Left constant -> writeValF m (recip constant)
+--   Right poly -> modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
 
 addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
 addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (Left x, Left y, Left q, Left r) : csDivMods cs}
@@ -595,6 +606,43 @@ wireU' others = Left <$> wireU others
 
 -- | Equalities are compiled with inequalities and inequalities with CNEQ constraints.
 --    introduce a new variable m
+--    if polynomial = 0 then m = 0 else m = recip polynomial
+--    Equality:
+--      polynomial * m = 1 - out
+--      polynomial * out = 0
+--    Inequality:
+--      polynomial * m = out
+--      polynomial * (1 - out) = 0
+eqZero :: (GaloisField n, Integral n) => Bool -> Either n (PolyG Ref n) -> M n (Either RefB Bool)
+eqZero isEq (Left constant) = return $ Right $ if isEq then constant == 0 else constant /= 0
+eqZero isEq (Right polynomial) = do
+  m <- freshRefF
+  out <- freshRefB
+  if isEq
+    then do
+      writeMulWithPoly
+        (Right polynomial)
+        (PolyG.singleton 0 (F m, 1))
+        (PolyG.singleton 1 (B out, -1))
+      writeMulWithPoly
+        (Right polynomial)
+        (PolyG.singleton 0 (B out, 1))
+        (PolyG.build 0 [])
+    else do
+      writeMulWithPoly
+        (Right polynomial)
+        (PolyG.singleton 0 (F m, 1))
+        (PolyG.singleton 0 (B out, 1))
+      writeMulWithPoly
+        (Right polynomial)
+        (PolyG.singleton 1 (B out, -1))
+        (PolyG.build 0 [])
+  --  keep track of the relation between (x - y) and m
+  addEqZeroHintWithPoly (Right polynomial) m
+  return (Left out)
+
+-- | Equalities are compiled with inequalities and inequalities with CNEQ constraints.
+--    introduce a new variable m
 --    if diff = 0 then m = 0 else m = recip diff
 --    Equality:
 --      (x - y) * m = 1 - out
@@ -880,8 +928,9 @@ andBs (Left x0) (Left x1) (x2 :<| xs) = do
   --      if all operands are 1           then 1 else 0
   --  =>  if the sum of operands is N     then 1 else 0
   --  =>  the sum of operands is N
-  sumOfOperands <- add ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
-  eqFU True (Right (fromIntegral (3 + length xs))) sumOfOperands
+  let arity = fromIntegral (3 + length xs)
+  let polynomal = PolyG.addConstant (-arity) <$> add' ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
+  eqZero True polynomal
 
 orBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
 orBs (Right True) _ _ = return $ Right True
@@ -905,8 +954,8 @@ orBs (Left x0) (Left x1) (x2 :<| xs) = do
   --  =>  if the sum of operands is 0     then 0 else 1
   --  =>  if the sum of operands is not 0 then 1 else 0
   --  =>  the sum of operands is not 0
-  sumOfOperands <- add ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
-  eqFU False (Right 0) sumOfOperands
+  let polynomal = add' ((Left . B) x0) ((Left . B) x1) (fmap fromB (x2 :<| xs))
+  eqZero False polynomal
 
 xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 xorB (Right True) (Right True) = return $ Right False
@@ -1229,41 +1278,10 @@ compileLTEUConstVarPrim (Right True) (False, _) = return $ Right True
 compileLTEUConstVarPrim (Right False) (True, _) = return $ Right False
 compileLTEUConstVarPrim (Right False) (False, y) = return $ Left y
 
--- -- | Compute the addition of two variables
--- add :: (GaloisField n, Integral n) => Either Ref n -> Either Ref n -> M n (Either Ref n)
--- add (Left x) (Left y) = do
---   out <- freshRefF
---   addC $ cAddF 0 [(x, 1), (y, 1), (F out, -1)]
---   return $ Left (F out)
--- add (Left x) (Right y) = do
---   out <- freshRefF
---   addC $ cAddF y [(x, 1), (F out, -1)]
---   return $ Left (F out)
--- add (Right x) (Left y) = add (Left y) (Right x)
--- add (Right x) (Right y) = return $ Right (x + y)
-
--- | Compute the addition of two variables
-add :: (GaloisField n, Integral n) => Either Ref n -> Either Ref n -> Seq (Either Ref n) -> M n (Either Ref n)
-add x0 x1 xs = do
-  out <- freshRefF
+add' :: (GaloisField n, Integral n) => Either Ref n -> Either Ref n -> Seq (Either Ref n) -> Either n (PolyG Ref n)
+add' x0 x1 xs = do
   let (variables, constants) = partitionEithers (x0 : x1 : toList xs)
-  addC $ cAddF (sum constants) $ (F out, -1) : [(x, 1) | x <- variables]
-  return $ Left (F out)
-
--- add (Left x) (Left y) Empty = do
---   out <- freshRefF
---   addC $ cAddF 0 [(x, 1), (y, 1), (F out, -1)]
---   return $ Left (F out)
--- add (Left x) (Left y) (z :<| xs) = _
--- add (Left x) (Right y) Empty = do
---   out <- freshRefF
---   addC $ cAddF y [(x, 1), (F out, -1)]
---   return $ Left (F out)
--- add (Left x) (Right y) (z :<| xs) = _
--- add (Right x) (Left y) Empty = add (Left y) (Right x) Empty
--- add (Right x) (Left y) (z :<| xs) = _
--- add (Right x) (Right y) Empty = return $ Right (x + y)
--- add (Right x) (Right y) (z :<| xs) = _
+   in PolyG.build (sum constants) [(x, 1) | x <- variables]
 
 -- | Compute the multiplication of two variables
 mul :: (GaloisField n, Integral n) => Either Ref n -> Either Ref n -> M n (Either Ref n)
