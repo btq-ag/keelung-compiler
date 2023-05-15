@@ -95,7 +95,8 @@ tests = do
           x <- inputField Public
           y <- reuse x
           return (x * y :: Field)
-        cs `shouldHaveSize` 2
+        debug cs
+        cs `shouldHaveSize` 3
         cs' `shouldHaveSize` 1
         return ()
 

@@ -237,30 +237,43 @@ compileExprF out expr = case expr of
     x' <- toLC x
     y' <- fmap (fmap PolyG.negate) (toLC y)
     let operands = [x', y']
-    handleLC (F out) (foldl mergeLC (Left 0) operands) 
+    handleLC (F out) (foldl mergeLC (Left 0) operands)
   AddF x y rest -> do
     operands <- mapM toLC (toList (x :<| y :<| rest))
-    handleLC (F out) (foldl mergeLC (Left 0) operands) 
+    handleLC (F out) (foldl mergeLC (Left 0) operands)
   MulF x y -> do
-    x' <- wireF x
-    y' <- wireF y
-    addC $ cMulSimpleF (F x') (F y') (F out)
+    x' <- toLC x
+    y' <- toLC y
+    result <- do
+      out' <- freshRefF
+      let polynomial = PolyG.singleton 0 (F out', 1)
+      writeMulWithPoly x' y' polynomial
+      return polynomial
+    handleLC (F out) result
   ExpF x n -> do
     base <- wireF x
     result <- fastExp base (Left 1) n
     handleLC (F out) result
   DivF x y -> do
-    x' <- wireF x
-    y' <- wireF y
-    addC $ cMulSimpleF (F y') (F out) (F x')
+    x' <- toLC x
+    y' <- toLC y
+    result <- do
+      out' <- freshRefF
+      let polynomial = PolyG.singleton 0 (F out', 1)
+      writeMulWithPoly y' polynomial x'
+      return polynomial
+    handleLC (F out) result
   IfF p x y -> do
     p' <- compileExprB p
-    x' <- wireF' x
-    y' <- wireF' y
+    x' <- toLC x
+    y' <- toLC y
+    -- x' <- wireF' x
+    -- y' <- wireF' y
     result <- compileIfF p' x' y'
-    case result of
-      Left var -> addC $ cVarEq (F out) (F var)
-      Right val -> addC $ cVarBindF (F out) val
+    handleLC (F out) result
+  -- case result of
+  --   Left var -> addC $ cVarEq (F out) (F var)
+  --   Right val -> addC $ cVarBindF (F out) val
   BtoF x -> do
     result <- compileExprB x
     case result of
@@ -486,41 +499,45 @@ compileMulU width out a b = do
 --  out = p * x + y - p * y
 --      =>
 --  (out - y) = p * (x - y)
-compileIfF :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefF n -> Either RefF n -> M n (Either RefF n)
+compileIfF :: (GaloisField n, Integral n) => Either RefB Bool -> LC n -> LC n -> M n (LC n)
 compileIfF (Right True) x _ = return x
 compileIfF (Right False) _ y = return y
-compileIfF (Left p) (Right x) (Right y) = do
+compileIfF (Left p) (Left x) (Left y) = do
   if x == y
-    then return $ Right x
+    then return $ Left x
     else do
       out <- freshRefF
       -- (x - y) * p - out + y = 0
       writeAdd y [(B p, x - y), (F out, -1)]
-      return $ Left out
-compileIfF (Left p) (Right x) (Left y) = do
-  out <- freshRefF
-  -- (out - y) = p * (x - y)
-  writeMul
-    (0, [(B p, 1)])
-    (x, [(F y, -1)])
-    (0, [(F y, -1), (F out, 1)])
-  return $ Left out
+      return $ PolyG.singleton 0 (F out, 1)
 compileIfF (Left p) (Left x) (Right y) = do
   out <- freshRefF
-  -- (out - y) = p * (x - y)
-  writeMul
-    (0, [(B p, 1)])
-    (-y, [(F x, 1)])
-    (-y, [(F out, 1)])
-  return $ Left out
-compileIfF (Left p) (Left x) (Left y) = do
+  -- p * (x - y) = (out - y)
+  let negatedY = PolyG.negate y
+  writeMulWithPoly
+    (PolyG.singleton 0 (B p, 1)) -- p
+    (Right $ PolyG.addConstant x negatedY) -- (x - y)
+    (PolyG.insert 0 (F out, 1) negatedY) -- (out - y)
+  return $ PolyG.singleton 0 (F out, 1)
+compileIfF (Left p) (Right x) (Left y) = do
   out <- freshRefF
-  -- (out - y) = p * (x - y)
-  writeMul
-    (0, [(B p, 1)])
-    (0, [(F x, 1), (F y, -1)])
-    (0, [(F y, -1), (F out, 1)])
-  return $ Left out
+  -- p * (x - y) = (out - y)
+  writeMulWithPoly
+    (PolyG.singleton 0 (B p, 1)) -- p
+    (Right $ PolyG.addConstant (-y) x) -- (x - y)
+    (PolyG.singleton (-y) (F out, 1)) -- (out - y)
+  return $ PolyG.singleton 0 (F out, 1)
+compileIfF (Left p) (Right x) (Right y) = do
+  out <- do
+    r <- freshRefF
+    return $ PolyG.singleton 0 (F r, 1)
+  -- p * (x - y) = out - y
+  let negatedY = PolyG.negate y
+  writeMulWithPoly
+    (PolyG.singleton 0 (B p, 1)) -- p
+    (PolyG.merge x negatedY) -- (x - y)
+    (mergeLC out (Right negatedY)) -- (out - y)
+  return out
 
 -- | Conditional
 --  out = p * x + (1 - p) * y
