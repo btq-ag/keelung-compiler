@@ -27,7 +27,9 @@ library
   exposed-modules:
       Keelung.Compiler
       Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
+      Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
@@ -90,7 +92,9 @@ executable keelungc
       Option
       Keelung.Compiler
       Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
+      Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem
@@ -179,7 +183,9 @@ test-suite keelung-test
       Test.WitnessGeneration
       Keelung.Compiler
       Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
+      Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintSystem

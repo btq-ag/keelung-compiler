@@ -7,11 +7,11 @@ import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
+import Keelung.Compiler.Constraint
+import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
-import Keelung.Compiler.Constraint
-import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
@@ -192,3 +192,67 @@ writeNEqB a b = addC [CVarNEqB a b]
 
 writeEqU :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
 writeEqU a b = addC [CVarEqU a b]
+
+--------------------------------------------------------------------------------
+
+-- | Hints
+addEqZeroHint :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> RefF -> M n ()
+addEqZeroHint c xs m = case PolyG.build c xs of
+  Left 0 -> writeValF m 0
+  Left constant -> writeValF m (recip constant)
+  Right poly -> modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
+
+addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> RefF -> M n ()
+addEqZeroHintWithPoly (Left 0) m = writeValF m 0
+addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
+addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
+
+-- addEqZeroHintWithPoly c xs m = case PolyG.build c xs of
+--   Left 0 -> writeValF m 0
+--   Left constant -> writeValF m (recip constant)
+--   Right poly -> modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
+
+addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
+addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (Left x, Left y, Left q, Left r) : csDivMods cs}
+
+addModInvHint :: (GaloisField n, Integral n) => RefU -> RefU -> Integer -> M n ()
+addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (Left x, Left n, p) : csModInvs cs}
+
+--------------------------------------------------------------------------------
+
+-- | Equalities are compiled with inequalities and inequalities with CNEQ constraints.
+--    introduce a new variable m
+--    if polynomial = 0 then m = 0 else m = recip polynomial
+--    Equality:
+--      polynomial * m = 1 - out
+--      polynomial * out = 0
+--    Inequality:
+--      polynomial * m = out
+--      polynomial * (1 - out) = 0
+eqZero :: (GaloisField n, Integral n) => Bool -> Either n (PolyG Ref n) -> M n (Either RefB Bool)
+eqZero isEq (Left constant) = return $ Right $ if isEq then constant == 0 else constant /= 0
+eqZero isEq (Right polynomial) = do
+  m <- freshRefF
+  out <- freshRefB
+  if isEq
+    then do
+      writeMulWithPoly
+        (Right polynomial)
+        (PolyG.singleton 0 (F m, 1))
+        (PolyG.singleton 1 (B out, -1))
+      writeMulWithPoly
+        (Right polynomial)
+        (PolyG.singleton 0 (B out, 1))
+        (PolyG.build 0 [])
+    else do
+      writeMulWithPoly
+        (Right polynomial)
+        (PolyG.singleton 0 (F m, 1))
+        (PolyG.singleton 0 (B out, 1))
+      writeMulWithPoly
+        (Right polynomial)
+        (PolyG.singleton 1 (B out, -1))
+        (PolyG.build 0 [])
+  --  keep track of the relation between (x - y) and m
+  addEqZeroHintWithPoly (Right polynomial) m
+  return (Left out)
