@@ -187,7 +187,7 @@ main = withUtf8 $ do
             (\fieldInfo -> generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs))
             (\fieldInfo -> generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs))
             fieldType
-    Version -> putStrLn "Keelung v0.10.0"
+    Version -> putStrLn "Keelung v0.11.0"
   where
     outputCircuit :: Serialize a => a -> IO ()
     outputCircuit = putStrLn . BSC.unpack . encode
