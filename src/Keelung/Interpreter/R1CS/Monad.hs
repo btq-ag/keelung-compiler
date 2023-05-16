@@ -56,6 +56,7 @@ data Constraint n
   | -- | Dividend, Divisor, Quotient, Remainder
     DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
   | BinRepConstraint BinRep
+  | BinRepConstraint2 [(Var, Int)]
   | -- | (a, n, p) where modInv a * a = n * p + 1
     ModInvConstraint (Either Var n, Either Var n, Integer)
   deriving (Eq, Generic, NFData)
@@ -76,6 +77,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
       <> " + $"
       <> show remainder
   show (BinRepConstraint binRep) = "(BinRep)    " <> show binRep
+  show (BinRepConstraint2 segments) = "(BinRep)    " <> show segments
   show (ModInvConstraint (var, _, p)) = "(ModInv)    $" <> show var <> "⁻¹ (mod " <> show p <> ")"
 
 instance Functor Constraint where
@@ -84,6 +86,7 @@ instance Functor Constraint where
   fmap f (EqZeroConstraint (xs, m)) = EqZeroConstraint (fmap f xs, m)
   fmap f (DivModConstaint (a, b, q, r)) = DivModConstaint (fmap f a, fmap f b, fmap f q, fmap f r)
   fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
+  fmap _ (BinRepConstraint2 segments) = BinRepConstraint2 segments
   fmap f (ModInvConstraint (a, n, p)) = ModInvConstraint (fmap f a, fmap f n, p)
 
 --------------------------------------------------------------------------------

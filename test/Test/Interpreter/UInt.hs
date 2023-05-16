@@ -26,11 +26,12 @@ tests = do
   describe "Unsigned Integers" $ do
     describe "Arithmetics" $ do
       describe "Addition" $ do
-        it "constant / constant" $ do
+        it "variable / variable" $ do
           let program = do
                 x <- inputUInt @4 Public
                 y <- inputUInt @4 Public
                 return $ x + y
+          -- runAll gf181Info program [3, 4] ([] :: [GF181]) [7]
           let genPair = do
                 x <- choose (0, 15)
                 y <- choose (0, 15)

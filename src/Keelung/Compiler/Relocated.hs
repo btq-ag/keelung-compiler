@@ -97,6 +97,7 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
     csUseNewOptimizer :: Bool,
     csConstraints :: !(Seq (Constraint n)),
     csBinReps :: [BinRep],
+    csBinReps' :: [Seq (Var, Int)],
     csCounters :: Counters,
     csEqZeros :: [(Poly n, Var)],
     csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
@@ -106,11 +107,11 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: RelocatedConstraintSystem n -> Int
-numberOfConstraints (RelocatedConstraintSystem _ _ cs binReps counters _eqs _divMods _modInvs) =
+numberOfConstraints (RelocatedConstraintSystem _ _ cs binReps _ counters _eqs _divMods _modInvs) =
   length cs + getBooleanConstraintSize counters + length binReps
 
 instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
-  show (RelocatedConstraintSystem _ _ constraints binReps counters _eqs _divMods _modInvs) =
+  show (RelocatedConstraintSystem _ _ constraints binReps _ counters _eqs _divMods _modInvs) =
     "ConstraintSystem {\n"
       <> prettyConstraints counters (toList constraints) binReps
       <> prettyVariables counters
@@ -127,6 +128,7 @@ renumberConstraints cs =
       csUseNewOptimizer = csUseNewOptimizer cs,
       csConstraints = fmap renumberConstraint (csConstraints cs),
       csBinReps = if csUseNewOptimizer cs then fmap renumberBinRep (csBinReps cs) else csBinReps cs,
+      csBinReps' = csBinReps' cs,
       csCounters = setReducedCount reducedCount counters,
       csEqZeros = fmap renumberEqZero (csEqZeros cs),
       csDivMods = fmap renumberDivMod (csDivMods cs),

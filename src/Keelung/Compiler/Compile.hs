@@ -456,6 +456,15 @@ compileAddOrSubU isSub width out (Left a) (Right b) = do
     -- Cᵢ = outᵢ
     addC $ cVarEqB (RefUBit width c i) (RefUBit width out i)
 compileAddOrSubU isSub width out (Left a) (Left b) = do
+  -- carry <- freshRefB
+  -- addBooleanConstraint carry
+  -- -- out + carry = A + B
+  -- let resultSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+
+  -- writeAdd 0 $ [(U a, -1), (U b, if isSub then 1 else -1), (B carry, 2 ^ width)] <> resultSegment
+
+  -- addBinRepHint [(RefUBit width out 0, 4), (carry, 1)]
+
   c <- freshRefU (width + 1)
   -- C = A + B
   addC $ cAddF 0 [(U a, 1), (U b, if isSub then -1 else 1), (U c, -1)]
@@ -463,9 +472,6 @@ compileAddOrSubU isSub width out (Left a) (Left b) = do
   forM_ [0 .. width - 1] $ \i -> do
     -- Cᵢ = outᵢ
     addC $ cVarEqB (RefUBit width c i) (RefUBit width out i)
-
--- HACK: addC occurences of RefUs
--- addOccurrencesUTemp [out, a, b, c]
 
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileAddU = compileAddOrSubU False

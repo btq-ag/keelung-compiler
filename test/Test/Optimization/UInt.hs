@@ -7,6 +7,9 @@ import Keelung hiding (compileO0)
 import Test.Hspec
 import Test.Optimization.Util
 
+run :: IO ()
+run = hspec tests
+
 
 tests :: SpecWith ()
 tests = do
@@ -95,6 +98,3 @@ tests = do
           return $ x `gt` y
         cs `shouldHaveSize` 19
         cs' `shouldHaveSize` 18
-
-run :: IO ()
-run = hspec tests

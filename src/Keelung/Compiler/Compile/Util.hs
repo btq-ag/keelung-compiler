@@ -29,7 +29,7 @@ runM fieldInfo useNewOptimizer counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem fieldInfo counters useNewOptimizer mempty mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintSystem fieldInfo counters useNewOptimizer mempty mempty mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -229,6 +229,12 @@ addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (Left x, Left y, Left q
 
 addModInvHint :: (GaloisField n, Integral n) => RefU -> RefU -> Integer -> M n ()
 addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (Left x, Left n, p) : csModInvs cs}
+
+addBinRepHint :: (GaloisField n, Integral n) => [(RefB, Int)] -> M n ()
+addBinRepHint segments = modify' $ \cs -> cs {csBinReps = segments : csBinReps cs}
+
+addBooleanConstraint :: (GaloisField n, Integral n) => RefB -> M n ()
+addBooleanConstraint x = writeMulWithLC (1 @ B x) (1 @ B x) (1 @ B x)
 
 --------------------------------------------------------------------------------
 

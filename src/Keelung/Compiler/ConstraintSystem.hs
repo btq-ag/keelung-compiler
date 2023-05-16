@@ -12,7 +12,7 @@ module Keelung.Compiler.ConstraintSystem
   )
 where
 
-import Control.Arrow (left)
+import Control.Arrow (left, first)
 import Control.DeepSeq (NFData)
 import Data.Bifunctor (bimap)
 import Data.Field.Galois (GaloisField)
@@ -26,6 +26,7 @@ import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
+import Keelung.Compiler.Constraint
 import Keelung.Compiler.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (AllRelations)
@@ -33,7 +34,6 @@ import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
-import Keelung.Compiler.Constraint
 import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
 import Keelung.Data.BinRep (BinRep (..))
@@ -56,6 +56,7 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceB :: !(Map RefB Int),
     csOccurrenceU :: !(Map RefU Int),
     csBitTests :: !(Map RefU Int),
+    csBinReps :: [[(RefB, Int)]],
     -- when x == y (FieldRelations)
     csFieldRelations :: AllRelations n,
     -- csUIntRelations :: UIntRelations n,
@@ -221,6 +222,7 @@ relocateConstraintSystem cs =
       Relocated.csUseNewOptimizer = csUseNewOptimizer cs,
       Relocated.csCounters = counters,
       Relocated.csBinReps = binReps,
+      Relocated.csBinReps' = map (Seq.fromList . map (first (reindexRefB counters))) (csBinReps cs),
       Relocated.csConstraints =
         varEqFs
           <> varEqBs
