@@ -1,4 +1,4 @@
-module Test.Relations.UInt (tests, run, debug) where
+module Test.Relations.UInt (tests, run) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -163,9 +163,6 @@ isValid :: M ()
 isValid = do
   xs <- get
   UIntRelations.isValid xs `shouldBe` True
-
-debug :: M ()
-debug = get >>= liftIO . print
 
 ------------------------------------------------------------------------
 

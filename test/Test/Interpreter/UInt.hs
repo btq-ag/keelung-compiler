@@ -25,6 +25,32 @@ tests :: SpecWith ()
 tests = do
   describe "Unsigned Integers" $ do
     describe "Arithmetics" $ do
+      describe "Addition" $ do
+        it "constant / constant" $ do
+          let program = do
+                x <- inputUInt @4 Public
+                y <- inputUInt @4 Public
+                return $ x + y
+          let genPair = do
+                x <- choose (0, 15)
+                y <- choose (0, 15)
+                return (x, y)
+          forAll genPair $ \(x, y) -> do
+            let expected = [fromInteger ((x + y) `mod` 16)]
+            runAll gf181Info program [fromInteger x, fromInteger y] ([] :: [GF181]) expected
+
+        it "variable / constant" $ do
+          let program = do
+                x <- inputUInt @4 Public
+                return $ x + 2
+          forAll (choose (0, 100)) $ \x -> do
+            let expected = [fromInteger ((x + 2) `mod` 16)]
+            runAll gf181Info program [fromInteger (x `mod` 16)] ([] :: [GF181]) expected
+
+        it "constant / constant" $ do
+          let program = do
+                return $ 1 + (2 :: UInt 4)
+          runAll gf181Info program [] ([] :: [GF181]) [3]
       it "arithmetics 1" $ do
         let program = do
               f <- inputField Public

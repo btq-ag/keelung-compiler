@@ -5,13 +5,24 @@ module Test.Optimization.UInt (tests, run) where
 
 import Keelung hiding (compileO0)
 import Test.Hspec
-import Test.Optimization.Util (execute, shouldHaveSize)
+import Test.Optimization.Util
 
 
 tests :: SpecWith ()
 tests = do
   describe "UInt" $ do
+    describe "Addition" $ do
+        -- TODO: should've been just 16 
+        it "variable / variable" $ do
+          (cs, cs') <- execute $ do
+                x <- inputUInt @4 Public
+                y <- inputUInt @4 Public
+                return $ x + y
+          cs `shouldHaveSize` 21
+          cs' `shouldHaveSize` 21
+
     describe "Constants" $ do
+      -- TODO: should be just 4
       it "`return 0`" $ do
         (cs, cs') <- execute $ do
           return (0 :: UInt 4)

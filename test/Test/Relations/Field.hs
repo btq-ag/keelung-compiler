@@ -1,4 +1,4 @@
-module Test.Relations.Field (tests, run, debug) where
+module Test.Relations.Field (tests, run) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -86,11 +86,6 @@ assertRelation :: RefF -> GF181 -> RefF -> GF181 -> M ()
 assertRelation var1 slope var2 intercept = do
   xs <- get
   FieldRelations.relationBetween (F var1) (F var2) xs `shouldBe` Just (slope, intercept)
-
-debug :: M ()
-debug = do
-  xs <- get
-  liftIO $ print xs
 
 ------------------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-module Test.Relations.Boolean (tests, run, debug) where
+module Test.Relations.Boolean (tests, run) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -205,9 +205,6 @@ isValid = do
   BooleanRelations.isValid xs `shouldBe` True
 
 ------------------------------------------------------------------------
-
-debug :: M ()
-debug = get >>= liftIO . print
 
 -- instance Arbitrary BooleanRelations where
 --   arbitrary = do

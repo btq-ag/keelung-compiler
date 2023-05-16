@@ -23,6 +23,7 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Error
+import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
@@ -213,19 +214,6 @@ compileAssertionEqU a b = do
   compileExprU b' b
   addC $ cVarEqU a' b'
 
--- compileRelations :: (GaloisField n, Integral n) => Relations n -> M n ()
--- compileRelations (Relations vb eb) = do
---   -- intermediate variable bindings of values
---   forM_ (IntMap.toList (structF vb)) $ \(var, val) -> addC $ cVarBindF (RefF var) val
---   forM_ (IntMap.toList (structB vb)) $ \(var, val) -> addC $ cVarBindB (RefB var) val
---   forM_ (IntMap.toList (structU vb)) $ \(width, bindings) ->
---     forM_ (IntMap.toList bindings) $ \(var, val) -> addC $ cVarBindU (RefUX width var) val
---   -- intermediate variable bindings of expressions
---   forM_ (IntMap.toList (structF eb)) $ \(var, val) -> compileExprF (RefF var) val
---   forM_ (IntMap.toList (structB eb)) $ \(var, val) -> compileExprB (RefB var) val
---   forM_ (IntMap.toList (structU eb)) $ \(width, bindings) ->
---     forM_ (IntMap.toList bindings) $ \(var, val) -> compileExprU (RefUX width var) val
-
 ----------------------------------------------------------------
 
 freshExprU :: Width -> M n (ExprU n)
@@ -306,12 +294,12 @@ compileExprU out expr = case expr of
     forM_ [0 .. width - 1] $ \i -> do
       addC $ cVarEqB (RefUBit width out i) (RefUBit width ref i) -- out[i] = ref[i]
   SubU w x y -> do
-    x' <- wireU x
-    y' <- wireU y
+    x' <- wireU' x
+    y' <- wireU' y
     compileSubU w out x' y'
   AddU w x y -> do
-    x' <- wireU x
-    y' <- wireU y
+    x' <- wireU' x
+    y' <- wireU' y
     compileAddU w out x' y'
   MulU w x y -> do
     x' <- wireU x
@@ -443,8 +431,31 @@ wireU' others = Left <$> wireU others
 --      C       = 2ⁿ⁺¹Cₙ + 2ⁿCₙ₋₁ + ... + 2C₁ + C₀
 --      Result  =          2ⁿCₙ₋₁ + ... + 2C₁ + C₀
 --      C       = A + B
-compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> RefU -> RefU -> M n ()
-compileAddOrSubU isSub width out a b = do
+compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileAddOrSubU isSub width out (Right a) (Right b) = do
+  let val = if isSub then a - b else a + b
+  -- Right val -> return $ Right (FieldBits.testBit' val index)
+  -- copying bits from C to 'out'
+  forM_ [0 .. width - 1] $ \i -> do
+    -- Cᵢ = outᵢ
+    writeValB (RefUBit width out i) (FieldBits.testBit' val i)
+compileAddOrSubU isSub width out (Right a) (Left b) = do
+  c <- freshRefU (width + 1)
+  -- C = A + B
+  addC $ cAddF a [(U b, if isSub then -1 else 1), (U c, -1)]
+  -- copying bits from C to 'out'
+  forM_ [0 .. width - 1] $ \i -> do
+    -- Cᵢ = outᵢ
+    addC $ cVarEqB (RefUBit width c i) (RefUBit width out i)
+compileAddOrSubU isSub width out (Left a) (Right b) = do
+  c <- freshRefU (width + 1)
+  -- C = A + B
+  addC $ cAddF (if isSub then -b else b) [(U a, 1), (U c, -1)]
+  -- copying bits from C to 'out'
+  forM_ [0 .. width - 1] $ \i -> do
+    -- Cᵢ = outᵢ
+    addC $ cVarEqB (RefUBit width c i) (RefUBit width out i)
+compileAddOrSubU isSub width out (Left a) (Left b) = do
   c <- freshRefU (width + 1)
   -- C = A + B
   addC $ cAddF 0 [(U a, 1), (U b, if isSub then -1 else 1), (U c, -1)]
@@ -456,10 +467,10 @@ compileAddOrSubU isSub width out a b = do
 -- HACK: addC occurences of RefUs
 -- addOccurrencesUTemp [out, a, b, c]
 
-compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
+compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileAddU = compileAddOrSubU False
 
-compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
+compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileSubU = compileAddOrSubU True
 
 -- | Encoding addition on UInts with multiple operands: O(2)
@@ -594,7 +605,7 @@ assertNotZeroU width expr = do
 --   --  that is, there exists a BinRep of y - x
 --   difference <- freshRefU  width
 --   compileSubU width difference y x
-assertLTU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
+assertLTU :: (GaloisField n, Integral n) => Width -> Either RefU n -> Either RefU n -> M n ()
 assertLTU width x y = do
   --    x < y
   --  =>
@@ -625,7 +636,7 @@ assertDivModU width dividend divisor quotient remainder = do
       (0, [(U quotientRef, 1)])
       (0, [(U dividendRef, 1), (U remainderRef, -1)])
   --    0 ≤ remainder < divisor
-  assertLTU width remainderRef divisorRef
+  assertLTU width (Left remainderRef) (Left divisorRef)
   -- --    0 < divisor
   -- -- =>
   -- --    divisor != 0
