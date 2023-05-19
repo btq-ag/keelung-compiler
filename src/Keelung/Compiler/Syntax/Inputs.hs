@@ -1,20 +1,18 @@
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Compiler.Syntax.Inputs where
 
 import Control.DeepSeq (NFData)
-import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
-import Data.Vector (Vector)
-import Data.Vector qualified as Vector
 import GHC.Generics (Generic)
+import Keelung
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Syntax.Counters
 
@@ -40,8 +38,8 @@ deserialize counters rawPublicInputs rawPrivateInputs = do
   -- sort and populate them with binary representation accordingly
   let publicInputSequence = new (Seq.zip (getPublicInputSequence counters) (Seq.fromList rawPublicInputs))
       privateInputSequence = new (Seq.zip (getPrivateInputSequence counters) (Seq.fromList rawPrivateInputs))
-      expectedPublicInputSize = length (getPublicInputSequence counters) -- getCountBySort OfPublicInput counters
-      expectedPrivateInputSize = length (getPrivateInputSequence counters) -- getCountBySort OfPrivateInput counters
+      expectedPublicInputSize = length (getPublicInputSequence counters)
+      expectedPrivateInputSize = length (getPrivateInputSequence counters)
       actualPublicInputSize = length rawPublicInputs
       actualPrivateInputSize = length rawPrivateInputs
    in if expectedPublicInputSize /= actualPublicInputSize
@@ -57,29 +55,37 @@ flatten (Inputs _ public private) = (flattenInputSequence public, flattenInputSe
 
 -- | Size of all inputs
 size :: (GaloisField n, Integral n) => Inputs n -> Int
-size (Inputs counters _ _) =
-  let (startPublic, _endPublic) = getPublicInputVarRange counters
-      (_startPrivate, endPrivate) = getPrivateInputVarRange counters
-   in endPrivate - startPublic
+size (Inputs counters _ _) = sum $ getCounts counters [PrivateInputField .. PublicInputUInt]
 
 toIntMap :: (GaloisField n, Integral n) => Inputs n -> IntMap n
 toIntMap (Inputs counters public private) =
-  let (startPublic, endPublic) = getPublicInputVarRange counters
-      (startPrivate, endPrivate) = getPrivateInputVarRange counters
-   in IntMap.fromDistinctAscList (zip [startPublic .. endPublic - 1] (flattenInputSequence public))
-        <> IntMap.fromDistinctAscList (zip [startPrivate .. endPrivate - 1] (flattenInputSequence private))
+  let publicInputRanges = enumerate (getRanges counters [PublicInputField .. PublicInputUInt])
+      indexedPublicInput = IntMap.fromDistinctAscList $ zip publicInputRanges (flattenInputSequence public)
+      privateInputRanges = enumerate (getRanges counters [PrivateInputField .. PrivateInputUInt])
+      indexedPrivateInput = IntMap.fromDistinctAscList $ zip privateInputRanges (flattenInputSequence private)
+   in indexedPublicInput
+        <> indexedPrivateInput
 
--- | Assuming that the variables are ordered as follows:
---      | output | public input | private input | intermediate
-toVector :: (GaloisField n, Integral n) => Inputs n -> Vector (Maybe n)
-toVector (Inputs counters public private) =
-  let (startPublic, _endPublic) = getPublicInputVarRange counters
-      (_startPrivate, endPrivate) = getPrivateInputVarRange counters
-      totalCount = getTotalCount counters
-   in Vector.replicate startPublic Nothing
-        <> Vector.fromList (map Just (flattenInputSequence public))
-        <> Vector.fromList (map Just (flattenInputSequence private))
-        <> Vector.replicate (totalCount - endPrivate) Nothing
+-- toIntMap :: (GaloisField n, Integral n) => Inputs n -> IntMap n
+-- toIntMap (Inputs counters public private) =
+--   let publicInputRanges = getRanges counters [PublicInputField .. PublicInputUInt]
+--       indexedPublicInput = map (\(offset, count) -> IntMap.fromDistinctAscList (zip [offset .. offset + count - 1] (flattenInputSequence public))) (IntMap.toList publicInputRanges)
+--       privateInputRanges = getRanges counters [PrivateInputField .. PrivateInputUInt]
+--       indexedPrivateInput = map (\(offset, count) -> IntMap.fromDistinctAscList (zip [offset .. offset + count - 1] (flattenInputSequence private))) (IntMap.toList privateInputRanges)
+--    in mconcat indexedPublicInput <> mconcat indexedPrivateInput
+
+-- -- | Assuming that the variables are ordered as follows:
+-- --    ... PublicInputField, PublicInputBool, PublicInputBits, PublicInputUInt, ...
+-- --    ... PrivateInputField, PrivateInputBool, PrivateInputBits, PrivateInputUInt, ...
+-- toVector :: (GaloisField n, Integral n) => Inputs n -> Vector (Maybe n)
+-- toVector (Inputs counters public private) =
+--   let (start, _) = IntMap.findMin $ getRanges counters [PublicInputField]
+--       (end, count) = IntMap.findMax $ getRanges counters [PrivateInputUInt]
+--       totalCount = getTotalCount counters
+--    in Vector.replicate start Nothing
+--         <> Vector.fromList (map Just (flattenInputSequence public))
+--         <> Vector.fromList (map Just (flattenInputSequence private))
+--         <> Vector.replicate (totalCount - (end + count)) Nothing
 
 --------------------------------------------------------------------------------
 

@@ -36,8 +36,8 @@ run' r1cs inputs = do
   witness <- runM inputs $ goThroughManyTimes constraints
 
   -- extract output values from the witness
-  let (start, end) = getOutputVarRange (r1csCounters r1cs)
-  let outputVars = [start .. end - 1]
+  let outputVars = enumerate $ getRanges (r1csCounters r1cs) [OutputField .. OutputUInt]
+        -- [start .. end - 1]
   let outputs = map (witness Vector.!) outputVars
 
   return (outputs, witness)

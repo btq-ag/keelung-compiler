@@ -44,10 +44,7 @@ runM heap inputs p = do
 toPartialBindings :: (GaloisField n, Integral n) => Inputs n -> Either (Error n) (Partial n)
 toPartialBindings inputs =
   let counters = Inputs.inputCounters inputs
-   in -- expectedInputSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters
-      -- actualInputSize = Inputs.size inputs
-
-      Right $
+   in Right $
         VarGroups
           { ofO =
               VarGroup

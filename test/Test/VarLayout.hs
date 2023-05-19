@@ -76,17 +76,6 @@ tests = do
       getCount OfIntermediate (OfUInt 4) counters `shouldBe` 5
       getCount OfIntermediate (OfUInt 5) counters `shouldBe` 0
 
-    it "getCountBySort" $ do
-      getCountBySort OfOutput counters `shouldBe` 3
-      getCountBySort OfPublicInput counters `shouldBe` 3
-      getCountBySort OfIntermediate counters `shouldBe` 25
-
-    it "getCountByType" $ do
-      getCountByType OfField counters `shouldBe` 5
-      getCountByType OfBoolean counters `shouldBe` 1
-      getCountByType (OfUIntBinRep undefined) counters `shouldBe` 20
-      getCountByType (OfUInt undefined) counters `shouldBe` 5
-
   describe "Variable indexing 1" $ do
     --
     --                F   B   BR  U
@@ -139,17 +128,6 @@ tests = do
       getCount OfIntermediate (OfUInt 4) counters `shouldBe` 0
       getCount OfIntermediate (OfUInt 5) counters `shouldBe` 0
 
-    it "getCountBySort" $ do
-      getCountBySort OfOutput counters `shouldBe` 6
-      getCountBySort OfPublicInput counters `shouldBe` 5
-      getCountBySort OfIntermediate counters `shouldBe` 0
-
-    it "getCountByType" $ do
-      getCountByType OfField counters `shouldBe` 0
-      getCountByType OfBoolean counters `shouldBe` 6
-      getCountByType (OfUIntBinRep undefined) counters `shouldBe` 4
-      getCountByType (OfUInt undefined) counters `shouldBe` 1
-
   describe "Variable indexing 2" $ do
     --
     --                F   B   BR  U
@@ -172,17 +150,6 @@ tests = do
       reindex counters OfPublicInput (OfUInt 4) 1 `shouldBe` 14
       reindex counters OfIntermediate (OfUIntBinRep 4) 0 `shouldBe` 15
       reindex counters OfIntermediate (OfUInt 4) 0 `shouldBe` 19
-
-    it "getCountBySort" $ do
-      getCountBySort OfOutput counters `shouldBe` 5
-      getCountBySort OfPublicInput counters `shouldBe` 10
-      getCountBySort OfIntermediate counters `shouldBe` 5
-
-    it "getCountByType" $ do
-      getCountByType OfField counters `shouldBe` 0
-      getCountByType OfBoolean counters `shouldBe` 0
-      getCountByType (OfUIntBinRep undefined) counters `shouldBe` 16
-      getCountByType (OfUInt undefined) counters `shouldBe` 4
 
   describe "Variable indexing 3" $ do
     --

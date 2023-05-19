@@ -92,7 +92,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
     where
       counters = csCounters cs
       -- sizes of constraint groups
-      booleanConstraintSize = getBooleanConstraintSize counters
+      booleanConstraintCount = getBooleanConstraintCount counters
 
       adapt :: String -> [a] -> (a -> String) -> String
       adapt name xs f =
@@ -103,11 +103,11 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 
       -- Boolean constraints
       showBooleanConstraints =
-        if booleanConstraintSize == 0
+        if booleanConstraintCount == 0
           then ""
           else
             "  Boolean constriants ("
-              <> show booleanConstraintSize
+              <> show booleanConstraintCount
               <> "):\n\n"
               <> unlines (map ("    " <>) (prettyBooleanConstraints counters))
               <> "\n"

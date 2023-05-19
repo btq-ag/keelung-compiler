@@ -28,7 +28,8 @@ import Keelung.Syntax.Counters hiding (reindex)
 --   the "witnesses" field should contain private inputs & rest of the witnesses
 serializeInputAndWitness :: Integral n => Counters -> Vector n -> ByteString
 serializeInputAndWitness counters witness =
-  let (inputs, witnesses) = splitAt (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters) $ toList witness
+  let outputAndPublicInputCount = sum (getCounts counters [OutputField .. PublicInputUInt])
+      (inputs, witnesses) = splitAt outputAndPublicInputCount $ toList witness
    in encodingToLazyByteString $
         pairs $
           pairStr "inputs" (list (integerText . toInteger) inputs)
@@ -50,6 +51,9 @@ serializeR1CS r1cs =
 
     (_, characteristic, degree) = r1csField r1cs
 
+    -- outputs & public inputs
+    outputAndPublicInputCount = sum (getCounts counters [OutputField .. PublicInputUInt])
+
     header :: Encoding
     header =
       pairs $
@@ -58,8 +62,8 @@ serializeR1CS r1cs =
             pairStr "version" (string "0.11.0")
               <> pairStr "field_characteristic" (integerText characteristic)
               <> pairStr "extension_degree" (integerText degree)
-              <> pairStr "instances" (int (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters)) -- outputs & public inputs
-              <> pairStr "witness" (int (getTotalCount counters - getCountBySort OfOutput counters - getCountBySort OfPublicInput counters)) -- private inputs & other intermediate variables after optimization
+              <> pairStr "instances" (int outputAndPublicInputCount)
+              <> pairStr "witness" (int (getTotalCount counters - outputAndPublicInputCount)) -- private inputs & other intermediate variables after optimization
               <> pairStr "constraints" (int (length r1cConstraints))
               <> pairStr "optimized" (bool True)
 
@@ -116,4 +120,5 @@ reindexR1C r1cs (R1C a b c) =
       | isPublicInputOrOutputVar var = -(var + 1) -- + 1 to avoid $0 the constant 1
       | otherwise = var + 1 -- + 1 to avoid $0 the constant 1
     isPublicInputOrOutputVar :: Var -> Bool
-    isPublicInputOrOutputVar var = var < (getCountBySort OfPublicInput (r1csCounters r1cs) + getCountBySort OfOutput (r1csCounters r1cs))
+    isPublicInputOrOutputVar var =
+      var < sum (getCounts (r1csCounters r1cs) [OutputField .. PublicInputUInt])

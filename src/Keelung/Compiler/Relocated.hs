@@ -107,7 +107,7 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: RelocatedConstraintSystem n -> Int
 numberOfConstraints (RelocatedConstraintSystem _ cs binReps _ counters _eqs _divMods _modInvs) =
-  length cs + getBooleanConstraintSize counters + length binReps
+  length cs + getBooleanConstraintCount counters + length binReps
 
 instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
   show (RelocatedConstraintSystem _ constraints binReps _ counters _eqs _divMods _modInvs) =
@@ -134,7 +134,7 @@ renumberConstraints cs =
     }
   where
     counters = csCounters cs
-    pinnedVarSize = getCountBySort OfPublicInput counters + getCountBySort OfPrivateInput counters + getCountBySort OfOutput counters
+    pinnedVarSize = sum (getCounts counters [OutputField .. PrivateInputUInt])
 
     -- variables in constraints (that should be kept after renumbering!)
     varsInBinReps =
@@ -145,7 +145,7 @@ renumberConstraints cs =
     -- variables in constraints excluding input & output variables
     newIntermediateVars = IntSet.filter (>= pinnedVarSize) vars
     -- numbers of variables reduced via renumbering
-    reducedCount = getCountBySort OfIntermediate counters - IntSet.size newIntermediateVars
+    reducedCount = sum (getCounts counters [IntermediateField .. IntermediateUInt]) - IntSet.size newIntermediateVars
     -- new variables after renumbering (excluding input & output variables)
     renumberedIntermediateVars = [pinnedVarSize .. pinnedVarSize + IntSet.size newIntermediateVars - 1]
 
