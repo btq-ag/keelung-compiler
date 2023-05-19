@@ -24,12 +24,12 @@ import Keelung.Syntax.Counters
 -- | Monad for compilation
 type M n = StateT (ConstraintSystem n) (Except (Error n))
 
-runM :: GaloisField n => (FieldType, Integer, Integer) -> Bool -> Counters -> M n a -> Either (Error n) (ConstraintSystem n)
-runM fieldInfo useNewOptimizer counters program =
+runM :: GaloisField n => (FieldType, Integer, Integer) -> Counters -> M n a -> Either (Error n) (ConstraintSystem n)
+runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem fieldInfo counters useNewOptimizer mempty mempty mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintSystem fieldInfo counters mempty mempty mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()

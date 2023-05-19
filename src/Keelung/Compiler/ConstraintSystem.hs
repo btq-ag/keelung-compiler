@@ -50,7 +50,6 @@ import Keelung.Syntax.Counters
 data ConstraintSystem n = ConstraintSystem
   { csField :: (FieldType, Integer, Integer),
     csCounters :: !Counters,
-    csUseNewOptimizer :: Bool,
     -- for counting the occurences of variables in constraints (excluding the ones that are in FieldRelations)
     csOccurrenceF :: !(Map Ref Int),
     csOccurrenceB :: !(Map RefB Int),
@@ -219,7 +218,6 @@ relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n ->
 relocateConstraintSystem cs =
   Relocated.RelocatedConstraintSystem
     { Relocated.csField = csField cs,
-      Relocated.csUseNewOptimizer = csUseNewOptimizer cs,
       Relocated.csCounters = counters,
       Relocated.csBinReps = binReps,
       Relocated.csBinReps' = map (Seq.fromList . map (first (reindexRefB counters))) (csBinReps cs),

@@ -115,7 +115,7 @@ compileToModules ::
   (FieldType, Integer, Integer) ->
   Comp t ->
   Either (Error n) (ConstraintSystem n)
-compileToModules fieldInfo prog = elaborateAndEncode prog >>= Compile.run fieldInfo True . ConstantPropagation.run . ToInternal.run >>= left CompileError . Optimizer.run
+compileToModules fieldInfo prog = elaborateAndEncode prog >>= Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run >>= left CompileError . Optimizer.run
 
 -- | 'compile' defaults to 'compileO1'
 compile ::
@@ -143,10 +143,10 @@ generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   return (counters, outputs, witness)
 
 compileO0Elab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> Either (Error n) (ConstraintSystem n)
-compileO0Elab fieldInfo = Compile.run fieldInfo True . ConstantPropagation.run . ToInternal.run
+compileO0Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run
 
 compileO1Elab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO1Elab fieldInfo = Compile.run fieldInfo True . ConstantPropagation.run . ToInternal.run >=> left CompileError . Optimizer.run >=> return . Relocated.renumberConstraints . relocateConstraintSystem
+compileO1Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run >=> left CompileError . Optimizer.run >=> return . Relocated.renumberConstraints . relocateConstraintSystem
 
 --------------------------------------------------------------------------------
 

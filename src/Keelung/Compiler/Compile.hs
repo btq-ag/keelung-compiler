@@ -33,8 +33,8 @@ import Keelung.Syntax.Counters (VarSort (..), VarType (..), addCount, getCount)
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Bool -> Internal n -> Either (Error n) (ConstraintSystem n)
-run fieldInfo useNewOptimizer (Internal untypedExprs _ counters assertions sideEffects) = left CompileError $ runM fieldInfo useNewOptimizer counters $ do
+run :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Internal n -> Either (Error n) (ConstraintSystem n)
+run fieldInfo (Internal untypedExprs _ counters assertions sideEffects) = left CompileError $ runM fieldInfo counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
