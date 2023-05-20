@@ -20,7 +20,8 @@ import Keelung.Syntax.Counters
 --   TODO: make it something like a proper inverse of Inputs.deserialize
 removeBinRepsFromOutputs :: Counters -> [n] -> [n]
 removeBinRepsFromOutputs counters outputs =
-  let (start, end) = getOutputBinRepRange counters
+  let (start, count) = getRange counters (Output, ReadAllBits)
+      end = start + count
    in take start outputs ++ drop end outputs
 
 -- | Data structure for holding structured inputs
@@ -55,37 +56,15 @@ flatten (Inputs _ public private) = (flattenInputSequence public, flattenInputSe
 
 -- | Size of all inputs
 size :: (GaloisField n, Integral n) => Inputs n -> Int
-size (Inputs counters _ _) = sum $ getCounts counters [PrivateInputField .. PublicInputUInt]
+size (Inputs counters _ _) = getCount counters PublicInput + getCount counters PrivateInput
 
 toIntMap :: (GaloisField n, Integral n) => Inputs n -> IntMap n
 toIntMap (Inputs counters public private) =
-  let publicInputRanges = enumerate (getRanges counters [PublicInputField .. PublicInputUInt])
+  let publicInputRanges = enumerate (getRanges counters [PublicInput])
       indexedPublicInput = IntMap.fromDistinctAscList $ zip publicInputRanges (flattenInputSequence public)
-      privateInputRanges = enumerate (getRanges counters [PrivateInputField .. PrivateInputUInt])
+      privateInputRanges = enumerate (getRanges counters [PrivateInput])
       indexedPrivateInput = IntMap.fromDistinctAscList $ zip privateInputRanges (flattenInputSequence private)
-   in indexedPublicInput
-        <> indexedPrivateInput
-
--- toIntMap :: (GaloisField n, Integral n) => Inputs n -> IntMap n
--- toIntMap (Inputs counters public private) =
---   let publicInputRanges = getRanges counters [PublicInputField .. PublicInputUInt]
---       indexedPublicInput = map (\(offset, count) -> IntMap.fromDistinctAscList (zip [offset .. offset + count - 1] (flattenInputSequence public))) (IntMap.toList publicInputRanges)
---       privateInputRanges = getRanges counters [PrivateInputField .. PrivateInputUInt]
---       indexedPrivateInput = map (\(offset, count) -> IntMap.fromDistinctAscList (zip [offset .. offset + count - 1] (flattenInputSequence private))) (IntMap.toList privateInputRanges)
---    in mconcat indexedPublicInput <> mconcat indexedPrivateInput
-
--- -- | Assuming that the variables are ordered as follows:
--- --    ... PublicInputField, PublicInputBool, PublicInputBits, PublicInputUInt, ...
--- --    ... PrivateInputField, PrivateInputBool, PrivateInputBits, PrivateInputUInt, ...
--- toVector :: (GaloisField n, Integral n) => Inputs n -> Vector (Maybe n)
--- toVector (Inputs counters public private) =
---   let (start, _) = IntMap.findMin $ getRanges counters [PublicInputField]
---       (end, count) = IntMap.findMax $ getRanges counters [PrivateInputUInt]
---       totalCount = getTotalCount counters
---    in Vector.replicate start Nothing
---         <> Vector.fromList (map Just (flattenInputSequence public))
---         <> Vector.fromList (map Just (flattenInputSequence private))
---         <> Vector.replicate (totalCount - (end + count)) Nothing
+   in indexedPublicInput <> indexedPrivateInput
 
 --------------------------------------------------------------------------------
 
@@ -108,15 +87,14 @@ instance Semigroup (InputSequence n) where
 instance Monoid (InputSequence n) where
   mempty = InputSequence mempty mempty mempty mempty
 
-new :: (GaloisField n, Integral n) => Seq (VarType, n) -> InputSequence n
+new :: (GaloisField n, Integral n) => Seq (WriteType, n) -> InputSequence n
 new =
   foldl
     ( \inputSequence (inputType, rawInputValue) ->
         case inputType of
-          OfField -> addField rawInputValue inputSequence
-          OfBoolean -> addBool rawInputValue inputSequence
-          OfUIntBinRep _ -> error "[ panic ] OfUIntBinRep should not appear in the inputs sequence"
-          OfUInt width -> addUInt width rawInputValue inputSequence
+          WriteField -> addField rawInputValue inputSequence
+          WriteBool -> addBool rawInputValue inputSequence
+          WriteUInt width -> addUInt width rawInputValue inputSequence
     )
     mempty
 

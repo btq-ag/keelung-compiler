@@ -28,7 +28,7 @@ import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax (widthOf)
-import Keelung.Syntax.Counters (VarSort (..), VarType (..), addCount, getCount)
+import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
@@ -219,8 +219,8 @@ compileAssertionEqU a b = do
 freshExprU :: Width -> M n (ExprU n)
 freshExprU width = do
   counters <- gets csCounters
-  let index = getCount OfIntermediate (OfUInt width) counters
-  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
+  let index = getCount counters (Intermediate, ReadUInt width)
+  modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ VarU width index
 
 ----------------------------------------------------------------

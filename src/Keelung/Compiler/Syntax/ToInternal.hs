@@ -114,26 +114,26 @@ convertExprAndAllocOutputVar :: (GaloisField n, Integral n) => T.Expr -> M n [(V
 convertExprAndAllocOutputVar expr = case expr of
   T.Unit -> return []
   T.Boolean x -> do
-    var <- fresh OfOutput OfBoolean
+    var <- fresh Output ReadBool WriteBool
     x' <- convertExprB x
     return [(var, ExprB x')]
   T.Field x -> do
-    var <- fresh OfOutput OfField
+    var <- fresh Output ReadField WriteField
     x' <- convertExprF x
     return [(var, ExprF x')]
   T.UInt x -> do
     x' <- convertExprU x
-    var <- fresh OfOutput (OfUInt (widthOf x'))
+    var <- fresh Output (ReadUInt (widthOf x')) (WriteUInt (widthOf x'))
     return [(var, ExprU x')]
   T.Array exprs -> do
     exprss <- mapM convertExprAndAllocOutputVar exprs
     return (concat exprss)
   where
-    fresh :: VarSort -> VarType -> M n Var
-    fresh sort kind = do
+    fresh :: Category -> ReadType -> WriteType -> M n Var
+    fresh category readType writeType = do
       counters <- get
-      let index = getCount sort kind counters
-      modify $ addCount sort kind 1
+      let index = getCount counters (category, readType)
+      modify $ addCount (category, writeType) 1
       return index
 
 convertExpr :: (GaloisField n, Integral n) => T.Expr -> M n [Expr n]

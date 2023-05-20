@@ -27,54 +27,54 @@ tests = do
     -- intermediate   0   0   20  5
     --
     let counters =
-          ( addCount OfPublicInput OfBoolean 1
-              . addCount OfPublicInput OfField 2
-              . addCount OfOutput OfField 3
-              . addCount OfIntermediate (OfUInt 4) 5
+          ( addCount (PublicInput, WriteBool) 1
+              . addCount (PublicInput, WriteField) 2
+              . addCount (Output, WriteField) 3
+              . addCount (Intermediate, WriteUInt 4) 5
           )
             mempty
     it "reindex" $ do
-      reindex counters OfOutput OfField 0 `shouldBe` 0
-      reindex counters OfOutput OfField 1 `shouldBe` 1
-      reindex counters OfOutput OfField 2 `shouldBe` 2
-      reindex counters OfPublicInput OfField 0 `shouldBe` 3
-      reindex counters OfPublicInput OfField 1 `shouldBe` 4
-      reindex counters OfPublicInput OfBoolean 0 `shouldBe` 5
-      reindex counters OfIntermediate (OfUIntBinRep 4) 0 `shouldBe` 6
-      reindex counters OfIntermediate (OfUIntBinRep 4) 1 `shouldBe` 10
-      reindex counters OfIntermediate (OfUIntBinRep 4) 2 `shouldBe` 14
-      reindex counters OfIntermediate (OfUIntBinRep 4) 3 `shouldBe` 18
-      reindex counters OfIntermediate (OfUIntBinRep 4) 4 `shouldBe` 22
-      reindex counters OfIntermediate (OfUInt 4) 0 `shouldBe` 26
-      reindex counters OfIntermediate (OfUInt 4) 1 `shouldBe` 27
-      reindex counters OfIntermediate (OfUInt 4) 2 `shouldBe` 28
-      reindex counters OfIntermediate (OfUInt 4) 3 `shouldBe` 29
+      reindex counters Output ReadField 0 `shouldBe` 0
+      reindex counters Output ReadField 1 `shouldBe` 1
+      reindex counters Output ReadField 2 `shouldBe` 2
+      reindex counters PublicInput ReadField 0 `shouldBe` 3
+      reindex counters PublicInput ReadField 1 `shouldBe` 4
+      reindex counters PublicInput ReadBool 0 `shouldBe` 5
+      reindex counters Intermediate (ReadBits 4) 0 `shouldBe` 6
+      reindex counters Intermediate (ReadBits 4) 1 `shouldBe` 10
+      reindex counters Intermediate (ReadBits 4) 2 `shouldBe` 14
+      reindex counters Intermediate (ReadBits 4) 3 `shouldBe` 18
+      reindex counters Intermediate (ReadBits 4) 4 `shouldBe` 22
+      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 26
+      reindex counters Intermediate (ReadUInt 4) 1 `shouldBe` 27
+      reindex counters Intermediate (ReadUInt 4) 2 `shouldBe` 28
+      reindex counters Intermediate (ReadUInt 4) 3 `shouldBe` 29
 
     it "getCount" $ do
-      getCount OfOutput OfField counters `shouldBe` 3
-      getCount OfOutput OfBoolean counters `shouldBe` 0
-      getCount OfOutput (OfUIntBinRep 3) counters `shouldBe` 0
-      getCount OfOutput (OfUIntBinRep 4) counters `shouldBe` 0
-      getCount OfOutput (OfUIntBinRep 5) counters `shouldBe` 0
-      getCount OfOutput (OfUInt 3) counters `shouldBe` 0
-      getCount OfOutput (OfUInt 4) counters `shouldBe` 0
-      getCount OfOutput (OfUInt 5) counters `shouldBe` 0
-      getCount OfPublicInput OfField counters `shouldBe` 2
-      getCount OfPublicInput OfBoolean counters `shouldBe` 1
-      getCount OfPublicInput (OfUIntBinRep 3) counters `shouldBe` 0
-      getCount OfPublicInput (OfUIntBinRep 4) counters `shouldBe` 0
-      getCount OfPublicInput (OfUIntBinRep 5) counters `shouldBe` 0
-      getCount OfPublicInput (OfUInt 3) counters `shouldBe` 0
-      getCount OfPublicInput (OfUInt 4) counters `shouldBe` 0
-      getCount OfPublicInput (OfUInt 5) counters `shouldBe` 0
-      getCount OfIntermediate OfField counters `shouldBe` 0
-      getCount OfIntermediate OfBoolean counters `shouldBe` 0
-      getCount OfIntermediate (OfUIntBinRep 3) counters `shouldBe` 0
-      getCount OfIntermediate (OfUIntBinRep 4) counters `shouldBe` 20
-      getCount OfIntermediate (OfUIntBinRep 5) counters `shouldBe` 0
-      getCount OfIntermediate (OfUInt 3) counters `shouldBe` 0
-      getCount OfIntermediate (OfUInt 4) counters `shouldBe` 5
-      getCount OfIntermediate (OfUInt 5) counters `shouldBe` 0
+      getCount counters (Output, ReadField) `shouldBe` 3
+      getCount counters (Output, ReadBool) `shouldBe` 0
+      getCount counters (Output, ReadUInt 3) `shouldBe` 0
+      getCount counters (Output, ReadUInt 4) `shouldBe` 0
+      getCount counters (Output, ReadUInt 5) `shouldBe` 0
+      getCount counters (Output, ReadUInt 3) `shouldBe` 0
+      getCount counters (Output, ReadUInt 4) `shouldBe` 0
+      getCount counters (Output, ReadUInt 5) `shouldBe` 0
+      getCount counters (PublicInput, ReadField) `shouldBe` 2
+      getCount counters (PublicInput, ReadBool) `shouldBe` 1
+      getCount counters (PublicInput, ReadUInt 3) `shouldBe` 0
+      getCount counters (PublicInput, ReadUInt 4) `shouldBe` 0
+      getCount counters (PublicInput, ReadUInt 5) `shouldBe` 0
+      getCount counters (PublicInput, ReadUInt 3) `shouldBe` 0
+      getCount counters (PublicInput, ReadUInt 4) `shouldBe` 0
+      getCount counters (PublicInput, ReadUInt 5) `shouldBe` 0
+      getCount counters (Intermediate, ReadField) `shouldBe` 0
+      getCount counters (Intermediate, ReadBool) `shouldBe` 0
+      getCount counters (Intermediate, ReadBits 3) `shouldBe` 0
+      getCount counters (Intermediate, ReadBits 4) `shouldBe` 20
+      getCount counters (Intermediate, ReadBits 5) `shouldBe` 0
+      getCount counters (Intermediate, ReadUInt 3) `shouldBe` 0
+      getCount counters (Intermediate, ReadUInt 4) `shouldBe` 5
+      getCount counters (Intermediate, ReadUInt 5) `shouldBe` 0
 
   describe "Variable indexing 1" $ do
     --
@@ -88,45 +88,45 @@ tests = do
     --   x <- inputUInt @4
     --   return $ toArray [x !!! (-1), x !!! 0, x !!! 1, x !!! 2, x !!! 3, x !!! 4]
     let counters =
-          ( addCount OfPublicInput (OfUInt 4) 1
-              . addCount OfOutput OfBoolean 6
+          ( addCount (PublicInput, WriteUInt 4) 1
+              . addCount (Output, WriteBool) 6
           )
             mempty
     it "reindex" $ do
-      reindex counters OfOutput OfBoolean 0 `shouldBe` 0
-      reindex counters OfOutput OfBoolean 1 `shouldBe` 1
-      reindex counters OfOutput OfBoolean 2 `shouldBe` 2
-      reindex counters OfOutput OfBoolean 3 `shouldBe` 3
-      reindex counters OfOutput OfBoolean 4 `shouldBe` 4
-      reindex counters OfOutput OfBoolean 5 `shouldBe` 5
-      reindex counters OfPublicInput (OfUIntBinRep 4) 0 `shouldBe` 6
-      reindex counters OfPublicInput (OfUInt 4) 0 `shouldBe` 10
+      reindex counters Output ReadBool 0 `shouldBe` 0
+      reindex counters Output ReadBool 1 `shouldBe` 1
+      reindex counters Output ReadBool 2 `shouldBe` 2
+      reindex counters Output ReadBool 3 `shouldBe` 3
+      reindex counters Output ReadBool 4 `shouldBe` 4
+      reindex counters Output ReadBool 5 `shouldBe` 5
+      reindex counters PublicInput (ReadBits 4) 0 `shouldBe` 6
+      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 10
 
     it "getCount" $ do
-      getCount OfOutput OfField counters `shouldBe` 0
-      getCount OfOutput OfBoolean counters `shouldBe` 6
-      getCount OfOutput (OfUIntBinRep 3) counters `shouldBe` 0
-      getCount OfOutput (OfUIntBinRep 4) counters `shouldBe` 0
-      getCount OfOutput (OfUIntBinRep 5) counters `shouldBe` 0
-      getCount OfOutput (OfUInt 3) counters `shouldBe` 0
-      getCount OfOutput (OfUInt 4) counters `shouldBe` 0
-      getCount OfOutput (OfUInt 5) counters `shouldBe` 0
-      getCount OfPublicInput OfField counters `shouldBe` 0
-      getCount OfPublicInput OfBoolean counters `shouldBe` 0
-      getCount OfPublicInput (OfUIntBinRep 3) counters `shouldBe` 0
-      getCount OfPublicInput (OfUIntBinRep 4) counters `shouldBe` 4
-      getCount OfPublicInput (OfUIntBinRep 5) counters `shouldBe` 0
-      getCount OfPublicInput (OfUInt 3) counters `shouldBe` 0
-      getCount OfPublicInput (OfUInt 4) counters `shouldBe` 1
-      getCount OfPublicInput (OfUInt 5) counters `shouldBe` 0
-      getCount OfIntermediate OfField counters `shouldBe` 0
-      getCount OfIntermediate OfBoolean counters `shouldBe` 0
-      getCount OfIntermediate (OfUIntBinRep 3) counters `shouldBe` 0
-      getCount OfIntermediate (OfUIntBinRep 4) counters `shouldBe` 0
-      getCount OfIntermediate (OfUIntBinRep 5) counters `shouldBe` 0
-      getCount OfIntermediate (OfUInt 3) counters `shouldBe` 0
-      getCount OfIntermediate (OfUInt 4) counters `shouldBe` 0
-      getCount OfIntermediate (OfUInt 5) counters `shouldBe` 0
+      getCount counters (Output, ReadField) `shouldBe` 0
+      getCount counters (Output, ReadBool) `shouldBe` 6
+      getCount counters (Output, ReadUInt 3) `shouldBe` 0
+      getCount counters (Output, ReadUInt 4) `shouldBe` 0
+      getCount counters (Output, ReadUInt 5) `shouldBe` 0
+      getCount counters (Output, ReadUInt 3) `shouldBe` 0
+      getCount counters (Output, ReadUInt 4) `shouldBe` 0
+      getCount counters (Output, ReadUInt 5) `shouldBe` 0
+      getCount counters (PublicInput, ReadField) `shouldBe` 0
+      getCount counters (PublicInput, ReadBool) `shouldBe` 0
+      getCount counters (PublicInput, ReadBits 3) `shouldBe` 0
+      getCount counters (PublicInput, ReadBits 4) `shouldBe` 4
+      getCount counters (PublicInput, ReadBits 5) `shouldBe` 0
+      getCount counters (PublicInput, ReadUInt 3) `shouldBe` 0
+      getCount counters (PublicInput, ReadUInt 4) `shouldBe` 1
+      getCount counters (PublicInput, ReadUInt 5) `shouldBe` 0
+      getCount counters (Intermediate, ReadField) `shouldBe` 0
+      getCount counters (Intermediate, ReadBool) `shouldBe` 0
+      getCount counters (Intermediate, ReadBits 3) `shouldBe` 0
+      getCount counters (Intermediate, ReadBits 4) `shouldBe` 0
+      getCount counters (Intermediate, ReadBits 5) `shouldBe` 0
+      getCount counters (Intermediate, ReadUInt 3) `shouldBe` 0
+      getCount counters (Intermediate, ReadUInt 4) `shouldBe` 0
+      getCount counters (Intermediate, ReadUInt 5) `shouldBe` 0
 
   describe "Variable indexing 2" $ do
     --
@@ -136,20 +136,20 @@ tests = do
     -- intermediate   0   0   4   1
     --
     let counters =
-          ( addCount OfOutput (OfUInt 4) 1
-              . addCount OfPublicInput (OfUInt 4) 2
-              . addCount OfIntermediate (OfUInt 4) 1
+          ( addCount (Output, WriteUInt 4) 1
+              . addCount (PublicInput, WriteUInt 4) 2
+              . addCount (Intermediate, WriteUInt 4) 1
           )
             mempty
     it "reindex" $ do
-      reindex counters OfOutput (OfUIntBinRep 4) 0 `shouldBe` 0
-      reindex counters OfOutput (OfUInt 4) 0 `shouldBe` 4
-      reindex counters OfPublicInput (OfUIntBinRep 4) 0 `shouldBe` 5
-      reindex counters OfPublicInput (OfUIntBinRep 4) 1 `shouldBe` 9
-      reindex counters OfPublicInput (OfUInt 4) 0 `shouldBe` 13
-      reindex counters OfPublicInput (OfUInt 4) 1 `shouldBe` 14
-      reindex counters OfIntermediate (OfUIntBinRep 4) 0 `shouldBe` 15
-      reindex counters OfIntermediate (OfUInt 4) 0 `shouldBe` 19
+      reindex counters Output (ReadBits 4) 0 `shouldBe` 0
+      reindex counters Output (ReadUInt 4) 0 `shouldBe` 4
+      reindex counters PublicInput (ReadBits 4) 0 `shouldBe` 5
+      reindex counters PublicInput (ReadBits 4) 1 `shouldBe` 9
+      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 13
+      reindex counters PublicInput (ReadUInt 4) 1 `shouldBe` 14
+      reindex counters Intermediate (ReadBits 4) 0 `shouldBe` 15
+      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 19
 
   describe "Variable indexing 3" $ do
     --
@@ -159,16 +159,16 @@ tests = do
     -- intermediate   0   0   21  4   1   1
     --
     let counters =
-          ( addCount OfIntermediate (OfUInt 4) 2
-              . addCount OfIntermediate (OfUInt 5) 1
-              . addCount OfIntermediate (OfUInt 8) 1
+          ( addCount (Intermediate, WriteUInt 4) 2
+              . addCount (Intermediate, WriteUInt 5) 1
+              . addCount (Intermediate, WriteUInt 8) 1
           )
             mempty
     it "reindex" $ do
-      reindex counters OfIntermediate (OfUIntBinRep 4) 0 `shouldBe` 0
-      reindex counters OfIntermediate (OfUIntBinRep 4) 1 `shouldBe` 4
-      reindex counters OfIntermediate (OfUIntBinRep 5) 0 `shouldBe` 8
-      reindex counters OfIntermediate (OfUIntBinRep 8) 0 `shouldBe` 13
+      reindex counters Intermediate (ReadBits 4) 0 `shouldBe` 0
+      reindex counters Intermediate (ReadBits 4) 1 `shouldBe` 4
+      reindex counters Intermediate (ReadBits 5) 0 `shouldBe` 8
+      reindex counters Intermediate (ReadBits 8) 0 `shouldBe` 13
 
   describe "Variable indexing 4" $ do
     --
@@ -178,35 +178,35 @@ tests = do
     -- intermediate   0   0   0   3   4
     --
     let counters =
-          ( addCount OfIntermediate (OfUInt 4) 3
-              . addCount OfIntermediate (OfUInt 5) 4
-              . addCount OfOutput (OfUInt 4) 1
-              . addCount OfPublicInput (OfUInt 4) 3
+          ( addCount (Intermediate, WriteUInt 4) 3
+              . addCount (Intermediate, WriteUInt 5) 4
+              . addCount (Output, WriteUInt 4) 1
+              . addCount (PublicInput, WriteUInt 4) 3
           )
             mempty
     it "reindex" $ do
-      reindex counters OfOutput (OfUIntBinRep 4) 0 `shouldBe` 0
-      reindex counters OfOutput (OfUInt 4) 0 `shouldBe` 4
-      reindex counters OfPublicInput (OfUIntBinRep 4) 0 `shouldBe` 5
-      reindex counters OfPublicInput (OfUIntBinRep 4) 1 `shouldBe` 9
-      reindex counters OfPublicInput (OfUIntBinRep 4) 2 `shouldBe` 13
-      reindex counters OfPublicInput (OfUInt 4) 0 `shouldBe` 17
-      reindex counters OfPublicInput (OfUInt 4) 1 `shouldBe` 18
-      reindex counters OfPublicInput (OfUInt 4) 2 `shouldBe` 19
-      reindex counters OfIntermediate (OfUIntBinRep 4) 0 `shouldBe` 20
-      reindex counters OfIntermediate (OfUIntBinRep 4) 1 `shouldBe` 24
-      reindex counters OfIntermediate (OfUIntBinRep 4) 2 `shouldBe` 28
-      reindex counters OfIntermediate (OfUIntBinRep 5) 0 `shouldBe` 32
-      reindex counters OfIntermediate (OfUIntBinRep 5) 1 `shouldBe` 37
-      reindex counters OfIntermediate (OfUIntBinRep 5) 2 `shouldBe` 42
-      reindex counters OfIntermediate (OfUIntBinRep 5) 3 `shouldBe` 47
-      reindex counters OfIntermediate (OfUInt 4) 0 `shouldBe` 52
-      reindex counters OfIntermediate (OfUInt 4) 1 `shouldBe` 53
-      reindex counters OfIntermediate (OfUInt 4) 2 `shouldBe` 54
-      reindex counters OfIntermediate (OfUInt 5) 0 `shouldBe` 55
-      reindex counters OfIntermediate (OfUInt 5) 1 `shouldBe` 56
-      reindex counters OfIntermediate (OfUInt 5) 2 `shouldBe` 57
-      reindex counters OfIntermediate (OfUInt 5) 3 `shouldBe` 58
+      reindex counters Output (ReadBits 4) 0 `shouldBe` 0
+      reindex counters Output (ReadUInt 4) 0 `shouldBe` 4
+      reindex counters PublicInput (ReadBits 4) 0 `shouldBe` 5
+      reindex counters PublicInput (ReadBits 4) 1 `shouldBe` 9
+      reindex counters PublicInput (ReadBits 4) 2 `shouldBe` 13
+      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 17
+      reindex counters PublicInput (ReadUInt 4) 1 `shouldBe` 18
+      reindex counters PublicInput (ReadUInt 4) 2 `shouldBe` 19
+      reindex counters Intermediate (ReadBits 4) 0 `shouldBe` 20
+      reindex counters Intermediate (ReadBits 4) 1 `shouldBe` 24
+      reindex counters Intermediate (ReadBits 4) 2 `shouldBe` 28
+      reindex counters Intermediate (ReadBits 5) 0 `shouldBe` 32
+      reindex counters Intermediate (ReadBits 5) 1 `shouldBe` 37
+      reindex counters Intermediate (ReadBits 5) 2 `shouldBe` 42
+      reindex counters Intermediate (ReadBits 5) 3 `shouldBe` 47
+      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 52
+      reindex counters Intermediate (ReadUInt 4) 1 `shouldBe` 53
+      reindex counters Intermediate (ReadUInt 4) 2 `shouldBe` 54
+      reindex counters Intermediate (ReadUInt 5) 0 `shouldBe` 55
+      reindex counters Intermediate (ReadUInt 5) 1 `shouldBe` 56
+      reindex counters Intermediate (ReadUInt 5) 2 `shouldBe` 57
+      reindex counters Intermediate (ReadUInt 5) 3 `shouldBe` 58
 
   describe "Layout 0" $ do
     --                F   B   BR  U
@@ -221,10 +221,10 @@ tests = do
 
     it "reindex" $ do
       counters <- execute program
-      reindex counters OfOutput OfField 0 `shouldBe` 0
-      reindex counters OfPublicInput OfField 0 `shouldBe` 1
-      reindex counters OfPublicInput OfField 1 `shouldBe` 2
-      reindex counters OfPublicInput OfField 2 `shouldBe` 3
+      reindex counters Output ReadField 0 `shouldBe` 0
+      reindex counters PublicInput ReadField 0 `shouldBe` 1
+      reindex counters PublicInput ReadField 1 `shouldBe` 2
+      reindex counters PublicInput ReadField 2 `shouldBe` 3
 
   describe "Layout 1" $ do
     --                F   B   BR  U
@@ -237,6 +237,6 @@ tests = do
           return $ cond y x 0
     it "reindex" $ do
       counters <- execute program
-      reindex counters OfOutput OfField 0 `shouldBe` 0
-      reindex counters OfPublicInput OfField 0 `shouldBe` 1
-      reindex counters OfPublicInput OfBoolean 0 `shouldBe` 2
+      reindex counters Output ReadField 0 `shouldBe` 0
+      reindex counters PublicInput ReadField 0 `shouldBe` 1
+      reindex counters PublicInput ReadBool 0 `shouldBe` 2

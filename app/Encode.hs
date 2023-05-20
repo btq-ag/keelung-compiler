@@ -28,7 +28,7 @@ import Keelung.Syntax.Counters hiding (reindex)
 --   the "witnesses" field should contain private inputs & rest of the witnesses
 serializeInputAndWitness :: Integral n => Counters -> Vector n -> ByteString
 serializeInputAndWitness counters witness =
-  let outputAndPublicInputCount = sum (getCounts counters [OutputField .. PublicInputUInt])
+  let outputAndPublicInputCount = getCount counters Output + getCount counters PublicInput
       (inputs, witnesses) = splitAt outputAndPublicInputCount $ toList witness
    in encodingToLazyByteString $
         pairs $
@@ -52,7 +52,7 @@ serializeR1CS r1cs =
     (_, characteristic, degree) = r1csField r1cs
 
     -- outputs & public inputs
-    outputAndPublicInputCount = sum (getCounts counters [OutputField .. PublicInputUInt])
+    outputAndPublicInputCount = getCount counters Output + getCount counters PublicInput
 
     header :: Encoding
     header =
@@ -121,4 +121,4 @@ reindexR1C r1cs (R1C a b c) =
       | otherwise = var + 1 -- + 1 to avoid $0 the constant 1
     isPublicInputOrOutputVar :: Var -> Bool
     isPublicInputOrOutputVar var =
-      var < sum (getCounts (r1csCounters r1cs) [OutputField .. PublicInputUInt])
+      var < getCount (r1csCounters r1cs) Output + getCount (r1csCounters r1cs) PublicInput

@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use lambda-case" #-}
@@ -12,7 +13,7 @@ module Keelung.Compiler.ConstraintSystem
   )
 where
 
-import Control.Arrow (left, first)
+import Control.Arrow (first, left)
 import Control.DeepSeq (NFData)
 import Data.Bifunctor (bimap)
 import Data.Field.Galois (GaloisField)
@@ -182,14 +183,14 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
             padRight4 s = s <> replicate (4 - length s) ' '
             padLeft12 n = replicate (12 - length (show n)) ' ' <> show n
             formLine typ =
-              padLeft12 (getCount OfOutput typ counters)
+              padLeft12 (getCount counters (Output, typ))
                 <> "    "
-                <> padLeft12 (getCount OfPublicInput typ counters)
+                <> padLeft12 (getCount counters (PublicInput, typ))
                 <> "    "
-                <> padLeft12 (getCount OfPrivateInput typ counters)
+                <> padLeft12 (getCount counters (PrivateInput, typ))
                 <> "    "
-                <> padLeft12 (getCount OfIntermediate typ counters)
-            uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (OfUInt w)
+                <> padLeft12 (getCount counters (Intermediate, typ))
+            uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (ReadUInt w)
             -- Bit widths existed in the system
             uintWidthEntries (Counters o i p x _ _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
             showUInts =
@@ -206,9 +207,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
                   <> "                  output       pub input      priv input    intermediate\n"
                   <> "    --------------------------------------------------------------------"
                   <> "\n    Field   "
-                  <> formLine OfField
+                  <> formLine ReadField
                   <> "\n    Boolean "
-                  <> formLine OfBoolean
+                  <> formLine ReadBool
                   <> showUInts
                   <> "\n"
 
@@ -243,9 +244,9 @@ relocateConstraintSystem cs =
     generateBinReps :: Counters -> Map RefU Int -> Map Ref Int -> [BinRep]
     generateBinReps (Counters o i1 i2 _ _ _ _) occurrencesU occurrencesF =
       toList $
-        fromSmallCounter OfOutput o
-          <> fromSmallCounter OfPublicInput i1
-          <> fromSmallCounter OfPrivateInput i2
+        fromSmallCounter Output o
+          <> fromSmallCounter PublicInput i1
+          <> fromSmallCounter PrivateInput i2
           <> binRepsFromIntermediateRefUsOccurredInUAndF
       where
         intermediateRefUsOccurredInU =
@@ -282,8 +283,8 @@ relocateConstraintSystem cs =
           Seq.fromList
             $ map
               ( \(width, var) ->
-                  let varOffset = reindex counters OfIntermediate (OfUInt width) var
-                      binRepOffset = reindex counters OfIntermediate (OfUIntBinRep width) var
+                  let varOffset = reindex counters Intermediate (ReadUInt width) var
+                      binRepOffset = reindex counters Intermediate (ReadBits width) var
                    in BinRep varOffset width binRepOffset
               )
             $ Set.toList (intermediateRefUsOccurredInU <> intermediateRefUsOccurredInF <> intermediateRefUsOccurredInBitTests)
@@ -293,8 +294,8 @@ relocateConstraintSystem cs =
 
         -- fromPair :: VarSort -> (Width, Int) -> [BinRep]
         fromPair sort (width, count) =
-          let varOffset = reindex counters sort (OfUInt width) 0
-              binRepOffset = reindex counters sort (OfUIntBinRep width) 0
+          let varOffset = reindex counters sort (ReadUInt width) 0
+              binRepOffset = reindex counters sort (ReadBits width) 0
            in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
 
     extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Relocated.Constraint n)

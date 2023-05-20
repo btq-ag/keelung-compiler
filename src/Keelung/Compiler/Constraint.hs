@@ -198,28 +198,28 @@ reindexRef counters (B x) = reindexRefB counters x
 reindexRef counters (U x) = reindexRefU counters x
 
 reindexRefF :: Counters -> RefF -> Var
-reindexRefF counters (RefFO x) = reindex counters OfOutput OfField x
-reindexRefF counters (RefFI x) = reindex counters OfPublicInput OfField x
-reindexRefF counters (RefFP x) = reindex counters OfPrivateInput OfField x
-reindexRefF counters (RefFX x) = reindex counters OfIntermediate OfField x
+reindexRefF counters (RefFO x) = reindex counters Output ReadField x
+reindexRefF counters (RefFI x) = reindex counters PublicInput ReadField x
+reindexRefF counters (RefFP x) = reindex counters PrivateInput ReadField x
+reindexRefF counters (RefFX x) = reindex counters Intermediate ReadField x
 
 reindexRefB :: Counters -> RefB -> Var
-reindexRefB counters (RefBO x) = reindex counters OfOutput OfBoolean x
-reindexRefB counters (RefBI x) = reindex counters OfPublicInput OfBoolean x
-reindexRefB counters (RefBP x) = reindex counters OfPrivateInput OfBoolean x
-reindexRefB counters (RefBX x) = reindex counters OfIntermediate OfBoolean x
+reindexRefB counters (RefBO x) = reindex counters Output ReadBool x
+reindexRefB counters (RefBI x) = reindex counters PublicInput ReadBool x
+reindexRefB counters (RefBP x) = reindex counters PrivateInput ReadBool x
+reindexRefB counters (RefBX x) = reindex counters Intermediate ReadBool x
 reindexRefB counters (RefUBit _ x i) =
   case x of
-    RefUO w x' -> reindex counters OfOutput (OfUIntBinRep w) x' + (i `mod` w)
-    RefUI w x' -> reindex counters OfPublicInput (OfUIntBinRep w) x' + (i `mod` w)
-    RefUP w x' -> reindex counters OfPrivateInput (OfUIntBinRep w) x' + (i `mod` w)
-    RefUX w x' -> reindex counters OfIntermediate (OfUIntBinRep w) x' + (i `mod` w)
+    RefUO w x' -> reindex counters Output (ReadBits w) x' + (i `mod` w)
+    RefUI w x' -> reindex counters PublicInput (ReadBits w) x' + (i `mod` w)
+    RefUP w x' -> reindex counters PrivateInput (ReadBits w) x' + (i `mod` w)
+    RefUX w x' -> reindex counters Intermediate (ReadBits w) x' + (i `mod` w)
 
 reindexRefU :: Counters -> RefU -> Var
-reindexRefU counters (RefUO w x) = reindex counters OfOutput (OfUInt w) x
-reindexRefU counters (RefUI w x) = reindex counters OfPublicInput (OfUInt w) x
-reindexRefU counters (RefUP w x) = reindex counters OfPrivateInput (OfUInt w) x
-reindexRefU counters (RefUX w x) = reindex counters OfIntermediate (OfUInt w) x
+reindexRefU counters (RefUO w x) = reindex counters Output (ReadUInt w) x
+reindexRefU counters (RefUI w x) = reindex counters PublicInput (ReadUInt w) x
+reindexRefU counters (RefUP w x) = reindex counters PrivateInput (ReadUInt w) x
+reindexRefU counters (RefUX w x) = reindex counters Intermediate (ReadUInt w) x
 
 --------------------------------------------------------------------------------
 

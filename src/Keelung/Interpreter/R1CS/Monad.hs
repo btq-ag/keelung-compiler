@@ -36,7 +36,7 @@ runM inputs p =
   let counters = Inputs.inputCounters inputs
    in case runExcept (execStateT p (Inputs.toIntMap inputs)) of
         Left err -> Left err
-        Right bindings -> case toEither $ toTotal' (sum $ getCounts counters [PublicInputField .. PrivateInputUInt], bindings) of
+        Right bindings -> case toEither $ toTotal' (getCount counters PublicInput + getCount counters PrivateInput, bindings) of
           Left unbound -> Left (VarUnassignedError unbound)
           Right bindings' -> Right bindings'
 

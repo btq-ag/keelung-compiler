@@ -134,7 +134,7 @@ renumberConstraints cs =
     }
   where
     counters = csCounters cs
-    pinnedVarSize = sum (getCounts counters [OutputField .. PrivateInputUInt])
+    pinnedVarSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
 
     -- variables in constraints (that should be kept after renumbering!)
     varsInBinReps =
@@ -145,7 +145,7 @@ renumberConstraints cs =
     -- variables in constraints excluding input & output variables
     newIntermediateVars = IntSet.filter (>= pinnedVarSize) vars
     -- numbers of variables reduced via renumbering
-    reducedCount = sum (getCounts counters [IntermediateField .. IntermediateUInt]) - IntSet.size newIntermediateVars
+    reducedCount = getCount counters Intermediate - IntSet.size newIntermediateVars
     -- new variables after renumbering (excluding input & output variables)
     renumberedIntermediateVars = [pinnedVarSize .. pinnedVarSize + IntSet.size newIntermediateVars - 1]
 

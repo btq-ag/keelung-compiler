@@ -38,40 +38,40 @@ modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
 freshRefF :: M n RefF
 freshRefF = do
   counters <- gets csCounters
-  let index = getCount OfIntermediate OfField counters
-  modifyCounter $ addCount OfIntermediate OfField 1
+  let index = getCount counters (Intermediate, ReadField)
+  modifyCounter $ addCount (Intermediate, WriteField) 1
   return $ RefFX index
 
 freshRefForU :: Ref -> M n Ref
 freshRefForU (F _) = do
   counters <- gets csCounters
-  let index = getCount OfIntermediate OfField counters
-  modifyCounter $ addCount OfIntermediate OfField 1
+  let index = getCount counters (Intermediate, ReadField)
+  modifyCounter $ addCount (Intermediate, WriteField) 1
   return $ F $ RefFX index
 freshRefForU (B _) = do
   counters <- gets csCounters
-  let index = getCount OfIntermediate OfBoolean counters
-  modifyCounter $ addCount OfIntermediate OfBoolean 1
+  let index = getCount counters (Intermediate, ReadBool)
+  modifyCounter $ addCount (Intermediate, WriteBool) 1
   return $ B $ RefBX index
 freshRefForU (U ref) = do
   let width = widthOf ref
   counters <- gets csCounters
-  let index = getCount OfIntermediate (OfUInt width) counters
-  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
+  let index = getCount counters (Intermediate, ReadUInt width)
+  modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ U $ RefUX width index
 
 freshRefB :: M n RefB
 freshRefB = do
   counters <- gets csCounters
-  let index = getCount OfIntermediate OfBoolean counters
-  modifyCounter $ addCount OfIntermediate OfBoolean 1
+  let index = getCount counters (Intermediate, ReadBool)
+  modifyCounter $ addCount (Intermediate, WriteBool) 1
   return $ RefBX index
 
 freshRefU :: Width -> M n RefU
 freshRefU width = do
   counters <- gets csCounters
-  let index = getCount OfIntermediate (OfUInt width) counters
-  modifyCounter $ addCount OfIntermediate (OfUInt width) 1
+  let index = getCount counters (Intermediate, ReadUInt width)
+  modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ RefUX width index
 
 --------------------------------------------------------------------------------

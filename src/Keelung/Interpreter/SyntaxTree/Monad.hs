@@ -48,24 +48,24 @@ toPartialBindings inputs =
         VarGroups
           { ofO =
               VarGroup
-                (getCount OfOutput OfField counters, mempty)
-                (getCount OfOutput OfBoolean counters, mempty)
-                (IntMap.mapWithKey (\w _ -> (getCount OfOutput (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))),
+                (getCount counters (Output, ReadField), mempty)
+                (getCount counters (Output, ReadBool), mempty)
+                (IntMap.mapWithKey (\w _ -> (getCount counters (Output, ReadUInt w), mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))),
             ofI =
               VarGroup
-                (getCount OfPublicInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
-                (getCount OfPublicInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs))))
-                (IntMap.mapWithKey (\w bindings -> (getCount OfPublicInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
+                (getCount counters (PublicInput, ReadField), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
+                (getCount counters (PublicInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs))))
+                (IntMap.mapWithKey (\w bindings -> (getCount counters (PublicInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
             ofP =
               VarGroup
-                (getCount OfPrivateInput OfField counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
-                (getCount OfPrivateInput OfBoolean counters, IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPrivate inputs))))
-                (IntMap.mapWithKey (\w bindings -> (getCount OfPrivateInput (OfUInt w) counters, IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
+                (getCount counters (PrivateInput, ReadField), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
+                (getCount counters (PrivateInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPrivate inputs))))
+                (IntMap.mapWithKey (\w bindings -> (getCount counters (PrivateInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (toList bindings))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
             ofX =
               VarGroup
-                (getCount OfIntermediate OfField counters, mempty)
-                (getCount OfIntermediate OfBoolean counters, mempty)
-                (IntMap.mapWithKey (\w _ -> (getCount OfIntermediate (OfUInt w) counters, mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs)))
+                (getCount counters (Intermediate, ReadField), mempty)
+                (getCount counters (Intermediate, ReadBool), mempty)
+                (IntMap.mapWithKey (\w _ -> (getCount counters (Intermediate, ReadUInt w), mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs)))
           }
 
 addF :: Var -> [n] -> M n ()
