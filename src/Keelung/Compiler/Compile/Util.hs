@@ -18,6 +18,7 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
+import qualified Keelung.Compiler.Optimize.OccurB as OccurB
 
 --------------------------------------------------------------------------------
 

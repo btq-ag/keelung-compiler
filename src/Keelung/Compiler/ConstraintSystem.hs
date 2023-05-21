@@ -347,8 +347,7 @@ relocateConstraintSystem cs =
       RefUBit _ var _ ->
         --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
         --  the UInt variable should be kept
-        var `Set.member` bitTestsInOccurrencesB occurences
-          || shouldBeKept (U var)
+        shouldBeKept (U var)
       _ ->
         -- it's a pinned Field variable
         True
@@ -504,7 +503,6 @@ data Occurences = Occurences
   { refFsInOccurrencesF :: !(Set RefF),
     refBsInOccurrencesF :: !(Set RefB),
     refUsInOccurrencesF :: !(Set RefU),
-    bitTestsInOccurrencesB :: !(Set RefU),
     refBsInOccurrencesB :: !(Set RefB),
     refUsInOccurrencesU :: !(Set RefU)
   }
@@ -520,10 +518,6 @@ constructOccurences cs =
       findUInRef (U r) _ = Just r
       findUInRef _ _ = Nothing
 
-      findBitTestInRefB (RefUBit {}) 0 = Nothing
-      findBitTestInRefB (RefUBit _ r _) _ = Just r
-      findBitTestInRefB _ _ = Nothing
-
       findBInRef (B _) 0 = Nothing
       findBInRef (B r) _ = Just r
       findBInRef _ _ = Nothing
@@ -531,7 +525,6 @@ constructOccurences cs =
         { refFsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findFInRef (csOccurrenceF cs),
           refBsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findBInRef (csOccurrenceF cs),
           refUsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findUInRef (csOccurrenceF cs),
-          bitTestsInOccurrencesB = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findBitTestInRefB (csOccurrenceB cs),
           refBsInOccurrencesB = Map.keysSet $ Map.filter (> 0) (csOccurrenceB cs),
           refUsInOccurrencesU = Map.keysSet $ Map.filter (> 0) (csOccurrenceU cs)
         }
