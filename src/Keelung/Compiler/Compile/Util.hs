@@ -10,6 +10,7 @@ import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
+import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
@@ -18,7 +19,6 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
-import qualified Keelung.Compiler.Optimize.OccurB as OccurB
 
 --------------------------------------------------------------------------------
 
@@ -30,7 +30,7 @@ runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem fieldInfo counters mempty mempty mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintSystem fieldInfo counters mempty (OccurB.new False) mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
