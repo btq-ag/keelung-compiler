@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Module for RefB bookkeeping
-module Keelung.Compiler.Optimize.OccurB (OccurB, new, null, toList, increase, decrease, occuredRefBSet) where
+module Keelung.Compiler.Optimize.OccurB (OccurB, new, null, toList, increase, decrease, occuredSet) where
 
 import Control.Arrow (Arrow (first))
 import Control.DeepSeq (NFData)
@@ -79,12 +79,12 @@ decrease var (OccurB xs) = OccurB (xs Vec.// [(var, 0 `max` pred (xs Vec.! var))
 -- decrease (RefBX i) (OccurB os is ps xs) = OccurB os is ps (xs Vec.// [(i, 0 `max` pred (xs Vec.! i))])
 -- decrease (RefUBit {}) occurrences = occurrences
 
-occuredRefBSet :: OccurB -> IntSet
-occuredRefBSet (MapB xs) = IntMap.keysSet $ IntMap.filter (> 0) xs
-occuredRefBSet (OccurB xs) = Vec.foldl' (\s (i, n) -> if n > 0 then IntSet.insert i s else s) IntSet.empty (Vec.indexed xs)
+occuredSet :: OccurB -> IntSet
+occuredSet (MapB xs) = IntMap.keysSet $ IntMap.filter (> 0) xs
+occuredSet (OccurB xs) = Vec.foldl' (\s (i, n) -> if n > 0 then IntSet.insert i s else s) IntSet.empty (Vec.indexed xs)
 
--- occuredRefBSet (MapB xs) = Map.keysSet $ Map.filter (> 0) xs
--- occuredRefBSet (OccurB os is ps xs) =
+-- occuredSet (MapB xs) = Map.keysSet $ Map.filter (> 0) xs
+-- occuredSet (OccurB os is ps xs) =
 --   Vec.foldl' (\s (i, n) -> if n > 0 then Set.insert (RefBO i) s else s) Set.empty (Vec.indexed os)
 --     `Set.union` Vec.foldl' (\s (i, n) -> if n > 0 then Set.insert (RefBI i) s else s) Set.empty (Vec.indexed is)
 --     `Set.union` Vec.foldl' (\s (i, n) -> if n > 0 then Set.insert (RefBP i) s else s) Set.empty (Vec.indexed ps)

@@ -11,6 +11,7 @@ import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
+import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
@@ -30,7 +31,7 @@ runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem fieldInfo counters mempty (OccurB.new False) mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintSystem fieldInfo counters OccurF.new (OccurB.new False) mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()

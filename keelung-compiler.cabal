@@ -41,6 +41,7 @@ library
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.OccurB
+      Keelung.Compiler.Optimize.OccurF
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations.Boolean
@@ -108,6 +109,7 @@ executable keelungc
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.OccurB
+      Keelung.Compiler.Optimize.OccurF
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations.Boolean
@@ -199,6 +201,7 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
       Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.OccurB
+      Keelung.Compiler.Optimize.OccurF
       Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations.Boolean
