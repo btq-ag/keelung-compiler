@@ -22,7 +22,6 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
 import Data.Sequence (Seq)
@@ -64,7 +63,7 @@ data ConstraintSystem n = ConstraintSystem
     csOccurrenceF :: !OccurF,
     csOccurrenceB :: !OccurB,
     csOccurrenceU :: !OccurU,
-    csBitTests :: !(Map RefU Int),
+    csBitTests :: !(IntMap IntSet),
     csBinReps :: [[(RefB, Int)]],
     -- when x == y (FieldRelations)
     csFieldRelations :: AllRelations n,
@@ -266,13 +265,8 @@ relocateConstraintSystem cs =
 
         intermediateRefUsOccurredInBitTests =
           Set.fromList $
-            Map.elems $
-              Map.mapMaybeWithKey
-                ( \ref count -> case ref of
-                    RefUX width var -> if count > 0 then Just (width, var) else Nothing
-                    _ -> Nothing
-                )
-                (csBitTests cs)
+            concatMap (\(width, xs) -> map (width,) (IntSet.toList xs)) $
+              IntMap.toList (csBitTests cs)
 
         binRepsFromIntermediateRefUsOccurredInUAndF =
           Seq.fromList
@@ -330,7 +324,10 @@ relocateConstraintSystem cs =
             Nothing -> False
             Just xs -> IntSet.member var xs
         )
-          || RefUX width var `Map.member` Map.filter (> 0) (csBitTests cs)
+          || ( case IntMap.lookup width (csBitTests cs) of
+                 Nothing -> False
+                 Just xs -> IntSet.member var xs
+             )
       _ ->
         -- it's a pinned UInt variable
         True

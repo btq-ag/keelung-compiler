@@ -4,7 +4,8 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
-import Data.Map.Strict qualified as Map
+import Data.IntMap.Strict qualified as IntMap
+import Data.IntSet qualified as IntSet
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
@@ -12,6 +13,7 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintSystem
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
+import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
@@ -20,7 +22,6 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
-import qualified Keelung.Compiler.Optimize.OccurU as OccurU
 
 --------------------------------------------------------------------------------
 
@@ -138,38 +139,33 @@ addC = mapM_ addOne
         Nothing -> return ()
         Just relations -> put cs {csFieldRelations = relations}
 
-    -- addBitTestOccurrences :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
-    -- addBitTestOccurrences (B (RefUBit _ refA _)) (B (RefUBit _ refB _)) = do
-    --   modify' (\cs -> cs {csBitTests = Map.insertWith (+) refA 1 $ Map.insertWith (+) refB 1 (csBitTests cs)})
-    -- addBitTestOccurrences _ _ = return ()
-
-    addBitTestOccurrences' :: (GaloisField n, Integral n) => Ref -> M n ()
-    addBitTestOccurrences' (B (RefUBit _ ref _)) = do
-      modify' (\cs -> cs {csBitTests = Map.insertWith (+) ref 1 (csBitTests cs)})
-    addBitTestOccurrences' _ = return ()
+    addBitTestOccurrences :: (GaloisField n, Integral n) => Ref -> M n ()
+    addBitTestOccurrences (B (RefUBit _ (RefUX width var) _)) = do
+      modify' (\cs -> cs {csBitTests = IntMap.insertWith (<>) width (IntSet.singleton var) (csBitTests cs)})
+    addBitTestOccurrences _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
     addOne (CVarBindF x c) = do
       execRelations $ AllRelations.assignF x c
     addOne (CVarBindB x c) = do
-      addBitTestOccurrences' (B x)
+      addBitTestOccurrences (B x)
       execRelations $ AllRelations.assignB x c
     addOne (CVarBindU x c) = do
       execRelations $ AllRelations.assignU x c
     addOne (CVarEq x y) = do
-      addBitTestOccurrences' x
-      addBitTestOccurrences' y
+      addBitTestOccurrences x
+      addBitTestOccurrences y
       execRelations $ AllRelations.relateRefs x 1 y 0
     addOne (CVarEqF x y) = do
       execRelations $ AllRelations.relateRefs (F x) 1 (F y) 0
     addOne (CVarEqB x y) = do
-      addBitTestOccurrences' (B x)
-      addBitTestOccurrences' (B y)
+      addBitTestOccurrences (B x)
+      addBitTestOccurrences (B y)
       execRelations $ AllRelations.relateB x (True, y)
     addOne (CVarNEqB x y) = do
-      addBitTestOccurrences' (B x)
-      addBitTestOccurrences' (B y)
+      addBitTestOccurrences (B x)
+      addBitTestOccurrences (B y)
       execRelations $ AllRelations.relateB x (False, y)
     addOne (CVarEqU x y) = do
       execRelations $ AllRelations.assertEqualU x y
