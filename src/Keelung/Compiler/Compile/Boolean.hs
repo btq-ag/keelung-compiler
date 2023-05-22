@@ -249,7 +249,7 @@ computeLTEUVarVar x y = do
       yBit = B (RefUBit width y 0)
   -- x[0] * y[0] = result + x[0] - 1
   result <- freshRefB
-  addC $ cMulF (0, [(xBit, 1)]) (0, [(yBit, 1)]) (-1, [(B result, 1), (xBit, 1)])
+  writeMul (0, [(xBit, 1)]) (0, [(yBit, 1)]) (-1, [(B result, 1), (xBit, 1)])
   -- starting from the least significant bit
   Left <$> foldM (compileLTEUVarVarPrim width x y) result [1 .. width - 1]
 
@@ -280,7 +280,7 @@ computeLTUVarVar x y = do
       yBit = B (RefUBit width y 0)
   -- (y - lastBit) = (x)(y)
   lastBit <- freshRefB
-  addC $ cMulF (0, [(xBit, 1)]) (0, [(yBit, 1)]) (0, [(B lastBit, -1), (yBit, 1)])
+  writeMul (0, [(xBit, 1)]) (0, [(yBit, 1)]) (0, [(B lastBit, -1), (yBit, 1)])
   -- starting from the least significant bit
   Left <$> foldM (compileLTEUVarVarPrim width x y) lastBit [1 .. width - 1]
 
@@ -298,11 +298,11 @@ compileLTEUVarVarPrim width x y acc i = do
 
   -- yacc = y[i] * acc
   yacc <- freshRefB
-  addC $ cMulF (0, [(yBit, 1)]) (0, [(B acc, 1)]) (0, [(B yacc, 1)])
+  writeMul (0, [(yBit, 1)]) (0, [(B acc, 1)]) (0, [(B yacc, 1)])
 
   -- result - yacc = (1 - x[i]) * (y[i] + acc - 2 * yacc)
   result <- freshRefB
-  addC $ cMulF (1, [(xBit, -1)]) (0, [(yBit, 1), (B acc, 1), (B yacc, -2)]) (0, [(B result, 1), (B yacc, -1)])
+  writeMul (1, [(xBit, -1)]) (0, [(yBit, 1), (B acc, 1), (B yacc, -2)]) (0, [(B result, 1), (B yacc, -1)])
 
   return result
 
@@ -324,21 +324,21 @@ compileLTEUVarConstPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (R
 compileLTEUVarConstPrim (Left acc) (x, True) = do
   -- result - acc = (1 - x[i]) * (1 - acc)
   result <- freshRefB
-  addC $ cMulF (1, [(B x, -1)]) (1, [(B acc, -1)]) (0, [(B result, 1), (B acc, -1)])
+  writeMul (1, [(B x, -1)]) (1, [(B acc, -1)]) (0, [(B result, 1), (B acc, -1)])
   return $ Left result
 compileLTEUVarConstPrim (Left acc) (x, False) = do
   -- result = (1 - x[i]) * acc
   result <- freshRefB
-  addC $ cMulF (1, [(B x, -1)]) (0, [(B acc, 1)]) (0, [(B result, 1)])
+  writeMul (1, [(B x, -1)]) (0, [(B acc, 1)]) (0, [(B result, 1)])
   return $ Left result
 compileLTEUVarConstPrim (Right True) (_, True) = return $ Right True
 compileLTEUVarConstPrim (Right True) (x, False) = do
   result <- freshRefB
-  addC $ cVarNEqB result x
+  writeNEqB result x
   return $ Left result
 compileLTEUVarConstPrim (Right False) (x, True) = do
   result <- freshRefB
-  addC $ cVarNEqB result x
+  writeNEqB result x
   return $ Left result
 compileLTEUVarConstPrim (Right False) (_, False) = return $ Right False
 
@@ -346,12 +346,12 @@ compileLTEUConstVarPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (B
 compileLTEUConstVarPrim (Left acc) (True, y) = do
   -- y[i] * acc = result
   result <- freshRefB
-  addC $ cMulF (0, [(B y, 1)]) (0, [(B acc, 1)]) (0, [(B result, 1)])
+  writeMul (0, [(B y, 1)]) (0, [(B acc, 1)]) (0, [(B result, 1)])
   return $ Left result
 compileLTEUConstVarPrim (Left acc) (_, y) = do
   -- - y[i] * acc = result - y[i] - acc
   result <- freshRefB
-  addC $ cMulF (0, [(B y, -1)]) (0, [(B acc, 1)]) (0, [(B result, 1), (B y, -1), (B acc, -1)])
+  writeMul (0, [(B y, -1)]) (0, [(B acc, 1)]) (0, [(B result, 1), (B y, -1), (B acc, -1)])
   return $ Left result
 compileLTEUConstVarPrim (Right True) (True, y) = return $ Left y
 compileLTEUConstVarPrim (Right True) (False, _) = return $ Right True

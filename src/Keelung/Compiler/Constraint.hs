@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -17,18 +16,6 @@ module Keelung.Compiler.Constraint
     pinnedRef,
     pinnedRefB,
     pinnedRefU,
-    cAddF,
-    cVarEq,
-    cVarEqF,
-    cVarEqB,
-    cVarNEqB,
-    cVarEqU,
-    cVarBindF,
-    cVarBindB,
-    cVarBindU,
-    cMulF,
-    cMulSimpleF,
-    -- cRotateU,
     fromConstraint,
     fromPoly_,
   )
@@ -275,76 +262,6 @@ instance Functor Constraint where
   fmap f (CVarBindU x y) = CVarBindU x (f y)
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
-
--- | Smart constructor for the CAddF constraint
-cAddF :: GaloisField n => n -> [(Ref, n)] -> [Constraint n]
-cAddF !c !xs = case PolyG.build c xs of
-  Left _ -> []
-  Right xs' -> [CAddF xs']
-
--- | Smart constructor for the CVarEqF constraint
-cVarEq :: GaloisField n => Ref -> Ref -> [Constraint n]
-cVarEq x y = if x == y then [] else [CVarEq x y]
-
--- | Smart constructor for the CVarEqT constraint
-cVarEqF :: GaloisField n => RefF -> RefF -> [Constraint n]
-cVarEqF x y = if x == y then [] else [CVarEqF x y]
-
--- | Smart constructor for the CVarEqB constraint
-cVarEqB :: GaloisField n => RefB -> RefB -> [Constraint n]
-cVarEqB x y = if x == y then [] else [CVarEqB x y]
-
--- | Smart constructor for the CVarNEqB constraint
-cVarNEqB :: GaloisField n => RefB -> RefB -> [Constraint n]
-cVarNEqB x y = if x == y then [] else [CVarNEqB x y]
-
--- | Smart constructor for the CVarEqU constraint
-cVarEqU :: GaloisField n => RefU -> RefU -> [Constraint n]
-cVarEqU x y = if x == y then [] else [CVarEqU x y]
-
--- cRotateU :: GaloisField n => RefU -> RefU -> Int -> [Constraint n]
--- cRotateU x y n = if x == y then [] else [CRotateU x y n]
-
--- | Smart constructor for the cVarBindF constraint
-cVarBindF :: GaloisField n => Ref -> n -> [Constraint n]
-cVarBindF x n = [CVarBindF x n]
-
--- | Smart constructor for the cVarBindB constraint
-cVarBindB :: GaloisField n => RefB -> Bool -> [Constraint n]
-cVarBindB x n = [CVarBindB x n]
-
--- | Smart constructor for the cVarBindU constraint
-cVarBindU :: GaloisField n => RefU -> n -> [Constraint n]
-cVarBindU x n = [CVarBindU x n]
-
-cMulSimple :: (GaloisField n, Ord ref) => (PolyG ref n -> PolyG ref n -> Either n (PolyG ref n) -> Constraint n) -> ref -> ref -> ref -> [Constraint n]
-cMulSimple ctor !x !y !z = case ( do
-                                    xs' <- PolyG.build 0 [(x, 1)]
-                                    ys' <- PolyG.build 0 [(y, 1)]
-                                    return $ ctor xs' ys' (PolyG.build 0 [(z, 1)])
-                                ) of
-  Left _ -> []
-  Right result -> [result]
-
-cMulSimpleF :: GaloisField n => Ref -> Ref -> Ref -> [Constraint n]
-cMulSimpleF = cMulSimple CMulF
-
--- | Smart constructor for the CMulF constraint
-cMulF :: GaloisField n => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> [Constraint n]
-cMulF (a, xs) (b, ys) (c, zs) = case ( do
-                                         xs' <- PolyG.build a xs
-                                         ys' <- PolyG.build b ys
-                                         return $ CMulF xs' ys' (PolyG.build c zs)
-                                     ) of
-  Left _ -> []
-  Right result -> [result]
-
--- -- | Smart constructor for the CNEq constraint
--- cNEqF :: GaloisField n => RefF -> Either RefF n -> RefF -> [Constraint n]
--- cNEqF x y m = [CNEqF x y m]
-
--- cNEqU :: GaloisField n => RefU -> Either RefU n -> RefF -> [Constraint n]
--- cNEqU x y m = [CNEqU x y m]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddF xs) = "AF " <> show xs <> " = 0"
