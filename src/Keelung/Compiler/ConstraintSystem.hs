@@ -18,11 +18,13 @@ import Control.DeepSeq (NFData)
 import Data.Bifunctor (bimap)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
+import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Maybe (mapMaybe)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
@@ -33,6 +35,8 @@ import Keelung.Compiler.Optimize.OccurB (OccurB)
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF (OccurF)
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
+import Keelung.Compiler.Optimize.OccurU (OccurU)
+import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (AllRelations)
@@ -59,7 +63,7 @@ data ConstraintSystem n = ConstraintSystem
     -- for counting the occurences of variables in constraints (excluding the ones that are in FieldRelations)
     csOccurrenceF :: !OccurF,
     csOccurrenceB :: !OccurB,
-    csOccurrenceU :: !(Map RefU Int),
+    csOccurrenceU :: !OccurU,
     csBitTests :: !(Map RefU Int),
     csBinReps :: [[(RefB, Int)]],
     -- when x == y (FieldRelations)
@@ -158,9 +162,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
           then ""
           else "  OccruencesB:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurB.toList $ csOccurrenceB cs)))
       showOccurrencesU =
-        if Map.null $ csOccurrenceU cs
+        if OccurU.null $ csOccurrenceU cs
           then ""
-          else "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceU cs)))
+          else "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurU.toList $ csOccurrenceU cs)))
 
       showMul (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
@@ -246,7 +250,7 @@ relocateConstraintSystem cs =
     occurences = constructOccurences cs
 
     -- \| Generate BinReps from the UIntRelations
-    generateBinReps :: Counters -> Map RefU Int -> [BinRep]
+    generateBinReps :: Counters -> OccurU -> [BinRep]
     generateBinReps (Counters o i1 i2 _ _ _ _) occurrencesU =
       toList $
         fromSmallCounter Output o
@@ -256,13 +260,9 @@ relocateConstraintSystem cs =
       where
         intermediateRefUsOccurredInU =
           Set.fromList $
-            Map.elems $
-              Map.mapMaybeWithKey
-                ( \ref count -> case ref of
-                    RefUX width var -> if count > 0 then Just (width, var) else Nothing
-                    _ -> Nothing
-                )
-                occurrencesU
+            concatMap
+              (\(width, xs) -> mapMaybe (\(var, count) -> if count > 0 then Just (width, var) else Nothing) (IntMap.toList xs))
+              (OccurU.toList occurrencesU)
 
         intermediateRefUsOccurredInBitTests =
           Set.fromList $
@@ -326,7 +326,10 @@ relocateConstraintSystem cs =
     refUShouldBeKept ref = case ref of
       RefUX width var ->
         -- it's a UInt intermediate variable that occurs in the circuit
-        RefUX width var `Set.member` refUsInOccurrencesU occurences
+        ( case IntMap.lookup width (refUsInOccurrencesU occurences) of
+            Nothing -> False
+            Just xs -> IntSet.member var xs
+        )
           || RefUX width var `Map.member` Map.filter (> 0) (csBitTests cs)
       _ ->
         -- it's a pinned UInt variable
@@ -450,9 +453,9 @@ instance UpdateOccurrences RefB where
       ( foldl
           ( \cs ref ->
               case ref of
-                RefUBit _ refU _ ->
+                RefUBit _ (RefUX width var) _ ->
                   cs
-                    { csOccurrenceU = Map.insertWith (+) refU 1 (csOccurrenceU cs)
+                    { csOccurrenceU = OccurU.increase width var (csOccurrenceU cs)
                     }
                 RefBX var ->
                   cs
@@ -466,9 +469,9 @@ instance UpdateOccurrences RefB where
       ( foldl
           ( \cs ref ->
               case ref of
-                RefUBit _ refU _ ->
+                RefUBit _ (RefUX width var) _ ->
                   cs
-                    { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) refU (csOccurrenceU cs)
+                    { csOccurrenceU = OccurU.decrease width var (csOccurrenceU cs)
                     }
                 RefBX var ->
                   cs
@@ -483,18 +486,24 @@ instance UpdateOccurrences RefU where
     flip
       ( foldl
           ( \cs ref ->
-              cs
-                { csOccurrenceU = Map.insertWith (+) ref 1 (csOccurrenceU cs)
-                }
+              case ref of
+                RefUX width var ->
+                  cs
+                    { csOccurrenceU = OccurU.increase width var (csOccurrenceU cs)
+                    }
+                _ -> cs
           )
       )
   removeOccurrences =
     flip
       ( foldl
           ( \cs ref ->
-              cs
-                { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceU cs)
-                }
+              case ref of
+                RefUX width var ->
+                  cs
+                    { csOccurrenceU = OccurU.decrease width var (csOccurrenceU cs)
+                    }
+                _ -> cs
           )
       )
 
@@ -504,7 +513,7 @@ instance UpdateOccurrences RefU where
 data Occurences = Occurences
   { refFsInOccurrencesF :: !IntSet,
     refBsInOccurrencesB :: !IntSet,
-    refUsInOccurrencesU :: !(Set RefU)
+    refUsInOccurrencesU :: !(IntMap IntSet)
   }
 
 -- | Smart constructor for 'Occurences'
@@ -513,5 +522,5 @@ constructOccurences cs =
   Occurences
     { refFsInOccurrencesF = OccurF.occuredSet (csOccurrenceF cs),
       refBsInOccurrencesB = OccurB.occuredSet (csOccurrenceB cs),
-      refUsInOccurrencesU = Map.keysSet $ Map.filter (> 0) (csOccurrenceU cs)
+      refUsInOccurrencesU = OccurU.occuredSet (csOccurrenceU cs)
     }

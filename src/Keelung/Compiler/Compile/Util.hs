@@ -20,6 +20,7 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
+import qualified Keelung.Compiler.Optimize.OccurU as OccurU
 
 --------------------------------------------------------------------------------
 
@@ -31,7 +32,7 @@ runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem fieldInfo counters OccurF.new (OccurB.new False) mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintSystem fieldInfo counters OccurF.new (OccurB.new False) OccurU.new mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
