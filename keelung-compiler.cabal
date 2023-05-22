@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -38,12 +38,9 @@ library
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
-      Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.OccurB
       Keelung.Compiler.Optimize.OccurF
       Keelung.Compiler.Optimize.OccurU
-      Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
@@ -107,12 +104,9 @@ executable keelungc
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
-      Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.OccurB
       Keelung.Compiler.Optimize.OccurF
       Keelung.Compiler.Optimize.OccurU
-      Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
@@ -200,12 +194,9 @@ test-suite keelung-test
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
-      Keelung.Compiler.Optimize.Monad
       Keelung.Compiler.Optimize.OccurB
       Keelung.Compiler.Optimize.OccurF
       Keelung.Compiler.Optimize.OccurU
-      Keelung.Compiler.Optimize.UnionFind
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass

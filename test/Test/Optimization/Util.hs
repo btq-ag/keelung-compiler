@@ -14,24 +14,24 @@ import Test.Interpreter.Util (gf181Info)
 -- | Returns the original and optimized constraint system
 execute :: Encode t => Comp t -> IO (ConstraintModule (N GF181), ConstraintModule (N GF181))
 execute program = do
-  cs <- case Compiler.compileO0 gf181Info program of
+  cm <- case Compiler.compileO0 gf181Info program of
     Left err -> assertFailure $ show err
     Right result -> return result
 
-  case Optimizer.run cs of
+  case Optimizer.run cm of
     Left err -> assertFailure $ show err
-    Right cs' -> do
+    Right cm' -> do
       -- var counters should remain the same
-      csCounters cs `shouldBe` csCounters cs'
-      return (cs, cs')
+      cmCounters cm `shouldBe` cmCounters cm'
+      return (cm, cm')
 
 shouldHaveSize :: ConstraintModule (N GF181) -> Int -> IO ()
-shouldHaveSize cs expectedBeforeSize = do
+shouldHaveSize cm expectedBeforeSize = do
   -- compare the number of constraints
-  let actualBeforeSize = Relocated.numberOfConstraints (relocateConstraintModule cs)
+  let actualBeforeSize = Relocated.numberOfConstraints (relocateConstraintModule cm)
   actualBeforeSize `shouldBe` expectedBeforeSize
 
 debug :: ConstraintModule (N GF181) -> IO ()
-debug cs = do
-  print cs
-  print (relocateConstraintModule cs)
+debug cm = do
+  print cm
+  print (relocateConstraintModule cm)
