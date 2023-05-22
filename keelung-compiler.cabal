@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -34,6 +34,7 @@ library
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -47,7 +48,6 @@ library
       Keelung.Compiler.Relations.Field
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
-      Keelung.Compiler.Relocated
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
@@ -100,6 +100,7 @@ executable keelungc
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -113,7 +114,6 @@ executable keelungc
       Keelung.Compiler.Relations.Field
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
-      Keelung.Compiler.Relocated
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
@@ -190,6 +190,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
+      Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -203,7 +204,6 @@ test-suite keelung-test
       Keelung.Compiler.Relations.Field
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
-      Keelung.Compiler.Relocated
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal

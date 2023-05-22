@@ -13,7 +13,7 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Compiler.Relocated hiding (numberOfConstraints)
+import Keelung.Compiler.ConstraintSystem hiding (numberOfConstraints)
 import Keelung.Compiler.Util
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1C qualified as R1C
@@ -34,7 +34,7 @@ satisfyR1CS witness r1cs =
         else Just unsatisfiable
 
 -- | Converts ConstraintSystem to R1CS
-toR1CS :: GaloisField n => RelocatedConstraintSystem n -> R1CS n
+toR1CS :: GaloisField n => ConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
     { r1csField = csField cs,

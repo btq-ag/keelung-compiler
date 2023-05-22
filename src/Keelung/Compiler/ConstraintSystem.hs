@@ -4,7 +4,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 
-module Keelung.Compiler.Relocated where
+module Keelung.Compiler.ConstraintSystem where
 
 import Control.Arrow (left)
 import Control.DeepSeq (NFData)
@@ -90,8 +90,8 @@ varsInConstraints = IntSet.unions . fmap varsInConstraint
 
 --------------------------------------------------------------------------------
 
--- | Relocated Constraint System
-data RelocatedConstraintSystem n = RelocatedConstraintSystem
+-- | Linked Constraint System
+data ConstraintSystem n = ConstraintSystem
   { -- | Constraints
     csField :: (FieldType, Integer, Integer),
     csConstraints :: !(Seq (Constraint n)),
@@ -105,12 +105,12 @@ data RelocatedConstraintSystem n = RelocatedConstraintSystem
   deriving (Eq, Generic, NFData, Functor)
 
 -- | return the number of constraints (including constraints of boolean input vars)
-numberOfConstraints :: RelocatedConstraintSystem n -> Int
-numberOfConstraints (RelocatedConstraintSystem _ cs binReps _ counters _eqs _divMods _modInvs) =
+numberOfConstraints :: ConstraintSystem n -> Int
+numberOfConstraints (ConstraintSystem _ cs binReps _ counters _eqs _divMods _modInvs) =
   length cs + getBooleanConstraintCount counters + length binReps
 
-instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
-  show (RelocatedConstraintSystem _ constraints binReps _ counters _eqs _divMods _modInvs) =
+instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
+  show (ConstraintSystem _ constraints binReps _ counters _eqs _divMods _modInvs) =
     "ConstraintSystem {\n"
       <> prettyConstraints counters (toList constraints) binReps
       <> prettyVariables counters
@@ -120,9 +120,9 @@ instance (GaloisField n, Integral n) => Show (RelocatedConstraintSystem n) where
 --   renumbered constraints, together with the total number of
 --   variables in the (renumbered) constraint set and the (possibly
 --   renumbered) in and out variables.
-renumberConstraints :: (GaloisField n, Integral n) => RelocatedConstraintSystem n -> RelocatedConstraintSystem n
+renumberConstraints :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
 renumberConstraints cs =
-  RelocatedConstraintSystem
+  ConstraintSystem
     { csField = csField cs,
       csConstraints = fmap renumberConstraint (csConstraints cs),
       csBinReps = fmap renumberBinRep (csBinReps cs),

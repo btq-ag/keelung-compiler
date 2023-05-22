@@ -41,7 +41,6 @@ import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
-import Keelung.Compiler.Relocated qualified as Relocated
 import Keelung.Compiler.Util (indent)
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.PolyG (PolyG)
@@ -50,6 +49,8 @@ import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
+import Keelung.Compiler.ConstraintSystem (ConstraintSystem(..))
+import qualified Keelung.Compiler.ConstraintSystem as Linked
 
 --------------------------------------------------------------------------------
 
@@ -209,22 +210,22 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
 
 -------------------------------------------------------------------------------
 
-relocateConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> Relocated.RelocatedConstraintSystem n
+relocateConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintSystem n
 relocateConstraintModule cm =
-  Relocated.RelocatedConstraintSystem
-    { Relocated.csField = cmField cm,
-      Relocated.csCounters = counters,
-      Relocated.csBinReps = binReps,
-      Relocated.csBinReps' = map (Seq.fromList . map (first (reindexRefB counters))) (cmBinReps cm),
-      Relocated.csConstraints =
+  ConstraintSystem
+    { csField = cmField cm,
+      csCounters = counters,
+      csBinReps = binReps,
+      csBinReps' = map (Seq.fromList . map (first (reindexRefB counters))) (cmBinReps cm),
+      csConstraints =
         varEqFs
           <> varEqBs
           <> varEqUs
           <> addFs
           <> mulFs,
-      Relocated.csEqZeros = toList eqZeros,
-      Relocated.csDivMods = divMods,
-      Relocated.csModInvs = modInvs
+      csEqZeros = toList eqZeros,
+      csDivMods = divMods,
+      csModInvs = modInvs
     }
   where
     counters = cmCounters cm
@@ -273,7 +274,7 @@ relocateConstraintModule cm =
               binRepOffset = reindex counters sort (ReadBits width) 0
            in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
 
-    extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Relocated.Constraint n)
+    extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Linked.Constraint n)
     extractFieldRelations relations =
       let convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Constraint n
           convert (var, Right val) = CVarBindF var val
@@ -332,7 +333,7 @@ relocateConstraintModule cm =
         -- it's a pinned Field variable
         True
 
-    extractBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Seq (Relocated.Constraint n)
+    extractBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Seq (Linked.Constraint n)
     extractBooleanRelations relations =
       let convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Constraint n
           convert (var, Right val) = CVarBindB var val
@@ -344,7 +345,7 @@ relocateConstraintModule cm =
           result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
        in Seq.fromList (map (fromConstraint counters) result)
 
-    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Seq (Relocated.Constraint n)
+    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Seq (Linked.Constraint n)
     extractUIntRelations relations =
       let convert :: (GaloisField n, Integral n) => (RefU, Either (Int, RefU) n) -> Constraint n
           convert (var, Right val) = CVarBindU var val

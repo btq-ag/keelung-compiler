@@ -26,7 +26,7 @@ import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
-import Keelung.Compiler.Relocated qualified as Relocated
+import Keelung.Compiler.ConstraintSystem qualified as Linked
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
@@ -35,34 +35,34 @@ import Keelung.Data.VarGroup (toSubscript)
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
-fromConstraint :: (GaloisField n, Integral n) => Counters -> Constraint n -> Relocated.Constraint n
-fromConstraint counters (CAddF as) = Relocated.CAdd (fromPoly_ counters as)
+fromConstraint :: (GaloisField n, Integral n) => Counters -> Constraint n -> Linked.Constraint n
+fromConstraint counters (CAddF as) = Linked.CAdd (fromPoly_ counters as)
 fromConstraint counters (CVarEq x y) =
   case Poly.buildEither 0 [(reindexRef counters x, 1), (reindexRef counters y, -1)] of
     Left _ -> error "CVarEq: two variables are the same"
-    Right xs -> Relocated.CAdd xs
+    Right xs -> Linked.CAdd xs
 fromConstraint counters (CVarEqF x y) =
   case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
     Left _ -> error "CVarEqF: two variables are the same"
-    Right xs -> Relocated.CAdd xs
+    Right xs -> Linked.CAdd xs
 fromConstraint counters (CVarEqB x y) =
   case Poly.buildEither 0 [(reindexRefB counters x, 1), (reindexRefB counters y, -1)] of
     Left _ -> error $ "CVarEqB: two variables are the same" ++ show x ++ " " ++ show y
-    Right xs -> Relocated.CAdd xs
+    Right xs -> Linked.CAdd xs
 fromConstraint counters (CVarNEqB x y) =
   case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
     Left _ -> error "CVarNEqB: two variables are the same"
-    Right xs -> Relocated.CAdd xs
+    Right xs -> Linked.CAdd xs
 fromConstraint counters (CVarEqU x y) =
   case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
     Left _ -> error "CVarEqU: two variables are the same"
-    Right xs -> Relocated.CAdd xs
-fromConstraint counters (CVarBindF x n) = Relocated.CAdd (Poly.bind (reindexRef counters x) n)
-fromConstraint counters (CVarBindB x True) = Relocated.CAdd (Poly.bind (reindexRefB counters x) 1)
-fromConstraint counters (CVarBindB x False) = Relocated.CAdd (Poly.bind (reindexRefB counters x) 0)
-fromConstraint counters (CVarBindU x n) = Relocated.CAdd (Poly.bind (reindexRefU counters x) n)
+    Right xs -> Linked.CAdd xs
+fromConstraint counters (CVarBindF x n) = Linked.CAdd (Poly.bind (reindexRef counters x) n)
+fromConstraint counters (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB counters x) 1)
+fromConstraint counters (CVarBindB x False) = Linked.CAdd (Poly.bind (reindexRefB counters x) 0)
+fromConstraint counters (CVarBindU x n) = Linked.CAdd (Poly.bind (reindexRefU counters x) n)
 fromConstraint counters (CMulF as bs cs) =
-  Relocated.CMul
+  Linked.CMul
     (fromPoly_ counters as)
     (fromPoly_ counters bs)
     ( case cs of
