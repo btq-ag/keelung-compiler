@@ -21,7 +21,7 @@ import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.ConstraintSystem
+import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
@@ -33,7 +33,7 @@ import Keelung.Syntax.Counters
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Internal n -> Either (Error n) (ConstraintSystem n)
+run :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Internal n -> Either (Error n) (ConstraintModule n)
 run fieldInfo (Internal untypedExprs _ counters assertions sideEffects) = left CompileError $ runM fieldInfo counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
@@ -218,7 +218,7 @@ compileAssertionEqU a b = do
 
 freshExprU :: Width -> M n (ExprU n)
 freshExprU width = do
-  counters <- gets csCounters
+  counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadUInt width)
   modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ VarU width index

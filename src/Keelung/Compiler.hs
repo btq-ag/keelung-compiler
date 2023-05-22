@@ -48,7 +48,7 @@ import Data.Vector (Vector)
 import Keelung (Encode, N (..))
 import Keelung qualified as Lang
 import Keelung.Compiler.Compile qualified as Compile
-import Keelung.Compiler.ConstraintSystem (ConstraintSystem, relocateConstraintSystem)
+import Keelung.Compiler.ConstraintModule (ConstraintModule, relocateConstraintModule)
 import Keelung.Compiler.Error
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
@@ -95,10 +95,10 @@ convertToInternal prog = ToInternal.run <$> elaborateAndEncode prog
 
 -- elaborate => rewrite => to internal syntax => compile => relocate
 compileWithoutConstProp :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> Either (Error n) (RelocatedConstraintSystem n)
-compileWithoutConstProp fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . relocateConstraintSystem
+compileWithoutConstProp fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . relocateConstraintModule
 
 -- elaborate => rewrite => to internal syntax => constant propagation => compile => relocate
-compileO0 :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0 :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> Either (Error n) (ConstraintModule n)
 compileO0 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo
 
 -- elaborate => rewrite => to internal syntax => constant propagation => compile => optimisation (new) => relocate => renumber
@@ -114,7 +114,7 @@ compileToModules ::
   (GaloisField n, Integral n, Encode t) =>
   (FieldType, Integer, Integer) ->
   Comp t ->
-  Either (Error n) (ConstraintSystem n)
+  Either (Error n) (ConstraintModule n)
 compileToModules fieldInfo prog = elaborateAndEncode prog >>= Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run >>= left CompileError . Optimizer.run
 
 -- | 'compile' defaults to 'compileO1'
@@ -142,11 +142,11 @@ generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   (outputs, witness) <- left (InterpretError . Interpreter.R1CSError) (R1CS.run' r1cs inputs)
   return (counters, outputs, witness)
 
-compileO0Elab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> Either (Error n) (ConstraintSystem n)
+compileO0Elab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> Either (Error n) (ConstraintModule n)
 compileO0Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run
 
 compileO1Elab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> Either (Error n) (RelocatedConstraintSystem n)
-compileO1Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run >=> left CompileError . Optimizer.run >=> return . Relocated.renumberConstraints . relocateConstraintSystem
+compileO1Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run >=> left CompileError . Optimizer.run >=> return . Relocated.renumberConstraints . relocateConstraintModule
 
 --------------------------------------------------------------------------------
 

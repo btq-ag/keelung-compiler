@@ -1,14 +1,12 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# LANGUAGE TupleSections #-}
 
-{-# HLINT ignore "Use lambda-case" #-}
-
-module Keelung.Compiler.ConstraintSystem
-  ( ConstraintSystem (..),
-    relocateConstraintSystem,
-    sizeOfConstraintSystem,
+module Keelung.Compiler.ConstraintModule
+  ( ConstraintModule (..),
+    relocateConstraintModule,
+    sizeOfConstraintModule,
     UpdateOccurrences (..),
   )
 where
@@ -55,35 +53,35 @@ import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
--- | A constraint system is a collection of constraints
-data ConstraintSystem n = ConstraintSystem
-  { csField :: (FieldType, Integer, Integer),
-    csCounters :: !Counters,
+-- | A constraint module is a collection of constraints with some additional information
+data ConstraintModule n = ConstraintModule
+  { cmField :: (FieldType, Integer, Integer),
+    cmCounters :: !Counters,
     -- for counting the occurences of variables in constraints (excluding the ones that are in FieldRelations)
-    csOccurrenceF :: !OccurF,
-    csOccurrenceB :: !OccurB,
-    csOccurrenceU :: !OccurU,
-    csBitTests :: !(IntMap IntSet),
-    csBinReps :: [[(RefB, Int)]],
+    cmOccurrenceF :: !OccurF,
+    cmOccurrenceB :: !OccurB,
+    cmOccurrenceU :: !OccurU,
+    cmBitTests :: !(IntMap IntSet),
+    cmBinReps :: [[(RefB, Int)]],
     -- when x == y (FieldRelations)
-    csFieldRelations :: AllRelations n,
-    -- csUIntRelations :: UIntRelations n,
+    cmFieldRelations :: AllRelations n,
+    -- cmUIntRelations :: UIntRelations n,
     -- addative constraints
-    csAddF :: [PolyG Ref n],
+    cmAddF :: [PolyG Ref n],
     -- multiplicative constraints
-    csMulF :: [(PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))],
+    cmMulF :: [(PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))],
     -- hits for computing equality
-    csEqZeros :: [(PolyG Ref n, RefF)],
+    cmEqZeros :: [(PolyG Ref n, RefF)],
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
-    csDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
+    cmDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
     -- hints for generating witnesses for ModInv constraints
-    csModInvs :: [(Either RefU n, Either RefU n, Integer)]
+    cmModInvs :: [(Either RefU n, Either RefU n, Integer)]
   }
   deriving (Eq, Generic, NFData)
 
-instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show cs =
+instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
+  show cm =
     "Constraint Module {\n"
       <> showVarEqF
       -- <> showVarEqU
@@ -99,7 +97,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> showVariables
       <> "}"
     where
-      counters = csCounters cs
+      counters = cmCounters cm
       -- sizes of constraint groups
       booleanConstraintCount = getBooleanConstraintCount counters
 
@@ -122,48 +120,36 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
               <> "\n"
 
       showDivModHints =
-        if null $ csDivMods cs
+        if null $ cmDivMods cm
           then ""
-          else "  DivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (csDivMods cs))))
+          else "  DivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (cmDivMods cm))))
 
       showModInvHints =
-        if null $ csModInvs cs
+        if null $ cmModInvs cm
           then ""
-          else "  ModInv hints:\n" <> indent (indent (showList' (map (\(x, _n, p) -> show x <> "⁻¹ = (mod " <> show p <> ")") (csModInvs cs))))
+          else "  ModInv hints:\n" <> indent (indent (showList' (map (\(x, _n, p) -> show x <> "⁻¹ = (mod " <> show p <> ")") (cmModInvs cm))))
 
-      -- BinRep constraints
-      -- showBinRepConstraints =
-      --   if totalBinRepConstraintSize == 0
-      --     then ""
-      --     else
-      --       "  Binary representation constriants ("
-      --         <> show totalBinRepConstraintSize
-      --         <> "):\n\n"
-      --         <> unlines (map ("    " <>) (prettyBinRepConstraints counters))
-      --         <> "\n"
+      showVarEqF = "  Field relations:\n" <> indent (indent (show (cmFieldRelations cm)))
 
-      showVarEqF = "  Field relations:\n" <> indent (indent (show (csFieldRelations cs)))
-      -- showVarEqU = "  UInt relations:\n" <> indent (indent (show (csUIntRelations cs)))
+      showAddF = adapt "AddF" (cmAddF cm) show
 
-      showAddF = adapt "AddF" (csAddF cs) show
+      showMulF = adapt "MulF" (cmMulF cm) showMul
 
-      showMulF = adapt "MulF" (csMulF cs) showMul
-
-      showEqs = adapt "Eqs" (csEqZeros cs) $ \(poly, m) ->
+      showEqs = adapt "Eqs" (cmEqZeros cm) $ \(poly, m) ->
         "Eqs " <> show poly <> " / " <> show m
 
       showOccurrencesF =
-        if OccurF.null $ csOccurrenceF cs
+        if OccurF.null $ cmOccurrenceF cm
           then ""
-          else "  OccruencesF:\n  " <> indent (showList' (map (\(var, n) -> show (RefFX var) <> ": " <> show n) (OccurF.toList $ csOccurrenceF cs)))
+          else "  OccruencesF:\n  " <> indent (showList' (map (\(var, n) -> show (RefFX var) <> ": " <> show n) (OccurF.toList $ cmOccurrenceF cm)))
       showOccurrencesB =
-        if OccurB.null $ csOccurrenceB cs
+        if OccurB.null $ cmOccurrenceB cm
           then ""
-          else "  OccruencesB:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurB.toList $ csOccurrenceB cs)))
+          else "  OccruencesB:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurB.toList $ cmOccurrenceB cm)))
       showOccurrencesU =
-        if OccurU.null $ csOccurrenceU cs
+        if OccurU.null $ cmOccurrenceU cm
           then ""
-          else "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurU.toList $ csOccurrenceU cs)))
+          else "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurU.toList $ cmOccurrenceU cm)))
 
       showMul (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
@@ -223,13 +209,13 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
 
 -------------------------------------------------------------------------------
 
-relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
-relocateConstraintSystem cs =
+relocateConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> Relocated.RelocatedConstraintSystem n
+relocateConstraintModule cm =
   Relocated.RelocatedConstraintSystem
-    { Relocated.csField = csField cs,
+    { Relocated.csField = cmField cm,
       Relocated.csCounters = counters,
       Relocated.csBinReps = binReps,
-      Relocated.csBinReps' = map (Seq.fromList . map (first (reindexRefB counters))) (csBinReps cs),
+      Relocated.csBinReps' = map (Seq.fromList . map (first (reindexRefB counters))) (cmBinReps cm),
       Relocated.csConstraints =
         varEqFs
           <> varEqBs
@@ -241,12 +227,12 @@ relocateConstraintSystem cs =
       Relocated.csModInvs = modInvs
     }
   where
-    counters = csCounters cs
+    counters = cmCounters cm
     uncurry3 f (a, b, c) = f a b c
 
-    binReps = generateBinReps counters (csOccurrenceU cs)
+    binReps = generateBinReps counters (cmOccurrenceU cm)
 
-    occurences = constructOccurences cs
+    occurences = constructOccurences cm
 
     -- \| Generate BinReps from the UIntRelations
     generateBinReps :: Counters -> OccurU -> [BinRep]
@@ -266,7 +252,7 @@ relocateConstraintSystem cs =
         intermediateRefUsOccurredInBitTests =
           Set.fromList $
             concatMap (\(width, xs) -> map (width,) (IntSet.toList xs)) $
-              IntMap.toList (csBitTests cs)
+              IntMap.toList (cmBitTests cm)
 
         binRepsFromIntermediateRefUsOccurredInUAndF =
           Seq.fromList
@@ -324,7 +310,7 @@ relocateConstraintSystem cs =
             Nothing -> False
             Just xs -> IntSet.member var xs
         )
-          || ( case IntMap.lookup width (csBitTests cs) of
+          || ( case IntMap.lookup width (cmBitTests cm) of
                  Nothing -> False
                  Just xs -> IntSet.member var xs
              )
@@ -370,51 +356,51 @@ relocateConstraintSystem cs =
           result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
        in Seq.fromList (map (fromConstraint counters) result)
 
-    -- varEqFs = fromFieldRelations (csFieldRelations cs) (FieldRelations.exportUIntRelations (csFieldRelations cs)) (csOccurrenceF cs)
-    varEqFs = extractFieldRelations (csFieldRelations cs)
-    varEqUs = extractUIntRelations (FieldRelations.exportUIntRelations (csFieldRelations cs))
-    varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (csFieldRelations cs))
+    -- varEqFs = fromFieldRelations (cmFieldRelations cm) (FieldRelations.exportUIntRelations (cmFieldRelations cm)) (cmOccurrenceF cm)
+    varEqFs = extractFieldRelations (cmFieldRelations cm)
+    varEqUs = extractUIntRelations (FieldRelations.exportUIntRelations (cmFieldRelations cm))
+    varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (cmFieldRelations cm))
 
-    addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
-    mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
-    eqZeros = Seq.fromList $ map (bimap (fromPoly_ counters) (reindexRefF counters)) $ csEqZeros cs
+    addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ cmAddF cm
+    mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ cmMulF cm
+    eqZeros = Seq.fromList $ map (bimap (fromPoly_ counters) (reindexRefF counters)) $ cmEqZeros cm
 
-    divMods = map (\(a, b, q, r) -> (left (reindexRefU counters) a, left (reindexRefU counters) b, left (reindexRefU counters) q, left (reindexRefU counters) r)) $ csDivMods cs
-    modInvs = map (\(a, n, p) -> (left (reindexRefU counters) a, left (reindexRefU counters) n, p)) $ csModInvs cs
+    divMods = map (\(a, b, q, r) -> (left (reindexRefU counters) a, left (reindexRefU counters) b, left (reindexRefU counters) q, left (reindexRefU counters) r)) $ cmDivMods cm
+    modInvs = map (\(a, n, p) -> (left (reindexRefU counters) a, left (reindexRefU counters) n, p)) $ cmModInvs cm
 
 -- | TODO: revisit this
-sizeOfConstraintSystem :: ConstraintSystem n -> Int
-sizeOfConstraintSystem cs =
-  FieldRelations.size (csFieldRelations cs)
-    + BooleanRelations.size (FieldRelations.exportBooleanRelations (csFieldRelations cs))
-    + UIntRelations.size (FieldRelations.exportUIntRelations (csFieldRelations cs))
-    + length (csAddF cs)
-    + length (csMulF cs)
-    + length (csEqZeros cs)
+sizeOfConstraintModule :: ConstraintModule n -> Int
+sizeOfConstraintModule cm =
+  FieldRelations.size (cmFieldRelations cm)
+    + BooleanRelations.size (FieldRelations.exportBooleanRelations (cmFieldRelations cm))
+    + UIntRelations.size (FieldRelations.exportUIntRelations (cmFieldRelations cm))
+    + length (cmAddF cm)
+    + length (cmMulF cm)
+    + length (cmEqZeros cm)
 
 class UpdateOccurrences ref where
-  addOccurrences :: Set ref -> ConstraintSystem n -> ConstraintSystem n
-  removeOccurrences :: Set ref -> ConstraintSystem n -> ConstraintSystem n
+  addOccurrences :: Set ref -> ConstraintModule n -> ConstraintModule n
+  removeOccurrences :: Set ref -> ConstraintModule n -> ConstraintModule n
 
 instance UpdateOccurrences Ref where
   addOccurrences =
     flip
       ( foldl
-          ( \cs ref ->
+          ( \cm ref ->
               case ref of
-                F refF -> addOccurrences (Set.singleton refF) cs
-                B refB -> addOccurrences (Set.singleton refB) cs
-                U refU -> addOccurrences (Set.singleton refU) cs
+                F refF -> addOccurrences (Set.singleton refF) cm
+                B refB -> addOccurrences (Set.singleton refB) cm
+                U refU -> addOccurrences (Set.singleton refU) cm
           )
       )
   removeOccurrences =
     flip
       ( foldl
-          ( \cs ref ->
+          ( \cm ref ->
               case ref of
-                F refF -> removeOccurrences (Set.singleton refF) cs
-                B refB -> removeOccurrences (Set.singleton refB) cs
-                U refU -> removeOccurrences (Set.singleton refU) cs
+                F refF -> removeOccurrences (Set.singleton refF) cm
+                B refB -> removeOccurrences (Set.singleton refB) cm
+                U refU -> removeOccurrences (Set.singleton refU) cm
           )
       )
 
@@ -422,25 +408,25 @@ instance UpdateOccurrences RefF where
   addOccurrences =
     flip
       ( foldl
-          ( \cs ref ->
+          ( \cm ref ->
               case ref of
                 RefFX var ->
-                  cs
-                    { csOccurrenceF = OccurF.increase var (csOccurrenceF cs)
+                  cm
+                    { cmOccurrenceF = OccurF.increase var (cmOccurrenceF cm)
                     }
-                _ -> cs
+                _ -> cm
           )
       )
   removeOccurrences =
     flip
       ( foldl
-          ( \cs ref ->
+          ( \cm ref ->
               case ref of
                 RefFX var ->
-                  cs
-                    { csOccurrenceF = OccurF.decrease var (csOccurrenceF cs)
+                  cm
+                    { cmOccurrenceF = OccurF.decrease var (cmOccurrenceF cm)
                     }
-                _ -> cs
+                _ -> cm
           )
       )
 
@@ -448,33 +434,33 @@ instance UpdateOccurrences RefB where
   addOccurrences =
     flip
       ( foldl
-          ( \cs ref ->
+          ( \cm ref ->
               case ref of
                 RefUBit _ (RefUX width var) _ ->
-                  cs
-                    { csOccurrenceU = OccurU.increase width var (csOccurrenceU cs)
+                  cm
+                    { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm)
                     }
                 RefBX var ->
-                  cs
-                    { csOccurrenceB = OccurB.increase var (csOccurrenceB cs)
+                  cm
+                    { cmOccurrenceB = OccurB.increase var (cmOccurrenceB cm)
                     }
-                _ -> cs
+                _ -> cm
           )
       )
   removeOccurrences =
     flip
       ( foldl
-          ( \cs ref ->
+          ( \cm ref ->
               case ref of
                 RefUBit _ (RefUX width var) _ ->
-                  cs
-                    { csOccurrenceU = OccurU.decrease width var (csOccurrenceU cs)
+                  cm
+                    { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm)
                     }
                 RefBX var ->
-                  cs
-                    { csOccurrenceB = OccurB.decrease var (csOccurrenceB cs)
+                  cm
+                    { cmOccurrenceB = OccurB.decrease var (cmOccurrenceB cm)
                     }
-                _ -> cs
+                _ -> cm
           )
       )
 
@@ -482,25 +468,25 @@ instance UpdateOccurrences RefU where
   addOccurrences =
     flip
       ( foldl
-          ( \cs ref ->
+          ( \cm ref ->
               case ref of
                 RefUX width var ->
-                  cs
-                    { csOccurrenceU = OccurU.increase width var (csOccurrenceU cs)
+                  cm
+                    { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm)
                     }
-                _ -> cs
+                _ -> cm
           )
       )
   removeOccurrences =
     flip
       ( foldl
-          ( \cs ref ->
+          ( \cm ref ->
               case ref of
                 RefUX width var ->
-                  cs
-                    { csOccurrenceU = OccurU.decrease width var (csOccurrenceU cs)
+                  cm
+                    { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm)
                     }
-                _ -> cs
+                _ -> cm
           )
       )
 
@@ -514,10 +500,10 @@ data Occurences = Occurences
   }
 
 -- | Smart constructor for 'Occurences'
-constructOccurences :: ConstraintSystem n -> Occurences
-constructOccurences cs =
+constructOccurences :: ConstraintModule n -> Occurences
+constructOccurences cm =
   Occurences
-    { refFsInOccurrencesF = OccurF.occuredSet (csOccurrenceF cs),
-      refBsInOccurrencesB = OccurB.occuredSet (csOccurrenceB cs),
-      refUsInOccurrencesU = OccurU.occuredSet (csOccurrenceU cs)
+    { refFsInOccurrencesF = OccurF.occuredSet (cmOccurrenceF cm),
+      refBsInOccurrencesB = OccurB.occuredSet (cmOccurrenceB cm),
+      refUsInOccurrencesU = OccurU.occuredSet (cmOccurrenceU cm)
     }

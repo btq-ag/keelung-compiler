@@ -9,7 +9,7 @@ import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compileO0)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
+import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Test.Hspec
 import Test.Optimization.UInt qualified as Optimization.UInt
 import Test.Optimization.Util
@@ -134,7 +134,7 @@ tests = do
 --           x <- inputUInt Public :: Comp (UInt 4)
 --           return $ rotate x 1
 --         -- print _cs
---         -- print $ relocateConstraintSystem _cs
+--         -- print $ relocateConstraintModule _cs
 --         return ()
 
 --       it "add 1" $ do
@@ -152,7 +152,7 @@ tests = do
 -- --     w <- reuse $ x + y
 -- --     return $ x + y + z + w
 -- --   -- print _cs
--- --   -- print $ relocateConstraintSystem _cs
+-- --   -- print $ relocateConstraintModule _cs
 -- --   return ()
 
 -- -- it "UInt 1" $ do
@@ -162,7 +162,7 @@ tests = do
 -- --     -- z <- reuse x
 -- --     return (x + y)
 -- --   print _cs
--- --   print $ relocateConstraintSystem _cs
+-- --   print $ relocateConstraintModule _cs
 -- --   return ()
 
 -- -- it "Boolean 2" $ do
@@ -171,5 +171,5 @@ tests = do
 -- --     return (x `eq` 100 .|. x `eq` 200 .|. x `eq` 300)
 
 -- --   print _cs
--- --   print $ relocateConstraintSystem _cs
+-- --   print $ relocateConstraintModule _cs
 -- --   return ()

@@ -23,7 +23,7 @@ import Keelung.Compiler
     interpretElab,
     toR1CS,
   )
-import Keelung.Compiler.ConstraintSystem qualified as Relocated
+import Keelung.Compiler.ConstraintModule qualified as Relocated
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Field
 import Keelung.Syntax.Counters
@@ -124,8 +124,8 @@ main = withUtf8 $ do
           adapter
             outputCircuit
             outputCircuit
-            (\fieldInfo -> left show $ toR1CS . Relocated.relocateConstraintSystem <$> compileO0Elab fieldInfo elaborated)
-            (\fieldInfo -> left show $ toR1CS . Relocated.relocateConstraintSystem <$> compileO0Elab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS . Relocated.relocateConstraintModule <$> compileO0Elab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS . Relocated.relocateConstraintModule <$> compileO0Elab fieldInfo elaborated)
             fieldType
     Protocol CompileO1 -> do
       blob <- getContents

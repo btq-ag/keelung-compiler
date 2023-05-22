@@ -10,7 +10,7 @@ import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.ConstraintSystem
+import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
@@ -26,54 +26,54 @@ import Keelung.Syntax.Counters
 --------------------------------------------------------------------------------
 
 -- | Monad for compilation
-type M n = StateT (ConstraintSystem n) (Except (Error n))
+type M n = StateT (ConstraintModule n) (Except (Error n))
 
-runM :: GaloisField n => (FieldType, Integer, Integer) -> Counters -> M n a -> Either (Error n) (ConstraintSystem n)
+runM :: GaloisField n => (FieldType, Integer, Integer) -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
 runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintSystem fieldInfo counters OccurF.new (OccurB.new False) OccurU.new mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
-modifyCounter f = modify (\cs -> cs {csCounters = f (csCounters cs)})
+modifyCounter f = modify (\cs -> cs {cmCounters = f (cmCounters cs)})
 
 freshRefF :: M n RefF
 freshRefF = do
-  counters <- gets csCounters
+  counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadField)
   modifyCounter $ addCount (Intermediate, WriteField) 1
   return $ RefFX index
 
 freshRefForU :: Ref -> M n Ref
 freshRefForU (F _) = do
-  counters <- gets csCounters
+  counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadField)
   modifyCounter $ addCount (Intermediate, WriteField) 1
   return $ F $ RefFX index
 freshRefForU (B _) = do
-  counters <- gets csCounters
+  counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadBool)
   modifyCounter $ addCount (Intermediate, WriteBool) 1
   return $ B $ RefBX index
 freshRefForU (U ref) = do
   let width = widthOf ref
-  counters <- gets csCounters
+  counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadUInt width)
   modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ U $ RefUX width index
 
 freshRefB :: M n RefB
 freshRefB = do
-  counters <- gets csCounters
+  counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadBool)
   modifyCounter $ addCount (Intermediate, WriteBool) 1
   return $ RefBX index
 
 freshRefU :: Width -> M n RefU
 freshRefU width = do
-  counters <- gets csCounters
+  counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadUInt width)
   modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ RefUX width index
@@ -134,18 +134,18 @@ addC = mapM_ addOne
     execRelations :: (AllRelations n -> EquivClass.M (Error n) (AllRelations n)) -> M n ()
     execRelations f = do
       cs <- get
-      result <- lift $ (EquivClass.runM . f) (csFieldRelations cs)
+      result <- lift $ (EquivClass.runM . f) (cmFieldRelations cs)
       case result of
         Nothing -> return ()
-        Just relations -> put cs {csFieldRelations = relations}
+        Just relations -> put cs {cmFieldRelations = relations}
 
     addBitTestOccurrences :: (GaloisField n, Integral n) => Ref -> M n ()
     addBitTestOccurrences (B (RefUBit _ (RefUX width var) _)) = do
-      modify' (\cs -> cs {csBitTests = IntMap.insertWith (<>) width (IntSet.singleton var) (csBitTests cs)})
+      modify' (\cs -> cs {cmBitTests = IntMap.insertWith (<>) width (IntSet.singleton var) (cmBitTests cs)})
     addBitTestOccurrences _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
-    addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {csAddF = xs : csAddF cs})
+    addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
     addOne (CVarBindF x c) = do
       execRelations $ AllRelations.assignF x c
     addOne (CVarBindB x c) = do
@@ -169,8 +169,8 @@ addC = mapM_ addOne
       execRelations $ AllRelations.relateB x (False, y)
     addOne (CVarEqU x y) = do
       execRelations $ AllRelations.assertEqualU x y
-    addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {csMulF = (x, y, Left c) : csMulF cs})
-    addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {csMulF = (x, y, Right z) : csMulF cs})
+    addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {cmMulF = (x, y, Left c) : cmMulF cs})
+    addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {cmMulF = (x, y, Right z) : cmMulF cs})
 
 --------------------------------------------------------------------------------
 
@@ -216,21 +216,21 @@ addEqZeroHint :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> RefF -> M n (
 addEqZeroHint c xs m = case PolyG.build c xs of
   Left 0 -> writeValF m 0
   Left constant -> writeValF m (recip constant)
-  Right poly -> modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
+  Right poly -> modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
 addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> RefF -> M n ()
 addEqZeroHintWithPoly (Left 0) m = writeValF m 0
 addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
-addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {csEqZeros = (poly, m) : csEqZeros cs}
+addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
 addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
-addDivModHint x y q r = modify' $ \cs -> cs {csDivMods = (Left x, Left y, Left q, Left r) : csDivMods cs}
+addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (Left x, Left y, Left q, Left r) : cmDivMods cs}
 
 addModInvHint :: (GaloisField n, Integral n) => RefU -> RefU -> Integer -> M n ()
-addModInvHint x n p = modify' $ \cs -> cs {csModInvs = (Left x, Left n, p) : csModInvs cs}
+addModInvHint x n p = modify' $ \cs -> cs {cmModInvs = (Left x, Left n, p) : cmModInvs cs}
 
 addBinRepHint :: (GaloisField n, Integral n) => [(RefB, Int)] -> M n ()
-addBinRepHint segments = modify' $ \cs -> cs {csBinReps = segments : csBinReps cs}
+addBinRepHint segments = modify' $ \cs -> cs {cmBinReps = segments : cmBinReps cs}
 
 addBooleanConstraint :: (GaloisField n, Integral n) => RefB -> M n ()
 addBooleanConstraint x = writeMulWithLC (1 @ B x) (1 @ B x) (1 @ B x)
