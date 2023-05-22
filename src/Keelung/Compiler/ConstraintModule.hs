@@ -1,29 +1,21 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections #-}
 
 module Keelung.Compiler.ConstraintModule
   ( ConstraintModule (..),
-    relocateConstraintModule,
     sizeOfConstraintModule,
     UpdateOccurrences (..),
   )
 where
 
-import Control.Arrow (first, left)
 import Control.DeepSeq (NFData)
-import Data.Bifunctor (bimap)
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Map.Strict qualified as Map
-import Data.Maybe (mapMaybe)
-import Data.Sequence (Seq)
-import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
@@ -34,23 +26,17 @@ import Keelung.Compiler.Optimize.OccurF (OccurF)
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
-import Keelung.Compiler.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (AllRelations)
-import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
-import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Util (indent)
-import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
-import Keelung.Compiler.ConstraintSystem (ConstraintSystem(..))
-import qualified Keelung.Compiler.ConstraintSystem as Linked
 
 --------------------------------------------------------------------------------
 
@@ -209,166 +195,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
                   <> "\n"
 
 -------------------------------------------------------------------------------
-
-relocateConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintSystem n
-relocateConstraintModule cm =
-  ConstraintSystem
-    { csField = cmField cm,
-      csCounters = counters,
-      csBinReps = binReps,
-      csBinReps' = map (Seq.fromList . map (first (reindexRefB counters))) (cmBinReps cm),
-      csConstraints =
-        varEqFs
-          <> varEqBs
-          <> varEqUs
-          <> addFs
-          <> mulFs,
-      csEqZeros = toList eqZeros,
-      csDivMods = divMods,
-      csModInvs = modInvs
-    }
-  where
-    counters = cmCounters cm
-    uncurry3 f (a, b, c) = f a b c
-
-    binReps = generateBinReps counters (cmOccurrenceU cm)
-
-    occurences = constructOccurences cm
-
-    -- \| Generate BinReps from the UIntRelations
-    generateBinReps :: Counters -> OccurU -> [BinRep]
-    generateBinReps (Counters o i1 i2 _ _ _ _) occurrencesU =
-      toList $
-        fromSmallCounter Output o
-          <> fromSmallCounter PublicInput i1
-          <> fromSmallCounter PrivateInput i2
-          <> binRepsFromIntermediateRefUsOccurredInUAndF
-      where
-        intermediateRefUsOccurredInU =
-          Set.fromList $
-            concatMap
-              (\(width, xs) -> mapMaybe (\(var, count) -> if count > 0 then Just (width, var) else Nothing) (IntMap.toList xs))
-              (OccurU.toList occurrencesU)
-
-        intermediateRefUsOccurredInBitTests =
-          Set.fromList $
-            concatMap (\(width, xs) -> map (width,) (IntSet.toList xs)) $
-              IntMap.toList (cmBitTests cm)
-
-        binRepsFromIntermediateRefUsOccurredInUAndF =
-          Seq.fromList
-            $ map
-              ( \(width, var) ->
-                  let varOffset = reindex counters Intermediate (ReadUInt width) var
-                      binRepOffset = reindex counters Intermediate (ReadBits width) var
-                   in BinRep varOffset width binRepOffset
-              )
-            $ Set.toList (intermediateRefUsOccurredInU <> intermediateRefUsOccurredInBitTests)
-
-        -- fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
-        fromSmallCounter sort (Struct _ _ u) = Seq.fromList $ concatMap (fromPair sort) (IntMap.toList u)
-
-        -- fromPair :: VarSort -> (Width, Int) -> [BinRep]
-        fromPair sort (width, count) =
-          let varOffset = reindex counters sort (ReadUInt width) 0
-              binRepOffset = reindex counters sort (ReadBits width) 0
-           in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
-
-    extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Linked.Constraint n)
-    extractFieldRelations relations =
-      let convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Constraint n
-          convert (var, Right val) = CVarBindF var val
-          convert (var, Left (slope, root, intercept)) =
-            case (slope, intercept) of
-              (0, _) -> CVarBindF var intercept
-              (1, 0) -> CVarEq var root
-              (_, _) -> case PolyG.build intercept [(var, -1), (root, slope)] of
-                Left _ -> error "[ panic ] extractFieldRelations: failed to build polynomial"
-                Right poly -> CAddF poly
-
-          result = map convert $ Map.toList $ AllRelations.toInt shouldBeKept relations
-       in Seq.fromList (map (fromConstraint counters) result)
-
-    shouldBeKept :: Ref -> Bool
-    shouldBeKept (F ref) = refFShouldBeKept ref
-    shouldBeKept (B ref) = refBShouldBeKept ref
-    shouldBeKept (U ref) = refUShouldBeKept ref
-
-    refFShouldBeKept :: RefF -> Bool
-    refFShouldBeKept ref = case ref of
-      RefFX var ->
-        -- it's a Field intermediate variable that occurs in the circuit
-        var `IntSet.member` refFsInOccurrencesF occurences
-      _ ->
-        -- it's a pinned Field variable
-        True
-
-    refUShouldBeKept :: RefU -> Bool
-    refUShouldBeKept ref = case ref of
-      RefUX width var ->
-        -- it's a UInt intermediate variable that occurs in the circuit
-        ( case IntMap.lookup width (refUsInOccurrencesU occurences) of
-            Nothing -> False
-            Just xs -> IntSet.member var xs
-        )
-          || ( case IntMap.lookup width (cmBitTests cm) of
-                 Nothing -> False
-                 Just xs -> IntSet.member var xs
-             )
-      _ ->
-        -- it's a pinned UInt variable
-        True
-
-    refBShouldBeKept :: RefB -> Bool
-    refBShouldBeKept ref = case ref of
-      RefBX var ->
-        --  it's a Boolean intermediate variable that occurs in the circuit
-        var `IntSet.member` refBsInOccurrencesB occurences
-      -- \|| RefBX var `Set.member` refBsInOccurrencesF occurences
-      RefUBit _ var _ ->
-        --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
-        --  the UInt variable should be kept
-        shouldBeKept (U var)
-      _ ->
-        -- it's a pinned Field variable
-        True
-
-    extractBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Seq (Linked.Constraint n)
-    extractBooleanRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Constraint n
-          convert (var, Right val) = CVarBindB var val
-          convert (var, Left (dontFlip, root)) =
-            if dontFlip
-              then CVarEqB var root
-              else CVarNEqB var root
-
-          result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
-       in Seq.fromList (map (fromConstraint counters) result)
-
-    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Seq (Linked.Constraint n)
-    extractUIntRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefU, Either (Int, RefU) n) -> Constraint n
-          convert (var, Right val) = CVarBindU var val
-          convert (var, Left (rotation, root)) =
-            if rotation == 0
-              then CVarEqU var root
-              else error "[ panic ] Unexpected rotation in extractUIntRelations"
-
-          result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
-       in Seq.fromList (map (fromConstraint counters) result)
-
-    -- varEqFs = fromFieldRelations (cmFieldRelations cm) (FieldRelations.exportUIntRelations (cmFieldRelations cm)) (cmOccurrenceF cm)
-    varEqFs = extractFieldRelations (cmFieldRelations cm)
-    varEqUs = extractUIntRelations (FieldRelations.exportUIntRelations (cmFieldRelations cm))
-    varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (cmFieldRelations cm))
-
-    addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ cmAddF cm
-    mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ cmMulF cm
-    eqZeros = Seq.fromList $ map (bimap (fromPoly_ counters) (reindexRefF counters)) $ cmEqZeros cm
-
-    divMods = map (\(a, b, q, r) -> (left (reindexRefU counters) a, left (reindexRefU counters) b, left (reindexRefU counters) q, left (reindexRefU counters) r)) $ cmDivMods cm
-    modInvs = map (\(a, n, p) -> (left (reindexRefU counters) a, left (reindexRefU counters) n, p)) $ cmModInvs cm
-
 -- | TODO: revisit this
 sizeOfConstraintModule :: ConstraintModule n -> Int
 sizeOfConstraintModule cm =
@@ -490,21 +316,3 @@ instance UpdateOccurrences RefU where
                 _ -> cm
           )
       )
-
--------------------------------------------------------------------------------
-
--- | Allow us to determine which relations should be extracted from the pool
-data Occurences = Occurences
-  { refFsInOccurrencesF :: !IntSet,
-    refBsInOccurrencesB :: !IntSet,
-    refUsInOccurrencesU :: !(IntMap IntSet)
-  }
-
--- | Smart constructor for 'Occurences'
-constructOccurences :: ConstraintModule n -> Occurences
-constructOccurences cm =
-  Occurences
-    { refFsInOccurrencesF = OccurF.occuredSet (cmOccurrenceF cm),
-      refBsInOccurrencesB = OccurB.occuredSet (cmOccurrenceB cm),
-      refUsInOccurrencesU = OccurU.occuredSet (cmOccurrenceU cm)
-    }

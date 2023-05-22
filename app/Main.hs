@@ -23,13 +23,13 @@ import Keelung.Compiler
     interpretElab,
     toR1CS,
   )
-import Keelung.Compiler.ConstraintModule qualified as Relocated
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Field
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
 import Option
+import qualified Keelung.Compiler.Linker as Linker
 
 type Result n = Either String (R1CS n)
 
@@ -124,8 +124,8 @@ main = withUtf8 $ do
           adapter
             outputCircuit
             outputCircuit
-            (\fieldInfo -> left show $ toR1CS . Relocated.relocateConstraintModule <$> compileO0Elab fieldInfo elaborated)
-            (\fieldInfo -> left show $ toR1CS . Relocated.relocateConstraintModule <$> compileO0Elab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS . Linker.linkConstraintModule <$> compileO0Elab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS . Linker.linkConstraintModule <$> compileO0Elab fieldInfo elaborated)
             fieldType
     Protocol CompileO1 -> do
       blob <- getContents

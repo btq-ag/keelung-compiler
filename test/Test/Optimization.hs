@@ -134,7 +134,7 @@ tests = do
 --           x <- inputUInt Public :: Comp (UInt 4)
 --           return $ rotate x 1
 --         -- print _cm
---         -- print $ relocateConstraintModule _cm
+--         -- print $ linkConstraintModule _cm
 --         return ()
 
 --       it "add 1" $ do
@@ -152,7 +152,7 @@ tests = do
 -- --     w <- reuse $ x + y
 -- --     return $ x + y + z + w
 -- --   -- print _cm
--- --   -- print $ relocateConstraintModule _cm
+-- --   -- print $ linkConstraintModule _cm
 -- --   return ()
 
 -- -- it "UInt 1" $ do
@@ -162,7 +162,7 @@ tests = do
 -- --     -- z <- reuse x
 -- --     return (x + y)
 -- --   print _cm
--- --   print $ relocateConstraintModule _cm
+-- --   print $ linkConstraintModule _cm
 -- --   return ()
 
 -- -- it "Boolean 2" $ do
@@ -171,5 +171,5 @@ tests = do
 -- --     return (x `eq` 100 .|. x `eq` 200 .|. x `eq` 300)
 
 -- --   print _cm
--- --   print $ relocateConstraintModule _cm
+-- --   print $ linkConstraintModule _cm
 -- --   return ()

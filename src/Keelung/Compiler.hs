@@ -48,7 +48,7 @@ import Data.Vector (Vector)
 import Keelung (Encode, N (..))
 import Keelung qualified as Lang
 import Keelung.Compiler.Compile qualified as Compile
-import Keelung.Compiler.ConstraintModule (ConstraintModule, relocateConstraintModule)
+import Keelung.Compiler.ConstraintModule (ConstraintModule)
 import Keelung.Compiler.Error
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
@@ -66,6 +66,7 @@ import Keelung.Monad (Comp)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax (Elaborated)
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
+import qualified Keelung.Compiler.Linker as Linker
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
@@ -94,7 +95,7 @@ convertToInternal prog = ToInternal.run <$> elaborateAndEncode prog
 
 -- elaborate => rewrite => to internal syntax => compile => relocate
 compileWithoutConstProp :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> Either (Error n) (ConstraintSystem n)
-compileWithoutConstProp fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . relocateConstraintModule
+compileWithoutConstProp fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . Linker.linkConstraintModule
 
 -- elaborate => rewrite => to internal syntax => constant propagation => compile => relocate
 compileO0 :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> Either (Error n) (ConstraintModule n)
@@ -145,7 +146,7 @@ compileO0Elab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) ->
 compileO0Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run
 
 compileO1Elab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> Either (Error n) (ConstraintSystem n)
-compileO1Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run >=> left CompileError . Optimizer.run >=> return . renumberConstraints . relocateConstraintModule
+compileO1Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run >=> left CompileError . Optimizer.run >=> return . renumberConstraints . Linker.linkConstraintModule
 
 --------------------------------------------------------------------------------
 

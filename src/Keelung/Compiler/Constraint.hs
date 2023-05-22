@@ -8,67 +8,19 @@ module Keelung.Compiler.Constraint
     RefF (..),
     RefB (..),
     RefU (..),
-    reindexRef,
-    reindexRefF,
-    reindexRefB,
-    reindexRefU,
     Constraint (..),
     pinnedRef,
     pinnedRefB,
     pinnedRefU,
-    fromConstraint,
-    fromPoly_,
   )
 where
 
 import Control.DeepSeq (NFData)
-import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
-import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
-import Keelung.Compiler.ConstraintSystem qualified as Linked
 import Keelung.Data.PolyG (PolyG)
-import Keelung.Data.PolyG qualified as PolyG
-import Keelung.Data.Polynomial (Poly)
-import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.VarGroup (toSubscript)
 import Keelung.Syntax
-import Keelung.Syntax.Counters
-
-fromConstraint :: (GaloisField n, Integral n) => Counters -> Constraint n -> Linked.Constraint n
-fromConstraint counters (CAddF as) = Linked.CAdd (fromPoly_ counters as)
-fromConstraint counters (CVarEq x y) =
-  case Poly.buildEither 0 [(reindexRef counters x, 1), (reindexRef counters y, -1)] of
-    Left _ -> error "CVarEq: two variables are the same"
-    Right xs -> Linked.CAdd xs
-fromConstraint counters (CVarEqF x y) =
-  case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
-    Left _ -> error "CVarEqF: two variables are the same"
-    Right xs -> Linked.CAdd xs
-fromConstraint counters (CVarEqB x y) =
-  case Poly.buildEither 0 [(reindexRefB counters x, 1), (reindexRefB counters y, -1)] of
-    Left _ -> error $ "CVarEqB: two variables are the same" ++ show x ++ " " ++ show y
-    Right xs -> Linked.CAdd xs
-fromConstraint counters (CVarNEqB x y) =
-  case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
-    Left _ -> error "CVarNEqB: two variables are the same"
-    Right xs -> Linked.CAdd xs
-fromConstraint counters (CVarEqU x y) =
-  case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
-    Left _ -> error "CVarEqU: two variables are the same"
-    Right xs -> Linked.CAdd xs
-fromConstraint counters (CVarBindF x n) = Linked.CAdd (Poly.bind (reindexRef counters x) n)
-fromConstraint counters (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB counters x) 1)
-fromConstraint counters (CVarBindB x False) = Linked.CAdd (Poly.bind (reindexRefB counters x) 0)
-fromConstraint counters (CVarBindU x n) = Linked.CAdd (Poly.bind (reindexRefU counters x) n)
-fromConstraint counters (CMulF as bs cs) =
-  Linked.CMul
-    (fromPoly_ counters as)
-    (fromPoly_ counters bs)
-    ( case cs of
-        Left n -> Left n
-        Right xs -> fromPoly counters xs
-    )
 
 --------------------------------------------------------------------------------
 
@@ -176,50 +128,6 @@ pinnedRefU (RefUI _ _) = True
 pinnedRefU (RefUP _ _) = True
 pinnedRefU (RefUO _ _) = True
 pinnedRefU (RefUX _ _) = False
-
---------------------------------------------------------------------------------
-
-reindexRef :: Counters -> Ref -> Var
-reindexRef counters (F x) = reindexRefF counters x
-reindexRef counters (B x) = reindexRefB counters x
-reindexRef counters (U x) = reindexRefU counters x
-
-reindexRefF :: Counters -> RefF -> Var
-reindexRefF counters (RefFO x) = reindex counters Output ReadField x
-reindexRefF counters (RefFI x) = reindex counters PublicInput ReadField x
-reindexRefF counters (RefFP x) = reindex counters PrivateInput ReadField x
-reindexRefF counters (RefFX x) = reindex counters Intermediate ReadField x
-
-reindexRefB :: Counters -> RefB -> Var
-reindexRefB counters (RefBO x) = reindex counters Output ReadBool x
-reindexRefB counters (RefBI x) = reindex counters PublicInput ReadBool x
-reindexRefB counters (RefBP x) = reindex counters PrivateInput ReadBool x
-reindexRefB counters (RefBX x) = reindex counters Intermediate ReadBool x
-reindexRefB counters (RefUBit _ x i) =
-  case x of
-    RefUO w x' -> reindex counters Output (ReadBits w) x' + (i `mod` w)
-    RefUI w x' -> reindex counters PublicInput (ReadBits w) x' + (i `mod` w)
-    RefUP w x' -> reindex counters PrivateInput (ReadBits w) x' + (i `mod` w)
-    RefUX w x' -> reindex counters Intermediate (ReadBits w) x' + (i `mod` w)
-
-reindexRefU :: Counters -> RefU -> Var
-reindexRefU counters (RefUO w x) = reindex counters Output (ReadUInt w) x
-reindexRefU counters (RefUI w x) = reindex counters PublicInput (ReadUInt w) x
-reindexRefU counters (RefUP w x) = reindex counters PrivateInput (ReadUInt w) x
-reindexRefU counters (RefUX w x) = reindex counters Intermediate (ReadUInt w) x
-
---------------------------------------------------------------------------------
-
-fromPoly :: (Integral n, GaloisField n) => Counters -> PolyG Ref n -> Either n (Poly n)
-fromPoly counters poly = case PolyG.view poly of
-  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRef counters var, coeff)]
-  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRef counters var1, coeff1), (reindexRef counters var2, coeff2)]
-  PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRef counters)) (Map.toList xs))
-
-fromPoly_ :: (Integral n, GaloisField n) => Counters -> PolyG Ref n -> Poly n
-fromPoly_ counters xs = case fromPoly counters xs of
-  Left _ -> error "[ panic ] fromPoly_: Left"
-  Right p -> p
 
 --------------------------------------------------------------------------------
 

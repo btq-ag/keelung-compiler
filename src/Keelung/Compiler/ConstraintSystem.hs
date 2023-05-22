@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# OPTIONS_GHC -Wno-type-defaults #-}
 
 module Keelung.Compiler.ConstraintSystem where
 

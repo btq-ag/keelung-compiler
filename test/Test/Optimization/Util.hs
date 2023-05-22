@@ -2,12 +2,13 @@ module Test.Optimization.Util (debug, execute, shouldHaveSize) where
 
 import Keelung hiding (compileO0)
 import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.ConstraintModule (ConstraintModule (..), relocateConstraintModule)
+import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.ConstraintSystem qualified as ConstraintSystem
 import Test.HUnit (assertFailure)
 import Test.Hspec
 import Test.Interpreter.Util (gf181Info)
+import qualified Keelung.Compiler.Linker as Linker
 
 --------------------------------------------------------------------------------
 
@@ -28,10 +29,10 @@ execute program = do
 shouldHaveSize :: ConstraintModule (N GF181) -> Int -> IO ()
 shouldHaveSize cm expectedBeforeSize = do
   -- compare the number of constraints
-  let actualBeforeSize = ConstraintSystem.numberOfConstraints (relocateConstraintModule cm)
+  let actualBeforeSize = ConstraintSystem.numberOfConstraints (Linker.linkConstraintModule cm)
   actualBeforeSize `shouldBe` expectedBeforeSize
 
 debug :: ConstraintModule (N GF181) -> IO ()
 debug cm = do
   print cm
-  print (relocateConstraintModule cm)
+  print (Linker.linkConstraintModule cm)

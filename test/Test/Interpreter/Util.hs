@@ -6,8 +6,8 @@ import Data.Proxy (Proxy (..), asProxyTypeOf)
 import Keelung hiding (compile)
 import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.ConstraintModule qualified as CS
 import Keelung.Compiler.ConstraintSystem qualified as CS
+import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Interpreter.Error qualified as Interpreter
@@ -37,7 +37,7 @@ interpretR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
 -- | constraint system interpreters (unoptimized)
 interpretR1CSUnoptimized :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Either (Error n) [n]
 interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS . CS.relocateConstraintModule <$> Compiler.compileO0 fieldInfo prog
+  r1cs <- toR1CS . Linker.linkConstraintModule <$> Compiler.compileO0 fieldInfo prog
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case R1CS.run r1cs inputs of
     Left err -> Left (InterpretError $ Interpreter.R1CSError err)
@@ -94,7 +94,7 @@ runAndCompare fieldInfo program rawPublicInputs rawPrivateInputs = do
 debug :: Encode t => Comp t -> IO ()
 debug program = do
   print $ Compiler.asGF181N $ Compiler.compileO0 gf181Info program
-  print (Compiler.asGF181N $ toR1CS . CS.relocateConstraintModule <$> Compiler.compileO0 gf181Info program)
+  print (Compiler.asGF181N $ toR1CS . Linker.linkConstraintModule <$> Compiler.compileO0 gf181Info program)
   -- print $ Compiler.asGF181N $ Compiler.compileO1 program
   print $ Compiler.asGF181N $ Compiler.compileToModules gf181Info program
   print (Compiler.asGF181N $ toR1CS <$> Compiler.compileO1 gf181Info program)
@@ -104,7 +104,7 @@ assertSize afterSize program = do
   -- case Compiler.asGF181N (Compiler.compileO0 program) of
   --   Left err -> print err
   --   Right cs -> do
-  --     CS.numberOfConstraints (relocateConstraintModule cs) `shouldBe` beforeSize
+  --     CS.numberOfConstraints (linkConstraintModule cs) `shouldBe` beforeSize
   case Compiler.asGF181N (Compiler.compileO1 gf181Info program) of
     Left err -> print err
     Right cs -> do
