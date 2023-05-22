@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-
 module Keelung.Compiler.Linker (linkConstraintModule, renumberConstraints) where
 
 import Control.Arrow (left)
@@ -14,7 +12,6 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Data.Set qualified as Set
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
@@ -76,28 +73,23 @@ linkConstraintModule cm =
         fromSmallCounter Output o
           <> fromSmallCounter PublicInput i1
           <> fromSmallCounter PrivateInput i2
-          <> binRepsFromIntermediateRefUsOccurredInUAndF
+          <> intermediateBinReps
       where
-        intermediateRefUsOccurredInU =
-          Set.fromList $
+        intermediateBinReps =
+          Seq.fromList $
             concatMap
-              (\(width, xs) -> mapMaybe (\(var, count) -> if count > 0 then Just (width, var) else Nothing) (IntMap.toList xs))
-              (OccurU.toList occurrencesU)
-
-        intermediateRefUsOccurredInBitTests =
-          Set.fromList $
-            concatMap (\(width, xs) -> map (width,) (IntSet.toList xs)) $
-              IntMap.toList (cmBitTests cm)
-
-        binRepsFromIntermediateRefUsOccurredInUAndF =
-          Seq.fromList
-            $ map
-              ( \(width, var) ->
-                  let varOffset = reindex counters Intermediate (ReadUInt width) var
-                      binRepOffset = reindex counters Intermediate (ReadBits width) var
-                   in BinRep varOffset width binRepOffset
+              ( \(width, xs) ->
+                  mapMaybe
+                    ( \(var, count) ->
+                        let varOffset = reindex counters Intermediate (ReadUInt width) var
+                            binRepOffset = reindex counters Intermediate (ReadBits width) var
+                         in if count > 0
+                              then Just (BinRep varOffset width binRepOffset)
+                              else Nothing
+                    )
+                    (IntMap.toList xs)
               )
-            $ Set.toList (intermediateRefUsOccurredInU <> intermediateRefUsOccurredInBitTests)
+              (OccurU.toList occurrencesU)
 
         -- fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
         fromSmallCounter sort (Struct _ _ u) = Seq.fromList $ concatMap (fromPair sort) (IntMap.toList u)
@@ -145,10 +137,10 @@ linkConstraintModule cm =
             Nothing -> False
             Just xs -> IntSet.member var xs
         )
-          || ( case IntMap.lookup width (cmBitTests cm) of
-                 Nothing -> False
-                 Just xs -> IntSet.member var xs
-             )
+      --   || ( case IntMap.lookup width (cmBitTests cm) of
+      --          Nothing -> False
+      --          Just xs -> IntSet.member var xs
+      --      )
       _ ->
         -- it's a pinned UInt variable
         True
@@ -290,10 +282,9 @@ reindexRefU counters (RefUX w x) = reindex counters Intermediate (ReadUInt w) x
 data Occurences = Occurences
   { refFsInOccurrencesF :: !IntSet,
     refBsInOccurrencesB :: !IntSet,
-    refUsInOccurrencesU :: !(IntMap IntSet),
-    bitTests :: !(IntMap IntSet),
-    bitTestBits :: !(IntMap (IntMap IntSet))
+    refUsInOccurrencesU :: !(IntMap IntSet)
   }
+  deriving (Show)
 
 -- | Smart constructor for 'Occurences'
 constructOccurences :: ConstraintModule n -> Occurences
@@ -301,16 +292,13 @@ constructOccurences cm =
   Occurences
     { refFsInOccurrencesF = OccurF.occuredSet (cmOccurrenceF cm),
       refBsInOccurrencesB = OccurB.occuredSet (cmOccurrenceB cm),
-      refUsInOccurrencesU = OccurU.occuredSet (cmOccurrenceU cm),
-      bitTests = cmBitTests cm,
-      bitTestBits = cmBitTestBits cm
+      refUsInOccurrencesU = OccurU.occuredSet (cmOccurrenceU cm)
     }
 
 data LinkedOccurences = LinkedOccurences
   { linkedOccurF :: !IntSet,
     linkedOccurB :: !IntSet,
     linkedOccurU :: !(IntMap IntSet),
-    linkedBitTests :: !(IntMap IntSet),
     linkedBitTestBits :: !(IntMap IntSet)
   }
   deriving (Show)
@@ -321,23 +309,24 @@ linkOccurences counters xs =
     { linkedOccurF = IntSet.map (reindexRefF counters . RefFX) (refFsInOccurrencesF xs),
       linkedOccurB = IntSet.map (reindexRefB counters . RefBX) (refBsInOccurrencesB xs),
       linkedOccurU = IntMap.mapWithKey (\width -> IntSet.map (reindexRefU counters . RefUX width)) (refUsInOccurrencesU xs),
-      linkedBitTests = IntMap.mapWithKey (\width set -> IntSet.map (reindexRefU counters . RefUX width) set) (bitTests xs),
       linkedBitTestBits =
         IntMap.mapWithKey
-          (\width varAndBits -> IntSet.unions $ IntMap.mapWithKey (\var indices -> IntSet.map (reindexRefB counters . RefUBit width (RefUX width var)) indices) varAndBits)
-          (bitTestBits xs)
+          ( \width set ->
+              IntSet.unions
+                $ map
+                  ( \var ->
+                      let start = reindex counters Intermediate (ReadBits width) var
+                       in IntSet.fromAscList [start .. start + width - 1]
+                  )
+                $ IntSet.toList set
+          )
+          (refUsInOccurrencesU xs)
     }
 
--- relatedToBitTests :: Counters -> Occurences -> IntSet
--- relatedToBitTests counters xs =
---   let linked = linkOccurences counters xs
---    in IntSet.unions
---         [ --     linkedOccurF xs,
---           --   linkedOccurB xs,
---           --   IntSet.unions (IntMap.elems (linkedOccurU xs)),
---           IntSet.unions (IntMap.elems (linkedBitTests linked)),
---           IntSet.unions (IntMap.elems (linkedBitTestBits linked))
---         ]
+relatedToBitTests :: Counters -> Occurences -> IntSet
+relatedToBitTests counters xs =
+  let linked = linkOccurences counters xs
+   in IntSet.unions (IntMap.elems (linkedBitTestBits linked))
 
 toIntSet :: Counters -> Occurences -> IntSet
 toIntSet counters xs =
@@ -371,34 +360,20 @@ renumberConstraints (cs, (occurrences, _cm)) =
     pinnedVarSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
 
     -- variables in constraints (that should be kept after renumbering!)
-    varsInBinReps =
-      IntSet.fromList $
-        concatMap (\binRep -> BinRep.binRepVar binRep : [BinRep.binRepBitStart binRep .. BinRep.binRepBitStart binRep + BinRep.binRepWidth binRep - 1]) (getBinReps counters)
-    varsInIntermediateBinReps = IntSet.filter (>= pinnedVarSize) varsInBinReps
-
     vars = IntSet.filter (>= pinnedVarSize) $ toIntSet counters occurrences
 
+    bitTests = relatedToBitTests counters occurrences
+
     -- variables in constraints excluding input & output variables
-    newIntermediateVars = vars <> varsInIntermediateBinReps
-    
+    newIntermediateVars = vars <> bitTests
+
     -- numbers of variables reduced via renumbering
-    reducedCount =
-      --   if varsInIntermediateBinReps /= relatedToBitTests counters occurrences
-      --     then
-      --       traceShow
-      --         cs
-      --         traceShow
-      --         ( IntSet.toList varsInIntermediateBinReps,
-      --           IntSet.toList (relatedToBitTests counters occurrences)
-      --         )
-      --         $ getCount counters Intermediate - IntSet.size newIntermediateVars
-      --     else
-      getCount counters Intermediate - IntSet.size newIntermediateVars
+    reducedCount = getCount counters Intermediate - IntSet.size newIntermediateVars
     renumberedIntermediateVars = [pinnedVarSize .. pinnedVarSize + IntSet.size newIntermediateVars - 1]
 
     -- mapping of old variables to new variables
     -- input variables are placed in the front
-    variableMap = Map.fromList $ zip (IntSet.toList newIntermediateVars) renumberedIntermediateVars
+    variableMap = Map.fromAscList $ zip (IntSet.toAscList newIntermediateVars) renumberedIntermediateVars
 
     renumber var =
       if var >= pinnedVarSize
@@ -413,7 +388,7 @@ renumberConstraints (cs, (occurrences, _cm)) =
                   <> show renumberedIntermediateVars
               )
           Just var' -> var'
-        else var -- this is an input variable
+        else var -- this is an pinned variable
     renumberConstraint constraint = case constraint of
       Linked.CAdd xs ->
         Linked.CAdd $ Poly.renumberVars renumber xs

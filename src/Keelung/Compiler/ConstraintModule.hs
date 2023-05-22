@@ -12,9 +12,7 @@ where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
-import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
-import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
@@ -49,8 +47,6 @@ data ConstraintModule n = ConstraintModule
     cmOccurrenceF :: !OccurF,
     cmOccurrenceB :: !OccurB,
     cmOccurrenceU :: !OccurU,
-    cmBitTests :: !(IntMap IntSet),
-    cmBitTestBits :: !(IntMap (IntMap IntSet)),
     cmBinReps :: [[(RefB, Int)]],
     -- when x == y (FieldRelations)
     cmFieldRelations :: AllRelations n,

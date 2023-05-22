@@ -23,7 +23,7 @@ import Prelude hiding (null)
 
 newtype OccurU
   = OccurU (IntMap (IntMap Int))
-  deriving (Eq, Generic)
+  deriving (Show, Eq, Generic)
 
 instance NFData OccurU
 

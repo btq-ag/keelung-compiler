@@ -4,8 +4,6 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
-import Data.IntMap.Strict qualified as IntMap
-import Data.IntSet qualified as IntSet
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
@@ -33,7 +31,7 @@ runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new mempty AllRelations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -139,48 +137,33 @@ addC = mapM_ addOne
         Nothing -> return ()
         Just relations -> put cs {cmFieldRelations = relations}
 
-    addBitTestOccurrences :: (GaloisField n, Integral n) => Ref -> M n ()
-    addBitTestOccurrences (B (RefUBit _ (RefUX width var) index)) = do
-      modify'
-        ( \cs ->
-            cs
-              { cmBitTests = IntMap.insertWith (<>) width (IntSet.singleton var) (cmBitTests cs),
-                cmBitTestBits = case IntMap.lookup width (cmBitTestBits cs) of
-                  Nothing -> IntMap.insert width (IntMap.singleton var (IntSet.singleton index)) (cmBitTestBits cs)
-                  Just mapping ->
-                    IntMap.insert
-                      width
-                      ( case IntMap.lookup var mapping of
-                          Nothing -> IntMap.insert var (IntSet.singleton index) mapping
-                          Just indices -> IntMap.insert var (IntSet.insert index indices) mapping
-                      )
-                      (cmBitTestBits cs)
-              }
-        )
-    addBitTestOccurrences _ = return ()
+    countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
+    countBitTestAsOccurU (B (RefUBit _ (RefUX width var) _)) =
+      modify' ( \cs -> cs { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cs)})
+    countBitTestAsOccurU _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
     addOne (CVarBindF x c) = do
       execRelations $ AllRelations.assignF x c
     addOne (CVarBindB x c) = do
-      addBitTestOccurrences (B x)
+      countBitTestAsOccurU (B x)
       execRelations $ AllRelations.assignB x c
     addOne (CVarBindU x c) = do
       execRelations $ AllRelations.assignU x c
     addOne (CVarEq x y) = do
-      addBitTestOccurrences x
-      addBitTestOccurrences y
+      countBitTestAsOccurU x
+      countBitTestAsOccurU y
       execRelations $ AllRelations.relateRefs x 1 y 0
     addOne (CVarEqF x y) = do
       execRelations $ AllRelations.relateRefs (F x) 1 (F y) 0
     addOne (CVarEqB x y) = do
-      addBitTestOccurrences (B x)
-      addBitTestOccurrences (B y)
+      countBitTestAsOccurU (B x)
+      countBitTestAsOccurU (B y)
       execRelations $ AllRelations.relateB x (True, y)
     addOne (CVarNEqB x y) = do
-      addBitTestOccurrences (B x)
-      addBitTestOccurrences (B y)
+      countBitTestAsOccurU (B x)
+      countBitTestAsOccurU (B y)
       execRelations $ AllRelations.relateB x (False, y)
     addOne (CVarEqU x y) = do
       execRelations $ AllRelations.assertEqualU x y
