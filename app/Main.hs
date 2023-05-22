@@ -124,8 +124,8 @@ main = withUtf8 $ do
           adapter
             outputCircuit
             outputCircuit
-            (\fieldInfo -> left show $ toR1CS . Linker.linkConstraintModule <$> compileO0Elab fieldInfo elaborated)
-            (\fieldInfo -> left show $ toR1CS . Linker.linkConstraintModule <$> compileO0Elab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS . fst . Linker.linkConstraintModule <$> compileO0Elab fieldInfo elaborated)
+            (\fieldInfo -> left show $ toR1CS . fst . Linker.linkConstraintModule <$> compileO0Elab fieldInfo elaborated)
             fieldType
     Protocol CompileO1 -> do
       blob <- getContents

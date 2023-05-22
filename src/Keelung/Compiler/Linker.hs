@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Linker (linkConstraintModule) where
+module Keelung.Compiler.Linker (linkConstraintModule, renumberConstraints) where
 
 import Control.Arrow (left)
 import Data.Bifunctor (Bifunctor (bimap), first)
@@ -31,33 +31,36 @@ import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Data.BinRep
+import Keelung.Data.BinRep qualified as BinRep
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Struct (Struct (..))
-import Keelung.Syntax.Counters
 import Keelung.Syntax (Var)
+import Keelung.Syntax.Counters
 
 -------------------------------------------------------------------------------
 
-linkConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintSystem n
+linkConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> (ConstraintSystem n, (Occurences, ConstraintModule n))
 linkConstraintModule cm =
-  ConstraintSystem
-    { csField = cmField cm,
-      csCounters = counters,
-      csBinReps = binReps,
-      csBinReps' = map (Seq.fromList . map (first (reindexRefB counters))) (cmBinReps cm),
-      csConstraints =
-        varEqFs
-          <> varEqBs
-          <> varEqUs
-          <> addFs
-          <> mulFs,
-      csEqZeros = toList eqZeros,
-      csDivMods = divMods,
-      csModInvs = modInvs
-    }
+  ( ConstraintSystem
+      { csField = cmField cm,
+        csCounters = counters,
+        csBinReps = binReps,
+        csBinReps' = map (Seq.fromList . map (first (reindexRefB counters))) (cmBinReps cm),
+        csConstraints =
+          varEqFs
+            <> varEqBs
+            <> varEqUs
+            <> addFs
+            <> mulFs,
+        csEqZeros = toList eqZeros,
+        csDivMods = divMods,
+        csModInvs = modInvs
+      },
+    (occurences, cm)
+  )
   where
     counters = cmCounters cm
     uncurry3 f (a, b, c) = f a b c
@@ -287,7 +290,9 @@ reindexRefU counters (RefUX w x) = reindex counters Intermediate (ReadUInt w) x
 data Occurences = Occurences
   { refFsInOccurrencesF :: !IntSet,
     refBsInOccurrencesB :: !IntSet,
-    refUsInOccurrencesU :: !(IntMap IntSet)
+    refUsInOccurrencesU :: !(IntMap IntSet),
+    bitTests :: !(IntMap IntSet),
+    bitTestBits :: !(IntMap (IntMap IntSet))
   }
 
 -- | Smart constructor for 'Occurences'
@@ -296,5 +301,138 @@ constructOccurences cm =
   Occurences
     { refFsInOccurrencesF = OccurF.occuredSet (cmOccurrenceF cm),
       refBsInOccurrencesB = OccurB.occuredSet (cmOccurrenceB cm),
-      refUsInOccurrencesU = OccurU.occuredSet (cmOccurrenceU cm)
+      refUsInOccurrencesU = OccurU.occuredSet (cmOccurrenceU cm),
+      bitTests = cmBitTests cm,
+      bitTestBits = cmBitTestBits cm
     }
+
+data LinkedOccurences = LinkedOccurences
+  { linkedOccurF :: !IntSet,
+    linkedOccurB :: !IntSet,
+    linkedOccurU :: !(IntMap IntSet),
+    linkedBitTests :: !(IntMap IntSet),
+    linkedBitTestBits :: !(IntMap IntSet)
+  }
+  deriving (Show)
+
+linkOccurences :: Counters -> Occurences -> LinkedOccurences
+linkOccurences counters xs =
+  LinkedOccurences
+    { linkedOccurF = IntSet.map (reindexRefF counters . RefFX) (refFsInOccurrencesF xs),
+      linkedOccurB = IntSet.map (reindexRefB counters . RefBX) (refBsInOccurrencesB xs),
+      linkedOccurU = IntMap.mapWithKey (\width -> IntSet.map (reindexRefU counters . RefUX width)) (refUsInOccurrencesU xs),
+      linkedBitTests = IntMap.mapWithKey (\width set -> IntSet.map (reindexRefU counters . RefUX width) set) (bitTests xs),
+      linkedBitTestBits =
+        IntMap.mapWithKey
+          (\width varAndBits -> IntSet.unions $ IntMap.mapWithKey (\var indices -> IntSet.map (reindexRefB counters . RefUBit width (RefUX width var)) indices) varAndBits)
+          (bitTestBits xs)
+    }
+
+-- relatedToBitTests :: Counters -> Occurences -> IntSet
+-- relatedToBitTests counters xs =
+--   let linked = linkOccurences counters xs
+--    in IntSet.unions
+--         [ --     linkedOccurF xs,
+--           --   linkedOccurB xs,
+--           --   IntSet.unions (IntMap.elems (linkedOccurU xs)),
+--           IntSet.unions (IntMap.elems (linkedBitTests linked)),
+--           IntSet.unions (IntMap.elems (linkedBitTestBits linked))
+--         ]
+
+toIntSet :: Counters -> Occurences -> IntSet
+toIntSet counters xs =
+  let linked = linkOccurences counters xs
+   in IntSet.unions
+        [ linkedOccurF linked,
+          linkedOccurB linked,
+          IntSet.unions (IntMap.elems (linkedOccurU linked))
+        ]
+
+-------------------------------------------------------------------------------
+
+-- | Sequentially renumber term variables '0..max_var'.  Return
+--   renumbered constraints, together with the total number of
+--   variables in the (renumbered) constraint set and the (possibly
+--   renumbered) in and out variables.
+renumberConstraints :: (GaloisField n, Integral n) => (ConstraintSystem n, (Occurences, ConstraintModule n)) -> ConstraintSystem n
+renumberConstraints (cs, (occurrences, _cm)) =
+  ConstraintSystem
+    { csField = csField cs,
+      csConstraints = fmap renumberConstraint (csConstraints cs),
+      csBinReps = fmap renumberBinRep (csBinReps cs),
+      csBinReps' = csBinReps' cs,
+      csCounters = setReducedCount reducedCount counters,
+      csEqZeros = fmap renumberEqZero (csEqZeros cs),
+      csDivMods = fmap renumberDivMod (csDivMods cs),
+      csModInvs = fmap renumberModInv (csModInvs cs)
+    }
+  where
+    counters = csCounters cs
+    pinnedVarSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
+
+    -- variables in constraints (that should be kept after renumbering!)
+    varsInBinReps =
+      IntSet.fromList $
+        concatMap (\binRep -> BinRep.binRepVar binRep : [BinRep.binRepBitStart binRep .. BinRep.binRepBitStart binRep + BinRep.binRepWidth binRep - 1]) (getBinReps counters)
+    varsInIntermediateBinReps = IntSet.filter (>= pinnedVarSize) varsInBinReps
+
+    vars = IntSet.filter (>= pinnedVarSize) $ toIntSet counters occurrences
+
+    -- variables in constraints excluding input & output variables
+    newIntermediateVars = vars <> varsInIntermediateBinReps
+    
+    -- numbers of variables reduced via renumbering
+    reducedCount =
+      --   if varsInIntermediateBinReps /= relatedToBitTests counters occurrences
+      --     then
+      --       traceShow
+      --         cs
+      --         traceShow
+      --         ( IntSet.toList varsInIntermediateBinReps,
+      --           IntSet.toList (relatedToBitTests counters occurrences)
+      --         )
+      --         $ getCount counters Intermediate - IntSet.size newIntermediateVars
+      --     else
+      getCount counters Intermediate - IntSet.size newIntermediateVars
+    renumberedIntermediateVars = [pinnedVarSize .. pinnedVarSize + IntSet.size newIntermediateVars - 1]
+
+    -- mapping of old variables to new variables
+    -- input variables are placed in the front
+    variableMap = Map.fromList $ zip (IntSet.toList newIntermediateVars) renumberedIntermediateVars
+
+    renumber var =
+      if var >= pinnedVarSize
+        then case Map.lookup var variableMap of
+          Nothing ->
+            error
+              ( "can't find a mapping for variable "
+                  <> show var
+                  <> " \nmapping: "
+                  <> show variableMap
+                  <> " \nrenumbered vars: "
+                  <> show renumberedIntermediateVars
+              )
+          Just var' -> var'
+        else var -- this is an input variable
+    renumberConstraint constraint = case constraint of
+      Linked.CAdd xs ->
+        Linked.CAdd $ Poly.renumberVars renumber xs
+      Linked.CMul aV bV cV ->
+        Linked.CMul (Poly.renumberVars renumber aV) (Poly.renumberVars renumber bV) (Poly.renumberVars renumber <$> cV)
+
+    renumberBinRep binRep =
+      binRep
+        { BinRep.binRepVar = renumber (BinRep.binRepVar binRep),
+          BinRep.binRepBitStart = renumber (BinRep.binRepBitStart binRep)
+        }
+
+    renumberEqZero (xs, m) = (Poly.renumberVars renumber xs, renumber m)
+
+    renumberDivMod (x, y, q, r) =
+      ( left renumber x,
+        left renumber y,
+        left renumber q,
+        left renumber r
+      )
+
+    renumberModInv (x, n, p) = (left renumber x, left renumber n, p)

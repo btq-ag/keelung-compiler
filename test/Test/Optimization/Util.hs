@@ -29,10 +29,10 @@ execute program = do
 shouldHaveSize :: ConstraintModule (N GF181) -> Int -> IO ()
 shouldHaveSize cm expectedBeforeSize = do
   -- compare the number of constraints
-  let actualBeforeSize = ConstraintSystem.numberOfConstraints (Linker.linkConstraintModule cm)
+  let actualBeforeSize = ConstraintSystem.numberOfConstraints (fst $ Linker.linkConstraintModule cm)
   actualBeforeSize `shouldBe` expectedBeforeSize
 
 debug :: ConstraintModule (N GF181) -> IO ()
 debug cm = do
   print cm
-  print (Linker.linkConstraintModule cm)
+  print (fst $ Linker.linkConstraintModule cm)

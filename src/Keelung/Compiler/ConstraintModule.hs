@@ -5,6 +5,7 @@
 module Keelung.Compiler.ConstraintModule
   ( ConstraintModule (..),
     sizeOfConstraintModule,
+    prettyCMVariables,
     UpdateOccurrences (..),
   )
 where
@@ -49,6 +50,7 @@ data ConstraintModule n = ConstraintModule
     cmOccurrenceB :: !OccurB,
     cmOccurrenceU :: !OccurU,
     cmBitTests :: !(IntMap IntSet),
+    cmBitTestBits :: !(IntMap (IntMap IntSet)),
     cmBinReps :: [[(RefB, Int)]],
     -- when x == y (FieldRelations)
     cmFieldRelations :: AllRelations n,
@@ -81,7 +83,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> showOccurrencesF
       <> showOccurrencesB
       <> showOccurrencesU
-      <> showVariables
+      <> prettyCMVariables (cmCounters cm)
       <> "}"
     where
       counters = cmCounters cm
@@ -158,41 +160,41 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
                   then showVec (Right xs)
                   else "(" ++ showVec (Right xs) ++ ")"
 
-      showVariables :: String
-      showVariables =
-        let totalSize = getTotalCount counters
-            padRight4 s = s <> replicate (4 - length s) ' '
-            padLeft12 n = replicate (12 - length (show n)) ' ' <> show n
-            formLine typ =
-              padLeft12 (getCount counters (Output, typ))
-                <> "    "
-                <> padLeft12 (getCount counters (PublicInput, typ))
-                <> "    "
-                <> padLeft12 (getCount counters (PrivateInput, typ))
-                <> "    "
-                <> padLeft12 (getCount counters (Intermediate, typ))
-            uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (ReadUInt w)
-            -- Bit widths existed in the system
-            uintWidthEntries (Counters o i p x _ _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
-            showUInts =
-              let entries = uintWidthEntries counters
-               in if IntSet.null entries
-                    then ""
-                    else mconcat $ fmap uint (IntSet.toList entries)
-         in if totalSize == 0
+prettyCMVariables :: Counters -> String
+prettyCMVariables counters =
+  let totalSize = getTotalCount counters
+      padRight4 s = s <> replicate (4 - length s) ' '
+      padLeft12 n = replicate (12 - length (show n)) ' ' <> show n
+      formLine typ =
+        padLeft12 (getCount counters (Output, typ))
+          <> "    "
+          <> padLeft12 (getCount counters (PublicInput, typ))
+          <> "    "
+          <> padLeft12 (getCount counters (PrivateInput, typ))
+          <> "    "
+          <> padLeft12 (getCount counters (Intermediate, typ))
+      uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (ReadUInt w)
+      -- Bit widths existed in the system
+      uintWidthEntries (Counters o i p x _ _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
+      showUInts =
+        let entries = uintWidthEntries counters
+          in if IntSet.null entries
               then ""
-              else
-                "  Variables ("
-                  <> show totalSize
-                  <> "):\n"
-                  <> "                  output       pub input      priv input    intermediate\n"
-                  <> "    --------------------------------------------------------------------"
-                  <> "\n    Field   "
-                  <> formLine ReadField
-                  <> "\n    Boolean "
-                  <> formLine ReadBool
-                  <> showUInts
-                  <> "\n"
+              else mconcat $ fmap uint (IntSet.toList entries)
+    in if totalSize == 0
+        then ""
+        else
+          "  Variables ("
+            <> show totalSize
+            <> "):\n"
+            <> "                  output       pub input      priv input    intermediate\n"
+            <> "    --------------------------------------------------------------------"
+            <> "\n    Field   "
+            <> formLine ReadField
+            <> "\n    Boolean "
+            <> formLine ReadBool
+            <> showUInts
+            <> "\n"
 
 -------------------------------------------------------------------------------
 -- | TODO: revisit this

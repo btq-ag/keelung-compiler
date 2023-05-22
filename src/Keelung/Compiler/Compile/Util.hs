@@ -33,7 +33,7 @@ runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new mempty mempty mempty AllRelations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -140,8 +140,23 @@ addC = mapM_ addOne
         Just relations -> put cs {cmFieldRelations = relations}
 
     addBitTestOccurrences :: (GaloisField n, Integral n) => Ref -> M n ()
-    addBitTestOccurrences (B (RefUBit _ (RefUX width var) _)) = do
-      modify' (\cs -> cs {cmBitTests = IntMap.insertWith (<>) width (IntSet.singleton var) (cmBitTests cs)})
+    addBitTestOccurrences (B (RefUBit _ (RefUX width var) index)) = do
+      modify'
+        ( \cs ->
+            cs
+              { cmBitTests = IntMap.insertWith (<>) width (IntSet.singleton var) (cmBitTests cs),
+                cmBitTestBits = case IntMap.lookup width (cmBitTestBits cs) of
+                  Nothing -> IntMap.insert width (IntMap.singleton var (IntSet.singleton index)) (cmBitTestBits cs)
+                  Just mapping ->
+                    IntMap.insert
+                      width
+                      ( case IntMap.lookup var mapping of
+                          Nothing -> IntMap.insert var (IntSet.singleton index) mapping
+                          Just indices -> IntMap.insert var (IntSet.insert index indices) mapping
+                      )
+                      (cmBitTestBits cs)
+              }
+        )
     addBitTestOccurrences _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
