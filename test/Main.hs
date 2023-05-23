@@ -13,6 +13,7 @@ import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Test.Hspec
+import Test.IndexTable qualified as IndexTable
 import Test.Interpreter qualified as Interpreter
 import Test.Interpreter.Util (gf181Info)
 import Test.Optimization qualified as Optimization
@@ -37,6 +38,8 @@ main = hspec $ do
   describe "Boolean Relations" Relations.Boolean.tests
 
   describe "UInt Relations" Relations.UInt.tests
+
+  describe "IndexTable" IndexTable.tests
 
   describe "Poly" $ do
     it "instance Eq 1" $ Poly.buildEither 42 [(1, 1)] `shouldBe` (Poly.buildEither 42 [(1, 1)] :: Either GF181 (Poly GF181))

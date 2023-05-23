@@ -167,6 +167,7 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Test.IndexTable
       Test.Interpreter
       Test.Interpreter.Boolean
       Test.Interpreter.Field

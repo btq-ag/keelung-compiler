@@ -1,67 +1,88 @@
-module Keelung.Compiler.Compile.IndexTable where
+module Keelung.Compiler.Compile.IndexTable (IndexTable, empty, fromOccurrenceMap, reindex, merge) where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 
 -------------------------------------------------------------------------------
 
--- | Lookup table for speeding up variable renumbering
---   Stores intervals (index, (size, vacancy count before)) of contiguous variables
---   For example, if there were 10 variables, but the 4th and 5th are unused, then the table will be
---   [(0, 0), (6, 2)]
---   So that when we want to renumber the 7th variable, we can just minus 2 from it
+-- | Lookup table for speeding up variable renumbering:
+--   Some of the variables maybe unused, we want to remove unused variables and renumber the remaining variables so that they are contiguous.
+--   To do so, we create a lookup table that keep tracks of "hole" sections in the domain.
+--
+--   Suppose we have 10 variables, but only some of them are used:
+--
+--                      0 1 2 3 4 5 6 7 8 9
+--   used               x x     x x x     x
+--
+--                              ^         ^
+--   unused so far              2         4
+--
+--   table: [(4, 2), (9, 4)]
+--
+--   we want to mark the place where the used variable segments begins, so that we can know how many unused variables are there so far.
+--   So that when we want to renumber the 6th variable, we can just minus 2 from it
 data IndexTable = IndexTable
   { indexTableDomainSize :: Int,
-    indexTableVacancyCount :: Int,
+    indexTableTotalHoleSize :: Int,
+    indexTableStartsWithHole :: Maybe Bool,
     indexTable :: IntMap Int
   }
   deriving (Show)
 
--- | O(1). Construct an empty IndexTable
-empty :: Int -> IndexTable
-empty size = IndexTable size 0 IntMap.empty
-
 data FoldState = FoldState
   { -- | The resulting table
-    stateTable :: IntMap Int,
-    -- | The latest interval (index, count) for fast lookup,
-    stateHead :: Maybe (Int, Int),
+    _stateTable :: IntMap Int,
+    -- | Are we in a hole?
+    _stateInAHole :: Bool,
     -- | The number of unused variables so far
-    stateVacancyCount :: Int
+    _stateTotalHoleSize :: Int,
+    -- | If the first variable is unused
+    _stateStartsWithHole :: Maybe Bool
   }
 
--- | O( size of the occurence map ). Construct an IndexTable from:
---      1. an ocurence map
---      2. the number of variables of the original domain (so that we can cap the last interval)
-fromOccurrenceMap :: Int -> IntMap Int -> IndexTable
-fromOccurrenceMap domainSize occurrences =
-  let FoldState xs x vacancyCount = IntMap.foldlWithKey' go (FoldState mempty Nothing 0) occurrences
-   in case x of
-        Nothing -> IndexTable domainSize vacancyCount xs
-        Just (x', c) -> IndexTable domainSize vacancyCount $ IntMap.insert x' c xs
+instance Semigroup IndexTable where
+  (<>) = merge
+
+instance Monoid IndexTable where
+  mempty = empty
+
+-- | O(1). Construct an empty IndexTable
+empty :: IndexTable
+empty = IndexTable 0 0 Nothing mempty
+
+-- | O( size of the occurence map ). Construct an IndexTable from an ocurence map
+fromOccurrenceMap :: IntMap Int -> IndexTable
+fromOccurrenceMap occurrences =
+  let FoldState xs _ totalHoleSize startsWithHole = IntMap.foldlWithKey' go (FoldState mempty False 0 Nothing) occurrences
+      domainSize = IntMap.size occurrences
+   in IndexTable domainSize totalHoleSize startsWithHole xs
   where
     go :: FoldState -> Int -> Int -> FoldState
-    go (FoldState acc Nothing vacancyCount) var count =
+    go (FoldState acc False totalHoleSize Nothing) _ count =
       if count == 0
-        then -- skip `var`, bump the vacancy count
-          FoldState acc Nothing (vacancyCount + 1)
-        else -- start a new interval
-          FoldState acc (Just (var, 1)) vacancyCount
-    go (FoldState acc (Just (previousVar, previousCount)) vacancyCount) var count =
+        then FoldState acc True (totalHoleSize + 1) (Just True) -- staring a new hole
+        else FoldState acc False totalHoleSize (Just False) -- still not in a hole
+    go (FoldState acc False totalHoleSize (Just startsWithHole)) _ count =
       if count == 0
-        then -- skip `var`, bump the vacancy count
-          FoldState acc (Just (previousVar, previousCount)) (vacancyCount + 1)
-        else -- start a new interval
-
-          let distance = var - (previousVar + previousCount)
-           in if distance == 0
-                then -- continue with the privious interval
-                  FoldState acc (Just (previousVar, previousCount + 1)) vacancyCount
-                else -- conclude the privious interval and start a new one
-                  FoldState (IntMap.insert previousVar vacancyCount acc) (Just (var, 1)) (vacancyCount + distance)
+        then FoldState acc True (totalHoleSize + 1) (Just startsWithHole) -- staring a new hole
+        else FoldState acc False totalHoleSize (Just startsWithHole) -- still not in a hole
+    go (FoldState acc True totalHoleSize startsWithHole) var count =
+      if count == 0
+        then FoldState acc True (totalHoleSize + 1) startsWithHole -- still in a hole
+        else FoldState (IntMap.insert var totalHoleSize acc) False totalHoleSize startsWithHole -- ending the current hole
 
 -- | O(lg n). Given an IndexTable and a variable, reindex the variable so that it become contiguous with the other variables
 reindex :: IndexTable -> Int -> Int
-reindex (IndexTable _ _ xs) var = case IntMap.lookupLE var xs of
+reindex (IndexTable _ _ _ xs) var = case IntMap.lookupLE var xs of
   Nothing -> var
   Just (_, vacancyCount) -> var - vacancyCount
+
+-- | O(lg n). Mergin two IndexTable
+merge :: IndexTable -> IndexTable -> IndexTable
+merge (IndexTable domainSize1 totalHoleSize1 startsWithHole1 xs1) (IndexTable domainSize2 totalHoleSize2 startsWithHole2 xs2) =
+  let totalHoleSize = totalHoleSize1 + totalHoleSize2
+   in IndexTable (domainSize1 + domainSize2) totalHoleSize startsWithHole1 $
+        case startsWithHole2 of
+          Nothing -> xs1
+          Just True -> xs1 <> IntMap.mapKeys (+ domainSize1) (IntMap.map (+ totalHoleSize1) xs2)
+          Just False -> xs1 <> IntMap.insert domainSize1 totalHoleSize1 (IntMap.mapKeys (+ domainSize1) (IntMap.map (+ totalHoleSize1) xs2))
