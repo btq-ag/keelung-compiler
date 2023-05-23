@@ -30,6 +30,7 @@ library
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
@@ -97,6 +98,7 @@ executable keelungc
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
@@ -188,6 +190,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint

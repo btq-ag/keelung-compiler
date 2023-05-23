@@ -360,8 +360,7 @@ renumberConstraints (cs, (occurrences, _cm)) =
     pinnedVarSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
 
     -- variables in constraints (that should be kept after renumbering!)
-    vars = IntSet.filter (>= pinnedVarSize) $ toIntSet counters occurrences
-
+    vars = toIntSet counters occurrences
     bitTests = relatedToBitTests counters occurrences
 
     -- variables in constraints excluding input & output variables
