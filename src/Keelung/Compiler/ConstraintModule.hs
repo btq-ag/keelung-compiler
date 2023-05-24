@@ -43,7 +43,7 @@ import Keelung.Syntax.Counters
 data ConstraintModule n = ConstraintModule
   { cmField :: (FieldType, Integer, Integer),
     cmCounters :: !Counters,
-    -- for counting the occurences of variables in constraints (excluding the ones that are in FieldRelations)
+    -- for counting the occurrences of variables in constraints (excluding the ones that are in FieldRelations)
     cmOccurrenceF :: !OccurF,
     cmOccurrenceB :: !OccurB,
     cmOccurrenceU :: !OccurU,

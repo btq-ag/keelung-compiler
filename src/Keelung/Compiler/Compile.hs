@@ -495,7 +495,7 @@ compileMulU width out a b = do
     -- Cᵢ = outᵢ
     writeEqB (RefUBit width c i) (RefUBit width out i)
 
--- HACK: addC occurences of RefUs
+-- HACK: addC occurrences of RefUs
 -- addOccurrencesUTemp [out, a, b, c]
 
 -- | Conditional
