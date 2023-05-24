@@ -1,64 +1,77 @@
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Module for RefB bookkeeping
-module Keelung.Compiler.Optimize.OccurB (OccurB, new, null, toList, increase, decrease, occuredSet) where
+module Keelung.Compiler.Optimize.OccurB (OccurB, new, null, toList, toIndexTable, increase, decrease, occuredSet) where
 
 import Control.Arrow (Arrow (first))
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
-import Data.IntSet qualified as IntSet
-import Data.Vector.Unboxed (Vector)
-import Data.Vector.Unboxed qualified as Vec
+-- import Data.IntSet qualified as IntSet
+-- import Data.Vector.Unboxed (Vector)
+-- import Data.Vector.Unboxed qualified as Vec
 import GHC.Generics (Generic)
+import Keelung.Compiler.Compile.IndexTable (IndexTable)
+import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Constraint
 import Keelung.Syntax (Var)
 import Prelude hiding (null)
 
-data OccurB
+newtype OccurB
   = MapB (IntMap Int)
-  | OccurB
-      { -- _occurBO :: !(Vector Int),
-        -- _occurBI :: !(Vector Int),
-        -- _occurBP :: !(Vector Int),
-        _occurBX :: !(Vector Int)
-      }
-  deriving (Eq, Generic, NFData)
+  deriving (-- | OccurB
+            --     { -- _occurBO :: !(Vector Int),
+            --       -- _occurBI :: !(Vector Int),
+            --       -- _occurBP :: !(Vector Int),
+            --       _occurBX :: !(Vector Int)
+            --     }
+            Eq, Generic)
+
+instance NFData OccurB
 
 -- | O(1). Construct an empty OccurB
 new :: Bool -> OccurB
-new useVector =
-  if useVector
-    then
-      OccurB
-        (Vec.replicate 100 0)
-    else MapB mempty
+new _useVector = MapB mempty
+
+-- if useVector
+--   then
+--     OccurB
+--       (Vec.replicate 100 0)
+--   else MapB mempty
 
 -- | O(1). Test whether a OccurB is empty
 null :: OccurB -> Bool
 null (MapB xs) = IntMap.null xs
-null (OccurB xs) = Vec.null xs
+
+-- null (OccurB xs) = Vec.null xs
 
 -- null (OccurB os is ps xs) = Vec.null os && Vec.null is && Vec.null ps && Vec.null xs
 
 -- | O(1).  To a list of (RefB, Int) pairs
 toList :: OccurB -> [(RefB, Int)]
 toList (MapB xs) = map (first RefBX) $ IntMap.toList xs
-toList (OccurB xs) =
-  --   map (first RefBO) (filter notEmpty (Vec.toList (Vec.indexed os)))
-  --     ++ map (first RefBI) (filter notEmpty (Vec.toList (Vec.indexed is)))
-  --     ++ map (first RefBP) (filter notEmpty (Vec.toList (Vec.indexed ps)))
-  map (first RefBX) (filter notEmpty (Vec.toList (Vec.indexed xs)))
-  where
-    notEmpty (_, 0) = True
-    notEmpty _ = False
+
+-- toList (OccurB xs) =
+--   --   map (first RefBO) (filter notEmpty (Vec.toList (Vec.indexed os)))
+--   --     ++ map (first RefBI) (filter notEmpty (Vec.toList (Vec.indexed is)))
+--   --     ++ map (first RefBP) (filter notEmpty (Vec.toList (Vec.indexed ps)))
+--   map (first RefBX) (filter notEmpty (Vec.toList (Vec.indexed xs)))
+--   where
+--     notEmpty (_, 0) = True
+--     notEmpty _ = False
+
+-- | O(lg n). To an IndexTable
+toIndexTable :: OccurB -> IndexTable
+toIndexTable (MapB xs) = IndexTable.fromOccurrenceMap 1 xs
+
+-- toIndexTable (MapB xs) = IndexTable.fromOccurrenceMap xs
 
 -- | O(1). Bump the count of a RefB
 increase :: Var -> OccurB -> OccurB
 increase var (MapB xs) = MapB $ IntMap.insertWith (+) var 1 xs
-increase var (OccurB xs) = OccurB (xs Vec.// [(var, succ (xs Vec.! var))])
+
+-- increase var (OccurB xs) = OccurB (xs Vec.// [(var, succ (xs Vec.! var))])
 
 -- increase ref (MapB xs) = MapB $ Map.insertWith (+) ref 1 xs
 -- increase (RefBO i) (OccurB os is ps xs) = OccurB (os Vec.// [(i, succ (os Vec.! i))]) is ps xs
@@ -70,7 +83,8 @@ increase var (OccurB xs) = OccurB (xs Vec.// [(var, succ (xs Vec.! var))])
 -- | O(1). Decrease the count of a RefB
 decrease :: Var -> OccurB -> OccurB
 decrease var (MapB xs) = MapB $ IntMap.adjust (\count -> pred count `max` 0) var xs
-decrease var (OccurB xs) = OccurB (xs Vec.// [(var, 0 `max` pred (xs Vec.! var))])
+
+-- decrease var (OccurB xs) = OccurB (xs Vec.// [(var, 0 `max` pred (xs Vec.! var))])
 
 -- decrease ref (MapB xs) = MapB $ Map.adjust (\count -> pred count `max` 0) ref xs
 -- decrease (RefBO i) (OccurB os is ps xs) = OccurB (os Vec.// [(i, 0 `max` pred (os Vec.! i))]) is ps xs
@@ -81,7 +95,8 @@ decrease var (OccurB xs) = OccurB (xs Vec.// [(var, 0 `max` pred (xs Vec.! var))
 
 occuredSet :: OccurB -> IntSet
 occuredSet (MapB xs) = IntMap.keysSet $ IntMap.filter (> 0) xs
-occuredSet (OccurB xs) = Vec.foldl' (\s (i, n) -> if n > 0 then IntSet.insert i s else s) IntSet.empty (Vec.indexed xs)
+
+-- occuredSet (OccurB xs) = Vec.foldl' (\s (i, n) -> if n > 0 then IntSet.insert i s else s) IntSet.empty (Vec.indexed xs)
 
 -- occuredSet (MapB xs) = Map.keysSet $ Map.filter (> 0) xs
 -- occuredSet (OccurB os is ps xs) =

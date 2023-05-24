@@ -2,6 +2,7 @@ module Keelung.Compiler.Compile.IndexTable (IndexTable, empty, fromOccurrenceMap
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Keelung (Width)
 
 -------------------------------------------------------------------------------
 
@@ -51,25 +52,25 @@ empty :: IndexTable
 empty = IndexTable 0 0 Nothing mempty
 
 -- | O( size of the occurence map ). Construct an IndexTable from an ocurence map
-fromOccurrenceMap :: IntMap Int -> IndexTable
-fromOccurrenceMap occurrences =
+fromOccurrenceMap :: Width -> IntMap Int -> IndexTable
+fromOccurrenceMap width occurrences =
   let FoldState xs _ totalHoleSize startsWithHole = IntMap.foldlWithKey' go (FoldState mempty False 0 Nothing) occurrences
-      domainSize = IntMap.size occurrences
+      domainSize = width * IntMap.size occurrences
    in IndexTable domainSize totalHoleSize startsWithHole xs
   where
     go :: FoldState -> Int -> Int -> FoldState
     go (FoldState acc False totalHoleSize Nothing) _ count =
       if count == 0
-        then FoldState acc True (totalHoleSize + 1) (Just True) -- staring a new hole
+        then FoldState acc True (totalHoleSize + width) (Just True) -- staring a new hole
         else FoldState acc False totalHoleSize (Just False) -- still not in a hole
     go (FoldState acc False totalHoleSize (Just startsWithHole)) _ count =
       if count == 0
-        then FoldState acc True (totalHoleSize + 1) (Just startsWithHole) -- staring a new hole
+        then FoldState acc True (totalHoleSize + width) (Just startsWithHole) -- staring a new hole
         else FoldState acc False totalHoleSize (Just startsWithHole) -- still not in a hole
     go (FoldState acc True totalHoleSize startsWithHole) var count =
       if count == 0
-        then FoldState acc True (totalHoleSize + 1) startsWithHole -- still in a hole
-        else FoldState (IntMap.insert var totalHoleSize acc) False totalHoleSize startsWithHole -- ending the current hole
+        then FoldState acc True (totalHoleSize + width) startsWithHole -- still in a hole
+        else FoldState (IntMap.insert (var * width) totalHoleSize acc) False totalHoleSize startsWithHole -- ending the current hole
 
 -- | O(lg n). Given an IndexTable and a variable, reindex the variable so that it become contiguous with the other variables
 reindex :: IndexTable -> Int -> Int

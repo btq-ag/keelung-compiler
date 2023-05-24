@@ -12,11 +12,15 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Keelung.Compiler.Compile.IndexTable (IndexTable)
+import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
 import Keelung.Compiler.ConstraintSystem qualified as Linked
+import Keelung.Compiler.Optimize.OccurB (OccurB)
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
+import Keelung.Compiler.Optimize.OccurF (OccurF)
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
@@ -276,23 +280,67 @@ reindexRefU counters (RefUI w x) = reindex counters PublicInput (ReadUInt w) x
 reindexRefU counters (RefUP w x) = reindex counters PrivateInput (ReadUInt w) x
 reindexRefU counters (RefUX w x) = reindex counters Intermediate (ReadUInt w) x
 
+reindexRef2 :: Occurences -> Ref -> Var
+reindexRef2 occurences (F x) = reindexRefF2 occurences x
+reindexRef2 occurences (B x) = reindexRefB2 occurences x
+reindexRef2 occurences (U x) = reindexRefU2 occurences x
+
+reindexRefF2 :: Occurences -> RefF -> Var
+reindexRefF2 occurrences (RefFO x) = reindex (occurCounters occurrences) Output ReadField x
+reindexRefF2 occurrences (RefFI x) = reindex (occurCounters occurrences) PublicInput ReadField x
+reindexRefF2 occurrences (RefFP x) = reindex (occurCounters occurrences) PrivateInput ReadField x
+reindexRefF2 occurrences (RefFX x) = IndexTable.reindex (indexTable occurrences) $ reindex (occurCounters occurrences) Intermediate ReadField x
+
+reindexRefB2 :: Occurences -> RefB -> Var
+reindexRefB2 occurrences (RefBO x) = reindex (occurCounters occurrences) Output ReadBool x
+reindexRefB2 occurrences (RefBI x) = reindex (occurCounters occurrences) PublicInput ReadBool x
+reindexRefB2 occurrences (RefBP x) = reindex (occurCounters occurrences) PrivateInput ReadBool x
+reindexRefB2 occurrences (RefBX x) = IndexTable.reindex (indexTable occurrences) $ reindex (occurCounters occurrences) Intermediate ReadBool x
+reindexRefB2 occurrences (RefUBit _ x i) =
+  case x of
+    RefUO w x' -> reindex (occurCounters occurrences) Output (ReadBits w) x' + (i `mod` w)
+    RefUI w x' -> reindex (occurCounters occurrences) PublicInput (ReadBits w) x' + (i `mod` w)
+    RefUP w x' -> reindex (occurCounters occurrences) PrivateInput (ReadBits w) x' + (i `mod` w)
+    RefUX w x' -> IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadBits w) x') + (i `mod` w)
+
+reindexRefU2 :: Occurences -> RefU -> Var
+reindexRefU2 occurrences (RefUO w x) = reindex (occurCounters occurrences) Output (ReadUInt w) x
+reindexRefU2 occurrences (RefUI w x) = reindex (occurCounters occurrences) PublicInput (ReadUInt w) x
+reindexRefU2 occurrences (RefUP w x) = reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x
+reindexRefU2 occurrences (RefUX w x) = IndexTable.reindex (indexTable occurrences) $ reindex (occurCounters occurrences) Intermediate (ReadUInt w) x
+
 -------------------------------------------------------------------------------
 
 -- | Allow us to determine which relations should be extracted from the pool
 data Occurences = Occurences
-  { refFsInOccurrencesF :: !IntSet,
+  { occurCounters :: !Counters,
+    occurF :: !OccurF,
+    occurB :: !OccurB,
+    occurU :: !OccurU,
+    refFsInOccurrencesF :: !IntSet,
     refBsInOccurrencesB :: !IntSet,
-    refUsInOccurrencesU :: !(IntMap IntSet)
+    refUsInOccurrencesU :: !(IntMap IntSet),
+    -- indexTableF :: IndexTable,
+    -- indexTableB :: IndexTable,
+    -- indexTableU :: IntMap IndexTable,
+    indexTable :: !IndexTable
   }
-  deriving (Show)
 
 -- | Smart constructor for 'Occurences'
 constructOccurences :: ConstraintModule n -> Occurences
 constructOccurences cm =
   Occurences
-    { refFsInOccurrencesF = OccurF.occuredSet (cmOccurrenceF cm),
+    { occurCounters = cmCounters cm,
+      occurF = cmOccurrenceF cm,
+      occurB = cmOccurrenceB cm,
+      occurU = cmOccurrenceU cm,
+      refFsInOccurrencesF = OccurF.occuredSet (cmOccurrenceF cm),
       refBsInOccurrencesB = OccurB.occuredSet (cmOccurrenceB cm),
-      refUsInOccurrencesU = OccurU.occuredSet (cmOccurrenceU cm)
+      refUsInOccurrencesU = OccurU.occuredSet (cmOccurrenceU cm),
+      -- indexTableF = OccurF.toIndexTable (cmOccurrenceF cm),
+      -- indexTableB = OccurB.toIndexTable (cmOccurrenceB cm),
+      -- indexTableU = OccurU.toIndexTable (cmOccurrenceU cm),
+      indexTable = OccurF.toIndexTable (cmOccurrenceF cm) <> OccurB.toIndexTable (cmOccurrenceB cm) <> mconcat (IntMap.elems (OccurU.toIndexTable (cmOccurrenceU cm)))
     }
 
 data LinkedOccurences = LinkedOccurences

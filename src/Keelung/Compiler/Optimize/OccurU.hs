@@ -7,6 +7,7 @@ module Keelung.Compiler.Optimize.OccurU
     null,
     toList,
     toIntMap,
+    toIndexTable,
     increase,
     decrease,
     occuredSet,
@@ -18,6 +19,8 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
+import Keelung.Compiler.Compile.IndexTable (IndexTable)
+import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Syntax (Var, Width)
 import Prelude hiding (null)
 
@@ -41,6 +44,10 @@ toList (OccurU xs) = IntMap.toList xs
 
 toIntMap :: OccurU -> IntMap (IntMap Int)
 toIntMap (OccurU xs) = xs
+
+-- | O(lg n). To an IndexTable
+toIndexTable :: OccurU -> IntMap IndexTable
+toIndexTable (OccurU xs) = IntMap.mapWithKey IndexTable.fromOccurrenceMap xs
 
 -- | O(1). Bump the count of a RefF
 increase :: Width -> Var -> OccurU -> OccurU
