@@ -22,6 +22,7 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Syntax (Var, Width)
+import Keelung.Syntax.Counters
 import Prelude hiding (null)
 
 newtype OccurU
@@ -46,8 +47,8 @@ toIntMap :: OccurU -> IntMap (IntMap Int)
 toIntMap (OccurU xs) = xs
 
 -- | O(lg n). To an IndexTable
-toIndexTable :: OccurU -> IntMap IndexTable
-toIndexTable (OccurU xs) = IntMap.mapWithKey IndexTable.fromOccurrenceMap xs
+toIndexTable :: Counters -> OccurU -> IntMap IndexTable
+toIndexTable counters (OccurU xs) = IntMap.mapWithKey (\width x -> IndexTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
 
 -- | O(1). Bump the count of a RefF
 increase :: Width -> Var -> OccurU -> OccurU

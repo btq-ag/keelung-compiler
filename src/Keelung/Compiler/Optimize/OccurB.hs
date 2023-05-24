@@ -16,17 +16,21 @@ import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Constraint
 import Keelung.Syntax (Var)
+import Keelung.Syntax.Counters
 import Prelude hiding (null)
 
 newtype OccurB
   = MapB (IntMap Int)
-  deriving (-- | OccurB
-            --     { -- _occurBO :: !(Vector Int),
-            --       -- _occurBI :: !(Vector Int),
-            --       -- _occurBP :: !(Vector Int),
-            --       _occurBX :: !(Vector Int)
-            --     }
-            Eq, Generic)
+  deriving
+    ( -- | OccurB
+      --     { -- _occurBO :: !(Vector Int),
+      --       -- _occurBI :: !(Vector Int),
+      --       -- _occurBP :: !(Vector Int),
+      --       _occurBX :: !(Vector Int)
+      --     }
+      Eq,
+      Generic
+    )
 
 instance NFData OccurB
 
@@ -62,8 +66,8 @@ toList (MapB xs) = map (first RefBX) $ IntMap.toList xs
 --     notEmpty _ = False
 
 -- | O(lg n). To an IndexTable
-toIndexTable :: OccurB -> IndexTable
-toIndexTable (MapB xs) = IndexTable.fromOccurrenceMap 1 xs
+toIndexTable :: Counters -> OccurB -> IndexTable
+toIndexTable counters (MapB xs) = IndexTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadBool), xs)
 
 -- toIndexTable (MapB xs) = IndexTable.fromOccurrenceMap xs
 

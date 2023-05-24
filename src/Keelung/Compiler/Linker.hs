@@ -12,6 +12,7 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Debug.Trace (traceShow, traceShowId)
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Constraint
@@ -40,7 +41,6 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
-import Debug.Trace (traceShow)
 
 -------------------------------------------------------------------------------
 
@@ -281,6 +281,9 @@ linkPoly_ occurrences xs = case linkPoly occurrences xs of
 -- reindexRefU counters (RefUP w x) = reindex counters PrivateInput (ReadUInt w) x
 -- reindexRefU counters (RefUX w x) = reindex counters Intermediate (ReadUInt w) x
 
+useIndexTable :: Bool
+useIndexTable = True
+
 reindexRef :: Occurences -> Ref -> Var
 reindexRef occurrences (F x) = reindexRefF occurrences x
 reindexRef occurrences (B x) = reindexRefB occurrences x
@@ -290,25 +293,37 @@ reindexRefF :: Occurences -> RefF -> Var
 reindexRefF occurrences (RefFO x) = reindex (occurCounters occurrences) Output ReadField x
 reindexRefF occurrences (RefFI x) = reindex (occurCounters occurrences) PublicInput ReadField x
 reindexRefF occurrences (RefFP x) = reindex (occurCounters occurrences) PrivateInput ReadField x
-reindexRefF occurrences (RefFX x) = IndexTable.reindex (indexTable occurrences) $ reindex (occurCounters occurrences) Intermediate ReadField x
+reindexRefF occurrences (RefFX x) =
+  if useIndexTable
+    then IndexTable.reindex (indexTable occurrences) $ reindex (occurCounters occurrences) Intermediate ReadField x
+    else reindex (occurCounters occurrences) Intermediate ReadField x
 
 reindexRefB :: Occurences -> RefB -> Var
 reindexRefB occurrences (RefBO x) = reindex (occurCounters occurrences) Output ReadBool x
 reindexRefB occurrences (RefBI x) = reindex (occurCounters occurrences) PublicInput ReadBool x
 reindexRefB occurrences (RefBP x) = reindex (occurCounters occurrences) PrivateInput ReadBool x
-reindexRefB occurrences (RefBX x) = IndexTable.reindex (indexTable occurrences) $ reindex (occurCounters occurrences) Intermediate ReadBool x
+reindexRefB occurrences (RefBX x) =
+  if useIndexTable
+    then IndexTable.reindex (indexTable occurrences) $ reindex (occurCounters occurrences) Intermediate ReadBool x
+    else reindex (occurCounters occurrences) Intermediate ReadBool x
 reindexRefB occurrences (RefUBit _ x i) =
   case x of
     RefUO w x' -> reindex (occurCounters occurrences) Output (ReadBits w) x' + (i `mod` w)
     RefUI w x' -> reindex (occurCounters occurrences) PublicInput (ReadBits w) x' + (i `mod` w)
     RefUP w x' -> reindex (occurCounters occurrences) PrivateInput (ReadBits w) x' + (i `mod` w)
-    RefUX w x' -> IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadBits w) x') + (i `mod` w)
+    RefUX w x' ->
+      if useIndexTable
+        then IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadBits w) x') + (i `mod` w)
+        else reindex (occurCounters occurrences) Intermediate (ReadBits w) x' + (i `mod` w)
 
 reindexRefU :: Occurences -> RefU -> Var
 reindexRefU occurrences (RefUO w x) = reindex (occurCounters occurrences) Output (ReadUInt w) x
 reindexRefU occurrences (RefUI w x) = reindex (occurCounters occurrences) PublicInput (ReadUInt w) x
 reindexRefU occurrences (RefUP w x) = reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x
-reindexRefU occurrences (RefUX w x) = IndexTable.reindex (indexTable occurrences) $ reindex (occurCounters occurrences) Intermediate (ReadUInt w) x
+reindexRefU occurrences (RefUX w x) =
+  if useIndexTable
+    then IndexTable.reindex (indexTable occurrences) $ reindex (occurCounters occurrences) Intermediate (ReadUInt w) x
+    else reindex (occurCounters occurrences) Intermediate (ReadUInt w) x
 
 -------------------------------------------------------------------------------
 
@@ -341,7 +356,7 @@ constructOccurences cm =
       -- indexTableF = OccurF.toIndexTable (cmOccurrenceF cm),
       -- indexTableB = OccurB.toIndexTable (cmOccurrenceB cm),
       -- indexTableU = OccurU.toIndexTable (cmOccurrenceU cm),
-      indexTable = OccurF.toIndexTable (cmOccurrenceF cm) <> OccurB.toIndexTable (cmOccurrenceB cm) <> mconcat (IntMap.elems (OccurU.toIndexTable (cmOccurrenceU cm)))
+      indexTable = OccurF.toIndexTable (cmCounters cm) (cmOccurrenceF cm) <> OccurB.toIndexTable (cmCounters cm) (cmOccurrenceB cm) <> mconcat (IntMap.elems (OccurU.toIndexTable  (cmCounters cm) (cmOccurrenceU cm)))
     }
 
 data LinkedOccurences = LinkedOccurences
@@ -372,18 +387,20 @@ linkOccurences xs =
           (refUsInOccurrencesU xs)
     }
 
-relatedToBitTests :: Occurences -> IntSet
-relatedToBitTests xs =
+fromUInt :: Occurences -> IntSet
+fromUInt xs =
   let linked = linkOccurences xs
-   in IntSet.unions (IntMap.elems (linkedBitTestBits linked))
+   in IntSet.unions
+        [ IntSet.unions (IntMap.elems (linkedOccurU linked)),
+          IntSet.unions (IntMap.elems (linkedBitTestBits linked))
+        ]
 
-toIntSet :: Occurences -> IntSet
-toIntSet xs =
+fromFB :: Occurences -> IntSet
+fromFB xs =
   let linked = linkOccurences xs
    in IntSet.unions
         [ linkedOccurF linked,
-          linkedOccurB linked,
-          IntSet.unions (IntMap.elems (linkedOccurU linked))
+          linkedOccurB linked
         ]
 
 -------------------------------------------------------------------------------
@@ -409,39 +426,43 @@ renumberConstraints (cs, (occurrences, _cm)) =
     pinnedVarSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
 
     -- variables in constraints (that should be kept after renumbering!)
-    vars = toIntSet occurrences
-    bitTests = relatedToBitTests occurrences
-
-    -- variables in constraints excluding input & output variables
-    newIntermediateVars = vars <> bitTests
+    newIntermediateVars = fromFB occurrences <> fromUInt occurrences
 
     -- numbers of variables reduced via renumbering
     reducedCount = getCount counters Intermediate - IntSet.size newIntermediateVars
     renumberedIntermediateVars = [pinnedVarSize .. pinnedVarSize + IntSet.size newIntermediateVars - 1]
 
+    us = case IntMap.lookup 4 (OccurU.toIntMap (cmOccurrenceU _cm)) of
+      Nothing -> IndexTable.empty
+      Just x -> traceShow x $ IndexTable.fromOccurrenceMap 4 (traceShowId $ getCount counters (Intermediate, ReadUInt 4), x)
+
     -- mapping of old variables to new variables
     -- input variables are placed in the front
-    variableMap = 
-      if IntSet.size newIntermediateVars /= length renumberedIntermediateVars
-        then 
-          traceShow (reducedCount, "newIntermediateVars", newIntermediateVars, "renumberedIntermediateVars", renumberedIntermediateVars) $    
-          Map.fromAscList $ zip (IntSet.toAscList newIntermediateVars) renumberedIntermediateVars
-        else Map.fromAscList $ zip (IntSet.toAscList newIntermediateVars) renumberedIntermediateVars
+    variableMap =
+      if newIntermediateVars /= IntSet.fromList renumberedIntermediateVars
+        then
+          traceShow (us, pinnedVarSize, IntSet.toList newIntermediateVars, renumberedIntermediateVars) $
+            Just $
+              Map.fromAscList $
+                zip (IntSet.toAscList newIntermediateVars) renumberedIntermediateVars
+        else Nothing
 
-    renumber var =
-      if var >= pinnedVarSize
-        then case Map.lookup var variableMap of
-          Nothing ->
-            error
-              ( "can't find a mapping for variable "
-                  <> show var
-                  <> " \nmapping: "
-                  <> show variableMap
-                  <> " \nrenumbered vars: "
-                  <> show renumberedIntermediateVars
-              )
-          Just var' -> var'
-        else var -- this is an pinned variable
+    renumber var = case variableMap of
+      Nothing -> var
+      Just mapping ->
+        if var >= pinnedVarSize
+          then case Map.lookup var mapping of
+            Nothing ->
+              error
+                ( "can't find a mapping for variable "
+                    <> show var
+                    <> " \nmapping: "
+                    <> show variableMap
+                    <> " \nrenumbered vars: "
+                    <> show renumberedIntermediateVars
+                )
+            Just var' -> var'
+          else var -- this is an pinned variable
     renumberConstraint constraint = case constraint of
       Linked.CAdd xs ->
         Linked.CAdd $ Poly.renumberVars renumber xs

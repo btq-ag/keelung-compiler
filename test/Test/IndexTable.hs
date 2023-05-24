@@ -13,19 +13,19 @@ tests = do
   describe "reindex" $ do
     it "with no holes" $ do
       let occurrences = IntMap.fromList $ zip [0 ..] [1, 2, 1, 3, 4, 1]
-          table = IndexTable.fromOccurrenceMap 1 occurrences
+          table = IndexTable.fromOccurrenceMap 1 (6, occurrences)
       forM_ [0 .. 5] $ \i -> do
         IndexTable.reindex table i `shouldBe` i
 
     it "with 1 hole in the back" $ do
       let occurrences = IntMap.fromList $ zip [0 ..] [1, 2, 1, 3, 0, 0]
-          table = IndexTable.fromOccurrenceMap 1 occurrences
+          table = IndexTable.fromOccurrenceMap 1 (6, occurrences)
       forM_ [0 .. 3] $ \i -> do
         IndexTable.reindex table i `shouldBe` i
 
     it "with 1 hole in the middle" $ do
-      let occurrences = IntMap.fromList $ zip [0 ..] [1, 0, 0, 2, 1, 3]
-          table = IndexTable.fromOccurrenceMap 1 occurrences
+      let occurrences = IntMap.fromList [(0,1),(2,0),(3,2),(4,1),(5,3)]
+          table = IndexTable.fromOccurrenceMap 1 (6, occurrences)
 
       forM_ [0] $ \i -> do
         IndexTable.reindex table i `shouldBe` i
@@ -34,14 +34,15 @@ tests = do
 
     it "with 1 hole in the front" $ do
       let occurrences = IntMap.fromList $ zip [0 ..] [0, 0, 0, 1, 2, 1, 3]
-          table = IndexTable.fromOccurrenceMap 1 occurrences
+          table = IndexTable.fromOccurrenceMap 1 (7, occurrences)
 
       forM_ [3 .. 6] $ \i -> do
         IndexTable.reindex table i `shouldBe` i - 3
 
     it "other cases" $ do
       let occurrences = IntMap.fromList $ zip [0 ..] [0, 1, 0, 1, 2, 0, 3]
-          table = IndexTable.fromOccurrenceMap 1 occurrences
+          table = IndexTable.fromOccurrenceMap 1 (7, occurrences)
+
 
       IndexTable.reindex table 1 `shouldBe` 0
       IndexTable.reindex table 3 `shouldBe` 1
@@ -50,7 +51,7 @@ tests = do
 
     it "with different bit widths 1" $ do
       let occurrences = IntMap.fromList $ zip [0 ..] [0, 1, 2, 1, 2, 0, 3]
-          table = IndexTable.fromOccurrenceMap 2 occurrences <> IndexTable.fromOccurrenceMap 3 occurrences
+          table = IndexTable.fromOccurrenceMap 2 (7, occurrences)
 
       -- 01234567890123
       -- __xxxxxxxx__xx
@@ -63,9 +64,9 @@ tests = do
       IndexTable.reindex table 8 `shouldBe` 6
       IndexTable.reindex table 12 `shouldBe` 8
 
-    it "with different bit widths" $ do
+    it "with different bit widths 2" $ do
       let occurrences = IntMap.fromList $ zip [0 ..] [0, 1, 2, 1, 2, 0, 3]
-          table = IndexTable.fromOccurrenceMap 2 occurrences <> IndexTable.fromOccurrenceMap 3 occurrences
+          table = IndexTable.fromOccurrenceMap 2 (7, occurrences) <> IndexTable.fromOccurrenceMap 3 (7, occurrences)
 
       -- 01234567890123456789012345678901234
       -- __xxxxxxxx__xx___xxxxxxxxxxxx___xxx
@@ -86,7 +87,7 @@ tests = do
   describe "merge" $ do
     it "1" $ do
       let occurrences = IntMap.fromList $ zip [0 ..] [0, 1, 0, 1, 2, 0, 3]
-          table1 = IndexTable.fromOccurrenceMap 1 occurrences
+          table1 = IndexTable.fromOccurrenceMap 1 (7, occurrences)
           table = table1 <> table1
 
       IndexTable.reindex table 1 `shouldBe` 0
@@ -99,9 +100,9 @@ tests = do
       IndexTable.reindex table 13 `shouldBe` 7
 
     it "2" $ do
-      let table1 = IndexTable.fromOccurrenceMap 1 (IntMap.fromList (zip [0 ..] [0, 0, 0]))
-          table2 = IndexTable.fromOccurrenceMap 1 (IntMap.fromList (zip [0 ..] [2, 3, 0]))
-          table3 = IndexTable.fromOccurrenceMap 1 (IntMap.fromList (zip [0 ..] [2, 3, 0]))
+      let table1 = IndexTable.fromOccurrenceMap 1 (3, IntMap.fromList (zip [0 ..] [0, 0, 0]))
+          table2 = IndexTable.fromOccurrenceMap 1 (3, IntMap.fromList (zip [0 ..] [2, 3, 0]))
+          table3 = IndexTable.fromOccurrenceMap 1 (3, IntMap.fromList (zip [0 ..] [2, 3, 0]))
           table = table1 <> table2 <> table3
 
       IndexTable.reindex table 3 `shouldBe` 0

@@ -21,6 +21,7 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Syntax (Var)
+import Keelung.Syntax.Counters
 import Prelude hiding (null)
 
 newtype OccurF
@@ -42,8 +43,8 @@ toList :: OccurF -> [(Int, Int)]
 toList (OccurF xs) = IntMap.toList xs
 
 -- | O(lg n). To an IndexTable
-toIndexTable :: OccurF -> IndexTable
-toIndexTable (OccurF xs) = IndexTable.fromOccurrenceMap 1 xs
+toIndexTable :: Counters -> OccurF -> IndexTable
+toIndexTable counters (OccurF xs) = IndexTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadField), xs)
 
 -- | O(1). Bump the count of a RefF
 increase :: Var -> OccurF -> OccurF
