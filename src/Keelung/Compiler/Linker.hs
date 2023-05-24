@@ -1,4 +1,4 @@
-module Keelung.Compiler.Linker (linkConstraintModule, renumberConstraints) where
+module Keelung.Compiler.Linker (linkConstraintModule, renumberConstraints, reindexRef, indexTable) where
 
 import Control.Arrow (left)
 import Data.Bifunctor (Bifunctor (bimap), first)
@@ -12,7 +12,7 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Debug.Trace (traceShow, traceShowId)
+import Debug.Trace
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Constraint
@@ -75,9 +75,9 @@ linkConstraintModule cm =
     generateBinReps :: Counters -> OccurU -> [BinRep]
     generateBinReps (Counters o i1 i2 _ _ _ _) occurrencesU =
       toList $
-        fromSmallCounter Output o
-          <> fromSmallCounter PublicInput i1
-          <> fromSmallCounter PrivateInput i2
+        fromSmallCounter RefUO o
+          <> fromSmallCounter RefUI i1
+          <> fromSmallCounter RefUP i2
           <> intermediateBinReps
       where
         intermediateBinReps =
@@ -86,8 +86,8 @@ linkConstraintModule cm =
               ( \(width, xs) ->
                   mapMaybe
                     ( \(var, count) ->
-                        let varOffset = reindex counters Intermediate (ReadUInt width) var
-                            binRepOffset = reindex counters Intermediate (ReadBits width) var
+                        let varOffset = reindexRef occurrences (U (RefUX width var))
+                            binRepOffset = reindexRef occurrences (B (RefUBit width (RefUX width var) 0))
                          in if count > 0
                               then Just (BinRep varOffset width binRepOffset)
                               else Nothing
@@ -97,12 +97,14 @@ linkConstraintModule cm =
               (OccurU.toList occurrencesU)
 
         -- fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
-        fromSmallCounter sort (Struct _ _ u) = Seq.fromList $ concatMap (fromPair sort) (IntMap.toList u)
+        fromSmallCounter refType (Struct _ _ u) = Seq.fromList $ concatMap (fromPair refType) (IntMap.toList u)
 
         -- fromPair :: VarSort -> (Width, Int) -> [BinRep]
-        fromPair sort (width, count) =
-          let varOffset = reindex counters sort (ReadUInt width) 0
-              binRepOffset = reindex counters sort (ReadBits width) 0
+        fromPair refType (width, count) =
+          let varOffset = reindexRef occurrences (U (refType width 0))
+              binRepOffset = reindexRef occurrences (B (RefUBit width (refType width 0) 0))
+              -- reindex counters refType (ReadUInt width) 0
+              -- binRepOffset = reindex counters refType (ReadBits width) 0
            in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
 
     extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Linked.Constraint n)
@@ -356,7 +358,10 @@ constructOccurences cm =
       -- indexTableF = OccurF.toIndexTable (cmOccurrenceF cm),
       -- indexTableB = OccurB.toIndexTable (cmOccurrenceB cm),
       -- indexTableU = OccurU.toIndexTable (cmOccurrenceU cm),
-      indexTable = OccurF.toIndexTable (cmCounters cm) (cmOccurrenceF cm) <> OccurB.toIndexTable (cmCounters cm) (cmOccurrenceB cm) <> mconcat (IntMap.elems (OccurU.toIndexTable  (cmCounters cm) (cmOccurrenceU cm)))
+      indexTable =
+        OccurF.toIndexTable (cmCounters cm) (cmOccurrenceF cm)
+          <> OccurB.toIndexTable (cmCounters cm) (cmOccurrenceB cm)
+          <> OccurU.toIndexTable (cmCounters cm) (cmOccurrenceU cm)
     }
 
 data LinkedOccurences = LinkedOccurences
@@ -426,25 +431,23 @@ renumberConstraints (cs, (occurrences, _cm)) =
     pinnedVarSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
 
     -- variables in constraints (that should be kept after renumbering!)
-    newIntermediateVars = fromFB occurrences <> fromUInt occurrences
+    intermediateVars = fromFB occurrences <> fromUInt occurrences
 
     -- numbers of variables reduced via renumbering
-    reducedCount = getCount counters Intermediate - IntSet.size newIntermediateVars
-    renumberedIntermediateVars = [pinnedVarSize .. pinnedVarSize + IntSet.size newIntermediateVars - 1]
+    reducedCount = getCount counters Intermediate - IntSet.size intermediateVars
+    renumberedIntermediateVars = [pinnedVarSize .. pinnedVarSize + IntSet.size intermediateVars - 1]
 
-    us = case IntMap.lookup 4 (OccurU.toIntMap (cmOccurrenceU _cm)) of
-      Nothing -> IndexTable.empty
-      Just x -> traceShow x $ IndexTable.fromOccurrenceMap 4 (traceShowId $ getCount counters (Intermediate, ReadUInt 4), x)
+    us2 = OccurU.toIndexTable counters (cmOccurrenceU _cm)
 
     -- mapping of old variables to new variables
     -- input variables are placed in the front
     variableMap =
-      if newIntermediateVars /= IntSet.fromList renumberedIntermediateVars
+      if intermediateVars /= IntSet.fromList renumberedIntermediateVars
         then
-          traceShow (us, pinnedVarSize, IntSet.toList newIntermediateVars, renumberedIntermediateVars) $
+          traceShow (us2, pinnedVarSize, IntSet.toList intermediateVars, renumberedIntermediateVars) $
             Just $
               Map.fromAscList $
-                zip (IntSet.toAscList newIntermediateVars) renumberedIntermediateVars
+                zip (IntSet.toAscList intermediateVars) renumberedIntermediateVars
         else Nothing
 
     renumber var = case variableMap of

@@ -1,9 +1,16 @@
+{-# LANGUAGE DataKinds #-}
+
 module Test.IndexTable (tests, run) where
 
 import Control.Monad (forM_)
 import Data.IntMap.Strict qualified as IntMap
+import Keelung
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
+import Keelung.Compiler.Constraint
+import Keelung.Compiler.ConstraintModule (ConstraintModule)
+import Keelung.Compiler.Linker (indexTable, linkConstraintModule, reindexRef)
 import Test.Hspec
+import Test.Optimization.Util (execute)
 
 run :: IO ()
 run = hspec tests
@@ -24,7 +31,7 @@ tests = do
         IndexTable.reindex table i `shouldBe` i
 
     it "with 1 hole in the middle" $ do
-      let occurrences = IntMap.fromList [(0,1),(2,0),(3,2),(4,1),(5,3)]
+      let occurrences = IntMap.fromList [(0, 1), (2, 0), (3, 2), (4, 1), (5, 3)]
           table = IndexTable.fromOccurrenceMap 1 (6, occurrences)
 
       forM_ [0] $ \i -> do
@@ -42,7 +49,6 @@ tests = do
     it "other cases" $ do
       let occurrences = IntMap.fromList $ zip [0 ..] [0, 1, 0, 1, 2, 0, 3]
           table = IndexTable.fromOccurrenceMap 1 (7, occurrences)
-
 
       IndexTable.reindex table 1 `shouldBe` 0
       IndexTable.reindex table 3 `shouldBe` 1
@@ -109,3 +115,60 @@ tests = do
       IndexTable.reindex table 4 `shouldBe` 1
       IndexTable.reindex table 6 `shouldBe` 2
       IndexTable.reindex table 7 `shouldBe` 3
+
+  describe "fromOccurrences" $ do
+    it "add + assertion" $ do
+      (_, cm) <- execute $ do
+        x <- inputUInt @4 Public
+        assert $ 2 `eq` (x + 1)
+      let (_, (occurrences, _)) = linkConstraintModule cm
+      let inputVar = RefUI 4 0
+      reindexRef occurrences (B (RefUBit 4 inputVar 0)) `shouldBe` 0
+      reindexRef occurrences (B (RefUBit 4 inputVar 1)) `shouldBe` 1
+      reindexRef occurrences (B (RefUBit 4 inputVar 2)) `shouldBe` 2
+      reindexRef occurrences (B (RefUBit 4 inputVar 3)) `shouldBe` 3
+      reindexRef occurrences (U inputVar) `shouldBe` 4
+      let intermediate4 = RefUX 4 1
+      reindexRef occurrences (B (RefUBit 4 intermediate4 0)) `shouldBe` 5
+      reindexRef occurrences (B (RefUBit 4 intermediate4 1)) `shouldBe` 6
+      reindexRef occurrences (B (RefUBit 4 intermediate4 2)) `shouldBe` 7
+      reindexRef occurrences (B (RefUBit 4 intermediate4 3)) `shouldBe` 8
+      let intermediate5 = RefUX 5 0
+      reindexRef occurrences (B (RefUBit 5 intermediate5 0)) `shouldBe` 9
+      reindexRef occurrences (B (RefUBit 5 intermediate5 1)) `shouldBe` 10
+      reindexRef occurrences (B (RefUBit 5 intermediate5 2)) `shouldBe` 11
+      reindexRef occurrences (B (RefUBit 5 intermediate5 3)) `shouldBe` 12
+      reindexRef occurrences (B (RefUBit 5 intermediate5 4)) `shouldBe` 13
+
+      reindexRef occurrences (U intermediate4) `shouldBe` 14
+      reindexRef occurrences (U intermediate5) `shouldBe` 15
+
+    it "Bit test / and 1" $ do
+      (_, cm) <- execute $ do
+        x <- inputUInt @4 Public
+        y <- inputUInt @4 Private
+        return $ (x .&. y) !!! 0
+      let (cs, (occurrences, _)) = linkConstraintModule cm
+
+      reindexRef occurrences (B (RefBO 0)) `shouldBe` 0
+      let inputVar0 = RefUI 4 0
+      reindexRef occurrences (B (RefUBit 4 inputVar0 0)) `shouldBe` 1
+      reindexRef occurrences (B (RefUBit 4 inputVar0 1)) `shouldBe` 2
+      reindexRef occurrences (B (RefUBit 4 inputVar0 2)) `shouldBe` 3
+      reindexRef occurrences (B (RefUBit 4 inputVar0 3)) `shouldBe` 4
+      reindexRef occurrences (U inputVar0) `shouldBe` 5
+      let inputVar1 = RefUP 4 0
+      reindexRef occurrences (B (RefUBit 4 inputVar1 0)) `shouldBe` 6
+      reindexRef occurrences (B (RefUBit 4 inputVar1 1)) `shouldBe` 7
+      reindexRef occurrences (B (RefUBit 4 inputVar1 2)) `shouldBe` 8
+      reindexRef occurrences (B (RefUBit 4 inputVar1 3)) `shouldBe` 9
+      reindexRef occurrences (U inputVar1) `shouldBe` 10
+      let intermediateVar0 = RefUX 4 0
+      reindexRef occurrences (B (RefUBit 4 intermediateVar0 0)) `shouldBe` 11
+      reindexRef occurrences (B (RefUBit 4 intermediateVar0 1)) `shouldBe` 12
+      reindexRef occurrences (B (RefUBit 4 intermediateVar0 2)) `shouldBe` 13
+      reindexRef occurrences (B (RefUBit 4 intermediateVar0 3)) `shouldBe` 14
+      reindexRef occurrences (U intermediateVar0) `shouldBe` 15
+
+      print cm
+      print cs
