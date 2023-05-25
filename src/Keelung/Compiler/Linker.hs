@@ -1,4 +1,4 @@
-module Keelung.Compiler.Linker (linkConstraintModule, renumberConstraints, reindexRef, indexTable) where
+module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Occurrences, constructOccurrences) where
 
 import Control.Arrow (left)
 import Data.Bifunctor (Bifunctor (bimap), first)
@@ -12,7 +12,6 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Debug.Trace
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Constraint
@@ -33,7 +32,6 @@ import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Data.BinRep
-import Keelung.Data.BinRep qualified as BinRep
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
@@ -44,32 +42,29 @@ import Keelung.Syntax.Counters
 
 -------------------------------------------------------------------------------
 
-linkConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> (ConstraintSystem n, (Occurences, ConstraintModule n))
+linkConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintSystem n
 linkConstraintModule cm =
-  ( ConstraintSystem
-      { csField = cmField cm,
-        csCounters = counters,
-        csBinReps = binReps,
-        csBinReps' = map (Seq.fromList . map (first (reindexRefB occurrences))) (cmBinReps cm),
-        csConstraints =
-          varEqFs
-            <> varEqBs
-            <> varEqUs
-            <> addFs
-            <> mulFs,
-        csEqZeros = toList eqZeros,
-        csDivMods = divMods,
-        csModInvs = modInvs
-      },
-    (occurrences, cm)
-  )
+  ConstraintSystem
+    { csField = cmField cm,
+      csCounters = counters,
+      csBinReps = binReps,
+      csBinReps' = map (Seq.fromList . map (first (reindexRefB occurrences))) (cmBinReps cm),
+      csConstraints =
+        varEqFs
+          <> varEqBs
+          <> varEqUs
+          <> addFs
+          <> mulFs,
+      csEqZeros = toList eqZeros,
+      csDivMods = divMods,
+      csModInvs = modInvs
+    }
   where
-    counters = cmCounters cm
+    !occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
+    !counters = updateCounters occurrences (cmCounters cm)
     uncurry3 f (a, b, c) = f a b c
 
     binReps = generateBinReps counters (cmOccurrenceU cm)
-
-    occurrences = constructOccurences cm
 
     -- \| Generate BinReps from the UIntRelations
     generateBinReps :: Counters -> OccurU -> [BinRep]
@@ -202,7 +197,7 @@ linkConstraintModule cm =
 
 -------------------------------------------------------------------------------
 
-linkConstraint :: (GaloisField n, Integral n) => Occurences -> Constraint n -> Linked.Constraint n
+linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Constraint n -> Linked.Constraint n
 linkConstraint counters (CAddF as) = Linked.CAdd (linkPoly_ counters as)
 linkConstraint occurrences (CVarEq x y) =
   case Poly.buildEither 0 [(reindexRef occurrences x, 1), (reindexRef occurrences y, -1)] of
@@ -237,221 +232,80 @@ linkConstraint counters (CMulF as bs cs) =
         Right xs -> linkPoly counters xs
     )
 
+updateCounters :: Occurrences -> Counters -> Counters
+updateCounters occurrences counters =
+  let reducedFX = (WriteField, getCount counters (Intermediate, ReadField) - IntSet.size (refFsInOccurrencesF occurrences))
+      reducedBX = (WriteBool, getCount counters (Intermediate, ReadBool) - IntSet.size (refBsInOccurrencesB occurrences))
+      reducedUXs = IntMap.mapWithKey (\width set -> (WriteUInt width, getCount counters (Intermediate, ReadUInt width) - IntSet.size set)) (refUsInOccurrencesU occurrences)
+   in foldr (\(selector, reducedAmount) -> addCount (Intermediate, selector) (-reducedAmount)) counters $ reducedFX : reducedBX : IntMap.elems reducedUXs
+
 --------------------------------------------------------------------------------
 
-linkPoly :: (Integral n, GaloisField n) => Occurences -> PolyG Ref n -> Either n (Poly n)
+linkPoly :: (Integral n, GaloisField n) => Occurrences -> PolyG Ref n -> Either n (Poly n)
 linkPoly occurrences poly = case PolyG.view poly of
   PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRef occurrences var, coeff)]
   PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRef occurrences var1, coeff1), (reindexRef occurrences var2, coeff2)]
   PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRef occurrences)) (Map.toList xs))
 
-linkPoly_ :: (Integral n, GaloisField n) => Occurences -> PolyG Ref n -> Poly n
+linkPoly_ :: (Integral n, GaloisField n) => Occurrences -> PolyG Ref n -> Poly n
 linkPoly_ occurrences xs = case linkPoly occurrences xs of
   Left _ -> error "[ panic ] linkPoly_: Left"
   Right p -> p
 
 --------------------------------------------------------------------------------
 
-useIndexTable :: Bool
-useIndexTable = True
-
-pinnedSize :: Occurences -> Int
-pinnedSize occurrences = getCount (occurCounters occurrences) Output + getCount (occurCounters occurrences) PublicInput + getCount (occurCounters occurrences) PrivateInput
-
-reindexRef :: Occurences -> Ref -> Var
+reindexRef :: Occurrences -> Ref -> Var
 reindexRef occurrences (F x) = reindexRefF occurrences x
 reindexRef occurrences (B x) = reindexRefB occurrences x
 reindexRef occurrences (U x) = reindexRefU occurrences x
 
-reindexRefF :: Occurences -> RefF -> Var
+reindexRefF :: Occurrences -> RefF -> Var
 reindexRefF occurrences (RefFO x) = reindex (occurCounters occurrences) Output ReadField x
 reindexRefF occurrences (RefFI x) = reindex (occurCounters occurrences) PublicInput ReadField x
 reindexRefF occurrences (RefFP x) = reindex (occurCounters occurrences) PrivateInput ReadField x
-reindexRefF occurrences (RefFX x) =
-  if useIndexTable
-    then IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadField x - pinnedSize occurrences) + pinnedSize occurrences
-    else reindex (occurCounters occurrences) Intermediate ReadField x
+reindexRefF occurrences (RefFX x) = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadField x - pinnedSize occurrences) + pinnedSize occurrences
 
-reindexRefB :: Occurences -> RefB -> Var
+reindexRefB :: Occurrences -> RefB -> Var
 reindexRefB occurrences (RefBO x) = reindex (occurCounters occurrences) Output ReadBool x
 reindexRefB occurrences (RefBI x) = reindex (occurCounters occurrences) PublicInput ReadBool x
 reindexRefB occurrences (RefBP x) = reindex (occurCounters occurrences) PrivateInput ReadBool x
-reindexRefB occurrences (RefBX x) =
-  if useIndexTable
-    then IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadBool x - pinnedSize occurrences) + pinnedSize occurrences
-    else reindex (occurCounters occurrences) Intermediate ReadBool x
+reindexRefB occurrences (RefBX x) = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadBool x - pinnedSize occurrences) + pinnedSize occurrences
 reindexRefB occurrences (RefUBit _ x i) =
   case x of
     RefUO w x' -> reindex (occurCounters occurrences) Output (ReadBits w) x' + (i `mod` w)
     RefUI w x' -> reindex (occurCounters occurrences) PublicInput (ReadBits w) x' + (i `mod` w)
     RefUP w x' -> reindex (occurCounters occurrences) PrivateInput (ReadBits w) x' + (i `mod` w)
-    RefUX w x' ->
-      if useIndexTable
-        then IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadBits w) x' - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
-        else reindex (occurCounters occurrences) Intermediate (ReadBits w) x' + (i `mod` w)
+    RefUX w x' -> IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadBits w) x' - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
 
-reindexRefU :: Occurences -> RefU -> Var
+reindexRefU :: Occurrences -> RefU -> Var
 reindexRefU occurrences (RefUO w x) = reindex (occurCounters occurrences) Output (ReadUInt w) x
 reindexRefU occurrences (RefUI w x) = reindex (occurCounters occurrences) PublicInput (ReadUInt w) x
 reindexRefU occurrences (RefUP w x) = reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x
-reindexRefU occurrences (RefUX w x) =
-  if useIndexTable
-    then IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x - pinnedSize occurrences) + pinnedSize occurrences
-    else reindex (occurCounters occurrences) Intermediate (ReadUInt w) x
+reindexRefU occurrences (RefUX w x) = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x - pinnedSize occurrences) + pinnedSize occurrences
 
 -------------------------------------------------------------------------------
 
 -- | Allow us to determine which relations should be extracted from the pool
-data Occurences = Occurences
+data Occurrences = Occurrences
   { occurCounters :: !Counters,
-    occurF :: !OccurF,
-    occurB :: !OccurB,
-    occurU :: !OccurU,
     refFsInOccurrencesF :: !IntSet,
     refBsInOccurrencesB :: !IntSet,
     refUsInOccurrencesU :: !(IntMap IntSet),
-    indexTable :: !IndexTable
+    indexTable :: !IndexTable,
+    pinnedSize :: !Int
   }
 
--- | Smart constructor for 'Occurences'
-constructOccurences :: ConstraintModule n -> Occurences
-constructOccurences cm =
-  Occurences
-    { occurCounters = cmCounters cm,
-      occurF = cmOccurrenceF cm,
-      occurB = cmOccurrenceB cm,
-      occurU = cmOccurrenceU cm,
-      refFsInOccurrencesF = OccurF.occuredSet (cmOccurrenceF cm),
-      refBsInOccurrencesB = OccurB.occuredSet (cmOccurrenceB cm),
-      refUsInOccurrencesU = OccurU.occuredSet (cmOccurrenceU cm),
+-- | Smart constructor for 'Occurrences'
+constructOccurrences :: Counters -> OccurF -> OccurB -> OccurU -> Occurrences
+constructOccurrences counters occurF occurB occurU =
+  Occurrences
+    { occurCounters = counters,
+      refFsInOccurrencesF = OccurF.occuredSet occurF,
+      refBsInOccurrencesB = OccurB.occuredSet occurB,
+      refUsInOccurrencesU = OccurU.occuredSet occurU,
       indexTable =
-        -- traceShow (OccurF.toIndexTable (cmCounters cm) (cmOccurrenceF cm))
-        -- traceShow (OccurB.toIndexTable (cmCounters cm) (cmOccurrenceB cm))
-        -- traceShow (OccurU.toIndexTable (cmCounters cm) (cmOccurrenceU cm))
-        OccurF.toIndexTable (cmCounters cm) (cmOccurrenceF cm)
-          <> OccurB.toIndexTable (cmCounters cm) (cmOccurrenceB cm)
-          <> OccurU.toIndexTable (cmCounters cm) (cmOccurrenceU cm)
+        OccurF.toIndexTable counters occurF
+          <> OccurB.toIndexTable counters occurB
+          <> OccurU.toIndexTable counters occurU,
+      pinnedSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
     }
-
-data LinkedOccurences = LinkedOccurences
-  { linkedOccurF :: !IntSet,
-    linkedOccurB :: !IntSet,
-    linkedOccurU :: !(IntMap IntSet),
-    linkedBitTestBits :: !(IntMap IntSet)
-  }
-  deriving (Show)
-
-linkOccurences :: Occurences -> LinkedOccurences
-linkOccurences xs =
-  LinkedOccurences
-    { linkedOccurF = IntSet.map (reindexRefF xs . RefFX) (refFsInOccurrencesF xs),
-      linkedOccurB = IntSet.map (reindexRefB xs . RefBX) (refBsInOccurrencesB xs),
-      linkedOccurU = IntMap.mapWithKey (\width -> IntSet.map (reindexRefU xs . RefUX width)) (refUsInOccurrencesU xs),
-      linkedBitTestBits =
-        IntMap.mapWithKey
-          ( \width set ->
-              IntSet.unions
-                $ map
-                  ( \var ->
-                      let start = reindexRef xs (B (RefUBit width (RefUX width var) 0))
-                       in IntSet.fromAscList [start .. start + width - 1]
-                  )
-                $ IntSet.toList set
-          )
-          (refUsInOccurrencesU xs)
-    }
-
-fromUInt :: Occurences -> IntSet
-fromUInt xs =
-  let linked = linkOccurences xs
-   in IntSet.unions
-        [ IntSet.unions (IntMap.elems (linkedBitTestBits linked)),
-          IntSet.unions (IntMap.elems (linkedOccurU linked))
-        ]
-
-fromFB :: Occurences -> IntSet
-fromFB xs =
-  let linked = linkOccurences xs
-   in IntSet.unions
-        [ linkedOccurF linked,
-          linkedOccurB linked
-        ]
-
--------------------------------------------------------------------------------
-
--- | Sequentially renumber term variables '0..max_var'.  Return
---   renumbered constraints, together with the total number of
---   variables in the (renumbered) constraint set and the (possibly
---   renumbered) in and out variables.
-renumberConstraints :: (GaloisField n, Integral n) => (ConstraintSystem n, (Occurences, ConstraintModule n)) -> ConstraintSystem n
-renumberConstraints (cs, (occurrences, _cm)) =
-  ConstraintSystem
-    { csField = csField cs,
-      csConstraints = fmap renumberConstraint (csConstraints cs),
-      csBinReps = fmap renumberBinRep (csBinReps cs),
-      csBinReps' = csBinReps' cs,
-      csCounters = setReducedCount reducedCount counters,
-      csEqZeros = fmap renumberEqZero (csEqZeros cs),
-      csDivMods = fmap renumberDivMod (csDivMods cs),
-      csModInvs = fmap renumberModInv (csModInvs cs)
-    }
-  where
-    counters = csCounters cs
-    pinnedVarSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
-
-    -- variables in constraints (that should be kept after renumbering!)
-    intermediateVars = fromFB occurrences <> fromUInt occurrences
-
-    -- numbers of variables reduced via renumbering
-    reducedCount = getCount counters Intermediate - IntSet.size intermediateVars
-    renumberedIntermediateVars = [pinnedVarSize .. pinnedVarSize + IntSet.size intermediateVars - 1]
-
-    -- mapping of old variables to new variables
-    -- input variables are placed in the front
-    variableMap =
-      if intermediateVars /= IntSet.fromList renumberedIntermediateVars
-        then
-          traceShow (indexTable occurrences, pinnedVarSize, IntSet.toList intermediateVars, renumberedIntermediateVars) $
-            Just $
-              Map.fromAscList $
-                zip (IntSet.toAscList intermediateVars) renumberedIntermediateVars
-        else Nothing
-
-    renumber var = case variableMap of
-      Nothing -> var
-      Just mapping ->
-        if var >= pinnedVarSize
-          then case Map.lookup var mapping of
-            Nothing ->
-              error
-                ( "can't find a mapping for variable $"
-                    <> show var
-                    <> " \nmapping: "
-                    <> show (Map.toList mapping)
-                    <> " \nrenumbered vars: "
-                    <> show renumberedIntermediateVars
-                )
-            Just var' -> var'
-          else var -- this is an pinned variable
-    renumberConstraint constraint = case constraint of
-      Linked.CAdd xs ->
-        Linked.CAdd $ Poly.renumberVars renumber xs
-      Linked.CMul aV bV cV ->
-        Linked.CMul (Poly.renumberVars renumber aV) (Poly.renumberVars renumber bV) (Poly.renumberVars renumber <$> cV)
-
-    renumberBinRep binRep =
-      binRep
-        { BinRep.binRepVar = renumber (BinRep.binRepVar binRep),
-          BinRep.binRepBitStart = renumber (BinRep.binRepBitStart binRep)
-        }
-
-    renumberEqZero (xs, m) = (Poly.renumberVars renumber xs, renumber m)
-
-    renumberDivMod (x, y, q, r) =
-      ( left renumber x,
-        left renumber y,
-        left renumber q,
-        left renumber r
-      )
-
-    renumberModInv (x, n, p) = (left renumber x, left renumber n, p)

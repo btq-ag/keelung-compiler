@@ -37,7 +37,7 @@ interpretR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
 -- | constraint system interpreters (unoptimized)
 interpretR1CSUnoptimized :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Either (Error n) [n]
 interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS . fst . Linker.linkConstraintModule <$> Compiler.compileO0 fieldInfo prog
+  r1cs <- toR1CS . Linker.linkConstraintModule <$> Compiler.compileO0 fieldInfo prog
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case R1CS.run r1cs inputs of
     Left err -> Left (InterpretError $ Interpreter.R1CSError err)
@@ -94,7 +94,7 @@ runAndCompare fieldInfo program rawPublicInputs rawPrivateInputs = do
 debug :: Encode t => Comp t -> IO ()
 debug program = do
   print $ Compiler.asGF181N $ Compiler.compileO0 gf181Info program
-  print (Compiler.asGF181N $ toR1CS . fst . Linker.linkConstraintModule <$> Compiler.compileO0 gf181Info program)
+  print (Compiler.asGF181N $ toR1CS . Linker.linkConstraintModule <$> Compiler.compileO0 gf181Info program)
   -- print $ Compiler.asGF181N $ Compiler.compileO1 program
   print $ Compiler.asGF181N $ Compiler.compileToModules gf181Info program
   print (Compiler.asGF181N $ toR1CS <$> Compiler.compileO1 gf181Info program)

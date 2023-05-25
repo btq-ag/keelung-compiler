@@ -7,8 +7,8 @@ import Data.IntMap.Strict qualified as IntMap
 import Keelung
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.ConstraintModule (ConstraintModule)
-import Keelung.Compiler.Linker (indexTable, linkConstraintModule, reindexRef)
+import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
+import Keelung.Compiler.Linker (constructOccurrences, reindexRef)
 import Test.Hspec
 import Test.Optimization.Util (execute)
 
@@ -121,7 +121,7 @@ tests = do
       (_, cm) <- execute $ do
         x <- inputUInt @4 Public
         assert $ 2 `eq` (x + 1)
-      let (cs, (occurrences, _)) = linkConstraintModule cm
+      let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
       let inputVar = RefUI 4 0
       reindexRef occurrences (B (RefUBit 4 inputVar 0)) `shouldBe` 0
       reindexRef occurrences (B (RefUBit 4 inputVar 1)) `shouldBe` 1
@@ -149,7 +149,7 @@ tests = do
         x <- inputUInt @4 Public
         y <- inputUInt @4 Private
         return $ (x .&. y) !!! 0
-      let (_cs, (occurrences, _)) = linkConstraintModule cm
+      let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
 
       reindexRef occurrences (B (RefBO 0)) `shouldBe` 0
       let inputVar0 = RefUI 4 0
@@ -177,7 +177,7 @@ tests = do
         y <- inputUInt @4 Private
         z <- inputUInt @4 Public
         return $ (x .&. y .&. z) !!! 0
-      let (_, (occurrences, _)) = linkConstraintModule cm
+      let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
 
       reindexRef occurrences (B (RefBO 0)) `shouldBe` 0
       let inputVar0 = RefUI 4 0
