@@ -25,16 +25,17 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.VarGroup
 import Keelung.Syntax
 import Keelung.Syntax.Counters
+import Control.Monad.Reader
 
 --------------------------------------------------------------------------------
 
 -- | Monad for R1CS interpretation / witness generation
-type M n = StateT (IntMap n) (Except (Error n))
+type M n = ReaderT Ranges (StateT (IntMap n) (Except (Error n)))
 
-runM :: (GaloisField n, Integral n) => Inputs n -> M n a -> Either (Error n) (Vector n)
-runM inputs p =
+runM :: (GaloisField n, Integral n) => Ranges -> Inputs n -> M n a -> Either (Error n) (Vector n)
+runM boolVarRanges inputs p =
   let counters = Inputs.inputCounters inputs
-   in case runExcept (execStateT p (Inputs.toIntMap inputs)) of
+   in case runExcept (execStateT (runReaderT p boolVarRanges) (Inputs.toIntMap inputs)) of
         Left err -> Left err
         Right bindings -> case toEither $ toTotal' (getCount counters PublicInput + getCount counters PrivateInput, bindings) of
           Left unbound -> Left (VarUnassignedError unbound)
@@ -56,7 +57,7 @@ data Constraint n
   | -- | Dividend, Divisor, Quotient, Remainder
     DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
   | BinRepConstraint BinRep
-  | BinRepConstraint2 [(Var, Int)]
+  -- | BinRepConstraint2 [(Var, Int)]
   | -- | (a, n, p) where modInv a * a = n * p + 1
     ModInvConstraint (Either Var n, Either Var n, Integer)
   deriving (Eq, Generic, NFData)
@@ -77,7 +78,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
       <> " + $"
       <> show remainder
   show (BinRepConstraint binRep) = "(BinRep)    " <> show binRep
-  show (BinRepConstraint2 segments) = "(BinRep)    " <> show segments
+  -- show (BinRepConstraint2 segments) = "(BinRep)    " <> show segments
   show (ModInvConstraint (var, _, p)) = "(ModInv)    $" <> show var <> "⁻¹ (mod " <> show p <> ")"
 
 instance Functor Constraint where
@@ -86,7 +87,7 @@ instance Functor Constraint where
   fmap f (EqZeroConstraint (xs, m)) = EqZeroConstraint (fmap f xs, m)
   fmap f (DivModConstaint (a, b, q, r)) = DivModConstaint (fmap f a, fmap f b, fmap f q, fmap f r)
   fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
-  fmap _ (BinRepConstraint2 segments) = BinRepConstraint2 segments
+  -- fmap _ (BinRepConstraint2 segments) = BinRepConstraint2 segments
   fmap f (ModInvConstraint (a, n, p)) = ModInvConstraint (fmap f a, fmap f n, p)
 
 --------------------------------------------------------------------------------

@@ -5,8 +5,9 @@
 module Keelung.Interpreter.R1CS (run, run', Error (..)) where
 
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.State
-import Data.Field.Galois (GaloisField)
+import Data.Field.Galois (GaloisField (order))
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -15,6 +16,7 @@ import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Keelung.Compiler.Syntax.FieldBits (toBits)
+import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
@@ -25,6 +27,7 @@ import Keelung.Interpreter.Arithmetics qualified as Arithmetics
 import Keelung.Interpreter.R1CS.Monad
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
+import Debug.Trace
 
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) [n]
 run r1cs inputs = fst <$> run' r1cs inputs
@@ -33,11 +36,13 @@ run r1cs inputs = fst <$> run' r1cs inputs
 run' :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) ([n], Vector n)
 run' r1cs inputs = do
   let constraints = fromOrdinaryConstraints r1cs
-  witness <- runM inputs $ goThroughManyTimes constraints
+  let booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllBits), (PublicInput, ReadBool), (PublicInput, ReadAllBits), (PrivateInput, ReadBool), (PrivateInput, ReadAllBits)]
+  let boolVarRanges = getRanges (r1csCounters r1cs) booleanConstraintCategories
+  witness <- runM boolVarRanges inputs $ goThroughManyTimes constraints
 
   -- extract output values from the witness
   let outputVars = enumerate $ getRanges (r1csCounters r1cs) [Output]
-        -- [start .. end - 1]
+  -- [start .. end - 1]
   let outputs = map (witness Vector.!) outputVars
 
   return (outputs, witness)
@@ -88,11 +93,12 @@ lookupVarEither (Right val) = return (Just val)
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (R1CConstraint r1c) = fmap (pure . R1CConstraint) <$> shrinkR1C r1c
+-- shrink (R1CConstraint r1c) = fmap (pure . R1CConstraint) <$> (shrinkR1C r1c >>= shrinkBinRep2)
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
-shrink (BinRepConstraint2 binRep) = fmap (pure . BinRepConstraint2) <$> shrinkBinRep2 binRep
+-- shrink (BinRepConstraint2 binRep) = fmap (pure . BinRepConstraint2) <$> shrinkBinRep2 binRep
 shrink (ModInvConstraint modInv) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInv
 
 -- | Trying to reduce a DivMod constraint if any of these set of variables are known:
@@ -223,10 +229,116 @@ shrinkBinRep binRep@(BinRep var width bitVarStart) = do
           Nothing -> return Nothing
           Just bit -> return (Just (accVal * 2 + bit))
 
--- | Trying to reduce a BinRep constraint
-shrinkBinRep2 :: (GaloisField n, Integral n) => [(Var, Int)] -> M n (Result [(Var, Int)])
-shrinkBinRep2 _segments = do
-  return Eliminated
+-- -- | Trying to reduce a BinRep constraint
+-- shrinkBinRep2 :: (GaloisField n, Integral n) => [(Var, Int)] -> M n (Result [(Var, Int)])
+-- shrinkBinRep2 _segments = do
+--   return Eliminated
+
+data FoldState = Start | Failed | Continue (IntMap Var) Bool deriving (Eq, Show)
+
+-- | Watch out for a stuck R1C, and see if it's a binary representation
+--    1. see if it's a linear combination
+--    2. see if all coefficients are positive
+--    3. see if all variables are Boolean
+--   NOTE: the criteria above may not be sufficient
+shrinkBinRep2 :: (GaloisField n, Integral n) => Result (R1C n) -> M n (Result (R1C n))
+shrinkBinRep2 NothingToDo = return NothingToDo
+shrinkBinRep2 Eliminated = return Eliminated
+shrinkBinRep2 (Shrinked r1c) = return (Shrinked r1c)
+shrinkBinRep2 (Stuck r1c) = do
+  boolVarRanges <- ask
+  case toLinear r1c of
+    Nothing -> return (Stuck r1c)
+    Just polynomial -> do
+      case allCoeffsSameSignAndBooleanAndCollectCoeffs boolVarRanges polynomial of
+        Start -> return (Stuck r1c)
+        Failed -> return (Stuck r1c)
+        Continue invertedPolynomial positive -> do
+          let constant = if positive then -(Poly.constant polynomial) else Poly.constant polynomial
+          -- NOTE: the criteria below is not necessary
+          -- because we know that these coefficients are:
+          --  1. all of the same sign
+          --  2. unique
+          -- we can check if they are actually coefficients of a binary representation, that is:
+          --  1. they happen to be 1, 2, 4, 8, 16, ...
+          traceShowM (polynomial, constant, IntMap.keys invertedPolynomial == [0 .. IntMap.size invertedPolynomial - 1])
+          if IntMap.keys invertedPolynomial == [0 .. IntMap.size invertedPolynomial - 1]
+            then do
+              -- we have a binary representation
+              -- we can now bind the variables
+              forM_ (IntMap.toList invertedPolynomial) $ \(power, var) -> do
+                bindVar var (FieldBits.testBit constant power)
+
+              return Eliminated
+            else do
+              -- we don't have a binary representation
+              -- we can't do anything
+              return (Stuck r1c)
+  where
+    toLinear :: (GaloisField n, Integral n) => R1C n -> Maybe (Poly n)
+    toLinear (R1C (Left _) (Left _) (Left _)) = Nothing
+    toLinear (R1C (Left a) (Left b) (Right cs)) = Just $ Poly.addConstant (-a * b) cs
+    toLinear (R1C (Left a) (Right bs) (Left c)) = Just $ Poly.addConstant (-c / a) bs
+    toLinear (R1C (Left a) (Right bs) (Right cs)) = case Poly.multiplyBy (-a) bs of
+      Left c -> Just $ Poly.addConstant (-c) cs
+      Right bs' -> case Poly.merge bs' cs of
+        Left _ -> Nothing
+        Right xs -> Just xs
+    toLinear (R1C (Right as) (Left b) cs) = toLinear (R1C (Left b) (Right as) cs)
+    toLinear (R1C (Right _) (Right _) _) = Nothing
+
+    allCoeffsSameSignAndBooleanAndCollectCoeffs :: (GaloisField n, Integral n) => Ranges -> Poly n -> FoldState
+    allCoeffsSameSignAndBooleanAndCollectCoeffs boolVarRanges xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
+      where
+        isPowerOf2 :: (GaloisField n, Integral n) => n -> Maybe (Int, Bool)
+        isPowerOf2 coeff =
+          let (normalized, sign) = normalize coeff
+              expected = floor (logBase 2 (fromInteger (abs normalized)) :: Double)
+           in if abs normalized == 2 ^ expected
+                then Just (expected, sign)
+                else Nothing
+
+        -- normalize the coefficient to be in the range [-size/2, size/2) and return the sign
+        normalize :: (GaloisField n, Integral n) => n -> (Integer, Bool)
+        normalize coeff =
+          let size = order coeff
+              halfway = fromIntegral (size `div` 2)
+           in if coeff >= halfway
+                then (negate (fromIntegral size - fromIntegral coeff), False)
+                else (fromIntegral coeff, True)
+
+        isBoolean :: Var -> Bool
+        isBoolean var = case IntMap.lookupLE var boolVarRanges of
+          Nothing -> False
+          Just (index, len) -> var < index + len
+
+        go :: (GaloisField n, Integral n) => FoldState -> Var -> n -> FoldState
+        go Start var coeff = case isPowerOf2 coeff of
+          Nothing -> Failed
+          Just (power, sign) -> Continue (IntMap.singleton power var) sign
+        go Failed _ _ = Failed
+        go (Continue coeffs previousSign) var coeff = case isPowerOf2 coeff of
+          Nothing -> Failed
+          Just (power, sign) ->
+            let sameSign = sign == previousSign
+                uniqueCoeff = IntMap.notMember power coeffs
+             in if isBoolean var && sameSign && uniqueCoeff
+                  then Continue (IntMap.insert power var coeffs) sign
+                  else Failed
+
+-- go :: (GaloisField n, Integral n) => FoldState -> Var -> n -> FoldState
+-- go Start var coeff = case isPowerOf2 coeff of
+--   Nothing -> traceShow "Failed" Failed
+--   Just (power, sign) -> traceShow ("Start", IntMap.toList (IntMap.singleton power var)) (Continue (IntMap.singleton power var) sign)
+-- go Failed _ _ = Failed
+-- go (Continue coeffs previousSign) var coeff = case isPowerOf2 coeff of
+--   Nothing -> traceShow "Failed" Failed
+--   Just (power, sign) ->
+--     let sameSign = sign == previousSign
+--         uniqueCoeff = IntMap.notMember power coeffs
+--      in if isBoolean var && sameSign && uniqueCoeff
+--             then traceShow ("Continue", IntMap.toList (IntMap.insert power var coeffs)) Continue (IntMap.insert power var coeffs) sign
+--             else Failed
 
 -- if (x - y) = 0 then m = 0 else m = recip (x - y)
 shrinkEqZero :: (GaloisField n, Integral n) => (Poly n, Var) -> M n (Result (Poly n, Var))
@@ -274,6 +386,141 @@ instance Functor Result where
   fmap _ Eliminated = Eliminated
   fmap _ NothingToDo = NothingToDo
 
+-- shrinkR1C :: (GaloisField n, Integral n) => R1C n -> M n (Result (R1C n))
+-- shrinkR1C r1c = do
+--   bindings <- get
+--   case r1c of
+--     R1C (Left a) (Left b) (Left c) -> eliminatedIfHold a b c
+--     R1C (Left a) (Left b) (Right cs) -> case substAndView bindings cs of
+--       Constant c -> eliminatedIfHold a b c
+--       Uninomial _ c (var, coeff) -> do
+--         -- a * b - c = coeff var
+--         bindVar var ((a * b - c) / coeff)
+--         return Eliminated
+--       Polynomial cs' -> return $ Stuck $ R1C (Left a) (Left b) (Right cs')
+--     R1C (Left a) (Right bs) (Left c) -> case substAndView bindings bs of
+--       Constant b -> eliminatedIfHold a b c
+--       Uninomial _ b (var, coeff) -> do
+--         if a == 0
+--           then eliminatedIfHold a b c
+--           else do
+--             -- a * (b + coeff var) = c
+--             --    =>
+--             -- a * b + a * coeff * var = c
+--             --    =>
+--             -- a * coeff * var = c - a * b
+--             --    =>
+--             -- var = (c - a * b) / (coeff * a)
+--             bindVar var ((c - a * b) / (coeff * a))
+--             return Eliminated
+--       Polynomial bs' -> return $ Stuck $ R1C (Left a) (Right bs') (Left c)
+--     R1C (Left a) (Right bs) (Right cs) -> case (substAndView bindings bs, substAndView bindings cs) of
+--       (Constant b, Constant c) -> eliminatedIfHold a b c
+--       (Constant b, Uninomial _ c (var, coeff)) -> do
+--         -- a * b - c = coeff var
+--         bindVar var ((a * b - c) / coeff)
+--         return Eliminated
+--       (Constant b, Polynomial cs') -> return $ Stuck $ R1C (Left a) (Left b) (Right cs')
+--       (Uninomial _ b (var, coeff), Constant c) ->
+--         if a == 0
+--           then eliminatedIfHold a b c
+--           else do
+--             -- a * (b + coeff var) = c
+--             bindVar var ((c - a * b) / (coeff * a))
+--             return Eliminated
+--       (Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
+--       (Uninomial bs' _ _, Polynomial cs') -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
+--       (Polynomial bs', Constant c) -> return $ Stuck $ R1C (Left a) (Right bs') (Left c)
+--       (Polynomial bs', Uninomial cs' _ _) -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
+--       (Polynomial bs', Polynomial cs') -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
+--     R1C (Right as) (Left b) (Left c) -> shrinkR1C $ R1C (Left b) (Right as) (Left c)
+--     R1C (Right as) (Left b) (Right cs) -> shrinkR1C $ R1C (Left b) (Right as) (Right cs)
+--     R1C (Right as) (Right bs) (Left c) -> case (substAndView bindings as, substAndView bindings bs) of
+--       (Constant a, Constant b) -> eliminatedIfHold a b c
+--       (Constant a, Uninomial _ b (var, coeff)) -> do
+--         if a == 0
+--           then eliminatedIfHold a b c
+--           else do
+--             -- a * (b + coeff var) = c
+--             --    =>
+--             -- a * b + a * coeff * var = c
+--             --    =>
+--             -- a * coeff * var = c - a * b
+--             --    =>
+--             -- var = (c - a * b) / (coeff * a)
+--             bindVar var ((c - a * b) / (coeff * a))
+--             return Eliminated
+--       (Constant a, Polynomial bs') -> return $ Stuck $ R1C (Left a) (Right bs') (Left c)
+--       (Uninomial _ a (var, coeff), Constant b) -> do
+--         if b == 0
+--           then eliminatedIfHold a b c
+--           else do
+--             -- (a + coeff var) * b = c
+--             bindVar var ((c - a * b) / (coeff * b))
+--             return Eliminated
+--       (Uninomial as' _ _, Uninomial bs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
+--       (Uninomial as' _ _, Polynomial bs') -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
+--       (Polynomial as', Constant b) -> return $ Stuck $ R1C (Right as') (Left b) (Left c)
+--       (Polynomial as', Uninomial bs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
+--       (Polynomial as', Polynomial bs') -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
+--     R1C (Right as) (Right bs) (Right cs) -> case (substAndView bindings as, substAndView bindings bs, substAndView bindings cs) of
+--       (Constant a, Constant b, Constant c) -> eliminatedIfHold a b c
+--       (Constant a, Constant b, Uninomial _ c (var, coeff)) -> do
+--         -- a * b - c = coeff var
+--         bindVar var ((a * b - c) / coeff)
+--         return Eliminated
+--       (Constant a, Constant b, Polynomial cs') -> return $ Stuck $ R1C (Left a) (Left b) (Right cs')
+--       (Constant a, Uninomial _ b (var, coeff), Constant c) -> do
+--         if a == 0
+--           then eliminatedIfHold a b c
+--           else do
+--             -- a * (b + coeff var) = c
+--             --    =>
+--             -- a * b + a * coeff * var = c
+--             --    =>
+--             -- a * coeff * var = c - a * b
+--             --    =>
+--             -- var = (c - a * b) / (coeff * a)
+--             bindVar var ((c - a * b) / (coeff * a))
+--             return Eliminated
+--       (Constant a, Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
+--       (Constant a, Uninomial bs' _ _, Polynomial cs') -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
+--       (Constant a, Polynomial bs', Constant c) -> return $ Stuck $ R1C (Left a) (Right bs') (Left c)
+--       (Constant a, Polynomial bs', Uninomial cs' _ _) -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
+--       (Constant a, Polynomial bs', Polynomial cs') -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
+--       (Uninomial _ a (var, coeff), Constant b, Constant c) -> do
+--         if b == 0
+--           then eliminatedIfHold a b c
+--           else do
+--             -- (a + coeff var) * b = c
+--             bindVar var ((c - a * b) / (coeff * b))
+--             return Eliminated
+--       (Uninomial as' _ _, Constant b, Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Left b) (Right cs')
+--       (Uninomial as' _ _, Constant b, Polynomial cs') -> return $ Stuck $ R1C (Right as') (Left b) (Right cs')
+--       (Uninomial as' _ _, Uninomial bs' _ _, Constant c) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
+--       (Uninomial as' _ _, Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
+--       (Uninomial as' _ _, Uninomial bs' _ _, Polynomial cs') -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
+--       (Uninomial as' _ _, Polynomial bs', Constant c) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
+--       (Uninomial as' _ _, Polynomial bs', Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
+--       (Uninomial as' _ _, Polynomial bs', Polynomial cs') -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
+--       (Polynomial as', Constant b, Constant c) -> return $ Stuck $ R1C (Right as') (Left b) (Left c)
+--       (Polynomial as', Constant b, Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Left b) (Right cs')
+--       (Polynomial as', Constant b, Polynomial cs') -> return $ Stuck $ R1C (Right as') (Left b) (Right cs')
+--       (Polynomial as', Uninomial bs' _ _, Constant c) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
+--       (Polynomial as', Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
+--       (Polynomial as', Uninomial bs' _ _, Polynomial cs') -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
+--       (Polynomial as', Polynomial bs', Constant c) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
+--       (Polynomial as', Polynomial bs', Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
+--       (Polynomial as', Polynomial bs', Polynomial cs') -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
+--   where
+--     -- return Eliminated if the equation holds
+--     -- else throw an error
+--     eliminatedIfHold :: (Num n, Eq n) => n -> n -> n -> M n (Result (R1C n))
+--     eliminatedIfHold a b c = do
+--       if a * b == c
+--         then return Eliminated
+--         else throwError $ R1CInconsistentError $ R1C (Left a) (Left b) (Left c)
+
 shrinkR1C :: (GaloisField n, Integral n) => R1C n -> M n (Result (R1C n))
 shrinkR1C r1c = do
   bindings <- get
@@ -301,14 +548,14 @@ shrinkR1C r1c = do
             -- var = (c - a * b) / (coeff * a)
             bindVar var ((c - a * b) / (coeff * a))
             return Eliminated
-      Polynomial bs' -> return $ Stuck $ R1C (Left a) (Right bs') (Left c)
+      Polynomial bs' -> return $ Shrinked $ R1C (Left a) (Right bs') (Left c)
     R1C (Left a) (Right bs) (Right cs) -> case (substAndView bindings bs, substAndView bindings cs) of
       (Constant b, Constant c) -> eliminatedIfHold a b c
       (Constant b, Uninomial _ c (var, coeff)) -> do
         -- a * b - c = coeff var
         bindVar var ((a * b - c) / coeff)
         return Eliminated
-      (Constant b, Polynomial cs') -> return $ Stuck $ R1C (Left a) (Left b) (Right cs')
+      (Constant b, Polynomial cs') -> return $ Shrinked $ R1C (Left a) (Left b) (Right cs')
       (Uninomial _ b (var, coeff), Constant c) ->
         if a == 0
           then eliminatedIfHold a b c
@@ -316,11 +563,11 @@ shrinkR1C r1c = do
             -- a * (b + coeff var) = c
             bindVar var ((c - a * b) / (coeff * a))
             return Eliminated
-      (Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
-      (Uninomial bs' _ _, Polynomial cs') -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
-      (Polynomial bs', Constant c) -> return $ Stuck $ R1C (Left a) (Right bs') (Left c)
-      (Polynomial bs', Uninomial cs' _ _) -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
-      (Polynomial bs', Polynomial cs') -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
+      (Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Shrinked $ R1C (Left a) (Right bs') (Right cs')
+      (Uninomial bs' _ _, Polynomial cs') -> return $ Shrinked $ R1C (Left a) (Right bs') (Right cs')
+      (Polynomial bs', Constant c) -> return $ Shrinked $ R1C (Left a) (Right bs') (Left c)
+      (Polynomial bs', Uninomial cs' _ _) -> return $ Shrinked $ R1C (Left a) (Right bs') (Right cs')
+      (Polynomial bs', Polynomial cs') -> return $ Shrinked $ R1C (Left a) (Right bs') (Right cs')
     R1C (Right as) (Left b) (Left c) -> shrinkR1C $ R1C (Left b) (Right as) (Left c)
     R1C (Right as) (Left b) (Right cs) -> shrinkR1C $ R1C (Left b) (Right as) (Right cs)
     R1C (Right as) (Right bs) (Left c) -> case (substAndView bindings as, substAndView bindings bs) of
@@ -338,7 +585,7 @@ shrinkR1C r1c = do
             -- var = (c - a * b) / (coeff * a)
             bindVar var ((c - a * b) / (coeff * a))
             return Eliminated
-      (Constant a, Polynomial bs') -> return $ Stuck $ R1C (Left a) (Right bs') (Left c)
+      (Constant a, Polynomial bs') -> return $ Shrinked $ R1C (Left a) (Right bs') (Left c)
       (Uninomial _ a (var, coeff), Constant b) -> do
         if b == 0
           then eliminatedIfHold a b c
@@ -346,18 +593,18 @@ shrinkR1C r1c = do
             -- (a + coeff var) * b = c
             bindVar var ((c - a * b) / (coeff * b))
             return Eliminated
-      (Uninomial as' _ _, Uninomial bs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
-      (Uninomial as' _ _, Polynomial bs') -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
-      (Polynomial as', Constant b) -> return $ Stuck $ R1C (Right as') (Left b) (Left c)
-      (Polynomial as', Uninomial bs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
-      (Polynomial as', Polynomial bs') -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
+      (Uninomial as' _ _, Uninomial bs' _ _) -> return $ Shrinked $ R1C (Right as') (Right bs') (Left c)
+      (Uninomial as' _ _, Polynomial bs') -> return $ Shrinked $ R1C (Right as') (Right bs') (Left c)
+      (Polynomial as', Constant b) -> return $ Shrinked $ R1C (Right as') (Left b) (Left c)
+      (Polynomial as', Uninomial bs' _ _) -> return $ Shrinked $ R1C (Right as') (Right bs') (Left c)
+      (Polynomial as', Polynomial bs') -> return $ Shrinked $ R1C (Right as') (Right bs') (Left c)
     R1C (Right as) (Right bs) (Right cs) -> case (substAndView bindings as, substAndView bindings bs, substAndView bindings cs) of
       (Constant a, Constant b, Constant c) -> eliminatedIfHold a b c
       (Constant a, Constant b, Uninomial _ c (var, coeff)) -> do
         -- a * b - c = coeff var
         bindVar var ((a * b - c) / coeff)
         return Eliminated
-      (Constant a, Constant b, Polynomial cs') -> return $ Stuck $ R1C (Left a) (Left b) (Right cs')
+      (Constant a, Constant b, Polynomial cs') -> return $ Shrinked $ R1C (Left a) (Left b) (Right cs')
       (Constant a, Uninomial _ b (var, coeff), Constant c) -> do
         if a == 0
           then eliminatedIfHold a b c
@@ -371,11 +618,11 @@ shrinkR1C r1c = do
             -- var = (c - a * b) / (coeff * a)
             bindVar var ((c - a * b) / (coeff * a))
             return Eliminated
-      (Constant a, Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
-      (Constant a, Uninomial bs' _ _, Polynomial cs') -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
-      (Constant a, Polynomial bs', Constant c) -> return $ Stuck $ R1C (Left a) (Right bs') (Left c)
-      (Constant a, Polynomial bs', Uninomial cs' _ _) -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
-      (Constant a, Polynomial bs', Polynomial cs') -> return $ Stuck $ R1C (Left a) (Right bs') (Right cs')
+      (Constant a, Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Shrinked $ R1C (Left a) (Right bs') (Right cs')
+      (Constant a, Uninomial bs' _ _, Polynomial cs') -> return $ Shrinked $ R1C (Left a) (Right bs') (Right cs')
+      (Constant a, Polynomial bs', Constant c) -> return $ Shrinked $ R1C (Left a) (Right bs') (Left c)
+      (Constant a, Polynomial bs', Uninomial cs' _ _) -> return $ Shrinked $ R1C (Left a) (Right bs') (Right cs')
+      (Constant a, Polynomial bs', Polynomial cs') -> return $ Shrinked $ R1C (Left a) (Right bs') (Right cs')
       (Uninomial _ a (var, coeff), Constant b, Constant c) -> do
         if b == 0
           then eliminatedIfHold a b c
@@ -383,23 +630,23 @@ shrinkR1C r1c = do
             -- (a + coeff var) * b = c
             bindVar var ((c - a * b) / (coeff * b))
             return Eliminated
-      (Uninomial as' _ _, Constant b, Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Left b) (Right cs')
-      (Uninomial as' _ _, Constant b, Polynomial cs') -> return $ Stuck $ R1C (Right as') (Left b) (Right cs')
-      (Uninomial as' _ _, Uninomial bs' _ _, Constant c) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
-      (Uninomial as' _ _, Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
-      (Uninomial as' _ _, Uninomial bs' _ _, Polynomial cs') -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
-      (Uninomial as' _ _, Polynomial bs', Constant c) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
-      (Uninomial as' _ _, Polynomial bs', Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
-      (Uninomial as' _ _, Polynomial bs', Polynomial cs') -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
-      (Polynomial as', Constant b, Constant c) -> return $ Stuck $ R1C (Right as') (Left b) (Left c)
-      (Polynomial as', Constant b, Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Left b) (Right cs')
-      (Polynomial as', Constant b, Polynomial cs') -> return $ Stuck $ R1C (Right as') (Left b) (Right cs')
-      (Polynomial as', Uninomial bs' _ _, Constant c) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
-      (Polynomial as', Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
-      (Polynomial as', Uninomial bs' _ _, Polynomial cs') -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
-      (Polynomial as', Polynomial bs', Constant c) -> return $ Stuck $ R1C (Right as') (Right bs') (Left c)
-      (Polynomial as', Polynomial bs', Uninomial cs' _ _) -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
-      (Polynomial as', Polynomial bs', Polynomial cs') -> return $ Stuck $ R1C (Right as') (Right bs') (Right cs')
+      (Uninomial as' _ _, Constant b, Uninomial cs' _ _) -> return $ Shrinked $ R1C (Right as') (Left b) (Right cs')
+      (Uninomial as' _ _, Constant b, Polynomial cs') -> return $ Shrinked $ R1C (Right as') (Left b) (Right cs')
+      (Uninomial as' _ _, Uninomial bs' _ _, Constant c) -> return $ Shrinked $ R1C (Right as') (Right bs') (Left c)
+      (Uninomial as' _ _, Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Shrinked $ R1C (Right as') (Right bs') (Right cs')
+      (Uninomial as' _ _, Uninomial bs' _ _, Polynomial cs') -> return $ Shrinked $ R1C (Right as') (Right bs') (Right cs')
+      (Uninomial as' _ _, Polynomial bs', Constant c) -> return $ Shrinked $ R1C (Right as') (Right bs') (Left c)
+      (Uninomial as' _ _, Polynomial bs', Uninomial cs' _ _) -> return $ Shrinked $ R1C (Right as') (Right bs') (Right cs')
+      (Uninomial as' _ _, Polynomial bs', Polynomial cs') -> return $ Shrinked $ R1C (Right as') (Right bs') (Right cs')
+      (Polynomial as', Constant b, Constant c) -> return $ Shrinked $ R1C (Right as') (Left b) (Left c)
+      (Polynomial as', Constant b, Uninomial cs' _ _) -> return $ Shrinked $ R1C (Right as') (Left b) (Right cs')
+      (Polynomial as', Constant b, Polynomial cs') -> return $ Shrinked $ R1C (Right as') (Left b) (Right cs')
+      (Polynomial as', Uninomial bs' _ _, Constant c) -> return $ Shrinked $ R1C (Right as') (Right bs') (Left c)
+      (Polynomial as', Uninomial bs' _ _, Uninomial cs' _ _) -> return $ Shrinked $ R1C (Right as') (Right bs') (Right cs')
+      (Polynomial as', Uninomial bs' _ _, Polynomial cs') -> return $ Shrinked $ R1C (Right as') (Right bs') (Right cs')
+      (Polynomial as', Polynomial bs', Constant c) -> return $ Shrinked $ R1C (Right as') (Right bs') (Left c)
+      (Polynomial as', Polynomial bs', Uninomial cs' _ _) -> return $ Shrinked $ R1C (Right as') (Right bs') (Right cs')
+      (Polynomial as', Polynomial bs', Polynomial cs') -> return $ Shrinked $ R1C (Right as') (Right bs') (Right cs')
   where
     -- return Eliminated if the equation holds
     -- else throw an error
