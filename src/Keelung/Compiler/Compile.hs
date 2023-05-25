@@ -77,9 +77,9 @@ compileSideEffect (AssertGT width value bound) = assertGT width value bound
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
 compileAssertion expr = case expr of
-  ExprB (EqB x y) -> compileAssertionEqB x y
-  ExprB (EqF x y) -> compileAssertionEqF x y
-  ExprB (EqU x y) -> compileAssertionEqU x y
+  ExprB (EqB x y) -> assertEqB x y
+  ExprB (EqF x y) -> assertEqF x y
+  ExprB (EqU x y) -> assertEqU x y
   -- rewriting `assert (x <= y)` width `assertLTE x y`
   ExprB (LTEU x (ValU width bound)) -> assertLTE width x (toInteger bound)
   ExprB (LTEU (ValU width bound) x) -> assertGTE width x (toInteger bound)
@@ -104,35 +104,59 @@ compileAssertion expr = case expr of
     compileExprU out x
     writeValU out 1
 
-compileAssertionEqB :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> M n ()
-compileAssertionEqB (VarB a) (ValB b) = writeValB (RefBX a) b
-compileAssertionEqB (VarB a) (VarB b) = writeEqB (RefBX a) (RefBX b)
-compileAssertionEqB (VarB a) (VarBO b) = writeEqB (RefBX a) (RefBO b)
-compileAssertionEqB (VarB a) (VarBI b) = writeEqB (RefBX a) (RefBI b)
-compileAssertionEqB (VarB a) b = do
+-- | Assert that two Boolean expressions are equal
+assertEqB :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> M n ()
+assertEqB (ValB a) (ValB b) = when (a /= b) $ throwError $ Compile.ConflictingValuesB a b
+assertEqB (ValB a) (VarB b) = writeValB (RefBX b) a
+assertEqB (ValB a) (VarBO b) = writeValB (RefBO b) a
+assertEqB (ValB a) (VarBI b) = writeValB (RefBI b) a
+assertEqB (ValB a) (VarBP b) = writeValB (RefBP b) a
+assertEqB (ValB a) b = do
+  result <- compileExprB b
+  case result of
+    Left var -> writeValB var a
+    Right val -> when (a /= val) $ throwError $ Compile.ConflictingValuesB a val
+assertEqB (VarB a) (ValB b) = writeValB (RefBX a) b
+assertEqB (VarB a) (VarB b) = writeEqB (RefBX a) (RefBX b)
+assertEqB (VarB a) (VarBO b) = writeEqB (RefBX a) (RefBO b)
+assertEqB (VarB a) (VarBI b) = writeEqB (RefBX a) (RefBI b)
+assertEqB (VarB a) (VarBP b) = writeEqB (RefBX a) (RefBP b)
+assertEqB (VarB a) b = do
   result <- compileExprB b
   case result of
     Left var -> writeEqB (RefBX a) var
     Right val -> writeValB (RefBX a) val
-compileAssertionEqB (VarBO a) (ValB b) = writeValB (RefBO a) b
-compileAssertionEqB (VarBO a) (VarB b) = writeEqB (RefBO a) (RefBX b)
-compileAssertionEqB (VarBO a) (VarBO b) = writeEqB (RefBO a) (RefBO b)
-compileAssertionEqB (VarBO a) (VarBI b) = writeEqB (RefBO a) (RefBI b)
-compileAssertionEqB (VarBO a) b = do
+assertEqB (VarBO a) (ValB b) = writeValB (RefBO a) b
+assertEqB (VarBO a) (VarB b) = writeEqB (RefBO a) (RefBX b)
+assertEqB (VarBO a) (VarBO b) = writeEqB (RefBO a) (RefBO b)
+assertEqB (VarBO a) (VarBI b) = writeEqB (RefBO a) (RefBI b)
+assertEqB (VarBO a) (VarBP b) = writeEqB (RefBO a) (RefBP b)
+assertEqB (VarBO a) b = do
   result <- compileExprB b
   case result of
     Left var -> writeEqB (RefBO a) var
     Right val -> writeValB (RefBO a) val
-compileAssertionEqB (VarBI a) (ValB b) = writeValB (RefBI a) b
-compileAssertionEqB (VarBI a) (VarB b) = writeEqB (RefBI a) (RefBX b)
-compileAssertionEqB (VarBI a) (VarBO b) = writeEqB (RefBI a) (RefBO b)
-compileAssertionEqB (VarBI a) (VarBI b) = writeEqB (RefBI a) (RefBI b)
-compileAssertionEqB (VarBI a) b = do
+assertEqB (VarBI a) (ValB b) = writeValB (RefBI a) b
+assertEqB (VarBI a) (VarB b) = writeEqB (RefBI a) (RefBX b)
+assertEqB (VarBI a) (VarBO b) = writeEqB (RefBI a) (RefBO b)
+assertEqB (VarBI a) (VarBI b) = writeEqB (RefBI a) (RefBI b)
+assertEqB (VarBI a) (VarBP b) = writeEqB (RefBI a) (RefBP b)
+assertEqB (VarBI a) b = do
   result <- compileExprB b
   case result of
     Left var -> writeEqB (RefBI a) var
     Right val -> writeValB (RefBI a) val
-compileAssertionEqB a b = do
+assertEqB (VarBP a) (ValB b) = writeValB (RefBP a) b
+assertEqB (VarBP a) (VarB b) = writeEqB (RefBP a) (RefBX b)
+assertEqB (VarBP a) (VarBO b) = writeEqB (RefBP a) (RefBO b)
+assertEqB (VarBP a) (VarBI b) = writeEqB (RefBP a) (RefBI b)
+assertEqB (VarBP a) (VarBP b) = writeEqB (RefBP a) (RefBP b)
+assertEqB (VarBP a) b = do
+  result <- compileExprB b
+  case result of
+    Left var -> writeEqB (RefBI a) var
+    Right val -> writeValB (RefBI a) val
+assertEqB a b = do
   a' <- compileExprB a
   b' <- compileExprB b
   case (a', b') of
@@ -141,33 +165,49 @@ compileAssertionEqB a b = do
     (Right valA, Left varB) -> writeValB varB valA
     (Right valA, Right valB) -> when (valA /= valB) $ throwError $ Compile.ConflictingValuesB valA valB
 
-compileAssertionEqF :: (GaloisField n, Integral n) => ExprF n -> ExprF n -> M n ()
-compileAssertionEqF (VarF a) (ValF b) = writeValF (RefFX a) b
-compileAssertionEqF (VarF a) (VarF b) = writeEqF (RefFX a) (RefFX b)
-compileAssertionEqF (VarF a) (VarFO b) = writeEqF (RefFX a) (RefFO b)
-compileAssertionEqF (VarF a) (VarFI b) = writeEqF (RefFX a) (RefFI b)
-compileAssertionEqF (VarF a) b = do
+-- | Assert that two Field expressions are equal
+assertEqF :: (GaloisField n, Integral n) => ExprF n -> ExprF n -> M n ()
+assertEqF (ValF a) (ValF b) = when (a /= b) $ throwError $ Compile.ConflictingValuesF a b
+assertEqF (ValF a) (VarF b) = writeValF (RefFX b) a
+assertEqF (ValF a) (VarFO b) = writeValF (RefFO b) a
+assertEqF (ValF a) (VarFI b) = writeValF (RefFI b) a
+assertEqF (ValF a) (VarFP b) = writeValF (RefFP b) a
+assertEqF (ValF a) b = do
+  result <- compileExprF b
+  assertLC a result
+assertEqF (VarF a) (ValF b) = writeValF (RefFX a) b
+assertEqF (VarF a) (VarF b) = writeEqF (RefFX a) (RefFX b)
+assertEqF (VarF a) (VarFO b) = writeEqF (RefFX a) (RefFO b)
+assertEqF (VarF a) (VarFI b) = writeEqF (RefFX a) (RefFI b)
+assertEqF (VarF a) (VarFP b) = writeEqF (RefFX a) (RefFP b)
+assertEqF (VarF a) b = do
   result <- compileExprF b
   handleLC (F (RefFX a)) result
-compileAssertionEqF (VarFO a) (ValF b) = writeValF (RefFO a) b
-compileAssertionEqF (VarFO a) (VarF b) = writeEqF (RefFO a) (RefFX b)
-compileAssertionEqF (VarFO a) (VarFO b) = writeEqF (RefFO a) (RefFO b)
-compileAssertionEqF (VarFO a) b = do
+assertEqF (VarFO a) (ValF b) = writeValF (RefFO a) b
+assertEqF (VarFO a) (VarF b) = writeEqF (RefFO a) (RefFX b)
+assertEqF (VarFO a) (VarFO b) = writeEqF (RefFO a) (RefFO b)
+assertEqF (VarFO a) (VarFI b) = writeEqF (RefFO a) (RefFI b)
+assertEqF (VarFO a) (VarFP b) = writeEqF (RefFO a) (RefFP b)
+assertEqF (VarFO a) b = do
   result <- compileExprF b
   handleLC (F (RefFO a)) result
-compileAssertionEqF (VarFI a) (ValF b) = writeValF (RefFI a) b
-compileAssertionEqF (VarFI a) (VarF b) = writeEqF (RefFI a) (RefFX b)
-compileAssertionEqF (VarFI a) (VarFO b) = writeEqF (RefFI a) (RefFX b)
-compileAssertionEqF (VarFI a) b = do
+assertEqF (VarFI a) (ValF b) = writeValF (RefFI a) b
+assertEqF (VarFI a) (VarF b) = writeEqF (RefFI a) (RefFX b)
+assertEqF (VarFI a) (VarFO b) = writeEqF (RefFI a) (RefFO b)
+assertEqF (VarFI a) (VarFI b) = writeEqF (RefFI a) (RefFI b)
+assertEqF (VarFI a) (VarFP b) = writeEqF (RefFI a) (RefFP b)
+assertEqF (VarFI a) b = do
   result <- compileExprF b
   handleLC (F (RefFI a)) result
-compileAssertionEqF a (VarF b) = compileAssertionEqF (VarF b) a
-compileAssertionEqF a (VarFO b) = compileAssertionEqF (VarFO b) a
-compileAssertionEqF a (VarFI b) = compileAssertionEqF (VarFI b) a
-compileAssertionEqF a b = do
-  -- a' <- freshRefF
-  -- b' <- freshRefF
-
+assertEqF (VarFP a) (ValF b) = writeValF (RefFP a) b
+assertEqF (VarFP a) (VarF b) = writeEqF (RefFP a) (RefFX b)
+assertEqF (VarFP a) (VarFO b) = writeEqF (RefFP a) (RefFO b)
+assertEqF (VarFP a) (VarFI b) = writeEqF (RefFP a) (RefFI b)
+assertEqF (VarFP a) (VarFP b) = writeEqF (RefFP a) (RefFP b)
+assertEqF (VarFP a) b = do
+  result <- compileExprF b
+  handleLC (F (RefFP a)) result
+assertEqF a b = do
   resultA <- compileExprF a
   resultB <- compileExprF b
 
@@ -179,34 +219,54 @@ compileAssertionEqF a b = do
     (Polynomial as, Polynomial bs) -> do
       writeAddWithPoly $ PolyG.merge as bs
 
--- compileExprF a' a
--- compileExprF b' b
--- writeEqF a' b'
-
-compileAssertionEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()
-compileAssertionEqU (VarU w a) (ValU _ b) = writeValU (RefUX w a) b
-compileAssertionEqU (VarU w a) (VarU _ b) = writeEqU (RefUX w a) (RefUX w b)
-compileAssertionEqU (VarU w a) (VarUO _ b) = writeEqU (RefUX w a) (RefUO w b)
-compileAssertionEqU (VarU w a) (VarUI _ b) = writeEqU (RefUX w a) (RefUI w b)
-compileAssertionEqU (VarU w a) b = do
+-- | Assert that two UInt expressions are equal
+assertEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()
+assertEqU (ValU _ a) (ValU _ b) = when (a /= b) $ throwError $ Compile.ConflictingValuesU a b
+assertEqU (ValU w a) (VarU _ b) = writeValU (RefUX w b) a
+assertEqU (ValU w a) (VarUO _ b) = writeValU (RefUO w b) a
+assertEqU (ValU w a) (VarUI _ b) = writeValU (RefUI w b) a
+assertEqU (ValU w a) (VarUP _ b) = writeValU (RefUP w b) a
+assertEqU (ValU w a) b = do
+  out <- freshRefU w
+  compileExprU out b
+  writeValU out a
+assertEqU (VarU w a) (ValU _ b) = writeValU (RefUX w a) b
+assertEqU (VarU w a) (VarU _ b) = writeEqU (RefUX w a) (RefUX w b)
+assertEqU (VarU w a) (VarUO _ b) = writeEqU (RefUX w a) (RefUO w b)
+assertEqU (VarU w a) (VarUI _ b) = writeEqU (RefUX w a) (RefUI w b)
+assertEqU (VarU w a) (VarUP _ b) = writeEqU (RefUX w a) (RefUP w b)
+assertEqU (VarU w a) b = do
   out <- freshRefU w
   compileExprU out b
   writeEqU (RefUX w a) out
-compileAssertionEqU (VarUO w a) (ValU _ b) = writeValU (RefUO w a) b
-compileAssertionEqU (VarUO w a) (VarU _ b) = writeEqU (RefUO w a) (RefUX w b)
-compileAssertionEqU (VarUO w a) (VarUO _ b) = writeEqU (RefUO w a) (RefUO w b)
-compileAssertionEqU (VarUO w a) b = do
+assertEqU (VarUO w a) (ValU _ b) = writeValU (RefUO w a) b
+assertEqU (VarUO w a) (VarU _ b) = writeEqU (RefUO w a) (RefUX w b)
+assertEqU (VarUO w a) (VarUO _ b) = writeEqU (RefUO w a) (RefUO w b)
+assertEqU (VarUO w a) (VarUI _ b) = writeEqU (RefUO w a) (RefUI w b)
+assertEqU (VarUO w a) (VarUP _ b) = writeEqU (RefUO w a) (RefUP w b)
+assertEqU (VarUO w a) b = do
   out <- freshRefU w
   compileExprU out b
   writeEqU (RefUO w a) out
-compileAssertionEqU (VarUI w a) (ValU _ b) = writeValU (RefUI w a) b
-compileAssertionEqU (VarUI w a) (VarU _ b) = writeEqU (RefUI w a) (RefUX w b)
-compileAssertionEqU (VarUI w a) (VarUO _ b) = writeEqU (RefUI w a) (RefUO w b)
-compileAssertionEqU (VarUI w a) b = do
+assertEqU (VarUI w a) (ValU _ b) = writeValU (RefUI w a) b
+assertEqU (VarUI w a) (VarU _ b) = writeEqU (RefUI w a) (RefUX w b)
+assertEqU (VarUI w a) (VarUO _ b) = writeEqU (RefUI w a) (RefUO w b)
+assertEqU (VarUI w a) (VarUI _ b) = writeEqU (RefUI w a) (RefUI w b)
+assertEqU (VarUI w a) (VarUP _ b) = writeEqU (RefUI w a) (RefUP w b)
+assertEqU (VarUI w a) b = do
   out <- freshRefU w
   compileExprU out b
   writeEqU (RefUI w a) out
-compileAssertionEqU a b = do
+assertEqU (VarUP w a) (ValU _ b) = writeValU (RefUP w a) b
+assertEqU (VarUP w a) (VarU _ b) = writeEqU (RefUP w a) (RefUX w b)
+assertEqU (VarUP w a) (VarUO _ b) = writeEqU (RefUP w a) (RefUO w b)
+assertEqU (VarUP w a) (VarUI _ b) = writeEqU (RefUP w a) (RefUI w b)
+assertEqU (VarUP w a) (VarUP _ b) = writeEqU (RefUP w a) (RefUP w b)
+assertEqU (VarUP w a) b = do
+  out <- freshRefU w
+  compileExprU out b
+  writeEqU (RefUP w a) out
+assertEqU a b = do
   let width = widthOf a
   a' <- freshRefU width
   b' <- freshRefU width
@@ -594,9 +654,9 @@ assertNotZeroU width expr = do
   -- introduce a new variable m, such that `expr * m = 1`
   m <- freshRefU width
   writeMul
-      (0, [(U ref, 1)])
-      (0, [(U m, 1)])
-      (1, [])
+    (0, [(U ref, 1)])
+    (0, [(U m, 1)])
+    (1, [])
 
 -- | Assert that x is less than or equal to y
 --
@@ -636,9 +696,9 @@ assertDivModU width dividend divisor quotient remainder = do
   dividendRef <- wireU dividend
   addDivModHint dividendRef divisorRef quotientRef remainderRef
   writeMul
-      (0, [(U divisorRef, 1)])
-      (0, [(U quotientRef, 1)])
-      (0, [(U dividendRef, 1), (U remainderRef, -1)])
+    (0, [(U divisorRef, 1)])
+    (0, [(U quotientRef, 1)])
+    (0, [(U dividendRef, 1), (U remainderRef, -1)])
   --    0 ≤ remainder < divisor
   assertLTU width (Left remainderRef) (Left divisorRef)
   -- --    0 < divisor
