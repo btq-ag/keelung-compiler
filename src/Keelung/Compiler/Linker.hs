@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Occurrences, constructOccurrences) where
 
 import Control.Arrow (left)
