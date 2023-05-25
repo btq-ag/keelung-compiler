@@ -663,7 +663,7 @@ tests = do
       it "shift" $ do
         let program = do
               x <- inputUInt @4 Public
-              return [shift x (-4), shift x (-3), shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
+              return [x .<<. (-4), x .>>. 3, shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
 
         runAll gf181Info program [0 :: GF181] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
         runAll gf181Info program [1 :: GF181] [] [0, 0, 0, 0, 1, 2, 4, 8, 0]
