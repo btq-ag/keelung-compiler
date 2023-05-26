@@ -6,7 +6,6 @@ module Test.Optimization.UInt (tests, run) where
 import Keelung hiding (compileO0)
 import Test.Hspec
 import Test.Optimization.Util
-import Keelung.Compiler.Linker
 -- import Keelung.Compiler.Linker
 -- import Keelung.Compiler.Linker (linkConstraintModule)
 
@@ -77,8 +76,8 @@ tests = do
         cs `shouldHaveSize` 9
         cs' `shouldHaveSize` 9
 
-    describe "Comparison" $ do
-      it "compute: x ≤ y" $ do
+    describe "Comparison computation" $ do
+      it "x ≤ y" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
@@ -86,42 +85,41 @@ tests = do
         cs `shouldHaveSize` 19
         cs' `shouldHaveSize` 18
 
-      it "compute: 0 ≤ x" $ do
+      it "0 ≤ x" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           return $ (0 :: UInt 4) `lte` x
         cs `shouldHaveSize` 7
         cs' `shouldHaveSize` 7
 
-      it "compute: 1 ≤ x" $ do
+      it "1 ≤ x" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           return $ (1 :: UInt 4) `lte` x
         cs `shouldHaveSize` 10
         cs' `shouldHaveSize` 9
 
-      it "compute: x ≤ 0" $ do
+      it "x ≤ 0" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           return $ x `lte` (0 :: UInt 4)
-        -- debug cs'
         cs `shouldHaveSize` 11
         cs' `shouldHaveSize` 9
 
-      it "compute: x ≤ 1" $ do
+      it "x ≤ 1" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           return $ x `lte` (1 :: UInt 4)
         cs `shouldHaveSize` 10
         cs' `shouldHaveSize` 8
 
-      it "compute: 0 ≤ 0" $ do
+      it "0 ≤ 0" $ do
         (cs, cs') <- execute $ do
           return $ 0 `lte` (0 :: UInt 4)
         cs `shouldHaveSize` 2
         cs' `shouldHaveSize` 2
 
-      it "compute: x < y" $ do
+      it "x < y" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
@@ -129,7 +127,7 @@ tests = do
         cs `shouldHaveSize` 19
         cs' `shouldHaveSize` 18
 
-      it "compute: x ≥ y" $ do
+      it "x ≥ y" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
@@ -137,11 +135,79 @@ tests = do
         cs `shouldHaveSize` 19
         cs' `shouldHaveSize` 18
 
-      it "compute: x > y" $ do
+      it "x > y" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           return $ x `gt` y
         cs `shouldHaveSize` 19
         cs' `shouldHaveSize` 18
+
+    describe "Comparison assertion" $ do
+      it "x ≤ y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          assert $ x `lte` y
+        cs `shouldHaveSize` 18
+        cs' `shouldHaveSize` 17
+
+      it "x ≤ 7 (LTE with trailing ones)" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          assert $ x `lte` 7
+        cs `shouldHaveSize` 6
+        cs' `shouldHaveSize` 6
+
+      it "x ≥ 1 (GTE with trailing zeros)" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          -- 1000
+          assert $ x `gte` 8
+        cs `shouldHaveSize` 8
+        cs' `shouldHaveSize` 6
+
+      it "x ≤ 0" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          assert $ x `lte` (0 :: UInt 4)
+        cs `shouldHaveSize` 9
+        cs' `shouldHaveSize` 9
+
+      it "x ≤ 1" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          assert $ x `lte` (1 :: UInt 4)
+        cs `shouldHaveSize` 8
+        cs' `shouldHaveSize` 8
+
+      it "0 ≤ 0" $ do
+        (cs, cs') <- execute $ do
+          assert $ 0 `lte` (0 :: UInt 4)
+        cs `shouldHaveSize` 0
+        cs' `shouldHaveSize` 0
+
+      it "x < y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          assert $ x `lt` y
+        cs `shouldHaveSize` 18
+        cs' `shouldHaveSize` 17
+
+      it "x ≥ y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          assert $ x `gte` y
+        cs `shouldHaveSize` 18
+        cs' `shouldHaveSize` 17
+
+      it "x > y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          assert $ x `gt` y
+        cs `shouldHaveSize` 18
+        cs' `shouldHaveSize` 17
 

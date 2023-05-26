@@ -69,7 +69,9 @@ compileSideEffect (AssignmentF var val) = do
   handleLC (F (RefFX var)) result
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
 compileSideEffect (DivMod width dividend divisor quotient remainder) = assertDivModU width dividend divisor quotient remainder
-compileSideEffect (AssertLTE width value bound) = assertLTE width value bound
+compileSideEffect (AssertLTE width value bound) = do
+  x <- wireU' value
+  assertLTE2 width x bound
 compileSideEffect (AssertLT width value bound) = assertLT width value bound
 compileSideEffect (AssertGTE width value bound) = assertGTE width value bound
 compileSideEffect (AssertGT width value bound) = assertGT width value bound
@@ -81,12 +83,16 @@ compileAssertion expr = case expr of
   ExprB (EqF x y) -> assertEqF x y
   ExprB (EqU x y) -> assertEqU x y
   -- rewriting `assert (x <= y)` width `assertLTE x y`
-  ExprB (LTEU x (ValU width bound)) -> assertLTE width x (toInteger bound)
+  ExprB (LTEU x (ValU width bound)) -> do
+    x' <- wireU' x
+    assertLTE2 width x' (toInteger bound)
   ExprB (LTEU (ValU width bound) x) -> assertGTE width x (toInteger bound)
   ExprB (LTU x (ValU width bound)) -> assertLT width x (toInteger bound)
   ExprB (LTU (ValU width bound) x) -> assertGT width x (toInteger bound)
   ExprB (GTEU x (ValU width bound)) -> assertGTE width x (toInteger bound)
-  ExprB (GTEU (ValU width bound) x) -> assertLTE width x (toInteger bound)
+  ExprB (GTEU (ValU width bound) x) -> do
+    x' <- wireU' x
+    assertLTE2 width x' (toInteger bound)
   ExprB (GTU x (ValU width bound)) -> assertGT width x (toInteger bound)
   ExprB (GTU (ValU width bound) x) -> assertLT width x (toInteger bound)
   ExprB x -> do
@@ -369,12 +375,12 @@ compileExprU out expr = case expr of
     -- 1. a * a⁻¹ = np + 1
     -- 2. n ≤ ⌈log₂p⌉
     a' <- wireU a
-    n <- freshExprU w
-    nRef <- wireU n
+    -- n <- freshExprU w
+    nRef <- freshRefU w
     let ceilingLg2P = ceiling (logBase 2 (fromInteger p) :: Double)
     writeMul (0, [(U a', 1)]) (0, [(U out, 1)]) (1, [(U nRef, fromInteger p)])
     addModInvHint a' nRef p
-    assertLTE w n ceilingLg2P
+    assertLTE2 w (Left nRef) ceilingLg2P
   AndU w x y xs -> do
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (AndB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
@@ -752,9 +758,13 @@ assertDivModU width dividend divisor quotient remainder = do
 
 --------------------------------------------------------------------------------
 
+assertLTE2 :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
+assertLTE2 _ (Right a) c = if fromIntegral a <= c then return () else throwError $ Compile.AssertLTEBoundTooSmallError c
+assertLTE2 width (Left a) c = assertLTE width a c
+
 -- | Assert that a UInt is less than or equal to some constant
 -- reference doc: A.3.2.2 Range Check https://zips.z.cash/protocol/protocol.pdf
-assertLTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
+assertLTE :: (GaloisField n, Integral n) => Width -> RefU -> Integer -> M n ()
 assertLTE width a c = do
   -- check if the bound is within the range of the UInt
   when (c < 0) $
@@ -764,10 +774,9 @@ assertLTE width a c = do
     throwError $
       Compile.AssertLTEBoundTooLargeError c width
 
-  ref <- wireU a
   -- because we don't have to execute the `go` function for trailing ones of `c`
   -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
-  foldM_ (go ref) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
+  foldM_ (go a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
   where
     -- for counting the number of trailing ones of `c`
     countTrailingOnes :: Int
@@ -823,7 +832,8 @@ assertLT width a c = do
     throwError $
       Compile.AssertLTBoundTooLargeError c width
   -- otherwise, assert that a <= c - 1
-  assertLTE width a (c - 1)
+  a' <- wireU' a
+  assertLTE2 width a' (c - 1)
 
 -- | Assert that a UInt is greater than or equal to some constant
 assertGTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
@@ -839,15 +849,33 @@ assertGTE width a bound = do
   ref <- wireU a
   flag <- freshRefF
   writeValF flag 1
-  foldM_ (go ref) (F flag) [width - 1, width - 2 .. 0]
+  -- because we don't have to execute the `go` function for trailing zeros of `bound`
+  -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
+  -- foldM_ (go ref) (F flag) [width - 1, width - 2 .. 0]
+  foldM_ (go ref) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
   where
+    -- for counting the number of trailing zeros of `bound`
+    countTrailingZeros :: Int
+    countTrailingZeros =
+      fst $
+        foldl
+          ( \(count, keepCounting) i ->
+              if keepCounting && not (Data.Bits.testBit bound i) then (count + 1, True) else (count, False)
+          )
+          (0, True)
+          [0 .. width - 1]
+
     go :: (GaloisField n, Integral n) => RefU -> Ref -> Int -> M n Ref
     go ref flag i =
       let aBit = RefUBit width ref i
           bBit = Data.Bits.testBit bound i
        in if bBit
             then do
-              writeMul (1, [(B aBit, -1), (flag, -1)]) (0, [(B aBit, 1)]) (0, [(flag, -1)])
+              -- constraint on bit
+              -- (flag + bit - 1) * bit = flag
+              -- such that if flag = 0 then bit = 0 or 1 (don't care)
+              --           if flag = 1 then bit = 1
+              writeMul (-1, [(B aBit, 1), (flag, 1)]) (0, [(B aBit, 1)]) (0, [(flag, 1)])
               return flag
             else do
               flag' <- freshRefF

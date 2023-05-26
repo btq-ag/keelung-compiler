@@ -322,24 +322,24 @@ computeLTUConstVar x y = do
 
 compileLTEUVarConstPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (RefB, Bool) -> M n (Either RefB Bool)
 compileLTEUVarConstPrim (Left acc) (x, True) = do
-  -- result - acc = (1 - x[i]) * (1 - acc)
-  result <- freshRefB
-  writeMul (1, [(B x, -1)]) (1, [(B acc, -1)]) (0, [(B result, 1), (B acc, -1)])
-  return $ Left result
+  -- acc' - acc = (1 - x[i]) * (1 - acc)
+  acc' <- freshRefB
+  writeMul (1, [(B x, -1)]) (1, [(B acc, -1)]) (0, [(B acc', 1), (B acc, -1)])
+  return $ Left acc'
 compileLTEUVarConstPrim (Left acc) (x, False) = do
-  -- result = (1 - x[i]) * acc
-  result <- freshRefB
-  writeMul (1, [(B x, -1)]) (0, [(B acc, 1)]) (0, [(B result, 1)])
-  return $ Left result
+  -- acc' = (1 - x[i]) * acc
+  acc' <- freshRefB
+  writeMul (1, [(B x, -1)]) (0, [(B acc, 1)]) (0, [(B acc', 1)])
+  return $ Left acc'
 compileLTEUVarConstPrim (Right True) (_, True) = return $ Right True
 compileLTEUVarConstPrim (Right True) (x, False) = do
-  result <- freshRefB
-  writeNEqB result x
-  return $ Left result
+  acc <- freshRefB
+  writeNEqB acc x
+  return $ Left acc
 compileLTEUVarConstPrim (Right False) (x, True) = do
-  result <- freshRefB
-  writeNEqB result x
-  return $ Left result
+  acc <- freshRefB
+  writeNEqB acc x
+  return $ Left acc
 compileLTEUVarConstPrim (Right False) (_, False) = return $ Right False
 
 compileLTEUConstVarPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (Bool, RefB) -> M n (Either RefB Bool)
