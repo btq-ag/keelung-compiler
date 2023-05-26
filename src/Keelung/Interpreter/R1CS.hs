@@ -36,7 +36,7 @@ run r1cs inputs = fst <$> run' r1cs inputs
 -- | Return interpreted outputs along with the witnesses
 run' :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) ([n], Vector n)
 run' r1cs inputs = do
-  let booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllBits), (PublicInput, ReadBool), (PublicInput, ReadAllBits), (PrivateInput, ReadBool), (PrivateInput, ReadAllBits)]
+  let booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllBits), (PublicInput, ReadBool), (PublicInput, ReadAllBits), (PrivateInput, ReadBool), (PrivateInput, ReadAllBits), (Intermediate, ReadBool), (Intermediate, ReadAllBits)]
   let boolVarRanges = getRanges (r1csCounters r1cs) booleanConstraintCategories
   constraints <- fromOrdinaryConstraints r1cs
   witness <- runM boolVarRanges inputs $ goThroughManyTimes constraints
@@ -117,10 +117,10 @@ lookupVarEither (Right val) = return (Just val)
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
-  xs <- shrinkMul as bs cs
+  xs <- shrinkMul as bs cs >>= _shrinkBinRep2
   return $ fmap Seq.singleton xs
 shrink (AddConstraint as) = do
-  as' <- shrinkAdd as
+  as' <- shrinkAdd as >>= _shrinkBinRep2
   return $ fmap Seq.singleton as'
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
@@ -405,56 +405,42 @@ shrinkBinRep binRep@(BinRep var width bitVarStart) = do
 data FoldState = Start | Failed | Continue (IntMap Var) Bool deriving (Eq, Show)
 
 -- | Watch out for a stuck R1C, and see if it's a binary representation
---    1. see if it's a linear combination
---    2. see if all coefficients are positive
---    3. see if all variables are Boolean
+--    1. see if all coefficients are positive
+--    2. see if all variables are Boolean
 --   NOTE: the criteria above may not be sufficient
-_shrinkBinRep2 :: (GaloisField n, Integral n) => Result (R1C n) -> M n (Result (R1C n))
+_shrinkBinRep2 :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
 _shrinkBinRep2 NothingToDo = return NothingToDo
 _shrinkBinRep2 Eliminated = return Eliminated
-_shrinkBinRep2 (Shrinked r1c) = return (Shrinked r1c)
-_shrinkBinRep2 (Stuck r1c) = do
-  case toLinear r1c of
-    Nothing -> return (Stuck r1c)
-    Just polynomial -> do
-      boolVarRanges <- ask
-      case allCoeffsSameSignAndBooleanAndCollectCoeffs boolVarRanges polynomial of
-        Start -> return (Stuck r1c)
-        Failed -> return (Stuck r1c)
-        Continue invertedPolynomial positive -> do
-          let constant = if positive then -(Poly.constant polynomial) else Poly.constant polynomial
-          -- NOTE: the criteria below is not necessary
-          -- because we know that these coefficients are:
-          --  1. all of the same sign
-          --  2. unique
-          -- we can check if they are actually coefficients of a binary representation, that is:
-          --  1. they happen to be 1, 2, 4, 8, 16, ...
-          traceShowM (fmap N polynomial, fmap N r1c, constant, IntMap.keys invertedPolynomial == [0 .. IntMap.size invertedPolynomial - 1])
-          if IntMap.keys invertedPolynomial == [0 .. IntMap.size invertedPolynomial - 1]
-            then do
-              -- we have a binary representation
-              -- we can now bind the variables
-              forM_ (IntMap.toList invertedPolynomial) $ \(power, var) -> do
-                bindVar var (FieldBits.testBit constant power)
+_shrinkBinRep2 (Shrinked polynomial) = return (Shrinked polynomial)
+_shrinkBinRep2 (Stuck (AddConstraint polynomial)) = do
+  boolVarRanges <- ask
+  -- traceShowM (fmap N polynomial)
+  -- traceShowM (boolVarRanges)
+  case allCoeffsSameSignAndBooleanAndCollectCoeffs boolVarRanges polynomial of
+    Start -> return (Stuck (AddConstraint polynomial))
+    Failed -> return (Stuck (AddConstraint polynomial))
+    Continue invertedPolynomial positive -> do
+      let constant = if positive then -(Poly.constant polynomial) else Poly.constant polynomial
+      -- NOTE: the criteria below is not necessary
+      -- because we know that these coefficients are:
+      --  1. all of the same sign
+      --  2. unique
+      -- we can check if they are actually coefficients of a binary representation, that is:
+      --  1. they happen to be 1, 2, 4, 8, 16, ...
+      -- traceShowM (fmap N polynomial, fmap N polynomial, constant, IntMap.keys invertedPolynomial == [0 .. IntMap.size invertedPolynomial - 1])
+      if IntMap.keys invertedPolynomial == [0 .. IntMap.size invertedPolynomial - 1]
+        then do
+          -- we have a binary representation
+          -- we can now bind the variables
+          forM_ (IntMap.toList invertedPolynomial) $ \(power, var) -> do
+            bindVar var (FieldBits.testBit constant power)
 
-              return Eliminated
-            else do
-              -- we don't have a binary representation
-              -- we can't do anything
-              return (Stuck r1c)
+          return Eliminated
+        else do
+          -- we don't have a binary representation
+          -- we can't do anything
+          return (Stuck (AddConstraint polynomial))
   where
-    toLinear :: (GaloisField n, Integral n) => R1C n -> Maybe (Poly n)
-    toLinear (R1C (Left _) (Left _) (Left _)) = Nothing
-    toLinear (R1C (Left a) (Left b) (Right cs)) = Just $ Poly.addConstant (-a * b) cs
-    toLinear (R1C (Left a) (Right bs) (Left c)) = Just $ Poly.addConstant (-c / a) bs
-    toLinear (R1C (Left a) (Right bs) (Right cs)) = case Poly.multiplyBy (-a) bs of
-      Left c -> Just $ Poly.addConstant (-c) cs
-      Right bs' -> case Poly.merge bs' cs of
-        Left _ -> Nothing
-        Right xs -> Just xs
-    toLinear (R1C (Right as) (Left b) cs) = toLinear (R1C (Left b) (Right as) cs)
-    toLinear (R1C (Right _) (Right _) _) = Nothing
-
     allCoeffsSameSignAndBooleanAndCollectCoeffs :: (GaloisField n, Integral n) => Ranges -> Poly n -> FoldState
     allCoeffsSameSignAndBooleanAndCollectCoeffs boolVarRanges xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
       where
@@ -493,6 +479,7 @@ _shrinkBinRep2 (Stuck r1c) = do
              in if isBoolean var && sameSign && uniqueCoeff
                   then Continue (IntMap.insert power var coeffs) sign
                   else Failed
+_shrinkBinRep2 (Stuck polynomial) = return (Stuck polynomial)
 
 -- go :: (GaloisField n, Integral n) => FoldState -> Var -> n -> FoldState
 -- go Start var coeff = case isPowerOf2 coeff of

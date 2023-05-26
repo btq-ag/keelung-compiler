@@ -516,22 +516,24 @@ compileAddOrSubU isSub width out (Left a) (Right b) = do
     -- Cᵢ = outᵢ
     writeEqB (RefUBit width c i) (RefUBit width out i)
 compileAddOrSubU isSub width out (Left a) (Left b) = do
-  -- carry <- freshRefB
-  -- addBooleanConstraint carry
-  -- -- out + carry = A + B
-  -- let resultSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+  carry <- freshRefB
+  addBooleanConstraint carry
+  -- out + carry = A + B
+  let as = [(B (RefUBit width a i), -(2 ^ i)) | i <- [0 .. width - 1]]
+  let bs = [(B (RefUBit width b i), if isSub then 2 ^ i else -(2 ^ i)) | i <- [0 .. width - 1]]
+  let carryAndResult = (B carry, 2 ^ width) : [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
 
-  -- writeAdd 0 $ [(U a, -1), (U b, if isSub then 1 else -1), (B carry, 2 ^ width)] <> resultSegment
+  writeAdd 0 $ as <> bs <> carryAndResult
 
-  -- addBinRepHint [(RefUBit width out 0, 4), (carry, 1)]
+-- addBinRepHint [(RefUBit width out 0, 4), (carry, 1)]
 
-  c <- freshRefU (width + 1)
-  -- C = A + B
-  writeAdd 0 [(U a, 1), (U b, if isSub then -1 else 1), (U c, -1)]
-  -- copying bits from C to 'out'
-  forM_ [0 .. width - 1] $ \i -> do
-    -- Cᵢ = outᵢ
-    writeEqB (RefUBit width c i) (RefUBit width out i)
+-- c <- freshRefU (width + 1)
+-- -- C = A + B
+-- writeAdd 0 [(U a, 1), (U b, if isSub then -1 else 1), (U c, -1)]
+-- -- copying bits from C to 'out'
+-- forM_ [0 .. width - 1] $ \i -> do
+--   -- Cᵢ = outᵢ
+--   writeEqB (RefUBit width c i) (RefUBit width out i)
 
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileAddU = compileAddOrSubU False

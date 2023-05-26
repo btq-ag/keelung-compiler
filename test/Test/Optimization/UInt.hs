@@ -21,8 +21,8 @@ tests = do
                 x <- inputUInt @4 Public
                 y <- inputUInt @4 Public
                 return $ x + y
-          cs `shouldHaveSize` 21
-          cs' `shouldHaveSize` 21
+          cs `shouldHaveSize` 17
+          cs' `shouldHaveSize` 17
 
     describe "Constants" $ do
       -- TODO: should be just 4
