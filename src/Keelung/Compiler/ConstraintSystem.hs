@@ -16,7 +16,7 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
 import Keelung.Syntax (Var)
-import Keelung.Syntax.Counters
+import Keelung.Syntax.Counters hiding (prettyConstraints)
 
 --------------------------------------------------------------------------------
 
@@ -109,3 +109,54 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> prettyConstraints counters (toList constraints) binReps
       <> prettyVariables counters
       <> "\n}"
+
+prettyConstraints :: Show constraint => Counters -> [constraint] -> [BinRep] -> String
+prettyConstraints counters cs binReps =
+  showConstraintSummary
+    <> showOrdinaryConstraints
+    <> showBooleanConstraints
+    <> showBinRepConstraints
+  where
+    -- sizes of constraint groups
+    totalBinRepConstraintSize = length binReps
+    booleanConstraintSize = getBooleanConstraintCount counters
+    ordinaryConstraintSize = length cs
+
+    -- summary of constraint groups
+    showConstraintSummary =
+      "  Constriant ("
+        <> show (ordinaryConstraintSize + booleanConstraintSize + totalBinRepConstraintSize)
+        <> "): \n"
+
+    -- Ordinary constraints
+    showOrdinaryConstraints =
+      if ordinaryConstraintSize == 0
+        then ""
+        else
+          "    Ordinary constraints ("
+            <> show ordinaryConstraintSize
+            <> "):\n\n"
+            <> unlines (map (\x -> "      " <> show x) cs)
+            <> "\n"
+
+    -- Boolean constraints
+    showBooleanConstraints =
+      if booleanConstraintSize == 0
+        then ""
+        else
+          "    Boolean constraints ("
+            <> show booleanConstraintSize
+            <> "):\n\n"
+            <> unlines (map ("      " <>) (prettyBooleanConstraints counters))
+            <> "\n"
+
+    -- BinRep constraints
+    showBinRepConstraints =
+      if null binReps
+        then ""
+        else
+          "    Binary representation constraints ("
+            <> show (length binReps)
+            <> "):\n\n"
+            <> unlines (map (("      " <>) . show) binReps)
+            <> "\n"

@@ -408,15 +408,22 @@ compileExprU out expr = case expr of
       Left var -> writeEqU out var
       Right val -> writeValU out val
   RoLU w n x -> do
-    x' <- wireU x
-    -- addC $ cRotateU out x' n
-    forM_ [0 .. w - 1] $ \i -> do
-      let i' = (i - n) `mod` w
-      writeEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']
+    result <- wireU' x
+    case result of
+      Left var -> do
+        forM_ [0 .. w - 1] $ \i -> do
+          let i' = (i - n) `mod` w
+          writeEqB (RefUBit w out i) (RefUBit w var i') -- out[i] = x[i']
+      Right val -> do
+        forM_ [0 .. w - 1] $ \i -> do
+          let i' = (i - n) `mod` w
+          writeValB (RefUBit w out i) (FieldBits.testBit' val i') -- out[i] = val[i']
   ShLU w n x -> do
-    x' <- wireU x
+    x' <- wireU' x
     case compare n 0 of
-      EQ -> writeEqU out x'
+      EQ -> case x' of
+        Left var -> writeEqU out var
+        Right val -> writeValU out val
       GT -> do
         -- fill lower bits with 0s
         forM_ [0 .. n - 1] $ \i -> do
@@ -424,22 +431,29 @@ compileExprU out expr = case expr of
           -- shift upper bits
         forM_ [n .. w - 1] $ \i -> do
           let i' = i - n
-          writeEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']
+          case x' of
+            Left var -> writeEqB (RefUBit w out i) (RefUBit w var i') -- out[i] = x'[i']
+            Right val -> writeValB (RefUBit w out i) (FieldBits.testBit' val i') -- out[i] = x'[i']
       LT -> do
         -- shift lower bits
         forM_ [0 .. w + n - 1] $ \i -> do
           let i' = i - n
-          writeEqB (RefUBit w out i) (RefUBit w x' i') -- out[i] = x'[i']
-          -- fill upper bits with 0s
+          case x' of
+            Left var -> writeEqB (RefUBit w out i) (RefUBit w var i') -- out[i] = x'[i']
+            Right val -> writeValB (RefUBit w out i) (FieldBits.testBit' val i') -- out[i] = x'[i']
+            -- fill upper bits with 0s
         forM_ [w + n .. w - 1] $ \i -> do
           writeValB (RefUBit w out i) False -- out[i] = 0
   SetU w x j b -> do
-    x' <- wireU x
+    x' <- wireU' x
     b' <- wireB b
     forM_ [0 .. w - 1] $ \i -> do
       if i == j
         then writeEqB (RefUBit w out i) b' -- out[i] = b
-        else writeEqB (RefUBit w out i) (RefUBit w x' i) -- out[i] = x[i]
+        else do
+          case x' of
+            Left var -> writeEqB (RefUBit w out i) (RefUBit w var i) -- out[i] = x'[i]
+            Right val -> writeValB (RefUBit w out i) (FieldBits.testBit' val i) -- out[i] = x'[i]
   BtoU w x -> do
     -- 1. wire 'out[ZERO]' to 'x'
     result <- compileExprB x
@@ -584,17 +598,6 @@ compileMulU width out (Left a) (Left b) = do
 
   writeMul (0, as) (0, bs) (0, outputSegment <> carrySegment)
 
--- c <- freshRefU (width * 2)
--- -- C = A * B
--- writeMul (0, [(U a, 1)]) (0, [(U b, 1)]) (0, [(U c, 1)])
--- -- copying bits from C to 'out'
--- forM_ [0 .. width - 1] $ \i -> do
---   -- Cᵢ = outᵢ
---   writeEqB (RefUBit width c i) (RefUBit width out i)
-
--- HACK: addC occurrences of RefUs
--- addOccurrencesUTemp [out, a, b, c]
-
 -- | Conditional
 --  out = p * x + (1 - p) * y
 --      =>
@@ -687,13 +690,17 @@ compileIfU width (Left p) (Left x) (Left y) = do
 
 assertNotZeroU :: (GaloisField n, Integral n) => Width -> ExprU n -> M n ()
 assertNotZeroU width expr = do
-  ref <- wireU expr
+  ref <- wireU' expr
   -- introduce a new variable m, such that `expr * m = 1`
   m <- freshRefU width
-  writeMul
-    (0, [(U ref, 1)])
-    (0, [(U m, 1)])
-    (1, [])
+  case ref of
+    Left var -> do
+      writeMul
+        (0, [(U var, 1)])
+        (0, [(U m, 1)])
+        (1, [])
+    Right 0 -> throwError $ Compile.ConflictingValuesU 1 0
+    Right _ -> return ()
 
 -- | Assert that x is less than or equal to y
 --
@@ -731,7 +738,7 @@ assertDivModU width dividend divisor quotient remainder = do
   divisorRef <- wireU divisor
   quotientRef <- wireU quotient
   dividendRef <- wireU dividend
-  addDivModHint dividendRef divisorRef quotientRef remainderRef
+  addDivModHint (Left dividendRef) (Left divisorRef) (Left quotientRef) (Left remainderRef)
   writeMul
     (0, [(U divisorRef, 1)])
     (0, [(U quotientRef, 1)])
@@ -741,7 +748,7 @@ assertDivModU width dividend divisor quotient remainder = do
   -- --    0 < divisor
   -- -- =>
   -- --    divisor != 0
-  assertNotZeroU width divisor
+  assertGT width divisor 0
 
 --------------------------------------------------------------------------------
 

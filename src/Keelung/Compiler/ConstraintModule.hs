@@ -5,7 +5,8 @@
 module Keelung.Compiler.ConstraintModule
   ( ConstraintModule (..),
     sizeOfConstraintModule,
-    prettyCMVariables,
+    prettyVariables,
+    getBooleanConstraintCount,
     UpdateOccurrences (..),
   )
 where
@@ -36,6 +37,13 @@ import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
+    ( Counters(Counters),
+      getRanges,
+      getTotalCount,
+      Category(..),
+      ReadCounters(getCount),
+      ReadType(ReadAllBits, ReadUInt, ReadField, ReadBool) )
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -79,7 +87,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> showOccurrencesF
       <> showOccurrencesB
       <> showOccurrencesU
-      <> prettyCMVariables (cmCounters cm)
+      <> prettyVariables (cmCounters cm)
       <> "}"
     where
       counters = cmCounters cm
@@ -156,8 +164,8 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
                   then showVec (Right xs)
                   else "(" ++ showVec (Right xs) ++ ")"
 
-prettyCMVariables :: Counters -> String
-prettyCMVariables counters =
+prettyVariables :: Counters -> String
+prettyVariables counters =
   let totalSize = getTotalCount counters
       padRight4 s = s <> replicate (4 - length s) ' '
       padLeft12 n = replicate (12 - length (show n)) ' ' <> show n
@@ -174,10 +182,10 @@ prettyCMVariables counters =
       uintWidthEntries (Counters o i p x _ _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
       showUInts =
         let entries = uintWidthEntries counters
-          in if IntSet.null entries
+         in if IntSet.null entries
               then ""
               else mconcat $ fmap uint (IntSet.toList entries)
-    in if totalSize == 0
+   in if totalSize == 0
         then ""
         else
           "  Variables ("
@@ -193,6 +201,63 @@ prettyCMVariables counters =
             <> "\n"
 
 -------------------------------------------------------------------------------
+
+-- | Variables that needed to be constrained to be Boolean
+--    1. Boolean output variables
+--    2. UInt BinReps output variables
+--    3. Boolean private input variables
+--    4. UInt BinReps private input variables
+--    5. Boolean public input variables
+--    6. UInt BinReps public input variables
+--    7. Boolean intermediate variables
+--    8. UInt BinReps public intermediate variables
+booleanConstraintCategories :: [(Category, ReadType)]
+booleanConstraintCategories =
+  [ (Output, ReadBool),
+    (Output, ReadAllBits),
+    (PublicInput, ReadBool),
+    (PublicInput, ReadAllBits),
+    (PrivateInput, ReadBool),
+    (PrivateInput, ReadAllBits),
+    (Intermediate, ReadBool),
+    (Intermediate, ReadAllBits)
+  ]
+
+getBooleanConstraintCount :: Counters -> Int
+getBooleanConstraintCount counters = sum $ map (getCount counters) booleanConstraintCategories
+
+getBooleanConstraintRanges :: Counters -> [(Int, Int)]
+getBooleanConstraintRanges counters = IntMap.toList $ getRanges counters booleanConstraintCategories
+
+prettyBooleanConstraints :: Counters -> [String]
+prettyBooleanConstraints counters =
+  concatMap showSegment (getBooleanConstraintRanges counters)
+  where
+    showSegment :: (Int, Int) -> [String]
+    showSegment (start, end) =
+      case end - start of
+        0 -> []
+        1 -> [showBooleanConstraint start]
+        2 ->
+          [ showBooleanConstraint start,
+            showBooleanConstraint (start + 1)
+          ]
+        3 ->
+          [ showBooleanConstraint start,
+            showBooleanConstraint (start + 1),
+            showBooleanConstraint (start + 2)
+          ]
+        _ ->
+          [ showBooleanConstraint start,
+            "  ...",
+            showBooleanConstraint (end - 1)
+          ]
+
+    showBooleanConstraint :: Int -> String
+    showBooleanConstraint n = "$" <> show n <> " = $" <> show n <> " * $" <> show n
+
+-------------------------------------------------------------------------------
+
 -- | TODO: revisit this
 sizeOfConstraintModule :: ConstraintModule n -> Int
 sizeOfConstraintModule cm =
@@ -314,5 +379,3 @@ instance UpdateOccurrences RefU where
                 _ -> cm
           )
       )
-
--------------------------------------------------------------------------------

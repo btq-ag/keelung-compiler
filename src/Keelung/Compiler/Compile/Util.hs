@@ -139,7 +139,7 @@ addC = mapM_ addOne
 
     countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
     countBitTestAsOccurU (B (RefUBit _ (RefUX width var) _)) =
-      modify' ( \cs -> cs { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cs)})
+      modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cs)})
     countBitTestAsOccurU _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
@@ -221,8 +221,8 @@ addEqZeroHintWithPoly (Left 0) m = writeValF m 0
 addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
-addDivModHint :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> RefU -> M n ()
-addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (Left x, Left y, Left q, Left r) : cmDivMods cs}
+addDivModHint :: (GaloisField n, Integral n) => Either RefU n -> Either RefU n -> Either RefU n -> Either RefU n -> M n ()
+addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (x, y, q, r) : cmDivMods cs}
 
 addModInvHint :: (GaloisField n, Integral n) => RefU -> RefU -> Integer -> M n ()
 addModInvHint x n p = modify' $ \cs -> cs {cmModInvs = (Left x, Left n, p) : cmModInvs cs}
