@@ -333,7 +333,9 @@ compileExprF expr = case expr of
 
 compileExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compileExprU out expr = case expr of
-  ValU _ val -> writeValU out val
+  ValU width val -> do
+    forM_ [0 .. width - 1] $ \i -> do
+      writeValB (RefUBit width out i) (FieldBits.testBit' val i)
   VarU width var -> writeEqU out (RefUX width var)
   VarUO width var -> writeEqU out (RefUX width var) -- out = var
   VarUI width var -> do

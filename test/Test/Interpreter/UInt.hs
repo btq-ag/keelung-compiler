@@ -190,24 +190,22 @@ tests = do
 
         it "assertDivMod (with wrong quotient constant)" $ do
           let program = assertDivMod 7 (3 :: UInt 4) 3 1
-          throwAll'
+          throwAll
             gf181Info
             program
             []
             ([] :: [GF181])
             (Interpreter.SyntaxTreeError (SyntaxTree.DivModQuotientError 7 3 2 3))
-            (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues))
             (InterpretError (Interpreter.R1CSError (R1CS.DivModQuotientError 7 3 2 3)))
 
         it "assertDivMod (with wrong remainder constant)" $ do
           let program = assertDivMod 7 (3 :: UInt 4) 2 0
-          throwAll'
+          throwAll
             gf181Info
             program
             []
             ([] :: [GF181])
             (Interpreter.SyntaxTreeError (SyntaxTree.DivModRemainderError 7 3 1 0))
-            (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues))
             (InterpretError (Interpreter.R1CSError (R1CS.DivModRemainderError 7 3 1 0)))
 
         it "assertDivMod (multiple statements)" $ do

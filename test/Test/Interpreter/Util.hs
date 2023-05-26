@@ -1,4 +1,4 @@
-module Test.Interpreter.Util (runAll, throwAll, throwAll', runAndCompare, debug, assertSize, gf181Info) where
+module Test.Interpreter.Util (runAll, throwAll, runAndCompare, debug, assertSize, gf181Info) where
 
 import Control.Arrow (left)
 import Data.Field.Galois
@@ -66,18 +66,6 @@ throwAll fieldInfo program rawPublicInputs rawPrivateInputs stError csError = do
   -- constraint system interpreters
   interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
     `shouldBe` Left csError
-  interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-    `shouldBe` Left csError
-
--- | Expect all interpreters to throw an error
-throwAll' :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Interpreter.Error n -> Error n -> Error n -> IO ()
-throwAll' fieldInfo program rawPublicInputs rawPrivateInputs stError csError optmError = do
-  -- syntax tree interpreters
-  interpretSyntaxTree program rawPublicInputs rawPrivateInputs
-    `shouldBe` Left (InterpretError stError)
-  -- constraint system interpreters
-  interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
-    `shouldBe` Left optmError
   interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
     `shouldBe` Left csError
 

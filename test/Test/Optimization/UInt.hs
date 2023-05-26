@@ -6,6 +6,7 @@ module Test.Optimization.UInt (tests, run) where
 import Keelung hiding (compileO0)
 import Test.Hspec
 import Test.Optimization.Util
+import Keelung.Compiler.Linker
 -- import Keelung.Compiler.Linker (linkConstraintModule)
 
 run :: IO ()
@@ -71,8 +72,9 @@ tests = do
       it "`return 0`" $ do
         (cs, cs') <- execute $ do
           return (0 :: UInt 4)
-        cs `shouldHaveSize` 6
-        cs' `shouldHaveSize` 6
+        print $ linkConstraintModule cs'
+        cs `shouldHaveSize` 9
+        cs' `shouldHaveSize` 9
 
     describe "Comparison" $ do
       it "compute LTE (variable / variable)" $ do
