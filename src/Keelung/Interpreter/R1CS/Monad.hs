@@ -6,6 +6,7 @@ module Keelung.Interpreter.R1CS.Monad where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict (IntMap)
@@ -25,7 +26,6 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.VarGroup
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Control.Monad.Reader
 
 --------------------------------------------------------------------------------
 
@@ -51,21 +51,24 @@ bindVarEither (Right _) _ = return ()
 --------------------------------------------------------------------------------
 
 data Constraint n
-  = R1CConstraint (R1C n)
+  = MulConstraint (Poly n) (Poly n) (Either n (Poly n))
+  | AddConstraint (Poly n)
   | BooleanConstraint Var
   | EqZeroConstraint (Poly n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
     DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
   | BinRepConstraint BinRep
-  -- | BinRepConstraint2 [(Var, Int)]
-  | -- | (a, n, p) where modInv a * a = n * p + 1
+  | -- \| (a, n, p) where modInv a * a = n * p + 1
+
+    -- | BinRepConstraint2 [(Var, Int)]
     ModInvConstraint (Either Var n, Either Var n, Integer)
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Constraint n)
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
-  show (R1CConstraint r1c) = show r1c
+  show (MulConstraint a b c) = "(Mul)       (" <> show a <> ") * (" <> show b <> ") = (" <> show c <> ")"
+  show (AddConstraint a) = "(Add)       " <> show a
   show (BooleanConstraint var) = "(Boolean)   $" <> show var <> " = $" <> show var <> " * $" <> show var
   show (EqZeroConstraint eqZero) = "(EqZero)     " <> show eqZero
   show (DivModConstaint (dividend, divisor, quotient, remainder)) =
@@ -82,7 +85,10 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (ModInvConstraint (var, _, p)) = "(ModInv)    $" <> show var <> "⁻¹ (mod " <> show p <> ")"
 
 instance Functor Constraint where
-  fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
+  -- fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
+  fmap f (MulConstraint a b (Left c)) = MulConstraint (fmap f a) (fmap f b) (Left (f c))
+  fmap f (MulConstraint a b (Right c)) = MulConstraint (fmap f a) (fmap f b) (Right (fmap f c))
+  fmap f (AddConstraint a) = AddConstraint (fmap f a)
   fmap _ (BooleanConstraint var) = BooleanConstraint var
   fmap f (EqZeroConstraint (xs, m)) = EqZeroConstraint (fmap f xs, m)
   fmap f (DivModConstaint (a, b, q, r)) = DivModConstaint (fmap f a, fmap f b, fmap f q, fmap f r)
@@ -95,6 +101,7 @@ instance Functor Constraint where
 data Error n
   = VarUnassignedError IntSet
   | R1CInconsistentError (R1C n)
+  | ConflictingValues
   | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
   | DivModQuotientError n n n n
@@ -111,6 +118,8 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (R1CInconsistentError r1c) =
     "equation doesn't hold: `" <> show (fmap N r1c) <> "`"
   -- " <> show (N a) <> " * " <> show (N b) <> " ≠ " <> show (N c) <> "`"
+  show ConflictingValues = "Cannot unify conflicting values in constraint"
+  -- show (ConflictingValues expected actual) = "Cannot unify conflicting values: " <> show (N expected) <> " and " <> show (N actual)
   show (BooleanConstraintError var val) =
     "expected the value of $" <> show var <> " to be either 0 or 1, but got `" <> show (N val) <> "`"
   show (StuckError context constraints) =

@@ -8,7 +8,6 @@ import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Compiler.Compile.Error qualified as CompilerError
-import Keelung.Constraint.R1C (R1C (R1C))
 import Keelung.Interpreter.Error qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
@@ -155,7 +154,7 @@ tests = do
             []
             ([] :: [GF181])
             (Interpreter.SyntaxTreeError (SyntaxTree.DivModQuotientError 7 3 2 3))
-            (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 3) (Left 3) (Left 6))))
+            (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues))
             (InterpretError (Interpreter.R1CSError (R1CS.DivModQuotientError 7 3 2 3)))
 
         it "assertDivMod (with wrong remainder constant)" $ do
@@ -166,7 +165,7 @@ tests = do
             []
             ([] :: [GF181])
             (Interpreter.SyntaxTreeError (SyntaxTree.DivModRemainderError 7 3 1 0))
-            (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 3) (Left 2) (Left 7))))
+            (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues))
             (InterpretError (Interpreter.R1CSError (R1CS.DivModRemainderError 7 3 1 0)))
 
         it "assertDivMod (multiple statements)" $ do
@@ -274,7 +273,7 @@ tests = do
                     [fromInteger x :: GF181]
                     []
                     (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError (fromInteger x) bound))
-                    (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left (-1)) (Left 1) (Left 0))))
+                    (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues))
 
           when (bound >= 15) $ do
             forM_ [0 .. 15] $ \x -> do
@@ -316,7 +315,7 @@ tests = do
                     [fromInteger x :: GF181]
                     []
                     (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTError (fromInteger x) bound))
-                    (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left (-1)) (Left 1) (Left 0))))
+                    (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues))
 
           when (bound >= 16) $ do
             forM_ [0 .. 15] $ \x -> do
@@ -358,7 +357,7 @@ tests = do
                     [fromInteger x :: GF181]
                     []
                     (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEError (fromInteger x) bound))
-                    (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left (-1)))))
+                    (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues))
 
           when (bound >= 16) $ do
             forM_ [0 .. 15] $ \x -> do
@@ -400,7 +399,7 @@ tests = do
                     [fromInteger x :: GF181]
                     []
                     (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTError (fromInteger x) bound))
-                    (InterpretError (Interpreter.R1CSError (R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left (-1)))))
+                    (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues))
 
           when (bound >= 15) $ do
             forM_ [0 .. 15] $ \x -> do
@@ -636,7 +635,7 @@ tests = do
           [3 :: GF181]
           []
           (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ ($UI₄0 = 3)")
-          (InterpretError (Interpreter.R1CSError $ R1CS.R1CInconsistentError $ R1C (Left 0) (Left 0) (Left 1)))
+          (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues))
 
       it "neq 4" $ do
         let program = do
