@@ -36,14 +36,7 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Field (FieldType)
-import Keelung.Syntax.Counters
-    ( Counters(Counters),
-      getRanges,
-      getTotalCount,
-      Category(..),
-      ReadCounters(getCount),
-      ReadType(ReadAllBits, ReadUInt, ReadField, ReadBool) )
-import Debug.Trace
+import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
 
 --------------------------------------------------------------------------------
 

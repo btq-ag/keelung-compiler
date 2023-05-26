@@ -71,10 +71,16 @@ compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) v
 compileSideEffect (DivMod width dividend divisor quotient remainder) = assertDivModU width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do
   x <- wireU' value
-  assertLTE2 width x bound
-compileSideEffect (AssertLT width value bound) = assertLT width value bound
-compileSideEffect (AssertGTE width value bound) = assertGTE width value bound
-compileSideEffect (AssertGT width value bound) = assertGT width value bound
+  assertLTE width x bound
+compileSideEffect (AssertLT width value bound) = do
+  x <- wireU' value
+  assertLT width x bound
+compileSideEffect (AssertGTE width value bound) = do
+  x <- wireU' value
+  assertGTE width x bound
+compileSideEffect (AssertGT width value bound) = do
+  x <- wireU' value
+  assertGT width x bound
 
 -- | Compile the constraint 'out = x'.
 compileAssertion :: (GaloisField n, Integral n) => Expr n -> M n ()
@@ -85,16 +91,28 @@ compileAssertion expr = case expr of
   -- rewriting `assert (x <= y)` width `assertLTE x y`
   ExprB (LTEU x (ValU width bound)) -> do
     x' <- wireU' x
-    assertLTE2 width x' (toInteger bound)
-  ExprB (LTEU (ValU width bound) x) -> assertGTE width x (toInteger bound)
-  ExprB (LTU x (ValU width bound)) -> assertLT width x (toInteger bound)
-  ExprB (LTU (ValU width bound) x) -> assertGT width x (toInteger bound)
-  ExprB (GTEU x (ValU width bound)) -> assertGTE width x (toInteger bound)
+    assertLTE width x' (toInteger bound)
+  ExprB (LTEU (ValU width bound) x) -> do
+    x' <- wireU' x
+    assertGTE width x' (toInteger bound)
+  ExprB (LTU x (ValU width bound)) -> do
+    x' <- wireU' x
+    assertLT width x' (toInteger bound)
+  ExprB (LTU (ValU width bound) x) -> do
+    x' <- wireU' x
+    assertGT width x' (toInteger bound)
+  ExprB (GTEU x (ValU width bound)) -> do
+    x' <- wireU' x
+    assertGTE width x' (toInteger bound)
   ExprB (GTEU (ValU width bound) x) -> do
     x' <- wireU' x
-    assertLTE2 width x' (toInteger bound)
-  ExprB (GTU x (ValU width bound)) -> assertGT width x (toInteger bound)
-  ExprB (GTU (ValU width bound) x) -> assertLT width x (toInteger bound)
+    assertLTE width x' (toInteger bound)
+  ExprB (GTU x (ValU width bound)) -> do
+    x' <- wireU' x
+    assertGT width x' (toInteger bound)
+  ExprB (GTU (ValU width bound) x) -> do
+    x' <- wireU' x
+    assertLT width x' (toInteger bound)
   ExprB x -> do
     -- out <- freshRefB
     result <- compileExprB x
@@ -380,7 +398,7 @@ compileExprU out expr = case expr of
     let ceilingLg2P = ceiling (logBase 2 (fromInteger p) :: Double)
     writeMul (0, [(U a', 1)]) (0, [(U out, 1)]) (1, [(U nRef, fromInteger p)])
     addModInvHint a' nRef p
-    assertLTE2 w (Left nRef) ceilingLg2P
+    assertLTE w (Left nRef) ceilingLg2P
   AndU w x y xs -> do
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (AndB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
@@ -754,18 +772,15 @@ assertDivModU width dividend divisor quotient remainder = do
   -- --    0 < divisor
   -- -- =>
   -- --    divisor != 0
-  assertGT width divisor 0
+  assertGT width (Left divisorRef) 0
 
 --------------------------------------------------------------------------------
 
-assertLTE2 :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
-assertLTE2 _ (Right a) c = if fromIntegral a <= c then return () else throwError $ Compile.AssertLTEBoundTooSmallError c
-assertLTE2 width (Left a) c = assertLTE width a c
-
 -- | Assert that a UInt is less than or equal to some constant
 -- reference doc: A.3.2.2 Range Check https://zips.z.cash/protocol/protocol.pdf
-assertLTE :: (GaloisField n, Integral n) => Width -> RefU -> Integer -> M n ()
-assertLTE width a c = do
+assertLTE :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
+assertLTE _ (Right a) c = if fromIntegral a <= c then return () else throwError $ Compile.AssertComparisonError (toInteger a) LT (succ c)
+assertLTE width (Left a) c = do
   -- check if the bound is within the range of the UInt
   when (c < 0) $
     throwError $
@@ -822,7 +837,7 @@ assertLTE width a c = do
               return $ Just acc
 
 -- | Assert that a UInt is less than some constant
-assertLT :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
+assertLT :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
 assertLT width a c = do
   -- check if the bound is within the range of the UInt
   when (c < 1) $
@@ -832,12 +847,12 @@ assertLT width a c = do
     throwError $
       Compile.AssertLTBoundTooLargeError c width
   -- otherwise, assert that a <= c - 1
-  a' <- wireU' a
-  assertLTE2 width a' (c - 1)
+  assertLTE width a (c - 1)
 
 -- | Assert that a UInt is greater than or equal to some constant
-assertGTE :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
-assertGTE width a bound = do
+assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
+assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Compile.AssertComparisonError (succ (toInteger a)) GT c
+assertGTE width (Left a) bound = do
   -- check if the bound is within the range of the UInt
   when (bound < 1) $
     throwError $
@@ -846,13 +861,11 @@ assertGTE width a bound = do
     throwError $
       Compile.AssertGTEBoundTooLargeError bound width
 
-  ref <- wireU a
   flag <- freshRefF
   writeValF flag 1
   -- because we don't have to execute the `go` function for trailing zeros of `bound`
   -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
-  -- foldM_ (go ref) (F flag) [width - 1, width - 2 .. 0]
-  foldM_ (go ref) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
+  foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
   where
     -- for counting the number of trailing zeros of `bound`
     countTrailingZeros :: Int
@@ -884,7 +897,7 @@ assertGTE width a bound = do
               return (F flag')
 
 -- | Assert that a UInt is greater than some constant
-assertGT :: (GaloisField n, Integral n) => Width -> ExprU n -> Integer -> M n ()
+assertGT :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
 assertGT width a c = do
   -- check if the bound is within the range of the UInt
   when (c < 0) $
