@@ -15,8 +15,6 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
-import Debug.Trace
-import Keelung (N (..))
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Inputs (Inputs)
@@ -117,10 +115,10 @@ lookupVarEither (Right val) = return (Just val)
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
-  xs <- shrinkMul as bs cs >>= _shrinkBinRep2
+  xs <- shrinkMul as bs cs >>= detectBinRep
   return $ fmap Seq.singleton xs
 shrink (AddConstraint as) = do
-  as' <- shrinkAdd as >>= _shrinkBinRep2
+  as' <- shrinkAdd as >>= detectBinRep
   return $ fmap Seq.singleton as'
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
@@ -408,11 +406,11 @@ data FoldState = Start | Failed | Continue (IntMap Var) Bool deriving (Eq, Show)
 --    1. see if all coefficients are positive
 --    2. see if all variables are Boolean
 --   NOTE: the criteria above may not be sufficient
-_shrinkBinRep2 :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
-_shrinkBinRep2 NothingToDo = return NothingToDo
-_shrinkBinRep2 Eliminated = return Eliminated
-_shrinkBinRep2 (Shrinked polynomial) = return (Shrinked polynomial)
-_shrinkBinRep2 (Stuck (AddConstraint polynomial)) = do
+detectBinRep :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
+detectBinRep NothingToDo = return NothingToDo
+detectBinRep Eliminated = return Eliminated
+detectBinRep (Shrinked polynomial) = return (Shrinked polynomial)
+detectBinRep (Stuck (AddConstraint polynomial)) = do
   boolVarRanges <- ask
   -- traceShowM (fmap N polynomial)
   -- traceShowM (boolVarRanges)
@@ -479,7 +477,7 @@ _shrinkBinRep2 (Stuck (AddConstraint polynomial)) = do
              in if isBoolean var && sameSign && uniqueCoeff
                   then Continue (IntMap.insert power var coeffs) sign
                   else Failed
-_shrinkBinRep2 (Stuck polynomial) = return (Stuck polynomial)
+detectBinRep (Stuck polynomial) = return (Stuck polynomial)
 
 -- go :: (GaloisField n, Integral n) => FoldState -> Var -> n -> FoldState
 -- go Start var coeff = case isPowerOf2 coeff of

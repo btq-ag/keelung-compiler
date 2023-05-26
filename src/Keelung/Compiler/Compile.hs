@@ -333,12 +333,9 @@ compileExprF expr = case expr of
 
 compileExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compileExprU out expr = case expr of
-  ValU _ val -> do
-    writeValU out val
-  VarU width var -> do
-    writeEqU out (RefUX width var)
-  VarUO width var -> do
-    writeEqU out (RefUX width var) -- out = var
+  ValU _ val -> writeValU out val
+  VarU width var -> writeEqU out (RefUX width var)
+  VarUO width var -> writeEqU out (RefUX width var) -- out = var
   VarUI width var -> do
     let ref = RefUI width var
     -- constraint for UInt : out = ref
@@ -362,8 +359,8 @@ compileExprU out expr = case expr of
     y' <- wireU' y
     compileAddU w out x' y'
   MulU w x y -> do
-    x' <- wireU x
-    y' <- wireU y
+    x' <- wireU' x
+    y' <- wireU' y
     compileMulU w out x' y'
   MMIU w a p -> do
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
@@ -494,27 +491,36 @@ wireU' others = Left <$> wireU others
 compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileAddOrSubU isSub width out (Right a) (Right b) = do
   let val = if isSub then a - b else a + b
-  -- Right val -> return $ Right (FieldBits.testBit' val index)
-  -- copying bits from C to 'out'
   forM_ [0 .. width - 1] $ \i -> do
     -- Cᵢ = outᵢ
     writeValB (RefUBit width out i) (FieldBits.testBit' val i)
 compileAddOrSubU isSub width out (Right a) (Left b) = do
-  c <- freshRefU (width + 1)
-  -- C = A + B
-  writeAdd a [(U b, if isSub then -1 else 1), (U c, -1)]
-  -- copying bits from C to 'out'
-  forM_ [0 .. width - 1] $ \i -> do
-    -- Cᵢ = outᵢ
-    writeEqB (RefUBit width c i) (RefUBit width out i)
+  carry <- freshRefB
+  addBooleanConstraint carry
+  let bs = [(B (RefUBit width b i), if isSub then -(2 ^ i) else 2 ^ i) | i <- [0 .. width - 1]]
+  let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
+  writeAdd a $ bs <> carryAndResult
+-- c <- freshRefU (width + 1)
+-- -- C = A + B
+-- writeAdd a [(U b, if isSub then -1 else 1), (U c, -1)]
+-- -- copying bits from C to 'out'
+-- forM_ [0 .. width - 1] $ \i -> do
+--   -- Cᵢ = outᵢ
+--   writeEqB (RefUBit width c i) (RefUBit width out i)
 compileAddOrSubU isSub width out (Left a) (Right b) = do
-  c <- freshRefU (width + 1)
-  -- C = A + B
-  writeAdd (if isSub then -b else b) [(U a, 1), (U c, -1)]
-  -- copying bits from C to 'out'
-  forM_ [0 .. width - 1] $ \i -> do
-    -- Cᵢ = outᵢ
-    writeEqB (RefUBit width c i) (RefUBit width out i)
+  carry <- freshRefB
+  addBooleanConstraint carry
+  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+  let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
+  writeAdd (if isSub then -b else b) $ as <> carryAndResult
+
+-- c <- freshRefU (width + 1)
+-- -- C = A + B
+-- writeAdd (if isSub then -b else b) [(U a, 1), (U c, -1)]
+-- -- copying bits from C to 'out'
+-- forM_ [0 .. width - 1] $ \i -> do
+--   -- Cᵢ = outᵢ
+--   writeEqB (RefUBit width c i) (RefUBit width out i)
 compileAddOrSubU isSub width out (Left a) (Left b) = do
   carry <- freshRefB
   addBooleanConstraint carry
@@ -546,16 +552,43 @@ compileSubU = compileAddOrSubU True
 --      B       =   2ⁿBₙ₋₁ + ... + 2B₁ + B₀
 --      C       = 2²ⁿC₂ₙ₋₁ + ... + 2C₁ + C₀
 --      Result  =   2ⁿCₙ₋₁ + ... + 2C₁ + C₀
---      C       = A * B
-compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> RefU -> RefU -> M n ()
-compileMulU width out a b = do
-  c <- freshRefU (width * 2)
-  -- C = A * B
-  writeMul (0, [(U a, 1)]) (0, [(U b, 1)]) (0, [(U c, 1)])
-  -- copying bits from C to 'out'
+compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileMulU width out (Right a) (Right b) = do
+  let val = a * b
   forM_ [0 .. width - 1] $ \i -> do
-    -- Cᵢ = outᵢ
-    writeEqB (RefUBit width c i) (RefUBit width out i)
+    writeValB (RefUBit width out i) (FieldBits.testBit' val i)
+compileMulU width out (Right a) (Left b) = do
+  carry <- replicateM width (B <$> freshRefB)
+  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
+  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
+  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+  writeMul (a, []) (0, bs) (0, outputSegment <> carrySegment)
+
+-- writeAdd 0 [(U b, -a), (U out, 1)]
+compileMulU width out (Left a) (Right b) = do
+  carry <- replicateM width (B <$> freshRefB)
+  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
+  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+  writeMul (0, as) (b, []) (0, outputSegment <> carrySegment)
+-- writeAdd 0 [(U a, -b), (U out, 1)]
+compileMulU width out (Left a) (Left b) = do
+  carry <- replicateM width (B <$> freshRefB)
+
+  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
+  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
+  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+
+  writeMul (0, as) (0, bs) (0, outputSegment <> carrySegment)
+
+-- c <- freshRefU (width * 2)
+-- -- C = A * B
+-- writeMul (0, [(U a, 1)]) (0, [(U b, 1)]) (0, [(U c, 1)])
+-- -- copying bits from C to 'out'
+-- forM_ [0 .. width - 1] $ \i -> do
+--   -- Cᵢ = outᵢ
+--   writeEqB (RefUBit width c i) (RefUBit width out i)
 
 -- HACK: addC occurrences of RefUs
 -- addOccurrencesUTemp [out, a, b, c]

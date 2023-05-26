@@ -9,7 +9,7 @@ import Keelung
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
-import Keelung.Compiler.Linker (constructOccurrences, reindexRef)
+import Keelung.Compiler.Linker (constructOccurrences, reindexRef, linkConstraintModule)
 import Test.Hspec
 import Test.Optimization.Util (execute)
 
@@ -119,7 +119,7 @@ tests = do
 
   describe "fromOccurrences" $ do
     it "add + assertion" $ do
-      (_, cm) <- execute $ do
+      (_cm, cm) <- execute $ do
         x <- inputUInt @4 Public
         assert $ 2 `eq` (x + 1)
       let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
@@ -129,21 +129,15 @@ tests = do
       reindexRef occurrences (B (RefUBit 4 inputVar 2)) `shouldBe` 2
       reindexRef occurrences (B (RefUBit 4 inputVar 3)) `shouldBe` 3
       reindexRef occurrences (U inputVar) `shouldBe` 4
-
+      let intermediateB = RefBX 0
+      reindexRef occurrences (B intermediateB) `shouldBe` 5
       let intermediate4 = RefUX 4 0
-      reindexRef occurrences (B (RefUBit 4 intermediate4 0)) `shouldBe` 5
-      reindexRef occurrences (B (RefUBit 4 intermediate4 1)) `shouldBe` 6
-      reindexRef occurrences (B (RefUBit 4 intermediate4 2)) `shouldBe` 7
-      reindexRef occurrences (B (RefUBit 4 intermediate4 3)) `shouldBe` 8
-      let intermediate5 = RefUX 5 0
-      reindexRef occurrences (B (RefUBit 5 intermediate5 0)) `shouldBe` 9
-      reindexRef occurrences (B (RefUBit 5 intermediate5 1)) `shouldBe` 10
-      reindexRef occurrences (B (RefUBit 5 intermediate5 2)) `shouldBe` 11
-      reindexRef occurrences (B (RefUBit 5 intermediate5 3)) `shouldBe` 12
-      reindexRef occurrences (B (RefUBit 5 intermediate5 4)) `shouldBe` 13
-
-      reindexRef occurrences (U intermediate4) `shouldBe` 14
-      reindexRef occurrences (U intermediate5) `shouldBe` 15
+      reindexRef occurrences (B (RefUBit 4 intermediate4 0)) `shouldBe` 6
+      reindexRef occurrences (B (RefUBit 4 intermediate4 1)) `shouldBe` 7
+      reindexRef occurrences (B (RefUBit 4 intermediate4 2)) `shouldBe` 8
+      reindexRef occurrences (B (RefUBit 4 intermediate4 3)) `shouldBe` 9
+      -- print $ linkConstraintModule cm
+      reindexRef occurrences (U intermediate4) `shouldBe` 10
 
     it "Bit test / and 1" $ do
       (_, cm) <- execute $ do

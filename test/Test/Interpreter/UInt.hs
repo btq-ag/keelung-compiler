@@ -48,9 +48,51 @@ tests = do
             runAll gf181Info program [fromInteger (x `mod` 16)] ([] :: [GF181]) expected
 
         it "constant / constant" $ do
+          let program x y = do
+                return $ x + (y :: UInt 4)
+          let genPair = do
+                x <- choose (0, 15)
+                y <- choose (0, 15)
+                return (x, y)
+          forAll genPair $ \(x, y) -> do
+            let expected = [fromInteger ((x + y) `mod` 16)]
+            runAll gf181Info (program (fromInteger x) (fromInteger y)) [] ([] :: [GF181]) expected
+
+      describe "Multiplication" $ do
+        it "variable / variable" $ do
           let program = do
-                return $ 1 + (2 :: UInt 4)
-          runAll gf181Info program [] ([] :: [GF181]) [3]
+                x <- inputUInt @4 Public
+                y <- inputUInt @4 Public
+                return $ x * y
+          -- runAll gf181Info program [3, 4] ([] :: [GF181]) [7]
+          let genPair = do
+                x <- choose (0, 15)
+                y <- choose (0, 15)
+                return (x, y)
+          forAll genPair $ \(x, y) -> do
+            let expected = [fromInteger ((x * y) `mod` 16)]
+            runAll gf181Info program [fromInteger x, fromInteger y] ([] :: [GF181]) expected
+
+        it "variable / constant" $ do
+          let program = do
+                x <- inputUInt @4 Public
+                return $ x * 2
+
+          forAll (choose (0, 100)) $ \x -> do
+            let expected = [fromInteger ((x * 2) `mod` 16)]
+            runAll gf181Info program [fromInteger (x `mod` 16)] ([] :: [GF181]) expected
+
+        it "constant / constant" $ do
+          let program x y = do
+                return $ x * (y :: UInt 4)
+          let genPair = do
+                x <- choose (0, 15)
+                y <- choose (0, 15)
+                return (x, y)
+          forAll genPair $ \(x, y) -> do
+            let expected = [fromInteger ((x * y) `mod` 16)]
+            runAll gf181Info (program (fromInteger x) (fromInteger y)) [] ([] :: [GF181]) expected
+
       it "arithmetics 1" $ do
         let program = do
               f <- inputField Public
