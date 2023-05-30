@@ -8,7 +8,6 @@ module Keelung.Compiler.Compile (run) where
 import Control.Arrow (left)
 import Control.Monad
 import Control.Monad.Except
-import Control.Monad.State
 import Data.Bits qualified
 -- import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 
@@ -28,7 +27,6 @@ import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax (widthOf)
-import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
@@ -297,15 +295,6 @@ assertEqU a b = do
   compileExprU a' a
   compileExprU b' b
   writeEqU a' b'
-
-----------------------------------------------------------------
-
-freshExprU :: Width -> M n (ExprU n)
-freshExprU width = do
-  counters <- gets cmCounters
-  let index = getCount counters (Intermediate, ReadUInt width)
-  modifyCounter $ addCount (Intermediate, WriteUInt width) 1
-  return $ VarU width index
 
 ----------------------------------------------------------------
 
@@ -712,20 +701,6 @@ compileIfU width (Left p) (Left x) (Left y) = do
 
 --------------------------------------------------------------------------------
 
-assertNotZeroU :: (GaloisField n, Integral n) => Width -> ExprU n -> M n ()
-assertNotZeroU width expr = do
-  ref <- wireU' expr
-  -- introduce a new variable m, such that `expr * m = 1`
-  m <- freshRefU width
-  case ref of
-    Left var -> do
-      writeMul
-        (0, [(U var, 1)])
-        (0, [(U m, 1)])
-        (1, [])
-    Right 0 -> throwError $ Compile.ConflictingValuesU 1 0
-    Right _ -> return ()
-
 -- | Assert that x is less than or equal to y
 --
 -- TODO, replace with a more efficient implementation
@@ -744,10 +719,9 @@ assertLTU width x y = do
   --  =>
   --    0 < y - x
   --  that is, there exists a non-zero BinRep of y - x
-  difference <- freshExprU width
-  difference' <- wireU difference
-  compileSubU width difference' y x
-  assertNotZeroU width difference
+  difference <- freshRefU width
+  compileSubU width difference y x
+  assertGT width (Left difference) 0
 
 -- | Division with remainder on UInts
 --    1. dividend = divisor * quotient + remainder
@@ -779,19 +753,30 @@ assertDivModU width dividend divisor quotient remainder = do
 -- | Assert that a UInt is less than or equal to some constant
 -- reference doc: A.3.2.2 Range Check https://zips.z.cash/protocol/protocol.pdf
 assertLTE :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
-assertLTE _ (Right a) c = if fromIntegral a <= c then return () else throwError $ Compile.AssertComparisonError (toInteger a) LT (succ c)
-assertLTE width (Left a) c = do
-  -- check if the bound is within the range of the UInt
-  when (c < 0) $
-    throwError $
-      Compile.AssertLTEBoundTooSmallError c
-  when (c >= 2 ^ width - 1) $
-    throwError $
-      Compile.AssertLTEBoundTooLargeError c width
-
-  -- because we don't have to execute the `go` function for trailing ones of `c`
-  -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
-  foldM_ (go a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
+assertLTE _ (Right a) bound = if fromIntegral a <= bound then return () else throwError $ Compile.AssertComparisonError (toInteger a) LT (succ bound)
+assertLTE width (Left a) bound
+  | bound < 0 = throwError $ Compile.AssertLTEBoundTooSmallError bound
+  | bound >= 2 ^ width - 1 = throwError $ Compile.AssertLTEBoundTooLargeError bound width
+  | bound == 0 = do
+      -- there's only 1 possible value for `a`, which is `0`
+      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+      writeAdd 0 bits
+  | bound == 1 = do
+      -- there are 2 possible values for `a`, which are `0` and `1`
+      -- we can use these 2 values as the only roots of the following multiplicative polynomial
+      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+      writeMul (0, bits) (-1, bits) (0, [])
+  | bound == 2 = do
+      -- there are 3 possible values for `a`, which are `0`, `1` and `2`
+      -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
+      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+      temp <- freshRefF
+      writeMul (0, bits) (-1, bits) (0, [(F temp, 1)])
+      writeMul (0, [(F temp, 1)]) (-2, bits) (0, [])
+  | otherwise = do
+      -- because we don't have to execute the `go` function for trailing ones of `c`
+      -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
+      foldM_ (go a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
   where
     -- for counting the number of trailing ones of `c`
     countTrailingOnes :: Int
@@ -799,7 +784,7 @@ assertLTE width (Left a) c = do
       fst $
         foldl
           ( \(count, keepCounting) i ->
-              if keepCounting && Data.Bits.testBit c i then (count + 1, True) else (count, False)
+              if keepCounting && Data.Bits.testBit bound i then (count + 1, True) else (count, False)
           )
           (0, True)
           [0 .. width - 1]
@@ -808,7 +793,7 @@ assertLTE width (Left a) c = do
     go ref Nothing i =
       let aBit = RefUBit width ref i
        in -- have not found the first bit in 'c' that is 1 yet
-          if Data.Bits.testBit c i
+          if Data.Bits.testBit bound i
             then do
               return $ Just (B aBit) -- when found, return a[i]
             else do
@@ -817,7 +802,7 @@ assertLTE width (Left a) c = do
               return Nothing -- otherwise, continue searching
     go ref (Just acc) i =
       let aBit = B (RefUBit width ref i)
-       in if Data.Bits.testBit c i
+       in if Data.Bits.testBit bound i
             then do
               -- constraint for the next accumulator
               -- acc * a[i] = acc'
@@ -852,20 +837,37 @@ assertLT width a c = do
 -- | Assert that a UInt is greater than or equal to some constant
 assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
 assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Compile.AssertComparisonError (succ (toInteger a)) GT c
-assertGTE width (Left a) bound = do
-  -- check if the bound is within the range of the UInt
-  when (bound < 1) $
-    throwError $
-      Compile.AssertGTEBoundTooSmallError bound
-  when (bound >= 2 ^ width) $
-    throwError $
-      Compile.AssertGTEBoundTooLargeError bound width
-
-  flag <- freshRefF
-  writeValF flag 1
-  -- because we don't have to execute the `go` function for trailing zeros of `bound`
-  -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
-  foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
+assertGTE width (Left a) bound
+  | bound < 1 = throwError $ Compile.AssertGTEBoundTooSmallError bound
+  | bound >= 2 ^ width = throwError $ Compile.AssertGTEBoundTooLargeError bound width
+  | bound == 2 ^ width - 1 = do
+      -- there's only 1 possible value for `a`, which is `2^width - 1`
+      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+      writeAdd (1 - 2 ^ width) bits
+  | bound == 2 ^ width - 2 = do
+      -- there's only 2 possible value for `a`, which is `2^width - 1` or `2^width - 2`
+      -- we can use these 2 values as the only roots of the following multiplicative polynomial
+      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+      writeMul (1 - 2 ^ width, bits) (2 - 2 ^ width, bits) (0, [])
+  | bound == 2 ^ width - 3 = do
+      -- there's only 3 possible value for `a`, which is `2^width - 1`, `2^width - 2` or `2^width - 3`
+      -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
+      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+      temp <- freshRefF
+      writeMul (1 - 2 ^ width, bits) (2 - 2 ^ width, bits) (0, [(F temp, 1)])
+      writeMul (0, [(F temp, 1)]) (3 - 2 ^ width, bits) (0, [])
+  | bound == 1 = do
+      -- a >= 1 => a > 0 => a is not zero
+      -- there exists a number m such that the product of a and m is 1
+      m <- freshRefF
+      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+      writeMul (0, bits) (0, [(F m, 1)]) (1, [])
+  | otherwise = do
+      flag <- freshRefF
+      writeValF flag 1
+      -- because we don't have to execute the `go` function for trailing zeros of `bound`
+      -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
+      foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
   where
     -- for counting the number of trailing zeros of `bound`
     countTrailingZeros :: Int
