@@ -39,7 +39,7 @@ import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Struct (Struct (..))
-import Keelung.Syntax (Var)
+import Keelung.Syntax (HasWidth (widthOf), Var)
 import Keelung.Syntax.Counters
 
 -------------------------------------------------------------------------------
@@ -194,7 +194,11 @@ linkConstraintModule cm =
     mulFs = Seq.fromList $ map (linkConstraint occurrences . uncurry3 CMulF) $ cmMulF cm
     eqZeros = Seq.fromList $ map (bimap (linkPoly_ occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
 
-    divMods = map (\(a, b, q, r) -> (left (reindexRefU occurrences) a, left (reindexRefU occurrences) b, left (reindexRefU occurrences) q, left (reindexRefU occurrences) r)) $ cmDivMods cm
+    reindexBits refU =
+      let width = widthOf refU
+       in (reindexRefB occurrences (RefUBit (widthOf refU) refU 0), width)
+
+    divMods = map (\(a, b, q, r) -> (left reindexBits a, left reindexBits b, left reindexBits q, left reindexBits r)) $ cmDivMods cm
     modInvs = map (\(a, n, p) -> (left (reindexRefU occurrences) a, left (reindexRefU occurrences) n, p)) $ cmModInvs cm
 
 -------------------------------------------------------------------------------

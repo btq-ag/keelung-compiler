@@ -81,8 +81,8 @@ runAndCompare fieldInfo program rawPublicInputs rawPrivateInputs = do
 -- | Print out the result of compilation
 debug :: Encode t => Comp t -> IO ()
 debug program = do
-  print $ Compiler.asGF181N $ Compiler.compileO0 gf181Info program
-  print (Compiler.asGF181N $ toR1CS . Linker.linkConstraintModule <$> Compiler.compileO0 gf181Info program)
+  -- print $ Compiler.asGF181N $ Compiler.compileO0 gf181Info program
+  -- print (Compiler.asGF181N $ toR1CS . Linker.linkConstraintModule <$> Compiler.compileO0 gf181Info program)
   -- print $ Compiler.asGF181N $ Compiler.compileO1 program
   print $ Compiler.asGF181N $ Compiler.compileToModules gf181Info program
   print (Compiler.asGF181N $ toR1CS <$> Compiler.compileO1 gf181Info program)

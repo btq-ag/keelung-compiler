@@ -93,7 +93,7 @@ data ConstraintSystem n = ConstraintSystem
     csBinReps' :: [Seq (Var, Int)],
     csCounters :: Counters,
     csEqZeros :: [(Poly n, Var)],
-    csDivMods :: [(Either Var n, Either Var n, Either Var n, Either Var n)],
+    csDivMods :: [(Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n)],
     csModInvs :: [(Either Var n, Either Var n, Integer)]
   }
   deriving (Eq, Generic, NFData, Functor)

@@ -173,7 +173,7 @@ tests = do
       describe "DivMod" $ do
         it "performDivMod (quotient & remainder unknown)" $ do
           let program = do
-                dividend <- input Private :: Comp (UInt 4)
+                dividend <- input Private :: Comp (UInt 6)
                 divisor <- input Public
                 performDivMod dividend divisor
           runAll gf181Info program [7 :: GF181] [20] [2, 6]
@@ -196,7 +196,7 @@ tests = do
             []
             ([] :: [GF181])
             (Interpreter.SyntaxTreeError (SyntaxTree.DivModQuotientError 7 3 2 3))
-            (InterpretError (Interpreter.R1CSError (R1CS.DivModQuotientError 7 3 2 3)))
+            (CompileError (Compiler.ConflictingValuesB True False))
 
         it "assertDivMod (with wrong remainder constant)" $ do
           let program = assertDivMod 7 (3 :: UInt 4) 2 0
@@ -206,7 +206,7 @@ tests = do
             []
             ([] :: [GF181])
             (Interpreter.SyntaxTreeError (SyntaxTree.DivModRemainderError 7 3 1 0))
-            (InterpretError (Interpreter.R1CSError (R1CS.DivModRemainderError 7 3 1 0)))
+            (CompileError (Compiler.ConflictingValuesB False True))
 
         it "assertDivMod (multiple statements)" $ do
           let program = do
@@ -255,7 +255,7 @@ tests = do
         it "assertDivMod (dividend unknown)" $ do
           let program = do
                 dividend <- freshVarUInt
-                divisor <- input Public :: Comp (UInt 4)
+                divisor <- input Public :: Comp (UInt 6)
                 quotient <- input Public
                 remainder <- input Private
                 assertDivMod dividend divisor quotient remainder
@@ -274,7 +274,7 @@ tests = do
 
         it "assertDivMod (quotient & remainder unknown)" $ do
           let program = do
-                dividend <- input Public :: Comp (UInt 4)
+                dividend <- input Public :: Comp (UInt 6)
                 divisor <- input Public
                 quotient <- freshVarUInt
                 remainder <- freshVarUInt

@@ -11,6 +11,7 @@ import Data.Field.Galois (GaloisField (order))
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Data.List qualified as List
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
@@ -113,6 +114,14 @@ lookupVarEither :: Either Var n -> M n (Maybe n)
 lookupVarEither (Left var) = lookupVar var
 lookupVarEither (Right val) = return (Just val)
 
+lookupBitsEither :: (GaloisField n, Integral n) => Either (Var, Int) n -> M n (Maybe n)
+lookupBitsEither (Left (var, count)) = do
+  vals <- mapM lookupVar [var .. var + count - 1]
+  case sequence vals of
+    Nothing -> return Nothing
+    Just bitVals -> return $ Just $ sum [bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
+lookupBitsEither (Right val) = return (Just val)
+
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
   xs <- shrinkMul as bs cs >>= detectBinRep
@@ -123,6 +132,7 @@ shrink (AddConstraint as) = do
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
+-- shrink (DivModConstaint2 divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
 shrink (ModInvConstraint modInv) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInv
 
@@ -261,8 +271,8 @@ shrinkMul as bs (Right cs) = do
     (Polynomial av as', Polynomial bv bs', Uninomial cv cs' _ _) -> return $ shrinkedOrStuck [av, bv, cv] $ MulConstraint as' bs' (Right cs')
     (Polynomial av as', Polynomial bv bs', Polynomial cv cs') -> return $ shrinkedOrStuck [av, bv, cv] $ MulConstraint as' bs' (Right cs')
 
-eliminateIfHold :: (Num n, Eq n) => n -> n -> M n (Result a)
-eliminateIfHold expected actual = do
+eliminateIfHold :: (GaloisField n, Integral n) => n -> n -> M n (Result a)
+eliminateIfHold expected actual =
   if expected == actual
     then return Eliminated
     else throwError ConflictingValues
@@ -271,14 +281,15 @@ eliminateIfHold expected actual = do
 --    1. dividend & divisor
 --    1. dividend & quotient
 --    2. divisor & quotient & remainder
-shrinkDivMod :: (GaloisField n, Integral n) => (Either Var n, Either Var n, Either Var n, Either Var n) -> M n (Result (Either Var n, Either Var n, Either Var n, Either Var n))
+shrinkDivMod :: (GaloisField n, Integral n) => (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n) -> M n (Result (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n))
 shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
   -- check the value of the dividend first,
   -- if it's unknown, then its value can only be determined from other variables
-  dividendResult <- lookupVarEither dividendVar
-  divisorResult <- lookupVarEither divisorVar
-  quotientResult <- lookupVarEither quotientVar
-  remainderResult <- lookupVarEither remainderVar
+  dividendResult <- lookupBitsEither dividendVar
+  divisorResult <- lookupBitsEither divisorVar
+  quotientResult <- lookupBitsEither quotientVar
+  remainderResult <- lookupBitsEither remainderVar
+
   case dividendResult of
     Just dividendVal -> do
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
@@ -287,47 +298,51 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
               expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
-            throwError $
-              DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
+            throwError ConflictingValues
+          -- DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
           when (expectedRemainderVal /= actualRemainderVal) $
-            throwError $
-              DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+            throwError ConflictingValues
+          -- throwError $
+          --   DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
           return Eliminated
         (Just divisorVal, Just actualQuotientVal, Nothing) -> do
           let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
               expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
-            throwError $
-              DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
-          bindVarEither remainderVar expectedRemainderVal
+            throwError ConflictingValues
+          -- throwError $
+          --   DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
+          bindBitsEither remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
           let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
               expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
-            throwError $
-              DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
-          bindVarEither quotientVar expectedQuotientVal
+            throwError ConflictingValues
+          -- throwError $
+          --   DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+          bindBitsEither quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
           let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
               expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
-          bindVarEither quotientVar expectedQuotientVal
-          bindVarEither remainderVar expectedRemainderVal
+          bindBitsEither quotientVar expectedQuotientVal
+          bindBitsEither remainderVar expectedRemainderVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Just actualRemainderVal) -> do
           let expectedDivisorVal = dividendVal `Arithmetics.integerDiv` actualQuotientVal
               expectedRemainderVal = dividendVal `Arithmetics.integerMod` expectedDivisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
-            throwError $
-              DivModRemainderError dividendVal expectedDivisorVal expectedRemainderVal actualRemainderVal
-          bindVarEither divisorVar expectedDivisorVal
+            throwError ConflictingValues
+          -- throwError $
+          --   DivModRemainderError dividendVal expectedDivisorVal expectedRemainderVal actualRemainderVal
+          bindBitsEither divisorVar expectedDivisorVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Nothing) -> do
           let expectedDivisorVal = dividendVal `Arithmetics.integerDiv` actualQuotientVal
               expectedRemainderVal = dividendVal `Arithmetics.integerMod` expectedDivisorVal
-          bindVarEither divisorVar expectedDivisorVal
-          bindVarEither remainderVar expectedRemainderVal
+          bindBitsEither divisorVar expectedDivisorVal
+          bindBitsEither remainderVar expectedRemainderVal
           return Eliminated
         _ -> return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
     Nothing -> do
@@ -336,7 +351,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
         -- divisor, quotient, and remainder are all known
         (Just divisorVal, Just quotientVal, Just remainderVal) -> do
           let dividendVal = divisorVal * quotientVal + remainderVal
-          bindVarEither dividendVar dividendVal
+          bindBitsEither dividendVar dividendVal
           return Eliminated
         _ -> do
           return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
@@ -423,10 +438,12 @@ detectBinRep (Stuck (AddConstraint polynomial)) = do
       -- because we know that these coefficients are:
       --  1. all of the same sign
       --  2. unique
-      -- we can check if they are actually coefficients of a binary representation, that is:
-      --  1. they happen to be 1, 2, 4, 8, 16, ...
       -- traceShowM (fmap N polynomial, fmap N polynomial, constant, IntMap.keys invertedPolynomial == [0 .. IntMap.size invertedPolynomial - 1])
-      if IntMap.keys invertedPolynomial == [0 .. IntMap.size invertedPolynomial - 1]
+
+      let powers = IntMap.keys invertedPolynomial
+      let powersAllUnique = length powers == length (List.nub powers)
+
+      if powersAllUnique
         then do
           -- we have a binary representation
           -- we can now bind the variables

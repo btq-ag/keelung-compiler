@@ -701,28 +701,6 @@ compileIfU width (Left p) (Left x) (Left y) = do
 
 --------------------------------------------------------------------------------
 
--- | Assert that x is less than or equal to y
---
--- TODO, replace with a more efficient implementation
---  as in A.3.2.2 Range check in https://zips.z.cash/protocol/protocol.pdf
--- assertLTEU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
--- assertLTEU width x y = do
---   --    x ≤ y
---   --  =>
---   --    0 ≤ y - x
---   --  that is, there exists a BinRep of y - x
---   difference <- freshRefU  width
---   compileSubU width difference y x
-assertLTU :: (GaloisField n, Integral n) => Width -> Either RefU n -> Either RefU n -> M n ()
-assertLTU width x y = do
-  --    x < y
-  --  =>
-  --    0 < y - x
-  --  that is, there exists a non-zero BinRep of y - x
-  difference <- freshRefU width
-  compileSubU width difference y x
-  assertGT width (Left difference) 0
-
 -- | Division with remainder on UInts
 --    1. dividend = divisor * quotient + remainder
 --    2. 0 ≤ remainder < divisor
@@ -732,21 +710,21 @@ assertDivModU width dividend divisor quotient remainder = do
   --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder
-  remainderRef <- wireU remainder
-  divisorRef <- wireU divisor
-  quotientRef <- wireU quotient
-  dividendRef <- wireU dividend
-  addDivModHint (Left dividendRef) (Left divisorRef) (Left quotientRef) (Left remainderRef)
-  writeMul
-    (0, [(U divisorRef, 1)])
-    (0, [(U quotientRef, 1)])
-    (0, [(U dividendRef, 1), (U remainderRef, -1)])
-  --    0 ≤ remainder < divisor
-  assertLTU width (Left remainderRef) (Left divisorRef)
-  -- --    0 < divisor
-  -- -- =>
-  -- --    divisor != 0
-  assertGT width (Left divisorRef) 0
+  remainderRef <- wireU' remainder
+  divisorRef <- wireU' divisor
+  quotientRef <- wireU' quotient
+  dividendRef <- wireU' dividend
+
+  productDQ <- freshRefU width
+  compileMulU width productDQ divisorRef quotientRef
+  compileSubU width productDQ dividendRef remainderRef
+
+  -- 0 ≤ remainder < divisor
+  compileAssertion $ ExprB (LTU remainder divisor)
+  -- 0 < divisor
+  assertGT width divisorRef 0
+  -- add hint for DivMod
+  addDivModHint dividendRef divisorRef quotientRef remainderRef
 
 --------------------------------------------------------------------------------
 

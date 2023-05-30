@@ -18,6 +18,7 @@ import Data.Validation (toEither)
 import Data.Vector (Vector)
 import GHC.Generics (Generic)
 import Keelung (N (N))
+import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
@@ -48,6 +49,12 @@ bindVarEither :: Either Var n -> n -> M n ()
 bindVarEither (Left var) val = bindVar var val
 bindVarEither (Right _) _ = return ()
 
+bindBitsEither :: (GaloisField n, Integral n) => Either (Var, Int) n -> n -> M n ()
+bindBitsEither (Left (var, count)) val = do
+  forM_ [0 .. count - 1] $ \i -> do
+    bindVar (var + i) (FieldBits.testBit val i)
+bindBitsEither (Right _) _ = return ()
+
 --------------------------------------------------------------------------------
 
 data Constraint n
@@ -56,7 +63,8 @@ data Constraint n
   | BooleanConstraint Var
   | EqZeroConstraint (Poly n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
-    DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
+    -- DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
+    DivModConstaint (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n)
   | BinRepConstraint BinRep
   | -- \| (a, n, p) where modInv a * a = n * p + 1
 
@@ -93,7 +101,6 @@ instance Functor Constraint where
   fmap f (EqZeroConstraint (xs, m)) = EqZeroConstraint (fmap f xs, m)
   fmap f (DivModConstaint (a, b, q, r)) = DivModConstaint (fmap f a, fmap f b, fmap f q, fmap f r)
   fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
-  -- fmap _ (BinRepConstraint2 segments) = BinRepConstraint2 segments
   fmap f (ModInvConstraint (a, n, p)) = ModInvConstraint (fmap f a, fmap f n, p)
 
 --------------------------------------------------------------------------------
@@ -104,8 +111,8 @@ data Error n
   | ConflictingValues
   | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
-  | DivModQuotientError n n n n
-  | DivModRemainderError n n n n
+  -- | DivModQuotientError n n n n
+  -- | DivModRemainderError n n n n
   | ModInvError (Either Var n) n Integer
   deriving (Eq, Generic, NFData, Functor)
 
@@ -127,10 +134,10 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints
       <> "while these variables have been solved: \n"
       <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList context)
-  show (DivModQuotientError dividend divisor expected actual) =
-    "Expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
-  show (DivModRemainderError dividend divisor expected actual) =
-    "Expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
+  -- show (DivModQuotientError dividend divisor expected actual) =
+  --   "Expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
+  -- show (DivModRemainderError dividend divisor expected actual) =
+  --   "Expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
   show (ModInvError (Left var) val p) =
     "Unable to calculate the inverse of `$" <> show var <> " " <> show (N val) <> "` (mod " <> show p <> ")"
   show (ModInvError (Right val') val p) =
