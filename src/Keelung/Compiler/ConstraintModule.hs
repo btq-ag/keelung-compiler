@@ -62,7 +62,7 @@ data ConstraintModule n = ConstraintModule
     -- a = b * q + r
     cmDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
     -- hints for generating witnesses for ModInv constraints
-    cmModInvs :: [(Either RefU n, Either RefU n, Integer)]
+    cmModInvs :: [(Either RefU n, Either RefU n, Either RefU n, Integer)]
   }
   deriving (Eq, Generic, NFData)
 
@@ -113,7 +113,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       showModInvHints =
         if null $ cmModInvs cm
           then ""
-          else "  ModInv hints:\n" <> indent (indent (showList' (map (\(x, _n, p) -> show x <> "⁻¹ = (mod " <> show p <> ")") (cmModInvs cm))))
+          else "  ModInv hints:\n" <> indent (indent (showList' (map (\(a, _aainv, _n, p) -> show a <> "⁻¹ = (mod " <> show p <> ")") (cmModInvs cm))))
 
       showVarEqF = "  Field relations:\n" <> indent (indent (show (cmFieldRelations cm)))
 

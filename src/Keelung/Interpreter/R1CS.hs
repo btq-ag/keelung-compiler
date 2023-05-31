@@ -110,16 +110,15 @@ goThroughOnce constraints = mconcat <$> mapM shrink (toList constraints)
 lookupVar :: Var -> M n (Maybe n)
 lookupVar var = gets (IntMap.lookup var)
 
-lookupVarEither :: Either Var n -> M n (Maybe n)
-lookupVarEither (Left var) = lookupVar var
-lookupVarEither (Right val) = return (Just val)
-
-lookupBitsEither :: (GaloisField n, Integral n) => Either (Var, Int) n -> M n (Maybe n)
-lookupBitsEither (Left (var, count)) = do
+lookupBits :: (GaloisField n, Integral n) => (Var, Int) -> M n (Maybe n)
+lookupBits (var, count) = do
   vals <- mapM lookupVar [var .. var + count - 1]
   case sequence vals of
     Nothing -> return Nothing
     Just bitVals -> return $ Just $ sum [bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
+
+lookupBitsEither :: (GaloisField n, Integral n) => Either (Var, Int) n -> M n (Maybe n)
+lookupBitsEither (Left (var, count)) = lookupBits (var, count)
 lookupBitsEither (Right val) = return (Just val)
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
@@ -368,19 +367,20 @@ shrinkBooleanConstraint var = do
     Nothing -> return $ Stuck var
 
 -- | Trying to reduce a ModInv constraint
-shrinkModInv :: (GaloisField n, Integral n) => (Either Var n, Either Var n, Integer) -> M n (Result (Either Var n, Either Var n, Integer))
-shrinkModInv (aVar, nVar, p) = do
-  aResult <- lookupVarEither aVar
+shrinkModInv :: (GaloisField n, Integral n) => (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer) -> M n (Result (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer))
+shrinkModInv (aVar, outVar, nVar, p) = do
+  aResult <- lookupBitsEither aVar
   case aResult of
     Just aVal -> do
       case Arithmetics.modInv (toInteger aVal) p of
         Just result -> do
           -- aVal * result = n * p + 1
           let nVal = (aVal * fromInteger result - 1) `Arithmetics.integerDiv` fromInteger p
-          bindVarEither nVar nVal
+          bindBitsEither nVar nVal
+          bindBitsEither outVar (fromInteger result)
           return Eliminated
         Nothing -> throwError $ ModInvError aVar aVal p
-    Nothing -> return $ Stuck (aVar, nVar, p)
+    Nothing -> return $ Stuck (aVar, outVar, nVar, p)
 
 -- | Trying to reduce a BinRep constraint
 shrinkBinRep :: (GaloisField n, Integral n) => BinRep -> M n (Result BinRep)

@@ -224,8 +224,8 @@ addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m
 addDivModHint :: (GaloisField n, Integral n) => Either RefU n -> Either RefU n -> Either RefU n -> Either RefU n -> M n ()
 addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (x, y, q, r) : cmDivMods cs}
 
-addModInvHint :: (GaloisField n, Integral n) => RefU -> RefU -> Integer -> M n ()
-addModInvHint x n p = modify' $ \cs -> cs {cmModInvs = (Left x, Left n, p) : cmModInvs cs}
+addModInvHint :: (GaloisField n, Integral n) => Either RefU n -> Either RefU n -> Either RefU n -> Integer -> M n ()
+addModInvHint a output n p = modify' $ \cs -> cs {cmModInvs = (a, output, n, p) : cmModInvs cs}
 
 addBinRepHint :: (GaloisField n, Integral n) => [(RefB, Int)] -> M n ()
 addBinRepHint segments = modify' $ \cs -> cs {cmBinReps = segments : cmBinReps cs}

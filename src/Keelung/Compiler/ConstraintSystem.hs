@@ -94,7 +94,7 @@ data ConstraintSystem n = ConstraintSystem
     csCounters :: Counters,
     csEqZeros :: [(Poly n, Var)],
     csDivMods :: [(Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n)],
-    csModInvs :: [(Either Var n, Either Var n, Integer)]
+    csModInvs :: [(Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer)]
   }
   deriving (Eq, Generic, NFData, Functor)
 

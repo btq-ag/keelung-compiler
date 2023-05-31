@@ -11,13 +11,13 @@ import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
+import Keelung.Compiler.Constraint
+import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
-import Keelung.Compiler.Constraint
-import Keelung.Compiler.ConstraintModule
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 
@@ -78,11 +78,11 @@ goThroughDivMods cm =
 goThroughModInvs :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughModInvs cm =
   let relations = cmFieldRelations cm
-      substModInv (a, b, c) = (substVar relations a, substVar relations b, c)
+      substModInv (a, b, c, d) = (substVarEither relations a, b, substVarEither relations c, d)
    in cm {cmModInvs = map substModInv (cmModInvs cm)}
   where
-    substVar _ (Right val) = Right val
-    substVar relations (Left ref) = case AllRelations.lookup (U ref) relations of
+    substVarEither _ (Right val) = Right val
+    substVarEither relations (Left ref) = case AllRelations.lookup (U ref) relations of
       AllRelations.Root -> Left ref
       AllRelations.Value val -> Right val
       AllRelations.ChildOf 1 (U root) 0 -> Left root

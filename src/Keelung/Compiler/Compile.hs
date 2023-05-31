@@ -379,15 +379,19 @@ compileExprU out expr = case expr of
     compileMulU w out x' y'
   MMIU w a p -> do
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
-    -- 1. a * a⁻¹ = np + 1
-    -- 2. n ≤ ⌈log₂p⌉
-    a' <- wireU a
-    -- n <- freshExprU w
+    a' <- wireU' a
     nRef <- freshRefU w
-    let ceilingLg2P = ceiling (logBase 2 (fromInteger p) :: Double)
-    writeMul (0, [(U a', 1)]) (0, [(U out, 1)]) (1, [(U nRef, fromInteger p)])
-    addModInvHint a' nRef p
-    assertLTE w (Left nRef) ceilingLg2P
+    -- 1. a * a⁻¹ = np + 1
+    aainv <- freshRefU (w * 2)
+    compileMulU2 w aainv a' (Left out) -- a * a⁻¹
+    np <- freshRefU (w * 2)
+    compileMulU2 w np (Left nRef) (Right (fromInteger p))
+    compileAddU2 w aainv (Left np) (Right 1)
+    -- 2. n ≤ p
+    assertLTE w (Left nRef) p
+    addModInvHint a' (Left out) (Left nRef) p
+
+  -- writeMul (0, [(U var, 1)]) (0, [(U out, 1)]) (1, [(U nRef, fromInteger p)])
   AndU w x y xs -> do
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (AndB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
@@ -529,27 +533,12 @@ compileAddOrSubU isSub width out (Right a) (Left b) = do
   let bs = [(B (RefUBit width b i), if isSub then -(2 ^ i) else 2 ^ i) | i <- [0 .. width - 1]]
   let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
   writeAdd a $ bs <> carryAndResult
--- c <- freshRefU (width + 1)
--- -- C = A + B
--- writeAdd a [(U b, if isSub then -1 else 1), (U c, -1)]
--- -- copying bits from C to 'out'
--- forM_ [0 .. width - 1] $ \i -> do
---   -- Cᵢ = outᵢ
---   writeEqB (RefUBit width c i) (RefUBit width out i)
 compileAddOrSubU isSub width out (Left a) (Right b) = do
   carry <- freshRefB
   addBooleanConstraint carry
   let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
   let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
   writeAdd (if isSub then -b else b) $ as <> carryAndResult
-
--- c <- freshRefU (width + 1)
--- -- C = A + B
--- writeAdd (if isSub then -b else b) [(U a, 1), (U c, -1)]
--- -- copying bits from C to 'out'
--- forM_ [0 .. width - 1] $ \i -> do
---   -- Cᵢ = outᵢ
---   writeEqB (RefUBit width c i) (RefUBit width out i)
 compileAddOrSubU isSub width out (Left a) (Left b) = do
   carry <- freshRefB
   addBooleanConstraint carry
@@ -559,6 +548,28 @@ compileAddOrSubU isSub width out (Left a) (Left b) = do
   let carryAndResult = (B carry, 2 ^ width) : [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
 
   writeAdd 0 $ as <> bs <> carryAndResult
+
+compileAddOrSubU2 :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileAddOrSubU2 isSub width out (Right a) (Right b) = do
+  let val = if isSub then a - b else a + b
+  forM_ [0 .. width - 1] $ \i -> do
+    -- Cᵢ = outᵢ
+    writeValB (RefUBit (width * 2) out i) (FieldBits.testBit' val i)
+compileAddOrSubU2 isSub width out (Right a) (Left b) = do
+  let bs = [(B (RefUBit width b i), if isSub then -(2 ^ i) else 2 ^ i) | i <- [0 .. width - 1]]
+  let outputBits = [(B (RefUBit (width * 2) out i), -(2 ^ i)) | i <- [0 .. width * 2 - 1]]
+  writeAdd a $ bs <> outputBits
+compileAddOrSubU2 isSub width out (Left a) (Right b) = do
+  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+  let outputBits = [(B (RefUBit (width * 2) out i), -(2 ^ i)) | i <- [0 .. width * 2 - 1]]
+  writeAdd (if isSub then -b else b) $ as <> outputBits
+compileAddOrSubU2 isSub width out (Left a) (Left b) = do
+  -- out + carry = A + B
+  let as = [(B (RefUBit width a i), -(2 ^ i)) | i <- [0 .. width - 1]]
+  let bs = [(B (RefUBit width b i), if isSub then 2 ^ i else -(2 ^ i)) | i <- [0 .. width - 1]]
+  let outputBits = [(B (RefUBit (width * 2) out i), -(2 ^ i)) | i <- [0 .. width * 2 - 1]]
+
+  writeAdd 0 $ as <> bs <> outputBits
 
 -- addBinRepHint [(RefUBit width out 0, 4), (carry, 1)]
 
@@ -572,6 +583,9 @@ compileAddOrSubU isSub width out (Left a) (Left b) = do
 
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileAddU = compileAddOrSubU False
+
+compileAddU2 :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileAddU2 = compileAddOrSubU2 False
 
 compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileSubU = compileAddOrSubU True
@@ -592,15 +606,12 @@ compileMulU width out (Right a) (Left b) = do
   let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
   let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
   writeMul (a, []) (0, bs) (0, outputSegment <> carrySegment)
-
--- writeAdd 0 [(U b, -a), (U out, 1)]
 compileMulU width out (Left a) (Right b) = do
   carry <- replicateM width (B <$> freshRefB)
   let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
   let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
   let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
   writeMul (0, as) (b, []) (0, outputSegment <> carrySegment)
--- writeAdd 0 [(U a, -b), (U out, 1)]
 compileMulU width out (Left a) (Left b) = do
   carry <- replicateM width (B <$> freshRefB)
 
@@ -610,6 +621,25 @@ compileMulU width out (Left a) (Left b) = do
   let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
 
   writeMul (0, as) (0, bs) (0, outputSegment <> carrySegment)
+
+compileMulU2 :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileMulU2 width out (Right a) (Right b) = do
+  let val = a * b
+  forM_ [0 .. width - 1] $ \i -> do
+    writeValB (RefUBit (width * 2) out i) (FieldBits.testBit' val i)
+compileMulU2 width out (Right a) (Left b) = do
+  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
+  let outputBits = [(B (RefUBit (width * 2) out i), 2 ^ i) | i <- [0 .. width * 2 - 1]]
+  writeMul (a, []) (0, bs) (0, outputBits)
+compileMulU2 width out (Left a) (Right b) = do
+  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+  let outputBits = [(B (RefUBit (width * 2) out i), 2 ^ i) | i <- [0 .. width * 2 - 1]]
+  writeMul (0, as) (b, []) (0, outputBits)
+compileMulU2 width out (Left a) (Left b) = do
+  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
+  let outputBits = [(B (RefUBit (width * 2) out i), 2 ^ i) | i <- [0 .. width * 2 - 1]]
+  writeMul (0, as) (0, bs) (0, outputBits)
 
 -- | Conditional
 --  out = p * x + (1 - p) * y
