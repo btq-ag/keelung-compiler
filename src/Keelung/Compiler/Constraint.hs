@@ -141,7 +141,6 @@ data Constraint n
   | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y
   | CVarNEqB RefB RefB -- when x = ¬ y
-  | CVarEqU RefU RefU -- when x == y
   | CVarBindF Ref n -- when x = val
   | CVarBindB RefB Bool -- when x = val
   | CVarBindU RefU n -- when x = val
@@ -150,8 +149,6 @@ data Constraint n
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAddF x, CAddF y) -> x == y
-    -- (CAddB x, CAddB y) -> x == y
-    (CVarEqU x y, CVarEqU u v) -> (x == u && y == v) || (x == v && y == u)
     (CVarBindU x y, CVarBindU u v) -> x == u && y == v
     (CVarBindF x y, CVarBindF u v) -> x == u && y == v
     (CMulF x y z, CMulF u v w) ->
@@ -164,7 +161,6 @@ instance Functor Constraint where
   fmap _ (CVarEqF x y) = CVarEqF x y
   fmap _ (CVarNEqB x y) = CVarNEqB x y
   fmap _ (CVarEqB x y) = CVarEqB x y
-  fmap _ (CVarEqU x y) = CVarEqU x y
   fmap f (CVarBindF x y) = CVarBindF x (f y)
   fmap _ (CVarBindB x y) = CVarBindB x y
   fmap f (CVarBindU x y) = CVarBindU x (f y)
@@ -177,7 +173,6 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CVarEqF x y) = "VF " <> show x <> " = " <> show y
   show (CVarEqB x y) = "VB " <> show x <> " = " <> show y
   show (CVarNEqB x y) = "VN " <> show x <> " = ¬ " <> show y
-  show (CVarEqU x y) = "VU " <> show x <> " = " <> show y
   show (CVarBindF x n) = "BF " <> show x <> " = " <> show n
   show (CVarBindB x n) = "BB " <> show x <> " = " <> show n
   show (CVarBindU x n) = "BU " <> show x <> " = " <> show n

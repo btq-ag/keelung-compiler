@@ -630,7 +630,7 @@ tests = do
     describe "Conditionals" $ do
       it "with inputs" $ do
         let program = do
-              x <- input Public :: Comp (UInt 2)
+              x <- input Public :: Comp (UInt 4)
               y <- input Public
               return $ cond true x y
         runAll gf181Info program [5, 6 :: GF181] [] [5]

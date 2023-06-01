@@ -253,48 +253,48 @@ assertEqU (ValU w a) b = do
   compileExprU out b
   writeValU out a
 assertEqU (VarU w a) (ValU _ b) = writeValU (RefUX w a) b
-assertEqU (VarU w a) (VarU _ b) = writeEqU (RefUX w a) (RefUX w b)
-assertEqU (VarU w a) (VarUO _ b) = writeEqU (RefUX w a) (RefUO w b)
-assertEqU (VarU w a) (VarUI _ b) = writeEqU (RefUX w a) (RefUI w b)
-assertEqU (VarU w a) (VarUP _ b) = writeEqU (RefUX w a) (RefUP w b)
+assertEqU (VarU w a) (VarU _ b) = writeEqU w (RefUX w a) (RefUX w b)
+assertEqU (VarU w a) (VarUO _ b) = writeEqU w (RefUX w a) (RefUO w b)
+assertEqU (VarU w a) (VarUI _ b) = writeEqU w (RefUX w a) (RefUI w b)
+assertEqU (VarU w a) (VarUP _ b) = writeEqU w (RefUX w a) (RefUP w b)
 assertEqU (VarU w a) b = do
   out <- freshRefU w
   compileExprU out b
-  writeEqU (RefUX w a) out
+  writeEqU w (RefUX w a) out
 assertEqU (VarUO w a) (ValU _ b) = writeValU (RefUO w a) b
-assertEqU (VarUO w a) (VarU _ b) = writeEqU (RefUO w a) (RefUX w b)
-assertEqU (VarUO w a) (VarUO _ b) = writeEqU (RefUO w a) (RefUO w b)
-assertEqU (VarUO w a) (VarUI _ b) = writeEqU (RefUO w a) (RefUI w b)
-assertEqU (VarUO w a) (VarUP _ b) = writeEqU (RefUO w a) (RefUP w b)
+assertEqU (VarUO w a) (VarU _ b) = writeEqU w (RefUO w a) (RefUX w b)
+assertEqU (VarUO w a) (VarUO _ b) = writeEqU w (RefUO w a) (RefUO w b)
+assertEqU (VarUO w a) (VarUI _ b) = writeEqU w (RefUO w a) (RefUI w b)
+assertEqU (VarUO w a) (VarUP _ b) = writeEqU w (RefUO w a) (RefUP w b)
 assertEqU (VarUO w a) b = do
   out <- freshRefU w
   compileExprU out b
-  writeEqU (RefUO w a) out
+  writeEqU w (RefUO w a) out
 assertEqU (VarUI w a) (ValU _ b) = writeValU (RefUI w a) b
-assertEqU (VarUI w a) (VarU _ b) = writeEqU (RefUI w a) (RefUX w b)
-assertEqU (VarUI w a) (VarUO _ b) = writeEqU (RefUI w a) (RefUO w b)
-assertEqU (VarUI w a) (VarUI _ b) = writeEqU (RefUI w a) (RefUI w b)
-assertEqU (VarUI w a) (VarUP _ b) = writeEqU (RefUI w a) (RefUP w b)
+assertEqU (VarUI w a) (VarU _ b) = writeEqU w (RefUI w a) (RefUX w b)
+assertEqU (VarUI w a) (VarUO _ b) = writeEqU w (RefUI w a) (RefUO w b)
+assertEqU (VarUI w a) (VarUI _ b) = writeEqU w (RefUI w a) (RefUI w b)
+assertEqU (VarUI w a) (VarUP _ b) = writeEqU w (RefUI w a) (RefUP w b)
 assertEqU (VarUI w a) b = do
   out <- freshRefU w
   compileExprU out b
-  writeEqU (RefUI w a) out
+  writeEqU w (RefUI w a) out
 assertEqU (VarUP w a) (ValU _ b) = writeValU (RefUP w a) b
-assertEqU (VarUP w a) (VarU _ b) = writeEqU (RefUP w a) (RefUX w b)
-assertEqU (VarUP w a) (VarUO _ b) = writeEqU (RefUP w a) (RefUO w b)
-assertEqU (VarUP w a) (VarUI _ b) = writeEqU (RefUP w a) (RefUI w b)
-assertEqU (VarUP w a) (VarUP _ b) = writeEqU (RefUP w a) (RefUP w b)
+assertEqU (VarUP w a) (VarU _ b) = writeEqU w (RefUP w a) (RefUX w b)
+assertEqU (VarUP w a) (VarUO _ b) = writeEqU w (RefUP w a) (RefUO w b)
+assertEqU (VarUP w a) (VarUI _ b) = writeEqU w (RefUP w a) (RefUI w b)
+assertEqU (VarUP w a) (VarUP _ b) = writeEqU w (RefUP w a) (RefUP w b)
 assertEqU (VarUP w a) b = do
   out <- freshRefU w
   compileExprU out b
-  writeEqU (RefUP w a) out
+  writeEqU w (RefUP w a) out
 assertEqU a b = do
   let width = widthOf a
   a' <- freshRefU width
   b' <- freshRefU width
   compileExprU a' a
   compileExprU b' b
-  writeEqU a' b'
+  writeEqU width a' b'
 
 ----------------------------------------------------------------
 
@@ -349,22 +349,10 @@ compileExprU out expr = case expr of
   ValU width val -> do
     forM_ [0 .. width - 1] $ \i -> do
       writeValB (RefUBit width out i) (FieldBits.testBit' val i)
-  VarU width var -> writeEqU out (RefUX width var)
-  VarUO width var -> writeEqU out (RefUX width var) -- out = var
-  VarUI width var -> do
-    let ref = RefUI width var
-    -- constraint for UInt : out = ref
-    writeEqU out ref
-    -- constraints for BinRep of UInt
-    forM_ [0 .. width - 1] $ \i -> do
-      writeEqB (RefUBit width out i) (RefUBit width ref i) -- out[i] = ref[i]
-  VarUP width var -> do
-    let ref = RefUP width var
-    -- constraint for UInt : out = ref
-    writeEqU out ref
-    -- constraints for BinRep of UInt
-    forM_ [0 .. width - 1] $ \i -> do
-      writeEqB (RefUBit width out i) (RefUBit width ref i) -- out[i] = ref[i]
+  VarU width var -> writeEqU width out (RefUX width var)
+  VarUO width var -> writeEqU width out (RefUX width var)
+  VarUI width var -> writeEqU width out (RefUI width var)
+  VarUP width var -> writeEqU width out (RefUP width var)
   SubU w x y -> do
     x' <- wireU' x
     y' <- wireU' y
@@ -416,13 +404,13 @@ compileExprU out expr = case expr of
       case result of
         Left var -> writeEqB (RefUBit w out i) var
         Right val -> writeValB (RefUBit w out i) val
-  IfU width p x y -> do
+  IfU w p x y -> do
     p' <- compileExprB p
     x' <- wireU' x
     y' <- wireU' y
-    result <- compileIfU width p' x' y'
+    result <- compileIfU w p' x' y'
     case result of
-      Left var -> writeEqU out var
+      Left var -> writeEqU w out var
       Right val -> writeValU out val
   RoLU w n x -> do
     result <- wireU' x
@@ -439,7 +427,7 @@ compileExprU out expr = case expr of
     x' <- wireU' x
     case compare n 0 of
       EQ -> case x' of
-        Left var -> writeEqU out var
+        Left var -> writeEqU w out var
         Right val -> writeValU out val
       GT -> do
         -- fill lower bits with 0s
@@ -463,10 +451,12 @@ compileExprU out expr = case expr of
           writeValB (RefUBit w out i) False -- out[i] = 0
   SetU w x j b -> do
     x' <- wireU' x
-    b' <- wireB b
+    b' <- compileExprB b
     forM_ [0 .. w - 1] $ \i -> do
       if i == j
-        then writeEqB (RefUBit w out i) b' -- out[i] = b
+        then case b' of
+          Left var -> writeEqB (RefUBit w out i) var
+          Right val -> writeValB (RefUBit w out i) val
         else do
           case x' of
             Left var -> writeEqB (RefUBit w out i) (RefUBit w var i) -- out[i] = x'[i]
@@ -483,21 +473,6 @@ compileExprU out expr = case expr of
       writeValB (RefUBit w out i) False -- out[i] = 0
 
 --------------------------------------------------------------------------------
-
--- | If the expression is not already a variable, create a new variable
-wireB :: (GaloisField n, Integral n) => ExprB n -> M n RefB
-wireB (VarB ref) = return (RefBX ref)
-wireB (VarBO ref) = return (RefBO ref)
-wireB (VarBI ref) = return (RefBI ref)
-wireB (VarBP ref) = return (RefBP ref)
-wireB expr = do
-  result <- compileExprB expr
-  case result of
-    Left var -> return var
-    Right val -> do
-      out <- freshRefB
-      writeValB out val
-      return out
 
 wireU :: (GaloisField n, Integral n) => ExprU n -> M n RefU
 wireU (VarU w ref) = return (RefUX w ref)

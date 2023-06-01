@@ -165,8 +165,6 @@ addC = mapM_ addOne
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
       execRelations $ AllRelations.relateB x (False, y)
-    addOne (CVarEqU x y) = do
-      execRelations $ AllRelations.assertEqualU x y
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {cmMulF = (x, y, Left c) : cmMulF cs})
     addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {cmMulF = (x, y, Right z) : cmMulF cs})
 
@@ -204,8 +202,8 @@ writeEqB a b = addC [CVarEqB a b]
 writeNEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
 writeNEqB a b = addC [CVarNEqB a b]
 
-writeEqU :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
-writeEqU a b = addC [CVarEqU a b]
+writeEqU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
+writeEqU width a b = forM_ [0 .. width - 1] $ \i -> writeEqB (RefUBit width a i) (RefUBit width b i)
 
 --------------------------------------------------------------------------------
 

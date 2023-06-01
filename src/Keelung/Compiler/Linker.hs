@@ -175,14 +175,14 @@ linkConstraintModule cm =
 
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Seq (Linked.Constraint n)
     extractUIntRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefU, Either (Int, RefU) n) -> Constraint n
-          convert (var, Right val) = CVarBindU var val
+      let convert :: (GaloisField n, Integral n) => (RefU, Either (Int, RefU) n) -> [Constraint n]
+          convert (var, Right val) = [CVarBindU var val]
           convert (var, Left (rotation, root)) =
-            if rotation == 0
-              then CVarEqU var root
-              else error "[ panic ] Unexpected rotation in extractUIntRelations"
-
-          result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
+            let width = widthOf var
+             in if rotation == 0
+                  then map (\i -> CVarEqB (RefUBit width var i) (RefUBit width root i)) [0 .. width - 1]
+                  else error "[ panic ] Unexpected rotation in extractUIntRelations"
+          result = concatMap convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
        in Seq.fromList (map (linkConstraint occurrences) result)
 
     -- varEqFs = fromFieldRelations (cmFieldRelations cm) (FieldRelations.exportUIntRelations (cmFieldRelations cm)) (cmOccurrenceF cm)
@@ -220,10 +220,6 @@ linkConstraint counters (CVarEqB x y) =
 linkConstraint counters (CVarNEqB x y) =
   case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
     Left _ -> error "CVarNEqB: two variables are the same"
-    Right xs -> Linked.CAdd xs
-linkConstraint counters (CVarEqU x y) =
-  case Poly.buildEither 0 [(reindexRefU counters x, 1), (reindexRefU counters y, -1)] of
-    Left _ -> error "CVarEqU: two variables are the same"
     Right xs -> Linked.CAdd xs
 linkConstraint counters (CVarBindF x n) = Linked.CAdd (Poly.bind (reindexRef counters x) n)
 linkConstraint counters (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB counters x) 1)
