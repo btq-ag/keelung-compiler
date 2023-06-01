@@ -29,11 +29,11 @@ import Keelung.Interpreter.R1CS.Monad
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
 
-run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) [n]
+run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n)
 run r1cs inputs = fst <$> run' r1cs inputs
 
 -- | Return interpreted outputs along with the witnesses
-run' :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) ([n], Vector n)
+run' :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
 run' r1cs inputs = do
   let booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllBits), (PublicInput, ReadBool), (PublicInput, ReadAllBits), (PrivateInput, ReadBool), (PrivateInput, ReadAllBits), (Intermediate, ReadBool), (Intermediate, ReadAllBits)]
   let boolVarRanges = getRanges (r1csCounters r1cs) booleanConstraintCategories
@@ -41,11 +41,9 @@ run' r1cs inputs = do
   witness <- runM boolVarRanges inputs $ goThroughManyTimes constraints
 
   -- extract output values from the witness
-  let outputVars = enumerate $ getRanges (r1csCounters r1cs) [Output]
-  -- [start .. end - 1]
-  let outputs = map (witness Vector.!) outputVars
-
-  return (outputs, witness)
+  let (outputStart, outputLength) = getRange (r1csCounters r1cs) Output
+  
+  return (Vector.slice outputStart outputLength witness, witness)
 
 -- | Return Constraints from a R1CS, which include:
 --   1. ordinary constraints

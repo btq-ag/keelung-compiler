@@ -15,14 +15,16 @@ import GHC.Generics (Generic)
 import Keelung
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Syntax.Counters
+import Data.Vector (Vector)
+import qualified Data.Vector as Vec
 
--- | Deserialise the outputs from the R1CS interpreter
+-- | Convert binary representation of inputs into human friendly Integers
 --   TODO: make it something like a proper inverse of Inputs.deserialize
-removeBinRepsFromOutputs :: Counters -> [n] -> [n]
-removeBinRepsFromOutputs counters outputs =
+deserializeBinReps :: Counters -> Vector n -> Vector n
+deserializeBinReps counters outputs =
   let (start, count) = getRange counters (Output, ReadAllBits)
       end = start + count
-   in take start outputs ++ drop end outputs
+   in Vec.take start outputs <> Vec.drop end outputs
 
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs

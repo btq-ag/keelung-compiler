@@ -84,7 +84,7 @@ interpret prog rawPublicInputs rawPrivateInputs = do
 
 -- | Given a Keelung program and a list of raw public inputs and private inputs,
 --   Generate (structured inputs, outputs, witness)
-generateWitness :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Either (Error n) (Counters, [n], Vector n)
+generateWitness :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Either (Error n) (Counters, Vector n, Vector n)
 generateWitness fieldInfo program rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode program
   generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs
@@ -134,7 +134,7 @@ interpretElab elab rawPublicInputs rawPrivateInputs = do
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
   left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
-generateWitnessElab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> [n] -> [n] -> Either (Error n) (Counters, [n], Vector n)
+generateWitnessElab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> [n] -> [n] -> Either (Error n) (Counters, Vector n, Vector n)
 generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> compileO1Elab fieldInfo elab
   let counters = r1csCounters r1cs

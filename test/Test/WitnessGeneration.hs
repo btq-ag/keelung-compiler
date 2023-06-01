@@ -26,7 +26,7 @@ tests = do
       let actual = generateWitness gf181Info program [1 :: GF181] [2]
       let expected = do
             cs <- Compiler.compile gf181Info program
-            return (csCounters cs, [1, 2], Vec.fromList [1, 2, 1, 2])
+            return (csCounters cs, Vec.fromList [1, 2], Vec.fromList [1, 2, 1, 2])
       actual `shouldBe` expected
 
     it "`generateWitness` 2" $ do
@@ -37,7 +37,7 @@ tests = do
       let actual = generateWitness gf181Info program [2 :: GF181] [3]
       let expected = do
             cs <- Compiler.compile gf181Info program
-            return (csCounters cs, [6], Vec.fromList [6, 2, 3])
+            return (csCounters cs, Vec.fromList [6], Vec.fromList [6, 2, 3])
       actual `shouldBe` expected
 
     it "`generateWitness` 3" $ do
@@ -49,7 +49,7 @@ tests = do
       let actual = generateWitness gf181Info program [2, 3 :: GF181] [4]
       let expected = do
             cs <- Compiler.compile gf181Info program
-            return (csCounters cs, [8, 4, 12], Vec.fromList [8, 4, 12, 2, 3, 4])
+            return (csCounters cs, Vec.fromList [8, 4, 12], Vec.fromList [8, 4, 12, 2, 3, 4])
       actual `shouldBe` expected
 
     it "`generateWitness` 4" $ do
@@ -61,7 +61,7 @@ tests = do
       let actual = generateWitness gf181Info program [3 :: GF181] [1, 2]
       let expected = do
             cs <- Compiler.compile gf181Info program
-            return (csCounters cs, [3], Vec.fromList [3, 3, 2, 1])
+            return (csCounters cs, Vec.fromList [3], Vec.fromList [3, 3, 2, 1])
       actual `shouldBe` expected
 
     it "`generateWitness` 5" $ do
@@ -71,5 +71,5 @@ tests = do
       let actual = generateWitness gf181Info program [] [0, 1, 2, 3 :: GF181]
       let expected = do
             cs <- Compiler.compile gf181Info program
-            return (csCounters cs, [0], Vec.fromList [0, 0, 1, 2, 3])
+            return (csCounters cs, Vec.fromList [0], Vec.fromList [0, 0, 1, 2, 3])
       actual `shouldBe` expected

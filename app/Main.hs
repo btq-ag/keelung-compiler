@@ -30,12 +30,14 @@ import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
 import Option
 import qualified Keelung.Compiler.Linker as Linker
+import Data.Foldable (toList)
+import qualified Data.Vector as Vector
 
 type Result n = Either String (R1CS n)
 
 type Result3 n = Either String (R1CS n)
 
-type Result2 n = Either (Error n) (Counters, [n], Vector n)
+type Result2 n = Either (Error n) (Counters, Vector n, Vector n)
 
 convert :: Integral a => Result3 a -> Result3 Integer
 convert (Left err) = Left err
@@ -76,17 +78,17 @@ adapter4 _ funcB _ argB (Binary n) = case someNatVal n of
   Nothing -> return ()
 
 adapter3 ::
-  (forall n. (KnownNat n) => Either String [Prime n] -> IO ()) ->
-  (forall n. (KnownNat n) => Either String [Binary n] -> IO ()) ->
+  (forall n. (KnownNat n) => Either String (Vector (Prime n)) -> IO ()) ->
+  (forall n. (KnownNat n) => Either String (Vector (Binary n)) -> IO ()) ->
   (forall n. (KnownNat n) => Either String [Prime n]) ->
   (forall n. (KnownNat n) => Either String [Binary n]) ->
   FieldType ->
   IO ()
 adapter3 funcP _ argP _ (Prime n) = case someNatVal n of
-  Just (SomeNat (_ :: Proxy n)) -> funcP (argP :: Either String [Prime n])
+  Just (SomeNat (_ :: Proxy n)) -> funcP (fmap Vector.fromList argP :: Either String (Vector (Prime n)))
   Nothing -> return ()
 adapter3 _ funcB _ argB (Binary n) = case someNatVal n of
-  Just (SomeNat (_ :: Proxy n)) -> funcB (argB :: Either String [Binary n])
+  Just (SomeNat (_ :: Proxy n)) -> funcB (fmap Vector.fromList argB :: Either String (Vector (Binary n)))
   Nothing -> return ()
 
 adapter2 ::
@@ -200,10 +202,10 @@ main = withUtf8 $ do
         Right r1cs' -> do
           BS.writeFile filepath (serializeR1CS r1cs')
 
-    outputInterpretedResult :: (Serialize a, Serialize n) => Either a [n] -> IO ()
-    outputInterpretedResult = putStrLn . BSC.unpack . encode
+    outputInterpretedResult :: (Serialize a, Serialize n) => Either a (Vector n) -> IO ()
+    outputInterpretedResult = putStrLn . BSC.unpack . encode . fmap toList
 
-    outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => FilePath -> Either (Error n) (Counters, [n], Vector n) -> IO ()
+    outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => FilePath -> Either (Error n) (Counters, Vector n, Vector n) -> IO ()
     outputInterpretedResultAndWriteFile filepath result = do
       -- print outputs
       outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)

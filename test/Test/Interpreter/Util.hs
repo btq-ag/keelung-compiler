@@ -2,6 +2,7 @@ module Test.Interpreter.Util (runAll, throwAll, runAndCompare, debug, assertSize
 
 import Control.Arrow (left)
 import Data.Field.Galois
+import Data.Foldable (toList)
 import Data.Proxy (Proxy (..), asProxyTypeOf)
 import Keelung hiding (compile)
 import Keelung.Compiler (Error (..), toR1CS)
@@ -32,7 +33,7 @@ interpretR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case R1CS.run r1cs inputs of
     Left err -> Left (InterpretError $ Interpreter.R1CSError err)
-    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
+    Right outputs -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
 
 -- | constraint system interpreters (unoptimized)
 interpretR1CSUnoptimized :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Either (Error n) [n]
@@ -41,7 +42,7 @@ interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case R1CS.run r1cs inputs of
     Left err -> Left (InterpretError $ Interpreter.R1CSError err)
-    Right outputs -> Right (Inputs.removeBinRepsFromOutputs (r1csCounters r1cs) outputs)
+    Right outputs -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
 
 --------------------------------------------------------------------------------
 
