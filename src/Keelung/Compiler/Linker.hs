@@ -33,6 +33,7 @@ import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
+import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Data.BinRep
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
@@ -176,7 +177,9 @@ linkConstraintModule cm =
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Seq (Linked.Constraint n)
     extractUIntRelations relations =
       let convert :: (GaloisField n, Integral n) => (RefU, Either (Int, RefU) n) -> [Constraint n]
-          convert (var, Right val) = [CVarBindU var val]
+          convert (var, Right val) =
+            let width = widthOf var
+             in map (\i -> CVarBindB (RefUBit width var i) (FieldBits.testBit' val i)) [0 .. width - 1]
           convert (var, Left (rotation, root)) =
             let width = widthOf var
              in if rotation == 0
@@ -224,7 +227,6 @@ linkConstraint counters (CVarNEqB x y) =
 linkConstraint counters (CVarBindF x n) = Linked.CAdd (Poly.bind (reindexRef counters x) n)
 linkConstraint counters (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB counters x) 1)
 linkConstraint counters (CVarBindB x False) = Linked.CAdd (Poly.bind (reindexRefB counters x) 0)
-linkConstraint counters (CVarBindU x n) = Linked.CAdd (Poly.bind (reindexRefU counters x) n)
 linkConstraint counters (CMulF as bs cs) =
   Linked.CMul
     (linkPoly_ counters as)

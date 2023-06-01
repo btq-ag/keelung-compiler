@@ -15,6 +15,7 @@ import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
+import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
@@ -149,8 +150,6 @@ addC = mapM_ addOne
     addOne (CVarBindB x c) = do
       countBitTestAsOccurU (B x)
       execRelations $ AllRelations.assignB x c
-    addOne (CVarBindU x c) = do
-      execRelations $ AllRelations.assignU x c
     addOne (CVarEq x y) = do
       countBitTestAsOccurU x
       countBitTestAsOccurU y
@@ -179,7 +178,7 @@ writeAdd c as = writeAddWithPoly (PolyG.build c as)
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x
 writeVal (B a) x = writeValB a (x /= 0)
-writeVal (U a) x = writeValU a x
+writeVal (U a) x = writeValU (widthOf a) a x
 
 writeValF :: (GaloisField n, Integral n) => RefF -> n -> M n ()
 writeValF a x = addC [CVarBindF (F a) x]
@@ -187,8 +186,8 @@ writeValF a x = addC [CVarBindF (F a) x]
 writeValB :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
 writeValB a x = addC [CVarBindB a x]
 
-writeValU :: (GaloisField n, Integral n) => RefU -> n -> M n ()
-writeValU a x = addC [CVarBindU a x]
+writeValU :: (GaloisField n, Integral n) => Width -> RefU -> n -> M n ()
+writeValU width a x = forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width a i) (FieldBits.testBit' x i)
 
 writeEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
 writeEq a b = addC [CVarEq a b]

@@ -122,9 +122,10 @@ compileAssertion expr = case expr of
     result <- compileExprF x
     assertLC 1 result
   ExprU x -> do
-    out <- freshRefU (widthOf x)
+    let width = widthOf x
+    out <- freshRefU width
     compileExprU out x
-    writeValU out 1
+    writeValU width out 1
 
 -- | Assert that two Boolean expressions are equal
 assertEqB :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> M n ()
@@ -244,15 +245,15 @@ assertEqF a b = do
 -- | Assert that two UInt expressions are equal
 assertEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()
 assertEqU (ValU _ a) (ValU _ b) = when (a /= b) $ throwError $ Compile.ConflictingValuesU a b
-assertEqU (ValU w a) (VarU _ b) = writeValU (RefUX w b) a
-assertEqU (ValU w a) (VarUO _ b) = writeValU (RefUO w b) a
-assertEqU (ValU w a) (VarUI _ b) = writeValU (RefUI w b) a
-assertEqU (ValU w a) (VarUP _ b) = writeValU (RefUP w b) a
+assertEqU (ValU w a) (VarU _ b) = writeValU w (RefUX w b) a
+assertEqU (ValU w a) (VarUO _ b) = writeValU w (RefUO w b) a
+assertEqU (ValU w a) (VarUI _ b) = writeValU w (RefUI w b) a
+assertEqU (ValU w a) (VarUP _ b) = writeValU w (RefUP w b) a
 assertEqU (ValU w a) b = do
   out <- freshRefU w
   compileExprU out b
-  writeValU out a
-assertEqU (VarU w a) (ValU _ b) = writeValU (RefUX w a) b
+  writeValU w out a
+assertEqU (VarU w a) (ValU _ b) = writeValU w (RefUX w a) b
 assertEqU (VarU w a) (VarU _ b) = writeEqU w (RefUX w a) (RefUX w b)
 assertEqU (VarU w a) (VarUO _ b) = writeEqU w (RefUX w a) (RefUO w b)
 assertEqU (VarU w a) (VarUI _ b) = writeEqU w (RefUX w a) (RefUI w b)
@@ -261,7 +262,7 @@ assertEqU (VarU w a) b = do
   out <- freshRefU w
   compileExprU out b
   writeEqU w (RefUX w a) out
-assertEqU (VarUO w a) (ValU _ b) = writeValU (RefUO w a) b
+assertEqU (VarUO w a) (ValU _ b) = writeValU w (RefUO w a) b
 assertEqU (VarUO w a) (VarU _ b) = writeEqU w (RefUO w a) (RefUX w b)
 assertEqU (VarUO w a) (VarUO _ b) = writeEqU w (RefUO w a) (RefUO w b)
 assertEqU (VarUO w a) (VarUI _ b) = writeEqU w (RefUO w a) (RefUI w b)
@@ -270,7 +271,7 @@ assertEqU (VarUO w a) b = do
   out <- freshRefU w
   compileExprU out b
   writeEqU w (RefUO w a) out
-assertEqU (VarUI w a) (ValU _ b) = writeValU (RefUI w a) b
+assertEqU (VarUI w a) (ValU _ b) = writeValU w (RefUI w a) b
 assertEqU (VarUI w a) (VarU _ b) = writeEqU w (RefUI w a) (RefUX w b)
 assertEqU (VarUI w a) (VarUO _ b) = writeEqU w (RefUI w a) (RefUO w b)
 assertEqU (VarUI w a) (VarUI _ b) = writeEqU w (RefUI w a) (RefUI w b)
@@ -279,7 +280,7 @@ assertEqU (VarUI w a) b = do
   out <- freshRefU w
   compileExprU out b
   writeEqU w (RefUI w a) out
-assertEqU (VarUP w a) (ValU _ b) = writeValU (RefUP w a) b
+assertEqU (VarUP w a) (ValU _ b) = writeValU w (RefUP w a) b
 assertEqU (VarUP w a) (VarU _ b) = writeEqU w (RefUP w a) (RefUX w b)
 assertEqU (VarUP w a) (VarUO _ b) = writeEqU w (RefUP w a) (RefUO w b)
 assertEqU (VarUP w a) (VarUI _ b) = writeEqU w (RefUP w a) (RefUI w b)
@@ -346,9 +347,7 @@ compileExprF expr = case expr of
 
 compileExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compileExprU out expr = case expr of
-  ValU width val -> do
-    forM_ [0 .. width - 1] $ \i -> do
-      writeValB (RefUBit width out i) (FieldBits.testBit' val i)
+  ValU width val -> writeValU width out val
   VarU width var -> writeEqU width out (RefUX width var)
   VarUO width var -> writeEqU width out (RefUX width var)
   VarUI width var -> writeEqU width out (RefUI width var)
@@ -411,7 +410,7 @@ compileExprU out expr = case expr of
     result <- compileIfU w p' x' y'
     case result of
       Left var -> writeEqU w out var
-      Right val -> writeValU out val
+      Right val -> writeValU w out val
   RoLU w n x -> do
     result <- wireU' x
     case result of
@@ -428,7 +427,7 @@ compileExprU out expr = case expr of
     case compare n 0 of
       EQ -> case x' of
         Left var -> writeEqU w out var
-        Right val -> writeValU out val
+        Right val -> writeValU w out val
       GT -> do
         -- fill lower bits with 0s
         forM_ [0 .. n - 1] $ \i -> do
