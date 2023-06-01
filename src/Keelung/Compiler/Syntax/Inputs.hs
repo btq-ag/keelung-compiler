@@ -11,20 +11,26 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
+import Data.Vector (Vector)
+import Data.Vector qualified as Vec
 import GHC.Generics (Generic)
 import Keelung
 import Keelung.Compiler.Syntax.FieldBits (toBits)
+import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Syntax.Counters
-import Data.Vector (Vector)
-import qualified Data.Vector as Vec
 
 -- | Convert binary representation of inputs into human friendly Integers
 --   TODO: make it something like a proper inverse of Inputs.deserialize
-deserializeBinReps :: Counters -> Vector n -> Vector n
+deserializeBinReps :: (GaloisField n, Integral n) => Counters -> Vector n -> Vector n
 deserializeBinReps counters outputs =
-  let (start, count) = getRange counters (Output, ReadAllBits)
-      end = start + count
-   in Vec.take start outputs <> Vec.drop end outputs
+  let sliceBits (width, count) =
+        let offset = reindex counters Output (ReadBits width) 0
+         in [Vec.slice (offset + width * index) width outputs | index <- [0 .. count - 1]]
+      binRepRanges = IntMap.toList (getUIntMap counters Output)
+      bitArrays = concatMap sliceBits binRepRanges
+      (start, _) = getRange counters (Output, ReadAllBits)
+      beforeBinReps = Vec.take start outputs
+   in beforeBinReps <> Vec.fromList (map (fromInteger . FieldBits.fromBits . toList) bitArrays)
 
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs
