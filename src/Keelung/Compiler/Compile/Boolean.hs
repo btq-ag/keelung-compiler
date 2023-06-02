@@ -1,11 +1,9 @@
 module Keelung.Compiler.Compile.Boolean where
 
-import Control.Arrow (left)
 import Control.Monad (foldM)
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..))
 import Keelung (HasWidth (widthOf))
-import Keelung.Compiler.Compile.Field
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
@@ -57,7 +55,7 @@ compileExprB compileU compileF expr =
         NEqU x y -> do
           x' <- compileU x
           y' <- compileU y
-          eqFU False (left U x') (left U y')
+          eqZero False (fromRefU x' <> neg (fromRefU y'))
         EqB x y -> do
           x' <- compile x
           y' <- compile y
@@ -69,7 +67,7 @@ compileExprB compileU compileF expr =
         EqU x y -> do
           x' <- compileU x
           y' <- compileU y
-          eqFU True (left U x') (left U y')
+          eqZero True (fromRefU x' <> neg (fromRefU y'))
         LTEU x y -> do
           x' <- compileU x
           y' <- compileU y

@@ -1,7 +1,8 @@
-module Keelung.Compiler.Compile.LC (LC (..), fromEither, toEither, (@), neg, scale) where
+module Keelung.Compiler.Compile.LC (LC (..), fromEither, toEither, fromRefU, (@), neg, scale) where
 
 import Data.Field.Galois
-import Keelung.Compiler.Constraint (Ref)
+import Keelung (HasWidth (widthOf))
+import Keelung.Compiler.Constraint
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 
@@ -14,6 +15,14 @@ data LC n
 -- | Converting from a 'Either n (PolyG Ref n)' to a 'LC n'.
 fromEither :: Either n (PolyG Ref n) -> LC n
 fromEither = either Constant Polynomial
+
+-- | Converting from a 'Either RefU n' to a 'LC n'.
+fromRefU :: (Num n, Eq n) => Either RefU n -> LC n
+fromRefU (Right val) = Constant val
+fromRefU (Left var) =
+  let width = widthOf var
+      bits = [(B (RefUBit width var i), 2 ^ i) | i <- [0 .. width - 1]]
+   in fromEither (PolyG.build 0 bits)
 
 toEither :: LC n -> Either n (PolyG Ref n)
 toEither (Constant c) = Left c

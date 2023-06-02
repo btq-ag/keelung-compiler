@@ -128,7 +128,6 @@ tests = do
       reindexRef occurrences (B (RefUBit 4 inputVar 1)) `shouldBe` 1
       reindexRef occurrences (B (RefUBit 4 inputVar 2)) `shouldBe` 2
       reindexRef occurrences (B (RefUBit 4 inputVar 3)) `shouldBe` 3
-      reindexRef occurrences (U inputVar) `shouldBe` 4
       let intermediateB = RefBX 0
       reindexRef occurrences (B intermediateB) `shouldBe` 5
       let intermediate4 = RefUX 4 0
@@ -136,8 +135,6 @@ tests = do
       reindexRef occurrences (B (RefUBit 4 intermediate4 1)) `shouldBe` 7
       reindexRef occurrences (B (RefUBit 4 intermediate4 2)) `shouldBe` 8
       reindexRef occurrences (B (RefUBit 4 intermediate4 3)) `shouldBe` 9
-      -- print $ linkConstraintModule cm
-      reindexRef occurrences (U intermediate4) `shouldBe` 10
 
     it "Bit test / and 1" $ do
       (_, cm) <- execute $ do
@@ -152,19 +149,16 @@ tests = do
       reindexRef occurrences (B (RefUBit 4 inputVar0 1)) `shouldBe` 2
       reindexRef occurrences (B (RefUBit 4 inputVar0 2)) `shouldBe` 3
       reindexRef occurrences (B (RefUBit 4 inputVar0 3)) `shouldBe` 4
-      reindexRef occurrences (U inputVar0) `shouldBe` 5
       let inputVar1 = RefUP 4 0
       reindexRef occurrences (B (RefUBit 4 inputVar1 0)) `shouldBe` 6
       reindexRef occurrences (B (RefUBit 4 inputVar1 1)) `shouldBe` 7
       reindexRef occurrences (B (RefUBit 4 inputVar1 2)) `shouldBe` 8
       reindexRef occurrences (B (RefUBit 4 inputVar1 3)) `shouldBe` 9
-      reindexRef occurrences (U inputVar1) `shouldBe` 10
       let intermediateVar0 = RefUX 4 0
       reindexRef occurrences (B (RefUBit 4 intermediateVar0 0)) `shouldBe` 11
       reindexRef occurrences (B (RefUBit 4 intermediateVar0 1)) `shouldBe` 12
       reindexRef occurrences (B (RefUBit 4 intermediateVar0 2)) `shouldBe` 13
       reindexRef occurrences (B (RefUBit 4 intermediateVar0 3)) `shouldBe` 14
-      reindexRef occurrences (U intermediateVar0) `shouldBe` 15
 
     it "Bit test / and 2" $ do
       (_, cm) <- execute $ do
@@ -185,14 +179,11 @@ tests = do
       reindexRef occurrences (B (RefUBit 4 inputVar2 1)) `shouldBe` 6
       reindexRef occurrences (B (RefUBit 4 inputVar2 2)) `shouldBe` 7
       reindexRef occurrences (B (RefUBit 4 inputVar2 3)) `shouldBe` 8
-      reindexRef occurrences (U inputVar0) `shouldBe` 9
-      reindexRef occurrences (U inputVar2) `shouldBe` 10
       let inputVar1 = RefUP 4 0
       reindexRef occurrences (B (RefUBit 4 inputVar1 0)) `shouldBe` 11
       reindexRef occurrences (B (RefUBit 4 inputVar1 1)) `shouldBe` 12
       reindexRef occurrences (B (RefUBit 4 inputVar1 2)) `shouldBe` 13
       reindexRef occurrences (B (RefUBit 4 inputVar1 3)) `shouldBe` 14
-      reindexRef occurrences (U inputVar1) `shouldBe` 15
       reindexRef occurrences (F (RefFX 0)) `shouldBe` 16
       reindexRef occurrences (F (RefFX 1)) `shouldBe` 17
       reindexRef occurrences (F (RefFX 2)) `shouldBe` 18
@@ -201,4 +192,3 @@ tests = do
       reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 1)) `shouldBe` 21
       reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 2)) `shouldBe` 22
       reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 3)) `shouldBe` 23
-      reindexRef occurrences (U (RefUX 4 0)) `shouldBe` 24
