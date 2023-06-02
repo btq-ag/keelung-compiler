@@ -50,8 +50,7 @@ toIntMap (OccurU xs) = xs
 toIndexTable :: Counters -> OccurU -> IndexTable
 toIndexTable counters (OccurU xs) = 
   let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IndexTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
-      uintPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IndexTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadUInt width), x)) xs
-   in bitsPart <> uintPart
+   in bitsPart
 
 -- | O(1). Bump the count of a RefF
 increase :: Width -> Var -> OccurU -> OccurU

@@ -24,11 +24,11 @@ import Keelung.Syntax.Counters
 deserializeBinReps :: (GaloisField n, Integral n) => Counters -> Vector n -> Vector n
 deserializeBinReps counters outputs =
   let sliceBits (width, count) =
-        let offset = reindex counters Output (ReadBits width) 0
+        let offset = reindex counters Output (ReadUInt width) 0
          in [Vec.slice (offset + width * index) width outputs | index <- [0 .. count - 1]]
       binRepRanges = IntMap.toList (getUIntMap counters Output)
       bitArrays = concatMap sliceBits binRepRanges
-      (start, _) = getRange counters (Output, ReadAllBits)
+      (start, _) = getRange counters (Output, ReadAllUInts)
       beforeBinReps = Vec.take start outputs
    in beforeBinReps <> Vec.fromList (map (fromInteger . FieldBits.fromBits . toList) bitArrays)
 

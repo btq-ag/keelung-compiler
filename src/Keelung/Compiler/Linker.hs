@@ -233,10 +233,10 @@ reindexRefB occurrences (RefBP x) = reindex (occurCounters occurrences) PrivateI
 reindexRefB occurrences (RefBX x) = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadBool x - pinnedSize occurrences) + pinnedSize occurrences
 reindexRefB occurrences (RefUBit _ x i) =
   case x of
-    RefUO w x' -> reindex (occurCounters occurrences) Output (ReadBits w) x' + (i `mod` w)
-    RefUI w x' -> reindex (occurCounters occurrences) PublicInput (ReadBits w) x' + (i `mod` w)
-    RefUP w x' -> reindex (occurCounters occurrences) PrivateInput (ReadBits w) x' + (i `mod` w)
-    RefUX w x' -> IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadBits w) x' - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
+    RefUO w x' -> reindex (occurCounters occurrences) Output (ReadUInt w) x' + (i `mod` w)
+    RefUI w x' -> reindex (occurCounters occurrences) PublicInput (ReadUInt w) x' + (i `mod` w)
+    RefUP w x' -> reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x' + (i `mod` w)
+    RefUX w x' -> IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x' - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
 
 -------------------------------------------------------------------------------
 

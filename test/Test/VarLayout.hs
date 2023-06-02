@@ -40,41 +40,21 @@ tests = do
       reindex counters PublicInput ReadField 0 `shouldBe` 3
       reindex counters PublicInput ReadField 1 `shouldBe` 4
       reindex counters PublicInput ReadBool 0 `shouldBe` 5
-      reindex counters Intermediate (ReadBits 4) 0 `shouldBe` 6
-      reindex counters Intermediate (ReadBits 4) 1 `shouldBe` 10
-      reindex counters Intermediate (ReadBits 4) 2 `shouldBe` 14
-      reindex counters Intermediate (ReadBits 4) 3 `shouldBe` 18
-      reindex counters Intermediate (ReadBits 4) 4 `shouldBe` 22
-      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 26
-      reindex counters Intermediate (ReadUInt 4) 1 `shouldBe` 27
-      reindex counters Intermediate (ReadUInt 4) 2 `shouldBe` 28
-      reindex counters Intermediate (ReadUInt 4) 3 `shouldBe` 29
+      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 6
+      reindex counters Intermediate (ReadUInt 4) 1 `shouldBe` 10
+      reindex counters Intermediate (ReadUInt 4) 2 `shouldBe` 14
+      reindex counters Intermediate (ReadUInt 4) 3 `shouldBe` 18
+      reindex counters Intermediate (ReadUInt 4) 4 `shouldBe` 22
 
     it "getCount" $ do
       getCount counters (Output, ReadField) `shouldBe` 3
       getCount counters (Output, ReadBool) `shouldBe` 0
-      getCount counters (Output, ReadUInt 3) `shouldBe` 0
-      getCount counters (Output, ReadUInt 4) `shouldBe` 0
-      getCount counters (Output, ReadUInt 5) `shouldBe` 0
-      getCount counters (Output, ReadUInt 3) `shouldBe` 0
-      getCount counters (Output, ReadUInt 4) `shouldBe` 0
-      getCount counters (Output, ReadUInt 5) `shouldBe` 0
       getCount counters (PublicInput, ReadField) `shouldBe` 2
       getCount counters (PublicInput, ReadBool) `shouldBe` 1
-      getCount counters (PublicInput, ReadUInt 3) `shouldBe` 0
-      getCount counters (PublicInput, ReadUInt 4) `shouldBe` 0
-      getCount counters (PublicInput, ReadUInt 5) `shouldBe` 0
-      getCount counters (PublicInput, ReadUInt 3) `shouldBe` 0
-      getCount counters (PublicInput, ReadUInt 4) `shouldBe` 0
-      getCount counters (PublicInput, ReadUInt 5) `shouldBe` 0
       getCount counters (Intermediate, ReadField) `shouldBe` 0
       getCount counters (Intermediate, ReadBool) `shouldBe` 0
-      getCount counters (Intermediate, ReadBits 3) `shouldBe` 0
-      getCount counters (Intermediate, ReadBits 4) `shouldBe` 20
-      getCount counters (Intermediate, ReadBits 5) `shouldBe` 0
       getCount counters (Intermediate, ReadUInt 3) `shouldBe` 0
       getCount counters (Intermediate, ReadUInt 4) `shouldBe` 5
-      getCount counters (Intermediate, ReadUInt 5) `shouldBe` 0
 
   describe "Variable indexing 1" $ do
     --
@@ -99,31 +79,17 @@ tests = do
       reindex counters Output ReadBool 3 `shouldBe` 3
       reindex counters Output ReadBool 4 `shouldBe` 4
       reindex counters Output ReadBool 5 `shouldBe` 5
-      reindex counters PublicInput (ReadBits 4) 0 `shouldBe` 6
-      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 10
+      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 6
 
     it "getCount" $ do
       getCount counters (Output, ReadField) `shouldBe` 0
       getCount counters (Output, ReadBool) `shouldBe` 6
-      getCount counters (Output, ReadUInt 3) `shouldBe` 0
-      getCount counters (Output, ReadUInt 4) `shouldBe` 0
-      getCount counters (Output, ReadUInt 5) `shouldBe` 0
-      getCount counters (Output, ReadUInt 3) `shouldBe` 0
-      getCount counters (Output, ReadUInt 4) `shouldBe` 0
-      getCount counters (Output, ReadUInt 5) `shouldBe` 0
       getCount counters (PublicInput, ReadField) `shouldBe` 0
       getCount counters (PublicInput, ReadBool) `shouldBe` 0
-      getCount counters (PublicInput, ReadBits 3) `shouldBe` 0
-      getCount counters (PublicInput, ReadBits 4) `shouldBe` 4
-      getCount counters (PublicInput, ReadBits 5) `shouldBe` 0
       getCount counters (PublicInput, ReadUInt 3) `shouldBe` 0
       getCount counters (PublicInput, ReadUInt 4) `shouldBe` 1
-      getCount counters (PublicInput, ReadUInt 5) `shouldBe` 0
       getCount counters (Intermediate, ReadField) `shouldBe` 0
       getCount counters (Intermediate, ReadBool) `shouldBe` 0
-      getCount counters (Intermediate, ReadBits 3) `shouldBe` 0
-      getCount counters (Intermediate, ReadBits 4) `shouldBe` 0
-      getCount counters (Intermediate, ReadBits 5) `shouldBe` 0
       getCount counters (Intermediate, ReadUInt 3) `shouldBe` 0
       getCount counters (Intermediate, ReadUInt 4) `shouldBe` 0
       getCount counters (Intermediate, ReadUInt 5) `shouldBe` 0
@@ -142,14 +108,10 @@ tests = do
           )
             mempty
     it "reindex" $ do
-      reindex counters Output (ReadBits 4) 0 `shouldBe` 0
-      reindex counters Output (ReadUInt 4) 0 `shouldBe` 4
-      reindex counters PublicInput (ReadBits 4) 0 `shouldBe` 5
-      reindex counters PublicInput (ReadBits 4) 1 `shouldBe` 9
-      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 13
-      reindex counters PublicInput (ReadUInt 4) 1 `shouldBe` 14
-      reindex counters Intermediate (ReadBits 4) 0 `shouldBe` 15
-      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 19
+      reindex counters Output (ReadUInt 4) 0 `shouldBe` 0
+      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 4
+      reindex counters PublicInput (ReadUInt 4) 1 `shouldBe` 8
+      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 12
 
   describe "Variable indexing 3" $ do
     --
@@ -165,10 +127,10 @@ tests = do
           )
             mempty
     it "reindex" $ do
-      reindex counters Intermediate (ReadBits 4) 0 `shouldBe` 0
-      reindex counters Intermediate (ReadBits 4) 1 `shouldBe` 4
-      reindex counters Intermediate (ReadBits 5) 0 `shouldBe` 8
-      reindex counters Intermediate (ReadBits 8) 0 `shouldBe` 13
+      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 0
+      reindex counters Intermediate (ReadUInt 4) 1 `shouldBe` 4
+      reindex counters Intermediate (ReadUInt 5) 0 `shouldBe` 8
+      reindex counters Intermediate (ReadUInt 8) 0 `shouldBe` 13
 
   describe "Variable indexing 4" $ do
     --
@@ -185,28 +147,17 @@ tests = do
           )
             mempty
     it "reindex" $ do
-      reindex counters Output (ReadBits 4) 0 `shouldBe` 0
-      reindex counters Output (ReadUInt 4) 0 `shouldBe` 4
-      reindex counters PublicInput (ReadBits 4) 0 `shouldBe` 5
-      reindex counters PublicInput (ReadBits 4) 1 `shouldBe` 9
-      reindex counters PublicInput (ReadBits 4) 2 `shouldBe` 13
-      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 17
-      reindex counters PublicInput (ReadUInt 4) 1 `shouldBe` 18
-      reindex counters PublicInput (ReadUInt 4) 2 `shouldBe` 19
-      reindex counters Intermediate (ReadBits 4) 0 `shouldBe` 20
-      reindex counters Intermediate (ReadBits 4) 1 `shouldBe` 24
-      reindex counters Intermediate (ReadBits 4) 2 `shouldBe` 28
-      reindex counters Intermediate (ReadBits 5) 0 `shouldBe` 32
-      reindex counters Intermediate (ReadBits 5) 1 `shouldBe` 37
-      reindex counters Intermediate (ReadBits 5) 2 `shouldBe` 42
-      reindex counters Intermediate (ReadBits 5) 3 `shouldBe` 47
-      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 52
-      reindex counters Intermediate (ReadUInt 4) 1 `shouldBe` 53
-      reindex counters Intermediate (ReadUInt 4) 2 `shouldBe` 54
-      reindex counters Intermediate (ReadUInt 5) 0 `shouldBe` 55
-      reindex counters Intermediate (ReadUInt 5) 1 `shouldBe` 56
-      reindex counters Intermediate (ReadUInt 5) 2 `shouldBe` 57
-      reindex counters Intermediate (ReadUInt 5) 3 `shouldBe` 58
+      reindex counters Output (ReadUInt 4) 0 `shouldBe` 0
+      reindex counters PublicInput (ReadUInt 4) 0 `shouldBe` 4
+      reindex counters PublicInput (ReadUInt 4) 1 `shouldBe` 8
+      reindex counters PublicInput (ReadUInt 4) 2 `shouldBe` 12
+      reindex counters Intermediate (ReadUInt 4) 0 `shouldBe` 16
+      reindex counters Intermediate (ReadUInt 4) 1 `shouldBe` 20
+      reindex counters Intermediate (ReadUInt 4) 2 `shouldBe` 24
+      reindex counters Intermediate (ReadUInt 5) 0 `shouldBe` 28
+      reindex counters Intermediate (ReadUInt 5) 1 `shouldBe` 33
+      reindex counters Intermediate (ReadUInt 5) 2 `shouldBe` 38
+      reindex counters Intermediate (ReadUInt 5) 3 `shouldBe` 43
 
   describe "Layout 0" $ do
     --                F   B   BR  U
