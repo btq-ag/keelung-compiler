@@ -30,9 +30,6 @@ import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
-import Keelung.Compiler.Relations.UInt (UIntRelations)
-import Keelung.Compiler.Relations.UInt qualified as UIntRelations
-import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
@@ -50,7 +47,6 @@ linkConstraintModule cm =
       csConstraints =
         varEqFs
           <> varEqBs
-          <> varEqUs
           <> addFs
           <> mulFs,
       csEqZeros = toList eqZeros,
@@ -132,23 +128,8 @@ linkConstraintModule cm =
           result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
        in Seq.fromList (map (linkConstraint occurrences) result)
 
-    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Seq (Linked.Constraint n)
-    extractUIntRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefU, Either (Int, RefU) n) -> [Constraint n]
-          convert (var, Right val) =
-            let width = widthOf var
-             in map (\i -> CVarBindB (RefUBit width var i) (FieldBits.testBit' val i)) [0 .. width - 1]
-          convert (var, Left (rotation, root)) =
-            let width = widthOf var
-             in if rotation == 0
-                  then map (\i -> CVarEqB (RefUBit width var i) (RefUBit width root i)) [0 .. width - 1]
-                  else error "[ panic ] Unexpected rotation in extractUIntRelations"
-          result = concatMap convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
-       in Seq.fromList (map (linkConstraint occurrences) result)
-
     -- varEqFs = fromFieldRelations (cmFieldRelations cm) (FieldRelations.exportUIntRelations (cmFieldRelations cm)) (cmOccurrenceF cm)
     varEqFs = extractFieldRelations (cmFieldRelations cm)
-    varEqUs = extractUIntRelations (FieldRelations.exportUIntRelations (cmFieldRelations cm))
     varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (cmFieldRelations cm))
 
     addFs = Seq.fromList $ map (linkConstraint occurrences . CAddF) $ cmAddF cm

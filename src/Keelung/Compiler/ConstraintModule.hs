@@ -29,7 +29,6 @@ import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
-import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Util (indent)
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
@@ -48,10 +47,7 @@ data ConstraintModule n = ConstraintModule
     cmOccurrenceF :: !OccurF,
     cmOccurrenceB :: !OccurB,
     cmOccurrenceU :: !OccurU,
-    cmBinReps :: [[(RefB, Int)]],
-    -- when x == y (FieldRelations)
     cmFieldRelations :: AllRelations n,
-    -- cmUIntRelations :: UIntRelations n,
     -- addative constraints
     cmAddF :: [PolyG Ref n],
     -- multiplicative constraints
@@ -256,7 +252,6 @@ sizeOfConstraintModule :: ConstraintModule n -> Int
 sizeOfConstraintModule cm =
   FieldRelations.size (cmFieldRelations cm)
     + BooleanRelations.size (FieldRelations.exportBooleanRelations (cmFieldRelations cm))
-    + UIntRelations.size (FieldRelations.exportUIntRelations (cmFieldRelations cm))
     + length (cmAddF cm)
     + length (cmMulF cm)
     + length (cmEqZeros cm)

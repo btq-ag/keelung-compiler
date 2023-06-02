@@ -19,7 +19,6 @@ import Test.Interpreter.Util (gf181Info)
 import Test.Optimization qualified as Optimization
 import Test.Relations.Boolean qualified as Relations.Boolean
 import Test.Relations.Field qualified as Relations.Field
-import Test.Relations.UInt qualified as Relations.UInt
 import Test.VarLayout qualified as VarBookkeep
 import Test.WitnessGeneration qualified as WitnessGeneration
 
@@ -36,8 +35,6 @@ main = hspec $ do
   describe "Field Relations" Relations.Field.tests
 
   describe "Boolean Relations" Relations.Boolean.tests
-
-  describe "UInt Relations" Relations.UInt.tests
 
   describe "IndexTable" IndexTable.tests
 

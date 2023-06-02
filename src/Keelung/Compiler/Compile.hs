@@ -498,9 +498,7 @@ wireU' others = Left <$> wireU others
 compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileAddOrSubU isSub width out (Right a) (Right b) = do
   let val = if isSub then a - b else a + b
-  forM_ [0 .. width - 1] $ \i -> do
-    -- Cᵢ = outᵢ
-    writeValB (RefUBit width out i) (FieldBits.testBit' val i)
+  writeValU width out val
 compileAddOrSubU isSub width out (Right a) (Left b) = do
   carry <- freshRefB
   addBooleanConstraint carry
@@ -526,9 +524,7 @@ compileAddOrSubU isSub width out (Left a) (Left b) = do
 compileAddOrSubU2 :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileAddOrSubU2 isSub width out (Right a) (Right b) = do
   let val = if isSub then a - b else a + b
-  forM_ [0 .. width - 1] $ \i -> do
-    -- Cᵢ = outᵢ
-    writeValB (RefUBit (width * 2) out i) (FieldBits.testBit' val i)
+  writeValU (width * 2) out val
 compileAddOrSubU2 isSub width out (Right a) (Left b) = do
   let bs = [(B (RefUBit width b i), if isSub then -(2 ^ i) else 2 ^ i) | i <- [0 .. width - 1]]
   let outputBits = [(B (RefUBit (width * 2) out i), -(2 ^ i)) | i <- [0 .. width * 2 - 1]]
@@ -545,15 +541,6 @@ compileAddOrSubU2 isSub width out (Left a) (Left b) = do
 
   writeAdd 0 $ as <> bs <> outputBits
 
--- addBinRepHint [(RefUBit width out 0, 4), (carry, 1)]
-
--- c <- freshRefU (width + 1)
--- -- C = A + B
--- writeAdd 0 [(U a, 1), (U b, if isSub then -1 else 1), (U c, -1)]
--- -- copying bits from C to 'out'
--- forM_ [0 .. width - 1] $ \i -> do
---   -- Cᵢ = outᵢ
---   writeEqB (RefUBit width c i) (RefUBit width out i)
 
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileAddU = compileAddOrSubU False
@@ -572,8 +559,7 @@ compileSubU = compileAddOrSubU True
 compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileMulU width out (Right a) (Right b) = do
   let val = a * b
-  forM_ [0 .. width - 1] $ \i -> do
-    writeValB (RefUBit width out i) (FieldBits.testBit' val i)
+  writeValU width out val  
 compileMulU width out (Right a) (Left b) = do
   carry <- replicateM width (B <$> freshRefB)
   let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
@@ -599,8 +585,7 @@ compileMulU width out (Left a) (Left b) = do
 compileMulU2 :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileMulU2 width out (Right a) (Right b) = do
   let val = a * b
-  forM_ [0 .. width - 1] $ \i -> do
-    writeValB (RefUBit (width * 2) out i) (FieldBits.testBit' val i)
+  writeValU (width * 2) out val  
 compileMulU2 width out (Right a) (Left b) = do
   let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
   let outputBits = [(B (RefUBit (width * 2) out i), 2 ^ i) | i <- [0 .. width * 2 - 1]]

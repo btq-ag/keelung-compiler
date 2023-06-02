@@ -31,7 +31,7 @@ runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new mempty AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -215,9 +215,6 @@ addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (x, y, q, r) : cmDivMod
 
 addModInvHint :: (GaloisField n, Integral n) => Either RefU n -> Either RefU n -> Either RefU n -> Integer -> M n ()
 addModInvHint a output n p = modify' $ \cs -> cs {cmModInvs = (a, output, n, p) : cmModInvs cs}
-
-addBinRepHint :: (GaloisField n, Integral n) => [(RefB, Int)] -> M n ()
-addBinRepHint segments = modify' $ \cs -> cs {cmBinReps = segments : cmBinReps cs}
 
 addBooleanConstraint :: (GaloisField n, Integral n) => RefB -> M n ()
 addBooleanConstraint x = writeMulWithLC (1 @ B x) (1 @ B x) (1 @ B x)

@@ -48,7 +48,6 @@ library
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
-      Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
@@ -116,7 +115,6 @@ executable keelungc
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
-      Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
@@ -183,7 +181,6 @@ test-suite keelung-test
       Test.PolyG
       Test.Relations.Boolean
       Test.Relations.Field
-      Test.Relations.UInt
       Test.VarLayout
       Test.WitnessGeneration
       Keelung.Compiler
@@ -209,7 +206,6 @@ test-suite keelung-test
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
-      Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs

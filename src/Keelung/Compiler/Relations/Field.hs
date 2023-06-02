@@ -8,19 +8,16 @@ module Keelung.Compiler.Relations.Field
     new,
     assignF,
     assignB,
-    assignU,
     relateB,
     relateRefs,
     assertEqual,
-    assertEqualU,
     relationBetween,
     toInt,
     size,
     isValid,
     lookup,
     Lookup (..),
-    exportBooleanRelations,
-    exportUIntRelations,
+    exportBooleanRelations
   )
 where
 
@@ -34,7 +31,6 @@ import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.Boolean qualified as Boolean
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Compiler.Constraint
 import Prelude hiding (lookup)
 
@@ -42,13 +38,12 @@ type FieldRelations n = EquivClass.EquivClass Ref n (LinRel n)
 
 data AllRelations n = AllRelations
   { relationsF :: FieldRelations n,
-    relationsB :: Boolean.BooleanRelations,
-    relationsU :: UInt.UIntRelations n
+    relationsB :: Boolean.BooleanRelations
   }
   deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (AllRelations n) where
-  show (AllRelations f b u) = show f <> show b <> show u
+  show (AllRelations f b) = show f <> show b
 
 mapError :: EquivClass.M (n, n) a -> EquivClass.M (Error n) a
 mapError = EquivClass.mapError (uncurry ConflictingValuesF)
@@ -69,27 +64,16 @@ updateRelationsB f xs = do
   relations <- f (relationsB xs)
   return $ xs {relationsB = relations}
 
-updateRelationsU ::
-  (UInt.UIntRelations n -> EquivClass.M (Error n) (UInt.UIntRelations n)) ->
-  AllRelations n ->
-  EquivClass.M (Error n) (AllRelations n)
-updateRelationsU f xs = do
-  relations <- f (relationsU xs)
-  return $ xs {relationsU = relations}
-
 --------------------------------------------------------------------------------
 
 new :: AllRelations n
-new = AllRelations (EquivClass.new "Field") Boolean.new UInt.new
+new = AllRelations (EquivClass.new "Field") Boolean.new
 
 assignF :: (GaloisField n, Integral n) => Ref -> n -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
 assignF var val = updateRelationsF $ EquivClass.assign var val
 
 assignB :: RefB -> Bool -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
 assignB ref val = updateRelationsB $ Boolean.assign ref val
-
-assignU :: (GaloisField n, Integral n) => RefU -> n -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
-assignU ref val = updateRelationsU $ UInt.assign ref val
 
 relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
 relateF var1 slope var2 intercept = updateRelationsF $ EquivClass.relate var1 (LinRel slope intercept) var2
@@ -117,9 +101,6 @@ relateRefs x slope y intercept xs =
 
 assertEqual :: (GaloisField n, Integral n) => Ref -> Ref -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
 assertEqual var1 var2 = relateF var1 1 var2 0
-
-assertEqualU :: (GaloisField n, Integral n) => RefU -> RefU -> AllRelations n -> EquivClass.M (Error n) (AllRelations n)
-assertEqualU var1 var2 = updateRelationsU $ UInt.assertEqual var1 var2
 
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> AllRelations n -> Maybe (n, n)
 relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 (relationsF xs) of
@@ -295,6 +276,3 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
 
 exportBooleanRelations :: AllRelations n -> Boolean.BooleanRelations
 exportBooleanRelations = relationsB
-
-exportUIntRelations :: AllRelations n -> UInt.UIntRelations n
-exportUIntRelations = relationsU

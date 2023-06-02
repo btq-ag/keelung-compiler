@@ -13,11 +13,9 @@ import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
-import Keelung.Compiler.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
-import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 
@@ -310,10 +308,8 @@ addAddF poly = case PolyG.view poly of
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
 substPolyG :: (GaloisField n, Integral n) => AllRelations n -> PolyG Ref n -> Maybe (Either n (PolyG Ref n), Set Ref, Set Ref)
 substPolyG relations poly = do
-  let boolRels = AllRelations.exportBooleanRelations relations
-  let uintRels = AllRelations.exportUIntRelations relations
   let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' (substPolyG_ relations boolRels uintRels) (False, Left c, mempty, mempty) xs of
+  case Map.foldlWithKey' (substPolyG_ relations) (False, Left c, mempty, mempty) xs of
     (False, _, _, _) -> Nothing -- nothing changed
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyG.vars poly)
@@ -321,13 +317,11 @@ substPolyG relations poly = do
 substPolyG_ ::
   (Integral n, GaloisField n) =>
   AllRelations n ->
-  BooleanRelations ->
-  UIntRelations n ->
   (Bool, Either n (PolyG Ref n), Set Ref, Set Ref) ->
   Ref ->
   n ->
   (Bool, Either n (PolyG Ref n), Set Ref, Set Ref)
-substPolyG_ relations _boolRels _uintRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case AllRelations.lookup ref relations of
+substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = case AllRelations.lookup ref relations of
   AllRelations.Root -> case accPoly of
     Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
     Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
