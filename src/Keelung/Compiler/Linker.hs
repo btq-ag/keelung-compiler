@@ -11,7 +11,6 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Map.Strict qualified as Map
-import Data.Maybe (mapMaybe)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
@@ -34,12 +33,10 @@ import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
-import Keelung.Data.BinRep
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Data.Struct (Struct (..))
 import Keelung.Syntax (HasWidth (widthOf), Var)
 import Keelung.Syntax.Counters
 
@@ -50,8 +47,6 @@ linkConstraintModule cm =
   ConstraintSystem
     { csField = cmField cm,
       csCounters = counters,
-      csBinReps = binReps,
-      csBinReps' = map (Seq.fromList . map (first (reindexRefB occurrences))) (cmBinReps cm),
       csConstraints =
         varEqFs
           <> varEqBs
@@ -66,42 +61,6 @@ linkConstraintModule cm =
     !occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
     !counters = updateCounters occurrences (cmCounters cm)
     uncurry3 f (a, b, c) = f a b c
-
-    binReps = generateBinReps counters (cmOccurrenceU cm)
-
-    -- \| Generate BinReps from the UIntRelations
-    generateBinReps :: Counters -> OccurU -> [BinRep]
-    generateBinReps (Counters o i1 i2 _ _ _ _) occurrencesU =
-      toList $
-        fromSmallCounter RefUO o
-          <> fromSmallCounter RefUI i1
-          <> fromSmallCounter RefUP i2
-          <> intermediateBinReps
-      where
-        intermediateBinReps =
-          Seq.fromList $
-            concatMap
-              ( \(width, xs) ->
-                  mapMaybe
-                    ( \(var, count) ->
-                        let varOffset = reindexRef occurrences (U (RefUX width var))
-                            binRepOffset = reindexRef occurrences (B (RefUBit width (RefUX width var) 0))
-                         in if count > 0
-                              then Just (BinRep varOffset width binRepOffset)
-                              else Nothing
-                    )
-                    (IntMap.toList xs)
-              )
-              (OccurU.toList occurrencesU)
-
-        -- fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
-        fromSmallCounter refType (Struct _ _ u) = Seq.fromList $ concatMap (fromPair refType) (IntMap.toList u)
-
-        -- fromPair :: VarSort -> (Width, Int) -> [BinRep]
-        fromPair refType (width, count) =
-          let varOffset = reindexRef occurrences (U (refType width 0))
-              binRepOffset = reindexRef occurrences (B (RefUBit width (refType width 0) 0))
-           in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
 
     extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Linked.Constraint n)
     extractFieldRelations relations =

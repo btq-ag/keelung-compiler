@@ -11,7 +11,6 @@ import Data.Foldable (toList)
 import Data.Sequence (Seq)
 import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
-import Keelung.Data.BinRep (BinRep)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
@@ -89,8 +88,6 @@ data ConstraintSystem n = ConstraintSystem
   { -- | Constraints
     csField :: (FieldType, Integer, Integer),
     csConstraints :: !(Seq (Constraint n)),
-    csBinReps :: [BinRep],
-    csBinReps' :: [Seq (Var, Int)],
     csCounters :: Counters,
     csEqZeros :: [(Poly n, Var)],
     csDivMods :: [(Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n)],
@@ -100,32 +97,30 @@ data ConstraintSystem n = ConstraintSystem
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem _ cs binReps _ counters _eqs _divMods _modInvs) =
-  length cs + getBooleanConstraintCount counters + length binReps
+numberOfConstraints (ConstraintSystem _ cs counters _eqs _divMods _modInvs) =
+  length cs + getBooleanConstraintCount counters
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem _ constraints binReps _ counters _eqs _divMods _modInvs) =
+  show (ConstraintSystem _ constraints counters _eqs _divMods _modInvs) =
     "ConstraintSystem {\n"
-      <> prettyConstraints counters (toList constraints) binReps
+      <> prettyConstraints counters (toList constraints)
       <> prettyVariables counters
       <> "\n}"
 
-prettyConstraints :: Show constraint => Counters -> [constraint] -> [BinRep] -> String
-prettyConstraints counters cs binReps =
+prettyConstraints :: Show constraint => Counters -> [constraint] -> String
+prettyConstraints counters cs =
   showConstraintSummary
     <> showOrdinaryConstraints
     <> showBooleanConstraints
-    <> showBinRepConstraints
   where
     -- sizes of constraint groups
-    totalBinRepConstraintSize = length binReps
     booleanConstraintSize = getBooleanConstraintCount counters
     ordinaryConstraintSize = length cs
 
     -- summary of constraint groups
     showConstraintSummary =
       "  Constriant ("
-        <> show (ordinaryConstraintSize + booleanConstraintSize + totalBinRepConstraintSize)
+        <> show (ordinaryConstraintSize + booleanConstraintSize)
         <> "): \n"
 
     -- Ordinary constraints
@@ -148,15 +143,4 @@ prettyConstraints counters cs binReps =
             <> show booleanConstraintSize
             <> "):\n\n"
             <> unlines (map ("      " <>) (prettyBooleanConstraints counters))
-            <> "\n"
-
-    -- BinRep constraints
-    showBinRepConstraints =
-      if null binReps
-        then ""
-        else
-          "    Binary representation constraints ("
-            <> show (length binReps)
-            <> "):\n\n"
-            <> unlines (map (("      " <>) . show) binReps)
             <> "\n"
