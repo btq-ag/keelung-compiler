@@ -41,9 +41,11 @@ run' r1cs inputs = do
   witness <- runM boolVarRanges inputs $ goThroughManyTimes constraints
 
   -- extract output values from the witness
-  let (outputStart, outputLength) = getRange (r1csCounters r1cs) Output
-  
-  return (Vector.slice outputStart outputLength witness, witness)
+  let outputRanges = getRanges (r1csCounters r1cs) [(Output, ReadField), (Output, ReadBool), (Output, ReadAllBits)]
+  case IntMap.toList outputRanges of
+    [(outputStart, outputLength)] -> return (Vector.slice outputStart outputLength witness, witness)
+    _ -> return (mempty, witness)
+
 
 -- | Return Constraints from a R1CS, which include:
 --   1. ordinary constraints
