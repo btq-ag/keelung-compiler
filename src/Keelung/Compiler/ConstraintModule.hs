@@ -273,7 +273,6 @@ instance UpdateOccurrences Ref where
               case ref of
                 F refF -> addOccurrences (Set.singleton refF) cm
                 B refB -> addOccurrences (Set.singleton refB) cm
-                U refU -> addOccurrences (Set.singleton refU) cm
           )
       )
   removeOccurrences =
@@ -283,7 +282,6 @@ instance UpdateOccurrences Ref where
               case ref of
                 F refF -> removeOccurrences (Set.singleton refF) cm
                 B refB -> removeOccurrences (Set.singleton refB) cm
-                U refU -> removeOccurrences (Set.singleton refU) cm
           )
       )
 

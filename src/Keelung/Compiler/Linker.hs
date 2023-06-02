@@ -80,7 +80,6 @@ linkConstraintModule cm =
     shouldBeKept :: Ref -> Bool
     shouldBeKept (F ref) = refFShouldBeKept ref
     shouldBeKept (B ref) = refBShouldBeKept ref
-    shouldBeKept (U ref) = refUShouldBeKept ref
 
     refFShouldBeKept :: RefF -> Bool
     refFShouldBeKept ref = case ref of
@@ -116,7 +115,7 @@ linkConstraintModule cm =
       RefUBit _ var _ ->
         --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
         --  the UInt variable should be kept
-        shouldBeKept (U var)
+        refUShouldBeKept var
       _ ->
         -- it's a pinned Field variable
         True
@@ -220,7 +219,6 @@ linkPoly_ occurrences xs = case linkPoly occurrences xs of
 reindexRef :: Occurrences -> Ref -> Var
 reindexRef occurrences (F x) = reindexRefF occurrences x
 reindexRef occurrences (B x) = reindexRefB occurrences x
-reindexRef occurrences (U x) = reindexRefU occurrences x
 
 reindexRefF :: Occurrences -> RefF -> Var
 reindexRefF occurrences (RefFO x) = reindex (occurCounters occurrences) Output ReadField x
@@ -239,12 +237,6 @@ reindexRefB occurrences (RefUBit _ x i) =
     RefUI w x' -> reindex (occurCounters occurrences) PublicInput (ReadBits w) x' + (i `mod` w)
     RefUP w x' -> reindex (occurCounters occurrences) PrivateInput (ReadBits w) x' + (i `mod` w)
     RefUX w x' -> IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadBits w) x' - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
-
-reindexRefU :: Occurrences -> RefU -> Var
-reindexRefU occurrences (RefUO w x) = reindex (occurCounters occurrences) Output (ReadUInt w) x
-reindexRefU occurrences (RefUI w x) = reindex (occurCounters occurrences) PublicInput (ReadUInt w) x
-reindexRefU occurrences (RefUP w x) = reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x
-reindexRefU occurrences (RefUX w x) = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x - pinnedSize occurrences) + pinnedSize occurrences
 
 -------------------------------------------------------------------------------
 

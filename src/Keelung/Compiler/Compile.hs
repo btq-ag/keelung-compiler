@@ -675,32 +675,40 @@ compileIfU width (Left p) (Right x) (Right y) = do
     then return $ Right x
     else do
       out <- freshRefU width
+      let bits = [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
       -- (x - y) * p - out + y = 0
-      writeAdd y [(B p, x - y), (U out, -1)]
+      writeAdd y $ (B p, x - y) : bits
       return $ Left out
 compileIfU width (Left p) (Right x) (Left y) = do
   out <- freshRefU width
+  let bitsY = [(B (RefUBit width y  i), -(2 ^ i)) | i <- [0 .. width - 1]]
+  let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
   -- (out - y) = p * (x - y)
   writeMul
     (0, [(B p, 1)])
-    (x, [(U y, -1)])
-    (0, [(U y, -1), (U out, 1)])
+    (x, bitsY)
+    (0, bitsY <> bitsOut)
   return $ Left out
 compileIfU width (Left p) (Left x) (Right y) = do
   out <- freshRefU width
+  let bitsX = [(B (RefUBit width x i), 2 ^ i) | i <- [0 .. width - 1]]
+  let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
   -- (out - y) = p * (x - y)
   writeMul
     (0, [(B p, 1)])
-    (-y, [(U x, 1)])
-    (-y, [(U out, 1)])
+    (-y, bitsX)
+    (-y, bitsOut)
   return $ Left out
 compileIfU width (Left p) (Left x) (Left y) = do
   out <- freshRefU width
+  let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+  let bitsX = [(B (RefUBit width x i), 2 ^ i) | i <- [0 .. width - 1]]
+  let bitsY = [(B (RefUBit width y  i), -(2 ^ i)) | i <- [0 .. width - 1]]
   -- (out - y) = p * (x - y)
   writeMul
     (0, [(B p, 1)])
-    (0, [(U x, 1), (U y, -1)])
-    (0, [(U y, -1), (U out, 1)])
+    (0, bitsX <> bitsY)
+    (0, bitsOut <> bitsY)
   return $ Left out
 
 --------------------------------------------------------------------------------

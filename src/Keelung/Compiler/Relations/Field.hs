@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Keelung.Compiler.Relations.Field
@@ -103,10 +102,8 @@ relateRefs :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> AllRelation
 relateRefs x slope y intercept xs =
   case (x, y, slope, intercept) of
     (B refB, _, 0, value) -> assignB refB (value == 1) xs
-    (U refU, _, 0, value) -> assignU refU value xs
     (_, _, 0, value) -> assignF x value xs
     (B refA, B refB, 1, 0) -> relateB refA (True, refB) xs
-    (U refA, U refB, 1, 0) -> assertEqualU refA refB xs
     (B refA, B refB, -1, 1) -> relateB refA (False, refB) xs
     (refA, refB, _, _) ->
       composeLookup
@@ -159,7 +156,6 @@ lookup :: GaloisField n => Ref -> AllRelations n -> Lookup n
 lookup var xs = fromLinRel $ lookup' var xs
 
 lookup' :: GaloisField n => Ref -> AllRelations n -> EquivClass.VarStatus Ref n (LinRel n)
-lookup' (U var) xs = fromUIntLookup (EquivClass.lookup var (relationsU xs))
 lookup' (B var) xs = fromBooleanLookup $ EquivClass.lookup var (relationsB xs)
 lookup' (F var) xs = EquivClass.lookup (F var) (relationsF xs)
 
@@ -220,22 +216,6 @@ fromBooleanLookup (EquivClass.IsConstant True) = EquivClass.IsConstant 1
 fromBooleanLookup (EquivClass.IsConstant False) = EquivClass.IsConstant 0
 fromBooleanLookup (EquivClass.IsChildOf parent (Boolean.Polarity True)) = EquivClass.IsChildOf (B parent) (LinRel 1 0)
 fromBooleanLookup (EquivClass.IsChildOf parent (Boolean.Polarity False)) = EquivClass.IsChildOf (B parent) (LinRel (-1) 1)
-
-fromUIntLookup :: GaloisField n => EquivClass.VarStatus RefU n UInt.Rotation -> EquivClass.VarStatus Ref n (LinRel n)
-fromUIntLookup (EquivClass.IsRoot children) =
-  EquivClass.IsRoot $
-    Map.mapKeys U $
-      Map.map
-        ( \case
-            UInt.Rotation _ 0 -> LinRel 1 0
-            UInt.NoRotation -> LinRel 1 0
-            _ -> error "[ panic ]: Don't know how to relate a Field to a rotated UInt"
-        )
-        children
-fromUIntLookup (EquivClass.IsConstant n) = EquivClass.IsConstant n
-fromUIntLookup (EquivClass.IsChildOf parent (UInt.Rotation _ 0)) = EquivClass.IsChildOf (U parent) (LinRel 1 0)
-fromUIntLookup (EquivClass.IsChildOf parent UInt.NoRotation) = EquivClass.IsChildOf (U parent) (LinRel 1 0)
-fromUIntLookup (EquivClass.IsChildOf _ _) = error "[ panic ]: Don't know how to relate a Field to a rotated UInt"
 
 -- applyRelation :: (GaloisField n, Integral n) => EquivClass.VarStatus Ref n (LinRel n) -> n -> n -> EquivClass.VarStatus Ref n (LinRel n)
 -- applyRelation (EquivClass.IsRoot children) slope intercept =

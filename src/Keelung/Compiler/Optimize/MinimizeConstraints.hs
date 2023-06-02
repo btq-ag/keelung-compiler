@@ -64,29 +64,13 @@ goThroughEqZeros cm =
 
 goThroughDivMods :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughDivMods cm =
-  let relations = cmFieldRelations cm
-      substDivMod (a, b, q, r) = (substVar relations a, substVar relations b, substVar relations q, substVar relations r)
+  let substDivMod (a, b, q, r) = (a, b, q, r)
    in cm {cmDivMods = map substDivMod (cmDivMods cm)}
-  where
-    substVar _ (Right val) = Right val
-    substVar relations (Left ref) = case AllRelations.lookup (U ref) relations of
-      AllRelations.Root -> Left ref
-      AllRelations.Value val -> Right val
-      AllRelations.ChildOf 1 (U root) 0 -> Left root
-      AllRelations.ChildOf {} -> Left ref
 
 goThroughModInvs :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughModInvs cm =
-  let relations = cmFieldRelations cm
-      substModInv (a, b, c, d) = (substVarEither relations a, b, substVarEither relations c, d)
+  let substModInv (a, b, c, d) = (a, b, c, d)
    in cm {cmModInvs = map substModInv (cmModInvs cm)}
-  where
-    substVarEither _ (Right val) = Right val
-    substVarEither relations (Left ref) = case AllRelations.lookup (U ref) relations of
-      AllRelations.Root -> Left ref
-      AllRelations.Value val -> Right val
-      AllRelations.ChildOf 1 (U root) 0 -> Left root
-      AllRelations.ChildOf {} -> Left ref
 
 goThroughMulF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughMulF = do
@@ -276,14 +260,6 @@ assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
   cm <- get
   result <- lift $ lift $ EquivClass.runM $ AllRelations.assignB var (value == 1) (cmFieldRelations cm)
-  case result of
-    Nothing -> return ()
-    Just relations -> do
-      markChanged RelationChanged
-      put $ removeOccurrences (Set.singleton var) $ cm {cmFieldRelations = relations}
-assign (U var) value = do
-  cm <- get
-  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignU var value (cmFieldRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do

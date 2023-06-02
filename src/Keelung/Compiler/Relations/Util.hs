@@ -41,4 +41,3 @@ instance HasLevel RefF where
 instance HasLevel Ref where
   hasLevel (F x) = hasLevel x
   hasLevel (B x) = hasLevel x
-  hasLevel (U x) = hasLevel x

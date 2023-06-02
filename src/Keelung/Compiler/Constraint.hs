@@ -30,14 +30,11 @@ data Ref
     F RefF
   | -- | Boolean variable
     B RefB
-  | -- | UInt variable
-    U RefU
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show Ref where
   show (F x) = show x
   show (B x) = show x
-  show (U x) = show x
 
 -- | For representing Boolean variables in constraints
 data RefB
@@ -107,7 +104,6 @@ instance HasWidth RefU where
 
 pinnedRef :: Ref -> Bool
 pinnedRef (B ref) = pinnedRefB ref
-pinnedRef (U ref) = pinnedRefU ref
 pinnedRef (F ref) = pinnedRefF ref
 
 pinnedRefF :: RefF -> Bool

@@ -4,7 +4,6 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
-import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Constraint
@@ -56,12 +55,6 @@ freshRefForU (B _) = do
   let index = getCount counters (Intermediate, ReadBool)
   modifyCounter $ addCount (Intermediate, WriteBool) 1
   return $ B $ RefBX index
-freshRefForU (U ref) = do
-  let width = widthOf ref
-  counters <- gets cmCounters
-  let index = getCount counters (Intermediate, ReadUInt width)
-  modifyCounter $ addCount (Intermediate, WriteUInt width) 1
-  return $ U $ RefUX width index
 
 freshRefB :: M n RefB
 freshRefB = do
@@ -178,7 +171,6 @@ writeAdd c as = writeAddWithPoly (PolyG.build c as)
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x
 writeVal (B a) x = writeValB a (x /= 0)
-writeVal (U a) x = writeValU (widthOf a) a x
 
 writeValF :: (GaloisField n, Integral n) => RefF -> n -> M n ()
 writeValF a x = addC [CVarBindF (F a) x]
