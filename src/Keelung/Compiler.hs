@@ -75,7 +75,7 @@ elaborateAndEncode :: Encode t => Comp t -> Either (Error n) Elaborated
 elaborateAndEncode = left LangError . Lang.elaborateAndEncode
 
 -- elaboration => interpretation
-interpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
+interpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
 interpret prog rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode prog
   let counters = Encoded.compCounters (Encoded.elabComp elab)
@@ -84,7 +84,7 @@ interpret prog rawPublicInputs rawPrivateInputs = do
 
 -- | Given a Keelung program and a list of raw public inputs and private inputs,
 --   Generate (structured inputs, outputs, witness)
-generateWitness :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Either (Error n) (Counters, Vector n, Vector n)
+generateWitness :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
 generateWitness fieldInfo program rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode program
   generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs
@@ -128,13 +128,13 @@ compile = compileO1
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
 
-interpretElab :: (GaloisField n, Integral n) => Elaborated -> [n] -> [n] -> Either (Error n) [n]
+interpretElab :: (GaloisField n, Integral n) => Elaborated -> [Integer] -> [Integer] -> Either (Error n) [n]
 interpretElab elab rawPublicInputs rawPrivateInputs = do
   let counters = Encoded.compCounters (Encoded.elabComp elab)
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
   left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
-generateWitnessElab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> [n] -> [n] -> Either (Error n) (Counters, Vector n, Vector n)
+generateWitnessElab :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
 generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> compileO1Elab fieldInfo elab
   let counters = r1csCounters r1cs

@@ -15,7 +15,6 @@ import Data.Vector (Vector)
 import Data.Vector qualified as Vec
 import GHC.Generics (Generic)
 import Keelung
-import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Syntax.Counters
 
@@ -41,7 +40,7 @@ data Inputs n = Inputs
   deriving (Eq, Show, Functor)
 
 -- | Parse raw inputs into structured inputs and populate corresponding binary representations
-deserialize :: (GaloisField n, Integral n) => Counters -> [n] -> [n] -> Either Error (Inputs n)
+deserialize :: (GaloisField n, Integral n) => Counters -> [Integer] -> [Integer] -> Either Error (Inputs n)
 deserialize counters rawPublicInputs rawPrivateInputs = do
   -- go through all raw inputs
   -- sort and populate them with binary representation accordingly
@@ -58,10 +57,6 @@ deserialize counters rawPublicInputs rawPrivateInputs = do
             then Left (PrivateInputSizeMismatch expectedPrivateInputSize actualPrivateInputSize)
             else Right (Inputs counters publicInputSequence privateInputSequence)
 
--- | Concatenate all inputs into a single list
-flatten :: (GaloisField n, Integral n) => Inputs n -> ([n], [n])
-flatten (Inputs _ public private) = (flattenInputSequence public, flattenInputSequence private)
-
 -- | Size of all inputs
 size :: (GaloisField n, Integral n) => Inputs n -> Int
 size (Inputs counters _ _) = getCount counters PublicInput + getCount counters PrivateInput
@@ -69,9 +64,9 @@ size (Inputs counters _ _) = getCount counters PublicInput + getCount counters P
 toIntMap :: (GaloisField n, Integral n) => Inputs n -> IntMap n
 toIntMap (Inputs counters public private) =
   let publicInputRanges = enumerate (getRanges counters [PublicInput])
-      indexedPublicInput = IntMap.fromDistinctAscList $ zip publicInputRanges (flattenInputSequence public)
+      indexedPublicInput = IntMap.fromDistinctAscList $ zip publicInputRanges (toList (flattenInputSequence public))
       privateInputRanges = enumerate (getRanges counters [PrivateInput])
-      indexedPrivateInput = IntMap.fromDistinctAscList $ zip privateInputRanges (flattenInputSequence private)
+      indexedPrivateInput = IntMap.fromDistinctAscList $ zip privateInputRanges (toList (flattenInputSequence private))
    in indexedPublicInput <> indexedPrivateInput
 
 --------------------------------------------------------------------------------
@@ -79,7 +74,7 @@ toIntMap (Inputs counters public private) =
 data InputSequence n = InputSequence
   { seqField :: Seq n,
     seqBool :: Seq n,
-    seqUInt :: IntMap (Seq n),
+    seqUInt :: IntMap (Seq Integer),
     seqUIntBinRep :: IntMap (Seq n)
   }
   deriving (Eq, Show, Functor)
@@ -95,7 +90,7 @@ instance Semigroup (InputSequence n) where
 instance Monoid (InputSequence n) where
   mempty = InputSequence mempty mempty mempty mempty
 
-new :: (GaloisField n, Integral n) => Seq (WriteType, n) -> InputSequence n
+new :: (GaloisField n, Integral n) => Seq (WriteType, Integer) -> InputSequence n
 new =
   foldl
     ( \inputSequence (inputType, rawInputValue) ->
@@ -106,26 +101,23 @@ new =
     )
     mempty
 
-addField :: n -> InputSequence n -> InputSequence n
-addField x (InputSequence field bool uint uintBinRep) = InputSequence (field Seq.:|> x) bool uint uintBinRep
+addField :: (GaloisField n, Integral n) => Integer -> InputSequence n -> InputSequence n
+addField x (InputSequence field bool uint uintBinRep) = InputSequence (field Seq.:|> fromInteger x) bool uint uintBinRep
 
-addBool :: n -> InputSequence n -> InputSequence n
-addBool x (InputSequence field bool uint uintBinRep) = InputSequence field (bool Seq.:|> x) uint uintBinRep
+addBool :: (GaloisField n, Integral n) => Integer -> InputSequence n -> InputSequence n
+addBool x (InputSequence field bool uint uintBinRep) = InputSequence field (bool Seq.:|> fromInteger x) uint uintBinRep
 
-addUInt :: (GaloisField n, Integral n) => Int -> n -> InputSequence n -> InputSequence n
+addUInt :: (GaloisField n, Integral n) => Int -> Integer -> InputSequence n -> InputSequence n
 addUInt width x (InputSequence field bool uint uintBinRep) =
   InputSequence
     field
     bool
     (IntMap.insertWith (flip (<>)) width (Seq.singleton x) uint)
-    (IntMap.insertWith (flip (<>)) width (Seq.fromList (take width (toBits x))) uintBinRep)
+    (IntMap.insertWith (flip (<>)) width (Seq.fromList (take width (FieldBits.toBits' width x))) uintBinRep)
 
-flattenInputSequence :: InputSequence n -> [n]
-flattenInputSequence (InputSequence field bool uint uintBinRep) =
-  toList field
-    ++ toList bool
-    ++ concatMap toList (IntMap.elems uintBinRep)
-    ++ concatMap toList (IntMap.elems uint)
+flattenInputSequence :: InputSequence n -> Seq n
+flattenInputSequence (InputSequence field bool _uint uintBinRep) =
+  field <> bool <> mconcat (IntMap.elems uintBinRep)
 
 --------------------------------------------------------------------------------
 

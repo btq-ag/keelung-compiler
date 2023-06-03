@@ -46,5 +46,8 @@ instance {-# INCOHERENT #-} FieldBits BN128 where
 toBits :: (GaloisField a, Integral a) => a -> [a]
 toBits x = map (testBit x) [0 .. bitSize x - 1]
 
+toBits' :: (GaloisField a, Integral a) => Width -> Integer -> [a]
+toBits' width x = map (\i -> if Data.Bits.testBit x i then 1 else 0) [0 .. width - 1]
+
 fromBits :: Integral a => [a] -> Integer
 fromBits = foldr (\x acc -> toInteger x + Data.Bits.shiftL acc 1) 0

@@ -1,4 +1,4 @@
-module Test.Interpreter.Util (runAll, throwAll, runAndCompare, debug, assertSize, gf181Info) where
+module Test.Interpreter.Util (runAll, throwAll, debug, assertSize, gf181Info) where
 
 import Control.Arrow (left)
 import Data.Field.Galois
@@ -20,14 +20,14 @@ import Test.Hspec
 --------------------------------------------------------------------------------
 
 -- | syntax tree interpreter
-interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [n] -> [n] -> Either (Error n) [n]
+interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
 interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborateAndEncode prog)
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
   left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
 -- | constraint system interpreters (optimized)
-interpretR1CS :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Either (Error n) [n]
+interpretR1CS :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
 interpretR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> Compiler.compileO1 fieldInfo prog
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
@@ -36,7 +36,7 @@ interpretR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
     Right outputs -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
 
 -- | constraint system interpreters (unoptimized)
-interpretR1CSUnoptimized :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Either (Error n) [n]
+interpretR1CSUnoptimized :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
 interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS . Linker.linkConstraintModule <$> Compiler.compileO0 fieldInfo prog
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
@@ -47,7 +47,7 @@ interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
 --------------------------------------------------------------------------------
 
 -- | Expect all interpreters to return the same output
-runAll :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> [n] -> IO ()
+runAll :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> [n] -> IO ()
 runAll fieldInfo program rawPublicInputs rawPrivateInputs expected = do
   -- syntax tree interpreter
   interpretSyntaxTree program rawPublicInputs rawPrivateInputs
@@ -59,7 +59,7 @@ runAll fieldInfo program rawPublicInputs rawPrivateInputs expected = do
     `shouldBe` Right expected
 
 -- | Expect all interpreters to throw an error
-throwAll :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> Interpreter.Error n -> Error n -> IO ()
+throwAll :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
 throwAll fieldInfo program rawPublicInputs rawPrivateInputs stError csError = do
   -- syntax tree interpreters
   interpretSyntaxTree program rawPublicInputs rawPrivateInputs
@@ -70,14 +70,14 @@ throwAll fieldInfo program rawPublicInputs rawPrivateInputs stError csError = do
   interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
     `shouldBe` Left csError
 
--- | Using result of syntax tree interpreter as expected output for constraint system interpreters
-runAndCompare :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [n] -> [n] -> IO ()
-runAndCompare fieldInfo program rawPublicInputs rawPrivateInputs = do
-  let expectedOutput = interpretSyntaxTree program rawPublicInputs rawPrivateInputs
-  interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
-    `shouldBe` expectedOutput
-  interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-    `shouldBe` expectedOutput
+-- -- | Using result of syntax tree interpreter as expected output for constraint system interpreters
+-- runAndCompare :: Encode t => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> IO ()
+-- runAndCompare fieldInfo program rawPublicInputs rawPrivateInputs = do
+--   let expectedOutput = interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+--   interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+--     `shouldBe` expectedOutput
+--   interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+--     `shouldBe` expectedOutput
 
 -- | Print out the result of compilation
 debug :: Encode t => Comp t -> IO ()

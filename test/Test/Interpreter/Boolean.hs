@@ -9,9 +9,9 @@ import Test.QuickCheck hiding ((.&.))
 run :: IO ()
 run = hspec tests
 
-toGF181 :: Bool -> GF181
-toGF181 True = 1
-toGF181 False = 0
+fromBool :: Bool -> Integer
+fromBool True = 1
+fromBool False = 0
 
 makeProgram :: (Boolean -> Boolean -> Boolean) -> Int -> Boolean -> Boolean -> [Boolean] -> Comp Boolean
 makeProgram op mode a b cs = case mode `mod` 4 of
@@ -31,13 +31,13 @@ makeProgram op mode a b cs = case mode `mod` 4 of
 testProgram :: (Bool -> Bool -> Bool) -> (Boolean -> Boolean -> Boolean) -> Property
 testProgram opH opK = do
   property $ \(mode, a, b, cs) -> do
-    let expectedOutput = [toGF181 (foldl opH (a `opH` b) cs)]
+    let expectedOutput = [fromInteger (fromBool (foldl opH (a `opH` b) cs)) :: GF181]
     let inputs = case mode `mod` 4 of
-          0 -> [toGF181 a, toGF181 b]
-          1 -> [toGF181 b]
-          2 -> [toGF181 a]
+          0 -> [fromBool a, fromBool b]
+          1 -> [fromBool b]
+          2 -> [fromBool a]
           _ -> []
-    runAll gf181Info (makeProgram opK (mode `mod` 4 :: Int) (Boolean a) (Boolean b) (map Boolean cs)) inputs ([] :: [GF181]) expectedOutput
+    runAll gf181Info (makeProgram opK (mode `mod` 4 :: Int) (Boolean a) (Boolean b) (map Boolean cs)) inputs [] expectedOutput
 
 tests :: SpecWith ()
 tests = describe "Boolean" $ do
@@ -91,12 +91,12 @@ tests = describe "Boolean" $ do
           x <- inputField Public
           return $ cond (x `eq` 3) true false
     property $ \x -> do
-      let expectedOutput = if x == 3 then [1] else [0]
-      runAll gf181Info program [x :: GF181] [] expectedOutput
+      let expectedOutput = if x == 3 then [1 :: GF181] else [0]
+      runAll gf181Info program [x] [] expectedOutput
 
   it "BtoF" $ do
     let program = do
           x <- input Public
           y <- input Private
           return $ BtoF x * BtoF y
-    runAll gf181Info program [1 :: GF181] [1] [1]
+    runAll gf181Info program [1] [1] [1 :: GF181]

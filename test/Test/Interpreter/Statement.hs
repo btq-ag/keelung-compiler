@@ -15,7 +15,7 @@ tests = describe "Statements" $ do
     let program = do
           x <- inputField Public
           assert (x `eq` 3)
-    runAll gf181Info program [3 :: GF181] [] []
+    runAll gf181Info program [3] [] ([] :: [GF181])
 
   it "assertions intertwined with assignments" $ do
     let program = do
@@ -28,24 +28,23 @@ tests = describe "Statements" $ do
     runAll gf181Info program [] [] ([] :: [GF181])
 
   it "Basic.summation2" $
-    forAll (vector 4) $ \inp -> do
-      let expectedOutput = []
-      runAll gf181Info Basic.summation2 (inp :: [GF181]) [] expectedOutput
+    forAll (vector 4) $ \inputs -> do
+      runAll gf181Info Basic.summation2 inputs [] ([] :: [GF181])
 
   it "Basic.assertArraysEqual" $
-    runAll gf181Info Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] [] []
+    runAll gf181Info Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8] [] ([] :: [GF181])
 
   it "Basic.assertArraysEqual2" $
-    runAll gf181Info Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8 :: GF181] [] []
+    runAll gf181Info Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8] [] ([] :: [GF181])
 
   it "Basic.array1D" $
-    runAll gf181Info (Basic.array1D 1) [2, 4 :: GF181] [] []
+    runAll gf181Info (Basic.array1D 1) [2, 4] [] ([] :: [GF181])
 
   it "Basic.array2D 1" $
-    runAll gf181Info (Basic.array2D 1 1) [2, 4 :: GF181] [] []
+    runAll gf181Info (Basic.array2D 1 1) [2, 4] [] ([] :: [GF181])
 
   it "Basic.array2D 2" $
-    runAll gf181Info (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9 :: GF181] [] []
+    runAll gf181Info (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9] [] ([] :: [GF181])
 
   it "Basic.toArray1" $
-    runAll gf181Info Basic.toArray1 [0 .. 7 :: GF181] [] []
+    runAll gf181Info Basic.toArray1 [0 .. 7] [] ([] :: [GF181])
