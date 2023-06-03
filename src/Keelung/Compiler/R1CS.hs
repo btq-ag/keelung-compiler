@@ -37,7 +37,7 @@ satisfyR1CS witness r1cs =
 toR1CS :: GaloisField n => ConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
-    { r1csField = csField cs,
+    { r1csField = let (a, _, c, d) = csField cs in (a, c, d),
       r1csConstraints = map toR1C (toList (csConstraints cs)),
       r1csBinReps = [],
       r1csCounters = csCounters cs,

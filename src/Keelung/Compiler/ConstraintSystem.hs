@@ -86,7 +86,7 @@ instance GaloisField n => Ord (Constraint n) where
 -- | Linked Constraint System
 data ConstraintSystem n = ConstraintSystem
   { -- | Constraints
-    csField :: (FieldType, Integer, Integer),
+    csField :: (FieldType, Int, Integer, Integer),
     csConstraints :: !(Seq (Constraint n)),
     csCounters :: Counters,
     csEqZeros :: [(Poly n, Var)],

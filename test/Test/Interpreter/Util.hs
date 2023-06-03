@@ -27,7 +27,7 @@ interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
   left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
 -- | constraint system interpreters (optimized)
-interpretR1CS :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
+interpretR1CS :: (GaloisField n, Integral n, Encode t) => (FieldType, Int, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
 interpretR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> Compiler.compileO1 fieldInfo prog
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
@@ -36,7 +36,7 @@ interpretR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
     Right outputs -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
 
 -- | constraint system interpreters (unoptimized)
-interpretR1CSUnoptimized :: (GaloisField n, Integral n, Encode t) => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
+interpretR1CSUnoptimized :: (GaloisField n, Integral n, Encode t) => (FieldType, Int, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
 interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS . Linker.linkConstraintModule <$> Compiler.compileO0 fieldInfo prog
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
@@ -47,7 +47,7 @@ interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
 --------------------------------------------------------------------------------
 
 -- | Expect all interpreters to return the same output
-runAll :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> [n] -> IO ()
+runAll :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Int, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> [n] -> IO ()
 runAll fieldInfo program rawPublicInputs rawPrivateInputs expected = do
   -- syntax tree interpreter
   interpretSyntaxTree program rawPublicInputs rawPrivateInputs
@@ -59,7 +59,7 @@ runAll fieldInfo program rawPublicInputs rawPrivateInputs expected = do
     `shouldBe` Right expected
 
 -- | Expect all interpreters to throw an error
-throwAll :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
+throwAll :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Int, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
 throwAll fieldInfo program rawPublicInputs rawPrivateInputs stError csError = do
   -- syntax tree interpreters
   interpretSyntaxTree program rawPublicInputs rawPrivateInputs
@@ -71,7 +71,7 @@ throwAll fieldInfo program rawPublicInputs rawPrivateInputs stError csError = do
     `shouldBe` Left csError
 
 -- -- | Using result of syntax tree interpreter as expected output for constraint system interpreters
--- runAndCompare :: Encode t => (FieldType, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> IO ()
+-- runAndCompare :: Encode t => (FieldType, Int, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> IO ()
 -- runAndCompare fieldInfo program rawPublicInputs rawPrivateInputs = do
 --   let expectedOutput = interpretSyntaxTree program rawPublicInputs rawPrivateInputs
 --   interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
@@ -99,7 +99,7 @@ assertSize afterSize program = do
     Right cs -> do
       CS.numberOfConstraints cs `shouldBe` afterSize
 
-gf181Info :: (FieldType, Integer, Integer)
+gf181Info :: (FieldType, Int, Integer, Integer)
 gf181Info =
   let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy GF181)
-   in (gf181, toInteger (char fieldNumber), toInteger (deg fieldNumber))
+   in (gf181, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))

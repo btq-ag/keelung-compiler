@@ -31,7 +31,7 @@ import Keelung.Syntax (widthOf)
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => (FieldType, Integer, Integer) -> Internal n -> Either (Error n) (ConstraintModule n)
+run :: (GaloisField n, Integral n) => (FieldType, Int, Integer, Integer) -> Internal n -> Either (Error n) (ConstraintModule n)
 run fieldInfo (Internal untypedExprs _ counters assertions sideEffects) = left CompileError $ runM fieldInfo counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
@@ -520,6 +520,32 @@ compileAddOrSubU isSub width out (Left a) (Left b) = do
   let carryAndResult = (B carry, 2 ^ width) : [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
 
   writeAdd 0 $ as <> bs <> carryAndResult
+
+-- compileAddOrSubUBig :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
+-- compileAddOrSubUBig isSub width out (Right a) (Right b) = do
+--   let val = if isSub then a - b else a + b
+--   writeValU width out val
+-- compileAddOrSubUBig isSub width out (Right a) (Left b) = do
+--   carry <- freshRefB
+--   addBooleanConstraint carry
+--   let bs = [(B (RefUBit width b i), if isSub then -(2 ^ i) else 2 ^ i) | i <- [0 .. width - 1]]
+--   let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
+--   writeAdd a $ bs <> carryAndResult
+-- compileAddOrSubUBig isSub width out (Left a) (Right b) = do
+--   carry <- freshRefB
+--   addBooleanConstraint carry
+--   let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+--   let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
+--   writeAdd (if isSub then -b else b) $ as <> carryAndResult
+-- compileAddOrSubUBig isSub width out (Left a) (Left b) = do
+--   carry <- freshRefB
+--   addBooleanConstraint carry
+--   -- out + carry = A + B
+--   let as = [(B (RefUBit width a i), -(2 ^ i)) | i <- [0 .. width - 1]]
+--   let bs = [(B (RefUBit width b i), if isSub then 2 ^ i else -(2 ^ i)) | i <- [0 .. width - 1]]
+--   let carryAndResult = (B carry, 2 ^ width) : [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+
+--   writeAdd 0 $ as <> bs <> carryAndResult
 
 compileAddOrSubU2 :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
 compileAddOrSubU2 isSub width out (Right a) (Right b) = do

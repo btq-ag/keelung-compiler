@@ -26,7 +26,7 @@ import Keelung.Syntax.Counters
 -- | Monad for compilation
 type M n = StateT (ConstraintModule n) (Except (Error n))
 
-runM :: GaloisField n => (FieldType, Integer, Integer) -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
+runM :: GaloisField n => (FieldType, Int, Integer, Integer) -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
 runM fieldInfo counters program =
   runExcept
     ( execStateT

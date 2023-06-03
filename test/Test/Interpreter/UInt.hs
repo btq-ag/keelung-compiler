@@ -4,6 +4,7 @@
 module Test.Interpreter.UInt (tests, run) where
 
 import Control.Monad (forM_, when)
+import Data.Field.Galois (Prime)
 import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compiler
@@ -14,7 +15,6 @@ import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
--- import Data.Field.Galois (Prime)
 
 run :: IO ()
 run = hspec tests
@@ -24,10 +24,10 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "Unsigned Integers" $ do
-    -- describe "Big Int I/O" $ do
-    --     it "10 bit / GF257" $ do
-    --       let program = inputUInt @10 Public
-    --       runAll gf181Info program [300] [] [300 :: Prime 257]
+    describe "Big Int I/O" $ do
+      it "10 bit / GF257" $ do
+        let program = inputUInt @10 Public
+        runAll gf181Info program [300] [] [300 :: Prime 257]
 
     describe "Arithmetics" $ do
       describe "Addition" $ do
@@ -63,6 +63,13 @@ tests = do
           forAll genPair $ \(x, y) -> do
             let expected = [fromInteger ((x + y) `mod` 16) :: GF181]
             runAll gf181Info (program (fromInteger x) (fromInteger y)) [] [] expected
+
+        -- it "10 bit / GF257" $ do
+        --   let program = do
+        --         x <- inputUInt @4 Public
+        --         y <- inputUInt @4 Public
+        --         return $ x + y
+        --   runAll gf181Info program [100, 200] [] [300 :: Prime 257]
 
       describe "Multiplication" $ do
         it "variable / variable" $ do
