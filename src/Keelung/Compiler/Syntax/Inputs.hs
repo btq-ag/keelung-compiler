@@ -27,7 +27,7 @@ deserializeBinReps counters outputs =
          in [Vec.slice (offset + width * index) width outputs | index <- [0 .. count - 1]]
       binRepRanges = IntMap.toList (getUIntMap counters Output)
       bitArrays = concatMap sliceBits binRepRanges
-      (start, _) = getRange counters (Output, ReadAllUInt)
+      (start, _) = getRange counters (Output, ReadAllUInts)
       beforeBinReps = Vec.take start outputs
    in beforeBinReps <> Vec.fromList (map (fromInteger . FieldBits.fromBits . toList) bitArrays)
 

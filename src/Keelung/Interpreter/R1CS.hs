@@ -35,13 +35,13 @@ run r1cs inputs = fst <$> run' r1cs inputs
 -- | Return interpreted outputs along with the witnesses
 run' :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
 run' r1cs inputs = do
-  let booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllUInt), (PublicInput, ReadBool), (PublicInput, ReadAllUInt), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInt), (Intermediate, ReadBool), (Intermediate, ReadAllUInt)]
+  let booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts), (Intermediate, ReadBool), (Intermediate, ReadAllUInts)]
   let boolVarRanges = getRanges (r1csCounters r1cs) booleanConstraintCategories
   constraints <- fromOrdinaryConstraints r1cs
   witness <- runM boolVarRanges inputs $ goThroughManyTimes constraints
 
   -- extract output values from the witness
-  let outputRanges = getRanges (r1csCounters r1cs) [(Output, ReadField), (Output, ReadBool), (Output, ReadAllUInt)]
+  let outputRanges = getRanges (r1csCounters r1cs) [(Output, ReadField), (Output, ReadBool), (Output, ReadAllUInts)]
   case IntMap.toList outputRanges of
     [(outputStart, outputLength)] -> return (Vector.slice outputStart outputLength witness, witness)
     _ -> return (mempty, witness)
