@@ -1,12 +1,16 @@
-module Test.Interpreter.Util (runAll, throwAll, debug, assertSize, gf181Info) where
+{-# LANGUAGE ScopedTypeVariables #-}
+
+module Test.Interpreter.Util (runAll, throwAll, debug, assertSize, gf181Info, prime, runPrime, debugPrime) where
 
 import Control.Arrow (left)
 import Data.Field.Galois
 import Data.Foldable (toList)
 import Data.Proxy (Proxy (..), asProxyTypeOf)
+import GHC.TypeLits
 import Keelung hiding (compile)
 import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
+import Keelung.Compiler.ConstraintModule (ConstraintModule)
 import Keelung.Compiler.ConstraintSystem qualified as CS
 import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
@@ -19,6 +23,8 @@ import Test.Hspec
 
 --------------------------------------------------------------------------------
 
+type FieldInfo = (FieldType, Int, Integer, Integer)
+
 -- | syntax tree interpreter
 interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
 interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
@@ -27,7 +33,7 @@ interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
   left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
 -- | constraint system interpreters (optimized)
-interpretR1CS :: (GaloisField n, Integral n, Encode t) => (FieldType, Int, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
+interpretR1CS :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
 interpretR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> Compiler.compileO1 fieldInfo prog
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
@@ -36,7 +42,7 @@ interpretR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
     Right outputs -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
 
 -- | constraint system interpreters (unoptimized)
-interpretR1CSUnoptimized :: (GaloisField n, Integral n, Encode t) => (FieldType, Int, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
+interpretR1CSUnoptimized :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
 interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS . Linker.linkConstraintModule <$> Compiler.compileO0 fieldInfo prog
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
@@ -47,7 +53,7 @@ interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
 --------------------------------------------------------------------------------
 
 -- | Expect all interpreters to return the same output
-runAll :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Int, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> [n] -> IO ()
+runAll :: (GaloisField n, Integral n, Encode t, Show t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> [n] -> IO ()
 runAll fieldInfo program rawPublicInputs rawPrivateInputs expected = do
   -- syntax tree interpreter
   interpretSyntaxTree program rawPublicInputs rawPrivateInputs
@@ -59,7 +65,7 @@ runAll fieldInfo program rawPublicInputs rawPrivateInputs expected = do
     `shouldBe` Right expected
 
 -- | Expect all interpreters to throw an error
-throwAll :: (GaloisField n, Integral n, Encode t, Show t) => (FieldType, Int, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
+throwAll :: (GaloisField n, Integral n, Encode t, Show t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
 throwAll fieldInfo program rawPublicInputs rawPrivateInputs stError csError = do
   -- syntax tree interpreters
   interpretSyntaxTree program rawPublicInputs rawPrivateInputs
@@ -71,7 +77,7 @@ throwAll fieldInfo program rawPublicInputs rawPrivateInputs stError csError = do
     `shouldBe` Left csError
 
 -- -- | Using result of syntax tree interpreter as expected output for constraint system interpreters
--- runAndCompare :: Encode t => (FieldType, Int, Integer, Integer) -> Comp t -> [Integer] -> [Integer] -> IO ()
+-- runAndCompare :: Encode t => FieldInfo -> Comp t -> [Integer] -> [Integer] -> IO ()
 -- runAndCompare fieldInfo program rawPublicInputs rawPrivateInputs = do
 --   let expectedOutput = interpretSyntaxTree program rawPublicInputs rawPrivateInputs
 --   interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
@@ -99,7 +105,64 @@ assertSize afterSize program = do
     Right cs -> do
       CS.numberOfConstraints cs `shouldBe` afterSize
 
-gf181Info :: (FieldType, Int, Integer, Integer)
+gf181Info :: FieldInfo
 gf181Info =
   let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy GF181)
    in (gf181, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
+
+prime :: Integer -> FieldInfo
+prime n = case someNatVal (fromIntegral n) of
+  Just (SomeNat (_ :: Proxy n)) ->
+    let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Prime n))
+     in (Prime (fromIntegral n), ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
+  Nothing -> error "[ panic ] someNatVal failed"
+
+deriveFieldInfo :: KnownNat n => Either (Error (Prime n)) [Prime n] -> FieldInfo
+deriveFieldInfo result =
+  let number = natVal (deriveProxy result)
+      fieldNumber = deriveFieldNumber result
+   in (Prime (fromIntegral number), ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
+  where
+    deriveProxy :: KnownNat n => Either (Error (Prime n)) [Prime n] -> Proxy n
+    deriveProxy _ = Proxy
+
+    deriveFieldNumber :: KnownNat n => Either (Error (Prime n)) [Prime n] -> Prime n
+    deriveFieldNumber _ = asProxyTypeOf 0 Proxy
+
+-- | Expect all interpreters to return the same output
+runPrime :: KnownNat n => (Encode t, Show t) => Comp t -> [Integer] -> [Integer] -> [Prime n] -> IO ()
+runPrime program rawPublicInputs rawPrivateInputs expected = do
+  -- syntax tree interpreter
+  let result = interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+  let fieldInfo = deriveFieldInfo result
+
+  result `shouldBe` Right expected
+  -- constraint system interpreters
+  interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right expected
+  interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+    `shouldBe` Right expected
+
+fromFieldType :: FieldType -> Maybe FieldInfo
+fromFieldType (Prime n) = case someNatVal n of
+  Just (SomeNat (_ :: Proxy n)) ->
+    let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Prime n))
+     in Just (Prime n, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
+  Nothing -> Nothing
+fromFieldType (Binary n) = case someNatVal n of
+  Just (SomeNat (_ :: Proxy n)) ->
+    let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Binary n))
+     in Just (Binary n, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
+  Nothing -> Nothing
+
+debugPrime :: Encode t => FieldType -> Comp t -> IO ()
+debugPrime fieldType program = do
+  case fromFieldType fieldType of 
+    Just fieldInfo -> case fieldType of 
+      Prime n -> case someNatVal n of
+        Just (SomeNat (_ :: Proxy n)) -> do
+          print (Compiler.compileToModules fieldInfo program :: Either (Error (N (Prime n))) (ConstraintModule (N (Prime n))))
+          print (toR1CS <$> Compiler.compileO1 fieldInfo program :: Either (Error (N (Prime n))) (R1CS (N (Prime n))))
+        Nothing -> return ()
+      Binary _ -> return ()
+    Nothing -> return ()

@@ -28,11 +28,12 @@ type M n = StateT (ConstraintModule n) (Except (Error n))
 
 runM :: GaloisField n => (FieldType, Int, Integer, Integer) -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
 runM fieldInfo counters program =
-  runExcept
-    ( execStateT
-        program
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty)
-    )
+  let (_, fieldWidth, _, _) = fieldInfo
+   in runExcept
+        ( execStateT
+            program
+            (ConstraintModule fieldInfo fieldWidth counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty)
+        )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {cmCounters = f (cmCounters cs)})

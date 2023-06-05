@@ -64,12 +64,13 @@ tests = do
             let expected = [fromInteger ((x + y) `mod` 16) :: GF181]
             runAll gf181Info (program (fromInteger x) (fromInteger y)) [] [] expected
 
-        -- it "10 bit / GF257" $ do
-        --   let program = do
-        --         x <- inputUInt @4 Public
-        --         y <- inputUInt @4 Public
-        --         return $ x + y
-        --   runAll gf181Info program [100, 200] [] [300 :: Prime 257]
+        it "10 bit / GF257" $ do
+          let program = do
+                x <- inputUInt @10 Public
+                y <- inputUInt @10 Public
+                return $ x + y
+          -- debugPrime (Prime 257) program
+          runPrime program [100, 200] [] [300 :: Prime 257]
 
       describe "Multiplication" $ do
         it "variable / variable" $ do
