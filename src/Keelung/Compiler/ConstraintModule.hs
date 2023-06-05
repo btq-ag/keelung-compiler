@@ -205,13 +205,13 @@ prettyVariables counters =
 booleanConstraintCategories :: [(Category, ReadType)]
 booleanConstraintCategories =
   [ (Output, ReadBool),
-    (Output, ReadAllUInts),
+    (Output, ReadAllUInt),
     (PublicInput, ReadBool),
-    (PublicInput, ReadAllUInts),
+    (PublicInput, ReadAllUInt),
     (PrivateInput, ReadBool),
-    (PrivateInput, ReadAllUInts),
+    (PrivateInput, ReadAllUInt),
     (Intermediate, ReadBool),
-    (Intermediate, ReadAllUInts)
+    (Intermediate, ReadAllUInt)
   ]
 
 getBooleanConstraintCount :: Counters -> Int
