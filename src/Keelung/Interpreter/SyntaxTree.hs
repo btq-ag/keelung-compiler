@@ -38,7 +38,6 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
       -- let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e)
-
   -- lastly interpret the expression and return the result
   interpret expr
 

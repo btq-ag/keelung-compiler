@@ -32,18 +32,32 @@ tests = do
     describe "Arithmetics" $ do
       describe "Addition" $ do
         it "variable / variable" $ do
+          -- let program = do
+          --       x <- inputUInt @4 Public
+          --       y <- inputUInt @4 Public
+          --       return $ x + y
+          -- debugPrime (Prime 13) program
+          -- runPrime' (Prime 13) program [13, 7] [] [4]
+          -- let genPair = do
+          --       x <- choose (0, 16)
+          --       y <- choose (0, 16)
+          --       return (x, y)
+          -- forAll genPair $ \(x, y) -> do
+          --   let expected = [(x + y) `mod` 16]
+          --   runPrime' (Prime 13) program [x, y] [] expected
+
           let program = do
                 x <- inputUInt @4 Public
                 y <- inputUInt @4 Public
                 return $ x + y
-          -- runAll gf181Info program [3, 4] [] [7]
+          -- runPrime' gf181 program [13, 7] [] [4]
           let genPair = do
-                x <- choose (0, 15)
-                y <- choose (0, 15)
+                x <- choose (0, 16)
+                y <- choose (0, 16)
                 return (x, y)
           forAll genPair $ \(x, y) -> do
-            let expected = [fromInteger ((x + y) `mod` 16) :: GF181]
-            runAll gf181Info program [fromInteger x, fromInteger y] [] expected
+            let expected = [(x + y) `mod` 16]
+            runPrime' gf181 program [x, y] [] expected
 
         it "variable / constant" $ do
           let program = do
