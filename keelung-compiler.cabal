@@ -181,7 +181,6 @@ test-suite keelung-test
       Test.PolyG
       Test.Relations.Boolean
       Test.Relations.Field
-      Test.VarLayout
       Test.WitnessGeneration
       Keelung.Compiler
       Keelung.Compiler.Compile
