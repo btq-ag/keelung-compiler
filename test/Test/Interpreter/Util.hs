@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Test.Interpreter.Util (runAll, throwAll, debug, assertSize, gf181Info, prime, runPrime, runPrime', debugPrime) where
 
