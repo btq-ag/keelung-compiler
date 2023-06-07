@@ -128,11 +128,11 @@ compile = compileO1
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
 
-interpretElab :: (GaloisField n, Integral n) => Elaborated -> [Integer] -> [Integer] -> Either (Error n) [n]
+interpretElab :: (GaloisField n, Integral n) => Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Either Integer n]
 interpretElab elab rawPublicInputs rawPrivateInputs = do
   let counters = Encoded.compCounters (Encoded.elabComp elab)
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
-  left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
+  map Right <$> left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
 generateWitnessElab :: (GaloisField n, Integral n) => (FieldType, Int, Integer, Integer) -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
 generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
