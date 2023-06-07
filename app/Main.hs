@@ -35,11 +35,9 @@ import Option
 
 type Result n = Either String (R1CS n)
 
-type Result3 n = Either String (R1CS n)
-
 type Result2 n = Either (Error n) (Counters, Vector n, Vector n)
 
-convert :: Integral a => Result3 a -> Result3 Integer
+convert :: Integral a => Result a -> Result Integer
 convert (Left err) = Left err
 convert (Right cs) = Right (fmap toInteger cs)
 
@@ -78,17 +76,17 @@ adapter4 _ funcB _ argB (Binary n) = case someNatVal n of
   Nothing -> return ()
 
 adapter3 ::
-  (forall n. (KnownNat n) => Either String (Vector (Prime n)) -> IO ()) ->
-  (forall n. (KnownNat n) => Either String (Vector (Binary n)) -> IO ()) ->
-  (forall n. (KnownNat n) => Either String [Prime n]) ->
-  (forall n. (KnownNat n) => Either String [Binary n]) ->
+  (a -> IO ()) ->
+  (a -> IO ()) ->
+  (forall n. (KnownNat n) => Proxy (Prime n) -> a) ->
+  (forall n. (KnownNat n) => Proxy (Binary n) -> a) ->
   FieldType ->
   IO ()
 adapter3 funcP _ argP _ (Prime n) = case someNatVal n of
-  Just (SomeNat (_ :: Proxy n)) -> funcP (fmap Vector.fromList argP :: Either String (Vector (Prime n)))
+  Just (SomeNat (_ :: Proxy n)) -> funcP (argP (Proxy :: Proxy (Prime n)))
   Nothing -> return ()
 adapter3 _ funcB _ argB (Binary n) = case someNatVal n of
-  Just (SomeNat (_ :: Proxy n)) -> funcB (fmap Vector.fromList argB :: Either String (Vector (Binary n)))
+  Just (SomeNat (_ :: Proxy n)) -> funcB (argB (Proxy :: Proxy (Binary n)))
   Nothing -> return ()
 
 adapter2 ::
@@ -162,8 +160,12 @@ main = withUtf8 $ do
           adapter3
             outputInterpretedResult
             outputInterpretedResult
-            (left show $ interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs))
-            (left show $ interpretElab elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs))
+            ( \(Proxy :: Proxy (Prime n)) ->
+                Vector.fromList <$> left show (interpretElab elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) [Integer])
+            )
+            ( \(Proxy :: Proxy (Binary n)) ->
+                Vector.fromList <$> left show (interpretElab elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Binary n)) [Integer])
+            )
             fieldType
     Protocol (GenCircuit filepath) -> do
       blob <- getContents
@@ -207,11 +209,13 @@ main = withUtf8 $ do
 
     outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => FilePath -> Either (Error n) (Counters, Vector n, Vector n) -> IO ()
     outputInterpretedResultAndWriteFile filepath result = do
-      -- print outputs
-      outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
       case result of
-        Left _ -> return ()
-        Right (counters, _, witness) -> do
+        Left err -> do
+          putStrLn $ BSC.unpack $ encode err
+        Right (counters, outputs, witness) -> do
+          -- print outputs
+          putStrLn $ BSC.unpack $ encode $ toList outputs
+          -- write files
           BS.writeFile filepath (serializeInputAndWitness counters witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()

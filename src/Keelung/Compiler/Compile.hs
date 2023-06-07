@@ -527,21 +527,49 @@ compileAddBig width out (Right a) (Right b) = do
   let val = a + b
   writeValU width out val
 compileAddBig width out (Right a) (Left b) = do
-  carry <- freshRefB
-  addBooleanConstraint carry
-  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  writeAdd a $ bs <> carryAndResult
+  -- carry <- freshRefB
+  -- addBooleanConstraint carry
+  -- let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
+  -- let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
+  -- writeAdd a $ bs <> carryAndResult
+  compileAddBig width out (Left b) (Right a)  
 compileAddBig width out (Left a) (Right b) = do
-  carry <- freshRefB
-  addBooleanConstraint carry
-  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  writeAdd b $ as <> carryAndResult
+  -- carry <- freshRefB
+  -- addBooleanConstraint carry
+  -- let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+  -- let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
+  -- writeAdd b $ as <> carryAndResult
+
+  fieldWidth <- gets cmFieldWidth
+  -- because we need some extra bits for carry when adding two UInts
+  -- a limb should have width `fieldWidth - 1 - carryWidth`
+  let carryWidth = 1
+  let limbWidth = fieldWidth - 1 - carryWidth
+  foldM_ (go limbWidth) Nothing [0, limbWidth .. width - 1]
+  where
+    go :: (GaloisField n, Integral n) => Int -> Maybe RefB -> Int -> M n (Maybe RefB)
+    go limbWidth previousCarry limbStart = do
+      let range = [0 .. (limbWidth - 1) `min` (width - 1 - limbStart)]
+      let as = [(B (RefUBit width a (limbStart + i)), 2 ^ i) | i <- range]
+      let bs = toInteger $ sum [FieldBits.testBit b (limbStart + i) * (2 ^ (limbStart + i)) | i <- range]
+      let result = [(B (RefUBit width out (limbStart + i)), -(2 ^ i)) | i <- range]
+      case previousCarry of
+        Nothing -> do
+          -- as + bs = out + carry
+          carry <- freshRefB
+          addBooleanConstraint carry
+          writeAdd (fromInteger bs) $ as <> ((B carry, -(2 ^ (limbStart + limbWidth))) : result)
+          return $ Just carry
+        Just previousCarry' -> do
+          -- as + bs + previousCarry = out + carry
+          carry <- freshRefB
+          addBooleanConstraint carry
+          writeAdd (fromInteger bs) $ as <> ((B previousCarry', 1) : (B carry, -(2 ^ limbWidth)) : result)
+          return $ Just carry
 compileAddBig width out (Left a) (Left b) = do
   fieldWidth <- gets cmFieldWidth
-  -- because we need an extra bit for carry when adding two UInts
-  -- a limb should have width `fieldWidth - 2`
+  -- because we need some extra bits for carry when adding two UInts
+  -- a limb should have width `fieldWidth - 1 - carryWidth`
   let carryWidth = 1
   let limbWidth = fieldWidth - 1 - carryWidth
   foldM_ (go limbWidth) Nothing [0, limbWidth .. width - 1]
@@ -565,6 +593,35 @@ compileAddBig width out (Left a) (Left b) = do
           addBooleanConstraint carry
           writeAdd 0 $ as <> bs <> ((B previousCarry', 1) : (B carry, -(2 ^ limbWidth)) : result)
           return $ Just carry
+
+-- compileAddBig' :: (GaloisField n, Integral n) => Width -> RefU -> [n] -> [RefU] -> M n ()
+-- compileAddBig' width out constants vars = do
+--   fieldWidth <- gets cmFieldWidth
+--   -- because we need some extra bits for carry when adding two UInts
+--   -- a limb should have width `fieldWidth - 1 - carryWidth`
+--   let carryWidth = ceiling (logBase 2 (fromIntegral $ length vars)) :: Int
+--   let limbWidth = fieldWidth - 1 - carryWidth
+--   foldM_ (go limbWidth) Nothing [0, limbWidth .. width - 1]
+--   where
+--     go :: (GaloisField n, Integral n) => Int -> Maybe RefB -> Int -> M n (Maybe RefB)
+--     go limbWidth previousCarry limbStart = do
+--       let range = [0 .. (limbWidth - 1) `min` (width - 1 - limbStart)]
+--       let as = [(B (RefUBit width a (limbStart + i)), 2 ^ i) | i <- range]
+--       let bs = [(B (RefUBit width b (limbStart + i)), 2 ^ i) | i <- range]
+--       let result = [(B (RefUBit width out (limbStart + i)), -(2 ^ i)) | i <- range]
+--       case previousCarry of
+--         Nothing -> do
+--           -- as + bs = out + carry
+--           carry <- freshRefB
+--           addBooleanConstraint carry
+--           writeAdd 0 $ as <> bs <> ((B carry, -(2 ^ (limbStart + limbWidth))) : result)
+--           return $ Just carry
+--         Just previousCarry' -> do
+--           -- as + bs + previousCarry = out + carry
+--           carry <- freshRefB
+--           addBooleanConstraint carry
+--           writeAdd 0 $ as <> bs <> ((B previousCarry', 1) : (B carry, -(2 ^ limbWidth)) : result)
+--           return $ Just carry
 
 -- carry <- freshRefB
 -- addBooleanConstraint carry

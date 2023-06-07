@@ -427,8 +427,6 @@ detectBinRep Eliminated = return Eliminated
 detectBinRep (Shrinked polynomial) = return (Shrinked polynomial)
 detectBinRep (Stuck (AddConstraint polynomial)) = do
   boolVarRanges <- ask
-  -- traceShowM (fmap N polynomial)
-  -- traceShowM (boolVarRanges)
   case allCoeffsSameSignAndBooleanAndCollectCoeffs boolVarRanges polynomial of
     Start -> return (Stuck (AddConstraint polynomial))
     Failed -> return (Stuck (AddConstraint polynomial))
@@ -438,8 +436,6 @@ detectBinRep (Stuck (AddConstraint polynomial)) = do
       -- because we know that these coefficients are:
       --  1. all of the same sign
       --  2. unique
-      -- traceShowM (fmap N polynomial, fmap N polynomial, constant, IntMap.keys invertedPolynomial == [0 .. IntMap.size invertedPolynomial - 1])
-
       let powers = IntMap.keys invertedPolynomial
       let powersAllUnique = length powers == length (List.nub powers)
 
@@ -495,20 +491,6 @@ detectBinRep (Stuck (AddConstraint polynomial)) = do
                   then Continue (IntMap.insert power var coeffs) sign
                   else Failed
 detectBinRep (Stuck polynomial) = return (Stuck polynomial)
-
--- go :: (GaloisField n, Integral n) => FoldState -> Var -> n -> FoldState
--- go Start var coeff = case isPowerOf2 coeff of
---   Nothing -> traceShow "Failed" Failed
---   Just (power, sign) -> traceShow ("Start", IntMap.toList (IntMap.singleton power var)) (Continue (IntMap.singleton power var) sign)
--- go Failed _ _ = Failed
--- go (Continue coeffs previousSign) var coeff = case isPowerOf2 coeff of
---   Nothing -> traceShow "Failed" Failed
---   Just (power, sign) ->
---     let sameSign = sign == previousSign
---         uniqueCoeff = IntMap.notMember power coeffs
---      in if isBoolean var && sameSign && uniqueCoeff
---             then traceShow ("Continue", IntMap.toList (IntMap.insert power var coeffs)) Continue (IntMap.insert power var coeffs) sign
---             else Failed
 
 -- if (x - y) = 0 then m = 0 else m = recip (x - y)
 shrinkEqZero :: (GaloisField n, Integral n) => (Poly n, Var) -> M n (Result (Poly n, Var))
