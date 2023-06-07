@@ -161,12 +161,10 @@ main = withUtf8 $ do
             outputInterpretedResult
             outputInterpretedResult
             ( \(Proxy :: Proxy (Prime n)) ->
-                Vector.fromList . map (either id toInteger :: Either Integer (Prime n) -> Integer)
-                  <$> left show (interpretElab elaborated rawPublicInputs rawPrivateInputs)
+                Vector.fromList <$> left show (interpretElab elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) [Integer])
             )
             ( \(Proxy :: Proxy (Binary n)) ->
-                Vector.fromList . map (either id toInteger :: Either Integer (Binary n) -> Integer)
-                  <$> left show (interpretElab elaborated rawPublicInputs rawPrivateInputs)
+                Vector.fromList <$> left show (interpretElab elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Binary n)) [Integer])
             )
             fieldType
     Protocol (GenCircuit filepath) -> do

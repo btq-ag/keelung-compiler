@@ -31,14 +31,14 @@ import Keelung.Syntax.Counters
 -- | The interpreter monad
 type M n = ReaderT Heap (StateT (Partial n) (Except (Error n)))
 
-runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n a -> Either (Error n) (a, VarGroup.Witness n)
+runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n [n] -> Either (Error n) ([Integer], VarGroup.Witness Integer)
 runM heap inputs p = do
   partialBindings <- toPartialBindings inputs
   (result, partialBindings') <- runExcept (runStateT (runReaderT p heap) partialBindings)
   -- make the partial Bindings total
   case toTotal partialBindings' of
     Left unbound -> Left (VarUnassignedError unbound)
-    Right bindings -> Right (result, bindings)
+    Right bindings -> Right (map toInteger result, fmap (fmap (fmap toInteger)) bindings)
 
 -- | Construct partial Bindings from Inputs
 toPartialBindings :: (GaloisField n, Integral n) => Inputs n -> Either (Error n) (Partial n)

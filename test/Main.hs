@@ -60,21 +60,21 @@ main = hspec $ do
 
   describe "Keelung `interpret`" $ do
     it "Program that throws ElabError.IndexOutOfBoundsError" $ do
-      let expected = left show (Compiler.interpret Basic.outOfBound [] [])
-      actual <- left show <$> Keelung.interpret_ gf181 Basic.outOfBound [] ([] :: [GF181])
+      let expected = left show (Compiler.interpret Basic.outOfBound [] [] :: Either (Error GF181) [Integer])
+      actual <- right (map toInteger) . left show <$> Keelung.interpret_ gf181 Basic.outOfBound [] ([] :: [GF181])
       actual `shouldBe` expected
 
     it "Program that throws ElabError.EmptyArrayError" $ do
-      let expected = left show (Compiler.interpret Basic.emptyArray [] [])
-      actual <- left show <$> Keelung.interpret_ gf181 Basic.emptyArray [] ([] :: [GF181])
+      let expected = left show (Compiler.interpret Basic.emptyArray [] [] :: Either (Error GF181) [Integer])
+      actual <- right (map toInteger) . left show <$> Keelung.interpret_ gf181 Basic.emptyArray [] ([] :: [GF181])
       actual `shouldBe` expected
 
     it "Basic.eq1 1" $ do
-      let expected = left show (Compiler.interpret Basic.eq1 [0] [])
-      actual <- left show <$> Keelung.interpret_ gf181 Basic.eq1 [0] ([] :: [GF181])
+      let expected = left show (Compiler.interpret Basic.eq1 [0] [] :: Either (Error GF181) [Integer])
+      actual <- right (map toInteger) . left show <$> Keelung.interpret_ gf181 Basic.eq1 [0] ([] :: [GF181])
       actual `shouldBe` expected
 
     it "Basic.eq1 2" $ do
-      let expected = left show (Compiler.interpret Basic.eq1 [3] [])
-      actual <- left show <$> Keelung.interpret_ gf181 Basic.eq1 [3] ([] :: [GF181])
+      let expected = left show (Compiler.interpret Basic.eq1 [3] [] :: Either (Error GF181) [Integer])
+      actual <- right (map toInteger) . left show <$> Keelung.interpret_ gf181 Basic.eq1 [3] ([] :: [GF181])
       actual `shouldBe` expected

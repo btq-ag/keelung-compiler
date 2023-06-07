@@ -24,7 +24,7 @@ import Keelung.Syntax.Encode.Syntax
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
-runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) ([n], Witness n)
+runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) ([Integer], Witness Integer)
 runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
   -- interpret side-effects
   forM_ (compSideEffects comp) $ \sideEffect -> void $ interpret sideEffect
@@ -42,7 +42,7 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
   interpret expr
 
 -- | Interpret a program with inputs.
-run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) [n]
+run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) [Integer]
 run elab inputs = fst <$> runAndOutputWitnesses elab inputs
 
 --------------------------------------------------------------------------------
