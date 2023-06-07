@@ -37,18 +37,18 @@ testProgram opH opK = do
           1 -> [fromBool b]
           2 -> [fromBool a]
           _ -> []
-    runPrime' gf181 (makeProgram opK (mode `mod` 4 :: Int) (Boolean a) (Boolean b) (map Boolean cs)) inputs [] expectedOutput
+    runPrime gf181 (makeProgram opK (mode `mod` 4 :: Int) (Boolean a) (Boolean b) (map Boolean cs)) inputs [] expectedOutput
 
 tests :: SpecWith ()
 tests = describe "Boolean" $ do
   it "not 1" $ do
     let program = return $ complement true
-    runPrime' gf181 program [] [] [0]
+    runPrime gf181 program [] [] [0]
 
   it "not 2" $ do
     let program = complement <$> inputBool Public
-    runPrime' gf181 program [0] [] [1]
-    runPrime' gf181 program [1] [] [0]
+    runPrime gf181 program [0] [] [1]
+    runPrime gf181 program [1] [] [0]
 
   it "and" $ testProgram (&&) And
   it "or" $ testProgram (||) Or
@@ -60,10 +60,10 @@ tests = describe "Boolean" $ do
           y <- input Private
           let z = true
           return $ x `Or` y `And` z
-    runPrime' gf181 program [0] [0] [0]
-    runPrime' gf181 program [0] [1] [1]
-    runPrime' gf181 program [1] [0] [1]
-    runPrime' gf181 program [1] [1] [1]
+    runPrime gf181 program [0] [0] [0]
+    runPrime gf181 program [0] [1] [1]
+    runPrime gf181 program [1] [0] [1]
+    runPrime gf181 program [1] [1] [1]
 
   it "mixed 2" $ do
     let program = do
@@ -72,10 +72,10 @@ tests = describe "Boolean" $ do
           let z = false
           w <- reuse $ x `Or` y
           return $ x `And` w `Or` z
-    runPrime' gf181 program [0] [0] [0]
-    runPrime' gf181 program [0] [1] [0]
-    runPrime' gf181 program [1] [0] [1]
-    runPrime' gf181 program [1] [1] [1]
+    runPrime gf181 program [0] [0] [0]
+    runPrime gf181 program [0] [1] [0]
+    runPrime gf181 program [1] [0] [1]
+    runPrime gf181 program [1] [1] [1]
 
   it "eq 1" $ do
     -- takes an input and see if its equal to False
@@ -83,8 +83,8 @@ tests = describe "Boolean" $ do
           x <- input Public
           return $ x `eq` false
 
-    runPrime' gf181 program [0] [] [1]
-    runPrime' gf181 program [1] [] [0]
+    runPrime gf181 program [0] [] [1]
+    runPrime gf181 program [1] [] [0]
 
   it "conditional" $ do
     let program = do
@@ -92,11 +92,11 @@ tests = describe "Boolean" $ do
           return $ cond (x `eq` 3) true false
     property $ \x -> do
       let expectedOutput = if x == 3 then [1] else [0]
-      runPrime' gf181 program [x] [] expectedOutput
+      runPrime gf181 program [x] [] expectedOutput
 
   it "BtoF" $ do
     let program = do
           x <- input Public
           y <- input Private
           return $ BtoF x * BtoF y
-    runPrime' gf181 program [1] [1] [1]
+    runPrime gf181 program [1] [1] [1]

@@ -203,10 +203,10 @@ instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) whe
       showPartialBinding :: (GaloisField n, Integral n) => String -> (Int, IntMap n) -> IntMap String
       showPartialBinding prefix (_size, bindings) = IntMap.mapWithKey (\k v -> prefix <> show k <> " := " <> show (N v)) bindings
 
-      showPartialBindingB :: (GaloisField n, Integral n) => String -> (Int, IntMap Bool) -> IntMap String
+      showPartialBindingB :: String -> (Int, IntMap Bool) -> IntMap String
       showPartialBindingB prefix (_size, bindings) = IntMap.mapWithKey (\k v -> prefix <> show k <> " := " <> show v) bindings
 
-      showPartialBindingU :: (GaloisField n, Integral n) => String -> (Int, IntMap U) -> IntMap String
+      showPartialBindingU :: String -> (Int, IntMap U) -> IntMap String
       showPartialBindingU prefix (_size, bindings) = IntMap.mapWithKey (\k v -> prefix <> show k <> " := " <> show v) bindings
 
       showStruct :: (GaloisField n, Integral n) => String -> Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding U) -> [String]

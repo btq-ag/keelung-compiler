@@ -26,7 +26,7 @@ tests = do
     describe "Big Int I/O" $ do
       it "10 bit / GF257" $ do
         let program = inputUInt @10 Public
-        runPrime' (Prime 257) program [300] [] [300]
+        runPrime (Prime 257) program [300] [] [300]
 
     describe "Arithmetics" $ do
       describe "Addition" $ do
@@ -41,17 +41,17 @@ tests = do
                 return (x, y)
           forAll genPair $ \(x, y) -> do
             let expected = [(x + y) `mod` 16]
-            runPrime' (Prime 13) program [x, y] [] expected
+            runPrime (Prime 13) program [x, y] [] expected
 
         it "variable / constant" $ do
           let program = do
                 x <- inputUInt @4 Public
                 return $ x + 2
           -- debugPrime (Prime 13) program
-          -- runPrime' (Prime 13) program [11] [] [13]
+          -- runPrime (Prime 13) program [11] [] [13]
           forAll (choose (0, 16)) $ \x -> do
             let expected = [(x + 2) `mod` 16]
-            runPrime' (Prime 13) program [x `mod` 16] [] expected
+            runPrime (Prime 13) program [x `mod` 16] [] expected
 
         it "constant / constant" $ do
           let program x y = do
@@ -62,7 +62,7 @@ tests = do
                 return (x, y)
           forAll genPair $ \(x, y) -> do
             let expected = [(x + y) `mod` 16]
-            runPrime' gf181 (program (fromInteger x) (fromInteger y)) [] [] expected
+            runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] expected
 
         it "10 bit / GF257" $ do
           let program = do
@@ -70,7 +70,7 @@ tests = do
                 y <- inputUInt @10 Public
                 return $ x + y
           -- debugPrime (Prime 257) program
-          runPrime' (Prime 13) program [100, 200] [] [300]
+          runPrime (Prime 13) program [100, 200] [] [300]
 
       describe "Multiplication" $ do
         it "variable / variable" $ do
@@ -78,14 +78,14 @@ tests = do
                 x <- inputUInt @4 Public
                 y <- inputUInt @4 Public
                 return $ x * y
-          -- runPrime' gf181 program [3, 4] [] [7]
+          -- runPrime gf181 program [3, 4] [] [7]
           let genPair = do
                 x <- choose (0, 15)
                 y <- choose (0, 15)
                 return (x, y)
           forAll genPair $ \(x, y) -> do
             let expected = [fromInteger ((x * y) `mod` 16)]
-            runPrime' gf181 program [fromInteger x, fromInteger y] [] expected
+            runPrime gf181 program [fromInteger x, fromInteger y] [] expected
 
         it "variable / constant" $ do
           let program = do
@@ -94,7 +94,7 @@ tests = do
 
           forAll (choose (0, 100)) $ \x -> do
             let expected = [fromInteger ((x * 2) `mod` 16)]
-            runPrime' gf181 program [fromInteger (x `mod` 16)] [] expected
+            runPrime gf181 program [fromInteger (x `mod` 16)] [] expected
 
         it "constant / constant" $ do
           let program x y = do
@@ -105,7 +105,7 @@ tests = do
                 return (x, y)
           forAll genPair $ \(x, y) -> do
             let expected = [fromInteger ((x * y) `mod` 16)]
-            runPrime' gf181 (program (fromInteger x) (fromInteger y)) [] [] expected
+            runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] expected
 
       it "arithmetics 1" $ do
         let program = do
@@ -118,8 +118,8 @@ tests = do
                   (f + 1)
                   (f + 2)
 
-        runPrime' gf181 program [100, 1, 1] [] [101]
-        runPrime' gf181 program [100, 0, 1] [] [102]
+        runPrime gf181 program [100, 1, 1] [] [101]
+        runPrime gf181 program [100, 0, 1] [] [102]
 
       it "add 1" $ do
         let program = do
@@ -127,9 +127,9 @@ tests = do
               y <- inputUInt @4 Public
               return $ x + y
 
-        runPrime' gf181 program [5, 6] [] [11]
-        runPrime' gf181 program [2, 5] [] [7]
-        runPrime' gf181 program [15, 1] [] [0]
+        runPrime gf181 program [5, 6] [] [11]
+        runPrime gf181 program [2, 5] [] [7]
+        runPrime gf181 program [15, 1] [] [0]
 
       it "add 2" $ do
         let program = do
@@ -139,15 +139,15 @@ tests = do
               w <- reuse $ x + y
               return $ x + y + z + w
 
-        runPrime' gf181 program [5, 6, 7] [] [13]
-        runPrime' gf181 program [2, 5, 3] [] [1]
-        runPrime' gf181 program [0, 1, 2] [] [4]
+        runPrime gf181 program [5, 6, 7] [] [13]
+        runPrime gf181 program [2, 5, 3] [] [1]
+        runPrime gf181 program [0, 1, 2] [] [4]
 
       it "add + assertion" $ do
         let program = do
               x <- inputUInt @4 Public
               assert $ 2 `eq` (x + 1)
-        runPrime' gf181 program [1] [] []
+        runPrime gf181 program [1] [] []
 
       it "mul 3" $ do
         let program = do
@@ -155,8 +155,8 @@ tests = do
               y <- inputUInt @4 Public
               return $ x * y
 
-        runPrime' gf181 program [2, 4] [] [8]
-        runPrime' gf181 program [5, 6] [] [14]
+        runPrime gf181 program [2, 4] [] [8]
+        runPrime gf181 program [5, 6] [] [14]
 
       it "arithmetics 4" $ do
         let program = do
@@ -164,20 +164,20 @@ tests = do
               y <- inputUInt @4 Public
               return $ x * y + y
 
-        runPrime' gf181 program [5, 6] [] [4]
-        runPrime' gf181 program [2, 5] [] [15]
-        runPrime' gf181 program [15, 1] [] [0]
+        runPrime gf181 program [5, 6] [] [4]
+        runPrime gf181 program [2, 5] [] [15]
+        runPrime gf181 program [15, 1] [] [0]
 
       it "arithmetics 5" $ do
         let program = do
               x <- inputUInt @4 Public
               y <- reuse x
               return (x + y)
-        runPrime' gf181 program [5] [] [10]
+        runPrime gf181 program [5] [] [10]
 
       it "modInv 123 2833" $ do
         let program = return $ modInv (123 :: UInt 32) 2833
-        runPrime' gf181 program [] [] [2119]
+        runPrime gf181 program [] [] [2119]
 
       describe "DivMod" $ do
         it "performDivMod (quotient & remainder unknown)" $ do
@@ -185,17 +185,17 @@ tests = do
                 dividend <- input Private :: Comp (UInt 6)
                 divisor <- input Public
                 performDivMod dividend divisor
-          runPrime' gf181 program [7] [20] [2, 6]
-          runPrime' gf181 program [4] [4] [1, 0]
+          runPrime gf181 program [7] [20] [2, 6]
+          runPrime gf181 program [4] [4] [1, 0]
 
         it "performDivMod (on constants) (issue #18)" $ do
           -- 7 = 3 * 2 + 1
           let program = performDivMod 7 (3 :: UInt 4)
-          runPrime' gf181 program [] [] [2, 1]
+          runPrime gf181 program [] [] [2, 1]
 
         it "assertDivMod (on constants) (issue #18)" $ do
           let program = assertDivMod 7 (3 :: UInt 4) 2 1
-          runPrime' gf181 program [] [] []
+          runPrime gf181 program [] [] []
 
         it "assertDivMod (with wrong quotient constant)" $ do
           let program = assertDivMod 7 (3 :: UInt 4) 3 1
@@ -226,7 +226,7 @@ tests = do
                 (q0, r0) <- performDivMod a b
                 (q1, r1) <- performDivMod c d
                 return [q0, r0, q1, r1]
-          runPrime' gf181 program [20, 7, 8] [21] [2, 6, 2, 5]
+          runPrime gf181 program [20, 7, 8] [21] [2, 6, 2, 5]
 
         it "assertDivMod (multiple statements chained together)" $ do
           let program = do
@@ -235,7 +235,7 @@ tests = do
                 (q0, r0) <- performDivMod a b
                 (q1, r1) <- performDivMod q0 b
                 return [q0, r0, q1, r1]
-          runPrime' gf181 program [25, 3] [] [8, 1, 2, 2]
+          runPrime gf181 program [25, 3] [] [8, 1, 2, 2]
 
         it "performDivMod (before assertions)" $ do
           let program = do
@@ -243,7 +243,7 @@ tests = do
                 b <- input Public
                 (q, r) <- performDivMod a b
                 assert $ q `eq` r
-          runPrime' gf181 program [10, 4] [] []
+          runPrime gf181 program [10, 4] [] []
 
         it "performDivMod (before reuse)" $ do
           let program = do
@@ -251,7 +251,7 @@ tests = do
                 b <- input Public
                 (q, _) <- performDivMod a b
                 reuse q
-          runPrime' gf181 program [10, 4] [] [2]
+          runPrime gf181 program [10, 4] [] [2]
 
         it "performDivMod (after reuse)" $ do
           let program = do
@@ -259,7 +259,7 @@ tests = do
                 b <- input Public
                 (q, r) <- performDivMod a b
                 assert $ q `eq` r
-          runPrime' gf181 program [10, 4] [] []
+          runPrime gf181 program [10, 4] [] []
 
         it "assertDivMod (dividend unknown)" $ do
           let program = do
@@ -269,7 +269,7 @@ tests = do
                 remainder <- input Private
                 assertDivMod dividend divisor quotient remainder
                 return dividend
-          runPrime' gf181 program [7, 2] [6] [20]
+          runPrime gf181 program [7, 2] [6] [20]
 
         it "assertDivMod (divisor & remainder unknown)" $ do
           let program = do
@@ -279,7 +279,7 @@ tests = do
                 remainder <- freshVarUInt
                 assertDivMod dividend divisor quotient remainder
                 return (divisor, remainder)
-          runPrime' gf181 program [7, 2] [] [3, 1]
+          runPrime gf181 program [7, 2] [] [3, 1]
 
         it "assertDivMod (quotient & remainder unknown)" $ do
           let program = do
@@ -289,7 +289,7 @@ tests = do
                 remainder <- freshVarUInt
                 assertDivMod dividend divisor quotient remainder
                 return (quotient, remainder)
-          runPrime' gf181 program [34, 6] [] [5, 4]
+          runPrime gf181 program [34, 6] [] [5, 4]
 
     describe "Comparisons" $ do
       it "assertLTE" $ do
@@ -314,7 +314,7 @@ tests = do
           when (bound >= 0 && bound < 15) $ do
             forM_ [0 .. 15] $ \x -> do
               if x <= bound
-                then runPrime' gf181 program [fromInteger x] [] []
+                then runPrime gf181 program [fromInteger x] [] []
                 else do
                   throwAll
                     gf181Info
@@ -356,7 +356,7 @@ tests = do
           when (bound >= 1 && bound < 16) $ do
             forM_ [0 .. 15] $ \x -> do
               if x < bound
-                then runPrime' gf181 program [fromInteger x] [] []
+                then runPrime gf181 program [fromInteger x] [] []
                 else do
                   throwAll
                     gf181Info
@@ -398,7 +398,7 @@ tests = do
           when (bound >= 1 && bound < 16) $ do
             forM_ [0 .. 15] $ \x -> do
               if x >= bound
-                then runPrime' gf181 program [fromInteger x] [] []
+                then runPrime gf181 program [fromInteger x] [] []
                 else do
                   throwAll
                     gf181Info
@@ -440,7 +440,7 @@ tests = do
           when (bound >= 0 && bound < 15) $ do
             forM_ [0 .. 15] $ \x -> do
               if x > bound
-                then runPrime' gf181 program [fromInteger x] [] []
+                then runPrime gf181 program [fromInteger x] [] []
                 else do
                   throwAll
                     gf181Info
@@ -469,8 +469,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x <= y
-            then runPrime' gf181 program [fromInteger x, fromInteger y] [] [1]
-            else runPrime' gf181 program [fromInteger x, fromInteger y] [] [0]
+            then runPrime gf181 program [fromInteger x, fromInteger y] [] [1]
+            else runPrime gf181 program [fromInteger x, fromInteger y] [] [0]
 
       it "lte (variable / constant)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -480,8 +480,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x <= y
-            then runPrime' gf181 (program (fromInteger y)) [fromInteger x] [] [1]
-            else runPrime' gf181 (program (fromInteger y)) [fromInteger x] [] [0]
+            then runPrime gf181 (program (fromInteger y)) [fromInteger x] [] [1]
+            else runPrime gf181 (program (fromInteger y)) [fromInteger x] [] [0]
 
       it "lte (constant / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -491,8 +491,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x <= y
-            then runPrime' gf181 (program (fromInteger x)) [fromInteger y] [] [1]
-            else runPrime' gf181 (program (fromInteger x)) [fromInteger y] [] [0]
+            then runPrime gf181 (program (fromInteger x)) [fromInteger y] [] [1]
+            else runPrime gf181 (program (fromInteger x)) [fromInteger y] [] [0]
 
       it "lte (constant / constant)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -501,8 +501,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x <= y
-            then runPrime' gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
-            else runPrime' gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
+            then runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
+            else runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
 
       it "lt (variable / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -513,8 +513,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x < y
-            then runPrime' gf181 program [fromInteger x, fromInteger y] [] [1]
-            else runPrime' gf181 program [fromInteger x, fromInteger y] [] [0]
+            then runPrime gf181 program [fromInteger x, fromInteger y] [] [1]
+            else runPrime gf181 program [fromInteger x, fromInteger y] [] [0]
 
       it "lt (variable / constant)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -524,8 +524,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x < y
-            then runPrime' gf181 (program (fromInteger y)) [fromInteger x] [] [1]
-            else runPrime' gf181 (program (fromInteger y)) [fromInteger x] [] [0]
+            then runPrime gf181 (program (fromInteger y)) [fromInteger x] [] [1]
+            else runPrime gf181 (program (fromInteger y)) [fromInteger x] [] [0]
 
       it "lt (constant / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -535,8 +535,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x < y
-            then runPrime' gf181 (program (fromInteger x)) [fromInteger y] [] [1]
-            else runPrime' gf181 (program (fromInteger x)) [fromInteger y] [] [0]
+            then runPrime gf181 (program (fromInteger x)) [fromInteger y] [] [1]
+            else runPrime gf181 (program (fromInteger x)) [fromInteger y] [] [0]
 
       it "lt (constant / constant)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -545,8 +545,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x < y
-            then runPrime' gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
-            else runPrime' gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
+            then runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
+            else runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
 
       it "gte (variable / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -557,8 +557,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x >= y
-            then runPrime' gf181 program [fromInteger x, fromInteger y] [] [1]
-            else runPrime' gf181 program [fromInteger x, fromInteger y] [] [0]
+            then runPrime gf181 program [fromInteger x, fromInteger y] [] [1]
+            else runPrime gf181 program [fromInteger x, fromInteger y] [] [0]
 
       it "gte (variable / constant)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -568,8 +568,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x >= y
-            then runPrime' gf181 (program (fromInteger y)) [fromInteger x] [] [1]
-            else runPrime' gf181 (program (fromInteger y)) [fromInteger x] [] [0]
+            then runPrime gf181 (program (fromInteger y)) [fromInteger x] [] [1]
+            else runPrime gf181 (program (fromInteger y)) [fromInteger x] [] [0]
 
       it "gte (constant / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -579,8 +579,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x >= y
-            then runPrime' gf181 (program (fromInteger x)) [fromInteger y] [] [1]
-            else runPrime' gf181 (program (fromInteger x)) [fromInteger y] [] [0]
+            then runPrime gf181 (program (fromInteger x)) [fromInteger y] [] [1]
+            else runPrime gf181 (program (fromInteger x)) [fromInteger y] [] [0]
 
       it "gte (constant / constant)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -589,8 +589,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x >= y
-            then runPrime' gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
-            else runPrime' gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
+            then runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
+            else runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
 
       it "gt (variable / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -601,8 +601,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x > y
-            then runPrime' gf181 program [fromInteger x, fromInteger y] [] [1]
-            else runPrime' gf181 program [fromInteger x, fromInteger y] [] [0]
+            then runPrime gf181 program [fromInteger x, fromInteger y] [] [1]
+            else runPrime gf181 program [fromInteger x, fromInteger y] [] [0]
 
       it "gt (variable / constant)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -612,8 +612,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x > y
-            then runPrime' gf181 (program (fromInteger y)) [fromInteger x] [] [1]
-            else runPrime' gf181 (program (fromInteger y)) [fromInteger x] [] [0]
+            then runPrime gf181 (program (fromInteger y)) [fromInteger x] [] [1]
+            else runPrime gf181 (program (fromInteger y)) [fromInteger x] [] [0]
 
       it "gt (constant / variable)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -623,8 +623,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x > y
-            then runPrime' gf181 (program (fromInteger x)) [fromInteger y] [] [1]
-            else runPrime' gf181 (program (fromInteger x)) [fromInteger y] [] [0]
+            then runPrime gf181 (program (fromInteger x)) [fromInteger y] [] [1]
+            else runPrime gf181 (program (fromInteger x)) [fromInteger y] [] [0]
 
       it "gt (constant / constant)" $ do
         let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -633,8 +633,8 @@ tests = do
 
         forAll genPair $ \(x, y) -> do
           if x > y
-            then runPrime' gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
-            else runPrime' gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
+            then runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
+            else runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
 
     describe "Conditionals" $ do
       it "with inputs" $ do
@@ -642,12 +642,12 @@ tests = do
               x <- input Public :: Comp (UInt 4)
               y <- input Public
               return $ cond true x y
-        runPrime' gf181 program [5, 6] [] [5]
+        runPrime gf181 program [5, 6] [] [5]
 
       it "with literals" $ do
         let program = do
               return $ cond true (3 :: UInt 2) 2
-        runPrime' gf181 program [] [] [3]
+        runPrime gf181 program [] [] [3]
 
     describe "Equalities" $ do
       it "eq" $ do
@@ -655,29 +655,29 @@ tests = do
               x <- inputUInt @4 Public
               y <- inputUInt @4 Public
               return (x `eq` y)
-        runPrime' gf181 program [5, 6] [] [0]
-        runPrime' gf181 program [4, 4] [] [1]
+        runPrime gf181 program [5, 6] [] [0]
+        runPrime gf181 program [4, 4] [] [1]
 
       it "neq 1" $ do
         let program = do
               x <- inputUInt @4 Public
               y <- inputUInt @4 Public
               return (x `neq` y)
-        runPrime' gf181 program [5, 6] [] [1]
-        runPrime' gf181 program [4, 4] [] [0]
+        runPrime gf181 program [5, 6] [] [1]
+        runPrime gf181 program [4, 4] [] [0]
 
       it "neq 2" $ do
         let program = do
               x <- inputUInt @4 Public
               return (x `neq` 3)
-        runPrime' gf181 program [5] [] [1]
-        runPrime' gf181 program [3] [] [0]
+        runPrime gf181 program [5] [] [1]
+        runPrime gf181 program [3] [] [0]
 
       it "neq 3" $ do
         let program = do
               x <- inputUInt @4 Public
               assert $ x `neq` 3
-        runPrime' gf181 program [5] [] []
+        runPrime gf181 program [5] [] []
         throwAll
           gf181Info
           program
@@ -703,42 +703,42 @@ tests = do
               x <- inputUInt @4 Public
               return [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
 
-        runPrime' gf181 program [0] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
-        runPrime' gf181 program [1] [] [1, 2, 4, 8, 1, 2, 4, 8, 1]
-        runPrime' gf181 program [3] [] [3, 6, 12, 9, 3, 6, 12, 9, 3]
-        runPrime' gf181 program [5] [] [5, 10, 5, 10, 5, 10, 5, 10, 5]
+        runPrime gf181 program [0] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        runPrime gf181 program [1] [] [1, 2, 4, 8, 1, 2, 4, 8, 1]
+        runPrime gf181 program [3] [] [3, 6, 12, 9, 3, 6, 12, 9, 3]
+        runPrime gf181 program [5] [] [5, 10, 5, 10, 5, 10, 5, 10, 5]
 
       it "shift" $ do
         let program = do
               x <- inputUInt @4 Public
               return [x .<<. (-4), x .>>. 3, shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
 
-        runPrime' gf181 program [0] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
-        runPrime' gf181 program [1] [] [0, 0, 0, 0, 1, 2, 4, 8, 0]
-        runPrime' gf181 program [3] [] [0, 0, 0, 1, 3, 6, 12, 8, 0]
-        runPrime' gf181 program [5] [] [0, 0, 1, 2, 5, 10, 4, 8, 0]
+        runPrime gf181 program [0] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        runPrime gf181 program [1] [] [0, 0, 0, 0, 1, 2, 4, 8, 0]
+        runPrime gf181 program [3] [] [0, 0, 0, 1, 3, 6, 12, 8, 0]
+        runPrime gf181 program [5] [] [0, 0, 1, 2, 5, 10, 4, 8, 0]
 
       it "Bit test / literal" $ do
         -- 0011
         let program = do
               let c = 3 :: UInt 4
               return [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
-        runPrime' gf181 program [] [] [0, 1, 1, 0, 0, 1]
+        runPrime gf181 program [] [] [0, 1, 1, 0, 0, 1]
 
       it "Bit test / input var" $ do
         let program = do
               c <- input Private :: Comp (UInt 4)
               return [c !!! (-1), c !!! 0, c !!! 1, c !!! 2, c !!! 3, c !!! 4]
-        runPrime' gf181 program [] [3] [0, 1, 1, 0, 0, 1]
-        runPrime' gf181 program [] [5] [0, 1, 0, 1, 0, 1]
+        runPrime gf181 program [] [3] [0, 1, 1, 0, 0, 1]
+        runPrime gf181 program [] [5] [0, 1, 0, 1, 0, 1]
 
       it "Bit test / and 1" $ do
         let program = do
               x <- inputUInt @4 Public
               y <- inputUInt @4 Private
               return $ (x .&. y) !!! 0
-        runPrime' gf181 program [2] [3] [0]
-        runPrime' gf181 program [3] [5] [1]
+        runPrime gf181 program [2] [3] [0]
+        runPrime gf181 program [3] [5] [1]
 
       it "Bit test / and 2" $ do
         let program = do
@@ -746,25 +746,25 @@ tests = do
               y <- inputUInt @4 Private
               z <- inputUInt @4 Public
               return $ (x .&. y .&. z) !!! 0
-        runPrime' gf181 program [2, 4] [3] [0]
-        runPrime' gf181 program [3, 7] [5] [1]
+        runPrime gf181 program [2, 4] [3] [0]
+        runPrime gf181 program [3, 7] [5] [1]
 
       it "Bit test / or 1" $ do
         let program = do
               x <- inputUInt @4 Public
               y <- inputUInt @4 Private
               return $ (x .|. y) !!! 1
-        runPrime' gf181 program [2] [3] [1]
-        runPrime' gf181 program [3] [5] [1]
-        runPrime' gf181 program [5] [9] [0]
+        runPrime gf181 program [2] [3] [1]
+        runPrime gf181 program [3] [5] [1]
+        runPrime gf181 program [5] [9] [0]
 
       it "Bit test / or 2" $ do
         let program = do
               x <- inputUInt @4 Public
               return $ (x .|. 3) !!! 2
-        runPrime' gf181 program [2] [] [0]
-        runPrime' gf181 program [3] [] [0]
-        runPrime' gf181 program [5] [] [1]
+        runPrime gf181 program [2] [] [0]
+        runPrime gf181 program [3] [] [0]
+        runPrime gf181 program [5] [] [1]
 
       it "Bit test / xor 0" $ do
         let program = do
@@ -772,7 +772,7 @@ tests = do
               y <- inputUInt @4 Private
               let w = x .^. y .^. 0
               return [w !!! 0]
-        runPrime' gf181 program [2] [3] [1]
+        runPrime gf181 program [2] [3] [1]
 
       it "Bit test / xor 1" $ do
         let program = do
@@ -781,22 +781,22 @@ tests = do
               z <- inputUInt @4 Public
               w <- reuse $ x .^. y .^. z
               return [w !!! 0, w !!! 1, w !!! 2, w !!! 3]
-        runPrime' gf181 program [2, 4] [3] [1, 0, 1, 0]
-        runPrime' gf181 program [3, 7] [5] [1, 0, 0, 0]
+        runPrime gf181 program [2, 4] [3] [1, 0, 1, 0]
+        runPrime gf181 program [3, 7] [5] [1, 0, 0, 0]
 
       it "Bit test / BtoU" $ do
         let program = do
               x <- input Public
               let u = BtoU x :: UInt 4
               return [u !!! 0, u !!! 1, u !!! 2, u !!! 3]
-        runPrime' gf181 program [0] [] [0, 0, 0, 0]
-        runPrime' gf181 program [1] [] [1, 0, 0, 0]
+        runPrime gf181 program [0] [] [0, 0, 0, 0]
+        runPrime gf181 program [1] [] [1, 0, 0, 0]
 
       it "Bit test / rotate 1" $ do
         let program = do
               x <- inputUInt @4 Public
               return $ (x `rotate` 0) !!! 0
-        runPrime' gf181 program [2] [] [0]
+        runPrime gf181 program [2] [] [0]
 
       it "Bit test / rotate 2" $ do
         -- 0011 0100211003
@@ -809,4 +809,4 @@ tests = do
                   (x `rotate` (-1)) !!! 0,
                   ((x .^. y) `rotate` 1) !!! 1
                 ]
-        runPrime' gf181 program [2, 3] [] [0, 0, 1, 1]
+        runPrime gf181 program [2, 3] [] [0, 0, 1, 1]

@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, prime, runPrime', debugPrime) where
+module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, prime, runPrime, debugPrime) where
 
 import Control.Arrow (left, right)
 import Data.Field.Galois
@@ -146,8 +146,8 @@ prime n = case someNatVal (fromIntegral n) of
 --   interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
 --     `shouldBe` Right expected
 
-runPrime' :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
-runPrime' fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldType fieldType handlePrime handleBinary
+runPrime :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
+runPrime fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldType fieldType handlePrime handleBinary
   where
     handlePrime :: KnownNat n => FieldInfo -> Proxy (Prime n) -> IO ()
     handlePrime fieldInfo (_ :: Proxy (Prime n)) = do

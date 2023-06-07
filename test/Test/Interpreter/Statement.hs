@@ -15,7 +15,7 @@ tests = describe "Statements" $ do
     let program = do
           x <- inputField Public
           assert (x `eq` 3)
-    runPrime' gf181 program [3] [] []
+    runPrime gf181 program [3] [] []
 
   it "assertions intertwined with assignments" $ do
     let program = do
@@ -25,26 +25,26 @@ tests = describe "Statements" $ do
           updateM xs 0 1
           x1 <- accessM xs 0
           assert (x1 `eq` 1)
-    runPrime' gf181 program [] [] []
+    runPrime gf181 program [] [] []
 
   it "Basic.summation2" $
     forAll (vector 4) $ \inputs -> do
-      runPrime' gf181 Basic.summation2 inputs [] []
+      runPrime gf181 Basic.summation2 inputs [] []
 
   it "Basic.assertArraysEqual" $
-    runPrime' gf181 Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8] [] []
+    runPrime gf181 Basic.assertArraysEqual [0, 2, 4, 8, 0, 2, 4, 8] [] []
 
   it "Basic.assertArraysEqual2" $
-    runPrime' gf181 Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8] [] []
+    runPrime gf181 Basic.assertArraysEqual2 [0, 2, 4, 8, 0, 2, 4, 8] [] []
 
   it "Basic.array1D" $
-    runPrime' gf181 (Basic.array1D 1) [2, 4] [] []
+    runPrime gf181 (Basic.array1D 1) [2, 4] [] []
 
   it "Basic.array2D 1" $
-    runPrime' gf181 (Basic.array2D 1 1) [2, 4] [] []
+    runPrime gf181 (Basic.array2D 1 1) [2, 4] [] []
 
   it "Basic.array2D 2" $
-    runPrime' gf181 (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9] [] []
+    runPrime gf181 (Basic.array2D 2 2) [0, 1, 2, 3, 0, 1, 4, 9] [] []
 
   it "Basic.toArray1" $
-    runPrime' gf181 Basic.toArray1 [0 .. 7] [] []
+    runPrime gf181 Basic.toArray1 [0 .. 7] [] []

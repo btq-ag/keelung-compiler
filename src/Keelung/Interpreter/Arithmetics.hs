@@ -1,19 +1,13 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE DeriveAnyClass #-}
 module Keelung.Interpreter.Arithmetics where
 
 import Data.Field.Galois (GaloisField)
 import Keelung.Syntax (Width)
-import GHC.Generics (Generic)
-import Data.Serialize (Serialize)
-import Control.DeepSeq (NFData)
 import Data.Bits (Bits(..))
 
 --------------------------------------------------------------------------------
 
 data U = UVal {uintWidth :: Width, uintValue :: Integer}
-  deriving stock (Eq, Ord, Generic)
-  deriving anyclass (NFData, Serialize)
+  deriving (Eq, Ord)
 
 instance Show U where
   show (UVal _ value) = show value
