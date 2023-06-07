@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DerivingStrategies #-}
 
 module Keelung.Data.VarGroup where
 
@@ -26,6 +27,7 @@ import Keelung.Data.N (N (N))
 import Keelung.Data.Struct
 import Keelung.Syntax (Width)
 import Keelung.Syntax.Counters
+import Keelung.Interpreter.Arithmetics (U (..))
 
 --------------------------------------------------------------------------------
 
@@ -147,11 +149,11 @@ instance HasX (VarGroups n) n where
 
 type Witness f b u = VarGroups (Struct (Vector f) (Vector b) (Vector u))
 
-convertWitness :: Integral a => Witness a Bool a -> Witness Integer Integer Integer
+convertWitness :: Integral a => Witness a Bool U -> Witness Integer Integer Integer
 convertWitness (VarGroups o i p x) = VarGroups (convertStruct o) (convertStruct i) (convertStruct p) (convertStruct x)
   where
-    convertStruct :: Integral a => Struct (Vector a) (Vector Bool) (Vector a) -> Struct (Vector Integer) (Vector Integer) (Vector Integer)
-    convertStruct (Struct f b us) = Struct (fmap toInteger f) (fmap (\val -> if val then 1 else 0) b) (IntMap.map (fmap toInteger) us)
+    convertStruct :: Integral a => Struct (Vector a) (Vector Bool) (Vector U) -> Struct (Vector Integer) (Vector Integer) (Vector Integer)
+    convertStruct (Struct f b us) = Struct (fmap toInteger f) (fmap (\val -> if val then 1 else 0) b) (IntMap.map (fmap uintValue) us)
 
 --------------------------------------------------------------------------------
 
@@ -190,7 +192,7 @@ toSubscript = map go . show
 --------------------------------------------------------------------------------
 
 -- | Data structure for interpreters
-type Partial n = VarGroups (Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding n))
+type Partial n = VarGroups (Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding U))
 
 -- | Expected number of bindings and actual bindings
 type PartialBinding n = (Int, IntMap n)
@@ -204,14 +206,17 @@ instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) whe
       showPartialBindingB :: (GaloisField n, Integral n) => String -> (Int, IntMap Bool) -> IntMap String
       showPartialBindingB prefix (_size, bindings) = IntMap.mapWithKey (\k v -> prefix <> show k <> " := " <> show v) bindings
 
-      showStruct :: (GaloisField n, Integral n) => String -> Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding n) -> [String]
+      showPartialBindingU :: (GaloisField n, Integral n) => String -> (Int, IntMap U) -> IntMap String
+      showPartialBindingU prefix (_size, bindings) = IntMap.mapWithKey (\k v -> prefix <> show k <> " := " <> show v) bindings
+
+      showStruct :: (GaloisField n, Integral n) => String -> Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding U) -> [String]
       showStruct suffix (Struct f b u) =
         toList (showPartialBinding ("F" <> suffix) f)
           <> toList (showPartialBindingB ("B" <> suffix) b)
-          <> concatMap (\(width, xs) -> toList (showPartialBinding ("U" <> suffix <> toSubscript width) xs)) (IntMap.toList u)
+          <> concatMap (\(width, xs) -> toList (showPartialBindingU ("U" <> suffix <> toSubscript width) xs)) (IntMap.toList u)
 
 -- | Convert a partial binding to a total binding, or return the variables that are not bound
-toTotal :: Partial n -> Either (VarSet n) (Witness n Bool n)
+toTotal :: Partial n -> Either (VarSet n) (Witness n Bool U)
 toTotal (VarGroups o i p x) =
   toEither $
     VarGroups
@@ -221,8 +226,8 @@ toTotal (VarGroups o i p x) =
       <*> first (VarGroups mempty mempty mempty) (convertStruct x)
   where
     convertStruct ::
-      Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding n) ->
-      Validation (Struct IntSet IntSet IntSet) (Struct (Vector n) (Vector Bool) (Vector n))
+      Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding U) ->
+      Validation (Struct IntSet IntSet IntSet) (Struct (Vector n) (Vector Bool) (Vector U))
     convertStruct (Struct f b u) =
       Struct
         <$> first (\set -> Struct set mempty mempty) (toTotal' f)
@@ -261,7 +266,7 @@ restrictVars (VarGroups o i p x) (VarGroups o' i' p' x') =
     (restrictStruct p p')
     (restrictStruct x x')
   where
-    restrictStruct :: Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding n) -> Struct IntSet IntSet IntSet -> Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding n)
+    restrictStruct :: Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding U) -> Struct IntSet IntSet IntSet -> Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding U)
     restrictStruct (Struct f b u) (Struct f' b' u') =
       Struct
         (restrict f f')

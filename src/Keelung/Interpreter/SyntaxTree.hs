@@ -63,7 +63,7 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
       -- now that we don't know the dividend, we can only solve the relation if we know the divisor, quotient, and remainder
       case (divisor, quotient, remainder) of
         (Right divisorVal, Right quotientVal, Right remainderVal) -> do
-          let dividendVal = divisorVal * quotientVal + remainderVal
+          let dividendVal = UVal width (uintValue divisorVal * uintValue quotientVal + uintValue remainderVal)
           addU width dividendVar [dividendVal]
         _ -> do
           let unsolvedVars = dividendVar : Either.lefts [divisor, quotient, remainder]
@@ -72,47 +72,47 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisor, quotient, remainder) of
         (Right divisorVal, Right actualQuotientVal, Right actualRemainderVal) -> do
-          let expectedQuotientVal = dividendVal `integerDiv` divisorVal
-              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          let expectedQuotientVal = dividendVal `integerDivU` divisorVal
+              expectedRemainderVal = dividendVal `integerModU` divisorVal
           if expectedQuotientVal == actualQuotientVal
             then return ()
-            else throwError $ DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
+            else throwError $ DivModQuotientError (uintValue dividendVal) (uintValue divisorVal) (uintValue expectedQuotientVal) (uintValue actualQuotientVal)
           if expectedRemainderVal == actualRemainderVal
             then return ()
-            else throwError $ DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+            else throwError $ DivModRemainderError (uintValue dividendVal) (uintValue divisorVal) (uintValue expectedRemainderVal) (uintValue actualRemainderVal)
         (Right divisorVal, Left quotientVar, Left remainderVar) -> do
-          let quotientVal = dividendVal `integerDiv` divisorVal
-              remainderVal = dividendVal `integerMod` divisorVal
+          let quotientVal = dividendVal `integerDivU` divisorVal
+              remainderVal = dividendVal `integerModU` divisorVal
           addU width quotientVar [quotientVal]
           addU width remainderVar [remainderVal]
         (Right divisorVal, Left quotientVar, Right actualRemainderVal) -> do
-          let quotientVal = dividendVal `integerDiv` divisorVal
-              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          let quotientVal = dividendVal `integerDivU` divisorVal
+              expectedRemainderVal = dividendVal `integerModU` divisorVal
           if expectedRemainderVal == actualRemainderVal
             then addU width quotientVar [quotientVal]
-            else throwError $ DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+            else throwError $ DivModRemainderError (uintValue dividendVal) (uintValue divisorVal) (uintValue expectedRemainderVal) (uintValue actualRemainderVal)
         (Left divisorVar, Right quotientVal, Left remainderVar) -> do
-          let divisorVal = dividendVal `integerDiv` quotientVal
-              remainderVal = dividendVal `integerMod` divisorVal
+          let divisorVal = dividendVal `integerDivU` quotientVal
+              remainderVal = dividendVal `integerModU` divisorVal
           addU width divisorVar [divisorVal]
           addU width remainderVar [remainderVal]
         (Left divisorVar, Right quotientVal, Right actualRemainderVal) -> do
-          let divisorVal = dividendVal `integerDiv` quotientVal
-              expectedRemainderVal = dividendVal `integerMod` divisorVal
+          let divisorVal = dividendVal `integerDivU` quotientVal
+              expectedRemainderVal = dividendVal `integerModU` divisorVal
           if expectedRemainderVal == actualRemainderVal
             then addU width divisorVar [divisorVal]
-            else throwError $ DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
+            else throwError $ DivModRemainderError (uintValue dividendVal) (uintValue divisorVal) (uintValue expectedRemainderVal) (uintValue actualRemainderVal)
         _ -> do
           let unsolvedVars = Either.lefts [divisor, quotient, remainder]
           throwError $ DivModStuckError unsolvedVars
   where
-    analyze :: (GaloisField n, Integral n) => UInt -> M n (Either Var n)
+    analyze :: (GaloisField n, Integral n) => UInt -> M n (Either Var U)
     analyze = \case
       VarU w var -> catchError (Right <$> lookupU w var) $ \case
         VarUnboundError _ _ -> return (Left var)
         e -> throwError e
       x -> do
-        xs <- interpret x
+        xs <- interpretU x
         case xs of
           (v : _) -> return (Right v)
           _ -> throwError $ ResultSizeError 1 (length xs)
@@ -127,7 +127,7 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
     interpret val >>= addF var
     return []
   interpret (AssignmentU width var val) = do
-    interpret val >>= addU width var
+    interpretU val >>= addU width var
     return []
   interpret (DivMod width dividend divisor quotient remainder) = do
     interpretDivMod width (dividend, divisor, quotient, remainder)
@@ -140,10 +140,10 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
     when (bound >= 2 ^ width - 1) $
       throwError $
         AssertLTEBoundTooLargeError bound width
-    value' <- interpret value
+    value' <- interpretU value
     case value' of
       [v] -> do
-        when (v > fromInteger bound) $ throwError $ AssertLTEError v bound
+        when (uintValue v > bound) $ throwError $ AssertLTEError (uintValue v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
   interpret (AssertLT width value bound) = do
@@ -154,10 +154,10 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
     when (bound >= 2 ^ width) $
       throwError $
         AssertLTBoundTooLargeError bound width
-    value' <- interpret value
+    value' <- interpretU value
     case value' of
       [v] -> do
-        when (v >= fromInteger bound) $ throwError $ AssertLTError v bound
+        when (uintValue v >= bound) $ throwError $ AssertLTError (uintValue v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
   interpret (AssertGTE width value bound) = do
@@ -168,10 +168,10 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
     when (bound >= 2 ^ width) $
       throwError $
         AssertGTEBoundTooLargeError bound width
-    value' <- interpret value
+    value' <- interpretU value
     case value' of
       [v] -> do
-        when (v < fromInteger bound) $ throwError $ AssertGTEError v bound
+        when (uintValue v < bound) $ throwError $ AssertGTEError (uintValue v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
   interpret (AssertGT width value bound) = do
@@ -182,10 +182,10 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
     when (bound >= 2 ^ width - 1) $
       throwError $
         AssertGTBoundTooLargeError bound width
-    value' <- interpret value
+    value' <- interpretU value
     case value' of
       [v] -> do
-        when (v <= fromInteger bound) $ throwError $ AssertGTError v bound
+        when (uintValue v <= bound) $ throwError $ AssertGTError (uintValue v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
 
@@ -217,33 +217,30 @@ instance (GaloisField n, Integral n) => InterpretB Boolean n where
       y' <- interpret y
       interpretB (x' == y')
     EqU _ x y -> do
-      x' <- interpret x
-      y' <- interpret y
+      x' <- interpretU x
+      y' <- interpretU y
       interpretB (x' == y')
     LTU _ x y -> do
-      x' <- interpret x
-      y' <- interpret y
+      x' <- interpretU x
+      y' <- interpretU y
       interpretB (x' < y')
     LTEU _ x y -> do
-      x' <- interpret x
-      y' <- interpret y
+      x' <- interpretU x
+      y' <- interpretU y
       interpretB (x' <= y')
     GTU _ x y -> do
-      x' <- interpret x
-      y' <- interpret y
+      x' <- interpretU x
+      y' <- interpretU y
       interpretB (x' > y')
     GTEU _ x y -> do
-      x' <- interpret x
-      y' <- interpret y
+      x' <- interpretU x
+      y' <- interpretU y
       interpretB (x' >= y')
     BitU width x i -> do
-      xs <- interpret x
-      if Data.Bits.testBit (toInteger (head xs)) (i `mod` width)
+      xs <- interpretU x
+      if Data.Bits.testBit (uintValue (head xs)) (i `mod` width)
         then return [one]
         else return [zero]
-
-instance GaloisField n => Interpret Integer n where
-  interpret n = return [fromIntegral n]
 
 instance (GaloisField n, Integral n) => Interpret Field n where
   interpret expr = case expr of
@@ -268,43 +265,40 @@ instance (GaloisField n, Integral n) => Interpret Field n where
         [True] -> return [one]
         _ -> return [zero]
 
-instance (GaloisField n, Integral n) => Interpret UInt n where
-  interpret expr = case expr of
-    ValU _ n -> return [fromIntegral n]
+instance (GaloisField n, Integral n) => InterpretU UInt n where
+  interpretU expr = case expr of
+    ValU w n -> return [UVal w n]
     VarU w var -> pure <$> lookupU w var
     VarUI w var -> pure <$> lookupUI w var
     VarUP w var -> pure <$> lookupUP w var
-    AddU w x y -> wrapAround w $ zipWith (+) <$> interpret x <*> interpret y
-    SubU w x y -> wrapAround w $ zipWith (-) <$> interpret x <*> interpret y
-    MulU w x y -> wrapAround w $ zipWith (*) <$> interpret x <*> interpret y
-    MMIU _ x p -> do
-      x' <- map toInteger <$> interpret x
+    AddU _ x y -> zipWith integerAddU <$> interpretU x <*> interpretU y
+    SubU _ x y -> zipWith integerSubU <$> interpretU x <*> interpretU y
+    MulU _ x y -> zipWith integerMulU <$> interpretU x <*> interpretU y
+    MMIU w x p -> do
+      x' <- map uintValue <$> interpretU x
       case x' of
         [x''] -> case modInv x'' p of
           Just v -> do
-            return [fromInteger v]
+            return [UVal w v]
           _ -> throwError $ ModInvError x'' p
         _ -> throwError $ ResultSizeError 1 (length x')
-    AndU _ x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
-    OrU _ x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
-    XorU _ x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
-    NotU _ x -> map bitWiseNot <$> interpret x
-    RoLU w i x -> map (bitWiseRotateL w i) <$> interpret x
-    ShLU w i x -> map (bitWiseShiftL w i) <$> interpret x
-    SetU w x i y -> zipWith (\x' y' -> bitWiseSet w x' i y') <$> interpret x <*> interpretB y
+    AndU _ x y -> zipWith bitWiseAndU <$> interpretU x <*> interpretU y
+    OrU _ x y -> zipWith bitWiseOrU <$> interpretU x <*> interpretU y
+    XorU _ x y -> zipWith bitWiseXorU <$> interpretU x <*> interpretU y
+    NotU _ x -> map bitWiseNotU <$> interpretU x
+    RoLU w i x -> map (bitWiseRotateLU w i) <$> interpretU x
+    ShLU w i x -> map (bitWiseShiftLU w i) <$> interpretU x
+    SetU w x i y -> zipWith (\x' y' -> bitWiseSetU w x' i y') <$> interpretU x <*> interpretB y
     IfU _ p x y -> do
       p' <- interpretB p
       case p' of
-        [True] -> interpret x
-        _ -> interpret y
-    BtoU _ x -> do
+        [True] -> interpretU x
+        _ -> interpretU y
+    BtoU w x -> do
       result <- interpretB x
       case result of
-        [True] -> return [one]
-        _ -> return [zero]
-    where
-      wrapAround :: (GaloisField n, Integral n) => Int -> M n [n] -> M n [n]
-      wrapAround width = fmap (map (fromInteger . (`mod` 2 ^ width) . toInteger))
+        [True] -> return [UVal w 1]
+        _ -> return [UVal w 0]
 
 instance (GaloisField n, Integral n) => Interpret Expr n where
   interpret expr = case expr of
@@ -315,7 +309,7 @@ instance (GaloisField n, Integral n) => Interpret Expr n where
         [True] -> return [one]
         _ -> return [zero]
     Field e -> interpret e
-    UInt e -> interpret e
+    UInt e -> map (fromInteger . uintValue) <$> interpretU e
     Array xs -> concat <$> mapM interpret xs
 
 --------------------------------------------------------------------------------
