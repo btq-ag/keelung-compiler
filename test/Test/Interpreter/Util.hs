@@ -21,6 +21,7 @@ import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -150,6 +151,7 @@ runPrime' fieldType program rawPublicInputs rawPrivateInputs expected = caseFiel
     handlePrime :: KnownNat n => FieldInfo -> Proxy (Prime n) -> IO ()
     handlePrime fieldInfo (_ :: Proxy (Prime n)) = do
       let expected' = map fromInteger expected :: [Prime n]
+      -- traceShowM expected'
       interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` Right expected'
       -- constraint system interpreters
       interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
