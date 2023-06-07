@@ -24,7 +24,7 @@ import Keelung.Syntax.Encode.Syntax
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
-runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) ([Integer], Witness Integer)
+runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) ([Integer], Witness Integer Integer Integer)
 runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
   -- interpret side-effects
   forM_ (compSideEffects comp) $ \sideEffect -> void $ interpret sideEffect
@@ -121,7 +121,7 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
 
 instance (GaloisField n, Integral n) => Interpret SideEffect n where
   interpret (AssignmentB var val) = do
-    interpret val >>= addB var
+    interpretB val >>= addB var
     return []
   interpret (AssignmentF var val) = do
     interpret val >>= addF var
@@ -189,53 +189,53 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
 
-instance GaloisField n => Interpret Bool n where
-  interpret True = return [one]
-  interpret False = return [zero]
+instance GaloisField n => InterpretB Bool n where
+  interpretB True = return [one]
+  interpretB False = return [zero]
 
-instance (GaloisField n, Integral n) => Interpret Boolean n where
-  interpret expr = case expr of
-    ValB b -> interpret b
+instance (GaloisField n, Integral n) => InterpretB Boolean n where
+  interpretB expr = case expr of
+    ValB b -> interpretB b
     VarB var -> pure <$> lookupB var
     VarBI var -> pure <$> lookupBI var
     VarBP var -> pure <$> lookupBP var
-    AndB x y -> zipWith bitWiseAnd <$> interpret x <*> interpret y
-    OrB x y -> zipWith bitWiseOr <$> interpret x <*> interpret y
-    XorB x y -> zipWith bitWiseXor <$> interpret x <*> interpret y
-    NotB x -> map bitWiseNot <$> interpret x
+    AndB x y -> zipWith (.&.) <$> interpretB x <*> interpretB y
+    OrB x y -> zipWith (.|.) <$> interpretB x <*> interpretB y
+    XorB x y -> zipWith xor <$> interpretB x <*> interpretB y
+    NotB x -> map not <$> interpretB x
     IfB p x y -> do
-      p' <- interpret p
+      p' <- interpretB p
       case p' of
-        [0] -> interpret y
-        _ -> interpret x
+        [True] -> interpretB x
+        _ -> interpretB y
     EqB x y -> do
-      x' <- interpret x
-      y' <- interpret y
-      interpret (x' == y')
+      x' <- interpretB x
+      y' <- interpretB y
+      interpretB (x' == y')
     EqF x y -> do
       x' <- interpret x
       y' <- interpret y
-      interpret (x' == y')
+      interpretB (x' == y')
     EqU _ x y -> do
       x' <- interpret x
       y' <- interpret y
-      interpret (x' == y')
+      interpretB (x' == y')
     LTU _ x y -> do
       x' <- interpret x
       y' <- interpret y
-      interpret (x' < y')
+      interpretB (x' < y')
     LTEU _ x y -> do
       x' <- interpret x
       y' <- interpret y
-      interpret (x' <= y')
+      interpretB (x' <= y')
     GTU _ x y -> do
       x' <- interpret x
       y' <- interpret y
-      interpret (x' > y')
+      interpretB (x' > y')
     GTEU _ x y -> do
       x' <- interpret x
       y' <- interpret y
-      interpret (x' >= y')
+      interpretB (x' >= y')
     BitU width x i -> do
       xs <- interpret x
       if Data.Bits.testBit (toInteger (head xs)) (i `mod` width)
@@ -258,11 +258,15 @@ instance (GaloisField n, Integral n) => Interpret Field n where
     ExpF x n -> map (^ n) <$> interpret x
     DivF x y -> zipWith (/) <$> interpret x <*> interpret y
     IfF p x y -> do
-      p' <- interpret p
+      p' <- interpretB p
       case p' of
-        [0] -> interpret y
-        _ -> interpret x
-    BtoF x -> interpret x
+        [True] -> interpret x
+        _ -> interpret y
+    BtoF x -> do
+      result <- interpretB x
+      case result of
+        [True] -> return [one]
+        _ -> return [zero]
 
 instance (GaloisField n, Integral n) => Interpret UInt n where
   interpret expr = case expr of
@@ -287,13 +291,17 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
     NotU _ x -> map bitWiseNot <$> interpret x
     RoLU w i x -> map (bitWiseRotateL w i) <$> interpret x
     ShLU w i x -> map (bitWiseShiftL w i) <$> interpret x
-    SetU w x i y -> zipWith (\x' y' -> bitWiseSet w x' i y') <$> interpret x <*> interpret y
+    SetU w x i y -> zipWith (\x' y' -> bitWiseSet w x' i y') <$> interpret x <*> interpretB y
     IfU _ p x y -> do
-      p' <- interpret p
+      p' <- interpretB p
       case p' of
-        [0] -> interpret y
-        _ -> interpret x
-    BtoU _ x -> interpret x
+        [True] -> interpret x
+        _ -> interpret y
+    BtoU _ x -> do
+      result <- interpretB x
+      case result of
+        [True] -> return [one]
+        _ -> return [zero]
     where
       wrapAround :: (GaloisField n, Integral n) => Int -> M n [n] -> M n [n]
       wrapAround width = fmap (map (fromInteger . (`mod` 2 ^ width) . toInteger))
@@ -301,7 +309,11 @@ instance (GaloisField n, Integral n) => Interpret UInt n where
 instance (GaloisField n, Integral n) => Interpret Expr n where
   interpret expr = case expr of
     Unit -> return []
-    Boolean e -> interpret e
+    Boolean e -> do
+      result <- interpretB e
+      case result of
+        [True] -> return [one]
+        _ -> return [zero]
     Field e -> interpret e
     UInt e -> interpret e
     Array xs -> concat <$> mapM interpret xs

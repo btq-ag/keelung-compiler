@@ -42,12 +42,12 @@ bitWiseShiftL w n x =
     then fromInteger $ Data.Bits.shiftR (toInteger x) (-n)
     else fromInteger $ Data.Bits.shiftL (toInteger x) n Data.Bits..&. (2 ^ w - 1)
 
-bitWiseSet :: (GaloisField n, Integral n) => Width -> n -> Int -> n -> n
+bitWiseSet :: (GaloisField n, Integral n) => Width -> n -> Int -> Bool -> n
 bitWiseSet w x i b =
   let i' = i `mod` w
-   in case toInteger b of
-        0 -> fromInteger $ Data.Bits.clearBit (toInteger x) i'
-        _ -> fromInteger $ Data.Bits.setBit (toInteger x) i'
+   in if b
+        then fromInteger $ Data.Bits.clearBit (toInteger x) i'
+        else fromInteger $ Data.Bits.setBit (toInteger x) i'
 
 -- Given m and a, return Just x such that ax = 1 mod m.
 -- If there is no such x return Nothing.

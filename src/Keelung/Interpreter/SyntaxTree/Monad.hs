@@ -29,10 +29,13 @@ import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
+toBool :: (GaloisField n, Integral n) => n -> Bool
+toBool = (/= 0)
+
 -- | The interpreter monad
 type M n = ReaderT Heap (StateT (Partial n) (Except (Error n)))
 
-runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n [n] -> Either (Error n) ([Integer], VarGroup.Witness Integer)
+runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n [n] -> Either (Error n) ([Integer], VarGroup.Witness Integer Integer Integer)
 runM heap inputs p = do
   partialBindings <- toPartialBindings inputs
   (result, partialBindings') <- runExcept (runStateT (runReaderT p heap) partialBindings)
@@ -55,12 +58,12 @@ toPartialBindings inputs =
             ofI =
               Struct
                 (getCount counters (PublicInput, ReadField), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
-                (getCount counters (PublicInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs))))
+                (getCount counters (PublicInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (fmap toBool (Inputs.seqBool (Inputs.inputPublic inputs)))))
                 (IntMap.mapWithKey (\w bindings -> (getCount counters (PublicInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (map fromInteger (toList bindings)))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
             ofP =
               Struct
                 (getCount counters (PrivateInput, ReadField), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
-                (getCount counters (PrivateInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPrivate inputs))))
+                (getCount counters (PrivateInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (fmap toBool (Inputs.seqBool (Inputs.inputPrivate inputs)))))
                 (IntMap.mapWithKey (\w bindings -> (getCount counters (PrivateInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (map fromInteger (toList bindings)))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
             ofX =
               Struct
@@ -72,7 +75,7 @@ toPartialBindings inputs =
 addF :: Var -> [n] -> M n ()
 addF var vals = modify (modifyX (modifyF (second (IntMap.insert var (head vals)))))
 
-addB :: Var -> [n] -> M n ()
+addB :: Var -> [Bool] -> M n ()
 addB var vals = modify (modifyX (modifyB (second (IntMap.insert var (head vals)))))
 
 addU :: Width -> Var -> [n] -> M n ()
@@ -80,6 +83,13 @@ addU width var vals = modify (modifyX (modifyU width (0, mempty) (second (IntMap
 
 lookupVar :: (GaloisField n, Integral n) => String -> (Partial n -> (Int, IntMap n)) -> Int -> M n n
 lookupVar prefix selector var = do
+  (_, f) <- gets selector
+  case IntMap.lookup var f of
+    Nothing -> throwError $ VarUnboundError prefix var
+    Just val -> return val
+
+lookupVarB :: (GaloisField n, Integral n) => String -> (Partial n -> (Int, IntMap Bool)) -> Int -> M n Bool
+lookupVarB prefix selector var = do
   (_, f) <- gets selector
   case IntMap.lookup var f of
     Nothing -> throwError $ VarUnboundError prefix var
@@ -94,16 +104,16 @@ lookupFI = lookupVar "FI" (getF . ofI)
 lookupFP :: (GaloisField n, Integral n) => Var -> M n n
 lookupFP = lookupVar "FP" (getF . ofP)
 
-lookupB :: (GaloisField n, Integral n) => Var -> M n n
-lookupB = lookupVar "B" (getB . ofX)
+lookupB :: (GaloisField n, Integral n) => Var -> M n Bool
+lookupB = lookupVarB "B" (getB . ofX)
 
-lookupBI :: (GaloisField n, Integral n) => Var -> M n n
-lookupBI = lookupVar "BI" (getB . ofI)
+lookupBI :: (GaloisField n, Integral n) => Var -> M n Bool
+lookupBI = lookupVarB "BI" (getB . ofI)
 
-lookupBP :: (GaloisField n, Integral n) => Var -> M n n
-lookupBP = lookupVar "BP" (getB . ofP)
+lookupBP :: (GaloisField n, Integral n) => Var -> M n Bool
+lookupBP = lookupVarB "BP" (getB . ofP)
 
-lookupVarU :: (GaloisField n, Integral n) => String -> (VarGroups (Struct (PartialBinding n) (PartialBinding n) (PartialBinding n)) -> Struct (PartialBinding n) (PartialBinding n) (PartialBinding n)) -> Width -> Var -> M n n
+lookupVarU :: (GaloisField n, Integral n) => String -> (VarGroups (Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding n)) -> Struct (PartialBinding n) (PartialBinding Bool) (PartialBinding n)) -> Width -> Var -> M n n
 lookupVarU prefix selector w var = do
   gets (getU w . selector) >>= \case
     Nothing -> throwError $ VarUnboundError prefix var
@@ -131,6 +141,9 @@ unsafeLookup (Just x) = x
 -- | The interpreter typeclass
 class Interpret a n where
   interpret :: a -> M n [n]
+
+class InterpretB a n where
+  interpretB :: a -> M n [Bool]
 
 --------------------------------------------------------------------------------
 
