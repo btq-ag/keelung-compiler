@@ -17,7 +17,7 @@ tests = describe "Field" $ do
           y <- inputField Public
           return $ x * y + y * 2
     property $ \(x, y) -> do
-      runAll gf181Info program [toInteger x, toInteger y] [] [x * y + y * 2 :: GF181]
+      runPrime' gf181 program [toInteger x, toInteger y] [] [x * y + y * 2]
 
   it "arithmetics 2" $ do
     let program = do
@@ -26,7 +26,7 @@ tests = describe "Field" $ do
           z <- reuse $ x * y + y * 2
           return $ x * y - z
     property $ \(x, y) -> do
-      runAll gf181Info program [x] [toInteger y] [-y * 2 :: GF181]
+      runPrime' gf181 program [x] [toInteger y] [-y * 2]
 
   it "arithmetics 3" $ do
     let program = do
@@ -36,7 +36,7 @@ tests = describe "Field" $ do
           return $ x * z + y * 2
 
     property $ \(x, y) -> do
-      runAll gf181Info program [toInteger y] [toInteger x] [x * 3 + y * 2 :: GF181]
+      runPrime' gf181 program [toInteger y] [toInteger x] [x * 3 + y * 2]
 
   it "summation" $ do
     let program = do
@@ -46,7 +46,7 @@ tests = describe "Field" $ do
             return (accum + x :: Field)
 
     forAll (vector 4) $ \xs -> do
-      runAll gf181Info program (map toInteger xs) [] [sum xs :: GF181]
+      runPrime' gf181 program (map toInteger xs) [] [sum xs]
 
   it "eq (variable / variable)" $ do
     let program = do
@@ -56,8 +56,8 @@ tests = describe "Field" $ do
     property $ \(x', y') -> do
       let x = x' `mod` 4
           y = y' `mod` 4
-      let expectedOutput = if x == y then [1 :: GF181] else [0]
-      runAll gf181Info program [x, y] [] expectedOutput
+      let expectedOutput = if x == y then [1] else [0]
+      runPrime' gf181 program [x, y] [] expectedOutput
 
   it "eq (variable / constant)" $ do
     let program y = do
@@ -66,8 +66,8 @@ tests = describe "Field" $ do
     property $ \(x', y') -> do
       let x = x' `mod` 4
           y = y' `mod` 4
-      let expectedOutput = if x == y then [1 :: GF181] else [0]
-      runAll gf181Info (program y) [fromInteger x] [] expectedOutput
+      let expectedOutput = if x == y then [1] else [0]
+      runPrime' gf181 (program y) [fromInteger x] [] expectedOutput
 
   it "eq (constant / constant)" $ do
     let program x y = do
@@ -76,8 +76,8 @@ tests = describe "Field" $ do
     property $ \(x', y') -> do
       let x = x' `mod` 4
           y = y' `mod` 4
-      let expectedOutput = if x == y then [1 :: GF181] else [0]
-      runAll gf181Info (program x y) [] [] expectedOutput
+      let expectedOutput = if x == y then [1] else [0]
+      runPrime' gf181 (program x y) [] [] expectedOutput
 
   it "conditional (variable)" $ do
     let program = do
@@ -88,8 +88,8 @@ tests = describe "Field" $ do
     property $ \(x', y') -> do
       let x = x' `mod` 4
           y = y' `mod` 4
-      let expectedOutput = if (x `mod` 2) == 1 then [y :: GF181] else [5]
-      runAll gf181Info program [x `mod` 2, toInteger y] [] expectedOutput
+      let expectedOutput = if (x `mod` 2) == 1 then [y] else [5]
+      runPrime' gf181 program [x `mod` 2, toInteger y] [] expectedOutput
 
   it "exponentiation (variable base)" $ do
     let program i = do
@@ -97,13 +97,13 @@ tests = describe "Field" $ do
           return (x `pow` i)
     property $ \(x, i) -> do
       when (i >= 0) $ do
-        let expectedOutput = [x ^ (i :: Integer) :: GF181]
-        runAll gf181Info (program i) [toInteger x] [] expectedOutput
+        let expectedOutput = [x ^ (i :: Integer)]
+        runPrime' gf181 (program i) [toInteger x] [] expectedOutput
 
   it "exponentiation (constant base)" $ do
     let program x i = do
           return (fromIntegral x `pow` i)
     property $ \(x, i) -> do
       when (i >= 0) $ do
-        let expectedOutput = [x ^ (i :: Integer)]
-        runAll gf181Info (program (x :: GF181) i) [] [] expectedOutput
+        let expectedOutput = [x ^ (i :: Integer) :: Integer]
+        runPrime' gf181 (program (fromInteger x :: GF181) i) [] [] expectedOutput

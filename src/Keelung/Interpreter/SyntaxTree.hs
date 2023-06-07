@@ -32,20 +32,35 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
   -- interpret the assertions next
   -- throw error if any assertion fails
   forM_ (compAssertions comp) $ \e -> do
-    values <- interpret e
+    values <- interpretExpr e
     when (values /= [1]) $ do
       -- bindings <- get
       -- let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e)
   -- lastly interpret the expression and return the result
-  interpret expr
+  interpretExpr expr
 
 -- | Interpret a program with inputs.
 run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) [Integer]
 run elab inputs = fst <$> runAndOutputWitnesses elab inputs
 
 --------------------------------------------------------------------------------
+
+interpretExpr :: (GaloisField n, Integral n) => Expr -> M n [Integer]
+interpretExpr expr = case expr of
+    Unit -> return []
+    Boolean e -> do
+      result <- interpretB e
+      case result of
+        [True] -> return [1]
+        _ -> return [0]
+    Field e ->  map toInteger <$> interpret e
+    UInt e -> map uintValue <$> interpretU e
+    Array xs -> do 
+      result <- mapM interpretExpr xs
+      return $ concat result 
+
 
 -- | For handling div/mod statements
 -- we can solve a div/mod relation if we know:
@@ -300,17 +315,17 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
         [True] -> return [UVal w 1]
         _ -> return [UVal w 0]
 
-instance (GaloisField n, Integral n) => Interpret Expr n where
-  interpret expr = case expr of
-    Unit -> return []
-    Boolean e -> do
-      result <- interpretB e
-      case result of
-        [True] -> return [one]
-        _ -> return [zero]
-    Field e -> interpret e
-    UInt e -> map (fromInteger . uintValue) <$> interpretU e
-    Array xs -> concat <$> mapM interpret xs
+-- instance (GaloisField n, Integral n) => Interpret Expr n where
+--   interpret expr = case expr of
+--     Unit -> return []
+--     Boolean e -> do
+--       result <- interpretB e
+--       case result of
+--         [True] -> return [one]
+--         _ -> return [zero]
+--     Field e -> interpret e
+--     UInt e -> map (fromInteger . uintValue) <$> interpretU e
+--     Array xs -> concat <$> mapM interpret xs
 
 --------------------------------------------------------------------------------
 

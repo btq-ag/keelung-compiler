@@ -36,7 +36,7 @@ toBool = (/= 0)
 -- | The interpreter monad
 type M n = ReaderT Heap (StateT (Partial n) (Except (Error n)))
 
-runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n [n] -> Either (Error n) ([Integer], VarGroup.Witness Integer Integer Integer)
+runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n [Integer] -> Either (Error n) ([Integer], VarGroup.Witness Integer Integer Integer)
 runM heap inputs p = do
   partialBindings <- toPartialBindings inputs
   (result, partialBindings') <- runExcept (runStateT (runReaderT p heap) partialBindings)

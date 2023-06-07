@@ -28,7 +28,6 @@ import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax (widthOf)
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 

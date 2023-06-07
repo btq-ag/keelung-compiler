@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Test.Interpreter.Util (runAll, throwAll, debug, assertSize, gf181Info, prime, runPrime, runPrime', debugPrime) where
+module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, prime, runPrime', debugPrime) where
 
 import Control.Arrow (left, right)
 import Data.Field.Galois
@@ -21,14 +21,13 @@ import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
 type FieldInfo = (FieldType, Int, Integer, Integer)
 
 -- | syntax tree interpreter
-interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]
+interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
 interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborateAndEncode prog)
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
@@ -55,16 +54,18 @@ interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
 --------------------------------------------------------------------------------
 
 -- | Expect all interpreters to return the same output
-runAll :: (GaloisField n, Integral n, Encode t, Show t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> [n] -> IO ()
-runAll fieldInfo program rawPublicInputs rawPrivateInputs expected = do
-  -- syntax tree interpreter
-  interpretSyntaxTree program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right expected
-  -- constraint system interpreters
-  interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right expected
-  interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right expected
+-- runAll :: (GaloisField n, Integral n, Encode t, Show t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> [n] -> IO ()
+-- runAll fieldInfo program rawPublicInputs rawPrivateInputs expected = do
+--   -- syntax tree interpreter
+--   interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+--     `shouldBe` (Right (map toInteger expected) :: Either (Error n) [Integer])
+--     -- Right (map toInteger expected)
+--     -- (Right expected :: Either (Error (Prime n)) [Integer])
+--   -- constraint system interpreters
+--   interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+--     `shouldBe` Right expected
+--   interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+--     `shouldBe` Right expected
 
 -- | Expect all interpreters to throw an error
 throwAll :: (GaloisField n, Integral n, Encode t, Show t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
@@ -119,31 +120,31 @@ prime n = case someNatVal (fromIntegral n) of
      in (Prime (fromIntegral n), ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
   Nothing -> error "[ panic ] someNatVal failed"
 
-deriveFieldInfo :: KnownNat n => Either (Error (Prime n)) [Prime n] -> FieldInfo
-deriveFieldInfo result =
-  let number = natVal (deriveProxy result)
-      fieldNumber = deriveFieldNumber result
-   in (Prime (fromIntegral number), ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
-  where
-    deriveProxy :: KnownNat n => Either (Error (Prime n)) [Prime n] -> Proxy n
-    deriveProxy _ = Proxy
+-- deriveFieldInfo :: KnownNat n => Either (Error (Prime n)) [Prime n] -> FieldInfo
+-- deriveFieldInfo result =
+--   let number = natVal (deriveProxy result)
+--       fieldNumber = deriveFieldNumber result
+--    in (Prime (fromIntegral number), ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
+--   where
+--     deriveProxy :: KnownNat n => Either (Error (Prime n)) [Prime n] -> Proxy n
+--     deriveProxy _ = Proxy
 
-    deriveFieldNumber :: KnownNat n => Either (Error (Prime n)) [Prime n] -> Prime n
-    deriveFieldNumber _ = asProxyTypeOf 0 Proxy
+--     deriveFieldNumber :: KnownNat n => Either (Error (Prime n)) [Prime n] -> Prime n
+--     deriveFieldNumber _ = asProxyTypeOf 0 Proxy
 
 -- | Expect all interpreters to return the same output
-runPrime :: KnownNat n => (Encode t, Show t) => Comp t -> [Integer] -> [Integer] -> [Prime n] -> IO ()
-runPrime program rawPublicInputs rawPrivateInputs expected = do
-  -- syntax tree interpreter
-  let result = interpretSyntaxTree program rawPublicInputs rawPrivateInputs
-  let fieldInfo = deriveFieldInfo result
+-- runPrime :: KnownNat n => (Encode t, Show t) => Comp t -> [Integer] -> [Integer] -> [Prime n] -> IO ()
+-- runPrime program rawPublicInputs rawPrivateInputs expected = do
+--   -- syntax tree interpreter
+--   let result = interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+--   let fieldInfo = deriveFieldInfo result
 
-  result `shouldBe` Right expected
-  -- constraint system interpreters
-  interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right expected
-  interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-    `shouldBe` Right expected
+--   result `shouldBe` Right expected
+--   -- constraint system interpreters
+--   interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+--     `shouldBe` Right expected
+--   interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+--     `shouldBe` Right expected
 
 runPrime' :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
 runPrime' fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldType fieldType handlePrime handleBinary
@@ -151,8 +152,7 @@ runPrime' fieldType program rawPublicInputs rawPrivateInputs expected = caseFiel
     handlePrime :: KnownNat n => FieldInfo -> Proxy (Prime n) -> IO ()
     handlePrime fieldInfo (_ :: Proxy (Prime n)) = do
       let expected' = map fromInteger expected :: [Prime n]
-      -- traceShowM expected'
-      interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` Right expected'
+      interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- constraint system interpreters
       interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Right expected'
@@ -162,7 +162,7 @@ runPrime' fieldType program rawPublicInputs rawPrivateInputs expected = caseFiel
     handleBinary :: KnownNat n => FieldInfo -> Proxy (Binary n) -> IO ()
     handleBinary fieldInfo (_ :: Proxy (Binary n)) = do
       let expected' = map fromInteger expected :: [Binary n]
-      interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` Right expected'
+      interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- constraint system interpreters
       interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Right expected'
