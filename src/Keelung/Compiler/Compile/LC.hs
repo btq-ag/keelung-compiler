@@ -17,8 +17,8 @@ fromEither :: Either n (PolyG Ref n) -> LC n
 fromEither = either Constant Polynomial
 
 -- | Converting from a 'Either RefU n' to a 'LC n'.
-fromRefU :: (Num n, Eq n) => Either RefU n -> LC n
-fromRefU (Right val) = Constant val
+fromRefU :: (Num n, Eq n) => Either RefU Integer -> LC n
+fromRefU (Right val) = Constant (fromInteger val)
 fromRefU (Left var) =
   let width = widthOf var
       bits = [(B (RefUBit width var i), 2 ^ i) | i <- [0 .. width - 1]]

@@ -139,7 +139,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
 
 -- | UInt expressions
 data ExprU n
-  = ValU Width n
+  = ValU Width Integer
   | VarU Width Var
   | VarUO Width Var
   | VarUI Width Var

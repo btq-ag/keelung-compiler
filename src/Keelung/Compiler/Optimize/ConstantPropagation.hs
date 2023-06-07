@@ -22,7 +22,7 @@ run (Internal exprs fieldWidth counters assertions sideEffects) = runM $ do
     <*> mapM propagateExpr assertions
     <*> pure sideEffects'
 
-type Bindings n = Struct (IntMap n) (IntMap n) (IntMap n)
+type Bindings n = Struct (IntMap n) (IntMap n) (IntMap Integer)
 
 type M n = State (Bindings n)
 

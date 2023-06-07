@@ -14,12 +14,13 @@ import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
-import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
+import qualified Data.Bits
+import Control.Arrow (right)
 
 --------------------------------------------------------------------------------
 
@@ -179,8 +180,8 @@ writeValF a x = addC [CVarBindF (F a) x]
 writeValB :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
 writeValB a x = addC [CVarBindB a x]
 
-writeValU :: (GaloisField n, Integral n) => Width -> RefU -> n -> M n ()
-writeValU width a x = forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width a i) (FieldBits.testBit' x i)
+writeValU :: (GaloisField n, Integral n) => Width -> RefU -> Integer -> M n ()
+writeValU width a x = forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width a i) (Data.Bits.testBit x i)
 
 writeEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
 writeEq a b = addC [CVarEq a b]
@@ -211,11 +212,11 @@ addEqZeroHintWithPoly (Left 0) m = writeValF m 0
 addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
-addDivModHint :: (GaloisField n, Integral n) => Either RefU n -> Either RefU n -> Either RefU n -> Either RefU n -> M n ()
-addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (x, y, q, r) : cmDivMods cs}
+addDivModHint :: (GaloisField n, Integral n) => Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> M n ()
+addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (right fromInteger x, right fromInteger y, right fromInteger q, right fromInteger r) : cmDivMods cs}
 
-addModInvHint :: (GaloisField n, Integral n) => Either RefU n -> Either RefU n -> Either RefU n -> Integer -> M n ()
-addModInvHint a output n p = modify' $ \cs -> cs {cmModInvs = (a, output, n, p) : cmModInvs cs}
+addModInvHint :: (GaloisField n, Integral n) => Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Integer -> M n ()
+addModInvHint a output n p = modify' $ \cs -> cs {cmModInvs = (right fromInteger a, right fromInteger output, right fromInteger n, fromInteger p) : cmModInvs cs}
 
 addBooleanConstraint :: (GaloisField n, Integral n) => RefB -> M n ()
 addBooleanConstraint x = writeMulWithLC (1 @ B x) (1 @ B x) (1 @ B x)

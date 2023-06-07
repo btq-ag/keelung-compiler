@@ -141,7 +141,7 @@ linkConstraintModule cm =
        in (reindexRefB occurrences (RefUBit (widthOf refU) refU 0), width)
 
     divMods = map (\(a, b, q, r) -> (left reindexBits a, left reindexBits b, left reindexBits q, left reindexBits r)) $ cmDivMods cm
-    modInvs = map (\(a, output, n, p) -> (left reindexBits a, left reindexBits output, left reindexBits n, p)) $ cmModInvs cm
+    modInvs = map (\(a, output, n, p) -> (left reindexBits a, left reindexBits output, left reindexBits n, toInteger p)) $ cmModInvs cm
 
 -------------------------------------------------------------------------------
 

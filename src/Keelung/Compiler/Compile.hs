@@ -23,7 +23,6 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
-import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Field (FieldType)
@@ -422,7 +421,7 @@ compileExprU out expr = case expr of
       Right val -> do
         forM_ [0 .. w - 1] $ \i -> do
           let i' = (i - n) `mod` w
-          writeValB (RefUBit w out i) (FieldBits.testBit' val i') -- out[i] = val[i']
+          writeValB (RefUBit w out i) (Data.Bits.testBit val i') -- out[i] = val[i']
   ShLU w n x -> do
     x' <- wireU' x
     case compare n 0 of
@@ -438,14 +437,14 @@ compileExprU out expr = case expr of
           let i' = i - n
           case x' of
             Left var -> writeEqB (RefUBit w out i) (RefUBit w var i') -- out[i] = x'[i']
-            Right val -> writeValB (RefUBit w out i) (FieldBits.testBit' val i') -- out[i] = x'[i']
+            Right val -> writeValB (RefUBit w out i) (Data.Bits.testBit val i') -- out[i] = x'[i']
       LT -> do
         -- shift lower bits
         forM_ [0 .. w + n - 1] $ \i -> do
           let i' = i - n
           case x' of
             Left var -> writeEqB (RefUBit w out i) (RefUBit w var i') -- out[i] = x'[i']
-            Right val -> writeValB (RefUBit w out i) (FieldBits.testBit' val i') -- out[i] = x'[i']
+            Right val -> writeValB (RefUBit w out i) (Data.Bits.testBit val i') -- out[i] = x'[i']
             -- fill upper bits with 0s
         forM_ [w + n .. w - 1] $ \i -> do
           writeValB (RefUBit w out i) False -- out[i] = 0
@@ -460,7 +459,7 @@ compileExprU out expr = case expr of
         else do
           case x' of
             Left var -> writeEqB (RefUBit w out i) (RefUBit w var i) -- out[i] = x'[i]
-            Right val -> writeValB (RefUBit w out i) (FieldBits.testBit' val i) -- out[i] = x'[i]
+            Right val -> writeValB (RefUBit w out i) (Data.Bits.testBit val i) -- out[i] = x'[i]
   BtoU w x -> do
     -- 1. wire 'out[ZERO]' to 'x'
     result <- compileExprB x
@@ -484,7 +483,7 @@ wireU expr = do
   compileExprU out expr
   return out
 
-wireU' :: (GaloisField n, Integral n) => ExprU n -> M n (Either RefU n)
+wireU' :: (GaloisField n, Integral n) => ExprU n -> M n (Either RefU Integer)
 wireU' (ValU _ val) = return (Right val)
 wireU' others = Left <$> wireU others
 
@@ -496,7 +495,7 @@ wireU' others = Left <$> wireU others
 --      C       = 2ⁿ⁺¹Cₙ + 2ⁿCₙ₋₁ + ... + 2C₁ + C₀
 --      Result  =          2ⁿCₙ₋₁ + ... + 2C₁ + C₀
 --      C       = A + B
-compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddOrSubU isSub width out (Right a) (Right b) = do
   let val = if isSub then a - b else a + b
   writeValU width out val
@@ -505,13 +504,13 @@ compileAddOrSubU isSub width out (Right a) (Left b) = do
   addBooleanConstraint carry
   let bs = [(B (RefUBit width b i), if isSub then -(2 ^ i) else 2 ^ i) | i <- [0 .. width - 1]]
   let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  writeAdd a $ bs <> carryAndResult
+  writeAdd (fromInteger a) $ bs <> carryAndResult
 compileAddOrSubU isSub width out (Left a) (Right b) = do
   carry <- freshRefB
   addBooleanConstraint carry
   let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
   let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  writeAdd (if isSub then -b else b) $ as <> carryAndResult
+  writeAdd (fromInteger $ if isSub then -b else b) $ as <> carryAndResult
 compileAddOrSubU isSub width out (Left a) (Left b) = do
   carry <- freshRefB
   addBooleanConstraint carry
@@ -522,24 +521,24 @@ compileAddOrSubU isSub width out (Left a) (Left b) = do
 
   writeAdd 0 $ as <> bs <> carryAndResult
 
-compileAddBig :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileAddBig :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddBig width out (Right a) (Right b) = do
-  let val = a + b
-  writeValU width out val
-compileAddBig width out (Right a) (Left b) = do
-  -- carry <- freshRefB
-  -- addBooleanConstraint carry
-  -- let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
-  -- let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  -- writeAdd a $ bs <> carryAndResult
-  compileAddBig width out (Left b) (Right a)  
+  let summation = toInteger a + toInteger b
+  fieldWidth <- gets cmFieldWidth
+  -- because we need some extra bits for carry when adding two UInts
+  -- a limb should have width `fieldWidth - 1 - carryWidth`
+  let carryWidth = 1
+  let limbWidth = fieldWidth - 1 - carryWidth
+  mapM_ (go limbWidth summation) [0, limbWidth .. width - 1]
+  where
+    go :: (GaloisField n, Integral n) => Int -> Integer -> Int -> M n ()
+    go limbWidth summation limbStart = do
+      let range = [limbStart .. (limbStart + limbWidth - 1) `min` (width - 1)]
+      forM_ range $ \i -> do
+        let bit = Data.Bits.testBit summation i
+        writeValB (RefUBit width out i) bit
+compileAddBig width out (Right a) (Left b) = compileAddBig width out (Left b) (Right a)
 compileAddBig width out (Left a) (Right b) = do
-  -- carry <- freshRefB
-  -- addBooleanConstraint carry
-  -- let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-  -- let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  -- writeAdd b $ as <> carryAndResult
-
   fieldWidth <- gets cmFieldWidth
   -- because we need some extra bits for carry when adding two UInts
   -- a limb should have width `fieldWidth - 1 - carryWidth`
@@ -551,7 +550,7 @@ compileAddBig width out (Left a) (Right b) = do
     go limbWidth previousCarry limbStart = do
       let range = [0 .. (limbWidth - 1) `min` (width - 1 - limbStart)]
       let as = [(B (RefUBit width a (limbStart + i)), 2 ^ i) | i <- range]
-      let bs = toInteger $ sum [FieldBits.testBit b (limbStart + i) * (2 ^ (limbStart + i)) | i <- range]
+      let bs = sum [(if Data.Bits.testBit b (limbStart + i) then 1 else 0) * (2 ^ (limbStart + i)) | i <- range]
       let result = [(B (RefUBit width out (limbStart + i)), -(2 ^ i)) | i <- range]
       case previousCarry of
         Nothing -> do
@@ -632,18 +631,18 @@ compileAddBig width out (Left a) (Left b) = do
 
 -- writeAdd 0 $ as <> bs <> carryAndResult
 
-compileAddOrSubU2 :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileAddOrSubU2 :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddOrSubU2 isSub width out (Right a) (Right b) = do
   let val = if isSub then a - b else a + b
   writeValU (width * 2) out val
 compileAddOrSubU2 isSub width out (Right a) (Left b) = do
   let bs = [(B (RefUBit width b i), if isSub then -(2 ^ i) else 2 ^ i) | i <- [0 .. width - 1]]
   let outputBits = [(B (RefUBit (width * 2) out i), -(2 ^ i)) | i <- [0 .. width * 2 - 1]]
-  writeAdd a $ bs <> outputBits
+  writeAdd (fromInteger a) $ bs <> outputBits
 compileAddOrSubU2 isSub width out (Left a) (Right b) = do
   let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
   let outputBits = [(B (RefUBit (width * 2) out i), -(2 ^ i)) | i <- [0 .. width * 2 - 1]]
-  writeAdd (if isSub then -b else b) $ as <> outputBits
+  writeAdd (fromInteger $ if isSub then -b else b) $ as <> outputBits
 compileAddOrSubU2 isSub width out (Left a) (Left b) = do
   -- out + carry = A + B
   let as = [(B (RefUBit width a i), -(2 ^ i)) | i <- [0 .. width - 1]]
@@ -652,13 +651,13 @@ compileAddOrSubU2 isSub width out (Left a) (Left b) = do
 
   writeAdd 0 $ as <> bs <> outputBits
 
-compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddU = compileAddBig
 
-compileAddU2 :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileAddU2 :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddU2 = compileAddOrSubU2 False
 
-compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileSubU = compileAddOrSubU True
 
 -- | Encoding addition on UInts with multiple operands: O(2)
@@ -666,7 +665,7 @@ compileSubU = compileAddOrSubU True
 --      B       =   2ⁿBₙ₋₁ + ... + 2B₁ + B₀
 --      C       = 2²ⁿC₂ₙ₋₁ + ... + 2C₁ + C₀
 --      Result  =   2ⁿCₙ₋₁ + ... + 2C₁ + C₀
-compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileMulU width out (Right a) (Right b) = do
   let val = a * b
   writeValU width out val
@@ -675,13 +674,13 @@ compileMulU width out (Right a) (Left b) = do
   let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
   let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
   let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-  writeMul (a, []) (0, bs) (0, outputSegment <> carrySegment)
+  writeMul (fromInteger a, []) (0, bs) (0, outputSegment <> carrySegment)
 compileMulU width out (Left a) (Right b) = do
   carry <- replicateM width (B <$> freshRefB)
   let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
   let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
   let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-  writeMul (0, as) (b, []) (0, outputSegment <> carrySegment)
+  writeMul (0, as) (fromInteger b, []) (0, outputSegment <> carrySegment)
 compileMulU width out (Left a) (Left b) = do
   carry <- replicateM width (B <$> freshRefB)
 
@@ -692,18 +691,18 @@ compileMulU width out (Left a) (Left b) = do
 
   writeMul (0, as) (0, bs) (0, outputSegment <> carrySegment)
 
-compileMulU2 :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU n -> Either RefU n -> M n ()
+compileMulU2 :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileMulU2 width out (Right a) (Right b) = do
   let val = a * b
   writeValU (width * 2) out val
 compileMulU2 width out (Right a) (Left b) = do
   let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
   let outputBits = [(B (RefUBit (width * 2) out i), 2 ^ i) | i <- [0 .. width * 2 - 1]]
-  writeMul (a, []) (0, bs) (0, outputBits)
+  writeMul (fromInteger a, []) (0, bs) (0, outputBits)
 compileMulU2 width out (Left a) (Right b) = do
   let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
   let outputBits = [(B (RefUBit (width * 2) out i), 2 ^ i) | i <- [0 .. width * 2 - 1]]
-  writeMul (0, as) (b, []) (0, outputBits)
+  writeMul (0, as) (fromInteger b, []) (0, outputBits)
 compileMulU2 width out (Left a) (Left b) = do
   let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
   let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
@@ -762,7 +761,7 @@ compileIfF (Left p) (Polynomial x) (Polynomial y) = do
 --  out = p * x + y - p * y
 --      =>
 --  (out - y) = p * (x - y)
-compileIfU :: (GaloisField n, Integral n) => Width -> Either RefB Bool -> Either RefU n -> Either RefU n -> M n (Either RefU n)
+compileIfU :: (GaloisField n, Integral n) => Width -> Either RefB Bool -> Either RefU Integer -> Either RefU Integer -> M n (Either RefU Integer)
 compileIfU _ (Right True) x _ = return x
 compileIfU _ (Right False) _ y = return y
 compileIfU width (Left p) (Right x) (Right y) = do
@@ -772,7 +771,7 @@ compileIfU width (Left p) (Right x) (Right y) = do
       out <- freshRefU width
       let bits = [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
       -- (x - y) * p - out + y = 0
-      writeAdd y $ (B p, x - y) : bits
+      writeAdd (fromInteger y) $ (B p, fromInteger (x - y)) : bits
       return $ Left out
 compileIfU width (Left p) (Right x) (Left y) = do
   out <- freshRefU width
@@ -781,7 +780,7 @@ compileIfU width (Left p) (Right x) (Left y) = do
   -- (out - y) = p * (x - y)
   writeMul
     (0, [(B p, 1)])
-    (x, bitsY)
+    (fromInteger x, bitsY)
     (0, bitsY <> bitsOut)
   return $ Left out
 compileIfU width (Left p) (Left x) (Right y) = do
@@ -791,8 +790,8 @@ compileIfU width (Left p) (Left x) (Right y) = do
   -- (out - y) = p * (x - y)
   writeMul
     (0, [(B p, 1)])
-    (-y, bitsX)
-    (-y, bitsOut)
+    (fromInteger (-y), bitsX)
+    (fromInteger (-y), bitsOut)
   return $ Left out
 compileIfU width (Left p) (Left x) (Left y) = do
   out <- freshRefU width
@@ -837,7 +836,7 @@ assertDivModU width dividend divisor quotient remainder = do
 
 -- | Assert that a UInt is less than or equal to some constant
 -- reference doc: A.3.2.2 Range Check https://zips.z.cash/protocol/protocol.pdf
-assertLTE :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
+assertLTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
 assertLTE _ (Right a) bound = if fromIntegral a <= bound then return () else throwError $ Compile.AssertComparisonError (toInteger a) LT (succ bound)
 assertLTE width (Left a) bound
   | bound < 0 = throwError $ Compile.AssertLTEBoundTooSmallError bound
@@ -907,7 +906,7 @@ assertLTE width (Left a) bound
               return $ Just acc
 
 -- | Assert that a UInt is less than some constant
-assertLT :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
+assertLT :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
 assertLT width a c = do
   -- check if the bound is within the range of the UInt
   when (c < 1) $
@@ -920,7 +919,7 @@ assertLT width a c = do
   assertLTE width a (c - 1)
 
 -- | Assert that a UInt is greater than or equal to some constant
-assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
+assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
 assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Compile.AssertComparisonError (succ (toInteger a)) GT c
 assertGTE width (Left a) bound
   | bound < 1 = throwError $ Compile.AssertGTEBoundTooSmallError bound
@@ -984,7 +983,7 @@ assertGTE width (Left a) bound
               return (F flag')
 
 -- | Assert that a UInt is greater than some constant
-assertGT :: (GaloisField n, Integral n) => Width -> Either RefU n -> Integer -> M n ()
+assertGT :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
 assertGT width a c = do
   -- check if the bound is within the range of the UInt
   when (c < 0) $

@@ -62,7 +62,7 @@ tests = do
                 return (x, y)
           forAll genPair $ \(x, y) -> do
             let expected = [(x + y) `mod` 16]
-            runPrime gf181 (program (fromInteger x) (fromInteger y)) [] [] expected
+            runPrime (Prime 13) (program (fromInteger x) (fromInteger y)) [] [] expected
 
         it "10 bit / GF257" $ do
           let program = do

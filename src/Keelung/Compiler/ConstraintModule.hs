@@ -60,7 +60,7 @@ data ConstraintModule n = ConstraintModule
     -- a = b * q + r
     cmDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
     -- hints for generating witnesses for ModInv constraints
-    cmModInvs :: [(Either RefU n, Either RefU n, Either RefU n, Integer)]
+    cmModInvs :: [(Either RefU n, Either RefU n, Either RefU n, n)]
   }
   deriving (Eq, Generic, NFData)
 

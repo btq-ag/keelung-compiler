@@ -6,12 +6,12 @@ import Data.Sequence (Seq (..))
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Compiler.Compile.LC
 import Data.Foldable (toList)
+import qualified Data.Bits
 
-compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU n)) -> (ExprF n -> M n (LC n)) -> ExprB n -> M n (Either RefB Bool)
+compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> (ExprF n -> M n (LC n)) -> ExprB n -> M n (Either RefB Bool)
 compileExprB compileU compileF expr =
   let compile = compileExprB compileU compileF
    in case expr of
@@ -92,7 +92,7 @@ compileExprB compileU compileF expr =
           result <- compileU x
           case result of
             Left var -> return $ Left (RefUBit width var (i `mod` width)) -- out = x'[i]
-            Right val -> return $ Right (FieldBits.testBit' val index)
+            Right val -> return $ Right (Data.Bits.testBit val index)
 
 --------------------------------------------------------------------------------
 
@@ -251,18 +251,18 @@ computeLTEUVarVar x y = do
   -- starting from the least significant bit
   Left <$> foldM (compileLTEUVarVarPrim width x y) result [1 .. width - 1]
 
-computeLTEUVarConst :: (GaloisField n, Integral n) => RefU -> n -> M n (Either RefB Bool)
+computeLTEUVarConst :: (GaloisField n, Integral n) => RefU -> Integer -> M n (Either RefB Bool)
 computeLTEUVarConst x y = do
   let width = widthOf x
   -- starting from the least significant bit
-  let pairs = [(RefUBit width x i, FieldBits.testBit' y i) | i <- [0 .. width - 1]]
+  let pairs = [(RefUBit width x i, Data.Bits.testBit y i) | i <- [0 .. width - 1]]
   foldM compileLTEUVarConstPrim (Right True) pairs
 
-computeLTEUConstVar :: (GaloisField n, Integral n) => n -> RefU -> M n (Either RefB Bool)
+computeLTEUConstVar :: (GaloisField n, Integral n) => Integer -> RefU -> M n (Either RefB Bool)
 computeLTEUConstVar x y = do
   let width = widthOf y
   -- starting from the least significant bit
-  let pairs = [(FieldBits.testBit' x i, RefUBit width y i) | i <- [0 .. width - 1]]
+  let pairs = [(Data.Bits.testBit x i, RefUBit width y i) | i <- [0 .. width - 1]]
   foldM compileLTEUConstVarPrim (Right True) pairs
 
 -- Compiling a < b, where a and b are both variables
@@ -304,18 +304,18 @@ compileLTEUVarVarPrim width x y acc i = do
 
   return result
 
-computeLTUVarConst :: (GaloisField n, Integral n) => RefU -> n -> M n (Either RefB Bool)
+computeLTUVarConst :: (GaloisField n, Integral n) => RefU -> Integer -> M n (Either RefB Bool)
 computeLTUVarConst x y = do
   let width = widthOf x
   -- starting from the least significant bit
-  let pairs = [(RefUBit width x i, FieldBits.testBit' y i) | i <- [0 .. width - 1]]
+  let pairs = [(RefUBit width x i, Data.Bits.testBit y i) | i <- [0 .. width - 1]]
   foldM compileLTEUVarConstPrim (Right False) pairs
 
-computeLTUConstVar :: (GaloisField n, Integral n) => n -> RefU -> M n (Either RefB Bool)
+computeLTUConstVar :: (GaloisField n, Integral n) => Integer -> RefU -> M n (Either RefB Bool)
 computeLTUConstVar x y = do
   let width = widthOf y
   -- starting from the least significant bit
-  let pairs = [(FieldBits.testBit' x i, RefUBit width y i) | i <- [0 .. width - 1]]
+  let pairs = [(Data.Bits.testBit x i, RefUBit width y i) | i <- [0 .. width - 1]]
   foldM compileLTEUConstVarPrim (Right False) pairs
 
 compileLTEUVarConstPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (RefB, Bool) -> M n (Either RefB Bool)
