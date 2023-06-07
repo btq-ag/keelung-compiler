@@ -521,6 +521,52 @@ compileAddOrSubU isSub width out (Left a) (Left b) = do
 
   writeAdd 0 $ as <> bs <> carryAndResult
 
+compileAddBig' :: (GaloisField n, Integral n) => Width -> RefU -> [RefU] -> Integer -> M n ()
+compileAddBig' width out [] constant = do
+  -- constants only
+  fieldWidth <- gets cmFieldWidth
+  let carryWidth = 0 -- no carry needed
+  let limbWidth = fieldWidth - 1 - carryWidth
+  mapM_ (go limbWidth) [0, limbWidth .. width - 1]
+  where
+    go :: (GaloisField n, Integral n) => Int -> Int -> M n ()
+    go limbWidth limbStart = do
+      let range = [limbStart .. (limbStart + limbWidth - 1) `min` (width - 1)]
+      forM_ range $ \i -> do
+        let bit = Data.Bits.testBit constant i
+        writeValB (RefUBit width out i) bit
+compileAddBig' width out vars constant = do
+  fieldWidth <- gets cmFieldWidth
+  -- because we need some extra bits for carry when adding UInts
+  -- a limb should have width `fieldWidth - 1 - carryWidth`
+  let carryWidth = ceiling (logBase 2 (fromIntegral $ length vars) :: Double) :: Int
+  let limbWidth = fieldWidth - 1 - carryWidth
+  foldM_ (go limbWidth carryWidth) Nothing [0, limbWidth .. width - 1]
+  where
+    go :: (GaloisField n, Integral n) => Int -> Int -> Maybe [RefB] -> Int -> M n (Maybe [RefB])
+    go limbWidth carryWidth previousCarries limbStart = do
+      let range = [0 .. (limbWidth - 1) `min` (width - 1 - limbStart)]
+      let ofVars = concat [[(B (RefUBit width var (limbStart + i)), 2 ^ i) | i <- range] | var <- vars]
+      let ofConstants = sum [(if Data.Bits.testBit constant (limbStart + i) then 1 else 0) * (2 ^ (limbStart + i)) | i <- range]
+      let result = [(B (RefUBit width out (limbStart + i)), -(2 ^ i)) | i <- range]
+      case previousCarries of
+        Nothing -> do
+          -- constants + vars = out + carry
+          carries <- replicateM carryWidth freshRefB 
+          mapM_ addBooleanConstraint carries
+          let ofCarries = [(B carryVar, -(2 ^ (limbStart + limbWidth + i))) | (i, carryVar) <- zip [0 .. ] carries]
+          writeAdd (fromInteger ofConstants) $ ofVars <> ofCarries <> result
+          return $ Just carries
+        Just previousCarries' -> do
+          -- as + bs + previousCarry = out + carry
+          carries <- replicateM carryWidth freshRefB 
+          mapM_ addBooleanConstraint carries
+          let ofCarries = [(B carryVar, -(2 ^ (limbStart + limbWidth + i))) | (i, carryVar) <- zip [0 .. ] carries]
+          let ofPreviousCarries = [(B carryVar, 2 ^ (limbStart + i)) | (i, carryVar) <- zip [0 .. ] previousCarries']
+          writeAdd (fromInteger ofConstants) $ ofVars <> ofPreviousCarries <> ofCarries <> result
+          return $ Just carries
+
+
 compileAddBig :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddBig width out (Right a) (Right b) = do
   let summation = toInteger a + toInteger b
