@@ -29,39 +29,11 @@ import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
--- | Homogeneous version of 'Struct'
-data VarGroup a = VarGroup a a (IntMap a)
-  deriving (Eq, Show, Generic)
-
-instance NFData a => NFData (VarGroup a)
-
-instance Functor VarGroup where
-  fmap func (VarGroup f b u) = VarGroup (func f) (func b) (fmap func u)
-
-instance Foldable VarGroup where
-  foldMap func (VarGroup f b u) = func f <> func b <> foldMap func u
-
-instance Semigroup a => Semigroup (VarGroup a) where
-  VarGroup f1 b1 u1 <> VarGroup f2 b2 u2 =
-    VarGroup (f1 <> f2) (b1 <> b2) (u1 <> u2)
-
-instance Monoid a => Monoid (VarGroup a) where
-  mempty = VarGroup mempty mempty mempty
-
-instance Serialize n => Serialize (VarGroup n)
-
---------------------------------------------------------------------------------
-
 class HasF a f | a -> f where
   getF :: a -> f
   putF :: f -> a -> a
   modifyF :: (f -> f) -> a -> a
   modifyF f x = putF (f (getF x)) x
-
-instance HasF (VarGroup f) f where
-  getF (VarGroup f _ _) = f
-  putF f (VarGroup _ b u) = VarGroup f b u
-  modifyF func (VarGroup f b u) = VarGroup (func f) b u
 
 instance HasF (Struct f b u) f where
   getF (Struct f _ _) = f
@@ -75,11 +47,6 @@ class HasB a b | a -> b where
   putB :: b -> a -> a
   modifyB :: (b -> b) -> a -> a
   modifyB f x = putB (f (getB x)) x
-
-instance HasB (VarGroup b) b where
-  getB (VarGroup _ b _) = b
-  putB b (VarGroup f _ u) = VarGroup f b u
-  modifyB func (VarGroup f b u) = VarGroup f (func b) u
 
 instance HasB (Struct f b u) b where
   getB (Struct _ b _) = b
@@ -104,10 +71,6 @@ class HasU a u | a -> u where
 
   modifyUAll :: (IntMap u -> IntMap u) -> a -> a
   modifyUAll f x = putUAll (f (getUAll x)) x
-
-instance HasU (VarGroup u) u where
-  getUAll (VarGroup _ _ u) = u
-  putUAll u (VarGroup f b _) = VarGroup f b u
 
 instance HasU (Struct n n n) n where
   getUAll (Struct _ _ u) = u
@@ -182,11 +145,17 @@ instance HasX (VarGroups n) n where
 
 --------------------------------------------------------------------------------
 
-type Witness n = VarGroups (VarGroup (Vector n))
+type Witness n = VarGroups (Struct (Vector n) (Vector n) (Vector n))
+
+convertWitness :: Integral a => Witness a -> Witness Integer
+convertWitness (VarGroups o i p x) = VarGroups (convertStruct o) (convertStruct i) (convertStruct p) (convertStruct x)
+  where
+    convertStruct :: Integral a => Struct (Vector a) (Vector a) (Vector a) -> Struct (Vector Integer) (Vector Integer) (Vector Integer)
+    convertStruct (Struct f b us) = Struct (fmap toInteger f) (fmap toInteger b) (IntMap.map (fmap toInteger) us)
 
 --------------------------------------------------------------------------------
 
-type VarSet n = VarGroups (VarGroup IntSet)
+type VarSet n = VarGroups (Struct IntSet IntSet IntSet)
 
 showList' :: [String] -> String
 showList' xs = "[" <> List.intercalate ", " xs <> "]"
@@ -194,10 +163,10 @@ showList' xs = "[" <> List.intercalate ", " xs <> "]"
 instance {-# OVERLAPPING #-} Show (VarSet n) where
   show (VarGroups o i p x) =
     showList' $
-      showVarGroup "O" o <> showVarGroup "I" i <> showVarGroup "P" p <> showVarGroup "X" x
+      showStruct "O" o <> showStruct "I" i <> showStruct "P" p <> showStruct "X" x
     where
-      showVarGroup :: String -> VarGroup IntSet -> [String]
-      showVarGroup prefix (VarGroup f b u) =
+      showStruct :: String -> Struct IntSet IntSet IntSet -> [String]
+      showStruct prefix (Struct f b u) =
         map (\var -> "B" <> prefix <> show var) (IntSet.toList b)
           <> map (\var -> "F" <> prefix <> show var) (IntSet.toList f)
           <> concatMap (\(width, xs) -> map (\var -> "U" <> toSubscript width <> prefix <> show var) (IntSet.toList xs)) (IntMap.toList u)
@@ -221,19 +190,19 @@ toSubscript = map go . show
 --------------------------------------------------------------------------------
 
 -- | Data structure for interpreters
-type Partial n = VarGroups (VarGroup (PartialBinding n))
+type Partial n = VarGroups (Struct (PartialBinding n) (PartialBinding n) (PartialBinding n))
 
 -- | Expected number of bindings and actual bindings
 type PartialBinding n = (Int, IntMap n)
 
 instance {-# OVERLAPPING #-} (GaloisField n, Integral n) => Show (Partial n) where
-  show (VarGroups o i p x) = showList' $ showVarGroup "O" o <> showVarGroup "I" i <> showVarGroup "P" p <> showVarGroup "" x
+  show (VarGroups o i p x) = showList' $ showStruct "O" o <> showStruct "I" i <> showStruct "P" p <> showStruct "" x
     where
       showPartialBinding :: (GaloisField n, Integral n) => String -> (Int, IntMap n) -> IntMap String
       showPartialBinding prefix (_size, bindings) = IntMap.mapWithKey (\k v -> prefix <> show k <> " := " <> show (N v)) bindings
 
-      showVarGroup :: (GaloisField n, Integral n) => String -> VarGroup (PartialBinding n) -> [String]
-      showVarGroup suffix (VarGroup f b u) =
+      showStruct :: (GaloisField n, Integral n) => String -> Struct (PartialBinding n) (PartialBinding n) (PartialBinding n) -> [String]
+      showStruct suffix (Struct f b u) =
         toList (showPartialBinding ("F" <> suffix) f)
           <> toList (showPartialBinding ("B" <> suffix) b)
           <> concatMap (\(width, xs) -> toList (showPartialBinding ("U" <> suffix <> toSubscript width) xs)) (IntMap.toList u)
@@ -243,19 +212,19 @@ toTotal :: Partial n -> Either (VarSet n) (Witness n)
 toTotal (VarGroups o i p x) =
   toEither $
     VarGroups
-      <$> first (\struct -> VarGroups struct mempty mempty mempty) (convertVarGroup o)
-      <*> first (\struct -> VarGroups mempty struct mempty mempty) (convertVarGroup i)
-      <*> first (\struct -> VarGroups mempty mempty struct mempty) (convertVarGroup p)
-      <*> first (VarGroups mempty mempty mempty) (convertVarGroup x)
+      <$> first (\struct -> VarGroups struct mempty mempty mempty) (convertStruct o)
+      <*> first (\struct -> VarGroups mempty struct mempty mempty) (convertStruct i)
+      <*> first (\struct -> VarGroups mempty mempty struct mempty) (convertStruct p)
+      <*> first (VarGroups mempty mempty mempty) (convertStruct x)
   where
-    convertVarGroup ::
-      VarGroup (PartialBinding n) ->
-      Validation (VarGroup IntSet) (VarGroup (Vector n))
-    convertVarGroup (VarGroup f b u) =
-      VarGroup
-        <$> first (\set -> VarGroup set mempty mempty) (toTotal' f)
-        <*> first (\set -> VarGroup mempty set mempty) (toTotal' b)
-        <*> first (VarGroup mempty mempty) (sequenceIntMap toTotal' u)
+    convertStruct ::
+      Struct (PartialBinding n) (PartialBinding n) (PartialBinding n) ->
+      Validation (Struct IntSet IntSet IntSet) (Struct (Vector n) (Vector n) (Vector n))
+    convertStruct (Struct f b u) =
+      Struct
+        <$> first (\set -> Struct set mempty mempty) (toTotal' f)
+        <*> first (\set -> Struct mempty set mempty) (toTotal' b)
+        <*> first (Struct mempty mempty) (sequenceIntMap toTotal' u)
 
     sequenceIntMap :: (a -> Validation b c) -> IntMap a -> Validation (IntMap b) (IntMap c)
     sequenceIntMap f = sequenceA . IntMap.mapWithKey (\width xs -> first (IntMap.singleton width) (f xs))
@@ -263,15 +232,15 @@ toTotal (VarGroups o i p x) =
 emptyPartial :: Partial n
 emptyPartial =
   VarGroups
-    (VarGroup (0, mempty) (0, mempty) mempty)
-    (VarGroup (0, mempty) (0, mempty) mempty)
-    (VarGroup (0, mempty) (0, mempty) mempty)
-    (VarGroup (0, mempty) (0, mempty) mempty)
+    (Struct (0, mempty) (0, mempty) mempty)
+    (Struct (0, mempty) (0, mempty) mempty)
+    (Struct (0, mempty) (0, mempty) mempty)
+    (Struct (0, mempty) (0, mempty) mempty)
 
 partialIsEmpty :: Eq n => Partial n -> Bool
-partialIsEmpty (VarGroups o i p x) = isEmptyVarGroup o && isEmptyVarGroup i && isEmptyVarGroup p && isEmptyVarGroup x
+partialIsEmpty (VarGroups o i p x) = isEmptyStruct o && isEmptyStruct i && isEmptyStruct p && isEmptyStruct x
   where
-    isEmptyVarGroup (VarGroup f b u) = f == (0, mempty) && b == (0, mempty) && IntMap.null u
+    isEmptyStruct (Struct f b u) = f == (0, mempty) && b == (0, mempty) && IntMap.null u
 
 toTotal' :: (Int, IntMap n) -> Validation IntSet (Vector n)
 toTotal' (size, xs) =
@@ -284,14 +253,14 @@ toTotal' (size, xs) =
 restrictVars :: Partial n -> VarSet n -> Partial n
 restrictVars (VarGroups o i p x) (VarGroups o' i' p' x') =
   VarGroups
-    (restrictVarGroup o o')
-    (restrictVarGroup i i')
-    (restrictVarGroup p p')
-    (restrictVarGroup x x')
+    (restrictStruct o o')
+    (restrictStruct i i')
+    (restrictStruct p p')
+    (restrictStruct x x')
   where
-    restrictVarGroup :: VarGroup (PartialBinding n) -> VarGroup IntSet -> VarGroup (PartialBinding n)
-    restrictVarGroup (VarGroup f b u) (VarGroup f' b' u') =
-      VarGroup
+    restrictStruct :: Struct (PartialBinding n) (PartialBinding n) (PartialBinding n) -> Struct IntSet IntSet IntSet -> Struct (PartialBinding n) (PartialBinding n) (PartialBinding n)
+    restrictStruct (Struct f b u) (Struct f' b' u') =
+      Struct
         (restrict f f')
         (restrict b b')
         (IntMap.intersectionWith restrict u u')

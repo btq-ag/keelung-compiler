@@ -20,6 +20,7 @@ import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
+import Keelung.Data.Struct (Struct (..))
 import Keelung.Data.VarGroup
 import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Heap
@@ -38,7 +39,7 @@ runM heap inputs p = do
   -- make the partial Bindings total
   case toTotal partialBindings' of
     Left unbound -> Left (VarUnassignedError unbound)
-    Right bindings -> Right (map toInteger result, fmap (fmap (fmap toInteger)) bindings)
+    Right bindings -> Right (map toInteger result, convertWitness bindings)
 
 -- | Construct partial Bindings from Inputs
 toPartialBindings :: (GaloisField n, Integral n) => Inputs n -> Either (Error n) (Partial n)
@@ -47,22 +48,22 @@ toPartialBindings inputs =
    in Right $
         VarGroups
           { ofO =
-              VarGroup
+              Struct
                 (getCount counters (Output, ReadField), mempty)
                 (getCount counters (Output, ReadBool), mempty)
                 (IntMap.mapWithKey (\w _ -> (getCount counters (Output, ReadUInt w), mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))),
             ofI =
-              VarGroup
+              Struct
                 (getCount counters (PublicInput, ReadField), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
                 (getCount counters (PublicInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPublic inputs))))
                 (IntMap.mapWithKey (\w bindings -> (getCount counters (PublicInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (map fromInteger (toList bindings)))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
             ofP =
-              VarGroup
+              Struct
                 (getCount counters (PrivateInput, ReadField), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
                 (getCount counters (PrivateInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqBool (Inputs.inputPrivate inputs))))
                 (IntMap.mapWithKey (\w bindings -> (getCount counters (PrivateInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (map fromInteger (toList bindings)))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
             ofX =
-              VarGroup
+              Struct
                 (getCount counters (Intermediate, ReadField), mempty)
                 (getCount counters (Intermediate, ReadBool), mempty)
                 (IntMap.mapWithKey (\w _ -> (getCount counters (Intermediate, ReadUInt w), mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs)))
@@ -102,7 +103,7 @@ lookupBI = lookupVar "BI" (getB . ofI)
 lookupBP :: (GaloisField n, Integral n) => Var -> M n n
 lookupBP = lookupVar "BP" (getB . ofP)
 
-lookupVarU :: (GaloisField n, Integral n) => String -> (VarGroups (VarGroup (PartialBinding n)) -> VarGroup (PartialBinding n)) -> Width -> Var -> M n n
+lookupVarU :: (GaloisField n, Integral n) => String -> (VarGroups (Struct (PartialBinding n) (PartialBinding n) (PartialBinding n)) -> Struct (PartialBinding n) (PartialBinding n) (PartialBinding n)) -> Width -> Var -> M n n
 lookupVarU prefix selector w var = do
   gets (getU w . selector) >>= \case
     Nothing -> throwError $ VarUnboundError prefix var
