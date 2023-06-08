@@ -52,7 +52,7 @@ tests = do
                 y <- inputUInt @4 Public
                 z <- inputUInt @4 Public
                 return $ x + y + z + 2 + 3
-          throwPrimeR1CS (Prime 13) program [1, 2, 3] [] (CompileError (Compiler.FieldTooSmall (Prime 13) 4) :: Error (Prime 13))
+          throwPrimeR1CS (Prime 7) program [1, 2, 3] [] (CompileError (Compiler.FieldTooSmall (Prime 7) 3) :: Error (Prime 7))
 
         it "3 variables + constants" $ do
           let program = do

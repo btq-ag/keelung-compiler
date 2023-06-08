@@ -14,9 +14,8 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "UInt" $ do
-    describe "Addition" $ do
-      -- TODO: should've been just 15
-      it "variable / variable" $ do
+    describe "Addition / Subtraction" $ do
+      it "2 variables" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Public
@@ -24,16 +23,33 @@ tests = do
         cs `shouldHaveSize` 14
         cs' `shouldHaveSize` 14
 
-      -- TODO: should've been just 10
-      it "variable / constant" $ do
+      it "1 variable + 1 constant" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           return $ x + 4
         cs `shouldHaveSize` 10
         cs' `shouldHaveSize` 10
 
+      it "3 variable + 1 constant" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Public
+          z <- inputUInt @4 Public
+          return $ x + y + z + 4
+        cs `shouldHaveSize` 19
+        cs' `shouldHaveSize` 19
+
+      -- it "3 variable + 1 constant (with subtraction)" $ do
+      --   (cs, cs') <- execute $ do
+      --     x <- inputUInt @4 Public
+      --     y <- inputUInt @4 Public
+      --     z <- inputUInt @4 Public
+      --     return $ x - y + z + 4
+      --   cs `shouldHaveSize` 19
+      --   cs' `shouldHaveSize` 19
+
       -- TODO: should've been just 4
-      it "constant / constant" $ do
+      it "2 constants" $ do
         (cs, cs') <- execute $ do
           return $ 2 + (4 :: UInt 4)
         cs `shouldHaveSize` 8
