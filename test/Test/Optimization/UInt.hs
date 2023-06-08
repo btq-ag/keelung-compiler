@@ -7,7 +7,6 @@ import Control.Monad (forM_)
 import Keelung hiding (compileO0)
 import Test.Hspec
 import Test.Optimization.Util
-import Keelung.Compiler.Linker
 
 run :: IO ()
 run = hspec tests

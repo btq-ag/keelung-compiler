@@ -357,8 +357,8 @@ compileExprU out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileSubU w out x' y'
-  AddU w x0 x1 xs -> do
-    mixed <- mapM wireU (x0 : x1 : toList xs)
+  AddU w xs -> do
+    mixed <- mapM (wireU . fst) (toList xs)
     let (vars, constants) = partitionEithers mixed
     compileAddU w out vars (sum constants)
   MulU w x y -> do
