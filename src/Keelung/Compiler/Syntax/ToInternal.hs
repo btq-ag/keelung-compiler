@@ -96,7 +96,7 @@ convertExprU expr = case expr of
   T.VarU w var -> return $ VarU w var
   T.VarUI w var -> return $ VarUI w var
   T.VarUP w var -> return $ VarUP w var
-  T.AddU w x y -> AddU w <$> convertExprU x <*> convertExprU y
+  T.AddU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> convertExprU y
   T.SubU w x y -> SubU w <$> convertExprU x <*> convertExprU y
   T.MulU w x y -> MulU w <$> convertExprU x <*> convertExprU y
   T.MMIU w x p -> MMIU w <$> convertExprU x <*> pure p
@@ -164,6 +164,17 @@ chainExprsOfAssocOpAddF x y = case (x, y) of
     AddF x y0 (y1 :<| ys)
   -- there's nothing left we can do
   _ -> AddF x y mempty
+
+chainExprsOfAssocOpAddU :: Width -> ExprU n -> ExprU n -> ExprU n
+chainExprsOfAssocOpAddU w x y = case (x, y) of
+  (AddU _ x0 x1 xs, AddU _ y0 y1 ys) ->
+    AddU w x0 x1 (xs <> (y0 :<| y1 :<| ys))
+  (AddU _ x0 x1 xs, _) ->
+    AddU w x0 x1 (xs |> y)
+  (_, AddU _ y0 y1 ys) ->
+    AddU w x y0 (y1 :<| ys)
+  -- there's nothing left we can do
+  _ -> AddU w x y mempty
 
 chainExprsOfAssocOpAndB :: ExprB n -> ExprB n -> ExprB n
 chainExprsOfAssocOpAndB x y = case (x, y) of

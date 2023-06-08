@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, prime, runPrime, debugPrime) where
+module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, prime, runPrime, debugPrime, throwPrimeR1CS) where
 
 import Control.Arrow (left, right)
 import Data.Field.Galois
@@ -53,20 +53,6 @@ interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
 
 --------------------------------------------------------------------------------
 
--- | Expect all interpreters to return the same output
--- runAll :: (GaloisField n, Integral n, Encode t, Show t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> [n] -> IO ()
--- runAll fieldInfo program rawPublicInputs rawPrivateInputs expected = do
---   -- syntax tree interpreter
---   interpretSyntaxTree program rawPublicInputs rawPrivateInputs
---     `shouldBe` (Right (map toInteger expected) :: Either (Error n) [Integer])
---     -- Right (map toInteger expected)
---     -- (Right expected :: Either (Error (Prime n)) [Integer])
---   -- constraint system interpreters
---   interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
---     `shouldBe` Right expected
---   interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
---     `shouldBe` Right expected
-
 -- | Expect all interpreters to throw an error
 throwAll :: (GaloisField n, Integral n, Encode t, Show t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
 throwAll fieldInfo program rawPublicInputs rawPrivateInputs stError csError = do
@@ -78,15 +64,6 @@ throwAll fieldInfo program rawPublicInputs rawPrivateInputs stError csError = do
     `shouldBe` Left csError
   interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
     `shouldBe` Left csError
-
--- -- | Using result of syntax tree interpreter as expected output for constraint system interpreters
--- runAndCompare :: Encode t => FieldInfo -> Comp t -> [Integer] -> [Integer] -> IO ()
--- runAndCompare fieldInfo program rawPublicInputs rawPrivateInputs = do
---   let expectedOutput = interpretSyntaxTree program rawPublicInputs rawPrivateInputs
---   interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
---     `shouldBe` expectedOutput
---   interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
---     `shouldBe` expectedOutput
 
 -- | Print out the result of compilation
 debug :: Encode t => Comp t -> IO ()
@@ -168,6 +145,38 @@ runPrime fieldType program rawPublicInputs rawPrivateInputs expected = caseField
         `shouldBe` Right expected'
       interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Right expected'
+
+--------------------------------------------------------------------------
+
+-- | Expect R1CS interpreters to throw an error
+throwPrimeR1CS :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Error n -> IO ()
+throwPrimeR1CS fieldType program rawPublicInputs rawPrivateInputs csError = caseFieldType fieldType handlePrime handleBinary
+  where
+    handlePrime :: KnownNat n => FieldInfo -> Proxy (Prime n) -> IO ()
+    handlePrime fieldInfo (_ :: Proxy (Prime n)) = do
+      -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Left (InterpretError stError) :: Either (Error (Prime n)) [Integer])
+      -- syntax tree interpreters
+      -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+      --   `shouldBe` Left (InterpretError stError)
+      -- constraint system interpreters
+      interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+        `shouldBe` Left csError
+      interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+        `shouldBe` Left csError
+
+    handleBinary :: KnownNat n => FieldInfo -> Proxy (Binary n) -> IO ()
+    handleBinary fieldInfo (_ :: Proxy (Binary n)) = do
+      -- let expected' = map fromInteger expected :: [Binary n]
+      -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+      -- constraint system interpreters
+      -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+      --   `shouldBe` Left (InterpretError stError)
+      -- constraint system interpreters
+      interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+        `shouldBe` Left csError
+      interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+        `shouldBe` Left csError
+
 
 fromFieldType :: FieldType -> Maybe FieldInfo
 fromFieldType (Prime n) = case someNatVal n of

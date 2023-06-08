@@ -10,6 +10,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (N (..))
 import Keelung.Syntax (Width)
+import Keelung.Field (FieldType)
 
 data Error n
   = ConflictingValuesB Bool Bool
@@ -24,6 +25,7 @@ data Error n
   | AssertGTEBoundTooLargeError Integer Width
   | AssertGTBoundTooSmallError Integer
   | AssertGTBoundTooLargeError Integer Width
+  | FieldTooSmall FieldType Width
   deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
@@ -74,6 +76,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> "` are less than `"
       <> show ((2 ^ width) :: Integer)
       <> "`"
+  show (FieldTooSmall fieldType width) = "The minimal bits required to represent the underling field " <> show fieldType <> " is " <> show width <> ", which is too small for formulating constraints"
 
 -- show AssertLTBoundTooSmallError =
 --   "Using `0` as the bound for `assertLT` is too restrictive"

@@ -12,12 +12,13 @@ import Control.Monad.Except
 
 import Control.Monad.State
 import Data.Bits qualified
+import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
-import Keelung.Compiler.Compile.Boolean qualified as Compile.Boolean
-import Keelung.Compiler.Compile.Error qualified as Compile
+import Keelung.Compiler.Compile.Boolean qualified as Error.Boolean
+import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
@@ -117,7 +118,7 @@ compileAssertion expr = case expr of
     case result of
       Left var -> writeValB var True
       Right True -> return ()
-      Right val -> throwError $ Compile.ConflictingValuesB True val
+      Right val -> throwError $ Error.ConflictingValuesB True val
   ExprF x -> do
     result <- compileExprF x
     assertLC 1 result
@@ -129,7 +130,7 @@ compileAssertion expr = case expr of
 
 -- | Assert that two Boolean expressions are equal
 assertEqB :: (GaloisField n, Integral n) => ExprB n -> ExprB n -> M n ()
-assertEqB (ValB a) (ValB b) = when (a /= b) $ throwError $ Compile.ConflictingValuesB a b
+assertEqB (ValB a) (ValB b) = when (a /= b) $ throwError $ Error.ConflictingValuesB a b
 assertEqB (ValB a) (VarB b) = writeValB (RefBX b) a
 assertEqB (ValB a) (VarBO b) = writeValB (RefBO b) a
 assertEqB (ValB a) (VarBI b) = writeValB (RefBI b) a
@@ -138,7 +139,7 @@ assertEqB (ValB a) b = do
   result <- compileExprB b
   case result of
     Left var -> writeValB var a
-    Right val -> when (a /= val) $ throwError $ Compile.ConflictingValuesB a val
+    Right val -> when (a /= val) $ throwError $ Error.ConflictingValuesB a val
 assertEqB (VarB a) (ValB b) = writeValB (RefBX a) b
 assertEqB (VarB a) (VarB b) = writeEqB (RefBX a) (RefBX b)
 assertEqB (VarB a) (VarBO b) = writeEqB (RefBX a) (RefBO b)
@@ -186,11 +187,11 @@ assertEqB a b = do
     (Left varA, Left varB) -> writeEqB varA varB
     (Left varA, Right valB) -> writeValB varA valB
     (Right valA, Left varB) -> writeValB varB valA
-    (Right valA, Right valB) -> when (valA /= valB) $ throwError $ Compile.ConflictingValuesB valA valB
+    (Right valA, Right valB) -> when (valA /= valB) $ throwError $ Error.ConflictingValuesB valA valB
 
 -- | Assert that two Field expressions are equal
 assertEqF :: (GaloisField n, Integral n) => ExprF n -> ExprF n -> M n ()
-assertEqF (ValF a) (ValF b) = when (a /= b) $ throwError $ Compile.ConflictingValuesF a b
+assertEqF (ValF a) (ValF b) = when (a /= b) $ throwError $ Error.ConflictingValuesF a b
 assertEqF (ValF a) (VarF b) = writeValF (RefFX b) a
 assertEqF (ValF a) (VarFO b) = writeValF (RefFO b) a
 assertEqF (ValF a) (VarFI b) = writeValF (RefFI b) a
@@ -244,7 +245,7 @@ assertEqF a b = do
 
 -- | Assert that two UInt expressions are equal
 assertEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()
-assertEqU (ValU _ a) (ValU _ b) = when (a /= b) $ throwError $ Compile.ConflictingValuesU a b
+assertEqU (ValU _ a) (ValU _ b) = when (a /= b) $ throwError $ Error.ConflictingValuesU a b
 assertEqU (ValU w a) (VarU _ b) = writeValU w (RefUX w b) a
 assertEqU (ValU w a) (VarUO _ b) = writeValU w (RefUO w b) a
 assertEqU (ValU w a) (VarUI _ b) = writeValU w (RefUI w b) a
@@ -300,7 +301,7 @@ assertEqU a b = do
 ----------------------------------------------------------------
 
 compileExprB :: (GaloisField n, Integral n) => ExprB n -> M n (Either RefB Bool)
-compileExprB = Compile.Boolean.compileExprB wireU' compileExprF
+compileExprB = Error.Boolean.compileExprB wireU' compileExprF
 
 compileExprF :: (GaloisField n, Integral n) => ExprF n -> M n (LC n)
 compileExprF expr = case expr of
@@ -356,10 +357,10 @@ compileExprU out expr = case expr of
     x' <- wireU' x
     y' <- wireU' y
     compileSubU w out x' y'
-  AddU w x y -> do
-    x' <- wireU' x
-    y' <- wireU' y
-    compileAddU w out x' y'
+  AddU w x0 x1 xs -> do
+    mixed <- mapM wireU' (x0 : x1 : toList xs)
+    let (vars, constants) = partitionEithers mixed
+    compileAddU w out vars (sum constants)
   MulU w x y -> do
     x' <- wireU' x
     y' <- wireU' y
@@ -521,8 +522,8 @@ compileAddOrSubU isSub width out (Left a) (Left b) = do
 
   writeAdd 0 $ as <> bs <> carryAndResult
 
-compileAddBig' :: (GaloisField n, Integral n) => Width -> RefU -> [RefU] -> Integer -> M n ()
-compileAddBig' width out [] constant = do
+compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [RefU] -> Integer -> M n ()
+compileAddU width out [] constant = do
   -- constants only
   fieldWidth <- gets cmFieldWidth
   let carryWidth = 0 -- no carry needed
@@ -535,13 +536,16 @@ compileAddBig' width out [] constant = do
       forM_ range $ \i -> do
         let bit = Data.Bits.testBit constant i
         writeValB (RefUBit width out i) bit
-compileAddBig' width out vars constant = do
+compileAddU width out vars constant = do
   fieldWidth <- gets cmFieldWidth
+  (fieldType, _, _, _) <- gets cmField
   -- because we need some extra bits for carry when adding UInts
   -- a limb should have width `fieldWidth - 1 - carryWidth`
   let carryWidth = ceiling (logBase 2 (fromIntegral $ length vars) :: Double) + if constant == 0 then 0 else 1
   let limbWidth = fieldWidth - 1 - carryWidth
-  foldM_ (go limbWidth carryWidth) Nothing [0, limbWidth .. width - 1]
+  if limbWidth < 1
+    then throwError $ Error.FieldTooSmall fieldType fieldWidth
+    else foldM_ (go limbWidth carryWidth) Nothing [0, limbWidth .. width - 1]
   where
     go :: (GaloisField n, Integral n) => Int -> Int -> Maybe [RefB] -> Int -> M n (Maybe [RefB])
     go limbWidth carryWidth previousCarries limbStart = do
@@ -552,27 +556,19 @@ compileAddBig' width out vars constant = do
       case previousCarries of
         Nothing -> do
           -- constants + vars = out + carry
-          carries <- replicateM carryWidth freshRefB 
+          carries <- replicateM carryWidth freshRefB
           mapM_ addBooleanConstraint carries
-          let ofCarries = [(B carryVar, -(2 ^ (limbStart + limbWidth + i))) | (i, carryVar) <- zip [0 .. ] carries]
+          let ofCarries = [(B carryVar, -(2 ^ (limbStart + limbWidth + i))) | (i, carryVar) <- zip [0 ..] carries]
           writeAdd (fromInteger ofConstants) $ ofVars <> ofCarries <> result
           return $ Just carries
         Just previousCarries' -> do
           -- as + bs + previousCarry = out + carry
-          carries <- replicateM carryWidth freshRefB 
+          carries <- replicateM carryWidth freshRefB
           mapM_ addBooleanConstraint carries
-          let ofCarries = [(B carryVar, -(2 ^ (limbWidth + i))) | (i, carryVar) <- zip [0 .. ] carries]
-          let ofPreviousCarries = [(B carryVar, 2 ^ i) | (i :: Int, carryVar) <- zip [0 .. ] previousCarries']
+          let ofCarries = [(B carryVar, -(2 ^ (limbWidth + i))) | (i, carryVar) <- zip [0 ..] carries]
+          let ofPreviousCarries = [(B carryVar, 2 ^ i) | (i :: Int, carryVar) <- zip [0 ..] previousCarries']
           writeAdd (fromInteger ofConstants) $ ofVars <> ofPreviousCarries <> ofCarries <> result
           return $ Just carries
-
-
-compileAddBig :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileAddBig width out (Right a) (Right b) = compileAddBig' width out [] (a + b)
-compileAddBig width out (Right a) (Left b) = compileAddBig width out (Left b) (Right a)
-compileAddBig width out (Left a) (Right b) = compileAddBig' width out [a] b
-compileAddBig width out (Left a) (Left b) = compileAddBig' width out [a, b] 0
-
 
 compileAddOrSubU2 :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddOrSubU2 isSub width out (Right a) (Right b) = do
@@ -593,9 +589,6 @@ compileAddOrSubU2 isSub width out (Left a) (Left b) = do
   let outputBits = [(B (RefUBit (width * 2) out i), -(2 ^ i)) | i <- [0 .. width * 2 - 1]]
 
   writeAdd 0 $ as <> bs <> outputBits
-
-compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileAddU = compileAddBig
 
 compileAddU2 :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddU2 = compileAddOrSubU2 False
@@ -780,10 +773,10 @@ assertDivModU width dividend divisor quotient remainder = do
 -- | Assert that a UInt is less than or equal to some constant
 -- reference doc: A.3.2.2 Range Check https://zips.z.cash/protocol/protocol.pdf
 assertLTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
-assertLTE _ (Right a) bound = if fromIntegral a <= bound then return () else throwError $ Compile.AssertComparisonError (toInteger a) LT (succ bound)
+assertLTE _ (Right a) bound = if fromIntegral a <= bound then return () else throwError $ Error.AssertComparisonError (toInteger a) LT (succ bound)
 assertLTE width (Left a) bound
-  | bound < 0 = throwError $ Compile.AssertLTEBoundTooSmallError bound
-  | bound >= 2 ^ width - 1 = throwError $ Compile.AssertLTEBoundTooLargeError bound width
+  | bound < 0 = throwError $ Error.AssertLTEBoundTooSmallError bound
+  | bound >= 2 ^ width - 1 = throwError $ Error.AssertLTEBoundTooLargeError bound width
   | bound == 0 = do
       -- there's only 1 possible value for `a`, which is `0`
       let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
@@ -854,19 +847,19 @@ assertLT width a c = do
   -- check if the bound is within the range of the UInt
   when (c < 1) $
     throwError $
-      Compile.AssertLTBoundTooSmallError c
+      Error.AssertLTBoundTooSmallError c
   when (c >= 2 ^ width) $
     throwError $
-      Compile.AssertLTBoundTooLargeError c width
+      Error.AssertLTBoundTooLargeError c width
   -- otherwise, assert that a <= c - 1
   assertLTE width a (c - 1)
 
 -- | Assert that a UInt is greater than or equal to some constant
 assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
-assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Compile.AssertComparisonError (succ (toInteger a)) GT c
+assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Error.AssertComparisonError (succ (toInteger a)) GT c
 assertGTE width (Left a) bound
-  | bound < 1 = throwError $ Compile.AssertGTEBoundTooSmallError bound
-  | bound >= 2 ^ width = throwError $ Compile.AssertGTEBoundTooLargeError bound width
+  | bound < 1 = throwError $ Error.AssertGTEBoundTooSmallError bound
+  | bound >= 2 ^ width = throwError $ Error.AssertGTEBoundTooLargeError bound width
   | bound == 2 ^ width - 1 = do
       -- there's only 1 possible value for `a`, which is `2^width - 1`
       let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
@@ -931,10 +924,10 @@ assertGT width a c = do
   -- check if the bound is within the range of the UInt
   when (c < 0) $
     throwError $
-      Compile.AssertGTBoundTooSmallError c
+      Error.AssertGTBoundTooSmallError c
   when (c >= 2 ^ width - 1) $
     throwError $
-      Compile.AssertGTBoundTooLargeError c width
+      Error.AssertGTBoundTooLargeError c width
   -- otherwise, assert that a >= c + 1
   assertGTE width a (c + 1)
 
@@ -978,7 +971,7 @@ assertLC :: (GaloisField n, Integral n) => n -> LC n -> M n ()
 assertLC val (Constant val') =
   if val == val'
     then return ()
-    else throwError $ Compile.ConflictingValuesF val val'
+    else throwError $ Error.ConflictingValuesF val val'
 assertLC val (Polynomial poly) = case PolyG.view poly of
   PolyG.Monomial c (x, a) ->
     -- c + ax = val => x = (val - c) / a

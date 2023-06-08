@@ -14,6 +14,7 @@ import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
+import Data.Field.Galois (Prime)
 
 run :: IO ()
 run = hspec tests
@@ -45,12 +46,21 @@ tests = do
             let expected = [(x + y) `mod` 16]
             runPrime (Prime 13) program [x, y] [] expected
 
+        it "should throw `FieldTooSmall`" $ do
+          let program = do
+                x <- inputUInt @4 Public
+                y <- inputUInt @4 Public
+                z <- inputUInt @4 Public
+                return $ x + y + z + 2 + 3
+          throwPrimeR1CS (Prime 13) program [1, 2, 3] [] (CompileError (Compiler.FieldTooSmall (Prime 13) 4) :: Error (Prime 13))
+
         it "3 variables + constants" $ do
           let program = do
                 x <- inputUInt @4 Public
                 y <- inputUInt @4 Public
                 z <- inputUInt @4 Public
                 return $ x + y + z + 2 + 3
+          -- runPrime (Prime 31) program [1, 2, 3] [] [11]
           -- debugPrime (Prime 13) program
           let genPair = do
                 x <- choose (0, 16)
@@ -59,7 +69,7 @@ tests = do
                 return (x, y, z)
           forAll genPair $ \(x, y, z) -> do
             let expected = [(x + y + z + 5) `mod` 16]
-            runPrime (Prime 13) program [x, y, z] [] expected
+            runPrime (Prime 31) program [x, y, z] [] expected
 
         it "variable / constant" $ do
           let program y = do
