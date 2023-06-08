@@ -100,7 +100,6 @@ propagateExprU e = do
     VarUO _ _ -> return e -- no constant propagation for output variables
     VarUI _ _ -> return e -- no constant propagation for public input variables
     VarUP _ _ -> return e -- no constant propagation for private input variables
-    SubU w x y -> SubU w <$> propagateExprU x <*> propagateExprU y
     AddU w xs -> AddU w <$> mapM (\(x, sign) -> (,sign) <$> propagateExprU x) xs
     MulU w x y -> MulU w <$> propagateExprU x <*> propagateExprU y
     MMIU w x p -> MMIU w <$> propagateExprU x <*> pure p

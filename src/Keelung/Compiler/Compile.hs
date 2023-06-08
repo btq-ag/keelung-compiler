@@ -353,10 +353,6 @@ compileExprU out expr = case expr of
   VarUO width var -> writeEqU width out (RefUX width var)
   VarUI width var -> writeEqU width out (RefUI width var)
   VarUP width var -> writeEqU width out (RefUP width var)
-  SubU w x y -> do
-    x' <- wireU x
-    y' <- wireU y
-    compileSubU w out x' y'
   AddU w xs -> do
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = partitionEithers mixed

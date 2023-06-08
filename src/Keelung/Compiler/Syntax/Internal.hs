@@ -145,8 +145,7 @@ data ExprU n
   | VarUI Width Var
   | VarUP Width Var
   | -- arithmetic operators
-    SubU Width (ExprU n) (ExprU n)
-  | AddU Width (Seq (ExprU n, Bool))
+    AddU Width (Seq (ExprU n, Bool))
   | MulU Width (ExprU n) (ExprU n)
   | MMIU Width (ExprU n) Integer -- modular multiplicative inverse
   | -- logical operators
@@ -170,7 +169,6 @@ instance (Show n, Integral n) => Show (ExprU n) where
     VarUO _ var -> showString "UO" . shows var
     VarUI _ var -> showString "UI" . shows var
     VarUP _ var -> showString "UP" . shows var
-    SubU _ x y -> chain prec " - " 6 $ x :<| y :<| Empty
     AddU _ xs -> chain prec " + " 6 xs
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
     MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
@@ -191,7 +189,6 @@ instance HasWidth (ExprU n) where
     VarUO w _ -> w
     VarUI w _ -> w
     VarUP w _ -> w
-    SubU w _ _ -> w
     AddU w _ -> w
     MulU w _ _ -> w
     MMIU w _ _ -> w
