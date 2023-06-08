@@ -358,7 +358,7 @@ compileExprU out expr = case expr of
     y' <- wireU y
     compileSubU w out x' y'
   AddU w xs -> do
-    mixed <- mapM (wireU . fst) (toList xs)
+    mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = partitionEithers mixed
     compileAddU w out vars (sum constants)
   MulU w x y -> do
@@ -485,10 +485,14 @@ wireU expr = do
   compileExprU out expr
   return (Left out)
 
--- wireUWithSign :: (GaloisField n, Integral n) => ExprU n -> M n (Either (RefU, Bool) Integer)
--- wireUWithSign (ValU _ val) = return (Right val)
--- wireUWithSign (ValU _ val) = return (Right val)
--- wireUWithSign others = Left <$> wireU others
+wireUWithSign :: (GaloisField n, Integral n) => (ExprU n, Bool) -> M n (Either (RefU, Bool) Integer)
+wireUWithSign (ValU _ val, True) = return (Right val)
+wireUWithSign (ValU _ val, False) = return (Right (-val))
+wireUWithSign (others, sign) = do
+  result <- wireU others
+  case result of
+    Left var -> return (Left (var, sign))
+    Right val -> return (Right (if sign then val else -val))
 
 --------------------------------------------------------------------------------
 
@@ -524,7 +528,7 @@ compileAddOrSubU isSub width out (Left a) (Left b) = do
 
   writeAdd 0 $ as <> bs <> carryAndResult
 
-compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [RefU] -> Integer -> M n ()
+compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
 compileAddU width out [] constant = do
   -- constants only
   fieldWidth <- gets cmFieldWidth
@@ -541,21 +545,25 @@ compileAddU width out [] constant = do
 compileAddU width out vars constant = do
   fieldWidth <- gets cmFieldWidth
   (fieldType, _, _, _) <- gets cmField
+  -- for each negative operand, we compensate by adding 2^width
+  let numberOfNegativeOperand = length $ filter (not . snd) vars
   -- because we need some extra bits for carry when adding UInts
   -- a limb should have width `fieldWidth - 1 - carryWidth`
   let carryWidth = ceiling (logBase 2 (fromIntegral (length vars) + if constant == 0 then 0 else 1) :: Double)
   let limbWidth = fieldWidth - 1 - carryWidth
   if limbWidth < 1
     then throwError $ Error.FieldTooSmall fieldType fieldWidth
-    else foldM_ (go limbWidth carryWidth) [] [0, limbWidth .. width - 1]
+    else foldM_ (go limbWidth carryWidth numberOfNegativeOperand) [] [0, limbWidth .. width - 1]
   where
-    go :: (GaloisField n, Integral n) => Int -> Int -> [RefB] -> Int -> M n [RefB]
-    go limbWidth carryWidth previousCarries limbStart = do
+    go :: (GaloisField n, Integral n) => Int -> Int -> Int -> [RefB] -> Int -> M n [RefB]
+    go limbWidth carryWidth numberOfNegativeOperand previousCarries limbStart = do
       -- range inside the current limb
       let currentLimbWidth = (limbWidth - 1) `min` (width - 1 - limbStart)
       let range = [0 .. currentLimbWidth]
-      let varBits = concat [[(B (RefUBit width var (limbStart + i)), 2 ^ i) | i <- range] | var <- vars]
-      let constantBits = sum [(if Data.Bits.testBit constant (limbStart + i) then 1 else 0) * (2 ^ i) | i <- range]
+      let varBits = concat [[(B (RefUBit width var (limbStart + i)), if sign then 2 ^ i else -(2 ^ i)) | i <- range] | (var, sign) <- vars]
+      -- for each negative operand, we compensate by adding 2^width
+      let constantSegment = sum [(if Data.Bits.testBit constant (limbStart + i) then 1 else 0) * (2 ^ i) | i <- range]
+      let compensatedConstant = constantSegment + 2 ^ width * fromIntegral numberOfNegativeOperand
       let resultBits = [(B (RefUBit width out (limbStart + i)), -(2 ^ i)) | i <- range]
       -- carry
       carries <- replicateM carryWidth freshRefB
@@ -563,7 +571,7 @@ compileAddU width out vars constant = do
       let carryBits = [(B carryVar, -(2 ^ (currentLimbWidth + i))) | (i, carryVar) <- zip [1 ..] carries]
       -- constants + vars + previousCarry = out + carry
       let previousCarryBits = [(B carryVar, 2 ^ i) | (i :: Int, carryVar) <- zip [0 ..] previousCarries]
-      writeAdd (fromInteger constantBits) $ varBits <> previousCarryBits <> carryBits <> resultBits
+      writeAdd (fromInteger compensatedConstant) $ varBits <> previousCarryBits <> carryBits <> resultBits
       return carries
 
 compileAddOrSubU2 :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()

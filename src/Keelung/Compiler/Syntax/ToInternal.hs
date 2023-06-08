@@ -97,7 +97,7 @@ convertExprU expr = case expr of
   T.VarUI w var -> return $ VarUI w var
   T.VarUP w var -> return $ VarUP w var
   T.AddU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure True
-  T.SubU w x y -> SubU w <$> convertExprU x <*> convertExprU y
+  T.SubU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure False
   T.MulU w x y -> MulU w <$> convertExprU x <*> convertExprU y
   T.MMIU w x p -> MMIU w <$> convertExprU x <*> pure p
   T.AndU w x y -> chainExprsOfAssocOpAndU w <$> convertExprU x <*> convertExprU y

@@ -54,21 +54,21 @@ tests = do
                 return $ x + y + z + 2 + 3
           throwPrimeR1CS (Prime 7) program [1, 2, 3] [] (CompileError (Compiler.FieldTooSmall (Prime 7) 3) :: Error (Prime 7))
 
-        it "3 variables + constants" $ do
+        it "variables and constants with subtraction" $ do
           let program = do
                 x <- inputUInt @4 Public
                 y <- inputUInt @4 Public
                 z <- inputUInt @4 Public
-                return $ x + y + z + 2 + 3
-          -- runPrime (Prime 31) program [1, 2, 3] [] [11]
-          -- debugPrime (Prime 13) program
+                return $ x + y - z + 2 + 3 + 16
+          -- debugPrime (Prime 31) program
+          -- runPrime (Prime 31) program [5, 2, 13] [] [15]
           let genPair = do
                 x <- choose (0, 16)
                 y <- choose (0, 16)
                 z <- choose (0, 16)
                 return (x, y, z)
           forAll genPair $ \(x, y, z) -> do
-            let expected = [(x + y + z + 5) `mod` 16]
+            let expected = [(x + y - z + 5) `mod` 16]
             runPrime (Prime 31) program [x, y, z] [] expected
 
         it "variable / constant" $ do
