@@ -69,16 +69,16 @@ compileSideEffect (AssignmentF var val) = do
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
 compileSideEffect (DivMod width dividend divisor quotient remainder) = assertDivModU width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do
-  x <- wireU' value
+  x <- wireU value
   assertLTE width x bound
 compileSideEffect (AssertLT width value bound) = do
-  x <- wireU' value
+  x <- wireU value
   assertLT width x bound
 compileSideEffect (AssertGTE width value bound) = do
-  x <- wireU' value
+  x <- wireU value
   assertGTE width x bound
 compileSideEffect (AssertGT width value bound) = do
-  x <- wireU' value
+  x <- wireU value
   assertGT width x bound
 
 -- | Compile the constraint 'out = x'.
@@ -89,28 +89,28 @@ compileAssertion expr = case expr of
   ExprB (EqU x y) -> assertEqU x y
   -- rewriting `assert (x <= y)` width `assertLTE x y`
   ExprB (LTEU x (ValU width bound)) -> do
-    x' <- wireU' x
+    x' <- wireU x
     assertLTE width x' (toInteger bound)
   ExprB (LTEU (ValU width bound) x) -> do
-    x' <- wireU' x
+    x' <- wireU x
     assertGTE width x' (toInteger bound)
   ExprB (LTU x (ValU width bound)) -> do
-    x' <- wireU' x
+    x' <- wireU x
     assertLT width x' (toInteger bound)
   ExprB (LTU (ValU width bound) x) -> do
-    x' <- wireU' x
+    x' <- wireU x
     assertGT width x' (toInteger bound)
   ExprB (GTEU x (ValU width bound)) -> do
-    x' <- wireU' x
+    x' <- wireU x
     assertGTE width x' (toInteger bound)
   ExprB (GTEU (ValU width bound) x) -> do
-    x' <- wireU' x
+    x' <- wireU x
     assertLTE width x' (toInteger bound)
   ExprB (GTU x (ValU width bound)) -> do
-    x' <- wireU' x
+    x' <- wireU x
     assertGT width x' (toInteger bound)
   ExprB (GTU (ValU width bound) x) -> do
-    x' <- wireU' x
+    x' <- wireU x
     assertLT width x' (toInteger bound)
   ExprB x -> do
     -- out <- freshRefB
@@ -301,7 +301,7 @@ assertEqU a b = do
 ----------------------------------------------------------------
 
 compileExprB :: (GaloisField n, Integral n) => ExprB n -> M n (Either RefB Bool)
-compileExprB = Error.Boolean.compileExprB wireU' compileExprF
+compileExprB = Error.Boolean.compileExprB wireU compileExprF
 
 compileExprF :: (GaloisField n, Integral n) => ExprF n -> M n (LC n)
 compileExprF expr = case expr of
@@ -354,20 +354,20 @@ compileExprU out expr = case expr of
   VarUI width var -> writeEqU width out (RefUI width var)
   VarUP width var -> writeEqU width out (RefUP width var)
   SubU w x y -> do
-    x' <- wireU' x
-    y' <- wireU' y
+    x' <- wireU x
+    y' <- wireU y
     compileSubU w out x' y'
   AddU w x0 x1 xs -> do
-    mixed <- mapM wireU' (x0 : x1 : toList xs)
+    mixed <- mapM wireU (x0 : x1 : toList xs)
     let (vars, constants) = partitionEithers mixed
     compileAddU w out vars (sum constants)
   MulU w x y -> do
-    x' <- wireU' x
-    y' <- wireU' y
+    x' <- wireU x
+    y' <- wireU y
     compileMulU w out x' y'
   MMIU w a p -> do
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
-    a' <- wireU' a
+    a' <- wireU a
     nRef <- freshRefU w
     -- 1. a * a⁻¹ = np + 1
     aainv <- freshRefU (w * 2)
@@ -406,14 +406,14 @@ compileExprU out expr = case expr of
         Right val -> writeValB (RefUBit w out i) val
   IfU w p x y -> do
     p' <- compileExprB p
-    x' <- wireU' x
-    y' <- wireU' y
+    x' <- wireU x
+    y' <- wireU y
     result <- compileIfU w p' x' y'
     case result of
       Left var -> writeEqU w out var
       Right val -> writeValU w out val
   RoLU w n x -> do
-    result <- wireU' x
+    result <- wireU x
     case result of
       Left var -> do
         forM_ [0 .. w - 1] $ \i -> do
@@ -424,7 +424,7 @@ compileExprU out expr = case expr of
           let i' = (i - n) `mod` w
           writeValB (RefUBit w out i) (Data.Bits.testBit val i') -- out[i] = val[i']
   ShLU w n x -> do
-    x' <- wireU' x
+    x' <- wireU x
     case compare n 0 of
       EQ -> case x' of
         Left var -> writeEqU w out var
@@ -450,7 +450,7 @@ compileExprU out expr = case expr of
         forM_ [w + n .. w - 1] $ \i -> do
           writeValB (RefUBit w out i) False -- out[i] = 0
   SetU w x j b -> do
-    x' <- wireU' x
+    x' <- wireU x
     b' <- compileExprB b
     forM_ [0 .. w - 1] $ \i -> do
       if i == j
@@ -474,19 +474,21 @@ compileExprU out expr = case expr of
 
 --------------------------------------------------------------------------------
 
-wireU :: (GaloisField n, Integral n) => ExprU n -> M n RefU
-wireU (VarU w ref) = return (RefUX w ref)
-wireU (VarUO w ref) = return (RefUO w ref)
-wireU (VarUI w ref) = return (RefUI w ref)
-wireU (VarUP w ref) = return (RefUP w ref)
+wireU :: (GaloisField n, Integral n) => ExprU n -> M n (Either RefU Integer)
+wireU (ValU _ val) = return (Right val)
+wireU (VarU w ref) = return (Left (RefUX w ref))
+wireU (VarUO w ref) = return (Left (RefUO w ref))
+wireU (VarUI w ref) = return (Left (RefUI w ref))
+wireU (VarUP w ref) = return (Left (RefUP w ref))
 wireU expr = do
   out <- freshRefU (widthOf expr)
   compileExprU out expr
-  return out
+  return (Left out)
 
-wireU' :: (GaloisField n, Integral n) => ExprU n -> M n (Either RefU Integer)
-wireU' (ValU _ val) = return (Right val)
-wireU' others = Left <$> wireU others
+-- wireUWithSign :: (GaloisField n, Integral n) => ExprU n -> M n (Either (RefU, Bool) Integer)
+-- wireUWithSign (ValU _ val) = return (Right val)
+-- wireUWithSign (ValU _ val) = return (Right val)
+-- wireUWithSign others = Left <$> wireU others
 
 --------------------------------------------------------------------------------
 
@@ -746,10 +748,10 @@ assertDivModU width dividend divisor quotient remainder = do
   --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder
-  remainderRef <- wireU' remainder
-  divisorRef <- wireU' divisor
-  quotientRef <- wireU' quotient
-  dividendRef <- wireU' dividend
+  remainderRef <- wireU remainder
+  divisorRef <- wireU divisor
+  quotientRef <- wireU quotient
+  dividendRef <- wireU dividend
 
   productDQ <- freshRefU width
   compileMulU width productDQ divisorRef quotientRef
