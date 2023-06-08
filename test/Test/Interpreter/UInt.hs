@@ -35,6 +35,8 @@ tests = do
                 x <- inputUInt @4 Public
                 y <- inputUInt @4 Public
                 return $ x + y
+          -- debugPrime (Prime 13) program
+          -- runPrime (Prime 13) program [3, 10] [] [13]
           let genPair = do
                 x <- choose (0, 16)
                 y <- choose (0, 16)
@@ -43,15 +45,35 @@ tests = do
             let expected = [(x + y) `mod` 16]
             runPrime (Prime 13) program [x, y] [] expected
 
-        it "variable / constant" $ do
+        it "3 variables + constants" $ do
           let program = do
                 x <- inputUInt @4 Public
-                return $ x + 2
+                y <- inputUInt @4 Public
+                z <- inputUInt @4 Public
+                return $ x + y + z + 2 + 3
           -- debugPrime (Prime 13) program
-          -- runPrime (Prime 13) program [11] [] [13]
-          forAll (choose (0, 16)) $ \x -> do
-            let expected = [(x + 2) `mod` 16]
-            runPrime (Prime 13) program [x `mod` 16] [] expected
+          let genPair = do
+                x <- choose (0, 16)
+                y <- choose (0, 16)
+                z <- choose (0, 16)
+                return (x, y, z)
+          forAll genPair $ \(x, y, z) -> do
+            let expected = [(x + y + z + 5) `mod` 16]
+            runPrime (Prime 13) program [x, y, z] [] expected
+
+        it "variable / constant" $ do
+          let program y = do
+                x <- inputUInt @4 Public
+                return $ x + y
+          -- debugPrime (Prime 13) (program 6)
+          -- runPrime (Prime 13) (program 6) [4] [] [10]
+          let genPair = do
+                x <- choose (0, 16)
+                y <- choose (0, 16)
+                return (x, y)
+          forAll genPair $ \(x, y) -> do
+            let expected = [(x + y) `mod` 16]
+            runPrime (Prime 13) (program (fromInteger y)) [x `mod` 16] [] expected
 
         it "constant / constant" $ do
           let program x y = do
