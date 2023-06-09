@@ -34,14 +34,14 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
-import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
+import Keelung.Compiler.FieldInfo
 
 --------------------------------------------------------------------------------
 
 -- | A constraint module is a collection of constraints with some additional information
 data ConstraintModule n = ConstraintModule
-  { cmField :: (FieldType, Int, Integer, Integer),
+  { cmField :: FieldInfo,
     -- | the minimal bits required to represent a field element
     cmFieldWidth :: Int,
     cmCounters :: !Counters,

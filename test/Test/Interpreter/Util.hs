@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, prime, runPrime, debugPrime, throwPrimeR1CS) where
+module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, runPrime, debugPrime, throwPrimeR1CS) where
 
 import Control.Arrow (left, right)
 import Data.Field.Galois
@@ -21,10 +21,9 @@ import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
+import Keelung.Compiler.FieldInfo
 
 --------------------------------------------------------------------------------
-
-type FieldInfo = (FieldType, Int, Integer, Integer)
 
 -- | syntax tree interpreter
 interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
@@ -88,14 +87,20 @@ assertSize afterSize program = do
 gf181Info :: FieldInfo
 gf181Info =
   let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy GF181)
-   in (gf181, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
+   in FieldInfo {
+        fieldTypeData = gf181,
+        fieldOrder = toInteger (order fieldNumber),
+        fieldChar = char fieldNumber,
+        fieldDeg = fromIntegral (deg fieldNumber),
+        fieldWidth = ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
+   }
 
-prime :: Integer -> FieldInfo
-prime n = case someNatVal (fromIntegral n) of
-  Just (SomeNat (_ :: Proxy n)) ->
-    let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Prime n))
-     in (Prime (fromIntegral n), ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
-  Nothing -> error "[ panic ] someNatVal failed"
+-- prime :: Integer -> FieldInfo
+-- prime n = case someNatVal (fromIntegral n) of
+--   Just (SomeNat (_ :: Proxy n)) ->
+--     let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Prime n))
+--      in (Prime (fromIntegral n), ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
+--   Nothing -> error "[ panic ] someNatVal failed"
 
 -- deriveFieldInfo :: KnownNat n => Either (Error (Prime n)) [Prime n] -> FieldInfo
 -- deriveFieldInfo result =
@@ -126,8 +131,8 @@ prime n = case someNatVal (fromIntegral n) of
 runPrime :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
 runPrime fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldType fieldType handlePrime handleBinary
   where
-    handlePrime :: KnownNat n => FieldInfo -> Proxy (Prime n) -> IO ()
-    handlePrime fieldInfo (_ :: Proxy (Prime n)) = do
+    handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
+    handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
       let expected' = map fromInteger expected :: [Prime n]
       interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- constraint system interpreters
@@ -136,8 +141,8 @@ runPrime fieldType program rawPublicInputs rawPrivateInputs expected = caseField
       interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Right expected'
 
-    handleBinary :: KnownNat n => FieldInfo -> Proxy (Binary n) -> IO ()
-    handleBinary fieldInfo (_ :: Proxy (Binary n)) = do
+    handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
+    handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
       let expected' = map fromInteger expected :: [Binary n]
       interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- constraint system interpreters
@@ -152,8 +157,8 @@ runPrime fieldType program rawPublicInputs rawPrivateInputs expected = caseField
 throwPrimeR1CS :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Error n -> IO ()
 throwPrimeR1CS fieldType program rawPublicInputs rawPrivateInputs csError = caseFieldType fieldType handlePrime handleBinary
   where
-    handlePrime :: KnownNat n => FieldInfo -> Proxy (Prime n) -> IO ()
-    handlePrime fieldInfo (_ :: Proxy (Prime n)) = do
+    handlePrime :: KnownNat n =>Proxy (Prime n) -> FieldInfo -> IO ()
+    handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
       -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Left (InterpretError stError) :: Either (Error (Prime n)) [Integer])
       -- syntax tree interpreters
       -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs
@@ -164,8 +169,8 @@ throwPrimeR1CS fieldType program rawPublicInputs rawPrivateInputs csError = case
       interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Left csError
 
-    handleBinary :: KnownNat n => FieldInfo -> Proxy (Binary n) -> IO ()
-    handleBinary fieldInfo (_ :: Proxy (Binary n)) = do
+    handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
+    handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
       -- let expected' = map fromInteger expected :: [Binary n]
       -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- constraint system interpreters
@@ -178,42 +183,41 @@ throwPrimeR1CS fieldType program rawPublicInputs rawPrivateInputs csError = case
         `shouldBe` Left csError
 
 
-fromFieldType :: FieldType -> Maybe FieldInfo
-fromFieldType (Prime n) = case someNatVal n of
-  Just (SomeNat (_ :: Proxy n)) ->
-    let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Prime n))
-     in Just (Prime n, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
-  Nothing -> Nothing
-fromFieldType (Binary n) = case someNatVal n of
-  Just (SomeNat (_ :: Proxy n)) ->
-    let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Binary n))
-     in Just (Binary n, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
-  Nothing -> Nothing
+-- fromFieldType :: FieldType -> Maybe FieldInfo
+-- fromFieldType (Prime n) = case someNatVal n of
+--   Just (SomeNat (_ :: Proxy n)) ->
+--     let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Prime n))
+--      in Just (Prime n, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
+--   Nothing -> Nothing
+-- fromFieldType (Binary n) = case someNatVal n of
+--   Just (SomeNat (_ :: Proxy n)) ->
+--     let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Binary n))
+--      in Just (Binary n, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber))
+--   Nothing -> Nothing
 
-caseFieldType ::
-  FieldType ->
-  (forall n. KnownNat n => FieldInfo -> Proxy (Prime n) -> IO ()) ->
-  (forall n. KnownNat n => FieldInfo -> Proxy (Binary n) -> IO ()) ->
-  IO ()
-caseFieldType (Prime n) funcPrime _ = case someNatVal n of
-  Just (SomeNat (_ :: Proxy n)) -> do
-    let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Prime n))
-     in funcPrime (Prime n, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber)) (Proxy :: Proxy (Prime n))
-  Nothing -> return ()
-caseFieldType (Binary n) _ funcBinary = case someNatVal n of
-  Just (SomeNat (_ :: Proxy n)) ->
-    let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Binary n))
-     in funcBinary (Binary n, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber)) (Proxy :: Proxy (Binary n))
-  Nothing -> return ()
+-- caseFieldType ::
+--   FieldType ->
+--   (forall n. KnownNat n => FieldInfo -> Proxy (Prime n) -> IO ()) ->
+--   (forall n. KnownNat n => FieldInfo -> Proxy (Binary n) -> IO ()) ->
+--   IO ()
+-- caseFieldType (Prime n) funcPrime _ = case someNatVal n of
+--   Just (SomeNat (_ :: Proxy n)) -> do
+--     let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Prime n))
+--      in funcPrime (Prime n, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber)) (Proxy :: Proxy (Prime n))
+--   Nothing -> return ()
+-- caseFieldType (Binary n) _ funcBinary = case someNatVal n of
+--   Just (SomeNat (_ :: Proxy n)) ->
+--     let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy (Binary n))
+--      in funcBinary (Binary n, ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber))), toInteger (char fieldNumber), toInteger (deg fieldNumber)) (Proxy :: Proxy (Binary n))
+--   Nothing -> return ()
 
 debugPrime :: Encode t => FieldType -> Comp t -> IO ()
-debugPrime fieldType program = do
-  case fromFieldType fieldType of
-    Just fieldInfo -> case fieldType of
-      Prime n -> case someNatVal n of
-        Just (SomeNat (_ :: Proxy n)) -> do
+debugPrime fieldType program = caseFieldType fieldType handlePrime handleBinary
+  where 
+    handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
           print (Compiler.compileToModules fieldInfo program :: Either (Error (N (Prime n))) (ConstraintModule (N (Prime n))))
           print (toR1CS <$> Compiler.compileO1 fieldInfo program :: Either (Error (N (Prime n))) (R1CS (N (Prime n))))
-        Nothing -> return ()
-      Binary _ -> return ()
-    Nothing -> return ()
+    handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
+          print (Compiler.compileToModules fieldInfo program :: Either (Error (N (Binary n))) (ConstraintModule (N (Binary n))))
+          print (toR1CS <$> Compiler.compileO1 fieldInfo program :: Either (Error (N (Binary n))) (R1CS (N (Binary n))))
+  

@@ -26,13 +26,13 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
-import Keelung.Field (FieldType)
 import Keelung.Syntax (widthOf)
+import Keelung.Compiler.FieldInfo ( FieldInfo(fieldTypeData) )
 
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => (FieldType, Int, Integer, Integer) -> Internal n -> Either (Error n) (ConstraintModule n)
+run :: (GaloisField n, Integral n) => FieldInfo -> Internal n -> Either (Error n) (ConstraintModule n)
 run fieldInfo (Internal untypedExprs _ counters assertions sideEffects) = left CompileError $ runM fieldInfo counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
@@ -540,7 +540,7 @@ compileAddU width out [] constant = do
         writeValB (RefUBit width out i) bit
 compileAddU width out vars constant = do
   fieldWidth <- gets cmFieldWidth
-  (fieldType, _, _, _) <- gets cmField
+  fieldInfo <- gets cmField
   -- for each negative operand, we compensate by adding 2^width
   let numberOfNegativeOperand = length $ filter (not . snd) vars
   -- because we need some extra bits for carry when adding UInts
@@ -548,7 +548,7 @@ compileAddU width out vars constant = do
   let carryWidth = ceiling (logBase 2 (fromIntegral (length vars) + if constant == 0 then 0 else 1) :: Double)
   let limbWidth = fieldWidth - 1 - carryWidth
   if limbWidth < 1
-    then throwError $ Error.FieldTooSmall fieldType fieldWidth
+    then throwError $ Error.FieldTooSmall (fieldTypeData fieldInfo) fieldWidth
     else foldM_ (go limbWidth carryWidth numberOfNegativeOperand) [] [0, limbWidth .. width - 1]
   where
     go :: (GaloisField n, Integral n) => Int -> Int -> Int -> [RefB] -> Int -> M n [RefB]

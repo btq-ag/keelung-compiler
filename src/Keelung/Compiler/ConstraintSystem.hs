@@ -16,6 +16,7 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters hiding (prettyConstraints)
+import Keelung.Compiler.FieldInfo
 
 --------------------------------------------------------------------------------
 
@@ -86,7 +87,7 @@ instance GaloisField n => Ord (Constraint n) where
 -- | Linked Constraint System
 data ConstraintSystem n = ConstraintSystem
   { -- | Constraints
-    csField :: (FieldType, Int, Integer, Integer),
+    csField :: FieldInfo,
     csConstraints :: !(Seq (Constraint n)),
     csCounters :: Counters,
     csEqZeros :: [(Poly n, Var)],

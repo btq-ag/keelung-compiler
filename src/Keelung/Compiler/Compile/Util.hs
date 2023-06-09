@@ -17,23 +17,21 @@ import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
-import Keelung.Field (FieldType)
 import Keelung.Syntax.Counters
 import qualified Data.Bits
 import Control.Arrow (right)
+import Keelung.Compiler.FieldInfo
 
 --------------------------------------------------------------------------------
 
 -- | Monad for compilation
 type M n = StateT (ConstraintModule n) (Except (Error n))
 
-runM :: GaloisField n => (FieldType, Int, Integer, Integer) -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
-runM fieldInfo counters program =
-  let (_, fieldWidth, _, _) = fieldInfo
-   in runExcept
+runM :: GaloisField n => FieldInfo -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
+runM fieldInfo counters program = runExcept
         ( execStateT
             program
-            (ConstraintModule fieldInfo fieldWidth counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty)
+            (ConstraintModule fieldInfo (fieldWidth fieldInfo) counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty)
         )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
