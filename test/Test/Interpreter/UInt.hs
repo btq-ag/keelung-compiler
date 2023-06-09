@@ -39,8 +39,8 @@ tests = do
           -- debugPrime (Prime 13) program
           -- runPrime (Prime 13) program [3, 10] [] [13]
           let genPair = do
-                x <- choose (0, 16)
-                y <- choose (0, 16)
+                x <- choose (0, 15)
+                y <- choose (0, 15)
                 return (x, y)
           forAll genPair $ \(x, y) -> do
             let expected = [(x + y) `mod` 16]
@@ -63,9 +63,9 @@ tests = do
           -- debugPrime (Prime 31) program
           -- runPrime (Prime 31) program [5, 2, 13] [] [15]
           let genPair = do
-                x <- choose (0, 16)
-                y <- choose (0, 16)
-                z <- choose (0, 16)
+                x <- choose (0, 15)
+                y <- choose (0, 15)
+                z <- choose (0, 15)
                 return (x, y, z)
           forAll genPair $ \(x, y, z) -> do
             let expected = [(x + y - z + 5) `mod` 16]
@@ -78,8 +78,8 @@ tests = do
           -- debugPrime (Prime 13) (program 6)
           -- runPrime (Prime 13) (program 6) [4] [] [10]
           let genPair = do
-                x <- choose (0, 16)
-                y <- choose (0, 16)
+                x <- choose (0, 15)
+                y <- choose (0, 15)
                 return (x, y)
           forAll genPair $ \(x, y) -> do
             let expected = [(x + y) `mod` 16]
@@ -682,21 +682,88 @@ tests = do
         runPrime gf181 program [] [] [3]
 
     describe "Equalities" $ do
-      it "eq" $ do
+      it "eq: variable / constant" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              return (x `eq` 13)
+        -- runPrime (Prime 13) program [0] [] [0]
+        -- runPrime (Prime 13) program [4, 4] [] [1]
+        forAll (choose (0, 15)) $ \x -> do
+          let expected = [if x == 13 then 1 else 0]
+          runPrime (Prime 13) program [x `mod` 16] [] expected
+
+      it "eq: variables (Prime 13)" $ do
         let program = do
               x <- inputUInt @4 Public
               y <- inputUInt @4 Public
               return (x `eq` y)
-        runPrime gf181 program [5, 6] [] [0]
-        runPrime gf181 program [4, 4] [] [1]
+        let genPair = do
+              x <- choose (0, 15)
+              y <- choose (0, 15)
+              return (x, y)
+        forAll genPair $ \(x, y) -> do
+          let expected = [if x == y then 1 else 0]
+          runPrime (Prime 13) program [x, y] [] expected
 
-      it "neq 1" $ do
+      it "eq: variables (GF181)" $ do
         let program = do
               x <- inputUInt @4 Public
               y <- inputUInt @4 Public
+              return (x `eq` y)
+        let genPair = do
+              x <- choose (0, 15)
+              y <- choose (0, 15)
+              return (x, y)
+        forAll genPair $ \(x, y) -> do
+          let expected = [if x == y then 1 else 0]
+          runPrime gf181 program [x, y] [] expected
+
+      it "neq: variable / constant" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              return (x `neq` 13)
+
+        -- runPrime (Prime 13) program [0] [] [0]
+        -- runPrime (Prime 13) program [4, 4] [] [1]
+        forAll (choose (0, 15)) $ \x -> do
+          let expected = [if x == 13 then 0 else 1]
+          runPrime (Prime 13) program [x `mod` 16] [] expected
+
+      it "neq: variables (Prime 13)" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return (x `eq` y)
+        let genPair = do
+              x <- choose (0, 15)
+              y <- choose (0, 15)
+              return (x, y)
+        forAll genPair $ \(x, y) -> do
+          let expected = [if x /= y then 0 else 1]
+          runPrime (Prime 13) program [x, y] [] expected
+
+      it "neq: variables (GF181)" $ do
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Public
+              return (x `eq` y)
+        let genPair = do
+              x <- choose (0, 15)
+              y <- choose (0, 15)
+              return (x, y)
+        forAll genPair $ \(x, y) -> do
+          let expected = [if x /= y then 0 else 1]
+          runPrime gf181 program [x, y] [] expected
+
+      it "neq (40 bits / Prime 13)" $ do
+        let program = do
+              x <- inputUInt @40 Public
+              y <- inputUInt @40 Public
               return (x `neq` y)
-        runPrime gf181 program [5, 6] [] [1]
-        runPrime gf181 program [4, 4] [] [0]
+        -- debugPrime  (Prime 13)  program
+        runPrime (Prime 13) program [12345, 12344] [] [1]
+        runPrime (Prime 13) program [12340000001, 12340000000] [] [1]
+        runPrime (Prime 13) program [1234, 1234] [] [0]
 
       it "neq 2" $ do
         let program = do

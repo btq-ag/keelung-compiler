@@ -1,15 +1,18 @@
 module Keelung.Compiler.Compile.Boolean where
 
-import Control.Monad (foldM)
+import Control.Monad.State
+import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.Sequence (Seq (..))
+import Data.Sequence qualified as Seq
+import Debug.Trace
 import Keelung (HasWidth (widthOf))
+import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
+import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Syntax.Internal
-import Keelung.Compiler.Compile.LC
-import Data.Foldable (toList)
-import qualified Data.Bits
 
 compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> (ExprF n -> M n (LC n)) -> ExprB n -> M n (Either RefB Bool)
 compileExprB compileU compileF expr =
@@ -53,9 +56,17 @@ compileExprB compileU compileF expr =
           y' <- compileF y
           eqZero False (x' <> neg y')
         NEqU x y -> do
+          let width = widthOf x
+          fieldWidth <- gets cmFieldWidth
           x' <- compileU x
           y' <- compileU y
-          eqZero False (fromRefU x' <> neg (fromRefU y'))
+          result <- zipWithM (\a b -> eqZero False (a <> neg b)) (fromRefU width fieldWidth x') (fromRefU width fieldWidth y')
+          case result of
+            [] -> return $ Right True
+            [result'] -> return result'
+            (x0 : x1 : xs) -> do
+              traceShowM (x0, x1, xs)
+              andBs x0 x1 (Seq.fromList xs)
         EqB x y -> do
           x' <- compile x
           y' <- compile y
@@ -67,7 +78,7 @@ compileExprB compileU compileF expr =
         EqU x y -> do
           x' <- compileU x
           y' <- compileU y
-          eqZero True (fromRefU x' <> neg (fromRefU y'))
+          compileEqU (widthOf x) x' y'
         LTEU x y -> do
           x' <- compileU x
           y' <- compileU y
@@ -95,6 +106,16 @@ compileExprB compileU compileF expr =
             Right val -> return $ Right (Data.Bits.testBit val index)
 
 --------------------------------------------------------------------------------
+
+compileEqU :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> M n (Either RefB Bool)
+compileEqU width x y = do
+  fieldWidth <- gets cmFieldWidth
+  result <- zipWithM (\a b -> eqZero True (a <> neg b)) (fromRefU width fieldWidth x) (fromRefU width fieldWidth y)
+  case result of
+    [] -> return $ Right True
+    [result'] -> return result'
+    (x0 : x1 : xs) -> do
+      andBs x0 x1 (Seq.fromList xs)
 
 -- | Conditional
 --  out = p * x + (1 - p) * y
@@ -163,6 +184,7 @@ andBs (Left x0) (Left x1) (x2 :<| xs) = do
   --      if all operands are 1           then 1 else 0
   --  =>  if the sum of operands is N     then 1 else 0
   --  =>  the sum of operands is N
+  -- let sumOfOperands = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs)))
   let arity = Constant (fromIntegral (3 + length xs))
   let polynomal = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs))) <> neg arity
   eqZero True polynomal
@@ -191,8 +213,8 @@ orBs (Left x0) (Left x1) (x2 :<| xs) = do
   --  =>  the sum of operands is not 0
   let polynomal = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs)))
   eqZero False $ 1 @ B x0 <> 1 @ B x1 <> polynomal
-  
-  --  polynomal
+
+--  polynomal
 
 xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 xorB (Right True) (Right True) = return $ Right False

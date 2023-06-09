@@ -566,7 +566,7 @@ compileAddU width out vars constant = do
       mapM_ addBooleanConstraint carries
       let carryBits = [(B carryVar, -(2 ^ (currentLimbWidth + i))) | (i, carryVar) <- zip [1 ..] carries]
       -- constants + vars + previousCarry = out + carry
-      let previousCarryBits = [(B carryVar, 2 ^ i) | (i :: Int, carryVar) <- zip [0 ..] previousCarries]
+      let previousCarryBits = [(B carryVar, 2 ^ (i :: Int)) | (i, carryVar) <- zip [0 ..] previousCarries]
       writeAdd (fromInteger compensatedConstant) $ varBits <> previousCarryBits <> carryBits <> resultBits
       return carries
 
