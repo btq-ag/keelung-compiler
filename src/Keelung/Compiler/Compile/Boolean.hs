@@ -13,6 +13,7 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Compiler.FieldInfo
 
 compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> (ExprF n -> M n (LC n)) -> ExprB n -> M n (Either RefB Bool)
 compileExprB compileU compileF expr =
@@ -184,10 +185,24 @@ andBs (Left x0) (Left x1) (x2 :<| xs) = do
   --      if all operands are 1           then 1 else 0
   --  =>  if the sum of operands is N     then 1 else 0
   --  =>  the sum of operands is N
+  --
+  -- split the operands into pieces in case that the order of field is too small
+  -- each pieces has at most (order - 1) operands
+  order <- gets (fieldOrder . cmField)
+  let pieces = Seq.chunksOf (fromInteger order - 1) (Left x0 :<| Left x1 :<| x2 :<| xs) 
+  let seqToLC piece = mconcat (fmap fromB (toList piece)) <> neg (Constant (fromIntegral (length piece)))
+  result <- mapM (eqZero True . seqToLC) pieces
+  case result of 
+    Empty -> return $ Right True
+    (x0' :<| Empty) -> return x0'
+    (x0' :<| x1' :<| xs') -> andBs x0' x1' xs'
+
+
   -- let sumOfOperands = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs)))
-  let arity = Constant (fromIntegral (3 + length xs))
-  let polynomal = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs))) <> neg arity
-  eqZero True polynomal
+
+
+  -- let polynomal = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs))) <> neg arity
+  -- eqZero True polynomal
 
 orBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
 orBs (Right True) _ _ = return $ Right True
