@@ -2,18 +2,18 @@ module Keelung.Compiler.Compile.Boolean where
 
 import Control.Monad.State
 import Data.Bits qualified
+import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
+import Data.List.Split qualified as List
 import Data.Sequence (Seq (..))
-import Data.Sequence qualified as Seq
-import Debug.Trace
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
-import Keelung.Compiler.Syntax.Internal
 import Keelung.Compiler.FieldInfo
+import Keelung.Compiler.Syntax.Internal
 
 compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> (ExprF n -> M n (LC n)) -> ExprB n -> M n (Either RefB Bool)
 compileExprB compileU compileF expr =
@@ -28,7 +28,8 @@ compileExprB compileU compileF expr =
           x0' <- compile x0
           x1' <- compile x1
           xs' <- mapM compile xs
-          andBs x0' x1' xs'
+          andBs (x0' : x1' : toList xs')
+        -- andBs x0' x1' xs'
         OrB x0 x1 xs -> do
           x0' <- compile x0
           x1' <- compile x1
@@ -66,8 +67,7 @@ compileExprB compileU compileF expr =
             [] -> return $ Right True
             [result'] -> return result'
             (x0 : x1 : xs) -> do
-              traceShowM (x0, x1, xs)
-              andBs x0 x1 (Seq.fromList xs)
+              andBs (x0 : x1 : xs)
         EqB x y -> do
           x' <- compile x
           y' <- compile y
@@ -116,7 +116,7 @@ compileEqU width x y = do
     [] -> return $ Right True
     [result'] -> return result'
     (x0 : x1 : xs) -> do
-      andBs x0 x1 (Seq.fromList xs)
+      andBs (x0 : x1 : xs)
 
 -- | Conditional
 --  out = p * x + (1 - p) * y
@@ -164,45 +164,48 @@ fromB (Right True) = Constant 1
 fromB (Right False) = Constant 0
 fromB (Left x) = 1 @ B x
 
-andBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
-andBs (Right False) _ _ = return $ Right False
-andBs _ (Right False) _ = return $ Right False
-andBs (Right True) x Empty = return x
-andBs (Right True) x0 (x1 :<| xs) = andBs x0 x1 xs
-andBs (Left x) (Right True) Empty = return $ Left x
-andBs (Left x0) (Right True) (x1 :<| xs) = andBs (Left x0) x1 xs
-andBs (Left x0) (Left x1) Empty = do
-  -- 2 operands only
-  -- x * y = out
-  out <- freshRefB
-  writeMul
-    (0, [(B x0, 1)])
-    (0, [(B x1, 1)])
-    (0, [(B out, 1)])
-  return $ Left out
-andBs (Left x0) (Left x1) (x2 :<| xs) = do
-  -- more than 2 operands, rewrite it as an equality instead:
-  --      if all operands are 1           then 1 else 0
-  --  =>  if the sum of operands is N     then 1 else 0
-  --  =>  the sum of operands is N
-  --
-  -- split the operands into pieces in case that the order of field is too small
-  -- each pieces has at most (order - 1) operands
-  order <- gets (fieldOrder . cmField)
-  let pieces = Seq.chunksOf (fromInteger order - 1) (Left x0 :<| Left x1 :<| x2 :<| xs) 
-  let seqToLC piece = mconcat (fmap fromB (toList piece)) <> neg (Constant (fromIntegral (length piece)))
-  result <- mapM (eqZero True . seqToLC) pieces
-  case result of 
-    Empty -> return $ Right True
-    (x0' :<| Empty) -> return x0'
-    (x0' :<| x1' :<| xs') -> andBs x0' x1' xs'
-
-
-  -- let sumOfOperands = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs)))
-
-
-  -- let polynomal = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs))) <> neg arity
-  -- eqZero True polynomal
+andBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
+andBs xs =
+  let (vars, constants) = Either.partitionEithers xs
+   in andBs' vars (and constants)
+  where
+    -- rewrite as an equality instead:
+    --      if all operands are 1           then 1 else 0
+    --  =>  if the sum of operands is N     then 1 else 0
+    --  =>  the sum of operands is N
+    andBs' :: (GaloisField n, Integral n) => [RefB] -> Bool -> M n (Either RefB Bool)
+    andBs' _ False = return $ Right False
+    andBs' [] True = return $ Right True
+    andBs' [var] True = return $ Left var
+    andBs' [var1, var2] True = do
+      out <- freshRefB
+      writeMul
+        (0, [(B var1, 1)])
+        (0, [(B var2, 1)])
+        (0, [(B out, 1)])
+      return $ Left out
+    andBs' (var : vars) True = do
+      -- split operands into pieces in case that the order of field is too small
+      -- each pieces has at most (order - 1) operands
+      order <- gets (fieldOrder . cmField)
+      if order == 2
+        then do
+          -- the degenrate case, recursion won't terminate, all field elements are also Boolean
+          result <- andBs' vars True
+          case result of
+            Right False -> return $ Right False
+            Right True -> return $ Left var
+            Left resultVar -> do
+              out <- freshRefB
+              writeMul
+                (0, [(B var, 1)])
+                (0, [(B resultVar, 1)])
+                (0, [(B out, 1)])
+              return $ Left out
+        else do
+          let pieces = List.chunksOf (fromInteger order - 1) (var : vars)
+          let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece)) <> neg (Constant (fromIntegral (length piece)))
+          mapM (eqZero True . seqToLC) pieces >>= andBs
 
 orBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
 orBs (Right True) _ _ = return $ Right True

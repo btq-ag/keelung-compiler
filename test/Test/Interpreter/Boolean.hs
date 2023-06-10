@@ -51,6 +51,15 @@ tests = describe "Boolean" $ do
     runPrime gf181 program [1] [] [0]
 
   it "and" $ testProgram (&&) And
+
+  it "and on Prime 2" $ do
+    let program = (.&.) <$> inputBool Public <*> inputBool Public
+    -- debugPrime (Prime 2) program
+    runPrime (Prime 2) program [0, 0] [] [0]
+    runPrime (Prime 2) program [0, 1] [] [0]
+    runPrime (Prime 2) program [1, 0] [] [0]
+    runPrime (Prime 2) program [1, 1] [] [1]
+
   it "or" $ testProgram (||) Or
   it "xor" $ testProgram Data.Bits.xor Xor
 
