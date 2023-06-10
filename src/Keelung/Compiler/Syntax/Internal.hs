@@ -98,7 +98,7 @@ data ExprB n
   | -- comparison operators
     NEqB (ExprB n) (ExprB n)
   | NEqF (ExprF n) (ExprF n)
-  | NEqU (ExprU n) (ExprU n)
+  -- | NEqU (ExprU n) (ExprU n)
   | EqB (ExprB n) (ExprB n)
   | EqF (ExprF n) (ExprF n)
   | EqU (ExprU n) (ExprU n)
@@ -125,7 +125,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     NEqB x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
     NEqF x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
-    NEqU x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
+    -- NEqU x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
     EqB x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
     EqF x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
     EqU x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty

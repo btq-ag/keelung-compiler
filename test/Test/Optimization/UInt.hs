@@ -7,7 +7,7 @@ import Control.Monad (forM_)
 import Keelung hiding (compileO0)
 import Test.Hspec
 import Test.Optimization.Util
-import Keelung.Compiler.Linker
+-- import Keelung.Compiler.Linker
 
 run :: IO ()
 run = hspec tests
@@ -46,7 +46,7 @@ tests = do
           y <- inputUInt @4 Public
           z <- inputUInt @4 Public
           return $ x - y + z + 4
-        print $ linkConstraintModule cs'
+        -- print $ linkConstraintModule cs'
         cs `shouldHaveSize` 19
         cs' `shouldHaveSize` 19
 

@@ -244,7 +244,7 @@ eqZero isEq (Polynomial polynomial) = do
       writeMulWithLC
         (Polynomial polynomial)
         (1 @ B out)
-        mempty
+        (Constant 0)
     else do
       writeMulWithLC
         (Polynomial polynomial)
@@ -253,7 +253,7 @@ eqZero isEq (Polynomial polynomial) = do
       writeMulWithLC
         (Polynomial polynomial)
         (Constant 1 <> neg (1 @ B out))
-        mempty
+        (Constant 0)
   --  keep track of the relation between (x - y) and m
   addEqZeroHintWithPoly (Right polynomial) m
   return (Left out)

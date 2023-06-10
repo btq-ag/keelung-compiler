@@ -57,17 +57,23 @@ compileExprB compileU compileF expr =
           x' <- compileF x
           y' <- compileF y
           eqZero False (x' <> neg y')
-        NEqU x y -> do
-          let width = widthOf x
-          fieldWidth <- gets cmFieldWidth
-          x' <- compileU x
-          y' <- compileU y
-          result <- zipWithM (\a b -> eqZero False (a <> neg b)) (fromRefU width fieldWidth x') (fromRefU width fieldWidth y')
-          case result of
-            [] -> return $ Right True
-            [result'] -> return result'
-            (x0 : x1 : xs) -> do
-              andBs (x0 : x1 : xs)
+        -- NEqU x y -> do
+        --   let width = widthOf x
+        --   fieldWidth <- gets cmFieldWidth
+        --   x' <- compileU x
+        --   y' <- compileU y
+        --   -- let a = fromRefU width fieldWidth x'
+        --   -- let b = fromRefU width fieldWidth y'
+        --   -- traceShowM "!!!!!!!!" 
+        --   -- traceShowM a 
+        --   -- traceShowM b
+        --   result <- zipWithM (\a b -> eqZero False (a <> neg b)) (fromRefU width fieldWidth x') (fromRefU width fieldWidth y')
+        --   case result of
+        --     [] -> return $ Right True
+        --     [result'] -> return result'
+        --     (x0 : x1 : xs) -> do
+        --       orBs x0 x1 (Seq.fromList xs)
+        --       -- andBs (x0 : x1 : xs)
         EqB x y -> do
           x' <- compile x
           y' <- compile y

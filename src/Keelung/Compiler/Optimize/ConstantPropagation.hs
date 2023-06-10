@@ -135,7 +135,7 @@ propagateExprB e = do
     IfB p x y -> IfB <$> propagateExprB p <*> propagateExprB x <*> propagateExprB y
     NEqB x y -> NEqB <$> propagateExprB x <*> propagateExprB y
     NEqF x y -> NEqF <$> propagateExprF x <*> propagateExprF y
-    NEqU x y -> NEqU <$> propagateExprU x <*> propagateExprU y
+    -- NEqU x y -> NEqU <$> propagateExprU x <*> propagateExprU y
     EqB x y -> EqB <$> propagateExprB x <*> propagateExprB y
     EqF x y -> EqF <$> propagateExprF x <*> propagateExprF y
     EqU x y -> EqU <$> propagateExprU x <*> propagateExprU y
