@@ -376,15 +376,15 @@ compileExprU out expr = case expr of
     addModInvHint a' (Left out) (Left nRef) p
 
   -- writeMul (0, [(U var, 1)]) (0, [(U out, 1)]) (1, [(U nRef, fromInteger p)])
-  AndU w x y xs -> do
+  AndU w xs -> do
     forM_ [0 .. w - 1] $ \i -> do
-      result <- compileExprB (AndB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
+      result <- compileExprB (AndB (fmap (`BitU` i) xs))
       case result of
         Left var -> writeEqB (RefUBit w out i) var
         Right val -> writeValB (RefUBit w out i) val
-  OrU w x y xs -> do
+  OrU w xs -> do
     forM_ [0 .. w - 1] $ \i -> do
-      result <- compileExprB (OrB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
+      result <- compileExprB (OrB (fmap (`BitU` i) xs))
       case result of
         Left var -> writeEqB (RefUBit w out i) var
         Right val -> writeValB (RefUBit w out i) val

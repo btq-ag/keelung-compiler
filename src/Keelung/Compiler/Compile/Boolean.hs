@@ -6,7 +6,6 @@ import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.List.Split qualified as List
-import Data.Sequence (Seq (..))
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
@@ -24,17 +23,12 @@ compileExprB compileU compileF expr =
         VarBO var -> return $ Left (RefBO var) -- out = var
         VarBI var -> return $ Left (RefBI var) -- out = var
         VarBP var -> return $ Left (RefBP var) -- out = var
-        AndB x0 x1 xs -> do
-          x0' <- compile x0
-          x1' <- compile x1
+        AndB xs -> do
           xs' <- mapM compile xs
-          andBs (x0' : x1' : toList xs')
-        -- andBs x0' x1' xs'
-        OrB x0 x1 xs -> do
-          x0' <- compile x0
-          x1' <- compile x1
+          andBs (toList xs')
+        OrB xs -> do
           xs' <- mapM compile xs
-          orBs2 (x0' : x1' : toList xs')
+          orBs (toList xs')
         XorB x y -> do
           x' <- compile x
           y' <- compile y
@@ -209,8 +203,8 @@ andBs xs =
           let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece)) <> neg (Constant (fromIntegral (length piece)))
           mapM (eqZero True . seqToLC) pieces >>= andBs
 
-orBs2 :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
-orBs2 xs =
+orBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
+orBs xs =
   let (vars, constants) = Either.partitionEithers xs
    in go vars (or constants)
   where
@@ -250,32 +244,7 @@ orBs2 xs =
         else do
           let pieces = List.chunksOf (fromInteger order - 1) (var : vars)
           let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece))
-          mapM (eqZero False . seqToLC) pieces >>= orBs2
-
-orBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
-orBs (Right True) _ _ = return $ Right True
-orBs _ (Right True) _ = return $ Right True
-orBs (Right False) x Empty = return x
-orBs (Right False) x0 (x1 :<| xs) = orBs x0 x1 xs
-orBs (Left x) (Right False) Empty = return $ Left x
-orBs (Left x0) (Right False) (x1 :<| xs) = orBs (Left x0) x1 xs
-orBs (Left x0) (Left x1) Empty = do
-  -- 2 operands only
-  -- (1 - x) * y = (out - x)
-  out <- freshRefB
-  writeMul
-    (1, [(B x0, -1)])
-    (0, [(B x1, 1)])
-    (0, [(B x0, -1), (B out, 1)])
-  return $ Left out
-orBs (Left x0) (Left x1) (x2 :<| xs) = do
-  -- more than 2 operands, rewrite it as an inequality instead:
-  --      if all operands are 0           then 0 else 1
-  --  =>  if the sum of operands is 0     then 0 else 1
-  --  =>  if the sum of operands is not 0 then 1 else 0
-  --  =>  the sum of operands is not 0
-  let polynomal = 1 @ B x0 <> 1 @ B x1 <> mconcat (fmap fromB (toList (x2 :<| xs)))
-  eqZero False $ 1 @ B x0 <> 1 @ B x1 <> polynomal
+          mapM (eqZero False . seqToLC) pieces >>= orBs
 
 --  polynomal
 
