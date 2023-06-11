@@ -10,6 +10,7 @@ import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Compiler.Compile.Error qualified as CompilerError
+import Keelung.Interpreter.Arithmetics qualified as Arithmetics
 import Keelung.Interpreter.Error qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
@@ -798,9 +799,26 @@ tests = do
           (CompileError (Compiler.ConflictingValuesB True False) :: Error GF181)
 
     describe "Logical" $ do
- 
+      describe "complement" $ do
+        it "variable / byte / Prime 13" $ do
+          let program = do
+                x <- inputUInt @8 Public
+                return $ complement x
+          forAll (choose (0, 255)) $ \x -> do
+            let uint = Arithmetics.UVal 8 x
+            let expected = [Arithmetics.uintValue (Arithmetics.bitWiseNotU uint)]
+            runPrime (Prime 13) program [Arithmetics.uintValue uint] [] expected
+
+        it "constant / byte / Prime 13" $ do
+          let program x = do
+                return $ complement (x :: UInt 8)
+          forAll (choose (0, 255)) $ \x -> do
+            let uint = Arithmetics.UVal 8 x
+            let expected = [Arithmetics.uintValue (Arithmetics.bitWiseNotU uint)]
+            runPrime (Prime 13) (program (fromInteger x)) [] [] expected
+
       describe "conjunction" $ do
-        it "2 variables / byte / GF181" $ do
+        it "2 variables / byte / Prime 13" $ do
           let program = do
                 x <- inputUInt @8 Public
                 y <- inputUInt @8 Public
@@ -815,7 +833,7 @@ tests = do
               let expected = [x Data.Bits..&. y]
               runPrime (Prime 13) program [x, y] [] expected
 
-        it "3 variables / byte / GF181" $ do
+        it "3 variables / byte / Prime 13" $ do
           let program = do
                 x <- inputUInt @8 Public
                 y <- inputUInt @8 Public
@@ -832,7 +850,7 @@ tests = do
               let expected = [x Data.Bits..&. y Data.Bits..&. z]
               runPrime (Prime 13) program [x, y, z] [] expected
 
-        it "variables with constants / byte / GF181" $ do
+        it "variables with constants / byte / Prime 13" $ do
           let program = do
                 x <- inputUInt @8 Public
                 y <- inputUInt @8 Public
@@ -848,8 +866,9 @@ tests = do
             $ \(x, y, z) -> do
               let expected = [x Data.Bits..&. y Data.Bits..&. z Data.Bits..&. 3]
               runPrime (Prime 13) program [x, y, z] [] expected
+
       describe "disjunction" $ do
-        it "2 variables / byte / GF181" $ do
+        it "2 variables / byte / Prime 13" $ do
           let program = do
                 x <- inputUInt @8 Public
                 y <- inputUInt @8 Public
@@ -864,7 +883,7 @@ tests = do
               let expected = [x Data.Bits..|. y]
               runPrime (Prime 13) program [x, y] [] expected
 
-        it "3 variables / byte / GF181" $ do
+        it "3 variables / byte / Prime 13" $ do
           let program = do
                 x <- inputUInt @8 Public
                 y <- inputUInt @8 Public
@@ -881,7 +900,7 @@ tests = do
               let expected = [x Data.Bits..|. y Data.Bits..|. z]
               runPrime (Prime 13) program [x, y, z] [] expected
 
-        it "variables with constants / byte / GF181" $ do
+        it "variables with constants / byte / Prime 13" $ do
           let program = do
                 x <- inputUInt @8 Public
                 y <- inputUInt @8 Public
@@ -897,7 +916,6 @@ tests = do
             $ \(x, y, z) -> do
               let expected = [x Data.Bits..|. y Data.Bits..|. z Data.Bits..|. 3]
               runPrime (Prime 13) program [x, y, z] [] expected
-
 
     describe "Bitwise" $ do
       it "rotate" $ do

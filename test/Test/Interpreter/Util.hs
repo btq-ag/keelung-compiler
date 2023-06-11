@@ -3,7 +3,7 @@
 
 module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, runPrime, debugPrime, throwPrimeR1CS) where
 
-import Control.Arrow (left, right)
+import Control.Arrow (left)
 import Data.Field.Galois
 import Data.Foldable (toList)
 import Data.Proxy (Proxy (..), asProxyTypeOf)
@@ -30,7 +30,7 @@ interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [Integ
 interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborateAndEncode prog)
   inputs <- left (InterpretError . Interpreter.InputError) (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
-  right (map fromInteger) $ left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
+  left (InterpretError . Interpreter.SyntaxTreeError) (SyntaxTree.run elab inputs)
 
 -- | constraint system interpreters (optimized)
 interpretR1CS :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [n]

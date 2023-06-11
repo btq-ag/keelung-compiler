@@ -58,7 +58,7 @@ bitWiseXorU :: U -> U -> U
 bitWiseXorU a b = UVal (uintWidth a) (uintValue a `xor` uintValue b)
 
 bitWiseNotU :: U -> U
-bitWiseNotU a = UVal (uintWidth a) (complement (uintValue a))
+bitWiseNotU a = UVal (uintWidth a) (foldl complementBit (fromInteger (uintValue a)) [0 .. uintWidth a - 1])
 
 -- | w is the bit width of the result
 --   n is the amount to rotate left by
