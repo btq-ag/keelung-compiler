@@ -34,7 +34,7 @@ compileExprB compileU compileF expr =
           x0' <- compile x0
           x1' <- compile x1
           xs' <- mapM compile xs
-          orBs x0' x1' xs'
+          orBs2 (x0' : x1' : toList xs')
         XorB x y -> do
           x' <- compile x
           y' <- compile y
@@ -64,8 +64,8 @@ compileExprB compileU compileF expr =
         --   y' <- compileU y
         --   -- let a = fromRefU width fieldWidth x'
         --   -- let b = fromRefU width fieldWidth y'
-        --   -- traceShowM "!!!!!!!!" 
-        --   -- traceShowM a 
+        --   -- traceShowM "!!!!!!!!"
+        --   -- traceShowM a
         --   -- traceShowM b
         --   result <- zipWithM (\a b -> eqZero False (a <> neg b)) (fromRefU width fieldWidth x') (fromRefU width fieldWidth y')
         --   case result of
@@ -173,45 +173,84 @@ fromB (Left x) = 1 @ B x
 andBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
 andBs xs =
   let (vars, constants) = Either.partitionEithers xs
-   in andBs' vars (and constants)
+   in go vars (and constants)
   where
-    -- rewrite as an equality instead:
-    --      if all operands are 1           then 1 else 0
-    --  =>  if the sum of operands is N     then 1 else 0
-    --  =>  the sum of operands is N
-    andBs' :: (GaloisField n, Integral n) => [RefB] -> Bool -> M n (Either RefB Bool)
-    andBs' _ False = return $ Right False
-    andBs' [] True = return $ Right True
-    andBs' [var] True = return $ Left var
-    andBs' [var1, var2] True = do
+    andB :: (GaloisField n, Integral n) => RefB -> RefB -> M n (Either RefB Bool)
+    andB var1 var2 = do
       out <- freshRefB
       writeMul
         (0, [(B var1, 1)])
         (0, [(B var2, 1)])
         (0, [(B out, 1)])
       return $ Left out
-    andBs' (var : vars) True = do
+    -- rewrite as an equality instead:
+    --      if all operands are 1           then 1 else 0
+    --  =>  if the sum of operands is N     then 1 else 0
+    --  =>  the sum of operands is N
+    go :: (GaloisField n, Integral n) => [RefB] -> Bool -> M n (Either RefB Bool)
+    go _ False = return $ Right False
+    go [] True = return $ Right True
+    go [var] True = return $ Left var
+    go [var1, var2] True = andB var1 var2
+    go (var : vars) True = do
       -- split operands into pieces in case that the order of field is too small
       -- each pieces has at most (order - 1) operands
       order <- gets (fieldOrder . cmField)
       if order == 2
         then do
           -- the degenrate case, recursion won't terminate, all field elements are also Boolean
-          result <- andBs' vars True
+          result <- go vars True
           case result of
             Right False -> return $ Right False
             Right True -> return $ Left var
-            Left resultVar -> do
-              out <- freshRefB
-              writeMul
-                (0, [(B var, 1)])
-                (0, [(B resultVar, 1)])
-                (0, [(B out, 1)])
-              return $ Left out
+            Left resultVar -> andB var resultVar
         else do
           let pieces = List.chunksOf (fromInteger order - 1) (var : vars)
           let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece)) <> neg (Constant (fromIntegral (length piece)))
           mapM (eqZero True . seqToLC) pieces >>= andBs
+
+orBs2 :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
+orBs2 xs =
+  let (vars, constants) = Either.partitionEithers xs
+   in go vars (or constants)
+  where
+    -- 2 operands only
+    -- (1 - x) * y = (out - x)
+    orB :: (GaloisField n, Integral n) => RefB -> RefB -> M n (Either RefB Bool)
+    orB var1 var2 = do
+      out <- freshRefB
+      writeMul
+        (1, [(B var1, -1)])
+        (0, [(B var2, 1)])
+        (0, [(B var1, -1), (B out, 1)])
+      return $ Left out
+
+    -- rewrite as an inequality instead:
+    --      if all operands are 0           then 0 else 1
+    --  =>  if the sum of operands is 0     then 0 else 1
+    --  =>  if the sum of operands is not 0 then 1 else 0
+    --  =>  the sum of operands is not 0
+    go :: (GaloisField n, Integral n) => [RefB] -> Bool -> M n (Either RefB Bool)
+    go _ True = return $ Right True
+    go [] False = return $ Right False
+    go [var] False = return $ Left var
+    go [var1, var2] False = orB var1 var2
+    go (var : vars) False = do
+      -- split operands into pieces in case that the order of field is too small
+      -- each pieces has at most (order - 1) operands
+      order <- gets (fieldOrder . cmField)
+      if order == 2
+        then do
+          -- the degenrate case, recursion won't terminate, all field elements are also Boolean
+          result <- go vars False
+          case result of
+            Right True -> return $ Right True
+            Right False -> return $ Left var
+            Left resultVar -> orB var resultVar
+        else do
+          let pieces = List.chunksOf (fromInteger order - 1) (var : vars)
+          let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece))
+          mapM (eqZero False . seqToLC) pieces >>= orBs2
 
 orBs :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> Seq (Either RefB Bool) -> M n (Either RefB Bool)
 orBs (Right True) _ _ = return $ Right True
