@@ -110,8 +110,8 @@ compileExprB compileU compileF expr =
 
 compileEqU :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> M n (Either RefB Bool)
 compileEqU width x y = do
-  fieldWidth <- gets cmFieldWidth
-  result <- zipWithM (\a b -> eqZero True (a <> neg b)) (fromRefU width fieldWidth x) (fromRefU width fieldWidth y)
+  fieldWidth' <- gets cmFieldWidth
+  result <- zipWithM (\a b -> eqZero True (a <> neg b)) (fromRefU width fieldWidth' x) (fromRefU width fieldWidth' y)
   case result of
     [] -> return $ Right True
     [result'] -> return result'

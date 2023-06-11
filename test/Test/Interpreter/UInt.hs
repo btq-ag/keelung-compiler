@@ -806,7 +806,7 @@ tests = do
                 return $ complement x
           forAll (choose (0, 255)) $ \x -> do
             let uint = Arithmetics.UVal 8 x
-            let expected = [Arithmetics.uintValue (Arithmetics.bitWiseNotU uint)]
+            let expected = [Arithmetics.uintValue (Data.Bits.complement uint)]
             runPrime (Prime 13) program [Arithmetics.uintValue uint] [] expected
 
         it "constant / byte / Prime 13" $ do
@@ -814,7 +814,7 @@ tests = do
                 return $ complement (x :: UInt 8)
           forAll (choose (0, 255)) $ \x -> do
             let uint = Arithmetics.UVal 8 x
-            let expected = [Arithmetics.uintValue (Arithmetics.bitWiseNotU uint)]
+            let expected = [Arithmetics.uintValue (Data.Bits.complement uint)]
             runPrime (Prime 13) (program (fromInteger x)) [] [] expected
 
       describe "conjunction" $ do

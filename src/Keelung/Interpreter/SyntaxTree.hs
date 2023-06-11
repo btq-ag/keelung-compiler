@@ -49,18 +49,17 @@ run elab inputs = fst <$> runAndOutputWitnesses elab inputs
 
 interpretExpr :: (GaloisField n, Integral n) => Expr -> M n [Integer]
 interpretExpr expr = case expr of
-    Unit -> return []
-    Boolean e -> do
-      result <- interpretB e
-      case result of
-        [True] -> return [1]
-        _ -> return [0]
-    Field e ->  map toInteger <$> interpret e
-    UInt e -> map uintValue <$> interpretU e
-    Array xs -> do 
-      result <- mapM interpretExpr xs
-      return $ concat result 
-
+  Unit -> return []
+  Boolean e -> do
+    result <- interpretB e
+    case result of
+      [True] -> return [1]
+      _ -> return [0]
+  Field e -> map toInteger <$> interpret e
+  UInt e -> map uintValue <$> interpretU e
+  Array xs -> do
+    result <- mapM interpretExpr xs
+    return $ concat result
 
 -- | For handling div/mod statements
 -- we can solve a div/mod relation if we know:
@@ -297,13 +296,13 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
             return [UVal w v]
           _ -> throwError $ ModInvError x'' p
         _ -> throwError $ ResultSizeError 1 (length x')
-    AndU _ x y -> zipWith bitWiseAndU <$> interpretU x <*> interpretU y
-    OrU _ x y -> zipWith bitWiseOrU <$> interpretU x <*> interpretU y
-    XorU _ x y -> zipWith bitWiseXorU <$> interpretU x <*> interpretU y
-    NotU _ x -> map bitWiseNotU <$> interpretU x
-    RoLU w i x -> map (bitWiseRotateLU w i) <$> interpretU x
-    ShLU w i x -> map (bitWiseShiftLU w i) <$> interpretU x
-    SetU w x i y -> zipWith (\x' y' -> bitWiseSetU w x' i y') <$> interpretU x <*> interpretB y
+    AndU _ x y -> zipWith (.&.) <$> interpretU x <*> interpretU y
+    OrU _ x y -> zipWith (.|.) <$> interpretU x <*> interpretU y
+    XorU _ x y -> zipWith xor <$> interpretU x <*> interpretU y
+    NotU _ x -> map complement <$> interpretU x
+    RoLU _ i x -> map (`rotateL` i) <$> interpretU x
+    ShLU _ i x -> map (`shiftL` i) <$> interpretU x
+    SetU _ x i y -> zipWith (\x' val -> if val then setBit x' i else clearBit x' i) <$> interpretU x <*> interpretB y
     IfU _ p x y -> do
       p' <- interpretB p
       case p' of

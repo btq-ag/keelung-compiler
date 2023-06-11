@@ -1,8 +1,19 @@
-module Keelung.Interpreter.Arithmetics where
+module Keelung.Interpreter.Arithmetics
+  ( U (..),
+    integerAddU,
+    integerSubU,
+    integerMulU,
+    integerDivU,
+    integerModU,
+    integerDiv,
+    integerMod,
+    modInv,
+  )
+where
 
+import Data.Bits (Bits (..))
 import Data.Field.Galois (GaloisField)
 import Keelung.Syntax (Width)
-import Data.Bits (Bits(..))
 
 --------------------------------------------------------------------------------
 
@@ -48,6 +59,22 @@ integerDivU a b = UVal (uintWidth a) (uintValue a `div` uintValue b)
 integerModU :: U -> U -> U
 integerModU a b = UVal (uintWidth a) (uintValue a `mod` uintValue b)
 
+instance Bits U where
+  (.&.) = bitWiseAndU
+  (.|.) = bitWiseOrU
+  xor = bitWiseXorU
+  complement = bitWiseNotU
+  shift = shiftU
+  rotate = rotateU
+  bitSizeMaybe = Just . uintWidth
+  bitSize = uintWidth
+  isSigned = const False
+  testBit a = testBit (uintValue a)
+  bit = UVal 1 . bit
+  popCount = popCount . uintValue
+  setBit = setBitU
+  clearBit = clearBitU
+
 bitWiseAndU :: U -> U -> U
 bitWiseAndU a b = UVal (uintWidth a) (uintValue a .&. uintValue b)
 
@@ -63,28 +90,32 @@ bitWiseNotU a = UVal (uintWidth a) (foldl complementBit (fromInteger (uintValue 
 -- | w is the bit width of the result
 --   n is the amount to rotate left by
 --   x is the value to be rotated
-bitWiseRotateLU :: Width -> Int -> U -> U
-bitWiseRotateLU w n a =
-  UVal
-    (uintWidth a)
-    ( (uintValue a `Data.Bits.shiftL` fromIntegral (n `mod` w) Data.Bits..&. (2 ^ w - 1))
-        Data.Bits..|. (uintValue a `Data.Bits.shiftR` fromIntegral (w - (n `mod` w)))
-    )
+rotateU :: U -> Int -> U
+rotateU a n =
+  let w = uintWidth a
+   in UVal
+        (uintWidth a)
+        ( (uintValue a `Data.Bits.shiftL` fromIntegral (n `mod` w) Data.Bits..&. (2 ^ w - 1))
+            Data.Bits..|. (uintValue a `Data.Bits.shiftR` fromIntegral (w - (n `mod` w)))
+        )
 
 -- | This function shifts left if n is positive and shifts right if n is negative
-bitWiseShiftLU :: Width -> Int -> U -> U
-bitWiseShiftLU w n a =
+shiftU :: U -> Int -> U
+shiftU a n =
   UVal (uintWidth a) $
     if n < 0
       then Data.Bits.shiftR (uintValue a) (-n)
-      else Data.Bits.shiftL (uintValue a) n Data.Bits..&. (2 ^ w - 1)
+      else Data.Bits.shiftL (uintValue a) n Data.Bits..&. (2 ^ uintWidth a - 1)
 
-bitWiseSetU :: Width -> U -> Int -> Bool -> U
-bitWiseSetU w x i b =
-  let i' = i `mod` w
-   in UVal (uintWidth x) $ if b
-        then Data.Bits.clearBit (uintValue x) i'
-        else Data.Bits.setBit (uintValue x) i'
+setBitU :: U -> Int -> U
+setBitU x i =
+  let i' = i `mod` uintWidth x
+   in UVal (uintWidth x) (Data.Bits.setBit (uintValue x) i')
+
+clearBitU :: U -> Int -> U
+clearBitU x i =
+  let i' = i `mod` uintWidth x
+   in UVal (uintWidth x) (Data.Bits.clearBit (uintValue x) i')
 
 --------------------------------------------------------------------------------
 
@@ -93,43 +124,6 @@ integerDiv x y = fromInteger (toInteger x `div` toInteger y)
 
 integerMod :: (GaloisField n, Integral n) => n -> n -> n
 integerMod x y = fromInteger (toInteger x `mod` toInteger y)
-
-bitWiseAnd :: (GaloisField n, Integral n) => n -> n -> n
-bitWiseAnd x y = fromInteger $ (Data.Bits..&.) (toInteger x) (toInteger y)
-
-bitWiseOr :: (GaloisField n, Integral n) => n -> n -> n
-bitWiseOr x y = fromInteger $ (Data.Bits..|.) (toInteger x) (toInteger y)
-
-bitWiseXor :: (GaloisField n, Integral n) => n -> n -> n
-bitWiseXor x y = fromInteger $ Data.Bits.xor (toInteger x) (toInteger y)
-
-bitWiseNot :: (GaloisField n, Integral n) => n -> n
-bitWiseNot x = case toInteger x of
-  0 -> 1
-  _ -> 0
-
--- | w is the bit width of the result
---   n is the amount to rotate left by
---   x is the value to be rotated
-bitWiseRotateL :: (GaloisField n, Integral n) => Width -> Int -> n -> n
-bitWiseRotateL w n x =
-  fromInteger $
-    (toInteger x `Data.Bits.shiftL` fromIntegral (n `mod` w) Data.Bits..&. (2 ^ w - 1))
-      Data.Bits..|. (toInteger x `Data.Bits.shiftR` fromIntegral (w - (n `mod` w)))
-
--- | This function shifts left if n is positive and shifts right if n is negative
-bitWiseShiftL :: (GaloisField n, Integral n) => Width -> Int -> n -> n
-bitWiseShiftL w n x =
-  if n < 0
-    then fromInteger $ Data.Bits.shiftR (toInteger x) (-n)
-    else fromInteger $ Data.Bits.shiftL (toInteger x) n Data.Bits..&. (2 ^ w - 1)
-
-bitWiseSet :: (GaloisField n, Integral n) => Width -> n -> Int -> Bool -> n
-bitWiseSet w x i b =
-  let i' = i `mod` w
-   in if b
-        then fromInteger $ Data.Bits.clearBit (toInteger x) i'
-        else fromInteger $ Data.Bits.setBit (toInteger x) i'
 
 -- Given m and a, return Just x such that ax = 1 mod m.
 -- If there is no such x return Nothing.
