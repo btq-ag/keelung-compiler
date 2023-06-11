@@ -2,7 +2,6 @@
 
 module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Occurrences, constructOccurrences) where
 
-import Control.Arrow (left)
 import Data.Bifunctor (Bifunctor (bimap), first)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
@@ -34,7 +33,9 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Syntax (HasWidth (widthOf), Var)
+import Keelung.Interpreter.Arithmetics (U)
+import Keelung.Interpreter.Arithmetics qualified as U
+import Keelung.Syntax (HasWidth (widthOf), Var, Width)
 import Keelung.Syntax.Counters
 
 -------------------------------------------------------------------------------
@@ -136,12 +137,12 @@ linkConstraintModule cm =
     mulFs = Seq.fromList $ map (linkConstraint occurrences . uncurry3 CMulF) $ cmMulF cm
     eqZeros = Seq.fromList $ map (bimap (linkPoly_ occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
 
-    reindexBits refU =
-      let width = widthOf refU
-       in (reindexRefB occurrences (RefUBit (widthOf refU) refU 0), width)
+    fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
+    fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB occurrences (RefUBit width var 0)))
+    fromEitherRefU (Right val) = let width = U.uintWidth val in (width, Right (U.uintValue val))
 
-    divMods = map (\(a, b, q, r) -> (left reindexBits a, left reindexBits b, left reindexBits q, left reindexBits r)) $ cmDivMods cm
-    modInvs = map (\(a, output, n, p) -> (left reindexBits a, left reindexBits output, left reindexBits n, toInteger p)) $ cmModInvs cm
+    divMods = map (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) $ cmDivMods cm
+    modInvs = map (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, U.uintValue p)) $ cmModInvs cm
 
 -------------------------------------------------------------------------------
 

@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Keelung.Interpreter.Arithmetics
   ( U (..),
     integerAddU,
@@ -14,11 +17,13 @@ where
 import Data.Bits (Bits (..))
 import Data.Field.Galois (GaloisField)
 import Keelung.Syntax (Width)
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 --------------------------------------------------------------------------------
 
 data U = UVal {uintWidth :: Width, uintValue :: Integer}
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Generic, NFData)
 
 instance Show U where
   show (UVal _ value) = show value

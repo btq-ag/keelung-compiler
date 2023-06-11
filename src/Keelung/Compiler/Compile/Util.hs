@@ -1,13 +1,16 @@
 module Keelung.Compiler.Compile.Util where
 
+import Control.Arrow (right)
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Bits qualified
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
+import Keelung.Compiler.FieldInfo
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
@@ -17,10 +20,8 @@ import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Syntax.Counters
-import qualified Data.Bits
-import Control.Arrow (right)
-import Keelung.Compiler.FieldInfo
 
 --------------------------------------------------------------------------------
 
@@ -28,11 +29,12 @@ import Keelung.Compiler.FieldInfo
 type M n = StateT (ConstraintModule n) (Except (Error n))
 
 runM :: GaloisField n => FieldInfo -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
-runM fieldInfo counters program = runExcept
-        ( execStateT
-            program
-            (ConstraintModule fieldInfo (fieldWidth fieldInfo) counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty)
-        )
+runM fieldInfo counters program =
+  runExcept
+    ( execStateT
+        program
+        (ConstraintModule fieldInfo (fieldWidth fieldInfo) counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty)
+    )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
 modifyCounter f = modify (\cs -> cs {cmCounters = f (cmCounters cs)})
@@ -210,11 +212,11 @@ addEqZeroHintWithPoly (Left 0) m = writeValF m 0
 addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
-addDivModHint :: (GaloisField n, Integral n) => Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> M n ()
-addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (right fromInteger x, right fromInteger y, right fromInteger q, right fromInteger r) : cmDivMods cs}
+addDivModHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> M n ()
+addDivModHint w x y q r = modify' $ \cs -> cs {cmDivMods = (right (UVal w) x, right (UVal w) y, right (UVal w) q, right (UVal w) r) : cmDivMods cs}
 
-addModInvHint :: (GaloisField n, Integral n) => Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Integer -> M n ()
-addModInvHint a output n p = modify' $ \cs -> cs {cmModInvs = (right fromInteger a, right fromInteger output, right fromInteger n, fromInteger p) : cmModInvs cs}
+addModInvHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Integer -> M n ()
+addModInvHint w a output n p = modify' $ \cs -> cs {cmModInvs = (right (UVal w) a, right (UVal w) output, right (UVal w) n, UVal w p) : cmModInvs cs}
 
 addBooleanConstraint :: (GaloisField n, Integral n) => RefB -> M n ()
 addBooleanConstraint x = writeMulWithLC (1 @ B x) (1 @ B x) (1 @ B x)

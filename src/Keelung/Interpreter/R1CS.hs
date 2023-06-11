@@ -26,7 +26,7 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Interpreter.Arithmetics qualified as Arithmetics
 import Keelung.Interpreter.R1CS.Monad
-import Keelung.Syntax (Var)
+import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
 
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n)
@@ -45,7 +45,6 @@ run' r1cs inputs = do
   case IntMap.toList outputRanges of
     [(outputStart, outputLength)] -> return (Vector.slice outputStart outputLength witness, witness)
     _ -> return (mempty, witness)
-
 
 -- | Return Constraints from a R1CS, which include:
 --   1. ordinary constraints
@@ -117,9 +116,9 @@ lookupBits (var, count) = do
     Nothing -> return Nothing
     Just bitVals -> return $ Just $ sum [bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
 
-lookupBitsEither :: (GaloisField n, Integral n) => Either (Var, Int) n -> M n (Maybe n)
-lookupBitsEither (Left (var, count)) = lookupBits (var, count)
-lookupBitsEither (Right val) = return (Just val)
+lookupBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> M n (Maybe n)
+lookupBitsEither (width, Left var) = lookupBits (var, width)
+lookupBitsEither (_, Right val) = return (Just (fromInteger val))
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
@@ -280,7 +279,10 @@ eliminateIfHold expected actual =
 --    1. dividend & divisor
 --    1. dividend & quotient
 --    2. divisor & quotient & remainder
-shrinkDivMod :: (GaloisField n, Integral n) => (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n) -> M n (Result (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n))
+shrinkDivMod ::
+  (GaloisField n, Integral n) =>
+  ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer)) ->
+  M n (Result ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer)))
 shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
   -- check the value of the dividend first,
   -- if it's unknown, then its value can only be determined from other variables
@@ -367,7 +369,7 @@ shrinkBooleanConstraint var = do
     Nothing -> return $ Stuck var
 
 -- | Trying to reduce a ModInv constraint
-shrinkModInv :: (GaloisField n, Integral n) => (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer) -> M n (Result (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer))
+shrinkModInv :: (GaloisField n, Integral n) => ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer) -> M n (Result ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer))
 shrinkModInv (aVar, outVar, nVar, p) = do
   aResult <- lookupBitsEither aVar
   case aResult of

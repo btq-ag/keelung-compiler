@@ -373,7 +373,7 @@ compileExprU out expr = case expr of
     compileAddU2 w aainv (Left np) (Right 1)
     -- 2. n ≤ p
     assertLTE w (Left nRef) p
-    addModInvHint a' (Left out) (Left nRef) p
+    addModInvHint w a' (Left out) (Left nRef) p
 
   -- writeMul (0, [(U var, 1)]) (0, [(U out, 1)]) (1, [(U nRef, fromInteger p)])
   AndU w xs -> do
@@ -766,7 +766,7 @@ assertDivModU width dividend divisor quotient remainder = do
   -- 0 < divisor
   assertGT width divisorRef 0
   -- add hint for DivMod
-  addDivModHint dividendRef divisorRef quotientRef remainderRef
+  addDivModHint width dividendRef divisorRef quotientRef remainderRef
 
 --------------------------------------------------------------------------------
 

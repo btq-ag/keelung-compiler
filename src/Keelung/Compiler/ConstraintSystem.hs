@@ -14,7 +14,7 @@ import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
-import Keelung.Syntax (Var)
+import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters hiding (prettyConstraints)
 import Keelung.Compiler.FieldInfo
 
@@ -91,8 +91,8 @@ data ConstraintSystem n = ConstraintSystem
     csConstraints :: !(Seq (Constraint n)),
     csCounters :: Counters,
     csEqZeros :: [(Poly n, Var)],
-    csDivMods :: [(Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n)],
-    csModInvs :: [(Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer)]
+    csDivMods :: [((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))],
+    csModInvs :: [((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer)]
   }
   deriving (Eq, Generic, NFData, Functor)
 

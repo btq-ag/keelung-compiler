@@ -49,11 +49,11 @@ bindVarEither :: Either Var n -> n -> M n ()
 bindVarEither (Left var) val = bindVar var val
 bindVarEither (Right _) _ = return ()
 
-bindBitsEither :: (GaloisField n, Integral n) => Either (Var, Int) n -> n -> M n ()
-bindBitsEither (Left (var, count)) val = do
-  forM_ [0 .. count - 1] $ \i -> do
+bindBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> n -> M n ()
+bindBitsEither (width, Left var) val = do
+  forM_ [0 .. width - 1] $ \i -> do
     bindVar (var + i) (FieldBits.testBit val i)
-bindBitsEither (Right _) _ = return ()
+bindBitsEither (_, Right _) _ = return ()
 
 --------------------------------------------------------------------------------
 
@@ -64,12 +64,12 @@ data Constraint n
   | EqZeroConstraint (Poly n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
     -- DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
-    DivModConstaint (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n)
+    DivModConstaint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))
   | BinRepConstraint BinRep
   | -- \| (a, n, p) where modInv a * a = n * p + 1
 
     -- | BinRepConstraint2 [(Var, Int)]
-    ModInvConstraint (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer)
+    ModInvConstraint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer)
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Constraint n)
@@ -99,9 +99,9 @@ instance Functor Constraint where
   fmap f (AddConstraint a) = AddConstraint (fmap f a)
   fmap _ (BooleanConstraint var) = BooleanConstraint var
   fmap f (EqZeroConstraint (xs, m)) = EqZeroConstraint (fmap f xs, m)
-  fmap f (DivModConstaint (a, b, q, r)) = DivModConstaint (fmap f a, fmap f b, fmap f q, fmap f r)
+  fmap _ (DivModConstaint (a, b, q, r)) = DivModConstaint (a, b, q, r)
   fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
-  fmap f (ModInvConstraint (a, output, n, p)) = ModInvConstraint (fmap f a, fmap f output, fmap f n, p)
+  fmap _ (ModInvConstraint (a, output, n, p)) = ModInvConstraint (a, output, n, p)
 
 --------------------------------------------------------------------------------
 
@@ -111,7 +111,7 @@ data Error n
   | ConflictingValues
   | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
-  | ModInvError (Either (Var, Int) n) n Integer
+  | ModInvError (Width, Either Var Integer) n Integer
   deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
@@ -136,7 +136,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   --   "Expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
   -- show (DivModRemainderError dividend divisor expected actual) =
   --   "Expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
-  show (ModInvError (Left var) val p) =
+  show (ModInvError (_, Left var) val p) =
     "Unable to calculate the inverse of `$" <> show var <> " " <> show (N val) <> "` (mod " <> show p <> ")"
-  show (ModInvError (Right val') val p) =
-    "Unable to calculate the inverse of `" <> show (N val') <> " `" <> show (N val) <> "` (mod " <> show p <> ")"
+  show (ModInvError (_, Right val') val p) =
+    "Unable to calculate the inverse of `" <> show val' <> " `" <> show (N val) <> "` (mod " <> show p <> ")"

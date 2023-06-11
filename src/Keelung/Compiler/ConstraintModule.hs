@@ -36,6 +36,7 @@ import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
 import Keelung.Compiler.FieldInfo
+import Keelung.Interpreter.Arithmetics (U)
 
 --------------------------------------------------------------------------------
 
@@ -58,9 +59,9 @@ data ConstraintModule n = ConstraintModule
     cmEqZeros :: [(PolyG Ref n, RefF)],
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
-    cmDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
+    cmDivMods :: [(Either RefU U, Either RefU U, Either RefU U, Either RefU U)],
     -- hints for generating witnesses for ModInv constraints
-    cmModInvs :: [(Either RefU n, Either RefU n, Either RefU n, n)]
+    cmModInvs :: [(Either RefU U, Either RefU U, Either RefU U, U)]
   }
   deriving (Eq, Generic, NFData)
 
