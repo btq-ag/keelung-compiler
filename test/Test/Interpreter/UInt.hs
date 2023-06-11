@@ -917,6 +917,56 @@ tests = do
               let expected = [x Data.Bits..|. y Data.Bits..|. z Data.Bits..|. 3]
               runPrime (Prime 13) program [x, y, z] [] expected
 
+      describe "exclusive disjunction" $ do
+        it "2 variables / byte / Prime 13" $ do
+          let program = do
+                x <- inputUInt @8 Public
+                y <- inputUInt @8 Public
+                return $ x .^. y
+          forAll
+            ( do
+                x <- choose (0, 255)
+                y <- choose (0, 255)
+                return (x, y)
+            )
+            $ \(x, y) -> do
+              let expected = [Data.Bits.xor x y]
+              runPrime (Prime 13) program [x, y] [] expected
+
+        it "3 variables / byte / Prime 13" $ do
+          let program = do
+                x <- inputUInt @8 Public
+                y <- inputUInt @8 Public
+                z <- inputUInt @8 Public
+                return $ x .^. y .^. z
+          forAll
+            ( do
+                x <- choose (0, 255)
+                y <- choose (0, 255)
+                z <- choose (0, 255)
+                return (x, y, z)
+            )
+            $ \(x, y, z) -> do
+              let expected = [x `Data.Bits.xor ` y `Data.Bits.xor ` z]
+              runPrime (Prime 13) program [x, y, z] [] expected
+
+        it "variables with constants / byte / Prime 13" $ do
+          let program = do
+                x <- inputUInt @8 Public
+                y <- inputUInt @8 Public
+                z <- inputUInt @8 Public
+                return $ x .^. y .^. z .^. 3
+          forAll
+            ( do
+                x <- choose (0, 255)
+                y <- choose (0, 255)
+                z <- choose (0, 255)
+                return (x, y, z)
+            )
+            $ \(x, y, z) -> do
+              let expected = [x `Data.Bits.xor ` y `Data.Bits.xor ` z `Data.Bits.xor ` 3]
+              runPrime (Prime 13) program [x, y, z] [] expected
+
     describe "Bitwise" $ do
       it "rotate" $ do
         let program = do
