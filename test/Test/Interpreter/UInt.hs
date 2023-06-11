@@ -4,6 +4,8 @@
 module Test.Interpreter.UInt (tests, run) where
 
 import Control.Monad (forM_, when)
+import Data.Bits qualified
+import Data.Field.Galois (Prime)
 import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compiler
@@ -14,7 +16,6 @@ import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
-import Data.Field.Galois (Prime)
 
 run :: IO ()
 run = hspec tests
@@ -795,6 +796,108 @@ tests = do
           []
           (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ (3 = 3)")
           (CompileError (Compiler.ConflictingValuesB True False) :: Error GF181)
+
+    describe "Logical" $ do
+ 
+      describe "conjunction" $ do
+        it "2 variables / byte / GF181" $ do
+          let program = do
+                x <- inputUInt @8 Public
+                y <- inputUInt @8 Public
+                return $ x .&. y
+          forAll
+            ( do
+                x <- choose (0, 255)
+                y <- choose (0, 255)
+                return (x, y)
+            )
+            $ \(x, y) -> do
+              let expected = [x Data.Bits..&. y]
+              runPrime (Prime 13) program [x, y] [] expected
+
+        it "3 variables / byte / GF181" $ do
+          let program = do
+                x <- inputUInt @8 Public
+                y <- inputUInt @8 Public
+                z <- inputUInt @8 Public
+                return $ x .&. y .&. z
+          forAll
+            ( do
+                x <- choose (0, 255)
+                y <- choose (0, 255)
+                z <- choose (0, 255)
+                return (x, y, z)
+            )
+            $ \(x, y, z) -> do
+              let expected = [x Data.Bits..&. y Data.Bits..&. z]
+              runPrime (Prime 13) program [x, y, z] [] expected
+
+        it "variables with constants / byte / GF181" $ do
+          let program = do
+                x <- inputUInt @8 Public
+                y <- inputUInt @8 Public
+                z <- inputUInt @8 Public
+                return $ x .&. y .&. z .&. 3
+          forAll
+            ( do
+                x <- choose (0, 255)
+                y <- choose (0, 255)
+                z <- choose (0, 255)
+                return (x, y, z)
+            )
+            $ \(x, y, z) -> do
+              let expected = [x Data.Bits..&. y Data.Bits..&. z Data.Bits..&. 3]
+              runPrime (Prime 13) program [x, y, z] [] expected
+      describe "disjunction" $ do
+        it "2 variables / byte / GF181" $ do
+          let program = do
+                x <- inputUInt @8 Public
+                y <- inputUInt @8 Public
+                return $ x .|. y
+          forAll
+            ( do
+                x <- choose (0, 255)
+                y <- choose (0, 255)
+                return (x, y)
+            )
+            $ \(x, y) -> do
+              let expected = [x Data.Bits..|. y]
+              runPrime (Prime 13) program [x, y] [] expected
+
+        it "3 variables / byte / GF181" $ do
+          let program = do
+                x <- inputUInt @8 Public
+                y <- inputUInt @8 Public
+                z <- inputUInt @8 Public
+                return $ x .|. y .|. z
+          forAll
+            ( do
+                x <- choose (0, 255)
+                y <- choose (0, 255)
+                z <- choose (0, 255)
+                return (x, y, z)
+            )
+            $ \(x, y, z) -> do
+              let expected = [x Data.Bits..|. y Data.Bits..|. z]
+              runPrime (Prime 13) program [x, y, z] [] expected
+
+        it "variables with constants / byte / GF181" $ do
+          let program = do
+                x <- inputUInt @8 Public
+                y <- inputUInt @8 Public
+                z <- inputUInt @8 Public
+                return $ x .|. y .|. z .|. 3
+          forAll
+            ( do
+                x <- choose (0, 255)
+                y <- choose (0, 255)
+                z <- choose (0, 255)
+                return (x, y, z)
+            )
+            $ \(x, y, z) -> do
+              let expected = [x Data.Bits..|. y Data.Bits..|. z Data.Bits..|. 3]
+              runPrime (Prime 13) program [x, y, z] [] expected
+
 
     describe "Bitwise" $ do
       it "rotate" $ do
