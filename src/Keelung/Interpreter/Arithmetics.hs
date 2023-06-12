@@ -8,22 +8,22 @@ module Keelung.Interpreter.Arithmetics
     integerMulU,
     integerDivU,
     integerModU,
-    integerDiv,
-    integerMod,
     modInv,
   )
 where
 
 import Data.Bits (Bits (..))
-import Data.Field.Galois (GaloisField)
 import Keelung.Syntax (Width)
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
+import Data.Serialize (Serialize)
 
 --------------------------------------------------------------------------------
 
 data U = UVal {uintWidth :: Width, uintValue :: Integer}
   deriving (Eq, Ord, Generic, NFData)
+
+instance Serialize U
 
 instance Show U where
   show (UVal _ value) = show value
@@ -123,12 +123,6 @@ clearBitU x i =
    in UVal (uintWidth x) (Data.Bits.clearBit (uintValue x) i')
 
 --------------------------------------------------------------------------------
-
-integerDiv :: (GaloisField n, Integral n) => n -> n -> n
-integerDiv x y = fromInteger (toInteger x `div` toInteger y)
-
-integerMod :: (GaloisField n, Integral n) => n -> n -> n
-integerMod x y = fromInteger (toInteger x `mod` toInteger y)
 
 -- Given m and a, return Just x such that ax = 1 mod m.
 -- If there is no such x return Nothing.

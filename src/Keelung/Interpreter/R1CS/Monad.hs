@@ -8,6 +8,7 @@ import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -18,13 +19,14 @@ import Data.Validation (toEither)
 import Data.Vector (Vector)
 import GHC.Generics (Generic)
 import Keelung (N (N))
-import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.VarGroup
+import Keelung.Interpreter.Arithmetics (U)
+import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
@@ -49,10 +51,10 @@ bindVarEither :: Either Var n -> n -> M n ()
 bindVarEither (Left var) val = bindVar var val
 bindVarEither (Right _) _ = return ()
 
-bindBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> n -> M n ()
+bindBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> U -> M n ()
 bindBitsEither (width, Left var) val = do
   forM_ [0 .. width - 1] $ \i -> do
-    bindVar (var + i) (FieldBits.testBit val i)
+    bindVar (var + i) (if Data.Bits.testBit (U.uintValue val) i then 1 else 0)
 bindBitsEither (_, Right _) _ = return ()
 
 --------------------------------------------------------------------------------
@@ -63,7 +65,6 @@ data Constraint n
   | BooleanConstraint Var
   | EqZeroConstraint (Poly n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
-    -- DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
     DivModConstaint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))
   | BinRepConstraint BinRep
   | -- \| (a, n, p) where modInv a * a = n * p + 1
@@ -111,7 +112,7 @@ data Error n
   | ConflictingValues
   | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
-  | ModInvError (Width, Either Var Integer) n Integer
+  | ModInvError (Width, Either Var Integer) Integer
   deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
@@ -136,7 +137,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   --   "Expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
   -- show (DivModRemainderError dividend divisor expected actual) =
   --   "Expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
-  show (ModInvError (_, Left var) val p) =
-    "Unable to calculate the inverse of `$" <> show var <> " " <> show (N val) <> "` (mod " <> show p <> ")"
-  show (ModInvError (_, Right val') val p) =
-    "Unable to calculate the inverse of `" <> show val' <> " `" <> show (N val) <> "` (mod " <> show p <> ")"
+  show (ModInvError (_, Left var) p) =
+    "Unable to calculate '$" <> show var <> " `modInv` " <> show p <> "'"
+  show (ModInvError (_, Right val) p) =
+    "Unable to calculate '" <> show val <> " `modInv` " <> show p <> "'"

@@ -24,7 +24,8 @@ import Keelung.Constraint.R1CS
 import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Interpreter.Arithmetics qualified as Arithmetics
+import Keelung.Interpreter.Arithmetics (U (UVal))
+import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Interpreter.R1CS.Monad
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
@@ -109,16 +110,13 @@ goThroughOnce constraints = mconcat <$> mapM shrink (toList constraints)
 lookupVar :: Var -> M n (Maybe n)
 lookupVar var = gets (IntMap.lookup var)
 
-lookupBits :: (GaloisField n, Integral n) => (Var, Int) -> M n (Maybe n)
-lookupBits (var, count) = do
-  vals <- mapM lookupVar [var .. var + count - 1]
+lookupBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> M n (Maybe U)
+lookupBitsEither (width, Left var) = do
+  vals <- mapM lookupVar [var .. var + width - 1]
   case sequence vals of
     Nothing -> return Nothing
-    Just bitVals -> return $ Just $ sum [bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
-
-lookupBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> M n (Maybe n)
-lookupBitsEither (width, Left var) = lookupBits (var, width)
-lookupBitsEither (_, Right val) = return (Just (fromInteger val))
+    Just bitVals -> return $ Just $ UVal width $ toInteger $ sum [bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
+lookupBitsEither (width, Right val) = return (Just (UVal width val))
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
@@ -296,8 +294,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisorResult, quotientResult, remainderResult) of
         (Just divisorVal, Just actualQuotientVal, Just actualRemainderVal) -> do
-          let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
+          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
+              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError ConflictingValues
           -- DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
@@ -307,8 +305,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           --   DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
           return Eliminated
         (Just divisorVal, Just actualQuotientVal, Nothing) -> do
-          let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
+          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
+              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError ConflictingValues
           -- throwError $
@@ -316,8 +314,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
-          let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
+          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
+              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
           -- throwError $
@@ -325,14 +323,14 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
-          let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
+          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
+              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           bindBitsEither quotientVar expectedQuotientVal
           bindBitsEither remainderVar expectedRemainderVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Just actualRemainderVal) -> do
-          let expectedDivisorVal = dividendVal `Arithmetics.integerDiv` actualQuotientVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` expectedDivisorVal
+          let expectedDivisorVal = dividendVal `U.integerDivU` actualQuotientVal
+              expectedRemainderVal = dividendVal `U.integerModU` expectedDivisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
           -- throwError $
@@ -340,8 +338,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither divisorVar expectedDivisorVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Nothing) -> do
-          let expectedDivisorVal = dividendVal `Arithmetics.integerDiv` actualQuotientVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` expectedDivisorVal
+          let expectedDivisorVal = dividendVal `U.integerDivU` actualQuotientVal
+              expectedRemainderVal = dividendVal `U.integerModU` expectedDivisorVal
           bindBitsEither divisorVar expectedDivisorVal
           bindBitsEither remainderVar expectedRemainderVal
           return Eliminated
@@ -351,7 +349,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
       case (divisorResult, quotientResult, remainderResult) of
         -- divisor, quotient, and remainder are all known
         (Just divisorVal, Just quotientVal, Just remainderVal) -> do
-          let dividendVal = divisorVal * quotientVal + remainderVal
+          let dividendVal = (divisorVal `U.integerMulU` quotientVal) `U.integerAddU` remainderVal
           bindBitsEither dividendVar dividendVal
           return Eliminated
         _ -> do
@@ -369,19 +367,23 @@ shrinkBooleanConstraint var = do
     Nothing -> return $ Stuck var
 
 -- | Trying to reduce a ModInv constraint
-shrinkModInv :: (GaloisField n, Integral n) => ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer) -> M n (Result ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer))
+shrinkModInv ::
+  (GaloisField n, Integral n) =>
+  ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer) ->
+  M n (Result ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer))
 shrinkModInv (aVar, outVar, nVar, p) = do
   aResult <- lookupBitsEither aVar
   case aResult of
     Just aVal -> do
-      case Arithmetics.modInv (toInteger aVal) p of
+      case U.modInv (U.uintValue aVal) p of
         Just result -> do
+          let (width, _) = aVar
           -- aVal * result = n * p + 1
-          let nVal = (aVal * fromInteger result - 1) `Arithmetics.integerDiv` fromInteger p
+          let nVal = (aVal `U.integerMulU` UVal width result `U.integerSubU` UVal width 1) `U.integerDivU` UVal width p
           bindBitsEither nVar nVal
-          bindBitsEither outVar (fromInteger result)
+          bindBitsEither outVar (UVal width result)
           return Eliminated
-        Nothing -> throwError $ ModInvError aVar aVal p
+        Nothing -> throwError $ ModInvError aVar p
     Nothing -> return $ Stuck (aVar, outVar, nVar, p)
 
 -- | Trying to reduce a BinRep constraint
