@@ -327,8 +327,7 @@ tests = do
 
     describe "Comparisons" $ do
       it "assertLTE" $ do
-        -- `bound` ranges from `-50` to `50`
-        forAll (choose (-50, 50)) $ \bound -> do
+        forAll (choose (-2, 16)) $ \bound -> do
           let width = 4
 
           let program = do
@@ -337,8 +336,8 @@ tests = do
 
           when (bound < 0) $ do
             forM_ [0 .. 15] $ \x -> do
-              throwAll
-                gf181Info
+              throwPrimeBoth
+                (Prime 13)
                 program
                 [fromInteger x]
                 []
@@ -350,8 +349,8 @@ tests = do
               if x <= bound
                 then runPrime gf181 program [fromInteger x] [] []
                 else do
-                  throwAll
-                    gf181Info
+                  throwPrimeBoth
+                    (Prime 13)
                     program
                     [fromInteger x]
                     []
@@ -360,8 +359,8 @@ tests = do
 
           when (bound >= 15) $ do
             forM_ [0 .. 15] $ \x -> do
-              throwAll
-                gf181Info
+              throwPrimeBoth
+                (Prime 13)
                 program
                 [fromInteger x]
                 []

@@ -24,10 +24,10 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
+import Keelung.Compiler.FieldInfo (FieldInfo (fieldTypeData))
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
-import Keelung.Compiler.FieldInfo ( FieldInfo(fieldTypeData) )
 
 --------------------------------------------------------------------------------
 
@@ -779,8 +779,9 @@ assertLTE width (Left a) bound
   | bound >= 2 ^ width - 1 = throwError $ Error.AssertLTEBoundTooLargeError bound width
   | bound == 0 = do
       -- there's only 1 possible value for `a`, which is `0`
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeAdd 0 bits
+      -- let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+      -- writeAdd 0 bits
+      writeValU width a 0
   | bound == 1 = do
       -- there are 2 possible values for `a`, which are `0` and `1`
       -- we can use these 2 values as the only roots of the following multiplicative polynomial

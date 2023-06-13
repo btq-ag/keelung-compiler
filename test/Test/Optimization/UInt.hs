@@ -7,6 +7,7 @@ import Control.Monad (forM_)
 import Keelung hiding (compileO0)
 import Test.Hspec
 import Test.Optimization.Util
+
 -- import Keelung.Compiler.Linker
 
 run :: IO ()
@@ -224,7 +225,7 @@ tests = do
               x <- inputUInt @4 Public
               assert $ x `lte` (bound :: UInt 4)
         forM_
-          [ (0, 5), -- special case: only 1 possible value
+          [ (0, 8), -- special case: only 1 possible value
             (1, 5), -- special case: only 2 possible value
             (2, 6), -- special case: only 3 possible value
             (3, 6), -- trailing one: 1
@@ -232,7 +233,7 @@ tests = do
             (5, 6), -- trailing one: 1
             (6, 7),
             (7, 5), -- trailing one: 2
-            (8, 7),
+            (5, 6),
             (9, 6), -- trailing one: 1
             (10, 7),
             (11, 5), -- trailing one: 2

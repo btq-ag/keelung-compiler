@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, runPrime, debugPrime, throwPrimeR1CS) where
+module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, runPrime, debugPrime, throwPrimeR1CS, throwPrimeBoth) where
 
 import Control.Arrow (left)
 import Data.Field.Galois
@@ -176,6 +176,34 @@ throwPrimeR1CS fieldType program rawPublicInputs rawPrivateInputs csError = case
       -- constraint system interpreters
       -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs
       --   `shouldBe` Left (InterpretError stError)
+      -- constraint system interpreters
+      interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+        `shouldBe` Left csError
+      interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+        `shouldBe` Left csError
+
+throwPrimeBoth :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
+throwPrimeBoth fieldType program rawPublicInputs rawPrivateInputs stError csError = caseFieldType fieldType handlePrime handleBinary
+  where
+    handlePrime :: KnownNat n =>Proxy (Prime n) -> FieldInfo -> IO ()
+    handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
+      -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Left (InterpretError stError) :: Either (Error (Prime n)) [Integer])
+      -- syntax tree interpreters
+      interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+        `shouldBe` Left (InterpretError stError)
+      -- constraint system interpreters
+      interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+        `shouldBe` Left csError
+      interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+        `shouldBe` Left csError
+
+    handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
+    handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
+      -- let expected' = map fromInteger expected :: [Binary n]
+      -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+      -- constraint system interpreters
+      interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+        `shouldBe` Left (InterpretError stError)
       -- constraint system interpreters
       interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Left csError
