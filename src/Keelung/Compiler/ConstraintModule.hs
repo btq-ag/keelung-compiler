@@ -342,29 +342,3 @@ instance UpdateOccurrences RefB where
                 _ -> cm
           )
       )
-
-instance UpdateOccurrences RefU where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                RefUX width var ->
-                  cm
-                    { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm)
-                    }
-                _ -> cm
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                RefUX width var ->
-                  cm
-                    { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm)
-                    }
-                _ -> cm
-          )
-      )

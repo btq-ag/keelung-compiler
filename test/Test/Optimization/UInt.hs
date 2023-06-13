@@ -16,6 +16,17 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "UInt" $ do
+    describe "Variable management" $ do
+      it "keelung Issue #17" $ do
+        (cs, cs') <- execute $ do
+          a <- input Private :: Comp (UInt 5)
+          b <- input Private
+          c <- reuse $ a * b
+          return $ c .&. 5
+        -- debug cs'
+        cs `shouldHaveSize` 21
+        cs' `shouldHaveSize` 21
+
     describe "Addition / Subtraction" $ do
       it "2 variables" $ do
         (cs, cs') <- execute $ do
