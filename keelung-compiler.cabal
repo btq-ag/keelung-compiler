@@ -176,6 +176,8 @@ test-suite keelung-test
       Test.Interpreter.Misc
       Test.Interpreter.Statement
       Test.Interpreter.UInt
+      Test.Interpreter.UInt.Addition
+      Test.Interpreter.UInt.Multiplication
       Test.Interpreter.Util
       Test.Optimization
       Test.Optimization.Boolean

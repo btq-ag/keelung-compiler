@@ -360,7 +360,7 @@ compileExprU out expr = case expr of
   MulU w x y -> do
     x' <- wireU x
     y' <- wireU y
-    compileMulU w out x' y'
+    compileMulBig w out x' y'
   MMIU w a p -> do
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
     a' <- wireU a
@@ -492,38 +492,6 @@ wireUWithSign (others, sign) = do
 
 --------------------------------------------------------------------------------
 
--- | Encoding addition on UInts with multiple operands: O(1)
---      A       =          2ⁿAₙ₋₁ + ... + 2A₁ + A₀
---      B       =          2ⁿBₙ₋₁ + ... + 2B₁ + B₀
---      C       = 2ⁿ⁺¹Cₙ + 2ⁿCₙ₋₁ + ... + 2C₁ + C₀
---      Result  =          2ⁿCₙ₋₁ + ... + 2C₁ + C₀
---      C       = A + B
-compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileAddOrSubU isSub width out (Right a) (Right b) = do
-  let val = if isSub then a - b else a + b
-  writeValU width out val
-compileAddOrSubU isSub width out (Right a) (Left b) = do
-  carry <- freshRefB
-  addBooleanConstraint carry
-  let bs = [(B (RefUBit width b i), if isSub then -(2 ^ i) else 2 ^ i) | i <- [0 .. width - 1]]
-  let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  writeAdd (fromInteger a) $ bs <> carryAndResult
-compileAddOrSubU isSub width out (Left a) (Right b) = do
-  carry <- freshRefB
-  addBooleanConstraint carry
-  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  writeAdd (fromInteger $ if isSub then -b else b) $ as <> carryAndResult
-compileAddOrSubU isSub width out (Left a) (Left b) = do
-  carry <- freshRefB
-  addBooleanConstraint carry
-  -- out + carry = A + B
-  let as = [(B (RefUBit width a i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  let bs = [(B (RefUBit width b i), if isSub then 2 ^ i else -(2 ^ i)) | i <- [0 .. width - 1]]
-  let carryAndResult = (B carry, 2 ^ width) : [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-
-  writeAdd 0 $ as <> bs <> carryAndResult
-
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
 compileAddU width out [] constant = do
   -- constants only
@@ -570,6 +538,12 @@ compileAddU width out vars constant = do
       writeAdd (fromInteger compensatedConstant) $ varBits <> previousCarryBits <> carryBits <> resultBits
       return carries
 
+compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
+compileSubU width out (Right a) (Right b) = compileAddU width out [] (a - b)
+compileSubU width out (Right a) (Left b) = compileAddU width out [(b, False)] a
+compileSubU width out (Left a) (Right b) = compileAddU width out [(a, True)] (-b)
+compileSubU width out (Left a) (Left b) = compileAddU width out [(a, True), (b, False)] 0
+
 compileAddOrSubU2 :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddOrSubU2 isSub width out (Right a) (Right b) = do
   let val = if isSub then a - b else a + b
@@ -593,8 +567,57 @@ compileAddOrSubU2 isSub width out (Left a) (Left b) = do
 compileAddU2 :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddU2 = compileAddOrSubU2 False
 
-compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileSubU = compileAddOrSubU True
+compileMulBigCC :: (GaloisField n, Integral n) => Int -> RefU -> Integer -> Integer -> M n ()
+compileMulBigCC width out a b = do
+  let val = a * b
+  writeValU width out val
+
+-- assume that each number has been divided into L w-bit limbs
+-- multiplying two numbers will result in L^2 2w-bit limbs
+--
+--                          a1 a2 a3
+-- x                        b1 b2 b3
+-- ------------------------------------------
+--                             a3*b3
+--                          a2*b3
+--                       a1*b3
+--                          a3*b2
+--                       a2*b2
+--                    a1*b2
+--                       a3*b1
+--                    a2*b1
+--                 a1*b1
+-- ------------------------------------------
+--
+-- the maximum number of operands when adding these 2w-bit limbs is 2L (with carry from the previous limb)
+-- so each limb would need to be at least ceiling(log2(2L)) bits wide
+
+-- compileMulBigCV :: (GaloisField n, Integral n) => Int -> RefU -> Integer -> RefU -> M n ()
+-- compileMulBigCV width out a b = do
+--   -- mulpliplying two w-bit numbers will result in a 2w-bit number
+--   carries <- replicateM width freshRefB
+--   mapM_ addBooleanConstraint carries
+
+compileMulBig :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
+compileMulBig width out (Right a) (Right b) = do
+  let val = a * b
+  writeValU width out val
+compileMulBig width out (Right a) (Left b) = do
+  carry <- replicateM width (B <$> freshRefB)
+  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
+  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
+  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+  writeMul (fromInteger a, []) (0, bs) (0, outputSegment <> carrySegment)
+compileMulBig width out (Left a) (Right b) = compileMulBig width out (Right b) (Left a)
+compileMulBig width out (Left a) (Left b) = do
+  carry <- replicateM width (B <$> freshRefB)
+
+  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
+  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
+  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+
+  writeMul (0, as) (0, bs) (0, outputSegment <> carrySegment)
 
 -- | Encoding addition on UInts with multiple operands: O(2)
 --      A       =   2ⁿAₙ₋₁ + ... + 2A₁ + A₀
@@ -603,8 +626,9 @@ compileSubU = compileAddOrSubU True
 --      Result  =   2ⁿCₙ₋₁ + ... + 2C₁ + C₀
 compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileMulU width out (Right a) (Right b) = do
-  let val = a * b
-  writeValU width out val
+  -- let val = a * b
+  -- writeValU width out val
+  compileMulBigCC width out a b
 compileMulU width out (Right a) (Left b) = do
   carry <- replicateM width (B <$> freshRefB)
   let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
