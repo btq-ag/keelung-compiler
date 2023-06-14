@@ -17,6 +17,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq (..))
+import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.Boolean qualified as Error.Boolean
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LC
@@ -492,6 +493,75 @@ wireUWithSign (others, sign) = do
 
 --------------------------------------------------------------------------------
 
+-- data Limb = Limb
+--   { -- | Which RefU this limb belongs to
+--     limbRef :: RefU,
+--     -- | The width of the UInt
+--     limbRefWidth :: Width,
+--     -- | How wide this limb is
+--     limbWidth :: Width,
+--     -- | The starting bit of this limb
+--     limbOffset :: Int,
+--     -- | True if this limb is positive, False if negative
+--     limbSign :: Bool
+--   }
+
+-- -- | We can add multiple limbs at once by piling them up.
+-- --   But there's a limit to how many limbs we can pile up in one stack.
+-- --   There higher we pile them up, the more space we need to store the carry.
+-- --   We need to reserve at least 1 bit for the non-carry part of the limb.
+-- determineMaxHeight :: Width -> Int
+-- determineMaxHeight fieldWidth = 2 ^ (fieldWidth - 2) -- 1 bit for non-carry, 1 bit useless
+
+-- writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n (Maybe Limb)
+-- writeLimbVal limb val = do
+--   let range = [limbOffset limb .. limbOffset limb + limbWidth limb - 1]
+--   forM_ range $ \i -> do
+--     let bit = Data.Bits.testBit val i
+--     writeValB (RefUBit (limbRefWidth limb) (limbRef limb) i) bit
+--   return Nothing
+
+-- -- | This function takes a pile of limbs and adds them together.
+-- --   Takes:
+-- --      1. an pre-allocated limb for storing the output
+-- --      2. a pile of limbs
+-- --      3. a constant (to be added to the result)
+-- --   and returns:
+-- --      1. a limb for representing the carry of the addition
+-- --
+-- --   NOTE: The number of limbs must not exceed the maximum height allowed.
+-- addLimitedLimbs :: (GaloisField n, Integral n) => Limb -> [Limb] -> Integer -> M n [Limb]
+-- addLimitedLimbs out [] constant = do
+--   let range = [limbOffset out .. limbOffset out + limbWidth out - 1]
+--   forM_ range $ \i -> do
+--     let bit = Data.Bits.testBit constant i
+--     writeValB (RefUBit (limbRefWidth out) (limbRef out) i) bit
+--   return []
+-- addLimitedLimbs out limbs constant = do
+--   fieldWidth <- gets cmFieldWidth
+--   let carryWidth = ceiling (logBase 2 (fromIntegral (length limbs) + if constant == 0 then 0 else 1) :: Double)
+--   let range = [0 .. limbWidth out - 1]
+--   let limbBits =
+--         concat
+--           [ [ (B (RefUBit (limbRefWidth limb) (limbRef limb) (limbOffset limb + i)), if limbSign limb then 2 ^ i else -(2 ^ i))
+--               | i <- range
+--             ]
+--             | limb <- limbs
+--           ]
+--   -- for each negative operand, we compensate by adding 2^width
+--   let constantSegment = sum [(if Data.Bits.testBit constant (limbOffset out + i) then 1 else 0) * (2 ^ i) | i <- range]
+--   let numberOfNegativeOperand = length $ filter (not . limbSign) limbs
+--   let compensatedConstant = constantSegment + 2 ^ limbRefWidth out * fromIntegral numberOfNegativeOperand
+--   let resultBits = [(B (RefUBit (limbRefWidth out) (limbRef out) (limbOffset out + i)), -(2 ^ i)) | i <- range]
+
+--   -- carry limb
+--   carryRefU <- freshRefU carryWidth
+--   let carryLimb = Limb carryRefU carryWidth (limbRefWidth out) 0 True
+--   let carryBits = [(B (RefUBit (limbRefWidth out) carryRefU (limbOffset out + i)), -(2 ^ (limbWidth out + i))) | i <- [1 .. carryWidth] ]
+
+--   writeAdd (fromInteger compensatedConstant) $ limbBits <> carryBits <> resultBits
+--   return [carryLimb]
+
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
 compileAddU width out [] constant = do
   -- constants only
@@ -522,20 +592,20 @@ compileAddU width out vars constant = do
     go :: (GaloisField n, Integral n) => Int -> Int -> Int -> [RefB] -> Int -> M n [RefB]
     go limbWidth carryWidth numberOfNegativeOperand previousCarries limbStart = do
       -- range inside the current limb
-      let currentLimbWidth = (limbWidth - 1) `min` (width - 1 - limbStart)
-      let range = [0 .. currentLimbWidth]
-      let varBits = concat [[(B (RefUBit width var (limbStart + i)), if sign then 2 ^ i else -(2 ^ i)) | i <- range] | (var, sign) <- vars]
+      let currentLimbWidth = limbWidth `min` (width - limbStart)
+      let range = [0 .. currentLimbWidth - 1]
+      let varBits = mconcat [Seq.fromList [(B (RefUBit width var (limbStart + i)), if sign then 2 ^ i else -(2 ^ i)) | i <- range] | (var, sign) <- vars]
       -- for each negative operand, we compensate by adding 2^width
       let constantSegment = sum [(if Data.Bits.testBit constant (limbStart + i) then 1 else 0) * (2 ^ i) | i <- range]
       let compensatedConstant = constantSegment + 2 ^ width * fromIntegral numberOfNegativeOperand
-      let resultBits = [(B (RefUBit width out (limbStart + i)), -(2 ^ i)) | i <- range]
+      let resultBits = Seq.fromList [(B (RefUBit width out (limbStart + i)), -(2 ^ i)) | i <- range]
       -- carry
       carries <- replicateM carryWidth freshRefB
       mapM_ addBooleanConstraint carries
-      let carryBits = [(B carryVar, -(2 ^ (currentLimbWidth + i))) | (i, carryVar) <- zip [1 ..] carries]
+      let carryBits = Seq.fromList [(B carryVar, -(2 ^ (currentLimbWidth + i))) | (i, carryVar) <- zip [0 ..] carries]
       -- constants + vars + previousCarry = out + carry
-      let previousCarryBits = [(B carryVar, 2 ^ (i :: Int)) | (i, carryVar) <- zip [0 ..] previousCarries]
-      writeAdd (fromInteger compensatedConstant) $ varBits <> previousCarryBits <> carryBits <> resultBits
+      let previousCarryBits = Seq.fromList [(B carryVar, 2 ^ (i :: Int)) | (i, carryVar) <- zip [0 ..] previousCarries]
+      writeAddWithSeq (fromInteger compensatedConstant) $ varBits <> previousCarryBits <> carryBits <> resultBits
       return carries
 
 compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()

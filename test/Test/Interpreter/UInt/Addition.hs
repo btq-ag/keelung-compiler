@@ -1,13 +1,15 @@
 {-# LANGUAGE DataKinds #-}
 
 module Test.Interpreter.UInt.Addition (tests, run) where
+
+import Data.Field.Galois (Prime)
+import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as CompilerError
-import Keelung hiding (compile)
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
-import Data.Field.Galois (Prime)
+
 run :: IO ()
 run = hspec tests
 

@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial with variables generalized (unliked Poly which is limited to only Int)
-module Keelung.Data.PolyG (PolyG, View (..), build, buildWithMap, view, viewAsMap, insert, merge, addConstant, multiplyBy, negate, singleton, vars) where
+module Keelung.Data.PolyG (PolyG, View (..), build, buildWithSeq, buildWithMap, view, viewAsMap, insert, merge, addConstant, multiplyBy, negate, singleton, vars) where
 
 import Control.DeepSeq (NFData)
 import Data.Map.Strict (Map)
@@ -12,6 +12,8 @@ import Data.Set (Set)
 import GHC.Generics (Generic)
 import Prelude hiding (negate)
 import Prelude qualified
+import Data.Sequence (Seq)
+import Data.Foldable (toList)
 
 data PolyG ref n = PolyG n (Map ref n)
   deriving (Eq, Functor, Ord, Generic, NFData)
@@ -39,6 +41,13 @@ instance (Show n, Ord n, Eq n, Num n, Show ref) => Show (PolyG ref n) where
 build :: (Ord ref, Num n, Eq n) => n -> [(ref, n)] -> Either n (PolyG ref n)
 build c xs =
   let result = Map.filter (/= 0) $ Map.fromListWith (+) xs
+   in if Map.null result
+        then Left c
+        else Right (PolyG c result)
+
+buildWithSeq :: (Ord ref, Num n, Eq n) => n -> Seq (ref, n) -> Either n (PolyG ref n)
+buildWithSeq c xs =
+  let result = Map.filter (/= 0) $ Map.fromListWith (+) $ toList xs
    in if Map.null result
         then Left c
         else Right (PolyG c result)

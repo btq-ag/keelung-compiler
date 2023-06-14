@@ -6,6 +6,7 @@ import Control.Monad.State
 import Data.Bits qualified
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
+import Data.Sequence (Seq)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Constraint
@@ -169,6 +170,9 @@ writeMul as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.build as) (fromEi
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPoly (PolyG.build c as)
+
+writeAddWithSeq :: (GaloisField n, Integral n) => n -> Seq (Ref, n) -> M n ()
+writeAddWithSeq c as = writeAddWithPoly (PolyG.buildWithSeq c as)
 
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x
