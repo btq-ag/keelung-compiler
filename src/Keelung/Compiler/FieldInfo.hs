@@ -12,6 +12,7 @@ import Data.Proxy
 import GHC.Generics (Generic)
 import GHC.TypeLits
 import Keelung.Field (FieldType (..))
+import Data.Serialize (Serialize)
 
 -- | Runtime info data of a field
 data FieldInfo = FieldInfo
@@ -22,6 +23,8 @@ data FieldInfo = FieldInfo
     fieldWidth :: Int
   }
   deriving (Eq, Generic, NFData)
+
+instance Serialize FieldInfo
 
 caseFieldType ::
   FieldType ->

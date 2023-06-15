@@ -30,6 +30,7 @@ import Keelung.Compiler.FieldInfo (FieldInfo (fieldTypeData))
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
+import Keelung (FieldType(..))
 
 --------------------------------------------------------------------------------
 
@@ -494,39 +495,6 @@ wireUWithSign (others, sign) = do
 
 --------------------------------------------------------------------------------
 
-data Limb = Limb
-  { -- | Which RefU this limb belongs to
-    limbRef :: RefU,
-    -- | How wide this limb is
-    limbWidth :: Width,
-    -- | True if this limb is positive, False if negative
-    limbSign :: Bool
-  }
-
-allocLimb :: (GaloisField n, Integral n) => Width -> Bool -> M n Limb
-allocLimb w sign = do
-  refU <- freshRefU w
-  mapM_ addBooleanConstraint [RefUBit w refU i | i <- [0 .. w - 1]]
-  return $
-    Limb
-      { limbRef = refU,
-        limbWidth = w,
-        limbSign = sign
-      }
-
--- | Given the UInt width, limb offset, and a limb, construct a sequence of bits.
-toBits :: (GaloisField n, Integral n) => Int -> Int -> Int -> Bool -> Limb -> Seq (Ref, n)
-toBits width varOffset powerOffset dontFlip limb =
-  Seq.fromFunction
-    (limbWidth limb)
-    ( \i ->
-        ( B (RefUBit width (limbRef limb) (varOffset + i)),
-          if not (limbSign limb `xor` dontFlip)
-            then 2 ^ (powerOffset + i :: Int)
-            else -(2 ^ (powerOffset + i :: Int))
-        )
-    )
-
 -- Seq.fromList [(B carryVar, 2 ^ (i :: Int)) | (i, carryVar) <- zip [0 ..] previousCarries]
 
 -- | We can add multiple limbs at once by piling them up.
@@ -585,6 +553,42 @@ toBits width varOffset powerOffset dontFlip limb =
 --   writeAdd (fromInteger compensatedConstant) $ limbBits <> carryBits <> resultBits
 --   return [carryLimb]
 
+data Limb = Limb
+  { -- | Which RefU this limb belongs to
+    limbRef :: RefU,
+    -- | How wide this limb is
+    limbWidth :: Width,
+    -- | The offset of this limb
+    limbOffset :: Int,
+    -- | True if this limb is positive, False if negative
+    limbSign :: Bool
+  }
+
+allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
+allocLimb w offset sign = do
+  refU <- freshRefU w
+  mapM_ addBooleanConstraint [RefUBit w refU i | i <- [0 .. w - 1]]
+  return $
+    Limb
+      { limbRef = refU,
+        limbWidth = w,
+        limbOffset = offset,
+        limbSign = sign
+      }
+
+-- | Given the UInt width, limb offset, and a limb, construct a sequence of bits.
+toBits :: (GaloisField n, Integral n) => Int -> Int -> Bool -> Limb -> Seq (Ref, n)
+toBits width powerOffset dontFlip limb =
+  Seq.fromFunction
+    (limbWidth limb)
+    ( \i ->
+        ( B (RefUBit width (limbRef limb) (limbOffset limb + i)),
+          if not (limbSign limb `xor` dontFlip)
+            then 2 ^ (powerOffset + i :: Int)
+            else -(2 ^ (powerOffset + i :: Int))
+        )
+    )
+
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
 compileAddU width out [] constant = do
   -- constants only
@@ -608,34 +612,71 @@ compileAddU width out vars constant = do
   -- a limb should have width `fieldWidth - 1 - carryWidth`
   let carryWidth = ceiling (logBase 2 (fromIntegral (length vars) + if constant == 0 then 0 else 1) :: Double)
 
-  let limbWidth = fieldWidth - 1 - carryWidth
-  if limbWidth < 1
-    then throwError $ Error.FieldTooSmall (fieldTypeData fieldInfo) fieldWidth
-    else do
-      -- ranges of each limb
-      let ranges = map (\start -> (start, (start + limbWidth) `min` width)) [0, limbWidth .. width - 1]
-      foldM_ (go carryWidth numberOfNegativeOperand) Nothing ranges
-  where
-    go :: (GaloisField n, Integral n) => Int -> Int -> Maybe Limb -> (Int, Int) -> M n (Maybe Limb)
-    go carryWidth numberOfNegativeOperand previousCarries (limbStart, limbEnd) = do
-      -- range inside the current limb
-      -- let currentLimbWidth = limbWidth `min` (width - limbStart)
-      let currentLimbWidth = limbEnd - limbStart
-      let limbs = [Limb var currentLimbWidth sign | (var, sign) <- vars]
-      let resultLimb = Limb out currentLimbWidth True
-      carryLimb <- allocLimb carryWidth True
-      -- limbs + previousCarryLimb = resultLimb + carryLimb
-      -- for each negative operand, we compensate by adding 2^width
-      let constantSegment = sum [(if Data.Bits.testBit constant (limbStart + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-      let compensatedConstant = constantSegment + 2 ^ width * fromIntegral numberOfNegativeOperand
-      writeAddWithSeq (fromInteger compensatedConstant) $
-        mconcat [toBits width limbStart 0 True limb | limb <- limbs]
-          <> case previousCarries of
-            Nothing -> mempty
-            Just limb -> toBits width limbStart 0 True limb
-          <> toBits width limbStart 0 False resultLimb
-          <> toBits width limbStart currentLimbWidth False carryLimb -- multiply carryBits by `2^currentLimbWidth` and negate it
-      return (Just carryLimb)
+  let limbWidth = (fieldWidth - 1 - carryWidth) `max` 1
+
+  -- maxHeight <- maxHeightAllowed
+
+  case fieldTypeData fieldInfo of
+    Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+    Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+    Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+    _ -> do
+  -- if limbWidth < 1
+  --   then throwError $ Error.FieldTooSmall (fieldTypeData fieldInfo) fieldWidth
+  --   else do
+  -- ranges of each limb
+      let ranges =
+            map
+              ( \start ->
+                  let currentLimbWidth = limbWidth `min` (width - start)
+                      resultLimb = Limb out currentLimbWidth start False
+                      operandLimbs = [Limb var currentLimbWidth start sign | (var, sign) <- vars]
+                      -- for each negative operand, we compensate by adding 2^width
+                      constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
+                      compensatedConstant = constantSegment + 2 ^ width * fromIntegral numberOfNegativeOperand
+                    in (start, currentLimbWidth, resultLimb, operandLimbs, compensatedConstant)
+              )
+              [0, limbWidth .. width - 1]
+      foldM_ (addLimitedLimbs width carryWidth) [] ranges
+
+-- -- | Maximum number of limbs allowed to be added at once
+-- maxHeightAllowed :: M n Int
+-- maxHeightAllowed = do
+--   w <- gets (fieldWidth . cmField)
+
+--   if w <= 10
+--     then return (2 ^ w)
+--     else return 1024
+
+-- _addLimbs :: (GaloisField n, Integral n) => Width -> Int -> Int -> [Limb] -> (Int, Int, [Limb], Integer) -> M n [Limb]
+-- _addLimbs width maxHeight carryWidth previousCarries (limbStart, currentLimbWidth, limbs, compensatedConstant) = do
+--   -- let height = length previousCarries + length limbs + if compensatedConstant == 0 then 0 else 1
+--   let (currentBatch, nextBatch) = splitAt (maxHeight - if compensatedConstant == 0 then 0 else 1) (previousCarries <> limbs)
+
+--   nextCarryLimbs <- addLimitedLimbs width carryWidth [] (limbStart, currentLimbWidth, currentBatch, compensatedConstant)
+--   nextCarryLimbss <- addLimbs' width maxHeight carryWidth (limbStart + maxHeight, currentLimbWidth, nextBatch)
+--   return (nextCarryLimbs <> nextCarryLimbss)
+
+-- addLimbs' :: (GaloisField n, Integral n) => Width -> Int -> Int -> (Int, Int, [Limb]) -> M n [Limb]
+-- addLimbs' width maxHeight carryWidth (limbStart, currentLimbWidth, limbs) =
+--   if null limbs
+--     then return []
+--     else do
+--       let (currentBatch, nextBatch) = splitAt maxHeight limbs
+--       x <- addLimitedLimbs width carryWidth [] (limbStart, currentLimbWidth, currentBatch, 0)
+--       xs <- addLimitedLimbs width carryWidth [] (limbStart, currentLimbWidth, nextBatch, 0)
+--       return $ x <> xs
+
+addLimitedLimbs :: (GaloisField n, Integral n) => Width -> Int -> [Limb] -> (Int, Int, Limb, [Limb], Integer) -> M n [Limb]
+addLimitedLimbs width carryWidth previousCarries (limbStart, currentLimbWidth, resultLimb, limbs, compensatedConstant) = do
+  carryLimb <- allocLimb carryWidth (limbStart + currentLimbWidth) True
+  -- limbs + previousCarryLimb = carryLimb
+  writeAddWithSeq (fromInteger compensatedConstant) $
+    mconcat (map (toBits width 0 True) previousCarries)
+      <> mconcat (map (toBits width 0 True) limbs)
+      <> toBits width 0 True resultLimb
+      <> toBits width currentLimbWidth False carryLimb -- multiply carryBits by `2^currentLimbWidth` and negate it
+  return [carryLimb]
 
 compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileSubU width out (Right a) (Right b) = compileAddU width out [] (a - b)
