@@ -20,7 +20,7 @@ import Keelung.Syntax.Counters
 
 -- | Convert binary representation of inputs into human friendly Integers
 --   TODO: make it something like a proper inverse of Inputs.deserialize
-deserializeBinReps :: (GaloisField n, Integral n) => Counters -> Vector n -> Vector n
+deserializeBinReps :: (GaloisField n, Integral n) => Counters -> Vector n -> Vector Integer
 deserializeBinReps counters outputs =
   let sliceBits (width, count) =
         let offset = reindex counters Output (ReadUInt width) 0
@@ -29,7 +29,7 @@ deserializeBinReps counters outputs =
       bitArrays = concatMap sliceBits binRepRanges
       (start, _) = getRange counters (Output, ReadAllUInts)
       beforeBinReps = Vec.take start outputs
-   in beforeBinReps <> Vec.fromList (map (fromInteger . FieldBits.fromBits . toList) bitArrays)
+   in Vec.map toInteger beforeBinReps <> Vec.fromList (map (FieldBits.fromBits . toList) bitArrays)
 
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs

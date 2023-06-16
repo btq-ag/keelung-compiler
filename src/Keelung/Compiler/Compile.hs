@@ -634,7 +634,7 @@ compileAddU width out vars constant = do
                       resultLimb = Limb out currentLimbWidth start True
                       operandLimbs = [Limb var currentLimbWidth start sign | (var, sign) <- vars]
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                      compensatedConstant = constantSegment + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand
+                      compensatedConstant = constantSegment -- + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand
                    in (start, currentLimbWidth, resultLimb, operandLimbs, compensatedConstant)
               )
               [0, limbWidth .. width - 1]

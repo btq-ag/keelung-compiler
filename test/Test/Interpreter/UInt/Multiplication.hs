@@ -24,7 +24,7 @@ tests =
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x * y) `mod` 64]
-        runPrime (Prime 17) (program (fromInteger x) (fromInteger y)) [] [] expected
+        runAll (Prime 17) (program (fromInteger x) (fromInteger y)) [] [] expected
 
     -- it "variable / constant" $ do
     --   let program x = do
@@ -36,4 +36,4 @@ tests =
     --         return (x, y)
     --   forAll genPair $ \(x, y) -> do
     --     let expected = [(x * y) `mod` 64]
-    --     runPrime (Prime 17) (program (fromInteger x)) [y] [] expected
+    --     runAll (Prime 17) (program (fromInteger x)) [y] [] expected

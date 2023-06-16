@@ -76,7 +76,7 @@ tests = do
 
     describe "Poseidon" $ do
       it "[0]" $ do
-        runPrime gf181 (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385]
+        runAll gf181 (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385]
 
     -- describe "Tests on the optimizer" $ do
     --   it "Multiplicative 0" $ do
