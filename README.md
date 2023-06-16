@@ -1,7 +1,7 @@
 # The Keelung Compiler 
 
-This repository contains proprietary stuff.
-The compiler shall be distributed in the form of prebuilt binaries.
+Documentation on how to hack it is on the way.
+Feel free to open issues or make PRs!
 
 # How to dockerize `keelungc`
 
