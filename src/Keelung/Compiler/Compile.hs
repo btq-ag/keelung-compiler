@@ -31,6 +31,7 @@ import Keelung.Compiler.FieldInfo (FieldInfo (fieldTypeData, fieldWidth))
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -634,7 +635,7 @@ compileAddU width out vars constant = do
                       resultLimb = Limb out currentLimbWidth start True
                       operandLimbs = [Limb var currentLimbWidth start sign | (var, sign) <- vars]
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                      compensatedConstant = constantSegment -- + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand
+                      compensatedConstant = constantSegment + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand - (if start == 0 then 0 else fromIntegral numberOfNegativeOperand)
                    in (start, currentLimbWidth, resultLimb, operandLimbs, compensatedConstant)
               )
               [0, limbWidth .. width - 1]
@@ -659,16 +660,18 @@ addLimbs' width maxHeight carryWidth out (limbStart, currentLimbWidth, limbs, co
     then do
       addLimitedLimbs width carryWidth [] (limbStart, currentLimbWidth, out, currentBatch, constant)
     else do
+      traceShowM "NEXT"
       tempResultLimb <- allocLimb currentLimbWidth limbStart True
       x <- addLimitedLimbs width carryWidth [] (limbStart, currentLimbWidth, tempResultLimb, currentBatch, constant)
       xs <- addLimbs' width maxHeight carryWidth out (limbStart, currentLimbWidth, tempResultLimb : nextBatch, 0)
       return $ x <> xs
 
 addLimitedLimbs :: (GaloisField n, Integral n) => Width -> Int -> [Limb] -> (Int, Int, Limb, [Limb], Integer) -> M n [Limb]
-addLimitedLimbs width carryWidth previousCarries (limbStart, currentLimbWidth, resultLimb, limbs, compensatedConstant) = do
+addLimitedLimbs width carryWidth previousCarries (limbStart, currentLimbWidth, resultLimb, limbs, constant) = do
+  traceShowM (constant, map limbSign limbs)
   carryLimb <- allocLimb carryWidth (limbStart + currentLimbWidth) True
   -- limbs + previousCarryLimb = resultLimb + carryLimb
-  writeAddWithSeq (fromInteger compensatedConstant) $
+  writeAddWithSeq (fromInteger constant) $
     mconcat (map (toBits width 0 True) previousCarries)
       <> mconcat (map (toBits width 0 True) limbs)
       <> toBits width 0 False resultLimb
