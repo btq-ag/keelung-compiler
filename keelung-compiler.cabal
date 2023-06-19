@@ -32,6 +32,7 @@ library
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
@@ -101,6 +102,7 @@ executable keelungc
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
@@ -195,6 +197,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule

@@ -20,6 +20,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint
+import Keelung.Compiler.FieldInfo
 import Keelung.Compiler.Optimize.OccurB (OccurB)
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF (OccurF)
@@ -34,9 +35,8 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
-import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
-import Keelung.Compiler.FieldInfo
 import Keelung.Interpreter.Arithmetics (U)
+import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
 
 --------------------------------------------------------------------------------
 
