@@ -94,7 +94,7 @@ gf181Info =
           fieldOrder = toInteger (order fieldNumber),
           fieldChar = char fieldNumber,
           fieldDeg = fromIntegral (deg fieldNumber),
-          fieldWidth = ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
+          fieldWidth = floor (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
         }
 
 runAll :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()

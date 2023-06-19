@@ -51,23 +51,6 @@ compileExprB compileU compileF expr =
           x' <- compileF x
           y' <- compileF y
           eqZero False (x' <> neg y')
-        -- NEqU x y -> do
-        --   let width = widthOf x
-        --   fieldWidth <- gets cmFieldWidth
-        --   x' <- compileU x
-        --   y' <- compileU y
-        --   -- let a = fromRefU width fieldWidth x'
-        --   -- let b = fromRefU width fieldWidth y'
-        --   -- traceShowM "!!!!!!!!"
-        --   -- traceShowM a
-        --   -- traceShowM b
-        --   result <- zipWithM (\a b -> eqZero False (a <> neg b)) (fromRefU width fieldWidth x') (fromRefU width fieldWidth y')
-        --   case result of
-        --     [] -> return $ Right True
-        --     [result'] -> return result'
-        --     (x0 : x1 : xs) -> do
-        --       orBs x0 x1 (Seq.fromList xs)
-        --       -- andBs (x0 : x1 : xs)
         EqB x y -> do
           x' <- compile x
           y' <- compile y
@@ -110,8 +93,8 @@ compileExprB compileU compileF expr =
 
 compileEqU :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> M n (Either RefB Bool)
 compileEqU width x y = do
-  fieldWidth' <- gets cmFieldWidth
-  result <- zipWithM (\a b -> eqZero True (a <> neg b)) (fromRefU width fieldWidth' x) (fromRefU width fieldWidth' y)
+  fieldInfo <- gets cmField
+  result <- zipWithM (\a b -> eqZero True (a <> neg b)) (fromRefU width (fieldWidth fieldInfo) x) (fromRefU width (fieldWidth fieldInfo) y)
   case result of
     [] -> return $ Right True
     [result'] -> return result'

@@ -27,7 +27,7 @@ fromEither = either Constant Polynomial
 
 fromRefU :: (Num n, Eq n) => Width -> Int -> Either RefU Integer -> [LC n]
 fromRefU width fieldWidth (Right val) =
-  let limbWidth = fieldWidth - 1
+  let limbWidth = fieldWidth 
    in map (go limbWidth) [0, limbWidth .. width - 1]
   where
     go :: (Num n, Eq n) => Int -> Int -> LC n
@@ -35,7 +35,7 @@ fromRefU width fieldWidth (Right val) =
       let range = [limbStart .. (limbStart + limbWidth - 1) `min` (width - 1)]
       Constant $ fromInteger $ sum [2 ^ i | i <- range, Data.Bits.testBit val i]
 fromRefU width fieldWidth (Left var) =
-  let limbWidth = fieldWidth - 1
+  let limbWidth = fieldWidth 
    in map (go limbWidth) [0, limbWidth .. width - 1]
   where
     go :: (Num n, Eq n) => Int -> Int -> LC n

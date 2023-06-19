@@ -535,9 +535,9 @@ toBits width powerOffset dontFlip limb =
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
 compileAddU width out [] constant = do
   -- constants only
-  fieldWidth <- gets cmFieldWidth
+  fieldInfo <- gets cmField
   let carryWidth = 0 -- no carry needed
-  let limbWidth = fieldWidth - 1 - carryWidth
+  let limbWidth = fieldWidth fieldInfo - carryWidth
   mapM_ (go limbWidth) [0, limbWidth .. width - 1]
   where
     go :: (GaloisField n, Integral n) => Int -> Int -> M n ()
@@ -547,14 +547,13 @@ compileAddU width out [] constant = do
         let bit = Data.Bits.testBit constant i
         writeValB (RefUBit width out i) bit
 compileAddU width out vars constant = do
-  fieldWidth <- gets cmFieldWidth
   fieldInfo <- gets cmField
   -- for each negative operand, we compensate by adding 2^width
   let numberOfNegativeOperand = length $ filter (not . snd) vars
   -- we need some extra bits for carry when adding UInts
   let expectedCarryWidth = ceiling (logBase 2 (fromIntegral (length vars) + if constant == 0 then 0 else 1) :: Double)
-  let limbWidth = (fieldWidth - 1 - expectedCarryWidth) `max` 1
-  let carryWidth = fieldWidth - 1 - limbWidth
+  let limbWidth = (fieldWidth fieldInfo - expectedCarryWidth) `max` 1
+  let carryWidth = fieldWidth fieldInfo - limbWidth
 
   maxHeight <- maxHeightAllowed
   case fieldTypeData fieldInfo of
@@ -571,7 +570,7 @@ compileAddU width out vars constant = do
                       -- compensatedConstant = constantSegment + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand - borrow
                       compensatedConstant = constantSegment + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand - borrow
 
-                      overflowed = compensatedConstant == 2 ^ (fieldWidth - 1) && compensatedConstant < 2 ^ width
+                      overflowed = compensatedConstant == 2 ^ fieldWidth fieldInfo && compensatedConstant < 2 ^ width
                       compensatedConstant' = if overflowed then compensatedConstant - (2 ^ currentLimbWidth) else compensatedConstant
                       nextBorrow = if overflowed then fromIntegral numberOfNegativeOperand - 1 else fromIntegral numberOfNegativeOperand
 
@@ -584,7 +583,7 @@ maxHeightAllowed :: M n Int
 maxHeightAllowed = do
   w <- gets (fieldWidth . cmField)
   if w <= 10
-    then return (2 ^ (w - 2))
+    then return (2 ^ (w - 1))
     else return 256
 
 addLimbs :: (GaloisField n, Integral n) => Width -> Int -> Int -> [Limb] -> (Int, Int, Limb, [Limb], Integer) -> M n [Limb]
@@ -593,6 +592,7 @@ addLimbs width maxHeight carryWidth previousCarries (limbStart, currentLimbWidth
 
 addLimbs' :: (GaloisField n, Integral n) => Width -> Int -> Int -> Limb -> (Int, Int, [Limb], Integer) -> M n [Limb]
 addLimbs' width maxHeight carryWidth out (limbStart, currentLimbWidth, limbs, constant) = do
+  
   let (currentBatch, nextBatch) = splitAt (maxHeight - if constant == 0 then 0 else 1) limbs
   if null nextBatch
     then do

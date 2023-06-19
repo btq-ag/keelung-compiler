@@ -34,7 +34,7 @@ runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintModule fieldInfo (fieldWidth fieldInfo) counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()

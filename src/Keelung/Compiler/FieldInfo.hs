@@ -17,10 +17,10 @@ import Data.Serialize (Serialize)
 -- | Runtime info data of a field
 data FieldInfo = FieldInfo
   { fieldTypeData :: FieldType,
-    fieldOrder :: Integer,
+    fieldOrder :: Integer, -- size of the field
     fieldChar :: Natural,
     fieldDeg :: Int,
-    fieldWidth :: Int
+    fieldWidth :: Int -- the maximum bit width `w` such that `2^w <= fieldOrder`
   }
   deriving (Eq, Generic, NFData)
 
@@ -40,7 +40,7 @@ caseFieldType (Prime n) funcPrime _ = case someNatVal n of
               fieldOrder = toInteger (order fieldNumber),
               fieldChar = char fieldNumber,
               fieldDeg = fromIntegral (deg fieldNumber),
-              fieldWidth = ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
+              fieldWidth = floor (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
             }
   Nothing -> return ()
 caseFieldType (Binary n) _ funcBinary = case someNatVal n of
@@ -52,6 +52,6 @@ caseFieldType (Binary n) _ funcBinary = case someNatVal n of
               fieldOrder = toInteger (order fieldNumber),
               fieldChar = char fieldNumber,
               fieldDeg = fromIntegral (deg fieldNumber),
-              fieldWidth = ceiling (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
+              fieldWidth = floor (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
             }
   Nothing -> return ()
