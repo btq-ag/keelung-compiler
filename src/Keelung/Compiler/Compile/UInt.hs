@@ -13,6 +13,16 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.FieldInfo (FieldInfo (..))
 
+-- Model of addition: we expect these two piles of limbs to be equal
+--
+--              [ operand+ ]
+--              [ operand+ ]    positive operands
+--  + [ borrow ][ operand+ ]
+-- -----------------------------
+--    [ carry  ][  result  ]
+--              [ operand- ]    negative operands (including the result)
+--              [ operand- ]
+--
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
 compileAddU width out [] constant = do
   -- constants only
@@ -29,12 +39,30 @@ compileAddU width out [] constant = do
         writeValB (RefUBit width out i) bit
 compileAddU width out vars constant = do
   fieldInfo <- gets cmField
-  -- for each negative operand, we compensate by adding 2^width
-  let numberOfNegativeOperand = length $ filter (not . snd) vars
-  -- we need some extra bits for carry when adding UInts
-  let expectedCarryWidth = ceiling (logBase 2 (fromIntegral (length vars) + if constant == 0 then 0 else 1) :: Double)
-  let limbWidth = (fieldWidth fieldInfo - expectedCarryWidth) `max` 1
+
+  let numberOfOperands = length vars
+  let numberOfNegativeOperands = length (filter (not . snd) vars)
+  let numberOfPositiveOperands = numberOfOperands - numberOfNegativeOperands
+
+  -- calculate the pile height on both side of the addition
+  let positivePileHeight =
+        numberOfPositiveOperands -- positive operands
+          + (if constant > 0 then 1 else 0) -- positive constant
+  let negativePileHeight =
+        numberOfNegativeOperands -- negative operands
+          + (if constant < 0 then 1 else 0) -- negative constant
+          + 1 -- the result
+
+  -- calculate the expected width of the carry and borrow limbs
+  -- NOTE, we use the same width for all limbs on the both sides for the moment (they can be different)
+  let expectedCarryWidth = ceiling (logBase 2 (fromIntegral positivePileHeight) :: Double) :: Int
+  let expectedBorrowWidth = ceiling (logBase 2 (fromIntegral negativePileHeight) :: Double) :: Int
+
+  -- calculate the width of the limbs, both the limb and the carry (or borrow) needs to fit in a field
+  let limbWidth = (fieldWidth fieldInfo - (expectedCarryWidth `max` expectedBorrowWidth)) `max` 1
+
   let carryWidth = fieldWidth fieldInfo - limbWidth
+  let borrowWidth = fieldWidth fieldInfo - limbWidth
 
   maxHeight <- maxHeightAllowed
   case fieldTypeData fieldInfo of
@@ -43,26 +71,25 @@ compileAddU width out vars constant = do
     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     _ -> do
       let ranges =
-            reverse $
-              fst $
-                foldl
-                  ( \(acc, borrow) start ->
-                      let currentLimbWidth = limbWidth `min` (width - start)
-                          resultLimb = Limb out currentLimbWidth start True
-                          operandLimbs = [Limb var currentLimbWidth start sign | (var, sign) <- vars]
-                          constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                          -- borrowAmount =
-                          -- compensatedConstant = constantSegment + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand - borrow
-                          compensatedConstant = constantSegment + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand - borrow
-
-                          overflowed = compensatedConstant == 2 ^ fieldWidth fieldInfo && compensatedConstant < 2 ^ width
-                          compensatedConstant' = if overflowed then compensatedConstant - (2 ^ currentLimbWidth) else compensatedConstant
-                          nextBorrow = if overflowed then fromIntegral numberOfNegativeOperand - 1 else fromIntegral numberOfNegativeOperand
-                       in ((start, currentLimbWidth, resultLimb, operandLimbs, compensatedConstant') : acc, nextBorrow)
-                  )
-                  ([], 0)
-                  [0, limbWidth .. width - 1]
+            map
+              ( \start ->
+                  let currentLimbWidth = limbWidth `min` (width - start)
+                      resultLimb = Limb out currentLimbWidth start True
+                      operandLimbs = [Limb var currentLimbWidth start sign | (var, sign) <- vars]
+                      constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
+                   in (start, currentLimbWidth, resultLimb, operandLimbs, constantSegment)
+              )
+              [0, limbWidth .. width - 1]
       foldM_ (addLimbs width maxHeight carryWidth) [] ranges
+
+data Dimensions = Dimensions
+  { dimUIntWidth :: Int,
+    dimMaxHeight :: Int,
+    dimCarryWidth :: Int,
+    dimBorrowWidth :: Int
+  }
+
+-- addLimbs2 :: (GaloisField n, Integral n) => Dimensions -> ([Limb], [Limb]) -> (Int, Int, [Limb], Integer) -> M n [Limb]
 
 -- | Maximum number of limbs allowed to be added at once
 maxHeightAllowed :: M n Int
@@ -110,13 +137,13 @@ compileSubU width out (Left a) (Left b) = compileAddU width out [(a, True), (b, 
 
 data Limb = Limb
   { -- | Which RefU this limb belongs to
-    limbRef :: RefU,
+    lmbRef :: RefU,
     -- | How wide this limb is
-    limbWidth :: Width,
+    lmbWidth :: Width,
     -- | The offset of this limb
-    limbOffset :: Int,
+    lmbOffset :: Int,
     -- | True if this limb is positive, False if negative
-    limbSign :: Bool
+    lmbSign :: Bool
   }
   deriving (Show)
 
@@ -126,20 +153,20 @@ allocLimb w offset sign = do
   mapM_ addBooleanConstraint [RefUBit w refU i | i <- [0 .. w - 1]]
   return $
     Limb
-      { limbRef = refU,
-        limbWidth = w,
-        limbOffset = offset,
-        limbSign = sign
+      { lmbRef = refU,
+        lmbWidth = w,
+        lmbOffset = offset,
+        lmbSign = sign
       }
 
 -- | Given the UInt width, limb offset, and a limb, construct a sequence of bits.
 toBits :: (GaloisField n, Integral n) => Int -> Int -> Bool -> Limb -> Seq (Ref, n)
 toBits width powerOffset dontFlip limb =
   Seq.fromFunction
-    (limbWidth limb)
+    (lmbWidth limb)
     ( \i ->
-        ( B (RefUBit width (limbRef limb) (limbOffset limb + i)),
-          if not (limbSign limb `xor` dontFlip)
+        ( B (RefUBit width (lmbRef limb) (lmbOffset limb + i)),
+          if not (lmbSign limb `xor` dontFlip)
             then 2 ^ (powerOffset + i :: Int)
             else -(2 ^ (powerOffset + i :: Int))
         )
