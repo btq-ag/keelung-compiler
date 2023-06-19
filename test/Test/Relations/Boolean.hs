@@ -1,11 +1,11 @@
-module Test.Relations.Boolean (tests, run, debug) where
+module Test.Relations.Boolean (tests, run) where
 
 import Control.Monad.Except
 import Control.Monad.State
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.Boolean (BooleanRelations)
+import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
+import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Constraint (RefB (..), RefU (RefUX))
 import Keelung.Field (GF181)
 import Test.Hspec (SpecWith, describe, hspec, it)
@@ -205,9 +205,6 @@ isValid = do
   BooleanRelations.isValid xs `shouldBe` True
 
 ------------------------------------------------------------------------
-
-debug :: M ()
-debug = get >>= liftIO . print
 
 -- instance Arbitrary BooleanRelations where
 --   arbitrary = do

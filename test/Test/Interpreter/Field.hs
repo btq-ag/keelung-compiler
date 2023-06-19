@@ -1,6 +1,9 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Test.Interpreter.Field (tests, run) where
 
-import Keelung hiding (compile, run)
+import Control.Monad
+import Keelung hiding (compile)
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
@@ -16,7 +19,7 @@ tests = describe "Field" $ do
           y <- inputField Public
           return $ x * y + y * 2
     property $ \(x, y) -> do
-      runAll program [x, y :: GF181] [] [x * y + y * 2]
+      runPrime gf181 program [toInteger (x :: GF181), toInteger y] [] [toInteger $ x * y + y * 2]
 
   it "arithmetics 2" $ do
     let program = do
@@ -24,8 +27,8 @@ tests = describe "Field" $ do
           y <- inputField Private
           z <- reuse $ x * y + y * 2
           return $ x * y - z
-    property $ \(x, y) -> do
-      runAll program [x :: GF181] [y] [-y * 2]
+    property $ \(x :: GF181, y :: GF181) -> do
+      runPrime gf181 program [toInteger x] [toInteger y] [toInteger $ -y * 2]
 
   it "arithmetics 3" $ do
     let program = do
@@ -33,9 +36,9 @@ tests = describe "Field" $ do
           y <- inputField Public
           let z = 3
           return $ x * z + y * 2
-    
-    property $ \(x, y) -> do
-      runAll program [y :: GF181] [x] [x * 3 + y * 2]
+
+    property $ \(x :: GF181, y :: GF181) -> do
+      runPrime gf181 program [toInteger y] [toInteger x] [toInteger $ x * 3 + y * 2]
 
   it "summation" $ do
     let program = do
@@ -44,23 +47,65 @@ tests = describe "Field" $ do
             let x = arr !! i
             return (accum + x :: Field)
 
-    forAll (vector 4) $ \xs -> do
-      runAll program (xs :: [GF181]) [] [sum xs]
+    forAll (vector 4) $ \(xs :: [GF181]) -> do
+      runPrime gf181 program (map toInteger xs) [] [toInteger $ sum xs]
 
-  it "eq 1" $ do
-    -- takes an input and see if its equal to 3
+  it "eq (variable / variable)" $ do
     let program = do
           x <- inputField Public
-          return $ x `eq` 3
+          y <- inputField Public
+          return $ x `eq` y
+    property $ \(x' :: GF181, y' :: GF181) -> do
+      let x = x' `mod` 4
+          y = y' `mod` 4
+      let expectedOutput = if x == y then [1] else [0]
+      runPrime gf181 program [toInteger x, toInteger y] [] expectedOutput
 
-    property $ \x -> do
-      let expectedOutput = if x == 3 then [1] else [0]
-      runAll program [x :: GF181] [] expectedOutput
-
-  it "conditional" $ do
-    let program = do
+  it "eq (variable / constant)" $ do
+    let program y = do
           x <- inputField Public
-          return $ cond (x `eq` 3) 4 (5 :: Field)
-    property $ \x -> do
-      let expectedOutput = if x == 3 then [4] else [5]
-      runAll program [x :: GF181] [] expectedOutput
+          return $ x `eq` fromInteger y
+    property $ \(x' :: GF181, y' :: GF181) -> do
+      let x = x' `mod` 4
+          y = y' `mod` 4
+      let expectedOutput = if x == y then [1] else [0]
+      runPrime gf181 (program (toInteger y)) [toInteger x] [] expectedOutput
+
+  it "eq (constant / constant)" $ do
+    let program x y = do
+          return $ fromInteger x `eq` (fromInteger y :: Field)
+
+    property $ \(x' :: GF181, y' :: GF181) -> do
+      let x = x' `mod` 4
+          y = y' `mod` 4
+      let expectedOutput = if x == y then [1] else [0]
+      runPrime gf181 (program (toInteger x) (toInteger y)) [] [] expectedOutput
+
+  it "conditional (variable)" $ do
+    let program = do
+          x <- inputBool Public
+          y <- inputField Public
+          return $ cond x y (5 :: Field)
+
+    property $ \(x' :: GF181, y' :: GF181) -> do
+      let x = x' `mod` 4
+          y = y' `mod` 4
+      let expectedOutput = if (x `mod` 2) == 1 then [toInteger y] else [5]
+      runPrime gf181 program [toInteger x `mod` 2, toInteger y] [] expectedOutput
+
+  it "exponentiation (variable base)" $ do
+    let program i = do
+          x <- inputField Public
+          return (x `pow` i)
+    property $ \(x :: GF181, i) -> do
+      when (i >= 0) $ do
+        let expectedOutput = [toInteger (x ^ (i :: Integer) :: GF181)]
+        runPrime gf181 (program i) [toInteger x] [] expectedOutput
+
+  it "exponentiation (constant base)" $ do
+    let program x i = do
+          return (fromIntegral x `pow` i)
+    property $ \(x :: GF181, i) -> do
+      when (i >= 0) $ do
+        let expectedOutput = [toInteger (x ^ (i :: Integer) :: GF181)]
+        runPrime gf181 (program x i) [] [] expectedOutput

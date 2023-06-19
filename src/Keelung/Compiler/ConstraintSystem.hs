@@ -1,537 +1,147 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use lambda-case" #-}
+module Keelung.Compiler.ConstraintSystem where
 
-module Keelung.Compiler.ConstraintSystem
-  ( ConstraintSystem (..),
-    relocateConstraintSystem,
-    sizeOfConstraintSystem,
-    UpdateOccurrences (..),
-  )
-where
-
-import Control.Arrow (left)
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
-import Data.IntMap.Strict qualified as IntMap
-import Data.IntSet qualified as IntSet
-import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq)
-import Data.Sequence qualified as Seq
-import Data.Set (Set)
-import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Compile.Relations.Field (AllRelations)
-import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
-import Keelung.Compiler.Compile.Relations.Field qualified as FieldRelations
-import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
-import Keelung.Compiler.Compile.Relations.UInt qualified as UIntRelations
-import Keelung.Compiler.Constraint
-import Keelung.Compiler.Relocated qualified as Relocated
-import Keelung.Compiler.Util (indent)
-import Keelung.Constraint.R1CS qualified as Constraint
-import Keelung.Data.BinRep (BinRep (..))
-import Keelung.Data.PolyG (PolyG)
-import Keelung.Data.PolyG qualified as PolyG
-import Keelung.Data.Struct
-import Keelung.Data.VarGroup (showList', toSubscript)
-import Keelung.Syntax.Counters
+import Keelung.Constraint.R1C (R1C (..))
+import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
+import Keelung.Field
+import Keelung.Syntax (Var)
+import Keelung.Syntax.Counters hiding (prettyConstraints)
+import Keelung.Compiler.FieldInfo
 
 --------------------------------------------------------------------------------
 
--- | A constraint system is a collection of constraints
+-- | Constraint
+--      CAdd: 0 = c + c₀x₀ + c₁x₁ ... cₙxₙ
+--      CMul: ax * by = c or ax * by = cz
+--      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
+data Constraint n
+  = CAdd !(Poly n)
+  | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
+  deriving (Generic, NFData)
+
+instance GaloisField n => Eq (Constraint n) where
+  xs == ys = case (xs, ys) of
+    (CAdd x, CAdd y) -> x == y
+    (CMul x y z, CMul u v w) ->
+      (x == u && y == v || x == v && y == u) && z == w
+    _ -> False
+
+instance Functor Constraint where
+  fmap f (CAdd x) = CAdd (fmap f x)
+  fmap f (CMul x y (Left z)) = CMul (fmap f x) (fmap f y) (Left (f z))
+  fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
+
+-- | Smart constructor for the CAdd constraint
+cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
+cadd !c !xs = map CAdd $ case Poly.buildEither c xs of
+  Left _ -> []
+  Right xs' -> [xs']
+
+-- | Smart constructor for the CAdd constraint
+cmul :: GaloisField n => [(Var, n)] -> [(Var, n)] -> (n, [(Var, n)]) -> [Constraint n]
+cmul !xs !ys (c, zs) = case ( do
+                                xs' <- Poly.buildEither 0 xs
+                                ys' <- Poly.buildEither 0 ys
+                                return $ CMul xs' ys' (Poly.buildEither c zs)
+                            ) of
+  Left _ -> []
+  Right result -> [result]
+
+instance (GaloisField n, Integral n) => Show (Constraint n) where
+  show (CAdd xs) = "A " <> show xs <> " = 0"
+  show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
+
+instance GaloisField n => Ord (Constraint n) where
+  {-# SPECIALIZE instance Ord (Constraint GF181) #-}
+
+  -- CMul
+  compare (CMul aV bV cV) (CMul aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
+  compare _ CMul {} = LT
+  compare CMul {} _ = GT
+  -- CAdd
+  compare (CAdd xs) (CAdd ys) = compare xs ys
+
+--------------------------------------------------------------------------------
+
+-- | Return the list of variables occurring in constraints
+-- varsInConstraint :: Constraint a -> IntSet
+-- varsInConstraint (CAdd xs) = Poly.vars xs
+-- varsInConstraint (CMul aV bV (Left _)) = IntSet.unions $ map Poly.vars [aV, bV]
+-- varsInConstraint (CMul aV bV (Right cV)) = IntSet.unions $ map Poly.vars [aV, bV, cV]
+
+-- varsInConstraints :: Seq (Constraint a) -> IntSet
+-- varsInConstraints = IntSet.unions . fmap varsInConstraint
+
+--------------------------------------------------------------------------------
+
+-- | Linked Constraint System
 data ConstraintSystem n = ConstraintSystem
-  { csCounters :: !Counters,
-    csUseNewOptimizer :: Bool,
-    -- for counting the occurences of variables in constraints (excluding the ones that are in FieldRelations)
-    csOccurrenceF :: !(Map Ref Int),
-    csOccurrenceB :: !(Map RefB Int),
-    csOccurrenceU :: !(Map RefU Int),
-    csBitTests :: !(Map RefU Int),
-    -- when x == y (FieldRelations)
-    csFieldRelations :: AllRelations n,
-    -- csUIntRelations :: UIntRelations n,
-    -- addative constraints
-    csAddF :: [PolyG Ref n],
-    -- multiplicative constraints
-    csMulF :: [(PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))],
-    -- constraints for computing equality
-    csNEqF :: Map (RefT, RefT) RefT,
-    csNEqU :: Map (RefU, RefU) RefT,
-    -- hints for generating witnesses for DivMod constraints
-    -- a = b * q + r
-    csDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
-    -- hints for generating witnesses for ModInv constraints
-    csModInvs :: [(Either RefU n, Either RefU n, Integer)]
+  { -- | Constraints
+    csField :: FieldInfo,
+    csConstraints :: !(Seq (Constraint n)),
+    csCounters :: Counters,
+    csEqZeros :: [(Poly n, Var)],
+    csDivMods :: [(Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n)],
+    csModInvs :: [(Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer)]
   }
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
+
+-- | return the number of constraints (including constraints of boolean input vars)
+numberOfConstraints :: ConstraintSystem n -> Int
+numberOfConstraints (ConstraintSystem _ cs counters _eqs _divMods _modInvs) =
+  length cs + getBooleanConstraintCount counters
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show cs =
-    "Constraint Module {\n"
-      <> showVarEqF
-      -- <> showVarEqU
-      <> showAddF
-      <> showMulF
-      <> showNEqF
-      <> showNEqU
-      <> showBooleanConstraints
-      <> showDivModHints
-      <> showModInvHints
-      <> showOccurrencesF
-      <> showOccurrencesB
-      <> showOccurrencesU
-      <> showVariables
-      <> "}"
-    where
-      counters = csCounters cs
-      -- sizes of constraint groups
-      booleanConstraintSize = getBooleanConstraintSize counters
+  show (ConstraintSystem _ constraints counters _eqs _divMods _modInvs) =
+    "ConstraintSystem {\n"
+      <> prettyConstraints counters (toList constraints)
+      <> prettyVariables counters
+      <> "\n}"
 
-      adapt :: String -> [a] -> (a -> String) -> String
-      adapt name xs f =
-        let size = length xs
-         in if size == 0
-              then ""
-              else "  " <> name <> " (" <> show size <> "):\n\n" <> unlines (map (("    " <>) . f) xs) <> "\n"
-
-      -- Boolean constraints
-      showBooleanConstraints =
-        if booleanConstraintSize == 0
-          then ""
-          else
-            "  Boolean constriants ("
-              <> show booleanConstraintSize
-              <> "):\n\n"
-              <> unlines (map ("    " <>) (prettyBooleanConstraints counters))
-              <> "\n"
-
-      showDivModHints =
-        if null $ csDivMods cs
-          then ""
-          else "  DivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (csDivMods cs))))
-
-      showModInvHints =
-        if null $ csModInvs cs
-          then ""
-          else "  ModInv hints:\n" <> indent (indent (showList' (map (\(x, _n, p) -> show x <> "⁻¹ = (mod " <> show p <> ")") (csModInvs cs))))
-
-      -- BinRep constraints
-      -- showBinRepConstraints =
-      --   if totalBinRepConstraintSize == 0
-      --     then ""
-      --     else
-      --       "  Binary representation constriants ("
-      --         <> show totalBinRepConstraintSize
-      --         <> "):\n\n"
-      --         <> unlines (map ("    " <>) (prettyBinRepConstraints counters))
-      --         <> "\n"
-
-      showVarEqF = "  Field relations:\n" <> indent (indent (show (csFieldRelations cs)))
-      -- showVarEqU = "  UInt relations:\n" <> indent (indent (show (csUIntRelations cs)))
-
-      showAddF = adapt "AddF" (csAddF cs) show
-
-      showMulF = adapt "MulF" (csMulF cs) showMul
-
-      showNEqF = adapt "NEqF" (Map.toList $ csNEqF cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
-      showNEqU = adapt "NEqU" (Map.toList $ csNEqU cs) $ \((x, y), m) -> "NEqF " <> show x <> " " <> show y <> " " <> show m
-
-      showOccurrencesF =
-        if Map.null $ csOccurrenceF cs
-          then ""
-          else "  OccruencesF:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceF cs)))
-      showOccurrencesB =
-        if Map.null $ csOccurrenceB cs
-          then ""
-          else "  OccruencesB:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceB cs)))
-      showOccurrencesU =
-        if Map.null $ csOccurrenceU cs
-          then ""
-          else "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (Map.toList $ csOccurrenceU cs)))
-
-      showMul (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
-        where
-          showVec :: (Show n, Ord n, Eq n, Num n, Show ref) => Either n (PolyG ref n) -> String
-          showVec (Left c) = show c
-          showVec (Right xs) = show xs
-
-          -- wrap the string with parenthesis if it has more than 1 term
-          showVecWithParen :: (Show n, Ord n, Eq n, Num n, Show ref) => PolyG ref n -> String
-          showVecWithParen xs =
-            let termNumber = case PolyG.view xs of
-                  PolyG.Monomial 0 _ -> 1
-                  PolyG.Monomial _ _ -> 2
-                  PolyG.Binomial 0 _ _ -> 2
-                  PolyG.Binomial {} -> 3
-                  PolyG.Polynomial 0 xss -> Map.size xss
-                  PolyG.Polynomial _ xss -> 1 + Map.size xss
-             in if termNumber < 2
-                  then showVec (Right xs)
-                  else "(" ++ showVec (Right xs) ++ ")"
-
-      showVariables :: String
-      showVariables =
-        let totalSize = getTotalCount counters
-            padRight4 s = s <> replicate (4 - length s) ' '
-            padLeft12 n = replicate (12 - length (show n)) ' ' <> show n
-            formLine typ =
-              padLeft12 (getCount OfOutput typ counters)
-                <> "    "
-                <> padLeft12 (getCount OfPublicInput typ counters)
-                <> "    "
-                <> padLeft12 (getCount OfPrivateInput typ counters)
-                <> "    "
-                <> padLeft12 (getCount OfIntermediate typ counters)
-            uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (OfUInt w)
-            -- Bit widths existed in the system
-            uintWidthEntries (Counters o i p x _ _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
-            showUInts =
-              let entries = uintWidthEntries counters
-               in if IntSet.null entries
-                    then ""
-                    else mconcat $ fmap uint (IntSet.toList entries)
-         in if totalSize == 0
-              then ""
-              else
-                "  Variables ("
-                  <> show totalSize
-                  <> "):\n"
-                  <> "                  output       pub input      priv input    intermediate\n"
-                  <> "    --------------------------------------------------------------------"
-                  <> "\n    Field   "
-                  <> formLine OfField
-                  <> "\n    Boolean "
-                  <> formLine OfBoolean
-                  <> showUInts
-                  <> "\n"
-
--------------------------------------------------------------------------------
-
-relocateConstraintSystem :: (GaloisField n, Integral n) => ConstraintSystem n -> Relocated.RelocatedConstraintSystem n
-relocateConstraintSystem cs =
-  Relocated.RelocatedConstraintSystem
-    { Relocated.csUseNewOptimizer = csUseNewOptimizer cs,
-      Relocated.csCounters = counters,
-      Relocated.csBinReps = binReps,
-      Relocated.csConstraints =
-        varEqFs
-          <> varEqBs
-          <> varEqUs
-          <> addFs
-          <> mulFs
-          <> nEqFs
-          <> nEqUs,
-      Relocated.csDivMods = divMods,
-      Relocated.csModInvs = modInvs
-    }
+prettyConstraints :: Show constraint => Counters -> [constraint] -> String
+prettyConstraints counters cs =
+  showConstraintSummary
+    <> showOrdinaryConstraints
+    <> showBooleanConstraints
   where
-    counters = csCounters cs
-    uncurry3 f (a, b, c) = f a b c
+    -- sizes of constraint groups
+    booleanConstraintSize = getBooleanConstraintCount counters
+    ordinaryConstraintSize = length cs
 
-    binReps = generateBinReps counters (csOccurrenceU cs) (csOccurrenceF cs)
+    -- summary of constraint groups
+    showConstraintSummary =
+      "  Constriant ("
+        <> show (ordinaryConstraintSize + booleanConstraintSize)
+        <> "): \n"
 
-    occurences = constructOccurences cs
+    -- Ordinary constraints
+    showOrdinaryConstraints =
+      if ordinaryConstraintSize == 0
+        then ""
+        else
+          "    Ordinary constraints ("
+            <> show ordinaryConstraintSize
+            <> "):\n\n"
+            <> unlines (map (\x -> "      " <> show x) cs)
+            <> "\n"
 
-    -- \| Generate BinReps from the UIntRelations
-    generateBinReps :: Counters -> Map RefU Int -> Map Ref Int -> [BinRep]
-    generateBinReps (Counters o i1 i2 _ _ _ _) occurrencesU occurrencesF =
-      toList $
-        fromSmallCounter OfOutput o
-          <> fromSmallCounter OfPublicInput i1
-          <> fromSmallCounter OfPrivateInput i2
-          <> binRepsFromIntermediateRefUsOccurredInUAndF
-      where
-        intermediateRefUsOccurredInU =
-          Set.fromList $
-            Map.elems $
-              Map.mapMaybeWithKey
-                ( \ref count -> case ref of
-                    RefUX width var -> if count > 0 then Just (width, var) else Nothing
-                    _ -> Nothing
-                )
-                occurrencesU
-
-        intermediateRefUsOccurredInF =
-          Set.fromList $
-            Map.elems $
-              Map.mapMaybeWithKey
-                ( \ref count -> case ref of
-                    U (RefUX width var) -> if count > 0 then Just (width, var) else Nothing
-                    _ -> Nothing
-                )
-                occurrencesF
-
-        intermediateRefUsOccurredInBitTests =
-          Set.fromList $
-            Map.elems $
-              Map.mapMaybeWithKey
-                ( \ref count -> case ref of
-                    RefUX width var -> if count > 0 then Just (width, var) else Nothing
-                    _ -> Nothing
-                )
-                (csBitTests cs)
-
-        binRepsFromIntermediateRefUsOccurredInUAndF =
-          Seq.fromList
-            $ map
-              ( \(width, var) ->
-                  let varOffset = reindex counters OfIntermediate (OfUInt width) var
-                      binRepOffset = reindex counters OfIntermediate (OfUIntBinRep width) var
-                   in BinRep varOffset width binRepOffset
-              )
-            $ Set.toList (intermediateRefUsOccurredInU <> intermediateRefUsOccurredInF <> intermediateRefUsOccurredInBitTests)
-
-        -- fromSmallCounter :: VarSort -> SmallCounters -> [BinRep]
-        fromSmallCounter sort (Struct _ _ u) = Seq.fromList $ concatMap (fromPair sort) (IntMap.toList u)
-
-        -- fromPair :: VarSort -> (Width, Int) -> [BinRep]
-        fromPair sort (width, count) =
-          let varOffset = reindex counters sort (OfUInt width) 0
-              binRepOffset = reindex counters sort (OfUIntBinRep width) 0
-           in [BinRep (varOffset + index) width (binRepOffset + width * index) | index <- [0 .. count - 1]]
-
-    extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Relocated.Constraint n)
-    extractFieldRelations relations =
-      let convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Constraint n
-          convert (var, Right val) = CVarBindF var val
-          convert (var, Left (slope, root, intercept)) =
-            case (slope, intercept) of
-              (0, _) -> CVarBindF var intercept
-              (1, 0) -> CVarEq var root
-              (_, _) -> case PolyG.build intercept [(var, -1), (root, slope)] of
-                Left _ -> error "[ panic ] extractFieldRelations: failed to build polynomial"
-                Right poly -> CAddF poly
-
-          result = map convert $ Map.toList $ AllRelations.toInt shouldBeKept relations
-       in Seq.fromList (map (fromConstraint counters) result)
-
-    shouldBeKept :: Ref -> Bool
-    shouldBeKept (F ref) = refFShouldBeKept ref
-    shouldBeKept (B ref) = refBShouldBeKept ref
-    shouldBeKept (U ref) = refUShouldBeKept ref
-
-    refFShouldBeKept :: RefT -> Bool
-    refFShouldBeKept ref = case ref of
-      RefFX var ->
-        -- it's a Field intermediate variable that occurs in the circuit
-        RefFX var `Set.member` refFsInOccurrencesF occurences
-      _ ->
-        -- it's a pinned Field variable
-        True
-
-    refUShouldBeKept :: RefU -> Bool
-    refUShouldBeKept ref = case ref of
-      RefUX width var ->
-        -- it's a UInt intermediate variable that occurs in the circuit
-        RefUX width var `Set.member` refUsInOccurrencesF occurences
-          || RefUX width var `Set.member` refUsInOccurrencesU occurences
-          || RefUX width var `Map.member` Map.filter (> 0) (csBitTests cs)
-      _ ->
-        -- it's a pinned UInt variable
-        True
-
-    refBShouldBeKept :: RefB -> Bool
-    refBShouldBeKept ref = case ref of
-      RefBX var ->
-        --  it's a Boolean intermediate variable that occurs in the circuit
-        RefBX var `Set.member` refBsInOccurrencesB occurences
-          || RefBX var `Set.member` refBsInOccurrencesF occurences
-      RefUBit _ var _ ->
-        --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
-        --  the UInt variable should be kept
-        var `Set.member` bitTestsInOccurrencesB occurences
-          || shouldBeKept (U var)
-      _ ->
-        -- it's a pinned Field variable
-        True
-
-    extractBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Seq (Relocated.Constraint n)
-    extractBooleanRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Constraint n
-          convert (var, Right val) = CVarBindB var (if val then 1 else 0)
-          convert (var, Left (dontFlip, root)) =
-            if dontFlip
-              then CVarEqB var root
-              else CVarNEqB var root
-
-          result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
-       in Seq.fromList (map (fromConstraint counters) result)
-
-    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations n -> Seq (Relocated.Constraint n)
-    extractUIntRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefU, Either (Int, RefU) n) -> Constraint n
-          convert (var, Right val) = CVarBindU var val
-          convert (var, Left (rotation, root)) =
-            if rotation == 0
-              then CVarEqU var root
-              else error "[ panic ] Unexpected rotation in extractUIntRelations"
-
-          result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
-       in Seq.fromList (map (fromConstraint counters) result)
-
-    -- varEqFs = fromFieldRelations (csFieldRelations cs) (FieldRelations.exportUIntRelations (csFieldRelations cs)) (csOccurrenceF cs)
-    varEqFs = extractFieldRelations (csFieldRelations cs)
-    varEqUs = extractUIntRelations (FieldRelations.exportUIntRelations (csFieldRelations cs))
-    varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (csFieldRelations cs))
-
-    addFs = Seq.fromList $ map (fromConstraint counters . CAddF) $ csAddF cs
-    mulFs = Seq.fromList $ map (fromConstraint counters . uncurry3 CMulF) $ csMulF cs
-    nEqFs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefT counters x)) (Left (reindexRefT counters y)) (reindexRefT counters m))) $ Map.toList $ csNEqF cs
-    nEqUs = Seq.fromList $ map (\((x, y), m) -> Relocated.CNEq (Constraint.CNEQ (Left (reindexRefU counters x)) (Left (reindexRefU counters y)) (reindexRefT counters m))) $ Map.toList $ csNEqU cs
-
-    divMods = map (\(a, b, q, r) -> (left (reindexRefU counters) a, left (reindexRefU counters) b, left (reindexRefU counters) q, left (reindexRefU counters) r)) $ csDivMods cs
-    modInvs = map (\(a, n, p) -> (left (reindexRefU counters) a, left (reindexRefU counters) n, p)) $ csModInvs cs
-
-sizeOfConstraintSystem :: ConstraintSystem n -> Int
-sizeOfConstraintSystem cs =
-  FieldRelations.size (csFieldRelations cs)
-    + BooleanRelations.size (FieldRelations.exportBooleanRelations (csFieldRelations cs))
-    + UIntRelations.size (FieldRelations.exportUIntRelations (csFieldRelations cs))
-    + length (csAddF cs)
-    + length (csMulF cs)
-    + length (csNEqF cs)
-    + length (csNEqU cs)
-
-class UpdateOccurrences ref where
-  addOccurrences :: Set ref -> ConstraintSystem n -> ConstraintSystem n
-  removeOccurrences :: Set ref -> ConstraintSystem n -> ConstraintSystem n
-
-instance UpdateOccurrences Ref where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cs ref ->
-              case ref of
-                F refF -> addOccurrences (Set.singleton refF) cs
-                B refB -> addOccurrences (Set.singleton refB) cs
-                U refU -> addOccurrences (Set.singleton refU) cs
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cs ref ->
-              case ref of
-                F refF -> removeOccurrences (Set.singleton refF) cs
-                B refB -> removeOccurrences (Set.singleton refB) cs
-                U refU -> removeOccurrences (Set.singleton refU) cs
-          )
-      )
-
-instance UpdateOccurrences RefT where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cs ref ->
-              cs
-                { csOccurrenceF = Map.insertWith (+) (F ref) 1 (csOccurrenceF cs)
-                }
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cs ref ->
-              cs
-                { csOccurrenceF = Map.adjust (\count -> pred count `max` 0) (F ref) (csOccurrenceF cs)
-                }
-          )
-      )
-
-instance UpdateOccurrences RefB where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cs ref ->
-              case ref of
-                RefUBit _ refU _ ->
-                  cs
-                    { csOccurrenceU = Map.insertWith (+) refU 1 (csOccurrenceU cs)
-                    }
-                _ ->
-                  cs
-                    { csOccurrenceB = Map.insertWith (+) ref 1 (csOccurrenceB cs)
-                    }
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cs ref ->
-              case ref of
-                RefUBit _ refU _ ->
-                  cs
-                    { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) refU (csOccurrenceU cs)
-                    }
-                _ ->
-                  cs
-                    { csOccurrenceB = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceB cs)
-                    }
-          )
-      )
-
-instance UpdateOccurrences RefU where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cs ref ->
-              cs
-                { csOccurrenceU = Map.insertWith (+) ref 1 (csOccurrenceU cs)
-                }
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cs ref ->
-              cs
-                { csOccurrenceU = Map.adjust (\count -> pred count `max` 0) ref (csOccurrenceU cs)
-                }
-          )
-      )
-
--------------------------------------------------------------------------------
-
--- | Allow us to determine which relations should be extracted from the pool
-data Occurences = Occurences
-  { refFsInOccurrencesF :: !(Set RefT),
-    refBsInOccurrencesF :: !(Set RefB),
-    refUsInOccurrencesF :: !(Set RefU),
-    bitTestsInOccurrencesB :: !(Set RefU),
-    refBsInOccurrencesB :: !(Set RefB),
-    refUsInOccurrencesU :: !(Set RefU)
-  }
-
--- | Smart constructor for 'Occurences'
-constructOccurences :: ConstraintSystem n -> Occurences
-constructOccurences cs =
-  let findFInRef (F _) 0 = Nothing
-      findFInRef (F r) _ = Just r
-      findFInRef _ _ = Nothing
-
-      findUInRef (U _) 0 = Nothing
-      findUInRef (U r) _ = Just r
-      findUInRef _ _ = Nothing
-
-      findBitTestInRefB (RefUBit {}) 0 = Nothing
-      findBitTestInRefB (RefUBit _ r _) _ = Just r
-      findBitTestInRefB _ _ = Nothing
-
-      findBInRef (B _) 0 = Nothing
-      findBInRef (B r) _ = Just r
-      findBInRef _ _ = Nothing
-   in Occurences
-        { refFsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findFInRef (csOccurrenceF cs),
-          refBsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findBInRef (csOccurrenceF cs),
-          refUsInOccurrencesF = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findUInRef (csOccurrenceF cs),
-          bitTestsInOccurrencesB = Set.fromList $ Map.elems $ Map.mapMaybeWithKey findBitTestInRefB (csOccurrenceB cs),
-          refBsInOccurrencesB = Map.keysSet $ Map.filter (> 0) (csOccurrenceB cs),
-          refUsInOccurrencesU = Map.keysSet $ Map.filter (> 0) (csOccurrenceU cs)
-        }
+    -- Boolean constraints
+    showBooleanConstraints =
+      if booleanConstraintSize == 0
+        then ""
+        else
+          "    Boolean constraints ("
+            <> show booleanConstraintSize
+            <> "):\n\n"
+            <> unlines (map ("      " <>) (prettyBooleanConstraints counters))
+            <> "\n"

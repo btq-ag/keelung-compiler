@@ -9,10 +9,9 @@ import Data.Aeson
 import Data.Aeson.Encoding
 import Data.ByteString.Lazy (ByteString)
 import Data.ByteString.Lazy qualified as BS
-import Data.Field.Galois (GaloisField (char, deg))
+import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.IntMap qualified as IntMap
-import Data.Proxy
 import Data.Vector (Vector)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
@@ -24,50 +23,47 @@ import Keelung.Syntax.Counters hiding (reindex)
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
 
--- | Encodes a R1CS in the JSON Lines text file format
-serializeR1CS :: (GaloisField n, Integral n) => R1CS n -> ByteString
-serializeR1CS = serializeR1CS2
-
 -- | Encodes inputs and witnesses in the JSON Lines text file format
 --   the "inputs" field should contain both outputs & public inputs
 --   the "witnesses" field should contain private inputs & rest of the witnesses
 serializeInputAndWitness :: Integral n => Counters -> Vector n -> ByteString
 serializeInputAndWitness counters witness =
-  let (inputs, witnesses) = splitAt (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters) $ toList witness
+  let outputAndPublicInputCount = getCount counters Output + getCount counters PublicInput
+      (inputs, witnesses) = splitAt outputAndPublicInputCount $ toList witness
    in encodingToLazyByteString $
         pairs $
           pairStr "inputs" (list (integerText . toInteger) inputs)
             <> pairStr "witnesses" (list (integerText . toInteger) witnesses)
 
-
 --------------------------------------------------------------------------------
 
-serializeR1CS2 :: (GaloisField n, Integral n) => R1CS n -> ByteString
-serializeR1CS2 r1cs =
+-- | Encodes a R1CS in the JSON Lines text file format
+serializeR1CS :: (GaloisField n, Integral n) => R1CS n -> ByteString
+serializeR1CS r1cs =
   BS.intercalate "\n" $
     map encodingToLazyByteString $
       header : map toEncoding r1cConstraints
   where
-    fieldNumberProxy :: GaloisField n => R1CS n -> n
-    fieldNumberProxy _ = asProxyTypeOf 0 Proxy
-
-    fieldNumber = fieldNumberProxy r1cs
-
     -- the constraints are reindexed and all field numbers are converted to Integer
     r1cConstraints = map (fmap toInteger . reindexR1C r1cs) (toR1Cs r1cs)
 
     counters = r1csCounters r1cs
+
+    (_, characteristic, degree) = r1csField r1cs
+
+    -- outputs & public inputs
+    outputAndPublicInputCount = getCount counters Output + getCount counters PublicInput
 
     header :: Encoding
     header =
       pairs $
         pairStr "r1cs" $
           pairs $
-            pairStr "version" (string "0.9.5")
-              <> pairStr "field_characteristic" (integerText (toInteger (char fieldNumber)))
-              <> pairStr "extension_degree" (integerText (toInteger (deg fieldNumber)))
-              <> pairStr "instances" (int (getCountBySort OfOutput counters + getCountBySort OfPublicInput counters)) -- outputs & public inputs
-              <> pairStr "witness" (int (getTotalCount counters - getCountBySort OfOutput counters - getCountBySort OfPublicInput counters)) -- private inputs & other intermediate variables after optimization
+            pairStr "version" (string "0.11.0")
+              <> pairStr "field_characteristic" (integerText characteristic)
+              <> pairStr "extension_degree" (integerText degree)
+              <> pairStr "instances" (int outputAndPublicInputCount)
+              <> pairStr "witness" (int (getTotalCount counters - outputAndPublicInputCount)) -- private inputs & other intermediate variables after optimization
               <> pairStr "constraints" (int (length r1cConstraints))
               <> pairStr "optimized" (bool True)
 
@@ -124,4 +120,5 @@ reindexR1C r1cs (R1C a b c) =
       | isPublicInputOrOutputVar var = -(var + 1) -- + 1 to avoid $0 the constant 1
       | otherwise = var + 1 -- + 1 to avoid $0 the constant 1
     isPublicInputOrOutputVar :: Var -> Bool
-    isPublicInputOrOutputVar var = var < (getCountBySort OfPublicInput (r1csCounters r1cs) + getCountBySort OfOutput (r1csCounters r1cs))
+    isPublicInputOrOutputVar var =
+      var < getCount (r1csCounters r1cs) Output + getCount (r1csCounters r1cs) PublicInput

@@ -1,134 +1,253 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
-module Test.Optimization.UInt (tests, run, debug) where
 
-import Keelung hiding (compileO0, run)
-import Keelung.Compiler qualified as Compiler
-import Keelung.Compiler.Compile qualified as Compiler
-import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), relocateConstraintSystem)
-import Keelung.Compiler.Error (Error)
-import Keelung.Compiler.Optimize qualified as Optimizer
-import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
-import Keelung.Compiler.Relocated qualified as Relocated
-import Test.HUnit (assertFailure)
+module Test.Optimization.UInt (tests, run) where
+
+import Control.Monad (forM_)
+import Keelung hiding (compileO0)
 import Test.Hspec
-
-tests :: SpecWith ()
-tests = do
-  describe "UInt" $ do
-    describe "Constants" $ do
-      it "`return 0`" $ do
-        (cs, cs') <- execute $ do
-          return (0  :: UInt 4)
-        cs `shouldHaveSize` 6
-        cs' `shouldHaveSize` 6
-
-      -- it "`return 0[3]`" $ do
-      --   (cs, cs') <- execute $ do
-      --     let a = 0  :: UInt 4
-      --     return $ a !!! 3
-      --   debug cs'
-      --   cs `shouldHaveSize` 2
-      --   cs' `shouldHaveSize` 2
-
-    describe "Comparison" $ do
-      it "compute LTE (variable / variable)" $ do
-        (cs, cs') <- execute $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Private
-          return $ x `lte` y
-        cs `shouldHaveSize` 20
-        cs' `shouldHaveSize` 19
-
-      it "compute LTE 1 (variable / constant)" $ do
-        (cs, cs') <- execute $ do
-          x <- inputUInt @4 Public
-          return $ (0  :: UInt 4) `lte` x
-        cs `shouldHaveSize` 7
-        cs' `shouldHaveSize` 7
-
-      it "compute LTE 2 (variable / constant)" $ do
-        (cs, cs') <- execute $ do
-          x <- inputUInt @4 Public
-          return $ (1  :: UInt 4) `lte` x
-        cs `shouldHaveSize` 10
-        cs' `shouldHaveSize` 9
-
-      it "compute LTE 1 (constant / variable)" $ do
-        (cs, cs') <- execute $ do
-          x <- inputUInt @4 Public
-          return $ x `lte` (0  :: UInt 4)
-        cs `shouldHaveSize` 11
-        cs' `shouldHaveSize` 9
-
-      it "compute LTE 2 (constant / variable)" $ do
-        (cs, cs') <- execute $ do
-          x <- inputUInt @4 Public
-          return $ x `lte` (1  :: UInt 4)
-        cs `shouldHaveSize` 10
-        cs' `shouldHaveSize` 8
-
-      it "compute LTE (constant / constant)" $ do
-        (cs, cs') <- execute $ do
-          return $ 0 `lte` (0  :: UInt 4)
-        cs `shouldHaveSize` 2
-        cs' `shouldHaveSize` 2
-
-      it "compute LT" $ do
-        (cs, cs') <- execute $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Private
-          return $ x `lt` y
-        cs `shouldHaveSize` 19
-        cs' `shouldHaveSize` 18
-
-      it "compute GTE" $ do
-        (cs, cs') <- execute $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Private
-          return $ x `gte` y
-        cs `shouldHaveSize` 20
-        cs' `shouldHaveSize` 19
-
-      it "compute GT" $ do
-        (cs, cs') <- execute $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Private
-          return $ x `gt` y
-        cs `shouldHaveSize` 19
-        cs' `shouldHaveSize` 18
-
---------------------------------------------------------------------------------
-
-
--- | elaborate => rewrite => type erase => constant propagation => compile
-compileO0 :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (ConstraintSystem n)
-compileO0 program = Compiler.erase program >>= Compiler.run True . ConstantPropagation.run
-
--- | Returns the original and optimized constraint system
-execute :: Encode t => Comp t -> IO (ConstraintSystem (N GF181), ConstraintSystem (N GF181))
-execute program = do
-  cs <- case Compiler.asGF181N $ compileO0 program of
-    Left err -> assertFailure $ show err
-    Right result -> return result
-
-  case Optimizer.optimizeNew cs of
-    Left err -> assertFailure $ show err
-    Right cs' -> do 
-        -- var counters should remain the same
-        csCounters cs `shouldBe` csCounters cs'
-        return (cs, cs')
-
-shouldHaveSize :: ConstraintSystem (N GF181) -> Int -> IO ()
-shouldHaveSize cs expectedBeforeSize = do
-  -- compare the number of constraints
-  let actualBeforeSize = Relocated.numberOfConstraints (relocateConstraintSystem cs)
-  actualBeforeSize `shouldBe` expectedBeforeSize
+import Test.Optimization.Util
+import Keelung.Compiler.Linker
 
 run :: IO ()
 run = hspec tests
 
-debug :: ConstraintSystem (N GF181) -> IO ()
-debug cs = do
-  print cs
-  print (relocateConstraintSystem cs)
+tests :: SpecWith ()
+tests = do
+  describe "UInt" $ do
+    describe "Addition / Subtraction" $ do
+      it "2 variables" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Public
+          return $ x + y
+        cs `shouldHaveSize` 14
+        cs' `shouldHaveSize` 14
+
+      it "1 variable + 1 constant" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          return $ x + 4
+        cs `shouldHaveSize` 10
+        cs' `shouldHaveSize` 10
+
+      it "3 variable + 1 constant" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Public
+          z <- inputUInt @4 Public
+          return $ x + y + z + 4
+        cs `shouldHaveSize` 19
+        cs' `shouldHaveSize` 19
+
+      it "3 variable + 1 constant (with subtraction)" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Public
+          z <- inputUInt @4 Public
+          return $ x - y + z + 4
+        print $ linkConstraintModule cs'
+        cs `shouldHaveSize` 19
+        cs' `shouldHaveSize` 19
+
+      -- TODO: should've been just 4
+      it "2 constants" $ do
+        (cs, cs') <- execute $ do
+          return $ 2 + (4 :: UInt 4)
+        cs `shouldHaveSize` 8
+        cs' `shouldHaveSize` 8
+
+    describe "Multiplication" $ do
+      -- TODO: should've been just 13
+      it "variable / variable" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Public
+          return $ x * y
+        cs `shouldHaveSize` 13
+        cs' `shouldHaveSize` 13
+
+      -- TODO: should've been just 10
+      it "variable / constant" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          return $ x * 4
+        cs `shouldHaveSize` 9
+        cs' `shouldHaveSize` 9
+
+      -- TODO: should've been just 4
+      it "constant / constant" $ do
+        (cs, cs') <- execute $ do
+          return $ 2 * (4 :: UInt 4)
+        -- print $ linkConstraintModule cs'
+        cs `shouldHaveSize` 8
+        cs' `shouldHaveSize` 8
+
+    describe "Constants" $ do
+      -- TODO: should be just 4
+      it "`return 0`" $ do
+        (cs, cs') <- execute $ do
+          return (0 :: UInt 4)
+        -- print $ linkConstraintModule cs'
+        cs `shouldHaveSize` 8
+        cs' `shouldHaveSize` 8
+
+    describe "Comparison computation" $ do
+      it "x ≤ y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          return $ x `lte` y
+        cs `shouldHaveSize` 17
+        cs' `shouldHaveSize` 16
+
+      it "0 ≤ x" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          return $ (0 :: UInt 4) `lte` x
+        cs `shouldHaveSize` 6
+        cs' `shouldHaveSize` 6
+
+      it "1 ≤ x" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          return $ (1 :: UInt 4) `lte` x
+        cs `shouldHaveSize` 9
+        cs' `shouldHaveSize` 8
+
+      it "x ≤ 0" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          return $ x `lte` (0 :: UInt 4)
+        cs `shouldHaveSize` 10
+        cs' `shouldHaveSize` 8
+
+      it "x ≤ 1" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          return $ x `lte` (1 :: UInt 4)
+        cs `shouldHaveSize` 9
+        cs' `shouldHaveSize` 7
+
+      it "0 ≤ 0" $ do
+        (cs, cs') <- execute $ do
+          return $ 0 `lte` (0 :: UInt 4)
+        cs `shouldHaveSize` 2
+        cs' `shouldHaveSize` 2
+
+      it "x < y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          return $ x `lt` y
+        cs `shouldHaveSize` 17
+        cs' `shouldHaveSize` 16
+
+      it "x ≥ y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          return $ x `gte` y
+        cs `shouldHaveSize` 17
+        cs' `shouldHaveSize` 16
+
+      it "x > y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          return $ x `gt` y
+        cs `shouldHaveSize` 17
+        cs' `shouldHaveSize` 16
+
+    describe "Comparison assertion" $ do
+      describe "between variables" $ do
+        it "x ≤ y" $ do
+          (cs, cs') <- execute $ do
+            x <- inputUInt @4 Public
+            y <- inputUInt @4 Private
+            assert $ x `lte` y
+          cs `shouldHaveSize` 16
+          cs' `shouldHaveSize` 15
+
+      it "x < y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          assert $ x `lt` y
+        cs `shouldHaveSize` 16
+        cs' `shouldHaveSize` 15
+
+      it "x ≥ y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          assert $ x `gte` y
+        cs `shouldHaveSize` 16
+        cs' `shouldHaveSize` 15
+
+      it "x > y" $ do
+        (cs, cs') <- execute $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          assert $ x `gt` y
+        cs `shouldHaveSize` 16
+        cs' `shouldHaveSize` 15
+
+      describe "GTE on constants (4 bits)" $ do
+        let program bound = do
+              x <- inputUInt @4 Public
+              assert $ x `gte` (bound :: UInt 4)
+        forM_
+          [ (1, 5), -- special case: the number is non-zero
+            (2, 6), -- trailing zero: 1
+            (3, 7),
+            (4, 5), -- trailing zero: 2
+            (5, 7),
+            (6, 6), -- trailing zero: 1
+            (7, 7),
+            (8, 5), -- trailing zero: 3
+            (9, 7),
+            (10, 6), -- trailing zero: 1
+            (11, 7),
+            (12, 6), -- trailing zero: 2
+            (13, 6), -- special case: only 3 possible values
+            (14, 5), -- special case: only 2 possible values
+            (15, 5) -- special case: only 1 possible value
+          ]
+          $ \(bound, expectedSize) -> do
+            it ("x ≥ " <> show bound) $ do
+              (_, cs) <- execute (program bound)
+              cs `shouldHaveSize` expectedSize
+
+      describe "LTE on constants (4 bits)" $ do
+        let program bound = do
+              x <- inputUInt @4 Public
+              assert $ x `lte` (bound :: UInt 4)
+        forM_
+          [ (0, 5), -- special case: only 1 possible value
+            (1, 5), -- special case: only 2 possible value
+            (2, 6), -- special case: only 3 possible value
+            (3, 6), -- trailing one: 1
+            (4, 7),
+            (5, 6), -- trailing one: 1
+            (6, 7),
+            (7, 5), -- trailing one: 2
+            (8, 7),
+            (9, 6), -- trailing one: 1
+            (10, 7),
+            (11, 5), -- trailing one: 2
+            (12, 7),
+            (13, 6), -- trailing one: 1
+            (14, 7)
+          ]
+          $ \(bound, expectedSize) -> do
+            it ("x ≥ " <> show bound) $ do
+              (_, cs) <- execute (program bound)
+              cs `shouldHaveSize` expectedSize
+
+      describe "between constants" $ do
+        it "0 ≤ 0" $ do
+          (cs, cs') <- execute $ do
+            assert $ 0 `lte` (0 :: UInt 4)
+          cs `shouldHaveSize` 0
+          cs' `shouldHaveSize` 0

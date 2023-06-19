@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Compiler.Error where
@@ -17,7 +18,7 @@ data Error n
   | InterpretError (Interpreter.Error n)
   | CompileError (Compiler.Error n)
   | LangError Lang.Error
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
 

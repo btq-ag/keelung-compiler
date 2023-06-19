@@ -1,51 +1,26 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Compiler.R1CS where
 
 import Control.DeepSeq (NFData)
-import Data.Either (lefts, rights)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung.Compiler.Optimize (optimizeWithWitness)
-import Keelung.Compiler.Relocated hiding (numberOfConstraints)
-import Keelung.Compiler.Syntax.Inputs (Inputs)
-import Keelung.Compiler.Syntax.Inputs qualified as Inputs
+import Keelung.Compiler.ConstraintSystem hiding (numberOfConstraints)
+import Keelung.Compiler.FieldInfo
 import Keelung.Compiler.Util
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1C qualified as R1C
-import Keelung.Constraint.R1CS (CNEQ (..), R1CS (..), toR1Cs)
+import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
 import Keelung.Field (N (..))
 import Keelung.Syntax
-import Keelung.Syntax.Counters
-
--- | Starting from an initial partial assignment, solve the
--- constraints and return the resulting complete assignment.
--- Return `Left String` if the constraints are unsolvable.
-generateWitness ::
-  (GaloisField n, Integral n) =>
-  -- | Constraints to be solved
-  RelocatedConstraintSystem n ->
-  -- | Initial assignment
-  Witness n ->
-  -- | Resulting assignment
-  Either (ExecError n) (Witness n)
-generateWitness cs initWit =
-  let cs' = renumberConstraints cs
-      variables = [0 .. getTotalCount (csCounters cs) - 1]
-      (witness, _) = optimizeWithWitness initWit cs'
-   in if all (isMapped witness) variables
-        then Right witness
-        else Left $ ExecVarUnassignedError [x | x <- variables, not $ isMapped witness x] witness
-  where
-    isMapped witness var = IntMap.member var witness
 
 --------------------------------------------------------------------------------
 
@@ -60,57 +35,21 @@ satisfyR1CS witness r1cs =
         else Just unsatisfiable
 
 -- | Converts ConstraintSystem to R1CS
-toR1CS :: GaloisField n => RelocatedConstraintSystem n -> R1CS n
+toR1CS :: GaloisField n => ConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
-    { r1csConstraints = rights convertedConstratins,
-      r1csBinReps = csBinReps cs,
+    { r1csField = (fieldTypeData (csField cs), toInteger $ fieldChar (csField cs), toInteger $ fieldDeg (csField cs)),
+      r1csConstraints = map toR1C (toList (csConstraints cs)),
+      r1csBinReps = [],
       r1csCounters = csCounters cs,
-      r1csCNEQs = lefts convertedConstratins,
+      r1csEqZeros = csEqZeros cs,
       r1csDivMods = csDivMods cs,
       r1csModInvs = csModInvs cs
     }
   where
-    convertedConstratins = map toR1C (toList (csConstraints cs))
-
-    toR1C :: GaloisField n => Constraint n -> Either (CNEQ n) (R1C n)
-    toR1C (CAdd xs) =
-      Right $
-        R1C
-          (Left 1)
-          (Right xs)
-          (Left 0)
-    toR1C (CMul aX bX cX) =
-      Right $ R1C (Right aX) (Right bX) cX
-    toR1C (CNEq x) = Left x
-
-fromR1CS :: GaloisField n => R1CS n -> RelocatedConstraintSystem n
-fromR1CS r1cs =
-  RelocatedConstraintSystem
-    { csUseNewOptimizer = False,
-      csConstraints =
-        Seq.fromList (map fromR1C (r1csConstraints r1cs))
-          <> Seq.fromList (map CNEq (r1csCNEQs r1cs)),
-      csBinReps = r1csBinReps r1cs,
-      csCounters = r1csCounters r1cs,
-      csDivMods = r1csDivMods r1cs,
-      csModInvs = r1csModInvs r1cs
-    }
-  where
-    fromR1C (R1C aX bX cX) =
-      case (aX, bX, cX) of
-        (Left 1, Right xs, Left 0) -> CAdd xs
-        (Right xs, Left 1, Left 0) -> CAdd xs
-        (Right xs, Right ys, _) -> CMul xs ys cX
-        _ -> error "fromR1C: invalid R1C"
-
--- | Computes an assignment for a R1CS with given inputs
-witnessOfR1CS :: (GaloisField n, Integral n) => Inputs n -> R1CS n -> Either (ExecError n) (Witness n)
-witnessOfR1CS inputs r1cs =
-  let inputSize = getCountBySort OfPublicInput (r1csCounters r1cs) + getCountBySort OfPrivateInput (r1csCounters r1cs)
-   in if inputSize /= Inputs.size inputs
-        then Left $ ExecInputUnmatchedError inputSize (Inputs.size inputs)
-        else generateWitness (fromR1CS r1cs) (Inputs.toIntMap inputs)
+    toR1C :: GaloisField n => Constraint n -> R1C n
+    toR1C (CAdd xs) = R1C (Left 1) (Right xs) (Left 0)
+    toR1C (CMul aX bX cX) = R1C (Right aX) (Right bX) cX
 
 --------------------------------------------------------------------------------
 
@@ -120,7 +59,7 @@ data ExecError n
   | ExecR1CUnsatisfiableError [R1C n] (IntMap n)
   | ExecInputUnmatchedError Int Int
   | ExecVarUnassignedError [Var] (IntMap n)
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (ExecError n)
 

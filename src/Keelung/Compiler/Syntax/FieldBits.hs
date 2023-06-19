@@ -4,7 +4,7 @@
 -- | Like `Data.Bits` but with `Boolean` instead of `Bool`
 module Keelung.Compiler.Syntax.FieldBits where
 
-import qualified Data.Bits
+import Data.Bits qualified
 import Data.Field.Galois
 import Keelung
 
@@ -12,11 +12,11 @@ class (Integral a) => FieldBits a where
   {-# MINIMAL bitSize #-}
   bitSize :: a -> Int
 
-  testBit :: a -> Int -> a
-  testBit x i = if Data.Bits.testBit (toInteger x) (i `mod` bitSize x) then 1 else 0
+  testBit' :: a -> Int -> Bool
+  testBit' x i = Data.Bits.testBit (toInteger x) (i `mod` bitSize x)
 
--- and :: a -> a -> a
--- and x y = fromInteger $ (Data.Bits..&.) (toInteger x) (toInteger y)
+  testBit :: a -> Int -> a
+  testBit x i = if testBit' x i then 1 else 0
 
 -- | All instances of Galois fields are also instances of `Bits`
 --   `bitSize` will have to be calculated at runtime every time though,
@@ -42,3 +42,9 @@ instance {-# INCOHERENT #-} FieldBits BN128 where
 
 toBits :: (GaloisField a, Integral a) => a -> [a]
 toBits x = map (testBit x) [0 .. bitSize x - 1]
+
+toBits' :: (GaloisField a, Integral a) => Width -> Integer -> [a]
+toBits' width x = map (\i -> if Data.Bits.testBit x i then 1 else 0) [0 .. width - 1]
+
+fromBits :: Integral a => [a] -> Integer
+fromBits = foldr (\x acc -> toInteger x + Data.Bits.shiftL acc 1) 0

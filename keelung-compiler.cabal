@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           keelung-compiler
-version:        0.9.5.0
+version:        0.12.0
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung-compiler#readme>
 homepage:       https://github.com/btq-ag/keelung-compiler#readme
 bug-reports:    https://github.com/btq-ag/keelung-compiler/issues
@@ -27,27 +27,33 @@ library
   exposed-modules:
       Keelung.Compiler
       Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
-      Keelung.Compiler.Compile.Relations.Boolean
-      Keelung.Compiler.Compile.Relations.EquivClass
-      Keelung.Compiler.Compile.Relations.Field
-      Keelung.Compiler.Compile.Relations.UInt
-      Keelung.Compiler.Compile.Relations.Util
+      Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.IndexTable
+      Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
+      Keelung.Compiler.FieldInfo
+      Keelung.Compiler.Linker
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
-      Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.UnionFind
+      Keelung.Compiler.Optimize.OccurB
+      Keelung.Compiler.Optimize.OccurF
+      Keelung.Compiler.Optimize.OccurU
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Relocated
-      Keelung.Compiler.Syntax.Erase
+      Keelung.Compiler.Relations.Boolean
+      Keelung.Compiler.Relations.EquivClass
+      Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
-      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
@@ -55,7 +61,6 @@ library
       Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
   other-modules:
@@ -90,27 +95,33 @@ executable keelungc
       Option
       Keelung.Compiler
       Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
-      Keelung.Compiler.Compile.Relations.Boolean
-      Keelung.Compiler.Compile.Relations.EquivClass
-      Keelung.Compiler.Compile.Relations.Field
-      Keelung.Compiler.Compile.Relations.UInt
-      Keelung.Compiler.Compile.Relations.Util
+      Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.IndexTable
+      Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
+      Keelung.Compiler.FieldInfo
+      Keelung.Compiler.Linker
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
-      Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.UnionFind
+      Keelung.Compiler.Optimize.OccurB
+      Keelung.Compiler.Optimize.OccurF
+      Keelung.Compiler.Optimize.OccurU
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Relocated
-      Keelung.Compiler.Syntax.Erase
+      Keelung.Compiler.Relations.Boolean
+      Keelung.Compiler.Relations.EquivClass
+      Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
-      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
@@ -118,11 +129,8 @@ executable keelungc
       Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
-      AggregateSignature.Program
-      AggregateSignature.Util
       Basic
       Hash.Poseidon
       Hash.Poseidon.Constant
@@ -159,7 +167,7 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Test.Compilation
+      Test.IndexTable
       Test.Interpreter
       Test.Interpreter.Boolean
       Test.Interpreter.Field
@@ -168,37 +176,43 @@ test-suite keelung-test
       Test.Interpreter.UInt
       Test.Interpreter.Util
       Test.Optimization
+      Test.Optimization.Boolean
+      Test.Optimization.Field
       Test.Optimization.UInt
-      Test.OptimizationOld
+      Test.Optimization.Util
       Test.PolyG
       Test.Relations.Boolean
       Test.Relations.Field
-      Test.Relations.UInt
-      Test.VarLayout
       Test.WitnessGeneration
       Keelung.Compiler
       Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
-      Keelung.Compiler.Compile.Relations.Boolean
-      Keelung.Compiler.Compile.Relations.EquivClass
-      Keelung.Compiler.Compile.Relations.Field
-      Keelung.Compiler.Compile.Relations.UInt
-      Keelung.Compiler.Compile.Relations.Util
+      Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.IndexTable
+      Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
+      Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
+      Keelung.Compiler.FieldInfo
+      Keelung.Compiler.Linker
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
-      Keelung.Compiler.Optimize.MinimizeRelocatedConstraints
-      Keelung.Compiler.Optimize.Monad
-      Keelung.Compiler.Optimize.UnionFind
+      Keelung.Compiler.Optimize.OccurB
+      Keelung.Compiler.Optimize.OccurF
+      Keelung.Compiler.Optimize.OccurU
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Relocated
-      Keelung.Compiler.Syntax.Erase
+      Keelung.Compiler.Relations.Boolean
+      Keelung.Compiler.Relations.EquivClass
+      Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
-      Keelung.Compiler.Syntax.Untyped
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
@@ -206,11 +220,8 @@ test-suite keelung-test
       Keelung.Interpreter.Error
       Keelung.Interpreter.R1CS
       Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.Relocated
       Keelung.Interpreter.SyntaxTree
       Keelung.Interpreter.SyntaxTree.Monad
-      AggregateSignature.Program
-      AggregateSignature.Util
       Basic
       Hash.Poseidon
       Hash.Poseidon.Constant

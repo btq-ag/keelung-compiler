@@ -1,6 +1,7 @@
 module Test.Interpreter.Boolean (tests, run) where
 
-import Keelung hiding (compile, run)
+import Data.Bits qualified
+import Keelung hiding (compile)
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
@@ -8,45 +9,50 @@ import Test.QuickCheck hiding ((.&.))
 run :: IO ()
 run = hspec tests
 
+fromBool :: Bool -> Integer
+fromBool True = 1
+fromBool False = 0
+
+makeProgram :: (Boolean -> Boolean -> Boolean) -> Int -> Boolean -> Boolean -> [Boolean] -> Comp Boolean
+makeProgram op mode a b cs = case mode `mod` 4 of
+  0 -> do
+    x <- inputBool Public
+    y <- inputBool Public
+    return $ foldl op (x `op` y) cs
+  1 -> do
+    y <- inputBool Public
+    return $ foldl op (a `op` y) cs
+  2 -> do
+    x <- inputBool Public
+    return $ foldl op (x `op` b) cs
+  _ -> do
+    return $ foldl op (a `op` b) cs
+
+testProgram :: (Bool -> Bool -> Bool) -> (Boolean -> Boolean -> Boolean) -> Property
+testProgram opH opK = do
+  property $ \(mode, a, b, cs) -> do
+    let expectedOutput = [fromInteger (fromBool (foldl opH (a `opH` b) cs))]
+    let inputs = case mode `mod` 4 of
+          0 -> [fromBool a, fromBool b]
+          1 -> [fromBool b]
+          2 -> [fromBool a]
+          _ -> []
+    runPrime gf181 (makeProgram opK (mode `mod` 4 :: Int) (Boolean a) (Boolean b) (map Boolean cs)) inputs [] expectedOutput
+
 tests :: SpecWith ()
 tests = describe "Boolean" $ do
   it "not 1" $ do
     let program = return $ complement true
-    runAll program [] [] [0 :: GF181]
+    runPrime gf181 program [] [] [0]
 
   it "not 2" $ do
     let program = complement <$> inputBool Public
-    runAll program [0] [] [1 :: GF181]
-    runAll program [1] [] [0 :: GF181]
+    runPrime gf181 program [0] [] [1]
+    runPrime gf181 program [1] [] [0]
 
-  it "and 1" $ do
-    let program = return $ true `And` false
-    runAll program [] [] [0 :: GF181]
-
-  it "and 2" $ do
-    let program = And <$> input Public <*> input Private
-    runAll program [1] [0] [0 :: GF181]
-    runAll program [1] [1] [1 :: GF181]
-    runAll program [0] [1] [0 :: GF181]
-    runAll program [1] [1] [1 :: GF181]
-
-  it "or 1" $ do
-    let program = return $ true `Or` false
-    runAll program [] [] [1 :: GF181]
-
-  it "or 2" $ do
-    let program = Or true <$> input Private
-    runAll program [] [0] [1 :: GF181]
-    runAll program [] [1] [1 :: GF181]
-
-  it "xor 1" $ do
-    let program = return $ true `Xor` false
-    runAll program [] [] [1 :: GF181]
-
-  it "xor 2" $ do
-    let program = Xor <$> input Public <*> return true
-    runAll program [0] [] [1 :: GF181]
-    runAll program [1] [] [0 :: GF181]
+  it "and" $ testProgram (&&) And
+  it "or" $ testProgram (||) Or
+  it "xor" $ testProgram Data.Bits.xor Xor
 
   it "mixed 1" $ do
     let program = do
@@ -54,10 +60,10 @@ tests = describe "Boolean" $ do
           y <- input Private
           let z = true
           return $ x `Or` y `And` z
-    runAll program [0] [0] [0 :: GF181]
-    runAll program [0] [1] [1 :: GF181]
-    runAll program [1] [0] [1 :: GF181]
-    runAll program [1] [1] [1 :: GF181]
+    runPrime gf181 program [0] [0] [0]
+    runPrime gf181 program [0] [1] [1]
+    runPrime gf181 program [1] [0] [1]
+    runPrime gf181 program [1] [1] [1]
 
   it "mixed 2" $ do
     let program = do
@@ -66,10 +72,10 @@ tests = describe "Boolean" $ do
           let z = false
           w <- reuse $ x `Or` y
           return $ x `And` w `Or` z
-    runAll program [0] [0] [0 :: GF181]
-    runAll program [0] [1] [0 :: GF181]
-    runAll program [1] [0] [1 :: GF181]
-    runAll program [1] [1] [1 :: GF181]
+    runPrime gf181 program [0] [0] [0]
+    runPrime gf181 program [0] [1] [0]
+    runPrime gf181 program [1] [0] [1]
+    runPrime gf181 program [1] [1] [1]
 
   it "eq 1" $ do
     -- takes an input and see if its equal to False
@@ -77,8 +83,8 @@ tests = describe "Boolean" $ do
           x <- input Public
           return $ x `eq` false
 
-    runAll program [0] [] [1 :: GF181]
-    runAll program [1] [] [0 :: GF181]
+    runPrime gf181 program [0] [] [1]
+    runPrime gf181 program [1] [] [0]
 
   it "conditional" $ do
     let program = do
@@ -86,11 +92,11 @@ tests = describe "Boolean" $ do
           return $ cond (x `eq` 3) true false
     property $ \x -> do
       let expectedOutput = if x == 3 then [1] else [0]
-      runAll program [x :: GF181] [] expectedOutput
+      runPrime gf181 program [x] [] expectedOutput
 
   it "BtoF" $ do
     let program = do
           x <- input Public
           y <- input Private
           return $ BtoF x * BtoF y
-    runAll program [1 :: GF181] [1] [1]
+    runPrime gf181 program [1] [1] [1]

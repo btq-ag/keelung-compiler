@@ -3,7 +3,7 @@ module Test.PolyG () where
 -- import Control.Monad.State
 -- import Data.Map.Strict qualified as Map
 -- import Data.Maybe qualified as Maybe
--- import Keelung hiding (run)
+-- import Keelung
 -- import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 -- import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind
 -- import Test.Hspec (SpecWith, describe, hspec, it)
@@ -27,7 +27,7 @@ module Test.PolyG () where
 -- import Data.Set (Set)
 -- import Data.Set qualified as Set
 -- import Data.Traversable (for)
--- import Keelung hiding (compile, run)
+-- import Keelung hiding (compile)
 -- import Keelung.Compiler.Constraint (RefB (..), RefF (..), substPolyG)
 -- import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind (UnionFind)
 -- import Keelung.Compiler.Optimize.MinimizeConstraints.UnionFind qualified as UnionFind

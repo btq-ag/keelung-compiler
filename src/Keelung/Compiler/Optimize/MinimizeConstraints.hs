@@ -7,81 +7,75 @@ import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
+import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
-import Keelung.Compiler.Compile.Relations.Boolean (BooleanRelations)
-import Keelung.Compiler.Compile.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Compile.Relations.Field (AllRelations)
-import Keelung.Compiler.Compile.Relations.Field qualified as AllRelations
-import Keelung.Compiler.Compile.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Constraint
-import Keelung.Compiler.ConstraintSystem
+import Keelung.Compiler.ConstraintModule
+import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.Field (AllRelations)
+import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
-run :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (ConstraintSystem n)
-run cs = goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cs
+run :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (ConstraintModule n)
+run cm = goThroughEqZeros . goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cm
 
-optimizeAddF :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (WhatChanged, ConstraintSystem n)
-optimizeAddF cs = do
-  (changed, cs') <- runOptiM cs goThroughAddF
+optimizeAddF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeAddF cm = do
+  (changed, cm') <- runOptiM cm goThroughAddF
   case changed of
-    NothingChanged -> optimizeMulF cs
-    RelationChanged -> optimizeAddF cs'
-    AdditiveConstraintChanged -> optimizeMulF cs'
-    MultiplicativeConstraintChanged -> optimizeMulF cs'
+    NothingChanged -> optimizeMulF cm
+    RelationChanged -> optimizeAddF cm'
+    AdditiveConstraintChanged -> optimizeMulF cm'
+    MultiplicativeConstraintChanged -> optimizeMulF cm'
 
-optimizeMulF :: (GaloisField n, Integral n) => ConstraintSystem n -> Either (Compile.Error n) (WhatChanged, ConstraintSystem n)
-optimizeMulF cs = do
-  (changed, cs') <- runOptiM cs goThroughMulF
+optimizeMulF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeMulF cm = do
+  (changed, cm') <- runOptiM cm goThroughMulF
   case changed of
-    NothingChanged -> return (changed, cs')
-    RelationChanged -> optimizeAddF cs'
-    AdditiveConstraintChanged -> optimizeMulF cs'
-    MultiplicativeConstraintChanged -> optimizeMulF cs'
+    NothingChanged -> return (changed, cm')
+    RelationChanged -> optimizeAddF cm'
+    AdditiveConstraintChanged -> optimizeMulF cm'
+    MultiplicativeConstraintChanged -> optimizeMulF cm'
 
 goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughAddF = do
-  cs <- get
+  cm <- get
   runRoundM $ do
-    csAddF' <- foldMaybeM reduceAddF [] (csAddF cs)
-    modify' $ \cs'' -> cs'' {csAddF = csAddF'}
+    result <- foldMaybeM reduceAddF [] (cmAddF cm)
+    modify' $ \cm' -> cm' {cmAddF = result}
 
-goThroughDivMods :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
-goThroughDivMods cs =
-  let relations = csFieldRelations cs
-      substDivMod (a, b, q, r) = (substVar relations a, substVar relations b, substVar relations q, substVar relations r)
-   in cs {csDivMods = map substDivMod (csDivMods cs)}
+goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
+goThroughEqZeros cm =
+  let relations = cmFieldRelations cm
+   in cm {cmEqZeros = mapMaybe (reduceEqZeros relations) (cmEqZeros cm)}
   where
-    substVar _ (Right val) = Right val
-    substVar relations (Left ref) = case AllRelations.lookup (U ref) relations of
-      AllRelations.Root -> Left ref
-      AllRelations.Value val -> Right val
-      AllRelations.ChildOf 1 (U root) 0 -> Left root
-      AllRelations.ChildOf {} -> error "[ panic ] goThroughDivMods: ChildOf with non-1 coefficient"
+    reduceEqZeros :: (GaloisField n, Integral n) => AllRelations n -> (PolyG Ref n, RefF) -> Maybe (PolyG Ref n, RefF)
+    reduceEqZeros relations (polynomial, m) = case substPolyG relations polynomial of
+      Nothing -> Just (polynomial, m) -- nothing changed
+      Just (Left _constant, _, _) -> Nothing
+      Just (Right reducePolynomial, _, _) -> Just (reducePolynomial, m)
 
-goThroughModInvs :: (GaloisField n, Integral n) => ConstraintSystem n -> ConstraintSystem n
-goThroughModInvs cs =
-  let relations = csFieldRelations cs
-      substModInv (a, b, c) = (substVar relations a, substVar relations b, c)
-   in cs {csModInvs = map substModInv (csModInvs cs)}
-  where
-    substVar _ (Right val) = Right val
-    substVar relations (Left ref) = case AllRelations.lookup (U ref) relations of
-      AllRelations.Root -> Left ref
-      AllRelations.Value val -> Right val
-      AllRelations.ChildOf 1 (U root) 0 -> Left root
-      AllRelations.ChildOf {} -> error "[ panic ] goThroughModInvs: ChildOf with non-1 coefficient"
+goThroughDivMods :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
+goThroughDivMods cm =
+  let substDivMod (a, b, q, r) = (a, b, q, r)
+   in cm {cmDivMods = map substDivMod (cmDivMods cm)}
+
+goThroughModInvs :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
+goThroughModInvs cm =
+  let substModInv (a, b, c, d) = (a, b, c, d)
+   in cm {cmModInvs = map substModInv (cmModInvs cm)}
 
 goThroughMulF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughMulF = do
-  cs <- get
+  cm <- get
   runRoundM $ do
-    csMulF' <- foldMaybeM reduceMulF [] (csMulF cs)
-    modify' $ \cs'' -> cs'' {csMulF = csMulF'}
+    cmMulF' <- foldMaybeM reduceMulF [] (cmMulF cm)
+    modify' $ \cm'' -> cm'' {cmMulF = cmMulF'}
 
 foldMaybeM :: Monad m => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
 foldMaybeM f = foldM $ \acc x -> do
@@ -96,7 +90,7 @@ reduceAddF polynomial = do
   if changed
     then return Nothing
     else do
-      allRelations <- gets csFieldRelations
+      allRelations <- gets cmFieldRelations
       case substPolyG allRelations polynomial of
         Nothing -> return (Just polynomial) -- nothing changed
         Just (Left constant, removedRefs, _) -> do
@@ -128,7 +122,7 @@ reduceMulF (polyA, polyB, polyC) = do
 
 substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG Ref n -> RoundM n (Either n (PolyG Ref n))
 substitutePolyF typeOfChange polynomial = do
-  allRelations <- gets csFieldRelations
+  allRelations <- gets cmFieldRelations
   case substPolyG allRelations polynomial of
     Nothing -> return (Right polynomial) -- nothing changed
     Just (Left constant, removedRefs, _) -> do
@@ -157,12 +151,12 @@ reduceMulF_ polyA polyB polyC = case (polyA, polyB, polyC) of
   (Right a, Right b, Right c) -> return (Just (a, b, Right c))
 
 -- | Trying to reduce a multiplicative constaint of (Constant / Constant / Polynomial)
---    a * b = cs
+--    a * b = cm
 --      =>
---    cs - a * b = 0
+--    cm - a * b = 0
 reduceMulFCCP :: (GaloisField n, Integral n) => n -> n -> PolyG Ref n -> RoundM n ()
-reduceMulFCCP a b cs = do
-  addAddF $ PolyG.addConstant (-a * b) cs
+reduceMulFCCP a b cm = do
+  addAddF $ PolyG.addConstant (-a * b) cm
 
 -- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Constant)
 --    a * bs = c
@@ -178,9 +172,9 @@ reduceMulFCPC a bs c = do
     Right xs -> addAddF $ PolyG.addConstant c xs
 
 -- | Trying to reduce a multiplicative constaint of (Constant / Polynomial / Polynomial)
---    a * bs = cs
+--    a * bs = cm
 --      =>
---    cs - a * bs = 0
+--    cm - a * bs = 0
 reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG Ref n -> PolyG Ref n -> RoundM n ()
 reduceMulFCPP a polyB polyC = do
   case PolyG.multiplyBy (-a) polyB of
@@ -188,12 +182,12 @@ reduceMulFCPP a polyB polyC = do
       if constant == 0
         then do
           -- a * bs = 0
-          -- cs = 0
+          -- cm = 0
           modify' $ removeOccurrences (PolyG.vars polyB)
           addAddF polyC
         else do
-          -- a * bs = constant = cs
-          -- => cs - constant = 0
+          -- a * bs = constant = cm
+          -- => cm - constant = 0
           modify' $ removeOccurrences (PolyG.vars polyB)
           addAddF (PolyG.addConstant (-constant) polyC)
     Right polyBa -> do
@@ -228,12 +222,12 @@ instance Monoid WhatChanged where
 
 ------------------------------------------------------------------------------
 
-type OptiM n = StateT (ConstraintSystem n) (Except (Compile.Error n))
+type OptiM n = StateT (ConstraintModule n) (Except (Compile.Error n))
 
 type RoundM n = WriterT WhatChanged (OptiM n)
 
-runOptiM :: ConstraintSystem n -> OptiM n a -> Either (Compile.Error n) (a, ConstraintSystem n)
-runOptiM cs m = runExcept (runStateT m cs)
+runOptiM :: ConstraintModule n -> OptiM n a -> Either (Compile.Error n) (a, ConstraintModule n)
+runOptiM cm m = runExcept (runStateT m cm)
 
 runRoundM :: RoundM n a -> OptiM n WhatChanged
 runRoundM = execWriterT
@@ -262,40 +256,32 @@ learnFromAddF poly = case PolyG.view poly of
 
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
-  cs <- get
-  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignB var (value == 1) (csFieldRelations cs)
+  cm <- get
+  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignB var (value == 1) (cmFieldRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
       markChanged RelationChanged
-      put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
-assign (U var) value = do
-  cs <- get
-  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignU var value (csFieldRelations cs)
-  case result of
-    Nothing -> return ()
-    Just relations -> do
-      markChanged RelationChanged
-      put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
+      put $ removeOccurrences (Set.singleton var) $ cm {cmFieldRelations = relations}
 assign (F var) value = do
-  cs <- get
-  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignF (F var) value (csFieldRelations cs)
+  cm <- get
+  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignF (F var) value (cmFieldRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
       markChanged RelationChanged
-      put $ removeOccurrences (Set.singleton var) $ cs {csFieldRelations = relations}
+      put $ removeOccurrences (Set.singleton var) $ cm {cmFieldRelations = relations}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
-  cs <- get
-  result <- lift $ lift $ EquivClass.runM $ AllRelations.relateRefs var1 slope var2 intercept (csFieldRelations cs)
+  cm <- get
+  result <- lift $ lift $ EquivClass.runM $ AllRelations.relateRefs var1 slope var2 intercept (cmFieldRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do
       markChanged RelationChanged
-      modify' $ \cs' -> removeOccurrences (Set.fromList [var1, var2]) $ cs' {csFieldRelations = relations}
+      modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmFieldRelations = relations}
       return True
 
 addAddF :: (GaloisField n, Integral n) => PolyG Ref n -> RoundM n ()
@@ -314,7 +300,7 @@ addAddF poly = case PolyG.view poly of
     void $ relateF var1 (-coeff2 / coeff1, var2, -constant / coeff1)
   PolyG.Polynomial _ _ -> do
     markChanged AdditiveConstraintChanged
-    modify' $ \cs' -> cs' {csAddF = poly : csAddF cs'}
+    modify' $ \cm' -> cm' {cmAddF = poly : cmAddF cm'}
 
 --------------------------------------------------------------------------------
 
@@ -322,10 +308,8 @@ addAddF poly = case PolyG.view poly of
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
 substPolyG :: (GaloisField n, Integral n) => AllRelations n -> PolyG Ref n -> Maybe (Either n (PolyG Ref n), Set Ref, Set Ref)
 substPolyG relations poly = do
-  let boolRels = AllRelations.exportBooleanRelations relations
-  let uintRels = AllRelations.exportUIntRelations relations
   let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' (substPolyG_ relations boolRels uintRels) (False, Left c, mempty, mempty) xs of
+  case Map.foldlWithKey' (substPolyG_ relations) (False, Left c, mempty, mempty) xs of
     (False, _, _, _) -> Nothing -- nothing changed
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyG.vars poly)
@@ -333,13 +317,11 @@ substPolyG relations poly = do
 substPolyG_ ::
   (Integral n, GaloisField n) =>
   AllRelations n ->
-  BooleanRelations ->
-  UIntRelations n ->
   (Bool, Either n (PolyG Ref n), Set Ref, Set Ref) ->
   Ref ->
   n ->
   (Bool, Either n (PolyG Ref n), Set Ref, Set Ref)
-substPolyG_ relations _boolRels _uintRels (changed, accPoly, removedRefs, addedRefs) ref coeff = case AllRelations.lookup ref relations of
+substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = case AllRelations.lookup ref relations of
   AllRelations.Root -> case accPoly of
     Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
     Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)

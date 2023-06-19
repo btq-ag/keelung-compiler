@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compiler.Compile.Relations.EquivClass
+module Keelung.Compiler.Relations.EquivClass
   ( IsRelation (..),
     ExecRelation (..),
     EquivClass,
@@ -31,7 +31,7 @@ import Data.Map qualified as Map
 import Data.Map.Strict (Map)
 import GHC.Generics (Generic)
 import GHC.TypeLits
-import Keelung.Compiler.Compile.Relations.Util
+import Keelung.Compiler.Relations.Util
 import Keelung.Data.N (N (..))
 import Prelude hiding (lookup)
 

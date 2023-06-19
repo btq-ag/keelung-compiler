@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Compiler.Compile.Error where
@@ -9,11 +10,13 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (N (..))
 import Keelung.Syntax (Width)
+import Keelung.Field (FieldType)
 
 data Error n
   = ConflictingValuesB Bool Bool
   | ConflictingValuesF n n
-  | ConflictingValuesU n n
+  | ConflictingValuesU Integer Integer
+  | AssertComparisonError Integer Ordering Integer
   | AssertLTEBoundTooSmallError Integer
   | AssertLTEBoundTooLargeError Integer Width
   | AssertLTBoundTooSmallError Integer
@@ -22,14 +25,21 @@ data Error n
   | AssertGTEBoundTooLargeError Integer Width
   | AssertGTBoundTooSmallError Integer
   | AssertGTBoundTooLargeError Integer Width
-  deriving (Eq, Generic, NFData)
+  | FieldTooSmall FieldType Width
+  deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
 
 instance (GaloisField n, Integral n) => Show (Error n) where
   show (ConflictingValuesB b1 b2) = "Cannot unify conflicting values: " <> show b1 <> " and " <> show b2
   show (ConflictingValuesF f1 f2) = "Cannot unify conflicting values: " <> show (N f1) <> " and " <> show (N f2)
-  show (ConflictingValuesU u1 u2) = "Cannot unify conflicting values: " <> show (N u1) <> " and " <> show (N u2)
+  show (ConflictingValuesU u1 u2) = "Cannot unify conflicting values: " <> show u1 <> " and " <> show u2
+  show (AssertComparisonError x op y) = "Assertion on comparison doesn't hold: " <> show x <> " " <> op' <> " " <> show y
+    where
+      op' = case op of
+        LT -> "<"
+        EQ -> "="
+        GT -> ">"
   show (AssertLTEBoundTooSmallError bound) = "assertLTE: the bound `" <> show bound <> "` is too restrictive, no UInt can be less than or equal to it"
   show (AssertLTEBoundTooLargeError bound width) =
     "assertLTE: the bound `"
@@ -66,6 +76,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> "` are less than `"
       <> show ((2 ^ width) :: Integer)
       <> "`"
+  show (FieldTooSmall fieldType width) = "The minimal bits required to represent the underling field " <> show fieldType <> " is " <> show width <> ", which is too small for formulating constraints"
 
 -- show AssertLTBoundTooSmallError =
 --   "Using `0` as the bound for `assertLT` is too restrictive"
