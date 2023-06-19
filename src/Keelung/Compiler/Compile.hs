@@ -31,7 +31,6 @@ import Keelung.Compiler.FieldInfo (FieldInfo (fieldTypeData, fieldWidth))
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -496,64 +495,6 @@ wireUWithSign (others, sign) = do
 
 --------------------------------------------------------------------------------
 
--- Seq.fromList [(B carryVar, 2 ^ (i :: Int)) | (i, carryVar) <- zip [0 ..] previousCarries]
-
--- | We can add multiple limbs at once by piling them up.
---   But there's a limit to how many limbs we can pile up in one stack.
---   There higher we pile them up, the more space we need to store the carry.
---   We need to reserve at least 1 bit for the non-carry part of the limb.
--- determineMaxHeight :: Width -> Integer
--- determineMaxHeight fieldWidth = 2 ^ (fieldWidth - 2) -- 1 bit for non-carry, 1 bit useless
-
--- writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n (Maybe Limb)
--- writeLimbVal limb val = do
---   let range = [limbOffset limb .. limbOffset limb + limbWidth limb - 1]
---   forM_ range $ \i -> do
---     let bit = Data.Bits.testBit val i
---     writeValB (RefUBit (limbRefWidth limb) (limbRef limb) i) bit
---   return Nothing
-
--- -- | This function takes a pile of limbs and adds them together.
--- --   Takes:
--- --      1. an pre-allocated limb for storing the output
--- --      2. a pile of limbs
--- --      3. a constant (to be added to the result)
--- --   and returns:
--- --      1. a limb for representing the carry of the addition
--- --
--- --   NOTE: The number of limbs must not exceed the maximum height allowed.
--- addLimitedLimbs :: (GaloisField n, Integral n) => Limb -> [Limb] -> Integer -> M n [Limb]
--- addLimitedLimbs out [] constant = do
---   let range = [limbOffset out .. limbOffset out + limbWidth out - 1]
---   forM_ range $ \i -> do
---     let bit = Data.Bits.testBit constant i
---     writeValB (RefUBit (limbRefWidth out) (limbRef out) i) bit
---   return []
--- addLimitedLimbs out limbs constant = do
---   fieldWidth <- gets cmFieldWidth
---   let carryWidth = ceiling (logBase 2 (fromIntegral (length limbs) + if constant == 0 then 0 else 1) :: Double)
---   let range = [0 .. limbWidth out - 1]
---   let limbBits =
---         concat
---           [ [ (B (RefUBit (limbRefWidth limb) (limbRef limb) (limbOffset limb + i)), if limbSign limb then 2 ^ i else -(2 ^ i))
---               | i <- range
---             ]
---             | limb <- limbs
---           ]
---   -- for each negative operand, we compensate by adding 2^width
---   let constantSegment = sum [(if Data.Bits.testBit constant (limbOffset out + i) then 1 else 0) * (2 ^ i) | i <- range]
---   let numberOfNegativeOperand = length $ filter (not . limbSign) limbs
---   let compensatedConstant = constantSegment + 2 ^ limbRefWidth out * fromIntegral numberOfNegativeOperand
---   let resultBits = [(B (RefUBit (limbRefWidth out) (limbRef out) (limbOffset out + i)), -(2 ^ i)) | i <- range]
-
---   -- carry limb
---   carryRefU <- freshRefU carryWidth
---   let carryLimb = Limb carryRefU carryWidth (limbRefWidth out) 0 True
---   let carryBits = [(B (RefUBit (limbRefWidth out) carryRefU (limbOffset out + i)), -(2 ^ (limbWidth out + i))) | i <- [1 .. carryWidth] ]
-
---   writeAdd (fromInteger compensatedConstant) $ limbBits <> carryBits <> resultBits
---   return [carryLimb]
-
 data Limb = Limb
   { -- | Which RefU this limb belongs to
     limbRef :: RefU,
@@ -614,13 +555,6 @@ compileAddU width out vars constant = do
   let expectedCarryWidth = ceiling (logBase 2 (fromIntegral (length vars) + if constant == 0 then 0 else 1) :: Double)
   let limbWidth = (fieldWidth - 1 - expectedCarryWidth) `max` 1
   let carryWidth = fieldWidth - 1 - limbWidth
-  -- for each negative operand, we compensate by adding 2^width
-  -- let compensatedConstant = constant + 2 ^ width * fromIntegral numberOfNegativeOperand
-
-
-  -- let added = sum (map (\start -> let currentLimbWidth = limbWidth `min` (width - start) in 2 ^ currentLimbWidth) [0, limbWidth .. width - 1])
-  -- let buffed = (2 ^ width * fromIntegral numberOfNegativeOperand) - added
-  -- traceShowM (added, buffed)
 
   maxHeight <- maxHeightAllowed
   case fieldTypeData fieldInfo of
@@ -628,17 +562,21 @@ compileAddU width out vars constant = do
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     _ -> do
-      let ranges =
-            map
-              ( \start ->
+      let ranges = reverse $ fst $ foldl (\(acc, borrow) start -> 
                   let currentLimbWidth = limbWidth `min` (width - start)
                       resultLimb = Limb out currentLimbWidth start True
                       operandLimbs = [Limb var currentLimbWidth start sign | (var, sign) <- vars]
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                      compensatedConstant = constantSegment + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand - (if start == 0 then 0 else fromIntegral numberOfNegativeOperand)
-                   in (start, currentLimbWidth, resultLimb, operandLimbs, compensatedConstant)
-              )
-              [0, limbWidth .. width - 1]
+                      -- borrowAmount = 
+                      -- compensatedConstant = constantSegment + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand - borrow
+                      compensatedConstant = constantSegment + 2 ^ currentLimbWidth * fromIntegral numberOfNegativeOperand - borrow
+
+                      overflowed = compensatedConstant == 2 ^ (fieldWidth - 1) && compensatedConstant < 2 ^ width
+                      compensatedConstant' = if overflowed then compensatedConstant - (2 ^ currentLimbWidth) else compensatedConstant
+                      nextBorrow = if overflowed then fromIntegral numberOfNegativeOperand - 1 else fromIntegral numberOfNegativeOperand
+
+                   in ((start, currentLimbWidth, resultLimb, operandLimbs, compensatedConstant') : acc, nextBorrow)
+                ) ([], 0) [0, limbWidth .. width - 1]
       foldM_ (addLimbs width maxHeight carryWidth) [] ranges
 
 -- | Maximum number of limbs allowed to be added at once
@@ -660,7 +598,6 @@ addLimbs' width maxHeight carryWidth out (limbStart, currentLimbWidth, limbs, co
     then do
       addLimitedLimbs width carryWidth [] (limbStart, currentLimbWidth, out, currentBatch, constant)
     else do
-      traceShowM "NEXT"
       tempResultLimb <- allocLimb currentLimbWidth limbStart True
       x <- addLimitedLimbs width carryWidth [] (limbStart, currentLimbWidth, tempResultLimb, currentBatch, constant)
       xs <- addLimbs' width maxHeight carryWidth out (limbStart, currentLimbWidth, tempResultLimb : nextBatch, 0)
@@ -668,7 +605,7 @@ addLimbs' width maxHeight carryWidth out (limbStart, currentLimbWidth, limbs, co
 
 addLimitedLimbs :: (GaloisField n, Integral n) => Width -> Int -> [Limb] -> (Int, Int, Limb, [Limb], Integer) -> M n [Limb]
 addLimitedLimbs width carryWidth previousCarries (limbStart, currentLimbWidth, resultLimb, limbs, constant) = do
-  traceShowM (constant, map limbSign limbs)
+  -- traceShowM (constant, map limbSign limbs)
   carryLimb <- allocLimb carryWidth (limbStart + currentLimbWidth) True
   -- limbs + previousCarryLimb = resultLimb + carryLimb
   writeAddWithSeq (fromInteger constant) $
@@ -730,11 +667,23 @@ compileMulBigCC width out a b = do
 -- ------------------------------------------
 --
 -- the maximum number of operands when adding these 2w-bit limbs is 2L (with carry from the previous limb)
--- so each limb would need to be at least ceiling(log2(2L)) bits wide
-
 -- compileMulBigCV :: (GaloisField n, Integral n) => Int -> RefU -> Integer -> RefU -> M n ()
 -- compileMulBigCV width out a b = do
 --   -- mulpliplying two w-bit numbers will result in a 2w-bit number
+
+--   fieldWidth <- gets cmFieldWidth
+--   fieldInfo <- gets cmField
+
+
+--   let limbWidth = (fieldWidth - 1 - expectedCarryWidth) `max` 1
+--   let carryWidth = fieldWidth - 1 - limbWidth
+
+--   maxHeight <- maxHeightAllowed
+--   case fieldTypeData fieldInfo of
+--     Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+--     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+--     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+
 --   carries <- replicateM width freshRefB
 --   mapM_ addBooleanConstraint carries
 

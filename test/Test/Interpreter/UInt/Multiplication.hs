@@ -15,7 +15,7 @@ run = hspec tests
 tests :: SpecWith ()
 tests =
   describe "Multiplication" $ do
-    it "constant / constant" $ do
+    it "constants only" $ do
       let program x y = do
             return $ x * (y :: UInt 6)
       let genPair = do
@@ -24,7 +24,8 @@ tests =
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x * y) `mod` 64]
-        runAll (Prime 17) (program (fromInteger x) (fromInteger y)) [] [] expected
+        runAll (Prime 5) (program (fromInteger x) (fromInteger y)) [] [] expected
+        runAll (Prime 257) (program (fromInteger x) (fromInteger y)) [] [] expected
 
     -- it "variable / constant" $ do
     --   let program x = do
