@@ -6,7 +6,6 @@ module Test.Interpreter.UInt.Addition (tests, run) where
 import Keelung hiding (compile)
 import Test.Hspec
 import Test.Interpreter.Util
-import Control.Monad
 
 run :: IO ()
 run = hspec tests
@@ -16,14 +15,42 @@ run = hspec tests
 tests :: SpecWith ()
 tests =
   describe "Addition / Subtraction" $ do
-      it "variables (2 positive)" $ do
+      it "2 positive variables" $ do
         let program = do
               x <- inputUInt @8 Public
               y <- inputUInt @8 Public
               return $ x + y
         runAll (Prime 997) program [10, 30] [] [40]
-        -- runAll (Prime 31) program [10, 30] [] [40]
-        -- runAll (Prime 5) program [10, 30] [] [40]
+        runAll (Prime 37) program [10, 30] [] [40]
+
+      it "2 positive variables / constant" $ do
+        let program = do
+              x <- inputUInt @8 Public
+              return $ x + 2
+        runAll (Prime 997) program [10] [] [12]
+        runAll (Prime 37) program [10] [] [12]
+
+      it "1 negative variable" $ do
+        let program = do
+              x <- inputUInt @8 Public
+              return $ - x
+        runAll (Prime 997) program [100] [] [156]
+        runAll (Prime 37) program [100] [] [156]
+
+      it "1 negative variable / constant" $ do
+        let program = do
+              x <- inputUInt @8 Public
+              return $ 10 - x
+        runAll (Prime 997) program [100] [] [166]
+        runAll (Prime 37) program [100] [] [166]
+
+      it "2 negative variables / constant" $ do
+        let program = do
+              x <- inputUInt @8 Public
+              y <- inputUInt @8 Public
+              return $ 10 - x - y
+        runAll (Prime 997) program [100, 20] [] [146]
+        runAll (Prime 37) program [100, 20] [] [146]
 
       -- it "3 variables" $ do
       --   let program = do
@@ -51,39 +78,6 @@ tests =
       --   let list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
       --   runAll (Prime 31) program list [] [sum list `mod` 256]
       --   runAll (Prime 5) program list [] [sum list `mod` 256]
-
-      it "with constants (1 positive)" $ do
-        let program = do
-              x <- inputUInt @8 Public
-              return $ x + 2
-        runAll (Prime 997) program [10] [] [12]
-        -- runAll (Prime 31) program [10] [] [12]
-        -- runAll (Prime 5) program [10] [] [12]
-
-      -- it "2 variables + constant" $ do
-      --   let program = do
-      --         x <- inputUInt @8 Public
-      --         y <- inputUInt @8 Public
-      --         return $ x + y + 1
-      --   runAll (Prime 31) program [10, 30] [] [41]
-      --   runAll (Prime 5) program [10, 30] [] [41]
-
-      -- it "3 variables + constant" $ do
-      --   let program = do
-      --         x <- inputUInt @8 Public
-      --         y <- inputUInt @8 Public
-      --         z <- inputUInt @8 Public
-      --         return $ x + y + z + 1
-      --   runAll (Prime 31) program [10, 30, 40] [] [81]
-      --   runAll (Prime 5) program [10, 30, 40] [] [81]
-
-      it "variables (1 negative)" $ do
-        let program = do
-              x <- inputUInt @8 Public
-              return $ - x
-        -- let field = 997
-        debug (Prime 997) program
-        runAll (Prime 997) program [100] [] [156]
 
       -- it "variables with subtraction" $ do
       --   let program = do

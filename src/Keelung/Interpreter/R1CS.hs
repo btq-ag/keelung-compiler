@@ -7,6 +7,8 @@ module Keelung.Interpreter.R1CS (run, run', Error (..)) where
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Bifunctor (first)
+import Data.Bits qualified
 import Data.Field.Galois (GaloisField (order))
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
@@ -17,7 +19,6 @@ import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Keelung.Compiler.Syntax.FieldBits (toBits)
-import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
@@ -414,15 +415,49 @@ shrinkBinRep binRep@(BinRep var width bitVarStart) = do
           Nothing -> return Nothing
           Just bit -> return (Just (accVal * 2 + bit))
 
--- -- | Trying to reduce a BinRep constraint
--- shrinkBinRep2 :: (GaloisField n, Integral n) => [(Var, Int)] -> M n (Result [(Var, Int)])
--- shrinkBinRep2 _segments = do
---   return Eliminated
+data FoldState = Start | Failed | Continue (IntMap (Bool, Var)) deriving (Eq, Show)
 
-data FoldState = Start | Failed | Continue (IntMap Var) Bool deriving (Eq, Show)
+-- | Given a mapping of (Int, (Bool, Var)) pairs, where the Int indicates the power of 2, and the Bool indicates whether the coefficient is positive or negative
+--   and an Integer, derive coefficients (Boolean) for each of these variables such that the sum of the coefficients times the powers of 2 is equal to the Integer
+deriveCoeffs :: (GaloisField n, Integral n) => n -> IntMap (Bool, Var) -> [(Var, Bool)]
+deriveCoeffs rawConstant polynomial =
+  let negatedPolynomial = fmap (first not) polynomial
+      (upper, lower) = boundsOf negatedPolynomial
+      constant = toInteger rawConstant
+      negatedConstant = negate (toInteger (order rawConstant - fromIntegral rawConstant))
+      -- should flip the sign if the constant is outside the bounds of the polynomial
+      shouldFlipSign = upper < negatedConstant || lower > negatedConstant
+   in if shouldFlipSign
+        then fst $ IntMap.foldlWithKey' (go True) ([], constant) polynomial
+        else fst $ IntMap.foldlWithKey' (go False) ([], negatedConstant) polynomial
+  where
+    -- given coefficients, calculate the upper bound and the lower bound of the polynomial
+    boundsOf :: IntMap (Bool, Var) -> (Integer, Integer)
+    boundsOf =
+      IntMap.foldlWithKey'
+        ( \(upper, lower) power (sign, _) ->
+            if sign then (upper + (2 ^ power), lower) else (upper, lower - (2 ^ power))
+        )
+        (0, 0)
+
+    go :: Bool -> ([(Var, Bool)], Integer) -> Int -> (Bool, Var) -> ([(Var, Bool)], Integer)
+    go True (acc, c) power (sign, var) =
+      if Data.Bits.testBit c power
+        then
+          if sign
+            then ((var, True) : acc, c + (2 ^ power))
+            else ((var, True) : acc, c - (2 ^ power))
+        else ((var, False) : acc, c)
+    go False (acc, c) power (sign, var) =
+      if Data.Bits.testBit c power
+        then
+          if sign
+            then ((var, True) : acc, c + (2 ^ power))
+            else ((var, True) : acc, c - (2 ^ power))
+        else ((var, False) : acc, c)
 
 -- | Watch out for a stuck R1C, and see if it's a binary representation
---    1. see if all coefficients are positive
+--    1. see if coefficients are all powers of 2
 --    2. see if all variables are Boolean
 --   NOTE: the criteria above may not be sufficient
 detectBinRep :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
@@ -430,15 +465,15 @@ detectBinRep NothingToDo = return NothingToDo
 detectBinRep Eliminated = return Eliminated
 detectBinRep (Shrinked polynomial) = return (Shrinked polynomial)
 detectBinRep (Stuck (AddConstraint polynomial)) = do
+  -- let (normalizedConstant, positive) = normalize (Poly.constant polynomial)
   boolVarRanges <- ask
-  case allCoeffsSameSignAndBooleanAndCollectCoeffs boolVarRanges polynomial of
+  case collectCoeffs boolVarRanges polynomial of
     Start -> return (Stuck (AddConstraint polynomial))
     Failed -> return (Stuck (AddConstraint polynomial))
-    Continue invertedPolynomial positive -> do
-      let constant = if positive then -(Poly.constant polynomial) else Poly.constant polynomial
+    Continue invertedPolynomial -> do
+      let constant = Poly.constant polynomial
       -- NOTE: the criteria below is not necessary
       -- because we know that these coefficients are:
-      --  1. all of the same sign
       --  2. unique
       let powers = IntMap.keys invertedPolynomial
       let powersAllUnique = length powers == length (List.nub powers)
@@ -447,8 +482,8 @@ detectBinRep (Stuck (AddConstraint polynomial)) = do
         then do
           -- we have a binary representation
           -- we can now bind the variables
-          forM_ (IntMap.toList invertedPolynomial) $ \(power, var) -> do
-            bindVar var (FieldBits.testBit constant power)
+          forM_ (deriveCoeffs constant invertedPolynomial) $ \(var, val) -> do
+            bindVar var (if val then 1 else 0)
 
           return Eliminated
         else do
@@ -456,8 +491,17 @@ detectBinRep (Stuck (AddConstraint polynomial)) = do
           -- we can't do anything
           return (Stuck (AddConstraint polynomial))
   where
-    allCoeffsSameSignAndBooleanAndCollectCoeffs :: (GaloisField n, Integral n) => Ranges -> Poly n -> FoldState
-    allCoeffsSameSignAndBooleanAndCollectCoeffs boolVarRanges xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
+    -- normalize the coefficient to be in the range [-size/2, size/2) and return the sign
+    normalize :: (GaloisField n, Integral n) => n -> (Integer, Bool)
+    normalize coeff =
+      let size = order coeff
+          halfway = fromIntegral (size `div` 2)
+       in if coeff >= halfway
+            then (negate (fromIntegral size - fromIntegral coeff), False)
+            else (fromIntegral coeff, True)
+
+    collectCoeffs :: (GaloisField n, Integral n) => Ranges -> Poly n -> FoldState
+    collectCoeffs boolVarRanges xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
       where
         isPowerOf2 :: (GaloisField n, Integral n) => n -> Maybe (Int, Bool)
         isPowerOf2 coeff =
@@ -467,15 +511,6 @@ detectBinRep (Stuck (AddConstraint polynomial)) = do
                 then Just (expected, sign)
                 else Nothing
 
-        -- normalize the coefficient to be in the range [-size/2, size/2) and return the sign
-        normalize :: (GaloisField n, Integral n) => n -> (Integer, Bool)
-        normalize coeff =
-          let size = order coeff
-              halfway = fromIntegral (size `div` 2)
-           in if coeff >= halfway
-                then (negate (fromIntegral size - fromIntegral coeff), False)
-                else (fromIntegral coeff, True)
-
         isBoolean :: Var -> Bool
         isBoolean var = case IntMap.lookupLE var boolVarRanges of
           Nothing -> False
@@ -484,15 +519,14 @@ detectBinRep (Stuck (AddConstraint polynomial)) = do
         go :: (GaloisField n, Integral n) => FoldState -> Var -> n -> FoldState
         go Start var coeff = case isPowerOf2 coeff of
           Nothing -> Failed
-          Just (power, sign) -> Continue (IntMap.singleton power var) sign
+          Just (power, sign) -> Continue (IntMap.singleton power (sign, var))
         go Failed _ _ = Failed
-        go (Continue coeffs previousSign) var coeff = case isPowerOf2 coeff of
+        go (Continue coeffs) var coeff = case isPowerOf2 coeff of
           Nothing -> Failed
           Just (power, sign) ->
-            let sameSign = sign == previousSign
-                uniqueCoeff = IntMap.notMember power coeffs
-             in if isBoolean var && sameSign && uniqueCoeff
-                  then Continue (IntMap.insert power var coeffs) sign
+            let uniqueCoeff = IntMap.notMember power coeffs
+             in if isBoolean var && uniqueCoeff
+                  then Continue (IntMap.insert power (sign, var) coeffs)
                   else Failed
 detectBinRep (Stuck polynomial) = return (Stuck polynomial)
 

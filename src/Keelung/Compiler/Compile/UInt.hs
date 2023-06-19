@@ -2,11 +2,9 @@ module Keelung.Compiler.Compile.UInt where
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.Bits (xor)
 import Data.Bits qualified
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Debug.Trace
 import Keelung
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Util
@@ -152,11 +150,11 @@ compileWholeLimbPile dimensions limbStart currentLimbWidth (prevCarries, prevBor
   writeAddWithSeq constant $
     -- positive side
     mconcat (map (toBits (dimUIntWidth dimensions) 0 True) posLimbs)
-      <> mconcat (map (toBits (dimUIntWidth dimensions) 0 True) prevBorrows)
+      <> mconcat (map (toBits (dimUIntWidth dimensions) 0 True) prevCarries)
       <> mconcat (map (toBits (dimUIntWidth dimensions) currentLimbWidth True) borrowLimbs) -- multiply by `2^currentLimbWidth`
       -- negative side
       <> mconcat (map (toBits (dimUIntWidth dimensions) 0 False) negLimbs)
-      <> mconcat (map (toBits (dimUIntWidth dimensions) 0 False) prevCarries)
+      <> mconcat (map (toBits (dimUIntWidth dimensions) 0 False) prevBorrows)
       <> mconcat (map (toBits (dimUIntWidth dimensions) currentLimbWidth False) carryLimbs) -- multiply by `2^currentLimbWidth`
   return (carryLimbs, borrowLimbs)
 
@@ -193,7 +191,6 @@ addLimbs' width maxHeight carryWidth out (limbStart, currentLimbWidth, limbs, co
 
 addLimitedLimbs :: (GaloisField n, Integral n) => Width -> Int -> [Limb] -> (Int, Int, Limb, [Limb], Integer) -> M n [Limb]
 addLimitedLimbs width carryWidth previousCarries (limbStart, currentLimbWidth, resultLimb, limbs, constant) = do
-  -- traceShowM (constant, map limbSign limbs)
   carryLimb <- allocLimb carryWidth (limbStart + currentLimbWidth)
   -- limbs + previousCarryLimb = resultLimb + carryLimb
   writeAddWithSeq (fromInteger constant) $
