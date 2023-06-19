@@ -16,13 +16,14 @@ run = hspec tests
 tests :: SpecWith ()
 tests =
   describe "Addition / Subtraction" $ do
-      -- it "2 variables" $ do
-      --   let program = do
-      --         x <- inputUInt @8 Public
-      --         y <- inputUInt @8 Public
-      --         return $ x + y
-      --   runAll (Prime 31) program [10, 30] [] [40]
-      --   runAll (Prime 5) program [10, 30] [] [40]
+      it "2 variables" $ do
+        let program = do
+              x <- inputUInt @8 Public
+              y <- inputUInt @8 Public
+              return $ x + y
+        runAll (Prime 997) program [10, 30] [] [40]
+        -- runAll (Prime 31) program [10, 30] [] [40]
+        -- runAll (Prime 5) program [10, 30] [] [40]
 
       -- it "3 variables" $ do
       --   let program = do
@@ -51,12 +52,13 @@ tests =
       --   runAll (Prime 31) program list [] [sum list `mod` 256]
       --   runAll (Prime 5) program list [] [sum list `mod` 256]
 
-      -- it "1 variable + constant" $ do
-      --   let program = do
-      --         x <- inputUInt @8 Public
-      --         return $ x + 2
-      --   runAll (Prime 31) program [10] [] [12]
-      --   runAll (Prime 5) program [10] [] [12]
+      it "1 variable + constant" $ do
+        let program = do
+              x <- inputUInt @8 Public
+              return $ x + 2
+        runAll (Prime 997) program [10] [] [12]
+        -- runAll (Prime 31) program [10] [] [12]
+        -- runAll (Prime 5) program [10] [] [12]
 
       -- it "2 variables + constant" $ do
       --   let program = do
@@ -75,13 +77,13 @@ tests =
       --   runAll (Prime 31) program [10, 30, 40] [] [81]
       --   runAll (Prime 5) program [10, 30, 40] [] [81]
 
-      it "variables with subtraction" $ do
-        let program = do
-              x <- inputUInt @8 Public
-              return $ - x
-        let field = 257
-        debug (Prime field) program
-        runAll (Prime field) program [100] [] [156]
+      -- it "variables with subtraction" $ do
+      --   let program = do
+      --         x <- inputUInt @8 Public
+      --         return $ - x
+      --   let field = 257
+      --   debug (Prime field) program
+      --   runAll (Prime field) program [100] [] [156]
 
       -- it "variables with subtraction" $ do
       --   let program = do

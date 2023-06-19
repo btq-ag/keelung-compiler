@@ -6,6 +6,7 @@ import Data.Bits (xor)
 import Data.Bits qualified
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Debug.Trace
 import Keelung
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Util
@@ -65,6 +66,14 @@ compileAddU width out vars constant = do
   let borrowWidth = fieldWidth fieldInfo - limbWidth
 
   maxHeight <- maxHeightAllowed
+  let dimensions =
+        Dimensions
+          { dimUIntWidth = width,
+            dimMaxHeight = maxHeight,
+            dimCarryWidth = carryWidth,
+            dimBorrowWidth = borrowWidth
+          }
+
   case fieldTypeData fieldInfo of
     Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
@@ -74,13 +83,17 @@ compileAddU width out vars constant = do
             map
               ( \start ->
                   let currentLimbWidth = limbWidth `min` (width - start)
-                      resultLimb = Limb out currentLimbWidth start True
+                      -- positive limbs
                       operandLimbs = [Limb var currentLimbWidth start sign | (var, sign) <- vars]
+                      -- negative limbs
+                      resultLimb = Limb out currentLimbWidth start True
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                   in (start, currentLimbWidth, resultLimb, operandLimbs, constantSegment)
+                   in (start, currentLimbWidth, constantSegment, (operandLimbs, [resultLimb]))
               )
               [0, limbWidth .. width - 1]
-      foldM_ (addLimbs width maxHeight carryWidth) [] ranges
+      foldM_ (\(prevCarries, prevBorrows) (start, limbWidth', constant', (posLimbs, negLimbs)) -> compileWholeLimbPile dimensions start limbWidth' (prevCarries, prevBorrows) constant' (posLimbs, negLimbs)) ([], []) ranges
+
+-- foldM_ (addLimbs width maxHeight carryWidth) [] ranges
 
 data Dimensions = Dimensions
   { dimUIntWidth :: Int,
@@ -89,7 +102,69 @@ data Dimensions = Dimensions
     dimBorrowWidth :: Int
   }
 
--- addLimbs2 :: (GaloisField n, Integral n) => Dimensions -> ([Limb], [Limb]) -> (Int, Int, [Limb], Integer) -> M n [Limb]
+-- | Compress a pile of limbs into a single limb and some carry
+--
+--              [ operand+ ]
+--              [ operand+ ]    positive operands
+--  +           [ operand+ ]
+-- -----------------------------
+--    [ carry  ][  result  ]
+compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> [Limb] -> M n ([Limb], [Limb])
+compileSingleLimbPile dimensions limbStart currentLimbWidth limbs = do
+  carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True
+  resultLimb <- allocLimb currentLimbWidth limbStart True
+  -- limbs = resultLimb + carryLimb
+  writeAddWithSeq 0 $
+    -- positive side
+    mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
+      -- negative side
+      <> toBits (dimUIntWidth dimensions) 0 False resultLimb
+      <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb -- multiply carryBits by `2^currentLimbWidth` and negate it
+  return ([carryLimb], [resultLimb])
+
+compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> ([Limb], [Limb]) -> n -> ([Limb], [Limb]) -> M n ([Limb], [Limb])
+compileWholeLimbPile dimensions limbStart currentLimbWidth (prevCarries, prevBorrows) constant (posLimbs, negLimbs) = do
+  -- positive piles
+  -- let (currentBatch, nextBatch) = splitAt (dimMaxHeight dimensions) posLimbs
+  carryLimbs <- 
+    if constant > 0 
+      then 
+        if null posLimbs
+          then return []
+          else pure <$> allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True
+      else 
+        if length posLimbs < 2
+          then return []
+          else pure <$> allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True
+  borrowLimbs <-
+    if constant < 0 
+      then 
+        if null negLimbs
+          then return []
+          else pure <$> allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True
+      else 
+        if length negLimbs < 2 
+          then return []
+          else pure <$> allocLimb (dimBorrowWidth dimensions) (limbStart + currentLimbWidth) True
+
+  -- limbs = resultLimb + carryLimb
+  writeAddWithSeq constant $
+    -- positive side
+    mconcat (map (toBits (dimUIntWidth dimensions) 0 True) posLimbs)
+      <> mconcat (map (toBits (dimUIntWidth dimensions) 0 True) prevBorrows)
+      <> mconcat (map (toBits (dimUIntWidth dimensions) currentLimbWidth False) borrowLimbs) -- multiply by `2^currentLimbWidth`
+      -- negative side
+      <> mconcat (map (toBits (dimUIntWidth dimensions) 0 False) negLimbs)
+      <> mconcat (map (toBits (dimUIntWidth dimensions) 0 False) prevCarries)
+      <> mconcat (map (toBits (dimUIntWidth dimensions) currentLimbWidth False) carryLimbs) -- multiply by `2^currentLimbWidth`
+  return (carryLimbs, borrowLimbs)
+
+-- writeAddWithSeq (fromInteger constant) $
+--   mconcat (map (toBits width 0 True) previousCarries)
+--     <> mconcat (map (toBits width 0 True) limbs)
+--     <> toBits width 0 False resultLimb
+--     <> toBits width currentLimbWidth False carryLimb -- multiply carryBits by `2^currentLimbWidth` and negate it
+--   return [carryLimb]
 
 -- | Maximum number of limbs allowed to be added at once
 maxHeightAllowed :: M n Int
