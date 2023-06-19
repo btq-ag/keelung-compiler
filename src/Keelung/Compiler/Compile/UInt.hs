@@ -84,11 +84,12 @@ compileAddU width out vars constant = do
               ( \start ->
                   let currentLimbWidth = limbWidth `min` (width - start)
                       -- positive limbs
-                      operandLimbs = [Limb var currentLimbWidth start sign | (var, sign) <- vars]
+                      positiveLimbs = [Limb var currentLimbWidth start | (var, sign) <- vars, sign]
+                      negativeLimbs = [Limb var currentLimbWidth start | (var, sign) <- vars, not sign]
                       -- negative limbs
-                      resultLimb = Limb out currentLimbWidth start True
+                      resultLimb = Limb out currentLimbWidth start
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                   in (start, currentLimbWidth, constantSegment, (operandLimbs, [resultLimb]))
+                   in (start, currentLimbWidth, constantSegment, (positiveLimbs, resultLimb : negativeLimbs))
               )
               [0, limbWidth .. width - 1]
       foldM_ (\(prevCarries, prevBorrows) (start, limbWidth', constant', (posLimbs, negLimbs)) -> compileWholeLimbPile dimensions start limbWidth' (prevCarries, prevBorrows) constant' (posLimbs, negLimbs)) ([], []) ranges
@@ -111,8 +112,8 @@ data Dimensions = Dimensions
 --    [ carry  ][  result  ]
 compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> [Limb] -> M n ([Limb], [Limb])
 compileSingleLimbPile dimensions limbStart currentLimbWidth limbs = do
-  carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True
-  resultLimb <- allocLimb currentLimbWidth limbStart True
+  carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth)
+  resultLimb <- allocLimb currentLimbWidth limbStart
   -- limbs = resultLimb + carryLimb
   writeAddWithSeq 0 $
     -- positive side
@@ -131,28 +132,28 @@ compileWholeLimbPile dimensions limbStart currentLimbWidth (prevCarries, prevBor
       then 
         if null posLimbs
           then return []
-          else pure <$> allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True
+          else pure <$> allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth)
       else 
         if length posLimbs < 2
           then return []
-          else pure <$> allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True
+          else pure <$> allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth)
   borrowLimbs <-
     if constant < 0 
       then 
         if null negLimbs
           then return []
-          else pure <$> allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True
+          else pure <$> allocLimb (dimBorrowWidth dimensions) (limbStart + currentLimbWidth)
       else 
         if length negLimbs < 2 
           then return []
-          else pure <$> allocLimb (dimBorrowWidth dimensions) (limbStart + currentLimbWidth) True
+          else pure <$> allocLimb (dimBorrowWidth dimensions) (limbStart + currentLimbWidth)
 
   -- limbs = resultLimb + carryLimb
   writeAddWithSeq constant $
     -- positive side
     mconcat (map (toBits (dimUIntWidth dimensions) 0 True) posLimbs)
       <> mconcat (map (toBits (dimUIntWidth dimensions) 0 True) prevBorrows)
-      <> mconcat (map (toBits (dimUIntWidth dimensions) currentLimbWidth False) borrowLimbs) -- multiply by `2^currentLimbWidth`
+      <> mconcat (map (toBits (dimUIntWidth dimensions) currentLimbWidth True) borrowLimbs) -- multiply by `2^currentLimbWidth`
       -- negative side
       <> mconcat (map (toBits (dimUIntWidth dimensions) 0 False) negLimbs)
       <> mconcat (map (toBits (dimUIntWidth dimensions) 0 False) prevCarries)
@@ -185,7 +186,7 @@ addLimbs' width maxHeight carryWidth out (limbStart, currentLimbWidth, limbs, co
     then do
       addLimitedLimbs width carryWidth [] (limbStart, currentLimbWidth, out, currentBatch, constant)
     else do
-      tempResultLimb <- allocLimb currentLimbWidth limbStart True
+      tempResultLimb <- allocLimb currentLimbWidth limbStart
       x <- addLimitedLimbs width carryWidth [] (limbStart, currentLimbWidth, tempResultLimb, currentBatch, constant)
       xs <- addLimbs' width maxHeight carryWidth out (limbStart, currentLimbWidth, tempResultLimb : nextBatch, 0)
       return $ x <> xs
@@ -193,7 +194,7 @@ addLimbs' width maxHeight carryWidth out (limbStart, currentLimbWidth, limbs, co
 addLimitedLimbs :: (GaloisField n, Integral n) => Width -> Int -> [Limb] -> (Int, Int, Limb, [Limb], Integer) -> M n [Limb]
 addLimitedLimbs width carryWidth previousCarries (limbStart, currentLimbWidth, resultLimb, limbs, constant) = do
   -- traceShowM (constant, map limbSign limbs)
-  carryLimb <- allocLimb carryWidth (limbStart + currentLimbWidth) True
+  carryLimb <- allocLimb carryWidth (limbStart + currentLimbWidth)
   -- limbs + previousCarryLimb = resultLimb + carryLimb
   writeAddWithSeq (fromInteger constant) $
     mconcat (map (toBits width 0 True) previousCarries)
@@ -216,32 +217,29 @@ data Limb = Limb
     -- | How wide this limb is
     lmbWidth :: Width,
     -- | The offset of this limb
-    lmbOffset :: Int,
-    -- | True if this limb is positive, False if negative
-    lmbSign :: Bool
+    lmbOffset :: Int
   }
   deriving (Show)
 
-allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
-allocLimb w offset sign = do
+allocLimb :: (GaloisField n, Integral n) => Width -> Int -> M n Limb
+allocLimb w offset = do
   refU <- freshRefU w
   mapM_ addBooleanConstraint [RefUBit w refU i | i <- [0 .. w - 1]]
   return $
     Limb
       { lmbRef = refU,
         lmbWidth = w,
-        lmbOffset = offset,
-        lmbSign = sign
+        lmbOffset = offset
       }
 
 -- | Given the UInt width, limb offset, and a limb, construct a sequence of bits.
 toBits :: (GaloisField n, Integral n) => Int -> Int -> Bool -> Limb -> Seq (Ref, n)
-toBits width powerOffset dontFlip limb =
+toBits width powerOffset positive limb =
   Seq.fromFunction
     (lmbWidth limb)
     ( \i ->
         ( B (RefUBit width (lmbRef limb) (lmbOffset limb + i)),
-          if not (lmbSign limb `xor` dontFlip)
+          if positive
             then 2 ^ (powerOffset + i :: Int)
             else -(2 ^ (powerOffset + i :: Int))
         )

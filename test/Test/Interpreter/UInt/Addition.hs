@@ -16,7 +16,7 @@ run = hspec tests
 tests :: SpecWith ()
 tests =
   describe "Addition / Subtraction" $ do
-      it "2 variables" $ do
+      it "variables (2 positive)" $ do
         let program = do
               x <- inputUInt @8 Public
               y <- inputUInt @8 Public
@@ -52,7 +52,7 @@ tests =
       --   runAll (Prime 31) program list [] [sum list `mod` 256]
       --   runAll (Prime 5) program list [] [sum list `mod` 256]
 
-      it "1 variable + constant" $ do
+      it "with constants (1 positive)" $ do
         let program = do
               x <- inputUInt @8 Public
               return $ x + 2
@@ -77,13 +77,13 @@ tests =
       --   runAll (Prime 31) program [10, 30, 40] [] [81]
       --   runAll (Prime 5) program [10, 30, 40] [] [81]
 
-      -- it "variables with subtraction" $ do
-      --   let program = do
-      --         x <- inputUInt @8 Public
-      --         return $ - x
-      --   let field = 257
-      --   debug (Prime field) program
-      --   runAll (Prime field) program [100] [] [156]
+      it "variables (1 negative)" $ do
+        let program = do
+              x <- inputUInt @8 Public
+              return $ - x
+        -- let field = 997
+        debug (Prime 997) program
+        runAll (Prime 997) program [100] [] [156]
 
       -- it "variables with subtraction" $ do
       --   let program = do
