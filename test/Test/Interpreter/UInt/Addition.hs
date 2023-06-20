@@ -15,6 +15,14 @@ run = hspec tests
 tests :: SpecWith ()
 tests =
   describe "Addition / Subtraction" $ do
+      it "6 positive variables" $ do
+        let program = do
+              x <- inputUInt @8 Public
+              return $ x + x + x + x + x + x
+        runAll (Prime 997) program [5] [] [30]
+        runAll (Prime 37) program [5] [] [30]
+        runAll (Prime 5) program [5] [] [30]
+
       it "2 positive variables" $ do
         let program = do
               x <- inputUInt @8 Public
@@ -22,13 +30,15 @@ tests =
               return $ x + y
         runAll (Prime 997) program [10, 30] [] [40]
         runAll (Prime 37) program [10, 30] [] [40]
+        -- runAll (Prime 5) program [10, 30] [] [40]
 
-      it "2 positive variables / constant" $ do
+      it "1 positive variable / constant" $ do
         let program = do
               x <- inputUInt @8 Public
               return $ x + 2
         runAll (Prime 997) program [10] [] [12]
         runAll (Prime 37) program [10] [] [12]
+        -- runAll (Prime 5) program [10] [] [12]
 
       it "1 negative variable" $ do
         let program = do
@@ -36,6 +46,7 @@ tests =
               return $ - x
         runAll (Prime 997) program [100] [] [156]
         runAll (Prime 37) program [100] [] [156]
+        -- runAll (Prime 5) program [100] [] [156]
 
       it "1 negative variable / constant" $ do
         let program = do
@@ -52,14 +63,22 @@ tests =
         runAll (Prime 997) program [100, 20] [] [146]
         runAll (Prime 37) program [100, 20] [] [146]
 
-      -- it "3 variables" $ do
-      --   let program = do
-      --         x <- inputUInt @8 Public
-      --         y <- inputUInt @8 Public
-      --         z <- inputUInt @8 Public
-      --         return $ x + y + z
-      --   runAll (Prime 31) program [10, 30, 5] [] [45]
-      --   runAll (Prime 5) program [10, 30, 5] [] [45]
+      it "2 positive variables / 2 negative variables / constant" $ do
+        let program = do
+              x <- inputUInt @8 Public
+              y <- inputUInt @8 Public
+              return $ 10 + x - y
+        runAll (Prime 997) program [100, 20] [] [90]
+        runAll (Prime 37) program [100, 20] [] [90]
+
+      it "3 positive variables" $ do
+        let program = do
+              x <- inputUInt @8 Public
+              y <- inputUInt @8 Public
+              z <- inputUInt @8 Public
+              return $ x + y + z
+        runAll (Prime 31) program [10, 30, 5] [] [45]
+        runAll (Prime 5) program [10, 30, 5] [] [45]
 
       -- it "4 variables" $ do
       --   let program = do
