@@ -22,14 +22,18 @@ tests =
               x <- inputUInt @2 Public
               y <- inputUInt @2 Public
               return $ x + y
-        debug (Prime 5) program
-        -- let genPair = do
-        --       x <- choose (0, 3)
-        --       y <- choose (0, 3)
-        --       return (x, y)
-        -- forAll genPair $ \(x, y) -> do
-        --   let expected = [(x + y) `mod` 4]
-        --   runAll (Prime 7) program [x, y] [] expected
+        let genPair = do
+              x <- choose (0, 3)
+              y <- choose (0, 3)
+              return (x, y)
+        forAll genPair $ \(x, y) -> do
+          let expected = [(x + y) `mod` 4]
+          runAll (Prime 5) program [x, y] [] expected
+          runAll (Prime 7) program [x, y] [] expected
+          runAll (Prime 11) program [x, y] [] expected
+          runAll (Prime 13) program [x, y] [] expected
+          runAll (Prime 17) program [x, y] [] expected
+          runAll (Prime 19) program [x, y] [] expected
 
       -- it "2 positive variables" $ do
       --   let program = do

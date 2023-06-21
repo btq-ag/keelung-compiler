@@ -18,6 +18,7 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
+import Debug.Trace
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
@@ -491,26 +492,9 @@ detectBinRep (Stuck (AddConstraint polynomial)) = do
           -- we can't do anything
           return (Stuck (AddConstraint polynomial))
   where
-    -- normalize the coefficient to be in the range [-size/2, size/2) and return the sign
-    normalize :: (GaloisField n, Integral n) => n -> (Integer, Bool)
-    normalize coeff =
-      let size = order coeff
-          halfway = fromIntegral (size `div` 2)
-       in if coeff >= halfway
-            then (negate (fromIntegral size - fromIntegral coeff), False)
-            else (fromIntegral coeff, True)
-
     collectCoeffs :: (GaloisField n, Integral n) => Ranges -> Poly n -> FoldState
     collectCoeffs boolVarRanges xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
       where
-        isPowerOf2 :: (GaloisField n, Integral n) => n -> Maybe (Int, Bool)
-        isPowerOf2 coeff =
-          let (normalized, sign) = normalize coeff
-              expected = floor (logBase 2 (fromInteger (abs normalized)) :: Double)
-           in if abs normalized == 2 ^ expected
-                then Just (expected, sign)
-                else Nothing
-
         isBoolean :: Var -> Bool
         isBoolean var = case IntMap.lookupLE var boolVarRanges of
           Nothing -> False
@@ -519,16 +503,44 @@ detectBinRep (Stuck (AddConstraint polynomial)) = do
         go :: (GaloisField n, Integral n) => FoldState -> Var -> n -> FoldState
         go Start var coeff = case isPowerOf2 coeff of
           Nothing -> Failed
-          Just (power, sign) -> Continue (IntMap.singleton power (sign, var))
+          Just (sign, power) -> Continue (IntMap.singleton power (sign, var))
         go Failed _ _ = Failed
         go (Continue coeffs) var coeff = case isPowerOf2 coeff of
           Nothing -> Failed
-          Just (power, sign) ->
+          Just (sign, power) ->
             let uniqueCoeff = IntMap.notMember power coeffs
              in if isBoolean var && uniqueCoeff
                   then Continue (IntMap.insert power (sign, var) coeffs)
                   else Failed
 detectBinRep (Stuck polynomial) = return (Stuck polynomial)
+
+-- | See if a coefficient is a power of 2
+--   Note that, because these coefficients are field elements,
+--    they can be powers of 2 when viewed as either "positive integers" or "negative integers"
+isPowerOf2 :: (GaloisField n, Integral n) => n -> Maybe (Bool, Int)
+isPowerOf2 (-2) = Just (False, 1)
+isPowerOf2 (-1) = Just (False, 0)
+isPowerOf2 1 = Just (True, 0)
+isPowerOf2 2 = Just (True, 1)
+isPowerOf2 coeff =
+  let asInteger = toInteger coeff
+   in if even asInteger
+        then (True,) <$> check asInteger
+        else (False,) <$> check (negate (fromIntegral (order coeff) - fromIntegral coeff))
+  where
+    -- Speed this up
+    check :: Integer -> Maybe Int
+    check n =
+      let expected = floor (logBase 2 (fromInteger (abs n)) :: Double)
+       in if abs n == 2 ^ expected
+            then Just expected
+            else Nothing
+
+-- let (normalized, sign) = normalize coeff
+--     expected = floor (logBase 2 (fromInteger (abs normalized)) :: Double)
+--  in if abs normalized == 2 ^ expected
+--       then Just (expected, sign)
+--       else Nothing
 
 -- if (x - y) = 0 then m = 0 else m = recip (x - y)
 shrinkEqZero :: (GaloisField n, Integral n) => (Poly n, Var) -> M n (Result (Poly n, Var))
