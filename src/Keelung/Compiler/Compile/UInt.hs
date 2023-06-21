@@ -5,13 +5,13 @@ import Control.Monad.State
 import Data.Bits qualified
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Debug.Trace
 import Keelung
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.FieldInfo (FieldInfo (..))
-import Debug.Trace
 
 -- Model of addition: we expect these two piles of limbs to be equal
 --
@@ -96,7 +96,12 @@ compileAddU width out vars constant = do
                    in (start, currentLimbWidth, constantSegment, resultLimb : operandLimbs)
               )
               [0, limbWidth .. width - 1]
-      foldM_ (\prevCarries (start, limbWidth', constant', limbs) -> compileWholeLimbPile dimensions start limbWidth' constant' (prevCarries <> limbs)) [] ranges
+      foldM_
+        ( \prevCarries (start, limbWidth', constant', limbs) ->
+            compileWholeLimbPile dimensions start limbWidth' constant' (prevCarries <> limbs)
+        )
+        []
+        ranges
 
 data Dimensions = Dimensions
   { dimUIntWidth :: Int,
@@ -106,6 +111,7 @@ data Dimensions = Dimensions
     dimCarryWidth :: Int,
     dimBorrowWidth :: Int
   }
+  deriving (Show)
 
 -- | Compress a pile of limbs into a single limb and some carry
 --
@@ -114,53 +120,59 @@ data Dimensions = Dimensions
 --  +           [ operand+ ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-
-compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> [Limb] -> M n (Limb, Limb)
+compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> [Limb] -> M n ([Limb], Limb)
 compileSingleLimbPile dimensions limbStart currentLimbWidth limbs = do
-  carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True
-  resultLimb <- allocLimb currentLimbWidth limbStart True
-  -- limbs = resultLimb + carryLimb
-  writeAddWithSeq 0 $
-    -- positive side
-    mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
-      -- negative side
-      <> toBits (dimUIntWidth dimensions) 0 False resultLimb
-      <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb -- multiply carryBits by `2^currentLimbWidth` and negate it
-  return (carryLimb, resultLimb)
+  let isSpecialCase = length limbs == 2 && lmbSign (head limbs) /= lmbSign (last limbs)
+
+  if isSpecialCase
+    then do
+      -- traceShowM (map lmbSign limbs)
+      carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) False
+      resultLimb <- allocLimb currentLimbWidth limbStart True
+      -- limbs = resultLimb + carryLimb
+      writeAddWithSeq 0 $
+        -- positive side
+        mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
+          -- negative side
+          <> toBits (dimUIntWidth dimensions) 0 False resultLimb
+          <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
+      return ([carryLimb], resultLimb)
+    else do
+      let carrySign = dimPos dimensions >= dimNeg dimensions
+      -- traceShowM (map lmbSign limbs)
+      carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) carrySign
+      resultLimb <- allocLimb currentLimbWidth limbStart True
+      -- limbs = resultLimb + carryLimb
+      writeAddWithSeq 0 $
+        -- positive side
+        mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
+          -- negative side
+          <> toBits (dimUIntWidth dimensions) 0 False resultLimb
+          <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
+      return ([carryLimb], resultLimb)
 
 compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> [Limb] -> M n [Limb]
 compileWholeLimbPile dimensions limbStart currentLimbWidth constant limbs = do
-
-
-
   let (currentBatch, nextBatch) = splitAt (dimMaxHeight dimensions) limbs
 
-  if null nextBatch then do 
+  if null nextBatch
+    then do
+      let carrySign = dimPos dimensions >= dimNeg dimensions
+      carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) carrySign
 
-    let carrySign = dimPos dimensions >= dimNeg dimensions
-    carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) carrySign
+      -- limbs - result + previous carry = carryLimb
+      writeAddWithSeq constant $
+        -- positive side
+        mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
+          -- negative side
+          <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb -- multiply by `2^currentLimbWidth`
+      return [carryLimb]
+    else do
+      (carryLimb, resultLimb) <- compileSingleLimbPile dimensions limbStart currentLimbWidth currentBatch
+      -- insert the result limb of the current batch to the next batch
+      moreCarryLimbs <- compileWholeLimbPile dimensions limbStart currentLimbWidth constant (resultLimb : nextBatch)
 
-    -- limbs - result + previous carry = carryLimb
-    writeAddWithSeq constant $
-      -- positive side
-      mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
-        -- negative side
-        <> mconcat (map (toBits (dimUIntWidth dimensions) currentLimbWidth False) [carryLimb]) -- multiply by `2^currentLimbWidth`
-    return [carryLimb]
-
-  else do 
-
-    (carryLimb, resultLimb) <- compileSingleLimbPile dimensions limbStart currentLimbWidth currentBatch
-    moreCarryLimbs <- compileWholeLimbPile  dimensions limbStart currentLimbWidth constant (resultLimb : nextBatch)
-
-    return (carryLimb : moreCarryLimbs)
-
--- writeAddWithSeq (fromInteger constant) $
---   mconcat (map (toBits width 0 True) previousCarries)
---     <> mconcat (map (toBits width 0 True) limbs)
---     <> toBits width 0 False resultLimb
---     <> toBits width currentLimbWidth False carryLimb -- multiply carryBits by `2^currentLimbWidth` and negate it
---   return [carryLimb]
+      return (carryLimb <> moreCarryLimbs)
 
 -- | Maximum number of limbs allowed to be added at once
 maxHeightAllowed :: M n Int
