@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use guards" #-}
 module Keelung.Compiler.Compile.UInt where
 
 import Control.Monad.Except
@@ -5,7 +8,6 @@ import Control.Monad.State
 import Data.Bits qualified
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Debug.Trace
 import Keelung
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Util
@@ -122,34 +124,19 @@ data Dimensions = Dimensions
 --    [ carry  ][  result  ]
 compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> [Limb] -> M n ([Limb], Limb)
 compileSingleLimbPile dimensions limbStart currentLimbWidth limbs = do
-  let isSpecialCase = length limbs == 2 && lmbSign (head limbs) /= lmbSign (last limbs)
+  let signs = all lmbSign limbs : replicate (dimCarryWidth dimensions - 1) True
 
-  if isSpecialCase
-    then do
-      -- traceShowM (map lmbSign limbs)
-      carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) False
-      resultLimb <- allocLimb currentLimbWidth limbStart True
-      -- limbs = resultLimb + carryLimb
-      writeAddWithSeq 0 $
-        -- positive side
-        mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
-          -- negative side
-          <> toBits (dimUIntWidth dimensions) 0 False resultLimb
-          <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
-      return ([carryLimb], resultLimb)
-    else do
-      let carrySign = dimPos dimensions >= dimNeg dimensions
-      -- traceShowM (map lmbSign limbs)
-      carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) carrySign
-      resultLimb <- allocLimb currentLimbWidth limbStart True
-      -- limbs = resultLimb + carryLimb
-      writeAddWithSeq 0 $
-        -- positive side
-        mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
-          -- negative side
-          <> toBits (dimUIntWidth dimensions) 0 False resultLimb
-          <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
-      return ([carryLimb], resultLimb)
+  carryLimbs <- mapM (\(i, sign) -> allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth + i) sign) (zip [dimCarryWidth dimensions - 1, dimCarryWidth dimensions - 2 .. 0] signs)
+
+  resultLimb <- allocLimb currentLimbWidth limbStart True
+  -- limbs = resultLimb + carryLimb
+  writeAddWithSeq 0 $
+    -- positive side
+    mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
+      -- negative side
+      <> toBits (dimUIntWidth dimensions) 0 False resultLimb
+      <> mconcat (map (toBits (dimUIntWidth dimensions) currentLimbWidth False) carryLimbs)
+  return (carryLimbs, resultLimb)
 
 compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> [Limb] -> M n [Limb]
 compileWholeLimbPile dimensions limbStart currentLimbWidth constant limbs = do

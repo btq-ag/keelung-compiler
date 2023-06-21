@@ -18,7 +18,6 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
-import Debug.Trace
 import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
@@ -428,9 +427,7 @@ deriveCoeffs rawConstant polynomial =
       negatedConstant = negate (toInteger (order rawConstant - fromIntegral rawConstant))
       -- should flip the sign if the constant is outside the bounds of the polynomial
       shouldFlipSign = upper < negatedConstant || lower > negatedConstant
-   in if shouldFlipSign
-        then fst $ IntMap.foldlWithKey' (go True) ([], constant) polynomial
-        else fst $ IntMap.foldlWithKey' (go False) ([], negatedConstant) polynomial
+   in fst $ IntMap.foldlWithKey' go ([], if shouldFlipSign then constant else negatedConstant) polynomial
   where
     -- given coefficients, calculate the upper bound and the lower bound of the polynomial
     boundsOf :: IntMap (Bool, Var) -> (Integer, Integer)
@@ -441,15 +438,8 @@ deriveCoeffs rawConstant polynomial =
         )
         (0, 0)
 
-    go :: Bool -> ([(Var, Bool)], Integer) -> Int -> (Bool, Var) -> ([(Var, Bool)], Integer)
-    go True (acc, c) power (sign, var) =
-      if Data.Bits.testBit c power
-        then
-          if sign
-            then ((var, True) : acc, c + (2 ^ power))
-            else ((var, True) : acc, c - (2 ^ power))
-        else ((var, False) : acc, c)
-    go False (acc, c) power (sign, var) =
+    go :: ([(Var, Bool)], Integer) -> Int -> (Bool, Var) -> ([(Var, Bool)], Integer)
+    go (acc, c) power (sign, var) =
       if Data.Bits.testBit c power
         then
           if sign
