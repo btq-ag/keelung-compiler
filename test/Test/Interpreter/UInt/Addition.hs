@@ -29,7 +29,7 @@ tests =
       forAll genPair $ \(x, y) -> do
         let expected = [(x + y) `mod` 4]
         runAll (Prime 5) program [x, y] [] expected
-        -- runAll (Prime 11) program [x, y] [] expected
+        runAll (Prime 11) program [x, y] [] expected
         runAll (Prime 17) program [x, y] [] expected
 
     it "3 positive variables" $ do
@@ -41,7 +41,7 @@ tests =
       forAll (replicateM 3 (choose (0, 15))) $ \xs -> do
         let expected = [sum xs `mod` 16]
         runAll (Prime 5) program xs [] expected
-        -- runAll (Prime 11) program xs [] expected
+        runAll (Prime 11) program xs [] expected
         runAll (Prime 17) program xs [] expected
 
     it "4 positive variables" $ do
@@ -51,22 +51,23 @@ tests =
             z <- inputUInt @4 Public
             w <- inputUInt @4 Public
             return $ x + y + z + w
+      -- debug (Prime 17) program
+      -- runAll (Prime 17) program [0, 12, 14, 12] [] [6]
       forAll (replicateM 4 (choose (0, 15))) $ \xs -> do
         let expected = [sum xs `mod` 16]
         runAll (Prime 5) program xs [] expected
-        -- debug (Prime 11) program
-        -- runAll (Prime 11) program xs [] expected
+        runAll (Prime 11) program xs [] expected
         runAll (Prime 17) program xs [] expected
 
-    -- it "more than 3 positive variables" $ do
-    --   let program n = do
-    --         x <- inputUInt @4 Public
-    --         return $ sum (replicate (fromInteger n) x)
-    --   forAll (choose (2, 10)) $ \n -> do
-    --     let expected = [n * n `mod` 16]
-    --     runAll (Prime 5) (program n) [n] [] expected
-    --     runAll (Prime 11) (program n) [n] [] expected
-    --     runAll (Prime 17) (program n) [n] [] expected
+    it "more than 5 positive variables" $ do
+      let program n = do
+            x <- inputUInt @4 Public
+            return $ sum (replicate (fromInteger n) x)
+      forAll (choose (5, 10)) $ \n -> do
+        let expected = [n * n `mod` 16]
+        runAll (Prime 5) (program n) [n] [] expected
+        runAll (Prime 11) (program n) [n] [] expected
+        runAll (Prime 17) (program n) [n] [] expected
 
     -- it "6 positive variables" $ do
     --   let program = do

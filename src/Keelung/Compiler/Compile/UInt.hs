@@ -60,25 +60,28 @@ compileAddU width out vars constant = do
           + (if constant < 0 then 1 else 0) -- negative constant
           + 1 -- the result
 
-  -- calculate the expected width of the carry and borrow limbs
+  -- calculate the expected width of the carry limbs, which is logarithimic to the number of operands
+  let expectedCarryWidth = ceiling (logBase 2 (fromIntegral numberOfOperands + if constant == 0 then 0 else 1) :: Double) :: Int
+
+  -- invariants about widths of carry and limbs:
+  --  1. limb width + carry width ≤ field width, so that they both fit in a field
+  --  2. limb width ≥ carry width, so that the carry can be added to the next limb
+  let carryWidth =
+        if expectedCarryWidth * 2 <= fieldWidth fieldInfo
+          then expectedCarryWidth -- we can use the expected carry width
+          else fieldWidth fieldInfo `div` 2 -- the actual carry width should be less than half of the field width
+
   -- NOTE, we use the same width for all limbs on the both sides for the moment (they can be different)
-  let expectedCarryWidth = ceiling (logBase 2 (fromIntegral positivePileHeight) :: Double) :: Int
-  let expectedBorrowWidth = ceiling (logBase 2 (fromIntegral negativePileHeight) :: Double) :: Int
+  let limbWidth = fieldWidth fieldInfo - carryWidth
 
-  -- calculate the width of the limbs, both the limb and the carry (or borrow) needs to fit in a field
-  let limbWidth = (fieldWidth fieldInfo - (expectedCarryWidth `max` expectedBorrowWidth)) `max` 1
-
-  let carryWidth = fieldWidth fieldInfo - limbWidth
-
-  maxHeight <- maxHeightAllowed
+  -- maxHeight <- maxHeightAllowed limbWidth
   let dimensions =
         Dimensions
           { dimUIntWidth = width,
-            dimMaxHeight = maxHeight,
+            dimMaxHeight = 2 ^ carryWidth,
             dimPos = positivePileHeight,
             dimNeg = negativePileHeight,
-            dimCarryWidth = carryWidth,
-            dimBorrowWidth = carryWidth
+            dimCarryWidth = carryWidth
           }
 
   case fieldTypeData fieldInfo of
@@ -91,16 +94,16 @@ compileAddU width out vars constant = do
               ( \start ->
                   let currentLimbWidth = limbWidth `min` (width - start)
                       -- positive limbs
-                      operandLimbs = [Limb var currentLimbWidth start sign | (var, sign) <- vars]
+                      operandLimbs = [Limb var currentLimbWidth start sign sign | (var, sign) <- vars]
                       -- negative limbs
-                      resultLimb = Limb out currentLimbWidth start False
+                      resultLimb = Limb out currentLimbWidth start False False
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                   in (start, currentLimbWidth, constantSegment, resultLimb : operandLimbs)
+                   in (start, currentLimbWidth, constantSegment, resultLimb, operandLimbs)
               )
               [0, limbWidth .. width - 1]
       foldM_
-        ( \prevCarries (start, limbWidth', constant', limbs) ->
-            compileWholeLimbPile dimensions start limbWidth' constant' (prevCarries <> limbs)
+        ( \prevCarries (start, limbWidth', constant', resultLimb, limbs) ->
+            compileWholeLimbPile dimensions start limbWidth' constant' resultLimb (prevCarries <> limbs)
         )
         []
         ranges
@@ -110,8 +113,7 @@ data Dimensions = Dimensions
     dimMaxHeight :: Int,
     dimPos :: Int,
     dimNeg :: Int,
-    dimCarryWidth :: Int,
-    dimBorrowWidth :: Int
+    dimCarryWidth :: Int
   }
   deriving (Show)
 
@@ -122,12 +124,11 @@ data Dimensions = Dimensions
 --  +           [ operand+ ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> [Limb] -> M n ([Limb], Limb)
+compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> [Limb] -> M n (Limb, Limb)
 compileSingleLimbPile dimensions limbStart currentLimbWidth limbs = do
-  let signs = all lmbSign limbs : replicate (dimCarryWidth dimensions - 1) True
-
-  carryLimbs <- mapM (\(i, sign) -> allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth + i) sign) (zip [dimCarryWidth dimensions - 1, dimCarryWidth dimensions - 2 .. 0] signs)
-
+  -- if the any of the limbs is negative, the largest digit of the carry should be negative as well
+  let msbSign = all lmbSign limbs
+  carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart True msbSign
   resultLimb <- allocLimb currentLimbWidth limbStart True
   -- limbs = resultLimb + carryLimb
   writeAddWithSeq 0 $
@@ -135,38 +136,41 @@ compileSingleLimbPile dimensions limbStart currentLimbWidth limbs = do
     mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
       -- negative side
       <> toBits (dimUIntWidth dimensions) 0 False resultLimb
-      <> mconcat (map (toBits (dimUIntWidth dimensions) currentLimbWidth False) carryLimbs)
-  return (carryLimbs, resultLimb)
+      <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
+  return (carryLimb, resultLimb)
 
-compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> [Limb] -> M n [Limb]
-compileWholeLimbPile dimensions limbStart currentLimbWidth constant limbs = do
+compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> Limb -> [Limb] -> M n [Limb]
+compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb limbs = do
   let (currentBatch, nextBatch) = splitAt (dimMaxHeight dimensions) limbs
-
   if null nextBatch
     then do
-      let carrySign = dimPos dimensions >= dimNeg dimensions
-      carryLimb <- allocLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) carrySign
+      -- edge case, all limbs are in the current batch
+      let msbSign = all lmbSign currentBatch
+
+      carryLimb <- allocCarryLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True msbSign
 
       -- limbs - result + previous carry = carryLimb
       writeAddWithSeq constant $
         -- positive side
         mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
           -- negative side
+          <> toBits (dimUIntWidth dimensions) 0 True finalResultLimb
           <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb -- multiply by `2^currentLimbWidth`
       return [carryLimb]
     else do
+      -- inductive case, there are more limbs to be processed
       (carryLimb, resultLimb) <- compileSingleLimbPile dimensions limbStart currentLimbWidth currentBatch
       -- insert the result limb of the current batch to the next batch
-      moreCarryLimbs <- compileWholeLimbPile dimensions limbStart currentLimbWidth constant (resultLimb : nextBatch)
+      moreCarryLimbs <- compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb (resultLimb : nextBatch)
 
-      return (carryLimb <> moreCarryLimbs)
+      return (carryLimb : moreCarryLimbs)
 
 -- | Maximum number of limbs allowed to be added at once
-maxHeightAllowed :: M n Int
-maxHeightAllowed = do
+maxHeightAllowed :: Int -> M n Int
+maxHeightAllowed limbWidth = do
   w <- gets (fieldWidth . cmField)
   if w <= 10
-    then return (2 ^ (w - 1))
+    then return (2 ^ (w - limbWidth))
     else return 256
 
 addLimbs :: (GaloisField n, Integral n) => Width -> Int -> Int -> [Limb] -> (Int, Int, Limb, [Limb], Integer) -> M n [Limb]
@@ -211,8 +215,10 @@ data Limb = Limb
     lmbWidth :: Width,
     -- | The offset of this limb
     lmbOffset :: Int,
-    -- | Whether this limb is positive or negative
-    lmbSign :: Bool
+    -- | Whether all bits (except for the highest bit) are positive or negative
+    lmbSign :: Bool,
+    -- | Whether the highest bit is positive or negative
+    lmbMSBSign :: Bool
   }
   deriving (Show)
 
@@ -225,7 +231,21 @@ allocLimb w offset sign = do
       { lmbRef = refU,
         lmbWidth = w,
         lmbOffset = offset,
-        lmbSign = sign
+        lmbSign = sign,
+        lmbMSBSign = sign
+      }
+
+allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> Bool -> M n Limb
+allocCarryLimb w offset sign msbSign = do
+  refU <- freshRefU w
+  mapM_ addBooleanConstraint [RefUBit w refU i | i <- [0 .. w - 1]]
+  return $
+    Limb
+      { lmbRef = refU,
+        lmbWidth = w,
+        lmbOffset = offset,
+        lmbSign = sign,
+        lmbMSBSign = msbSign
       }
 
 -- | Given the UInt width, limb offset, and a limb, construct a sequence of bits.
@@ -235,8 +255,14 @@ toBits width powerOffset positive limb =
     (lmbWidth limb)
     ( \i ->
         ( B (RefUBit width (lmbRef limb) (lmbOffset limb + i)),
-          if (if lmbSign limb then positive else not positive)
-            then 2 ^ (powerOffset + i :: Int)
-            else -(2 ^ (powerOffset + i :: Int))
+          if i == lmbWidth limb - 1
+            then
+              if (if lmbMSBSign limb then positive else not positive)
+                then 2 ^ (powerOffset + i :: Int)
+                else -(2 ^ (powerOffset + i :: Int))
+            else
+              if (if lmbSign limb then positive else not positive)
+                then 2 ^ (powerOffset + i :: Int)
+                else -(2 ^ (powerOffset + i :: Int))
         )
     )
