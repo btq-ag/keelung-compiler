@@ -79,7 +79,7 @@ compileAddU width out vars constant = do
                       -- positive limbs
                       operandLimbs = [Limb var currentLimbWidth start sign sign | (var, sign) <- vars]
                       -- negative limbs
-                      resultLimb = Limb out currentLimbWidth start False False
+                      resultLimb = Limb out currentLimbWidth start True True
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
                    in (start, currentLimbWidth, constantSegment, resultLimb, operandLimbs)
               )
@@ -105,55 +105,35 @@ data Dimensions = Dimensions
 --  +           [ operand+ ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> [Limb] -> M n (Limb, Limb)
-compileSingleLimbPile dimensions limbStart currentLimbWidth limbs = do
+compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n Limb
+compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb constant limbs = do
   -- if the any of the limbs is negative, the largest digit of the carry should be negative as well
-  let msbSign = all lmbSign limbs
+  let msbSign = all lmbSign limbs && all lmbMSBSign limbs
   carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart True msbSign
-  resultLimb <- allocLimb currentLimbWidth limbStart True
   -- limbs = resultLimb + carryLimb
-  writeAddWithSeq 0 $
+  writeAddWithSeq constant $
     -- positive side
     mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
       -- negative side
       <> toBits (dimUIntWidth dimensions) 0 False resultLimb
       <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
-  return (carryLimb, resultLimb)
+  return carryLimb
 
 compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> Limb -> [Limb] -> M n [Limb]
 compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb limbs = do
   let (currentBatch, nextBatch) = splitAt (dimMaxHeight dimensions) limbs
-  if null nextBatch
+  if not (null nextBatch) || (length currentBatch == dimMaxHeight dimensions && constant /= 0)
     then do
-      if length currentBatch == dimMaxHeight dimensions 
-        then do 
-          -- inductive case, there are more limbs to be processed
-          (carryLimb, resultLimb) <- compileSingleLimbPile dimensions limbStart currentLimbWidth currentBatch
-          -- insert the result limb of the current batch to the next batch
-          moreCarryLimbs <- compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb [resultLimb]
-
-          return (carryLimb : moreCarryLimbs)
-        else do 
-          -- edge case, all limbs are in the current batch
-          let msbSign = all lmbSign currentBatch
-
-          carryLimb <- allocCarryLimb (dimCarryWidth dimensions) (limbStart + currentLimbWidth) True msbSign
-
-          -- limbs - result + previous carry = carryLimb
-          writeAddWithSeq constant $
-            -- positive side
-            mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
-              -- negative side
-              <> toBits (dimUIntWidth dimensions) 0 True finalResultLimb
-              <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb -- multiply by `2^currentLimbWidth`
-          return [carryLimb]
-    else do
       -- inductive case, there are more limbs to be processed
-      (carryLimb, resultLimb) <- compileSingleLimbPile dimensions limbStart currentLimbWidth currentBatch
+      resultLimb <- allocLimb currentLimbWidth limbStart True
+      carryLimb <- compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb 0 currentBatch
       -- insert the result limb of the current batch to the next batch
       moreCarryLimbs <- compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb (resultLimb : nextBatch)
-
       return (carryLimb : moreCarryLimbs)
+    else do
+      -- edge case, all limbs are in the current batch
+      carryLimb <- compileSingleLimbPile dimensions limbStart currentLimbWidth finalResultLimb constant currentBatch
+      return [carryLimb]
 
 compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileSubU width out (Right a) (Right b) = compileAddU width out [] (a - b)
