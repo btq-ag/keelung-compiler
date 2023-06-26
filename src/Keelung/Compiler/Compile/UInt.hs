@@ -5,6 +5,7 @@ import Control.Monad.State
 import Data.Bits qualified
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Debug.Trace
 import Keelung
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Util
@@ -77,9 +78,9 @@ compileAddU width out vars constant = do
               ( \start ->
                   let currentLimbWidth = limbWidth `min` (width - start)
                       -- positive limbs
-                      operandLimbs = [Limb var currentLimbWidth start sign sign | (var, sign) <- vars]
+                      operandLimbs = [Limb var currentLimbWidth start (replicate currentLimbWidth sign) | (var, sign) <- vars]
                       -- negative limbs
-                      resultLimb = Limb out currentLimbWidth start True True
+                      resultLimb = Limb out currentLimbWidth start (replicate currentLimbWidth True)
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
                    in (start, currentLimbWidth, constantSegment, resultLimb, operandLimbs)
               )
@@ -107,10 +108,14 @@ data Dimensions = Dimensions
 --    [ carry  ][  result  ]
 compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n Limb
 compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb constant limbs = do
-  -- if the any of the limbs is negative, the largest digit of the carry should be negative as well
-  let msbSign = all lmbSign limbs && all lmbMSBSign limbs
-  carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart True msbSign
-  -- limbs = resultLimb + carryLimb
+  let negLimbSize = length $ filter (not . limbIsPositive) limbs
+  let carrySigns =
+        if negLimbSize == length limbs 
+          then replicate (dimCarryWidth dimensions) False -- TEMP HACK 
+          else map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
+
+  -- traceShowM (length limbs, negLimbSize, reverse carrySigns)
+  carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
   writeAddWithSeq constant $
     -- positive side
     mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
@@ -118,6 +123,22 @@ compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb constant 
       <> toBits (dimUIntWidth dimensions) 0 False resultLimb
       <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
   return carryLimb
+
+-- compileSingleLimbPile2 :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n Limb
+-- compileSingleLimbPile2 dimensions limbStart currentLimbWidth resultLimb constant limbs = do
+--   let posLimbNo = foldl (\acc limb -> if lmbSign limb then succ acc else acc) 0 limbs :: Int
+--   let negLimbNo = foldl (\acc limb -> if lmbSign limb then acc else succ acc) 0 limbs
+
+--   if negLimbNo > posLimbNo
+--     then do
+--       let negatedLimbs = map negateLimb limbs
+
+--       -- traceShowM negatedLimbs
+--       compileSingleLimbPile True dimensions limbStart currentLimbWidth resultLimb constant limbs
+--     else -- traceShowM (negateLimb resultLimb)
+--     -- traceShowM (negateLimb carryLimb)
+--     -- return $ carryLimb
+--       compileSingleLimbPile False dimensions limbStart currentLimbWidth resultLimb constant limbs
 
 compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> Limb -> [Limb] -> M n [Limb]
 compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb limbs = do
@@ -150,12 +171,16 @@ data Limb = Limb
     lmbWidth :: Width,
     -- | The offset of this limb
     lmbOffset :: Int,
-    -- | Whether all bits (except for the highest bit) are positive or negative
-    lmbSign :: Bool,
-    -- | Whether the highest bit is positive or negative
-    lmbMSBSign :: Bool
+    -- | Signs of each bit, LSB first
+    lmbSigns :: [Bool]
+    -- -- | Signs of each bit, LSB first
+    -- lmbType :: Either [Bool] Bool
   }
   deriving (Show)
+
+-- | A limb is considered "positive" if all of its bits are positive
+limbIsPositive :: Limb -> Bool
+limbIsPositive = and . lmbSigns
 
 allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
 allocLimb w offset sign = do
@@ -166,12 +191,11 @@ allocLimb w offset sign = do
       { lmbRef = refU,
         lmbWidth = w,
         lmbOffset = offset,
-        lmbSign = sign,
-        lmbMSBSign = sign
+        lmbSigns = replicate w sign
       }
 
-allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> Bool -> M n Limb
-allocCarryLimb w offset sign msbSign = do
+allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
+allocCarryLimb w offset signs = do
   refU <- freshRefU w
   mapM_ addBooleanConstraint [RefUBit w refU i | i <- [0 .. w - 1]]
   return $
@@ -179,25 +203,20 @@ allocCarryLimb w offset sign msbSign = do
       { lmbRef = refU,
         lmbWidth = w,
         lmbOffset = offset,
-        lmbSign = sign,
-        lmbMSBSign = msbSign
+        lmbSigns = signs
       }
 
 -- | Given the UInt width, limb offset, and a limb, construct a sequence of bits.
 toBits :: (GaloisField n, Integral n) => Int -> Int -> Bool -> Limb -> Seq (Ref, n)
 toBits width powerOffset positive limb =
-  Seq.fromFunction
-    (lmbWidth limb)
-    ( \i ->
-        ( B (RefUBit width (lmbRef limb) (lmbOffset limb + i)),
-          if i == lmbWidth limb - 1
-            then
-              if (if lmbMSBSign limb then positive else not positive)
-                then 2 ^ (powerOffset + i :: Int)
-                else -(2 ^ (powerOffset + i :: Int))
-            else
-              if (if lmbSign limb then positive else not positive)
-                then 2 ^ (powerOffset + i :: Int)
-                else -(2 ^ (powerOffset + i :: Int))
-        )
-    )
+  Seq.fromList $
+    zipWith
+      ( \i sign ->
+          ( B (RefUBit width (lmbRef limb) (lmbOffset limb + i)),
+            if (if sign then positive else not positive)
+              then 2 ^ (powerOffset + i :: Int)
+              else -(2 ^ (powerOffset + i :: Int))
+          )
+      )
+      [0 ..]
+      (lmbSigns limb)
