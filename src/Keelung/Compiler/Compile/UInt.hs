@@ -86,10 +86,10 @@ compileAddU width out vars constant = do
               )
               [0, limbWidth .. width - 1]
       foldM_
-        ( \prevCarries (start, limbWidth', constant', resultLimb, limbs) ->
-            compileWholeLimbPile dimensions start limbWidth' constant' resultLimb (prevCarries <> limbs)
+        ( \(prevCarries, compensated) (start, currentLimbWidth, constant', resultLimb, limbs) ->
+            compileWholeLimbPile dimensions start currentLimbWidth (constant' - fromIntegral compensated) resultLimb (prevCarries <> limbs)
         )
-        []
+        ([], 0)
         ranges
 
 data Dimensions = Dimensions
@@ -106,55 +106,60 @@ data Dimensions = Dimensions
 --  +           [ operand+ ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n Limb
+compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n (Limb, Int)
 compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb constant limbs = do
   let negLimbSize = length $ filter (not . limbIsPositive) limbs
-  let carrySigns =
-        if negLimbSize == length limbs 
-          then replicate (dimCarryWidth dimensions) False -- TEMP HACK 
-          else map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
 
-  -- traceShowM (length limbs, negLimbSize, reverse carrySigns)
-  carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
-  writeAddWithSeq constant $
-    -- positive side
-    mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
-      -- negative side
-      <> toBits (dimUIntWidth dimensions) 0 False resultLimb
-      <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
-  return carryLimb
+  -- if all limbs are negative, we should add 2^currentLimbWidth to the constant
+  let allNegative = negLimbSize == length limbs
+  if allNegative
+    then do
+      let carrySigns = replicate (dimCarryWidth dimensions) False
+      carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
+      traceM "--"
+      mapM_ traceShowM limbs
+      traceShowM carryLimb
+      traceShowM resultLimb
+      let compensatedConstant = constant + 2 ^ currentLimbWidth
+      writeAddWithSeq compensatedConstant $
+        -- positive side
+        mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
+          -- negative side
+          <> toBits (dimUIntWidth dimensions) 0 False resultLimb
+          <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
+      return (carryLimb, 1)
+    else do
+      let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
+      carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
+      traceM "+-"
+      mapM_ traceShowM limbs
+      traceShowM (carrySigns, carryLimb)
+      traceShowM resultLimb
+      writeAddWithSeq constant $
+        -- positive side
+        mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
+          -- negative side
+          <> toBits (dimUIntWidth dimensions) 0 False resultLimb
+          <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
+      return (carryLimb, 0)
 
--- compileSingleLimbPile2 :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n Limb
--- compileSingleLimbPile2 dimensions limbStart currentLimbWidth resultLimb constant limbs = do
---   let posLimbNo = foldl (\acc limb -> if lmbSign limb then succ acc else acc) 0 limbs :: Int
---   let negLimbNo = foldl (\acc limb -> if lmbSign limb then acc else succ acc) 0 limbs
-
---   if negLimbNo > posLimbNo
---     then do
---       let negatedLimbs = map negateLimb limbs
-
---       -- traceShowM negatedLimbs
---       compileSingleLimbPile True dimensions limbStart currentLimbWidth resultLimb constant limbs
---     else -- traceShowM (negateLimb resultLimb)
---     -- traceShowM (negateLimb carryLimb)
---     -- return $ carryLimb
---       compileSingleLimbPile False dimensions limbStart currentLimbWidth resultLimb constant limbs
-
-compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> Limb -> [Limb] -> M n [Limb]
+compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> Limb -> [Limb] -> M n ([Limb], Int)
 compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb limbs = do
+  traceShow ("CONSTANT", constant) $ return ()
   let (currentBatch, nextBatch) = splitAt (dimMaxHeight dimensions) limbs
   if not (null nextBatch) || (length currentBatch == dimMaxHeight dimensions && constant /= 0)
     then do
       -- inductive case, there are more limbs to be processed
       resultLimb <- allocLimb currentLimbWidth limbStart True
-      carryLimb <- compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb 0 currentBatch
+      (carryLimb, compensated) <- compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb 0 currentBatch
       -- insert the result limb of the current batch to the next batch
-      moreCarryLimbs <- compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb (resultLimb : nextBatch)
-      return (carryLimb : moreCarryLimbs)
+      (moreCarryLimbs, compensated') <- compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb (resultLimb : nextBatch)
+      -- (moreCarryLimbs, compensated') <- compileWholeLimbPile dimensions limbStart currentLimbWidth (constant - if compensated then 2 ^ currentLimbWidth else 0) finalResultLimb (resultLimb : nextBatch)
+      return (carryLimb : moreCarryLimbs, compensated + compensated')
     else do
       -- edge case, all limbs are in the current batch
-      carryLimb <- compileSingleLimbPile dimensions limbStart currentLimbWidth finalResultLimb constant currentBatch
-      return [carryLimb]
+      (carryLimb, compensated) <- compileSingleLimbPile dimensions limbStart currentLimbWidth finalResultLimb constant currentBatch
+      return ([carryLimb], compensated)
 
 compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileSubU width out (Right a) (Right b) = compileAddU width out [] (a - b)
@@ -173,8 +178,6 @@ data Limb = Limb
     lmbOffset :: Int,
     -- | Signs of each bit, LSB first
     lmbSigns :: [Bool]
-    -- -- | Signs of each bit, LSB first
-    -- lmbType :: Either [Bool] Bool
   }
   deriving (Show)
 
