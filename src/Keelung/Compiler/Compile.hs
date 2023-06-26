@@ -540,21 +540,6 @@ compileMulBigCC width out a b = do
 -- compileMulBigCV width out a b = do
 --   -- mulpliplying two w-bit numbers will result in a 2w-bit number
 
---   fieldWidth <- gets cmFieldWidth
---   fieldInfo <- gets cmField
-
---   let limbWidth = (fieldWidth - 1 - expectedCarryWidth) `max` 1
---   let carryWidth = fieldWidth - 1 - limbWidth
-
---   maxHeight <- maxHeightAllowed
---   case fieldTypeData fieldInfo of
---     Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
---     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
---     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-
---   carries <- replicateM width freshRefB
---   mapM_ addBooleanConstraint carries
-
 compileMulBig :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileMulBig width out (Right a) (Right b) = do
   let val = a * b
