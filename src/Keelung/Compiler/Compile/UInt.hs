@@ -5,7 +5,6 @@ import Control.Monad.State
 import Data.Bits qualified
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Debug.Trace
 import Keelung
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Util
@@ -48,11 +47,13 @@ compileAddU width out vars constant = do
   let numberOfOperands = length vars
 
   -- calculate the expected width of the carry limbs, which is logarithimic to the number of operands
-  let expectedCarryWidth = ceiling (logBase 2 (fromIntegral numberOfOperands + if constant == 0 then 0 else 1) :: Double) :: Int
+  let expectedCarryWidth =
+        ceiling (logBase 2 (fromIntegral numberOfOperands + if constant == 0 then 0 else 1) :: Double) `max` 2 :: Int
 
   -- invariants about widths of carry and limbs:
   --  1. limb width + carry width ≤ field width, so that they both fit in a field
   --  2. limb width ≥ carry width, so that the carry can be added to the next limb
+  --  3. carryWidth ≥ 2 (TEMP HACK)
   let carryWidth =
         if expectedCarryWidth * 2 <= fieldWidth fieldInfo
           then expectedCarryWidth -- we can use the expected carry width
@@ -64,14 +65,18 @@ compileAddU width out vars constant = do
   let dimensions =
         Dimensions
           { dimUIntWidth = width,
-            dimMaxHeight = 2 ^ carryWidth,
-            dimCarryWidth = carryWidth
+            dimMaxHeight = 2 ^ (carryWidth - 1),
+            dimCarryWidth = carryWidth - 1
           }
 
   case fieldTypeData fieldInfo of
     Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+    Prime 5 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+    Prime 7 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+    Prime 11 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+    Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     _ -> do
       let ranges =
             map
@@ -114,27 +119,20 @@ compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb constant 
   let allNegative = negLimbSize == length limbs
   if allNegative
     then do
-      let carrySigns = replicate (dimCarryWidth dimensions) False
-      carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
-      traceM "--"
-      mapM_ traceShowM limbs
-      traceShowM carryLimb
-      traceShowM resultLimb
-      let compensatedConstant = constant + 2 ^ currentLimbWidth
+      let carrySigns = replicate (dimCarryWidth dimensions + 1) False
+      carryLimb <- allocCarryLimb (dimCarryWidth dimensions + 1) limbStart carrySigns
+      let compensatedConstant = constant
+      -- let compensatedConstant = constant + 2 ^ currentLimbWidth
       writeAddWithSeq compensatedConstant $
         -- positive side
         mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
           -- negative side
           <> toBits (dimUIntWidth dimensions) 0 False resultLimb
           <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
-      return (carryLimb, 1)
+      return (carryLimb, 0)
     else do
       let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
       carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
-      traceM "+-"
-      mapM_ traceShowM limbs
-      traceShowM (carrySigns, carryLimb)
-      traceShowM resultLimb
       writeAddWithSeq constant $
         -- positive side
         mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
@@ -145,7 +143,6 @@ compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb constant 
 
 compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> Limb -> [Limb] -> M n ([Limb], Int)
 compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb limbs = do
-  traceShow ("CONSTANT", constant) $ return ()
   let (currentBatch, nextBatch) = splitAt (dimMaxHeight dimensions) limbs
   if not (null nextBatch) || (length currentBatch == dimMaxHeight dimensions && constant /= 0)
     then do
