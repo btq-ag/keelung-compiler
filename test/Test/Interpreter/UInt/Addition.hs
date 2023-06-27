@@ -230,17 +230,17 @@ tests =
     --     runAll (Prime 17) program [x, y] [] expected
     --     runAll (Prime 1031) program [x, y] [] expected
 
-    it "more than 2 mixed (positive / negative) variables" $ do
+    it "more than 2 mixed (positive / negative) variables / constant" $ do
       let program signs = do
             inputs <- replicateM (length signs) (inputUInt @4 Public)
-            return $ sum $ zipWith (\sign x -> if sign then x else -x) signs inputs
+            return $ -4 + sum (zipWith (\sign x -> if sign then x else -x) signs inputs)
       let genPair = do
             sign <- arbitrary
             x <- chooseInteger (0, 15)
             return (sign, x)
       forAll (choose (2, 2) >>= flip replicateM genPair) $ \pairs -> do
         let (signs, values) = unzip pairs
-        let expected = [sum (zipWith (\sign x -> if sign then x else -x) signs values) `mod` 16]
+        let expected = [(-4 + sum (zipWith (\sign x -> if sign then x else -x) signs values)) `mod` 16]
         -- runAll (Prime 5) (program signs) values [] expected
         -- runAll (Prime 11) (program signs) values [] expected
         runAll (Prime 17) (program signs) values [] expected

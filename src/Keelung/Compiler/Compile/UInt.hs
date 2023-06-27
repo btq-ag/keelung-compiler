@@ -91,10 +91,10 @@ compileAddU width out vars constant = do
               )
               [0, limbWidth .. width - 1]
       foldM_
-        ( \(prevCarries, compensated) (start, currentLimbWidth, constant', resultLimb, limbs) ->
-            compileWholeLimbPile dimensions start currentLimbWidth (constant' - fromIntegral compensated) resultLimb (prevCarries <> limbs)
+        ( \prevCarries (start, currentLimbWidth, constant', resultLimb, limbs) ->
+            compileWholeLimbPile dimensions start currentLimbWidth constant' resultLimb (prevCarries <> limbs)
         )
-        ([], 0)
+        []
         ranges
 
 data Dimensions = Dimensions
@@ -111,7 +111,7 @@ data Dimensions = Dimensions
 --  +           [ operand+ ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n (Limb, Int)
+compileSingleLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n Limb
 compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb constant limbs = do
   let negLimbSize = length $ filter (not . limbIsPositive) limbs
 
@@ -129,7 +129,7 @@ compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb constant 
           -- negative side
           <> toBits (dimUIntWidth dimensions) 0 False resultLimb
           <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
-      return (carryLimb, 0)
+      return carryLimb
     else do
       let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
       carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
@@ -139,24 +139,24 @@ compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb constant 
           -- negative side
           <> toBits (dimUIntWidth dimensions) 0 False resultLimb
           <> toBits (dimUIntWidth dimensions) currentLimbWidth False carryLimb
-      return (carryLimb, 0)
+      return carryLimb
 
-compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> Limb -> [Limb] -> M n ([Limb], Int)
+compileWholeLimbPile :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> Limb -> [Limb] -> M n [Limb]
 compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb limbs = do
   let (currentBatch, nextBatch) = splitAt (dimMaxHeight dimensions) limbs
   if not (null nextBatch) || (length currentBatch == dimMaxHeight dimensions && constant /= 0)
     then do
       -- inductive case, there are more limbs to be processed
       resultLimb <- allocLimb currentLimbWidth limbStart True
-      (carryLimb, compensated) <- compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb 0 currentBatch
+      carryLimb <- compileSingleLimbPile dimensions limbStart currentLimbWidth resultLimb 0 currentBatch
       -- insert the result limb of the current batch to the next batch
-      (moreCarryLimbs, compensated') <- compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb (resultLimb : nextBatch)
+      moreCarryLimbs <- compileWholeLimbPile dimensions limbStart currentLimbWidth constant finalResultLimb (resultLimb : nextBatch)
       -- (moreCarryLimbs, compensated') <- compileWholeLimbPile dimensions limbStart currentLimbWidth (constant - if compensated then 2 ^ currentLimbWidth else 0) finalResultLimb (resultLimb : nextBatch)
-      return (carryLimb : moreCarryLimbs, compensated + compensated')
+      return (carryLimb : moreCarryLimbs)
     else do
       -- edge case, all limbs are in the current batch
-      (carryLimb, compensated) <- compileSingleLimbPile dimensions limbStart currentLimbWidth finalResultLimb constant currentBatch
-      return ([carryLimb], compensated)
+      carryLimb <- compileSingleLimbPile dimensions limbStart currentLimbWidth finalResultLimb constant currentBatch
+      return [carryLimb]
 
 compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileSubU width out (Right a) (Right b) = compileAddU width out [] (a - b)
