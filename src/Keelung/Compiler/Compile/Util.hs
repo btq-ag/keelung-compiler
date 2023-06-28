@@ -23,7 +23,6 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Syntax.Counters
-import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
