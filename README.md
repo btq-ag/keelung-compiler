@@ -3,7 +3,18 @@
 Documentation on how to hack it is on the way.
 Feel free to open issues or make PRs!
 
-# How to dockerize `keelungc`
+## For Users
+
+### Installation
+See the [Installation Guide](https://btq.gitbook.io/keelung/getting-started/setting-up-the-environment) on Gitbook.
+
+### Release Notes
+Visit the [Releases](https://github.com/btq-ag/keelung-compiler/releases) page to see all the releases and their changelogs, note that old releases before v0.12.1 are in the [release page of btq-ag/keelung](https://github.com/btq-ag/keelung/releases) repo instead.
+
+
+## For Developers
+
+### How to dockerize `keelungc`
 
 To dockerize the executable `keelungc`, run the following command in the root of the repository:
 
@@ -23,7 +34,7 @@ docker run banacorn/keelung
 
 (add `--platform linux/amd64` if you are using architectures like arm64)
 
-# How to profile the compiler and generate flamegraphs
+### How to profile the compiler and generate flamegraphs
 
 1. Install [ghc-prof-flamegraph](https://hackage.haskell.org/package/ghc-prof-flamegraph) on your machine: 
 
@@ -50,5 +61,5 @@ stack exec --profile -- profile +RTS -p
 ghc-prof-flamegraph profile.prof
 ``` 
 
-# Notes for Releasing Binaries
+### Notes for Releasing Binaries
 Binaries released to the [Keelung repo](https://github.com/btq-ag/keelung/releases) includes automatically generated licenses using [cabal-plan](https://github.com/haskell-hvr/cabal-plan), for Github Actions to work, `keelung` dependency in `cabal.project` must be updated to match its commit hash used in `stack.yaml` for the CI to build. This is only required when a major release is needed.
