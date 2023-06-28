@@ -360,7 +360,7 @@ compileExprU out expr = case expr of
   MulU w x y -> do
     x' <- wireU x
     y' <- wireU y
-    compileMulBig w out x' y'
+    UInt.compileMulU w out x' y'
   MMIU w a p -> do
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
     a' <- wireU a
@@ -517,49 +517,6 @@ compileMulBigCC :: (GaloisField n, Integral n) => Int -> RefU -> Integer -> Inte
 compileMulBigCC width out a b = do
   let val = a * b
   writeValU width out val
-
--- assume that each number has been divided into L w-bit limbs
--- multiplying two numbers will result in L^2 2w-bit limbs
---
---                          a1 a2 a3
--- x                        b1 b2 b3
--- ------------------------------------------
---                             a3*b3
---                          a2*b3
---                       a1*b3
---                          a3*b2
---                       a2*b2
---                    a1*b2
---                       a3*b1
---                    a2*b1
---                 a1*b1
--- ------------------------------------------
---
--- the maximum number of operands when adding these 2w-bit limbs is 2L (with carry from the previous limb)
--- compileMulBigCV :: (GaloisField n, Integral n) => Int -> RefU -> Integer -> RefU -> M n ()
--- compileMulBigCV width out a b = do
---   -- mulpliplying two w-bit numbers will result in a 2w-bit number
-
-compileMulBig :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileMulBig width out (Right a) (Right b) = do
-  let val = a * b
-  writeValU width out val
-compileMulBig width out (Right a) (Left b) = do
-  carry <- replicateM width (B <$> freshRefB)
-  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
-  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-  writeMul (fromInteger a, []) (0, bs) (0, outputSegment <> carrySegment)
-compileMulBig width out (Left a) (Right b) = compileMulBig width out (Right b) (Left a)
-compileMulBig width out (Left a) (Left b) = do
-  carry <- replicateM width (B <$> freshRefB)
-
-  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
-  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-
-  writeMul (0, as) (0, bs) (0, outputSegment <> carrySegment)
 
 -- | Encoding addition on UInts with multiple operands: O(2)
 --      A       =   2ⁿAₙ₋₁ + ... + 2A₁ + A₀

@@ -23,6 +23,7 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Syntax.Counters
+import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
@@ -167,6 +168,9 @@ addC = mapM_ addOne
 
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
 writeMul as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.build as) (fromEither $ uncurry PolyG.build bs) (fromEither $ uncurry PolyG.build cs)
+
+writeMulWithSeq :: (GaloisField n, Integral n) => (n, Seq (Ref, n)) -> (n, Seq (Ref, n)) -> (n, Seq (Ref, n)) -> M n ()
+writeMulWithSeq as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.buildWithSeq as) (fromEither $ uncurry PolyG.buildWithSeq bs) (fromEither $ uncurry PolyG.buildWithSeq cs)
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPoly (PolyG.build c as)
