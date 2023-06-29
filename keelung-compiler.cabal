@@ -189,6 +189,7 @@ test-suite keelung-test
       Test.PolyG
       Test.Relations.Boolean
       Test.Relations.Field
+      Test.Solver.BinRep
       Test.WitnessGeneration
       Keelung.Compiler
       Keelung.Compiler.Compile
