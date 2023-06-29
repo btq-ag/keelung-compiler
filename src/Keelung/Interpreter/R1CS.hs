@@ -1,9 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TupleSections #-}
 
-module Keelung.Interpreter.R1CS (run, run', Error (..)) where
+module Keelung.Interpreter.R1CS (run, run', Error (..), detectBinRep) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -119,10 +116,10 @@ lookupBitsEither (width, Right val) = return (Just (UVal width val))
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
-  xs <- shrinkMul as bs cs >>= detectBinRep
+  xs <- shrinkMul as bs cs >>= shrinkBinRep
   return $ fmap Seq.singleton xs
 shrink (AddConstraint as) = do
-  as' <- shrinkAdd as >>= detectBinRep
+  as' <- shrinkAdd as >>= shrinkBinRep
   return $ fmap Seq.singleton as'
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
@@ -385,8 +382,7 @@ shrinkModInv (aVar, outVar, nVar, p) = do
     Nothing -> return $ Stuck (aVar, outVar, nVar, p)
 
 -- | Trying to reduce a BinRep constraint
-
-data FoldState = Start | Failed | Continue (IntMap (Bool, Var)) deriving (Eq, Show)
+data FoldState n = Start | Failed | Continue n (IntMap (Bool, Var)) deriving (Eq, Show)
 
 -- | Given a mapping of (Int, (Bool, Var)) pairs, where the Int indicates the power of 2, and the Bool indicates whether the coefficient is positive or negative
 --   and an Integer, derive coefficients (Boolean) for each of these variables such that the sum of the coefficients times the powers of 2 is equal to the Integer
@@ -418,76 +414,87 @@ deriveCoeffs rawConstant polynomial =
             else ((var, True) : acc, c - (2 ^ power))
         else ((var, False) : acc, c)
 
--- | Watch out for a stuck R1C, and see if it's a binary representation
---    1. see if coefficients are all powers of 2
---    2. see if all variables are Boolean
---   NOTE: the criteria above may not be sufficient
-detectBinRep :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
-detectBinRep NothingToDo = return NothingToDo
-detectBinRep Eliminated = return Eliminated
-detectBinRep (Shrinked polynomial) = return (Shrinked polynomial)
-detectBinRep (Stuck (AddConstraint polynomial)) = do
-  -- let (normalizedConstant, positive) = normalize (Poly.constant polynomial)
+-- | Reduce binary representations
+shrinkBinRep :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
+shrinkBinRep NothingToDo = return NothingToDo
+shrinkBinRep Eliminated = return Eliminated
+shrinkBinRep (Shrinked polynomial) = return (Shrinked polynomial)
+shrinkBinRep (Stuck (AddConstraint polynomial)) = do
   boolVarRanges <- ask
-  case collectCoeffs boolVarRanges polynomial of
-    Start -> return (Stuck (AddConstraint polynomial))
-    Failed -> return (Stuck (AddConstraint polynomial))
-    Continue invertedPolynomial -> do
-      let constant = Poly.constant polynomial
-      -- NOTE: the criteria below is not necessary
-      -- because we know that these coefficients are:
-      --  2. unique
+  let isBoolean var = case IntMap.lookupLE var boolVarRanges of
+        Nothing -> False
+        Just (index, len) -> var < index + len
+  case detectBinRep isBoolean polynomial of
+    Nothing -> return (Stuck (AddConstraint polynomial))
+    Just assignments -> do
+      -- we have a binary representation
+      -- we can now assign the variables
+      forM_ assignments $ \(var, val) -> do
+        bindVar var (if val then 1 else 0)
+      return Eliminated
+shrinkBinRep (Stuck polynomial) = return (Stuck polynomial)
+
+-- | Watch out for a stuck R1C, and see if it's a binary representation
+--    1. see if variables are all Boolean
+--    2. see if coefficients are all multiples of powers of 2
+--    3. see if these powers of 2 are all unique
+--
+--   Property:
+--    For a field of order `n`, let `k = floor(log2(n))`, i.e., the number of bits that can be fit into a field element.
+--    1. There can be at most `k` coefficients that are multiples of powers of 2 if the polynomial is a binary representation.
+--    2. These coefficients cannot be too far apart, i.e., the quotient of any 2 coefficients cannot be greater than `2^(k-1)`.
+--    3. For any 2 coefficients `a` and `b`, either `a / b` or `b / a` must be a power of 2 smaller than `2^k`.
+detectBinRep :: (GaloisField n, Integral n) => (Var -> Bool) -> Poly n -> Maybe [(Var, Bool)]
+detectBinRep isBoolean polynomial =
+  case collectCoeffs polynomial of
+    Start -> Nothing
+    Failed -> Nothing
+    Continue picked invertedPolynomial ->
       let powers = IntMap.keys invertedPolynomial
-      let powersAllUnique = length powers == length (List.nub powers)
-
-      if powersAllUnique
-        then do
-          -- we have a binary representation
-          -- we can now bind the variables
-          forM_ (deriveCoeffs constant invertedPolynomial) $ \(var, val) -> do
-            bindVar var (if val then 1 else 0)
-
-          return Eliminated
-        else do
-          -- we don't have a binary representation
-          -- we can't do anything
-          return (Stuck (AddConstraint polynomial))
+          powersAllUnique = length powers == length (List.nub powers)
+       in if powersAllUnique
+            then case IntMap.lookupMin invertedPolynomial of
+              Nothing -> Just []
+              Just (minPower, _) ->
+                -- if the smallest power is negative, make it 2^0
+                if minPower < 0
+                  then
+                    let normalizedPolynomial = IntMap.mapKeys (\i -> i - minPower) invertedPolynomial
+                        constant = Poly.constant polynomial * (2 ^ (-minPower)) / picked
+                     in Just (deriveCoeffs constant normalizedPolynomial)
+                  else Just (deriveCoeffs (Poly.constant polynomial / picked) invertedPolynomial)
+            else Nothing
   where
-    collectCoeffs :: (GaloisField n, Integral n) => Ranges -> Poly n -> FoldState
-    collectCoeffs boolVarRanges xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
+    collectCoeffs :: (GaloisField n, Integral n) => Poly n -> FoldState n
+    collectCoeffs xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
       where
-        isBoolean :: Var -> Bool
-        isBoolean var = case IntMap.lookupLE var boolVarRanges of
-          Nothing -> False
-          Just (index, len) -> var < index + len
-
-        go :: (GaloisField n, Integral n) => FoldState -> Var -> n -> FoldState
-        go Start var coeff = case isPowerOf2 coeff of
-          Nothing -> Failed
-          Just (sign, power) -> Continue (IntMap.singleton power (sign, var))
+        go :: (GaloisField n, Integral n) => FoldState n -> Var -> n -> FoldState n
+        go Start var coeff =
+          if isBoolean var
+            then -- since this is the first coefficient, we can always assume that it's a power of 2
+              Continue coeff (IntMap.singleton 0 (True, var))
+            else Failed
         go Failed _ _ = Failed
-        go (Continue coeffs) var coeff = case isPowerOf2 coeff of
-          Nothing -> Failed
-          Just (sign, power) ->
-            let uniqueCoeff = IntMap.notMember power coeffs
-             in if isBoolean var && uniqueCoeff
-                  then Continue (IntMap.insert power (sign, var) coeffs)
-                  else Failed
-detectBinRep (Stuck polynomial) = return (Stuck polynomial)
+        go (Continue picked coeffs) var coeff =
+          if isBoolean var
+            then case isPowerOf2' (coeff / picked) of
+              Just power -> Continue picked (IntMap.insert power (True, var) coeffs)
+              Nothing -> case isPowerOf2' (picked / coeff) of
+                Just power -> Continue picked (IntMap.insert (-power) (True, var) coeffs)
+                Nothing -> case isPowerOf2' ((-coeff) / picked) of
+                  Just power -> Continue picked (IntMap.insert power (False, var) coeffs)
+                  Nothing -> case isPowerOf2' (picked / (-coeff)) of
+                    Just power -> Continue picked (IntMap.insert (-power) (False, var) coeffs)
+                    Nothing -> Failed
+            else Failed
 
 -- | See if a coefficient is a power of 2
 --   Note that, because these coefficients are field elements,
 --    they can be powers of 2 when viewed as either "positive integers" or "negative integers"
-isPowerOf2 :: (GaloisField n, Integral n) => n -> Maybe (Bool, Int)
-isPowerOf2 (-2) = Just (False, 1)
-isPowerOf2 (-1) = Just (False, 0)
-isPowerOf2 1 = Just (True, 0)
-isPowerOf2 2 = Just (True, 1)
-isPowerOf2 coeff =
-  let asInteger = toInteger coeff
-   in if even asInteger
-        then (True,) <$> check asInteger
-        else (False,) <$> check (negate (fromIntegral (order coeff) - fromIntegral coeff))
+isPowerOf2' :: (GaloisField n, Integral n) => n -> Maybe Int
+isPowerOf2' 1 = Just 0
+isPowerOf2' 2 = Just 1
+isPowerOf2' coeff = check (toInteger coeff)
   where
     -- Speed this up
     check :: Integer -> Maybe Int
@@ -497,11 +504,24 @@ isPowerOf2 coeff =
             then Just expected
             else Nothing
 
--- let (normalized, sign) = normalize coeff
---     expected = floor (logBase 2 (fromInteger (abs normalized)) :: Double)
---  in if abs normalized == 2 ^ expected
---       then Just (expected, sign)
---       else Nothing
+-- isPowerOf2 :: (GaloisField n, Integral n) => n -> Maybe (Bool, Int)
+-- isPowerOf2 (-2) = Just (False, 1)
+-- isPowerOf2 (-1) = Just (False, 0)
+-- isPowerOf2 1 = Just (True, 0)
+-- isPowerOf2 2 = Just (True, 1)
+-- isPowerOf2 coeff =
+--   let asInteger = toInteger coeff
+--    in if even asInteger
+--         then (True,) <$> check asInteger
+--         else (False,) <$> check (negate (fromIntegral (order coeff) - fromIntegral coeff))
+--   where
+--     -- Speed this up
+--     check :: Integer -> Maybe Int
+--     check n =
+--       let expected = floor (logBase 2 (fromInteger (abs n)) :: Double)
+--        in if abs n == 2 ^ expected
+--             then Just expected
+--             else Nothing
 
 -- if (x - y) = 0 then m = 0 else m = recip (x - y)
 shrinkEqZero :: (GaloisField n, Integral n) => (Poly n, Var) -> M n (Result (Poly n, Var))
