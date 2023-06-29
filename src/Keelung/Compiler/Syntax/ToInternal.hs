@@ -4,18 +4,17 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
-import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
+import Keelung.Compiler.FieldInfo
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Syntax (HasWidth (widthOf), Var)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax qualified as T
 
-run :: (GaloisField n, Integral n) => T.Elaborated -> Internal n
-run (T.Elaborated expr comp) =
+run :: (GaloisField n, Integral n) => FieldInfo -> T.Elaborated -> Internal n
+run fieldInfo (T.Elaborated expr comp) =
   let T.Computation counters assertions sideEffects = comp
       proxy = 0
-      numBitWidth = bitSize proxy
-   in runM counters numBitWidth $ do
+   in runM counters (fieldWidth fieldInfo) $ do
         exprs <- sameType proxy <$> convertExprAndAllocOutputVar expr
         assertions' <- concat <$> mapM convertExpr assertions
         counters' <- get
@@ -23,7 +22,7 @@ run (T.Elaborated expr comp) =
         return $
           Internal
             { internalExpr = exprs,
-              internalFieldBitWidth = numBitWidth,
+              internalFieldBitWidth = fieldWidth fieldInfo,
               internalCounters = counters',
               internalAssertions = assertions',
               internalSideEffects = sideEffects'

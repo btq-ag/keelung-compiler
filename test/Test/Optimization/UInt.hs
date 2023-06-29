@@ -24,8 +24,8 @@ tests = do
           c <- reuse $ a * b
           return $ c .&. 5
         -- debug cs'
-        cs `shouldHaveSize` 21
-        cs' `shouldHaveSize` 21
+        cs `shouldHaveSize` 36
+        cs' `shouldHaveSize` 36
 
     describe "Addition / Subtraction" $ do
       it "2 variables" $ do
@@ -80,8 +80,8 @@ tests = do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Public
           return $ x * y
-        cs `shouldHaveSize` 13
-        cs' `shouldHaveSize` 13
+        cs `shouldHaveSize` 25
+        cs' `shouldHaveSize` 25
 
       -- TODO: should've been just 10
       it "variable / constant" $ do

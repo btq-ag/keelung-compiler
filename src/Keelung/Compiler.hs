@@ -91,8 +91,8 @@ generateWitness fieldInfo program rawPublicInputs rawPrivateInputs = do
   generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs
 
 -- elaborate => rewrite => to internal syntax
-convertToInternal :: (GaloisField n, Integral n, Encode t) => Comp t -> Either (Error n) (Internal n)
-convertToInternal prog = ToInternal.run <$> elaborateAndEncode prog
+convertToInternal :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (Internal n)
+convertToInternal fieldInfo prog = ToInternal.run fieldInfo <$> elaborateAndEncode prog
 
 -- elaborate => rewrite => to internal syntax => compile => relocate
 compileWithoutConstProp :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
@@ -112,7 +112,7 @@ compileToModules ::
   FieldInfo ->
   Comp t ->
   Either (Error n) (ConstraintModule n)
-compileToModules fieldInfo prog = elaborateAndEncode prog >>= Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run >>= left CompileError . Optimizer.run
+compileToModules fieldInfo prog = elaborateAndEncode prog >>= Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run fieldInfo >>= left CompileError . Optimizer.run
 
 -- | 'compile' defaults to 'compileO1'
 compile ::
@@ -140,10 +140,10 @@ generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   return (counters, outputs, witness)
 
 compileO0Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintModule n)
-compileO0Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run
+compileO0Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run fieldInfo
 
 compileO1Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintSystem n)
-compileO1Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run >=> left CompileError . Optimizer.run >=> return . Linker.linkConstraintModule
+compileO1Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run fieldInfo >=> left CompileError . Optimizer.run >=> return . Linker.linkConstraintModule
 
 --------------------------------------------------------------------------------
 
