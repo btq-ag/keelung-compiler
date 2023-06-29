@@ -19,11 +19,9 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
-import Keelung.Compiler.Syntax.FieldBits (toBits)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
-import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Interpreter.Arithmetics (U (UVal))
@@ -55,12 +53,11 @@ run' r1cs inputs = do
 --   3. binary representation constraints
 --   4. CNEQ constraints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Either (Error n) (Seq (Constraint n))
-fromOrdinaryConstraints (R1CS _ ordinaryConstraints binReps counters eqZeros divMods modInvs) = do
+fromOrdinaryConstraints (R1CS _ ordinaryConstraints _ counters eqZeros divMods modInvs) = do
   constraints <- concat <$> mapM differentiate ordinaryConstraints
   return $
     Seq.fromList constraints
       <> Seq.fromList (map BooleanConstraint booleanInputVarConstraints)
-      <> Seq.fromList (map BinRepConstraint binReps)
       -- <> Seq.fromList (map (BinRepConstraint2 . toList) binReps')
       <> Seq.fromList (map EqZeroConstraint eqZeros)
       <> Seq.fromList (map DivModConstaint divMods)
@@ -131,7 +128,6 @@ shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBoole
 shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 -- shrink (DivModConstaint2 divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
-shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
 shrink (ModInvConstraint modInv) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInv
 
 shrinkAdd :: (GaloisField n, Integral n) => Poly n -> M n (Result (Constraint n))
@@ -389,32 +385,6 @@ shrinkModInv (aVar, outVar, nVar, p) = do
     Nothing -> return $ Stuck (aVar, outVar, nVar, p)
 
 -- | Trying to reduce a BinRep constraint
-shrinkBinRep :: (GaloisField n, Integral n) => BinRep -> M n (Result BinRep)
-shrinkBinRep binRep@(BinRep var width bitVarStart) = do
-  varResult <- lookupVar var
-  case varResult of
-    -- value of "var" is known
-    Just val -> do
-      let bitVals = toBits val
-      forM_ (zip [bitVarStart .. bitVarStart + width - 1] bitVals) $ \(bitVar, bitVal) -> do
-        bindVar bitVar bitVal
-      return Eliminated
-    Nothing -> do
-      -- see if all bit variables are bound
-      bitVal <- foldM go (Just 0) [bitVarStart + width - 1, bitVarStart + width - 2 .. bitVarStart]
-      case bitVal of
-        Nothing -> return $ Stuck binRep
-        Just bitVal' -> do
-          bindVar var bitVal'
-          return Eliminated
-  where
-    go acc bitVar = case acc of
-      Nothing -> return Nothing
-      Just accVal -> do
-        bitValue <- lookupVar bitVar
-        case bitValue of
-          Nothing -> return Nothing
-          Just bit -> return (Just (accVal * 2 + bit))
 
 data FoldState = Start | Failed | Continue (IntMap (Bool, Var)) deriving (Eq, Show)
 

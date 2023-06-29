@@ -22,7 +22,6 @@ import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
-import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.VarGroup
 import Keelung.Interpreter.Arithmetics (U)
@@ -66,7 +65,6 @@ data Constraint n
   | EqZeroConstraint (Poly n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
     DivModConstaint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))
-  | BinRepConstraint BinRep
   | -- \| (a, n, p) where modInv a * a = n * p + 1
 
     -- | BinRepConstraint2 [(Var, Int)]
@@ -89,7 +87,6 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
       <> show quotient
       <> " + $"
       <> show remainder
-  show (BinRepConstraint binRep) = "(BinRep)    " <> show binRep
   -- show (BinRepConstraint2 segments) = "(BinRep)    " <> show segments
   show (ModInvConstraint (var, _, _, p)) = "(ModInv)    $" <> show var <> "⁻¹ (mod " <> show p <> ")"
 
@@ -101,7 +98,6 @@ instance Functor Constraint where
   fmap _ (BooleanConstraint var) = BooleanConstraint var
   fmap f (EqZeroConstraint (xs, m)) = EqZeroConstraint (fmap f xs, m)
   fmap _ (DivModConstaint (a, b, q, r)) = DivModConstaint (a, b, q, r)
-  fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
   fmap _ (ModInvConstraint (a, output, n, p)) = ModInvConstraint (a, output, n, p)
 
 --------------------------------------------------------------------------------
