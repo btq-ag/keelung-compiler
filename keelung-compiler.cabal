@@ -38,7 +38,6 @@ library
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
-      Keelung.Compiler.FieldInfo
       Keelung.Compiler.Linker
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -107,7 +106,6 @@ executable keelungc
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
-      Keelung.Compiler.FieldInfo
       Keelung.Compiler.Linker
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -202,7 +200,6 @@ test-suite keelung-test
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
-      Keelung.Compiler.FieldInfo
       Keelung.Compiler.Linker
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation

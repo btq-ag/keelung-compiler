@@ -11,7 +11,7 @@ import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
-import Keelung.Compiler.FieldInfo
+import Keelung.Data.FieldInfo
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU

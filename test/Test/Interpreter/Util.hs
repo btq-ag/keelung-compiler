@@ -13,7 +13,7 @@ import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.ConstraintModule (ConstraintModule)
 import Keelung.Compiler.ConstraintSystem qualified as CS
-import Keelung.Compiler.FieldInfo
+import Keelung.Data.FieldInfo
 import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))

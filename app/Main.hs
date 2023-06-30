@@ -30,7 +30,7 @@ import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
 import Option
-import Keelung.Compiler.FieldInfo
+import Keelung.Data.FieldInfo
 import Data.Field.Galois (GaloisField, Prime, Binary)
 
 convert :: Integral n => Either String (R1CS n) -> Either String (R1CS Integer)

@@ -14,7 +14,6 @@ import Data.IntSet qualified as IntSet
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Compiler.ConstraintSystem hiding (numberOfConstraints)
-import Keelung.Compiler.FieldInfo
 import Keelung.Compiler.Util
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1C qualified as R1C
@@ -38,7 +37,7 @@ satisfyR1CS witness r1cs =
 toR1CS :: GaloisField n => ConstraintSystem n -> R1CS n
 toR1CS cs =
   R1CS
-    { r1csField = (fieldTypeData (csField cs), toInteger $ fieldChar (csField cs), toInteger $ fieldDeg (csField cs)),
+    { r1csField = csField cs,
       r1csConstraints = map toR1C (toList (csConstraints cs)),
       r1csBinReps = [],
       r1csCounters = csCounters cs,

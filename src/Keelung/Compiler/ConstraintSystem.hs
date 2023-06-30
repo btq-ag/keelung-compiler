@@ -16,7 +16,7 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters hiding (prettyConstraints)
-import Keelung.Compiler.FieldInfo
+import Keelung.Data.FieldInfo
 
 --------------------------------------------------------------------------------
 

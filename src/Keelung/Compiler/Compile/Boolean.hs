@@ -11,7 +11,7 @@ import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
-import Keelung.Compiler.FieldInfo
+import Keelung.Data.FieldInfo
 import Keelung.Compiler.Syntax.Internal
 
 compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> (ExprF n -> M n (LC n)) -> ExprB n -> M n (Either RefB Bool)

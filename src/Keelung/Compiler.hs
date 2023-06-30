@@ -51,7 +51,7 @@ import Keelung.Compiler.Compile qualified as Compile
 import Keelung.Compiler.ConstraintModule (ConstraintModule)
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
-import Keelung.Compiler.FieldInfo
+import Keelung.Data.FieldInfo
 import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation

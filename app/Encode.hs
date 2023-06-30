@@ -17,6 +17,7 @@ import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
+import Keelung.Data.FieldInfo
 import Keelung.Syntax
 import Keelung.Syntax.Counters hiding (reindex)
 
@@ -49,7 +50,8 @@ serializeR1CS r1cs =
 
     counters = r1csCounters r1cs
 
-    (_, characteristic, degree) = r1csField r1cs
+    characteristic = fromIntegral (fieldChar (r1csField r1cs))
+    degree = fromIntegral (fieldDeg (r1csField r1cs))
 
     -- outputs & public inputs
     outputAndPublicInputCount = getCount counters Output + getCount counters PublicInput

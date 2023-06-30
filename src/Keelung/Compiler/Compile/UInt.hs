@@ -10,7 +10,7 @@ import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
-import Keelung.Compiler.FieldInfo (FieldInfo (..))
+import Keelung.Data.FieldInfo (FieldInfo (..))
 
 -- Model of addition: elementary school addition with possibly multiple carries
 --

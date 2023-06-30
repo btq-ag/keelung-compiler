@@ -4,7 +4,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
-import Keelung.Compiler.FieldInfo
+import Keelung.Data.FieldInfo
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Syntax (HasWidth (widthOf), Var)
 import Keelung.Syntax.Counters

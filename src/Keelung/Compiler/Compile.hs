@@ -24,7 +24,7 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
-import Keelung.Compiler.FieldInfo (FieldInfo)
+import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
