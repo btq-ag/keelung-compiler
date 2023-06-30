@@ -28,16 +28,17 @@ import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax
 import Keelung.Syntax.Counters
+import Keelung.Data.FieldInfo
 
 --------------------------------------------------------------------------------
 
 -- | Monad for R1CS interpretation / witness generation
-type M n = ReaderT Ranges (StateT (IntMap n) (Except (Error n)))
+type M n = ReaderT (Ranges, Width) (StateT (IntMap n) (Except (Error n)))
 
-runM :: (GaloisField n, Integral n) => Ranges -> Inputs n -> M n a -> Either (Error n) (Vector n)
-runM boolVarRanges inputs p =
+runM :: (GaloisField n, Integral n) => Ranges -> FieldInfo -> Inputs n -> M n a -> Either (Error n) (Vector n)
+runM boolVarRanges fieldInfo inputs p =
   let counters = Inputs.inputCounters inputs
-   in case runExcept (execStateT (runReaderT p boolVarRanges) (Inputs.toIntMap inputs)) of
+   in case runExcept (execStateT (runReaderT p (boolVarRanges, fieldWidth fieldInfo)) (Inputs.toIntMap inputs)) of
         Left err -> Left err
         Right bindings -> case toEither $ toTotal' (getCount counters PublicInput + getCount counters PrivateInput, bindings) of
           Left unbound -> Left (VarUnassignedError unbound)

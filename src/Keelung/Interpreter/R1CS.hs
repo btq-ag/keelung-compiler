@@ -16,6 +16,7 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
+import Keelung
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
@@ -24,7 +25,6 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Interpreter.R1CS.Monad
-import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
 
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n)
@@ -36,7 +36,7 @@ run' r1cs inputs = do
   let booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts), (Intermediate, ReadBool), (Intermediate, ReadAllUInts)]
   let boolVarRanges = getRanges (r1csCounters r1cs) booleanConstraintCategories
   constraints <- fromOrdinaryConstraints r1cs
-  witness <- runM boolVarRanges inputs $ goThroughManyTimes constraints
+  witness <- runM boolVarRanges (r1csField r1cs) inputs $ goThroughManyTimes constraints
 
   -- extract output values from the witness
   let outputRanges = getRanges (r1csCounters r1cs) [(Output, ReadField), (Output, ReadBool), (Output, ReadAllUInts)]
@@ -61,8 +61,8 @@ fromOrdinaryConstraints (R1CS _ ordinaryConstraints _ counters eqZeros divMods m
       <> Seq.fromList (map ModInvConstraint modInvs)
   where
     booleanInputVarConstraints =
-      let generate (start, end) = [start .. end - 1]
-       in concatMap generate (getBooleanConstraintRanges counters)
+      let generateRange (start, end) = [start .. end - 1]
+       in concatMap generateRange (getBooleanConstraintRanges counters)
 
     differentiate :: (GaloisField n, Integral n) => R1C n -> Either (Error n) [Constraint n]
     differentiate (R1C (Left a) (Left b) (Left c)) = if a * b == c then Right [] else Left ConflictingValues
@@ -125,7 +125,7 @@ shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBoole
 shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 -- shrink (DivModConstaint2 divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
-shrink (ModInvConstraint modInv) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInv
+shrink (ModInvConstraint modInvHint) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInvHint
 
 shrinkAdd :: (GaloisField n, Integral n) => Poly n -> M n (Result (Constraint n))
 shrinkAdd xs = do
@@ -420,11 +420,11 @@ shrinkBinRep NothingToDo = return NothingToDo
 shrinkBinRep Eliminated = return Eliminated
 shrinkBinRep (Shrinked polynomial) = return (Shrinked polynomial)
 shrinkBinRep (Stuck (AddConstraint polynomial)) = do
-  boolVarRanges <- ask
+  (boolVarRanges, fieldBitWidth) <- ask
   let isBoolean var = case IntMap.lookupLE var boolVarRanges of
         Nothing -> False
         Just (index, len) -> var < index + len
-  case detectBinRep isBoolean polynomial of
+  case detectBinRep fieldBitWidth isBoolean polynomial of
     Nothing -> return (Stuck (AddConstraint polynomial))
     Just assignments -> do
       -- we have a binary representation
@@ -444,26 +444,28 @@ shrinkBinRep (Stuck polynomial) = return (Stuck polynomial)
 --    1. There can be at most `k` coefficients that are multiples of powers of 2 if the polynomial is a binary representation.
 --    2. These coefficients cannot be too far apart, i.e., the quotient of any 2 coefficients cannot be greater than `2^(k-1)`.
 --    3. For any 2 coefficients `a` and `b`, either `a / b` or `b / a` must be a power of 2 smaller than `2^k`.
-detectBinRep :: (GaloisField n, Integral n) => (Var -> Bool) -> Poly n -> Maybe [(Var, Bool)]
-detectBinRep isBoolean polynomial =
-  case collectCoeffs polynomial of
-    Start -> Nothing
-    Failed -> Nothing
-    Continue picked invertedPolynomial ->
-      let powers = IntMap.keys invertedPolynomial
-          powersAllUnique = length powers == length (List.nub powers)
-       in if powersAllUnique
-            then case IntMap.lookupMin invertedPolynomial of
-              Nothing -> Just []
-              Just (minPower, _) ->
-                -- if the smallest power is negative, make it 2^0
-                if minPower < 0
-                  then
-                    let normalizedPolynomial = IntMap.mapKeys (\i -> i - minPower) invertedPolynomial
-                        constant = Poly.constant polynomial * (2 ^ (-minPower)) / picked
-                     in Just (deriveCoeffs constant normalizedPolynomial)
-                  else Just (deriveCoeffs (Poly.constant polynomial / picked) invertedPolynomial)
-            else Nothing
+detectBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe [(Var, Bool)]
+detectBinRep fieldBitWidth isBoolean polynomial =
+  if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
+    then Nothing
+    else case collectCoeffs polynomial of
+      Start -> Nothing
+      Failed -> Nothing
+      Continue picked invertedPolynomial ->
+        let powers = IntMap.keys invertedPolynomial
+            powersAllUnique = length powers == length (List.nub powers)
+         in if powersAllUnique
+              then case IntMap.lookupMin invertedPolynomial of
+                Nothing -> Just []
+                Just (minPower, _) ->
+                  -- if the smallest power is negative, make it 2^0
+                  if minPower < 0
+                    then
+                      let normalizedPolynomial = IntMap.mapKeys (\i -> i - minPower) invertedPolynomial
+                          constant = Poly.constant polynomial * (2 ^ (-minPower)) / picked
+                       in Just (deriveCoeffs constant normalizedPolynomial)
+                    else Just (deriveCoeffs (Poly.constant polynomial / picked) invertedPolynomial)
+              else Nothing
   where
     collectCoeffs :: (GaloisField n, Integral n) => Poly n -> FoldState n
     collectCoeffs xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
@@ -477,24 +479,38 @@ detectBinRep isBoolean polynomial =
         go Failed _ _ = Failed
         go (Continue picked coeffs) var coeff =
           if isBoolean var
-            then case isPowerOf2' (coeff / picked) of
-              Just power -> Continue picked (IntMap.insert power (True, var) coeffs)
-              Nothing -> case isPowerOf2' (picked / coeff) of
-                Just power -> Continue picked (IntMap.insert (-power) (True, var) coeffs)
-                Nothing -> case isPowerOf2' ((-coeff) / picked) of
-                  Just power -> Continue picked (IntMap.insert power (False, var) coeffs)
-                  Nothing -> case isPowerOf2' (picked / (-coeff)) of
-                    Just power -> Continue picked (IntMap.insert (-power) (False, var) coeffs)
+            then
+              let result = case isPowerOf2' fieldBitWidth (coeff / picked) of
+                    Just power -> Just (power, True)
+                    Nothing -> case isPowerOf2' fieldBitWidth (picked / coeff) of
+                      Just power -> Just (-power, True)
+                      Nothing -> case isPowerOf2' fieldBitWidth ((-coeff) / picked) of
+                        Just power -> Just (power, False)
+                        Nothing -> case isPowerOf2' fieldBitWidth (picked / (-coeff)) of
+                          Just power -> Just (-power, False)
+                          Nothing -> Nothing
+               in case result of
                     Nothing -> Failed
+                    Just (power, sign) ->
+                      case IntMap.lookup power coeffs of
+                        Nothing -> Continue picked (IntMap.insert power (sign, var) coeffs)
+                        Just _ -> Failed
             else Failed
 
 -- | See if a coefficient is a power of 2
 --   Note that, because these coefficients are field elements,
 --    they can be powers of 2 when viewed as either "positive integers" or "negative integers"
-isPowerOf2' :: (GaloisField n, Integral n) => n -> Maybe Int
-isPowerOf2' 1 = Just 0
-isPowerOf2' 2 = Just 1
-isPowerOf2' coeff = check (toInteger coeff)
+isPowerOf2' :: (GaloisField n, Integral n) => Width -> n -> Maybe Int
+isPowerOf2' _ 1 = Nothing
+isPowerOf2' _ 2 = Just 1
+isPowerOf2' fieldBitWidth coeff =
+  case check (toInteger coeff) of
+    Nothing -> Nothing
+    Just 0 -> Nothing --
+    Just result ->
+      if result >= fieldBitWidth
+        then Nothing
+        else Just result
   where
     -- Speed this up
     check :: Integer -> Maybe Int
