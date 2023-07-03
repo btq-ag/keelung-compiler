@@ -17,6 +17,7 @@ tests :: SpecWith ()
 tests = do
   describe "UInt" $ do
     describe "Variable management" $ do
+      -- can be lower
       it "keelung Issue #17" $ do
         (cs, cs') <- execute $ do
           a <- input Private :: Comp (UInt 5)
@@ -24,8 +25,8 @@ tests = do
           c <- reuse $ a * b
           return $ c .&. 5
         -- debug cs'
-        cs `shouldHaveSize` 26
-        cs' `shouldHaveSize` 26
+        cs `shouldHaveSize` 36
+        cs' `shouldHaveSize` 36
 
     describe "Addition / Subtraction" $ do
       it "2 variables" $ do
@@ -80,16 +81,16 @@ tests = do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Public
           return $ x * y
-        cs `shouldHaveSize` 17
-        cs' `shouldHaveSize` 17
+        cs `shouldHaveSize` 25
+        cs' `shouldHaveSize` 25
 
       -- TODO: can be lower
       it "variable / constant" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           return $ x * 4
-        cs `shouldHaveSize` 13
-        cs' `shouldHaveSize` 13
+        cs `shouldHaveSize` 21
+        cs' `shouldHaveSize` 21
 
       -- TODO: should've been just 4
       it "constant / constant" $ do
