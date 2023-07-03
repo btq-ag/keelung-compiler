@@ -3,6 +3,7 @@ module Keelung.Compiler.Compile.UInt where
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Bits qualified
+import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung
@@ -265,27 +266,12 @@ compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer
 compileMulU width out (Right a) (Right b) = do
   let val = a * b
   writeValU width out val
-compileMulU width out (Right a) (Left b) = compileMulCV width out a b
--- carry <- replicateM width (B <$> freshRefB)
--- let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
--- let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
--- let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
--- writeMul (fromInteger a, []) (0, bs) (0, outputSegment <> carrySegment)
-compileMulU width out (Left a) (Right b) = compileMulCV width out b a
-compileMulU width out (Left a) (Left b) = do
-  compileMulVV width out a b
+compileMulU width out (Right a) (Left b) = compileMul width out b (Left a)
+compileMulU width out (Left a) (Right b) = compileMul width out a (Left b)
+compileMulU width out (Left a) (Left b) = compileMul width out a (Right b)
 
--- carry <- replicateM width (B <$> freshRefB)
-
--- let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
--- let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
--- let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
--- let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-
--- writeMul (0, as) (0, bs) (0, outputSegment <> carrySegment)
-
-compileMulCV :: (GaloisField n, Integral n) => Width -> RefU -> Integer -> RefU -> M n ()
-compileMulCV width out c x = do
+compileMul :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either Integer RefU -> M n ()
+compileMul width out x y = do
   fieldInfo <- gets cmField
 
   -- invariants about widths of carry and limbs:
@@ -312,55 +298,9 @@ compileMulCV width out c x = do
     Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     _ -> do
       let limbNumber = ceiling (fromIntegral width / fromIntegral limbWidth :: Double) :: Int
-
       let currentLimbWidth = limbWidth
       let limbStart = 0
-      case limbNumber of
-        1 -> do
-          mul1x1 dimensions currentLimbWidth limbStart out x (Left c)
-        2 -> do
-          mul2x2 dimensions currentLimbWidth limbStart out x (Left c)
-        3 -> do
-          mul3x3 dimensions currentLimbWidth limbStart out x (Left c)
-        _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-
-compileMulVV :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
-compileMulVV width out x y = do
-  fieldInfo <- gets cmField
-
-  -- invariants about widths of carry and limbs:
-  --  1. limb width * 2 ≤ field width
-  let maxLimbWidth = fieldWidth fieldInfo `div` 2
-  let minLimbWidth = 2 -- TEMPORARY HACK FOR ADDITION
-  let limbWidth = minLimbWidth `max` widthOf x `min` maxLimbWidth
-
-  let dimensions =
-        Dimensions
-          { dimUIntWidth = width,
-            dimMaxHeight = 2 ^ limbWidth,
-            dimCarryWidth = limbWidth
-          }
-
-  case fieldTypeData fieldInfo of
-    Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    Prime 5 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    Prime 7 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    Prime 11 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    _ -> do
-      let limbNumber = ceiling (fromIntegral width / fromIntegral limbWidth :: Double) :: Int
-      let currentLimbWidth = limbWidth
-      let limbStart = 0
-      case limbNumber of
-        1 -> do
-          mul1x1 dimensions currentLimbWidth limbStart out x (Right y)
-        2 -> do
-          mul2x2 dimensions currentLimbWidth limbStart out x (Right y)
-        3 -> do
-          mul3x3 dimensions currentLimbWidth limbStart out x (Right y)
-        _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+      mulnxn dimensions currentLimbWidth limbStart limbNumber out x y
 
 mul2Limbs :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> (n, Limb) -> Either n (n, Limb) -> M n (Limb, Limb)
 mul2Limbs dimensions currentLimbWidth limbStart (a, x) operand = do
@@ -407,98 +347,60 @@ _mul2LimbPreallocated dimensions currentLimbWidth limbStart (a, x) operand lower
 
   return upperLimb
 
--- | 1-limb by 1-limb multiplication
---                             x0
--- x                           y0
--- ------------------------------------------
---                          x0*y0
-mul1x1 :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> RefU -> RefU -> Either Integer RefU -> M n ()
-mul1x1 dimensions currentLimbWidth limbStart out x operand = do
-  let x0 = Limb x currentLimbWidth limbStart (replicate currentLimbWidth True)
-  let y0 = case operand of
-        Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbStart + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-        Right variable -> Right (0, Limb variable currentLimbWidth limbStart (replicate currentLimbWidth True))
-  (lowerX0Y0, _) <- mul2Limbs dimensions currentLimbWidth limbStart (0, x0) y0
-  writeEqU currentLimbWidth out (lmbRef lowerX0Y0)
-
--- | 2-limb by 2-limb multiplication
---                          x1 x0
--- x                        y1 y0
--- ------------------------------------------
---                          x0*y0
---                       x1*y0
---                       x0*y1
---                    x1*y1
--- ------------------------------------------
-mul2x2 :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> RefU -> RefU -> Either Integer RefU -> M n ()
-mul2x2 dimensions currentLimbWidth limbStart out x operand = do
-  let x0 = Limb x currentLimbWidth limbStart (replicate currentLimbWidth True)
-  let x1 = Limb x currentLimbWidth (limbStart + currentLimbWidth) (replicate currentLimbWidth True)
-
-  let c0 = case operand of
-        Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbStart + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-        Right variable -> Right (0, Limb variable currentLimbWidth limbStart (replicate currentLimbWidth True))
-  let c1 = case operand of
-        Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbStart + currentLimbWidth + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-        Right variable -> Right (0, Limb variable currentLimbWidth (limbStart + currentLimbWidth) (replicate currentLimbWidth True))
-
-  (lowerX0Y0, upperX0Y0) <- mul2Limbs dimensions currentLimbWidth limbStart (0, x0) c0
-  (lowerX1Y0, _) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth) (0, x1) c0
-  (lowerX0Y1, _) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth) (0, x0) c1
-
-  -- column 0
-  writeEqU currentLimbWidth out (lmbRef lowerX0Y0)
-  -- column 1
-  let resultLimb1 = Limb out currentLimbWidth (limbStart + currentLimbWidth) (replicate currentLimbWidth True)
-  _ <- addWholeColumn dimensions limbStart currentLimbWidth 0 resultLimb1 [upperX0Y0, lowerX1Y0, lowerX0Y1]
-  return ()
-
--- | 3-limb by 3-limb multiplication
---                          x2 x1 x0
--- x                        y2 y1 y0
+-- | n-limb by n-limb multiplication
+--                       .. x2 x1 x0
+-- x                     .. y2 y1 y0
 -- ------------------------------------------
 --                             x0*y0
 --                          x1*y0
 --                       x2*y0
+--                    .....
 --                          x0*y1
 --                       x1*y1
 --                    x2*y1
+--                 .....
 --                       x0*y2
 --                    x1*y2
 --                 x2*y2
+--               .....
 -- ------------------------------------------
-mul3x3 :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> RefU -> RefU -> Either Integer RefU -> M n ()
-mul3x3 dimensions currentLimbWidth limbStart out x operand = do
-  let x0 = Limb x currentLimbWidth limbStart (replicate currentLimbWidth True)
-  let x1 = Limb x currentLimbWidth (limbStart + currentLimbWidth) (replicate currentLimbWidth True)
-  let x2 = Limb x currentLimbWidth (limbStart + currentLimbWidth * 2) (replicate currentLimbWidth True)
+mulnxn :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> Int -> RefU -> RefU -> Either Integer RefU -> M n ()
+mulnxn dimensions currentLimbWidth limbStart arity out var operand = do
+  let xs = zip [0 ..] [Limb var currentLimbWidth (limbStart + currentLimbWidth * i) (replicate currentLimbWidth True) | i <- [0 .. arity - 1]]
+  let ys = zip [0 ..] $ case operand of
+        Left constant -> [Left $ sum [(if Data.Bits.testBit constant (limbStart + currentLimbWidth * j + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]] | j <- [0 .. arity - 1]]
+        Right variable -> [Right (0, Limb variable currentLimbWidth (limbStart + currentLimbWidth * j) (replicate currentLimbWidth True)) | j <- [0 .. arity - 1]]
 
-  let y0 = case operand of
-        Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbStart + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-        Right variable -> Right (0, Limb variable currentLimbWidth limbStart (replicate currentLimbWidth True))
-  let y1 = case operand of
-        Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbStart + currentLimbWidth + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-        Right variable -> Right (0, Limb variable currentLimbWidth (limbStart + currentLimbWidth) (replicate currentLimbWidth True))
-  let y2 = case operand of
-        Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbStart + currentLimbWidth * 2 + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-        Right variable -> Right (0, Limb variable currentLimbWidth (limbStart + currentLimbWidth * 2) (replicate currentLimbWidth True))
+  let limbPairs = [(xi + yi, x, y) | (xi, x) <- xs, (yi, y) <- ys, xi + yi < arity]
+  -- generate pairs of limbs to be added together
+  limbColumns <-
+    foldM
+      ( \columns (index, x, y) -> do
+          (lowerLimb, upperLimb) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth * index) (0, x) y
+          let columns' = case IntMap.lookup index columns of
+                Nothing -> IntMap.insert index [lowerLimb] columns
+                Just limbs -> IntMap.insert index (lowerLimb : limbs) columns
+          let columns'' =
+                if index == arity - 1 -- throw limbs higher than arity away
+                  then columns'
+                  else case IntMap.lookup (index + 1) columns' of
+                    Nothing -> IntMap.insert (index + 1) [upperLimb] columns'
+                    Just limbs -> IntMap.insert (index + 1) (upperLimb : limbs) columns'
+          return columns''
+      )
+      mempty
+      limbPairs
 
-  (lowerX0Y0, upperX0Y0) <- mul2Limbs dimensions currentLimbWidth limbStart (0, x0) y0
-  (lowerX1Y0, upperX1Y0) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth) (0, x1) y0
-  (lowerX2Y0, _upperX2Y0) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth * 2) (0, x2) y0
-  (lowerX0Y1, upperX0Y1) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth) (0, x0) y1
-  (lowerX1Y1, _upperX1Y1) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth * 2) (0, x1) y1
-  (_lowerX2Y1, _upperX2Y1) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth * 3) (0, x2) y1
-  (lowerX0Y2, _upperX0Y2) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth * 2) (0, x0) y2
-  -- (lowerX1Y2, upperX1Y2) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth * 3) (0, x1) (0, y2)
-  -- (lowerX2Y2, upperX2Y2) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth * 4) (0, x2) (0, y2)
-
-  -- column 0
-  writeEqU currentLimbWidth out (lmbRef lowerX0Y0)
-  -- column 1
-  let resultLimb1 = Limb out currentLimbWidth (limbStart + currentLimbWidth) (replicate currentLimbWidth True)
-  column1CarryLimbs <- addWholeColumn dimensions limbStart currentLimbWidth 0 resultLimb1 [upperX0Y0, lowerX1Y0, lowerX0Y1]
-  -- column 2
-  let resultLimb2 = Limb out currentLimbWidth (limbStart + currentLimbWidth * 2) (replicate currentLimbWidth True)
-  _ <- addWholeColumn dimensions limbStart currentLimbWidth 0 resultLimb2 $ column1CarryLimbs <> [upperX1Y0, upperX0Y1, lowerX2Y0, lowerX1Y1, lowerX0Y2]
-  return ()
+  -- go through each columns and add them up
+  foldM_
+    ( \previousCarryLimbs (index, limbs) -> do
+        if index == 0
+          then do
+            mapM_ (writeEqU currentLimbWidth out . lmbRef) limbs
+            return []
+          else do
+            let resultLimb = Limb out currentLimbWidth (limbStart + currentLimbWidth * index) (replicate currentLimbWidth True)
+            addWholeColumn dimensions limbStart currentLimbWidth 0 resultLimb (previousCarryLimbs <> limbs)
+    )
+    []
+    (IntMap.toList limbColumns)
