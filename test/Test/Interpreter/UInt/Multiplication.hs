@@ -111,3 +111,18 @@ tests =
       forAll genPair $ \(x, y) -> do
         let expected = [(x * y) `mod` 64]
         runAll (Prime 17) (program y) [x] [] expected
+
+--     it "n-limb variable x n-limb constant" $ do
+
+      
+--       let program y = do
+--             x <- inputUInt @32 Public
+--             return $ x * fromInteger y
+--       debug (Prime 1031) (program 3)
+--       -- let genPair = do
+--       --       x <- (arbitrary :: Gen Int)
+--       --       y <- (arbitrary :: Gen Int) 
+--       --       return (toInteger x, toInteger y)
+--       -- forAll genPair $ \(x, y) -> do
+--       --   let expected = [(x * y) `mod` (2 ^ 32)]
+--       --   runAll (Prime 17) (program y) [x] [] expected
