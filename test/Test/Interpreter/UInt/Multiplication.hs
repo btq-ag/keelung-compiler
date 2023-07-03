@@ -71,6 +71,20 @@ tests =
         let expected = [(x * y) `mod` 16]
         runAll (Prime 17) program [x, y] [] expected
 
+    it "2-limb variable x 2-limb constant" $ do
+      let program y = do
+            x <- inputUInt @4 Public
+            return $ x * fromInteger y
+      -- runAll (Prime 17) (program 0) [10] [] [0]
+      let genPair = do
+            x <- choose (0, 15)
+            y <- choose (0, 15)
+            return (x, y)
+      forAll genPair $ \(x, y) -> do
+        let expected = [(x * y) `mod` 16]
+        runAll (Prime 1031) (program y) [x] [] expected
+        runAll (Prime 17) (program y) [x] [] expected
+
     it "3-limb x 3-limb" $ do
       let program = do
             x <- inputUInt @6 Public
