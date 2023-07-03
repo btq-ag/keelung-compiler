@@ -54,7 +54,7 @@ tests =
       forAll genPair $ \(x, y) -> do
         let expected = [(x * y) `mod` 16]
         runAll (Prime 1031) (program y) [x] [] expected
-      --   runAll (Prime 17) (program y) [x] [] expected
+    --   runAll (Prime 17) (program y) [x] [] expected
 
     it "2-limb x 2-limb" $ do
       let program = do
