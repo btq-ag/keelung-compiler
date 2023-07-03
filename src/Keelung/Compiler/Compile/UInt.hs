@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.UInt where
+module Keelung.Compiler.Compile.UInt (compileAddU, compileSubU, compileMulU) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -183,9 +183,6 @@ data Limb = Limb
 limbIsPositive :: Limb -> Bool
 limbIsPositive = and . lmbSigns
 
-fromLimb :: Limb -> RefU
-fromLimb = lmbRef
-
 allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
 allocLimb w offset sign = do
   refU <- freshRefU w
@@ -366,16 +363,17 @@ _mul2LimbPreallocated dimensions currentLimbWidth limbStart (a, x) operand lower
 -- ------------------------------------------
 mulnxn :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> Int -> RefU -> RefU -> Either Integer RefU -> M n ()
 mulnxn dimensions currentLimbWidth limbStart arity out var operand = do
-  let xs = zip [0 ..] [Limb var currentLimbWidth (limbStart + currentLimbWidth * i) (replicate currentLimbWidth True) | i <- [0 .. arity - 1]]
-  let ys = zip [0 ..] $ case operand of
-        Left constant -> [Left $ sum [(if Data.Bits.testBit constant (limbStart + currentLimbWidth * j + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]] | j <- [0 .. arity - 1]]
-        Right variable -> [Right (0, Limb variable currentLimbWidth (limbStart + currentLimbWidth * j) (replicate currentLimbWidth True)) | j <- [0 .. arity - 1]]
-
-  let limbPairs = [(xi + yi, x, y) | (xi, x) <- xs, (yi, y) <- ys, xi + yi < arity]
+  -- generate pairs of indices for choosing limbs
+  let indices = [(xi, columnIndex - xi) | columnIndex <- [0 .. arity - 1], xi <- [0 .. columnIndex]]
   -- generate pairs of limbs to be added together
   limbColumns <-
     foldM
-      ( \columns (index, x, y) -> do
+      ( \columns (xi, yi) -> do
+          let x = Limb var currentLimbWidth (limbStart + currentLimbWidth * xi) (replicate currentLimbWidth True)
+          let y = case operand of
+                Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbStart + currentLimbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
+                Right variable -> Right (0, Limb variable currentLimbWidth (limbStart + currentLimbWidth * yi) (replicate currentLimbWidth True))
+          let index = xi + yi
           (lowerLimb, upperLimb) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth * index) (0, x) y
           let columns' = case IntMap.lookup index columns of
                 Nothing -> IntMap.insert index [lowerLimb] columns
@@ -389,8 +387,7 @@ mulnxn dimensions currentLimbWidth limbStart arity out var operand = do
           return columns''
       )
       mempty
-      limbPairs
-
+      indices
   -- go through each columns and add them up
   foldM_
     ( \previousCarryLimbs (index, limbs) -> do
