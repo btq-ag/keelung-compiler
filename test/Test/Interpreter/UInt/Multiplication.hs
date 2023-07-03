@@ -20,8 +20,8 @@ tests =
       let program x y = do
             return $ x * (y :: UInt 6)
       let genPair = do
-            x <- choose (0, 63)
-            y <- choose (0, 63)
+            x <- choose (-63, 63)
+            y <- choose (-63, 63)
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x * y) `mod` 64]
@@ -35,8 +35,8 @@ tests =
             return $ x * y
       -- debug (Prime 1031) program
       let genPair = do
-            x <- choose (0, 15)
-            y <- choose (0, 15)
+            x <- choose (-15, 15)
+            y <- choose (-15, 15)
             return (x, y)
 
       forAll genPair $ \(x, y) -> do
@@ -48,8 +48,8 @@ tests =
             x <- inputUInt @4 Public
             return $ x * fromInteger y
       let genPair = do
-            x <- choose (0, 15)
-            y <- choose (0, 15)
+            x <- choose (-15, 15)
+            y <- choose (-15, 15)
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x * y) `mod` 16]
@@ -64,8 +64,8 @@ tests =
       -- debug (Prime 17) program
       -- runAll (Prime 17) program [10, 2] [] [4]
       let genPair = do
-            x <- choose (0, 15)
-            y <- choose (0, 15)
+            x <- choose (-15, 15)
+            y <- choose (-15, 15)
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x * y) `mod` 16]
@@ -77,8 +77,8 @@ tests =
             return $ x * fromInteger y
       -- runAll (Prime 17) (program 0) [10] [] [0]
       let genPair = do
-            x <- choose (0, 15)
-            y <- choose (0, 15)
+            x <- choose (-15, 15)
+            y <- choose (-15, 15)
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x * y) `mod` 16]
@@ -93,9 +93,21 @@ tests =
       -- debug (Prime 17) program
       -- runAll (Prime 17) program [10, 2] [] [4]
       let genPair = do
-            x <- choose (0, 63)
-            y <- choose (0, 63)
+            x <- choose (-63, 63)
+            y <- choose (-63, 63)
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x * y) `mod` 64]
         runAll (Prime 17) program [x, y] [] expected
+
+    it "3-limb variable x 3-limb constant" $ do
+      let program y = do
+            x <- inputUInt @6 Public
+            return $ x * fromInteger y
+      let genPair = do
+            x <- choose (-63, 63)
+            y <- choose (-63, 63)
+            return (x, y)
+      forAll genPair $ \(x, y) -> do
+        let expected = [(x * y) `mod` 64]
+        runAll (Prime 17) (program y) [x] [] expected
