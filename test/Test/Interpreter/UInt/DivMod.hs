@@ -48,8 +48,8 @@ tests =
 
     it "assertDivMod (with wrong quotient constant)" $ do
       let program = assertDivMod 7 (3 :: UInt 4) 3 1
-      throwAll
-        gf181Info
+      throwBoth
+        gf181
         program
         []
         []
@@ -58,8 +58,8 @@ tests =
 
     it "assertDivMod (with wrong remainder constant)" $ do
       let program = assertDivMod 7 (3 :: UInt 4) 2 0
-      throwAll
-        gf181Info
+      throwBoth
+        gf181
         program
         []
         []

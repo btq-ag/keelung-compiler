@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Test.Interpreter.Util (throwAll, debug, assertSize, gf181Info, runAll, throwR1CS, throwBoth) where
+module Test.Interpreter.Util (debug, assertSize, gf181Info, runAll, throwR1CS, throwBoth) where
 
 import Control.Arrow (left)
 import Data.Field.Galois
@@ -52,17 +52,31 @@ interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
 
 --------------------------------------------------------------------------------
 
--- | Expect all interpreters to throw an error
-throwAll :: (GaloisField n, Integral n, Encode t, Show t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
-throwAll fieldInfo program rawPublicInputs rawPrivateInputs stError csError = do
-  -- syntax tree interpreters
-  interpretSyntaxTree program rawPublicInputs rawPrivateInputs
-    `shouldBe` Left (InterpretError stError)
-  -- constraint system interpreters
-  interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
-    `shouldBe` Left csError
-  interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-    `shouldBe` Left csError
+-- -- | Expect all interpreters to throw an error
+-- throwAll :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
+-- throwAll fieldType program rawPublicInputs rawPrivateInputs stError csError =  caseFieldType fieldType handlePrime handleBinary
+--   where
+--     handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
+--     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
+--       -- syntax tree interpreters
+--       interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+--         `shouldBe` Left (InterpretError stError)
+--       -- constraint system interpreters
+--       interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+--         `shouldBe` Left csError
+--       interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+--         `shouldBe` Left csError
+
+--     handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
+--     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
+--       -- syntax tree interpreters
+--       interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+--         `shouldBe` Left (InterpretError stError)
+--       -- constraint system interpreters
+--       interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+--         `shouldBe` Left csError
+--       interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+--         `shouldBe` Left csError
 
 -- | Print out the result of compilation
 debug :: Encode t => FieldType -> Comp t -> IO ()

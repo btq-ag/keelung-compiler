@@ -32,7 +32,7 @@ tests = describe "Comparisons" $ do
       when (bound < 0) $ do
         forM_ [0 .. 15] $ \x -> do
           throwBoth
-            (Prime 13)
+            (Prime 2)
             program
             [fromInteger x]
             []
@@ -42,10 +42,10 @@ tests = describe "Comparisons" $ do
       when (bound >= 0 && bound < 15) $ do
         forM_ [0 .. 15] $ \x -> do
           if x <= bound
-            then runAll gf181 program [fromInteger x] [] []
+            then runAll (Prime 2) program [fromInteger x] [] []
             else do
               throwBoth
-                (Prime 13)
+                (Prime 2)
                 program
                 [fromInteger x]
                 []
@@ -55,7 +55,7 @@ tests = describe "Comparisons" $ do
       when (bound >= 15) $ do
         forM_ [0 .. 15] $ \x -> do
           throwBoth
-            (Prime 13)
+            (Prime 2)
             program
             [fromInteger x]
             []
@@ -63,8 +63,7 @@ tests = describe "Comparisons" $ do
             (CompileError (Compiler.AssertLTEBoundTooLargeError bound width) :: Error GF181)
 
   it "assertLT" $ do
-    -- `bound` ranges from `-50` to `50`
-    forAll (choose (-50, 50)) $ \bound -> do
+    forAll (choose (-2, 16)) $ \bound -> do
       let width = 4
 
       let program = do
@@ -73,8 +72,8 @@ tests = describe "Comparisons" $ do
 
       when (bound < 1) $ do
         forM_ [0 .. 15] $ \x -> do
-          throwAll
-            gf181Info
+          throwBoth
+            (Prime 2)
             program
             [fromInteger x]
             []
@@ -84,10 +83,10 @@ tests = describe "Comparisons" $ do
       when (bound >= 1 && bound < 16) $ do
         forM_ [0 .. 15] $ \x -> do
           if x < bound
-            then runAll gf181 program [fromInteger x] [] []
+            then runAll (Prime 2) program [fromInteger x] [] []
             else do
-              throwAll
-                gf181Info
+              throwBoth
+                (Prime 2)
                 program
                 [fromInteger x]
                 []
@@ -96,8 +95,8 @@ tests = describe "Comparisons" $ do
 
       when (bound >= 16) $ do
         forM_ [0 .. 15] $ \x -> do
-          throwAll
-            gf181Info
+          throwBoth
+            (Prime 2)
             program
             [fromInteger x]
             []
@@ -105,8 +104,7 @@ tests = describe "Comparisons" $ do
             (CompileError (Compiler.AssertLTBoundTooLargeError bound width) :: Error GF181)
 
   it "assertGTE" $ do
-    -- `bound` ranges from `-50` to `50`
-    forAll (choose (-50, 50)) $ \bound -> do
+    forAll (choose (-2, 16)) $ \bound -> do
       let width = 4
 
       let program = do
@@ -115,8 +113,8 @@ tests = describe "Comparisons" $ do
 
       when (bound < 1) $ do
         forM_ [0 .. 15] $ \x -> do
-          throwAll
-            gf181Info
+          throwBoth
+            gf181
             program
             [fromInteger x]
             []
@@ -128,8 +126,8 @@ tests = describe "Comparisons" $ do
           if x >= bound
             then runAll gf181 program [fromInteger x] [] []
             else do
-              throwAll
-                gf181Info
+              throwBoth
+                gf181
                 program
                 [fromInteger x]
                 []
@@ -138,8 +136,8 @@ tests = describe "Comparisons" $ do
 
       when (bound >= 16) $ do
         forM_ [0 .. 15] $ \x -> do
-          throwAll
-            gf181Info
+          throwBoth
+            gf181
             program
             [fromInteger x]
             []
@@ -147,8 +145,7 @@ tests = describe "Comparisons" $ do
             (CompileError (Compiler.AssertGTEBoundTooLargeError bound width) :: Error GF181)
 
   it "assertGT" $ do
-    -- `bound` ranges from `-50` to `50`
-    forAll (choose (-50, 50)) $ \bound -> do
+    forAll (choose (-2, 16)) $ \bound -> do
       let width = 4
 
       let program = do
@@ -157,8 +154,8 @@ tests = describe "Comparisons" $ do
 
       when (bound < 0) $ do
         forM_ [0 .. 15] $ \x -> do
-          throwAll
-            gf181Info
+          throwBoth
+            gf181
             program
             [fromInteger x]
             []
@@ -170,8 +167,8 @@ tests = describe "Comparisons" $ do
           if x > bound
             then runAll gf181 program [fromInteger x] [] []
             else do
-              throwAll
-                gf181Info
+              throwBoth
+                gf181
                 program
                 [fromInteger x]
                 []
@@ -180,8 +177,8 @@ tests = describe "Comparisons" $ do
 
       when (bound >= 15) $ do
         forM_ [0 .. 15] $ \x -> do
-          throwAll
-            gf181Info
+          throwBoth
+            gf181
             program
             [fromInteger x]
             []
@@ -197,8 +194,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x <= y
-        then runAll gf181 program [fromInteger x, fromInteger y] [] [1]
-        else runAll gf181 program [fromInteger x, fromInteger y] [] [0]
+        then runAll (Prime 2) program [fromInteger x, fromInteger y] [] [1]
+        else runAll (Prime 2) program [fromInteger x, fromInteger y] [] [0]
 
   it "lte (variable / constant)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -208,8 +205,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x <= y
-        then runAll gf181 (program (fromInteger y)) [fromInteger x] [] [1]
-        else runAll gf181 (program (fromInteger y)) [fromInteger x] [] [0]
+        then runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [1]
+        else runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [0]
 
   it "lte (constant / variable)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -219,8 +216,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x <= y
-        then runAll gf181 (program (fromInteger x)) [fromInteger y] [] [1]
-        else runAll gf181 (program (fromInteger x)) [fromInteger y] [] [0]
+        then runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [1]
+        else runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [0]
 
   it "lte (constant / constant)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -229,8 +226,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x <= y
-        then runAll gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
-        else runAll gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
+        then runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [1]
+        else runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [0]
 
   it "lt (variable / variable)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -241,8 +238,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x < y
-        then runAll gf181 program [fromInteger x, fromInteger y] [] [1]
-        else runAll gf181 program [fromInteger x, fromInteger y] [] [0]
+        then runAll (Prime 2) program [fromInteger x, fromInteger y] [] [1]
+        else runAll (Prime 2) program [fromInteger x, fromInteger y] [] [0]
 
   it "lt (variable / constant)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -252,8 +249,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x < y
-        then runAll gf181 (program (fromInteger y)) [fromInteger x] [] [1]
-        else runAll gf181 (program (fromInteger y)) [fromInteger x] [] [0]
+        then runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [1]
+        else runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [0]
 
   it "lt (constant / variable)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -263,8 +260,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x < y
-        then runAll gf181 (program (fromInteger x)) [fromInteger y] [] [1]
-        else runAll gf181 (program (fromInteger x)) [fromInteger y] [] [0]
+        then runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [1]
+        else runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [0]
 
   it "lt (constant / constant)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -273,8 +270,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x < y
-        then runAll gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
-        else runAll gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
+        then runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [1]
+        else runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [0]
 
   it "gte (variable / variable)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -285,8 +282,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x >= y
-        then runAll gf181 program [fromInteger x, fromInteger y] [] [1]
-        else runAll gf181 program [fromInteger x, fromInteger y] [] [0]
+        then runAll (Prime 2) program [fromInteger x, fromInteger y] [] [1]
+        else runAll (Prime 2) program [fromInteger x, fromInteger y] [] [0]
 
   it "gte (variable / constant)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -296,8 +293,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x >= y
-        then runAll gf181 (program (fromInteger y)) [fromInteger x] [] [1]
-        else runAll gf181 (program (fromInteger y)) [fromInteger x] [] [0]
+        then runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [1]
+        else runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [0]
 
   it "gte (constant / variable)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -307,8 +304,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x >= y
-        then runAll gf181 (program (fromInteger x)) [fromInteger y] [] [1]
-        else runAll gf181 (program (fromInteger x)) [fromInteger y] [] [0]
+        then runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [1]
+        else runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [0]
 
   it "gte (constant / constant)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -317,8 +314,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x >= y
-        then runAll gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
-        else runAll gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
+        then runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [1]
+        else runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [0]
 
   it "gt (variable / variable)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -329,8 +326,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x > y
-        then runAll gf181 program [fromInteger x, fromInteger y] [] [1]
-        else runAll gf181 program [fromInteger x, fromInteger y] [] [0]
+        then runAll (Prime 2) program [fromInteger x, fromInteger y] [] [1]
+        else runAll (Prime 2) program [fromInteger x, fromInteger y] [] [0]
 
   it "gt (variable / constant)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -340,8 +337,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x > y
-        then runAll gf181 (program (fromInteger y)) [fromInteger x] [] [1]
-        else runAll gf181 (program (fromInteger y)) [fromInteger x] [] [0]
+        then runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [1]
+        else runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [0]
 
   it "gt (constant / variable)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -351,8 +348,8 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x > y
-        then runAll gf181 (program (fromInteger x)) [fromInteger y] [] [1]
-        else runAll gf181 (program (fromInteger x)) [fromInteger y] [] [0]
+        then runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [1]
+        else runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [0]
 
   it "gt (constant / constant)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
@@ -361,5 +358,5 @@ tests = describe "Comparisons" $ do
 
     forAll genPair $ \(x, y) -> do
       if x > y
-        then runAll gf181 (program (fromInteger x) (fromInteger y)) [] [] [1]
-        else runAll gf181 (program (fromInteger x) (fromInteger y)) [] [] [0]
+        then runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [1]
+        else runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [0]
