@@ -21,6 +21,7 @@ instance Monoid LimbColumn where
 
 --------------------------------------------------------------------------------
 
+-- | Create a 'LimbColumn' from a constant and a list of 'Limb's.
 new :: Integer -> [Limb] -> LimbColumn
 new c xs = LimbColumn c (Seq.fromList xs)
 

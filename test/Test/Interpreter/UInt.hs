@@ -33,11 +33,9 @@ tests = do
         runAll (Prime 257) program [300] [] [300]
 
     describe "Arithmetics" $ do
-
       Addition.tests
 
       Multiplication.tests
-
 
       describe "Multiplication" $ do
         it "variable / variable" $ do

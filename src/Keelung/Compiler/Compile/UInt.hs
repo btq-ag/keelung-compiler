@@ -115,18 +115,19 @@ data Dimensions = Dimensions
 -- -----------------------------
 --    [ carry  ][  result  ]
 addPartialColumn :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n LimbColumn
+addPartialColumn dimensions _ _ resultLimb constant [] = do
+  forM_ [lmbOffset resultLimb .. lmbOffset resultLimb + lmbWidth resultLimb - 1] $ \i -> do
+    let bit = Data.Bits.testBit (toInteger constant) i
+    writeValB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) i) bit
+  return mempty
 addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs = do
   let negLimbSize = length $ filter (not . limbIsPositive) limbs
-
-  -- if all limbs are negative, we should add 2^currentLimbWidth to the constant
   let allNegative = negLimbSize == length limbs
   if allNegative
     then do
       let carrySigns = replicate (dimCarryWidth dimensions + 1) False
       carryLimb <- allocCarryLimb (dimCarryWidth dimensions + 1) limbStart carrySigns
-      let compensatedConstant = constant
-      -- let compensatedConstant = constant + 2 ^ currentLimbWidth
-      writeAddWithSeq compensatedConstant $
+      writeAddWithSeq constant $
         -- positive side
         mconcat (map (toBits (dimUIntWidth dimensions) 0 True) limbs)
           -- negative side
@@ -260,13 +261,11 @@ mul2Limbs :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> (n, Li
 mul2Limbs dimensions currentLimbWidth limbStart (a, x) operand = do
   case operand of
     Left 0 -> do
-      upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
-      lowerLimb <- allocLimb currentLimbWidth limbStart True
-      writeAddWithSeq 0 $
-        toBits (dimUIntWidth dimensions) 0 False lowerLimb
-          <> toBits (dimUIntWidth dimensions) currentLimbWidth False upperLimb
-      return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
-    -- return (mempty, mempty)
+      -- if the constant is 0, then the resulting limbs should be empty
+      return (mempty, mempty)
+    Left 1 -> do
+      -- if the constant is 1, then the resulting limbs should be the same as the input
+      return (LimbColumn.new (toInteger a) [x], mempty)
     Left constant -> do
       upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
