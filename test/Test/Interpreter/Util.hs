@@ -13,10 +13,10 @@ import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.ConstraintModule (ConstraintModule)
 import Keelung.Compiler.ConstraintSystem qualified as CS
-import Keelung.Data.FieldInfo
 import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1CS (R1CS (..))
+import Keelung.Data.FieldInfo
 import Keelung.Interpreter.Error qualified as Interpreter
 import Keelung.Interpreter.R1CS qualified as R1CS
 import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
@@ -51,32 +51,6 @@ interpretR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
     Right outputs -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
 
 --------------------------------------------------------------------------------
-
--- -- | Expect all interpreters to throw an error
--- throwAll :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Interpreter.Error n -> Error n -> IO ()
--- throwAll fieldType program rawPublicInputs rawPrivateInputs stError csError =  caseFieldType fieldType handlePrime handleBinary
---   where
---     handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
---     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
---       -- syntax tree interpreters
---       interpretSyntaxTree program rawPublicInputs rawPrivateInputs
---         `shouldBe` Left (InterpretError stError)
---       -- constraint system interpreters
---       interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
---         `shouldBe` Left csError
---       interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
---         `shouldBe` Left csError
-
---     handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
---     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
---       -- syntax tree interpreters
---       interpretSyntaxTree program rawPublicInputs rawPrivateInputs
---         `shouldBe` Left (InterpretError stError)
---       -- constraint system interpreters
---       interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
---         `shouldBe` Left csError
---       interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
---         `shouldBe` Left csError
 
 -- | Print out the result of compilation
 debug :: Encode t => FieldType -> Comp t -> IO ()
@@ -120,8 +94,8 @@ runAll fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldTy
       -- constraint system interpreters
       interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
-      -- interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-      --   `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+      interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+        `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
 
     handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do

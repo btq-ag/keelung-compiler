@@ -1,11 +1,12 @@
-module Keelung.Compiler.Compile.UInt (compileAddU, compileSubU, compileMulU) where
+module Keelung.Compiler.Compile.UInt (compileAddU, compileSubU, compileMulU, assertLTE) where
 
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Bits qualified
+import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
-import Keelung
+import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Limb
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
@@ -14,6 +15,7 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo (FieldInfo (..))
+import Keelung.Syntax (Width)
 
 -- Model of addition: elementary school addition with possibly multiple carries
 --
@@ -374,3 +376,112 @@ mulnxn dimensions currentLimbWidth limbStart arity out var operand = do
 --   Either RefU Integer -> -- remainder
 --   M n ()
 -- assertDivModU = undefined
+
+--------------------------------------------------------------------------------
+
+-- | Assert that a UInt is less than or equal to some constant
+-- reference doc: A.3.2.2 Range Check https://zips.z.cash/protocol/protocol.pdf
+assertLTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
+assertLTE _ (Right a) bound = if fromIntegral a <= bound then return () else throwError $ Error.AssertComparisonError (toInteger a) LT (succ bound)
+assertLTE width (Left a) bound
+  | bound < 0 = throwError $ Error.AssertLTEBoundTooSmallError bound
+  | bound >= 2 ^ width - 1 = throwError $ Error.AssertLTEBoundTooLargeError bound width
+  | bound == 0 = do
+      -- there's only 1 possible value for `a`, which is `0`
+      writeValU width a 0
+  | bound == 1 = do
+      -- there are 2 possible values for `a`, which are `0` and `1`
+      -- we can use these 2 values as the only roots of the following multiplicative polynomial
+      -- (a - 0) * (a - 1) = 0
+
+      fieldInfo <- gets cmField
+
+      let maxLimbWidth = fieldWidth fieldInfo
+      let minLimbWidth = 1
+      let limbWidth = minLimbWidth `max` widthOf a `min` maxLimbWidth
+
+      -- `(a - 0) * (a - 1) = 0` on the smallest limb
+      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
+      writeMul (0, bits) (-1, bits) (0, [])
+      -- assign the rest of the limbs to `0`
+      forM_ [limbWidth .. width - 1] $ \j ->
+        writeValB (RefUBit width a j) False
+  | bound == 2 = do
+      -- there are 3 possible values for `a`, which are `0`, `1` and `2`
+      -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
+      -- (a - 0) * (a - 1) * (a - 2) = 0
+
+      fieldInfo <- gets cmField
+
+      let maxLimbWidth = fieldWidth fieldInfo
+      let minLimbWidth = 1
+      let limbWidth = minLimbWidth `max` widthOf a `min` maxLimbWidth
+
+      -- cannot encode the `(a - 0) * (a - 1) * (a - 2) = 0` polynomial
+      -- if the field is only 1-bit wide
+      let isSmallField = case fieldTypeData fieldInfo of
+            Binary _ -> True
+            Prime 2 -> True
+            Prime 3 -> True
+            Prime _ -> False
+
+      if isSmallField
+        then -- because we don't have to execute the `go` function for trailing ones of `c`
+        -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
+          foldM_ (go a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
+        else do
+          -- `(a - 0) * (a - 1) * (a - 2) = 0` on the smallest limb
+          let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
+          temp <- freshRefF
+          writeMul (0, bits) (-1, bits) (0, [(F temp, 1)])
+          writeMul (0, [(F temp, 1)]) (-2, bits) (0, [])
+          -- assign the rest of the limbs to `0`
+          forM_ [limbWidth .. width - 1] $ \j ->
+            writeValB (RefUBit width a j) False
+  | otherwise = do
+      -- because we don't have to execute the `go` function for trailing ones of `c`
+      -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
+      foldM_ (go a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
+  where
+    -- for counting the number of trailing ones of `c`
+    countTrailingOnes :: Int
+    countTrailingOnes =
+      fst $
+        foldl
+          ( \(count, keepCounting) i ->
+              if keepCounting && Data.Bits.testBit bound i then (count + 1, True) else (count, False)
+          )
+          (0, True)
+          [0 .. width - 1]
+
+    go :: (GaloisField n, Integral n) => RefU -> Maybe Ref -> Int -> M n (Maybe Ref)
+    go ref Nothing i =
+      let aBit = RefUBit width ref i
+       in -- have not found the first bit in 'c' that is 1 yet
+          if Data.Bits.testBit bound i
+            then do
+              return $ Just (B aBit) -- when found, return a[i]
+            else do
+              -- a[i] = 0
+              writeValB aBit False
+              return Nothing -- otherwise, continue searching
+    go ref (Just acc) i =
+      let aBit = B (RefUBit width ref i)
+       in if Data.Bits.testBit bound i
+            then do
+              -- constraint for the next accumulator
+              -- acc * a[i] = acc'
+              -- such that if a[i] = 1
+              --    then acc' = acc
+              --    else acc' = 0
+              acc' <- freshRefF
+              writeMul (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(F acc', 1)])
+              return $ Just (F acc')
+            else do
+              -- constraint on a[i]
+              -- (1 - acc - a[i]) * a[i] = 0
+              -- such that if acc = 0 then a[i] = 0 or 1 (don't care)
+              --           if acc = 1 then a[i] = 0
+              writeMul (1, [(acc, -1), (aBit, -1)]) (0, [(aBit, 1)]) (0, [])
+              -- pass down the accumulator
+              return $ Just acc
