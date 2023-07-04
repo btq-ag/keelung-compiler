@@ -37,7 +37,6 @@ run' r1cs inputs = do
   let boolVarRanges = getRanges (r1csCounters r1cs) booleanConstraintCategories
   constraints <- fromOrdinaryConstraints r1cs
   witness <- runM boolVarRanges (r1csField r1cs) inputs $ goThroughManyTimes constraints
-
   -- extract output values from the witness
   let outputRanges = getRanges (r1csCounters r1cs) [(Output, ReadField), (Output, ReadBool), (Output, ReadAllUInts)]
   case IntMap.toList outputRanges of
