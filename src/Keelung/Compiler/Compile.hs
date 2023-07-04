@@ -24,8 +24,8 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
-import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
 
@@ -76,7 +76,7 @@ compileSideEffect (AssertLT width value bound) = do
   assertLT width x bound
 compileSideEffect (AssertGTE width value bound) = do
   x <- wireU value
-  assertGTE width x bound
+  UInt.assertGTE width x bound
 compileSideEffect (AssertGT width value bound) = do
   x <- wireU value
   assertGT width x bound
@@ -93,7 +93,7 @@ compileAssertion expr = case expr of
     UInt.assertLTE width x' (toInteger bound)
   ExprB (LTEU (ValU width bound) x) -> do
     x' <- wireU x
-    assertGTE width x' (toInteger bound)
+    UInt.assertGTE width x' (toInteger bound)
   ExprB (LTU x (ValU width bound)) -> do
     x' <- wireU x
     assertLT width x' (toInteger bound)
@@ -102,7 +102,7 @@ compileAssertion expr = case expr of
     assertGT width x' (toInteger bound)
   ExprB (GTEU x (ValU width bound)) -> do
     x' <- wireU x
-    assertGTE width x' (toInteger bound)
+    UInt.assertGTE width x' (toInteger bound)
   ExprB (GTEU (ValU width bound) x) -> do
     x' <- wireU x
     UInt.assertLTE width x' (toInteger bound)
@@ -704,70 +704,6 @@ assertLT width a c = do
   -- otherwise, assert that a <= c - 1
   UInt.assertLTE width a (c - 1)
 
--- | Assert that a UInt is greater than or equal to some constant
-assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
-assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Error.AssertComparisonError (succ (toInteger a)) GT c
-assertGTE width (Left a) bound
-  | bound < 1 = throwError $ Error.AssertGTEBoundTooSmallError bound
-  | bound >= 2 ^ width = throwError $ Error.AssertGTEBoundTooLargeError bound width
-  | bound == 2 ^ width - 1 = do
-      -- there's only 1 possible value for `a`, which is `2^width - 1`
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeAdd (1 - 2 ^ width) bits
-  | bound == 2 ^ width - 2 = do
-      -- there's only 2 possible value for `a`, which is `2^width - 1` or `2^width - 2`
-      -- we can use these 2 values as the only roots of the following multiplicative polynomial
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeMul (1 - 2 ^ width, bits) (2 - 2 ^ width, bits) (0, [])
-  | bound == 2 ^ width - 3 = do
-      -- there's only 3 possible value for `a`, which is `2^width - 1`, `2^width - 2` or `2^width - 3`
-      -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      temp <- freshRefF
-      writeMul (1 - 2 ^ width, bits) (2 - 2 ^ width, bits) (0, [(F temp, 1)])
-      writeMul (0, [(F temp, 1)]) (3 - 2 ^ width, bits) (0, [])
-  | bound == 1 = do
-      -- a >= 1 => a > 0 => a is not zero
-      -- there exists a number m such that the product of a and m is 1
-      m <- freshRefF
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeMul (0, bits) (0, [(F m, 1)]) (1, [])
-  | otherwise = do
-      flag <- freshRefF
-      writeValF flag 1
-      -- because we don't have to execute the `go` function for trailing zeros of `bound`
-      -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
-      foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
-  where
-    -- for counting the number of trailing zeros of `bound`
-    countTrailingZeros :: Int
-    countTrailingZeros =
-      fst $
-        foldl
-          ( \(count, keepCounting) i ->
-              if keepCounting && not (Data.Bits.testBit bound i) then (count + 1, True) else (count, False)
-          )
-          (0, True)
-          [0 .. width - 1]
-
-    go :: (GaloisField n, Integral n) => RefU -> Ref -> Int -> M n Ref
-    go ref flag i =
-      let aBit = RefUBit width ref i
-          bBit = Data.Bits.testBit bound i
-       in if bBit
-            then do
-              -- constraint on bit
-              -- (flag + bit - 1) * bit = flag
-              -- such that if flag = 0 then bit = 0 or 1 (don't care)
-              --           if flag = 1 then bit = 1
-              writeMul (-1, [(B aBit, 1), (flag, 1)]) (0, [(B aBit, 1)]) (0, [(flag, 1)])
-              return flag
-            else do
-              flag' <- freshRefF
-              -- flag' := flag * (1 - bit)
-              writeMul (0, [(flag, 1)]) (1, [(B aBit, -1)]) (0, [(F flag', 1)])
-              return (F flag')
-
 -- | Assert that a UInt is greater than some constant
 assertGT :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
 assertGT width a c = do
@@ -779,7 +715,7 @@ assertGT width a c = do
     throwError $
       Error.AssertGTBoundTooLargeError c width
   -- otherwise, assert that a >= c + 1
-  assertGTE width a (c + 1)
+  UInt.assertGTE width a (c + 1)
 
 -- | Fast exponentiation on field
 fastExp :: (GaloisField n, Integral n) => LC n -> n -> Integer -> M n (LC n)

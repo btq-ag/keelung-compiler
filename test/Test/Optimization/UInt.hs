@@ -215,7 +215,7 @@ tests = do
               x <- inputUInt @4 Public
               assert $ x `gte` (bound :: UInt 4)
         forM_
-          [ (1, 5), -- special case: the number is non-zero
+          [ (1, 7), -- special case: the number is non-zero
             (2, 6), -- trailing zero: 1
             (3, 7),
             (4, 5), -- trailing zero: 2
@@ -229,7 +229,7 @@ tests = do
             (12, 6), -- trailing zero: 2
             (13, 6), -- special case: only 3 possible values
             (14, 5), -- special case: only 2 possible values
-            (15, 5) -- special case: only 1 possible value
+            (15, 8) -- special case: only 1 possible value
           ]
           $ \(bound, expectedSize) -> do
             it ("x ≥ " <> show bound) $ do

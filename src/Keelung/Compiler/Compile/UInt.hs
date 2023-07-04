@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.UInt (compileAddU, compileSubU, compileMulU, assertLTE) where
+module Keelung.Compiler.Compile.UInt (compileAddU, compileSubU, compileMulU, assertLTE, assertGTE) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -485,3 +485,111 @@ assertLTE width (Left a) bound
               writeMul (1, [(acc, -1), (aBit, -1)]) (0, [(aBit, 1)]) (0, [])
               -- pass down the accumulator
               return $ Just acc
+
+--------------------------------------------------------------------------------
+
+-- | Assert that a UInt is greater than or equal to some constant
+assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
+assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Error.AssertComparisonError (succ (toInteger a)) GT c
+assertGTE width (Left a) bound
+  | bound < 1 = throwError $ Error.AssertGTEBoundTooSmallError bound
+  | bound >= 2 ^ width = throwError $ Error.AssertGTEBoundTooLargeError bound width
+  | bound == 2 ^ width - 1 = do
+      -- there's only 1 possible value for `a`, which is `2^width - 1`
+      writeValU width a (2 ^ width - 1)
+  | bound == 2 ^ width - 2 = do
+      -- there's only 2 possible value for `a`, which is `2^width - 1` or `2^width - 2`
+      -- we can use these 2 values as the only roots of the following multiplicative polynomial
+      -- (a - 2^width + 1) * (a - 2^width + 2) = 0
+      -- that is, either all bits are 1 or only the smallest bit is 0
+
+      fieldInfo <- gets cmField
+
+      let maxLimbWidth = fieldWidth fieldInfo
+      let minLimbWidth = 1
+      let limbWidth = minLimbWidth `max` widthOf a `min` maxLimbWidth
+
+      -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) = 0` on the smallest limb
+      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
+      writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [])
+      -- assign the rest of the limbs to `1`
+      forM_ [limbWidth .. width - 1] $ \j ->
+        writeValB (RefUBit width a j) True
+  | bound == 2 ^ width - 3 = do
+      -- there's only 3 possible value for `a`, which is `2^width - 1`, `2^width - 2` or `2^width - 3`
+      -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
+
+      fieldInfo <- gets cmField
+
+      let maxLimbWidth = fieldWidth fieldInfo
+      let minLimbWidth = 1
+      let limbWidth = minLimbWidth `max` widthOf a `min` maxLimbWidth
+
+      -- cannot encode the `(a - 0) * (a - 1) * (a - 2) = 0` polynomial
+      -- if the field is only 1-bit wide
+      let isSmallField = case fieldTypeData fieldInfo of
+            Binary _ -> True
+            Prime 2 -> True
+            Prime 3 -> True
+            Prime _ -> False
+
+      if isSmallField
+        then do
+          flag <- freshRefF
+          writeValF flag 1
+          -- because we don't have to execute the `go` function for trailing zeros of `bound`
+          -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
+          foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
+        else do
+          -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) * (a - 2^limbWidth + 3) = 0` on the smallest limb
+          let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
+          -- writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [])
+
+          temp <- freshRefF
+          writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [(F temp, 1)])
+          writeMul (0, [(F temp, 1)]) (3 - 2 ^ limbWidth, bits) (0, [])
+
+          -- assign the rest of the limbs to `1`
+          forM_ [limbWidth .. width - 1] $ \j ->
+            writeValB (RefUBit width a j) True
+  -- \| bound == 1 = do
+  --     -- a >= 1 => a > 0 => a is not zero
+  --     -- there exists a number m such that the product of a and m is 1
+  --     m <- freshRefF
+  --     let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+  --     writeMul (0, bits) (0, [(F m, 1)]) (1, [])
+  | otherwise = do
+      flag <- freshRefF
+      writeValF flag 1
+      -- because we don't have to execute the `go` function for trailing zeros of `bound`
+      -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
+      foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
+  where
+    -- for counting the number of trailing zeros of `bound`
+    countTrailingZeros :: Int
+    countTrailingZeros =
+      fst $
+        foldl
+          ( \(count, keepCounting) i ->
+              if keepCounting && not (Data.Bits.testBit bound i) then (count + 1, True) else (count, False)
+          )
+          (0, True)
+          [0 .. width - 1]
+
+    go :: (GaloisField n, Integral n) => RefU -> Ref -> Int -> M n Ref
+    go ref flag i =
+      let aBit = RefUBit width ref i
+          bBit = Data.Bits.testBit bound i
+       in if bBit
+            then do
+              -- constraint on bit
+              -- (flag + bit - 1) * bit = flag
+              -- such that if flag = 0 then bit = 0 or 1 (don't care)
+              --           if flag = 1 then bit = 1
+              writeMul (-1, [(B aBit, 1), (flag, 1)]) (0, [(B aBit, 1)]) (0, [(flag, 1)])
+              return flag
+            else do
+              flag' <- freshRefF
+              -- flag' := flag * (1 - bit)
+              writeMul (0, [(flag, 1)]) (1, [(B aBit, -1)]) (0, [(F flag', 1)])
+              return (F flag')
