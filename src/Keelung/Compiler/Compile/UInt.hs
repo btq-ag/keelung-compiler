@@ -358,3 +358,19 @@ mulnxn dimensions currentLimbWidth limbStart arity out var operand = do
     )
     mempty
     (IntMap.toList limbColumns)
+
+-- --------------------------------------------------------------------------------
+
+-- -- | Division with remainder on UInts
+-- --    1. dividend = divisor * quotient + remainder
+-- --    2. 0 ≤ remainder < divisor
+-- --    3. 0 < divisor
+-- assertDivModU ::
+--   (GaloisField n, Integral n) =>
+--   Width ->
+--   Either RefU Integer -> -- dividend
+--   Either RefU Integer -> -- divisor
+--   Either RefU Integer -> -- quotient
+--   Either RefU Integer -> -- remainder
+--   M n ()
+-- assertDivModU = undefined
