@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -32,12 +32,12 @@ library
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
-      Keelung.Compiler.FieldInfo
       Keelung.Compiler.Linker
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -50,7 +50,6 @@ library
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
       Keelung.Compiler.Relations.Util
-      Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
@@ -84,6 +83,7 @@ library
     , optparse-applicative
     , random
     , semirings
+    , split
     , validation
     , vector
   default-language: Haskell2010
@@ -100,12 +100,12 @@ executable keelungc
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
-      Keelung.Compiler.FieldInfo
       Keelung.Compiler.Linker
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -118,7 +118,6 @@ executable keelungc
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
       Keelung.Compiler.Relations.Util
-      Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
@@ -158,6 +157,7 @@ executable keelungc
     , optparse-applicative
     , random
     , semirings
+    , split
     , validation
     , vector
     , with-utf8
@@ -174,6 +174,8 @@ test-suite keelung-test
       Test.Interpreter.Misc
       Test.Interpreter.Statement
       Test.Interpreter.UInt
+      Test.Interpreter.UInt.Addition
+      Test.Interpreter.UInt.Multiplication
       Test.Interpreter.Util
       Test.Optimization
       Test.Optimization.Boolean
@@ -183,6 +185,7 @@ test-suite keelung-test
       Test.PolyG
       Test.Relations.Boolean
       Test.Relations.Field
+      Test.Solver.BinRep
       Test.WitnessGeneration
       Keelung.Compiler
       Keelung.Compiler.Compile
@@ -191,12 +194,12 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
-      Keelung.Compiler.FieldInfo
       Keelung.Compiler.Linker
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
@@ -209,7 +212,6 @@ test-suite keelung-test
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
       Keelung.Compiler.Relations.Util
-      Keelung.Compiler.Syntax.FieldBits
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
@@ -253,6 +255,7 @@ test-suite keelung-test
     , quickcheck-transformer
     , random
     , semirings
+    , split
     , validation
     , vector
   default-language: Haskell2010

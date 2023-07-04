@@ -4,18 +4,17 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
-import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
+import Keelung.Data.FieldInfo
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Syntax (HasWidth (widthOf), Var)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax qualified as T
 
-run :: (GaloisField n, Integral n) => T.Elaborated -> Internal n
-run (T.Elaborated expr comp) =
+run :: (GaloisField n, Integral n) => FieldInfo -> T.Elaborated -> Internal n
+run fieldInfo (T.Elaborated expr comp) =
   let T.Computation counters assertions sideEffects = comp
       proxy = 0
-      numBitWidth = bitSize proxy
-   in runM counters numBitWidth $ do
+   in runM counters (fieldWidth fieldInfo) $ do
         exprs <- sameType proxy <$> convertExprAndAllocOutputVar expr
         assertions' <- concat <$> mapM convertExpr assertions
         counters' <- get
@@ -23,7 +22,7 @@ run (T.Elaborated expr comp) =
         return $
           Internal
             { internalExpr = exprs,
-              internalFieldBitWidth = numBitWidth,
+              internalFieldBitWidth = fieldWidth fieldInfo,
               internalCounters = counters',
               internalAssertions = assertions',
               internalSideEffects = sideEffects'
@@ -178,44 +177,43 @@ chainExprsOfAssocOpAddU w x xSign y ySign = case (x, y) of
 
 chainExprsOfAssocOpAndB :: ExprB n -> ExprB n -> ExprB n
 chainExprsOfAssocOpAndB x y = case (x, y) of
-  (AndB x0 x1 xs, AndB y0 y1 ys) ->
-    AndB x0 x1 (xs <> (y0 :<| y1 :<| ys))
-  (AndB x0 x1 xs, _) ->
-    AndB x0 x1 (xs |> y)
-  (_, AndB y0 y1 ys) ->
-    AndB x y0 (y1 :<| ys)
+  (AndB xs, AndB ys) ->
+    AndB (xs <> ys)
+  (AndB xs, _) ->
+    AndB (xs |> y)
+  (_, AndB ys) ->
+    AndB (x :<| ys)
   -- there's nothing left we can do
-  _ -> AndB x y mempty
+  _ -> AndB (x :<| y :<| mempty)
 
 chainExprsOfAssocOpAndU :: Width -> ExprU n -> ExprU n -> ExprU n
 chainExprsOfAssocOpAndU w x y = case (x, y) of
-  (AndU _ x0 x1 xs, AndU _ y0 y1 ys) ->
-    AndU w x0 x1 (xs <> (y0 :<| y1 :<| ys))
-  (AndU _ x0 x1 xs, _) ->
-    AndU w x0 x1 (xs |> y)
-  (_, AndU _ y0 y1 ys) ->
-    AndU w x y0 (y1 :<| ys)
-  -- there's nothing left we can do
-  _ -> AndU w x y mempty
+  (AndU _ xs, AndU _ ys) ->
+    AndU w (xs <> ys)
+  (AndU _ xs, _) ->
+    AndU w (xs |> y)
+  (_, AndU _ ys) ->
+    AndU w (x :<| ys)
+  _ -> AndU w (x :<| y :<| mempty)
 
 chainExprsOfAssocOpOrB :: ExprB n -> ExprB n -> ExprB n
 chainExprsOfAssocOpOrB x y = case (x, y) of
-  (OrB x0 x1 xs, OrB y0 y1 ys) ->
-    OrB x0 x1 (xs <> (y0 :<| y1 :<| ys))
-  (OrB x0 x1 xs, _) ->
-    OrB x0 x1 (xs |> y)
-  (_, OrB y0 y1 ys) ->
-    OrB x y0 (y1 :<| ys)
+  (OrB xs, OrB ys) ->
+    OrB (xs <> ys)
+  (OrB xs, _) ->
+    OrB (xs |> y)
+  (_, OrB ys) ->
+    OrB (x :<| ys)
   -- there's nothing left we can do
-  _ -> OrB x y mempty
+  _ -> OrB (x :<| y :<| mempty)
 
 chainExprsOfAssocOpOrU :: Width -> ExprU n -> ExprU n -> ExprU n
 chainExprsOfAssocOpOrU w x y = case (x, y) of
-  (OrU _ x0 x1 xs, OrU _ y0 y1 ys) ->
-    OrU w x0 x1 (xs <> (y0 :<| y1 :<| ys))
-  (OrU _ x0 x1 xs, _) ->
-    OrU w x0 x1 (xs |> y)
-  (_, OrU _ y0 y1 ys) ->
-    OrU w x y0 (y1 :<| ys)
+  (OrU _ xs, OrU _ ys) ->
+    OrU w (xs <> ys)
+  (OrU _ xs, _) ->
+    OrU w (xs |> y)
+  (_, OrU _ ys) ->
+    OrU w (x :<| ys)
   -- there's nothing left we can do
-  _ -> OrU w x y mempty
+  _ -> OrU w (x :<| y :<| mempty)

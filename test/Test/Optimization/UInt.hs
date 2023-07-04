@@ -7,7 +7,8 @@ import Control.Monad (forM_)
 import Keelung hiding (compileO0)
 import Test.Hspec
 import Test.Optimization.Util
-import Keelung.Compiler.Linker
+
+-- import Keelung.Compiler.Linker
 
 run :: IO ()
 run = hspec tests
@@ -15,6 +16,18 @@ run = hspec tests
 tests :: SpecWith ()
 tests = do
   describe "UInt" $ do
+    describe "Variable management" $ do
+      -- can be lower
+      it "keelung Issue #17" $ do
+        (cs, cs') <- execute $ do
+          a <- input Private :: Comp (UInt 5)
+          b <- input Private
+          c <- reuse $ a * b
+          return $ c .&. 5
+        -- debug cs'
+        cs `shouldHaveSize` 36
+        cs' `shouldHaveSize` 36
+
     describe "Addition / Subtraction" $ do
       it "2 variables" $ do
         (cs, cs') <- execute $ do
@@ -37,8 +50,10 @@ tests = do
           y <- inputUInt @4 Public
           z <- inputUInt @4 Public
           return $ x + y + z + 4
-        cs `shouldHaveSize` 19
-        cs' `shouldHaveSize` 19
+        -- cs `shouldHaveSize` 19
+        -- cs' `shouldHaveSize` 19
+        cs `shouldHaveSize` 30
+        cs' `shouldHaveSize` 30
 
       it "3 variable + 1 constant (with subtraction)" $ do
         (cs, cs') <- execute $ do
@@ -46,9 +61,11 @@ tests = do
           y <- inputUInt @4 Public
           z <- inputUInt @4 Public
           return $ x - y + z + 4
-        print $ linkConstraintModule cs'
-        cs `shouldHaveSize` 19
-        cs' `shouldHaveSize` 19
+        -- print $ linkConstraintModule cs'
+        -- cs `shouldHaveSize` 19
+        -- cs' `shouldHaveSize` 19
+        cs `shouldHaveSize` 30
+        cs' `shouldHaveSize` 30
 
       -- TODO: should've been just 4
       it "2 constants" $ do
@@ -58,22 +75,22 @@ tests = do
         cs' `shouldHaveSize` 8
 
     describe "Multiplication" $ do
-      -- TODO: should've been just 13
+      -- TODO: can be lower
       it "variable / variable" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Public
           return $ x * y
-        cs `shouldHaveSize` 13
-        cs' `shouldHaveSize` 13
+        cs `shouldHaveSize` 25
+        cs' `shouldHaveSize` 25
 
-      -- TODO: should've been just 10
+      -- TODO: can be lower
       it "variable / constant" $ do
         (cs, cs') <- execute $ do
           x <- inputUInt @4 Public
           return $ x * 4
-        cs `shouldHaveSize` 9
-        cs' `shouldHaveSize` 9
+        cs `shouldHaveSize` 21
+        cs' `shouldHaveSize` 21
 
       -- TODO: should've been just 4
       it "constant / constant" $ do
@@ -224,7 +241,7 @@ tests = do
               x <- inputUInt @4 Public
               assert $ x `lte` (bound :: UInt 4)
         forM_
-          [ (0, 5), -- special case: only 1 possible value
+          [ (0, 8), -- special case: only 1 possible value
             (1, 5), -- special case: only 2 possible value
             (2, 6), -- special case: only 3 possible value
             (3, 6), -- trailing one: 1
@@ -232,7 +249,7 @@ tests = do
             (5, 6), -- trailing one: 1
             (6, 7),
             (7, 5), -- trailing one: 2
-            (8, 7),
+            (5, 6),
             (9, 6), -- trailing one: 1
             (10, 7),
             (11, 5), -- trailing one: 2

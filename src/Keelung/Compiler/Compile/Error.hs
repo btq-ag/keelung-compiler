@@ -26,6 +26,7 @@ data Error n
   | AssertGTBoundTooSmallError Integer
   | AssertGTBoundTooLargeError Integer Width
   | FieldTooSmall FieldType Width
+  | FieldNotSupported FieldType
   deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
@@ -77,6 +78,4 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> show ((2 ^ width) :: Integer)
       <> "`"
   show (FieldTooSmall fieldType width) = "The minimal bits required to represent the underling field " <> show fieldType <> " is " <> show width <> ", which is too small for formulating constraints"
-
--- show AssertLTBoundTooSmallError =
---   "Using `0` as the bound for `assertLT` is too restrictive"
+  show (FieldNotSupported fieldType) = "The field " <> show fieldType <> " is not supported at the moment"

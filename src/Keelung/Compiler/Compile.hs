@@ -10,7 +10,6 @@ import Control.Monad
 import Control.Monad.Except
 -- import Keelung.Compiler.Syntax.FieldBits (FieldBits (..))
 
-import Control.Monad.State
 import Data.Bits qualified
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
@@ -20,14 +19,15 @@ import Data.Sequence (Seq (..))
 import Keelung.Compiler.Compile.Boolean qualified as Error.Boolean
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LC
+import Keelung.Compiler.Compile.UInt qualified as UInt
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
+import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
-import Keelung.Compiler.FieldInfo ( FieldInfo(fieldTypeData) )
 
 --------------------------------------------------------------------------------
 
@@ -356,11 +356,11 @@ compileExprU out expr = case expr of
   AddU w xs -> do
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = partitionEithers mixed
-    compileAddU w out vars (sum constants)
+    UInt.compileAddU w out vars (sum constants)
   MulU w x y -> do
     x' <- wireU x
     y' <- wireU y
-    compileMulU w out x' y'
+    UInt.compileMulU w out x' y'
   MMIU w a p -> do
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
     a' <- wireU a
@@ -373,18 +373,18 @@ compileExprU out expr = case expr of
     compileAddU2 w aainv (Left np) (Right 1)
     -- 2. n ≤ p
     assertLTE w (Left nRef) p
-    addModInvHint a' (Left out) (Left nRef) p
+    addModInvHint w a' (Left out) (Left nRef) p
 
   -- writeMul (0, [(U var, 1)]) (0, [(U out, 1)]) (1, [(U nRef, fromInteger p)])
-  AndU w x y xs -> do
+  AndU w xs -> do
     forM_ [0 .. w - 1] $ \i -> do
-      result <- compileExprB (AndB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
+      result <- compileExprB (AndB (fmap (`BitU` i) xs))
       case result of
         Left var -> writeEqB (RefUBit w out i) var
         Right val -> writeValB (RefUBit w out i) val
-  OrU w x y xs -> do
+  OrU w xs -> do
     forM_ [0 .. w - 1] $ \i -> do
-      result <- compileExprB (OrB (BitU x i) (BitU y i) (fmap (`BitU` i) xs))
+      result <- compileExprB (OrB (fmap (`BitU` i) xs))
       case result of
         Left var -> writeEqB (RefUBit w out i) var
         Right val -> writeValB (RefUBit w out i) val
@@ -490,86 +490,6 @@ wireUWithSign (others, sign) = do
     Left var -> return (Left (var, sign))
     Right val -> return (Right (if sign then val else -val))
 
---------------------------------------------------------------------------------
-
--- | Encoding addition on UInts with multiple operands: O(1)
---      A       =          2ⁿAₙ₋₁ + ... + 2A₁ + A₀
---      B       =          2ⁿBₙ₋₁ + ... + 2B₁ + B₀
---      C       = 2ⁿ⁺¹Cₙ + 2ⁿCₙ₋₁ + ... + 2C₁ + C₀
---      Result  =          2ⁿCₙ₋₁ + ... + 2C₁ + C₀
---      C       = A + B
-compileAddOrSubU :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileAddOrSubU isSub width out (Right a) (Right b) = do
-  let val = if isSub then a - b else a + b
-  writeValU width out val
-compileAddOrSubU isSub width out (Right a) (Left b) = do
-  carry <- freshRefB
-  addBooleanConstraint carry
-  let bs = [(B (RefUBit width b i), if isSub then -(2 ^ i) else 2 ^ i) | i <- [0 .. width - 1]]
-  let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  writeAdd (fromInteger a) $ bs <> carryAndResult
-compileAddOrSubU isSub width out (Left a) (Right b) = do
-  carry <- freshRefB
-  addBooleanConstraint carry
-  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carryAndResult = (B carry, -(2 ^ width)) : [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  writeAdd (fromInteger $ if isSub then -b else b) $ as <> carryAndResult
-compileAddOrSubU isSub width out (Left a) (Left b) = do
-  carry <- freshRefB
-  addBooleanConstraint carry
-  -- out + carry = A + B
-  let as = [(B (RefUBit width a i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  let bs = [(B (RefUBit width b i), if isSub then 2 ^ i else -(2 ^ i)) | i <- [0 .. width - 1]]
-  let carryAndResult = (B carry, 2 ^ width) : [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-
-  writeAdd 0 $ as <> bs <> carryAndResult
-
-compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
-compileAddU width out [] constant = do
-  -- constants only
-  fieldWidth <- gets cmFieldWidth
-  let carryWidth = 0 -- no carry needed
-  let limbWidth = fieldWidth - 1 - carryWidth
-  mapM_ (go limbWidth) [0, limbWidth .. width - 1]
-  where
-    go :: (GaloisField n, Integral n) => Int -> Int -> M n ()
-    go limbWidth limbStart = do
-      let range = [limbStart .. (limbStart + limbWidth - 1) `min` (width - 1)]
-      forM_ range $ \i -> do
-        let bit = Data.Bits.testBit constant i
-        writeValB (RefUBit width out i) bit
-compileAddU width out vars constant = do
-  fieldWidth <- gets cmFieldWidth
-  fieldInfo <- gets cmField
-  -- for each negative operand, we compensate by adding 2^width
-  let numberOfNegativeOperand = length $ filter (not . snd) vars
-  -- because we need some extra bits for carry when adding UInts
-  -- a limb should have width `fieldWidth - 1 - carryWidth`
-  let carryWidth = ceiling (logBase 2 (fromIntegral (length vars) + if constant == 0 then 0 else 1) :: Double)
-  let limbWidth = fieldWidth - 1 - carryWidth
-  if limbWidth < 1
-    then throwError $ Error.FieldTooSmall (fieldTypeData fieldInfo) fieldWidth
-    else foldM_ (go limbWidth carryWidth numberOfNegativeOperand) [] [0, limbWidth .. width - 1]
-  where
-    go :: (GaloisField n, Integral n) => Int -> Int -> Int -> [RefB] -> Int -> M n [RefB]
-    go limbWidth carryWidth numberOfNegativeOperand previousCarries limbStart = do
-      -- range inside the current limb
-      let currentLimbWidth = (limbWidth - 1) `min` (width - 1 - limbStart)
-      let range = [0 .. currentLimbWidth]
-      let varBits = concat [[(B (RefUBit width var (limbStart + i)), if sign then 2 ^ i else -(2 ^ i)) | i <- range] | (var, sign) <- vars]
-      -- for each negative operand, we compensate by adding 2^width
-      let constantSegment = sum [(if Data.Bits.testBit constant (limbStart + i) then 1 else 0) * (2 ^ i) | i <- range]
-      let compensatedConstant = constantSegment + 2 ^ width * fromIntegral numberOfNegativeOperand
-      let resultBits = [(B (RefUBit width out (limbStart + i)), -(2 ^ i)) | i <- range]
-      -- carry
-      carries <- replicateM carryWidth freshRefB
-      mapM_ addBooleanConstraint carries
-      let carryBits = [(B carryVar, -(2 ^ (currentLimbWidth + i))) | (i, carryVar) <- zip [1 ..] carries]
-      -- constants + vars + previousCarry = out + carry
-      let previousCarryBits = [(B carryVar, 2 ^ (i :: Int)) | (i, carryVar) <- zip [0 ..] previousCarries]
-      writeAdd (fromInteger compensatedConstant) $ varBits <> previousCarryBits <> carryBits <> resultBits
-      return carries
-
 compileAddOrSubU2 :: (GaloisField n, Integral n) => Bool -> Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddOrSubU2 isSub width out (Right a) (Right b) = do
   let val = if isSub then a - b else a + b
@@ -593,8 +513,10 @@ compileAddOrSubU2 isSub width out (Left a) (Left b) = do
 compileAddU2 :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddU2 = compileAddOrSubU2 False
 
-compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileSubU = compileAddOrSubU True
+compileMulBigCC :: (GaloisField n, Integral n) => Int -> RefU -> Integer -> Integer -> M n ()
+compileMulBigCC width out a b = do
+  let val = a * b
+  writeValU width out val
 
 -- | Encoding addition on UInts with multiple operands: O(2)
 --      A       =   2ⁿAₙ₋₁ + ... + 2A₁ + A₀
@@ -603,8 +525,9 @@ compileSubU = compileAddOrSubU True
 --      Result  =   2ⁿCₙ₋₁ + ... + 2C₁ + C₀
 compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileMulU width out (Right a) (Right b) = do
-  let val = a * b
-  writeValU width out val
+  -- let val = a * b
+  -- writeValU width out val
+  compileMulBigCC width out a b
 compileMulU width out (Right a) (Left b) = do
   carry <- replicateM width (B <$> freshRefB)
   let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
@@ -759,14 +682,14 @@ assertDivModU width dividend divisor quotient remainder = do
 
   productDQ <- freshRefU width
   compileMulU width productDQ divisorRef quotientRef
-  compileSubU width productDQ dividendRef remainderRef
+  UInt.compileSubU width productDQ dividendRef remainderRef
 
   -- 0 ≤ remainder < divisor
   compileAssertion $ ExprB (LTU remainder divisor)
   -- 0 < divisor
   assertGT width divisorRef 0
   -- add hint for DivMod
-  addDivModHint dividendRef divisorRef quotientRef remainderRef
+  addDivModHint width dividendRef divisorRef quotientRef remainderRef
 
 --------------------------------------------------------------------------------
 
@@ -779,8 +702,9 @@ assertLTE width (Left a) bound
   | bound >= 2 ^ width - 1 = throwError $ Error.AssertLTEBoundTooLargeError bound width
   | bound == 0 = do
       -- there's only 1 possible value for `a`, which is `0`
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeAdd 0 bits
+      -- let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+      -- writeAdd 0 bits
+      writeValU width a 0
   | bound == 1 = do
       -- there are 2 possible values for `a`, which are `0` and `1`
       -- we can use these 2 values as the only roots of the following multiplicative polynomial

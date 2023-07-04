@@ -5,6 +5,7 @@
 module Keelung.Compiler.Syntax.Inputs where
 
 import Control.DeepSeq (NFData)
+import Data.Bits qualified
 import Data.Foldable (Foldable (toList))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -15,12 +16,11 @@ import Data.Vector (Vector)
 import Data.Vector qualified as Vec
 import GHC.Generics (Generic)
 import Keelung
-import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Syntax.Counters
 
 -- | Convert binary representation of inputs into human friendly Integers
 --   TODO: make it something like a proper inverse of Inputs.deserialize
-deserializeBinReps :: (GaloisField n, Integral n) => Counters -> Vector n -> Vector n
+deserializeBinReps :: (GaloisField n, Integral n) => Counters -> Vector n -> Vector Integer
 deserializeBinReps counters outputs =
   let sliceBits (width, count) =
         let offset = reindex counters Output (ReadUInt width) 0
@@ -29,7 +29,7 @@ deserializeBinReps counters outputs =
       bitArrays = concatMap sliceBits binRepRanges
       (start, _) = getRange counters (Output, ReadAllUInts)
       beforeBinReps = Vec.take start outputs
-   in beforeBinReps <> Vec.fromList (map (fromInteger . FieldBits.fromBits . toList) bitArrays)
+   in Vec.map toInteger beforeBinReps <> Vec.fromList (map (foldr (\x acc -> toInteger x + Data.Bits.shiftL acc 1) 0 . toList) bitArrays)
 
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs
@@ -113,7 +113,7 @@ addUInt width x (InputSequence field bool uint uintBinRep) =
     field
     bool
     (IntMap.insertWith (flip (<>)) width (Seq.singleton x) uint)
-    (IntMap.insertWith (flip (<>)) width (Seq.fromList (take width (FieldBits.toBits' width x))) uintBinRep)
+    (IntMap.insertWith (flip (<>)) width (Seq.fromList (take width (map (\i -> if Data.Bits.testBit x i then 1 else 0) [0 .. width - 1]))) uintBinRep)
 
 flattenInputSequence :: InputSequence n -> Seq n
 flattenInputSequence (InputSequence field bool _uint uintBinRep) =

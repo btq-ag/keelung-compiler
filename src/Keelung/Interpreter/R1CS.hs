@@ -1,12 +1,12 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Interpreter.R1CS (run, run', Error (..)) where
+module Keelung.Interpreter.R1CS (run, run', Error (..), detectBinRep) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Bifunctor (first)
+import Data.Bits qualified
 import Data.Field.Galois (GaloisField (order))
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
@@ -16,17 +16,15 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
-import Keelung.Compiler.Syntax.FieldBits (toBits)
-import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
+import Keelung
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
-import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Interpreter.Arithmetics qualified as Arithmetics
+import Keelung.Interpreter.Arithmetics (U (UVal))
+import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Interpreter.R1CS.Monad
-import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
 
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n)
@@ -38,7 +36,7 @@ run' r1cs inputs = do
   let booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts), (Intermediate, ReadBool), (Intermediate, ReadAllUInts)]
   let boolVarRanges = getRanges (r1csCounters r1cs) booleanConstraintCategories
   constraints <- fromOrdinaryConstraints r1cs
-  witness <- runM boolVarRanges inputs $ goThroughManyTimes constraints
+  witness <- runM boolVarRanges (r1csField r1cs) inputs $ goThroughManyTimes constraints
 
   -- extract output values from the witness
   let outputRanges = getRanges (r1csCounters r1cs) [(Output, ReadField), (Output, ReadBool), (Output, ReadAllUInts)]
@@ -46,27 +44,25 @@ run' r1cs inputs = do
     [(outputStart, outputLength)] -> return (Vector.slice outputStart outputLength witness, witness)
     _ -> return (mempty, witness)
 
-
 -- | Return Constraints from a R1CS, which include:
 --   1. ordinary constraints
 --   2. Boolean input variable constraints
 --   3. binary representation constraints
 --   4. CNEQ constraints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Either (Error n) (Seq (Constraint n))
-fromOrdinaryConstraints (R1CS _ ordinaryConstraints binReps counters eqZeros divMods modInvs) = do
+fromOrdinaryConstraints (R1CS _ ordinaryConstraints _ counters eqZeros divMods modInvs) = do
   constraints <- concat <$> mapM differentiate ordinaryConstraints
   return $
     Seq.fromList constraints
       <> Seq.fromList (map BooleanConstraint booleanInputVarConstraints)
-      <> Seq.fromList (map BinRepConstraint binReps)
       -- <> Seq.fromList (map (BinRepConstraint2 . toList) binReps')
       <> Seq.fromList (map EqZeroConstraint eqZeros)
       <> Seq.fromList (map DivModConstaint divMods)
       <> Seq.fromList (map ModInvConstraint modInvs)
   where
     booleanInputVarConstraints =
-      let generate (start, end) = [start .. end - 1]
-       in concatMap generate (getBooleanConstraintRanges counters)
+      let generateRange (start, end) = [start .. end - 1]
+       in concatMap generateRange (getBooleanConstraintRanges counters)
 
     differentiate :: (GaloisField n, Integral n) => R1C n -> Either (Error n) [Constraint n]
     differentiate (R1C (Left a) (Left b) (Left c)) = if a * b == c then Right [] else Left ConflictingValues
@@ -110,30 +106,26 @@ goThroughOnce constraints = mconcat <$> mapM shrink (toList constraints)
 lookupVar :: Var -> M n (Maybe n)
 lookupVar var = gets (IntMap.lookup var)
 
-lookupBits :: (GaloisField n, Integral n) => (Var, Int) -> M n (Maybe n)
-lookupBits (var, count) = do
-  vals <- mapM lookupVar [var .. var + count - 1]
+lookupBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> M n (Maybe U)
+lookupBitsEither (width, Left var) = do
+  vals <- mapM lookupVar [var .. var + width - 1]
   case sequence vals of
     Nothing -> return Nothing
-    Just bitVals -> return $ Just $ sum [bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
-
-lookupBitsEither :: (GaloisField n, Integral n) => Either (Var, Int) n -> M n (Maybe n)
-lookupBitsEither (Left (var, count)) = lookupBits (var, count)
-lookupBitsEither (Right val) = return (Just val)
+    Just bitVals -> return $ Just $ UVal width $ toInteger $ sum [bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
+lookupBitsEither (width, Right val) = return (Just (UVal width val))
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
-  xs <- shrinkMul as bs cs >>= detectBinRep
+  xs <- shrinkMul as bs cs >>= shrinkBinRep
   return $ fmap Seq.singleton xs
 shrink (AddConstraint as) = do
-  as' <- shrinkAdd as >>= detectBinRep
+  as' <- shrinkAdd as >>= shrinkBinRep
   return $ fmap Seq.singleton as'
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 -- shrink (DivModConstaint2 divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
-shrink (BinRepConstraint binRep) = fmap (pure . BinRepConstraint) <$> shrinkBinRep binRep
-shrink (ModInvConstraint modInv) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInv
+shrink (ModInvConstraint modInvHint) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInvHint
 
 shrinkAdd :: (GaloisField n, Integral n) => Poly n -> M n (Result (Constraint n))
 shrinkAdd xs = do
@@ -280,7 +272,10 @@ eliminateIfHold expected actual =
 --    1. dividend & divisor
 --    1. dividend & quotient
 --    2. divisor & quotient & remainder
-shrinkDivMod :: (GaloisField n, Integral n) => (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n) -> M n (Result (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n))
+shrinkDivMod ::
+  (GaloisField n, Integral n) =>
+  ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer)) ->
+  M n (Result ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer)))
 shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
   -- check the value of the dividend first,
   -- if it's unknown, then its value can only be determined from other variables
@@ -294,8 +289,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisorResult, quotientResult, remainderResult) of
         (Just divisorVal, Just actualQuotientVal, Just actualRemainderVal) -> do
-          let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
+          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
+              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError ConflictingValues
           -- DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
@@ -305,8 +300,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           --   DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
           return Eliminated
         (Just divisorVal, Just actualQuotientVal, Nothing) -> do
-          let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
+          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
+              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError ConflictingValues
           -- throwError $
@@ -314,8 +309,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
-          let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
+          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
+              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
           -- throwError $
@@ -323,14 +318,14 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
-          let expectedQuotientVal = dividendVal `Arithmetics.integerDiv` divisorVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` divisorVal
+          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
+              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           bindBitsEither quotientVar expectedQuotientVal
           bindBitsEither remainderVar expectedRemainderVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Just actualRemainderVal) -> do
-          let expectedDivisorVal = dividendVal `Arithmetics.integerDiv` actualQuotientVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` expectedDivisorVal
+          let expectedDivisorVal = dividendVal `U.integerDivU` actualQuotientVal
+              expectedRemainderVal = dividendVal `U.integerModU` expectedDivisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
           -- throwError $
@@ -338,8 +333,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither divisorVar expectedDivisorVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Nothing) -> do
-          let expectedDivisorVal = dividendVal `Arithmetics.integerDiv` actualQuotientVal
-              expectedRemainderVal = dividendVal `Arithmetics.integerMod` expectedDivisorVal
+          let expectedDivisorVal = dividendVal `U.integerDivU` actualQuotientVal
+              expectedRemainderVal = dividendVal `U.integerModU` expectedDivisorVal
           bindBitsEither divisorVar expectedDivisorVal
           bindBitsEither remainderVar expectedRemainderVal
           return Eliminated
@@ -349,7 +344,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
       case (divisorResult, quotientResult, remainderResult) of
         -- divisor, quotient, and remainder are all known
         (Just divisorVal, Just quotientVal, Just remainderVal) -> do
-          let dividendVal = divisorVal * quotientVal + remainderVal
+          let dividendVal = (divisorVal `U.integerMulU` quotientVal) `U.integerAddU` remainderVal
           bindBitsEither dividendVar dividendVal
           return Eliminated
         _ -> do
@@ -367,130 +362,182 @@ shrinkBooleanConstraint var = do
     Nothing -> return $ Stuck var
 
 -- | Trying to reduce a ModInv constraint
-shrinkModInv :: (GaloisField n, Integral n) => (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer) -> M n (Result (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer))
+shrinkModInv ::
+  (GaloisField n, Integral n) =>
+  ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer) ->
+  M n (Result ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer))
 shrinkModInv (aVar, outVar, nVar, p) = do
   aResult <- lookupBitsEither aVar
   case aResult of
     Just aVal -> do
-      case Arithmetics.modInv (toInteger aVal) p of
+      case U.modInv (U.uintValue aVal) p of
         Just result -> do
+          let (width, _) = aVar
           -- aVal * result = n * p + 1
-          let nVal = (aVal * fromInteger result - 1) `Arithmetics.integerDiv` fromInteger p
+          let nVal = (aVal `U.integerMulU` UVal width result `U.integerSubU` UVal width 1) `U.integerDivU` UVal width p
           bindBitsEither nVar nVal
-          bindBitsEither outVar (fromInteger result)
+          bindBitsEither outVar (UVal width result)
           return Eliminated
-        Nothing -> throwError $ ModInvError aVar aVal p
+        Nothing -> throwError $ ModInvError aVar p
     Nothing -> return $ Stuck (aVar, outVar, nVar, p)
 
 -- | Trying to reduce a BinRep constraint
-shrinkBinRep :: (GaloisField n, Integral n) => BinRep -> M n (Result BinRep)
-shrinkBinRep binRep@(BinRep var width bitVarStart) = do
-  varResult <- lookupVar var
-  case varResult of
-    -- value of "var" is known
-    Just val -> do
-      let bitVals = toBits val
-      forM_ (zip [bitVarStart .. bitVarStart + width - 1] bitVals) $ \(bitVar, bitVal) -> do
-        bindVar bitVar bitVal
-      return Eliminated
-    Nothing -> do
-      -- see if all bit variables are bound
-      bitVal <- foldM go (Just 0) [bitVarStart + width - 1, bitVarStart + width - 2 .. bitVarStart]
-      case bitVal of
-        Nothing -> return $ Stuck binRep
-        Just bitVal' -> do
-          bindVar var bitVal'
-          return Eliminated
+data FoldState n = Start | Failed | Continue n (IntMap (Bool, Var)) deriving (Eq, Show)
+
+-- | Given a mapping of (Int, (Bool, Var)) pairs, where the Int indicates the power of 2, and the Bool indicates whether the coefficient is positive or negative
+--   and an Integer, derive coefficients (Boolean) for each of these variables such that the sum of the coefficients times the powers of 2 is equal to the Integer
+deriveCoeffs :: (GaloisField n, Integral n) => n -> IntMap (Bool, Var) -> [(Var, Bool)]
+deriveCoeffs rawConstant polynomial =
+  let negatedPolynomial = fmap (first not) polynomial
+      (upper, lower) = boundsOf negatedPolynomial
+      constant = toInteger rawConstant
+      negatedConstant = negate (toInteger (order rawConstant - fromIntegral rawConstant))
+      -- should flip the sign if the constant is outside the bounds of the polynomial
+      shouldFlipSign = upper < negatedConstant || lower > negatedConstant
+   in fst $ IntMap.foldlWithKey' go ([], if shouldFlipSign then constant else negatedConstant) polynomial
   where
-    go acc bitVar = case acc of
-      Nothing -> return Nothing
-      Just accVal -> do
-        bitValue <- lookupVar bitVar
-        case bitValue of
-          Nothing -> return Nothing
-          Just bit -> return (Just (accVal * 2 + bit))
+    -- given coefficients, calculate the upper bound and the lower bound of the polynomial
+    boundsOf :: IntMap (Bool, Var) -> (Integer, Integer)
+    boundsOf =
+      IntMap.foldlWithKey'
+        ( \(upper, lower) power (sign, _) ->
+            if sign then (upper + (2 ^ power), lower) else (upper, lower - (2 ^ power))
+        )
+        (0, 0)
 
--- -- | Trying to reduce a BinRep constraint
--- shrinkBinRep2 :: (GaloisField n, Integral n) => [(Var, Int)] -> M n (Result [(Var, Int)])
--- shrinkBinRep2 _segments = do
---   return Eliminated
+    go :: ([(Var, Bool)], Integer) -> Int -> (Bool, Var) -> ([(Var, Bool)], Integer)
+    go (acc, c) power (sign, var) =
+      if Data.Bits.testBit c power
+        then
+          if sign
+            then ((var, True) : acc, c + (2 ^ power))
+            else ((var, True) : acc, c - (2 ^ power))
+        else ((var, False) : acc, c)
 
-data FoldState = Start | Failed | Continue (IntMap Var) Bool deriving (Eq, Show)
+-- | Reduce binary representations
+shrinkBinRep :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
+shrinkBinRep NothingToDo = return NothingToDo
+shrinkBinRep Eliminated = return Eliminated
+shrinkBinRep (Shrinked polynomial) = return (Shrinked polynomial)
+shrinkBinRep (Stuck (AddConstraint polynomial)) = do
+  (boolVarRanges, fieldBitWidth) <- ask
+  let isBoolean var = case IntMap.lookupLE var boolVarRanges of
+        Nothing -> False
+        Just (index, len) -> var < index + len
+  case detectBinRep fieldBitWidth isBoolean polynomial of
+    Nothing -> return (Stuck (AddConstraint polynomial))
+    Just assignments -> do
+      -- we have a binary representation
+      -- we can now assign the variables
+      forM_ assignments $ \(var, val) -> do
+        bindVar var (if val then 1 else 0)
+      return Eliminated
+shrinkBinRep (Stuck polynomial) = return (Stuck polynomial)
 
 -- | Watch out for a stuck R1C, and see if it's a binary representation
---    1. see if all coefficients are positive
---    2. see if all variables are Boolean
---   NOTE: the criteria above may not be sufficient
-detectBinRep :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
-detectBinRep NothingToDo = return NothingToDo
-detectBinRep Eliminated = return Eliminated
-detectBinRep (Shrinked polynomial) = return (Shrinked polynomial)
-detectBinRep (Stuck (AddConstraint polynomial)) = do
-  boolVarRanges <- ask
-  case allCoeffsSameSignAndBooleanAndCollectCoeffs boolVarRanges polynomial of
-    Start -> return (Stuck (AddConstraint polynomial))
-    Failed -> return (Stuck (AddConstraint polynomial))
-    Continue invertedPolynomial positive -> do
-      let constant = if positive then -(Poly.constant polynomial) else Poly.constant polynomial
-      -- NOTE: the criteria below is not necessary
-      -- because we know that these coefficients are:
-      --  1. all of the same sign
-      --  2. unique
-      let powers = IntMap.keys invertedPolynomial
-      let powersAllUnique = length powers == length (List.nub powers)
-
-      if powersAllUnique
-        then do
-          -- we have a binary representation
-          -- we can now bind the variables
-          forM_ (IntMap.toList invertedPolynomial) $ \(power, var) -> do
-            bindVar var (FieldBits.testBit constant power)
-
-          return Eliminated
-        else do
-          -- we don't have a binary representation
-          -- we can't do anything
-          return (Stuck (AddConstraint polynomial))
+--    1. see if variables are all Boolean
+--    2. see if coefficients are all multiples of powers of 2
+--    3. see if these powers of 2 are all unique
+--
+--   Property:
+--    For a field of order `n`, let `k = floor(log2(n))`, i.e., the number of bits that can be fit into a field element.
+--    1. There can be at most `k` coefficients that are multiples of powers of 2 if the polynomial is a binary representation.
+--    2. These coefficients cannot be too far apart, i.e., the quotient of any 2 coefficients cannot be greater than `2^(k-1)`.
+--    3. For any 2 coefficients `a` and `b`, either `a / b` or `b / a` must be a power of 2 smaller than `2^k`.
+detectBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe [(Var, Bool)]
+detectBinRep fieldBitWidth isBoolean polynomial =
+  if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
+    then Nothing
+    else case collectCoeffs polynomial of
+      Start -> Nothing
+      Failed -> Nothing
+      Continue picked invertedPolynomial ->
+        let powers = IntMap.keys invertedPolynomial
+            powersAllUnique = length powers == length (List.nub powers)
+         in if powersAllUnique
+              then case IntMap.lookupMin invertedPolynomial of
+                Nothing -> Just []
+                Just (minPower, _) ->
+                  -- if the smallest power is negative, make it 2^0
+                  if minPower < 0
+                    then
+                      let normalizedPolynomial = IntMap.mapKeys (\i -> i - minPower) invertedPolynomial
+                          constant = Poly.constant polynomial * (2 ^ (-minPower)) / picked
+                       in Just (deriveCoeffs constant normalizedPolynomial)
+                    else Just (deriveCoeffs (Poly.constant polynomial / picked) invertedPolynomial)
+              else Nothing
   where
-    allCoeffsSameSignAndBooleanAndCollectCoeffs :: (GaloisField n, Integral n) => Ranges -> Poly n -> FoldState
-    allCoeffsSameSignAndBooleanAndCollectCoeffs boolVarRanges xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
+    collectCoeffs :: (GaloisField n, Integral n) => Poly n -> FoldState n
+    collectCoeffs xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
       where
-        isPowerOf2 :: (GaloisField n, Integral n) => n -> Maybe (Int, Bool)
-        isPowerOf2 coeff =
-          let (normalized, sign) = normalize coeff
-              expected = floor (logBase 2 (fromInteger (abs normalized)) :: Double)
-           in if abs normalized == 2 ^ expected
-                then Just (expected, sign)
-                else Nothing
-
-        -- normalize the coefficient to be in the range [-size/2, size/2) and return the sign
-        normalize :: (GaloisField n, Integral n) => n -> (Integer, Bool)
-        normalize coeff =
-          let size = order coeff
-              halfway = fromIntegral (size `div` 2)
-           in if coeff >= halfway
-                then (negate (fromIntegral size - fromIntegral coeff), False)
-                else (fromIntegral coeff, True)
-
-        isBoolean :: Var -> Bool
-        isBoolean var = case IntMap.lookupLE var boolVarRanges of
-          Nothing -> False
-          Just (index, len) -> var < index + len
-
-        go :: (GaloisField n, Integral n) => FoldState -> Var -> n -> FoldState
-        go Start var coeff = case isPowerOf2 coeff of
-          Nothing -> Failed
-          Just (power, sign) -> Continue (IntMap.singleton power var) sign
+        go :: (GaloisField n, Integral n) => FoldState n -> Var -> n -> FoldState n
+        go Start var coeff =
+          if isBoolean var
+            then -- since this is the first coefficient, we can always assume that it's a power of 2
+              Continue coeff (IntMap.singleton 0 (True, var))
+            else Failed
         go Failed _ _ = Failed
-        go (Continue coeffs previousSign) var coeff = case isPowerOf2 coeff of
-          Nothing -> Failed
-          Just (power, sign) ->
-            let sameSign = sign == previousSign
-                uniqueCoeff = IntMap.notMember power coeffs
-             in if isBoolean var && sameSign && uniqueCoeff
-                  then Continue (IntMap.insert power var coeffs) sign
-                  else Failed
-detectBinRep (Stuck polynomial) = return (Stuck polynomial)
+        go (Continue picked coeffs) var coeff =
+          if isBoolean var
+            then
+              let result = case isPowerOf2' fieldBitWidth (coeff / picked) of
+                    Just power -> Just (power, True)
+                    Nothing -> case isPowerOf2' fieldBitWidth (picked / coeff) of
+                      Just power -> Just (-power, True)
+                      Nothing -> case isPowerOf2' fieldBitWidth ((-coeff) / picked) of
+                        Just power -> Just (power, False)
+                        Nothing -> case isPowerOf2' fieldBitWidth (picked / (-coeff)) of
+                          Just power -> Just (-power, False)
+                          Nothing -> Nothing
+               in case result of
+                    Nothing -> Failed
+                    Just (power, sign) ->
+                      case IntMap.lookup power coeffs of
+                        Nothing -> Continue picked (IntMap.insert power (sign, var) coeffs)
+                        Just _ -> Failed
+            else Failed
+
+-- | See if a coefficient is a power of 2
+--   Note that, because these coefficients are field elements,
+--    they can be powers of 2 when viewed as either "positive integers" or "negative integers"
+isPowerOf2' :: (GaloisField n, Integral n) => Width -> n -> Maybe Int
+isPowerOf2' _ 1 = Nothing
+isPowerOf2' _ 2 = Just 1
+isPowerOf2' fieldBitWidth coeff =
+  case check (toInteger coeff) of
+    Nothing -> Nothing
+    Just 0 -> Nothing --
+    Just result ->
+      if result >= fieldBitWidth
+        then Nothing
+        else Just result
+  where
+    -- Speed this up
+    check :: Integer -> Maybe Int
+    check n =
+      let expected = floor (logBase 2 (fromInteger (abs n)) :: Double)
+       in if abs n == 2 ^ expected
+            then Just expected
+            else Nothing
+
+-- isPowerOf2 :: (GaloisField n, Integral n) => n -> Maybe (Bool, Int)
+-- isPowerOf2 (-2) = Just (False, 1)
+-- isPowerOf2 (-1) = Just (False, 0)
+-- isPowerOf2 1 = Just (True, 0)
+-- isPowerOf2 2 = Just (True, 1)
+-- isPowerOf2 coeff =
+--   let asInteger = toInteger coeff
+--    in if even asInteger
+--         then (True,) <$> check asInteger
+--         else (False,) <$> check (negate (fromIntegral (order coeff) - fromIntegral coeff))
+--   where
+--     -- Speed this up
+--     check :: Integer -> Maybe Int
+--     check n =
+--       let expected = floor (logBase 2 (fromInteger (abs n)) :: Double)
+--        in if abs n == 2 ^ expected
+--             then Just expected
+--             else Nothing
 
 -- if (x - y) = 0 then m = 0 else m = recip (x - y)
 shrinkEqZero :: (GaloisField n, Integral n) => (Poly n, Var) -> M n (Result (Poly n, Var))

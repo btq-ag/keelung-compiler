@@ -8,6 +8,7 @@ import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -18,25 +19,26 @@ import Data.Validation (toEither)
 import Data.Vector (Vector)
 import GHC.Generics (Generic)
 import Keelung (N (N))
-import Keelung.Compiler.Syntax.FieldBits qualified as FieldBits
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
-import Keelung.Data.BinRep (BinRep (..))
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.VarGroup
+import Keelung.Interpreter.Arithmetics (U)
+import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax
 import Keelung.Syntax.Counters
+import Keelung.Data.FieldInfo
 
 --------------------------------------------------------------------------------
 
 -- | Monad for R1CS interpretation / witness generation
-type M n = ReaderT Ranges (StateT (IntMap n) (Except (Error n)))
+type M n = ReaderT (Ranges, Width) (StateT (IntMap n) (Except (Error n)))
 
-runM :: (GaloisField n, Integral n) => Ranges -> Inputs n -> M n a -> Either (Error n) (Vector n)
-runM boolVarRanges inputs p =
+runM :: (GaloisField n, Integral n) => Ranges -> FieldInfo -> Inputs n -> M n a -> Either (Error n) (Vector n)
+runM boolVarRanges fieldInfo inputs p =
   let counters = Inputs.inputCounters inputs
-   in case runExcept (execStateT (runReaderT p boolVarRanges) (Inputs.toIntMap inputs)) of
+   in case runExcept (execStateT (runReaderT p (boolVarRanges, fieldWidth fieldInfo)) (Inputs.toIntMap inputs)) of
         Left err -> Left err
         Right bindings -> case toEither $ toTotal' (getCount counters PublicInput + getCount counters PrivateInput, bindings) of
           Left unbound -> Left (VarUnassignedError unbound)
@@ -49,11 +51,11 @@ bindVarEither :: Either Var n -> n -> M n ()
 bindVarEither (Left var) val = bindVar var val
 bindVarEither (Right _) _ = return ()
 
-bindBitsEither :: (GaloisField n, Integral n) => Either (Var, Int) n -> n -> M n ()
-bindBitsEither (Left (var, count)) val = do
-  forM_ [0 .. count - 1] $ \i -> do
-    bindVar (var + i) (FieldBits.testBit val i)
-bindBitsEither (Right _) _ = return ()
+bindBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> U -> M n ()
+bindBitsEither (width, Left var) val = do
+  forM_ [0 .. width - 1] $ \i -> do
+    bindVar (var + i) (if Data.Bits.testBit (U.uintValue val) i then 1 else 0)
+bindBitsEither (_, Right _) _ = return ()
 
 --------------------------------------------------------------------------------
 
@@ -63,13 +65,11 @@ data Constraint n
   | BooleanConstraint Var
   | EqZeroConstraint (Poly n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
-    -- DivModConstaint (Either Var n, Either Var n, Either Var n, Either Var n)
-    DivModConstaint (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n)
-  | BinRepConstraint BinRep
+    DivModConstaint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))
   | -- \| (a, n, p) where modInv a * a = n * p + 1
 
     -- | BinRepConstraint2 [(Var, Int)]
-    ModInvConstraint (Either (Var, Int) n, Either (Var, Int) n, Either (Var, Int) n, Integer)
+    ModInvConstraint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer)
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Constraint n)
@@ -88,7 +88,6 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
       <> show quotient
       <> " + $"
       <> show remainder
-  show (BinRepConstraint binRep) = "(BinRep)    " <> show binRep
   -- show (BinRepConstraint2 segments) = "(BinRep)    " <> show segments
   show (ModInvConstraint (var, _, _, p)) = "(ModInv)    $" <> show var <> "⁻¹ (mod " <> show p <> ")"
 
@@ -99,9 +98,8 @@ instance Functor Constraint where
   fmap f (AddConstraint a) = AddConstraint (fmap f a)
   fmap _ (BooleanConstraint var) = BooleanConstraint var
   fmap f (EqZeroConstraint (xs, m)) = EqZeroConstraint (fmap f xs, m)
-  fmap f (DivModConstaint (a, b, q, r)) = DivModConstaint (fmap f a, fmap f b, fmap f q, fmap f r)
-  fmap _ (BinRepConstraint binRep) = BinRepConstraint binRep
-  fmap f (ModInvConstraint (a, output, n, p)) = ModInvConstraint (fmap f a, fmap f output, fmap f n, p)
+  fmap _ (DivModConstaint (a, b, q, r)) = DivModConstaint (a, b, q, r)
+  fmap _ (ModInvConstraint (a, output, n, p)) = ModInvConstraint (a, output, n, p)
 
 --------------------------------------------------------------------------------
 
@@ -111,7 +109,7 @@ data Error n
   | ConflictingValues
   | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
-  | ModInvError (Either (Var, Int) n) n Integer
+  | ModInvError (Width, Either Var Integer) Integer
   deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
@@ -136,7 +134,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   --   "Expected the result of `" <> show (N dividend) <> " / " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
   -- show (DivModRemainderError dividend divisor expected actual) =
   --   "Expected the result of `" <> show (N dividend) <> " % " <> show (N divisor) <> "` to be `" <> show (N expected) <> "` but got `" <> show (N actual) <> "`"
-  show (ModInvError (Left var) val p) =
-    "Unable to calculate the inverse of `$" <> show var <> " " <> show (N val) <> "` (mod " <> show p <> ")"
-  show (ModInvError (Right val') val p) =
-    "Unable to calculate the inverse of `" <> show (N val') <> " `" <> show (N val) <> "` (mod " <> show p <> ")"
+  show (ModInvError (_, Left var) p) =
+    "Unable to calculate '$" <> show var <> " `modInv` " <> show p <> "'"
+  show (ModInvError (_, Right val) p) =
+    "Unable to calculate '" <> show val <> " `modInv` " <> show p <> "'"

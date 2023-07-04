@@ -16,7 +16,7 @@ where
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..))
 import Keelung.Field (N (..))
-import Keelung.Syntax (Var, Width, HasWidth(..))
+import Keelung.Syntax (HasWidth (..), Var, Width)
 import Keelung.Syntax.Counters (Counters)
 import Keelung.Syntax.Counters qualified as Counters
 
@@ -45,7 +45,7 @@ instance (Integral n, Show n) => Show (Expr n) where
 
 --------------------------------------------------------------------------------
 
--- | Field expressions 
+-- | Field expressions
 data ExprF n
   = ValF n
   | VarF Var
@@ -90,16 +90,16 @@ data ExprB n
   | VarBI Var
   | VarBP Var
   | -- logical operators
-    AndB (ExprB n) (ExprB n) (Seq (ExprB n))
-  | OrB (ExprB n) (ExprB n) (Seq (ExprB n))
+    AndB (Seq (ExprB n))
+  | OrB (Seq (ExprB n))
   | XorB (ExprB n) (ExprB n)
   | NotB (ExprB n)
   | IfB (ExprB n) (ExprB n) (ExprB n)
   | -- comparison operators
     NEqB (ExprB n) (ExprB n)
   | NEqF (ExprF n) (ExprF n)
-  | NEqU (ExprU n) (ExprU n)
-  | EqB (ExprB n) (ExprB n)
+  | -- | NEqU (ExprU n) (ExprU n)
+    EqB (ExprB n) (ExprB n)
   | EqF (ExprF n) (ExprF n)
   | EqU (ExprU n) (ExprU n)
   | LTU (ExprU n) (ExprU n)
@@ -118,14 +118,14 @@ instance (Integral n, Show n) => Show (ExprB n) where
     VarBO var -> showString "BO" . shows var
     VarBI var -> showString "BI" . shows var
     VarBP var -> showString "BP" . shows var
-    AndB x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
-    OrB x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
+    AndB xs -> chain prec " ∧ " 3 xs
+    OrB xs -> chain prec " ∨ " 2 xs
     XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
     NotB x -> chain prec "¬ " 5 $ x :<| Empty
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     NEqB x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
     NEqF x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
-    NEqU x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
+    -- NEqU x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty
     EqB x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
     EqF x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
     EqU x0 x1 -> chain prec " ≡ " 5 $ x0 :<| x1 :<| Empty
@@ -149,8 +149,8 @@ data ExprU n
   | MulU Width (ExprU n) (ExprU n)
   | MMIU Width (ExprU n) Integer -- modular multiplicative inverse
   | -- logical operators
-    AndU Width (ExprU n) (ExprU n) (Seq (ExprU n))
-  | OrU Width (ExprU n) (ExprU n) (Seq (ExprU n))
+    AndU Width (Seq (ExprU n))
+  | OrU Width (Seq (ExprU n))
   | XorU Width (ExprU n) (ExprU n)
   | NotU Width (ExprU n)
   | IfU Width (ExprB n) (ExprU n) (ExprU n)
@@ -172,8 +172,8 @@ instance (Show n, Integral n) => Show (ExprU n) where
     AddU _ xs -> chain prec " + " 6 xs
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
     MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
-    AndU _ x0 x1 xs -> chain prec " ∧ " 3 $ x0 :<| x1 :<| xs
-    OrU _ x0 x1 xs -> chain prec " ∨ " 2 $ x0 :<| x1 :<| xs
+    AndU _ xs -> chain prec " ∧ " 3 xs
+    OrU _ xs -> chain prec " ∨ " 2 xs
     XorU _ x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
     NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
@@ -192,8 +192,8 @@ instance HasWidth (ExprU n) where
     AddU w _ -> w
     MulU w _ _ -> w
     MMIU w _ _ -> w
-    AndU w _ _ _ -> w
-    OrU w _ _ _ -> w
+    AndU w _ -> w
+    OrU w _ -> w
     XorU w _ _ -> w
     NotU w _ -> w
     IfU w _ _ _ -> w
@@ -201,7 +201,6 @@ instance HasWidth (ExprU n) where
     ShLU w _ _ -> w
     SetU w _ _ _ -> w
     BtoU w _ -> w
-
 
 -- --------------------------------------------------------------------------------
 

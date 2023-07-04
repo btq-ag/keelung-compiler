@@ -20,6 +20,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Compiler.Constraint
+import Keelung.Data.FieldInfo
 import Keelung.Compiler.Optimize.OccurB (OccurB)
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF (OccurF)
@@ -34,16 +35,14 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
+import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
-import Keelung.Compiler.FieldInfo
 
 --------------------------------------------------------------------------------
 
 -- | A constraint module is a collection of constraints with some additional information
 data ConstraintModule n = ConstraintModule
   { cmField :: FieldInfo,
-    -- | the minimal bits required to represent a field element
-    cmFieldWidth :: Int,
     cmCounters :: !Counters,
     -- for counting the occurrences of variables in constraints (excluding the ones that are in FieldRelations)
     cmOccurrenceF :: !OccurF,
@@ -58,9 +57,9 @@ data ConstraintModule n = ConstraintModule
     cmEqZeros :: [(PolyG Ref n, RefF)],
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
-    cmDivMods :: [(Either RefU n, Either RefU n, Either RefU n, Either RefU n)],
+    cmDivMods :: [(Either RefU U, Either RefU U, Either RefU U, Either RefU U)],
     -- hints for generating witnesses for ModInv constraints
-    cmModInvs :: [(Either RefU n, Either RefU n, Either RefU n, n)]
+    cmModInvs :: [(Either RefU U, Either RefU U, Either RefU U, U)]
   }
   deriving (Eq, Generic, NFData)
 
@@ -337,32 +336,6 @@ instance UpdateOccurrences RefB where
                 RefBX var ->
                   cm
                     { cmOccurrenceB = OccurB.decrease var (cmOccurrenceB cm)
-                    }
-                _ -> cm
-          )
-      )
-
-instance UpdateOccurrences RefU where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                RefUX width var ->
-                  cm
-                    { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm)
-                    }
-                _ -> cm
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                RefUX width var ->
-                  cm
-                    { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm)
                     }
                 _ -> cm
           )

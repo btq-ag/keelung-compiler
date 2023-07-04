@@ -4,8 +4,10 @@ import Control.Monad (when)
 import Data.Foldable (foldlM)
 import Data.Vector (Vector, (!))
 import qualified Hash.Poseidon.Constant as Constant
-import Keelung
 import Prelude hiding (round)
+
+
+import Keelung
 
 -- | "AddRoundConstants"
 arc :: Vector Field -> Int -> [Field] -> [Field]
