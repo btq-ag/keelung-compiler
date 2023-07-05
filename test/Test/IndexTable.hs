@@ -11,7 +11,7 @@ import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Linker (constructOccurrences, reindexRef)
 import Test.Hspec
-import Test.Optimization.Util (execute)
+import Test.Optimization.Util (executeGF181)
 
 run :: IO ()
 run = hspec tests
@@ -119,7 +119,7 @@ tests = do
 
   describe "fromOccurrences" $ do
     it "add + assertion" $ do
-      (_cm, cm) <- execute $ do
+      (_cm, cm) <- executeGF181 $ do
         x <- inputUInt @4 Public
         assert $ 2 `eq` (x + 1)
       let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
@@ -137,7 +137,7 @@ tests = do
       reindexRef occurrences (B (RefUBit 4 intermediate4 3)) `shouldBe` 8
 
     it "Bit test / and 1" $ do
-      (_, cm) <- execute $ do
+      (_, cm) <- executeGF181 $ do
         x <- inputUInt @4 Public
         y <- inputUInt @4 Private
         return $ (x .&. y) !!! 0
@@ -161,7 +161,7 @@ tests = do
       reindexRef occurrences (B (RefUBit 4 intermediateVar0 3)) `shouldBe` 12
 
     it "Bit test / and 2" $ do
-      (_, cm) <- execute $ do
+      (_, cm) <- executeGF181 $ do
         x <- inputUInt @4 Public
         y <- inputUInt @4 Private
         z <- inputUInt @4 Public

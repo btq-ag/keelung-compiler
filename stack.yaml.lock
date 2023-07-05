@@ -16,15 +16,15 @@ packages:
     commit: d7d0da6b5df8045afdfb820ba8d08f34dc4c3e58
     git: https://github.com/btq-ag/galois-field.git
 - completed:
-    commit: 36de622f62ffdf58a626cc79981473ef2adf9af3
+    commit: 6e00fe837d3033ae160473f7a04c7be1eeee2adc
     git: https://github.com/btq-ag/keelung.git
     name: keelung
     pantry-tree:
-      sha256: 2cf333d5c1cc37c14a4de6cb14be8d7c0c48a3f7aa7729edd6359da416c892fb
-      size: 1812
-    version: 0.11.0
+      sha256: 184c3a131771bf2da02d3cdd44475e1a7d2478faa432d118941bd09031d873c5
+      size: 1813
+    version: 0.12.1
   original:
-    commit: 36de622f62ffdf58a626cc79981473ef2adf9af3
+    commit: 6e00fe837d3033ae160473f7a04c7be1eeee2adc
     git: https://github.com/btq-ag/keelung.git
 snapshots:
 - completed:

@@ -8,6 +8,7 @@ import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error qualified as Error
+import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Limb
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
@@ -534,12 +535,7 @@ assertGTE width (Left a) bound
             Prime _ -> False
 
       if isSmallField
-        then do
-          flag <- freshRefF
-          writeValF flag 1
-          -- because we don't have to execute the `go` function for trailing zeros of `bound`
-          -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
-          foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
+        then runDefault
         else do
           -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) * (a - 2^limbWidth + 3) = 0` on the smallest limb
           let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
@@ -552,19 +548,19 @@ assertGTE width (Left a) bound
           -- assign the rest of the limbs to `1`
           forM_ [limbWidth .. width - 1] $ \j ->
             writeValB (RefUBit width a j) True
-  -- \| bound == 1 = do
-  --     -- a >= 1 => a > 0 => a is not zero
-  --     -- there exists a number m such that the product of a and m is 1
-  --     m <- freshRefF
-  --     let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-  --     writeMul (0, bits) (0, [(F m, 1)]) (1, [])
-  | otherwise = do
+  | bound == 1 = do
+      -- a ≥ 1 → a > 0 → a is not zero
+      -- there exists a number m such that the product of a and m is 1
+      assertNonZero width a
+  | otherwise = runDefault
+  where
+    runDefault = do
       flag <- freshRefF
       writeValF flag 1
       -- because we don't have to execute the `go` function for trailing zeros of `bound`
       -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
       foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
-  where
+
     -- for counting the number of trailing zeros of `bound`
     countTrailingZeros :: Int
     countTrailingZeros =
@@ -593,3 +589,64 @@ assertGTE width (Left a) bound
               -- flag' := flag * (1 - bit)
               writeMul (0, [(flag, 1)]) (1, [(B aBit, -1)]) (0, [(F flag', 1)])
               return (F flag')
+
+--------------------------------------------------------------------------------
+
+-- | Assert that the given UInt is not zero.
+assertNonZero :: (GaloisField n, Integral n) => Width -> RefU -> M n ()
+assertNonZero width ref = do
+  let bits = [RefUBit width ref i | i <- [0 .. width - 1]]
+  assertNonZeroOnRefBs bits
+  where
+    assertNonZeroOnRefBs :: (GaloisField n, Integral n) => [RefB] -> M n ()
+    assertNonZeroOnRefBs bits = do
+      fieldInfo <- gets cmField
+      case fieldTypeData fieldInfo of
+        Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+        Prime 2 -> linearCase bits
+        Prime 3 -> linearCase bits
+        Prime n -> fasterCase (fromInteger n) bits
+
+    -- Using N constraints on N-bits UInt to assert that the UInt is not zero.
+    linearCase :: (GaloisField n, Integral n) => [RefB] -> M n ()
+    linearCase bits = do
+      nonZero <- freshRefB
+      writeValB nonZero False
+      final <- foldM go nonZero bits
+      -- assert that the final `nonZero` is 1
+      writeValB final True
+      where
+        -- we enforce this constraint:
+        --    nonZero' = nonZero `or` bit
+        --             = nonZero + bit - nonZero * bit
+        -- such that:
+        --    if `nonZero = 0` then `nonZero' = bit`
+        --    if `nonZero = 1` then `nonZero' = 1`
+        -- and assert the final `nonZero' = 1`
+        go :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
+        go nonZero bit = do
+          nonZero' <- freshRefB
+          writeMul (0, [(B nonZero, 1)]) (0, [(B bit, 1)]) (0, [(B nonZero, 1), (B bit, 1), (B nonZero', -1)])
+          return nonZero'
+
+    fasterCase :: (GaloisField n, Integral n) => Int -> [RefB] -> M n ()
+    fasterCase order bits = do
+      -- we can only add at most `order - 1` bits at a time
+      let (currentBatch, nextBatch) = splitAt (order - 1) bits
+      result <- compress currentBatch
+      if null nextBatch
+        then do
+          -- edge case
+          writeValB result True
+        else do
+          -- inductive case
+          fasterCase order (result : nextBatch)
+      where
+        -- add all bits up and see if it's non-zero
+        -- reduce N bits to 2 constraints
+        compress :: (GaloisField n, Integral n) => [RefB] -> M n RefB
+        compress chunk = do
+          result <- eqZero False (mconcat (map (\x -> 1 @ B x) chunk))
+          case result of
+            Left var -> return var
+            Right _ -> error "[ panic ] assertNonZero: impossible case"

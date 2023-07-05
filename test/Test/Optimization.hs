@@ -23,7 +23,7 @@ tests = do
     Optimization.UInt.tests
 
     it "Poseidon" $ do
-      (cm, cm') <- execute $ do
+      (cm, cm') <- executeGF181 $ do
         xs <- inputList Public 1
         Poseidon.hash (toList xs)
 
@@ -36,7 +36,7 @@ tests = do
       
     describe "Field" $ do
       it "Field 1" $ do
-        (cm, cm') <- execute $ do
+        (cm, cm') <- executeGF181 $ do
           x <- inputField Public
           y <- reuse x
           z <- reuse x
@@ -53,7 +53,7 @@ tests = do
         AllRelations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmFieldRelations cm') `shouldBe` Just (1, 0)
 
       it "Field 2" $ do
-        (cm, cm') <- execute $ do
+        (cm, cm') <- executeGF181 $ do
           x <- inputField Public
           y <- reuse x
           z <- reuse (x + y)
@@ -70,7 +70,7 @@ tests = do
         AllRelations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmFieldRelations cm') `shouldBe` Just (2, 0)
 
       it "Field 3" $ do
-        (cm, cm') <- execute $ do
+        (cm, cm') <- executeGF181 $ do
           x <- inputField Public
           y <- reuse (x + 1)
           return (x + y)
@@ -82,7 +82,7 @@ tests = do
         AllRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmFieldRelations cm') `shouldBe` Just (2, 1)
 
       it "Field 4" $ do
-        (cm, cm') <- execute $ do
+        (cm, cm') <- executeGF181 $ do
           let x = 4
           y <- reuse x
           return (x + y :: Field)
@@ -92,7 +92,7 @@ tests = do
         AllRelations.lookup (F $ RefFO 0) (cmFieldRelations cm') `shouldBe` AllRelations.Value 8
 
       it "Field 5" $ do
-        (cm, cm') <- execute $ do
+        (cm, cm') <- executeGF181 $ do
           x <- inputField Public
           y <- reuse x
           return (x * y :: Field)
@@ -102,7 +102,7 @@ tests = do
 
     describe "Boolean" $ do
       it "Boolean 1" $ do
-        (cm, cm') <- execute $ do
+        (cm, cm') <- executeGF181 $ do
           x <- inputBool Public
           y <- reuse x
           return (x .|. y)
@@ -110,7 +110,7 @@ tests = do
         cm' `shouldHaveSize` 3
 
       it "Boolean 2" $ do
-        (cm, cm') <- execute $ do
+        (cm, cm') <- executeGF181 $ do
           x <- inputBool Public
           reuse x
 
