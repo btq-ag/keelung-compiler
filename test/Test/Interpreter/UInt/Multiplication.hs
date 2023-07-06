@@ -75,7 +75,8 @@ tests =
       let program y = do
             x <- inputUInt @4 Public
             return $ x * fromInteger y
-      -- runAll (Prime 17) (program 0) [10] [] [0]
+      -- debug (Prime 17) (program 15)
+      -- runAll (Prime 17) (program 10) [10] [] [4]
       let genPair = do
             x <- choose (-15, 15)
             y <- choose (-15, 15)
@@ -118,10 +119,10 @@ tests =
 --             x <- inputUInt @32 Public
 --             return $ x * fromInteger y
 --       debug (Prime 1031) (program 1)
-      -- let genPair = do
-      --       x <- (arbitrary :: Gen Int)
-      --       y <- (arbitrary :: Gen Int)
-      --       return (toInteger x, toInteger y)
-      -- forAll genPair $ \(x, y) -> do
-      --   let expected = [(x * y) `mod` (2 ^ 32)]
-      --   runAll (Prime 17) (program y) [x] [] expected
+-- let genPair = do
+--       x <- (arbitrary :: Gen Int)
+--       y <- (arbitrary :: Gen Int)
+--       return (toInteger x, toInteger y)
+-- forAll genPair $ \(x, y) -> do
+--   let expected = [(x * y) `mod` (2 ^ 32)]
+--   runAll (Prime 17) (program y) [x] [] expected

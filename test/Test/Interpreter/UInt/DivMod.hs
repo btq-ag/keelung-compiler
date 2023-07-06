@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+
 -- {-# LANGUAGE TypeApplications #-}
 
 module Test.Interpreter.UInt.DivMod (tests, run) where
@@ -25,9 +26,11 @@ tests =
             dividend <- input Private :: Comp (UInt 6)
             divisor <- input Public
             performDivMod dividend divisor
-      -- runAll gf181 program [7] [20] [2, 6]
-      -- runAll gf181 program [4] [4] [1, 0]
       -- debug (Prime 1031) program
+      -- runAll (Prime 1031) program [7] [20] [2, 6]
+      -- debug (Prime 4099) program
+      -- runAll (Prime 4099) program [7] [20] [2, 6]
+      -- runAll gf181 program [4] [4] [1, 0]
       let genPair = do
             dividend <- choose (0, 63)
             divisor <- choose (1, 63)
@@ -35,7 +38,8 @@ tests =
 
       forAll genPair $ \(dividend, divisor) -> do
         let expected = [dividend `div` divisor, dividend `mod` divisor]
-        runAll (Prime 1031) program [fromInteger divisor] [fromInteger dividend] expected
+        runAll gf181 program [fromInteger divisor] [fromInteger dividend] expected
+    -- runAll (Prime 1031) program [fromInteger divisor] [fromInteger dividend] expected
 
     it "performDivMod (on constants) (issue #18)" $ do
       -- 7 = 3 * 2 + 1

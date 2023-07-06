@@ -513,43 +513,6 @@ compileAddOrSubU2 isSub width out (Left a) (Left b) = do
 compileAddU2 :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddU2 = compileAddOrSubU2 False
 
-compileMulBigCC :: (GaloisField n, Integral n) => Int -> RefU -> Integer -> Integer -> M n ()
-compileMulBigCC width out a b = do
-  let val = a * b
-  writeValU width out val
-
--- | Encoding addition on UInts with multiple operands: O(2)
---      A       =   2ⁿAₙ₋₁ + ... + 2A₁ + A₀
---      B       =   2ⁿBₙ₋₁ + ... + 2B₁ + B₀
---      C       = 2²ⁿC₂ₙ₋₁ + ... + 2C₁ + C₀
---      Result  =   2ⁿCₙ₋₁ + ... + 2C₁ + C₀
-compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileMulU width out (Right a) (Right b) = do
-  -- let val = a * b
-  -- writeValU width out val
-  compileMulBigCC width out a b
-compileMulU width out (Right a) (Left b) = do
-  carry <- replicateM width (B <$> freshRefB)
-  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
-  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-  writeMul (fromInteger a, []) (0, bs) (0, outputSegment <> carrySegment)
-compileMulU width out (Left a) (Right b) = do
-  carry <- replicateM width (B <$> freshRefB)
-  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
-  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-  writeMul (0, as) (fromInteger b, []) (0, outputSegment <> carrySegment)
-compileMulU width out (Left a) (Left b) = do
-  carry <- replicateM width (B <$> freshRefB)
-
-  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
-  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-
-  writeMul (0, as) (0, bs) (0, outputSegment <> carrySegment)
-
 compileMulU2 :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileMulU2 width out (Right a) (Right b) = do
   let val = a * b
@@ -681,7 +644,7 @@ assertDivModU width dividend divisor quotient remainder = do
   dividendRef <- wireU dividend
 
   productDQ <- freshRefU width
-  compileMulU width productDQ divisorRef quotientRef
+  UInt.compileMulU width productDQ divisorRef quotientRef
   UInt.compileSubU width productDQ dividendRef remainderRef
 
   -- 0 ≤ remainder < divisor
