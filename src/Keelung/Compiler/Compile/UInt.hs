@@ -331,19 +331,23 @@ _mul2LimbPreallocated dimensions currentLimbWidth limbStart (a, x) operand lower
 --               .....
 -- ------------------------------------------
 mulnxn :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> Int -> RefU -> RefU -> Either Integer RefU -> M n ()
-mulnxn dimensions currentLimbWidth limbStart arity out var operand = do
+mulnxn dimensions limbWidth limbStart arity out var operand = do
   -- generate pairs of indices for choosing limbs
   let indices = [(xi, columnIndex - xi) | columnIndex <- [0 .. arity - 1], xi <- [0 .. columnIndex]]
   -- generate pairs of limbs to be added together
   limbColumns <-
     foldM
       ( \columns (xi, yi) -> do
-          let x = Limb var currentLimbWidth (limbStart + currentLimbWidth * xi) (replicate currentLimbWidth True)
+          -- current limb width may be smaller than the default limb width in the highest limbs
+          let currentLimbWidthX = limbWidth `min` (dimUIntWidth dimensions - (limbStart + limbWidth * xi))
+          let currentLimbWidthY = limbWidth `min` (dimUIntWidth dimensions - (limbStart + limbWidth * yi))
+
+          let x = Limb var currentLimbWidthX (limbStart + limbWidth * xi) (replicate currentLimbWidthX True)
           let y = case operand of
-                Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbStart + currentLimbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                Right variable -> Right (0, Limb variable currentLimbWidth (limbStart + currentLimbWidth * yi) (replicate currentLimbWidth True))
+                Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbStart + limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
+                Right variable -> Right (0, Limb variable currentLimbWidthY (limbStart + limbWidth * yi) (replicate currentLimbWidthY True))
           let index = xi + yi
-          (lowerLimb, upperLimb) <- mul2Limbs dimensions currentLimbWidth (limbStart + currentLimbWidth * index) (0, x) y
+          (lowerLimb, upperLimb) <- mul2Limbs dimensions limbWidth (limbStart + limbWidth * index) (0, x) y
           let columns' = IntMap.insertWith (<>) index lowerLimb columns
           let columns'' =
                 if index == arity - 1 -- throw limbs higher than arity away
@@ -356,8 +360,8 @@ mulnxn dimensions currentLimbWidth limbStart arity out var operand = do
   -- go through each columns and add them up
   foldM_
     ( \previousCarryLimbs (index, limbs) -> do
-        let resultLimb = Limb out currentLimbWidth (limbStart + currentLimbWidth * index) (replicate currentLimbWidth True)
-        addWholeColumn' dimensions limbStart currentLimbWidth resultLimb (previousCarryLimbs <> limbs)
+        let resultLimb = Limb out limbWidth (limbStart + limbWidth * index) (replicate limbWidth True)
+        addWholeColumn' dimensions limbStart limbWidth resultLimb (previousCarryLimbs <> limbs)
     )
     mempty
     (IntMap.toList limbColumns)

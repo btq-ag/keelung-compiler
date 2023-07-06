@@ -36,7 +36,7 @@ toBits width powerOffset positive limb =
               else -(2 ^ (powerOffset + i :: Int))
           )
       )
-      [0 ..]
+      [0 .. lmbWidth limb - 1]
       (lmbSigns limb)
 
 toBitsC :: (GaloisField n, Integral n) => Int -> Int -> Bool -> Limb -> n -> Seq (Ref, n)
@@ -51,5 +51,5 @@ toBitsC width powerOffset positive limb constant =
                 else -(2 ^ (powerOffset + i :: Int))
           )
       )
-      [0 ..]
+      [0 .. lmbWidth limb - 1]
       (lmbSigns limb)
