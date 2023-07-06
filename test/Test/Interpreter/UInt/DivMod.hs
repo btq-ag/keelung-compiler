@@ -26,7 +26,7 @@ tests =
             dividend <- input Private :: Comp (UInt 6)
             divisor <- input Public
             performDivMod dividend divisor
-      -- debug (Prime 1031) program
+      -- debug (Prime 61) program
       -- runAll (Prime 1031) program [7] [20] [2, 6]
       -- debug (Prime 4099) program
       -- runAll (Prime 4099) program [7] [20] [2, 6]
@@ -38,8 +38,9 @@ tests =
 
       forAll genPair $ \(dividend, divisor) -> do
         let expected = [dividend `div` divisor, dividend `mod` divisor]
-        runAll gf181 program [fromInteger divisor] [fromInteger dividend] expected
-    -- runAll (Prime 1031) program [fromInteger divisor] [fromInteger dividend] expected
+        -- runAll gf181 program [fromInteger divisor] [fromInteger dividend] expected
+        -- runAll (Prime 61) program [fromInteger divisor] [fromInteger dividend] expected
+        runAll (Prime 67) program [fromInteger divisor] [fromInteger dividend] expected
 
     it "performDivMod (on constants) (issue #18)" $ do
       -- 7 = 3 * 2 + 1

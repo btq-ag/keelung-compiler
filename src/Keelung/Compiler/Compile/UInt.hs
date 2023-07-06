@@ -118,19 +118,15 @@ data Dimensions = Dimensions
 -- -----------------------------
 --    [ carry  ][  result  ]
 addPartialColumn :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n LimbColumn
-addPartialColumn dimensions _ _ resultLimb constant [] = do
+addPartialColumn dimensions limbStart limbWidth resultLimb constant [] = do
+  let currentLimbWidth = limbWidth `min` (dimUIntWidth dimensions - limbStart)
   -- no limb => result = constant, no carry
-  forM_ [lmbOffset resultLimb .. lmbOffset resultLimb + lmbWidth resultLimb - 1] $ \i -> do
+  forM_ [0 .. currentLimbWidth - 1] $ \i -> do
     let bit = Data.Bits.testBit (toInteger constant) i
-    writeValB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) i) bit
+    writeValB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) bit
   return mempty
--- addPartialColumn dimensions _ _ resultLimb 0 [limb] = do
---   -- 1 limb / no constant => result = limb, no carry
---   forM_ [lmbOffset resultLimb .. lmbOffset resultLimb + lmbWidth resultLimb - 1] $ \i -> do
---     let bit = RefUBit (dimUIntWidth dimensions) (lmbRef limb) i
---     writeEqB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) i) bit
---   return mempty
-addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs = do
+addPartialColumn dimensions limbStart limbWidth resultLimb constant limbs = do
+  let currentLimbWidth = limbWidth `min` (dimUIntWidth dimensions - limbStart)
   let negLimbSize = length $ filter (not . limbIsPositive) limbs
   let allNegative = negLimbSize == length limbs
   if allNegative
@@ -144,36 +140,43 @@ addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs
           <> toBits 0 False resultLimb
           <> toBits currentLimbWidth False carryLimb
       return $ LimbColumn.singleton carryLimb
-    else do
-      let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
-      carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
-      writeAddWithSeq constant $
-        -- positive side
-        mconcat (map (toBits 0 True) limbs)
-          -- negative side
-          <> toBits 0 False resultLimb
-          <> toBits currentLimbWidth False carryLimb
-      return $ LimbColumn.singleton carryLimb
+    else
+      if length limbs == 1 && constant == 0
+        then do
+          forM_ [0 .. currentLimbWidth - 1] $ \i -> do
+            let limb = head limbs
+            writeEqB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) (RefUBit (dimUIntWidth dimensions) (lmbRef limb) (lmbOffset limb + i))
+          return mempty
+        else do
+          -- more than limbs
+          let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
+          carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
+          writeAddWithSeq constant $
+            -- positive side
+            mconcat (map (toBits 0 True) limbs)
+              -- negative side
+              <> toBits 0 False resultLimb
+              <> toBits currentLimbWidth False carryLimb
+          return $ LimbColumn.singleton carryLimb
 
 addWholeColumn :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> n -> Limb -> [Limb] -> M n LimbColumn
-addWholeColumn dimensions limbStart currentLimbWidth constant finalResultLimb limbs = do
+addWholeColumn dimensions limbStart limbWidth constant finalResultLimb limbs = do
   let (currentBatch, nextBatch) = splitAt (dimMaxHeight dimensions) limbs
   if not (null nextBatch) || (length currentBatch == dimMaxHeight dimensions && constant /= 0)
     then do
       -- inductive case, there are more limbs to be processed
-      resultLimb <- allocLimb currentLimbWidth limbStart True
-      carryLimb <- addPartialColumn dimensions limbStart currentLimbWidth resultLimb 0 currentBatch
+      resultLimb <- allocLimb limbWidth limbStart True
+      carryLimb <- addPartialColumn dimensions limbStart limbWidth resultLimb 0 currentBatch
       -- insert the result limb of the current batch to the next batch
-      moreCarryLimbs <- addWholeColumn' dimensions limbStart currentLimbWidth finalResultLimb (LimbColumn.new (toInteger constant) (resultLimb : nextBatch))
-      -- (moreCarryLimbs, compensated') <- addWholeColumn dimensions limbStart currentLimbWidth (constant - if compensated then 2 ^ currentLimbWidth else 0) finalResultLimb (resultLimb : nextBatch)
+      moreCarryLimbs <- addWholeColumn' dimensions limbStart limbWidth finalResultLimb (LimbColumn.new (toInteger constant) (resultLimb : nextBatch))
       return (carryLimb <> moreCarryLimbs)
     else do
       -- edge case, all limbs are in the current batch
-      addPartialColumn dimensions limbStart currentLimbWidth finalResultLimb constant currentBatch
+      addPartialColumn dimensions limbStart limbWidth finalResultLimb constant currentBatch
 
 addWholeColumn' :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> LimbColumn -> M n LimbColumn
-addWholeColumn' dimensions limbStart currentLimbWidth finalResultLimb column =
-  addWholeColumn dimensions limbStart currentLimbWidth (fromInteger (LimbColumn.constant column)) finalResultLimb (toList (LimbColumn.limbs column))
+addWholeColumn' dimensions limbStart limbWidth finalResultLimb column =
+  addWholeColumn dimensions limbStart limbWidth (fromInteger (LimbColumn.constant column)) finalResultLimb (toList (LimbColumn.limbs column))
 
 compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileSubU width out (Right a) (Right b) = compileAddU width out [] (a - b)
@@ -263,9 +266,7 @@ compileMul width out x y = do
     Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     _ -> do
       let limbNumber = ceiling (fromIntegral width / fromIntegral limbWidth :: Double) :: Int
-      let currentLimbWidth = limbWidth
-      let limbStart = 0
-      mulnxn dimensions currentLimbWidth limbStart limbNumber out x y
+      mulnxn dimensions limbWidth limbNumber out x y
 
 mul2Limbs :: (GaloisField n, Integral n) => Width -> Int -> (n, Limb) -> Either n (n, Limb) -> M n (LimbColumn, LimbColumn)
 mul2Limbs currentLimbWidth limbStart (a, x) operand = do
@@ -337,8 +338,8 @@ _mul2LimbPreallocated currentLimbWidth limbStart (a, x) operand lowerLimb = do
 --                 x2*y2
 --               .....
 -- ------------------------------------------
-mulnxn :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> Int -> RefU -> RefU -> Either Integer RefU -> M n ()
-mulnxn dimensions limbWidth limbStart arity out var operand = do
+mulnxn :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> RefU -> RefU -> Either Integer RefU -> M n ()
+mulnxn dimensions limbWidth arity out var operand = do
   -- generate pairs of indices for choosing limbs
   let indices = [(xi, columnIndex - xi) | columnIndex <- [0 .. arity - 1], xi <- [0 .. columnIndex]]
   -- generate pairs of limbs to be added together
@@ -346,18 +347,19 @@ mulnxn dimensions limbWidth limbStart arity out var operand = do
     foldM
       ( \columns (xi, yi) -> do
           -- current limb width may be smaller than the default limb width in the highest limbs
-          let currentLimbWidthX = limbWidth `min` (dimUIntWidth dimensions - (limbStart + limbWidth * xi))
-          let currentLimbWidthY = limbWidth `min` (dimUIntWidth dimensions - (limbStart + limbWidth * yi))
+          let currentLimbWidthX = limbWidth `min` (dimUIntWidth dimensions - (limbWidth * xi))
+          let currentLimbWidthY = limbWidth `min` (dimUIntWidth dimensions - (limbWidth * yi))
 
-          let x = Limb var currentLimbWidthX (limbStart + limbWidth * xi) (Left True)
+          let x = Limb var currentLimbWidthX (limbWidth * xi) (Left True)
           let y = case operand of
-                Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbStart + limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
-                Right variable -> Right (0, Limb variable currentLimbWidthY (limbStart + limbWidth * yi) (Left True))
+                Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
+                Right variable -> Right (0, Limb variable currentLimbWidthY (limbWidth * yi) (Left True))
           let index = xi + yi
-          (lowerLimb, upperLimb) <- mul2Limbs limbWidth (limbStart + limbWidth * index) (0, x) y
+
+          (lowerLimb, upperLimb) <- mul2Limbs limbWidth (limbWidth * index) (0, x) y
           let columns' = IntMap.insertWith (<>) index lowerLimb columns
           let columns'' =
-                if index == arity - 1 -- throw limbs higher than arity away
+                if index == arity - 1 -- throw limbs higher than the arity away
                   then columns'
                   else IntMap.insertWith (<>) (index + 1) upperLimb columns'
           return columns''
@@ -367,8 +369,8 @@ mulnxn dimensions limbWidth limbStart arity out var operand = do
   -- go through each columns and add them up
   foldM_
     ( \previousCarryLimbs (index, limbs) -> do
-        let resultLimb = Limb out limbWidth (limbStart + limbWidth * index) (Left True)
-        addWholeColumn' dimensions limbStart limbWidth resultLimb (previousCarryLimbs <> limbs)
+        let resultLimb = Limb out limbWidth (limbWidth * index) (Left True)
+        addWholeColumn' dimensions (limbWidth * index) limbWidth resultLimb (previousCarryLimbs <> limbs)
     )
     mempty
     (IntMap.toList limbColumns)
