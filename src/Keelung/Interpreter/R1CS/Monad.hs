@@ -22,13 +22,13 @@ import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Constraint.R1C
+import Keelung.Data.FieldInfo
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.VarGroup
 import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Data.FieldInfo
 
 --------------------------------------------------------------------------------
 
@@ -44,10 +44,10 @@ runM boolVarRanges fieldInfo inputs p =
           Left unbound -> Left (VarUnassignedError unbound)
           Right bindings' -> Right bindings'
 
-bindVar :: Var -> n -> M n ()
+bindVar :: (GaloisField n, Integral n) => Var -> n -> M n ()
 bindVar var val = modify' $ IntMap.insert var val
 
-bindVarEither :: Either Var n -> n -> M n ()
+bindVarEither :: (GaloisField n, Integral n) => Either Var n -> n -> M n ()
 bindVarEither (Left var) val = bindVar var val
 bindVarEither (Right _) _ = return ()
 

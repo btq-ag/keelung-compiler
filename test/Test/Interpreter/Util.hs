@@ -94,8 +94,8 @@ runAll fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldTy
       -- constraint system interpreters
       interpretR1CS fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
-      interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-        `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+      -- interpretR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+      --   `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
 
     handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do

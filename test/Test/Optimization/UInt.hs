@@ -25,8 +25,8 @@ tests = do
           c <- reuse $ a * b
           return $ c .&. 5
         -- debug cs'
-        cs `shouldHaveSize` 37
-        cs' `shouldHaveSize` 37
+        cs `shouldHaveSize` 36
+        cs' `shouldHaveSize` 36
 
     describe "Addition / Subtraction" $ do
       it "2 variables" $ do
@@ -81,16 +81,16 @@ tests = do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Public
           return $ x * y
-        cs `shouldHaveSize` 26
-        cs' `shouldHaveSize` 26
+        cs `shouldHaveSize` 25
+        cs' `shouldHaveSize` 25
 
       -- TODO: can be lower
       it "variable / constant" $ do
         (cs, cs') <- executeGF181 $ do
           x <- inputUInt @4 Public
           return $ x * 4
-        cs `shouldHaveSize` 22
-        cs' `shouldHaveSize` 22
+        cs `shouldHaveSize` 21
+        cs' `shouldHaveSize` 21
 
       -- TODO: should've been just 4
       it "constant / constant" $ do

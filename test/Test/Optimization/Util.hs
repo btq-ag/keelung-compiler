@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Test.Optimization.Util (debug, executeGF181, executePrime, shouldHaveSize) where
 
 import Data.Field.Galois (Prime)

@@ -638,10 +638,10 @@ assertDivModU width dividend divisor quotient remainder = do
   --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder
-  remainderRef <- wireU remainder
+  dividendRef <- wireU dividend
   divisorRef <- wireU divisor
   quotientRef <- wireU quotient
-  dividendRef <- wireU dividend
+  remainderRef <- wireU remainder
 
   productDQ <- freshRefU width
   UInt.compileMulU width productDQ divisorRef quotientRef
