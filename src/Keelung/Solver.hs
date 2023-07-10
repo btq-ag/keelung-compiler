@@ -1,8 +1,7 @@
--- | Witness solver/generator for R1CS
-
 {-# LANGUAGE DeriveFunctor #-}
 
-module Keelung.Solver (run, run', Error (..), detectBinRep) where
+-- | Witness solver/generator for R1CS
+module Keelung.Solver (run, debug, Error (..), detectBinRep, Log (..)) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -29,21 +28,30 @@ import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
 
-run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n)
-run r1cs inputs = fst <$> run' r1cs inputs
+-- | Execute the R1CS solver
+run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
+run r1cs inputs = fst <$> run' False r1cs inputs
 
--- | Return interpreted outputs along with the witnesses
-run' :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
-run' r1cs inputs = do
+-- | Like `run`, but with debug logs
+debug :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) ((Vector n, Vector n), [Log n])
+debug = run' True
+
+-- | Returns (interpreted outputs, witnesses, log)s
+run' :: (GaloisField n, Integral n) => Bool -> R1CS n -> Inputs n -> Either (Error n) ((Vector n, Vector n), [Log n])
+run' debugMode r1cs inputs = do
   let booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts), (Intermediate, ReadBool), (Intermediate, ReadAllUInts)]
   let boolVarRanges = getRanges (r1csCounters r1cs) booleanConstraintCategories
   constraints <- fromOrdinaryConstraints r1cs
-  witness <- runM boolVarRanges (r1csField r1cs) inputs $ goThroughManyTimes constraints
+  let (result, logs) = runM debugMode boolVarRanges (r1csField r1cs) inputs $ goThroughManyTimes constraints
+  witness <- case result of
+    Left (err, _) -> throwError err
+    Right xs -> return xs
+
   -- extract output values from the witness
   let outputRanges = getRanges (r1csCounters r1cs) [(Output, ReadField), (Output, ReadBool), (Output, ReadAllUInts)]
   case IntMap.toList outputRanges of
-    [(outputStart, outputLength)] -> return (Vector.slice outputStart outputLength witness, witness)
-    _ -> return (mempty, witness)
+    [(outputStart, outputLength)] -> return ((Vector.slice outputStart outputLength witness, witness), logs)
+    _ -> return ((mempty, witness), logs)
 
 -- | Return Constraints from a R1CS, which include:
 --   1. ordinary constraints
@@ -56,7 +64,6 @@ fromOrdinaryConstraints (R1CS _ ordinaryConstraints _ counters eqZeros divMods m
   return $
     Seq.fromList constraints
       <> Seq.fromList (map BooleanConstraint booleanInputVarConstraints)
-      -- <> Seq.fromList (map (BinRepConstraint2 . toList) binReps')
       <> Seq.fromList (map EqZeroConstraint eqZeros)
       <> Seq.fromList (map DivModConstaint divMods)
       <> Seq.fromList (map ModInvConstraint modInvs)
@@ -421,7 +428,7 @@ shrinkBinRep NothingToDo = return NothingToDo
 shrinkBinRep Eliminated = return Eliminated
 shrinkBinRep (Shrinked polynomial) = return (Shrinked polynomial)
 shrinkBinRep (Stuck (AddConstraint polynomial)) = do
-  (boolVarRanges, fieldBitWidth) <- ask
+  Env _ boolVarRanges fieldBitWidth <- ask
   let isBoolean var = case IntMap.lookupLE var boolVarRanges of
         Nothing -> False
         Just (index, len) -> var < index + len

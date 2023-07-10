@@ -51,7 +51,6 @@ import Keelung.Compiler.Compile qualified as Compile
 import Keelung.Compiler.ConstraintModule (ConstraintModule)
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..), numberOfConstraints)
 import Keelung.Compiler.Error
-import Keelung.Data.FieldInfo
 import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
@@ -60,10 +59,11 @@ import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Syntax.Internal (Internal (..))
 import Keelung.Compiler.Syntax.ToInternal as ToInternal
 import Keelung.Constraint.R1CS (R1CS (..))
+import Keelung.Data.FieldInfo
 import Keelung.Field (GF181)
-import Keelung.Solver qualified as R1CS
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Monad (Comp)
+import Keelung.Solver qualified as Solver
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax (Elaborated)
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
@@ -135,7 +135,7 @@ generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> compileO1Elab fieldInfo elab
   let counters = r1csCounters r1cs
   inputs <- left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
-  (outputs, witness) <- left SolverError (R1CS.run' r1cs inputs)
+  (outputs, witness) <- left SolverError (Solver.run r1cs inputs)
   return (counters, outputs, witness)
 
 compileO0Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintModule n)
