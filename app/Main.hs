@@ -95,7 +95,7 @@ main = withUtf8 $ do
           where 
             handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputInterpretedResultAndWriteFile filepath (generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Prime n)) (Counters, Vector (Prime n), Vector (Prime n)))
             handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputInterpretedResultAndWriteFile filepath (generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Binary n)) (Counters, Vector (Binary n), Vector (Binary n)))
-    Version -> putStrLn "Keelung v0.11.0"
+    Version -> putStrLn $ "Keelung v" ++ versionString
   where
     outputCircuit :: Serialize a => a -> IO ()
     outputCircuit = putStrLn . BSC.unpack . encode

@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Encode (serializeR1CS, serializeInputAndWitness) where
+module Encode (versionString, serializeR1CS, serializeInputAndWitness) where
 
 -- import Data.Aeson.Encoding
 
@@ -20,6 +20,17 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.FieldInfo
 import Keelung.Syntax
 import Keelung.Syntax.Counters hiding (reindex)
+
+-- | IMPORTANT: Make sure major, minor and patch versions are updated
+--   accordingly for every release.
+compilerVersion :: (Int, Int)
+compilerVersion = (0, 12)
+
+patchVersion :: Int
+patchVersion = 2
+
+versionString :: String
+versionString = unwords [show (fst compilerVersion), ".", show (snd compilerVersion), ".", show patchVersion]
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf
@@ -61,7 +72,7 @@ serializeR1CS r1cs =
       pairs $
         pairStr "r1cs" $
           pairs $
-            pairStr "version" (string "0.11.0")
+            pairStr "version" (string versionString)
               <> pairStr "field_characteristic" (integerText characteristic)
               <> pairStr "extension_degree" (integerText degree)
               <> pairStr "instances" (int outputAndPublicInputCount)
