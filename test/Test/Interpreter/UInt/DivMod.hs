@@ -7,11 +7,10 @@ module Test.Interpreter.UInt.DivMod (tests, run) where
 import Keelung hiding (compile)
 import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Compiler.Error (Error (..))
-import Keelung.Interpreter.Error qualified as Interpreter
-import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
+import qualified Keelung.Interpreter as Interpreter
 
 run :: IO ()
 run = hspec tests
@@ -80,8 +79,8 @@ tests =
         program
         []
         []
-        (Interpreter.SyntaxTreeError (SyntaxTree.DivModQuotientError 7 3 2 3))
-        (CompileError (Compiler.ConflictingValuesB True False) :: Error GF181)
+        (InterpreterError (Interpreter.DivModQuotientError 7 3 2 3))
+        (CompilerError (Compiler.ConflictingValuesB True False) :: Error GF181)
 
     it "assertDivMod (with wrong remainder constant)" $ do
       let program = assertDivMod 7 (3 :: UInt 4) 2 0
@@ -90,8 +89,8 @@ tests =
         program
         []
         []
-        (Interpreter.SyntaxTreeError (SyntaxTree.DivModRemainderError 7 3 1 0))
-        (CompileError (Compiler.ConflictingValuesB False True) :: Error GF181)
+        (InterpreterError (Interpreter.DivModRemainderError 7 3 1 0))
+        (CompilerError (Compiler.ConflictingValuesB False True) :: Error GF181)
 
     it "assertDivMod (multiple statements)" $ do
       let program = do

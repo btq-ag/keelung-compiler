@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -58,12 +58,11 @@ library
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
+      Keelung.Interpreter
       Keelung.Interpreter.Arithmetics
-      Keelung.Interpreter.Error
-      Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.SyntaxTree
-      Keelung.Interpreter.SyntaxTree.Monad
+      Keelung.Interpreter.Monad
+      Keelung.Solver
+      Keelung.Solver.Monad
   other-modules:
       Paths_keelung_compiler
   hs-source-dirs:
@@ -128,12 +127,11 @@ executable keelungc
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
+      Keelung.Interpreter
       Keelung.Interpreter.Arithmetics
-      Keelung.Interpreter.Error
-      Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.SyntaxTree
-      Keelung.Interpreter.SyntaxTree.Monad
+      Keelung.Interpreter.Monad
+      Keelung.Solver
+      Keelung.Solver.Monad
       Basic
       Hash.Poseidon
       Hash.Poseidon.Constant
@@ -226,12 +224,11 @@ test-suite keelung-test
       Keelung.Compiler.Util
       Keelung.Data.PolyG
       Keelung.Data.VarGroup
+      Keelung.Interpreter
       Keelung.Interpreter.Arithmetics
-      Keelung.Interpreter.Error
-      Keelung.Interpreter.R1CS
-      Keelung.Interpreter.R1CS.Monad
-      Keelung.Interpreter.SyntaxTree
-      Keelung.Interpreter.SyntaxTree.Monad
+      Keelung.Interpreter.Monad
+      Keelung.Solver
+      Keelung.Solver.Monad
       Basic
       Hash.Poseidon
       Hash.Poseidon.Constant

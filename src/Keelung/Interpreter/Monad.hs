@@ -5,7 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Interpreter.SyntaxTree.Monad where
+module Keelung.Interpreter.Monad where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except

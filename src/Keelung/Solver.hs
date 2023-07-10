@@ -1,6 +1,8 @@
+-- | Witness solver/generator for R1CS
+
 {-# LANGUAGE DeriveFunctor #-}
 
-module Keelung.Interpreter.R1CS (run, run', Error (..), detectBinRep) where
+module Keelung.Solver (run, run', Error (..), detectBinRep) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -24,7 +26,7 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Interpreter.Arithmetics qualified as U
-import Keelung.Interpreter.R1CS.Monad
+import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
 
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n)

@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Interpreter.R1CS.Monad where
+module Keelung.Solver.Monad where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except

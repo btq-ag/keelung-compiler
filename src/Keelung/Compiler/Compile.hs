@@ -33,7 +33,7 @@ import Keelung.Syntax (widthOf)
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => FieldInfo -> Internal n -> Either (Error n) (ConstraintModule n)
-run fieldInfo (Internal untypedExprs _ counters assertions sideEffects) = left CompileError $ runM fieldInfo counters $ do
+run fieldInfo (Internal untypedExprs _ counters assertions sideEffects) = left CompilerError $ runM fieldInfo counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do

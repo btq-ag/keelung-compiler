@@ -10,7 +10,7 @@ import Data.IntMap qualified as IntMap
 import Keelung (GF181)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Interpreter.R1CS (detectBinRep)
+import Keelung.Solver (detectBinRep)
 import Test.Hspec
 
 -- import Test.Interpreter.Util

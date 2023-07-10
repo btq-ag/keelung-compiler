@@ -8,9 +8,7 @@ import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Interpreter.Arithmetics qualified as Arithmetics
-import Keelung.Interpreter.Error qualified as Interpreter
-import Keelung.Interpreter.R1CS qualified as R1CS
-import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
+import Keelung.Solver qualified as Solver
 import Test.Hspec
 import Test.Interpreter.UInt.Addition qualified as Addition
 import Test.Interpreter.UInt.Comparison qualified as Comparison
@@ -18,6 +16,7 @@ import Test.Interpreter.UInt.DivMod qualified as DivMod
 import Test.Interpreter.UInt.Multiplication qualified as Multiplication
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
+import qualified Keelung.Interpreter as Interpreter
 
 run :: IO ()
 run = hspec tests
@@ -178,8 +177,8 @@ tests = do
           program
           [3]
           []
-          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ ($UI₄0 = 3)")
-          (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues) :: Error GF181)
+          (InterpreterError $ Interpreter.AssertionError "¬ ($UI₄0 = 3)")
+          (SolverError Solver.ConflictingValues :: Error GF181)
 
       it "neq 4" $ do
         let program = do
@@ -189,8 +188,8 @@ tests = do
           program
           []
           []
-          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "¬ (3 = 3)")
-          (CompileError (Compiler.ConflictingValuesB True False) :: Error GF181)
+          (InterpreterError $ Interpreter.AssertionError "¬ (3 = 3)")
+          (CompilerError (Compiler.ConflictingValuesB True False) :: Error GF181)
 
     describe "Logical" $ do
       describe "complement" $ do

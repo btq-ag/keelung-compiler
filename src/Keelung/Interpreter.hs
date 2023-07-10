@@ -5,7 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Keelung.Interpreter.SyntaxTree (runAndOutputWitnesses, run, interpretDivMod, Error (..)) where
+module Keelung.Interpreter (runAndOutputWitnesses, run, interpretDivMod, Error (..)) where
 
 import Control.Monad.Except
 import Data.Bits (Bits (..))
@@ -17,7 +17,7 @@ import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Data.VarGroup
 import Keelung.Interpreter.Arithmetics
-import Keelung.Interpreter.SyntaxTree.Monad
+import Keelung.Interpreter.Monad
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Encode.Syntax
 
