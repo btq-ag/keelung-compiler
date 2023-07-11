@@ -51,8 +51,8 @@ tests =
 
       -- debug (Prime 263) program
       -- debug (Prime 257) program
-      -- runAll (Prime 257) program [20, 7] [] [2, 6]
-      printLog (Prime 263) program [20, 7] []
+      printLog (Prime 257) program [20, 7] []
+      -- printLog (Prime 263) program [20, 7] []
 
 -- runAll (Prime 263) program [20, 7] [] [2, 6]
 --       let genPair = do

@@ -9,7 +9,6 @@ import Control.Monad.Except
 import Control.Monad.RWS.Strict
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
@@ -30,34 +29,48 @@ import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax
 import Keelung.Syntax.Counters
+import qualified Keelung.Data.Polynomial as Poly
 
 --------------------------------------------------------------------------------
 
 -- | Monad for R1CS interpretation / witness generation
 type M n = ExceptT (Error n) (RWS Env (Seq (Log n)) (IntMap n))
 
-runM :: (GaloisField n, Integral n) => Bool -> Ranges -> FieldInfo -> Inputs n -> M n a -> (Either (Error n, IntMap n) (Vector n), [Log n])
+runM :: (GaloisField n, Integral n) => Bool -> Ranges -> FieldInfo -> Inputs n -> M n a -> (Either (Error n, IntMap n) (Vector n), LogReport n)
 runM debug boolVarRanges fieldInfo inputs p =
   let counters = Inputs.inputCounters inputs
-      (result, bindings, logs) = runRWS (runExceptT p) (Env debug boolVarRanges (fieldWidth fieldInfo)) (Inputs.toIntMap inputs)
+      initState = Inputs.toIntMap inputs
+      (result, bindings, logs) = runRWS (runExceptT p) (Env debug boolVarRanges (fieldWidth fieldInfo)) initState
    in case result of
-        Left err -> (Left (err, bindings), toList logs)
+        Left err -> (Left (err, bindings), LogReport initState logs bindings)
         Right _ -> case toEither $ toTotal' (getCount counters PublicInput + getCount counters PrivateInput, bindings) of
-          Left unbound -> (Left (VarUnassignedError unbound, bindings), toList logs)
-          Right bindings' -> (Right bindings', toList logs)
+          Left unbound -> (Left (VarUnassignedError unbound, bindings), LogReport initState logs bindings)
+          Right bindings' -> (Right bindings', LogReport initState logs bindings)
 
-bindVar :: (GaloisField n, Integral n) => Var -> n -> M n ()
-bindVar var val = modify' $ IntMap.insert var val
+tryLog :: Log n -> M n ()
+tryLog x = do
+  inDebugMode <- asks envDebugMode
+  when inDebugMode $ tell (pure x)
 
-bindVarEither :: (GaloisField n, Integral n) => Either Var n -> n -> M n ()
-bindVarEither (Left var) val = bindVar var val
-bindVarEither (Right _) _ = return ()
+tryLogResult :: (GaloisField n, Integral n) => Constraint n -> Result (Constraint n) -> M n ()
+tryLogResult before result = do 
+  inDebugMode <- asks envDebugMode
+  when inDebugMode $ case result of
+    Shrinked after -> tell (pure $ LogShrinkConstraint before after)
+    Stuck _ -> return ()
+    Eliminated -> tell (pure $ LogEliminateConstraint before)
+    NothingToDo -> return ()
 
-bindBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> U -> M n ()
-bindBitsEither (width, Left var) val = do
+bindVar :: (GaloisField n, Integral n) => String -> Var -> n -> M n ()
+bindVar msg var val = do
+  tryLog $ LogBindVar msg var val
+  modify' $ IntMap.insert var val
+
+bindBitsEither :: (GaloisField n, Integral n) => String -> (Width, Either Var Integer) -> U -> M n ()
+bindBitsEither msg (width, Left var) val = do
   forM_ [0 .. width - 1] $ \i -> do
-    bindVar (var + i) (if Data.Bits.testBit (U.uintValue val) i then 1 else 0)
-bindBitsEither (_, Right _) _ = return ()
+    bindVar msg (var + i) (if Data.Bits.testBit (U.uintValue val) i then 1 else 0)
+bindBitsEither _ (_, Right _) _ = return ()
 
 --------------------------------------------------------------------------------
 
@@ -138,15 +151,88 @@ instance (GaloisField n, Integral n) => Show (Error n) where
 
 data Env = Env
   { envDebugMode :: Bool, -- enable logging when True
-    envBoolVars :: Ranges,
-    envFieldWidth :: Width
+    envBoolVars :: Ranges, -- ranges of boolean variables
+    envFieldWidth :: Width -- width of the field
   }
 
 --------------------------------------------------------------------------------
 
+-- | Data structure for aggregating logging information
+data LogReport n = LogReport
+  { logReportInitState :: IntMap n,
+    logReportEntries :: Seq (Log n),
+    logReportFinalState :: IntMap n
+  }
+
+instance (Integral n, GaloisField n) => Show (LogReport n) where
+  show (LogReport initState entries finalState) =
+    "<Solver Log Report>\n"
+      <> "Initial State:\n"
+      <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList initState)
+      <> "Entries:\n"
+      <> concatMap (\entry -> show entry <> "\n") entries
+      <> "Final State:\n"
+      <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList finalState)
+
+-- | Data structure for log entries
 data Log n
-  = LogBindVar Var Integer
+  = LogBindVar String Var n
   | LogEliminateConstraint (Constraint n)
   | LogShrinkConstraint (Constraint n) (Constraint n)
-  | LogStuck (IntMap n) [Constraint n]
-  deriving Show
+
+instance (Integral n, GaloisField n) => Show (Log n) where
+  show (LogBindVar msg var val) = "  BIND  " <> take 10 (msg <> "          ") <> "  $" <> show var <> " := " <> show (N val)
+  show (LogEliminateConstraint c) = "  ELIM  " <> show (fmap N c)
+  show (LogShrinkConstraint c1 c2) = "  SHNK  " <> show (fmap N c1) <> "\n    ->  " <> show (fmap N c2)
+
+
+--------------------------------------------------------------------------------
+
+-- | Result of shrinking a constraint
+data Result a = Shrinked a | Stuck a | Eliminated | NothingToDo
+  deriving (Eq, Show)
+
+instance Semigroup a => Semigroup (Result a) where
+  NothingToDo <> x = x
+  x <> NothingToDo = x
+  Shrinked x <> Shrinked y = Shrinked (x <> y)
+  Shrinked x <> Stuck y = Shrinked (x <> y)
+  Shrinked x <> Eliminated = Shrinked x
+  Stuck x <> Shrinked y = Shrinked (x <> y)
+  Stuck x <> Stuck y = Stuck (x <> y)
+  Stuck x <> Eliminated = Shrinked x
+  Eliminated <> Shrinked x = Shrinked x
+  Eliminated <> Stuck x = Shrinked x
+  Eliminated <> Eliminated = Eliminated
+
+instance Monoid a => Monoid (Result a) where
+  mempty = NothingToDo
+
+instance Functor Result where
+  fmap f (Shrinked x) = Shrinked (f x)
+  fmap f (Stuck x) = Stuck (f x)
+  fmap _ Eliminated = Eliminated
+  fmap _ NothingToDo = NothingToDo
+
+shrinkedOrStuck :: [Bool] -> a -> Result a
+shrinkedOrStuck changeds r1c = if or changeds then Shrinked r1c else Stuck r1c
+
+-- | Substitute varaibles with values in a polynomial
+substAndView :: (Num n, Eq n) => IntMap n -> Poly n -> PolyResult n
+substAndView bindings xs = case Poly.substWithIntMap xs bindings of
+  (Left constant, _) -> Constant constant -- reduced to a constant
+  (Right poly, changed) ->
+    let (constant, xs') = Poly.view poly
+     in case IntMap.minViewWithKey xs' of
+          Nothing -> Constant constant -- reduced to a constant
+          Just ((var, coeff), xs'') ->
+            if IntMap.null xs''
+              then Uninomial changed poly constant (var, coeff)
+              else Polynomial changed poly
+
+-- | View of result after substituting a polynomial
+data PolyResult n
+  = Constant n
+  | Uninomial Bool (Poly n) n (Var, n)
+  | Polynomial Bool (Poly n)
+  deriving (Show, Eq, Ord, Functor)
