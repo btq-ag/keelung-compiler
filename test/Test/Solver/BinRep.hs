@@ -5,15 +5,13 @@ module Test.Solver.BinRep (tests, run) where
 -- import Control.Monad
 -- import Keelung hiding (compile)
 
-import Data.Field.Galois
+import Data.Field.Galois ( Prime )
 import Data.IntMap qualified as IntMap
-import Keelung (GF181)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Solver (detectBinRep)
 import Test.Hspec
-
--- import Test.Interpreter.Util
+import Keelung (GF181)
 -- import Test.QuickCheck
 
 run :: IO ()
@@ -110,11 +108,17 @@ tests = describe "BinRep Detection" $ do
     actual `shouldBe` expected
 
   it "-16$17 + $24 + 2$25 + 4$26 + 8$27 - $28 - 2$29 - 4$30 - 8$31 = -7 (mod GF181)" $ do
-    let polynomial = case Poly.buildEither (-7) [(17, -16), (24, 1), (25, 2), (26, 4), (27, 8), (28, -1), (29, -2), (30, -4), (31, -8)] of
+    let polynomial = case Poly.buildEither 7 [(17, -16), (24, 1), (25, 2), (26, 4), (27, 8), (28, -1), (29, -2), (30, -4), (31, -8)] of
           Left _ -> error "Poly.buildEither"
           Right p -> p :: Poly GF181
     let actual = IntMap.fromList <$> detectBinRep 180 (const True) polynomial
     let expected = Nothing
     actual `shouldBe` expected
 
-  return ()
+  it "4$21 - $30 + -2$31 = 2 (mod 31)" $ do
+    let polynomial = case Poly.buildEither 2 [(21, 4), (30, -1), (31, -2)] of
+          Left _ -> error "Poly.buildEither"
+          Right p -> p :: Poly (Prime 31)
+    let actual = IntMap.fromList <$> detectBinRep 4 (const True) polynomial
+    let expected = Just $ IntMap.fromList [(21, True), (30, False), (31, True)]
+    actual `shouldBe` expected

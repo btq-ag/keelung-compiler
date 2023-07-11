@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
-
 -- | Witness solver/generator for R1CS
 module Keelung.Solver (run, debug, Error (..), detectBinRep, Log (..), LogReport (..)) where
 
@@ -145,11 +143,6 @@ shrink (ModInvConstraint modInvHint) = fmap (pure . ModInvConstraint) <$> shrink
 shrinkAdd :: (GaloisField n, Integral n) => Poly n -> M n (Result (Constraint n))
 shrinkAdd xs = do
   bindings <- get
-  -- case IntMap.member 48 (Poly.coeffs xs) of
-  --   True -> do 
-  --     traceShowM (fmap N xs)
-  --     traceShowM (fmap N bindings)
-  --   False -> return ()
   case substAndView bindings xs of
     Constant c -> eliminateIfHold c 0
     Uninomial _ _ c (var, coeff) -> do
@@ -396,7 +389,7 @@ shrinkModInv (aVar, outVar, nVar, p) = do
     Nothing -> return $ Stuck (aVar, outVar, nVar, p)
 
 -- | Trying to reduce a BinRep constraint
-data FoldState n = Start | Failed | Continue n (IntMap (Bool, Var)) deriving (Eq, Show)
+data FoldState n = Start | Failed | Continue n [IntMap (Bool, Var)] deriving (Eq, Show)
 
 -- | Given a mapping of (Int, (Bool, Var)) pairs, where the Int indicates the power of 2, and the Bool indicates whether the coefficient is positive or negative
 --   and an Integer, derive coefficients (Boolean) for each of these variables such that the sum of the coefficients times the powers of 2 is equal to the Integer
@@ -463,64 +456,86 @@ detectBinRep fieldBitWidth isBoolean polynomial =
   if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
     then Nothing
     else case collectCoeffs polynomial of
-      Start -> Nothing
-      Failed -> Nothing
-      Continue picked invertedPolynomial ->
+      Nothing -> Nothing
+      Just (_, invertedPolynomial) ->
         let powers = IntMap.keys invertedPolynomial
             powersAllUnique = length powers == length (List.nub powers)
          in if powersAllUnique
               then case IntMap.lookupMin invertedPolynomial of
                 Nothing -> Just []
-                Just (minPower, _) ->
-                  -- if the smallest power is negative, make it 2^0
-                  if minPower < 0
-                    then
-                      let normalizedPolynomial = IntMap.mapKeys (\i -> i - minPower) invertedPolynomial
-                          constant = Poly.constant polynomial * (2 ^ (-minPower)) / picked
-                       in Just (deriveCoeffs constant normalizedPolynomial)
-                    else Just (deriveCoeffs (Poly.constant polynomial / picked) invertedPolynomial)
+                Just (minPower, (_, minVar)) -> case IntMap.lookup minVar (Poly.coeffs polynomial) of
+                  Nothing -> Nothing
+                  Just minVarCoeff ->
+                    -- if the smallest power is negative, make it 2^0
+                    if minPower < 0
+                      then
+                        let normalizedPolynomial = IntMap.mapKeys (\i -> i - minPower) invertedPolynomial
+                            constant = Poly.constant polynomial / minVarCoeff
+                         in Just (deriveCoeffs constant normalizedPolynomial)
+                      else Just (deriveCoeffs (Poly.constant polynomial / minVarCoeff) invertedPolynomial)
               else Nothing
   where
-    collectCoeffs :: (GaloisField n, Integral n) => Poly n -> FoldState n
-    collectCoeffs xs = IntMap.foldlWithKey' go Start (Poly.coeffs xs)
+    collectCoeffs :: (GaloisField n, Integral n) => Poly n -> Maybe (n, IntMap (Bool, Var))
+    collectCoeffs xs =
+      case IntMap.foldlWithKey' go Start (Poly.coeffs xs) of
+        Start -> Nothing
+        Failed -> Nothing
+        Continue picked [coeffMap] -> Just (picked, coeffMap)
+        Continue _ [] -> Nothing
+        Continue _ _ -> Nothing
       where
         go :: (GaloisField n, Integral n) => FoldState n -> Var -> n -> FoldState n
         go Start var coeff =
           if isBoolean var
             then -- since this is the first coefficient, we can always assume that it's a power of 2
-              Continue coeff (IntMap.singleton 0 (True, var))
+              Continue coeff [IntMap.singleton 0 (True, var)]
             else Failed
         go Failed _ _ = Failed
-        go (Continue picked coeffs) var coeff =
+        go (Continue picked coeffMaps) var coeff =
           if isBoolean var
-            then
-              let result = case isPowerOf2' fieldBitWidth (coeff / picked) of
-                    Just power -> Just (power, True)
-                    Nothing -> case isPowerOf2' fieldBitWidth (picked / coeff) of
-                      Just power -> Just (-power, True)
-                      Nothing -> case isPowerOf2' fieldBitWidth ((-coeff) / picked) of
-                        Just power -> Just (power, False)
-                        Nothing -> case isPowerOf2' fieldBitWidth (picked / (-coeff)) of
-                          Just power -> Just (-power, False)
-                          Nothing -> Nothing
-               in case result of
-                    Nothing -> Failed
-                    Just (power, sign) ->
-                      case IntMap.lookup power coeffs of
-                        Nothing -> Continue picked (IntMap.insert power (sign, var) coeffs)
-                        Just _ -> Failed
+            then Continue picked (coeffMaps >>= checkCoeffDiff var picked coeff)
             else Failed
 
--- | See if a coefficient is a power of 2
---   Note that, because these coefficients are field elements,
---    they can be powers of 2 when viewed as either "positive integers" or "negative integers"
-isPowerOf2' :: (GaloisField n, Integral n) => Width -> n -> Maybe Int
-isPowerOf2' _ 1 = Nothing
-isPowerOf2' _ 2 = Just 1
-isPowerOf2' fieldBitWidth coeff =
+        -- see if a coefficient is a multiple of a power of 2 of the picked coefficient
+        -- we need to examine all 4 combinations:
+        --  1. `coeff / picked`
+        --  2. `picked / coeff`
+        --  3. `-coeff / picked`
+        --  4. `picked / -coeff`
+        checkCoeffDiff :: (GaloisField n, Integral n) => Var -> n -> n -> IntMap (Bool, Var) -> [IntMap (Bool, Var)]
+        checkCoeffDiff var picked coeff coeffMap = do
+          pickedAsDenominator <- [True, False] -- whether `picked` is the denominator
+          negated <- [True, False] -- whether the coefficient is negated
+          let coeff' = if negated then -coeff else coeff
+          let diff = if pickedAsDenominator then coeff' / picked else picked / coeff'
+          case isPowerOf2 fieldBitWidth diff of
+            Just power -> do
+              let power' = if pickedAsDenominator then power else -power
+              guard (guardPower coeffMap power')
+              guard (not (IntMap.member power' coeffMap))
+              return $ IntMap.insert power' (not negated, var) coeffMap
+            Nothing -> mzero
+
+        -- because the quotient of any 2 coefficients cannot be greater than `2^(k-1)`,
+        -- we need to check if the power to be inserted is too large or too small
+        guardPower :: IntMap (Bool, Var) -> Int -> Bool
+        guardPower coeffs power =
+          let k = fromIntegral fieldBitWidth
+           in -- because the quotient of any 2 coefficients cannot be greater than `2^(k-1)`,
+              -- we need to check if the power to be inserted is too large or too small
+              case IntMap.lookupMin coeffs of
+                Nothing -> False
+                Just (minPower, _) -> case IntMap.lookupMax coeffs of
+                  Nothing -> False
+                  Just (maxPower, _) -> not (power > maxPower && power - minPower > k - 1 || power < minPower && maxPower - power > k - 1)
+
+-- | See if a coefficient is a power of 2 (except for 2^0)
+isPowerOf2 :: (GaloisField n, Integral n) => Width -> n -> Maybe Int
+isPowerOf2 _ 1 = Nothing
+isPowerOf2 fieldBitWidth coeff =
   case check (toInteger coeff) of
     Nothing -> Nothing
-    Just 0 -> Nothing --
+    Just 0 -> Nothing
     Just result ->
       if result >= fieldBitWidth
         then Nothing
@@ -528,9 +543,13 @@ isPowerOf2' fieldBitWidth coeff =
   where
     -- Speed this up
     check :: Integer -> Maybe Int
+    check 2 = Just 1
+    check 4 = Just 2
+    check 8 = Just 3
+    check 16 = Just 4
     check n =
-      let expected = floor (logBase 2 (fromInteger (abs n)) :: Double)
-       in if abs n == 2 ^ expected
+      let expected = floor (logBase 2 (fromInteger n) :: Double)
+       in if n == 2 ^ expected
             then Just expected
             else Nothing
 
