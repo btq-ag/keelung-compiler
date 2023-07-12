@@ -106,7 +106,7 @@ main = withUtf8 $ do
       case r1cs of
         Left _ -> return ()
         Right r1cs' -> do
-          BS.writeFile filepath (serializeR1CS r1cs')
+          BS.writeFile filepath (serializeR1CS Aurora r1cs')
 
     outputInterpretedResult :: (Serialize a, Serialize n) => Either a (Vector n) -> IO ()
     outputInterpretedResult = putStrLn . BSC.unpack . encode . fmap toList
