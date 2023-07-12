@@ -9,7 +9,7 @@ tests = do
   describe "Boolean" $ do
     describe "and" $ do
       it "variable / variable" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           y <- inputBool Public
           return $ x .&. y
@@ -17,20 +17,20 @@ tests = do
         cs' `shouldHaveSize` 4
 
       it "variable / constant" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           return $ x .&. true
         cs `shouldHaveSize` 3
         cs' `shouldHaveSize` 3
 
       it "constant / constant" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           return $ false .&. true
         cs `shouldHaveSize` 2
         cs' `shouldHaveSize` 2
 
       it "3 operands" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           y <- inputBool Public
           z <- inputBool Public
@@ -39,7 +39,7 @@ tests = do
         cs' `shouldHaveSize` 6
 
       it "4 operands" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           y <- inputBool Public
           z <- inputBool Public
@@ -50,7 +50,7 @@ tests = do
 
     describe "or" $ do
       it "variable / variable" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           y <- inputBool Public
           return $ x .|. y
@@ -58,20 +58,20 @@ tests = do
         cs' `shouldHaveSize` 4
 
       it "variable / constant" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           return $ x .|. true
         cs `shouldHaveSize` 3
         cs' `shouldHaveSize` 3
 
       it "constant / constant" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           return $ false .|. true
         cs `shouldHaveSize` 2
         cs' `shouldHaveSize` 2
 
       it "3 operands" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           y <- inputBool Public
           z <- inputBool Public
@@ -80,7 +80,7 @@ tests = do
         cs' `shouldHaveSize` 6
 
       it "4 operands" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           y <- inputBool Public
           z <- inputBool Public
@@ -91,7 +91,7 @@ tests = do
 
     describe "xor" $ do
       it "variable / variable" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           y <- inputBool Public
           return $ x .^. y
@@ -99,21 +99,21 @@ tests = do
         cs' `shouldHaveSize` 4
 
       it "variable / constant" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           return $ x .^. true
         cs `shouldHaveSize` 3
         cs' `shouldHaveSize` 3
 
       it "constant / variable" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           x <- inputBool Public
           return $ false .^. x
         cs `shouldHaveSize` 3
         cs' `shouldHaveSize` 3
 
       it "constant / constant" $ do
-        (cs, cs') <- execute $ do
+        (cs, cs') <- executeGF181 $ do
           return $ false .^. true
         cs `shouldHaveSize` 2
         cs' `shouldHaveSize` 2

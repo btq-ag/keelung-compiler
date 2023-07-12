@@ -24,8 +24,8 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
-import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Syntax (widthOf)
 
@@ -70,13 +70,13 @@ compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) v
 compileSideEffect (DivMod width dividend divisor quotient remainder) = assertDivModU width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do
   x <- wireU value
-  assertLTE width x bound
+  UInt.assertLTE width x bound
 compileSideEffect (AssertLT width value bound) = do
   x <- wireU value
   assertLT width x bound
 compileSideEffect (AssertGTE width value bound) = do
   x <- wireU value
-  assertGTE width x bound
+  UInt.assertGTE width x bound
 compileSideEffect (AssertGT width value bound) = do
   x <- wireU value
   assertGT width x bound
@@ -87,13 +87,13 @@ compileAssertion expr = case expr of
   ExprB (EqB x y) -> assertEqB x y
   ExprB (EqF x y) -> assertEqF x y
   ExprB (EqU x y) -> assertEqU x y
-  -- rewriting `assert (x <= y)` width `assertLTE x y`
+  -- rewriting `assert (x <= y)` width `UInt.assertLTE x y`
   ExprB (LTEU x (ValU width bound)) -> do
     x' <- wireU x
-    assertLTE width x' (toInteger bound)
+    UInt.assertLTE width x' (toInteger bound)
   ExprB (LTEU (ValU width bound) x) -> do
     x' <- wireU x
-    assertGTE width x' (toInteger bound)
+    UInt.assertGTE width x' (toInteger bound)
   ExprB (LTU x (ValU width bound)) -> do
     x' <- wireU x
     assertLT width x' (toInteger bound)
@@ -102,10 +102,10 @@ compileAssertion expr = case expr of
     assertGT width x' (toInteger bound)
   ExprB (GTEU x (ValU width bound)) -> do
     x' <- wireU x
-    assertGTE width x' (toInteger bound)
+    UInt.assertGTE width x' (toInteger bound)
   ExprB (GTEU (ValU width bound) x) -> do
     x' <- wireU x
-    assertLTE width x' (toInteger bound)
+    UInt.assertLTE width x' (toInteger bound)
   ExprB (GTU x (ValU width bound)) -> do
     x' <- wireU x
     assertGT width x' (toInteger bound)
@@ -372,7 +372,7 @@ compileExprU out expr = case expr of
     compileMulU2 w np (Left nRef) (Right (fromInteger p))
     compileAddU2 w aainv (Left np) (Right 1)
     -- 2. n ≤ p
-    assertLTE w (Left nRef) p
+    UInt.assertLTE w (Left nRef) p
     addModInvHint w a' (Left out) (Left nRef) p
 
   -- writeMul (0, [(U var, 1)]) (0, [(U out, 1)]) (1, [(U nRef, fromInteger p)])
@@ -513,43 +513,6 @@ compileAddOrSubU2 isSub width out (Left a) (Left b) = do
 compileAddU2 :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAddU2 = compileAddOrSubU2 False
 
-compileMulBigCC :: (GaloisField n, Integral n) => Int -> RefU -> Integer -> Integer -> M n ()
-compileMulBigCC width out a b = do
-  let val = a * b
-  writeValU width out val
-
--- | Encoding addition on UInts with multiple operands: O(2)
---      A       =   2ⁿAₙ₋₁ + ... + 2A₁ + A₀
---      B       =   2ⁿBₙ₋₁ + ... + 2B₁ + B₀
---      C       = 2²ⁿC₂ₙ₋₁ + ... + 2C₁ + C₀
---      Result  =   2ⁿCₙ₋₁ + ... + 2C₁ + C₀
-compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileMulU width out (Right a) (Right b) = do
-  -- let val = a * b
-  -- writeValU width out val
-  compileMulBigCC width out a b
-compileMulU width out (Right a) (Left b) = do
-  carry <- replicateM width (B <$> freshRefB)
-  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
-  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-  writeMul (fromInteger a, []) (0, bs) (0, outputSegment <> carrySegment)
-compileMulU width out (Left a) (Right b) = do
-  carry <- replicateM width (B <$> freshRefB)
-  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
-  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-  writeMul (0, as) (fromInteger b, []) (0, outputSegment <> carrySegment)
-compileMulU width out (Left a) (Left b) = do
-  carry <- replicateM width (B <$> freshRefB)
-
-  let as = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-  let bs = [(B (RefUBit width b i), 2 ^ i) | i <- [0 .. width - 1]]
-  let carrySegment = zip carry [2 ^ i | i <- [width .. width * 2 - 1]]
-  let outputSegment = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-
-  writeMul (0, as) (0, bs) (0, outputSegment <> carrySegment)
-
 compileMulU2 :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileMulU2 width out (Right a) (Right b) = do
   let val = a * b
@@ -675,13 +638,13 @@ assertDivModU width dividend divisor quotient remainder = do
   --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder
-  remainderRef <- wireU remainder
+  dividendRef <- wireU dividend
   divisorRef <- wireU divisor
   quotientRef <- wireU quotient
-  dividendRef <- wireU dividend
+  remainderRef <- wireU remainder
 
   productDQ <- freshRefU width
-  compileMulU width productDQ divisorRef quotientRef
+  UInt.compileMulU width productDQ divisorRef quotientRef
   UInt.compileSubU width productDQ dividendRef remainderRef
 
   -- 0 ≤ remainder < divisor
@@ -690,80 +653,6 @@ assertDivModU width dividend divisor quotient remainder = do
   assertGT width divisorRef 0
   -- add hint for DivMod
   addDivModHint width dividendRef divisorRef quotientRef remainderRef
-
---------------------------------------------------------------------------------
-
--- | Assert that a UInt is less than or equal to some constant
--- reference doc: A.3.2.2 Range Check https://zips.z.cash/protocol/protocol.pdf
-assertLTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
-assertLTE _ (Right a) bound = if fromIntegral a <= bound then return () else throwError $ Error.AssertComparisonError (toInteger a) LT (succ bound)
-assertLTE width (Left a) bound
-  | bound < 0 = throwError $ Error.AssertLTEBoundTooSmallError bound
-  | bound >= 2 ^ width - 1 = throwError $ Error.AssertLTEBoundTooLargeError bound width
-  | bound == 0 = do
-      -- there's only 1 possible value for `a`, which is `0`
-      -- let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      -- writeAdd 0 bits
-      writeValU width a 0
-  | bound == 1 = do
-      -- there are 2 possible values for `a`, which are `0` and `1`
-      -- we can use these 2 values as the only roots of the following multiplicative polynomial
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeMul (0, bits) (-1, bits) (0, [])
-  | bound == 2 = do
-      -- there are 3 possible values for `a`, which are `0`, `1` and `2`
-      -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      temp <- freshRefF
-      writeMul (0, bits) (-1, bits) (0, [(F temp, 1)])
-      writeMul (0, [(F temp, 1)]) (-2, bits) (0, [])
-  | otherwise = do
-      -- because we don't have to execute the `go` function for trailing ones of `c`
-      -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
-      foldM_ (go a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
-  where
-    -- for counting the number of trailing ones of `c`
-    countTrailingOnes :: Int
-    countTrailingOnes =
-      fst $
-        foldl
-          ( \(count, keepCounting) i ->
-              if keepCounting && Data.Bits.testBit bound i then (count + 1, True) else (count, False)
-          )
-          (0, True)
-          [0 .. width - 1]
-
-    go :: (GaloisField n, Integral n) => RefU -> Maybe Ref -> Int -> M n (Maybe Ref)
-    go ref Nothing i =
-      let aBit = RefUBit width ref i
-       in -- have not found the first bit in 'c' that is 1 yet
-          if Data.Bits.testBit bound i
-            then do
-              return $ Just (B aBit) -- when found, return a[i]
-            else do
-              -- a[i] = 0
-              writeValB aBit False
-              return Nothing -- otherwise, continue searching
-    go ref (Just acc) i =
-      let aBit = B (RefUBit width ref i)
-       in if Data.Bits.testBit bound i
-            then do
-              -- constraint for the next accumulator
-              -- acc * a[i] = acc'
-              -- such that if a[i] = 1
-              --    then acc' = acc
-              --    else acc' = 0
-              acc' <- freshRefF
-              writeMul (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(F acc', 1)])
-              return $ Just (F acc')
-            else do
-              -- constraint on a[i]
-              -- (1 - acc - a[i]) * a[i] = 0
-              -- such that if acc = 0 then a[i] = 0 or 1 (don't care)
-              --           if acc = 1 then a[i] = 0
-              writeMul (1, [(acc, -1), (aBit, -1)]) (0, [(aBit, 1)]) (0, [])
-              -- pass down the accumulator
-              return $ Just acc
 
 -- | Assert that a UInt is less than some constant
 assertLT :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
@@ -776,71 +665,7 @@ assertLT width a c = do
     throwError $
       Error.AssertLTBoundTooLargeError c width
   -- otherwise, assert that a <= c - 1
-  assertLTE width a (c - 1)
-
--- | Assert that a UInt is greater than or equal to some constant
-assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
-assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Error.AssertComparisonError (succ (toInteger a)) GT c
-assertGTE width (Left a) bound
-  | bound < 1 = throwError $ Error.AssertGTEBoundTooSmallError bound
-  | bound >= 2 ^ width = throwError $ Error.AssertGTEBoundTooLargeError bound width
-  | bound == 2 ^ width - 1 = do
-      -- there's only 1 possible value for `a`, which is `2^width - 1`
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeAdd (1 - 2 ^ width) bits
-  | bound == 2 ^ width - 2 = do
-      -- there's only 2 possible value for `a`, which is `2^width - 1` or `2^width - 2`
-      -- we can use these 2 values as the only roots of the following multiplicative polynomial
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeMul (1 - 2 ^ width, bits) (2 - 2 ^ width, bits) (0, [])
-  | bound == 2 ^ width - 3 = do
-      -- there's only 3 possible value for `a`, which is `2^width - 1`, `2^width - 2` or `2^width - 3`
-      -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      temp <- freshRefF
-      writeMul (1 - 2 ^ width, bits) (2 - 2 ^ width, bits) (0, [(F temp, 1)])
-      writeMul (0, [(F temp, 1)]) (3 - 2 ^ width, bits) (0, [])
-  | bound == 1 = do
-      -- a >= 1 => a > 0 => a is not zero
-      -- there exists a number m such that the product of a and m is 1
-      m <- freshRefF
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeMul (0, bits) (0, [(F m, 1)]) (1, [])
-  | otherwise = do
-      flag <- freshRefF
-      writeValF flag 1
-      -- because we don't have to execute the `go` function for trailing zeros of `bound`
-      -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
-      foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
-  where
-    -- for counting the number of trailing zeros of `bound`
-    countTrailingZeros :: Int
-    countTrailingZeros =
-      fst $
-        foldl
-          ( \(count, keepCounting) i ->
-              if keepCounting && not (Data.Bits.testBit bound i) then (count + 1, True) else (count, False)
-          )
-          (0, True)
-          [0 .. width - 1]
-
-    go :: (GaloisField n, Integral n) => RefU -> Ref -> Int -> M n Ref
-    go ref flag i =
-      let aBit = RefUBit width ref i
-          bBit = Data.Bits.testBit bound i
-       in if bBit
-            then do
-              -- constraint on bit
-              -- (flag + bit - 1) * bit = flag
-              -- such that if flag = 0 then bit = 0 or 1 (don't care)
-              --           if flag = 1 then bit = 1
-              writeMul (-1, [(B aBit, 1), (flag, 1)]) (0, [(B aBit, 1)]) (0, [(flag, 1)])
-              return flag
-            else do
-              flag' <- freshRefF
-              -- flag' := flag * (1 - bit)
-              writeMul (0, [(flag, 1)]) (1, [(B aBit, -1)]) (0, [(F flag', 1)])
-              return (F flag')
+  UInt.assertLTE width a (c - 1)
 
 -- | Assert that a UInt is greater than some constant
 assertGT :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
@@ -853,7 +678,7 @@ assertGT width a c = do
     throwError $
       Error.AssertGTBoundTooLargeError c width
   -- otherwise, assert that a >= c + 1
-  assertGTE width a (c + 1)
+  UInt.assertGTE width a (c + 1)
 
 -- | Fast exponentiation on field
 fastExp :: (GaloisField n, Integral n) => LC n -> n -> Integer -> M n (LC n)

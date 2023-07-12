@@ -32,6 +32,8 @@ library
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.Limb
+      Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
@@ -100,6 +102,8 @@ executable keelungc
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.Limb
+      Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint
@@ -175,6 +179,8 @@ test-suite keelung-test
       Test.Interpreter.Statement
       Test.Interpreter.UInt
       Test.Interpreter.UInt.Addition
+      Test.Interpreter.UInt.Comparison
+      Test.Interpreter.UInt.DivMod
       Test.Interpreter.UInt.Multiplication
       Test.Interpreter.Util
       Test.Optimization
@@ -194,6 +200,8 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
+      Keelung.Compiler.Compile.Limb
+      Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.Constraint

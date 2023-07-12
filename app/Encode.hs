@@ -13,6 +13,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.IntMap qualified as IntMap
 import Data.Vector (Vector)
+import Data.List (intercalate)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
 import Keelung.Data.Polynomial (Poly)
@@ -30,7 +31,7 @@ patchVersion :: Int
 patchVersion = 2
 
 versionString :: String
-versionString = unwords [show (fst compilerVersion), ".", show (snd compilerVersion), ".", show patchVersion]
+versionString = intercalate "." [show (fst compilerVersion), show (snd compilerVersion), show patchVersion]
 
 -- | J-R1CS – a JSON Lines format for R1CS
 --   https://www.sikoba.com/docs/SKOR_GD_R1CS_Format.pdf

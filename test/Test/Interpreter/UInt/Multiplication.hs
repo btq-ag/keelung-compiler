@@ -3,6 +3,7 @@
 
 module Test.Interpreter.UInt.Multiplication (tests, run) where
 
+import Data.Word (Word8)
 import Keelung hiding (compile)
 import Test.Hspec
 import Test.Interpreter.Util
@@ -28,86 +29,72 @@ tests =
         runAll (Prime 5) (program (fromInteger x) (fromInteger y)) [] [] expected
         runAll (Prime 257) (program (fromInteger x) (fromInteger y)) [] [] expected
 
-    it "1-limb x 1-limb" $ do
+    it "2 variables" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
+            x <- inputUInt @8 Public
+            y <- inputUInt @8 Public
             return $ x * y
       -- debug (Prime 1031) program
       let genPair = do
-            x <- choose (-15, 15)
-            y <- choose (-15, 15)
-            return (x, y)
-
+            x <- (arbitrary :: Gen Word8)
+            y <- (arbitrary :: Gen Word8)
+            return (toInteger x, toInteger y)
       forAll genPair $ \(x, y) -> do
-        let expected = [(x * y) `mod` 16]
+        let expected = [(x * y) `mod` 256]
+        runAll (Prime 17) program [x, y] [] expected
+        runAll (Prime 257) program [x, y] [] expected
         runAll (Prime 1031) program [x, y] [] expected
 
-    it "1-limb variable x 1-limb constant" $ do
+    it "1 variable / 1 constant" $ do
       let program y = do
-            x <- inputUInt @4 Public
+            x <- inputUInt @8 Public
             return $ x * fromInteger y
+      -- debug (Prime 17) (program 32)
+      -- debug (Prime 1031) (program 32)
+      -- runAll (Prime 17) (program 16) [3] [] [48]
+      -- runAll (Prime 17) (program 32) [29] [] [160]
+      -- runAll (Prime 257) (program 32) [29] [] [160]
+      -- runAll (Prime 1031) (program 32) [29] [] [160]
       let genPair = do
-            x <- choose (-15, 15)
-            y <- choose (-15, 15)
-            return (x, y)
+            x <- (arbitrary :: Gen Word8)
+            y <- (arbitrary :: Gen Word8)
+            return (toInteger x, toInteger y)
       forAll genPair $ \(x, y) -> do
-        let expected = [(x * y) `mod` 16]
-        runAll (Prime 1031) (program y) [x] [] expected
-    --   runAll (Prime 17) (program y) [x] [] expected
-
-    it "2-limb x 2-limb" $ do
-      let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            return $ x * y
-      -- debug (Prime 17) program
-      -- runAll (Prime 17) program [10, 2] [] [4]
-      let genPair = do
-            x <- choose (-15, 15)
-            y <- choose (-15, 15)
-            return (x, y)
-      forAll genPair $ \(x, y) -> do
-        let expected = [(x * y) `mod` 16]
-        runAll (Prime 17) program [x, y] [] expected
-
-    it "2-limb variable x 2-limb constant" $ do
-      let program y = do
-            x <- inputUInt @4 Public
-            return $ x * fromInteger y
-      -- runAll (Prime 17) (program 0) [10] [] [0]
-      let genPair = do
-            x <- choose (-15, 15)
-            y <- choose (-15, 15)
-            return (x, y)
-      forAll genPair $ \(x, y) -> do
-        let expected = [(x * y) `mod` 16]
-        runAll (Prime 1031) (program y) [x] [] expected
+        let expected = [(x * y) `mod` 256]
         runAll (Prime 17) (program y) [x] [] expected
+        runAll (Prime 257) (program y) [x] [] expected
+        runAll (Prime 1031) (program y) [x] [] expected
 
-    it "3-limb x 3-limb" $ do
+    it "with addition" $ do
       let program = do
-            x <- inputUInt @6 Public
-            y <- inputUInt @6 Public
-            return $ x * y
-      -- debug (Prime 17) program
-      -- runAll (Prime 17) program [10, 2] [] [4]
+            x <- inputUInt @8 Public
+            y <- inputUInt @8 Public
+            z <- inputUInt @8 Public
+            return $ x * y + z
       let genPair = do
-            x <- choose (-63, 63)
-            y <- choose (-63, 63)
-            return (x, y)
-      forAll genPair $ \(x, y) -> do
-        let expected = [(x * y) `mod` 64]
-        runAll (Prime 17) program [x, y] [] expected
+            x <- (arbitrary :: Gen Word8)
+            y <- (arbitrary :: Gen Word8)
+            z <- (arbitrary :: Gen Word8)
+            return (toInteger x, toInteger y, toInteger z)
+      forAll genPair $ \(x, y, z) -> do
+        let expected = [(x * y + z) `mod` 256]
+        runAll (Prime 17) program [x, y, z] [] expected
+        runAll (Prime 257) program [x, y, z] [] expected
+        runAll (Prime 1031) program [x, y, z] [] expected
 
-    it "3-limb variable x 3-limb constant" $ do
-      let program y = do
-            x <- inputUInt @6 Public
-            return $ x * fromInteger y
+    it "with subtraction" $ do
+      let program = do
+            x <- inputUInt @8 Public
+            y <- inputUInt @8 Public
+            z <- inputUInt @8 Public
+            return $ -x * y - z
       let genPair = do
-            x <- choose (-63, 63)
-            y <- choose (-63, 63)
-            return (x, y)
-      forAll genPair $ \(x, y) -> do
-        let expected = [(x * y) `mod` 64]
-        runAll (Prime 17) (program y) [x] [] expected
+            x <- (arbitrary :: Gen Word8)
+            y <- (arbitrary :: Gen Word8)
+            z <- (arbitrary :: Gen Word8)
+            return (toInteger x, toInteger y, toInteger z)
+      forAll genPair $ \(x, y, z) -> do
+        let expected = [(-x * y - z) `mod` 256]
+        runAll (Prime 17) program [x, y, z] [] expected
+        runAll (Prime 257) program [x, y, z] [] expected
+        runAll (Prime 1031) program [x, y, z] [] expected
