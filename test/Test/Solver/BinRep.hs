@@ -122,3 +122,11 @@ tests = describe "BinRep Detection" $ do
     let actual = IntMap.fromList <$> detectBinRep 4 (const True) polynomial
     let expected = Just $ IntMap.fromList [(21, True), (30, False), (31, True)]
     actual `shouldBe` expected
+
+  it "$0 + 2$1 + 4$2 = 6 (mod 17)" $ do
+    let polynomial = case Poly.buildEither (-6) [(0, 1), (1, 2), (2, 4)] of
+          Left _ -> error "Poly.buildEither"
+          Right p -> p :: Poly (Prime 17)
+    let actual = IntMap.fromList <$> detectBinRep 4 (const True) polynomial
+    let expected = Just $ IntMap.fromList [(2, True), (1, True), (0, False)]
+    actual `shouldBe` expected

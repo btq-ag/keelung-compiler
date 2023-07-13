@@ -480,9 +480,8 @@ detectBinRep fieldBitWidth isBoolean polynomial =
       case IntMap.foldlWithKey' go Start (Poly.coeffs xs) of
         Start -> Nothing
         Failed -> Nothing
-        Continue picked [coeffMap] -> Just (picked, coeffMap)
-        Continue _ [] -> Nothing
-        Continue _ _ -> Nothing
+        Continue _ [] -> Nothing -- no answer
+        Continue picked (coeffMap : _) -> Just (picked, coeffMap)
       where
         go :: (GaloisField n, Integral n) => FoldState n -> Var -> n -> FoldState n
         go Start var coeff =
