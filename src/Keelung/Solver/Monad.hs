@@ -179,11 +179,15 @@ data Log n
   = LogBindVar String Var n
   | LogEliminateConstraint (Constraint n)
   | LogShrinkConstraint (Constraint n) (Constraint n)
+  | LogBinRepDetection (Poly n) [(Var, Bool)]
 
 instance (Integral n, GaloisField n) => Show (Log n) where
   show (LogBindVar msg var val) = "  BIND  " <> take 10 (msg <> "          ") <> "  $" <> show var <> " := " <> show (N val)
   show (LogEliminateConstraint c) = "  ELIM  " <> show (fmap N c)
   show (LogShrinkConstraint c1 c2) = "  SHNK  " <> show (fmap N c1) <> "\n    ->  " <> show (fmap N c2)
+  show (LogBinRepDetection poly assignments) =
+    "  BREP  " <> show (fmap N poly) <> "\n"
+      <> concatMap (\(var, val) -> "    ->  $" <> show var <> " := " <> show (if val then 1 else 0 :: Int) <> "\n") assignments
 
 
 --------------------------------------------------------------------------------

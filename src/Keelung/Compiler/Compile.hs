@@ -647,10 +647,10 @@ assertDivModU width dividend divisor quotient remainder = do
   UInt.compileMulU width productDQ divisorRef quotientRef
   UInt.compileSubU width productDQ dividendRef remainderRef
 
-  -- 0 ≤ remainder < divisor
-  compileAssertion $ ExprB (LTU remainder divisor)
-  -- 0 < divisor
-  assertGT width divisorRef 0
+  -- -- 0 ≤ remainder < divisor
+  -- compileAssertion $ ExprB (LTU remainder divisor)
+  -- -- 0 < divisor
+  -- assertGT width divisorRef 0
   -- add hint for DivMod
   addDivModHint width dividendRef divisorRef quotientRef remainderRef
 

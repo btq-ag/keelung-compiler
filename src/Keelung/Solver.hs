@@ -1,16 +1,14 @@
 -- | Witness solver/generator for R1CS
-module Keelung.Solver (run, debug, Error (..), detectBinRep, Log (..), LogReport (..)) where
+module Keelung.Solver (run, debug, Error (..), detectBinRep, deriveCoeffs, Log (..), LogReport (..), computeBinPoly, BinPoly(..)) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.Bifunctor (first)
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField (order))
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
-import Data.List qualified as List
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
@@ -25,6 +23,7 @@ import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
+import Data.Bifunctor (Bifunctor(..))
 
 -- | Execute the R1CS solver
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
@@ -393,24 +392,21 @@ data FoldState n = Start | Failed | Continue n [IntMap (Bool, Var)] deriving (Eq
 
 -- | Given a mapping of (Int, (Bool, Var)) pairs, where the Int indicates the power of 2, and the Bool indicates whether the coefficient is positive or negative
 --   and an Integer, derive coefficients (Boolean) for each of these variables such that the sum of the coefficients times the powers of 2 is equal to the Integer
-deriveCoeffs :: (GaloisField n, Integral n) => n -> IntMap (Bool, Var) -> [(Var, Bool)]
-deriveCoeffs rawConstant polynomial =
-  let negatedPolynomial = fmap (first not) polynomial
-      (upper, lower) = boundsOf negatedPolynomial
-      constant = toInteger rawConstant
-      negatedConstant = negate (toInteger (order rawConstant - fromIntegral rawConstant))
-      -- should flip the sign if the constant is outside the bounds of the polynomial
-      shouldFlipSign = upper < negatedConstant || lower > negatedConstant
-   in fst $ IntMap.foldlWithKey' go ([], if shouldFlipSign then constant else negatedConstant) polynomial
+deriveCoeffs :: (GaloisField n, Integral n) => Bool -> n -> IntMap (Bool, Var) -> [(Var, Bool)]
+deriveCoeffs sign' rawConstant polynomial =
+  let -- should flip the sign if the constant is outside the bounds of the polynomial
+      value = toInteger (order rawConstant - fromIntegral rawConstant)
+      constant = if sign' then negate value else value
+   in fst $ IntMap.foldlWithKey' go ([], constant) polynomial
   where
-    -- given coefficients, calculate the upper bound and the lower bound of the polynomial
-    boundsOf :: IntMap (Bool, Var) -> (Integer, Integer)
-    boundsOf =
-      IntMap.foldlWithKey'
-        ( \(upper, lower) power (sign, _) ->
-            if sign then (upper + (2 ^ power), lower) else (upper, lower - (2 ^ power))
-        )
-        (0, 0)
+    -- -- given coefficients, calculate the upper bound and the lower bound of the polynomial
+    -- boundsOf :: IntMap (Bool, Var) -> (Integer, Integer)
+    -- boundsOf =
+    --   IntMap.foldlWithKey'
+    --     ( \(upper, lower) power (sign, _) ->
+    --         if sign then (upper + (2 ^ power), lower) else (upper, lower - (2 ^ power))
+    --     )
+    --     (0, 0)
 
     go :: ([(Var, Bool)], Integer) -> Int -> (Bool, Var) -> ([(Var, Bool)], Integer)
     go (acc, c) power (sign, var) =
@@ -434,6 +430,7 @@ shrinkBinRep (Stuck (AddConstraint polynomial)) = do
   case detectBinRep fieldBitWidth isBoolean polynomial of
     Nothing -> return (Stuck (AddConstraint polynomial))
     Just assignments -> do
+      tryLog $ LogBinRepDetection polynomial assignments
       -- we have a binary representation
       -- we can now assign the variables
       forM_ assignments $ \(var, val) -> do
@@ -455,78 +452,84 @@ detectBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n 
 detectBinRep fieldBitWidth isBoolean polynomial =
   if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
     then Nothing
-    else case collectCoeffs polynomial of
+    else case computeBinPoly fieldBitWidth isBoolean polynomial of
       Nothing -> Nothing
-      Just (_, invertedPolynomial) ->
-        let powers = IntMap.keys invertedPolynomial
-            powersAllUnique = length powers == length (List.nub powers)
-         in if powersAllUnique
-              then case IntMap.lookupMin invertedPolynomial of
-                Nothing -> Just []
-                Just (minPower, (_, minVar)) -> case IntMap.lookup minVar (Poly.coeffs polynomial) of
-                  Nothing -> Nothing
-                  Just minVarCoeff ->
-                    -- if the smallest power is negative, make it 2^0
-                    if minPower < 0
-                      then
-                        let normalizedPolynomial = IntMap.mapKeys (\i -> i - minPower) invertedPolynomial
-                            constant = Poly.constant polynomial / minVarCoeff
-                         in Just (deriveCoeffs constant normalizedPolynomial)
-                      else Just (deriveCoeffs (Poly.constant polynomial / minVarCoeff) invertedPolynomial)
-              else Nothing
+      Just invertedPolynomial ->
+        case unBinPoly invertedPolynomial of
+          [] -> Just []
+          ((minVarSign, minVar) : _) -> case IntMap.lookup minVar (Poly.coeffs polynomial) of
+            Nothing -> Nothing
+            Just minVarCoeff ->
+              Just $
+                deriveCoeffs
+                  minVarSign
+                  (Poly.constant polynomial / minVarCoeff)
+                  -- if the smallest power is negative, make it 2^0
+                  (IntMap.fromList $ zip [0 .. ] (unBinPoly invertedPolynomial))
+                  -- ( if minPower < 0
+                  --     then IntMap.mapKeys (\i -> i - minPower) (unBinPoly invertedPolynomial)
+                  --     else unBinPoly invertedPolynomial
+                  -- )
+
+-- | Polynomial with coefficients that are multiples of powers of 2
+newtype BinPoly = BinPoly { unBinPoly :: [(Bool, Var)]} deriving (Show)
+
+instance Eq BinPoly where
+  BinPoly a == BinPoly b = a == b || a == fmap (first not) b
+
+-- | Computes a BinPoly
+computeBinPoly :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe BinPoly
+computeBinPoly fieldBitWidth isBoolean xs =
+  case IntMap.foldlWithKey' go Start (Poly.coeffs xs) of
+    Start -> Nothing
+    Failed -> Nothing
+    Continue _ [] -> Nothing -- no answer
+    Continue _ (coeffMap : _) -> Just (BinPoly (IntMap.elems coeffMap))
   where
-    collectCoeffs :: (GaloisField n, Integral n) => Poly n -> Maybe (n, IntMap (Bool, Var))
-    collectCoeffs xs =
-      case IntMap.foldlWithKey' go Start (Poly.coeffs xs) of
-        Start -> Nothing
-        Failed -> Nothing
-        Continue _ [] -> Nothing -- no answer
-        Continue picked (coeffMap : _) -> Just (picked, coeffMap)
-      where
-        go :: (GaloisField n, Integral n) => FoldState n -> Var -> n -> FoldState n
-        go Start var coeff =
-          if isBoolean var
-            then -- since this is the first coefficient, we can always assume that it's a power of 2
-              Continue coeff [IntMap.singleton 0 (True, var)]
-            else Failed
-        go Failed _ _ = Failed
-        go (Continue picked coeffMaps) var coeff =
-          if isBoolean var
-            then Continue picked (coeffMaps >>= checkCoeffDiff var picked coeff)
-            else Failed
+    go :: (GaloisField n, Integral n) => FoldState n -> Var -> n -> FoldState n
+    go Start var coeff =
+      if isBoolean var
+        then -- since this is the first coefficient, we can always assume that it's a power of 2
+          Continue coeff [IntMap.singleton 0 (True, var)]
+        else Failed
+    go Failed _ _ = Failed
+    go (Continue picked coeffMaps) var coeff =
+      if isBoolean var
+        then Continue picked (coeffMaps >>= checkCoeffDiff var picked coeff)
+        else Failed
 
-        -- see if a coefficient is a multiple of a power of 2 of the picked coefficient
-        -- we need to examine all 4 combinations:
-        --  1. `coeff / picked`
-        --  2. `picked / coeff`
-        --  3. `-coeff / picked`
-        --  4. `picked / -coeff`
-        checkCoeffDiff :: (GaloisField n, Integral n) => Var -> n -> n -> IntMap (Bool, Var) -> [IntMap (Bool, Var)]
-        checkCoeffDiff var picked coeff coeffMap = do
-          pickedAsDenominator <- [True, False] -- whether `picked` is the denominator
-          negated <- [True, False] -- whether the coefficient is negated
-          let coeff' = if negated then -coeff else coeff
-          let diff = if pickedAsDenominator then coeff' / picked else picked / coeff'
-          case isPowerOf2 fieldBitWidth diff of
-            Just power -> do
-              let power' = if pickedAsDenominator then power else -power
-              guard (guardPower coeffMap power')
-              guard (not (IntMap.member power' coeffMap))
-              return $ IntMap.insert power' (not negated, var) coeffMap
-            Nothing -> mzero
+    -- see if a coefficient is a multiple of a power of 2 of the picked coefficient
+    -- we need to examine all 4 combinations:
+    --  1. `coeff / picked`
+    --  2. `picked / coeff`
+    --  3. `-coeff / picked`
+    --  4. `picked / -coeff`
+    checkCoeffDiff :: (GaloisField n, Integral n) => Var -> n -> n -> IntMap (Bool, Var) -> [IntMap (Bool, Var)]
+    checkCoeffDiff var picked coeff coeffMap = do
+      pickedAsDenominator <- [True, False] -- whether `picked` is the denominator
+      negated <- [True, False] -- whether the coefficient is negated
+      let coeff' = if negated then -coeff else coeff
+      let diff = if pickedAsDenominator then coeff' / picked else picked / coeff'
+      case isPowerOf2 fieldBitWidth diff of
+        Just power -> do
+          let power' = if pickedAsDenominator then power else -power
+          guard (guardPower coeffMap power')
+          guard (not (IntMap.member power' coeffMap))
+          return $ IntMap.insert power' (not negated, var) coeffMap
+        Nothing -> mzero
 
-        -- because the quotient of any 2 coefficients cannot be greater than `2^(k-1)`,
-        -- we need to check if the power to be inserted is too large or too small
-        guardPower :: IntMap (Bool, Var) -> Int -> Bool
-        guardPower coeffs power =
-          let k = fromIntegral fieldBitWidth
-           in -- because the quotient of any 2 coefficients cannot be greater than `2^(k-1)`,
-              -- we need to check if the power to be inserted is too large or too small
-              case IntMap.lookupMin coeffs of
-                Nothing -> False
-                Just (minPower, _) -> case IntMap.lookupMax coeffs of
-                  Nothing -> False
-                  Just (maxPower, _) -> not (power > maxPower && power - minPower > k - 1 || power < minPower && maxPower - power > k - 1)
+    -- because the quotient of any 2 coefficients cannot be greater than `2^(k-1)`,
+    -- we need to check if the power to be inserted is too large or too small
+    guardPower :: IntMap (Bool, Var) -> Int -> Bool
+    guardPower coeffs power =
+      let k = fromIntegral fieldBitWidth
+       in -- because the quotient of any 2 coefficients cannot be greater than `2^(k-1)`,
+          -- we need to check if the power to be inserted is too large or too small
+          case IntMap.lookupMin coeffs of
+            Nothing -> False
+            Just (minPower, _) -> case IntMap.lookupMax coeffs of
+              Nothing -> False
+              Just (maxPower, _) -> not (power > maxPower && power - minPower > k - 1 || power < minPower && maxPower - power > k - 1)
 
 -- | See if a coefficient is a power of 2 (except for 2^0)
 isPowerOf2 :: (GaloisField n, Integral n) => Width -> n -> Maybe Int
