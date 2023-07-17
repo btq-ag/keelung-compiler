@@ -3,13 +3,12 @@
 {-# HLINT ignore "Redundant if" #-}
 
 -- | Witness solver/generator for R1CS
-module Keelung.Solver (run, debug, Error (..), assignBinRep, deriveCoeffs, Log (..), LogReport (..), detectBinRep, BinRep (..), rangeOfBinRep) where
+module Keelung.Solver (run, debug, Error (..), assignBinRep, deriveAssignments, Log (..), LogReport (..), detectBinRep, BinRep (..), rangeOfBinRep, powerOf2) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bits qualified
-import Data.Field.Galois (GaloisField (order))
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -17,6 +16,7 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
+import Debug.Trace
 import Keelung
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
@@ -393,24 +393,6 @@ shrinkModInv (aVar, outVar, nVar, p) = do
 -- | Trying to reduce a BinRep constraint
 data FoldState n = Start | Failed | Continue n [IntMap (Bool, Var)] deriving (Eq, Show)
 
--- | Given a mapping of (Int, (Bool, Var)) pairs, where the Int indicates the power of 2, and the Bool indicates whether the coefficient is positive or negative
---   and an Integer, derive coefficients (Boolean) for each of these variables such that the sum of the coefficients times the powers of 2 is equal to the Integer
-deriveCoeffs :: (GaloisField n, Integral n) => Bool -> n -> IntMap (Bool, Var) -> [(Var, Bool)]
-deriveCoeffs sign' rawConstant polynomial =
-  let -- should flip the sign if the constant is outside the bounds of the polynomial
-      value = toInteger (order rawConstant - fromIntegral rawConstant)
-      constant = if sign' then negate value else value
-   in fst $ IntMap.foldlWithKey' go ([], constant) polynomial
-  where
-    go :: ([(Var, Bool)], Integer) -> Int -> (Bool, Var) -> ([(Var, Bool)], Integer)
-    go (acc, c) power (sign, var) =
-      if Data.Bits.testBit c power
-        then
-          if sign
-            then ((var, True) : acc, c + (2 ^ power))
-            else ((var, True) : acc, c - (2 ^ power))
-        else ((var, False) : acc, c)
-
 -- | Reduce binary representations
 shrinkBinRep :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
 shrinkBinRep NothingToDo = return NothingToDo
@@ -424,13 +406,66 @@ shrinkBinRep (Stuck (AddConstraint polynomial)) = do
   case assignBinRep fieldBitWidth isBoolean polynomial of
     Nothing -> return (Stuck (AddConstraint polynomial))
     Just assignments -> do
-      tryLog $ LogBinRepDetection polynomial assignments
+      tryLog $ LogBinRepDetection polynomial (IntMap.toList assignments)
       -- we have a binary representation
       -- we can now assign the variables
-      forM_ assignments $ \(var, val) -> do
+      forM_ (IntMap.toList assignments) $ \(var, val) -> do
         bindVar "bin rep" var (if val then 1 else 0)
       return Eliminated
 shrinkBinRep (Stuck polynomial) = return (Stuck polynomial)
+
+-- | Given a mapping of (Int, (Bool, Var)) pairs, where the Int indicates the power of 2, and the Bool indicates whether the coefficient is positive or negative
+--   and an Integer, derive coefficients (Boolean) for each of these variables such that the sum of the coefficients times the powers of 2 is equal to the Integer
+deriveAssignments :: (GaloisField n, Integral n) => n -> IntMap (Bool, Var) -> Maybe (IntMap Bool)
+deriveAssignments rawConstant polynomial =
+  let -- should flip the sign if the constant is outside the bounds of the polynomial
+      -- constant = toInteger (order rawConstant - fromIntegral rawConstant)
+      constant = fromIntegral rawConstant
+      (posResult, posRemainder) = IntMap.foldlWithKey' (go False) (mempty, constant) polynomial
+      (posFResult, posFRemainder) = IntMap.foldlWithKey' (go True) (mempty, constant) polynomial
+      (negResult, negRemainder) = IntMap.foldlWithKey' (go False) (mempty, fromIntegral (-rawConstant)) polynomial
+      (negFResult, negFRemainder) = IntMap.foldlWithKey' (go True) (mempty, fromIntegral (-rawConstant)) polynomial
+   in traceShow ("REMAINDERS", posRemainder, posFRemainder, negRemainder, negFRemainder) $
+        if negRemainder == 0 
+          then Just negResult
+          else
+            if negFRemainder == 0 
+              then Just negFResult
+              else
+                if posRemainder == 0 
+                  then Just posResult
+                  else
+                    if posFRemainder == 0 
+                      then Just posFResult
+                      else Nothing
+        -- if posRemainder == 0
+        --   then Just posResult
+        --   else
+        --     if negRemainder == 0
+        --       then Just negResult
+        --       else
+        --         if posFRemainder == 0
+        --           then Just posFResult
+        --           else
+        --             if negFRemainder == 0
+        --               then Just negFResult
+        --               else Nothing
+  where
+    go :: Bool -> (IntMap Bool, Integer) -> Int -> (Bool, Var) -> (IntMap Bool, Integer)
+    go True (acc, c) power (sign, var) =
+      if Data.Bits.testBit c power
+        then
+          if sign
+            then traceShow ("T 1+", c, c + (2 ^ power)) (IntMap.insert var True acc, c + (2 ^ power))
+            else traceShow ("T 1-", c, c - (2 ^ power)) (IntMap.insert var True acc, c - (2 ^ power))
+        else traceShow ("T 0", c) (IntMap.insert var False acc, c)
+    go False (acc, c) power (sign, var) =
+      if Data.Bits.testBit c power
+        then
+          if sign
+            then traceShow ("F 1+", c, c - (2 ^ power))(IntMap.insert var True acc, c - (2 ^ power))
+            else traceShow ("F 1-", c, c + (2 ^ power))  (IntMap.insert var True acc, c + (2 ^ power))
+        else traceShow ("F 0", c)  (IntMap.insert var False acc, c)
 
 -- | Watch out for a stuck R1C, and see if it's a binary representation
 --    1. see if variables are all Boolean
@@ -442,7 +477,7 @@ shrinkBinRep (Stuck polynomial) = return (Stuck polynomial)
 --    1. There can be at most `k` coefficients that are multiples of powers of 2 if the polynomial is a binary representation.
 --    2. These coefficients cannot be too far apart, i.e., the quotient of any 2 coefficients cannot be greater than `2^(k-1)`.
 --    3. For any 2 coefficients `a` and `b`, either `a / b` or `b / a` must be a power of 2 smaller than `2^k`.
-assignBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe [(Var, Bool)]
+assignBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe (IntMap Bool)
 assignBinRep fieldBitWidth isBoolean polynomial =
   if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
     then Nothing
@@ -450,19 +485,29 @@ assignBinRep fieldBitWidth isBoolean polynomial =
       Nothing -> Nothing
       Just binPoly ->
         case IntMap.lookupMin (binPolyCoeffs binPoly) of
-          Nothing -> Just []
-          Just (minPower, (minVarSign, minVar)) -> case IntMap.lookup minVar (Poly.coeffs polynomial) of
+          Nothing -> Just mempty
+          Just (minPower, (_minVarSign, minVar)) -> case IntMap.lookup minVar (Poly.coeffs polynomial) of
             Nothing -> Nothing
-            Just minVarCoeff ->
-              Just $
-                deriveCoeffs
-                  minVarSign
-                  (Poly.constant polynomial / minVarCoeff)
-                  -- if the smallest power is negative, make it 2^0
-                  ( if minPower < 0
-                      then IntMap.mapKeys (\i -> i - minPower) (binPolyCoeffs binPoly)
-                      else binPolyCoeffs binPoly
-                  )
+            Just actualCoeff ->
+              let expectedCoeff = powerOf2 minPower
+                  diff = (expectedCoeff / actualCoeff)
+                  constant = -(Poly.constant polynomial * diff)
+               in if minPower < 0
+                    then
+                      deriveAssignments
+                        (constant * (2 ^ (-minPower)))
+                        (IntMap.mapKeys (\i -> i - minPower) (binPolyCoeffs binPoly))
+                    else
+                      deriveAssignments
+                        constant
+                        (binPolyCoeffs binPoly)
+
+-- (binPolyCoeffs binPoly)
+-- -- if the smallest power is negative, make it 2^0
+-- ( if minPower < 0
+--     then IntMap.mapKeys (\i -> i - minPower) (binPolyCoeffs binPoly)
+--     else binPolyCoeffs binPoly
+-- )
 
 -- | Polynomial with coefficients that are multiples of powers of 2
 newtype BinRep n = BinRep
