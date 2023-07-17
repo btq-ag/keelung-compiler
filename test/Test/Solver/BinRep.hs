@@ -10,7 +10,7 @@ import Data.IntMap qualified as IntMap
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field (GF181)
-import Keelung.Solver (BinPoly (..), computeBinPoly)
+import Keelung.Solver (BinRep (..), detectBinRep)
 import Test.Hspec
 import Test.QuickCheck
 
@@ -19,28 +19,33 @@ import Test.QuickCheck
 run :: IO ()
 run = hspec tests
 
--- | Test cases for BinPoly detection
-data Satisfiability
-  = -- | the polynomial is satisfiable
-    Satisfiable
+-- | Test cases for BinRep detection
+data TestDetection
+  = -- | construct a BinRep that can be successfully detected
+    DetectSuccess
   | -- | two coefficients have the same power
-    DuplicatedCoefficients
+    DetectDuplicatedCoefficients
   | -- | more than `fieldBitWidth` number of coefficients
-    TooManyCoefficients
-  -- | -- | constant of the polynomial is out of range
-  --   ConstantOutOfRange
-  deriving
-    ( Show,
-      Eq,
-      Enum
-    )
+    DetectTooManyCoefficients
+  deriving (Show, Eq)
 
-instance Arbitrary Satisfiability where
-  arbitrary = elements [Satisfiable, DuplicatedCoefficients, TooManyCoefficients]
+-- | Test cases for BinRep assignment
+data TestAssignment
+  = -- | construct a satisfiable BinRep
+    AssignSatisfiable
+  | -- | construct a unsatisfiable BinRep
+    AssignConstantOutOfRange
+  deriving (Show, Eq)
 
--- | Given the number of desired coefficients, generate a BinPoly
-genBinPoly :: Int -> Gen (BinPoly n)
-genBinPoly n = do
+instance Arbitrary TestDetection where
+  arbitrary = elements [DetectSuccess, DetectDuplicatedCoefficients, DetectTooManyCoefficients]
+
+instance Arbitrary TestAssignment where
+  arbitrary = elements [AssignSatisfiable, AssignConstantOutOfRange]
+
+-- | Given the number of desired coefficients, generate a BinRep
+genBinRep :: Int -> Gen (BinRep n)
+genBinRep n = do
   -- generate excess coefficients (so that we can remove some of them later)
   signs <- vectorOf (n * 2) arbitrary -- Bool
   vars <- shuffle [0 .. n * 2 - 1] -- Var
@@ -48,10 +53,10 @@ genBinPoly n = do
   -- take only `n` number of coefficients
   tuples <- take n <$> shuffle (zip signs vars)
   let zipped = zip [0 ..] tuples -- zip with powers
-  return $ BinPoly $ IntMap.fromList zipped
+  return $ BinRep $ IntMap.fromList zipped
 
--- | Given a BinPoly, generate some assignments and a valid polynomial
-genPoly :: (GaloisField n, Integral n) => BinPoly n -> Gen (Poly n)
+-- | Given a BinRep, generate some assignments and a valid polynomial
+genPoly :: (GaloisField n, Integral n) => BinRep n -> Gen (Poly n)
 genPoly binPolys = do
   xs <- shuffle $ IntMap.toList $ binPolyCoeffs binPolys
   multiplier <- suchThat arbitrary (> 0)
@@ -68,82 +73,76 @@ genPoly binPolys = do
     Left _ -> error "Poly.buildEither"
     Right poly -> return poly
 
-genTestCase :: (Integral n, GaloisField n) => Int -> Gen (Poly n, Maybe (BinPoly n))
-genTestCase fieldBitWidth = do
-  -- decide if we want this polynomial to be satisfiable or not
-  satisfiability <- arbitrary
-  case satisfiability of
-    Satisfiable -> do
+genTestDetection :: (Integral n, GaloisField n) => Int -> Gen (Poly n, Maybe (BinRep n))
+genTestDetection fieldBitWidth = do
+  -- decide if we want this BinRep to be detected or not
+  scenario <- arbitrary
+  case scenario of
+    DetectSuccess -> do
       size <- choose (1, fieldBitWidth)
-      binPoly <- genBinPoly size
+      binPoly <- genBinRep size
       polynomial <- genPoly binPoly
       return (polynomial, Just binPoly)
-    DuplicatedCoefficients -> do
+    DetectDuplicatedCoefficients -> do
       size <- choose (2, fieldBitWidth)
-      binPoly <- genBinPoly size
+      binPoly <- genBinRep size
       polynomial <- genPoly binPoly
       -- tweak the polynomial so that it has duplicated coefficients
       let coeffs = case IntMap.toList (Poly.coeffs polynomial) of
             (power1, coeff1) : (power2, _coeff2) : rest -> (power1, coeff1) : (power2, coeff1) : rest
-            _ -> error "[ panic ] genPoly.DuplicatedCoefficients impossible"
+            _ -> error "[ panic ] genTestDetection.DuplicatedCoefficients impossible"
       let polynomial' = case Poly.buildEither (Poly.constant polynomial) coeffs of
             Left _ -> error "Poly.buildEither"
             Right p -> p
       return (polynomial', Nothing)
-    TooManyCoefficients -> do
+    DetectTooManyCoefficients -> do
       size <- choose (fieldBitWidth + 1, fieldBitWidth + 2)
-      binPoly <- genBinPoly size
+      binPoly <- genBinRep size
       polynomial <- genPoly binPoly
       return (polynomial, Nothing)
-    -- ConstantOutOfRange -> do
-    --   size <- choose (1, fieldBitWidth)
-    --   binPoly <- genBinPoly size
 
-    --   let (lowerBound, upperBound) = rangeOfBinPoly binPoly
-    --   constant <-
-    --     if toInteger lowerBound < toInteger upperBound
-    --       then do
-    --         -- the domain of the polynomial ranges from [lowerBound, upperBound]
-    --         leftOrRight <- arbitrary
-    --         if leftOrRight
-    --           then choose (0, lowerBound - 1)
-    --           else return $ upperBound + 1
-    --       else -- the domain of the polynomial ranges from [0 .. lowerBound] and [upperBound .. maxBound]
-    --         choose (lowerBound + 1, upperBound - 1)
+-- ConstantOutOfRange -> do
+--   size <- choose (1, fieldBitWidth)
+--   binPoly <- genBinRep size
 
-    --   polynomial <- genPoly binPoly
-    --   -- tweak the polynomial so that it has duplicated coefficients
-    --   let polynomial' = Poly.addConstant (constant - Poly.constant polynomial) polynomial
-    --   return (polynomial', Nothing)
+--   let (lowerBound, upperBound) = rangeOfBinRep binPoly
+--   constant <-
+--     if toInteger lowerBound < toInteger upperBound
+--       then do
+--         -- the domain of the polynomial ranges from [lowerBound, upperBound]
+--         leftOrRight <- arbitrary
+--         if leftOrRight
+--           then choose (0, lowerBound - 1)
+--           else return $ upperBound + 1
+--       else -- the domain of the polynomial ranges from [0 .. lowerBound] and [upperBound .. maxBound]
+--         choose (lowerBound + 1, upperBound - 1)
+
+--   polynomial <- genPoly binPoly
+--   -- tweak the polynomial so that it has duplicated coefficients
+--   let polynomial' = Poly.addConstant (constant - Poly.constant polynomial) polynomial
+--   return (polynomial', Nothing)
 
 tests :: SpecWith ()
 tests = describe "BinRep Detection" $ do
-  -- let polynomial = case Poly.buildEither (-8) [(0, 1), (1, 2), (2, 4)] of
-  --       Left _ -> error "Poly.buildEither"
-  --       Right p -> p :: Poly (Prime 11)
-  -- let actual = computeBinPoly 3 (const True) polynomial
-  -- let expected = Nothing
-  -- it "unsatisfiable" $ do
-  --   actual `shouldBe` expected
+  describe "`detectBinRep`" $ do
+    it "Prime 17" $ do
+      forAll (genTestDetection 4) $ \(polynomial :: Poly (Prime 17), binPoly) -> do
+        let actual = detectBinRep 4 (const True) (Poly.coeffs polynomial)
+        let expected = binPoly
+        actual `shouldBe` expected
 
-  -- it "`computeBinPoly` : all positvie / mod 11" $ do
-  --   forAll (genBinPoly 3 [True]) $ \(binPoly, powerSignIntMap) -> do
-  --     -- testing with [(var, sign)] pairs
-  --     let actual = computeBinPoly 3 (const True) polynomial
-  --     let expected = powerSignIntMap
-  --     actual `shouldBe` expected
+    it "GF181" $ do
+      forAll (genTestDetection 180) $ \(polynomial :: Poly GF181, binPoly) -> do
+        let actual = detectBinRep 180 (const True) (Poly.coeffs polynomial)
+        let expected = binPoly
+        actual `shouldBe` expected
 
-  it "`computeBinPoly` : mod 17" $ do
-    forAll (genTestCase 4) $ \(polynomial :: Poly (Prime 17), binPoly) -> do
-      let actual = computeBinPoly 4 (const True) (Poly.coeffs polynomial)
-      let expected = binPoly
-      actual `shouldBe` expected
-
-  it "`computeBinPoly` : mod GF181" $ do
-    forAll (genTestCase 180) $ \(polynomial :: Poly GF181, binPoly) -> do
-      let actual = computeBinPoly 180 (const True) (Poly.coeffs polynomial)
-      let expected = binPoly
-      actual `shouldBe` expected
+-- describe "`detectBinRep`" $ do
+--   it "Prime 17" $ do
+--     forAll (genTestCase 4) $ \(polynomial :: Poly (Prime 17), binPoly) -> do
+--       let actual = detectBinRep 4 (const True) (Poly.coeffs polynomial)
+--       let expected = binPoly
+--       actual `shouldBe` expected
 
 -- it "$0 + 2$1 + 4$2 = 1 (mod 11)" $ do
 --   let polynomial = case Poly.buildEither (-1) [(0, 1), (1, 2), (2, 4)] of

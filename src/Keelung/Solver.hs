@@ -3,7 +3,7 @@
 {-# HLINT ignore "Redundant if" #-}
 
 -- | Witness solver/generator for R1CS
-module Keelung.Solver (run, debug, Error (..), detectBinRep, deriveCoeffs, Log (..), LogReport (..), computeBinPoly, BinPoly (..), rangeOfBinPoly) where
+module Keelung.Solver (run, debug, Error (..), assignBinRep, deriveCoeffs, Log (..), LogReport (..), detectBinRep, BinRep (..), rangeOfBinRep) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -421,7 +421,7 @@ shrinkBinRep (Stuck (AddConstraint polynomial)) = do
   let isBoolean var = case IntMap.lookupLE var boolVarRanges of
         Nothing -> False
         Just (index, len) -> var < index + len
-  case detectBinRep fieldBitWidth isBoolean polynomial of
+  case assignBinRep fieldBitWidth isBoolean polynomial of
     Nothing -> return (Stuck (AddConstraint polynomial))
     Just assignments -> do
       tryLog $ LogBinRepDetection polynomial assignments
@@ -442,11 +442,11 @@ shrinkBinRep (Stuck polynomial) = return (Stuck polynomial)
 --    1. There can be at most `k` coefficients that are multiples of powers of 2 if the polynomial is a binary representation.
 --    2. These coefficients cannot be too far apart, i.e., the quotient of any 2 coefficients cannot be greater than `2^(k-1)`.
 --    3. For any 2 coefficients `a` and `b`, either `a / b` or `b / a` must be a power of 2 smaller than `2^k`.
-detectBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe [(Var, Bool)]
-detectBinRep fieldBitWidth isBoolean polynomial =
+assignBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe [(Var, Bool)]
+assignBinRep fieldBitWidth isBoolean polynomial =
   if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
     then Nothing
-    else case computeBinPoly fieldBitWidth isBoolean (Poly.coeffs polynomial) of
+    else case detectBinRep fieldBitWidth isBoolean (Poly.coeffs polynomial) of
       Nothing -> Nothing
       Just binPoly ->
         case IntMap.lookupMin (binPolyCoeffs binPoly) of
@@ -465,17 +465,17 @@ detectBinRep fieldBitWidth isBoolean polynomial =
                   )
 
 -- | Polynomial with coefficients that are multiples of powers of 2
-newtype BinPoly n = BinPoly
+newtype BinRep n = BinRep
   { -- | Coefficients are stored as (sign, var) pairs
     binPolyCoeffs :: IntMap (Bool, Var)
   }
   deriving (Show)
 
--- | 2 BinPolys are equal if they are equal up to some shifts and negations
-instance (GaloisField n, Integral n) => Eq (BinPoly n) where
+-- | 2 BinReps are equal if they are equal up to some shifts and negations
+instance (GaloisField n, Integral n) => Eq (BinRep n) where
   binRepA == binRepB =
-    let flippedA = flipBinPoly binRepA
-        flippedB = flipBinPoly binRepB
+    let flippedA = flipBinRep binRepA
+        flippedB = flipBinRep binRepB
      in if IntMap.keys flippedA == IntMap.keys flippedB
           then
             let pairsA = IntMap.elems flippedA
@@ -485,14 +485,14 @@ instance (GaloisField n, Integral n) => Eq (BinPoly n) where
                       ((aSign, aPower) : _, (bSign, bPower) : _) ->
                         let powerDiff = powerOf2 (aPower - bPower)
                          in if aSign == bSign then powerDiff else -powerDiff
-                      _ -> error "BinPoly Eq impossible"
+                      _ -> error "BinRep Eq impossible"
                  in fmap normalize flippedA == fmap ((diff *) . normalize) flippedB
           else False
     where
-      -- BinPoly are power-indexed IntMaps
+      -- BinRep are power-indexed IntMaps
       -- we flip them into variable-indexed IntMaps so that we can compare them
-      flipBinPoly :: BinPoly n -> IntMap (Bool, Int)
-      flipBinPoly (BinPoly xs) = IntMap.fromList $ fmap (\(i, (b, v)) -> (v, (b, i))) (IntMap.toList xs)
+      flipBinRep :: BinRep n -> IntMap (Bool, Int)
+      flipBinRep (BinRep xs) = IntMap.fromList $ fmap (\(i, (b, v)) -> (v, (b, i))) (IntMap.toList xs)
 
       normalize :: (GaloisField n, Integral n) => (Bool, Int) -> n
       normalize (True, power) = powerOf2 power
@@ -503,21 +503,21 @@ powerOf2 n
   | n < 0 = recip (2 ^ (-n))
   | otherwise = 2 ^ n
 
-rangeOfBinPoly :: (GaloisField n, Integral n) => BinPoly n -> (n, n)
-rangeOfBinPoly (BinPoly xs) = IntMap.foldlWithKey' go (0, 0) xs
+rangeOfBinRep :: (GaloisField n, Integral n) => BinRep n -> (n, n)
+rangeOfBinRep (BinRep xs) = IntMap.foldlWithKey' go (0, 0) xs
   where
     go :: (GaloisField n, Integral n) => (n, n) -> Int -> (Bool, Var) -> (n, n)
     go (lowerBound, upperBound) power (True, _) = (lowerBound, upperBound + powerOf2 power)
     go (lowerBound, upperBound) power (False, _) = (lowerBound - powerOf2 power, upperBound)
 
--- | Computes a BinPoly
-computeBinPoly :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> IntMap n -> Maybe (BinPoly n)
-computeBinPoly fieldBitWidth isBoolean xs =
+-- | Computes a BinRep
+detectBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> IntMap n -> Maybe (BinRep n)
+detectBinRep fieldBitWidth isBoolean xs =
   case IntMap.foldlWithKey' go Start xs of
     Start -> Nothing
     Failed -> Nothing
     Continue _ [] -> Nothing -- no answer
-    Continue _ (coeffMap : _) -> Just (BinPoly coeffMap)
+    Continue _ (coeffMap : _) -> Just (BinRep coeffMap)
   where
     go :: (GaloisField n, Integral n) => FoldState n -> Var -> n -> FoldState n
     go Start var coeff =
