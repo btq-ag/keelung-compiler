@@ -1,5 +1,9 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant if" #-}
+
 -- | Witness solver/generator for R1CS
-module Keelung.Solver (run, debug, Error (..), detectBinRep, deriveCoeffs, Log (..), LogReport (..), computeBinPoly, BinPoly(..)) where
+module Keelung.Solver (run, debug, Error (..), detectBinRep, deriveCoeffs, Log (..), LogReport (..), computeBinPoly, BinPoly (..), rangeOfBinPoly) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -23,7 +27,6 @@ import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
-import Data.Bifunctor (Bifunctor(..))
 
 -- | Execute the R1CS solver
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
@@ -399,15 +402,6 @@ deriveCoeffs sign' rawConstant polynomial =
       constant = if sign' then negate value else value
    in fst $ IntMap.foldlWithKey' go ([], constant) polynomial
   where
-    -- -- given coefficients, calculate the upper bound and the lower bound of the polynomial
-    -- boundsOf :: IntMap (Bool, Var) -> (Integer, Integer)
-    -- boundsOf =
-    --   IntMap.foldlWithKey'
-    --     ( \(upper, lower) power (sign, _) ->
-    --         if sign then (upper + (2 ^ power), lower) else (upper, lower - (2 ^ power))
-    --     )
-    --     (0, 0)
-
     go :: ([(Var, Bool)], Integer) -> Int -> (Bool, Var) -> ([(Var, Bool)], Integer)
     go (acc, c) power (sign, var) =
       if Data.Bits.testBit c power
@@ -452,12 +446,12 @@ detectBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n 
 detectBinRep fieldBitWidth isBoolean polynomial =
   if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
     then Nothing
-    else case computeBinPoly fieldBitWidth isBoolean polynomial of
+    else case computeBinPoly fieldBitWidth isBoolean (Poly.coeffs polynomial) of
       Nothing -> Nothing
-      Just invertedPolynomial ->
-        case unBinPoly invertedPolynomial of
-          [] -> Just []
-          ((minVarSign, minVar) : _) -> case IntMap.lookup minVar (Poly.coeffs polynomial) of
+      Just binPoly ->
+        case IntMap.lookupMin (binPolyCoeffs binPoly) of
+          Nothing -> Just []
+          Just (minPower, (minVarSign, minVar)) -> case IntMap.lookup minVar (Poly.coeffs polynomial) of
             Nothing -> Nothing
             Just minVarCoeff ->
               Just $
@@ -465,26 +459,65 @@ detectBinRep fieldBitWidth isBoolean polynomial =
                   minVarSign
                   (Poly.constant polynomial / minVarCoeff)
                   -- if the smallest power is negative, make it 2^0
-                  (IntMap.fromList $ zip [0 .. ] (unBinPoly invertedPolynomial))
-                  -- ( if minPower < 0
-                  --     then IntMap.mapKeys (\i -> i - minPower) (unBinPoly invertedPolynomial)
-                  --     else unBinPoly invertedPolynomial
-                  -- )
+                  ( if minPower < 0
+                      then IntMap.mapKeys (\i -> i - minPower) (binPolyCoeffs binPoly)
+                      else binPolyCoeffs binPoly
+                  )
 
 -- | Polynomial with coefficients that are multiples of powers of 2
-newtype BinPoly = BinPoly { unBinPoly :: [(Bool, Var)]} deriving (Show)
+newtype BinPoly n = BinPoly
+  { -- | Coefficients are stored as (sign, var) pairs
+    binPolyCoeffs :: IntMap (Bool, Var)
+  }
+  deriving (Show)
 
-instance Eq BinPoly where
-  BinPoly a == BinPoly b = a == b || a == fmap (first not) b
+-- | 2 BinPolys are equal if they are equal up to some shifts and negations
+instance (GaloisField n, Integral n) => Eq (BinPoly n) where
+  binRepA == binRepB =
+    let flippedA = flipBinPoly binRepA
+        flippedB = flipBinPoly binRepB
+     in if IntMap.keys flippedA == IntMap.keys flippedB
+          then
+            let pairsA = IntMap.elems flippedA
+                pairsB = IntMap.elems flippedB
+             in let diff = case (pairsA, pairsB) of
+                      ([], []) -> 1
+                      ((aSign, aPower) : _, (bSign, bPower) : _) ->
+                        let powerDiff = powerOf2 (aPower - bPower)
+                         in if aSign == bSign then powerDiff else -powerDiff
+                      _ -> error "BinPoly Eq impossible"
+                 in fmap normalize flippedA == fmap ((diff *) . normalize) flippedB
+          else False
+    where
+      -- BinPoly are power-indexed IntMaps
+      -- we flip them into variable-indexed IntMaps so that we can compare them
+      flipBinPoly :: BinPoly n -> IntMap (Bool, Int)
+      flipBinPoly (BinPoly xs) = IntMap.fromList $ fmap (\(i, (b, v)) -> (v, (b, i))) (IntMap.toList xs)
+
+      normalize :: (GaloisField n, Integral n) => (Bool, Int) -> n
+      normalize (True, power) = powerOf2 power
+      normalize (False, power) = -(powerOf2 power)
+
+powerOf2 :: (GaloisField n, Integral n) => Int -> n
+powerOf2 n
+  | n < 0 = recip (2 ^ (-n))
+  | otherwise = 2 ^ n
+
+rangeOfBinPoly :: (GaloisField n, Integral n) => BinPoly n -> (n, n)
+rangeOfBinPoly (BinPoly xs) = IntMap.foldlWithKey' go (0, 0) xs
+  where
+    go :: (GaloisField n, Integral n) => (n, n) -> Int -> (Bool, Var) -> (n, n)
+    go (lowerBound, upperBound) power (True, _) = (lowerBound, upperBound + powerOf2 power)
+    go (lowerBound, upperBound) power (False, _) = (lowerBound - powerOf2 power, upperBound)
 
 -- | Computes a BinPoly
-computeBinPoly :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe BinPoly
+computeBinPoly :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> IntMap n -> Maybe (BinPoly n)
 computeBinPoly fieldBitWidth isBoolean xs =
-  case IntMap.foldlWithKey' go Start (Poly.coeffs xs) of
+  case IntMap.foldlWithKey' go Start xs of
     Start -> Nothing
     Failed -> Nothing
     Continue _ [] -> Nothing -- no answer
-    Continue _ (coeffMap : _) -> Just (BinPoly (IntMap.elems coeffMap))
+    Continue _ (coeffMap : _) -> Just (BinPoly coeffMap)
   where
     go :: (GaloisField n, Integral n) => FoldState n -> Var -> n -> FoldState n
     go Start var coeff =
