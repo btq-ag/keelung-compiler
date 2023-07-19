@@ -1,18 +1,17 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 {-# HLINT ignore "Redundant if" #-}
 module Keelung.Solver.BinRep where
 
-import Data.Field.Galois (GaloisField)
-import Data.IntMap.Strict qualified as IntMap
-import Keelung.Solver.Monad
-import Data.IntMap.Strict (IntMap)
-import Keelung.Syntax (Var, Width)
-import qualified Data.Bits
-import qualified Keelung.Data.Polynomial as Poly
-import Keelung.Data.Polynomial (Poly)
-import Debug.Trace
 import Control.Monad.RWS
-import Data.List (intercalate)
+import Data.Bits qualified
+import Data.Field.Galois (GaloisField)
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IntMap
+import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
+import Keelung.Solver.Monad
+import Keelung.Syntax (Var, Width)
 
 -- | Trying to reduce a BinRep constraint
 data FoldState n = Start | Failed | Continue n [Candidate n] deriving (Eq, Show)
@@ -46,38 +45,15 @@ deriveAssignments (lowerBound, upperBound) rawConstant polynomial =
       constantPos = fromIntegral rawConstant
       constantNeg = fromIntegral (-rawConstant)
 
-    --   shouldFlip =
-    --     if lowerBound > upperBound
-    --       then constantPos < lowerBound && constantPos > upperBound
-    --       else constantPos < lowerBound || constantPos > upperBound
+      shouldFlip = lowerBound > upperBound && constantPos >= lowerBound
 
-      -- if constantPos >= lowerBound && constantPos <= upperBound then False else True
-      -- constant = if shouldFlip then constantNeg else constantPos
+      constant = if shouldFlip then constantNeg else constantPos
 
-      shouldFlip2 = lowerBound > upperBound && constantPos >= lowerBound
-        -- if lowerBound > upperBound && constantPos >= lowerBound
-        --   then constantPos >= lowerBound
-        --   else False
-      constant = if shouldFlip2 then constantNeg else constantPos
-
-      (result, remainder) = IntMap.foldlWithKey' (go shouldFlip2) (mempty, constant) polynomial
-   in trace ("| " <> prettifyBinPoly polynomial <> " | " <> show constantPos) $
-        traceShow ("rem", rawConstant, (lowerBound, upperBound)) $
-          trace ("flip: " <> show shouldFlip2 <> "\n") $
-            if remainder == 0
-              then Just result
-              else Nothing
+      (result, remainder) = IntMap.foldlWithKey' (go shouldFlip) (mempty, constant) polynomial
+   in if remainder == 0
+        then Just result
+        else Nothing
   where
-    prettifyBinPoly :: IntMap (Bool, Var) -> String
-    prettifyBinPoly xs =
-      let terms = IntMap.foldlWithKey' go2 [] xs
-       in intercalate " + " terms
-      where
-        go2 :: [String] -> Int -> (Bool, Var) -> [String]
-        go2 acc power (sign, var) =
-          let signStr = if sign then "" else "-"
-           in (signStr ++ show (2 ^ power :: Int) ++ "$" ++ show var) : acc
-
     go :: Bool -> (IntMap Bool, Integer) -> Int -> (Bool, Var) -> (IntMap Bool, Integer)
     go True (acc, c) power (sign, var) =
       if Data.Bits.testBit c power
@@ -93,21 +69,6 @@ deriveAssignments (lowerBound, upperBound) rawConstant polynomial =
             then (IntMap.insert var True acc, c - (2 ^ power))
             else (IntMap.insert var True acc, c + (2 ^ power))
         else (IntMap.insert var False acc, c)
-
--- go True (acc, c) power (sign, var) =
---   if Data.Bits.testBit c power
---     then
---       if sign
---         then traceShow ("T 1+", c, c + (2 ^ power)) (IntMap.insert var True acc, c + (2 ^ power))
---         else traceShow ("T 1-", c, c - (2 ^ power)) (IntMap.insert var True acc, c - (2 ^ power))
---     else traceShow ("T 0", c) (IntMap.insert var False acc, c)
--- go False (acc, c) power (sign, var) =
---   if Data.Bits.testBit c power
---     then
---       if sign
---         then traceShow ("F 1+", c, c - (2 ^ power)) (IntMap.insert var True acc, c - (2 ^ power))
---         else traceShow ("F 1-", c, c + (2 ^ power)) (IntMap.insert var True acc, c + (2 ^ power))
---     else traceShow ("F 0", c) (IntMap.insert var False acc, c)
 
 -- | Watch out for a stuck R1C, and see if it's a binary representation
 --    1. see if variables are all Boolean
@@ -131,58 +92,16 @@ assignBinRep fieldBitWidth isBoolean polynomial =
           Just (minPower, (_, _)) ->
             let constant = (-Poly.constant polynomial / multiplier)
              in if minPower < 0
-                  then -- traceShow
-                  --   ("constant - sign " <> show minVarSign, constant * (2 ^ (-minPower)))
-
-                    trace
-                      ("\n\n-multiplier: " <> show (toInteger (multiplier / (2 ^ (-minPower)))))
-                      deriveAssignments
+                  then
+                    deriveAssignments
                       (toInteger (binPolyLowerBound binPoly * (2 ^ (-minPower))), toInteger (binPolyUpperBound binPoly * (2 ^ (-minPower))))
                       (constant * (2 ^ (-minPower)))
                       (IntMap.mapKeys (\i -> i - minPower) (binPolyCoeffs binPoly))
-                  else -- traceShow
-                  --   ("constant + sign " <> show minVarSign, multiplier, constant)
-
-                    trace
-                      ("\n\n+multiplier:" <> show multiplier)
-                      deriveAssignments
+                  else
+                    deriveAssignments
                       (toInteger (binPolyLowerBound binPoly), toInteger (binPolyUpperBound binPoly))
                       constant
                       (binPolyCoeffs binPoly)
-
--- assignBinRep2 :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe (IntMap Bool)
--- assignBinRep2 fieldBitWidth isBoolean polynomial =
---   if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
---     then Nothing
---     else case detectBinRep fieldBitWidth isBoolean (Poly.coeffs polynomial) of
---       Nothing -> Nothing
---       Just binPoly ->
---         case IntMap.lookupMin (binPolyCoeffs binPoly) of
---           Nothing -> Just mempty
---           Just (minPower, (minVarSign, minVar)) -> case IntMap.lookup minVar (Poly.coeffs polynomial) of
---             Nothing -> Nothing
---             Just actualCoeff ->
---               let expectedCoeff = powerOf2 minPower
---                   diff = if minVarSign then expectedCoeff / actualCoeff else -expectedCoeff / actualCoeff
---                   constant = -(Poly.constant polynomial * diff)
---                in if minPower < 0
---                       then
---                         deriveAssignments
---                           (toInteger (binPolyLowerBound binPoly * (2 ^ (-minPower))), toInteger (binPolyUpperBound binPoly * (2 ^ (-minPower))))
---                           (constant * (2 ^ (-minPower)))
---                           (IntMap.mapKeys (\i -> i - minPower) (binPolyCoeffs binPoly))
---                       else
---                         deriveAssignments
---                           (toInteger (binPolyLowerBound binPoly), toInteger (binPolyUpperBound binPoly))
---                           constant
---                           (binPolyCoeffs binPoly)
-
--- (binPolyCoeffs binPoly)
--- -- if the smallest power is negative, make it 2^0
--- ( if minPower < 0
---     then IntMap.mapKeys (\i -> i - minPower) (binPolyCoeffs binPoly)
---     else binPolyCoeffs binPoly
--- )
 
 -- | Polynomial with coefficients that are multiples of powers of 2
 data BinRep n = BinRep
