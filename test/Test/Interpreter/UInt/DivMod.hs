@@ -20,15 +20,28 @@ run = hspec tests
 tests :: SpecWith ()
 tests =
   describe "DivMod" $ do
-    it "performDivMod (quotient & remainder unknown)" $ do
+    it "performDivMod (quotient & remainder unknown) with divided by 0 exception" $ do
       let program = do
             dividend <- input Public :: Comp (UInt 5)
             divisor <- input Public
             performDivMod dividend divisor
 
+      -- runAll gf181 program [11, 160] [] [0, 11]
+      -- debug gf181 program
+      printLog gf181 program [11, 160] []
+
+    -- it "performDivMod (quotient & remainder unknown)" $ do
+    --   let program = do
+    --         dividend <- input Public :: Comp (UInt 5)
+    --         divisor <- input Public
+    --         performDivMod dividend divisor
+
     --   -- debug (Prime 263) program
       -- debugUnoptimized gf181 program
-      printLogUnoptimized gf181 program [7, 3] []
+      -- printLogUnoptimized gf181 program [7, 3] []
+      
+      -- divided by 0 exception
+
       -- runAll gf181 program [7, 3] [] [2, 1]
       -- runAll (Prime 31) program [30, 4] [] [7, 2]
     --   -- debug (Prime 31) program
@@ -38,16 +51,17 @@ tests =
     --   -- runAll (Prime 23) program [20, 7] [] [2, 6]
     --   -- runAll (Prime 263) program [20, 7] [] [2, 6]
     --   -- runAll (Prime 263) program [20, 7] [] [2, 6]
-    --   let genPair = do
-    --         dividend <- choose (0, 255)
-    --         divisor <- choose (1, 255)
-    --         return (dividend, divisor)
+      -- let genPair = do
+      --       dividend <- choose (0, 255)
+      --       divisor <- choose (1, 255)
+      --       return (dividend, divisor)
 
-    --   forAll genPair $ \(dividend, divisor) -> do
-    --     let expected = [dividend `div` divisor, dividend `mod` divisor]
-    --     -- runAll (Prime 1031) program [dividend, divisor] [] expected
-    --     -- runAll (Prime 257) program [dividend, divisor] [] expected
-    --     runAll (Prime 251) program [dividend, divisor] [] expected
+      -- forAll genPair $ \(dividend, divisor) -> do
+      --   let expected = [dividend `div` divisor, dividend `mod` divisor]
+      --   runAll gf181 program [dividend, divisor] [] expected
+        -- runAll (Prime 1031) program [dividend, divisor] [] expected
+        -- runAll (Prime 257) program [dividend, divisor] [] expected
+        -- runAll (Prime 251) program [dividend, divisor] [] expected
 
     -- it "performDivMod (on constants) (issue #18)" $ do
     --   -- 7 = 3 * 2 + 1

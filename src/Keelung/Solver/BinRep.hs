@@ -74,7 +74,7 @@ assignBinRep fieldBitWidth isBoolean polynomial =
         case IntMap.lookupMin (binPolyCoeffs binPoly) of
           Nothing -> Just mempty
           Just (minPower, _) ->
-            let constant = (-Poly.constant polynomial / multiplier)
+            let constant = -Poly.constant polynomial / multiplier
              in if minPower < 0
                   then
                     deriveAssignments

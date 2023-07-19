@@ -28,6 +28,7 @@ import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Solver.BinRep
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
+import Debug.Trace
 
 -- | Execute the R1CS solver
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
@@ -119,6 +120,8 @@ lookupVar var = gets (IntMap.lookup var)
 lookupBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> M n (Maybe U)
 lookupBitsEither (width, Left var) = do
   vals <- mapM lookupVar [var .. var + width - 1]
+  bindings <- get 
+  traceShowM (var, fmap N bindings)
   case sequence vals of
     Nothing -> return Nothing
     Just bitVals -> return $ Just $ UVal width $ toInteger $ sum [bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
@@ -132,7 +135,6 @@ shrink (MulConstraint as bs cs) = do
     Stuck _ -> return ()
     Eliminated -> tryLog $ LogEliminateConstraint (MulConstraint as bs cs)
     NothingToDo -> return ()
-
   return $ fmap Seq.singleton xs
 shrink (AddConstraint as) = do
   as' <- shrinkAdd as >>= shrinkBinRep
@@ -140,7 +142,6 @@ shrink (AddConstraint as) = do
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
--- shrink (DivModConstaint2 divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
 shrink (ModInvConstraint modInvHint) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInvHint
 
 shrinkAdd :: (GaloisField n, Integral n) => Poly n -> M n (Result (Constraint n))
@@ -305,6 +306,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisorResult, quotientResult, remainderResult) of
         (Just divisorVal, Just actualQuotientVal, Just actualRemainderVal) -> do
+          when (U.uintValue divisorVal == 0) $
+            throwError $ DivisorIsZeroError divisorVar
           let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
               expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
@@ -316,6 +319,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           --   DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
           return Eliminated
         (Just divisorVal, Just actualQuotientVal, Nothing) -> do
+          when (U.uintValue divisorVal == 0) $
+            throwError $ DivisorIsZeroError divisorVar
           let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
               expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
@@ -323,6 +328,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
+          when (U.uintValue divisorVal == 0) $
+            throwError $ DivisorIsZeroError divisorVar
           let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
               expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
@@ -330,6 +337,10 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither "quotient" quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
+          when (U.uintValue divisorVal == 0) $
+            throwError $ DivisorIsZeroError divisorVar
+          traceShowM (divisorVar, divisorResult)
+          traceShowM ("divisorVal", U.uintValue divisorVal == 0)
           let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
               expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           bindBitsEither "quotient" quotientVar expectedQuotientVal
