@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -62,6 +62,7 @@ library
       Keelung.Interpreter.Arithmetics
       Keelung.Interpreter.Monad
       Keelung.Solver
+      Keelung.Solver.BinRep
       Keelung.Solver.Monad
   other-modules:
       Paths_keelung_compiler
@@ -131,6 +132,7 @@ executable keelungc
       Keelung.Interpreter.Arithmetics
       Keelung.Interpreter.Monad
       Keelung.Solver
+      Keelung.Solver.BinRep
       Keelung.Solver.Monad
       Basic
       Hash.Poseidon
@@ -228,6 +230,7 @@ test-suite keelung-test
       Keelung.Interpreter.Arithmetics
       Keelung.Interpreter.Monad
       Keelung.Solver
+      Keelung.Solver.BinRep
       Keelung.Solver.Monad
       Basic
       Hash.Poseidon
