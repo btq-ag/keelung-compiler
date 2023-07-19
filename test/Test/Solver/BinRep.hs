@@ -126,26 +126,6 @@ genTestAssignment fieldBitWidth = do
       return (polynomial, Just assignments)
     AssignmentConstantOutOfRange -> error "hi"
 
---   size <- choose (1, fieldBitWidth)
---   binPoly <- genBinRep size
-
---   let (lowerBound, upperBound) = rangeOfBinRep binPoly
---   constant <-
---     if toInteger lowerBound < toInteger upperBound
---       then do
---         -- the domain of the polynomial ranges from [lowerBound, upperBound]
---         leftOrRight <- arbitrary
---         if leftOrRight
---           then choose (0, lowerBound - 1)
---           else return $ upperBound + 1
---       else -- the domain of the polynomial ranges from [0 .. lowerBound] and [upperBound .. maxBound]
---         choose (lowerBound + 1, upperBound - 1)
-
---   polynomial <- genPoly binPoly
---   -- tweak the polynomial so that it has duplicated coefficients
---   let polynomial' = Poly.addConstant (constant - Poly.constant polynomial) polynomial
---   return (polynomial', Nothing)
-
 tests :: SpecWith ()
 tests = describe "BinRep Detection" $ do
   describe "`detectBinRep`" $ do

@@ -4,6 +4,7 @@
 module Keelung.Solver.BinRep where
 
 import Control.Monad.RWS
+import Data.Bits (xor)
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict (IntMap)
@@ -41,39 +42,22 @@ shrinkBinRep (Stuck polynomial) = return (Stuck polynomial)
 --   and an Integer, derive coefficients (Boolean) for each of these variables such that the sum of the coefficients times the powers of 2 is equal to the Integer
 deriveAssignments :: (GaloisField n, Integral n) => (Integer, Integer) -> n -> IntMap (Bool, Var) -> Maybe (IntMap Bool)
 deriveAssignments (lowerBound, upperBound) rawConstant polynomial =
-  let -- should flip the sign if the constant is outside the bounds of the polynomial
-      constantPos = fromIntegral rawConstant
-      constantNeg = fromIntegral (-rawConstant)
-
-      shouldFlip = lowerBound > upperBound && constantPos >= lowerBound
-
-      constant = if shouldFlip then constantNeg else constantPos
-
+  let -- should flip the sign of everything (coefficients and constant) if the constant is outside the bounds of the polynomial
+      shouldFlip = lowerBound > upperBound && fromIntegral rawConstant >= lowerBound
+      constant = if shouldFlip then fromIntegral (-rawConstant) else fromIntegral rawConstant
       (result, remainder) = IntMap.foldlWithKey' (go shouldFlip) (mempty, constant) polynomial
    in if remainder == 0
         then Just result
         else Nothing
   where
     go :: Bool -> (IntMap Bool, Integer) -> Int -> (Bool, Var) -> (IntMap Bool, Integer)
-    go True (acc, c) power (sign, var) =
-      if Data.Bits.testBit c power
-        then
-          if sign
-            then (IntMap.insert var True acc, c + (2 ^ power))
-            else (IntMap.insert var True acc, c - (2 ^ power))
-        else (IntMap.insert var False acc, c)
-    go False (acc, c) power (sign, var) =
-      if Data.Bits.testBit c power
-        then
-          if sign
-            then (IntMap.insert var True acc, c - (2 ^ power))
-            else (IntMap.insert var True acc, c + (2 ^ power))
-        else (IntMap.insert var False acc, c)
+    go flipped (acc, c) power (sign, var) =
+      let deduct = flipped `xor` sign -- remove power of 2 from constant
+       in if Data.Bits.testBit c power
+            then (IntMap.insert var True acc, c + if deduct then -(2 ^ power) else 2 ^ power)
+            else (IntMap.insert var False acc, c)
 
 -- | Watch out for a stuck R1C, and see if it's a binary representation
---    1. see if variables are all Boolean
---    2. see if coefficients are all multiples of powers of 2
---    3. see if these powers of 2 are all unique
 --
 --   Property:
 --    For a field of order `n`, let `k = floor(log2(n))`, i.e., the number of bits that can be fit into a field element.
@@ -89,7 +73,7 @@ assignBinRep fieldBitWidth isBoolean polynomial =
       Just (binPoly, multiplier) ->
         case IntMap.lookupMin (binPolyCoeffs binPoly) of
           Nothing -> Just mempty
-          Just (minPower, (_, _)) ->
+          Just (minPower, _) ->
             let constant = (-Poly.constant polynomial / multiplier)
              in if minPower < 0
                   then

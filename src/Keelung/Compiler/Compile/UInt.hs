@@ -365,9 +365,9 @@ mulnxn dimensions limbWidth arity out var operand = do
   -- go through each columns and add them up
   foldM_
     ( \previousCarryLimbs (index, limbs) -> do
-        let resultLimb = Limb out limbWidth (limbWidth * index) (Left True)
         let limbStart = limbWidth * index
         let currentLimbWidth = limbWidth `min` (dimUIntWidth dimensions - limbStart)
+        let resultLimb = Limb out currentLimbWidth (limbWidth * index) (Left True)
         addWholeColumn dimensions limbStart currentLimbWidth resultLimb (previousCarryLimbs <> limbs)
     )
     mempty
