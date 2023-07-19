@@ -222,29 +222,29 @@ tests = describe "BinRep Detection" $ do
       let expected = Just $ IntMap.fromList [(1, True), (3, False)]
       actual `shouldBe` expected
 
-    -- it "8$1 + 4$3 = 4 (mod 37)" $ do
-    --   let polynomial = case Poly.buildEither 33 [(1, 8), (3, 4)] of
-    --         Left _ -> error "Poly.buildEither"
-    --         Right p -> p :: Poly (Prime 37)
-    --   let actual = assignBinRep 5 (const True) polynomial
-    --   let expected = Just $ IntMap.fromList [(1, False), (3, True)]
-    --   actual `shouldBe` expected
+    it "8$1 + 4$3 = 4 (mod 37)" $ do
+      let polynomial = case Poly.buildEither 33 [(1, 8), (3, 4)] of
+            Left _ -> error "Poly.buildEither"
+            Right p -> p :: Poly (Prime 37)
+      let actual = assignBinRep 5 (const True) polynomial
+      let expected = Just $ IntMap.fromList [(1, False), (3, True)]
+      actual `shouldBe` expected
 
-    -- it "11$2 + 22$3 + 13$4 = 35 (mod 37)" $ do
-    --   let polynomial = case Poly.buildEither 2 [(2, 11), (3, 22), (4, 13)] of
-    --         Left _ -> error "Poly.buildEither"
-    --         Right p -> p :: Poly (Prime 37)
-    --   let actual = assignBinRep 5 (const True) polynomial
-    --   let expected = Just $ IntMap.fromList [(2, False), (3, True), (4, True)]
-    --   actual `shouldBe` expected
+    it "11$2 + 22$3 + 13$4 = 35 (mod 37)" $ do
+      let polynomial = case Poly.buildEither 2 [(2, 11), (3, 22), (4, 13)] of
+            Left _ -> error "Poly.buildEither"
+            Right p -> p :: Poly (Prime 37)
+      let actual = assignBinRep 5 (const True) polynomial
+      let expected = Just $ IntMap.fromList [(2, False), (3, True), (4, True)]
+      actual `shouldBe` expected
 
-    -- it "$1 + 2$3 + 18$5 = 18 (mod 37)" $ do
-    --   let polynomial = case Poly.buildEither 19 [(1, 1), (3, 2), (5, 18)] of
-    --         Left _ -> error "Poly.buildEither"
-    --         Right p -> p :: Poly (Prime 37)
-    --   let actual = assignBinRep 5 (const True) polynomial
-    --   let expected = Just $ IntMap.fromList [(1, False), (3, False), (5, True)]
-    --   actual `shouldBe` expected
+    it "$1 + 2$3 + 18$5 = 18 (mod 37)" $ do
+      let polynomial = case Poly.buildEither 19 [(1, 1), (3, 2), (5, 18)] of
+            Left _ -> error "Poly.buildEither"
+            Right p -> p :: Poly (Prime 37)
+      let actual = assignBinRep 5 (const True) polynomial
+      let expected = Just $ IntMap.fromList [(1, False), (3, False), (5, True)]
+      actual `shouldBe` expected
 
 -- it "$0 + 2$1 + 4$2 = 1 (mod 11)" $ do
 --   let polynomial = case Poly.buildEither (-1) [(0, 1), (1, 2), (2, 4)] of
