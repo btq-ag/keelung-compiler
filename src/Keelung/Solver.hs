@@ -10,7 +10,7 @@ module Keelung.Solver
 where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.RWS
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
@@ -28,7 +28,6 @@ import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Solver.BinRep
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
-import Debug.Trace
 
 -- | Execute the R1CS solver
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
@@ -120,11 +119,11 @@ lookupVar var = gets (IntMap.lookup var)
 lookupBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> M n (Maybe U)
 lookupBitsEither (width, Left var) = do
   vals <- mapM lookupVar [var .. var + width - 1]
-  bindings <- get 
-  traceShowM (var, fmap N bindings)
   case sequence vals of
     Nothing -> return Nothing
-    Just bitVals -> return $ Just $ UVal width $ toInteger $ sum [bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
+    Just bitVals -> do
+      -- all bit variables are assigned values!
+      return $ Just $ UVal width $ sum [toInteger bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
 lookupBitsEither (width, Right val) = return (Just (UVal width val))
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
@@ -307,20 +306,19 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
       case (divisorResult, quotientResult, remainderResult) of
         (Just divisorVal, Just actualQuotientVal, Just actualRemainderVal) -> do
           when (U.uintValue divisorVal == 0) $
-            throwError $ DivisorIsZeroError divisorVar
+            throwError $
+              DivisorIsZeroError divisorVar
           let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
               expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError ConflictingValues
-          -- DivModQuotientError dividendVal divisorVal expectedQuotientVal actualQuotientVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
-          -- throwError $
-          --   DivModRemainderError dividendVal divisorVal expectedRemainderVal actualRemainderVal
           return Eliminated
         (Just divisorVal, Just actualQuotientVal, Nothing) -> do
           when (U.uintValue divisorVal == 0) $
-            throwError $ DivisorIsZeroError divisorVar
+            throwError $
+              DivisorIsZeroError divisorVar
           let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
               expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
@@ -329,7 +327,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
           when (U.uintValue divisorVal == 0) $
-            throwError $ DivisorIsZeroError divisorVar
+            throwError $
+              DivisorIsZeroError divisorVar
           let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
               expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
@@ -338,9 +337,8 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
           when (U.uintValue divisorVal == 0) $
-            throwError $ DivisorIsZeroError divisorVar
-          traceShowM (divisorVar, divisorResult)
-          traceShowM ("divisorVal", U.uintValue divisorVal == 0)
+            throwError $
+              DivisorIsZeroError divisorVar
           let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
               expectedRemainderVal = dividendVal `U.integerModU` divisorVal
           bindBitsEither "quotient" quotientVar expectedQuotientVal
