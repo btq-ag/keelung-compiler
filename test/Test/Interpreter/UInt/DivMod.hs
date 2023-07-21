@@ -2,10 +2,11 @@
 
 module Test.Interpreter.UInt.DivMod (tests, run) where
 
+import Data.Field.Galois (Prime)
 import Keelung hiding (compile)
-import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Compiler.Error (Error (..))
 import Keelung.Interpreter qualified as Interpreter
+import Keelung.Solver.Monad qualified as Solver
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
@@ -140,6 +141,42 @@ tests =
     --   runAll gf181 program [divisor, quotient] [remainder] expected
     --   runAll (Prime 17) program [divisor, quotient] [remainder] expected
 
+    it "assertDivMod (divisor & remainder unknown & quotient = 0)" $ do
+      let program = do
+            dividend <- input Public :: Comp (UInt 4)
+            divisor <- freshVarUInt
+            quotient <- input Public
+            remainder <- freshVarUInt
+            assertDivMod dividend divisor quotient remainder
+            return (divisor, remainder)
+
+      forAll (choose (1, 15)) $ \dividend -> do
+        throwBoth
+          (Prime 17)
+          program
+          [dividend, 0]
+          []
+          (InterpreterError Interpreter.DivModQuotientIsZeroError)
+          (SolverError (Solver.QuotientIsZeroError (4, Left 12)) :: Error (Prime 17))
+
+    it "assertDivMod (divisor & remainder unknown & dividend = 0)" $ do
+      let program = do
+            dividend <- input Public :: Comp (UInt 4)
+            divisor <- freshVarUInt
+            quotient <- input Public
+            remainder <- freshVarUInt
+            assertDivMod dividend divisor quotient remainder
+            return (divisor, remainder)
+
+      forAll (choose (1, 15)) $ \quotient -> do
+        throwBoth
+          (Prime 17)
+          program
+          [0, quotient]
+          []
+          (InterpreterError Interpreter.DivModDividendIsZeroError)
+          (SolverError (Solver.DividendIsZeroError (4, Left 8)) :: Error (Prime 17))
+
     it "assertDivMod (divisor & remainder unknown)" $ do
       let program = do
             dividend <- input Public :: Comp (UInt 4)
@@ -149,54 +186,50 @@ tests =
             assertDivMod dividend divisor quotient remainder
             return (divisor, remainder)
 
-      -- let genPair = do
-      --       dividend <- choose (0, 15)
-      --       quotient <- choose (0, 15)
-      --       return (dividend, quotient)
-      -- forAll genPair $ \(dividend, quotient) -> do
-      --   let expected =
-      --         if quotient == 0
-      --           then [0, dividend]
-      --           else [dividend `div` quotient, dividend `mod` quotient]
-      --   -- runAll gf181 program [dividend, quotient] [] expected
-      --   runAll (Prime 17) program [dividend, quotient] [] expected
-      runAll (Prime 17) program [1, 13] [] [0, 1]
+      let genPair = do
+            dividend <- choose (1, 15)
+            quotient <- choose (1, 15)
+            return (dividend, quotient)
+      forAll genPair $ \(dividend, quotient) -> do
+        let expected = [dividend `div` quotient, dividend `mod` quotient]
+        runAll (Prime 17) program [dividend, quotient] [] expected
+        runAll gf181 program [dividend, quotient] [] expected
 
-    -- it "assertDivMod (quotient & remainder unknown)" $ do
-    --   let program = do
-    --         dividend <- input Public :: Comp (UInt 6)
-    --         divisor <- input Public
-    --         quotient <- freshVarUInt
-    --         remainder <- freshVarUInt
-    --         assertDivMod dividend divisor quotient remainder
-    --         return (quotient, remainder)
-            
-    --   let genPair = do
-    --         dividend <- choose (0, 15)
-    --         divisor <- choose (1, 15)
-    --         return (dividend, divisor)
-    --   forAll genPair $ \(dividend, divisor) -> do
-    --     let expected = [dividend `div` divisor, dividend `mod` divisor]
-    --     runAll gf181 program [dividend, divisor] [] expected
-    --     runAll (Prime 17) program [dividend, divisor] [] expected
+-- it "assertDivMod (quotient & remainder unknown)" $ do
+--   let program = do
+--         dividend <- input Public :: Comp (UInt 6)
+--         divisor <- input Public
+--         quotient <- freshVarUInt
+--         remainder <- freshVarUInt
+--         assertDivMod dividend divisor quotient remainder
+--         return (quotient, remainder)
 
-    -- it "assertDivMod (quotient & remainder unknown)" $ do
-    --   let program = do
-    --         dividend <- input Public :: Comp (UInt 6)
-    --         divisor <- freshVarUInt
-    --         quotient <- input Public
-    --         remainder <- input Public
-    --         assertDivMod dividend divisor quotient remainder
-    --         return divisor
-            
-    --   let genPair = do
-    --         dividend <- choose (0, 63)
-    --         quotient <- choose (0, 63)
-    --         remainder <- choose (0, 63)
-    --         return (dividend, divisor)
-    --   forAll genPair $ \(dividend, divisor) -> do
-    --     let expected = [dividend `div` divisor, dividend `mod` divisor]
-    --     runAll gf181 program [dividend, divisor] [] expected
-    --     runAll (Prime 17) program [dividend, divisor] [] expected
+--   let genPair = do
+--         dividend <- choose (0, 15)
+--         divisor <- choose (1, 15)
+--         return (dividend, divisor)
+--   forAll genPair $ \(dividend, divisor) -> do
+--     let expected = [dividend `div` divisor, dividend `mod` divisor]
+--     runAll gf181 program [dividend, divisor] [] expected
+--     runAll (Prime 17) program [dividend, divisor] [] expected
+
+-- it "assertDivMod (quotient & remainder unknown)" $ do
+--   let program = do
+--         dividend <- input Public :: Comp (UInt 6)
+--         divisor <- freshVarUInt
+--         quotient <- input Public
+--         remainder <- input Public
+--         assertDivMod dividend divisor quotient remainder
+--         return divisor
+
+--   let genPair = do
+--         dividend <- choose (0, 63)
+--         quotient <- choose (0, 63)
+--         remainder <- choose (0, 63)
+--         return (dividend, divisor)
+--   forAll genPair $ \(dividend, divisor) -> do
+--     let expected = [dividend `div` divisor, dividend `mod` divisor]
+--     runAll gf181 program [dividend, divisor] [] expected
+--     runAll (Prime 17) program [dividend, divisor] [] expected
 
 --   runAll (Prime 17) program [34, 6] [] [5, 4]

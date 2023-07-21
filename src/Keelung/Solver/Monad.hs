@@ -122,6 +122,7 @@ data Error n
   | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
   | ModInvError (Width, Either Var Integer) Integer
+  | DividendIsZeroError (Width, Either Var Integer)
   | DivisorIsZeroError (Width, Either Var Integer)
   | QuotientIsZeroError (Width, Either Var Integer)
   deriving (Eq, Generic, NFData, Functor)
@@ -148,6 +149,10 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "Unable to calculate '$" <> show var <> " `modInv` " <> show p <> "'"
   show (ModInvError (_, Right val) p) =
     "Unable to calculate '" <> show val <> " `modInv` " <> show p <> "'"
+  show (DividendIsZeroError (width, Left var)) =
+    "Unable to perform division because the bits representing the dividend '$" <> show var <> " ~ $" <> show (var + width - 1) <> "' evaluates to 0"
+  show (DividendIsZeroError (_, Right _)) =
+    "Unable to perform division because the dividend is 0"
   show (DivisorIsZeroError (width, Left var)) =
     "Unable to perform division because the bits representing the divisor '$" <> show var <> " ~ $" <> show (var + width - 1) <> "' evaluates to 0"
   show (DivisorIsZeroError (_, Right _)) =

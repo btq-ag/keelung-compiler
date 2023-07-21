@@ -352,16 +352,19 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither "divisor" divisorVar expectedDivisorVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Nothing) -> do
+          -- if the quotient is 0, then we know that:
+          --  1. the remainder = the dividend
+          --  2. the divisor > the dividend
           (expectedDivisorVal, expectedRemainderVal) <-
             if U.uintValue actualQuotientVal == 0
-              then throwError $ DivisorIsZeroError quotientVar
-              else return (dividendVal `U.integerDivU` actualQuotientVal, dividendVal `U.integerModU` actualQuotientVal)
-          if U.uintValue expectedDivisorVal == 0 
-            then throwError $ DivisorIsZeroError divisorVar
-            else do
-              bindBitsEither "divisor" divisorVar expectedDivisorVal
-              bindBitsEither "remainder" remainderVar expectedRemainderVal
-              return Eliminated
+              then throwError $ QuotientIsZeroError quotientVar
+              else 
+                if U.uintValue dividendVal == 0
+                  then throwError $ DividendIsZeroError dividendVar
+                  else return (dividendVal `U.integerDivU` actualQuotientVal, dividendVal `U.integerModU` actualQuotientVal)
+          bindBitsEither "divisor" divisorVar expectedDivisorVal
+          bindBitsEither "remainder" remainderVar expectedRemainderVal
+          return Eliminated
           
           -- traceShowM (actualQuotientVal, expectedDivisorVal)
           -- bindBitsEither "divisor" divisorVar expectedDivisorVal
