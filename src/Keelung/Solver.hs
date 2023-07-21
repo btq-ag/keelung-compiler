@@ -61,7 +61,7 @@ run' debugMode r1cs inputs = do
 --   3. binary representation constraints
 --   4. CNEQ constraints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Either (Error n) (Seq (Constraint n))
-fromOrdinaryConstraints (R1CS _ ordinaryConstraints _ counters eqZeros divMods modInvs) = do
+fromOrdinaryConstraints (R1CS _ ordinaryConstraints counters eqZeros divMods modInvs) = do
   constraints <- concat <$> mapM differentiate ordinaryConstraints
   return $
     Seq.fromList constraints

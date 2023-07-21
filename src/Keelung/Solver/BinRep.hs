@@ -1,6 +1,5 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-{-# HLINT ignore "Redundant if" #-}
 module Keelung.Solver.BinRep where
 
 import Control.Monad.RWS
