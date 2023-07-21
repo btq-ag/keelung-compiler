@@ -352,11 +352,21 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither "divisor" divisorVar expectedDivisorVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Nothing) -> do
-          let expectedDivisorVal = dividendVal `U.integerDivU` actualQuotientVal
-              expectedRemainderVal = dividendVal `U.integerModU` expectedDivisorVal
-          bindBitsEither "divisor" divisorVar expectedDivisorVal
-          bindBitsEither "remainder" remainderVar expectedRemainderVal
-          return Eliminated
+          (expectedDivisorVal, expectedRemainderVal) <-
+            if U.uintValue actualQuotientVal == 0
+              then throwError $ DivisorIsZeroError quotientVar
+              else return (dividendVal `U.integerDivU` actualQuotientVal, dividendVal `U.integerModU` actualQuotientVal)
+          if U.uintValue expectedDivisorVal == 0 
+            then throwError $ DivisorIsZeroError divisorVar
+            else do
+              bindBitsEither "divisor" divisorVar expectedDivisorVal
+              bindBitsEither "remainder" remainderVar expectedRemainderVal
+              return Eliminated
+          
+          -- traceShowM (actualQuotientVal, expectedDivisorVal)
+          -- bindBitsEither "divisor" divisorVar expectedDivisorVal
+          -- bindBitsEither "remainder" remainderVar expectedRemainderVal
+          -- return Eliminated
         _ -> return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
     Nothing -> do
       -- we can only piece out the dividend if all of the divisor, quotient, and remainder are known
