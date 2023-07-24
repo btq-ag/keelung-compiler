@@ -182,6 +182,7 @@ test-suite keelung-test
       Test.Interpreter.UInt.Bitwise
       Test.Interpreter.UInt.Comparison
       Test.Interpreter.UInt.DivMod
+      Test.Interpreter.UInt.ModInv
       Test.Interpreter.UInt.Multiplication
       Test.Interpreter.Util
       Test.Optimization

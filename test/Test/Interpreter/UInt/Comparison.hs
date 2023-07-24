@@ -61,6 +61,7 @@ tests = describe "Comparisons" $ do
             []
             (InterpreterError (Interpreter.AssertLTEBoundTooLargeError bound width))
             (CompilerError (Compiler.AssertLTEBoundTooLargeError bound width) :: Error (Prime 2))
+
   it "assertLTE on Prime 31" $ do
     let program bound = do
           x <- inputUInt @4 Public
