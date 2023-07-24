@@ -2,7 +2,7 @@ module Keelung.Compiler.Compile.UInt
   ( compileAddU,
     compileSubU,
     compileMulU,
-    -- compileModInv,
+    compileModInv,
     assertLTE,
     assertGTE,
   )
@@ -670,24 +670,24 @@ assertNonZero width ref = do
             Left var -> return var
             Right _ -> error "[ panic ] assertNonZero: impossible case"
 
--- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- -- | Modular multiplicative inverse.
--- --  Let a⁻¹ = a `modInv` p:
--- --  The following constraints should be generated:
--- --    * a * a⁻¹ = np + 1
--- --    * n ≤ p
--- -- See: https://github.com/btq-ag/keelung-compiler/issues/14
--- compileModInv :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Integer -> M n ()
--- compileModInv width out a p = do
---   -- prod = a * out
---   prod <- freshRefU (width * 2)
---   compileMulU (width * 2) prod a (Left out)
---   -- prod = np + 1
---   np <- freshRefU (width * 2)
---   compileMulU (width * 2) np (Right p) (Left prod)
---   compileAddU (width * 2) np [(prod, True)] 1
---   -- n ≤ p
---   -- assertLTE (width * 2) (Left np) p
---   -- hints for witness generation
---   addModInvHint width a (Left out) (Left prod) p
+-- | Modular multiplicative inverse.
+--  Let a⁻¹ = a `modInv` p:
+--  The following constraints should be generated:
+--    * a * a⁻¹ = np + 1
+--    * n ≤ p
+-- See: https://github.com/btq-ag/keelung-compiler/issues/14
+compileModInv :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Integer -> M n ()
+compileModInv width out a p = do
+  -- prod = a * out
+  prod <- freshRefU (width * 2)
+  compileMulU width prod a (Left out)
+  -- prod = np + 1
+  n <- freshRefU width
+  np <- freshRefU (width * 2)
+  compileMulU width np (Left n) (Right p)
+  compileAddU width prod [(np, True)] 1
+  -- n ≤ p
+  assertLTE width (Left n) p
+  addModInvHint width a (Left out) (Left n) p
