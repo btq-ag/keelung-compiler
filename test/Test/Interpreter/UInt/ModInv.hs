@@ -2,15 +2,9 @@
 
 module Test.Interpreter.UInt.ModInv (tests, run) where
 
-import Data.Field.Galois (Prime)
 import Keelung hiding (compile)
-import Keelung.Compiler.Error (Error (..))
-import Keelung.Interpreter qualified as Interpreter
-import Keelung.Solver.Monad qualified as Solver
 import Test.Hspec
 import Test.Interpreter.Util
-import Test.QuickCheck hiding ((.&.))
-import qualified Keelung.Compiler.Compile.Error as Compiler
 
 run :: IO ()
 run = hspec tests

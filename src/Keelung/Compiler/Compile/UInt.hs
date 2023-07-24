@@ -80,7 +80,7 @@ compileAddU width out vars constant = do
   let dimensions =
         Dimensions
           { dimUIntWidth = width,
-            dimMaxHeight = 2 ^ (carryWidth - 1),
+            dimMaxHeight = if carryWidth > 21 then 1048576 else 2 ^ (carryWidth - 1), -- HACK
             dimCarryWidth = carryWidth - 1
           }
 
@@ -238,11 +238,11 @@ compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer
 compileMulU width out (Right a) (Right b) = do
   let val = a * b
   writeValU width out val
-compileMulU width out (Right a) (Left b) = compileMul width out b (Left a)
-compileMulU width out (Left a) (Right b) = compileMul width out a (Left b)
-compileMulU width out (Left a) (Left b) = compileMul width out a (Right b)
+compileMulU width out (Right a) (Left b) = compileMul width out b (Right a)
+compileMulU width out (Left a) (Right b) = compileMul width out a (Right b)
+compileMulU width out (Left a) (Left b) = compileMul width out a (Left b)
 
-compileMul :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either Integer RefU -> M n ()
+compileMul :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU Integer -> M n ()
 compileMul width out x y = do
   fieldInfo <- gets cmField
 
@@ -256,7 +256,7 @@ compileMul width out x y = do
   let dimensions =
         Dimensions
           { dimUIntWidth = width,
-            dimMaxHeight = 2 ^ limbWidth,
+            dimMaxHeight = if limbWidth > 20 then 1048576 else 2 ^ limbWidth, -- HACK
             dimCarryWidth = limbWidth
           }
 
@@ -342,7 +342,7 @@ _mul2LimbPreallocated currentLimbWidth limbStart (a, x) operand lowerLimb = do
 --                 x2*y2
 --               .....
 -- ------------------------------------------
-mulnxn :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> RefU -> RefU -> Either Integer RefU -> M n ()
+mulnxn :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> RefU -> RefU -> Either RefU Integer -> M n ()
 mulnxn dimensions limbWidth arity out var operand = do
   -- generate pairs of indices for choosing limbs
   let indices = [(xi, columnIndex - xi) | columnIndex <- [0 .. arity - 1], xi <- [0 .. columnIndex]]
@@ -356,8 +356,8 @@ mulnxn dimensions limbWidth arity out var operand = do
 
           let x = Limb var currentLimbWidthX (limbWidth * xi) (Left True)
           let y = case operand of
-                Left constant -> Left $ sum [(if Data.Bits.testBit constant (limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
-                Right variable -> Right (0, Limb variable currentLimbWidthY (limbWidth * yi) (Left True))
+                Right constant -> Left $ sum [(if Data.Bits.testBit constant (limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
+                Left variable -> Right (0, Limb variable currentLimbWidthY (limbWidth * yi) (Left True))
           let index = xi + yi
 
           (lowerLimb, upperLimb) <- mul2Limbs limbWidth (limbWidth * index) (0, x) y
