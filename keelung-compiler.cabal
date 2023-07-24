@@ -179,6 +179,7 @@ test-suite keelung-test
       Test.Interpreter.Statement
       Test.Interpreter.UInt
       Test.Interpreter.UInt.Addition
+      Test.Interpreter.UInt.Bitwise
       Test.Interpreter.UInt.Comparison
       Test.Interpreter.UInt.DivMod
       Test.Interpreter.UInt.Multiplication
