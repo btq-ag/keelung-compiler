@@ -684,8 +684,8 @@ compileModInv width out a p = do
   -- prod = np + 1
   n <- freshRefU width
   np <- freshRefU (width * 2)
-  compileMulU width np (Left n) (Right p)
-  compileAddU width prod [(np, True)] 1
+  compileMulU (width * 2) np (Left n) (Right p)
+  compileAddU (width * 2) prod [(np, True)] 1
   -- n ≤ p
   assertLTE width (Left n) p
-  addModInvHint width a (Left out) (Left n) p
+  addModInvHint (width * 2) a (Left out) (Left n) p

@@ -25,8 +25,8 @@ tests = do
           c <- reuse $ a * b
           return $ c .&. 5
         -- debug cs'
-        cs `shouldHaveSize` 36
-        cs' `shouldHaveSize` 36
+        cs `shouldHaveSize` 41
+        cs' `shouldHaveSize` 41
 
     describe "Addition / Subtraction" $ do
       it "2 variables" $ do
