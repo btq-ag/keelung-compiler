@@ -191,7 +191,6 @@ compileSubU width out (Left a) (Left b) = compileAddU width out [(a, True), (b, 
 allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
 allocLimb w offset sign = do
   refU <- freshRefU w
-  mapM_ addBooleanConstraint [RefUBit w refU i | i <- [0 .. w - 1]]
   return $
     Limb
       { lmbRef = refU,
@@ -203,7 +202,6 @@ allocLimb w offset sign = do
 allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
 allocCarryLimb w offset signs = do
   refU <- freshRefU w
-  mapM_ addBooleanConstraint [RefUBit w refU i | i <- [0 .. w - 1]]
   return $
     Limb
       { lmbRef = refU,
