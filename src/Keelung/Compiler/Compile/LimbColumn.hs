@@ -10,7 +10,7 @@ import Keelung.Compiler.Compile.Limb
 data LimbColumn = LimbColumn
   { constant :: Integer,
     limbs :: Seq Limb
-  }
+  } deriving (Show)
 
 instance Semigroup LimbColumn where
   (LimbColumn const1 limbs1) <> (LimbColumn const2 limbs2) =

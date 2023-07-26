@@ -5,7 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Interpreter.SyntaxTree.Monad where
+module Keelung.Interpreter.Monad where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
@@ -163,6 +163,9 @@ data Error n
   | VarUnassignedError (VarSet n)
   | ResultSizeError Int Int
   | AssertionError String
+  | DivModDividendIsZeroError
+  | DivModDivisorIsZeroError
+  | DivModQuotientIsZeroError
   | DivModQuotientError Integer Integer Integer Integer
   | DivModRemainderError Integer Integer Integer Integer
   | DivModStuckError [Var]
@@ -193,6 +196,12 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "expecting " <> show expected <> " result(s) but got " <> show actual <> " result(s)"
   show (AssertionError expr) =
     "assertion failed: " <> expr
+  show DivModDividendIsZeroError =
+    "dividend is zero"
+  show DivModDivisorIsZeroError = 
+    "divisor is zero"
+  show DivModQuotientIsZeroError =
+    "quotient is zero"
   show (DivModQuotientError dividend divisor expected actual) =
     "expected the result of `" <> show dividend <> " / " <> show divisor <> "` to be `" <> show expected <> "` but got `" <> show actual <> "`"
   show (DivModRemainderError dividend divisor expected actual) =

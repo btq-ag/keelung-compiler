@@ -169,7 +169,7 @@ prettyVariables counters =
           <> padLeft12 (getCount counters (Intermediate, typ))
       uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (ReadUInt w)
       -- Bit widths existed in the system
-      uintWidthEntries (Counters o i p x _ _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
+      uintWidthEntries (Counters o i p x _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
       showUInts =
         let entries = uintWidthEntries counters
          in if IntSet.null entries

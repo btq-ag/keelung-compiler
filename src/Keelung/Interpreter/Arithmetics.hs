@@ -12,11 +12,11 @@ module Keelung.Interpreter.Arithmetics
   )
 where
 
-import Data.Bits (Bits (..))
-import Keelung.Syntax (Width)
-import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
+import Data.Bits (Bits (..))
 import Data.Serialize (Serialize)
+import GHC.Generics (Generic)
+import Keelung.Syntax (Width)
 
 --------------------------------------------------------------------------------
 
@@ -59,7 +59,10 @@ integerMulU :: U -> U -> U
 integerMulU a b = UVal (uintWidth a) ((uintValue a * uintValue b) `mod` 2 ^ uintWidth a)
 
 integerDivU :: U -> U -> U
-integerDivU a b = UVal (uintWidth a) (uintValue a `div` uintValue b)
+integerDivU a b =
+  if uintValue b == 0
+    then error "[ panic ] division by zero in U.integerDivU"
+    else UVal (uintWidth a) (uintValue a `div` uintValue b)
 
 integerModU :: U -> U -> U
 integerModU a b = UVal (uintWidth a) (uintValue a `mod` uintValue b)

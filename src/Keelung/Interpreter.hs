@@ -5,7 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Keelung.Interpreter.SyntaxTree (runAndOutputWitnesses, run, interpretDivMod, Error (..)) where
+module Keelung.Interpreter (runAndOutputWitnesses, run, interpretDivMod, Error (..)) where
 
 import Control.Monad.Except
 import Data.Bits (Bits (..))
@@ -17,7 +17,7 @@ import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Data.VarGroup
 import Keelung.Interpreter.Arithmetics
-import Keelung.Interpreter.SyntaxTree.Monad
+import Keelung.Interpreter.Monad
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Encode.Syntax
 
@@ -75,17 +75,19 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
   case dividend of
     Left dividendVar -> do
       -- now that we don't know the dividend, we can only solve the relation if we know the divisor, quotient, and remainder
-      case (divisor, quotient, remainder) of
-        (Right divisorVal, Right quotientVal, Right remainderVal) -> do
-          let dividendVal = UVal width (uintValue divisorVal * uintValue quotientVal + uintValue remainderVal)
-          addU width dividendVar [dividendVal]
-        _ -> do
+      -- case (divisor, quotient, remainder) of
+      --   (Right divisorVal, Right quotientVal, Right remainderVal) -> do
+      --     let dividendVal = UVal width (uintValue divisorVal * uintValue quotientVal + uintValue remainderVal)
+      --     addU width dividendVar [dividendVal]
+      --   _ -> do
           let unsolvedVars = dividendVar : Either.lefts [divisor, quotient, remainder]
           throwError $ DivModStuckError unsolvedVars
     Right dividendVal -> do
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisor, quotient, remainder) of
         (Right divisorVal, Right actualQuotientVal, Right actualRemainderVal) -> do
+          when (uintValue divisorVal == 0) $
+            throwError DivModDivisorIsZeroError
           let expectedQuotientVal = dividendVal `integerDivU` divisorVal
               expectedRemainderVal = dividendVal `integerModU` divisorVal
           if expectedQuotientVal == actualQuotientVal
@@ -95,19 +97,31 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
             then return ()
             else throwError $ DivModRemainderError (uintValue dividendVal) (uintValue divisorVal) (uintValue expectedRemainderVal) (uintValue actualRemainderVal)
         (Right divisorVal, Left quotientVar, Left remainderVar) -> do
+          when (uintValue divisorVal == 0) $
+            throwError DivModDivisorIsZeroError
           let quotientVal = dividendVal `integerDivU` divisorVal
               remainderVal = dividendVal `integerModU` divisorVal
           addU width quotientVar [quotientVal]
           addU width remainderVar [remainderVal]
         (Right divisorVal, Left quotientVar, Right actualRemainderVal) -> do
+          when (uintValue divisorVal == 0) $
+            throwError DivModDivisorIsZeroError
           let quotientVal = dividendVal `integerDivU` divisorVal
               expectedRemainderVal = dividendVal `integerModU` divisorVal
           if expectedRemainderVal == actualRemainderVal
             then addU width quotientVar [quotientVal]
             else throwError $ DivModRemainderError (uintValue dividendVal) (uintValue divisorVal) (uintValue expectedRemainderVal) (uintValue actualRemainderVal)
         (Left divisorVar, Right quotientVal, Left remainderVar) -> do
-          let divisorVal = dividendVal `integerDivU` quotientVal
-              remainderVal = dividendVal `integerModU` divisorVal
+          -- we cannot solve this relation if:
+          --  1. quotient = 0
+          --  2. dividend = 0 but quotient != 0
+          (divisorVal, remainderVal) <-
+            if uintValue quotientVal == 0
+              then throwError DivModQuotientIsZeroError
+              else
+                if uintValue dividendVal == 0
+                  then throwError DivModDividendIsZeroError
+                  else return (dividendVal `integerDivU` quotientVal, dividendVal `integerModU` quotientVal)
           addU width divisorVar [divisorVal]
           addU width remainderVar [remainderVal]
         (Left divisorVar, Right quotientVal, Right actualRemainderVal) -> do
