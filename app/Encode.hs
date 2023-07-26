@@ -25,10 +25,10 @@ import Keelung.Syntax.Counters hiding (reindex)
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
 compilerVersion :: (Int, Int)
-compilerVersion = (0, 12)
+compilerVersion = (0, 13)
 
 patchVersion :: Int
-patchVersion = 2
+patchVersion = 0
 
 versionString :: String
 versionString = intercalate "." [show (fst compilerVersion), show (snd compilerVersion), show patchVersion]
