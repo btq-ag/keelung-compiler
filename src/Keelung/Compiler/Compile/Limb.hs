@@ -50,4 +50,16 @@ toBitsC powerOffset positive limb multiplyBy =
               [0 .. lmbWidth limb - 1]
 
 toBits :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> Seq (Ref, n)
-toBits powerOffset positive limb = toBitsC powerOffset positive limb 1
+toBits powerOffset positive limb =
+  Seq.singleton
+    ( U
+        ( RefBin
+            { refBinRefU = lmbRef limb,
+              refBinWidth = lmbWidth limb,
+              refBinStart = lmbOffset limb,
+              refBinPowerOffset = powerOffset,
+              refBinSigns = lmbSigns limb
+            }
+        ),
+      if positive then 1 else -1
+    )

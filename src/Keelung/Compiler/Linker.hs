@@ -2,7 +2,7 @@
 
 module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Occurrences, constructOccurrences) where
 
-import Data.Bifunctor (Bifunctor (bimap), first)
+import Data.Bifunctor (Bifunctor (bimap))
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
@@ -14,7 +14,6 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
-import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
 import Keelung.Compiler.ConstraintSystem qualified as Linked
@@ -29,6 +28,7 @@ import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
+import Keelung.Data.Constraint
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
@@ -150,7 +150,7 @@ linkConstraintModule cm =
 linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Constraint n -> Linked.Constraint n
 linkConstraint counters (CAddF as) = Linked.CAdd (linkPoly_ counters as)
 linkConstraint occurrences (CVarEq x y) =
-  case Poly.buildEither 0 [(reindexRef occurrences x, 1), (reindexRef occurrences y, -1)] of
+  case Poly.buildEither 0 (toList (reindexRef occurrences x 1 <> reindexRef occurrences y (-1))) of
     Left _ -> error "CVarEq: two variables are the same"
     Right xs -> Linked.CAdd xs
 linkConstraint counters (CVarEqF x y) =
@@ -165,7 +165,9 @@ linkConstraint counters (CVarNEqB x y) =
   case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
     Left _ -> error "CVarNEqB: two variables are the same"
     Right xs -> Linked.CAdd xs
-linkConstraint counters (CVarBindF x n) = Linked.CAdd (Poly.bind (reindexRef counters x) n)
+linkConstraint counters (CVarBindF x n) = case Poly.buildEither (-n) (toList (reindexRef counters x 1)) of
+  Left _ -> error "CVarBindF: impossible"
+  Right xs -> Linked.CAdd xs
 linkConstraint counters (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB counters x) 1)
 linkConstraint counters (CVarBindB x False) = Linked.CAdd (Poly.bind (reindexRefB counters x) 0)
 linkConstraint counters (CMulF as bs cs) =
@@ -188,9 +190,9 @@ updateCounters occurrences counters =
 
 linkPoly :: (Integral n, GaloisField n) => Occurrences -> PolyG Ref n -> Either n (Poly n)
 linkPoly occurrences poly = case PolyG.view poly of
-  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRef occurrences var, coeff)]
-  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRef occurrences var1, coeff1), (reindexRef occurrences var2, coeff2)]
-  PolyG.Polynomial constant xs -> Poly.buildEither constant (map (first (reindexRef occurrences)) (Map.toList xs))
+  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant $ toList (reindexRef occurrences var coeff)
+  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant $ toList $ reindexRef occurrences var1 coeff1 <> reindexRef occurrences var2 coeff2
+  PolyG.Polynomial constant xs -> Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexRef occurrences)) (Map.toList xs))
 
 linkPoly_ :: (Integral n, GaloisField n) => Occurrences -> PolyG Ref n -> Poly n
 linkPoly_ occurrences xs = case linkPoly occurrences xs of
@@ -199,10 +201,10 @@ linkPoly_ occurrences xs = case linkPoly occurrences xs of
 
 --------------------------------------------------------------------------------
 
-reindexRef :: Occurrences -> Ref -> Var
-reindexRef occurrences (F x) = reindexRefF occurrences x
-reindexRef occurrences (B x) = reindexRefB occurrences x
-reindexRef occurrences (U x) = error ""-- reindexRefU occurrences (refBinRefU x)
+reindexRef :: (Integral n, GaloisField n) => Occurrences -> Ref -> n -> Seq (Var, n)
+reindexRef occurrences (F x) multiplier = Seq.singleton (reindexRefF occurrences x, multiplier)
+reindexRef occurrences (B x) multiplier = Seq.singleton (reindexRefB occurrences x, multiplier)
+reindexRef occurrences (U x) multiplier = Seq.fromList [(reindexRefB occurrences (RefUBit (refBinWidth x) (refBinRefU x) i), multiplier * (2 ^ (i + refBinPowerOffset x))) | i <- [0 .. refBinWidth x - 1]]
 
 reindexRefF :: Occurrences -> RefF -> Var
 reindexRefF occurrences (RefFO x) = reindex (occurCounters occurrences) Output ReadField x
@@ -216,11 +218,12 @@ reindexRefB occurrences (RefBI x) = reindex (occurCounters occurrences) PublicIn
 reindexRefB occurrences (RefBP x) = reindex (occurCounters occurrences) PrivateInput ReadBool x
 reindexRefB occurrences (RefBX x) = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadBool x - pinnedSize occurrences) + pinnedSize occurrences
 reindexRefB occurrences (RefUBit _ x i) = reindexRefU occurrences x i
-  -- case x of
-  --   RefUO w x' -> reindex (occurCounters occurrences) Output (ReadUInt w) x' + (i `mod` w)
-  --   RefUI w x' -> reindex (occurCounters occurrences) PublicInput (ReadUInt w) x' + (i `mod` w)
-  --   RefUP w x' -> reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x' + (i `mod` w)
-  --   RefUX w x' -> IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x' - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
+
+-- case x of
+--   RefUO w x' -> reindex (occurCounters occurrences) Output (ReadUInt w) x' + (i `mod` w)
+--   RefUI w x' -> reindex (occurCounters occurrences) PublicInput (ReadUInt w) x' + (i `mod` w)
+--   RefUP w x' -> reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x' + (i `mod` w)
+--   RefUX w x' -> IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x' - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
 
 reindexRefU :: Occurrences -> RefU -> Int -> Var
 reindexRefU occurrences (RefUO w x) i = reindex (occurCounters occurrences) Output (ReadUInt w) x + (i `mod` w)

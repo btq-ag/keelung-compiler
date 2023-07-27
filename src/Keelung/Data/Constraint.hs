@@ -6,6 +6,7 @@
 module Keelung.Data.Constraint
   ( Ref (..),
     RefBin (..),
+    toRefUBits,
     RefF (..),
     RefB (..),
     RefU (..),
@@ -82,20 +83,23 @@ instance Show RefF where
 data RefBin = RefBin
   { refBinRefU :: RefU,
     refBinWidth :: Int,
+    refBinStart :: Int,
     refBinPowerOffset :: Int,
     -- refBinMultiplier :: Integer,
-    refBinSigns :: Bool
+    refBinSigns :: Either Bool [Bool]
   }
   deriving (Eq, Ord, Generic, NFData)
 
--- unicode symbols for superscript from 0 to 9 are : ⁰¹²³⁴⁵⁶⁷⁸⁹
-
 instance Show RefBin where
-  show (RefBin _ 0 _ _) = "<Empty RefBin>"
-  show (RefBin ref 1 offset sign) = if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show ref
-  show (RefBin ref 2 offset signs) = if signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show ref <> " " <> if signs then "+" else "-" <> "2" <> toSuperscript (offset + 1) <> "$" <> show ref
-  show (RefBin ref width offset signs) =
-    if signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show ref <> " ... " <> if signs then "+" else "-" <> "2" <> toSuperscript (offset + width - 1) <> "$" <> show ref
+  show (RefBin _ 0 _ _ _) = "<Empty RefBin>"
+  show (RefBin ref 1 i offset (Left sign)) = if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
+  show (RefBin ref 1 i offset (Right signs)) = if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
+  show (RefBin ref 2 i offset (Left sign)) = if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> if sign then "+" else "-" <> "2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
+  show (RefBin ref 2 i offset (Right signs)) = if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> if last signs then "+" else "-" <> "2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
+  show (RefBin ref width offset i (Left sign)) =
+    if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " ... " <> if sign then "+" else "-" <> "2" <> toSuperscript (offset + width - 1) <> "$" <> show (RefUBit 1 ref (i + width - 1))
+  show (RefBin ref width offset i (Right signs)) =
+    if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " ... " <> if last signs then "+" else "-" <> "2" <> toSuperscript (offset + width - 1) <> "$" <> show (RefUBit 1 ref (i + width - 1))
 
 -- | Helper function for converting integers to superscript strings
 toSuperscript :: Int -> String
@@ -111,6 +115,9 @@ toSuperscript = map convert . show
     convert '7' = '⁷'
     convert '8' = '⁸'
     convert _ = '⁹'
+
+toRefUBits :: RefBin -> [RefB]
+toRefUBits refBin = [RefUBit (refBinWidth refBin) (refBinRefU refBin) (i + refBinStart refBin) | i <- [0 .. refBinWidth refBin - 1]]
 
 -- | For representing UInt variables in constraints
 data RefU
