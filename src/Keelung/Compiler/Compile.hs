@@ -21,7 +21,7 @@ import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.UInt qualified as UInt
 import Keelung.Compiler.Compile.Util
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.Internal

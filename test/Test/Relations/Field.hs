@@ -7,7 +7,7 @@ import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
 

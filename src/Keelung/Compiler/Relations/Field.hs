@@ -31,7 +31,7 @@ import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.Boolean qualified as Boolean
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Prelude hiding (lookup)
 
 type FieldRelations n = EquivClass.EquivClass Ref n (LinRel n)
@@ -139,6 +139,7 @@ lookup var xs = fromLinRel $ lookup' var xs
 lookup' :: GaloisField n => Ref -> AllRelations n -> EquivClass.VarStatus Ref n (LinRel n)
 lookup' (B var) xs = fromBooleanLookup $ EquivClass.lookup var (relationsB xs)
 lookup' (F var) xs = EquivClass.lookup (F var) (relationsF xs)
+lookup' (U _) _ = error "[ panic ] lookup of RefBin not defined yet"
 
 fromLinRel :: EquivClass.VarStatus Ref n (LinRel n) -> Lookup n
 fromLinRel (EquivClass.IsRoot _) = Root

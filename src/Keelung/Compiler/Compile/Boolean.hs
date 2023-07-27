@@ -9,7 +9,7 @@ import Data.List.Split qualified as List
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo
 import Keelung.Compiler.Syntax.Internal

@@ -11,7 +11,7 @@ import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
@@ -271,6 +271,7 @@ assign (F var) value = do
     Just relations -> do
       markChanged RelationChanged
       put $ removeOccurrences (Set.singleton var) $ cm {cmFieldRelations = relations}
+assign (U _) _ = error "[ panic ] assign on RefBin not implemented yet"
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool

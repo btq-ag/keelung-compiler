@@ -3,7 +3,7 @@ module Keelung.Compiler.Compile.Limb where
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Syntax (HasWidth (widthOf), Width)
 
 --------------------------------------------------------------------------------

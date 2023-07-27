@@ -1,6 +1,6 @@
 module Keelung.Compiler.Relations.Util (Seniority(..)) where
 
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Data.Function (on)
 
 --------------------------------------------------------------------------------
@@ -38,6 +38,10 @@ instance HasLevel RefF where
   hasLevel (RefFX _) = 0
   hasLevel _ = 100
 
+instance HasLevel RefBin where
+  hasLevel = hasLevel . refBinRefU
+
 instance HasLevel Ref where
   hasLevel (F x) = hasLevel x
   hasLevel (B x) = hasLevel x
+  hasLevel (U x) = hasLevel x

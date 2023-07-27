@@ -3,7 +3,7 @@ module Keelung.Compiler.Compile.LC (LC (..), fromEither, toEither, fromRefU, (@)
 import Data.Bits qualified
 import Data.Field.Galois
 import Keelung (Width)
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 

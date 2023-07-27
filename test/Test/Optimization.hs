@@ -8,7 +8,7 @@ import Data.Foldable
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compileO0)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Test.Hspec
 import Test.Optimization.UInt qualified as Optimization.UInt

@@ -14,7 +14,7 @@ import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
 import Prelude hiding (null)

@@ -3,8 +3,9 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Keelung.Compiler.Constraint
+module Keelung.Data.Reference
   ( Ref (..),
+    RefBin (..),
     RefF (..),
     RefB (..),
     RefU (..),
@@ -30,11 +31,14 @@ data Ref
     F RefF
   | -- | Boolean variable
     B RefB
+  | -- | Sequence of coefficients of binary representation of UInt variable
+    U RefBin
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show Ref where
   show (F x) = show x
   show (B x) = show x
+  show (U x) = show x
 
 -- | For representing Boolean variables in constraints
 data RefB
@@ -75,6 +79,39 @@ instance Show RefF where
   show (RefFP x) = "FP" ++ show x
   show (RefFX x) = "F" ++ show x
 
+data RefBin = RefBin
+  { refBinRefU :: RefU,
+    refBinWidth :: Int,
+    refBinPowerOffset :: Int,
+    -- refBinMultiplier :: Integer,
+    refBinSigns :: Bool
+  }
+  deriving (Eq, Ord, Generic, NFData)
+
+-- unicode symbols for superscript from 0 to 9 are : ⁰¹²³⁴⁵⁶⁷⁸⁹
+
+instance Show RefBin where
+  show (RefBin _ 0 _ _) = "<Empty RefBin>"
+  show (RefBin ref 1 offset sign) = if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show ref
+  show (RefBin ref 2 offset signs) = if signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show ref <> " " <> if signs then "+" else "-" <> "2" <> toSuperscript (offset + 1) <> "$" <> show ref
+  show (RefBin ref width offset signs) =
+    if signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show ref <> " ... " <> if signs then "+" else "-" <> "2" <> toSuperscript (offset + width - 1) <> "$" <> show ref
+
+-- | Helper function for converting integers to superscript strings
+toSuperscript :: Int -> String
+toSuperscript = map convert . show
+  where
+    convert '0' = '⁰'
+    convert '1' = '¹'
+    convert '2' = '²'
+    convert '3' = '³'
+    convert '4' = '⁴'
+    convert '5' = '⁵'
+    convert '6' = '⁶'
+    convert '7' = '⁷'
+    convert '8' = '⁸'
+    convert _ = '⁹'
+
 -- | For representing UInt variables in constraints
 data RefU
   = -- | UInt output variable
@@ -105,6 +142,7 @@ instance HasWidth RefU where
 pinnedRef :: Ref -> Bool
 pinnedRef (B ref) = pinnedRefB ref
 pinnedRef (F ref) = pinnedRefF ref
+pinnedRef (U ref) = pinnedRefBin ref
 
 pinnedRefF :: RefF -> Bool
 pinnedRefF (RefFO _) = True
@@ -124,6 +162,9 @@ pinnedRefU (RefUI _ _) = True
 pinnedRefU (RefUP _ _) = True
 pinnedRefU (RefUO _ _) = True
 pinnedRefU (RefUX _ _) = False
+
+pinnedRefBin :: RefBin -> Bool
+pinnedRefBin = pinnedRefU . refBinRefU
 
 --------------------------------------------------------------------------------
 

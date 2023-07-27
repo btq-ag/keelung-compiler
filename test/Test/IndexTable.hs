@@ -7,7 +7,7 @@ import Control.Monad (forM_)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Linker (constructOccurrences, reindexRef)
 import Test.Hspec

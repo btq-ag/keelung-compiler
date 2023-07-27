@@ -22,7 +22,7 @@ import Keelung.Compiler.Compile.Limb
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Util
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo (FieldInfo (..))
 import Keelung.Syntax (Width)

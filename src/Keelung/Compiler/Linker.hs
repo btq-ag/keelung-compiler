@@ -14,7 +14,7 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
 import Keelung.Compiler.ConstraintSystem qualified as Linked
@@ -77,6 +77,7 @@ linkConstraintModule cm =
     shouldBeKept :: Ref -> Bool
     shouldBeKept (F ref) = refFShouldBeKept ref
     shouldBeKept (B ref) = refBShouldBeKept ref
+    shouldBeKept (U ref) = refUShouldBeKept (refBinRefU ref)
 
     refFShouldBeKept :: RefF -> Bool
     refFShouldBeKept ref = case ref of
@@ -201,6 +202,7 @@ linkPoly_ occurrences xs = case linkPoly occurrences xs of
 reindexRef :: Occurrences -> Ref -> Var
 reindexRef occurrences (F x) = reindexRefF occurrences x
 reindexRef occurrences (B x) = reindexRefB occurrences x
+reindexRef occurrences (U x) = error ""-- reindexRefU occurrences (refBinRefU x)
 
 reindexRefF :: Occurrences -> RefF -> Var
 reindexRefF occurrences (RefFO x) = reindex (occurCounters occurrences) Output ReadField x
@@ -213,12 +215,18 @@ reindexRefB occurrences (RefBO x) = reindex (occurCounters occurrences) Output R
 reindexRefB occurrences (RefBI x) = reindex (occurCounters occurrences) PublicInput ReadBool x
 reindexRefB occurrences (RefBP x) = reindex (occurCounters occurrences) PrivateInput ReadBool x
 reindexRefB occurrences (RefBX x) = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadBool x - pinnedSize occurrences) + pinnedSize occurrences
-reindexRefB occurrences (RefUBit _ x i) =
-  case x of
-    RefUO w x' -> reindex (occurCounters occurrences) Output (ReadUInt w) x' + (i `mod` w)
-    RefUI w x' -> reindex (occurCounters occurrences) PublicInput (ReadUInt w) x' + (i `mod` w)
-    RefUP w x' -> reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x' + (i `mod` w)
-    RefUX w x' -> IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x' - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
+reindexRefB occurrences (RefUBit _ x i) = reindexRefU occurrences x i
+  -- case x of
+  --   RefUO w x' -> reindex (occurCounters occurrences) Output (ReadUInt w) x' + (i `mod` w)
+  --   RefUI w x' -> reindex (occurCounters occurrences) PublicInput (ReadUInt w) x' + (i `mod` w)
+  --   RefUP w x' -> reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x' + (i `mod` w)
+  --   RefUX w x' -> IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x' - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
+
+reindexRefU :: Occurrences -> RefU -> Int -> Var
+reindexRefU occurrences (RefUO w x) i = reindex (occurCounters occurrences) Output (ReadUInt w) x + (i `mod` w)
+reindexRefU occurrences (RefUI w x) i = reindex (occurCounters occurrences) PublicInput (ReadUInt w) x + (i `mod` w)
+reindexRefU occurrences (RefUP w x) i = reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x + (i `mod` w)
+reindexRefU occurrences (RefUX w x) i = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
 
 -------------------------------------------------------------------------------
 

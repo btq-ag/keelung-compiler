@@ -19,7 +19,7 @@ import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Constraint
+import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo
 import Keelung.Compiler.Optimize.OccurB (OccurB)
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
@@ -269,6 +269,7 @@ instance UpdateOccurrences Ref where
               case ref of
                 F refF -> addOccurrences (Set.singleton refF) cm
                 B refB -> addOccurrences (Set.singleton refB) cm
+                U _ -> error "[ panic ] addOccurrences on RefBin not defnied yet"
           )
       )
   removeOccurrences =
@@ -278,6 +279,7 @@ instance UpdateOccurrences Ref where
               case ref of
                 F refF -> removeOccurrences (Set.singleton refF) cm
                 B refB -> removeOccurrences (Set.singleton refB) cm
+                U _ -> error "[ panic ] removeOccurrences on RefBin not defnied yet"
           )
       )
 
