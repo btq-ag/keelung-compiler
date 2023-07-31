@@ -5,14 +5,14 @@ module Test.IndexTable (tests, run) where
 
 import Control.Monad (forM_)
 import Data.IntMap.Strict qualified as IntMap
+import Data.Sequence qualified as Seq
 import Keelung
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
-import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Linker (constructOccurrences, reindexRef)
+import Keelung.Data.Constraint
 import Test.Hspec
 import Test.Optimization.Util (executeGF181)
-import qualified Data.Sequence as Seq
 
 run :: IO ()
 run = hspec tests

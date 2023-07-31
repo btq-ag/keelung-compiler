@@ -204,7 +204,23 @@ linkPoly_ occurrences xs = case linkPoly occurrences xs of
 reindexRef :: (Integral n, GaloisField n) => Occurrences -> Ref -> n -> Seq (Var, n)
 reindexRef occurrences (F x) multiplier = Seq.singleton (reindexRefF occurrences x, multiplier)
 reindexRef occurrences (B x) multiplier = Seq.singleton (reindexRefB occurrences x, multiplier)
-reindexRef occurrences (U x) multiplier = Seq.fromList [(reindexRefB occurrences (RefUBit (refBinWidth x) (refBinRefU x) i), multiplier * (2 ^ (i + refBinPowerOffset x))) | i <- [0 .. refBinWidth x - 1]]
+reindexRef occurrences (U x) multiplier = case refBinSigns x of
+  Left sign ->
+    Seq.fromList
+      [ ( reindexRefU
+            occurrences (refBinRefU x) (i + refBinStart x),
+          (2 ^ (i + refBinPowerOffset x)) * if sign then multiplier else (-multiplier)
+        )
+        | i <- [0 .. refBinWidth x - 1]
+      ]
+  Right signs ->
+    Seq.fromList
+      [ ( reindexRefU
+            occurrences (refBinRefU x) (i + refBinStart x),
+          (2 ^ (i + refBinPowerOffset x)) * if sign then multiplier else (-multiplier)
+        )
+        | (i, sign) <- zip [0 .. refBinWidth x - 1] signs
+      ]
 
 reindexRefF :: Occurrences -> RefF -> Var
 reindexRefF occurrences (RefFO x) = reindex (occurCounters occurrences) Output ReadField x
@@ -241,7 +257,7 @@ data Occurrences = Occurrences
     refUsInOccurrencesU :: !(IntMap IntSet),
     indexTable :: !IndexTable,
     pinnedSize :: !Int
-  }
+  } deriving (Show)
 
 -- | Smart constructor for 'Occurrences'
 constructOccurrences :: Counters -> OccurF -> OccurB -> OccurU -> Occurrences

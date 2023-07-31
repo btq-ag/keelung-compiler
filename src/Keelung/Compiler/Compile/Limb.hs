@@ -4,7 +4,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung.Data.Constraint
-import Keelung.Syntax (HasWidth (widthOf), Width)
+import Keelung.Syntax (Width)
 
 --------------------------------------------------------------------------------
 
@@ -30,27 +30,6 @@ limbIsPositive limb = case lmbSigns limb of
 -- | Construct a sequence of (Ref, n) pairs from a limb
 toBitsC :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> n -> Seq (Ref, n)
 toBitsC powerOffset positive limb multiplyBy =
-  let makePair sign i =
-        ( B (RefUBit (widthOf (lmbRef limb)) (lmbRef limb) (lmbOffset limb + i)),
-          multiplyBy
-            * if (if sign then positive else not positive)
-              then 2 ^ (powerOffset + i :: Int)
-              else -(2 ^ (powerOffset + i :: Int))
-        )
-   in Seq.fromList $
-        case lmbSigns limb of
-          Left sign ->
-            map
-              (makePair sign)
-              [0 .. lmbWidth limb - 1]
-          Right signs ->
-            zipWith
-              makePair
-              signs
-              [0 .. lmbWidth limb - 1]
-
-toBits :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> Seq (Ref, n)
-toBits powerOffset positive limb =
   Seq.singleton
     ( U
         ( RefBin
@@ -61,5 +40,8 @@ toBits powerOffset positive limb =
               refBinSigns = lmbSigns limb
             }
         ),
-      if positive then 1 else -1
+      if positive then multiplyBy else -multiplyBy
     )
+
+toBits :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> Seq (Ref, n)
+toBits powerOffset positive limb = toBitsC powerOffset positive limb 1

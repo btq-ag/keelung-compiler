@@ -117,7 +117,7 @@ toSuperscript = map convert . show
     convert _ = '⁹'
 
 toRefUBits :: RefBin -> [RefB]
-toRefUBits refBin = [RefUBit (refBinWidth refBin) (refBinRefU refBin) (i + refBinStart refBin) | i <- [0 .. refBinWidth refBin - 1]]
+toRefUBits refBin = [RefUBit (widthOf (refBinRefU refBin)) (refBinRefU refBin) (i + refBinStart refBin) | i <- [0 .. refBinWidth refBin - 1]]
 
 -- | For representing UInt variables in constraints
 data RefU
