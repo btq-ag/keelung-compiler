@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -32,7 +32,6 @@ library
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
-      Keelung.Compiler.Compile.Limb
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
@@ -103,7 +102,6 @@ executable keelungc
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
-      Keelung.Compiler.Compile.Limb
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util
@@ -204,7 +202,6 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
-      Keelung.Compiler.Compile.Limb
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.Util

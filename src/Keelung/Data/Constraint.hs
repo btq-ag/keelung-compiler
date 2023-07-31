@@ -15,7 +15,7 @@ import Keelung.Data.Reference
 pinnedRef :: Ref -> Bool
 pinnedRef (B ref) = pinnedRefB ref
 pinnedRef (F ref) = pinnedRefF ref
-pinnedRef (U ref) = pinnedRefBin ref
+pinnedRef (U ref) = pinnedRefL ref
 
 pinnedRefF :: RefF -> Bool
 pinnedRefF (RefFO _) = True
@@ -36,8 +36,8 @@ pinnedRefU (RefUP _ _) = True
 pinnedRefU (RefUO _ _) = True
 pinnedRefU (RefUX _ _) = False
 
-pinnedRefBin :: RefBin -> Bool
-pinnedRefBin = pinnedRefU . refBinRefU
+pinnedRefL :: RefL -> Bool
+pinnedRefL = pinnedRefU . lmbRef . refLLimb
 
 --------------------------------------------------------------------------------
 
@@ -47,7 +47,7 @@ pinnedRefBin = pinnedRefU . refBinRefU
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
   = CAddF !(PolyG n)
-  -- | CAddLimb RefBin
+  -- | CAddLimb RefL
   | CVarEq Ref Ref -- when x == y
   | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y

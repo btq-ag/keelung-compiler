@@ -271,7 +271,7 @@ assign (F var) value = do
     Just relations -> do
       markChanged RelationChanged
       put $ removeOccurrences (Set.singleton var) $ cm {cmFieldRelations = relations}
-assign (U _) _ = error "[ panic ] assign on RefBin not implemented yet"
+assign (U _) _ = error "[ panic ] assign on RefL not implemented yet"
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool

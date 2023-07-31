@@ -2,7 +2,7 @@ module Keelung.Compiler.Compile.LimbColumn where
 
 import Data.Sequence (Seq, (<|))
 import Data.Sequence qualified as Seq
-import Keelung.Compiler.Compile.Limb
+import Keelung.Data.Reference
 
 --------------------------------------------------------------------------------
 
@@ -10,7 +10,8 @@ import Keelung.Compiler.Compile.Limb
 data LimbColumn = LimbColumn
   { constant :: Integer,
     limbs :: Seq Limb
-  } deriving (Show)
+  }
+  deriving (Show)
 
 instance Semigroup LimbColumn where
   (LimbColumn const1 limbs1) <> (LimbColumn const2 limbs2) =

@@ -169,9 +169,9 @@ writeAddWithSeq c as = writeAddWithPoly (PolyG.buildWithSeq c as)
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x
 writeVal (B a) x = writeValB a (x /= 0)
-writeVal _ _ = error "[ panic ] writeVal on RefBin is not defined yet"
+writeVal _ _ = error "[ panic ] writeVal on RefL is not defined yet"
 
--- writeVal (U (RefBin ref width offset signs)) x =
+-- writeVal (U (RefL ref width offset signs)) x =
 -- forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width ref i) (Data.Bits.testBit (toInteger x) i)
 
 writeValF :: (GaloisField n, Integral n) => RefF -> n -> M n ()

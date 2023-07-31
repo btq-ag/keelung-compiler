@@ -5,15 +5,23 @@
 
 module Keelung.Data.Reference
   ( Ref (..),
-    RefBin (..),
+    RefL (..),
     RefF (..),
     RefB (..),
     RefU (..),
     toRefUBits,
+    -- | limbs
+    Limb (..),
+    limbIsPositive,
+    toRefL1,
+    toRefL,
   )
 where
 
 import Control.DeepSeq (NFData)
+import Data.Field.Galois (GaloisField)
+import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Data.VarGroup (toSubscript)
 import Keelung.Syntax
@@ -25,7 +33,7 @@ data Ref
   | -- | Boolean variable
     B RefB
   | -- | Sequence of coefficients of binary representation of UInt variable
-    U RefBin
+    U RefL
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show Ref where
@@ -72,25 +80,22 @@ instance Show RefF where
   show (RefFP x) = "FP" ++ show x
   show (RefFX x) = "F" ++ show x
 
-data RefBin = RefBin
-  { refBinRefU :: RefU,
-    refBinWidth :: Int,
-    refBinStart :: Int,
-    refBinPowerOffset :: Int,
-    -- refBinMultiplier :: Integer,
-    refBinSigns :: Either Bool [Bool]
+-- | For representing Limbs in constraints
+data RefL = RefL
+  { refLLimb :: Limb,
+    refLPowerOffset :: Int
   }
   deriving (Eq, Ord, Generic, NFData)
 
-instance Show RefBin where
-  show (RefBin _ 0 _ _ _) = "<Empty RefBin>"
-  show (RefBin ref 1 i offset (Left sign)) = if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
-  show (RefBin ref 1 i offset (Right signs)) = if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
-  show (RefBin ref 2 i offset (Left sign)) = if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> if sign then "+" else "-" <> "2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
-  show (RefBin ref 2 i offset (Right signs)) = if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> if last signs then "+" else "-" <> "2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
-  show (RefBin ref width offset i (Left sign)) =
+instance Show RefL where
+  show (RefL (Limb _ 0 _ _) _) = "<Empty RefL>"
+  show (RefL (Limb ref 1 i (Left sign)) offset) = if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
+  show (RefL (Limb ref 1 i (Right signs)) offset) = if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
+  show (RefL (Limb ref 2 i (Left sign)) offset) = if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> if sign then "+" else "-" <> "2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
+  show (RefL (Limb ref 2 i (Right signs)) offset) = if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> if last signs then "+" else "-" <> "2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
+  show (RefL (Limb ref width i (Left sign)) offset) =
     if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " ... " <> if sign then "+" else "-" <> "2" <> toSuperscript (offset + width - 1) <> "$" <> show (RefUBit 1 ref (i + width - 1))
-  show (RefBin ref width offset i (Right signs)) =
+  show (RefL (Limb ref width i (Right signs)) offset) =
     if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " ... " <> if last signs then "+" else "-" <> "2" <> toSuperscript (offset + width - 1) <> "$" <> show (RefUBit 1 ref (i + width - 1))
 
 -- | Helper function for converting integers to superscript strings
@@ -108,8 +113,9 @@ toSuperscript = map convert . show
     convert '8' = '⁸'
     convert _ = '⁹'
 
-toRefUBits :: RefBin -> [RefB]
-toRefUBits refBin = [RefUBit (widthOf (refBinRefU refBin)) (refBinRefU refBin) (i + refBinStart refBin) | i <- [0 .. refBinWidth refBin - 1]]
+-- | To list of RefBs
+toRefUBits :: RefL -> [RefB]
+toRefUBits (RefL (Limb ref width start _) _) = [RefUBit (widthOf ref) ref (i + start) | i <- [0 .. width - 1]]
 
 -- | For representing UInt variables in constraints
 data RefU
@@ -135,3 +141,36 @@ instance HasWidth RefU where
   widthOf (RefUI width _) = width
   widthOf (RefUP width _) = width
   widthOf (RefUX width _) = width
+
+--------------------------------------------------------------------------------
+
+data Limb = Limb
+  { -- | Which RefU this limb belongs to
+    lmbRef :: RefU,
+    -- | How wide this limb is
+    lmbWidth :: Width,
+    -- | The offset of this limb
+    lmbOffset :: Int,
+    -- | Left: Sign of all bits
+    -- | Right: Signs of each bit, LSB first
+    lmbSigns :: Either Bool [Bool]
+  }
+  deriving (Show, Eq, Ord, Generic, NFData)
+
+-- | A limb is considered "positive" if all of its bits are positive
+limbIsPositive :: Limb -> Bool
+limbIsPositive limb = case lmbSigns limb of
+  Left sign -> sign
+  Right signs -> and signs
+
+-- | Construct a sequence of (Ref, n) pairs from a limb
+toRefL :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> n -> Seq (Ref, n)
+toRefL powerOffset positive limb multiplyBy =
+  Seq.singleton
+    ( U (RefL limb powerOffset),
+      if positive then multiplyBy else -multiplyBy
+    )
+
+-- | Specialized version of `toRefL`
+toRefL1 :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> Seq (Ref, n)
+toRefL1 powerOffset positive limb = toRefL powerOffset positive limb 1

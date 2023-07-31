@@ -38,8 +38,8 @@ instance HasLevel RefF where
   hasLevel (RefFX _) = 0
   hasLevel _ = 100
 
-instance HasLevel RefBin where
-  hasLevel = hasLevel . refBinRefU
+instance HasLevel RefL where
+  hasLevel = hasLevel . lmbRef . refLLimb
 
 instance HasLevel Ref where
   hasLevel (F x) = hasLevel x
