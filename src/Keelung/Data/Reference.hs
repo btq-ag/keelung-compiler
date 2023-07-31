@@ -15,6 +15,8 @@ module Keelung.Data.Reference
     limbIsPositive,
     toRefL1,
     toRefL,
+    toRefQ,
+    toRefQ1,
   )
 where
 
@@ -174,3 +176,14 @@ toRefL powerOffset positive limb multiplyBy =
 -- | Specialized version of `toRefL`
 toRefL1 :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> Seq (Ref, n)
 toRefL1 powerOffset positive limb = toRefL powerOffset positive limb 1
+
+-- | Construct a sequence of (Ref, n) pairs from a limb
+toRefQ :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> n -> (RefL, n)
+toRefQ powerOffset positive limb multiplyBy =
+    ( RefL limb powerOffset,
+      if positive then multiplyBy else -multiplyBy
+    )
+
+-- | Specialized version of `toRefL`
+toRefQ1 :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> (RefL, n)
+toRefQ1 powerOffset positive limb = toRefQ powerOffset positive limb 1

@@ -241,7 +241,7 @@ assertEqF a b = do
     (Polynomial as, Constant valB) -> do
       assertLC valB (Polynomial as)
     (Polynomial as, Polynomial bs) -> do
-      writeAddWithPoly $ PolyG.merge as bs
+      writeAddWithPolyG $ PolyG.merge as bs
 
 -- | Assert that two UInt expressions are equal
 assertEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()

@@ -3,13 +3,11 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial made of Limbs
-module Keelung.Data.PolyL (PolyL (..), vars) where
+module Keelung.Data.PolyL (PolyL (..), buildWithSeq) where
 
 import Control.DeepSeq (NFData)
-import Data.Foldable (toList)
 import Data.Sequence (Seq)
-import Data.Set (Set)
-import Data.Set qualified as Set
+import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
 
@@ -44,12 +42,12 @@ data PolyL n = PolyL n (Seq (RefL, n))
 --         then Left c
 --         else Right (PolyG c result)
 
--- buildWithSeq :: (Num n, Eq n) => n -> Seq (Ref, n) -> Either n (PolyG n)
--- buildWithSeq c xs =
---   let result = Map.filter (/= 0) $ Map.fromListWith (+) $ toList xs
---    in if Map.null result
---         then Left c
---         else Right (PolyG c result)
+buildWithSeq :: (Num n, Eq n) => n -> Seq (RefL, n) -> Either n (PolyL n)
+buildWithSeq c xs =
+  let result = Seq.filter ((/= 0) . snd) xs
+   in if Seq.null result
+        then Left c
+        else Right (PolyL c result)
 
 -- buildWithMap :: (Num n, Eq n) => n -> Map Ref n -> Either n (PolyG n)
 -- buildWithMap c xs =
@@ -94,8 +92,8 @@ data PolyL n = PolyL n (Seq (RefL, n))
 -- viewAsMap :: PolyG n -> (n, Map Ref n)
 -- viewAsMap (PolyG c xs) = (c, xs)
 
-vars :: PolyL n -> Set Ref
-vars (PolyL _ xs) = Set.fromList $ concatMap (map B . toRefUBits . fst) (toList xs)
+-- vars :: PolyL n -> Set Ref
+-- vars (PolyL _ xs) = Set.fromList $ concatMap (map B . toRefUBits . fst) (toList xs)
 
 -- merge :: (Num n, Eq n) => PolyG n -> PolyG n -> Either n (PolyG n)
 -- merge (PolyG c1 xs1) (PolyG c2 xs2) =

@@ -139,12 +139,12 @@ addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs
     then do
       let carrySigns = replicate (dimCarryWidth dimensions + 1) False
       carryLimb <- allocCarryLimb (dimCarryWidth dimensions + 1) limbStart carrySigns
-      writeAddWithSeq constant $
+      writeAddWithRefLs constant $
         -- positive side
-        mconcat (map (toRefL1 0 True) limbs)
+        Seq.fromList (map (toRefQ1 0 True) limbs)
           -- negative side
-          <> toRefL1 0 False resultLimb
-          <> toRefL1 currentLimbWidth False carryLimb
+          Seq.:|> toRefQ1 0 False resultLimb
+          Seq.:|> toRefQ1 currentLimbWidth False carryLimb
       return $ LimbColumn.singleton carryLimb
     else
       if length limbs == 1 && constant == 0
@@ -157,12 +157,12 @@ addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs
           -- more than limbs
           let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
           carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
-          writeAddWithSeq constant $
+          writeAddWithRefLs constant $
             -- positive side
-            mconcat (map (toRefL1 0 True) limbs)
+            Seq.fromList (map (toRefQ1 0 True) limbs)
               -- negative side
-              <> toRefL1 0 False resultLimb
-              <> toRefL1 currentLimbWidth False carryLimb
+              Seq.:|> toRefQ1 0 False resultLimb
+              Seq.:|> toRefQ1 currentLimbWidth False carryLimb
           return $ LimbColumn.singleton carryLimb
 
 addWholeColumn :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> LimbColumn -> M n LimbColumn
@@ -281,12 +281,14 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
     Left constant -> do
       upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
-      writeAddWithSeq (a * constant) $
-        -- operand side
-        toRefL 0 True x constant
-          -- negative side
-          <> toRefL1 0 False lowerLimb
-          <> toRefL1 currentLimbWidth False upperLimb
+      writeAddWithRefLs (a * constant) $
+        Seq.fromList
+          [ -- operand side
+            toRefQ 0 True x constant,
+            -- negative side
+            toRefQ1 0 False lowerLimb,
+            toRefQ1 currentLimbWidth False upperLimb
+          ]
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
       upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
@@ -300,27 +302,27 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
         )
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
 
-_mul2LimbPreallocated :: (GaloisField n, Integral n) => Width -> Int -> (n, Limb) -> Either n (n, Limb) -> Limb -> M n Limb
-_mul2LimbPreallocated currentLimbWidth limbStart (a, x) operand lowerLimb = do
-  upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
-  case operand of
-    Left constant ->
-      writeAddWithSeq (a * constant) $
-        -- operand side
-        toRefL 0 True x constant
-          -- negative side
-          <> toRefL1 0 False lowerLimb
-          <> toRefL1 currentLimbWidth False upperLimb
-    Right (b, y) ->
-      writeMulWithSeq
-        (a, toRefL1 0 True x)
-        (b, toRefL1 0 True y)
-        ( 0,
-          toRefL1 0 True lowerLimb
-            <> toRefL1 currentLimbWidth True upperLimb
-        )
+-- _mul2LimbPreallocated :: (GaloisField n, Integral n) => Width -> Int -> (n, Limb) -> Either n (n, Limb) -> Limb -> M n Limb
+-- _mul2LimbPreallocated currentLimbWidth limbStart (a, x) operand lowerLimb = do
+--   upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
+--   case operand of
+--     Left constant ->
+--       writeAddWithSeq (a * constant) $
+--         -- operand side
+--         toRefL 0 True x constant
+--           -- negative side
+--           <> toRefL1 0 False lowerLimb
+--           <> toRefL1 currentLimbWidth False upperLimb
+--     Right (b, y) ->
+--       writeMulWithSeq
+--         (a, toRefL1 0 True x)
+--         (b, toRefL1 0 True y)
+--         ( 0,
+--           toRefL1 0 True lowerLimb
+--             <> toRefL1 currentLimbWidth True upperLimb
+--         )
 
-  return upperLimb
+--   return upperLimb
 
 -- | n-limb by n-limb multiplication
 --                       .. x2 x1 x0

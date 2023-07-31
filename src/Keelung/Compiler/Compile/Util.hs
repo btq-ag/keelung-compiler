@@ -21,10 +21,11 @@ import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL (PolyL)
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Syntax.Counters
-import qualified Keelung.Data.PolyL as PolyL
 
 --------------------------------------------------------------------------------
 
@@ -82,36 +83,41 @@ writeMulWithLC as bs cs = case (as, bs, cs) of
   (Constant _, Constant _, Constant _) -> return ()
   (Constant x, Constant y, Polynomial zs) ->
     -- z - x * y = 0
-    addC [CAddF $ PolyG.addConstant (-x * y) zs]
+    addC [CAddG $ PolyG.addConstant (-x * y) zs]
   (Constant x, Polynomial ys, Constant z) ->
     -- x * ys = z
     -- x * ys - z = 0
     case PolyG.multiplyBy x ys of
       Left _ -> return ()
-      Right poly -> addC [CAddF $ PolyG.addConstant (-z) poly]
+      Right poly -> addC [CAddG $ PolyG.addConstant (-z) poly]
   (Constant x, Polynomial ys, Polynomial zs) -> do
     -- x * ys = zs
     -- x * ys - zs = 0
     case PolyG.multiplyBy x ys of
       Left c ->
         -- c - zs = 0
-        addC [CAddF $ PolyG.addConstant (-c) zs]
+        addC [CAddG $ PolyG.addConstant (-c) zs]
       Right ys' -> case PolyG.merge ys' (PolyG.negate zs) of
         Left _ -> return ()
-        Right poly -> addC [CAddF poly]
+        Right poly -> addC [CAddG poly]
   (Polynomial xs, Constant y, Constant z) -> writeMulWithLC (Constant y) (Polynomial xs) (Constant z)
   (Polynomial xs, Constant y, Polynomial zs) -> writeMulWithLC (Constant y) (Polynomial xs) (Polynomial zs)
   (Polynomial xs, Polynomial ys, _) -> addC [CMulF xs ys (toEither cs)]
 
-writeAddWithPoly :: (GaloisField n, Integral n) => Either n (PolyG n) -> M n ()
-writeAddWithPoly xs = case xs of
+writeAddWithPolyG :: (GaloisField n, Integral n) => Either n (PolyG n) -> M n ()
+writeAddWithPolyG xs = case xs of
   Left _ -> return ()
-  Right poly -> addC [CAddF poly]
+  Right poly -> addC [CAddG poly]
+
+writeAddWithPolyL :: (GaloisField n, Integral n) => Either n (PolyL n) -> M n ()
+writeAddWithPolyL xs = case xs of
+  Left _ -> return ()
+  Right poly -> addC [CAddL poly]
 
 writeAddWithLC :: (GaloisField n, Integral n) => LC n -> M n ()
 writeAddWithLC xs = case xs of
   Constant _ -> return ()
-  Polynomial poly -> addC [CAddF poly]
+  Polynomial poly -> addC [CAddG poly]
 
 addC :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 addC = mapM_ addOne
@@ -130,8 +136,9 @@ addC = mapM_ addOne
     countBitTestAsOccurU _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
-    addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
-    addOne (CAddL xs) = modify' (\cs -> addOccurrences (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
+    addOne (CAddG xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
+    addOne (CAddL xs) = modify' (\cs -> cs {cmAddL = xs : cmAddL cs})
+    -- addOne (CAddL xs) = modify' (\cs -> addOccurrences (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
     addOne (CVarBindF x c) = do
       execRelations $ AllRelations.assignF x c
     addOne (CVarBindB x c) = do
@@ -163,18 +170,15 @@ writeMulWithSeq :: (GaloisField n, Integral n) => (n, Seq (Ref, n)) -> (n, Seq (
 writeMulWithSeq as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.buildWithSeq as) (fromEither $ uncurry PolyG.buildWithSeq bs) (fromEither $ uncurry PolyG.buildWithSeq cs)
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
-writeAdd c as = writeAddWithPoly (PolyG.build c as)
+writeAdd c as = writeAddWithPolyG (PolyG.build c as)
 
-writeAddWithSeq :: (GaloisField n, Integral n) => n -> Seq (Ref, n) -> M n ()
-writeAddWithSeq c as = writeAddWithPoly (PolyG.buildWithSeq c as)
+writeAddWithRefLs :: (GaloisField n, Integral n) => n -> Seq (RefL, n) -> M n ()
+writeAddWithRefLs c as = writeAddWithPolyL (PolyL.buildWithSeq c as)
 
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x
 writeVal (B a) x = writeValB a (x /= 0)
 writeVal _ _ = error "[ panic ] writeVal on RefL is not defined yet"
-
--- writeVal (U (RefL ref width offset signs)) x =
--- forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width ref i) (Data.Bits.testBit (toInteger x) i)
 
 writeValF :: (GaloisField n, Integral n) => RefF -> n -> M n ()
 writeValF a x = addC [CVarBindF (F a) x]

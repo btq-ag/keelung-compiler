@@ -51,6 +51,7 @@ linkConstraintModule cm =
         varEqFs
           <> varEqBs
           <> addFs
+          <> addLs
           <> mulFs,
       csEqZeros = toList eqZeros,
       csDivMods = divMods,
@@ -71,7 +72,7 @@ linkConstraintModule cm =
               (1, 0) -> CVarEq var root
               (_, _) -> case PolyG.build intercept [(var, -1), (root, slope)] of
                 Left _ -> error "[ panic ] extractFieldRelations: failed to build polynomial"
-                Right poly -> CAddF poly
+                Right poly -> CAddG poly
 
           result = map convert $ Map.toList $ AllRelations.toInt shouldBeKept relations
        in Seq.fromList (map (linkConstraint occurrences) result)
@@ -136,7 +137,8 @@ linkConstraintModule cm =
     varEqFs = extractFieldRelations (cmFieldRelations cm)
     varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (cmFieldRelations cm))
 
-    addFs = Seq.fromList $ map (linkConstraint occurrences . CAddF) $ cmAddF cm
+    addFs = Seq.fromList $ map (linkConstraint occurrences . CAddG) $ cmAddF cm
+    addLs = Seq.fromList $ map (linkConstraint occurrences . CAddL) $ cmAddL cm
     mulFs = Seq.fromList $ map (linkConstraint occurrences . uncurry3 CMulF) $ cmMulF cm
     eqZeros = Seq.fromList $ map (bimap (linkPolyGUnsafe occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
 
@@ -150,7 +152,7 @@ linkConstraintModule cm =
 -------------------------------------------------------------------------------
 
 linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Constraint n -> Linked.Constraint n
-linkConstraint counters (CAddF as) = Linked.CAdd (linkPolyGUnsafe counters as)
+linkConstraint counters (CAddG as) = Linked.CAdd (linkPolyGUnsafe counters as)
 linkConstraint counters (CAddL as) = Linked.CAdd (linkPolyLUnsafe counters as)
 linkConstraint occurrences (CVarEq x y) =
   case Poly.buildEither 0 (toList (reindexRef occurrences x 1 <> reindexRef occurrences y (-1))) of
