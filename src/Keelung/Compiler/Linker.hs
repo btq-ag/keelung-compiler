@@ -31,6 +31,7 @@ import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Data.Constraint
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Reference
@@ -137,7 +138,7 @@ linkConstraintModule cm =
 
     addFs = Seq.fromList $ map (linkConstraint occurrences . CAddF) $ cmAddF cm
     mulFs = Seq.fromList $ map (linkConstraint occurrences . uncurry3 CMulF) $ cmMulF cm
-    eqZeros = Seq.fromList $ map (bimap (linkPoly_ occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
+    eqZeros = Seq.fromList $ map (bimap (linkPolyGUnsafe occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
     fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB occurrences (RefUBit width var 0)))
@@ -149,7 +150,8 @@ linkConstraintModule cm =
 -------------------------------------------------------------------------------
 
 linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Constraint n -> Linked.Constraint n
-linkConstraint counters (CAddF as) = Linked.CAdd (linkPoly_ counters as)
+linkConstraint counters (CAddF as) = Linked.CAdd (linkPolyGUnsafe counters as)
+linkConstraint counters (CAddL as) = Linked.CAdd (linkPolyLUnsafe counters as)
 linkConstraint occurrences (CVarEq x y) =
   case Poly.buildEither 0 (toList (reindexRef occurrences x 1 <> reindexRef occurrences y (-1))) of
     Left _ -> error "CVarEq: two variables are the same"
@@ -173,11 +175,11 @@ linkConstraint counters (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB
 linkConstraint counters (CVarBindB x False) = Linked.CAdd (Poly.bind (reindexRefB counters x) 0)
 linkConstraint counters (CMulF as bs cs) =
   Linked.CMul
-    (linkPoly_ counters as)
-    (linkPoly_ counters bs)
+    (linkPolyGUnsafe counters as)
+    (linkPolyGUnsafe counters bs)
     ( case cs of
         Left n -> Left n
-        Right xs -> linkPoly counters xs
+        Right xs -> linkPolyG counters xs
     )
 
 updateCounters :: Occurrences -> Counters -> Counters
@@ -189,15 +191,23 @@ updateCounters occurrences counters =
 
 --------------------------------------------------------------------------------
 
-linkPoly :: (Integral n, GaloisField n) => Occurrences -> PolyG n -> Either n (Poly n)
-linkPoly occurrences poly = case PolyG.view poly of
+linkPolyG :: (Integral n, GaloisField n) => Occurrences -> PolyG n -> Either n (Poly n)
+linkPolyG occurrences poly = case PolyG.view poly of
   PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant $ toList (reindexRef occurrences var coeff)
   PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant $ toList $ reindexRef occurrences var1 coeff1 <> reindexRef occurrences var2 coeff2
   PolyG.Polynomial constant xs -> Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexRef occurrences)) (Map.toList xs))
 
-linkPoly_ :: (Integral n, GaloisField n) => Occurrences -> PolyG n -> Poly n
-linkPoly_ occurrences xs = case linkPoly occurrences xs of
-  Left _ -> error "[ panic ] linkPoly_: Left"
+linkPolyGUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyG n -> Poly n
+linkPolyGUnsafe occurrences xs = case linkPolyG occurrences xs of
+  Left _ -> error "[ panic ] linkPolyGUnsafe: Left"
+  Right p -> p
+
+linkPolyL :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Either n (Poly n)
+linkPolyL occurrences (PolyL constant limbs) = Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexRef occurrences . U)) (toList limbs))
+
+linkPolyLUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Poly n
+linkPolyLUnsafe occurrences xs = case linkPolyL occurrences xs of
+  Left _ -> error "[ panic ] linkPolyLUnsafe: Left"
   Right p -> p
 
 --------------------------------------------------------------------------------

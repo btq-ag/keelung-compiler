@@ -37,6 +37,7 @@ import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
+import Keelung.Data.PolyL (PolyL)
 
 --------------------------------------------------------------------------------
 
@@ -51,6 +52,7 @@ data ConstraintModule n = ConstraintModule
     cmFieldRelations :: AllRelations n,
     -- addative constraints
     cmAddF :: [PolyG n],
+    cmAddL :: [PolyL n],
     -- multiplicative constraints
     cmMulF :: [(PolyG n, PolyG n, Either n (PolyG n))],
     -- hits for computing equality

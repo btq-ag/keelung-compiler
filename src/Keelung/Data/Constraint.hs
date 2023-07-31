@@ -9,6 +9,7 @@ where
 import Data.Field.Galois (GaloisField)
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.Reference
+import Keelung.Data.PolyL (PolyL)
 
 --------------------------------------------------------------------------------
 
@@ -47,7 +48,7 @@ pinnedRefL = pinnedRefU . lmbRef . refLLimb
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
   = CAddF !(PolyG n)
-  -- | CAddLimb RefL
+  | CAddL !(PolyL n)
   | CVarEq Ref Ref -- when x == y
   | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y
@@ -66,6 +67,7 @@ instance GaloisField n => Eq (Constraint n) where
 
 instance Functor Constraint where
   fmap f (CAddF x) = CAddF (fmap f x)
+  fmap f (CAddL x) = CAddL (fmap f x)
   fmap _ (CVarEq x y) = CVarEq x y
   fmap _ (CVarEqF x y) = CVarEqF x y
   fmap _ (CVarNEqB x y) = CVarNEqB x y
@@ -77,6 +79,7 @@ instance Functor Constraint where
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddF xs) = "AF " <> show xs <> " = 0"
+  show (CAddL xs) = "AL " <> show xs <> " = 0"
   show (CVarEq x y) = "EQ " <> show x <> " = " <> show y
   show (CVarEqF x y) = "VF " <> show x <> " = " <> show y
   show (CVarEqB x y) = "VB " <> show x <> " = " <> show y

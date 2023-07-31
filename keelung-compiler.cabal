@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -56,6 +56,7 @@ library
       Keelung.Compiler.Util
       Keelung.Data.Constraint
       Keelung.Data.PolyG
+      Keelung.Data.PolyL
       Keelung.Data.Reference
       Keelung.Data.VarGroup
       Keelung.Interpreter
@@ -126,6 +127,7 @@ executable keelungc
       Keelung.Compiler.Util
       Keelung.Data.Constraint
       Keelung.Data.PolyG
+      Keelung.Data.PolyL
       Keelung.Data.Reference
       Keelung.Data.VarGroup
       Keelung.Interpreter
@@ -226,6 +228,7 @@ test-suite keelung-test
       Keelung.Compiler.Util
       Keelung.Data.Constraint
       Keelung.Data.PolyG
+      Keelung.Data.PolyL
       Keelung.Data.Reference
       Keelung.Data.VarGroup
       Keelung.Interpreter
