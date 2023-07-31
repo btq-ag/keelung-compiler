@@ -10,11 +10,11 @@ import Keelung.Data.Reference
 -- | Linear combination of variables and constants.
 data LC n
   = Constant n
-  | Polynomial (PolyG Ref n)
+  | Polynomial (PolyG n)
   deriving (Eq, Show)
 
--- | Converting from a 'Either n (PolyG Ref n)' to a 'LC n'.
-fromEither :: Either n (PolyG Ref n) -> LC n
+-- | Converting from a 'Either n (PolyG n)' to a 'LC n'.
+fromEither :: Either n (PolyG n) -> LC n
 fromEither = either Constant Polynomial
 
 -- | Converting from a 'Either RefU n' to a 'LC n'.
@@ -47,7 +47,7 @@ fromRefU width fieldWidth (Left var) =
 --     bits = [(B (RefUBit width var i), 2 ^ i) | i <- [0 .. width - 1]]
 --  in fromEither (PolyG.build 0 bits)
 
-toEither :: LC n -> Either n (PolyG Ref n)
+toEither :: LC n -> Either n (PolyG n)
 toEither (Constant c) = Left c
 toEither (Polynomial xs) = Right xs
 

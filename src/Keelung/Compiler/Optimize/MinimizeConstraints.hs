@@ -54,7 +54,7 @@ goThroughEqZeros cm =
   let relations = cmFieldRelations cm
    in cm {cmEqZeros = mapMaybe (reduceEqZeros relations) (cmEqZeros cm)}
   where
-    reduceEqZeros :: (GaloisField n, Integral n) => AllRelations n -> (PolyG Ref n, RefF) -> Maybe (PolyG Ref n, RefF)
+    reduceEqZeros :: (GaloisField n, Integral n) => AllRelations n -> (PolyG n, RefF) -> Maybe (PolyG n, RefF)
     reduceEqZeros relations (polynomial, m) = case substPolyG relations polynomial of
       Nothing -> Just (polynomial, m) -- nothing changed
       Just (Left _constant, _, _) -> Nothing
@@ -84,7 +84,7 @@ foldMaybeM f = foldM $ \acc x -> do
     Nothing -> return acc
     Just x' -> return (x' : acc)
 
-reduceAddF :: (GaloisField n, Integral n) => PolyG Ref n -> RoundM n (Maybe (PolyG Ref n))
+reduceAddF :: (GaloisField n, Integral n) => PolyG n -> RoundM n (Maybe (PolyG n))
 reduceAddF polynomial = do
   changed <- learnFromAddF polynomial
   if changed
@@ -109,7 +109,7 @@ reduceAddF polynomial = do
           -- keep reducing the reduced polynomial
           reduceAddF reducePolynomial
 
-type MulF n = (PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))
+type MulF n = (PolyG n, PolyG n, Either n (PolyG n))
 
 reduceMulF :: (GaloisField n, Integral n) => MulF n -> RoundM n (Maybe (MulF n))
 reduceMulF (polyA, polyB, polyC) = do
@@ -120,7 +120,7 @@ reduceMulF (polyA, polyB, polyC) = do
     Right polyC' -> substitutePolyF MultiplicativeConstraintChanged polyC'
   reduceMulF_ polyAResult polyBResult polyCResult
 
-substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG Ref n -> RoundM n (Either n (PolyG Ref n))
+substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG n -> RoundM n (Either n (PolyG n))
 substitutePolyF typeOfChange polynomial = do
   allRelations <- gets cmFieldRelations
   case substPolyG allRelations polynomial of
@@ -139,7 +139,7 @@ substitutePolyF typeOfChange polynomial = do
       return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative constaint, returns the reduced constraint if it is reduced
-reduceMulF_ :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> Either n (PolyG Ref n) -> Either n (PolyG Ref n) -> RoundM n (Maybe (MulF n))
+reduceMulF_ :: (GaloisField n, Integral n) => Either n (PolyG n) -> Either n (PolyG n) -> Either n (PolyG n) -> RoundM n (Maybe (MulF n))
 reduceMulF_ polyA polyB polyC = case (polyA, polyB, polyC) of
   (Left _a, Left _b, Left _c) -> return Nothing
   (Left a, Left b, Right c) -> reduceMulFCCP a b c >> return Nothing
@@ -154,7 +154,7 @@ reduceMulF_ polyA polyB polyC = case (polyA, polyB, polyC) of
 --    a * b = cm
 --      =>
 --    cm - a * b = 0
-reduceMulFCCP :: (GaloisField n, Integral n) => n -> n -> PolyG Ref n -> RoundM n ()
+reduceMulFCCP :: (GaloisField n, Integral n) => n -> n -> PolyG n -> RoundM n ()
 reduceMulFCCP a b cm = do
   addAddF $ PolyG.addConstant (-a * b) cm
 
@@ -162,7 +162,7 @@ reduceMulFCCP a b cm = do
 --    a * bs = c
 --      =>
 --    c - a * bs = 0
-reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG Ref n -> n -> RoundM n ()
+reduceMulFCPC :: (GaloisField n, Integral n) => n -> PolyG n -> n -> RoundM n ()
 reduceMulFCPC a bs c = do
   case PolyG.multiplyBy (-a) bs of
     Left constant ->
@@ -175,7 +175,7 @@ reduceMulFCPC a bs c = do
 --    a * bs = cm
 --      =>
 --    cm - a * bs = 0
-reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG Ref n -> PolyG Ref n -> RoundM n ()
+reduceMulFCPP :: (GaloisField n, Integral n) => n -> PolyG n -> PolyG n -> RoundM n ()
 reduceMulFCPP a polyB polyC = do
   case PolyG.multiplyBy (-a) polyB of
     Left constant ->
@@ -237,7 +237,7 @@ markChanged = tell
 
 -- | Go through additive constraints and classify them into relation constraints when possible.
 --   Returns 'True' if the constraint has been reduced.
-learnFromAddF :: (GaloisField n, Integral n) => PolyG Ref n -> RoundM n Bool
+learnFromAddF :: (GaloisField n, Integral n) => PolyG n -> RoundM n Bool
 learnFromAddF poly = case PolyG.view poly of
   PolyG.Monomial intercept (var, slope) -> do
     --    intercept + slope * var = 0
@@ -285,7 +285,7 @@ relateF var1 (slope, var2, intercept) = do
       modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmFieldRelations = relations}
       return True
 
-addAddF :: (GaloisField n, Integral n) => PolyG Ref n -> RoundM n ()
+addAddF :: (GaloisField n, Integral n) => PolyG n -> RoundM n ()
 addAddF poly = case PolyG.view poly of
   PolyG.Monomial constant (var1, coeff1) -> do
     --    constant + coeff1 * var1 = 0
@@ -307,7 +307,7 @@ addAddF poly = case PolyG.view poly of
 
 -- | Substitutes variables in a polynomial.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n) => AllRelations n -> PolyG Ref n -> Maybe (Either n (PolyG Ref n), Set Ref, Set Ref)
+substPolyG :: (GaloisField n, Integral n) => AllRelations n -> PolyG n -> Maybe (Either n (PolyG n), Set Ref, Set Ref)
 substPolyG relations poly = do
   let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' (substPolyG_ relations) (False, Left c, mempty, mempty) xs of
@@ -318,10 +318,10 @@ substPolyG relations poly = do
 substPolyG_ ::
   (Integral n, GaloisField n) =>
   AllRelations n ->
-  (Bool, Either n (PolyG Ref n), Set Ref, Set Ref) ->
+  (Bool, Either n (PolyG n), Set Ref, Set Ref) ->
   Ref ->
   n ->
-  (Bool, Either n (PolyG Ref n), Set Ref, Set Ref)
+  (Bool, Either n (PolyG n), Set Ref, Set Ref)
 substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = case AllRelations.lookup ref relations of
   AllRelations.Root -> case accPoly of
     Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)

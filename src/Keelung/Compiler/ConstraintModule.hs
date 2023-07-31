@@ -50,11 +50,11 @@ data ConstraintModule n = ConstraintModule
     cmOccurrenceU :: !OccurU,
     cmFieldRelations :: AllRelations n,
     -- addative constraints
-    cmAddF :: [PolyG Ref n],
+    cmAddF :: [PolyG n],
     -- multiplicative constraints
-    cmMulF :: [(PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))],
+    cmMulF :: [(PolyG n, PolyG n, Either n (PolyG n))],
     -- hits for computing equality
-    cmEqZeros :: [(PolyG Ref n, RefF)],
+    cmEqZeros :: [(PolyG n, RefF)],
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
     cmDivMods :: [(Either RefU U, Either RefU U, Either RefU U, Either RefU U)],
@@ -136,12 +136,12 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
 
       showMul (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
-          showVec :: (Show n, Ord n, Eq n, Num n, Show ref) => Either n (PolyG ref n) -> String
+          showVec :: (Show n, Ord n, Eq n, Num n) => Either n (PolyG n) -> String
           showVec (Left c) = show c
           showVec (Right xs) = show xs
 
           -- wrap the string with parenthesis if it has more than 1 term
-          showVecWithParen :: (Show n, Ord n, Eq n, Num n, Show ref) => PolyG ref n -> String
+          showVecWithParen :: (Show n, Ord n, Eq n, Num n) => PolyG n -> String
           showVecWithParen xs =
             let termNumber = case PolyG.view xs of
                   PolyG.Monomial 0 _ -> 1

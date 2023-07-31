@@ -65,7 +65,7 @@ freshRefU width = do
 --------------------------------------------------------------------------------
 
 -- | Compile a linear combination of expressions into a polynomial
-toPoly :: (GaloisField n, Integral n) => (Expr n -> M n (Either Ref n)) -> (n, [(Expr n, n)]) -> M n (Either n (PolyG Ref n))
+toPoly :: (GaloisField n, Integral n) => (Expr n -> M n (Either Ref n)) -> (n, [(Expr n, n)]) -> M n (Either n (PolyG n))
 toPoly compile (c, xs) = do
   (constants, terms) <- partitionEithers <$> mapM compileTerm xs
   return $ PolyG.build (c + sum constants) terms
@@ -102,7 +102,7 @@ writeMulWithLC as bs cs = case (as, bs, cs) of
   (Polynomial xs, Constant y, Polynomial zs) -> writeMulWithLC (Constant y) (Polynomial xs) (Polynomial zs)
   (Polynomial xs, Polynomial ys, _) -> addC [CMulF xs ys (toEither cs)]
 
-writeAddWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> M n ()
+writeAddWithPoly :: (GaloisField n, Integral n) => Either n (PolyG n) -> M n ()
 writeAddWithPoly xs = case xs of
   Left _ -> return ()
   Right poly -> addC [CAddF poly]
@@ -207,7 +207,7 @@ addEqZeroHint c xs m = case PolyG.build c xs of
   Left constant -> writeValF m (recip constant)
   Right poly -> modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
-addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> RefF -> M n ()
+addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyG n) -> RefF -> M n ()
 addEqZeroHintWithPoly (Left 0) m = writeValF m 0
 addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}

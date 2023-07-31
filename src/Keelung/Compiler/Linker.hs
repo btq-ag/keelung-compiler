@@ -189,13 +189,13 @@ updateCounters occurrences counters =
 
 --------------------------------------------------------------------------------
 
-linkPoly :: (Integral n, GaloisField n) => Occurrences -> PolyG Ref n -> Either n (Poly n)
+linkPoly :: (Integral n, GaloisField n) => Occurrences -> PolyG n -> Either n (Poly n)
 linkPoly occurrences poly = case PolyG.view poly of
   PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant $ toList (reindexRef occurrences var coeff)
   PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant $ toList $ reindexRef occurrences var1 coeff1 <> reindexRef occurrences var2 coeff2
   PolyG.Polynomial constant xs -> Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexRef occurrences)) (Map.toList xs))
 
-linkPoly_ :: (Integral n, GaloisField n) => Occurrences -> PolyG Ref n -> Poly n
+linkPoly_ :: (Integral n, GaloisField n) => Occurrences -> PolyG n -> Poly n
 linkPoly_ occurrences xs = case linkPoly occurrences xs of
   Left _ -> error "[ panic ] linkPoly_: Left"
   Right p -> p

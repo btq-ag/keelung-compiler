@@ -46,14 +46,15 @@ pinnedRefBin = pinnedRefU . refBinRefU
 --      CMul: ax * by = c or ax * by = cz
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
-  = CAddF !(PolyG Ref n)
+  = CAddF !(PolyG n)
+  -- | CAddLimb RefBin
   | CVarEq Ref Ref -- when x == y
   | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y
   | CVarNEqB RefB RefB -- when x = ¬ y
   | CVarBindF Ref n -- when x = val
   | CVarBindB RefB Bool -- when x = val
-  | CMulF !(PolyG Ref n) !(PolyG Ref n) !(Either n (PolyG Ref n))
+  | CMulF !(PolyG n) !(PolyG n) !(Either n (PolyG n))
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
