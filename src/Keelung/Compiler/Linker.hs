@@ -33,6 +33,7 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
+import Keelung.Data.Reference
 import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax (HasWidth (widthOf), Var, Width)
@@ -208,7 +209,9 @@ reindexRef occurrences (U x) multiplier = case refBinSigns x of
   Left sign ->
     Seq.fromList
       [ ( reindexRefU
-            occurrences (refBinRefU x) (i + refBinStart x),
+            occurrences
+            (refBinRefU x)
+            (i + refBinStart x),
           (2 ^ (i + refBinPowerOffset x)) * if sign then multiplier else (-multiplier)
         )
         | i <- [0 .. refBinWidth x - 1]
@@ -216,7 +219,9 @@ reindexRef occurrences (U x) multiplier = case refBinSigns x of
   Right signs ->
     Seq.fromList
       [ ( reindexRefU
-            occurrences (refBinRefU x) (i + refBinStart x),
+            occurrences
+            (refBinRefU x)
+            (i + refBinStart x),
           (2 ^ (i + refBinPowerOffset x)) * if sign then multiplier else (-multiplier)
         )
         | (i, sign) <- zip [0 .. refBinWidth x - 1] signs
@@ -257,7 +262,8 @@ data Occurrences = Occurrences
     refUsInOccurrencesU :: !(IntMap IntSet),
     indexTable :: !IndexTable,
     pinnedSize :: !Int
-  } deriving (Show)
+  }
+  deriving (Show)
 
 -- | Smart constructor for 'Occurrences'
 constructOccurrences :: Counters -> OccurF -> OccurB -> OccurU -> Occurrences

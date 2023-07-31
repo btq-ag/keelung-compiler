@@ -9,7 +9,6 @@ import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
-import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
@@ -18,9 +17,11 @@ import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as AllRelations
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.Reference
 import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Syntax.Counters
 
@@ -169,8 +170,9 @@ writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x
 writeVal (B a) x = writeValB a (x /= 0)
 writeVal _ _ = error "[ panic ] writeVal on RefBin is not defined yet"
--- writeVal (U (RefBin ref width offset signs)) x = 
-  -- forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width ref i) (Data.Bits.testBit (toInteger x) i)
+
+-- writeVal (U (RefBin ref width offset signs)) x =
+-- forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width ref i) (Data.Bits.testBit (toInteger x) i)
 
 writeValF :: (GaloisField n, Integral n) => RefF -> n -> M n ()
 writeValF a x = addC [CVarBindF (F a) x]

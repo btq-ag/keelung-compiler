@@ -7,9 +7,9 @@ module Test.Optimization (tests, run) where
 import Data.Foldable
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compileO0)
-import Keelung.Compiler.Relations.Field qualified as AllRelations
-import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
+import Keelung.Compiler.Relations.Field qualified as AllRelations
+import Keelung.Data.Reference
 import Test.Hspec
 import Test.Optimization.UInt qualified as Optimization.UInt
 import Test.Optimization.Util
@@ -33,7 +33,7 @@ tests = do
       cm' `shouldHaveSize` 552
 
       return ()
-      
+
     describe "Field" $ do
       it "Field 1" $ do
         (cm, cm') <- executeGF181 $ do

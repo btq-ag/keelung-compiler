@@ -14,23 +14,13 @@ import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
-import Keelung.Data.Constraint
+import Keelung.Data.Reference
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
 import Prelude hiding (null)
 
-newtype OccurB
-  = MapB (IntMap Int)
-  deriving
-    ( -- | OccurB
-      --     { -- _occurBO :: !(Vector Int),
-      --       -- _occurBI :: !(Vector Int),
-      --       -- _occurBP :: !(Vector Int),
-      --       _occurBX :: !(Vector Int)
-      --     }
-      Eq,
-      Generic
-    )
+newtype OccurB = MapB (IntMap Int)
+  deriving (Eq, Generic)
 
 instance NFData OccurB
 
@@ -38,19 +28,9 @@ instance NFData OccurB
 new :: Bool -> OccurB
 new _useVector = MapB mempty
 
--- if useVector
---   then
---     OccurB
---       (Vec.replicate 100 0)
---   else MapB mempty
-
 -- | O(1). Test whether a OccurB is empty
 null :: OccurB -> Bool
 null (MapB xs) = IntMap.null xs
-
--- null (OccurB xs) = Vec.null xs
-
--- null (OccurB os is ps xs) = Vec.null os && Vec.null is && Vec.null ps && Vec.null xs
 
 -- | O(1).  To a list of (RefB, Int) pairs
 toList :: OccurB -> [(RefB, Int)]

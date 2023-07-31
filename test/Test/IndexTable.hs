@@ -10,7 +10,7 @@ import Keelung
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Linker (constructOccurrences, reindexRef)
-import Keelung.Data.Constraint
+import Keelung.Data.Reference
 import Test.Hspec
 import Test.Optimization.Util (executeGF181)
 

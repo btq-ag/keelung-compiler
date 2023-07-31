@@ -21,12 +21,12 @@ import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.UInt qualified as UInt
 import Keelung.Compiler.Compile.Util
-import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.Reference
 import Keelung.Syntax (widthOf)
 
 --------------------------------------------------------------------------------

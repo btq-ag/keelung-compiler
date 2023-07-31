@@ -29,10 +29,10 @@ import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Util (indent)
-import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.Reference
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Interpreter.Arithmetics (U)

@@ -6,16 +6,21 @@
 module Keelung.Data.PolyG (PolyG, View (..), build, buildWithSeq, buildWithMap, view, viewAsMap, insert, merge, addConstant, multiplyBy, negate, singleton, vars) where
 
 import Control.DeepSeq (NFData)
+import Data.Foldable (toList)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Sequence (Seq)
 import Data.Set (Set)
 import GHC.Generics (Generic)
+-- import Keelung.Data.Reference
 import Prelude hiding (negate)
 import Prelude qualified
-import Data.Sequence (Seq)
-import Data.Foldable (toList)
 
-data PolyG ref n = PolyG n (Map ref n)
+data PolyG ref n = PolyG
+  { polyConst :: n,
+    polyCoeffs :: Map ref n
+    -- polyBinCoeffs :: Map (RefBin, Int) n
+  }
   deriving (Eq, Functor, Ord, Generic, NFData)
 
 instance (Show n, Ord n, Eq n, Num n, Show ref) => Show (PolyG ref n) where

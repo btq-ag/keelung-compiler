@@ -22,9 +22,9 @@ import Keelung.Compiler.Compile.Limb
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Util
-import Keelung.Data.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo (FieldInfo (..))
+import Keelung.Data.Reference
 import Keelung.Syntax (Width)
 
 -- Model of addition: elementary school addition with possibly multiple carries

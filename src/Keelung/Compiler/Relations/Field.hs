@@ -31,7 +31,7 @@ import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.Boolean qualified as Boolean
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Data.Constraint
+import Keelung.Data.Reference
 import Prelude hiding (lookup)
 
 type FieldRelations n = EquivClass.EquivClass Ref n (LinRel n)
