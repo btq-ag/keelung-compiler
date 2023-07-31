@@ -3,12 +3,16 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial made of Limbs
-module Keelung.Data.PolyL (PolyL (..), buildWithSeq) where
+module Keelung.Data.PolyL (PolyL (..), vars, buildWithSeq) where
 
 import Control.DeepSeq (NFData)
+import Data.Foldable (toList)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Data.Set (Set)
+import Data.Set qualified as Set
 import GHC.Generics (Generic)
+import Keelung (widthOf)
 import Keelung.Data.Reference
 
 -- | Polynomial made of Limbs + a constant
@@ -92,8 +96,11 @@ buildWithSeq c xs =
 -- viewAsMap :: PolyG n -> (n, Map Ref n)
 -- viewAsMap (PolyG c xs) = (c, xs)
 
--- vars :: PolyL n -> Set Ref
--- vars (PolyL _ xs) = Set.fromList $ concatMap (map B . toRefUBits . fst) (toList xs)
+vars :: PolyL n -> Set RefU
+vars (PolyL _ xs) = Set.fromList $ map (toRef . fst) (toList xs)
+  where
+    toRef :: RefL -> RefU
+    toRef (RefL (Limb ref _ _ _) _) = ref
 
 -- merge :: (Num n, Eq n) => PolyG n -> PolyG n -> Either n (PolyG n)
 -- merge (PolyG c1 xs1) (PolyG c2 xs2) =

@@ -137,8 +137,7 @@ addC = mapM_ addOne
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddG xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
-    addOne (CAddL xs) = modify' (\cs -> cs {cmAddL = xs : cmAddL cs})
-    -- addOne (CAddL xs) = modify' (\cs -> addOccurrences (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
+    addOne (CAddL xs) = modify' (\cs -> addOccurrences (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
     addOne (CVarBindF x c) = do
       execRelations $ AllRelations.assignF x c
     addOne (CVarBindB x c) = do
