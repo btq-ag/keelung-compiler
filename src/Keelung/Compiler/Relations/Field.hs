@@ -139,9 +139,6 @@ lookup var xs = fromLinRel $ lookup' var xs
 lookup' :: GaloisField n => Ref -> AllRelations n -> EquivClass.VarStatus Ref n (LinRel n)
 lookup' (B var) xs = fromBooleanLookup $ EquivClass.lookup var (relationsB xs)
 lookup' (F var) xs = EquivClass.lookup (F var) (relationsF xs)
-lookup' (U _var) _xs = EquivClass.IsRoot mempty
-
--- error "[ panic ] lookup of RefL not defined yet"
 
 fromLinRel :: EquivClass.VarStatus Ref n (LinRel n) -> Lookup n
 fromLinRel (EquivClass.IsRoot _) = Root

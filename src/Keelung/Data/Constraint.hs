@@ -8,15 +8,14 @@ where
 
 import Data.Field.Galois (GaloisField)
 import Keelung.Data.PolyG (PolyG)
-import Keelung.Data.Reference
 import Keelung.Data.PolyL (PolyL)
+import Keelung.Data.Reference
 
 --------------------------------------------------------------------------------
 
 pinnedRef :: Ref -> Bool
 pinnedRef (B ref) = pinnedRefB ref
 pinnedRef (F ref) = pinnedRefF ref
-pinnedRef (U ref) = pinnedRefL ref
 
 pinnedRefF :: RefF -> Bool
 pinnedRefF (RefFO _) = True
@@ -36,9 +35,6 @@ pinnedRefU (RefUI _ _) = True
 pinnedRefU (RefUP _ _) = True
 pinnedRefU (RefUO _ _) = True
 pinnedRefU (RefUX _ _) = False
-
-pinnedRefL :: RefL -> Bool
-pinnedRefL = pinnedRefU . lmbRef . refLLimb
 
 --------------------------------------------------------------------------------
 

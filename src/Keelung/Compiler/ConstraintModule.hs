@@ -32,12 +32,12 @@ import Keelung.Compiler.Util (indent)
 import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.Reference
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
-import Keelung.Data.PolyL (PolyL)
 
 --------------------------------------------------------------------------------
 
@@ -272,7 +272,7 @@ instance UpdateOccurrences Ref where
               case ref of
                 F refF -> addOccurrences (Set.singleton refF) cm
                 B refB -> addOccurrences (Set.singleton refB) cm
-                U refL -> addOccurrences (Set.fromList (toRefUBits refL)) cm
+                -- U refL -> addOccurrences (Set.fromList (toRefUBits refL)) cm
           )
       )
   removeOccurrences =
@@ -282,7 +282,7 @@ instance UpdateOccurrences Ref where
               case ref of
                 F refF -> removeOccurrences (Set.singleton refF) cm
                 B refB -> removeOccurrences (Set.singleton refB) cm
-                U refL -> removeOccurrences (Set.fromList (toRefUBits refL)) cm
+                -- U refL -> removeOccurrences (Set.fromList (toRefUBits refL)) cm
           )
       )
 
@@ -345,7 +345,6 @@ instance UpdateOccurrences RefB where
                 _ -> cm
           )
       )
-
 
 instance UpdateOccurrences RefU where
   addOccurrences =

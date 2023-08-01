@@ -2,7 +2,7 @@
 
 module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Occurrences, constructOccurrences) where
 
-import Data.Bifunctor (Bifunctor (bimap))
+import Data.Bifunctor (Bifunctor (bimap, first))
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
@@ -81,7 +81,6 @@ linkConstraintModule cm =
     shouldBeKept :: Ref -> Bool
     shouldBeKept (F ref) = refFShouldBeKept ref
     shouldBeKept (B ref) = refBShouldBeKept ref
-    shouldBeKept (U ref) = refUShouldBeKept (lmbRef (refLLimb ref))
 
     refFShouldBeKept :: RefF -> Bool
     refFShouldBeKept ref = case ref of
@@ -157,7 +156,7 @@ linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Constraint n -> 
 linkConstraint counters (CAddG as) = Linked.CAdd (linkPolyGUnsafe counters as)
 linkConstraint counters (CAddL as) = Linked.CAdd (linkPolyLUnsafe counters as)
 linkConstraint occurrences (CVarEq x y) =
-  case Poly.buildEither 0 (toList (reindexRef occurrences x 1 <> reindexRef occurrences y (-1))) of
+  case Poly.buildEither 0 [(reindexRef occurrences x, 1), (reindexRef occurrences y, -1)] of
     Left _ -> error "CVarEq: two variables are the same"
     Right xs -> Linked.CAdd xs
 linkConstraint counters (CVarEqF x y) =
@@ -172,7 +171,7 @@ linkConstraint counters (CVarNEqB x y) =
   case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
     Left _ -> error "CVarNEqB: two variables are the same"
     Right xs -> Linked.CAdd xs
-linkConstraint counters (CVarBindF x n) = case Poly.buildEither (-n) (toList (reindexRef counters x 1)) of
+linkConstraint counters (CVarBindF x n) = case Poly.buildEither (-n) [(reindexRef counters x, 1)] of
   Left _ -> error "CVarBindF: impossible"
   Right xs -> Linked.CAdd xs
 linkConstraint counters (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB counters x) 1)
@@ -205,9 +204,9 @@ updateCounters occurrences counters =
 
 linkPolyG :: (Integral n, GaloisField n) => Occurrences -> PolyG n -> Either n (Poly n)
 linkPolyG occurrences poly = case PolyG.view poly of
-  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant $ toList (reindexRef occurrences var coeff)
-  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant $ toList $ reindexRef occurrences var1 coeff1 <> reindexRef occurrences var2 coeff2
-  PolyG.Polynomial constant xs -> Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexRef occurrences)) (Map.toList xs))
+  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRef occurrences var, coeff)]
+  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRef occurrences var1, coeff1), (reindexRef occurrences var2, coeff2)]
+  PolyG.Polynomial constant xs -> Poly.buildEither constant $ fmap (first (reindexRef occurrences)) (Map.toList xs)
 
 linkPolyGUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyG n -> Poly n
 linkPolyGUnsafe occurrences xs = case linkPolyG occurrences xs of
@@ -215,7 +214,7 @@ linkPolyGUnsafe occurrences xs = case linkPolyG occurrences xs of
   Right p -> p
 
 linkPolyL :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Either n (Poly n)
-linkPolyL occurrences (PolyL constant limbs) = Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexRef occurrences . U)) (toList limbs))
+linkPolyL occurrences (PolyL constant limbs) = Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexRefL occurrences)) (toList limbs))
 
 linkPolyLUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Poly n
 linkPolyLUnsafe occurrences xs = case linkPolyL occurrences xs of
@@ -224,10 +223,12 @@ linkPolyLUnsafe occurrences xs = case linkPolyL occurrences xs of
 
 --------------------------------------------------------------------------------
 
-reindexRef :: (Integral n, GaloisField n) => Occurrences -> Ref -> n -> Seq (Var, n)
-reindexRef occurrences (F x) multiplier = Seq.singleton (reindexRefF occurrences x, multiplier)
-reindexRef occurrences (B x) multiplier = Seq.singleton (reindexRefB occurrences x, multiplier)
-reindexRef occurrences (U (RefL limb powerOffset)) multiplier = case lmbSigns limb of
+reindexRef :: Occurrences -> Ref -> Var
+reindexRef occurrences (F x) = reindexRefF occurrences x
+reindexRef occurrences (B x) = reindexRefB occurrences x
+
+reindexRefL :: (Integral n, GaloisField n) => Occurrences -> RefL -> n -> Seq (Var, n)
+reindexRefL occurrences (RefL limb powerOffset) multiplier = case lmbSigns limb of
   Left sign ->
     Seq.fromList
       [ ( reindexRefU

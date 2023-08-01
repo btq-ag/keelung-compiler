@@ -5,7 +5,6 @@ module Test.IndexTable (tests, run) where
 
 import Control.Monad (forM_)
 import Data.IntMap.Strict qualified as IntMap
-import Data.Sequence qualified as Seq
 import Keelung
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
@@ -125,17 +124,17 @@ tests = do
         assert $ 2 `eq` (x + 1)
       let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
       let inputVar = RefUI 4 0
-      reindexRef occurrences (B (RefUBit 4 inputVar 0)) (1 :: GF181) `shouldBe` Seq.singleton (0, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar 1)) (1 :: GF181) `shouldBe` Seq.singleton (1, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar 2)) (1 :: GF181) `shouldBe` Seq.singleton (2, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar 3)) (1 :: GF181) `shouldBe` Seq.singleton (3, 1)
+      reindexRef occurrences (B (RefUBit 4 inputVar 0)) `shouldBe` 0
+      reindexRef occurrences (B (RefUBit 4 inputVar 1)) `shouldBe` 1
+      reindexRef occurrences (B (RefUBit 4 inputVar 2)) `shouldBe` 2
+      reindexRef occurrences (B (RefUBit 4 inputVar 3)) `shouldBe` 3
       let intermediateB = RefBX 0
-      reindexRef occurrences (B intermediateB) (1 :: GF181) `shouldBe` Seq.singleton (4, 1)
+      reindexRef occurrences (B intermediateB) `shouldBe` 4
       let intermediate4 = RefUX 4 0
-      reindexRef occurrences (B (RefUBit 4 intermediate4 0)) (1 :: GF181) `shouldBe` Seq.singleton (5, 1)
-      reindexRef occurrences (B (RefUBit 4 intermediate4 1)) (1 :: GF181) `shouldBe` Seq.singleton (6, 1)
-      reindexRef occurrences (B (RefUBit 4 intermediate4 2)) (1 :: GF181) `shouldBe` Seq.singleton (7, 1)
-      reindexRef occurrences (B (RefUBit 4 intermediate4 3)) (1 :: GF181) `shouldBe` Seq.singleton (8, 1)
+      reindexRef occurrences (B (RefUBit 4 intermediate4 0)) `shouldBe` 5
+      reindexRef occurrences (B (RefUBit 4 intermediate4 1)) `shouldBe` 6
+      reindexRef occurrences (B (RefUBit 4 intermediate4 2)) `shouldBe` 7
+      reindexRef occurrences (B (RefUBit 4 intermediate4 3)) `shouldBe` 8
 
     it "Bit test / and 1" $ do
       (_, cm) <- executeGF181 $ do
@@ -144,22 +143,22 @@ tests = do
         return $ (x .&. y) !!! 0
       let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
 
-      reindexRef occurrences (B (RefBO 0)) (1 :: GF181) `shouldBe` Seq.singleton (0, 1)
+      reindexRef occurrences (B (RefBO 0)) `shouldBe` 0
       let inputVar0 = RefUI 4 0
-      reindexRef occurrences (B (RefUBit 4 inputVar0 0)) (1 :: GF181) `shouldBe` Seq.singleton (1, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar0 1)) (1 :: GF181) `shouldBe` Seq.singleton (2, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar0 2)) (1 :: GF181) `shouldBe` Seq.singleton (3, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar0 3)) (1 :: GF181) `shouldBe` Seq.singleton (4, 1)
+      reindexRef occurrences (B (RefUBit 4 inputVar0 0)) `shouldBe` 1
+      reindexRef occurrences (B (RefUBit 4 inputVar0 1)) `shouldBe` 2
+      reindexRef occurrences (B (RefUBit 4 inputVar0 2)) `shouldBe` 3
+      reindexRef occurrences (B (RefUBit 4 inputVar0 3)) `shouldBe` 4
       let inputVar1 = RefUP 4 0
-      reindexRef occurrences (B (RefUBit 4 inputVar1 0)) (1 :: GF181) `shouldBe` Seq.singleton (5, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar1 1)) (1 :: GF181) `shouldBe` Seq.singleton (6, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar1 2)) (1 :: GF181) `shouldBe` Seq.singleton (7, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar1 3)) (1 :: GF181) `shouldBe` Seq.singleton (8, 1)
+      reindexRef occurrences (B (RefUBit 4 inputVar1 0)) `shouldBe` 5
+      reindexRef occurrences (B (RefUBit 4 inputVar1 1)) `shouldBe` 6
+      reindexRef occurrences (B (RefUBit 4 inputVar1 2)) `shouldBe` 7
+      reindexRef occurrences (B (RefUBit 4 inputVar1 3)) `shouldBe` 8
       let intermediateVar0 = RefUX 4 0
-      reindexRef occurrences (B (RefUBit 4 intermediateVar0 0)) (1 :: GF181) `shouldBe` Seq.singleton (9, 1)
-      reindexRef occurrences (B (RefUBit 4 intermediateVar0 1)) (1 :: GF181) `shouldBe` Seq.singleton (10, 1)
-      reindexRef occurrences (B (RefUBit 4 intermediateVar0 2)) (1 :: GF181) `shouldBe` Seq.singleton (11, 1)
-      reindexRef occurrences (B (RefUBit 4 intermediateVar0 3)) (1 :: GF181) `shouldBe` Seq.singleton (12, 1)
+      reindexRef occurrences (B (RefUBit 4 intermediateVar0 0)) `shouldBe` 9
+      reindexRef occurrences (B (RefUBit 4 intermediateVar0 1)) `shouldBe` 10
+      reindexRef occurrences (B (RefUBit 4 intermediateVar0 2)) `shouldBe` 11
+      reindexRef occurrences (B (RefUBit 4 intermediateVar0 3)) `shouldBe` 12
 
     it "Bit test / and 2" $ do
       (_, cm) <- executeGF181 $ do
@@ -169,27 +168,27 @@ tests = do
         return $ (x .&. y .&. z) !!! 0
       let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
 
-      reindexRef occurrences (B (RefBO 0)) (1 :: GF181) `shouldBe` Seq.singleton (0, 1)
+      reindexRef occurrences (B (RefBO 0)) `shouldBe` 0
       let inputVar0 = RefUI 4 0
-      reindexRef occurrences (B (RefUBit 4 inputVar0 0)) (1 :: GF181) `shouldBe` Seq.singleton (1, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar0 1)) (1 :: GF181) `shouldBe` Seq.singleton (2, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar0 2)) (1 :: GF181) `shouldBe` Seq.singleton (3, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar0 3)) (1 :: GF181) `shouldBe` Seq.singleton (4, 1)
+      reindexRef occurrences (B (RefUBit 4 inputVar0 0)) `shouldBe` 1
+      reindexRef occurrences (B (RefUBit 4 inputVar0 1)) `shouldBe` 2
+      reindexRef occurrences (B (RefUBit 4 inputVar0 2)) `shouldBe` 3
+      reindexRef occurrences (B (RefUBit 4 inputVar0 3)) `shouldBe` 4
       let inputVar2 = RefUI 4 1
-      reindexRef occurrences (B (RefUBit 4 inputVar2 0)) (1 :: GF181) `shouldBe` Seq.singleton (5, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar2 1)) (1 :: GF181) `shouldBe` Seq.singleton (6, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar2 2)) (1 :: GF181) `shouldBe` Seq.singleton (7, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar2 3)) (1 :: GF181) `shouldBe` Seq.singleton (8, 1)
+      reindexRef occurrences (B (RefUBit 4 inputVar2 0)) `shouldBe` 5
+      reindexRef occurrences (B (RefUBit 4 inputVar2 1)) `shouldBe` 6
+      reindexRef occurrences (B (RefUBit 4 inputVar2 2)) `shouldBe` 7
+      reindexRef occurrences (B (RefUBit 4 inputVar2 3)) `shouldBe` 8
       let inputVar1 = RefUP 4 0
-      reindexRef occurrences (B (RefUBit 4 inputVar1 0)) (1 :: GF181) `shouldBe` Seq.singleton (9, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar1 1)) (1 :: GF181) `shouldBe` Seq.singleton (10, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar1 2)) (1 :: GF181) `shouldBe` Seq.singleton (11, 1)
-      reindexRef occurrences (B (RefUBit 4 inputVar1 3)) (1 :: GF181) `shouldBe` Seq.singleton (12, 1)
-      reindexRef occurrences (F (RefFX 0)) (1 :: GF181) `shouldBe` Seq.singleton (13, 1)
-      reindexRef occurrences (F (RefFX 1)) (1 :: GF181) `shouldBe` Seq.singleton (14, 1)
-      reindexRef occurrences (F (RefFX 2)) (1 :: GF181) `shouldBe` Seq.singleton (15, 1)
-      reindexRef occurrences (F (RefFX 3)) (1 :: GF181) `shouldBe` Seq.singleton (16, 1)
-      reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 0)) (1 :: GF181) `shouldBe` Seq.singleton (17, 1)
-      reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 1)) (1 :: GF181) `shouldBe` Seq.singleton (18, 1)
-      reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 2)) (1 :: GF181) `shouldBe` Seq.singleton (19, 1)
-      reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 3)) (1 :: GF181) `shouldBe` Seq.singleton (20, 1)
+      reindexRef occurrences (B (RefUBit 4 inputVar1 0)) `shouldBe` 9
+      reindexRef occurrences (B (RefUBit 4 inputVar1 1)) `shouldBe` 10
+      reindexRef occurrences (B (RefUBit 4 inputVar1 2)) `shouldBe` 11
+      reindexRef occurrences (B (RefUBit 4 inputVar1 3)) `shouldBe` 12
+      reindexRef occurrences (F (RefFX 0)) `shouldBe` 13
+      reindexRef occurrences (F (RefFX 1)) `shouldBe` 14
+      reindexRef occurrences (F (RefFX 2)) `shouldBe` 15
+      reindexRef occurrences (F (RefFX 3)) `shouldBe` 16
+      reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 0)) `shouldBe` 17
+      reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 1)) `shouldBe` 18
+      reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 2)) `shouldBe` 19
+      reindexRef occurrences (B (RefUBit 4 (RefUX 4 0) 3)) `shouldBe` 20

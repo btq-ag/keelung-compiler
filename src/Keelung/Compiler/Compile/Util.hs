@@ -179,7 +179,6 @@ writeAddWithRefLs c as = addC [CAddL (PolyL.buildWithSeq c as)]
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x
 writeVal (B a) x = writeValB a (x /= 0)
-writeVal _ _ = error "[ panic ] writeVal on RefL is not defined yet"
 
 writeValF :: (GaloisField n, Integral n) => RefF -> n -> M n ()
 writeValF a x = addC [CVarBindF (F a) x]

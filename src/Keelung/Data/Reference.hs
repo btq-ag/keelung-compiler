@@ -30,14 +30,11 @@ data Ref
     F RefF
   | -- | Boolean variable
     B RefB
-  | -- | Sequence of coefficients of binary representation of UInt variable
-    U RefL
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show Ref where
   show (F x) = show x
   show (B x) = show x
-  show (U x) = show x
 
 -- | For representing Boolean variables in constraints
 data RefB
