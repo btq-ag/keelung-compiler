@@ -365,11 +365,6 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           bindBitsEither "divisor" divisorVar expectedDivisorVal
           bindBitsEither "remainder" remainderVar expectedRemainderVal
           return Eliminated
-          
-          -- traceShowM (actualQuotientVal, expectedDivisorVal)
-          -- bindBitsEither "divisor" divisorVar expectedDivisorVal
-          -- bindBitsEither "remainder" remainderVar expectedRemainderVal
-          -- return Eliminated
         _ -> return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
     Nothing -> do
       -- we can only piece out the dividend if all of the divisor, quotient, and remainder are known

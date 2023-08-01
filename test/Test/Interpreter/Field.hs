@@ -109,3 +109,12 @@ tests = describe "Field" $ do
       when (i >= 0) $ do
         let expectedOutput = [toInteger (x ^ (i :: Integer) :: GF181)]
         runAll gf181 (program x i) [] [] expectedOutput
+
+  it "issue #25" $ do
+    let program = do
+          x <- input Public
+          y <- input Public
+          z <- inputField Public
+          assert $ (x * y) `eq` z
+    property $ \(x, y) -> do
+      runAll gf181 program [toInteger (x :: GF181), toInteger y, toInteger (x * y)] [] []

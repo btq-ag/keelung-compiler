@@ -234,14 +234,13 @@ assertEqF (VarFP a) b = do
 assertEqF a b = do
   resultA <- compileExprF a
   resultB <- compileExprF b
-
   case (resultA, resultB) of
     (Constant valA, _) -> do
       assertLC valA resultB
     (Polynomial as, Constant valB) -> do
       assertLC valB (Polynomial as)
     (Polynomial as, Polynomial bs) -> do
-      writeAddWithPolyG $ PolyG.merge as bs
+      writeAddWithPolyG $ PolyG.merge as (PolyG.negate bs)
 
 -- | Assert that two UInt expressions are equal
 assertEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()
