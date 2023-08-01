@@ -13,17 +13,13 @@ module Keelung.Data.Reference
     -- | limbs
     Limb (..),
     limbIsPositive,
-    toRefL1,
     toRefL,
-    toRefQ,
-    toRefQ1,
+    toRefL1,
   )
 where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
-import Data.Sequence (Seq)
-import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Data.VarGroup (toSubscript)
 import Keelung.Syntax
@@ -166,24 +162,13 @@ limbIsPositive limb = case lmbSigns limb of
   Right signs -> and signs
 
 -- | Construct a sequence of (Ref, n) pairs from a limb
-toRefL :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> n -> Seq (Ref, n)
+toRefL :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> n -> (RefL, n)
+toRefL _ _ _ 0 = error "[ panic ] toRefL: multiplier must be non-zero"
 toRefL powerOffset positive limb multiplyBy =
-  Seq.singleton
-    ( U (RefL limb powerOffset),
-      if positive then multiplyBy else -multiplyBy
-    )
+  ( RefL limb powerOffset,
+    if positive then multiplyBy else -multiplyBy
+  )
 
 -- | Specialized version of `toRefL`
-toRefL1 :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> Seq (Ref, n)
+toRefL1 :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> (RefL, n)
 toRefL1 powerOffset positive limb = toRefL powerOffset positive limb 1
-
--- | Construct a sequence of (Ref, n) pairs from a limb
-toRefQ :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> n -> (RefL, n)
-toRefQ powerOffset positive limb multiplyBy =
-    ( RefL limb powerOffset,
-      if positive then multiplyBy else -multiplyBy
-    )
-
--- | Specialized version of `toRefL`
-toRefQ1 :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> (RefL, n)
-toRefQ1 powerOffset positive limb = toRefQ powerOffset positive limb 1

@@ -56,6 +56,7 @@ data Constraint n
   | CVarBindF Ref n -- when x = val
   | CVarBindB RefB Bool -- when x = val
   | CMulF !(PolyG n) !(PolyG n) !(Either n (PolyG n))
+  | CMulL !(PolyL n) !(PolyL n) !(Either n (PolyL n))
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -77,6 +78,8 @@ instance Functor Constraint where
   fmap _ (CVarBindB x y) = CVarBindB x y
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
+  fmap f (CMulL x y (Left z)) = CMulL (fmap f x) (fmap f y) (Left (f z))
+  fmap f (CMulL x y (Right z)) = CMulL (fmap f x) (fmap f y) (Right (fmap f z))
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddG xs) = "AF " <> show xs <> " = 0"
@@ -88,3 +91,4 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CVarBindF x n) = "BF " <> show x <> " = " <> show n
   show (CVarBindB x n) = "BB " <> show x <> " = " <> show n
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
+  show (CMulL aV bV cV) = "ML " <> show aV <> " * " <> show bV <> " = " <> show cV

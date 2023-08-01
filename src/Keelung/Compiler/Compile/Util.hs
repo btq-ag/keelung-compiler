@@ -21,7 +21,6 @@ import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
-import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Interpreter.Arithmetics (U (UVal))
@@ -37,7 +36,7 @@ runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -109,11 +108,6 @@ writeAddWithPolyG xs = case xs of
   Left _ -> return ()
   Right poly -> addC [CAddG poly]
 
-writeAddWithPolyL :: (GaloisField n, Integral n) => Either n (PolyL n) -> M n ()
-writeAddWithPolyL xs = case xs of
-  Left _ -> return ()
-  Right poly -> addC [CAddL poly]
-
 writeAddWithLC :: (GaloisField n, Integral n) => LC n -> M n ()
 writeAddWithLC xs = case xs of
   Constant _ -> return ()
@@ -159,20 +153,28 @@ addC = mapM_ addOne
       execRelations $ AllRelations.relateB x (False, y)
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {cmMulF = (x, y, Left c) : cmMulF cs})
     addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {cmMulF = (x, y, Right z) : cmMulF cs})
+    addOne (CMulL x y (Left c)) = modify' (\cs -> addOccurrences (PolyL.vars x) $ addOccurrences (PolyL.vars y) $ cs {cmMulL = (x, y, Left c) : cmMulL cs})
+    addOne (CMulL x y (Right z)) = modify (\cs -> addOccurrences (PolyL.vars x) $ addOccurrences (PolyL.vars y) $ addOccurrences (PolyL.vars z) $ cs {cmMulL = (x, y, Right z) : cmMulL cs})
 
 --------------------------------------------------------------------------------
 
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
 writeMul as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.build as) (fromEither $ uncurry PolyG.build bs) (fromEither $ uncurry PolyG.build cs)
 
-writeMulWithSeq :: (GaloisField n, Integral n) => (n, Seq (Ref, n)) -> (n, Seq (Ref, n)) -> (n, Seq (Ref, n)) -> M n ()
-writeMulWithSeq as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.buildWithSeq as) (fromEither $ uncurry PolyG.buildWithSeq bs) (fromEither $ uncurry PolyG.buildWithSeq cs)
+writeMulWithRefLs :: (GaloisField n, Integral n) => (n, Seq (RefL, n)) -> (n, Seq (RefL, n)) -> (n, Seq (RefL, n)) -> M n ()
+writeMulWithRefLs as bs cs =
+  addC
+    [ CMulL
+        (uncurry PolyL.buildWithSeq as)
+        (uncurry PolyL.buildWithSeq bs)
+        (Right (uncurry PolyL.buildWithSeq cs))
+    ]
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPolyG (PolyG.build c as)
 
 writeAddWithRefLs :: (GaloisField n, Integral n) => n -> Seq (RefL, n) -> M n ()
-writeAddWithRefLs c as = writeAddWithPolyL (PolyL.buildWithSeq c as)
+writeAddWithRefLs c as = addC [CAddL (PolyL.buildWithSeq c as)]
 
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x

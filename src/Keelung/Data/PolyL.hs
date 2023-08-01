@@ -8,11 +8,9 @@ module Keelung.Data.PolyL (PolyL (..), vars, buildWithSeq) where
 import Control.DeepSeq (NFData)
 import Data.Foldable (toList)
 import Data.Sequence (Seq)
-import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung (widthOf)
 import Keelung.Data.Reference
 
 -- | Polynomial made of Limbs + a constant
@@ -46,12 +44,12 @@ data PolyL n = PolyL n (Seq (RefL, n))
 --         then Left c
 --         else Right (PolyG c result)
 
-buildWithSeq :: (Num n, Eq n) => n -> Seq (RefL, n) -> Either n (PolyL n)
-buildWithSeq c xs =
-  let result = Seq.filter ((/= 0) . snd) xs
-   in if Seq.null result
-        then Left c
-        else Right (PolyL c result)
+buildWithSeq :: (Num n, Eq n) => n -> Seq (RefL, n) -> PolyL n
+buildWithSeq = PolyL
+  -- let result = Seq.filter ((/= 0) . snd) xs
+  --  in if Seq.null result
+  --       then Left c
+  --       else Right (PolyL c xs)
 
 -- buildWithMap :: (Num n, Eq n) => n -> Map Ref n -> Either n (PolyG n)
 -- buildWithMap c xs =

@@ -55,6 +55,7 @@ data ConstraintModule n = ConstraintModule
     cmAddL :: [PolyL n],
     -- multiplicative constraints
     cmMulF :: [(PolyG n, PolyG n, Either n (PolyG n))],
+    cmMulL :: [(PolyL n, PolyL n, Either n (PolyL n))],
     -- hits for computing equality
     cmEqZeros :: [(PolyG n, RefF)],
     -- hints for generating witnesses for DivMod constraints

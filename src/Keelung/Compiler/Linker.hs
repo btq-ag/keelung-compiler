@@ -52,7 +52,8 @@ linkConstraintModule cm =
           <> varEqBs
           <> addFs
           <> addLs
-          <> mulFs,
+          <> mulFs
+          <> mulLs,
       csEqZeros = toList eqZeros,
       csDivMods = divMods,
       csModInvs = modInvs
@@ -140,6 +141,7 @@ linkConstraintModule cm =
     addFs = Seq.fromList $ map (linkConstraint occurrences . CAddG) $ cmAddF cm
     addLs = Seq.fromList $ map (linkConstraint occurrences . CAddL) $ cmAddL cm
     mulFs = Seq.fromList $ map (linkConstraint occurrences . uncurry3 CMulF) $ cmMulF cm
+    mulLs = Seq.fromList $ map (linkConstraint occurrences . uncurry3 CMulL) $ cmMulL cm
     eqZeros = Seq.fromList $ map (bimap (linkPolyGUnsafe occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
@@ -182,6 +184,14 @@ linkConstraint counters (CMulF as bs cs) =
     ( case cs of
         Left n -> Left n
         Right xs -> linkPolyG counters xs
+    )
+linkConstraint counters (CMulL as bs cs) =
+  Linked.CMul
+    (linkPolyLUnsafe counters as)
+    (linkPolyLUnsafe counters bs)
+    ( case cs of
+        Left n -> Left n
+        Right xs -> linkPolyL counters xs
     )
 
 updateCounters :: Occurrences -> Counters -> Counters
