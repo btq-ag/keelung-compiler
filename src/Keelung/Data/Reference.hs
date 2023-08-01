@@ -9,7 +9,6 @@ module Keelung.Data.Reference
     RefF (..),
     RefB (..),
     RefU (..),
-    toRefUBits,
     -- | limbs
     Limb (..),
     limbIsPositive,
@@ -107,10 +106,6 @@ toSuperscript = map convert . show
     convert '7' = '⁷'
     convert '8' = '⁸'
     convert _ = '⁹'
-
--- | To list of RefBs
-toRefUBits :: RefL -> [RefB]
-toRefUBits (RefL (Limb ref width start _) _) = [RefUBit (widthOf ref) ref (i + start) | i <- [0 .. width - 1]]
 
 -- | For representing UInt variables in constraints
 data RefU
