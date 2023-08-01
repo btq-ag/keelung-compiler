@@ -237,7 +237,7 @@ data Internal n = Internal
 
 instance (GaloisField n, Integral n) => Show (Internal n) where
   show (Internal expr _ counters assertions _sideEffects) =
-    "Interal {\n"
+    "Internal {\n"
       -- expressions
       <> "  Expression: "
       <> show (map (fmap N . snd) expr)
