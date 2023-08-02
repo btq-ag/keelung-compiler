@@ -47,7 +47,6 @@ module Test.PolyG () where
 
 --         -- traverse _ (1, 'a')
 
-
 --         -- substPolyG (setupPolyGs setup) (setupUnionFind setup) `shouldBe` setupPolyGs setup
 --         let substituted = flip map (setupPolyGs setup) $ \polynomial -> do
 --               case substPolyG (setupUnionFind setup) polynomial of
@@ -57,8 +56,8 @@ module Test.PolyG () where
 --               case substPolyG (setupUnionFind setup) polynomial of
 --                 Nothing -> polynomial
 --                 Just (polynomial', _) -> polynomial'
---         --  Maybe (PolyG ref n, UnionFind ref n, [ref])
---         -- UnionFind ref n -> PolyG ref n -> Maybe (PolyG ref n, UnionFind ref n, [ref])
+--         --  Maybe (PolyG n, UnionFind ref n, [ref])
+--         -- UnionFind ref n -> PolyG n -> Maybe (PolyG n, UnionFind ref n, [ref])
 
 --         -- run Basic.identity [inp :: GF181] [inp]
 --         -- print (setup :: Setup RefF (N GF181))
@@ -81,8 +80,6 @@ module Test.PolyG () where
 --         RefF <$> chooseInt (0, 99)
 --         -- RefB <$> arbitrary
 --       ]
-
-
 
 -- instance Arbitrary RefB where
 --   arbitrary =

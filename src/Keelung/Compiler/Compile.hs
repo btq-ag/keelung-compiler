@@ -21,12 +21,12 @@ import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.UInt qualified as UInt
 import Keelung.Compiler.Compile.Util
-import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.Reference
 import Keelung.Syntax (widthOf)
 
 --------------------------------------------------------------------------------
@@ -234,14 +234,13 @@ assertEqF (VarFP a) b = do
 assertEqF a b = do
   resultA <- compileExprF a
   resultB <- compileExprF b
-
   case (resultA, resultB) of
     (Constant valA, _) -> do
       assertLC valA resultB
     (Polynomial as, Constant valB) -> do
       assertLC valB (Polynomial as)
     (Polynomial as, Polynomial bs) -> do
-      writeAddWithPoly $ PolyG.merge as bs
+      writeAddWithPolyG $ PolyG.merge as (PolyG.negate bs)
 
 -- | Assert that two UInt expressions are equal
 assertEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()

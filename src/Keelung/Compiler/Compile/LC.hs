@@ -3,18 +3,18 @@ module Keelung.Compiler.Compile.LC (LC (..), fromEither, toEither, fromRefU, (@)
 import Data.Bits qualified
 import Data.Field.Galois
 import Keelung (Width)
-import Keelung.Compiler.Constraint
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.Reference
 
 -- | Linear combination of variables and constants.
 data LC n
   = Constant n
-  | Polynomial (PolyG Ref n)
+  | Polynomial (PolyG n)
   deriving (Eq, Show)
 
--- | Converting from a 'Either n (PolyG Ref n)' to a 'LC n'.
-fromEither :: Either n (PolyG Ref n) -> LC n
+-- | Converting from a 'Either n (PolyG n)' to a 'LC n'.
+fromEither :: Either n (PolyG n) -> LC n
 fromEither = either Constant Polynomial
 
 -- | Converting from a 'Either RefU n' to a 'LC n'.
@@ -24,10 +24,9 @@ fromEither = either Constant Polynomial
 --   let width = widthOf var
 --       bits = [(B (RefUBit width var i), 2 ^ i) | i <- [0 .. width - 1]]
 --    in fromEither (PolyG.build 0 bits)
-
 fromRefU :: (Num n, Eq n) => Width -> Int -> Either RefU Integer -> [LC n]
 fromRefU width fieldWidth (Right val) =
-  let limbWidth = fieldWidth 
+  let limbWidth = fieldWidth
    in map (go limbWidth) [0, limbWidth .. width - 1]
   where
     go :: (Num n, Eq n) => Int -> Int -> LC n
@@ -35,7 +34,7 @@ fromRefU width fieldWidth (Right val) =
       let range = [limbStart .. (limbStart + limbWidth - 1) `min` (width - 1)]
       Constant $ fromInteger $ sum [2 ^ i | i <- range, Data.Bits.testBit val i]
 fromRefU width fieldWidth (Left var) =
-  let limbWidth = fieldWidth 
+  let limbWidth = fieldWidth
    in map (go limbWidth) [0, limbWidth .. width - 1]
   where
     go :: (Num n, Eq n) => Int -> Int -> LC n
@@ -48,7 +47,7 @@ fromRefU width fieldWidth (Left var) =
 --     bits = [(B (RefUBit width var i), 2 ^ i) | i <- [0 .. width - 1]]
 --  in fromEither (PolyG.build 0 bits)
 
-toEither :: LC n -> Either n (PolyG Ref n)
+toEither :: LC n -> Either n (PolyG n)
 toEither (Constant c) = Left c
 toEither (Polynomial xs) = Right xs
 

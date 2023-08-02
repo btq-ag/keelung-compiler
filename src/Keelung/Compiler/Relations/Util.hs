@@ -1,7 +1,7 @@
-module Keelung.Compiler.Relations.Util (Seniority(..)) where
+module Keelung.Compiler.Relations.Util (Seniority (..)) where
 
-import Keelung.Compiler.Constraint
 import Data.Function (on)
+import Keelung.Data.Reference
 
 --------------------------------------------------------------------------------
 
@@ -23,7 +23,7 @@ instance Seniority Ref where
 --------------------------------------------------------------------------------
 
 class HasLevel a where
-  hasLevel :: a -> Int 
+  hasLevel :: a -> Int
 
 instance HasLevel RefB where
   hasLevel (RefBX _) = 0
@@ -37,6 +37,9 @@ instance HasLevel RefU where
 instance HasLevel RefF where
   hasLevel (RefFX _) = 0
   hasLevel _ = 100
+
+instance HasLevel RefL where
+  hasLevel = hasLevel . lmbRef . refLLimb
 
 instance HasLevel Ref where
   hasLevel (F x) = hasLevel x

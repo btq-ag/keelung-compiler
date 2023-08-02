@@ -18,13 +18,12 @@ import Data.Sequence qualified as Seq
 import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LC
-import Keelung.Compiler.Compile.Limb
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Util
-import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo (FieldInfo (..))
+import Keelung.Data.Reference
 import Keelung.Syntax (Width)
 
 -- Model of addition: elementary school addition with possibly multiple carries
@@ -140,12 +139,12 @@ addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs
     then do
       let carrySigns = replicate (dimCarryWidth dimensions + 1) False
       carryLimb <- allocCarryLimb (dimCarryWidth dimensions + 1) limbStart carrySigns
-      writeAddWithSeq constant $
+      writeAddWithRefLs constant $
         -- positive side
-        mconcat (map (toBits 0 True) limbs)
+        Seq.fromList (map (toRefL1 0 True) limbs)
           -- negative side
-          <> toBits 0 False resultLimb
-          <> toBits currentLimbWidth False carryLimb
+          Seq.:|> toRefL1 0 False resultLimb
+          Seq.:|> toRefL1 currentLimbWidth False carryLimb
       return $ LimbColumn.singleton carryLimb
     else
       if length limbs == 1 && constant == 0
@@ -158,12 +157,12 @@ addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs
           -- more than limbs
           let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
           carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
-          writeAddWithSeq constant $
+          writeAddWithRefLs constant $
             -- positive side
-            mconcat (map (toBits 0 True) limbs)
+            Seq.fromList (map (toRefL1 0 True) limbs)
               -- negative side
-              <> toBits 0 False resultLimb
-              <> toBits currentLimbWidth False carryLimb
+              Seq.:|> toRefL1 0 False resultLimb
+              Seq.:|> toRefL1 currentLimbWidth False carryLimb
           return $ LimbColumn.singleton carryLimb
 
 addWholeColumn :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> LimbColumn -> M n LimbColumn
@@ -282,46 +281,28 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
     Left constant -> do
       upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
-      writeAddWithSeq (a * constant) $
-        -- operand side
-        toBitsC 0 True x constant
-          -- negative side
-          <> toBits 0 False lowerLimb
-          <> toBits currentLimbWidth False upperLimb
+      writeAddWithRefLs (a * constant) $
+        Seq.fromList
+          [ -- operand side
+            toRefL 0 True x constant,
+            -- negative side
+            toRefL1 0 False lowerLimb,
+            toRefL1 currentLimbWidth False upperLimb
+          ]
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
       upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
-      writeMulWithSeq
-        (a, toBits 0 True x)
-        (b, toBits 0 True y)
+      writeMulWithRefLs
+        (a, Seq.singleton (toRefL1 0 True x))
+        (b, Seq.singleton (toRefL1 0 True y))
         ( 0,
-          toBits 0 True lowerLimb
-            <> toBits currentLimbWidth True upperLimb
+          Seq.fromList
+            [ toRefL1 0 True lowerLimb,
+              toRefL1 currentLimbWidth True upperLimb
+            ]
         )
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
-
-_mul2LimbPreallocated :: (GaloisField n, Integral n) => Width -> Int -> (n, Limb) -> Either n (n, Limb) -> Limb -> M n Limb
-_mul2LimbPreallocated currentLimbWidth limbStart (a, x) operand lowerLimb = do
-  upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
-  case operand of
-    Left constant ->
-      writeAddWithSeq (a * constant) $
-        -- operand side
-        toBitsC 0 True x constant
-          -- negative side
-          <> toBits 0 False lowerLimb
-          <> toBits currentLimbWidth False upperLimb
-    Right (b, y) ->
-      writeMulWithSeq
-        (a, toBits 0 True x)
-        (b, toBits 0 True y)
-        ( 0,
-          toBits 0 True lowerLimb
-            <> toBits currentLimbWidth True upperLimb
-        )
-
-  return upperLimb
 
 -- | n-limb by n-limb multiplication
 --                       .. x2 x1 x0

@@ -8,7 +8,7 @@ import Data.Field.Galois
 import Data.Foldable (toList)
 import Data.Proxy (Proxy (..), asProxyTypeOf)
 import GHC.TypeLits
-import Keelung hiding (compile)
+import Keelung hiding (compile, Elaborated)
 import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.ConstraintModule (ConstraintModule)

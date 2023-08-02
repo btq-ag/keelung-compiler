@@ -19,8 +19,6 @@ import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Constraint
-import Keelung.Data.FieldInfo
 import Keelung.Compiler.Optimize.OccurB (OccurB)
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF (OccurF)
@@ -31,8 +29,11 @@ import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (AllRelations)
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Util (indent)
+import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL (PolyL)
+import Keelung.Data.Reference
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Interpreter.Arithmetics (U)
@@ -50,11 +51,13 @@ data ConstraintModule n = ConstraintModule
     cmOccurrenceU :: !OccurU,
     cmFieldRelations :: AllRelations n,
     -- addative constraints
-    cmAddF :: [PolyG Ref n],
+    cmAddF :: [PolyG n],
+    cmAddL :: [PolyL n],
     -- multiplicative constraints
-    cmMulF :: [(PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))],
+    cmMulF :: [(PolyG n, PolyG n, Either n (PolyG n))],
+    cmMulL :: [(PolyL n, PolyL n, Either n (PolyL n))],
     -- hits for computing equality
-    cmEqZeros :: [(PolyG Ref n, RefF)],
+    cmEqZeros :: [(PolyG n, RefF)],
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
     cmDivMods :: [(Either RefU U, Either RefU U, Either RefU U, Either RefU U)],
@@ -136,12 +139,12 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
 
       showMul (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
-          showVec :: (Show n, Ord n, Eq n, Num n, Show ref) => Either n (PolyG ref n) -> String
+          showVec :: (Show n, Ord n, Eq n, Num n) => Either n (PolyG n) -> String
           showVec (Left c) = show c
           showVec (Right xs) = show xs
 
           -- wrap the string with parenthesis if it has more than 1 term
-          showVecWithParen :: (Show n, Ord n, Eq n, Num n, Show ref) => PolyG ref n -> String
+          showVecWithParen :: (Show n, Ord n, Eq n, Num n) => PolyG n -> String
           showVecWithParen xs =
             let termNumber = case PolyG.view xs of
                   PolyG.Monomial 0 _ -> 1
@@ -336,6 +339,32 @@ instance UpdateOccurrences RefB where
                 RefBX var ->
                   cm
                     { cmOccurrenceB = OccurB.decrease var (cmOccurrenceB cm)
+                    }
+                _ -> cm
+          )
+      )
+
+instance UpdateOccurrences RefU where
+  addOccurrences =
+    flip
+      ( foldl
+          ( \cm ref ->
+              case ref of
+                RefUX width var ->
+                  cm
+                    { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm)
+                    }
+                _ -> cm
+          )
+      )
+  removeOccurrences =
+    flip
+      ( foldl
+          ( \cm ref ->
+              case ref of
+                RefUX width var ->
+                  cm
+                    { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm)
                     }
                 _ -> cm
           )

@@ -10,8 +10,7 @@ module Keelung.Compiler.Relations.Boolean
     toMap,
     size,
     isValid,
-    -- lookup',
-    Polarity(..),
+    Polarity (..),
   )
 where
 
@@ -21,7 +20,7 @@ import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Constraint
+import Keelung.Data.Reference
 import Prelude hiding (lookup)
 
 type BooleanRelations = EquivClass.EquivClass RefB Bool Polarity
