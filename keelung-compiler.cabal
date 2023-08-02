@@ -1,11 +1,11 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
 name:           keelung-compiler
-version:        0.13.0
+version:        0.14.0
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung-compiler#readme>
 homepage:       https://github.com/btq-ag/keelung-compiler#readme
 bug-reports:    https://github.com/btq-ag/keelung-compiler/issues
@@ -74,6 +74,7 @@ library
   build-depends:
       array
     , base >=4.7 && <5
+    , binary
     , bytestring
     , cereal
     , containers
@@ -149,6 +150,7 @@ executable keelungc
       aeson
     , array
     , base >=4.7 && <5
+    , binary
     , bytestring
     , cereal
     , containers
@@ -250,6 +252,7 @@ test-suite keelung-test
     , QuickCheck
     , array
     , base >=4.7 && <5
+    , binary
     , bytestring
     , cereal
     , containers

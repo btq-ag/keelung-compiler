@@ -12,6 +12,8 @@ import Data.Aeson.Encoding
 import Data.Word
 import Data.ByteString.Lazy (ByteString, pack)
 import Data.ByteString.Lazy qualified as BS
+import Data.ByteString.Builder
+import Data.Binary qualified as B
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.IntMap qualified as IntMap
@@ -27,7 +29,7 @@ import Keelung.Syntax.Counters hiding (reindex)
 import Keelung (FieldType(..))
 import System.Random (genByteString)
 import Data.Array (Ix(inRange))
-import Data.ByteString.Builder
+import Data.Validation (Validate(_Either))
 
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
@@ -56,13 +58,6 @@ serializeInputAndWitness counters witness =
             <> pairStr "witnesses" (list (integerText . toInteger) witnesses)
 
 --------------------------------------------------------------------------------
-
-data CircuitFormat = Aurora | Snarkjs
-
-data R1csBin = R1csBin
-  { 
-
-  }
 
 -- | Encodes a R1CS in the JSON Lines text file format
 serializeR1CS :: (GaloisField n, Integral n) => CircuitFormat -> R1CS n -> ByteString
@@ -99,20 +94,29 @@ serializeR1CS Aurora r1cs =
 serializeR1CS Snarkjs r1cs = let info = r1csField r1cs in
   case fieldTypeData info of
     (Binary _) -> error "Snarkjs only allows prime fields."
-    (Prime p) -> let header = toHeader p
+    (Prime p) -> let header = toHeader p r1cs
                   in undefined
   where
     -- "r1cs, version 1, 3 sections"
     meta :: [Word8]
     meta = [0x72, 0x31, 0x63, 0x73, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00]
-    toHeader :: Integer -> FieldInfo -> Either String [Word8]
-    toHeader p info = do let size = fieldOrder info
+    toHeader :: Integer -> R1CS n -> Either String [Word8]
+    toHeader p r1cs = do let size = (fieldOrder . r1csField) r1cs
                          boundPrime <- B.bool (Left "Size of prime field is too large for Snarkjs (32 bits).")
                                               (Right $ word32LE $ fromIntegral size)
                                               (inRange (fromIntegral (minBound :: Word32), fromIntegral (maxBound :: Word32)) size)
-                         let prime = encode p
+                         let counters = r1csCounters r1cs
+                             j = encode p
+                             bin = BinHeader {
+                               prime        = p
+                             , nWires       = getTotalCount counters
+                             , nPubOut      = getCount counters Output
+                             , nPubIn       = getCount counters PublicInput
+                             , nPrvIn       = getCount counters PrivateInput
+                             , nLabels      = 0
+                             , mConstraints = length $ r1csConstraints r1cs
+                             }
                          return _
-
 
 --------------------------------------------------------------------------------
 
@@ -146,10 +150,36 @@ encodeVarCoeff (v, c) = list f [Left v, Right c]
   where
     f (Left var) = int var
     f (Right coeff) = integerText (toInteger coeff)
-
+  
 -- | Encode a R1C to Snarkjs' input format for Groth16
-toSnarkjsBin :: R1C Integer -> Encoding
-toSnarkjsBin (R1C a b c) = _
+data CircuitFormat = Aurora | Snarkjs
+
+data BinHeader = BinHeader {
+    prime        :: Integer
+,   nWires       :: Int
+,   nPubOut      :: Int
+,   nPubIn       :: Int
+,   nPrvIn       :: Int
+,   nLabels      :: Int
+,   mConstraints :: Int
+}
+
+-- | Encode in little Endian format
+encodeHeader :: BinHeader -> Builder
+encodeHeader (BinHeader p wires pubout pubin prvIn labels mcons) =
+  let primeBS = BS.reverse $ B.encode p
+      byteLength = BS.length primeBS
+   in word32LE (fromIntegral byteLength)
+   <> lazyByteString primeBS
+   <> word32LE (fromIntegral wires)
+   <> word32LE (fromIntegral pubout)
+   <> word32LE (fromIntegral pubin)
+   <> word32LE (fromIntegral prvIn)
+   <> word64LE (fromIntegral labels)
+   <> word32LE (fromIntegral mcons)
+
+toSnarkjsBin :: [R1C Integer] -> Builder
+toSnarkjsBin = _
 
 --------------------------------------------------------------------------------
 
