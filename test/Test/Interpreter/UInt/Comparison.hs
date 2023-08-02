@@ -8,9 +8,8 @@ import Data.Field.Galois (Prime)
 import Keelung hiding (compile)
 import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Compiler.Error (Error (..))
-import Keelung.Interpreter.Error qualified as Interpreter
-import Keelung.Interpreter.R1CS qualified as R1CS
-import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
+import Keelung.Interpreter qualified as Interpreter
+import Keelung.Solver qualified as Solver
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
@@ -37,8 +36,8 @@ tests = describe "Comparisons" $ do
             (program bound)
             [fromInteger x]
             []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooSmallError bound))
-            (CompileError (Compiler.AssertLTEBoundTooSmallError bound) :: Error (Prime 2))
+            (InterpreterError (Interpreter.AssertLTEBoundTooSmallError bound))
+            (CompilerError (Compiler.AssertLTEBoundTooSmallError bound) :: Error (Prime 2))
 
       when (bound >= 0 && bound < 15) $ do
         forM_ [0 .. 15] $ \x -> do
@@ -50,8 +49,8 @@ tests = describe "Comparisons" $ do
                 (program bound)
                 [fromInteger x]
                 []
-                (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError (fromInteger x) bound))
-                (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues) :: Error (Prime 2))
+                (InterpreterError (Interpreter.AssertLTEError (fromInteger x) bound))
+                (SolverError Solver.ConflictingValues :: Error (Prime 2))
 
       when (bound >= 15) $ do
         forM_ [0 .. 15] $ \x -> do
@@ -60,8 +59,9 @@ tests = describe "Comparisons" $ do
             (program bound)
             [fromInteger x]
             []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooLargeError bound width))
-            (CompileError (Compiler.AssertLTEBoundTooLargeError bound width) :: Error (Prime 2))
+            (InterpreterError (Interpreter.AssertLTEBoundTooLargeError bound width))
+            (CompilerError (Compiler.AssertLTEBoundTooLargeError bound width) :: Error (Prime 2))
+
   it "assertLTE on Prime 31" $ do
     let program bound = do
           x <- inputUInt @4 Public
@@ -77,8 +77,8 @@ tests = describe "Comparisons" $ do
             (program bound)
             [fromInteger x]
             []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooSmallError bound))
-            (CompileError (Compiler.AssertLTEBoundTooSmallError bound) :: Error (Prime 31))
+            (InterpreterError (Interpreter.AssertLTEBoundTooSmallError bound))
+            (CompilerError (Compiler.AssertLTEBoundTooSmallError bound) :: Error (Prime 31))
 
       when (bound >= 0 && bound < 15) $ do
         forM_ [0 .. 15] $ \x -> do
@@ -90,8 +90,8 @@ tests = describe "Comparisons" $ do
                 (program bound)
                 [fromInteger x]
                 []
-                (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEError (fromInteger x) bound))
-                (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues) :: Error (Prime 31))
+                (InterpreterError (Interpreter.AssertLTEError (fromInteger x) bound))
+                (SolverError Solver.ConflictingValues :: Error (Prime 31))
 
       when (bound >= 15) $ do
         forM_ [0 .. 15] $ \x -> do
@@ -100,8 +100,8 @@ tests = describe "Comparisons" $ do
             (program bound)
             [fromInteger x]
             []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTEBoundTooLargeError bound width))
-            (CompileError (Compiler.AssertLTEBoundTooLargeError bound width) :: Error (Prime 31))
+            (InterpreterError (Interpreter.AssertLTEBoundTooLargeError bound width))
+            (CompilerError (Compiler.AssertLTEBoundTooLargeError bound width) :: Error (Prime 31))
 
   it "assertLT on Prime 2" $ do
     forAll (choose (-2, 16)) $ \bound -> do
@@ -118,8 +118,8 @@ tests = describe "Comparisons" $ do
             program
             [fromInteger x]
             []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTBoundTooSmallError bound))
-            (CompileError (Compiler.AssertLTBoundTooSmallError bound) :: Error GF181)
+            (InterpreterError (Interpreter.AssertLTBoundTooSmallError bound))
+            (CompilerError (Compiler.AssertLTBoundTooSmallError bound) :: Error GF181)
 
       when (bound >= 1 && bound < 16) $ do
         forM_ [0 .. 15] $ \x -> do
@@ -131,8 +131,8 @@ tests = describe "Comparisons" $ do
                 program
                 [fromInteger x]
                 []
-                (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTError (fromInteger x) bound))
-                (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues) :: Error GF181)
+                (InterpreterError (Interpreter.AssertLTError (fromInteger x) bound))
+                (SolverError Solver.ConflictingValues :: Error GF181)
 
       when (bound >= 16) $ do
         forM_ [0 .. 15] $ \x -> do
@@ -141,8 +141,8 @@ tests = describe "Comparisons" $ do
             program
             [fromInteger x]
             []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertLTBoundTooLargeError bound width))
-            (CompileError (Compiler.AssertLTBoundTooLargeError bound width) :: Error GF181)
+            (InterpreterError (Interpreter.AssertLTBoundTooLargeError bound width))
+            (CompilerError (Compiler.AssertLTBoundTooLargeError bound width) :: Error GF181)
 
   it "assertGTE on Prime 2" $ do
     forAll (choose (-2, 16)) $ \bound -> do
@@ -159,8 +159,8 @@ tests = describe "Comparisons" $ do
             program
             [fromInteger x]
             []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEBoundTooSmallError bound))
-            (CompileError (Compiler.AssertGTEBoundTooSmallError bound) :: Error (Prime 2))
+            (InterpreterError (Interpreter.AssertGTEBoundTooSmallError bound))
+            (CompilerError (Compiler.AssertGTEBoundTooSmallError bound) :: Error (Prime 2))
 
       when (bound >= 1 && bound < 16) $ do
         forM_ [0 .. 15] $ \x -> do
@@ -172,8 +172,8 @@ tests = describe "Comparisons" $ do
                 program
                 [fromInteger x]
                 []
-                (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEError (fromInteger x) bound))
-                (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues) :: Error (Prime 2))
+                (InterpreterError (Interpreter.AssertGTEError (fromInteger x) bound))
+                (SolverError Solver.ConflictingValues :: Error (Prime 2))
 
       when (bound >= 16) $ do
         forM_ [0 .. 15] $ \x -> do
@@ -182,8 +182,8 @@ tests = describe "Comparisons" $ do
             program
             [fromInteger x]
             []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTEBoundTooLargeError bound width))
-            (CompileError (Compiler.AssertGTEBoundTooLargeError bound width) :: Error (Prime 2))
+            (InterpreterError (Interpreter.AssertGTEBoundTooLargeError bound width))
+            (CompilerError (Compiler.AssertGTEBoundTooLargeError bound width) :: Error (Prime 2))
 
   it "assertGT" $ do
     forAll (choose (-2, 16)) $ \bound -> do
@@ -200,8 +200,8 @@ tests = describe "Comparisons" $ do
             program
             [fromInteger x]
             []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTBoundTooSmallError bound))
-            (CompileError (Compiler.AssertGTBoundTooSmallError bound) :: Error GF181)
+            (InterpreterError (Interpreter.AssertGTBoundTooSmallError bound))
+            (CompilerError (Compiler.AssertGTBoundTooSmallError bound) :: Error GF181)
 
       when (bound >= 0 && bound < 15) $ do
         forM_ [0 .. 15] $ \x -> do
@@ -213,8 +213,8 @@ tests = describe "Comparisons" $ do
                 program
                 [fromInteger x]
                 []
-                (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTError (fromInteger x) bound))
-                (InterpretError (Interpreter.R1CSError R1CS.ConflictingValues) :: Error GF181)
+                (InterpreterError (Interpreter.AssertGTError (fromInteger x) bound))
+                (SolverError Solver.ConflictingValues :: Error GF181)
 
       when (bound >= 15) $ do
         forM_ [0 .. 15] $ \x -> do
@@ -223,8 +223,8 @@ tests = describe "Comparisons" $ do
             program
             [fromInteger x]
             []
-            (Interpreter.SyntaxTreeError (SyntaxTree.AssertGTBoundTooLargeError bound width))
-            (CompileError (Compiler.AssertGTBoundTooLargeError bound width) :: Error GF181)
+            (InterpreterError (Interpreter.AssertGTBoundTooLargeError bound width))
+            (CompilerError (Compiler.AssertGTBoundTooLargeError bound width) :: Error GF181)
 
   it "lte (variable / variable)" $ do
     let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)

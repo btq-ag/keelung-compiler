@@ -114,13 +114,10 @@ main = withUtf8 $ do
     outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => FilePath -> Either (Error n) (Counters, Vector n, Vector n) -> IO ()
     outputInterpretedResultAndWriteFile filepath result = do
       case result of
-        Left err -> do
-          putStrLn $ BSC.unpack $ encode err
-        Right (counters, outputs, witness) -> do
-          -- print outputs
-          putStrLn $ BSC.unpack $ encode $ toList outputs
-          -- write files
-          BS.writeFile filepath (serializeInputAndWitness counters witness)
+        Left err -> putStrLn $ BSC.unpack $ encode err
+        Right (counters, _, witness) -> do
+            outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
+            BS.writeFile filepath (serializeInputAndWitness counters witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do

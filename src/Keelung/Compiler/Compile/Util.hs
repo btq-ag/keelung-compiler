@@ -47,18 +47,6 @@ freshRefF = do
   modifyCounter $ addCount (Intermediate, WriteField) 1
   return $ RefFX index
 
-freshRefForU :: Ref -> M n Ref
-freshRefForU (F _) = do
-  counters <- gets cmCounters
-  let index = getCount counters (Intermediate, ReadField)
-  modifyCounter $ addCount (Intermediate, WriteField) 1
-  return $ F $ RefFX index
-freshRefForU (B _) = do
-  counters <- gets cmCounters
-  let index = getCount counters (Intermediate, ReadBool)
-  modifyCounter $ addCount (Intermediate, WriteBool) 1
-  return $ B $ RefBX index
-
 freshRefB :: M n RefB
 freshRefB = do
   counters <- gets cmCounters
@@ -224,9 +212,6 @@ addDivModHint w x y q r = modify' $ \cs -> cs {cmDivMods = (right (UVal w) x, ri
 
 addModInvHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Integer -> M n ()
 addModInvHint w a output n p = modify' $ \cs -> cs {cmModInvs = (right (UVal w) a, right (UVal w) output, right (UVal w) n, UVal w p) : cmModInvs cs}
-
-addBooleanConstraint :: (GaloisField n, Integral n) => RefB -> M n ()
-addBooleanConstraint x = writeMulWithLC (1 @ B x) (1 @ B x) (1 @ B x)
 
 --------------------------------------------------------------------------------
 

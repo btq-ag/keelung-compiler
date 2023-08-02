@@ -32,10 +32,10 @@ import Data.ByteString.Builder
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
 compilerVersion :: (Int, Int)
-compilerVersion = (0, 12)
+compilerVersion = (0, 13)
 
 patchVersion :: Int
-patchVersion = 3
+patchVersion = 0
 
 versionString :: String
 versionString = intercalate "." [show (fst compilerVersion), show (snd compilerVersion), show patchVersion]

@@ -7,10 +7,9 @@ import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
-import Keelung.Interpreter.Error qualified as Interpreter
-import Keelung.Interpreter.SyntaxTree qualified as SyntaxTree
 import Test.Hspec
 import Test.Interpreter.Util
+import qualified Keelung.Interpreter as Interpreter
 
 run :: IO ()
 run = hspec tests
@@ -28,8 +27,8 @@ tests = do
           program
           []
           []
-          (Interpreter.InputError (Inputs.PublicInputSizeMismatch 1 0))
-          (InterpretError (Interpreter.InputError (Inputs.PublicInputSizeMismatch 1 0)) :: Error GF181)
+          (InputError (Inputs.PublicInputSizeMismatch 1 0))
+          (InputError (Inputs.PublicInputSizeMismatch 1 0) :: Error GF181)
 
       it "missing 1 private input" $ do
         let program = complement <$> inputBool Private
@@ -38,8 +37,8 @@ tests = do
           program
           []
           []
-          (Interpreter.InputError (Inputs.PrivateInputSizeMismatch 1 0))
-          (InterpretError (Interpreter.InputError (Inputs.PrivateInputSizeMismatch 1 0)) :: Error GF181)
+          (InputError (Inputs.PrivateInputSizeMismatch 1 0))
+          (InputError (Inputs.PrivateInputSizeMismatch 1 0) :: Error GF181)
 
       it "assert (1 = 2) (Field)" $ do
         let program = do
@@ -49,8 +48,8 @@ tests = do
           program
           []
           []
-          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2")
-          (CompileError (Compile.ConflictingValuesF 1 2) :: Error GF181)
+          (InterpreterError (Interpreter.AssertionError "1 = 2"))
+          (CompilerError (Compile.ConflictingValuesF 1 2) :: Error GF181)
 
       it "assert (true = false) (Boolean)" $ do
         let program = do
@@ -60,8 +59,8 @@ tests = do
           program
           []
           []
-          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "True = False")
-          (CompileError (Compile.ConflictingValuesB True False) :: Error GF181)
+          (InterpreterError (Interpreter.AssertionError "True = False"))
+          (CompilerError (Compile.ConflictingValuesB True False) :: Error GF181)
 
       it "assert (1 = 2) (UInt)" $ do
         let program = do
@@ -71,8 +70,8 @@ tests = do
           program
           []
           []
-          (Interpreter.SyntaxTreeError $ SyntaxTree.AssertionError "1 = 2")
-          (CompileError (Compile.ConflictingValuesU 1 2) :: Error GF181)
+          (InterpreterError (Interpreter.AssertionError "1 = 2"))
+          (CompilerError (Compile.ConflictingValuesU 1 2) :: Error GF181)
 
     describe "Poseidon" $ do
       it "[0]" $ do

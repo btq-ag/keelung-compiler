@@ -1,9 +1,10 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Test.Interpreter.UInt.Multiplication (tests, run) where
 
-import Data.Word (Word8)
+import Data.Word
 import Keelung hiding (compile)
 import Test.Hspec
 import Test.Interpreter.Util
@@ -29,21 +30,27 @@ tests =
         runAll (Prime 5) (program (fromInteger x) (fromInteger y)) [] [] expected
         runAll (Prime 257) (program (fromInteger x) (fromInteger y)) [] [] expected
 
-    it "2 variables" $ do
+    it "2 byte variables" $ do
       let program = do
             x <- inputUInt @8 Public
             y <- inputUInt @8 Public
             return $ x * y
-      -- debug (Prime 1031) program
-      let genPair = do
-            x <- (arbitrary :: Gen Word8)
-            y <- (arbitrary :: Gen Word8)
-            return (toInteger x, toInteger y)
-      forAll genPair $ \(x, y) -> do
-        let expected = [(x * y) `mod` 256]
-        runAll (Prime 17) program [x, y] [] expected
-        runAll (Prime 257) program [x, y] [] expected
-        runAll (Prime 1031) program [x, y] [] expected
+      forAll arbitrary $ \(x :: Word8, y :: Word8) -> do
+        let expected = [toInteger (x * y)]
+        runAll (Prime 17) program [toInteger x, toInteger y] [] expected
+        runAll (Prime 257) program [toInteger x, toInteger y] [] expected
+        runAll (Prime 1031) program [toInteger x, toInteger y] [] expected
+
+    it "2 Word64 variables" $ do
+      let program = do
+            x <- inputUInt @64 Public
+            y <- inputUInt @64 Public
+            return $ x * y
+      forAll arbitrary $ \(x :: Word64, y :: Word64) -> do
+        let expected = [toInteger (x * y)]
+        --   runAll (Prime 17) program [toInteger x, toInteger y] [] expected
+      --   runAll (Prime 1031) program [toInteger x, toInteger y] [] expected
+        runAll gf181 program [toInteger x, toInteger y] [] expected
 
     it "1 variable / 1 constant" $ do
       let program y = do
