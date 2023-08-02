@@ -24,25 +24,52 @@ tests = do
           b <- input Private
           c <- reuse $ a * b
           return $ c .&. 5
-        -- debug cs'
         cs `shouldHaveSize` 41
         cs' `shouldHaveSize` 41
 
     describe "Addition / Subtraction" $ do
-      it "2 variables" $ do
+      it "2 variables / byte / GF181" $ do
+        -- 8 * 3 for input / output
+        -- 1 for carry bit
+        -- 1 for addition
         (cs, cs') <- executeGF181 $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Public
+          x <- inputUInt @8 Public
+          y <- inputUInt @8 Public
           return $ x + y
-        cs `shouldHaveSize` 14
-        cs' `shouldHaveSize` 14
+        cs `shouldHaveSize` 26
+        cs' `shouldHaveSize` 26
 
-      it "1 variable + 1 constant" $ do
+      it "2 variables / 128 bit / GF181" $ do
+        -- 128 * 3 for input / output
+        -- 1 for carry bit
+        -- 1 for addition
         (cs, cs') <- executeGF181 $ do
-          x <- inputUInt @4 Public
+          x <- inputUInt @128 Public
+          y <- inputUInt @128 Public
+          return $ x + y
+        cs `shouldHaveSize` 386
+        cs' `shouldHaveSize` 386
+
+      it "2 variables / 256 bit / GF181" $ do
+        -- 256 * 3 for input / output
+        -- 1 for carry bit
+        -- 2 for addition
+        (cs, cs') <- executeGF181 $ do
+          x <- inputUInt @256 Public
+          y <- inputUInt @256 Public
+          return $ x + y
+        cs `shouldHaveSize` 852
+        cs' `shouldHaveSize` 852
+
+      it "1 variable + 1 constant / byte / GF181" $ do
+        -- 8 * 2 for input / output
+        -- 1 for carry bit
+        -- 1 for addition
+        (cs, cs') <- executeGF181 $ do
+          x <- inputUInt @8 Public
           return $ x + 4
-        cs `shouldHaveSize` 10
-        cs' `shouldHaveSize` 10
+        cs `shouldHaveSize` 18
+        cs' `shouldHaveSize` 18
 
       it "3 variable + 1 constant" $ do
         (cs, cs') <- executeGF181 $ do

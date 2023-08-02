@@ -45,22 +45,24 @@ pinnedRefU (RefUX _ _) = False
 data Constraint n
   = CAddG !(PolyG n)
   | CAddL !(PolyL n)
+  | CMulF !(PolyG n) !(PolyG n) !(Either n (PolyG n))
+  | CMulL !(PolyL n) !(PolyL n) !(Either n (PolyL n))
   | CVarEq Ref Ref -- when x == y
   | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y
   | CVarNEqB RefB RefB -- when x = ¬ y
   | CVarBindF Ref n -- when x = val
   | CVarBindB RefB Bool -- when x = val
-  | CMulF !(PolyG n) !(PolyG n) !(Either n (PolyG n))
-  | CMulL !(PolyL n) !(PolyL n) !(Either n (PolyL n))
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAddG x, CAddG y) -> x == y
     (CAddL x, CAddL y) -> x == y
-    (CVarBindF x y, CVarBindF u v) -> x == u && y == v
     (CMulF x y z, CMulF u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
+    (CMulL x y z, CMulL u v w) ->
+      (x == u && y == v || x == v && y == u) && z == w
+    (CVarBindF x y, CVarBindF u v) -> x == u && y == v
     _ -> False
 
 instance Functor Constraint where
