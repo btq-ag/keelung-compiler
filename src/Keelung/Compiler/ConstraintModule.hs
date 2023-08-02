@@ -33,6 +33,7 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL (PolyL)
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
@@ -70,9 +71,10 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
   show cm =
     "Constraint Module {\n"
       <> showVarEqF
-      -- <> showVarEqU
       <> showAddF
+      <> showAddL
       <> showMulF
+      <> showMulL
       <> showEqs
       <> showBooleanConstraints
       <> showDivModHints
@@ -115,11 +117,16 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
           then ""
           else "  ModInv hints:\n" <> indent (indent (showList' (map (\(a, _aainv, _n, p) -> show a <> "⁻¹ = (mod " <> show p <> ")") (cmModInvs cm))))
 
-      showVarEqF = "  Field relations:\n" <> indent (indent (show (cmFieldRelations cm)))
+      showVarEqF =
+        if FieldRelations.size (cmFieldRelations cm) == 0
+          then ""
+          else "  Field relations:\n" <> indent (indent (show (cmFieldRelations cm)))
 
-      showAddF = adapt "AddF" (cmAddF cm) show
+      showAddF = adapt "AddF" (cmAddF cm) showAdd
+      showAddL = adapt "AddL" (cmAddL cm) showAdd
 
-      showMulF = adapt "MulF" (cmMulF cm) showMul
+      showMulF = adapt "MulF" (cmMulF cm) showMulF'
+      showMulL = adapt "MulL" (cmMulL cm) showMulL'
 
       showEqs = adapt "Eqs" (cmEqZeros cm) $ \(poly, m) ->
         "Eqs " <> show poly <> " / " <> show m
@@ -137,7 +144,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
           then ""
           else "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurU.toList $ cmOccurrenceU cm)))
 
-      showMul (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
+      showAdd xs = "0 = " <> show xs
+
+      showMulF' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
           showVec :: (Show n, Ord n, Eq n, Num n) => Either n (PolyG n) -> String
           showVec (Left c) = show c
@@ -156,6 +165,19 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
              in if termNumber < 2
                   then showVec (Right xs)
                   else "(" ++ showVec (Right xs) ++ ")"
+
+      showMulL' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
+        where
+          showVec :: (Show n, Ord n, Eq n, Num n) => Either n (PolyL n) -> String
+          showVec (Left c) = show c
+          showVec (Right xs) = show xs
+
+          -- wrap the string with parenthesis if it has more than 1 term
+          showVecWithParen :: (Show n, Ord n, Eq n, Num n) => PolyL n -> String
+          showVecWithParen xs =
+            if PolyL.size xs < 2
+              then showVec (Right xs)
+              else "(" ++ showVec (Right xs) ++ ")"
 
 prettyVariables :: Counters -> String
 prettyVariables counters =

@@ -83,14 +83,14 @@ data RefL = RefL
 
 instance Show RefL where
   show (RefL (Limb _ 0 _ _) _) = "<Empty RefL>"
-  show (RefL (Limb ref 1 i (Left sign)) offset) = if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
-  show (RefL (Limb ref 1 i (Right signs)) offset) = if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
-  show (RefL (Limb ref 2 i (Left sign)) offset) = if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> if sign then "+" else "-" <> "2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
-  show (RefL (Limb ref 2 i (Right signs)) offset) = if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> if last signs then "+" else "-" <> "2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
+  show (RefL (Limb ref 1 i (Left sign)) offset) = (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
+  show (RefL (Limb ref 1 i (Right signs)) offset) = (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
+  show (RefL (Limb ref 2 i (Left sign)) offset) = (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
+  show (RefL (Limb ref 2 i (Right signs)) offset) = (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
   show (RefL (Limb ref width i (Left sign)) offset) =
-    if sign then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " ... " <> if sign then "+" else "-" <> "2" <> toSuperscript (offset + width - 1) <> "$" <> show (RefUBit 1 ref (i + width - 1))
+    (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <>  (if sign then "+" else "-") <> " ... " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (offset + width - 1) <> "$" <> show (RefUBit 1 ref (i + width - 1))
   show (RefL (Limb ref width i (Right signs)) offset) =
-    if head signs then "" else "-" <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " ... " <> if last signs then "+" else "-" <> "2" <> toSuperscript (offset + width - 1) <> "$" <> show (RefUBit 1 ref (i + width - 1))
+    (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " ... " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (offset + width - 1) <> "$" <> show (RefUBit 1 ref (i + width - 1))
 
 -- | Helper function for converting integers to superscript strings
 toSuperscript :: Int -> String

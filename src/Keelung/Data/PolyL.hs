@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial made of Limbs
-module Keelung.Data.PolyL (PolyL (..), vars, buildWithSeq) where
+module Keelung.Data.PolyL (PolyL (..), vars, buildWithSeq, size) where
 
 import Control.DeepSeq (NFData)
 import Data.Foldable (toList)
@@ -15,27 +15,27 @@ import Keelung.Data.Reference
 
 -- | Polynomial made of Limbs + a constant
 data PolyL n = PolyL n (Seq (RefL, n))
-  deriving (Show, Eq, Functor, Ord, Generic, NFData)
+  deriving (Eq, Functor, Ord, Generic, NFData)
 
--- instance (Show n, Ord n, Eq n, Num n) => Show (PolyG n) where
---   show (PolyG n xs)
---     | n == 0 =
---         if firstSign == " + "
---           then concat restOfTerms
---           else "- " <> concat restOfTerms
---     | otherwise = concat (show n : firstSign : restOfTerms)
---     where
---       (firstSign, restOfTerms) = case concatMap printTerm $ Map.toList xs of
---         [] -> error "[ panic ] Empty PolyG"
---         (x' : xs') -> (x', xs')
---       -- return a pair of the sign ("+" or "-") and the string representation
---       printTerm :: (Show n, Ord n, Eq n, Num n) => (Ref, n) -> [String]
---       printTerm (x, c)
---         | c == 0 = error "printTerm: coefficient of 0"
---         | c == 1 = [" + ", show x]
---         | c == -1 = [" - ", show x]
---         | c < 0 = [" - ", show (Prelude.negate c) <> show x]
---         | otherwise = [" + ", show c <> show x]
+instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
+  show (PolyL n xs)
+    | n == 0 =
+        if firstSign == " + "
+          then concat restOfTerms
+          else "- " <> concat restOfTerms
+    | otherwise = concat (show n : firstSign : restOfTerms)
+    where
+      (firstSign, restOfTerms) = case concatMap printTerm $ toList xs of
+        [] -> error "[ panic ] Empty PolyG"
+        (x' : xs') -> (x', xs')
+      -- return a pair of the sign ("+" or "-") and the string representation
+      printTerm :: (Show n, Ord n, Eq n, Num n) => (RefL, n) -> [String]
+      printTerm (x, c)
+        | c == 0 = error "printTerm: coefficient of 0"
+        | c == 1 = [" + ", show x]
+        | c == -1 = [" - ", show x]
+        | c < 0 = [" - ", show (Prelude.negate c) <> show x]
+        | otherwise = [" + ", show c <> show x]
 
 -- build :: (Num n, Eq n) => n -> [(Ref, n)] -> Either n (PolyG n)
 -- build c xs =
@@ -46,10 +46,11 @@ data PolyL n = PolyL n (Seq (RefL, n))
 
 buildWithSeq :: (Num n, Eq n) => n -> Seq (RefL, n) -> PolyL n
 buildWithSeq = PolyL
-  -- let result = Seq.filter ((/= 0) . snd) xs
-  --  in if Seq.null result
-  --       then Left c
-  --       else Right (PolyL c xs)
+
+-- let result = Seq.filter ((/= 0) . snd) xs
+--  in if Seq.null result
+--       then Left c
+--       else Right (PolyL c xs)
 
 -- buildWithMap :: (Num n, Eq n) => n -> Map Ref n -> Either n (PolyG n)
 -- buildWithMap c xs =
@@ -105,4 +106,11 @@ vars (PolyL _ xs) = Set.fromList $ map (toRef . fst) (toList xs)
 --   let result = Map.filter (/= 0) $ Map.unionWith (+) xs1 xs2
 --    in if Map.null result
 --         then Left (c1 + c2)
---         else Right (PolyG (c1 + c2) result)
+--         else Right (PolyG (c1 + c2) result)z
+
+-- | Number of terms (including the constant)
+size :: (Eq n, Num n) => PolyL n -> Int 
+size (PolyL c xs) = sum (fmap (sizeOfRefL . fst) xs) + if c == 0 then 0 else 1
+  where 
+    sizeOfRefL :: RefL -> Int
+    sizeOfRefL (RefL limb _) = lmbWidth limb
