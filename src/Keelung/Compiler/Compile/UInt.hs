@@ -58,12 +58,10 @@ compileAddU width out [] constant = do
 compileAddU width out vars constant = do
   fieldInfo <- gets cmField
 
-  let numberOfOperands = length vars
+  let numberOfOperandsPlusCarry = length vars + 1
 
   -- calculate the expected width of the carry limbs, which is logarithimic to the number of operands
-  let expectedCarryWidth =
-        ceiling (logBase 2 (fromIntegral numberOfOperands + if constant == 0 then 0 else 1) :: Double) `max` 2 :: Int
-
+  let expectedCarryWidth = ceiling ((logBase 2 (fromIntegral numberOfOperandsPlusCarry + if constant == 0 then 0 else 1) :: Double) + 1) `max` 2 :: Int
   -- invariants about widths of carry and limbs:
   --  1. limb width + carry width ≤ field width, so that they both fit in a field
   --  2. limb width ≥ carry width, so that the carry can be added to the next limb

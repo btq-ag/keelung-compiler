@@ -36,8 +36,8 @@ tests = do
           x <- inputUInt @8 Public
           y <- inputUInt @8 Public
           return $ x + y
-        cs `shouldHaveSize` 26
-        cs' `shouldHaveSize` 26
+        cs `shouldHaveSize` 27
+        cs' `shouldHaveSize` 27
 
       it "2 variables / 128 bit / GF181" $ do
         -- 128 * 3 for input / output
@@ -47,19 +47,19 @@ tests = do
           x <- inputUInt @128 Public
           y <- inputUInt @128 Public
           return $ x + y
-        cs `shouldHaveSize` 386
-        cs' `shouldHaveSize` 386
+        cs `shouldHaveSize` 387
+        cs' `shouldHaveSize` 387
 
       it "2 variables / 256 bit / GF181" $ do
         -- 256 * 3 for input / output
-        -- 1 for carry bit
+        -- 2 for carry bit
         -- 2 for addition
         (cs, cs') <- executeGF181 $ do
           x <- inputUInt @256 Public
           y <- inputUInt @256 Public
           return $ x + y
-        cs `shouldHaveSize` 852
-        cs' `shouldHaveSize` 852
+        cs `shouldHaveSize` 774
+        cs' `shouldHaveSize` 774
 
       it "1 variable + 1 constant / byte / GF181" $ do
         -- 8 * 2 for input / output
@@ -68,8 +68,8 @@ tests = do
         (cs, cs') <- executeGF181 $ do
           x <- inputUInt @8 Public
           return $ x + 4
-        cs `shouldHaveSize` 18
-        cs' `shouldHaveSize` 18
+        cs `shouldHaveSize` 19
+        cs' `shouldHaveSize` 19
 
       it "3 variable + 1 constant" $ do
         (cs, cs') <- executeGF181 $ do
@@ -77,10 +77,8 @@ tests = do
           y <- inputUInt @4 Public
           z <- inputUInt @4 Public
           return $ x + y + z + 4
-        -- cs `shouldHaveSize` 19
-        -- cs' `shouldHaveSize` 19
-        cs `shouldHaveSize` 30
-        cs' `shouldHaveSize` 30
+        cs `shouldHaveSize` 20
+        cs' `shouldHaveSize` 20
 
       it "3 variable + 1 constant (with subtraction)" $ do
         (cs, cs') <- executeGF181 $ do
@@ -89,10 +87,8 @@ tests = do
           z <- inputUInt @4 Public
           return $ x - y + z + 4
         -- print $ linkConstraintModule cs'
-        -- cs `shouldHaveSize` 19
-        -- cs' `shouldHaveSize` 19
-        cs `shouldHaveSize` 30
-        cs' `shouldHaveSize` 30
+        cs `shouldHaveSize` 20
+        cs' `shouldHaveSize` 20
 
       -- TODO: should've been just 4
       it "2 constants" $ do
