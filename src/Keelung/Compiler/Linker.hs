@@ -99,10 +99,6 @@ linkConstraintModule cm =
             Nothing -> False
             Just xs -> IntSet.member var xs
         )
-      --   || ( case IntMap.lookup width (cmBitTests cm) of
-      --          Nothing -> False
-      --          Just xs -> IntSet.member var xs
-      --      )
       _ ->
         -- it's a pinned UInt variable
         True
@@ -133,7 +129,6 @@ linkConstraintModule cm =
           result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
        in Seq.fromList (map (linkConstraint occurrences) result)
 
-    -- varEqFs = fromFieldRelations (cmFieldRelations cm) (FieldRelations.exportUIntRelations (cmFieldRelations cm)) (cmOccurrenceF cm)
     varEqFs = extractFieldRelations (cmFieldRelations cm)
     varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (cmFieldRelations cm))
 
