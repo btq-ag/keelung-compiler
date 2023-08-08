@@ -6,7 +6,6 @@ module Encode (versionString, CircuitFormat(..), serializeR1CS, serializeInputAn
 
 -- import Data.Aeson.Encoding
 
-import qualified Data.Bool as B
 import Data.Aeson
 import Data.Aeson.Encoding
 import Data.Word
@@ -27,9 +26,8 @@ import Keelung.Data.FieldInfo
 import Keelung.Syntax
 import Keelung.Syntax.Counters hiding (reindex)
 import Keelung (FieldType(..))
-import System.Random (genByteString)
 import Data.Array (Ix(inRange))
-import Data.Validation (Validate(_Either))
+import Data.Int (Int64)
 
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
@@ -91,32 +89,41 @@ serializeR1CS Aurora r1cs =
               <> pairStr "optimized" (bool True)
 -- | Binary representation used by Snarkjs:
 -- | https://github.com/iden3/r1csfile/blob/master/doc/r1cs_bin_format.md
+-- | TODO: Lengthes are now calculated by running builders, may affects performance
 serializeR1CS Snarkjs r1cs = let info = r1csField r1cs in
   case fieldTypeData info of
     (Binary _) -> error "Snarkjs only allows prime fields."
-    (Prime p) -> let header = toHeader p r1cs
-                  in undefined
+    (Prime p) -> let header      = toHeader p
+                     constraints = toSnarkjsBin r1cConstraints p
+                  in meta
+                  <> toLazyByteString (word32LE 0x01) <> secLength header
+                  <> header
+                  <> toLazyByteString (word32LE 0x02) <> secLength constraints
+                  <> constraints
+                  <> toLazyByteString (word32LE 0x03 <> word64LE 0) -- Labels are now ignored
   where
+    r1cConstraints = map (fmap toInteger . reindexR1C r1cs) (toR1Cs r1cs)
+    secLength = toLazyByteString . word64LE . fromIntegral . BS.length
+
     -- "r1cs, version 1, 3 sections"
-    meta :: [Word8]
-    meta = [0x72, 0x31, 0x63, 0x73, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00]
-    toHeader :: Integer -> R1CS n -> Either String [Word8]
-    toHeader p r1cs = do let size = (fieldOrder . r1csField) r1cs
-                         boundPrime <- B.bool (Left "Size of prime field is too large for Snarkjs (32 bits).")
-                                              (Right $ word32LE $ fromIntegral size)
-                                              (inRange (fromIntegral (minBound :: Word32), fromIntegral (maxBound :: Word32)) size)
-                         let counters = r1csCounters r1cs
-                             j = encode p
-                             bin = BinHeader {
-                               prime        = p
-                             , nWires       = getTotalCount counters
-                             , nPubOut      = getCount counters Output
-                             , nPubIn       = getCount counters PublicInput
-                             , nPrvIn       = getCount counters PrivateInput
-                             , nLabels      = 0
-                             , mConstraints = length $ r1csConstraints r1cs
-                             }
-                         return _
+    meta :: ByteString
+    meta = pack [0x72, 0x31, 0x63, 0x73, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00]
+
+    toHeader :: Integer -> ByteString
+    toHeader p = let counters = r1csCounters r1cs
+                     header = BinHeader {
+                       primeLen     = fromIntegral $ BS.length $ B.encode p 
+                     , prime        = p
+                     , nWires       = getTotalCount counters
+                     , nPubOut      = getCount counters Output
+                     , nPubIn       = getCount counters PublicInput
+                     , nPrvIn       = getCount counters PrivateInput
+                     , nLabels      = 0
+                     , mConstraints = length $ r1csConstraints r1cs
+                     }
+                  in if inRange (minBound :: Word32, maxBound :: Word32) (fromIntegral $ primeLen header)
+                     then encodeHeader header
+                     else error "Size of prime field is too large for Snarkjs (32 bits in length)."
 
 --------------------------------------------------------------------------------
 
@@ -150,12 +157,24 @@ encodeVarCoeff (v, c) = list f [Left v, Right c]
   where
     f (Left var) = int var
     f (Right coeff) = integerText (toInteger coeff)
+
+--------------------------------------------------------------------------------
+
+-- Data.ByteString.Lazy.Builder but with length recorded
+-- data BuilderL = BuilderL { blLength :: !Int, blBuilder :: Builder }
+-- 
+-- instance Semigroup BuilderL where
+--   (BuilderL l1 t1) <> (BuilderL l2 t2) = BuilderL (l1 + l2) (t1 <> t2)
+-- 
+-- instance Monoid BuilderL where
+--     mempty = BuilderL 0 mempty
   
 -- | Encode a R1C to Snarkjs' input format for Groth16
 data CircuitFormat = Aurora | Snarkjs
 
 data BinHeader = BinHeader {
-    prime        :: Integer
+    primeLen     :: Int
+,   prime        :: Integer
 ,   nWires       :: Int
 ,   nPubOut      :: Int
 ,   nPubIn       :: Int
@@ -164,22 +183,45 @@ data BinHeader = BinHeader {
 ,   mConstraints :: Int
 }
 
--- | Encode in little Endian format
-encodeHeader :: BinHeader -> Builder
-encodeHeader (BinHeader p wires pubout pubin prvIn labels mcons) =
-  let primeBS = BS.reverse $ B.encode p
-      byteLength = BS.length primeBS
-   in word32LE (fromIntegral byteLength)
-   <> lazyByteString primeBS
-   <> word32LE (fromIntegral wires)
-   <> word32LE (fromIntegral pubout)
-   <> word32LE (fromIntegral pubin)
-   <> word32LE (fromIntegral prvIn)
-   <> word64LE (fromIntegral labels)
-   <> word32LE (fromIntegral mcons)
+-- | Encode in little Endian style
+encodeHeader :: BinHeader -> ByteString
+encodeHeader (BinHeader plen p wires pubout pubin prvIn labels mcons) =
+  let primeBS = BS.reverse $ B.encode p -- Reverse for little endian
+   in toLazyByteString $ word32LE (fromIntegral plen)
+                      <> lazyByteString primeBS
+                      <> word32LE (fromIntegral wires)
+                      <> word32LE (fromIntegral pubout)
+                      <> word32LE (fromIntegral pubin)
+                      <> word32LE (fromIntegral prvIn)
+                      <> word64LE (fromIntegral labels)
+                      <> word32LE (fromIntegral mcons)
 
-toSnarkjsBin :: [R1C Integer] -> Builder
-toSnarkjsBin = _
+toSnarkjsBin :: [R1C Integer] -> Integer -> ByteString
+toSnarkjsBin r1cs fieldPrime =
+  toLazyByteString $ mconcat $ map (\(R1C x y z) -> encodePoly x <> encodePoly y <> encodePoly z) r1cs
+  where
+    encodePoly :: Either Integer (Poly Integer) -> Builder
+    encodePoly (Left constant) = word32LE 1
+                              <> word32LE 0
+                              <> size64LE constant 
+    encodePoly (Right poly) = mconcat $
+                                -- Number of coefficients in this polynomial, adding one for the constant
+                                [ word32LE (fromIntegral $ IntMap.size (Poly.coeffs poly) + 1)
+                                , word32LE 0
+                                , size64LE (Poly.constant poly)
+                                ] <> map coeffsToBuilder (IntMap.toAscList $ Poly.coeffs poly)
+
+    coeffsToBuilder :: (Int, Integer) -> Builder
+    coeffsToBuilder (k, c) = word32LE (fromIntegral k) <> size64LE c
+
+    size64LE :: Integer -> Builder
+    size64LE x = (lazyByteString . extendByteString (fromIntegral fieldPrime)) (BS.reverse $ B.encode x)
+
+    -- Make sure the coefficients are of the same length with the prime
+    extendByteString :: Int64 -> ByteString -> ByteString
+    extendByteString len bs = let diff = BS.length bs - len
+                               in bs <> BS.pack (replicate (fromIntegral diff) 0)
+
 
 --------------------------------------------------------------------------------
 
