@@ -58,10 +58,9 @@ compileAddU width out [] constant = do
 compileAddU width out vars constant = do
   fieldInfo <- gets cmField
 
-  let numberOfOperandsPlusCarry = length vars + 1
-
+  let arity = length vars + if constant == 0 then 0 else 1
   -- calculate the expected width of the carry limbs, which is logarithimic to the number of operands
-  let expectedCarryWidth = ceiling ((logBase 2 (fromIntegral numberOfOperandsPlusCarry + if constant == 0 then 0 else 1) :: Double) + 1) `max` 2 :: Int
+  let expectedCarryWidth = ceiling (logBase 2 (fromIntegral arity :: Double)) `max` 2 :: Int
   -- invariants about widths of carry and limbs:
   --  1. limb width + carry width ≤ field width, so that they both fit in a field
   --  2. limb width ≥ carry width, so that the carry can be added to the next limb
@@ -77,8 +76,8 @@ compileAddU width out vars constant = do
   let dimensions =
         Dimensions
           { dimUIntWidth = width,
-            dimMaxHeight = if carryWidth > 21 then 1048576 else 2 ^ (carryWidth - 1), -- HACK
-            dimCarryWidth = carryWidth - 1
+            dimMaxHeight = if carryWidth > 21 then 1048576 else 2 ^ carryWidth, -- HACK
+            dimCarryWidth = carryWidth
           }
 
   case fieldTypeData fieldInfo of
@@ -133,10 +132,28 @@ addPartialColumn dimensions _ currentLimbWidth resultLimb constant [] = do
 addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs = do
   let negLimbSize = length $ filter (not . limbIsPositive) limbs
   let allNegative = negLimbSize == length limbs
-  if allNegative
+  -- if allNegative
+  --   then do
+  --     let carrySigns = replicate (dimCarryWidth dimensions + 1) False
+  --     carryLimb <- allocCarryLimb (dimCarryWidth dimensions + 1) limbStart carrySigns
+  --     writeAddWithRefLs constant $
+  --       -- positive side
+  --       Seq.fromList (map (toRefL1 0 True) limbs)
+  --         -- negative side
+  --         Seq.:|> toRefL1 0 False resultLimb
+  --         Seq.:|> toRefL1 currentLimbWidth False carryLimb
+  --     return $ LimbColumn.singleton carryLimb
+  --   else
+  if length limbs == 1 && constant == 0 && not allNegative
     then do
-      let carrySigns = replicate (dimCarryWidth dimensions + 1) False
-      carryLimb <- allocCarryLimb (dimCarryWidth dimensions + 1) limbStart carrySigns
+      forM_ [0 .. currentLimbWidth - 1] $ \i -> do
+        let limb = head limbs
+        writeEqB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) (RefUBit (dimUIntWidth dimensions) (lmbRef limb) (lmbOffset limb + i))
+      return mempty
+    else do
+      -- more than limbs
+      let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
+      carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
       writeAddWithRefLs constant $
         -- positive side
         Seq.fromList (map (toRefL1 0 True) limbs)
@@ -144,40 +161,33 @@ addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs
           Seq.:|> toRefL1 0 False resultLimb
           Seq.:|> toRefL1 currentLimbWidth False carryLimb
       return $ LimbColumn.singleton carryLimb
-    else
-      if length limbs == 1 && constant == 0
-        then do
-          forM_ [0 .. currentLimbWidth - 1] $ \i -> do
-            let limb = head limbs
-            writeEqB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) (RefUBit (dimUIntWidth dimensions) (lmbRef limb) (lmbOffset limb + i))
-          return mempty
-        else do
-          -- more than limbs
-          let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
-          carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
-          writeAddWithRefLs constant $
-            -- positive side
-            Seq.fromList (map (toRefL1 0 True) limbs)
-              -- negative side
-              Seq.:|> toRefL1 0 False resultLimb
-              Seq.:|> toRefL1 currentLimbWidth False carryLimb
-          return $ LimbColumn.singleton carryLimb
 
 addWholeColumn :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> LimbColumn -> M n LimbColumn
 addWholeColumn dimensions limbStart currentLimbWidth finalResultLimb column = do
   let constant = LimbColumn.constant column
-  let (currentBatch, nextBatch) = Seq.splitAt (dimMaxHeight dimensions) (LimbColumn.limbs column)
-  if not (null nextBatch) || (length currentBatch == dimMaxHeight dimensions && constant /= 0)
+
+  let limbs = LimbColumn.limbs column
+  let negLimbSize = length $ Seq.filter (not . limbIsPositive) limbs
+  let allNegative = negLimbSize == length limbs
+  let arity = length limbs + if allNegative || constant /= 0 then 1 else 0
+
+  if arity > dimMaxHeight dimensions
     then do
+      let stackHeight = if allNegative then dimMaxHeight dimensions - 1 else dimMaxHeight dimensions
+
+      -- if allNegative
+      --   then traceM "ALL NEG"
+      --   else return ()
+
+      let (currentBatch, nextBatch) = Seq.splitAt stackHeight limbs
       -- inductive case, there are more limbs to be processed
       resultLimb <- allocLimb currentLimbWidth limbStart True
       carryLimb <- addPartialColumn dimensions limbStart currentLimbWidth resultLimb 0 (toList currentBatch)
       -- insert the result limb of the current batch to the next batch
       moreCarryLimbs <- addWholeColumn dimensions limbStart currentLimbWidth finalResultLimb (LimbColumn.new (toInteger constant) (resultLimb : toList nextBatch))
       return (carryLimb <> moreCarryLimbs)
-    else do
-      -- edge case, all limbs are in the current batch
-      addPartialColumn dimensions limbStart currentLimbWidth finalResultLimb (fromInteger constant) (toList currentBatch)
+    else -- edge case, all limbs are in the current batch
+      addPartialColumn dimensions limbStart currentLimbWidth finalResultLimb (fromInteger constant) (toList limbs)
 
 compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileSubU width out (Right a) (Right b) = compileAddU width out [] (a - b)

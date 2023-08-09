@@ -34,6 +34,7 @@ library
       Keelung.Compiler.Compile.LC
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
+      Keelung.Compiler.Compile.UInt.Addition
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
@@ -105,6 +106,7 @@ executable keelungc
       Keelung.Compiler.Compile.LC
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
+      Keelung.Compiler.Compile.UInt.Addition
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
@@ -206,6 +208,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.LC
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
+      Keelung.Compiler.Compile.UInt.Addition
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem

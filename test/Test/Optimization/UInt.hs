@@ -77,8 +77,8 @@ tests = do
           y <- inputUInt @4 Public
           z <- inputUInt @4 Public
           return $ x + y + z + 4
-        cs `shouldHaveSize` 20
-        cs' `shouldHaveSize` 20
+        cs `shouldHaveSize` 19
+        cs' `shouldHaveSize` 19
 
       it "3 variable + 1 constant (with subtraction)" $ do
         (cs, cs') <- executeGF181 $ do
@@ -87,8 +87,8 @@ tests = do
           z <- inputUInt @4 Public
           return $ x - y + z + 4
         -- print $ linkConstraintModule cs'
-        cs `shouldHaveSize` 20
-        cs' `shouldHaveSize` 20
+        cs `shouldHaveSize` 19
+        cs' `shouldHaveSize` 19
 
       -- TODO: should've been just 4
       it "2 constants" $ do
