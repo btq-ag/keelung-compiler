@@ -28,7 +28,7 @@ compilerVersion :: (Int, Int)
 compilerVersion = (0, 13)
 
 patchVersion :: Int
-patchVersion = 0
+patchVersion = 1
 
 versionString :: String
 versionString = intercalate "." [show (fst compilerVersion), show (snd compilerVersion), show patchVersion]
