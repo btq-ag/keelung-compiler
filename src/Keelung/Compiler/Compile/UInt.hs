@@ -14,6 +14,7 @@ import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
+import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error qualified as Error
@@ -132,18 +133,7 @@ addPartialColumn dimensions _ currentLimbWidth resultLimb constant [] = do
 addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs = do
   let negLimbSize = length $ filter (not . limbIsPositive) limbs
   let allNegative = negLimbSize == length limbs
-  -- if allNegative
-  --   then do
-  --     let carrySigns = replicate (dimCarryWidth dimensions + 1) False
-  --     carryLimb <- allocCarryLimb (dimCarryWidth dimensions + 1) limbStart carrySigns
-  --     writeAddWithRefLs constant $
-  --       -- positive side
-  --       Seq.fromList (map (toRefL1 0 True) limbs)
-  --         -- negative side
-  --         Seq.:|> toRefL1 0 False resultLimb
-  --         Seq.:|> toRefL1 currentLimbWidth False carryLimb
-  --     return $ LimbColumn.singleton carryLimb
-  --   else
+
   if length limbs == 1 && constant == 0 && not allNegative
     then do
       forM_ [0 .. currentLimbWidth - 1] $ \i -> do
@@ -151,7 +141,6 @@ addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs
         writeEqB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) (RefUBit (dimUIntWidth dimensions) (lmbRef limb) (lmbOffset limb + i))
       return mempty
     else do
-      -- more than limbs
       let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
       carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
       writeAddWithRefLs constant $
@@ -173,13 +162,7 @@ addWholeColumn dimensions limbStart currentLimbWidth finalResultLimb column = do
 
   if arity > dimMaxHeight dimensions
     then do
-      let stackHeight = if allNegative then dimMaxHeight dimensions - 1 else dimMaxHeight dimensions
-
-      -- if allNegative
-      --   then traceM "ALL NEG"
-      --   else return ()
-
-      let (currentBatch, nextBatch) = Seq.splitAt stackHeight limbs
+      let (currentBatch, nextBatch) = splitLimbs limbs
       -- inductive case, there are more limbs to be processed
       resultLimb <- allocLimb currentLimbWidth limbStart True
       carryLimb <- addPartialColumn dimensions limbStart currentLimbWidth resultLimb 0 (toList currentBatch)
@@ -188,6 +171,20 @@ addWholeColumn dimensions limbStart currentLimbWidth finalResultLimb column = do
       return (carryLimb <> moreCarryLimbs)
     else -- edge case, all limbs are in the current batch
       addPartialColumn dimensions limbStart currentLimbWidth finalResultLimb (fromInteger constant) (toList limbs)
+  where
+    -- Let `H` be the maximum batch size allowed
+    --    if all limbs are negative
+    --      then we can only add `H-1` limbs up at a time
+    --      else we can add all `H` limbs up at a time
+    splitLimbs :: Seq Limb -> (Seq Limb, Seq Limb)
+    splitLimbs limbs =
+      let (currentBatch', nextBatch') = Seq.splitAt (dimMaxHeight dimensions - 1) limbs
+          currentBatchAllNegative = not (any limbIsPositive currentBatch')
+       in if currentBatchAllNegative
+            then (currentBatch', nextBatch')
+            else case Seq.viewl nextBatch' of
+              Seq.EmptyL -> (currentBatch', mempty)
+              nextBatchHead Seq.:< nextBatchTail -> (currentBatch' Seq.|> nextBatchHead, nextBatchTail)
 
 compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileSubU width out (Right a) (Right b) = compileAddU width out [] (a - b)
