@@ -26,6 +26,9 @@ instance Monoid LimbColumn where
 new :: Integer -> [Limb] -> LimbColumn
 new c xs = LimbColumn c (Seq.fromList xs)
 
+isEmpty :: LimbColumn -> Bool
+isEmpty (LimbColumn c xs) = c == 0 && Seq.null xs
+
 -- | Create a 'LimbColumn' with a single 'Limb'.
 singleton :: Limb -> LimbColumn
 singleton x = LimbColumn 0 (pure x)

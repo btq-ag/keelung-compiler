@@ -4,11 +4,10 @@ import Control.Monad.Except
 import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.Error qualified as Error
-import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
+import Keelung.Compiler.Compile.LimbColumn (LimbColumn (..))
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
@@ -22,13 +21,22 @@ import Keelung.Syntax (Width)
 --  * F – maximum bit width of unsigned integers allowed in some underlying field,
 --          for example, `F = 180` in `GF181`
 --  * W - bit width of unsigned integers
-data Model
-  = -- | N ≤ 1
-    Trivial
-  | -- | 2 < N ≤ 2^⌊F/2⌋
-    Standard
-  | -- | 2^⌊F/2⌋ < N
-    Extended
+-- data Model
+--   = -- | N ≤ 1
+--     Trivial
+--   | -- | 2 < N ≤ 2^⌊F/2⌋
+--     Standard
+--   | -- | 2^⌊F/2⌋ < N
+--     Extended
+
+--------------------------------------------------------------------------------
+
+data LimbStack
+  = Ordinary Integer (Seq Limb)
+  | OneLimbOnly Limb
+  | OneConstantOnly Integer
+
+-- AllNegative Integer [Limb] | Ordinary Integer [Limb]
 
 --------------------------------------------------------------------------------
 
@@ -129,38 +137,36 @@ compileSubU width out (Left a) (Left b) = compileAddU width out [(a, True), (b, 
 
 addWholeColumn :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> LimbColumn -> M n LimbColumn
 addWholeColumn dimensions limbStart currentLimbWidth finalResultLimb column = do
-  let constant = LimbColumn.constant column
-
-  let limbs = LimbColumn.limbs column
-  let negLimbSize = length $ Seq.filter (not . limbIsPositive) limbs
-  let allNegative = negLimbSize == length limbs
-  let arity = length limbs + if allNegative || constant /= 0 then 1 else 0
-
-  if arity > dimMaxHeight dimensions
+  let (stack, rest) = splitLimbStack column
+  if LimbColumn.isEmpty rest
     then do
-      let (currentBatch, nextBatch) = splitLimbs limbs
+      addLimbStack dimensions limbStart currentLimbWidth finalResultLimb stack
+    else do
       -- inductive case, there are more limbs to be processed
       resultLimb <- allocLimb currentLimbWidth limbStart True
-      carryLimb <- addPartialColumn dimensions limbStart currentLimbWidth resultLimb 0 (toList currentBatch)
+      carryLimb <- addLimbStack dimensions limbStart currentLimbWidth resultLimb stack
       -- insert the result limb of the current batch to the next batch
-      moreCarryLimbs <- addWholeColumn dimensions limbStart currentLimbWidth finalResultLimb (LimbColumn.new (toInteger constant) (resultLimb : toList nextBatch))
+      moreCarryLimbs <- addWholeColumn dimensions limbStart currentLimbWidth finalResultLimb (LimbColumn.insert resultLimb rest)
       return (carryLimb <> moreCarryLimbs)
-    else -- edge case, all limbs are in the current batch
-      addPartialColumn dimensions limbStart currentLimbWidth finalResultLimb (fromInteger constant) (toList limbs)
   where
     -- Let `H` be the maximum batch size allowed
     --    if all limbs are negative
     --      then we can only add `H-1` limbs up at a time
     --      else we can add all `H` limbs up at a time
-    splitLimbs :: Seq Limb -> (Seq Limb, Seq Limb)
-    splitLimbs limbs =
-      let (currentBatch', nextBatch') = Seq.splitAt (dimMaxHeight dimensions - 1) limbs
-          currentBatchAllNegative = not (any limbIsPositive currentBatch')
+    splitLimbStack :: LimbColumn -> (LimbStack, LimbColumn)
+    splitLimbStack (LimbColumn constant Seq.Empty) = (OneConstantOnly constant, mempty)
+    splitLimbStack (LimbColumn constant (limb Seq.:<| Seq.Empty)) =
+      if constant == 0 && limbIsPositive limb
+        then (OneLimbOnly limb, mempty)
+        else (Ordinary constant (Seq.singleton limb), mempty)
+    splitLimbStack (LimbColumn constant limbs) =
+      let (currentBatch, nextBatch) = Seq.splitAt (dimMaxHeight dimensions - 1) limbs
+          currentBatchAllNegative = not (any limbIsPositive currentBatch)
        in if currentBatchAllNegative
-            then (currentBatch', nextBatch')
-            else case Seq.viewl nextBatch' of
-              Seq.EmptyL -> (currentBatch', mempty)
-              nextBatchHead Seq.:< nextBatchTail -> (currentBatch' Seq.|> nextBatchHead, nextBatchTail)
+            then (Ordinary constant currentBatch, LimbColumn 0 nextBatch)
+            else case Seq.viewl nextBatch of
+              Seq.EmptyL -> (Ordinary constant currentBatch, mempty)
+              nextBatchHead Seq.:< nextBatchTail -> (Ordinary constant (currentBatch Seq.|> nextBatchHead), LimbColumn 0 nextBatchTail)
 
 -- | Compress a column of limbs into a single limb and some carry
 --
@@ -169,33 +175,28 @@ addWholeColumn dimensions limbStart currentLimbWidth finalResultLimb column = do
 --  +           [ operand+ ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-addPartialColumn :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> n -> [Limb] -> M n LimbColumn
-addPartialColumn dimensions _ currentLimbWidth resultLimb constant [] = do
+addLimbStack :: (GaloisField n, Integral n) => Dimensions -> Int -> Int -> Limb -> LimbStack -> M n LimbColumn
+addLimbStack dimensions _ currentLimbWidth resultLimb (OneConstantOnly constant) = do
   -- no limb => result = constant, no carry
   forM_ [0 .. currentLimbWidth - 1] $ \i -> do
-    let bit = Data.Bits.testBit (toInteger constant) i
+    let bit = Data.Bits.testBit constant i
     writeValB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) bit
   return mempty
-addPartialColumn dimensions limbStart currentLimbWidth resultLimb constant limbs = do
-  let negLimbSize = length $ filter (not . limbIsPositive) limbs
-  let allNegative = negLimbSize == length limbs
-
-  if length limbs == 1 && constant == 0 && not allNegative
-    then do
-      forM_ [0 .. currentLimbWidth - 1] $ \i -> do
-        let limb = head limbs
-        writeEqB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) (RefUBit (dimUIntWidth dimensions) (lmbRef limb) (lmbOffset limb + i))
-      return mempty
-    else do
-      let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
-      carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
-      writeAddWithRefLs constant $
-        -- positive side
-        Seq.fromList (map (toRefL1 0 True) limbs)
-          -- negative side
-          Seq.:|> toRefL1 0 False resultLimb
-          Seq.:|> toRefL1 currentLimbWidth False carryLimb
-      return $ LimbColumn.singleton carryLimb
+addLimbStack dimensions _ currentLimbWidth resultLimb (OneLimbOnly limb) = do
+  forM_ [0 .. currentLimbWidth - 1] $ \i -> do
+    writeEqB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) (RefUBit (dimUIntWidth dimensions) (lmbRef limb) (lmbOffset limb + i))
+  return mempty
+addLimbStack dimensions limbStart currentLimbWidth resultLimb (Ordinary constant limbs) = do
+  let negLimbSize = length $ Seq.filter (not . limbIsPositive) limbs
+  let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
+  carryLimb <- allocCarryLimb (dimCarryWidth dimensions) limbStart carrySigns
+  writeAddWithRefLs (fromInteger constant) $
+    -- positive side
+    fmap (toRefL1 0 True) limbs
+      -- negative side
+      Seq.:|> toRefL1 0 False resultLimb
+      Seq.:|> toRefL1 currentLimbWidth False carryLimb
+  return $ LimbColumn.singleton carryLimb
 
 allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
 allocCarryLimb w offset signs = do
