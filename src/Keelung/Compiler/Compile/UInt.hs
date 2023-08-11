@@ -19,7 +19,7 @@ import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
-import Keelung.Compiler.Compile.UInt.Addition (Dimensions (..), addWholeColumn, allocLimb, compileAddU, compileSubU)
+import Keelung.Compiler.Compile.UInt.Addition (Dimensions (..), addLimbColumn, allocLimb, compileAddU, compileSubU)
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo (FieldInfo (..))
@@ -171,8 +171,8 @@ mulnxn dimensions limbWidth arity out var operand = do
     ( \previousCarryLimbs (index, limbs) -> do
         let limbStart = limbWidth * index
         let currentLimbWidth = limbWidth `min` (dimUIntWidth dimensions - limbStart)
-        let resultLimb = Limb out currentLimbWidth (limbWidth * index) (Left True)
-        addWholeColumn dimensions limbStart currentLimbWidth resultLimb (previousCarryLimbs <> limbs)
+        let resultLimb = Limb out currentLimbWidth limbStart (Left True)
+        addLimbColumn dimensions resultLimb (previousCarryLimbs <> limbs)
     )
     mempty
     (IntMap.toList limbColumns)
