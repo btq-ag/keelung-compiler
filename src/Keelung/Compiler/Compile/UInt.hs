@@ -101,22 +101,22 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
       writeAddWithRefLs (a * constant) $
         Seq.fromList
           [ -- operand side
-            toRefL 0 True x constant,
+            toRefLMultiplied constant 0 True x,
             -- negative side
-            toRefL1 0 False lowerLimb,
-            toRefL1 currentLimbWidth False upperLimb
+            toRefL 0 False lowerLimb,
+            toRefL currentLimbWidth False upperLimb
           ]
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
       upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
       writeMulWithRefLs
-        (a, Seq.singleton (toRefL1 0 True x))
-        (b, Seq.singleton (toRefL1 0 True y))
+        (a, Seq.singleton (toRefL 0 True x))
+        (b, Seq.singleton (toRefL 0 True y))
         ( 0,
           Seq.fromList
-            [ toRefL1 0 True lowerLimb,
-              toRefL1 currentLimbWidth True upperLimb
+            [ toRefL 0 True lowerLimb,
+              toRefL currentLimbWidth True upperLimb
             ]
         )
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)

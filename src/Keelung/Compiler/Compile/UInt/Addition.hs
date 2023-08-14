@@ -190,14 +190,15 @@ addLimbStack dimensions resultLimb (OneLimbOnly limb) = do
   return mempty
 addLimbStack dimensions resultLimb (Ordinary constant limbs) = do
   let negLimbSize = length $ Seq.filter (not . limbIsPositive) limbs
-  let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. dimCarryWidth dimensions - 1]
-  carryLimb <- allocCarryLimb (dimCarryWidth dimensions) (lmbOffset resultLimb) carrySigns
+  let limbWidth = dimCarryWidth dimensions
+  let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. limbWidth - 1]
+  carryLimb <- allocCarryLimb limbWidth (lmbOffset resultLimb) carrySigns
   writeAddWithRefLs (fromInteger constant) $
     -- positive side
-    fmap (toRefL1 0 True) limbs
+    fmap (toRefL 0 True) limbs
       -- negative side
-      Seq.:|> toRefL1 0 False resultLimb
-      Seq.:|> toRefL1 (lmbWidth resultLimb) False carryLimb
+      Seq.:|> toRefL 0 False resultLimb
+      Seq.:|> toRefL (lmbWidth resultLimb) False carryLimb
   return $ LimbColumn.singleton carryLimb
 
 allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
