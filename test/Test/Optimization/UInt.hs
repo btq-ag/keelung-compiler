@@ -36,30 +36,30 @@ tests = do
           x <- inputUInt @8 Public
           y <- inputUInt @8 Public
           return $ x + y
-        cs `shouldHaveSize` 27
-        cs' `shouldHaveSize` 27
+        cs `shouldHaveSize` 26
+        cs' `shouldHaveSize` 26
 
       it "2 variables / 128 bit / GF181" $ do
-        -- 128 * 3 for input / output
+        -- 384 = 128 * 3 for input / output
         -- 1 for carry bit
         -- 1 for addition
         (cs, cs') <- executeGF181 $ do
           x <- inputUInt @128 Public
           y <- inputUInt @128 Public
           return $ x + y
-        cs `shouldHaveSize` 387
-        cs' `shouldHaveSize` 387
+        cs `shouldHaveSize` 386
+        cs' `shouldHaveSize` 386
 
       it "2 variables / 256 bit / GF181" $ do
-        -- 256 * 3 for input / output
+        -- 768 = 256 * 3 for input / output
         -- 2 for carry bit
         -- 2 for addition
         (cs, cs') <- executeGF181 $ do
           x <- inputUInt @256 Public
           y <- inputUInt @256 Public
           return $ x + y
-        cs `shouldHaveSize` 774
-        cs' `shouldHaveSize` 774
+        cs `shouldHaveSize` 773
+        cs' `shouldHaveSize` 773
 
       it "1 variable + 1 constant / byte / GF181" $ do
         -- 8 * 2 for input / output

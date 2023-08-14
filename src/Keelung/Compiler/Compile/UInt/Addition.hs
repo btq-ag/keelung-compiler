@@ -190,12 +190,16 @@ addLimbStack dimensions resultLimb (OneLimbOnly limb) = do
   return mempty
 addLimbStack dimensions resultLimb (Ordinary constant limbs) = do
   let negLimbSize = length $ Seq.filter (not . limbIsPositive) limbs
-  let limbWidth = dimCarryWidth dimensions
+  let limbWidth = if negLimbSize == 0 && constant == 0 
+        then case length limbs of 
+          2 -> 1
+          _ -> dimCarryWidth dimensions
+        else dimCarryWidth dimensions
   let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. limbWidth - 1]
   carryLimb <- allocCarryLimb limbWidth (lmbOffset resultLimb) carrySigns
   writeAddWithRefLs (fromInteger constant) $
     -- positive side
-    fmap (toRefL 0 True) limbs
+    fmap (\limb -> toRefLPrim (lmbWidth limb `min` lmbWidth resultLimb) 0 True 1 limb) limbs
       -- negative side
       Seq.:|> toRefL 0 False resultLimb
       Seq.:|> toRefL (lmbWidth resultLimb) False carryLimb
