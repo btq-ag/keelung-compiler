@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use guards" #-}
 module Keelung.Compiler.Compile.UInt.Addition (Dimensions (..), addLimbColumn, compileAddU, compileSubU, allocLimb) where
 
 import Control.Monad.Except
@@ -190,13 +193,22 @@ addLimbStack dimensions resultLimb (OneLimbOnly limb) = do
   return mempty
 addLimbStack dimensions resultLimb (Ordinary constant limbs) = do
   let negLimbSize = length $ Seq.filter (not . limbIsPositive) limbs
-  let limbWidth = if negLimbSize == 0 && constant == 0 
-        then case length limbs of 
-          2 -> 1
-          _ -> dimCarryWidth dimensions
-        else dimCarryWidth dimensions
-  let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. limbWidth - 1]
-  carryLimb <- allocCarryLimb limbWidth (lmbOffset resultLimb) carrySigns
+  let allNegatives = negLimbSize == length limbs && constant == 0
+
+  -- calculate the expected width of the carry limbs
+  let arity =
+        if constant /= 0
+          then length limbs + 1 -- presence of a constant limb
+          else
+            if allNegatives
+              then length limbs + 1 -- presence of a constant zero limb
+              else length limbs
+  let expectedCarryWidth = ceiling (logBase 2 (fromIntegral arity :: Double)) :: Int
+  -- the actual width cannot be larger than that allowed by the field (dimCarryWidth dimensions)
+  let carryWidth = expectedCarryWidth `min` dimCarryWidth dimensions
+
+  let carrySigns = map (not . Data.Bits.testBit negLimbSize) [0 .. carryWidth - 1]
+  carryLimb <- allocCarryLimb carryWidth (lmbOffset resultLimb) carrySigns
   writeAddWithRefLs (fromInteger constant) $
     -- positive side
     fmap (\limb -> toRefLPrim (lmbWidth limb `min` lmbWidth resultLimb) 0 True 1 limb) limbs

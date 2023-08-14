@@ -130,13 +130,11 @@ tests = do
       reindexRef occurrences (B (RefUBit 4 inputVar 3)) `shouldBe` 3
       let intermediateB = RefBX 0
       reindexRef occurrences (B intermediateB) `shouldBe` 4
-      let intermediateB' = RefBX 1
-      reindexRef occurrences (B intermediateB') `shouldBe` 5
       let intermediate4 = RefUX 4 0
-      reindexRef occurrences (B (RefUBit 4 intermediate4 0)) `shouldBe` 6
-      reindexRef occurrences (B (RefUBit 4 intermediate4 1)) `shouldBe` 7
-      reindexRef occurrences (B (RefUBit 4 intermediate4 2)) `shouldBe` 8
-      reindexRef occurrences (B (RefUBit 4 intermediate4 3)) `shouldBe` 9
+      reindexRef occurrences (B (RefUBit 4 intermediate4 0)) `shouldBe` 5
+      reindexRef occurrences (B (RefUBit 4 intermediate4 1)) `shouldBe` 6
+      reindexRef occurrences (B (RefUBit 4 intermediate4 2)) `shouldBe` 7
+      reindexRef occurrences (B (RefUBit 4 intermediate4 3)) `shouldBe` 8
 
     it "Bit test / and 1" $ do
       (_, cm) <- executeGF181 $ do

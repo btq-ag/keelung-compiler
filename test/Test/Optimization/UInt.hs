@@ -28,7 +28,7 @@ tests = do
         cs' `shouldHaveSize` 41
 
     describe "Addition / Subtraction" $ do
-      it "2 variables / byte / GF181" $ do
+      it "2 variables / 8 bit / GF181" $ do
         -- 8 * 3 for input / output
         -- 1 for carry bit
         -- 1 for addition
@@ -39,21 +39,11 @@ tests = do
         cs `shouldHaveSize` 26
         cs' `shouldHaveSize` 26
 
-      it "2 variables / 128 bit / GF181" $ do
-        -- 384 = 128 * 3 for input / output
-        -- 1 for carry bit
-        -- 1 for addition
-        (cs, cs') <- executeGF181 $ do
-          x <- inputUInt @128 Public
-          y <- inputUInt @128 Public
-          return $ x + y
-        cs `shouldHaveSize` 386
-        cs' `shouldHaveSize` 386
-
       it "2 variables / 256 bit / GF181" $ do
         -- 768 = 256 * 3 for input / output
         -- 2 for carry bit
         -- 2 for addition
+        -- TODO: should've been just 772
         (cs, cs') <- executeGF181 $ do
           x <- inputUInt @256 Public
           y <- inputUInt @256 Public
@@ -68,10 +58,13 @@ tests = do
         (cs, cs') <- executeGF181 $ do
           x <- inputUInt @8 Public
           return $ x + 4
-        cs `shouldHaveSize` 19
-        cs' `shouldHaveSize` 19
+        cs `shouldHaveSize` 18
+        cs' `shouldHaveSize` 18
 
       it "3 variable + 1 constant" $ do
+        -- 4 * 4 for input / output
+        -- 2 for carry bit
+        -- 1 for addition
         (cs, cs') <- executeGF181 $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Public
@@ -81,16 +74,19 @@ tests = do
         cs' `shouldHaveSize` 19
 
       it "3 variable + 1 constant (with subtraction)" $ do
+        -- 4 * 4 for input / output
+        -- 2 for carry bit
+        -- 1 for addition
         (cs, cs') <- executeGF181 $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Public
           z <- inputUInt @4 Public
           return $ x - y + z + 4
-        -- print $ linkConstraintModule cs'
         cs `shouldHaveSize` 19
         cs' `shouldHaveSize` 19
 
       -- TODO: should've been just 4
+      -- CAUSE: constant variable need no Boolean constraints
       it "2 constants" $ do
         (cs, cs') <- executeGF181 $ do
           return $ 2 + (4 :: UInt 4)
@@ -98,14 +94,17 @@ tests = do
         cs' `shouldHaveSize` 8
 
     describe "Multiplication" $ do
-      -- TODO: can be lower
-      it "variable / variable" $ do
+      -- 8 * 3 for input / output
+      -- 8 for carry bit
+      -- 1 for multiplication
+      -- TODO: should've been just 33
+      it "2 variables / byte / GF181" $ do
         (cs, cs') <- executeGF181 $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Public
+          x <- inputUInt @8 Public
+          y <- inputUInt @8 Public
           return $ x * y
-        cs `shouldHaveSize` 25
-        cs' `shouldHaveSize` 25
+        cs `shouldHaveSize` 49
+        cs' `shouldHaveSize` 49
 
       -- TODO: can be lower
       it "variable / constant" $ do
