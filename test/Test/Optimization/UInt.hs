@@ -43,13 +43,12 @@ tests = do
         -- 768 = 256 * 3 for input / output
         -- 2 for carry bit
         -- 2 for addition
-        -- TODO: should've been just 772
         (cs, cs') <- executeGF181 $ do
           x <- inputUInt @256 Public
           y <- inputUInt @256 Public
           return $ x + y
-        cs `shouldHaveSize` 773
-        cs' `shouldHaveSize` 773
+        cs `shouldHaveSize` 772
+        cs' `shouldHaveSize` 772
 
       it "1 variable + 1 constant / byte / GF181" $ do
         -- 8 * 2 for input / output

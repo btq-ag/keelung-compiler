@@ -117,6 +117,8 @@ tests =
             x <- inputUInt @4 Public
             y <- inputUInt @4 Public
             return $ x - y
+      -- debug (Prime 17) program
+      -- runAll (Prime 17) program [3, 13] [] [6]
       let genPair = do
             x <- choose (0, 15)
             y <- choose (0, 15)
