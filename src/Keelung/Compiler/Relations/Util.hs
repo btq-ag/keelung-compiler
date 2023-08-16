@@ -20,6 +20,12 @@ instance Seniority RefF where
 instance Seniority Ref where
   compareSeniority = compare `on` hasLevel
 
+instance Seniority Limb where
+  compareSeniority = compare `on` hasLevel
+
+instance Seniority RefL where
+  compareSeniority = compare `on` hasLevel
+
 --------------------------------------------------------------------------------
 
 class HasLevel a where
@@ -39,7 +45,10 @@ instance HasLevel RefF where
   hasLevel _ = 100
 
 instance HasLevel RefL where
-  hasLevel = hasLevel . lmbRef . refLLimb
+  hasLevel = hasLevel . refLLimb
+
+instance HasLevel Limb where
+  hasLevel = hasLevel . lmbRef
 
 instance HasLevel Ref where
   hasLevel (F x) = hasLevel x
