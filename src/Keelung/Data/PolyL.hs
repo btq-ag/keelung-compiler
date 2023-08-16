@@ -99,7 +99,7 @@ vars :: PolyL n -> Set RefU
 vars (PolyL _ xs) = Set.fromList $ map (toRef . fst) (toList xs)
   where
     toRef :: RefL -> RefU
-    toRef (RefL (Limb ref _ _ _) _ _) = ref
+    toRef (RefL (Limb ref _ _ _) _) = ref
 
 -- merge :: (Num n, Eq n) => PolyG n -> PolyG n -> Either n (PolyG n)
 -- merge (PolyG c1 xs1) (PolyG c2 xs2) =
@@ -113,4 +113,4 @@ size :: (Eq n, Num n) => PolyL n -> Int
 size (PolyL c xs) = sum (fmap (widthOfRefL . fst) xs) + if c == 0 then 0 else 1
   where
     widthOfRefL :: RefL -> Int
-    widthOfRefL (RefL limb trimmedWidth _) = lmbWidth limb `min` trimmedWidth
+    widthOfRefL (RefL limb _) = lmbWidth limb

@@ -223,29 +223,27 @@ reindexRef occurrences (F x) = reindexRefF occurrences x
 reindexRef occurrences (B x) = reindexRefB occurrences x
 
 reindexRefL :: (Integral n, GaloisField n) => Occurrences -> RefL -> n -> Seq (Var, n)
-reindexRefL occurrences (RefL limb trimmedWidth powerOffset) multiplier =
-  let width = lmbWidth limb `min` trimmedWidth
-   in case lmbSigns limb of
-        Left sign ->
-          Seq.fromList
-            [ ( reindexRefU
-                  occurrences
-                  (lmbRef limb)
-                  (i + lmbOffset limb),
-                (2 ^ (i + powerOffset)) * if sign then multiplier else (-multiplier)
-              )
-              | i <- [0 .. width - 1]
-            ]
-        Right signs ->
-          Seq.fromList
-            [ ( reindexRefU
-                  occurrences
-                  (lmbRef limb)
-                  (i + lmbOffset limb),
-                (2 ^ (i + powerOffset)) * if sign then multiplier else (-multiplier)
-              )
-              | (i, sign) <- zip [0 .. width - 1] signs
-            ]
+reindexRefL occurrences (RefL limb powerOffset) multiplier = case lmbSigns limb of
+  Left sign ->
+    Seq.fromList
+      [ ( reindexRefU
+            occurrences
+            (lmbRef limb)
+            (i + lmbOffset limb),
+          (2 ^ (i + powerOffset)) * if sign then multiplier else (-multiplier)
+        )
+        | i <- [0 .. lmbWidth limb - 1]
+      ]
+  Right signs ->
+    Seq.fromList
+      [ ( reindexRefU
+            occurrences
+            (lmbRef limb)
+            (i + lmbOffset limb),
+          (2 ^ (i + powerOffset)) * if sign then multiplier else (-multiplier)
+        )
+        | (i, sign) <- zip [0 .. lmbWidth limb - 1] signs
+      ]
 
 reindexRefF :: Occurrences -> RefF -> Var
 reindexRefF occurrences (RefFO x) = reindex (occurCounters occurrences) Output ReadField x

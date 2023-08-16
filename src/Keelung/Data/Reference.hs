@@ -12,8 +12,8 @@ module Keelung.Data.Reference
     -- | limbs
     Limb (..),
     limbIsPositive,
-    toRefLPrim,
     toRefLMultiplied,
+    toRefLShifted,
     toRefL,
   )
 where
@@ -78,22 +78,19 @@ instance Show RefF where
 -- | For representing Limbs in constraints
 data RefL = RefL
   { refLLimb :: Limb,
-    refLWidth :: Width,
     refLPowerOffset :: Int
   }
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefL where
-  show (RefL (Limb ref limbWidth i sign') trimmedWidth offset) =
-    let width = limbWidth `min` trimmedWidth
-     in case (width, sign') of
-          (0, _) -> "<Empty RefL>"
-          (1, Left sign) -> (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
-          (1, Right signs) -> (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
-          (2, Left sign) -> (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
-          (2, Right signs) -> (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
-          (_, Left sign) -> (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> (if sign then "+" else "-") <> " ... " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (offset + width - 1) <> "$" <> show (RefUBit 1 ref (i + width - 1))
-          (_, Right signs) -> (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " ... " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (offset + width - 1) <> "$" <> show (RefUBit 1 ref (i + width - 1))
+  show (RefL (Limb ref limbWidth i sign') offset) = case (limbWidth, sign') of
+    (0, _) -> "<Empty RefL>"
+    (1, Left sign) -> (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
+    (1, Right signs) -> (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
+    (2, Left sign) -> (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
+    (2, Right signs) -> (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
+    (_, Left sign) -> (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> (if sign then "+" else "-") <> " ... " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (offset + limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1))
+    (_, Right signs) -> (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " ... " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (offset + limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1))
 
 -- | Helper function for converting integers to superscript strings
 toSuperscript :: Int -> String
@@ -157,17 +154,17 @@ limbIsPositive limb = case lmbSigns limb of
   Right signs -> and signs
 
 -- | Construct a sequence of (Ref, n) pairs from a limb
-toRefLPrim :: (GaloisField n, Integral n) => Width -> Int -> Bool -> n -> Limb -> (RefL, n)
-toRefLPrim _ _ _ 0 _ = error "[ panic ] toRefL: multiplier must be non-zero"
-toRefLPrim trimmedWidth powerOffset positive multiplyBy limb =
-  ( RefL limb trimmedWidth powerOffset,
+toRefLMultiplied :: (GaloisField n, Integral n) => n -> Int -> Bool -> Limb -> (RefL, n)
+toRefLMultiplied 0 _ _ _ = error "[ panic ] toRefL: multiplier must be non-zero"
+toRefLMultiplied multiplyBy powerOffset positive limb =
+  ( RefL limb powerOffset,
     if positive then multiplyBy else -multiplyBy
   )
 
--- | Specialized version of `toRefLPrim`, with `lmbWidth limb` as the trimmed width
-toRefLMultiplied :: (GaloisField n, Integral n) => n -> Int -> Bool -> Limb -> (RefL, n)
-toRefLMultiplied multiplier powerOffset positive limb = toRefLPrim (lmbWidth limb) powerOffset positive multiplier limb
-
 -- | Specialized version of `toRefLMultiplied`, with `1` as the multiplier
-toRefL :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> (RefL, n)
-toRefL = toRefLMultiplied 1
+toRefLShifted :: (GaloisField n, Integral n) => Int -> Bool -> Limb -> (RefL, n)
+toRefLShifted = toRefLMultiplied 1
+
+-- | Specialized version of `toRefLShifted`, with `1` as the multiplier, and `0` as the power offset
+toRefL :: (GaloisField n, Integral n) => Bool -> Limb -> (RefL, n)
+toRefL = toRefLMultiplied 1 0

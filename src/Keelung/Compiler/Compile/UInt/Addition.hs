@@ -117,7 +117,7 @@ compileAddU width out vars constant = do
                       resultLimb = Limb out currentLimbWidth start (Left True)
                    in (column, resultLimb)
               )
-              [0, limbWidth .. width - 1]
+              [0, limbWidth .. width - 1] -- index of the first bit of each limb
       foldM_
         ( \prevCarries (column, resultLimb) ->
             case LimbColumn.limbs prevCarries of
@@ -142,10 +142,14 @@ compileSubU width out (Left a) (Left b) = compileAddU width out [(a, True), (b, 
 
 -- | Add a column of limbs, and return a column of carry limbs
 addLimbColumn :: (GaloisField n, Integral n) => Maybe Bool -> Dimensions -> Limb -> LimbColumn -> M n LimbColumn
-addLimbColumn hasOneAddCarry dimensions finalResultLimb column = do
-  let (stack, rest) = splitLimbStack dimensions column
+addLimbColumn hasOneAddCarry dimensions finalResultLimb limbs = do
+  -- trim the limbs so that their width does not exceed that of the result limb
+  let trimmedLimbs = LimbColumn.trim (lmbWidth finalResultLimb) limbs
+  -- split the limbs into a stack of limbs and the rest of the column
+  let (stack, rest) = splitLimbStack dimensions trimmedLimbs
   if LimbColumn.isEmpty rest
     then do
+      -- base case, there are no more limbs to be processed
       addLimbStack hasOneAddCarry dimensions finalResultLimb stack
     else do
       -- inductive case, there are more limbs to be processed
@@ -227,10 +231,10 @@ addLimbStack hasOneAddCarry dimensions resultLimb (Ordinary constant limbs) = do
   carryLimb <- allocCarryLimb carryWidth (lmbOffset resultLimb) carrySigns
   writeAddWithRefLs (fromInteger constant) $
     -- positive side
-    fmap (\limb -> toRefLPrim (lmbWidth limb `min` lmbWidth resultLimb) 0 True 1 limb) limbs
+    fmap (toRefL True) limbs
       -- negative side
-      Seq.:|> toRefL 0 False resultLimb
-      Seq.:|> toRefL (lmbWidth resultLimb) False carryLimb
+      Seq.:|> toRefL False resultLimb
+      Seq.:|> toRefLShifted (lmbWidth resultLimb) False carryLimb
   return $ LimbColumn.singleton carryLimb
 
 allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
