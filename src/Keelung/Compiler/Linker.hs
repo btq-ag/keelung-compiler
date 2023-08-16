@@ -25,8 +25,8 @@ import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Relations.Field (AllRelations)
-import Keelung.Compiler.Relations.Field qualified as AllRelations
+import Keelung.Compiler.Relations.Field (Relations)
+import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Data.Constraint
 import Keelung.Data.PolyG (PolyG)
@@ -63,7 +63,7 @@ linkConstraintModule cm =
     !counters = updateCounters occurrences (cmCounters cm)
     uncurry3 f (a, b, c) = f a b c
 
-    extractFieldRelations :: (GaloisField n, Integral n) => AllRelations n -> Seq (Linked.Constraint n)
+    extractFieldRelations :: (GaloisField n, Integral n) => Relations n -> Seq (Linked.Constraint n)
     extractFieldRelations relations =
       let convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Constraint n
           convert (var, Right val) = CVarBindF var val
@@ -75,7 +75,7 @@ linkConstraintModule cm =
                 Left _ -> error "[ panic ] extractFieldRelations: failed to build polynomial"
                 Right poly -> CAddG poly
 
-          result = map convert $ Map.toList $ AllRelations.toInt shouldBeKept relations
+          result = map convert $ Map.toList $ Relations.toInt shouldBeKept relations
        in Seq.fromList (map (linkConstraint occurrences) result)
 
     shouldBeKept :: Ref -> Bool
@@ -129,8 +129,8 @@ linkConstraintModule cm =
           result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
        in Seq.fromList (map (linkConstraint occurrences) result)
 
-    varEqFs = extractFieldRelations (cmFieldRelations cm)
-    varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (cmFieldRelations cm))
+    varEqFs = extractFieldRelations (cmRelations cm)
+    varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (cmRelations cm))
 
     addFs = Seq.fromList $ map (linkConstraint occurrences . CAddG) $ cmAddF cm
     addLs = Seq.fromList $ map (linkConstraint occurrences . CAddL) $ cmAddL cm

@@ -5,7 +5,7 @@ import Control.Monad.State
 import Keelung
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Field (AllRelations)
+import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Data.Reference
 import Test.Hspec (SpecWith, describe, hspec, it)
@@ -60,7 +60,7 @@ tests = do
         -- z = 1/3y - 2/3
         assertRelation (RefFX 2) (1 / 3) (RefFX 1) (-2 / 3)
 
-type M = StateT (AllRelations GF181) IO
+type M = StateT (Relations GF181) IO
 
 runM :: M a -> IO a
 runM p = evalStateT p FieldRelations.new

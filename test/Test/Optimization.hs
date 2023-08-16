@@ -8,7 +8,7 @@ import Data.Foldable
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compileO0)
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
-import Keelung.Compiler.Relations.Field qualified as AllRelations
+import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Data.Reference
 import Test.Hspec
 import Test.Optimization.UInt qualified as Optimization.UInt
@@ -46,11 +46,11 @@ tests = do
         cm' `shouldHaveSize` 1
 
         -- FO0 = 3FI0
-        AllRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmFieldRelations cm') `shouldBe` Just (3, 0)
+        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm') `shouldBe` Just (3, 0)
         -- F0 (y) = FI0
-        AllRelations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmFieldRelations cm') `shouldBe` Just (1, 0)
+        Relations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmRelations cm') `shouldBe` Just (1, 0)
         -- F1 (z) = F0 (y)
-        AllRelations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmFieldRelations cm') `shouldBe` Just (1, 0)
+        Relations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmRelations cm') `shouldBe` Just (1, 0)
 
       it "Field 2" $ do
         (cm, cm') <- executeGF181 $ do
@@ -63,11 +63,11 @@ tests = do
         cm' `shouldHaveSize` 1
 
         -- FO0 = 4FI0
-        AllRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmFieldRelations cm') `shouldBe` Just (4, 0)
+        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm') `shouldBe` Just (4, 0)
         -- F0 (y) = FI0
-        AllRelations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmFieldRelations cm') `shouldBe` Just (1, 0)
+        Relations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmRelations cm') `shouldBe` Just (1, 0)
         -- F1 (z) = 2F0 (y)
-        AllRelations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmFieldRelations cm') `shouldBe` Just (2, 0)
+        Relations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmRelations cm') `shouldBe` Just (2, 0)
 
       it "Field 3" $ do
         (cm, cm') <- executeGF181 $ do
@@ -79,7 +79,7 @@ tests = do
         cm' `shouldHaveSize` 1
 
         -- FO0 = 2FI0 + 1
-        AllRelations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmFieldRelations cm') `shouldBe` Just (2, 1)
+        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm') `shouldBe` Just (2, 1)
 
       it "Field 4" $ do
         (cm, cm') <- executeGF181 $ do
@@ -89,7 +89,7 @@ tests = do
 
         cm `shouldHaveSize` 1
         cm' `shouldHaveSize` 1
-        AllRelations.lookup (F $ RefFO 0) (cmFieldRelations cm') `shouldBe` AllRelations.Value 8
+        Relations.lookup (F $ RefFO 0) (cmRelations cm') `shouldBe` Relations.Value 8
 
       it "Field 5" $ do
         (cm, cm') <- executeGF181 $ do

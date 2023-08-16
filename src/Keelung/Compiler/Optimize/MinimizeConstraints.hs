@@ -13,8 +13,8 @@ import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Field (AllRelations)
-import Keelung.Compiler.Relations.Field qualified as AllRelations
+import Keelung.Compiler.Relations.Field (Relations)
+import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Reference
@@ -51,10 +51,10 @@ goThroughAddF = do
 
 goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughEqZeros cm =
-  let relations = cmFieldRelations cm
+  let relations = cmRelations cm
    in cm {cmEqZeros = mapMaybe (reduceEqZeros relations) (cmEqZeros cm)}
   where
-    reduceEqZeros :: (GaloisField n, Integral n) => AllRelations n -> (PolyG n, RefF) -> Maybe (PolyG n, RefF)
+    reduceEqZeros :: (GaloisField n, Integral n) => Relations n -> (PolyG n, RefF) -> Maybe (PolyG n, RefF)
     reduceEqZeros relations (polynomial, m) = case substPolyG relations polynomial of
       Nothing -> Just (polynomial, m) -- nothing changed
       Just (Left _constant, _, _) -> Nothing
@@ -90,8 +90,8 @@ reduceAddF polynomial = do
   if changed
     then return Nothing
     else do
-      allRelations <- gets cmFieldRelations
-      case substPolyG allRelations polynomial of
+      relations <- gets cmRelations
+      case substPolyG relations polynomial of
         Nothing -> return (Just polynomial) -- nothing changed
         Just (Left constant, removedRefs, _) -> do
           when (constant /= 0) $
@@ -122,8 +122,8 @@ reduceMulF (polyA, polyB, polyC) = do
 
 substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG n -> RoundM n (Either n (PolyG n))
 substitutePolyF typeOfChange polynomial = do
-  allRelations <- gets cmFieldRelations
-  case substPolyG allRelations polynomial of
+  relations <- gets cmRelations
+  case substPolyG relations polynomial of
     Nothing -> return (Right polynomial) -- nothing changed
     Just (Left constant, removedRefs, _) -> do
       -- the polynomial has been reduced to nothing
@@ -257,31 +257,31 @@ learnFromAddF poly = case PolyG.view poly of
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignB var (value == 1) (cmFieldRelations cm)
+  result <- lift $ lift $ EquivClass.runM $ Relations.assignB var (value == 1) (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
       markChanged RelationChanged
-      put $ removeOccurrences (Set.singleton var) $ cm {cmFieldRelations = relations}
+      put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 assign (F var) value = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ AllRelations.assignF (F var) value (cmFieldRelations cm)
+  result <- lift $ lift $ EquivClass.runM $ Relations.assignF (F var) value (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
       markChanged RelationChanged
-      put $ removeOccurrences (Set.singleton var) $ cm {cmFieldRelations = relations}
+      put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ AllRelations.relateRefs var1 slope var2 intercept (cmFieldRelations cm)
+  result <- lift $ lift $ EquivClass.runM $ Relations.relateRefs var1 slope var2 intercept (cmRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do
       markChanged RelationChanged
-      modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmFieldRelations = relations}
+      modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
       return True
 
 addAddF :: (GaloisField n, Integral n) => PolyG n -> RoundM n ()
@@ -306,7 +306,7 @@ addAddF poly = case PolyG.view poly of
 
 -- | Substitutes variables in a polynomial.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n) => AllRelations n -> PolyG n -> Maybe (Either n (PolyG n), Set Ref, Set Ref)
+substPolyG :: (GaloisField n, Integral n) => Relations n -> PolyG n -> Maybe (Either n (PolyG n), Set Ref, Set Ref)
 substPolyG relations poly = do
   let (c, xs) = PolyG.viewAsMap poly
   case Map.foldlWithKey' (substPolyG_ relations) (False, Left c, mempty, mempty) xs of
@@ -316,22 +316,22 @@ substPolyG relations poly = do
 
 substPolyG_ ::
   (Integral n, GaloisField n) =>
-  AllRelations n ->
+  Relations n ->
   (Bool, Either n (PolyG n), Set Ref, Set Ref) ->
   Ref ->
   n ->
   (Bool, Either n (PolyG n), Set Ref, Set Ref)
-substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = case AllRelations.lookup ref relations of
-  AllRelations.Root -> case accPoly of
+substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = case Relations.lookup ref relations of
+  Relations.Root -> case accPoly of
     Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
     Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
-  AllRelations.Value intercept ->
+  Relations.Value intercept ->
     -- ref = intercept
     let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
      in case accPoly of
           Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
           Right xs -> (True, Right $ PolyG.addConstant (intercept * coeff) xs, removedRefs', addedRefs)
-  AllRelations.ChildOf slope root intercept ->
+  Relations.ChildOf slope root intercept ->
     if root == ref
       then
         if slope == 1 && intercept == 0

@@ -14,8 +14,8 @@ import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Field (AllRelations)
-import Keelung.Compiler.Relations.Field qualified as AllRelations
+import Keelung.Compiler.Relations.Field (Relations)
+import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo
@@ -36,7 +36,7 @@ runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new Relations.new mempty mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -116,13 +116,13 @@ writeAddWithLC xs = case xs of
 addC :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 addC = mapM_ addOne
   where
-    execRelations :: (AllRelations n -> EquivClass.M (Error n) (AllRelations n)) -> M n ()
+    execRelations :: (Relations n -> EquivClass.M (Error n) (Relations n)) -> M n ()
     execRelations f = do
       cs <- get
-      result <- lift $ (EquivClass.runM . f) (cmFieldRelations cs)
+      result <- lift $ (EquivClass.runM . f) (cmRelations cs)
       case result of
         Nothing -> return ()
-        Just relations -> put cs {cmFieldRelations = relations}
+        Just relations -> put cs {cmRelations = relations}
 
     countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
     countBitTestAsOccurU (B (RefUBit _ (RefUX width var) _)) =
@@ -133,24 +133,24 @@ addC = mapM_ addOne
     addOne (CAddG xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
     addOne (CAddL xs) = modify' (\cs -> addOccurrences (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
     addOne (CVarBindF x c) = do
-      execRelations $ AllRelations.assignF x c
+      execRelations $ Relations.assignF x c
     addOne (CVarBindB x c) = do
       countBitTestAsOccurU (B x)
-      execRelations $ AllRelations.assignB x c
+      execRelations $ Relations.assignB x c
     addOne (CVarEq x y) = do
       countBitTestAsOccurU x
       countBitTestAsOccurU y
-      execRelations $ AllRelations.relateRefs x 1 y 0
+      execRelations $ Relations.relateRefs x 1 y 0
     addOne (CVarEqF x y) = do
-      execRelations $ AllRelations.relateRefs (F x) 1 (F y) 0
+      execRelations $ Relations.relateRefs (F x) 1 (F y) 0
     addOne (CVarEqB x y) = do
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
-      execRelations $ AllRelations.relateB x (True, y)
+      execRelations $ Relations.relateB x (True, y)
     addOne (CVarNEqB x y) = do
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
-      execRelations $ AllRelations.relateB x (False, y)
+      execRelations $ Relations.relateB x (False, y)
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {cmMulF = (x, y, Left c) : cmMulF cs})
     addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {cmMulF = (x, y, Right z) : cmMulF cs})
     addOne (CMulL x y (Left c)) = modify' (\cs -> addOccurrences (PolyL.vars x) $ addOccurrences (PolyL.vars y) $ cs {cmMulL = (x, y, Left c) : cmMulL cs})

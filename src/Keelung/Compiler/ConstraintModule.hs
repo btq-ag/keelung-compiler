@@ -26,7 +26,7 @@ import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Relations.Field (AllRelations)
+import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as FieldRelations
 import Keelung.Compiler.Util (indent)
 import Keelung.Data.FieldInfo
@@ -50,7 +50,7 @@ data ConstraintModule n = ConstraintModule
     cmOccurrenceF :: !OccurF,
     cmOccurrenceB :: !OccurB,
     cmOccurrenceU :: !OccurU,
-    cmFieldRelations :: AllRelations n,
+    cmRelations :: Relations n,
     -- addative constraints
     cmAddF :: [PolyG n],
     cmAddL :: [PolyL n],
@@ -118,9 +118,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
           else "  ModInv hints:\n" <> indent (indent (showList' (map (\(a, _aainv, _n, p) -> show a <> "⁻¹ = (mod " <> show p <> ")") (cmModInvs cm))))
 
       showVarEqF =
-        if FieldRelations.size (cmFieldRelations cm) == 0
+        if FieldRelations.size (cmRelations cm) == 0
           then ""
-          else "  Field relations:\n" <> indent (indent (show (cmFieldRelations cm)))
+          else "  Field relations:\n" <> indent (indent (show (cmRelations cm)))
 
       showAddF = adapt "AddF" (cmAddF cm) showAdd
       showAddL = adapt "AddL" (cmAddL cm) showAdd
@@ -276,8 +276,8 @@ prettyBooleanConstraints counters =
 -- | TODO: revisit this
 sizeOfConstraintModule :: ConstraintModule n -> Int
 sizeOfConstraintModule cm =
-  FieldRelations.size (cmFieldRelations cm)
-    + BooleanRelations.size (FieldRelations.exportBooleanRelations (cmFieldRelations cm))
+  FieldRelations.size (cmRelations cm)
+    + BooleanRelations.size (FieldRelations.exportBooleanRelations (cmRelations cm))
     + length (cmAddF cm)
     + length (cmMulF cm)
     + length (cmEqZeros cm)
