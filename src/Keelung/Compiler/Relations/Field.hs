@@ -160,7 +160,7 @@ instance Num n => Monoid (LinRel n) where
   mempty = LinRel 1 0
 
 instance (GaloisField n, Integral n) => EquivClass.IsRelation (LinRel n) where
-  relationToString (var, LinRel x y) = f (EquivClass.invertRel $ LinRel x y)
+  relationToString (var, LinRel x y) = f (LinRel (recip x) (-y / x))
     where
       f (LinRel a b) =
         let slope = case a of
@@ -176,7 +176,7 @@ instance (GaloisField n, Integral n) => EquivClass.IsRelation (LinRel n) where
   -- x = ay + b
   -- =>
   -- y = (x - b) / a
-  invertRel (LinRel a b) = LinRel (recip a) (-b / a)
+  invertRel (LinRel a b) = Just (LinRel (recip a) (-b / a))
 
 instance (GaloisField n, Integral n) => EquivClass.ExecRelation n (LinRel n) where
   execRel (LinRel a b) value = a * value + b

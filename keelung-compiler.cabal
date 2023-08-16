@@ -50,6 +50,7 @@ library
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
@@ -122,6 +123,7 @@ executable keelungc
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
@@ -224,6 +226,7 @@ test-suite keelung-test
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal

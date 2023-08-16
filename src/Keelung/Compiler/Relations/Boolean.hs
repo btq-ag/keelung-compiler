@@ -44,7 +44,7 @@ instance EquivClass.IsRelation Polarity where
   relationToString (var, Polarity True) = var
   relationToString (var, Polarity False) = "¬" <> var
 
-  invertRel (Polarity x) = Polarity x
+  invertRel (Polarity x) = Just (Polarity x)
 
 instance EquivClass.ExecRelation Bool Polarity where
   execRel (Polarity True) value = value
