@@ -203,32 +203,38 @@ addLimbStack hasOneAddCarry dimensions resultLimb (Ordinary constant limbs) = do
 
   -- calculate the expected width of the carry limbs
 
-  let addCarryArityDeduction = case hasOneAddCarry of
-        Just True -> 1
-        Just False -> 1
-        Nothing -> 0
+  -- let addCarryArityDeduction = case hasOneAddCarry of
+  --       Just True -> 1
+  --       Just False -> 1
+  --       Nothing -> 0
 
-  let arity =
-        if constant /= 0
-          then length limbs + 1 - addCarryArityDeduction -- presence of a constant limb
-          else
-            if allNegatives
-              then length limbs + 1 - addCarryArityDeduction -- presence of a constant zero limb
-              else length limbs - addCarryArityDeduction
+  -- let arity =
+  --       if constant /= 0
+  --         then length limbs + 1 - addCarryArityDeduction -- presence of a constant limb
+  --         else
+  --           if allNegatives
+  --             then length limbs + 1 - addCarryArityDeduction -- presence of a constant zero limb
+  --             else length limbs - addCarryArityDeduction
 
-  let expectedCarryWidth = ceiling (logBase 2 (fromIntegral arity :: Double)) :: Int
+  -- let expectedCarryWidth = ceiling (logBase 2 (fromIntegral arity :: Double)) :: Int
+
   -- the actual width cannot be larger than that allowed by the field (dimCarryWidth dimensions)
-  let carryWidth = expectedCarryWidth `min` dimCarryWidth dimensions
+  -- let carryWidth = expectedCarryWidth `min` dimCarryWidth dimensions
 
-  -- devise each sign of the carry limbs
-  -- if the carry limb is negative, treat it like it doesn't exist
-  let negLimbSize' = case hasOneAddCarry of
-        Just True -> negLimbSize -- positive carry
-        Just False -> negLimbSize - 1 -- negative carry
-        Nothing -> negLimbSize
+  -- -- devise each sign of the carry limbs
+  -- -- if the carry limb is negative, treat it like it doesn't exist
+  -- let negLimbSize' = case hasOneAddCarry of
+  --       Just True -> negLimbSize -- positive carry
+  --       Just False -> negLimbSize - 1 -- negative carry
+  --       Nothing -> negLimbSize
 
-  let carrySigns = map (not . Data.Bits.testBit negLimbSize') [0 .. carryWidth - 1]
-  carryLimb <- allocCarryLimb carryWidth (lmbOffset resultLimb) carrySigns
+  -- let carrySigns = map (not . Data.Bits.testBit negLimbSize') [0 .. carryWidth - 1]
+  -- traceShowM (negLimbSize, negLimbSize', hasOneAddCarry, limbs, carrySigns)
+
+  let carrySigns = LimbColumn.calculateCarrySigns (lmbWidth resultLimb) constant limbs
+  -- traceShowM limbs
+  -- traceShowM carrySigns
+  carryLimb <- allocCarryLimb (length carrySigns) (lmbOffset resultLimb) carrySigns
   writeAddWithRefLs (fromInteger constant) $
     -- positive side
     fmap (toRefL True) limbs
