@@ -39,6 +39,17 @@ tests = do
         cs `shouldHaveSize` 26
         cs' `shouldHaveSize` 26
 
+      it "2 variables / 4 bit / Prime 17" $ do
+        -- 12 = 4 * 3 for input / output
+        -- 2 for carry bit
+        -- 2 for addition
+        (cs, cs') <- executePrime 17 $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Public
+          return $ x + y
+        cs `shouldHaveSize` 16
+        cs' `shouldHaveSize` 16
+
       it "2 variables / 256 bit / GF181" $ do
         -- 768 = 256 * 3 for input / output
         -- 2 for carry bit
@@ -47,6 +58,7 @@ tests = do
           x <- inputUInt @256 Public
           y <- inputUInt @256 Public
           return $ x + y
+        print cs
         cs `shouldHaveSize` 772
         cs' `shouldHaveSize` 772
 

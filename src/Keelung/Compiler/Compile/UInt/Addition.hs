@@ -119,10 +119,7 @@ compileAddU width out vars constant = do
               )
               [0, limbWidth .. width - 1] -- index of the first bit of each limb
       foldM_
-        ( \prevCarries (column, resultLimb) ->
-            case LimbColumn.limbs prevCarries of
-              Seq.Empty -> addLimbColumn Nothing dimensions resultLimb column
-              x Seq.:<| _ -> addLimbColumn (Just (limbIsPositive x)) dimensions resultLimb (prevCarries <> column)
+        ( \prevCarries (column, resultLimb) -> addLimbColumn dimensions resultLimb (prevCarries <> column)
         )
         mempty
         ranges
@@ -141,8 +138,8 @@ compileSubU width out (Left a) (Right b) = compileAddU width out [(a, True)] (-b
 compileSubU width out (Left a) (Left b) = compileAddU width out [(a, True), (b, False)] 0
 
 -- | Add a column of limbs, and return a column of carry limbs
-addLimbColumn :: (GaloisField n, Integral n) => Maybe Bool -> Dimensions -> Limb -> LimbColumn -> M n LimbColumn
-addLimbColumn hasOneAddCarry dimensions finalResultLimb limbs = do
+addLimbColumn :: (GaloisField n, Integral n) => Dimensions -> Limb -> LimbColumn -> M n LimbColumn
+addLimbColumn dimensions finalResultLimb limbs = do
   -- trim the limbs so that their width does not exceed that of the result limb
   let trimmedLimbs = LimbColumn.trim (lmbWidth finalResultLimb) limbs
   -- split the limbs into a stack of limbs and the rest of the column
@@ -150,13 +147,13 @@ addLimbColumn hasOneAddCarry dimensions finalResultLimb limbs = do
   if LimbColumn.isEmpty rest
     then do
       -- base case, there are no more limbs to be processed
-      addLimbStack hasOneAddCarry dimensions finalResultLimb stack
+      addLimbStack dimensions finalResultLimb stack
     else do
       -- inductive case, there are more limbs to be processed
       resultLimb <- allocLimb (lmbWidth finalResultLimb) (lmbOffset finalResultLimb) True
-      carryLimb <- addLimbStack hasOneAddCarry dimensions resultLimb stack
+      carryLimb <- addLimbStack dimensions resultLimb stack
       -- insert the result limb of the current batch to the next batch
-      moreCarryLimbs <- addLimbColumn Nothing dimensions finalResultLimb (LimbColumn.insert resultLimb rest)
+      moreCarryLimbs <- addLimbColumn dimensions finalResultLimb (LimbColumn.insert resultLimb rest)
       return (carryLimb <> moreCarryLimbs)
 
 -- | Split a column of limbs into a stack of limbs and the rest of the column
@@ -186,54 +183,19 @@ splitLimbStack dimensions (LimbColumn constant limbs) =
 --  +           [ operand+ ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-addLimbStack :: (GaloisField n, Integral n) => Maybe Bool -> Dimensions -> Limb -> LimbStack -> M n LimbColumn
-addLimbStack _ dimensions resultLimb (OneConstantOnly constant) = do
+addLimbStack :: (GaloisField n, Integral n) => Dimensions -> Limb -> LimbStack -> M n LimbColumn
+addLimbStack dimensions resultLimb (OneConstantOnly constant) = do
   -- no limb => result = constant, no carry
   forM_ [0 .. lmbWidth resultLimb - 1] $ \i -> do
     let bit = Data.Bits.testBit constant i
     writeValB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) bit
   return mempty
-addLimbStack _ dimensions resultLimb (OneLimbOnly limb) = do
+addLimbStack dimensions resultLimb (OneLimbOnly limb) = do
   forM_ [0 .. lmbWidth resultLimb - 1] $ \i -> do
     writeEqB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) (RefUBit (dimUIntWidth dimensions) (lmbRef limb) (lmbOffset limb + i))
   return mempty
-addLimbStack hasOneAddCarry dimensions resultLimb (Ordinary constant limbs) = do
-  let negLimbSize = length $ Seq.filter (not . limbIsPositive) limbs
-  let allNegatives = negLimbSize == length limbs && constant == 0
-
-  -- calculate the expected width of the carry limbs
-
-  -- let addCarryArityDeduction = case hasOneAddCarry of
-  --       Just True -> 1
-  --       Just False -> 1
-  --       Nothing -> 0
-
-  -- let arity =
-  --       if constant /= 0
-  --         then length limbs + 1 - addCarryArityDeduction -- presence of a constant limb
-  --         else
-  --           if allNegatives
-  --             then length limbs + 1 - addCarryArityDeduction -- presence of a constant zero limb
-  --             else length limbs - addCarryArityDeduction
-
-  -- let expectedCarryWidth = ceiling (logBase 2 (fromIntegral arity :: Double)) :: Int
-
-  -- the actual width cannot be larger than that allowed by the field (dimCarryWidth dimensions)
-  -- let carryWidth = expectedCarryWidth `min` dimCarryWidth dimensions
-
-  -- -- devise each sign of the carry limbs
-  -- -- if the carry limb is negative, treat it like it doesn't exist
-  -- let negLimbSize' = case hasOneAddCarry of
-  --       Just True -> negLimbSize -- positive carry
-  --       Just False -> negLimbSize - 1 -- negative carry
-  --       Nothing -> negLimbSize
-
-  -- let carrySigns = map (not . Data.Bits.testBit negLimbSize') [0 .. carryWidth - 1]
-  -- traceShowM (negLimbSize, negLimbSize', hasOneAddCarry, limbs, carrySigns)
-
+addLimbStack _ resultLimb (Ordinary constant limbs) = do
   let carrySigns = LimbColumn.calculateCarrySigns (lmbWidth resultLimb) constant limbs
-  -- traceShowM limbs
-  -- traceShowM carrySigns
   carryLimb <- allocCarryLimb (length carrySigns) (lmbOffset resultLimb) carrySigns
   writeAddWithRefLs (fromInteger constant) $
     -- positive side

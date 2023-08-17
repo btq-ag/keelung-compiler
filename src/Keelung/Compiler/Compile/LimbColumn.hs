@@ -1,8 +1,11 @@
 module Keelung.Compiler.Compile.LimbColumn where
 
 import Data.Bits qualified
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq, (<|))
 import Data.Sequence qualified as Seq
+import Data.Word
 import Keelung.Data.Reference
 
 --------------------------------------------------------------------------------
@@ -50,6 +53,16 @@ trim width (LimbColumn c xs) = LimbColumn c (fmap trimLimb xs)
     trimLimb (Limb ref w offset (Left sign)) = Limb ref (w `min` width) offset (Left sign)
     trimLimb (Limb ref w offset (Right signs)) = Limb ref (w `min` width) offset (Right (take (w `min` width) signs))
 
+-- | Calculate the number of bits required to represent an Integer.
+widthOfInteger :: Integer -> Int
+widthOfInteger 0 = 0
+widthOfInteger x =
+  let lowerBits = fromInteger x :: Word32
+      higherBits = x `Data.Bits.shiftR` 32
+   in if higherBits == 0
+        then 32 - Data.Bits.countLeadingZeros lowerBits
+        else 32 + widthOfInteger higherBits
+
 -- | Calculate the lower bound and upper bound
 calculateBounds :: Integer -> Seq Limb -> (Integer, Integer)
 calculateBounds constant = foldl step (constant, constant)
@@ -73,12 +86,12 @@ calculateCarrySigns limbWidth constant limbs =
           if (-lower) <= 2 ^ limbWidth
             then
               let range = upper + 2 ^ limbWidth
-                  carryWidth = ceiling (logBase 2 (fromIntegral range :: Double)) :: Int
+                  carryWidth = widthOfInteger range
                in False : replicate (carryWidth - limbWidth - 1) True
             else
-              let range = upper - lower + 2 ^ limbWidth
-                  carryWidth = ceiling (logBase 2 (fromIntegral range :: Double)) :: Int
+              let range = upper - lower + 2 ^ limbWidth - 1
+                  carryWidth = widthOfInteger range
                in map (not . Data.Bits.testBit (-lower + 2 ^ limbWidth)) [limbWidth .. carryWidth - 1]
         else
-          let carryWidth = ceiling (logBase 2 (fromIntegral upper :: Double)) :: Int
+          let carryWidth = widthOfInteger upper
            in replicate (carryWidth - limbWidth) True

@@ -86,6 +86,11 @@ tests =
         uncurry LimbColumn.calculateBounds limbs `shouldBe` (-1, 6)
         uncurry (LimbColumn.calculateCarrySigns 2) limbs `shouldBe` [False, True]
 
+      it "12" $ do
+        let limbs = (0, Seq.fromList [Limb undefined 178 0 (Left True), Limb undefined 178 0 (Left True)])
+        uncurry LimbColumn.calculateBounds limbs `shouldBe` (0, 2 ^ (179 :: Int) - 2)
+        uncurry (LimbColumn.calculateCarrySigns 178) limbs `shouldBe` [True]
+
     describe "Addition / Subtraction" $ do
       it "2 positive variables" $ do
         let program = do

@@ -172,7 +172,7 @@ mulnxn dimensions limbWidth arity out var operand = do
         let limbStart = limbWidth * index
         let currentLimbWidth = limbWidth `min` (dimUIntWidth dimensions - limbStart)
         let resultLimb = Limb out currentLimbWidth limbStart (Left True)
-        addLimbColumn Nothing dimensions resultLimb (previousCarryLimbs <> limbs)
+        addLimbColumn dimensions resultLimb (previousCarryLimbs <> limbs)
     )
     mempty
     (IntMap.toList limbColumns)
