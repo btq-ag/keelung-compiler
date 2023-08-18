@@ -124,7 +124,7 @@ tests = do
         x <- inputUInt @4 Public
         return $ x * 4
       cs `shouldHaveSize` 18
-      cs' `shouldHaveSize` 18
+      cs' `shouldHaveSize` 13
 
     -- TODO: should've been just 4
     it "constant / constant" $ do

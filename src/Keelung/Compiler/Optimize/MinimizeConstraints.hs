@@ -40,19 +40,34 @@ optimizeAddF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Com
 optimizeAddF cm = do
   (changed, cm') <- runOptiM cm goThroughAddF
   case changed of
-    NothingChanged -> optimizeMulF cm
-    RelationChanged -> optimizeAddF cm'
-    AdditiveConstraintChanged -> optimizeMulF cm'
-    MultiplicativeConstraintChanged -> optimizeMulF cm'
+    NothingChanged -> optimizeAddL cm -- next pass
+    RelationChanged -> optimizeAddF cm' -- redo
+    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- next pass
+    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- next pass
+    MultiplicativeConstraintChanged -> optimizeMulF cm' -- again
+
+
+optimizeAddL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeAddL cm = do
+  (changed, cm') <- runOptiM cm goThroughAddL
+  case changed of
+    NothingChanged -> optimizeMulF cm -- next pass
+    RelationChanged -> optimizeAddF cm' -- redo
+    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- redo
+    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- next pass
+    MultiplicativeConstraintChanged -> optimizeMulF cm' -- again
+
+
 
 optimizeMulF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeMulF cm = do
   (changed, cm') <- runOptiM cm goThroughMulF
   case changed of
     NothingChanged -> return (changed, cm')
-    RelationChanged -> optimizeAddF cm'
-    AdditiveConstraintChanged -> optimizeMulF cm'
-    MultiplicativeConstraintChanged -> optimizeMulF cm'
+    RelationChanged -> optimizeAddF cm' -- redo
+    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- next pass
+    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- next pass
+    MultiplicativeConstraintChanged -> optimizeMulF cm' -- again
 
 goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughAddF = do
@@ -116,13 +131,13 @@ reduceAddF polynomial = do
           when (constant /= 0) $
             error "[ panic ] Additive reduced to some constant other than 0"
           -- the polynomial has been reduced to nothing
-          markChanged AdditiveConstraintChanged
+          markChanged AdditiveFieldConstraintChanged
           -- remove all variables in the polynomial from the occurrence list
           modify' $ removeOccurrences removedRefs
           return Nothing
         Just (Right reducePolynomial, removedRefs, addedRefs) -> do
           -- the polynomial has been reduced to something
-          markChanged AdditiveConstraintChanged
+          markChanged AdditiveFieldConstraintChanged
           -- remove variables that has been reduced in the polynomial from the occurrence list
           modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
           -- keep reducing the reduced polynomial
@@ -141,13 +156,13 @@ reduceAddL polynomial = do
           when (constant /= 0) $
             error "[ panic ] Additive reduced to some constant other than 0"
           -- the polynomial has been reduced to nothing
-          markChanged AdditiveConstraintChanged
+          markChanged AdditiveLimbConstraintChanged
           -- remove all variables in the polynomial from the occurrence list
           modify' $ removeOccurrences removedRefs
           return Nothing
         Just (Right reducePolynomial, removedRefs, addedRefs) -> do
           -- the polynomial has been reduced to something
-          markChanged AdditiveConstraintChanged
+          markChanged AdditiveLimbConstraintChanged
           -- remove variables that has been reduced in the polynomial from the occurrence list
           modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
           -- keep reducing the reduced polynomial
@@ -248,7 +263,8 @@ reduceMulFCPP a polyB polyC = do
 data WhatChanged
   = NothingChanged
   | RelationChanged
-  | AdditiveConstraintChanged
+  | AdditiveFieldConstraintChanged
+  | AdditiveLimbConstraintChanged
   | MultiplicativeConstraintChanged
   deriving (Eq, Show)
 
@@ -257,8 +273,10 @@ instance Semigroup WhatChanged where
   x <> NothingChanged = x
   RelationChanged <> _ = RelationChanged
   _ <> RelationChanged = RelationChanged
-  AdditiveConstraintChanged <> _ = AdditiveConstraintChanged
-  _ <> AdditiveConstraintChanged = AdditiveConstraintChanged
+  AdditiveFieldConstraintChanged <> _ = AdditiveFieldConstraintChanged
+  _ <> AdditiveFieldConstraintChanged = AdditiveFieldConstraintChanged
+  AdditiveLimbConstraintChanged <> _ = AdditiveLimbConstraintChanged
+  _ <> AdditiveLimbConstraintChanged = AdditiveLimbConstraintChanged
   MultiplicativeConstraintChanged <> _ = MultiplicativeConstraintChanged
 
 instance Monoid WhatChanged where
@@ -384,7 +402,7 @@ addAddF poly = case PolyG.view poly of
     --    var1 = - coeff2 * var2 / coeff1 - constant / coeff1
     void $ relateF var1 (-coeff2 / coeff1, var2, -constant / coeff1)
   PolyG.Polynomial _ _ -> do
-    markChanged AdditiveConstraintChanged
+    markChanged AdditiveFieldConstraintChanged
     modify' $ \cm' -> cm' {cmAddF = poly : cmAddF cm'}
 
 --------------------------------------------------------------------------------
