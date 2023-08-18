@@ -23,12 +23,12 @@ import Prelude hiding (lookup)
 
 type UIntRelations =
   EquivClass.EquivClass
-    Limb
+    RefL
     Integer -- constants can be represented as integers
-    () -- only allowing limbs of the same width to be related (as equal) at the moment
+    () -- only allowing RefLs of the same width to be related (as equal) at the moment
 
 new :: UIntRelations
-new = EquivClass.new "UInt (Limb Equivalence)"
+new = EquivClass.new "UInt (RefL Equivalence)"
 
 instance EquivClass.IsRelation () where
   relationToString (var, ()) = show var
@@ -38,24 +38,24 @@ instance EquivClass.ExecRelation Integer () where
   execRel () value = value
 
 -- | Assigning a constant value to a limb
-assign :: Limb -> Integer -> UIntRelations -> EquivClass.M (Error n) UIntRelations
-assign limb val xs = mapError $ EquivClass.assign limb val xs
+assign :: RefL -> Integer -> UIntRelations -> EquivClass.M (Error n) UIntRelations
+assign var val xs = mapError $ EquivClass.assign var val xs
 
 -- | Relate two limbs (that has the same width)
-relate :: Limb -> Limb -> UIntRelations -> EquivClass.M (Error n) UIntRelations
-relate limb1 limb2 xs =
-  if lmbWidth limb1 /= lmbWidth limb2
+relate :: RefL -> RefL -> UIntRelations -> EquivClass.M (Error n) UIntRelations
+relate var1 var2 xs =
+  if lmbWidth (refLLimb var1) /= lmbWidth (refLLimb var2) || refLPowerOffset var1 /= refLPowerOffset var2
     then pure xs
-    else mapError $ EquivClass.relate limb1 () limb2 xs
+    else mapError $ EquivClass.relate var1 () var2 xs
 
 -- | Examine the relation between two limbs
-relationBetween :: Limb -> Limb -> UIntRelations -> Bool
+relationBetween :: RefL -> RefL -> UIntRelations -> Bool
 relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
   Nothing -> False
   Just () -> True
 
 -- | Given a predicate, convert the relations to a mapping of Limbs to either some other Limb or a constant value
-toMap :: (Limb -> Bool) -> UIntRelations -> Map Limb (Either Limb Integer)
+toMap :: (RefL -> Bool) -> UIntRelations -> Map RefL (Either RefL Integer)
 toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
   where
     convert var status = do

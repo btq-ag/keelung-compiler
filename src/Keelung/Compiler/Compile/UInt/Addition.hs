@@ -191,7 +191,7 @@ addLimbStack dimensions resultLimb (OneConstantOnly constant) = do
     writeValB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) bit
   return mempty
 addLimbStack _ resultLimb (OneLimbOnly limb) = do
-  writeEqL resultLimb limb
+  writeEqL (RefL resultLimb 0) (RefL limb 0)
   return mempty
 addLimbStack _ resultLimb (Ordinary constant limbs) = do
   let carrySigns = LimbColumn.calculateCarrySigns (lmbWidth resultLimb) constant limbs

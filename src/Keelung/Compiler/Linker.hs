@@ -105,8 +105,8 @@ linkConstraintModule cm =
         -- it's a pinned UInt variable
         True
 
-    limbShouldBeKept :: Limb -> Bool
-    limbShouldBeKept = refUShouldBeKept . lmbRef
+    refLShouldBeKept :: RefL -> Bool
+    refLShouldBeKept = refUShouldBeKept . lmbRef . refLLimb
 
     refBShouldBeKept :: RefB -> Bool
     refBShouldBeKept ref = case ref of
@@ -136,11 +136,11 @@ linkConstraintModule cm =
 
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
     extractUIntRelations relations =
-      let convert :: (GaloisField n, Integral n) => (Limb, Either Limb Integer) -> Constraint n
+      let convert :: (GaloisField n, Integral n) => (RefL, Either RefL Integer) -> Constraint n
           convert (_var, Right _val) = error "extractUIntRelations: unsupported"
           convert (var, Left root) = CVarEqL var root
 
-          result = map convert $ Map.toList $ UIntRelations.toMap limbShouldBeKept relations
+          result = map convert $ Map.toList $ UIntRelations.toMap refLShouldBeKept relations
        in Seq.fromList (map (linkConstraint occurrences) result)
 
     varEqFs = extractFieldRelations (cmRelations cm)
@@ -163,54 +163,54 @@ linkConstraintModule cm =
 -------------------------------------------------------------------------------
 
 linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Constraint n -> Linked.Constraint n
-linkConstraint counters (CAddG as) = Linked.CAdd (linkPolyGUnsafe counters as)
-linkConstraint counters (CAddL as) = Linked.CAdd (linkPolyLUnsafe counters as)
+linkConstraint occurrences (CAddG as) = Linked.CAdd (linkPolyGUnsafe occurrences as)
+linkConstraint occurrences (CAddL as) = Linked.CAdd (linkPolyLUnsafe occurrences as)
 linkConstraint occurrences (CVarEq x y) =
   case Poly.buildEither 0 [(reindexRef occurrences x, 1), (reindexRef occurrences y, -1)] of
     Left _ -> error "CVarEq: two variables are the same"
     Right xs -> Linked.CAdd xs
-linkConstraint counters (CVarEqF x y) =
-  case Poly.buildEither 0 [(reindexRefF counters x, 1), (reindexRefF counters y, -1)] of
+linkConstraint occurrences (CVarEqF x y) =
+  case Poly.buildEither 0 [(reindexRefF occurrences x, 1), (reindexRefF occurrences y, -1)] of
     Left _ -> error "CVarEqF: two variables are the same"
     Right xs -> Linked.CAdd xs
-linkConstraint counters (CVarEqB x y) =
-  case Poly.buildEither 0 [(reindexRefB counters x, 1), (reindexRefB counters y, -1)] of
+linkConstraint occurrences (CVarEqB x y) =
+  case Poly.buildEither 0 [(reindexRefB occurrences x, 1), (reindexRefB occurrences y, -1)] of
     Left _ -> error $ "CVarEqB: two variables are the same" ++ show x ++ " " ++ show y
     Right xs -> Linked.CAdd xs
-linkConstraint counters (CVarNEqB x y) =
-  case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
+linkConstraint occurrences (CVarNEqB x y) =
+  case Poly.buildEither 1 [(reindexRefB occurrences x, -1), (reindexRefB occurrences y, -1)] of
     Left _ -> error "CVarNEqB: two variables are the same"
     Right xs -> Linked.CAdd xs
-linkConstraint counters (CVarEqL x y) =
-  if lmbWidth x /= lmbWidth y
+linkConstraint occurrences (CVarEqL x y) =
+  if lmbWidth (refLLimb x) /= lmbWidth (refLLimb y)
     then error "[ panic ] CVarEqL: Limbs are of different width"
     else do
-      let pairsX = reindexRefL counters (RefL x 0) 1
-      let pairsY = reindexRefL counters (RefL y 0) (-1)
+      let pairsX = reindexRefL occurrences x 1
+      let pairsY = reindexRefL occurrences y (-1)
       let pairs = toList (pairsX <> pairsY)
       case Poly.buildEither 0 pairs of
         Left _ -> error "CVarEqL: two variables are the same"
         Right xs -> Linked.CAdd xs
-linkConstraint counters (CVarBindF x n) = case Poly.buildEither (-n) [(reindexRef counters x, 1)] of
+linkConstraint occurrences (CVarBindF x n) = case Poly.buildEither (-n) [(reindexRef occurrences x, 1)] of
   Left _ -> error "CVarBindF: impossible"
   Right xs -> Linked.CAdd xs
-linkConstraint counters (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB counters x) 1)
-linkConstraint counters (CVarBindB x False) = Linked.CAdd (Poly.bind (reindexRefB counters x) 0)
-linkConstraint counters (CMulF as bs cs) =
+linkConstraint occurrences (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB occurrences x) 1)
+linkConstraint occurrences (CVarBindB x False) = Linked.CAdd (Poly.bind (reindexRefB occurrences x) 0)
+linkConstraint occurrences (CMulF as bs cs) =
   Linked.CMul
-    (linkPolyGUnsafe counters as)
-    (linkPolyGUnsafe counters bs)
+    (linkPolyGUnsafe occurrences as)
+    (linkPolyGUnsafe occurrences bs)
     ( case cs of
         Left n -> Left n
-        Right xs -> linkPolyG counters xs
+        Right xs -> linkPolyG occurrences xs
     )
-linkConstraint counters (CMulL as bs cs) =
+linkConstraint occurrences (CMulL as bs cs) =
   Linked.CMul
-    (linkPolyLUnsafe counters as)
-    (linkPolyLUnsafe counters bs)
+    (linkPolyLUnsafe occurrences as)
+    (linkPolyLUnsafe occurrences bs)
     ( case cs of
         Left n -> Left n
-        Right xs -> linkPolyL counters xs
+        Right xs -> linkPolyL occurrences xs
     )
 
 updateCounters :: Occurrences -> Counters -> Counters

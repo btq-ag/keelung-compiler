@@ -18,6 +18,8 @@ import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Reference
+-- import Keelung.Data.PolyL (PolyL (..))
+-- import qualified Data.Sequence as Seq
 
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
@@ -254,6 +256,19 @@ learnFromAddF poly = case PolyG.view poly of
     relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
   PolyG.Polynomial _ _ -> return False
 
+-- | Go through additive constraints and classify them into relation constraints when possible.
+--   Returns 'True' if the constraint has been reduced.
+-- learnFromAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n Bool
+-- learnFromAddL (PolyL constant pairs) = case pairs of
+--   Seq.Empty -> error "[ panic ] Empty PolyL"
+--   (var1, multiplier1) Seq.:<| Seq.Empty -> do 
+--     --  constant + multiplier1 * var1 = 0
+--     --    =>
+--     --  var1 = - constant / multiplier1
+--     assignL var1 (toInteger (-constant / multiplier1))
+--     return True
+--   x Seq.:<| xs -> _
+
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
   cm <- get
@@ -271,6 +286,16 @@ assign (F var) value = do
     Just relations -> do
       markChanged RelationChanged
       put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
+
+-- assignL :: (GaloisField n, Integral n) => RefL -> Integer -> RoundM n ()
+-- assignL var value = do
+--   cm <- get
+--   result <- lift $ lift $ EquivClass.runM $ Relations.assignL var value (cmRelations cm)
+--   case result of
+--     Nothing -> return ()
+--     Just relations -> do
+--       markChanged RelationChanged
+--       put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
