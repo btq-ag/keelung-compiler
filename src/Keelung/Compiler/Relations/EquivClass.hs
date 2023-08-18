@@ -72,7 +72,8 @@ mapError f xs = case runExcept (runWriterT xs) of
 
 data VarStatus var n rel
   = IsConstant n
-  | IsRoot (Map var rel)
+  | -- | contains the relations to the children
+    IsRoot (Map var rel)
   | -- | var = relation root
     IsChildOf var rel
   deriving (Show, Eq, Generic, NFData)

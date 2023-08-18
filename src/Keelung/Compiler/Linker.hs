@@ -33,6 +33,7 @@ import Keelung.Data.Constraint
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Reference
@@ -234,7 +235,7 @@ linkPolyGUnsafe occurrences xs = case linkPolyG occurrences xs of
   Right p -> p
 
 linkPolyL :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Either n (Poly n)
-linkPolyL occurrences (PolyL constant limbs) = Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexRefL occurrences)) (toList limbs))
+linkPolyL occurrences poly = let (constant, limbs) = PolyL.view poly in Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexRefL occurrences)) (toList limbs))
 
 linkPolyLUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Poly n
 linkPolyLUnsafe occurrences xs = case linkPolyL occurrences xs of

@@ -391,3 +391,7 @@ instance UpdateOccurrences RefU where
                 _ -> cm
           )
       )
+
+instance UpdateOccurrences RefL where
+  addOccurrences = addOccurrences . Set.map (lmbRef . refLLimb)
+  removeOccurrences = removeOccurrences . Set.map (lmbRef . refLLimb)

@@ -3,7 +3,18 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Polynomial made of Limbs
-module Keelung.Data.PolyL (PolyL (..), vars, buildWithSeq, size) where
+module Keelung.Data.PolyL
+  ( PolyL,
+    vars,
+    vars',
+    buildWithSeq,
+    insert,
+    singleton,
+    addConstant,
+    size,
+    view,
+  )
+where
 
 import Control.DeepSeq (NFData)
 import Data.Foldable (toList)
@@ -12,6 +23,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
+import qualified Data.Sequence as Seq
 
 -- | Polynomial made of Limbs + a constant
 data PolyL n = PolyL n (Seq (RefL, n))
@@ -59,19 +71,15 @@ buildWithSeq = PolyL
 --         then Left c
 --         else Right (PolyG c result)
 
--- singleton :: (Num n, Eq n) => n -> (Ref, n) -> Either n (PolyG n)
--- singleton c (_, 0) = Left c
--- singleton c (x, coeff) = Right $ PolyG c (Map.singleton x coeff)
+singleton :: (Num n, Eq n) => n -> (RefL, n) -> Either n (PolyL n)
+singleton c (_, 0) = Left c
+singleton c (x, coeff) = Right $ PolyL c (Seq.singleton (x, coeff))
 
--- insert :: (Num n, Eq n) => n -> (Ref, n) -> PolyG n -> Either n (PolyG n)
--- insert c' (x, coeff) (PolyG c xs) =
---   let result = Map.filter (/= 0) $ Map.insertWith (+) x coeff xs
---    in if Map.null result
---         then Left (c + c')
---         else Right $ PolyG (c + c') result
+insert :: (Num n, Eq n) => n -> (RefL, n) -> PolyL n -> PolyL n
+insert c' x (PolyL c xs) = PolyL (c + c') (x Seq.<| xs)
 
--- addConstant :: Num n => n -> PolyG n -> PolyG n
--- addConstant c' (PolyG c xs) = PolyG (c + c') xs
+addConstant :: Num n => n -> PolyL n -> PolyL n
+addConstant c' (PolyL c xs) = PolyL (c + c') xs
 
 -- -- | Multiply all coefficients and the constant by some non-zero number
 -- multiplyBy :: (Num n, Eq n) => n -> PolyG n -> Either n (PolyG n)
@@ -92,8 +100,8 @@ buildWithSeq = PolyL
 --   [(x, c'), (y, c'')] -> Binomial c (x, c') (y, c'')
 --   _ -> Polynomial c xs
 
--- viewAsMap :: PolyG n -> (n, Map Ref n)
--- viewAsMap (PolyG c xs) = (c, xs)
+view :: PolyL n -> (n, Seq (RefL, n))
+view (PolyL c xs) = (c, xs)
 
 vars :: PolyL n -> Set RefU
 vars (PolyL _ xs) = Set.fromList $ map (toRef . fst) (toList xs)
@@ -101,6 +109,10 @@ vars (PolyL _ xs) = Set.fromList $ map (toRef . fst) (toList xs)
     toRef :: RefL -> RefU
     toRef (RefL (Limb ref _ _ _) _) = ref
 
+vars' :: PolyL n -> Set RefL
+vars' (PolyL _ xs) = Set.fromList $ map fst (toList xs)
+
+-- merge :: (Num n, Eq
 -- merge :: (Num n, Eq n) => PolyG n -> PolyG n -> Either n (PolyG n)
 -- merge (PolyG c1 xs1) (PolyG c2 xs2) =
 --   let result = Map.filter (/= 0) $ Map.unionWith (+) xs1 xs2

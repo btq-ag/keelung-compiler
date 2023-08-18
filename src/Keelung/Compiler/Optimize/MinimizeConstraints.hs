@@ -8,6 +8,7 @@ import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
+import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
@@ -15,14 +16,23 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as Relations
+import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
--- import Keelung.Data.PolyL (PolyL (..))
--- import qualified Data.Sequence as Seq
+import Keelung.Data.PolyL
 
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
+-- 
+--  Passes are run in the following order:
+--    1. AddF
+--    2. AddL
+--    3. MulF
+--    4. DivMods
+--    5. ModInvs
+--    6. EqZeros
 run :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (ConstraintModule n)
 run cm = goThroughEqZeros . goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cm
 
@@ -50,6 +60,13 @@ goThroughAddF = do
   runRoundM $ do
     result <- foldMaybeM reduceAddF [] (cmAddF cm)
     modify' $ \cm' -> cm' {cmAddF = result}
+
+goThroughAddL :: (GaloisField n, Integral n) => OptiM n WhatChanged
+goThroughAddL = do
+  cm <- get
+  runRoundM $ do
+    result <- foldMaybeM reduceAddL [] (cmAddL cm)
+    modify' $ \cm' -> cm' {cmAddL = result}
 
 goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughEqZeros cm =
@@ -110,6 +127,31 @@ reduceAddF polynomial = do
           modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
           -- keep reducing the reduced polynomial
           reduceAddF reducePolynomial
+
+reduceAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Maybe (PolyL n))
+reduceAddL polynomial = do
+  changed <- learnFromAddL polynomial
+  if changed
+    then return Nothing
+    else do
+      relations <- gets cmRelations
+      case substPolyL relations polynomial of
+        Nothing -> return (Just polynomial) -- nothing changed
+        Just (Left constant, removedRefs, _) -> do
+          when (constant /= 0) $
+            error "[ panic ] Additive reduced to some constant other than 0"
+          -- the polynomial has been reduced to nothing
+          markChanged AdditiveConstraintChanged
+          -- remove all variables in the polynomial from the occurrence list
+          modify' $ removeOccurrences removedRefs
+          return Nothing
+        Just (Right reducePolynomial, removedRefs, addedRefs) -> do
+          -- the polynomial has been reduced to something
+          markChanged AdditiveConstraintChanged
+          -- remove variables that has been reduced in the polynomial from the occurrence list
+          modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
+          -- keep reducing the reduced polynomial
+          reduceAddL reducePolynomial
 
 type MulF n = (PolyG n, PolyG n, Either n (PolyG n))
 
@@ -258,16 +300,22 @@ learnFromAddF poly = case PolyG.view poly of
 
 -- | Go through additive constraints and classify them into relation constraints when possible.
 --   Returns 'True' if the constraint has been reduced.
--- learnFromAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n Bool
--- learnFromAddL (PolyL constant pairs) = case pairs of
---   Seq.Empty -> error "[ panic ] Empty PolyL"
---   (var1, multiplier1) Seq.:<| Seq.Empty -> do 
---     --  constant + multiplier1 * var1 = 0
---     --    =>
---     --  var1 = - constant / multiplier1
---     assignL var1 (toInteger (-constant / multiplier1))
---     return True
---   x Seq.:<| xs -> _
+learnFromAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n Bool
+learnFromAddL poly = case PolyL.view poly of
+  (_, Seq.Empty) -> error "[ panic ] Empty PolyL"
+  (constant, (var1, multiplier1) Seq.:<| Seq.Empty) -> do
+    --  constant + var1 * multiplier1  = 0
+    --    =>
+    --  var1 = - constant / multiplier1
+    assignL var1 (toInteger (-constant / multiplier1))
+    return True
+  (constant, (var1, multiplier1) Seq.:<| (var2, multiplier2) Seq.:<| Seq.Empty) ->
+    if constant == 0 && multiplier1 == -multiplier2
+      then do
+        --  var1 * multiplier1 = var2 * multiplier2
+        relateL var1 var2
+      else return False
+  _ -> return False
 
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
@@ -287,21 +335,33 @@ assign (F var) value = do
       markChanged RelationChanged
       put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 
--- assignL :: (GaloisField n, Integral n) => RefL -> Integer -> RoundM n ()
--- assignL var value = do
---   cm <- get
---   result <- lift $ lift $ EquivClass.runM $ Relations.assignL var value (cmRelations cm)
---   case result of
---     Nothing -> return ()
---     Just relations -> do
---       markChanged RelationChanged
---       put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
+assignL :: (GaloisField n, Integral n) => RefL -> Integer -> RoundM n ()
+assignL var value = do
+  cm <- get
+  result <- lift $ lift $ EquivClass.runM $ Relations.assignL var value (cmRelations cm)
+  case result of
+    Nothing -> return ()
+    Just relations -> do
+      markChanged RelationChanged
+      put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cm <- get
   result <- lift $ lift $ EquivClass.runM $ Relations.relateRefs var1 slope var2 intercept (cmRelations cm)
+  case result of
+    Nothing -> return False
+    Just relations -> do
+      markChanged RelationChanged
+      modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
+      return True
+
+-- | Relates two RefLs. Returns 'True' if a new relation has been established.
+relateL :: (GaloisField n, Integral n) => RefL -> RefL -> RoundM n Bool
+relateL var1 var2 = do
+  cm <- get
+  result <- lift $ lift $ EquivClass.runM $ Relations.relateL var1 var2 (cmRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do
@@ -372,3 +432,73 @@ substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = cas
               -- ref = slope * root + intercept
               Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), removedRefs', addedRefs')
               Right accPoly' -> (True, PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', removedRefs', addedRefs')
+
+--------------------------------------------------------------------------------
+
+-- | Substitutes RefLs in a PolyL.
+--   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
+substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Set RefL, Set RefL)
+substPolyL relations poly = do
+  let (c, xs) = PolyL.view poly
+  case foldl (substPolyL_ (Relations.exportUIntRelations relations)) (False, Left c, mempty, mempty) xs of
+    (False, _, _, _) -> Nothing -- nothing changed
+    (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
+    (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyL.vars' poly)
+
+substPolyL_ ::
+  (Integral n, GaloisField n) =>
+  UInt.UIntRelations ->
+  (Bool, Either n (PolyL n), Set RefL, Set RefL) ->
+  (RefL, n) ->
+  (Bool, Either n (PolyL n), Set RefL, Set RefL)
+substPolyL_ relations (changed, accPoly, removedRefs, addedRefs) (ref, multiplier) = case EquivClass.lookup ref relations of
+  EquivClass.IsConstant constant ->
+    let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
+     in case accPoly of
+          Left c -> (True, Left (fromInteger constant * multiplier + c), removedRefs', addedRefs)
+          Right xs -> (True, Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removedRefs', addedRefs)
+  EquivClass.IsRoot _ -> case accPoly of
+    Left c -> (changed, PolyL.singleton c (ref, multiplier), removedRefs, addedRefs)
+    Right xs -> (changed, Right (PolyL.insert 0 (ref, multiplier) xs), removedRefs, addedRefs)
+  EquivClass.IsChildOf root () ->
+    if root == ref
+      then case accPoly of
+        Left c -> (changed, PolyL.singleton c (ref, multiplier), removedRefs, addedRefs)
+        Right xs -> (changed, Right (PolyL.insert 0 (ref, multiplier) xs), removedRefs, addedRefs)
+      else
+        let removedRefs' = Set.insert ref removedRefs
+            addedRefs' = Set.insert root addedRefs
+         in case accPoly of
+              -- replace `ref` with `root`
+              Left c -> (True, PolyL.singleton c (root, multiplier), removedRefs', addedRefs')
+              Right accPoly' -> (True, Right (PolyL.insert 0 (root, multiplier) accPoly'), removedRefs', addedRefs')
+
+-- \| IsRoot (Map var rel)
+-- \| -- | var = relation root
+--   IsChildOf var rel
+-- case Relations.lookup ref relations of
+-- Relations.Root -> case accPoly of
+--   Left c -> (changed, PolyL.singleton c (ref, coeff), removedRefs, addedRefs)
+--   Right xs -> (changed, PolyL.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+-- Relations.Value intercept ->
+--   -- ref = intercept
+--   let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
+--    in case accPoly of
+--         Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
+--         Right xs -> (True, Right $ PolyG.addConstant (intercept * coeff) xs, removedRefs', addedRefs)
+-- Relations.ChildOf slope root intercept ->
+--   if root == ref
+--     then
+--       if slope == 1 && intercept == 0
+--         then -- ref = root, nothing changed
+--         case accPoly of
+--           Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
+--           Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+--         else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
+--     else
+--       let removedRefs' = Set.insert ref removedRefs
+--           addedRefs' = Set.insert root addedRefs
+--        in case accPoly of
+--             -- ref = slope * root + intercept
+--             Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), removedRefs', addedRefs')
+--             Right accPoly' -> (True, PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', removedRefs', addedRefs')
