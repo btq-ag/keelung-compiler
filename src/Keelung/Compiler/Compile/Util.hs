@@ -147,6 +147,8 @@ addC = mapM_ addOne
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
       execRelations $ Relations.relateB x (True, y)
+    addOne (CVarEqL x y) = do
+      execRelations $ Relations.relateU x y
     addOne (CVarNEqB x y) = do
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
@@ -203,6 +205,9 @@ writeNEqB a b = addC [CVarNEqB a b]
 
 writeEqU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
 writeEqU width a b = forM_ [0 .. width - 1] $ \i -> writeEqB (RefUBit width a i) (RefUBit width b i)
+
+writeEqL :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
+writeEqL a b = addC [CVarEqL a b]
 
 --------------------------------------------------------------------------------
 

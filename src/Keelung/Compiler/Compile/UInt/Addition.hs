@@ -190,9 +190,8 @@ addLimbStack dimensions resultLimb (OneConstantOnly constant) = do
     let bit = Data.Bits.testBit constant i
     writeValB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) bit
   return mempty
-addLimbStack dimensions resultLimb (OneLimbOnly limb) = do
-  forM_ [0 .. lmbWidth resultLimb - 1] $ \i -> do
-    writeEqB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) (RefUBit (dimUIntWidth dimensions) (lmbRef limb) (lmbOffset limb + i))
+addLimbStack _ resultLimb (OneLimbOnly limb) = do
+  writeEqL resultLimb limb
   return mempty
 addLimbStack _ resultLimb (Ordinary constant limbs) = do
   let carrySigns = LimbColumn.calculateCarrySigns (lmbWidth resultLimb) constant limbs

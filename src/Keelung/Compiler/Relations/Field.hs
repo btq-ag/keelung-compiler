@@ -8,7 +8,9 @@ module Keelung.Compiler.Relations.Field
     new,
     assignF,
     assignB,
+    assignU,
     relateB,
+    relateU,
     relateRefs,
     relationBetween,
     toInt,
@@ -16,6 +18,7 @@ module Keelung.Compiler.Relations.Field
     lookup,
     Lookup (..),
     exportBooleanRelations,
+    exportUIntRelations
   )
 where
 
@@ -266,3 +269,6 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
 
 exportBooleanRelations :: Relations n -> Boolean.BooleanRelations
 exportBooleanRelations = relationsB
+
+exportUIntRelations :: Relations n -> UInt.UIntRelations
+exportUIntRelations = relationsU

@@ -27,7 +27,8 @@ import Keelung.Compiler.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as Relations
-import Keelung.Compiler.Relations.Field qualified as FieldRelations
+import Keelung.Compiler.Relations.UInt (UIntRelations)
+import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Data.Constraint
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
@@ -50,6 +51,7 @@ linkConstraintModule cm =
       csConstraints =
         varEqFs
           <> varEqBs
+          <> varEqLs
           <> addFs
           <> addLs
           <> mulFs
@@ -103,6 +105,9 @@ linkConstraintModule cm =
         -- it's a pinned UInt variable
         True
 
+    limbShouldBeKept :: Limb -> Bool
+    limbShouldBeKept = refUShouldBeKept . lmbRef
+
     refBShouldBeKept :: RefB -> Bool
     refBShouldBeKept ref = case ref of
       RefBX var ->
@@ -129,8 +134,18 @@ linkConstraintModule cm =
           result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
        in Seq.fromList (map (linkConstraint occurrences) result)
 
+    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
+    extractUIntRelations relations =
+      let convert :: (GaloisField n, Integral n) => (Limb, Either Limb Integer) -> Constraint n
+          convert (_var, Right _val) = error "extractUIntRelations: unsupported"
+          convert (var, Left root) = CVarEqL var root
+
+          result = map convert $ Map.toList $ UIntRelations.toMap limbShouldBeKept relations
+       in Seq.fromList (map (linkConstraint occurrences) result)
+
     varEqFs = extractFieldRelations (cmRelations cm)
-    varEqBs = extractBooleanRelations (FieldRelations.exportBooleanRelations (cmRelations cm))
+    varEqBs = extractBooleanRelations (Relations.exportBooleanRelations (cmRelations cm))
+    varEqLs = extractUIntRelations (Relations.exportUIntRelations (cmRelations cm))
 
     addFs = Seq.fromList $ map (linkConstraint occurrences . CAddG) $ cmAddF cm
     addLs = Seq.fromList $ map (linkConstraint occurrences . CAddL) $ cmAddL cm
@@ -166,6 +181,16 @@ linkConstraint counters (CVarNEqB x y) =
   case Poly.buildEither 1 [(reindexRefB counters x, -1), (reindexRefB counters y, -1)] of
     Left _ -> error "CVarNEqB: two variables are the same"
     Right xs -> Linked.CAdd xs
+linkConstraint counters (CVarEqL x y) =
+  if lmbWidth x /= lmbWidth y
+    then error "[ panic ] CVarEqL: Limbs are of different width"
+    else do
+      let pairsX = reindexRefL counters (RefL x 0) 1
+      let pairsY = reindexRefL counters (RefL y 0) (-1)
+      let pairs = toList (pairsX <> pairsY)
+      case Poly.buildEither 0 pairs of
+        Left _ -> error "CVarEqL: two variables are the same"
+        Right xs -> Linked.CAdd xs
 linkConstraint counters (CVarBindF x n) = case Poly.buildEither (-n) [(reindexRef counters x, 1)] of
   Left _ -> error "CVarBindF: impossible"
   Right xs -> Linked.CAdd xs

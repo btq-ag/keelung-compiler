@@ -55,7 +55,7 @@ relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
   Just () -> True
 
 -- | Given a predicate, convert the relations to a mapping of Limbs to either some other Limb or a constant value
-toMap :: (Limb -> Bool) -> UIntRelations -> Map Limb (Either () Integer)
+toMap :: (Limb -> Bool) -> UIntRelations -> Map Limb (Either Limb Integer)
 toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
   where
     convert var status = do
@@ -65,7 +65,7 @@ toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
           EquivClass.IsRoot _ -> Nothing
           EquivClass.IsChildOf parent () ->
             if shouldBeKept parent
-              then Just $ Left ()
+              then Just $ Left parent
               else Nothing
         else Nothing
 
