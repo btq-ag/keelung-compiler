@@ -29,6 +29,7 @@ import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.Boolean qualified as Boolean
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Reference
 import Prelude hiding (lookup)
 
@@ -36,12 +37,13 @@ type FieldRelations n = EquivClass.EquivClass Ref n (LinRel n)
 
 data Relations n = Relations
   { relationsF :: FieldRelations n,
-    relationsB :: Boolean.BooleanRelations
+    relationsB :: Boolean.BooleanRelations,
+    relationsU :: UInt.UIntRelations
   }
   deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (Relations n) where
-  show (Relations f b) = show f <> show b
+  show (Relations f b u) = show f <> show b <> show u
 
 mapError :: EquivClass.M (n, n) a -> EquivClass.M (Error n) a
 mapError = EquivClass.mapError (uncurry ConflictingValuesF)
@@ -62,10 +64,18 @@ updateRelationsB f xs = do
   relations <- f (relationsB xs)
   return $ xs {relationsB = relations}
 
+updateRelationsU ::
+  (UInt.UIntRelations -> EquivClass.M (Error n) UInt.UIntRelations) ->
+  Relations n ->
+  EquivClass.M (Error n) (Relations n)
+updateRelationsU f xs = do
+  relations <- f (relationsU xs)
+  return $ xs {relationsU = relations}
+
 --------------------------------------------------------------------------------
 
 new :: Relations n
-new = Relations (EquivClass.new "Field") Boolean.new
+new = Relations (EquivClass.new "Field") Boolean.new UInt.new
 
 assignF :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignF var val = updateRelationsF $ EquivClass.assign var val
@@ -73,11 +83,17 @@ assignF var val = updateRelationsF $ EquivClass.assign var val
 assignB :: RefB -> Bool -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignB ref val = updateRelationsB $ Boolean.assign ref val
 
+assignU :: (GaloisField n, Integral n) => Limb -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
+assignU var val = updateRelationsU $ UInt.assign var val
+
 relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateF var1 slope var2 intercept = updateRelationsF $ EquivClass.relate var1 (LinRel slope intercept) var2
 
 relateB :: GaloisField n => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateB refA (polarity, refB) = updateRelationsB (Boolean.relate refA polarity refB)
+
+relateU :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateU var1 var2 = updateRelationsU $ UInt.relate var1 var2
 
 -- var = slope * var2 + intercept
 relateRefs :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
@@ -127,7 +143,7 @@ data Lookup n = Root | Value n | ChildOf n Ref n
 
 lookup :: GaloisField n => Ref -> Relations n -> Lookup n
 lookup var xs = fromLinRel $ lookup' var xs
-  
+
 lookup' :: GaloisField n => Ref -> Relations n -> EquivClass.VarStatus Ref n (LinRel n)
 lookup' (B var) xs = fromBooleanLookup $ EquivClass.lookup var (relationsB xs)
 lookup' (F var) xs = EquivClass.lookup (F var) (relationsF xs)

@@ -1,8 +1,6 @@
 module Keelung.Compiler.Compile.LimbColumn where
 
 import Data.Bits qualified
-import Data.IntMap.Strict (IntMap)
-import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq, (<|))
 import Data.Sequence qualified as Seq
 import Data.Word

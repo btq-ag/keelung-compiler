@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module Keelung.Compiler.Relations.UInt
   ( UIntRelations,
     new,
