@@ -18,7 +18,7 @@ module Keelung.Compiler.Relations.Field
     lookup,
     Lookup (..),
     exportBooleanRelations,
-    exportUIntRelations
+    exportUIntRelations,
   )
 where
 
@@ -46,7 +46,10 @@ data Relations n = Relations
   deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (Relations n) where
-  show (Relations f b u) = show f <> show b <> show u
+  show (Relations f b u) =
+    (if EquivClass.size f == 0 then "" else show f)
+      <> (if EquivClass.size b == 0 then "" else show b)
+      <> (if EquivClass.size u == 0 then "" else show u)
 
 mapError :: EquivClass.M (n, n) a -> EquivClass.M (Error n) a
 mapError = EquivClass.mapError (uncurry ConflictingValuesF)
@@ -136,7 +139,7 @@ toInt shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap (relation
         else Nothing
 
 size :: Relations n -> Int
-size = Map.size . EquivClass.toMap . relationsF
+size (Relations f b u) = EquivClass.size f + Boolean.size b + UInt.size u
 
 --------------------------------------------------------------------------------
 

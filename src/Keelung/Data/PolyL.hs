@@ -11,19 +11,22 @@ module Keelung.Data.PolyL
     insert,
     singleton,
     addConstant,
+    multiplyBy,
+    merge,
     size,
     view,
   )
 where
 
 import Control.DeepSeq (NFData)
+import Data.Bifunctor (Bifunctor (second))
 import Data.Foldable (toList)
 import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
-import qualified Data.Sequence as Seq
 
 -- | Polynomial made of Limbs + a constant
 data PolyL n = PolyL n (Seq (RefL, n))
@@ -81,10 +84,10 @@ insert c' x (PolyL c xs) = PolyL (c + c') (x Seq.<| xs)
 addConstant :: Num n => n -> PolyL n -> PolyL n
 addConstant c' (PolyL c xs) = PolyL (c + c') xs
 
--- -- | Multiply all coefficients and the constant by some non-zero number
--- multiplyBy :: (Num n, Eq n) => n -> PolyG n -> Either n (PolyG n)
--- multiplyBy 0 _ = Left 0
--- multiplyBy m (PolyG c xs) = Right $ PolyG (m * c) (Map.map (m *) xs)
+-- | Multiply all coefficients and the constant by some non-zero number
+multiplyBy :: (Num n, Eq n) => n -> PolyL n -> Either n (PolyL n)
+multiplyBy 0 _ = Left 0
+multiplyBy m (PolyL c xs) = Right $ PolyL (m * c) (fmap (second (m *)) xs)
 
 -- -- | Negate a polynomial
 -- negate :: (Num n, Eq n) => PolyG n -> PolyG n
@@ -112,13 +115,8 @@ vars (PolyL _ xs) = Set.fromList $ map (toRef . fst) (toList xs)
 vars' :: PolyL n -> Set RefL
 vars' (PolyL _ xs) = Set.fromList $ map fst (toList xs)
 
--- merge :: (Num n, Eq
--- merge :: (Num n, Eq n) => PolyG n -> PolyG n -> Either n (PolyG n)
--- merge (PolyG c1 xs1) (PolyG c2 xs2) =
---   let result = Map.filter (/= 0) $ Map.unionWith (+) xs1 xs2
---    in if Map.null result
---         then Left (c1 + c2)
---         else Right (PolyG (c1 + c2) result)z
+merge :: (Num n, Eq n) => PolyL n -> PolyL n -> PolyL n
+merge (PolyL c1 xs1) (PolyL c2 xs2) = PolyL (c1 + c2) (xs1 <> xs2)
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int

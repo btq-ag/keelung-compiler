@@ -27,7 +27,7 @@ import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (Relations)
-import Keelung.Compiler.Relations.Field qualified as FieldRelations
+import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Util (indent)
 import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
@@ -39,6 +39,7 @@ import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
+import qualified Keelung.Compiler.Relations.UInt as UIntRelations
 
 --------------------------------------------------------------------------------
 
@@ -46,7 +47,7 @@ import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanCons
 data ConstraintModule n = ConstraintModule
   { cmField :: FieldInfo,
     cmCounters :: !Counters,
-    -- for counting the occurrences of variables in constraints (excluding the ones that are in FieldRelations)
+    -- for counting the occurrences of variables in constraints (excluding the ones that are in Relations)
     cmOccurrenceF :: !OccurF,
     cmOccurrenceB :: !OccurB,
     cmOccurrenceU :: !OccurU,
@@ -118,9 +119,14 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
           else "  ModInv hints:\n" <> indent (indent (showList' (map (\(a, _aainv, _n, p) -> show a <> "⁻¹ = (mod " <> show p <> ")") (cmModInvs cm))))
 
       showVarEqF =
-        if FieldRelations.size (cmRelations cm) == 0
+        if Relations.size (cmRelations cm) == 0
           then ""
-          else "  Field relations:\n" <> indent (indent (show (cmRelations cm)))
+          else "  Relations:\n" <> indent (indent (show (cmRelations cm)))
+
+      -- showVarEqL =
+      --   if UIntRelations.size (Relations.exportUIntRelations (cmRelations cm)) == 0
+      --     then ""
+      --     else "  UInt relations:\n" <> indent (indent (show (cmRelations cm)))
 
       showAddF = adapt "AddF" (cmAddF cm) showAdd
       showAddL = adapt "AddL" (cmAddL cm) showAdd
@@ -276,8 +282,8 @@ prettyBooleanConstraints counters =
 -- | TODO: revisit this
 sizeOfConstraintModule :: ConstraintModule n -> Int
 sizeOfConstraintModule cm =
-  FieldRelations.size (cmRelations cm)
-    + BooleanRelations.size (FieldRelations.exportBooleanRelations (cmRelations cm))
+  Relations.size (cmRelations cm)
+    + BooleanRelations.size (Relations.exportBooleanRelations (cmRelations cm))
     + length (cmAddF cm)
     + length (cmMulF cm)
     + length (cmEqZeros cm)

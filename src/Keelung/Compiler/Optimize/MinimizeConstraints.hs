@@ -11,6 +11,7 @@ import Data.Maybe (mapMaybe)
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Debug.Trace
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
@@ -19,34 +20,36 @@ import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
-import Keelung.Data.PolyL
 
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
--- 
+--
 --  Passes are run in the following order:
 --    1. AddF
 --    2. AddL
 --    3. MulF
---    4. DivMods
---    5. ModInvs
---    6. EqZeros
+--    4. MulL
+--    5. DivMods
+--    6. ModInvs
+--    7. EqZeros
 run :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (ConstraintModule n)
 run cm = goThroughEqZeros . goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cm
 
+-- | TODO: reexamine the state transitions
 optimizeAddF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeAddF cm = do
   (changed, cm') <- runOptiM cm goThroughAddF
   case changed of
     NothingChanged -> optimizeAddL cm -- next pass
-    RelationChanged -> optimizeAddF cm' -- redo
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- next pass
+    RelationChanged -> optimizeAddF cm' -- restart from AddF
+    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
     AdditiveLimbConstraintChanged -> optimizeMulF cm' -- next pass
     MultiplicativeConstraintChanged -> optimizeMulF cm' -- again
 
-
+-- | TODO: reexamine the state transitions
 optimizeAddL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeAddL cm = do
   (changed, cm') <- runOptiM cm goThroughAddL
@@ -56,8 +59,6 @@ optimizeAddL cm = do
     AdditiveFieldConstraintChanged -> optimizeAddL cm' -- redo
     AdditiveLimbConstraintChanged -> optimizeMulF cm' -- next pass
     MultiplicativeConstraintChanged -> optimizeMulF cm' -- again
-
-
 
 optimizeMulF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeMulF cm = do
@@ -178,24 +179,24 @@ reduceMulF (polyA, polyB, polyC) = do
     Left constantC -> return (Left constantC)
     Right polyC' -> substitutePolyF MultiplicativeConstraintChanged polyC'
   reduceMulF_ polyAResult polyBResult polyCResult
-
-substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG n -> RoundM n (Either n (PolyG n))
-substitutePolyF typeOfChange polynomial = do
-  relations <- gets cmRelations
-  case substPolyG relations polynomial of
-    Nothing -> return (Right polynomial) -- nothing changed
-    Just (Left constant, removedRefs, _) -> do
-      -- the polynomial has been reduced to nothing
-      markChanged typeOfChange
-      -- remove all variables in the polynomial from the occurrence list
-      modify' $ removeOccurrences removedRefs
-      return (Left constant)
-    Just (Right reducePolynomial, removedRefs, addedRefs) -> do
-      -- the polynomial has been reduced to something
-      markChanged typeOfChange
-      -- remove all variables in the polynomial from the occurrence list
-      modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
-      return (Right reducePolynomial)
+  where
+    substitutePolyF :: (GaloisField n, Integral n) => WhatChanged -> PolyG n -> RoundM n (Either n (PolyG n))
+    substitutePolyF typeOfChange polynomial = do
+      relations <- gets cmRelations
+      case substPolyG relations polynomial of
+        Nothing -> return (Right polynomial) -- nothing changed
+        Just (Left constant, removedRefs, _) -> do
+          -- the polynomial has been reduced to nothing
+          markChanged typeOfChange
+          -- remove all variables in the polynomial from the occurrence list
+          modify' $ removeOccurrences removedRefs
+          return (Left constant)
+        Just (Right reducePolynomial, removedRefs, addedRefs) -> do
+          -- the polynomial has been reduced to something
+          markChanged typeOfChange
+          -- remove all variables in the polynomial from the occurrence list
+          modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
+          return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative constaint, returns the reduced constraint if it is reduced
 reduceMulF_ :: (GaloisField n, Integral n) => Either n (PolyG n) -> Either n (PolyG n) -> Either n (PolyG n) -> RoundM n (Maybe (MulF n))
@@ -260,13 +261,103 @@ reduceMulFCPP a polyB polyC = do
 
 ------------------------------------------------------------------------------
 
+type MulL n = (PolyL n, PolyL n, Either n (PolyL n))
+
+-- reduceMulL :: (GaloisField n, Integral n) => MulL n -> RoundM n (Maybe (MulL n))
+-- reduceMulL (polyA, polyB, polyC) = do
+--   polyAResult <- substitutePolyL MultiplicativeLimbConstraintChanged polyA
+--   polyBResult <- substitutePolyL MultiplicativeLimbConstraintChanged polyB
+--   polyCResult <- case polyC of
+--     Left constantC -> return (Left constantC)
+--     Right polyC' -> substitutePolyL MultiplicativeLimbConstraintChanged polyC'
+--   reduceMulL_ polyAResult polyBResult polyCResult
+--   where 
+--     substitutePolyL :: (GaloisField n, Integral n) => WhatChanged -> PolyL n -> RoundM n (Either n (PolyL n))
+--     substitutePolyL typeOfChange polynomial = do
+--       relations <- gets cmRelations
+--       case substPolyL relations polynomial of
+--         Nothing -> return (Right polynomial) -- nothing changed
+--         Just (Left constant, removedRefs, _) -> do
+--           -- the polynomial has been reduced to nothing
+--           markChanged typeOfChange
+--           -- remove all variables in the polynomial from the occurrence list
+--           modify' $ removeOccurrences removedRefs
+--           return (Left constant)
+--         Just (Right reducePolynomial, removedRefs, addedRefs) -> do
+--           -- the polynomial has been reduced to something
+--           markChanged typeOfChange
+--           -- remove all variables in the polynomial from the occurrence list
+--           modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
+--           return (Right reducePolynomial)
+
+-- | Trying to reduce a multiplicative limb constaint, returns the reduced constraint if it is reduced
+reduceMulL_ :: (GaloisField n, Integral n) => Either n (PolyL n) -> Either n (PolyL n) -> Either n (PolyL n) -> RoundM n (Maybe (MulL n))
+reduceMulL_ polyA polyB polyC = case (polyA, polyB, polyC) of
+  (Left _a, Left _b, Left _c) -> return Nothing
+  (Left a, Left b, Right c) -> reduceMulLCCP a b c >> return Nothing
+  (Left a, Right b, Left c) -> reduceMulLCPC a b c >> return Nothing
+  (Left a, Right b, Right c) -> reduceMulLCPP a b c >> return Nothing
+  (Right a, Left b, Left c) -> reduceMulLCPC b a c >> return Nothing
+  (Right a, Left b, Right c) -> reduceMulLCPP b a c >> return Nothing
+  (Right a, Right b, Left c) -> return (Just (a, b, Left c))
+  (Right a, Right b, Right c) -> return (Just (a, b, Right c))
+
+-- | Trying to reduce a multiplicative limb constaint of (Constant / Constant / Polynomial)
+--    a * b = cm
+--      =>
+--    cm - a * b = 0
+reduceMulLCCP :: (GaloisField n, Integral n) => n -> n -> PolyL n -> RoundM n ()
+reduceMulLCCP a b cm = do
+  addAddL $ PolyL.addConstant (-a * b) cm
+
+-- | Trying to reduce a multiplicative limb constaint of (Constant / Polynomial / Constant)
+--    a * bs = c
+--      =>
+--    c - a * bs = 0
+reduceMulLCPC :: (GaloisField n, Integral n) => n -> PolyL n -> n -> RoundM n ()
+reduceMulLCPC a bs c = do
+  case PolyL.multiplyBy (-a) bs of
+    Left constant ->
+      if constant == c
+        then modify' $ removeOccurrences (PolyL.vars bs)
+        else throwError $ Compile.ConflictingValuesU (toInteger constant) (toInteger c)
+    Right xs -> addAddL $ PolyL.addConstant c xs
+
+-- | Trying to reduce a multiplicative limb constaint of (Constant / Polynomial / Polynomial)
+--    a * bs = cm
+--      =>
+--    cm - a * bs = 0
+reduceMulLCPP :: (GaloisField n, Integral n) => n -> PolyL n -> PolyL n -> RoundM n ()
+reduceMulLCPP a polyB polyC = do
+  case PolyL.multiplyBy (-a) polyB of
+    Left constant ->
+      if constant == 0
+        then do
+          -- a * bs = 0
+          -- cm = 0
+          modify' $ removeOccurrences (PolyL.vars polyB)
+          addAddL polyC
+        else do
+          -- a * bs = constant = cm
+          -- => cm - constant = 0
+          modify' $ removeOccurrences (PolyL.vars polyB)
+          addAddL (PolyL.addConstant (-constant) polyC)
+    Right polyBa -> addAddL (PolyL.merge polyC polyBa)
+
+------------------------------------------------------------------------------
+
 data WhatChanged
   = NothingChanged
   | RelationChanged
   | AdditiveFieldConstraintChanged
   | AdditiveLimbConstraintChanged
   | MultiplicativeConstraintChanged
-  deriving (Eq, Show)
+  -- | MultiplicativeLimbConstraintChanged
+  deriving
+    ( 
+      Eq,
+      Show
+    )
 
 instance Semigroup WhatChanged where
   NothingChanged <> x = x
@@ -278,6 +369,8 @@ instance Semigroup WhatChanged where
   AdditiveLimbConstraintChanged <> _ = AdditiveLimbConstraintChanged
   _ <> AdditiveLimbConstraintChanged = AdditiveLimbConstraintChanged
   MultiplicativeConstraintChanged <> _ = MultiplicativeConstraintChanged
+  -- _ <> MultiplicativeConstraintChanged = MultiplicativeConstraintChanged
+  -- MultiplicativeLimbConstraintChanged <> _ = MultiplicativeLimbConstraintChanged
 
 instance Monoid WhatChanged where
   mempty = NothingChanged
@@ -387,6 +480,9 @@ relateL var1 var2 = do
       modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
       return True
 
+--------------------------------------------------------------------------------
+
+-- | Add learned additive constraints to the pool
 addAddF :: (GaloisField n, Integral n) => PolyG n -> RoundM n ()
 addAddF poly = case PolyG.view poly of
   PolyG.Monomial constant (var1, coeff1) -> do
@@ -404,6 +500,22 @@ addAddF poly = case PolyG.view poly of
   PolyG.Polynomial _ _ -> do
     markChanged AdditiveFieldConstraintChanged
     modify' $ \cm' -> cm' {cmAddF = poly : cmAddF cm'}
+
+-- | Add learned additive limb constraints to the pool
+addAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n ()
+addAddL poly = case PolyL.view poly of
+  (_, Seq.Empty) -> error "[ panic ] Empty PolyL"
+  (constant, (var1, multiplier1) Seq.:<| Seq.Empty) -> do
+    --  constant + var1 * multiplier1  = 0
+    --    =>
+    --  var1 = - constant / multiplier1
+    assignL var1 (toInteger (-constant / multiplier1))
+  (constant, (var1, multiplier1) Seq.:<| (var2, multiplier2) Seq.:<| Seq.Empty) ->
+    --  var1 * multiplier1 = var2 * multiplier2
+    when (constant == 0 && multiplier1 == -multiplier2) $
+      void $
+        relateL var1 var2
+  _ -> return ()
 
 --------------------------------------------------------------------------------
 

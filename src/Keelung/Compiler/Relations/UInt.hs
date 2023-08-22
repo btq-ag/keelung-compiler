@@ -31,7 +31,7 @@ new :: UIntRelations
 new = EquivClass.new "UInt (RefL Equivalence)"
 
 instance EquivClass.IsRelation () where
-  relationToString (var, ()) = show var
+  relationToString (var, ()) = var
   invertRel () = Just ()
 
 instance EquivClass.ExecRelation Integer () where
