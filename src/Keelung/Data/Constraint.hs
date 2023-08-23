@@ -54,6 +54,7 @@ data Constraint n
   | CVarNEqB RefB RefB -- when x = ¬ y
   | CVarBindF Ref n -- when x = val
   | CVarBindB RefB Bool -- when x = val
+  | CVarBindL RefL Integer -- when x = val
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -64,6 +65,8 @@ instance GaloisField n => Eq (Constraint n) where
     (CMulL x y z, CMulL u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CVarBindF x y, CVarBindF u v) -> x == u && y == v
+    (CVarBindB x y, CVarBindB u v) -> x == u && y == v
+    (CVarBindL x y, CVarBindL u v) -> x == u && y == v
     _ -> False
 
 instance Functor Constraint where
@@ -76,10 +79,12 @@ instance Functor Constraint where
   fmap _ (CVarNEqB x y) = CVarNEqB x y
   fmap f (CVarBindF x y) = CVarBindF x (f y)
   fmap _ (CVarBindB x y) = CVarBindB x y
+  fmap _ (CVarBindL x y) = CVarBindL x y
   fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
   fmap f (CMulL x y (Left z)) = CMulL (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulL x y (Right z)) = CMulL (fmap f x) (fmap f y) (Right (fmap f z))
+
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddG xs) = "AF " <> show xs <> " = 0"
@@ -91,5 +96,6 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CVarNEqB x y) = "VN " <> show x <> " = ¬ " <> show y
   show (CVarBindF x n) = "BF " <> show x <> " = " <> show n
   show (CVarBindB x n) = "BB " <> show x <> " = " <> show n
+  show (CVarBindL x n) = "BL " <> show x <> " = " <> show n
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulL aV bV cV) = "ML " <> show aV <> " * " <> show bV <> " = " <> show cV

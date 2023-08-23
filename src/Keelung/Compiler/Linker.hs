@@ -197,6 +197,10 @@ linkConstraint occurrences (CVarBindF x n) = case Poly.buildEither (-n) [(reinde
   Right xs -> Linked.CAdd xs
 linkConstraint occurrences (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB occurrences x) 1)
 linkConstraint occurrences (CVarBindB x False) = Linked.CAdd (Poly.bind (reindexRefB occurrences x) 0)
+linkConstraint occurrences (CVarBindL x n) = do
+  case Poly.buildEither (fromInteger (-n)) (toList (reindexRefL occurrences x 1)) of
+    Left _ -> error "CVarBindL: impossible"
+    Right xs -> Linked.CAdd xs
 linkConstraint occurrences (CMulF as bs cs) =
   Linked.CMul
     (linkPolyGUnsafe occurrences as)

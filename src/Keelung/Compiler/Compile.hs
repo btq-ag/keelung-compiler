@@ -45,7 +45,7 @@ run fieldInfo (Internal untypedExprs _ counters assertions sideEffects) = left C
       ExprF x -> do
         let out = RefFO var
         result <- compileExprF x
-        handleLC (F out) result
+        relateLC out result
       ExprU x -> do
         let out = RefUO (widthOf x) var
         compileExprU out x
@@ -65,7 +65,7 @@ compileSideEffect (AssignmentB var val) = do
     Right val' -> writeValB (RefBX var) val'
 compileSideEffect (AssignmentF var val) = do
   result <- compileExprF val
-  handleLC (F (RefFX var)) result
+  relateLC (RefFX var) result
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
 compileSideEffect (DivMod width dividend divisor quotient remainder) = assertDivModU width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do
@@ -206,7 +206,7 @@ assertEqF (VarF a) (VarFI b) = writeEqF (RefFX a) (RefFI b)
 assertEqF (VarF a) (VarFP b) = writeEqF (RefFX a) (RefFP b)
 assertEqF (VarF a) b = do
   result <- compileExprF b
-  handleLC (F (RefFX a)) result
+  relateLC (RefFX a) result
 assertEqF (VarFO a) (ValF b) = writeValF (RefFO a) b
 assertEqF (VarFO a) (VarF b) = writeEqF (RefFO a) (RefFX b)
 assertEqF (VarFO a) (VarFO b) = writeEqF (RefFO a) (RefFO b)
@@ -214,7 +214,7 @@ assertEqF (VarFO a) (VarFI b) = writeEqF (RefFO a) (RefFI b)
 assertEqF (VarFO a) (VarFP b) = writeEqF (RefFO a) (RefFP b)
 assertEqF (VarFO a) b = do
   result <- compileExprF b
-  handleLC (F (RefFO a)) result
+  relateLC (RefFO a) result
 assertEqF (VarFI a) (ValF b) = writeValF (RefFI a) b
 assertEqF (VarFI a) (VarF b) = writeEqF (RefFI a) (RefFX b)
 assertEqF (VarFI a) (VarFO b) = writeEqF (RefFI a) (RefFO b)
@@ -222,7 +222,7 @@ assertEqF (VarFI a) (VarFI b) = writeEqF (RefFI a) (RefFI b)
 assertEqF (VarFI a) (VarFP b) = writeEqF (RefFI a) (RefFP b)
 assertEqF (VarFI a) b = do
   result <- compileExprF b
-  handleLC (F (RefFI a)) result
+  relateLC (RefFI a) result
 assertEqF (VarFP a) (ValF b) = writeValF (RefFP a) b
 assertEqF (VarFP a) (VarF b) = writeEqF (RefFP a) (RefFX b)
 assertEqF (VarFP a) (VarFO b) = writeEqF (RefFP a) (RefFO b)
@@ -230,7 +230,7 @@ assertEqF (VarFP a) (VarFI b) = writeEqF (RefFP a) (RefFI b)
 assertEqF (VarFP a) (VarFP b) = writeEqF (RefFP a) (RefFP b)
 assertEqF (VarFP a) b = do
   result <- compileExprF b
-  handleLC (F (RefFP a)) result
+  relateLC (RefFP a) result
 assertEqF a b = do
   resultA <- compileExprF a
   resultB <- compileExprF b
@@ -655,13 +655,13 @@ fastExp (Polynomial base) acc e =
 --------------------------------------------------------------------------------
 
 -- | Temporary adapter for the LC type
-handleLC :: (GaloisField n, Integral n) => Ref -> LC n -> M n ()
-handleLC out (Constant val) = writeVal out val
-handleLC out (Polynomial poly) = case PolyG.view poly of
-  PolyG.Monomial 0 (x, 1) -> writeEq x out
-  PolyG.Monomial c (x, a) -> writeAdd c [(out, -1), (x, a)]
-  PolyG.Binomial c (x, a) (y, b) -> writeAdd c [(out, -1), (x, a), (y, b)]
-  PolyG.Polynomial c xs -> writeAdd c $ (out, -1) : Map.toList xs
+relateLC :: (GaloisField n, Integral n) => RefF -> LC n -> M n ()
+relateLC out (Constant val) = writeValF out val
+relateLC out (Polynomial poly) = case PolyG.view poly of
+  PolyG.Monomial 0 (x, 1) -> writeEq x (F out)
+  PolyG.Monomial c (x, a) -> writeAdd c [(F out, -1), (x, a)]
+  PolyG.Binomial c (x, a) (y, b) -> writeAdd c [(F out, -1), (x, a), (y, b)]
+  PolyG.Polynomial c xs -> writeAdd c $ (F out, -1) : Map.toList xs
 
 assertLC :: (GaloisField n, Integral n) => n -> LC n -> M n ()
 assertLC val (Constant val') =
