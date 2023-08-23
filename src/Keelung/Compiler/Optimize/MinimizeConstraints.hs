@@ -11,7 +11,6 @@ import Data.Maybe (mapMaybe)
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
-import Debug.Trace
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
@@ -43,32 +42,46 @@ optimizeAddF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Com
 optimizeAddF cm = do
   (changed, cm') <- runOptiM cm goThroughAddF
   case changed of
-    NothingChanged -> optimizeAddL cm -- next pass
+    NothingChanged -> optimizeAddL cm -- proceed to AddL?
     RelationChanged -> optimizeAddF cm' -- restart from AddF
     AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- next pass
-    MultiplicativeConstraintChanged -> optimizeMulF cm' -- again
+    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
+    MultiplicativeConstraintChanged -> optimizeMulF cm' -- proceed to MulL?
+    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
 
 -- | TODO: reexamine the state transitions
 optimizeAddL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeAddL cm = do
   (changed, cm') <- runOptiM cm goThroughAddL
   case changed of
-    NothingChanged -> optimizeMulF cm -- next pass
-    RelationChanged -> optimizeAddF cm' -- redo
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- redo
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- next pass
-    MultiplicativeConstraintChanged -> optimizeMulF cm' -- again
+    NothingChanged -> optimizeMulF cm -- proceed to MulF?
+    RelationChanged -> optimizeAddF cm' -- restart from AddF
+    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
+    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
+    MultiplicativeConstraintChanged -> optimizeMulL cm' -- proceed to MulL?
+    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
 
 optimizeMulF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeMulF cm = do
   (changed, cm') <- runOptiM cm goThroughMulF
   case changed of
+    NothingChanged -> optimizeMulL cm' -- proceed to MulL?
+    RelationChanged -> optimizeAddF cm' -- restart from AddF
+    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
+    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
+    MultiplicativeConstraintChanged -> optimizeMulL cm' -- proceed to MulL?
+    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
+
+optimizeMulL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeMulL cm = do
+  (changed, cm') <- runOptiM cm goThroughMulL
+  case changed of
     NothingChanged -> return (changed, cm')
-    RelationChanged -> optimizeAddF cm' -- redo
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- next pass
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- next pass
-    MultiplicativeConstraintChanged -> optimizeMulF cm' -- again
+    RelationChanged -> optimizeAddF cm' -- restart from AddF
+    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
+    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
+    MultiplicativeConstraintChanged -> optimizeMulL cm' -- proceed to MulL?
+    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
 
 goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
 goThroughAddF = do
@@ -111,6 +124,13 @@ goThroughMulF = do
   runRoundM $ do
     cmMulF' <- foldMaybeM reduceMulF [] (cmMulF cm)
     modify' $ \cm'' -> cm'' {cmMulF = cmMulF'}
+
+goThroughMulL :: (GaloisField n, Integral n) => OptiM n WhatChanged
+goThroughMulL = do
+  cm <- get
+  runRoundM $ do
+    cmMulL' <- foldMaybeM reduceMulL [] (cmMulL cm)
+    modify' $ \cm'' -> cm'' {cmMulL = cmMulL'}
 
 foldMaybeM :: Monad m => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
 foldMaybeM f = foldM $ \acc x -> do
@@ -263,32 +283,32 @@ reduceMulFCPP a polyB polyC = do
 
 type MulL n = (PolyL n, PolyL n, Either n (PolyL n))
 
--- reduceMulL :: (GaloisField n, Integral n) => MulL n -> RoundM n (Maybe (MulL n))
--- reduceMulL (polyA, polyB, polyC) = do
---   polyAResult <- substitutePolyL MultiplicativeLimbConstraintChanged polyA
---   polyBResult <- substitutePolyL MultiplicativeLimbConstraintChanged polyB
---   polyCResult <- case polyC of
---     Left constantC -> return (Left constantC)
---     Right polyC' -> substitutePolyL MultiplicativeLimbConstraintChanged polyC'
---   reduceMulL_ polyAResult polyBResult polyCResult
---   where 
---     substitutePolyL :: (GaloisField n, Integral n) => WhatChanged -> PolyL n -> RoundM n (Either n (PolyL n))
---     substitutePolyL typeOfChange polynomial = do
---       relations <- gets cmRelations
---       case substPolyL relations polynomial of
---         Nothing -> return (Right polynomial) -- nothing changed
---         Just (Left constant, removedRefs, _) -> do
---           -- the polynomial has been reduced to nothing
---           markChanged typeOfChange
---           -- remove all variables in the polynomial from the occurrence list
---           modify' $ removeOccurrences removedRefs
---           return (Left constant)
---         Just (Right reducePolynomial, removedRefs, addedRefs) -> do
---           -- the polynomial has been reduced to something
---           markChanged typeOfChange
---           -- remove all variables in the polynomial from the occurrence list
---           modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
---           return (Right reducePolynomial)
+reduceMulL :: (GaloisField n, Integral n) => MulL n -> RoundM n (Maybe (MulL n))
+reduceMulL (polyA, polyB, polyC) = do
+  polyAResult <- substitutePolyL MultiplicativeLimbConstraintChanged polyA
+  polyBResult <- substitutePolyL MultiplicativeLimbConstraintChanged polyB
+  polyCResult <- case polyC of
+    Left constantC -> return (Left constantC)
+    Right polyC' -> substitutePolyL MultiplicativeLimbConstraintChanged polyC'
+  reduceMulL_ polyAResult polyBResult polyCResult
+  where
+    substitutePolyL :: (GaloisField n, Integral n) => WhatChanged -> PolyL n -> RoundM n (Either n (PolyL n))
+    substitutePolyL typeOfChange polynomial = do
+      relations <- gets cmRelations
+      case substPolyL relations polynomial of
+        Nothing -> return (Right polynomial) -- nothing changed
+        Just (Left constant, removedRefs, _) -> do
+          -- the polynomial has been reduced to nothing
+          markChanged typeOfChange
+          -- remove all variables in the polynomial from the occurrence list
+          modify' $ removeOccurrences removedRefs
+          return (Left constant)
+        Just (Right reducePolynomial, removedRefs, addedRefs) -> do
+          -- the polynomial has been reduced to something
+          markChanged typeOfChange
+          -- remove all variables in the polynomial from the occurrence list
+          modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
+          return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative limb constaint, returns the reduced constraint if it is reduced
 reduceMulL_ :: (GaloisField n, Integral n) => Either n (PolyL n) -> Either n (PolyL n) -> Either n (PolyL n) -> RoundM n (Maybe (MulL n))
@@ -352,12 +372,8 @@ data WhatChanged
   | AdditiveFieldConstraintChanged
   | AdditiveLimbConstraintChanged
   | MultiplicativeConstraintChanged
-  -- | MultiplicativeLimbConstraintChanged
-  deriving
-    ( 
-      Eq,
-      Show
-    )
+  | MultiplicativeLimbConstraintChanged
+  deriving (Eq, Show)
 
 instance Semigroup WhatChanged where
   NothingChanged <> x = x
@@ -369,8 +385,8 @@ instance Semigroup WhatChanged where
   AdditiveLimbConstraintChanged <> _ = AdditiveLimbConstraintChanged
   _ <> AdditiveLimbConstraintChanged = AdditiveLimbConstraintChanged
   MultiplicativeConstraintChanged <> _ = MultiplicativeConstraintChanged
-  -- _ <> MultiplicativeConstraintChanged = MultiplicativeConstraintChanged
-  -- MultiplicativeLimbConstraintChanged <> _ = MultiplicativeLimbConstraintChanged
+  _ <> MultiplicativeConstraintChanged = MultiplicativeConstraintChanged
+  MultiplicativeLimbConstraintChanged <> _ = MultiplicativeLimbConstraintChanged
 
 instance Monoid WhatChanged where
   mempty = NothingChanged

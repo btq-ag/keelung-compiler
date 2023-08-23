@@ -39,7 +39,6 @@ import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
-import qualified Keelung.Compiler.Relations.UInt as UIntRelations
 
 --------------------------------------------------------------------------------
 
