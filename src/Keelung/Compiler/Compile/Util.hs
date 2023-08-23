@@ -194,8 +194,8 @@ writeValB a x = addC [CVarBindB a x]
 writeValU :: (GaloisField n, Integral n) => Width -> RefU -> Integer -> M n ()
 writeValU width a x = forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width a i) (Data.Bits.testBit x i)
 
--- writeValL :: (GaloisField n, Integral n) => RefL -> Integer -> M n ()
--- writeValL a x = forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width a i) (Data.Bits.testBit x i)
+writeValL :: (GaloisField n, Integral n) => RefL -> Integer -> M n ()
+writeValL a x = addC [CVarBindL a x]
 
 writeEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
 writeEq a b = addC [CVarEq a b]

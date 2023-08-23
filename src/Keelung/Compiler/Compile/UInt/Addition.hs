@@ -19,27 +19,12 @@ import Keelung.Data.Reference
 import Keelung.Field (FieldType (..))
 import Keelung.Syntax (Width)
 
--- | Metavariables
---  * N – arity, number of operands
---  * F – maximum bit width of unsigned integers allowed in some underlying field,
---          for example, `F = 180` in `GF181`
---  * W - bit width of unsigned integers
--- data Model
---   = -- | N ≤ 1
---     Trivial
---   | -- | 2 < N ≤ 2^⌊F/2⌋
---     Standard
---   | -- | 2^⌊F/2⌋ < N
---     Extended
-
 --------------------------------------------------------------------------------
 
 data LimbStack
   = Ordinary Integer (Seq Limb)
   | OneLimbOnly Limb
   | OneConstantOnly Integer
-
--- AllNegative Integer [Limb] | Ordinary Integer [Limb]
 
 --------------------------------------------------------------------------------
 
@@ -59,19 +44,6 @@ data LimbStack
 --       [ carry ]
 
 compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
-compileAddU width out [] constant = do
-  -- constants only
-  fieldInfo <- gets cmField
-  let carryWidth = 0 -- no carry needed
-  let limbWidth = fieldWidth fieldInfo - carryWidth
-  mapM_ (go limbWidth) [0, limbWidth .. width - 1]
-  where
-    go :: (GaloisField n, Integral n) => Int -> Int -> M n ()
-    go limbWidth limbStart = do
-      let range = [limbStart .. (limbStart + limbWidth - 1) `min` (width - 1)]
-      forM_ range $ \i -> do
-        let bit = Data.Bits.testBit constant i
-        writeValB (RefUBit width out i) bit
 compileAddU width out vars constant = do
   fieldInfo <- gets cmField
 
@@ -147,11 +119,11 @@ addLimbColumn dimensions finalResultLimb limbs = do
   if LimbColumn.isEmpty rest
     then do
       -- base case, there are no more limbs to be processed
-      addLimbStack dimensions finalResultLimb stack
+      addLimbStack finalResultLimb stack
     else do
       -- inductive case, there are more limbs to be processed
       resultLimb <- allocLimb (lmbWidth finalResultLimb) (lmbOffset finalResultLimb) True
-      carryLimb <- addLimbStack dimensions resultLimb stack
+      carryLimb <- addLimbStack resultLimb stack
       -- insert the result limb of the current batch to the next batch
       moreCarryLimbs <- addLimbColumn dimensions finalResultLimb (LimbColumn.insert resultLimb rest)
       return (carryLimb <> moreCarryLimbs)
@@ -183,17 +155,15 @@ splitLimbStack dimensions (LimbColumn constant limbs) =
 --  +           [ operand+ ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-addLimbStack :: (GaloisField n, Integral n) => Dimensions -> Limb -> LimbStack -> M n LimbColumn
-addLimbStack dimensions resultLimb (OneConstantOnly constant) = do
+addLimbStack :: (GaloisField n, Integral n) => Limb -> LimbStack -> M n LimbColumn
+addLimbStack resultLimb (OneConstantOnly constant) = do
   -- no limb => result = constant, no carry
-  forM_ [0 .. lmbWidth resultLimb - 1] $ \i -> do
-    let bit = Data.Bits.testBit constant i
-    writeValB (RefUBit (dimUIntWidth dimensions) (lmbRef resultLimb) (lmbOffset resultLimb + i)) bit
+  writeValL (RefL resultLimb 0) constant
   return mempty
-addLimbStack _ resultLimb (OneLimbOnly limb) = do
+addLimbStack resultLimb (OneLimbOnly limb) = do
   writeEqL (RefL resultLimb 0) (RefL limb 0)
   return mempty
-addLimbStack _ resultLimb (Ordinary constant limbs) = do
+addLimbStack resultLimb (Ordinary constant limbs) = do
   let carrySigns = LimbColumn.calculateCarrySigns (lmbWidth resultLimb) constant limbs
   carryLimb <- allocCarryLimb (length carrySigns) (lmbOffset resultLimb) carrySigns
   writeAddWithRefLs (fromInteger constant) $

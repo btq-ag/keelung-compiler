@@ -8,8 +8,6 @@ import Keelung hiding (compileO0)
 import Test.Hspec
 import Test.Optimization.Util
 
--- import Keelung.Compiler.Linker
-
 run :: IO ()
 run = hspec tests
 
@@ -100,8 +98,8 @@ tests = do
       it "2 constants" $ do
         (cs, cs') <- executeGF181 $ do
           return $ 2 + (4 :: UInt 4)
-        cs `shouldHaveSize` 8
-        cs' `shouldHaveSize` 8
+        cs `shouldHaveSize` 5
+        cs' `shouldHaveSize` 5
 
     describe "Multiplication" $ do
       -- 8 * 3 for input / output

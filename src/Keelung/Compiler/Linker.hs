@@ -138,7 +138,7 @@ linkConstraintModule cm =
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
     extractUIntRelations relations =
       let convert :: (GaloisField n, Integral n) => (RefL, Either RefL Integer) -> Constraint n
-          convert (_var, Right _val) = error "extractUIntRelations: unsupported"
+          convert (var, Right val) = CVarBindL var val
           convert (var, Left root) = CVarEqL var root
 
           result = map convert $ Map.toList $ UIntRelations.toMap refLShouldBeKept relations
