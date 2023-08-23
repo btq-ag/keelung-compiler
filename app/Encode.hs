@@ -27,7 +27,6 @@ import Keelung.Syntax.Counters hiding (reindex)
 import Keelung (FieldType(..))
 import Data.Int (Int64)
 import GHC.Num (integerLogBase)
-import Debug.Trace (traceShowId)
 
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
@@ -182,7 +181,8 @@ data BinHeader = BinHeader {
 encodeHeader :: BinHeader -> (Int64, ByteString)
 encodeHeader (BinHeader p wires pubout pubin prvIn labels mcons) =
   let primeBS = extendByteString 32 $ integerToByteString p
-      primeLen = 32 --BS.length primeBS
+      -- FIX: Assuming the length of prime is smaller than 32 bytes (e.g. bn128).
+      primeLen = 32
    in ( primeLen
       , toLazyByteString $ int32LE (fromIntegral primeLen)
                         <> lazyByteString primeBS
@@ -198,19 +198,19 @@ toSnarkjsBin r1cs primeLen =
   toLazyByteString $ mconcat $ map (\(R1C x y z) -> encodePoly x <> encodePoly y <> encodePoly z) r1cs
   where
     encodePoly :: Either Integer (Poly Integer) -> Builder
-    encodePoly (Left constant) = word32LE 1
-                              <> word32LE 0
-                              <> sizePrimeLE constant 
-    encodePoly (Right poly) = let size = (fromIntegral $ IntMap.size (Poly.coeffs poly))
-                                  body = map coeffsToBuilder (IntMap.toAscList $ traceShowId $ Poly.coeffs poly)
+    encodePoly (Left constant) = if constant == 0 
+                                   then word32LE 0
+                                   else word32LE 1 <> word32LE 0 <> sizePrimeLE constant 
+    encodePoly (Right poly) = let size = fromIntegral $ IntMap.size (Poly.coeffs poly)
+                                  body = map coeffsToBuilder (IntMap.toAscList $ Poly.coeffs poly)
                               in  mconcat $
-                                -- Number of coefficients in this polynomial, adding one for the constant
-                                           case Poly.constant poly of
-                                             0 -> word32LE size : body 
-                                             n -> [ word32LE (size + 1)
-                                                  , word32LE 0
-                                                  , sizePrimeLE n 
-                                                  ] <> body 
+                                    -- Number of coefficients in this polynomial, adding one for the constant
+                                    case Poly.constant poly of
+                                      0 -> word32LE size : body 
+                                      n -> [ word32LE (size + 1)
+                                           , word32LE 0
+                                           , sizePrimeLE n 
+                                           ] <> body 
 
     -- | Snakrjs' variable indices start at 1, ours start at 0.
     coeffsToBuilder :: (Int, Integer) -> Builder
