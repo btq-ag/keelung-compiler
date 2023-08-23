@@ -1,5 +1,5 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Test.Interpreter.UInt.Multiplication (tests, run) where
@@ -49,7 +49,7 @@ tests =
       forAll arbitrary $ \(x :: Word64, y :: Word64) -> do
         let expected = [toInteger (x * y)]
         --   runAll (Prime 17) program [toInteger x, toInteger y] [] expected
-      --   runAll (Prime 1031) program [toInteger x, toInteger y] [] expected
+        --   runAll (Prime 1031) program [toInteger x, toInteger y] [] expected
         runAll gf181 program [toInteger x, toInteger y] [] expected
 
     it "1 variable / 1 constant" $ do
@@ -62,6 +62,10 @@ tests =
       -- runAll (Prime 17) (program 32) [29] [] [160]
       -- runAll (Prime 257) (program 32) [29] [] [160]
       -- runAll (Prime 1031) (program 32) [29] [] [160]
+      -- runAll (Prime 17) (program 26) [25] [] [138]
+      -- runAll (Prime 257) (program 26) [25] [] [138]
+      -- runAll (Prime 1031) (program 26) [25] [] [138]
+
       let genPair = do
             x <- (arbitrary :: Gen Word8)
             y <- (arbitrary :: Gen Word8)

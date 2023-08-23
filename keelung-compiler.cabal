@@ -32,11 +32,10 @@ library
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
-      Keelung.Compiler.Compile.Limb
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
+      Keelung.Compiler.Compile.UInt.Addition
       Keelung.Compiler.Compile.Util
-      Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
@@ -51,12 +50,16 @@ library
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
+      Keelung.Data.Constraint
       Keelung.Data.PolyG
+      Keelung.Data.PolyL
+      Keelung.Data.Reference
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Arithmetics
@@ -103,11 +106,10 @@ executable keelungc
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
-      Keelung.Compiler.Compile.Limb
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
+      Keelung.Compiler.Compile.UInt.Addition
       Keelung.Compiler.Compile.Util
-      Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
@@ -122,12 +124,16 @@ executable keelungc
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
+      Keelung.Data.Constraint
       Keelung.Data.PolyG
+      Keelung.Data.PolyL
+      Keelung.Data.Reference
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Arithmetics
@@ -204,11 +210,10 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.LC
-      Keelung.Compiler.Compile.Limb
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
+      Keelung.Compiler.Compile.UInt.Addition
       Keelung.Compiler.Compile.Util
-      Keelung.Compiler.Constraint
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
@@ -223,12 +228,16 @@ test-suite keelung-test
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
+      Keelung.Data.Constraint
       Keelung.Data.PolyG
+      Keelung.Data.PolyL
+      Keelung.Data.Reference
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Arithmetics

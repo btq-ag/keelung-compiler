@@ -11,19 +11,18 @@ import Data.Foldable (toList)
 import Data.Sequence (Seq)
 import GHC.Generics (Generic)
 import Keelung.Constraint.R1C (R1C (..))
+import Keelung.Data.FieldInfo
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters hiding (prettyConstraints)
-import Keelung.Data.FieldInfo
 
 --------------------------------------------------------------------------------
 
 -- | Constraint
 --      CAdd: 0 = c + c₀x₀ + c₁x₁ ... cₙxₙ
 --      CMul: ax * by = c or ax * by = cz
---      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
   = CAdd !(Poly n)
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
@@ -58,8 +57,8 @@ cmul !xs !ys (c, zs) = case ( do
   Right result -> [result]
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
-  show (CAdd xs) = "A " <> show xs <> " = 0"
-  show (CMul aV bV cV) = "M " <> show (R1C (Right aV) (Right bV) cV)
+  show (CAdd xs) = show xs <> " = 0"
+  show (CMul aV bV cV) = show (R1C (Right aV) (Right bV) cV)
 
 instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}

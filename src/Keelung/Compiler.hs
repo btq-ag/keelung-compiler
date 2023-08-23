@@ -93,15 +93,15 @@ generateWitness fieldInfo program rawPublicInputs rawPrivateInputs = do
 convertToInternal :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (Internal n)
 convertToInternal fieldInfo prog = ToInternal.run fieldInfo <$> elaborateAndEncode prog
 
--- elaborate => rewrite => to internal syntax => compile => relocate
+-- elaborate => rewrite => to internal syntax => compile => link
 compileWithoutConstProp :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
 compileWithoutConstProp fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . Linker.linkConstraintModule
 
--- elaborate => rewrite => to internal syntax => constant propagation => compile => relocate
-compileO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintModule n)
-compileO0 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo
+-- elaborate => rewrite => to internal syntax => constant propagation => compile
+compileO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
+compileO0 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . Linker.linkConstraintModule
 
--- elaborate => rewrite => to internal syntax => constant propagation => compile => optimisation (new) => relocate => renumber
+-- elaborate => rewrite => to internal syntax => constant propagation => compile => optimisation (new) => link
 compileO1 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
 compileO1 fieldInfo prog = elaborateAndEncode prog >>= compileO1Elab fieldInfo
 

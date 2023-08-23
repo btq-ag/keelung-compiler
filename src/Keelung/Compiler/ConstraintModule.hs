@@ -19,8 +19,6 @@ import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung.Compiler.Constraint
-import Keelung.Data.FieldInfo
 import Keelung.Compiler.Optimize.OccurB (OccurB)
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF (OccurF)
@@ -28,11 +26,15 @@ import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Relations.Field (AllRelations)
-import Keelung.Compiler.Relations.Field qualified as FieldRelations
+import Keelung.Compiler.Relations.Field (Relations)
+import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Util (indent)
+import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL (PolyL)
+import Keelung.Data.PolyL qualified as PolyL
+import Keelung.Data.Reference
 import Keelung.Data.Struct
 import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Interpreter.Arithmetics (U)
@@ -44,17 +46,19 @@ import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanCons
 data ConstraintModule n = ConstraintModule
   { cmField :: FieldInfo,
     cmCounters :: !Counters,
-    -- for counting the occurrences of variables in constraints (excluding the ones that are in FieldRelations)
+    -- for counting the occurrences of variables in constraints (excluding the ones that are in Relations)
     cmOccurrenceF :: !OccurF,
     cmOccurrenceB :: !OccurB,
     cmOccurrenceU :: !OccurU,
-    cmFieldRelations :: AllRelations n,
+    cmRelations :: Relations n,
     -- addative constraints
-    cmAddF :: [PolyG Ref n],
+    cmAddF :: [PolyG n],
+    cmAddL :: [PolyL n],
     -- multiplicative constraints
-    cmMulF :: [(PolyG Ref n, PolyG Ref n, Either n (PolyG Ref n))],
+    cmMulF :: [(PolyG n, PolyG n, Either n (PolyG n))],
+    cmMulL :: [(PolyL n, PolyL n, Either n (PolyL n))],
     -- hits for computing equality
-    cmEqZeros :: [(PolyG Ref n, RefF)],
+    cmEqZeros :: [(PolyG n, RefF)],
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
     cmDivMods :: [(Either RefU U, Either RefU U, Either RefU U, Either RefU U)],
@@ -67,9 +71,10 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
   show cm =
     "Constraint Module {\n"
       <> showVarEqF
-      -- <> showVarEqU
       <> showAddF
+      <> showAddL
       <> showMulF
+      <> showMulL
       <> showEqs
       <> showBooleanConstraints
       <> showDivModHints
@@ -112,11 +117,21 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
           then ""
           else "  ModInv hints:\n" <> indent (indent (showList' (map (\(a, _aainv, _n, p) -> show a <> "⁻¹ = (mod " <> show p <> ")") (cmModInvs cm))))
 
-      showVarEqF = "  Field relations:\n" <> indent (indent (show (cmFieldRelations cm)))
+      showVarEqF =
+        if Relations.size (cmRelations cm) == 0
+          then ""
+          else "  Relations:\n" <> indent (indent (show (cmRelations cm)))
 
-      showAddF = adapt "AddF" (cmAddF cm) show
+      -- showVarEqL =
+      --   if UIntRelations.size (Relations.exportUIntRelations (cmRelations cm)) == 0
+      --     then ""
+      --     else "  UInt relations:\n" <> indent (indent (show (cmRelations cm)))
 
-      showMulF = adapt "MulF" (cmMulF cm) showMul
+      showAddF = adapt "AddF" (cmAddF cm) showAdd
+      showAddL = adapt "AddL" (cmAddL cm) showAdd
+
+      showMulF = adapt "MulF" (cmMulF cm) showMulF'
+      showMulL = adapt "MulL" (cmMulL cm) showMulL'
 
       showEqs = adapt "Eqs" (cmEqZeros cm) $ \(poly, m) ->
         "Eqs " <> show poly <> " / " <> show m
@@ -134,14 +149,16 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
           then ""
           else "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurU.toList $ cmOccurrenceU cm)))
 
-      showMul (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
+      showAdd xs = "0 = " <> show xs
+
+      showMulF' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
-          showVec :: (Show n, Ord n, Eq n, Num n, Show ref) => Either n (PolyG ref n) -> String
+          showVec :: (Show n, Ord n, Eq n, Num n) => Either n (PolyG n) -> String
           showVec (Left c) = show c
           showVec (Right xs) = show xs
 
           -- wrap the string with parenthesis if it has more than 1 term
-          showVecWithParen :: (Show n, Ord n, Eq n, Num n, Show ref) => PolyG ref n -> String
+          showVecWithParen :: (Show n, Ord n, Eq n, Num n) => PolyG n -> String
           showVecWithParen xs =
             let termNumber = case PolyG.view xs of
                   PolyG.Monomial 0 _ -> 1
@@ -153,6 +170,19 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
              in if termNumber < 2
                   then showVec (Right xs)
                   else "(" ++ showVec (Right xs) ++ ")"
+
+      showMulL' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
+        where
+          showVec :: (Show n, Ord n, Eq n, Num n) => Either n (PolyL n) -> String
+          showVec (Left c) = show c
+          showVec (Right xs) = show xs
+
+          -- wrap the string with parenthesis if it has more than 1 term
+          showVecWithParen :: (Show n, Ord n, Eq n, Num n) => PolyL n -> String
+          showVecWithParen xs =
+            if PolyL.size xs < 2
+              then showVec (Right xs)
+              else "(" ++ showVec (Right xs) ++ ")"
 
 prettyVariables :: Counters -> String
 prettyVariables counters =
@@ -251,8 +281,8 @@ prettyBooleanConstraints counters =
 -- | TODO: revisit this
 sizeOfConstraintModule :: ConstraintModule n -> Int
 sizeOfConstraintModule cm =
-  FieldRelations.size (cmFieldRelations cm)
-    + BooleanRelations.size (FieldRelations.exportBooleanRelations (cmFieldRelations cm))
+  Relations.size (cmRelations cm)
+    + BooleanRelations.size (Relations.exportBooleanRelations (cmRelations cm))
     + length (cmAddF cm)
     + length (cmMulF cm)
     + length (cmEqZeros cm)
@@ -340,3 +370,33 @@ instance UpdateOccurrences RefB where
                 _ -> cm
           )
       )
+
+instance UpdateOccurrences RefU where
+  addOccurrences =
+    flip
+      ( foldl
+          ( \cm ref ->
+              case ref of
+                RefUX width var ->
+                  cm
+                    { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm)
+                    }
+                _ -> cm
+          )
+      )
+  removeOccurrences =
+    flip
+      ( foldl
+          ( \cm ref ->
+              case ref of
+                RefUX width var ->
+                  cm
+                    { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm)
+                    }
+                _ -> cm
+          )
+      )
+
+instance UpdateOccurrences RefL where
+  addOccurrences = addOccurrences . Set.map (lmbRef . refLLimb)
+  removeOccurrences = removeOccurrences . Set.map (lmbRef . refLLimb)

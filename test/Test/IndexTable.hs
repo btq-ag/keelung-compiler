@@ -7,9 +7,9 @@ import Control.Monad (forM_)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
-import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Linker (constructOccurrences, reindexRef)
+import Keelung.Data.Reference
 import Test.Hspec
 import Test.Optimization.Util (executeGF181)
 

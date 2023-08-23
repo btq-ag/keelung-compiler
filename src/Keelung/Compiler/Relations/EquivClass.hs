@@ -42,7 +42,7 @@ class Monoid rel => IsRelation rel where
   relationToString :: (String, rel) -> String
 
   -- | Computes the inverse of a relation
-  invertRel :: rel -> rel
+  invertRel :: rel -> Maybe rel
 
 class ExecRelation n rel where
   -- | Given `parent = rel child`, executes `rel` on `child`
@@ -72,7 +72,8 @@ mapError f xs = case runExcept (runWriterT xs) of
 
 data VarStatus var n rel
   = IsConstant n
-  | IsRoot (Map var rel)
+  | -- | contains the relations to the children
+    IsRoot (Map var rel)
   | -- | var = relation root
     IsChildOf var rel
   deriving (Show, Eq, Generic, NFData)
@@ -173,17 +174,23 @@ assign var value (EquivClass name relations) = case Map.lookup var relations of
   -- =>
   -- root = relation^-1 child
   Just (IsChildOf root relation) ->
-    assign root (execRel (invertRel relation) value) (EquivClass name relations)
+    case invertRel relation of
+      Nothing -> error "[ panic ] assign: relation is not invertible"
+      Just rel -> assign root (execRel rel value) (EquivClass name relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
 relate :: (Seniority var, IsRelation rel, Ord var, Eq n, ExecRelation n rel) => var -> rel -> var -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
 relate a relation b relations =
   case compareSeniority a b of
     LT -> relateChildToParent a relation b relations
-    GT -> relateChildToParent b (invertRel relation) a relations
+    GT -> case invertRel relation of
+      Nothing -> error "[ panic ] relate: relation is not invertible"
+      Just rel -> relateChildToParent b rel a relations
     EQ -> case compare (childrenSizeOf a) (childrenSizeOf b) of
       LT -> relateChildToParent a relation b relations
-      GT -> relateChildToParent b (invertRel relation) a relations
+      GT -> case invertRel relation of
+        Nothing -> error "[ panic ] relate: relation is not invertible"
+        Just rel -> relateChildToParent b rel a relations
       EQ -> relateChildToParent a relation b relations
       where
         childrenSizeOf ref = case lookup ref relations of
@@ -200,7 +207,9 @@ relateChildToParent child relation parent relations =
       -- The parent is a constant, so we make the child a constant:
       --    * for the parent: do nothing
       --    * for the child: assign it the value of the parent with the inverted relation applied
-      IsConstant value -> assign child (execRel (invertRel relation) value) relations
+      IsConstant value -> case invertRel relation of
+        Nothing -> error "[ panic ] relateChildToParent: relation is not invertible"
+        Just rel -> assign child (execRel rel value) relations
       -- The parent has other children
       IsRoot children -> case lookup child relations of
         -- The child also has its grandchildren, so we relate all these grandchildren to the parent, too:
@@ -234,17 +243,34 @@ relateChildToParent child relation parent relations =
             -- child = relation parent
             -- child = relationWithParent parent'
             -- => parent = (invertRel relation <> relationWithParent) parent'
-              relate parent (invertRel relation <> relationWithParent) parent' relations
+            -- or parent' = (invertRel relationWithParent <> relation) parent
+            case invertRel relation of
+              Just rel -> relate parent (rel <> relationWithParent) parent' relations
+              Nothing -> case invertRel relationWithParent of
+                Just rel -> relate parent' (rel <> relation) parent relations
+                Nothing -> error "[ panic ] relateChildToParent: relation is not transitive!"
             else do
               --
               -- child = relation parent
               -- child = relationWithParent parent'
               -- => parent' = (invertRel relationWithParent <> relation) parent
-              markChanged
-              relate parent' (invertRel relationWithParent <> relation) parent $
-                EquivClass (eqPoolName relations) $
-                  Map.insert child (IsChildOf parent relation) $
-                    eqPoolEquivClass relations
+              -- or parent = (invertRel relation <> relationWithParent) parent'
+              case invertRel relationWithParent of
+                Just rel -> do
+                  markChanged
+                  relate parent' (rel <> relation) parent $
+                    EquivClass (eqPoolName relations) $
+                      Map.insert child (IsChildOf parent relation) $
+                        eqPoolEquivClass relations
+                Nothing -> case invertRel relation of
+                  Just rel -> do
+                    markChanged
+                    relate parent (rel <> relationWithParent) parent' $
+                      EquivClass (eqPoolName relations) $
+                        Map.insert child (IsChildOf parent relation) $
+                          eqPoolEquivClass relations
+                  Nothing -> return relations -- cannot relate parent' to parent, so we do nothing
+
       -- The parent is a child of another variable, so we relate the child to the grandparent instead
       IsChildOf grandparent relationWithGrandparent -> relate child (relation <> relationWithGrandparent) grandparent relations
 
@@ -263,7 +289,7 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       -- var1 = parent2
       -- =>
       -- var2 = relationWithParent2 var1
-        Just (invertRel relationWithParent2)
+        invertRel relationWithParent2
       else Nothing
   (IsChildOf parent1 relationWithParent1, IsRoot _) ->
     if parent1 == var2
@@ -278,11 +304,19 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       then -- var1 = relationWithParent1 parent1
       -- var2 = relationWithParent2 parent2
       -- parent1 == parent2
-      -- =>
+      --   =>
       -- var1 = relationWithParent1 parent2
       -- var2 = relationWithParent2 parent2
-        Just $ relationWithParent1 <> invertRel relationWithParent2
-      else Nothing
+      case invertRel relationWithParent2 of
+        Just rel ->
+          -- var1 = relationWithParent1 parent2
+          -- parent2 = rel var2
+          --   =>
+          -- var1 = (relationWithParent1 . rel) var2
+          Just $ relationWithParent1 <> rel
+        Nothing -> Nothing
+      else -- Just $ relationWithParent1 <> invertRel relationWithParent2
+        Nothing
 
 -- | Export the internal representation of the relations as a map from variables to their relations
 toMap :: EquivClass var n rel -> Map var (VarStatus var n rel)

@@ -9,18 +9,20 @@ import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
-import Keelung.Compiler.Constraint
 import Keelung.Compiler.ConstraintModule
-import Keelung.Data.FieldInfo
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Field (AllRelations)
-import Keelung.Compiler.Relations.Field qualified as AllRelations
+import Keelung.Compiler.Relations.Field (Relations)
+import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.Constraint
+import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL qualified as PolyL
+import Keelung.Data.Reference
 import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Syntax.Counters
 
@@ -34,7 +36,7 @@ runM fieldInfo counters program =
   runExcept
     ( execStateT
         program
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new AllRelations.new mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new Relations.new mempty mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -64,7 +66,7 @@ freshRefU width = do
 --------------------------------------------------------------------------------
 
 -- | Compile a linear combination of expressions into a polynomial
-toPoly :: (GaloisField n, Integral n) => (Expr n -> M n (Either Ref n)) -> (n, [(Expr n, n)]) -> M n (Either n (PolyG Ref n))
+toPoly :: (GaloisField n, Integral n) => (Expr n -> M n (Either Ref n)) -> (n, [(Expr n, n)]) -> M n (Either n (PolyG n))
 toPoly compile (c, xs) = do
   (constants, terms) <- partitionEithers <$> mapM compileTerm xs
   return $ PolyG.build (c + sum constants) terms
@@ -80,47 +82,47 @@ writeMulWithLC as bs cs = case (as, bs, cs) of
   (Constant _, Constant _, Constant _) -> return ()
   (Constant x, Constant y, Polynomial zs) ->
     -- z - x * y = 0
-    addC [CAddF $ PolyG.addConstant (-x * y) zs]
+    addC [CAddG $ PolyG.addConstant (-x * y) zs]
   (Constant x, Polynomial ys, Constant z) ->
     -- x * ys = z
     -- x * ys - z = 0
     case PolyG.multiplyBy x ys of
       Left _ -> return ()
-      Right poly -> addC [CAddF $ PolyG.addConstant (-z) poly]
+      Right poly -> addC [CAddG $ PolyG.addConstant (-z) poly]
   (Constant x, Polynomial ys, Polynomial zs) -> do
     -- x * ys = zs
     -- x * ys - zs = 0
     case PolyG.multiplyBy x ys of
       Left c ->
         -- c - zs = 0
-        addC [CAddF $ PolyG.addConstant (-c) zs]
+        addC [CAddG $ PolyG.addConstant (-c) zs]
       Right ys' -> case PolyG.merge ys' (PolyG.negate zs) of
         Left _ -> return ()
-        Right poly -> addC [CAddF poly]
+        Right poly -> addC [CAddG poly]
   (Polynomial xs, Constant y, Constant z) -> writeMulWithLC (Constant y) (Polynomial xs) (Constant z)
   (Polynomial xs, Constant y, Polynomial zs) -> writeMulWithLC (Constant y) (Polynomial xs) (Polynomial zs)
   (Polynomial xs, Polynomial ys, _) -> addC [CMulF xs ys (toEither cs)]
 
-writeAddWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> M n ()
-writeAddWithPoly xs = case xs of
+writeAddWithPolyG :: (GaloisField n, Integral n) => Either n (PolyG n) -> M n ()
+writeAddWithPolyG xs = case xs of
   Left _ -> return ()
-  Right poly -> addC [CAddF poly]
+  Right poly -> addC [CAddG poly]
 
 writeAddWithLC :: (GaloisField n, Integral n) => LC n -> M n ()
 writeAddWithLC xs = case xs of
   Constant _ -> return ()
-  Polynomial poly -> addC [CAddF poly]
+  Polynomial poly -> addC [CAddG poly]
 
 addC :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 addC = mapM_ addOne
   where
-    execRelations :: (AllRelations n -> EquivClass.M (Error n) (AllRelations n)) -> M n ()
+    execRelations :: (Relations n -> EquivClass.M (Error n) (Relations n)) -> M n ()
     execRelations f = do
       cs <- get
-      result <- lift $ (EquivClass.runM . f) (cmFieldRelations cs)
+      result <- lift $ (EquivClass.runM . f) (cmRelations cs)
       case result of
         Nothing -> return ()
-        Just relations -> put cs {cmFieldRelations = relations}
+        Just relations -> put cs {cmRelations = relations}
 
     countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
     countBitTestAsOccurU (B (RefUBit _ (RefUX width var) _)) =
@@ -128,42 +130,53 @@ addC = mapM_ addOne
     countBitTestAsOccurU _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
-    addOne (CAddF xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
+    addOne (CAddG xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
+    addOne (CAddL xs) = modify' (\cs -> addOccurrences (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
     addOne (CVarBindF x c) = do
-      execRelations $ AllRelations.assignF x c
+      execRelations $ Relations.assignF x c
     addOne (CVarBindB x c) = do
       countBitTestAsOccurU (B x)
-      execRelations $ AllRelations.assignB x c
+      execRelations $ Relations.assignB x c
     addOne (CVarEq x y) = do
       countBitTestAsOccurU x
       countBitTestAsOccurU y
-      execRelations $ AllRelations.relateRefs x 1 y 0
+      execRelations $ Relations.relateRefs x 1 y 0
     addOne (CVarEqF x y) = do
-      execRelations $ AllRelations.relateRefs (F x) 1 (F y) 0
+      execRelations $ Relations.relateRefs (F x) 1 (F y) 0
     addOne (CVarEqB x y) = do
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
-      execRelations $ AllRelations.relateB x (True, y)
+      execRelations $ Relations.relateB x (True, y)
+    addOne (CVarEqL x y) = do
+      execRelations $ Relations.relateL x y
     addOne (CVarNEqB x y) = do
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
-      execRelations $ AllRelations.relateB x (False, y)
+      execRelations $ Relations.relateB x (False, y)
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {cmMulF = (x, y, Left c) : cmMulF cs})
     addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {cmMulF = (x, y, Right z) : cmMulF cs})
+    addOne (CMulL x y (Left c)) = modify' (\cs -> addOccurrences (PolyL.vars x) $ addOccurrences (PolyL.vars y) $ cs {cmMulL = (x, y, Left c) : cmMulL cs})
+    addOne (CMulL x y (Right z)) = modify (\cs -> addOccurrences (PolyL.vars x) $ addOccurrences (PolyL.vars y) $ addOccurrences (PolyL.vars z) $ cs {cmMulL = (x, y, Right z) : cmMulL cs})
 
 --------------------------------------------------------------------------------
 
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
 writeMul as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.build as) (fromEither $ uncurry PolyG.build bs) (fromEither $ uncurry PolyG.build cs)
 
-writeMulWithSeq :: (GaloisField n, Integral n) => (n, Seq (Ref, n)) -> (n, Seq (Ref, n)) -> (n, Seq (Ref, n)) -> M n ()
-writeMulWithSeq as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.buildWithSeq as) (fromEither $ uncurry PolyG.buildWithSeq bs) (fromEither $ uncurry PolyG.buildWithSeq cs)
+writeMulWithRefLs :: (GaloisField n, Integral n) => (n, Seq (RefL, n)) -> (n, Seq (RefL, n)) -> (n, Seq (RefL, n)) -> M n ()
+writeMulWithRefLs as bs cs =
+  addC
+    [ CMulL
+        (uncurry PolyL.buildWithSeq as)
+        (uncurry PolyL.buildWithSeq bs)
+        (Right (uncurry PolyL.buildWithSeq cs))
+    ]
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
-writeAdd c as = writeAddWithPoly (PolyG.build c as)
+writeAdd c as = writeAddWithPolyG (PolyG.build c as)
 
-writeAddWithSeq :: (GaloisField n, Integral n) => n -> Seq (Ref, n) -> M n ()
-writeAddWithSeq c as = writeAddWithPoly (PolyG.buildWithSeq c as)
+writeAddWithRefLs :: (GaloisField n, Integral n) => n -> Seq (RefL, n) -> M n ()
+writeAddWithRefLs c as = addC [CAddL (PolyL.buildWithSeq c as)]
 
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x
@@ -193,6 +206,9 @@ writeNEqB a b = addC [CVarNEqB a b]
 writeEqU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
 writeEqU width a b = forM_ [0 .. width - 1] $ \i -> writeEqB (RefUBit width a i) (RefUBit width b i)
 
+writeEqL :: (GaloisField n, Integral n) => RefL -> RefL -> M n ()
+writeEqL a b = addC [CVarEqL a b]
+
 --------------------------------------------------------------------------------
 
 -- | Hints
@@ -202,7 +218,7 @@ addEqZeroHint c xs m = case PolyG.build c xs of
   Left constant -> writeValF m (recip constant)
   Right poly -> modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
-addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyG Ref n) -> RefF -> M n ()
+addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyG n) -> RefF -> M n ()
 addEqZeroHintWithPoly (Left 0) m = writeValF m 0
 addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}

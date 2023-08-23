@@ -15,13 +15,13 @@ import Data.Binary qualified as B
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.IntMap qualified as IntMap
-import Data.Vector (Vector)
 import Data.List (intercalate)
+import Data.Vector (Vector)
 import Keelung.Constraint.R1C (R1C (..))
 import Keelung.Constraint.R1CS (R1CS (..), toR1Cs)
+import Keelung.Data.FieldInfo
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Data.FieldInfo
 import Keelung.Syntax
 import Keelung.Syntax.Counters hiding (reindex)
 import Keelung (FieldType(..))
@@ -31,7 +31,7 @@ import GHC.Num (integerLogBase)
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
 compilerVersion :: (Int, Int)
-compilerVersion = (0, 13)
+compilerVersion = (0, 14)
 
 patchVersion :: Int
 patchVersion = 0
