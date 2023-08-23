@@ -8,7 +8,6 @@ module Encode (versionString, CircuitFormat(..), serializeR1CS, serializeInputAn
 
 import Data.Aeson
 import Data.Aeson.Encoding
-import Data.Word
 import Data.ByteString.Lazy (ByteString, pack)
 import Data.ByteString.Lazy qualified as BS
 import Data.ByteString.Builder
@@ -26,8 +25,9 @@ import Keelung.Data.FieldInfo
 import Keelung.Syntax
 import Keelung.Syntax.Counters hiding (reindex)
 import Keelung (FieldType(..))
-import Data.Array (Ix(inRange))
 import Data.Int (Int64)
+import GHC.Num (integerLogBase)
+import Debug.Trace (traceShowId)
 
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
@@ -93,37 +93,33 @@ serializeR1CS Aurora r1cs =
 serializeR1CS Snarkjs r1cs = let info = r1csField r1cs in
   case fieldTypeData info of
     (Binary _) -> error "Snarkjs only allows prime fields."
-    (Prime p) -> let header      = toHeader p
-                     constraints = toSnarkjsBin r1cConstraints p
+    (Prime p) -> let counters = r1csCounters r1cs
+                     binHeader = BinHeader {
+                                     prime        = p
+                                   , nWires       = getTotalCount counters
+                                   , nPubOut      = getCount counters Output
+                                   , nPubIn       = getCount counters PublicInput
+                                   , nPrvIn       = getCount counters PrivateInput
+                                   , nLabels      = getTotalCount counters
+                                   , mConstraints = length $ r1csConstraints r1cs
+                                   }
+                     (primeLen, header) = encodeHeader binHeader
+                     constraints = toSnarkjsBin r1cConstraints primeLen
+                     labels = toLazyByteString $ genLabels (nLabels binHeader)
                   in meta
                   <> toLazyByteString (word32LE 0x01) <> secLength header
                   <> header
                   <> toLazyByteString (word32LE 0x02) <> secLength constraints
                   <> constraints
-                  <> toLazyByteString (word32LE 0x03 <> word64LE 0) -- Labels are now ignored
+                  <> toLazyByteString (word32LE 0x03) <> secLength labels -- Labels are now ignored
+                  <> labels
   where
-    r1cConstraints = map (fmap toInteger . reindexR1C r1cs) (toR1Cs r1cs)
+    r1cConstraints = map (fmap toInteger) (toR1Cs r1cs)
     secLength = toLazyByteString . word64LE . fromIntegral . BS.length
 
     -- "r1cs, version 1, 3 sections"
     meta :: ByteString
     meta = pack [0x72, 0x31, 0x63, 0x73, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00]
-
-    toHeader :: Integer -> ByteString
-    toHeader p = let counters = r1csCounters r1cs
-                     header = BinHeader {
-                       primeLen     = fromIntegral $ BS.length $ B.encode p 
-                     , prime        = p
-                     , nWires       = getTotalCount counters
-                     , nPubOut      = getCount counters Output
-                     , nPubIn       = getCount counters PublicInput
-                     , nPrvIn       = getCount counters PrivateInput
-                     , nLabels      = 0
-                     , mConstraints = length $ r1csConstraints r1cs
-                     }
-                  in if inRange (minBound :: Word32, maxBound :: Word32) (fromIntegral $ primeLen header)
-                     then encodeHeader header
-                     else error "Size of prime field is too large for Snarkjs (32 bits in length)."
 
 --------------------------------------------------------------------------------
 
@@ -173,8 +169,7 @@ encodeVarCoeff (v, c) = list f [Left v, Right c]
 data CircuitFormat = Aurora | Snarkjs
 
 data BinHeader = BinHeader {
-    primeLen     :: Int
-,   prime        :: Integer
+    prime        :: Integer
 ,   nWires       :: Int
 ,   nPubOut      :: Int
 ,   nPubIn       :: Int
@@ -184,43 +179,56 @@ data BinHeader = BinHeader {
 }
 
 -- | Encode in little Endian style
-encodeHeader :: BinHeader -> ByteString
-encodeHeader (BinHeader plen p wires pubout pubin prvIn labels mcons) =
-  let primeBS = BS.reverse $ B.encode p -- Reverse for little endian
-   in toLazyByteString $ word32LE (fromIntegral plen)
-                      <> lazyByteString primeBS
-                      <> word32LE (fromIntegral wires)
-                      <> word32LE (fromIntegral pubout)
-                      <> word32LE (fromIntegral pubin)
-                      <> word32LE (fromIntegral prvIn)
-                      <> word64LE (fromIntegral labels)
-                      <> word32LE (fromIntegral mcons)
+encodeHeader :: BinHeader -> (Int64, ByteString)
+encodeHeader (BinHeader p wires pubout pubin prvIn labels mcons) =
+  let primeBS = extendByteString 32 $ integerToByteString p
+      primeLen = 32 --BS.length primeBS
+   in ( primeLen
+      , toLazyByteString $ int32LE (fromIntegral primeLen)
+                        <> lazyByteString primeBS
+                        <> word32LE (fromIntegral wires)
+                        <> word32LE (fromIntegral pubout)
+                        <> word32LE (fromIntegral pubin)
+                        <> word32LE (fromIntegral prvIn)
+                        <> word64LE (fromIntegral labels)
+                        <> word32LE (fromIntegral mcons))
 
-toSnarkjsBin :: [R1C Integer] -> Integer -> ByteString
-toSnarkjsBin r1cs fieldPrime =
+toSnarkjsBin :: [R1C Integer] -> Int64 -> ByteString
+toSnarkjsBin r1cs primeLen =
   toLazyByteString $ mconcat $ map (\(R1C x y z) -> encodePoly x <> encodePoly y <> encodePoly z) r1cs
   where
     encodePoly :: Either Integer (Poly Integer) -> Builder
     encodePoly (Left constant) = word32LE 1
                               <> word32LE 0
-                              <> size64LE constant 
-    encodePoly (Right poly) = mconcat $
+                              <> sizePrimeLE constant 
+    encodePoly (Right poly) = let size = (fromIntegral $ IntMap.size (Poly.coeffs poly))
+                                  body = map coeffsToBuilder (IntMap.toAscList $ traceShowId $ Poly.coeffs poly)
+                              in  mconcat $
                                 -- Number of coefficients in this polynomial, adding one for the constant
-                                [ word32LE (fromIntegral $ IntMap.size (Poly.coeffs poly) + 1)
-                                , word32LE 0
-                                , size64LE (Poly.constant poly)
-                                ] <> map coeffsToBuilder (IntMap.toAscList $ Poly.coeffs poly)
+                                           case Poly.constant poly of
+                                             0 -> word32LE size : body 
+                                             n -> [ word32LE (size + 1)
+                                                  , word32LE 0
+                                                  , sizePrimeLE n 
+                                                  ] <> body 
 
+    -- | Snakrjs' variable indices start at 1, ours start at 0.
     coeffsToBuilder :: (Int, Integer) -> Builder
-    coeffsToBuilder (k, c) = word32LE (fromIntegral k) <> size64LE c
+    coeffsToBuilder (k, c) = word32LE (fromIntegral (k + 1)) <> sizePrimeLE c
 
-    size64LE :: Integer -> Builder
-    size64LE x = (lazyByteString . extendByteString (fromIntegral fieldPrime)) (BS.reverse $ B.encode x)
+    sizePrimeLE :: Integer -> Builder
+    sizePrimeLE x = (lazyByteString . extendByteString primeLen) (BS.reverse $ integerToByteString x)
 
-    -- Make sure the coefficients are of the same length with the prime
-    extendByteString :: Int64 -> ByteString -> ByteString
-    extendByteString len bs = let diff = BS.length bs - len
-                               in bs <> BS.pack (replicate (fromIntegral diff) 0)
+genLabels :: Int -> Builder
+genLabels n = mconcat $ map (word64LE . fromIntegral) [0..n]
+
+-- Make sure the coefficients are of the same length with the prime
+extendByteString :: Int64 -> ByteString -> ByteString
+extendByteString len bs = let diff = len - BS.length bs
+                           in bs <> BS.pack (replicate (fromIntegral diff) 0)
+-- | Magic
+integerToByteString :: Integer -> ByteString
+integerToByteString p = BS.takeEnd (fromIntegral $ integerLogBase 256 p + 1) (B.encode p)
 
 
 --------------------------------------------------------------------------------
