@@ -37,6 +37,7 @@ data ProtocolOptions
   | Interpret
   | GenCircuit String
   | GenWitness String
+  | GenCircuitBin String
   deriving (Show)
 
 protocol :: Parser ProtocolOptions
@@ -88,6 +89,14 @@ protocol =
               (GenCircuit <$> pathArg "circuit.jsonl" <**> helper)
               ( fullDesc
                   <> progDesc "Compile (-O1) a Keelung program to R1CS and output it as \"circuit.jsonl\""
+              )
+          )
+        <> command
+          "genCircuitBin"
+          ( info
+              (GenCircuitBin <$> pathArg "circuit.r1cs" <**> helper)
+              ( fullDesc
+                  <> progDesc "Compile (-O1) a Keelung program to R1CS binary (for Snarkjs and such) and output it as \"circuit.r1cs\""
               )
           )
         <> command

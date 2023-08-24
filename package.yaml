@@ -1,5 +1,5 @@
 name:                keelung-compiler
-version:             0.13.1
+version:             0.14.0
 github:              "btq-ag/keelung-compiler"
 license:             BSD3
 author:              "BTQ AG"
@@ -23,6 +23,7 @@ dependencies:
 - array 
 - base >= 4.7 && < 5
 - bytestring 
+- binary
 - cereal
 - containers
 - deepseq

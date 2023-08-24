@@ -84,9 +84,18 @@ main = withUtf8 $ do
       case decoded of
         Left err -> print err
         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
-          where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile filepath (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuitAndWriteFile filepath (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
+          where 
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile Aurora filepath (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
+            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuitAndWriteFile Aurora filepath (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
+    Protocol (GenCircuitBin filepath) -> do
+       blob <- getContents
+       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
+       case decoded of
+         Left err -> print err
+         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
+          where 
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile Snarkjs filepath (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
+            handleBinary _ _ = error "Binary R1CS format doesn't support binary fields."
     Protocol (GenWitness filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
@@ -101,13 +110,13 @@ main = withUtf8 $ do
     outputCircuit :: Serialize a => a -> IO ()
     outputCircuit = putStrLn . BSC.unpack . encode
 
-    outputCircuitAndWriteFile :: (Serialize n, GaloisField n, Integral n) => FilePath -> Either String (R1CS n) -> IO ()
-    outputCircuitAndWriteFile filepath r1cs = do
+    outputCircuitAndWriteFile :: (Serialize n, GaloisField n, Integral n) => CircuitFormat -> FilePath -> Either String (R1CS n) -> IO ()
+    outputCircuitAndWriteFile format filepath r1cs = do
       outputCircuit r1cs
       case r1cs of
         Left _ -> return ()
         Right r1cs' -> do
-          BS.writeFile filepath (serializeR1CS r1cs')
+          BS.writeFile filepath (serializeR1CS format r1cs')
 
     outputInterpretedResult :: (Serialize a, Serialize n) => Either a (Vector n) -> IO ()
     outputInterpretedResult = putStrLn . BSC.unpack . encode . fmap toList
