@@ -2,6 +2,7 @@ module Keelung.Compiler.Compile.Util where
 
 import Control.Arrow (right)
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bits qualified
 import Data.Either (partitionEithers)
@@ -29,13 +30,14 @@ import Keelung.Syntax.Counters
 --------------------------------------------------------------------------------
 
 -- | Monad for compilation
-type M n = StateT (ConstraintModule n) (Except (Error n))
+type M n = ReaderT (BootstrapCompiler n) (StateT (ConstraintModule n) (Except (Error n)))
 
-runM :: GaloisField n => FieldInfo -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
-runM fieldInfo counters program =
+-- | Run the monad
+runM :: GaloisField n => BootstrapCompiler n -> FieldInfo -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
+runM compilers fieldInfo counters program =
   runExcept
     ( execStateT
-        program
+        (runReaderT program compilers)
         (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new Relations.new mempty mempty mempty mempty mempty mempty mempty)
     )
 
@@ -62,6 +64,36 @@ freshRefU width = do
   let index = getCount counters (Intermediate, ReadUInt width)
   modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ RefUX width index
+
+--------------------------------------------------------------------------------
+
+-- | We want to break the compilation module into smaller modules,
+--   but Haskell forbids mutually recursive modules,
+--   and functions in these small modules are mutually dependent on each other.
+--   One way to do this is by "tying the knot" with a recursive data type.
+data BootstrapCompiler n = BootstrapCompiler
+  { boostrapCompileF :: ExprF n -> M n (LC n),
+    boostrapCompileB :: ExprB n -> M n (Either RefB Bool),
+    boostrapCompileU :: RefU -> ExprU n -> M n ()
+  }
+
+-- | For extracting the bootstrapped ExprB compiler
+compileExprB :: (GaloisField n, Integral n) => ExprB n -> M n (Either RefB Bool)
+compileExprB expr = do
+  compiler <- asks boostrapCompileB
+  compiler expr
+
+-- | For extracting the bootstrapped ExprF compiler
+compileExprF :: (GaloisField n, Integral n) => ExprF n -> M n (LC n)
+compileExprF expr = do
+  compiler <- asks boostrapCompileF
+  compiler expr
+
+-- | For extracting the bootstrapped ExprU compiler
+compileExprU :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
+compileExprU out expr = do
+  compiler <- asks boostrapCompileU
+  compiler out expr
 
 --------------------------------------------------------------------------------
 
@@ -119,7 +151,7 @@ addC = mapM_ addOne
     execRelations :: (Relations n -> EquivClass.M (Error n) (Relations n)) -> M n ()
     execRelations f = do
       cs <- get
-      result <- lift $ (EquivClass.runM . f) (cmRelations cs)
+      result <- lift $ lift $ (EquivClass.runM . f) (cmRelations cs)
       case result of
         Nothing -> return ()
         Just relations -> put cs {cmRelations = relations}

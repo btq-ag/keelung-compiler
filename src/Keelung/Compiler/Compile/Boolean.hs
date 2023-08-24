@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.Boolean where
+module Keelung.Compiler.Compile.Boolean (compile) where
 
 import Control.Monad.State
 import Data.Bits qualified
@@ -14,80 +14,78 @@ import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo
 import Keelung.Data.Reference
 
-compileExprB :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> (ExprF n -> M n (LC n)) -> ExprB n -> M n (Either RefB Bool)
-compileExprB compileU compileF expr =
-  let compile = compileExprB compileU compileF
-   in case expr of
-        ValB val -> return $ Right val -- out = val
-        VarB var -> return $ Left (RefBX var) -- out = var
-        VarBO var -> return $ Left (RefBO var) -- out = var
-        VarBI var -> return $ Left (RefBI var) -- out = var
-        VarBP var -> return $ Left (RefBP var) -- out = var
-        AndB xs -> do
-          xs' <- mapM compile xs
-          andBs (toList xs')
-        OrB xs -> do
-          xs' <- mapM compile xs
-          orBs (toList xs')
-        XorB x y -> do
-          x' <- compile x
-          y' <- compile y
-          xorB x' y'
-        NotB x -> do
-          x' <- compile x
-          case x' of
-            Left var -> do
-              out <- freshRefB
-              writeNEqB var out
-              return $ Left out
-            Right val -> return $ Right (not val)
-        IfB p x y -> do
-          p' <- compile p
-          x' <- compile x
-          y' <- compile y
-          compileIfB p' x' y'
-        NEqB x y -> compile (XorB x y)
-        NEqF x y -> do
-          x' <- compileF x
-          y' <- compileF y
-          eqZero False (x' <> neg y')
-        EqB x y -> do
-          x' <- compile x
-          y' <- compile y
-          eqB x' y'
-        EqF x y -> do
-          x' <- compileF x
-          y' <- compileF y
-          eqZero True (x' <> neg y')
-        EqU x y -> do
-          x' <- compileU x
-          y' <- compileU y
-          compileEqU (widthOf x) x' y'
-        LTEU x y -> do
-          x' <- compileU x
-          y' <- compileU y
-          case (x', y') of
-            (Left xVar, Left yVar) -> computeLTEUVarVar xVar yVar
-            (Left xVar, Right yVal) -> computeLTEUVarConst xVar yVal
-            (Right xVal, Left yVar) -> computeLTEUConstVar xVal yVar
-            (Right xVal, Right yVal) -> return $ Right (xVal <= yVal)
-        LTU x y -> do
-          x' <- compileU x
-          y' <- compileU y
-          case (x', y') of
-            (Left xVar, Left yVar) -> computeLTUVarVar xVar yVar
-            (Left xVar, Right yVal) -> computeLTUVarConst xVar yVal
-            (Right xVal, Left yVar) -> computeLTUConstVar xVal yVar
-            (Right xVal, Right yVal) -> return $ Right (xVal < yVal)
-        GTEU x y -> compile (LTEU y x)
-        GTU x y -> compile (LTU y x)
-        BitU x i -> do
-          let width = widthOf x
-          let index = i `mod` width
-          result <- compileU x
-          case result of
-            Left var -> return $ Left (RefUBit width var (i `mod` width)) -- out = x'[i]
-            Right val -> return $ Right (Data.Bits.testBit val index)
+compile :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> ExprB n -> M n (Either RefB Bool)
+compile compileU expr = case expr of
+  ValB val -> return $ Right val -- out = val
+  VarB var -> return $ Left (RefBX var) -- out = var
+  VarBO var -> return $ Left (RefBO var) -- out = var
+  VarBI var -> return $ Left (RefBI var) -- out = var
+  VarBP var -> return $ Left (RefBP var) -- out = var
+  AndB xs -> do
+    xs' <- mapM compileExprB xs
+    andBs (toList xs')
+  OrB xs -> do
+    xs' <- mapM compileExprB xs
+    orBs (toList xs')
+  XorB x y -> do
+    x' <- compileExprB x
+    y' <- compileExprB y
+    xorB x' y'
+  NotB x -> do
+    x' <- compileExprB x
+    case x' of
+      Left var -> do
+        out <- freshRefB
+        writeNEqB var out
+        return $ Left out
+      Right val -> return $ Right (not val)
+  IfB p x y -> do
+    p' <- compileExprB p
+    x' <- compileExprB x
+    y' <- compileExprB y
+    compileIfB p' x' y'
+  NEqB x y -> compileExprB (XorB x y)
+  NEqF x y -> do
+    x' <- compileExprF x
+    y' <- compileExprF y
+    eqZero False (x' <> neg y')
+  EqB x y -> do
+    x' <- compileExprB x
+    y' <- compileExprB y
+    eqB x' y'
+  EqF x y -> do
+    x' <- compileExprF x
+    y' <- compileExprF y
+    eqZero True (x' <> neg y')
+  EqU x y -> do
+    x' <- compileU x
+    y' <- compileU y
+    compileEqU (widthOf x) x' y'
+  LTEU x y -> do
+    x' <- compileU x
+    y' <- compileU y
+    case (x', y') of
+      (Left xVar, Left yVar) -> computeLTEUVarVar xVar yVar
+      (Left xVar, Right yVal) -> computeLTEUVarConst xVar yVal
+      (Right xVal, Left yVar) -> computeLTEUConstVar xVal yVar
+      (Right xVal, Right yVal) -> return $ Right (xVal <= yVal)
+  LTU x y -> do
+    x' <- compileU x
+    y' <- compileU y
+    case (x', y') of
+      (Left xVar, Left yVar) -> computeLTUVarVar xVar yVar
+      (Left xVar, Right yVal) -> computeLTUVarConst xVar yVal
+      (Right xVal, Left yVar) -> computeLTUConstVar xVal yVar
+      (Right xVal, Right yVal) -> return $ Right (xVal < yVal)
+  GTEU x y -> compileExprB (LTEU y x)
+  GTU x y -> compileExprB (LTU y x)
+  BitU x i -> do
+    let width = widthOf x
+    let index = i `mod` width
+    result <- compileU x
+    case result of
+      Left var -> return $ Left (RefUBit width var (i `mod` width)) -- out = x'[i]
+      Right val -> return $ Right (Data.Bits.testBit val index)
 
 --------------------------------------------------------------------------------
 
@@ -141,11 +139,6 @@ compileIfB (Left p) (Left x) (Left y) = do
     (0, [(B x, 1), (B y, -1)])
     (0, [(B y, -1), (B out, 1)])
   return $ Left out
-
-fromB :: GaloisField n => Either RefB Bool -> LC n
-fromB (Right True) = Constant 1
-fromB (Right False) = Constant 0
-fromB (Left x) = 1 @ B x
 
 andBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
 andBs xs =

@@ -52,27 +52,8 @@ instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
         | c < 0 = [" - ", show (Prelude.negate c) <> show x]
         | otherwise = [" + ", show c <> show x]
 
--- build :: (Num n, Eq n) => n -> [(Ref, n)] -> Either n (PolyG n)
--- build c xs =
---   let result = Map.filter (/= 0) $ Map.fromListWith (+) xs
---    in if Map.null result
---         then Left c
---         else Right (PolyG c result)
-
 buildWithSeq :: (Num n, Eq n) => n -> Seq (RefL, n) -> PolyL n
 buildWithSeq = PolyL
-
--- let result = Seq.filter ((/= 0) . snd) xs
---  in if Seq.null result
---       then Left c
---       else Right (PolyL c xs)
-
--- buildWithMap :: (Num n, Eq n) => n -> Map Ref n -> Either n (PolyG n)
--- buildWithMap c xs =
---   let result = Map.filter (/= 0) xs
---    in if Map.null result
---         then Left c
---         else Right (PolyG c result)
 
 singleton :: (Num n, Eq n) => n -> (RefL, n) -> Either n (PolyL n)
 singleton c (_, 0) = Left c
@@ -88,20 +69,6 @@ addConstant c' (PolyL c xs) = PolyL (c + c') xs
 multiplyBy :: (Num n, Eq n) => n -> PolyL n -> Either n (PolyL n)
 multiplyBy 0 _ = Left 0
 multiplyBy m (PolyL c xs) = Right $ PolyL (m * c) (fmap (second (m *)) xs)
-
--- -- | Negate a polynomial
--- negate :: (Num n, Eq n) => PolyG n -> PolyG n
--- negate (PolyG c xs) = PolyG (-c) (fmap Prelude.negate xs)
-
--- data View n = Monomial n (Ref, n) | Binomial n (Ref, n) (Ref, n) | Polynomial n (Map Ref n)
---   deriving (Eq, Show)
-
--- view :: PolyG n -> View n
--- view (PolyG c xs) = case Map.toList xs of
---   [] -> error "[ panic ] PolyG.view: empty polynomial"
---   [(x, c')] -> Monomial c (x, c')
---   [(x, c'), (y, c'')] -> Binomial c (x, c') (y, c'')
---   _ -> Polynomial c xs
 
 view :: PolyL n -> (n, Seq (RefL, n))
 view (PolyL c xs) = (c, xs)
