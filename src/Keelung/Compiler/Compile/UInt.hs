@@ -108,7 +108,8 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
           ]
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
-      upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
+      let carryLimbWidth = lmbWidth x + lmbWidth y - currentLimbWidth
+      upperLimb <- allocLimb carryLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
       writeMulWithRefLs
         (a, Seq.singleton (toRefL True x))

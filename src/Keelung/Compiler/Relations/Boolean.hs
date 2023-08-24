@@ -84,19 +84,3 @@ size = Map.size . EquivClass.toMap
 
 isValid :: BooleanRelations -> Bool
 isValid = EquivClass.isValid
-
--- -- | Result of looking up a variable in the BooleanRelations
--- data Lookup = Root | Value Bool | ChildOf Bool RefB
---   deriving (Eq, Show)
-
--- lookup :: RefB -> BooleanRelations -> Lookup
--- lookup var xs = case EquivClass.lookup var xs of
---   EquivClass.IsRoot _ -> Root
---   EquivClass.IsConstant val -> Value val
---   EquivClass.IsChildOf parent (Polarity polarity) -> ChildOf polarity parent
-
--- lookup' :: RefB -> BooleanRelations -> EquivClass.VarStatus RefB Bool Bool
--- lookup' var xs = case EquivClass.lookup var xs of
---   EquivClass.IsRoot children -> EquivClass.IsRoot $ fmap unPolarity children
---   EquivClass.IsConstant val -> EquivClass.IsConstant val
---   EquivClass.IsChildOf parent (Polarity polarity) -> EquivClass.IsChildOf parent polarity

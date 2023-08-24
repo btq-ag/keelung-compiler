@@ -115,14 +115,14 @@ tests = do
 
       -- 8 * 3 for input / output
       -- 4 * 5 for intermediate limbs
+      -- 2 for carry bit
       -- 3 for multiplication
       -- 1 for addition
-      -- 2 for carry bit
 
       --                      #### ####
       --         x)           #### ####
       --    -------------------------------
-      --                      #### ####
+      --                      #### ----
       --                 #### ####
       --         +)      #### ####
       --    -------------------------------
@@ -135,6 +135,23 @@ tests = do
           return $ x * y
         cs `shouldHaveSize` 55
         cs' `shouldHaveSize` 50
+
+      --                      ### #####
+      --         x)           ### #####
+      --    -------------------------------
+      --                    ##### -----
+      --                ### #####
+      --         +)     ### #####
+      --    -------------------------------
+      --                    ##### #####
+      ------------------------------------------
+      it "2 variables / byte / Prime 1031" $ do
+        (cs, cs') <- executePrime 1031 $ do
+          x <- inputUInt @8 Public
+          y <- inputUInt @8 Public
+          return $ x * y
+        cs `shouldHaveSize` 57
+        cs' `shouldHaveSize` 51
 
       -- TODO: can be lower
       it "variable / constant" $ do

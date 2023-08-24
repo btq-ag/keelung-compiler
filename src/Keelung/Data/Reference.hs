@@ -87,8 +87,8 @@ instance Show RefL where
     (0, _) -> "<Empty RefL>"
     (1, Left sign) -> (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
     (1, Right signs) -> (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i)
-    (2, Left sign) -> (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
-    (2, Right signs) -> (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1))
+    (2, Left sign) -> (if sign then "" else "-") <> "{2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1)) <> "}"
+    (2, Right signs) -> (if head signs then "" else "-") <> "{2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (offset + 1) <> "$" <> show (RefUBit 1 ref (i + 1)) <> "}"
     (_, Left sign) -> (if sign then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " ... " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (offset + limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1))
     (_, Right signs) -> (if head signs then "" else "-") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit 1 ref i) <> " ... " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (offset + limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1))
 
