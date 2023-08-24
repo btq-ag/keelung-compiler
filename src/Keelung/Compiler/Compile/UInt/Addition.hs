@@ -1,6 +1,3 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use guards" #-}
 module Keelung.Compiler.Compile.UInt.Addition (Dimensions (..), addLimbColumn, compileAddU, compileSubU, allocLimb) where
 
 import Control.Monad.Except
@@ -10,7 +7,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.Error qualified as Error
-import Keelung.Compiler.Compile.LimbColumn (LimbColumn (..))
+import Keelung.Compiler.Compile.LimbColumn (LimbColumn (LimbColumn))
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
