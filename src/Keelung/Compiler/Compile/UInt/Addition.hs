@@ -161,7 +161,7 @@ addLimbStack resultLimb (OneLimbOnly limb) = do
   writeEqL (RefL resultLimb 0) (RefL limb 0)
   return mempty
 addLimbStack resultLimb (Ordinary constant limbs) = do
-  let carrySigns = LimbColumn.calculateCarrySigns (lmbWidth resultLimb) constant limbs
+  let carrySigns = calculateCarrySigns (lmbWidth resultLimb) constant limbs
   carryLimb <- allocCarryLimb (length carrySigns) (lmbOffset resultLimb) carrySigns
   writeAddWithRefLs (fromInteger constant) $
     -- positive side

@@ -26,6 +26,7 @@ import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Syntax.Counters
+import Data.Word (Word32)
 
 --------------------------------------------------------------------------------
 
@@ -305,3 +306,48 @@ eqZero isEq (Polynomial polynomial) = do
   --  keep track of the relation between (x - y) and m
   addEqZeroHintWithPoly (Right polynomial) m
   return (Left out)
+
+--------------------------------------------------------------------------------
+
+-- | Calculate the number of bits required to represent an Integer.
+widthOfInteger :: Integer -> Int
+widthOfInteger 0 = 0
+widthOfInteger x =
+  let lowerBits = fromInteger x :: Word32
+      higherBits = x `Data.Bits.shiftR` 32
+   in if higherBits == 0
+        then 32 - Data.Bits.countLeadingZeros lowerBits
+        else 32 + widthOfInteger higherBits
+
+-- | Calculate the lower bound and upper bound
+calculateBounds :: Integer -> Seq Limb -> (Integer, Integer)
+calculateBounds constant = foldl step (constant, constant)
+  where
+    step :: (Integer, Integer) -> Limb -> (Integer, Integer)
+    step (lower, upper) (Limb _ width _ (Left True)) = (lower, upper + 2 ^ width - 1)
+    step (lower, upper) (Limb _ width _ (Left False)) = (lower - 2 ^ width + 1, upper)
+    step (lower, upper) (Limb _ _ _ (Right xs)) = let (lower', upper') = calculateBoundsOfigns (lower, upper) xs in (lower + lower', upper + upper')
+
+    calculateBoundsOfigns :: (Integer, Integer) -> [Bool] -> (Integer, Integer)
+    calculateBoundsOfigns (_, _) [] = (0, 0)
+    calculateBoundsOfigns (lower, upper) (True : xs) = let (lower', upper') = calculateBoundsOfigns (lower, upper) xs in (lower' * 2, upper' * 2 + 1)
+    calculateBoundsOfigns (lower, upper) (False : xs) = let (lower', upper') = calculateBoundsOfigns (lower, upper) xs in (lower' * 2 - 1, upper' * 2)
+
+-- | Calculate the carry signs of a 'LimbColumn'.
+calculateCarrySigns :: Int -> Integer -> Seq Limb -> [Bool]
+calculateCarrySigns limbWidth constant limbs =
+  let (lower, upper) = calculateBounds constant limbs
+   in if lower < 0
+        then
+          if (-lower) <= 2 ^ limbWidth
+            then
+              let range = upper + 2 ^ limbWidth
+                  carryWidth = widthOfInteger range
+               in False : replicate (carryWidth - limbWidth - 1) True
+            else
+              let range = upper - lower + 2 ^ limbWidth - 1
+                  carryWidth = widthOfInteger range
+               in map (not . Data.Bits.testBit (-lower + 2 ^ limbWidth)) [limbWidth .. carryWidth - 1]
+        else
+          let carryWidth = widthOfInteger upper
+           in replicate (carryWidth - limbWidth) True
