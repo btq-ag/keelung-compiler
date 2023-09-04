@@ -136,22 +136,13 @@ tests = do
         cs `shouldHaveSize` 55
         cs' `shouldHaveSize` 50
 
-      --                      ### #####
-      --         x)           ### #####
-      --    -------------------------------
-      --                    ##### -----
-      --                ### #####
-      --         +)     ### #####
-      --    -------------------------------
-      --                    ##### #####
-      ------------------------------------------
       it "2 variables / byte / Prime 1031" $ do
         (cs, cs') <- executePrime 1031 $ do
           x <- inputUInt @8 Public
           y <- inputUInt @8 Public
           return $ x * y
-        cs `shouldHaveSize` 57
-        cs' `shouldHaveSize` 51
+        cs `shouldHaveSize` 55
+        cs' `shouldHaveSize` 50
 
       -- TODO: can be lower
       it "variable / constant" $ do

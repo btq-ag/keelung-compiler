@@ -6,7 +6,7 @@ import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence qualified as Seq
-import Keelung (FieldType (..), HasWidth (widthOf))
+import Keelung (FieldType (..))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
@@ -52,11 +52,15 @@ compileMul width out x y = do
   fieldInfo <- gets cmField
 
   -- invariants about widths of carry and limbs:
-  --  1. limb width * 2 ≤ field width
+  --  1. 2 ≤ limb width * 2 ≤ field width
 
-  let maxLimbWidth = fieldWidth fieldInfo `div` 2
+  -- determine the maximum and minimum limb widths
+  let maxLimbWidth = fieldWidth fieldInfo `div` 2 -- cannot exceed half of the field width
   let minLimbWidth = 2 -- TEMPORARY HACK FOR ADDITION
-  let limbWidth = minLimbWidth `max` widthOf x `min` maxLimbWidth
+  -- the number of limbs needed to represent an operand
+  let limbNumber = width `ceilDiv` (minLimbWidth `max` width `min` maxLimbWidth)
+  -- the optimal width
+  let limbWidth = width `ceilDiv` limbNumber
 
   let dimensions =
         Dimensions
@@ -73,9 +77,11 @@ compileMul width out x y = do
     Prime 7 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 11 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    _ -> do
-      let limbNumber = ceiling (fromIntegral width / fromIntegral limbWidth :: Double) :: Int
-      mulnxn dimensions limbWidth limbNumber out x y
+    _ -> mulnxn dimensions limbWidth limbNumber out x y
+  where 
+    -- like div, but rounds up
+    ceilDiv :: Int -> Int -> Int
+    ceilDiv a b = ((a - 1) `div` b) + 1
 
 mul2Limbs :: (GaloisField n, Integral n) => Width -> Int -> (n, Limb) -> Either n (n, Limb) -> M n (LimbColumn, LimbColumn)
 mul2Limbs currentLimbWidth limbStart (a, x) operand = do
