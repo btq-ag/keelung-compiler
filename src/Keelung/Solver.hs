@@ -17,7 +17,7 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
-import Keelung
+import Keelung hiding (witness)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
@@ -358,7 +358,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           (expectedDivisorVal, expectedRemainderVal) <-
             if U.uintValue actualQuotientVal == 0
               then throwError $ QuotientIsZeroError quotientVar
-              else 
+              else
                 if U.uintValue dividendVal == 0
                   then throwError $ DividendIsZeroError dividendVar
                   else return (dividendVal `U.integerDivU` actualQuotientVal, dividendVal `U.integerModU` actualQuotientVal)

@@ -8,6 +8,7 @@ import Data.Bits qualified
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq)
+import Data.Word (Word32)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.ConstraintModule
@@ -26,7 +27,6 @@ import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Interpreter.Arithmetics (U (UVal))
 import Keelung.Syntax.Counters
-import Data.Word (Word32)
 
 --------------------------------------------------------------------------------
 
@@ -168,10 +168,8 @@ addC = mapM_ addOne
     addOne (CVarBindF x c) = do
       execRelations $ Relations.assignF x c
     addOne (CVarBindB x c) = do
-      countBitTestAsOccurU (B x)
       execRelations $ Relations.assignB x c
     addOne (CVarBindL x c) = do
-      -- countBitTestAsOccurU (B x)
       execRelations $ Relations.assignL x c
     addOne (CVarEq x y) = do
       countBitTestAsOccurU x

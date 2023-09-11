@@ -169,6 +169,29 @@ tests = do
         cs `shouldHaveSize` 8
         cs' `shouldHaveSize` 8
 
+    -- describe "Bitwise Operators" $ do
+    --   it "setBit twice" $ do
+    --     (cs, cs') <- executeGF181 $ do
+    --       x <- inputUInt @8 Public
+    --       return $ setBit (setBit x 0 true) 1 true
+    --     print cs
+    --     -- print $ linkConstraintModule cs'
+    --     cs `shouldHaveSize` 24
+    --     cs' `shouldHaveSize` 24
+
+    --     it "U8 -> U16" $ do
+    --       (cs, cs') <- executeGF181 $ do
+    --         x <- inputUInt @8 Public
+    --         y <- inputUInt @8 Public
+    --         return $ u8ToU16 x y
+    --       print cs
+    --       cs `shouldHaveSize` 528
+    --       cs' `shouldHaveSize` 528
+    -- where
+    --   u8ToU16 :: UInt 8 -> UInt 8 -> UInt 16
+    --   u8ToU16 x y =
+    --     foldl (\n index -> setBit n (index + 8) (y !!! index)) (foldl (\n index -> setBit n index (x !!! index)) 0 [0 .. 7]) [0 .. 7]
+
     describe "Comparison computation" $ do
       it "x ≤ y" $ do
         (cs, cs') <- executeGF181 $ do
