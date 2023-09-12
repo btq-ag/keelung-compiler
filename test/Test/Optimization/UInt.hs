@@ -7,6 +7,7 @@ import Control.Monad (forM_)
 import Keelung hiding (compileO0)
 import Test.Hspec
 import Test.Optimization.Util
+import qualified Test.Optimization.UInt.Misc as Misc
 
 run :: IO ()
 run = hspec tests
@@ -403,3 +404,5 @@ tests = do
             assert $ 0 `lte` (0 :: UInt 4)
           cs `shouldHaveSize` 0
           cs' `shouldHaveSize` 0
+
+    Misc.tests

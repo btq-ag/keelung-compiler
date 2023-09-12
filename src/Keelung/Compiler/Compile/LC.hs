@@ -18,12 +18,6 @@ fromEither :: Either n (PolyG n) -> LC n
 fromEither = either Constant Polynomial
 
 -- | Converting from a 'Either RefU n' to a 'LC n'.
--- fromRefU :: (Num n, Eq n) => Width -> Either RefU Integer -> LC n
--- fromRefU _ (Right val) = Constant (fromInteger val)
--- fromRefU _ (Left var) =
---   let width = widthOf var
---       bits = [(B (RefUBit width var i), 2 ^ i) | i <- [0 .. width - 1]]
---    in fromEither (PolyG.build 0 bits)
 fromRefU :: (Num n, Eq n) => Width -> Int -> Either RefU Integer -> [LC n]
 fromRefU width fieldWidth (Right val) =
   let limbWidth = fieldWidth

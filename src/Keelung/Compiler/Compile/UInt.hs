@@ -10,6 +10,7 @@ module Keelung.Compiler.Compile.UInt
 where
 
 import Control.Monad.Except
+import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
@@ -19,7 +20,9 @@ import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.Multiplication
 import Keelung.Compiler.Compile.Util
+import Keelung.Compiler.ConstraintModule (ConstraintModule (cmField))
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.Reference
 import Keelung.Syntax (HasWidth (widthOf))
 
@@ -28,10 +31,19 @@ import Keelung.Syntax (HasWidth (widthOf))
 compile :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compile out expr = case expr of
   ValU width val -> writeValU width out val
-  VarU width var -> writeEqU width out (RefUX width var)
-  VarUO width var -> writeEqU width out (RefUX width var)
-  VarUI width var -> writeEqU width out (RefUI width var)
-  VarUP width var -> writeEqU width out (RefUP width var)
+  VarU width var -> do
+    -- fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+    -- zipWithM_ writeEqL (refUToRefL fieldWidth (RefUX width var)) (refUToRefL fieldWidth out)
+    writeEqU width out (RefUX width var)
+  VarUO width var -> do
+    fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+    zipWithM_ writeEqL (refUToRefL fieldWidth (RefUO width var)) (refUToRefL fieldWidth out)
+  VarUI width var -> do
+    fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+    zipWithM_ writeEqL (refUToRefL fieldWidth (RefUI width var)) (refUToRefL fieldWidth out)
+  VarUP width var -> do
+    fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+    zipWithM_ writeEqL (refUToRefL fieldWidth (RefUP width var)) (refUToRefL fieldWidth out)
   AddU w xs -> do
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = Either.partitionEithers mixed

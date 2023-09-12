@@ -15,6 +15,7 @@ module Keelung.Data.Reference
     toRefLMultiplied,
     toRefLShifted,
     toRefL,
+    refUToRefL,
   )
 where
 
@@ -168,3 +169,12 @@ toRefLShifted = toRefLMultiplied 1
 -- | Specialized version of `toRefLShifted`, with `1` as the multiplier, and `0` as the power offset
 toRefL :: (GaloisField n, Integral n) => Bool -> Limb -> (RefL, n)
 toRefL = toRefLMultiplied 1 0
+
+-- | Convert a RefU to a bunch of RefLs
+--   (in case that the field width is not large enough to hold the RefU)
+refUToRefL :: Width -> RefU -> [RefL]
+refUToRefL fieldWidth refU = step (widthOf refU) 0
+  where
+    step remainingWidth offset
+      | remainingWidth <= fieldWidth = [RefL (Limb refU remainingWidth offset (Left True)) 0]
+      | otherwise = RefL (Limb refU fieldWidth offset (Left True)) 0 : step (remainingWidth - fieldWidth) (offset + fieldWidth)

@@ -45,6 +45,11 @@ tests =
         let expected = [dividend `div` divisor, dividend `mod` divisor]
         runAll gf181 (program dividend divisor) [] [] expected
         runAll (Prime 17) (program dividend divisor) [] [] expected
+      -- let dividend = 13 
+      -- let divisor = 6
+      -- let expected = [dividend `div` divisor, dividend `mod` divisor]
+      -- runAll gf181 (program dividend divisor) [] [] expected
+      -- runAll (Prime 17) (program dividend divisor) [] [] expected
 
     it "assertDivMod (with wrong quotient constant)" $ do
       let program = assertDivMod 7 (3 :: UInt 4) 3 1
