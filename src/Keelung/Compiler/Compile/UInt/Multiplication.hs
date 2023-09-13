@@ -78,7 +78,7 @@ compileMul width out x y = do
     Prime 11 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     _ -> mulnxn dimensions limbWidth limbNumber out x y
-  where 
+  where
     -- like div, but rounds up
     ceilDiv :: Int -> Int -> Int
     ceilDiv a b = ((a - 1) `div` b) + 1
@@ -95,26 +95,26 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
     Left constant -> do
       upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
-      writeAddWithRefLs (a * constant) $
+      writeAddWithLimbs (a * constant) $
         Seq.fromList
           [ -- operand side
             toRefLMultiplied constant 0 True x,
             -- negative side
             toRefL False lowerLimb,
-            toRefLShifted currentLimbWidth False upperLimb
+            (upperLimb, -(2 ^ currentLimbWidth))
           ]
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
       let carryLimbWidth = lmbWidth x + lmbWidth y - currentLimbWidth
       upperLimb <- allocLimb carryLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
-      writeMulWithRefLs
+      writeMulWithLimbs
         (a, Seq.singleton (toRefL True x))
         (b, Seq.singleton (toRefL True y))
         ( 0,
           Seq.fromList
             [ toRefL True lowerLimb,
-              toRefLShifted currentLimbWidth True upperLimb
+              (upperLimb,  2 ^ currentLimbWidth)
             ]
         )
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)

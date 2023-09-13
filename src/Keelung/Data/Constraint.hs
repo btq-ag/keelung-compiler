@@ -50,11 +50,11 @@ data Constraint n
   | CVarEq Ref Ref -- when x == y
   | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y
-  | CVarEqL RefL RefL -- when x == y
+  | CVarEqL Limb Limb -- when x == y
   | CVarNEqB RefB RefB -- when x = ¬ y
   | CVarBindF Ref n -- when x = val
   | CVarBindB RefB Bool -- when x = val
-  | CVarBindL RefL Integer -- when x = val
+  | CVarBindL Limb Integer -- when x = val
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of

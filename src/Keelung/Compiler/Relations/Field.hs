@@ -89,7 +89,7 @@ assignF var val = updateRelationsF $ EquivClass.assign var val
 assignB :: RefB -> Bool -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignB ref val = updateRelationsB $ Boolean.assign ref val
 
-assignL :: (GaloisField n, Integral n) => RefL -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
+assignL :: (GaloisField n, Integral n) => Limb -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignL var val = updateRelationsU $ UInt.assign var val
 
 relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
@@ -98,7 +98,7 @@ relateF var1 slope var2 intercept = updateRelationsF $ EquivClass.relate var1 (L
 relateB :: GaloisField n => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateB refA (polarity, refB) = updateRelationsB (Boolean.relate refA polarity refB)
 
-relateL :: (GaloisField n, Integral n) => RefL -> RefL -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateL var1 var2 = updateRelationsU $ UInt.relate var1 var2
 
 -- var = slope * var2 + intercept

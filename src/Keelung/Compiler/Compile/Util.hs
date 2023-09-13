@@ -197,8 +197,8 @@ addC = mapM_ addOne
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
 writeMul as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.build as) (fromEither $ uncurry PolyG.build bs) (fromEither $ uncurry PolyG.build cs)
 
-writeMulWithRefLs :: (GaloisField n, Integral n) => (n, Seq (RefL, n)) -> (n, Seq (RefL, n)) -> (n, Seq (RefL, n)) -> M n ()
-writeMulWithRefLs as bs cs =
+writeMulWithLimbs :: (GaloisField n, Integral n) => (n, Seq (Limb, n)) -> (n, Seq (Limb, n)) -> (n, Seq (Limb, n)) -> M n ()
+writeMulWithLimbs as bs cs =
   addC
     [ CMulL
         (uncurry PolyL.buildWithSeq as)
@@ -209,8 +209,8 @@ writeMulWithRefLs as bs cs =
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPolyG (PolyG.build c as)
 
-writeAddWithRefLs :: (GaloisField n, Integral n) => n -> Seq (RefL, n) -> M n ()
-writeAddWithRefLs c as = addC [CAddL (PolyL.buildWithSeq c as)]
+writeAddWithLimbs :: (GaloisField n, Integral n) => n -> Seq (Limb, n) -> M n ()
+writeAddWithLimbs c as = addC [CAddL (PolyL.buildWithSeq c as)]
 
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x
@@ -225,7 +225,7 @@ writeValB a x = addC [CVarBindB a x]
 writeValU :: (GaloisField n, Integral n) => Width -> RefU -> Integer -> M n ()
 writeValU width a x = forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width a i) (Data.Bits.testBit x i)
 
-writeValL :: (GaloisField n, Integral n) => RefL -> Integer -> M n ()
+writeValL :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
 writeValL a x = addC [CVarBindL a x]
 
 writeEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
@@ -243,7 +243,7 @@ writeNEqB a b = addC [CVarNEqB a b]
 writeEqU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
 writeEqU width a b = forM_ [0 .. width - 1] $ \i -> writeEqB (RefUBit width a i) (RefUBit width b i)
 
-writeEqL :: (GaloisField n, Integral n) => RefL -> RefL -> M n ()
+writeEqL :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
 writeEqL a b = addC [CVarEqL a b]
 
 --------------------------------------------------------------------------------

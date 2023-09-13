@@ -33,17 +33,17 @@ compile out expr = case expr of
   ValU width val -> writeValU width out val
   VarU width var -> do
     -- fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-    -- zipWithM_ writeEqL (refUToRefL fieldWidth (RefUX width var)) (refUToRefL fieldWidth out)
+    -- zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUX width var)) (refUToLimbs fieldWidth out)
     writeEqU width out (RefUX width var)
   VarUO width var -> do
     fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-    zipWithM_ writeEqL (refUToRefL fieldWidth (RefUO width var)) (refUToRefL fieldWidth out)
+    zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUO width var)) (refUToLimbs fieldWidth out)
   VarUI width var -> do
     fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-    zipWithM_ writeEqL (refUToRefL fieldWidth (RefUI width var)) (refUToRefL fieldWidth out)
+    zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUI width var)) (refUToLimbs fieldWidth out)
   VarUP width var -> do
     fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-    zipWithM_ writeEqL (refUToRefL fieldWidth (RefUP width var)) (refUToRefL fieldWidth out)
+    zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUP width var)) (refUToLimbs fieldWidth out)
   AddU w xs -> do
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = Either.partitionEithers mixed

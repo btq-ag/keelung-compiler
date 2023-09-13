@@ -462,7 +462,7 @@ assign (F var) value = do
       markChanged RelationChanged
       put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 
-assignL :: (GaloisField n, Integral n) => RefL -> Integer -> RoundM n ()
+assignL :: (GaloisField n, Integral n) => Limb -> Integer -> RoundM n ()
 assignL var value = do
   cm <- get
   result <- lift $ lift $ EquivClass.runM $ Relations.assignL var value (cmRelations cm)
@@ -484,8 +484,8 @@ relateF var1 (slope, var2, intercept) = do
       modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
       return True
 
--- | Relates two RefLs. Returns 'True' if a new relation has been established.
-relateL :: (GaloisField n, Integral n) => RefL -> RefL -> RoundM n Bool
+-- | Relates two Limbs. Returns 'True' if a new relation has been established.
+relateL :: (GaloisField n, Integral n) => Limb -> Limb -> RoundM n Bool
 relateL var1 var2 = do
   cm <- get
   result <- lift $ lift $ EquivClass.runM $ Relations.relateL var1 var2 (cmRelations cm)
@@ -581,9 +581,9 @@ substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = cas
 
 --------------------------------------------------------------------------------
 
--- | Substitutes RefLs in a PolyL.
+-- | Substitutes Limbs in a PolyL.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Set RefL, Set RefL)
+substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Set Limb, Set Limb)
 substPolyL relations poly = do
   let (c, xs) = PolyL.view poly
   case foldl (substPolyL_ (Relations.exportUIntRelations relations)) (False, Left c, mempty, mempty) xs of
@@ -594,9 +594,9 @@ substPolyL relations poly = do
 substPolyL_ ::
   (Integral n, GaloisField n) =>
   UInt.UIntRelations ->
-  (Bool, Either n (PolyL n), Set RefL, Set RefL) ->
-  (RefL, n) ->
-  (Bool, Either n (PolyL n), Set RefL, Set RefL)
+  (Bool, Either n (PolyL n), Set Limb, Set Limb) ->
+  (Limb, n) ->
+  (Bool, Either n (PolyL n), Set Limb, Set Limb)
 substPolyL_ relations (changed, accPoly, removedRefs, addedRefs) (ref, multiplier) = case EquivClass.lookup ref relations of
   EquivClass.IsConstant constant ->
     let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs

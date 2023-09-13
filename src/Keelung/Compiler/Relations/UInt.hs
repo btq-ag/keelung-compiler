@@ -23,12 +23,12 @@ import Prelude hiding (lookup)
 
 type UIntRelations =
   EquivClass.EquivClass
-    RefL
+    Limb
     Integer -- constants can be represented as integers
-    () -- only allowing RefLs of the same width to be related (as equal) at the moment
+    () -- only allowing Limbs of the same width to be related (as equal) at the moment
 
 new :: UIntRelations
-new = EquivClass.new "UInt (RefL Equivalence)"
+new = EquivClass.new "UInt (Limb Equivalence)"
 
 instance EquivClass.IsRelation () where
   relationToString (var, ()) = var
@@ -38,24 +38,24 @@ instance EquivClass.ExecRelation Integer () where
   execRel () value = value
 
 -- | Assigning a constant value to a limb
-assign :: RefL -> Integer -> UIntRelations -> EquivClass.M (Error n) UIntRelations
+assign :: Limb -> Integer -> UIntRelations -> EquivClass.M (Error n) UIntRelations
 assign var val xs = mapError $ EquivClass.assign var val xs
 
 -- | Relate two limbs (that has the same width)
-relate :: RefL -> RefL -> UIntRelations -> EquivClass.M (Error n) UIntRelations
+relate :: Limb -> Limb -> UIntRelations -> EquivClass.M (Error n) UIntRelations
 relate var1 var2 xs =
-  if lmbWidth (refLLimb var1) /= lmbWidth (refLLimb var2) || refLPowerOffset var1 /= refLPowerOffset var2
+  if lmbWidth var1 /= lmbWidth var2
     then pure xs
     else mapError $ EquivClass.relate var1 () var2 xs
 
 -- | Examine the relation between two limbs
-relationBetween :: RefL -> RefL -> UIntRelations -> Bool
+relationBetween :: Limb -> Limb -> UIntRelations -> Bool
 relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
   Nothing -> False
   Just () -> True
 
 -- | Given a predicate, convert the relations to a mapping of Limbs to either some other Limb or a constant value
-toMap :: (RefL -> Bool) -> UIntRelations -> Map RefL (Either RefL Integer)
+toMap :: (Limb -> Bool) -> UIntRelations -> Map Limb (Either Limb Integer)
 toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
   where
     convert var status = do
