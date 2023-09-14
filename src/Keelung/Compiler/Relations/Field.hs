@@ -11,6 +11,7 @@ module Keelung.Compiler.Relations.Field
     assignL,
     relateB,
     relateL,
+    relateU,
     relateRefs,
     relationBetween,
     toInt,
@@ -82,13 +83,13 @@ updateRelationsL f xs = do
   relations <- f (relationsL xs)
   return $ xs {relationsL = relations}
 
--- updateRelationsU ::
---   (UInt.UIntRelations -> EquivClass.M (Error n) UInt.UIntRelations) ->
---   Relations n ->
---   EquivClass.M (Error n) (Relations n)
--- updateRelationsU f xs = do
---   relations <- f (relationsU xs)
---   return $ xs {relationsU = relations}
+updateRelationsU ::
+  (UInt.UIntRelations -> EquivClass.M (Error n) UInt.UIntRelations) ->
+  Relations n ->
+  EquivClass.M (Error n) (Relations n)
+updateRelationsU f xs = do
+  relations <- f (relationsU xs)
+  return $ xs {relationsU = relations}
 
 --------------------------------------------------------------------------------
 
@@ -112,6 +113,9 @@ relateB refA (polarity, refB) = updateRelationsB (Boolean.relate refA polarity r
 
 relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateL var1 var2 = updateRelationsL $ Limb.relate var1 var2
+
+relateU :: (GaloisField n, Integral n) => RefU -> RefU -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateU var1 var2 = updateRelationsU $ UInt.relate var1 var2
 
 -- var = slope * var2 + intercept
 relateRefs :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)

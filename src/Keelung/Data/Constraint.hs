@@ -51,6 +51,7 @@ data Constraint n
   | CVarEqF RefF RefF -- when x == y
   | CVarEqB RefB RefB -- when x == y
   | CVarEqL Limb Limb -- when x == y
+  | CVarEqU RefU RefU -- when x == y
   | CVarNEqB RefB RefB -- when x = ¬ y
   | CVarBindF Ref n -- when x = val
   | CVarBindB RefB Bool -- when x = val
@@ -76,6 +77,7 @@ instance Functor Constraint where
   fmap _ (CVarEqF x y) = CVarEqF x y
   fmap _ (CVarEqB x y) = CVarEqB x y
   fmap _ (CVarEqL x y) = CVarEqL x y
+  fmap _ (CVarEqU x y) = CVarEqU x y
   fmap _ (CVarNEqB x y) = CVarNEqB x y
   fmap f (CVarBindF x y) = CVarBindF x (f y)
   fmap _ (CVarBindB x y) = CVarBindB x y
@@ -85,17 +87,17 @@ instance Functor Constraint where
   fmap f (CMulL x y (Left z)) = CMulL (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulL x y (Right z)) = CMulL (fmap f x) (fmap f y) (Right (fmap f z))
 
-
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddG xs) = "AF " <> show xs <> " = 0"
   show (CAddL xs) = "AL " <> show xs <> " = 0"
   show (CVarEq x y) = "EQ " <> show x <> " = " <> show y
-  show (CVarEqF x y) = "VF " <> show x <> " = " <> show y
-  show (CVarEqB x y) = "VB " <> show x <> " = " <> show y
-  show (CVarEqL x y) = "VL " <> show x <> " = " <> show y
-  show (CVarNEqB x y) = "VN " <> show x <> " = ¬ " <> show y
-  show (CVarBindF x n) = "BF " <> show x <> " = " <> show n
-  show (CVarBindB x n) = "BB " <> show x <> " = " <> show n
-  show (CVarBindL x n) = "BL " <> show x <> " = " <> show n
+  show (CVarEqF x y) = "EF " <> show x <> " = " <> show y
+  show (CVarEqB x y) = "EB " <> show x <> " = " <> show y
+  show (CVarEqL x y) = "EL " <> show x <> " = " <> show y
+  show (CVarEqU x y) = "EU " <> show x <> " = " <> show y
+  show (CVarNEqB x y) = "NB " <> show x <> " = ¬ " <> show y
+  show (CVarBindF x n) = "VF " <> show x <> " = " <> show n
+  show (CVarBindB x n) = "VB " <> show x <> " = " <> show n
+  show (CVarBindL x n) = "VL " <> show x <> " = " <> show n
   show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulL aV bV cV) = "ML " <> show aV <> " * " <> show bV <> " = " <> show cV

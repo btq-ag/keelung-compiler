@@ -183,6 +183,8 @@ addC = mapM_ addOne
       execRelations $ Relations.relateB x (True, y)
     addOne (CVarEqL x y) = do
       execRelations $ Relations.relateL x y
+    addOne (CVarEqU x y) = do
+      execRelations $ Relations.relateU x y
     addOne (CVarNEqB x y) = do
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
