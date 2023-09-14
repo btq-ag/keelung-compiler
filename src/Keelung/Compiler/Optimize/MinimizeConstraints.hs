@@ -35,67 +35,79 @@ import Keelung.Data.Reference
 --    6. ModInvs
 --    7. EqZeros
 run :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (ConstraintModule n)
-run cm = goThroughEqZeros . goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cm
+run cm = do
+  cm' <- runStateMachine cm ShouldRunAddF
+  return $ (goThroughEqZeros . goThroughModInvs) cm'
 
--- | TODO: reexamine the state transitions
+-- | Next optimization pass to run
+data Action
+  = Accept
+  | ShouldRunAddF
+  | ShouldRunAddL
+  | ShouldRunMulF
+  | ShouldRunMulL
+  | ShouldRunDivMod
+  deriving (Eq, Show)
+
+-- | Decide what to do next based on the result of the previous optimization pass
+transition :: WhatChanged -> Action -> Action
+transition _ Accept = Accept
+transition NothingChanged ShouldRunAddF = ShouldRunAddL
+transition NothingChanged ShouldRunAddL = ShouldRunMulF
+transition NothingChanged ShouldRunMulF = ShouldRunMulL
+transition NothingChanged ShouldRunMulL = ShouldRunDivMod
+transition NothingChanged ShouldRunDivMod = Accept
+transition RelationChanged _ = ShouldRunAddF -- restart from optimizeAddF
+transition AdditiveFieldConstraintChanged _ = ShouldRunAddL -- restart from optimizeAddL
+transition AdditiveLimbConstraintChanged _ = ShouldRunMulF -- restart from optimizeMulF
+transition MultiplicativeConstraintChanged _ = ShouldRunMulL -- restart from optimizeMulL
+transition MultiplicativeLimbConstraintChanged _ = ShouldRunMulL -- restart from optimizeMulL
+
+-- | Run the state machine until it reaches the 'Accept' state
+runStateMachine :: (GaloisField n, Integral n) => ConstraintModule n -> Action -> Either (Compile.Error n) (ConstraintModule n)
+runStateMachine cm action = do
+  -- decide which optimization pass to run and see if it changed anything
+  (changed, cm') <- case action of
+    Accept -> return (NothingChanged, cm)
+    ShouldRunAddF -> optimizeAddF cm
+    ShouldRunAddL -> optimizeAddL cm
+    ShouldRunMulF -> optimizeMulF cm
+    ShouldRunMulL -> optimizeMulL cm
+    ShouldRunDivMod -> optimizeDivMod cm
+  -- derive the next action based on the result of the previous optimization pass
+  let action' = transition changed action
+  -- keep running the state machine until it reaches the 'Accept' state
+  if action' == Accept
+    then return cm'
+    else runStateMachine cm' action'
+------------------------------------------------------------------------------
+
 optimizeAddF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
-optimizeAddF cm = do
-  (changed, cm') <- runOptiM cm goThroughAddF
-  case changed of
-    NothingChanged -> optimizeAddL cm -- proceed to AddL?
-    RelationChanged -> optimizeAddF cm' -- restart from AddF
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
-    MultiplicativeConstraintChanged -> optimizeMulF cm' -- proceed to MulL?
-    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
-
--- | TODO: reexamine the state transitions
-optimizeAddL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
-optimizeAddL cm = do
-  (changed, cm') <- runOptiM cm goThroughAddL
-  case changed of
-    NothingChanged -> optimizeMulF cm -- proceed to MulF?
-    RelationChanged -> optimizeAddF cm' -- restart from AddF
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
-    MultiplicativeConstraintChanged -> optimizeMulL cm' -- proceed to MulL?
-    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
-
-optimizeMulF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
-optimizeMulF cm = do
-  (changed, cm') <- runOptiM cm goThroughMulF
-  case changed of
-    NothingChanged -> optimizeMulL cm' -- proceed to MulL?
-    RelationChanged -> optimizeAddF cm' -- restart from AddF
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
-    MultiplicativeConstraintChanged -> optimizeMulL cm' -- proceed to MulL?
-    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
-
-optimizeMulL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
-optimizeMulL cm = do
-  (changed, cm') <- runOptiM cm goThroughMulL
-  case changed of
-    NothingChanged -> return (changed, cm')
-    RelationChanged -> optimizeAddF cm' -- restart from AddF
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
-    MultiplicativeConstraintChanged -> optimizeMulL cm' -- proceed to MulL?
-    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
-
-goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
-goThroughAddF = do
-  cm <- get
-  runRoundM $ do
+optimizeAddF cm = runOptiM cm $ runRoundM $ do
     result <- foldMaybeM reduceAddF [] (cmAddF cm)
     modify' $ \cm' -> cm' {cmAddF = result}
 
-goThroughAddL :: (GaloisField n, Integral n) => OptiM n WhatChanged
-goThroughAddL = do
-  cm <- get
-  runRoundM $ do
+optimizeAddL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeAddL cm = runOptiM cm $ runRoundM $ do
     result <- foldMaybeM reduceAddL [] (cmAddL cm)
     modify' $ \cm' -> cm' {cmAddL = result}
+
+optimizeMulF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeMulF cm = runOptiM cm $ runRoundM $ do
+    cmMulF' <- foldMaybeM reduceMulF [] (cmMulF cm)
+    modify' $ \cm' -> cm' {cmMulF = cmMulF'}
+
+optimizeMulL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeMulL cm = runOptiM cm $ runRoundM $ do
+    cmMulL' <- foldMaybeM reduceMulL [] (cmMulL cm)
+    modify' $ \cm' -> cm' {cmMulL = cmMulL'}
+
+optimizeDivMod :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeDivMod cm = runOptiM cm $ do
+  let reduceDivMod (a, b, q, r) = return $ Just (a, b, q, r)
+  runRoundM $ do
+    result <- foldMaybeM reduceDivMod [] (cmDivMods cm)
+    modify' $ \cm' -> cm' {cmDivMods = result}
 
 goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughEqZeros cm =
@@ -108,29 +120,10 @@ goThroughEqZeros cm =
       Just (Left _constant, _, _) -> Nothing
       Just (Right reducePolynomial, _, _) -> Just (reducePolynomial, m)
 
-goThroughDivMods :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
-goThroughDivMods cm =
-  let substDivMod (a, b, q, r) = (a, b, q, r)
-   in cm {cmDivMods = map substDivMod (cmDivMods cm)}
-
 goThroughModInvs :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughModInvs cm =
   let substModInv (a, b, c, d) = (a, b, c, d)
    in cm {cmModInvs = map substModInv (cmModInvs cm)}
-
-goThroughMulF :: (GaloisField n, Integral n) => OptiM n WhatChanged
-goThroughMulF = do
-  cm <- get
-  runRoundM $ do
-    cmMulF' <- foldMaybeM reduceMulF [] (cmMulF cm)
-    modify' $ \cm'' -> cm'' {cmMulF = cmMulF'}
-
-goThroughMulL :: (GaloisField n, Integral n) => OptiM n WhatChanged
-goThroughMulL = do
-  cm <- get
-  runRoundM $ do
-    cmMulL' <- foldMaybeM reduceMulL [] (cmMulL cm)
-    modify' $ \cm'' -> cm'' {cmMulL = cmMulL'}
 
 foldMaybeM :: Monad m => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
 foldMaybeM f = foldM $ \acc x -> do
@@ -138,6 +131,8 @@ foldMaybeM f = foldM $ \acc x -> do
   case result of
     Nothing -> return acc
     Just x' -> return (x' : acc)
+
+------------------------------------------------------------------------------
 
 reduceAddF :: (GaloisField n, Integral n) => PolyG n -> RoundM n (Maybe (PolyG n))
 reduceAddF polynomial = do
