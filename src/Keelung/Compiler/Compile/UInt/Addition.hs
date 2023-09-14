@@ -165,9 +165,9 @@ addLimbStack resultLimb (Ordinary constant limbs) = do
   carryLimb <- allocCarryLimb (length carrySigns) (lmbOffset resultLimb) carrySigns
   writeAddWithLimbs (fromInteger constant) $
     -- positive side
-    fmap (toRefL True) limbs
+    fmap (, 1) limbs
       -- negative side
-      Seq.:|> toRefL False resultLimb
+      Seq.:|> (resultLimb, -1)
       Seq.:|> (carryLimb, -(2 ^ lmbWidth resultLimb))
   return $ LimbColumn.singleton carryLimb
 

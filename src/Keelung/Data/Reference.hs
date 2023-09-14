@@ -11,14 +11,11 @@ module Keelung.Data.Reference
     -- | limbs
     Limb (..),
     limbIsPositive,
-    toRefLMultiplied,
-    toRefL,
     refUToLimbs,
   )
 where
 
 import Control.DeepSeq (NFData)
-import Data.Field.Galois (GaloisField)
 import GHC.Generics (Generic)
 import Keelung.Data.VarGroup (toSubscript)
 import Keelung.Syntax
@@ -116,7 +113,7 @@ data Limb = Limb
 
 instance Show Limb where
   show (Limb ref limbWidth i sign') = case (limbWidth, sign') of
-    (0, _) -> "<Empty RefL>"
+    (0, _) -> "<Empty Limb>"
     (1, Left sign) -> (if sign then "" else "-") <> "$" <> show (RefUBit 1 ref i)
     (1, Right signs) -> (if head signs then "" else "-") <> "$" <> show (RefUBit 1 ref i)
     (2, Left sign) -> (if sign then "" else "-") <> "{$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " 2" <> toSuperscript 1 <> "$" <> show (RefUBit 1 ref (i + 1)) <> "}"
@@ -145,19 +142,7 @@ limbIsPositive limb = case lmbSigns limb of
   Left sign -> sign
   Right signs -> and signs
 
--- | Construct a sequence of (Ref, n) pairs from a limb
-toRefLMultiplied :: (GaloisField n, Integral n) => n -> Int -> Bool -> Limb -> (Limb, n)
-toRefLMultiplied 0 _ _ _ = error "[ panic ] toRefL: multiplier must be non-zero"
-toRefLMultiplied multiplyBy powerOffset positive limb =
-  ( limb,
-    (if positive then multiplyBy else -multiplyBy) * 2 ^ powerOffset
-  )
-
--- | Specialized version of `toRefLShifted`, with `1` as the multiplier, and `0` as the power offset
-toRefL :: (GaloisField n, Integral n) => Bool -> Limb -> (Limb, n)
-toRefL = toRefLMultiplied 1 0
-
--- | Convert a RefU to a bunch of RefLs
+-- | Convert a RefU to a bunch of Limbs
 --   (in case that the field width is not large enough to hold the RefU)
 refUToLimbs :: Width -> RefU -> [Limb]
 refUToLimbs fieldWidth refU = step (widthOf refU) 0
