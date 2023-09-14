@@ -5,6 +5,7 @@ module Keelung.Compiler.Relations.UInt
     new,
     assign,
     relate,
+    lookup,
     relationBetween,
     toMap,
     size,
@@ -18,6 +19,8 @@ import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Data.Reference
+import Keelung.Interpreter.Arithmetics (U)
+import Keelung.Interpreter.Arithmetics qualified as U
 import Prelude hiding (lookup)
 
 type UIntRelations =
@@ -39,6 +42,12 @@ relate var1 var2 xs =
   if widthOf var1 /= widthOf var2
     then pure xs
     else mapError $ EquivClass.relate var1 () var2 xs
+
+lookup :: UIntRelations -> RefU -> Either RefU U
+lookup xs var = case EquivClass.lookup var xs of
+  EquivClass.IsConstant constant -> Right (U.UVal (widthOf var) constant)
+  EquivClass.IsRoot _ -> Left var
+  EquivClass.IsChildOf root () -> Left root
 
 -- | Examine the relation between two RefUs
 relationBetween :: RefU -> RefU -> UIntRelations -> Bool

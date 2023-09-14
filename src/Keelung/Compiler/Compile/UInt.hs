@@ -34,10 +34,12 @@ compile out expr = case expr of
   VarU width var -> do
     -- fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
     -- zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUX width var)) (refUToLimbs fieldWidth out)
-    writeEqU width out (RefUX width var)
+    -- writeEqU width out (RefUX width var)
+    writeEqU2 out (RefUX width var)
   VarUO width var -> do
     fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
     zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUO width var)) (refUToLimbs fieldWidth out)
+  -- writeEqU2 out (RefUO width var)
   VarUI width var -> do
     fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
     zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUI width var)) (refUToLimbs fieldWidth out)

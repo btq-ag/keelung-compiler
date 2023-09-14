@@ -133,8 +133,8 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       showMulF = adapt "MulF" (cmMulF cm) showMulF'
       showMulL = adapt "MulL" (cmMulL cm) showMulL'
 
-      showEqs = adapt "Eqs" (cmEqZeros cm) $ \(poly, m) ->
-        "Eqs " <> show poly <> " / " <> show m
+      showEqs = adapt "EqZeros" (cmEqZeros cm) $ \(poly, m) ->
+        "EqZeros " <> show poly <> " / " <> show m
 
       showOccurrencesF =
         if OccurF.null $ cmOccurrenceF cm

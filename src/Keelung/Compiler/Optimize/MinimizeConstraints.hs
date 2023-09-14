@@ -17,11 +17,13 @@ import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Relations.Limb qualified as Limb
+import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Interpreter.Arithmetics (U)
 
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
@@ -80,34 +82,33 @@ runStateMachine cm action = do
   if action' == Accept
     then return cm'
     else runStateMachine cm' action'
+
 ------------------------------------------------------------------------------
 
 optimizeAddF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeAddF cm = runOptiM cm $ runRoundM $ do
-    result <- foldMaybeM reduceAddF [] (cmAddF cm)
-    modify' $ \cm' -> cm' {cmAddF = result}
+  result <- foldMaybeM reduceAddF [] (cmAddF cm)
+  modify' $ \cm' -> cm' {cmAddF = result}
 
 optimizeAddL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeAddL cm = runOptiM cm $ runRoundM $ do
-    result <- foldMaybeM reduceAddL [] (cmAddL cm)
-    modify' $ \cm' -> cm' {cmAddL = result}
+  result <- foldMaybeM reduceAddL [] (cmAddL cm)
+  modify' $ \cm' -> cm' {cmAddL = result}
 
 optimizeMulF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeMulF cm = runOptiM cm $ runRoundM $ do
-    cmMulF' <- foldMaybeM reduceMulF [] (cmMulF cm)
-    modify' $ \cm' -> cm' {cmMulF = cmMulF'}
+  cmMulF' <- foldMaybeM reduceMulF [] (cmMulF cm)
+  modify' $ \cm' -> cm' {cmMulF = cmMulF'}
 
 optimizeMulL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeMulL cm = runOptiM cm $ runRoundM $ do
-    cmMulL' <- foldMaybeM reduceMulL [] (cmMulL cm)
-    modify' $ \cm' -> cm' {cmMulL = cmMulL'}
+  cmMulL' <- foldMaybeM reduceMulL [] (cmMulL cm)
+  modify' $ \cm' -> cm' {cmMulL = cmMulL'}
 
 optimizeDivMod :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
-optimizeDivMod cm = runOptiM cm $ do
-  let reduceDivMod (a, b, q, r) = return $ Just (a, b, q, r)
-  runRoundM $ do
-    result <- foldMaybeM reduceDivMod [] (cmDivMods cm)
-    modify' $ \cm' -> cm' {cmDivMods = result}
+optimizeDivMod cm = runOptiM cm $ runRoundM $ do
+  result <- foldMaybeM reduceDivMod [] (cmDivMods cm)
+  modify' $ \cm' -> cm' {cmDivMods = result}
 
 goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughEqZeros cm =
@@ -358,6 +359,25 @@ reduceMulLCPP a polyB polyC = do
           modify' $ removeOccurrences (PolyL.vars polyB)
           addAddL (PolyL.addConstant (-constant) polyC)
     Right polyBa -> addAddL (PolyL.merge polyC polyBa)
+
+------------------------------------------------------------------------------
+
+type DivMod = (Either RefU U, Either RefU U, Either RefU U, Either RefU U)
+
+reduceDivMod :: (GaloisField n, Integral n) => DivMod -> RoundM n (Maybe DivMod)
+reduceDivMod (a, b, q, r) = do
+  relations <- gets (Relations.exportUIntRelations . cmRelations)
+  return $
+    Just
+      ( a `bind` UInt.lookup relations,
+        b `bind` UInt.lookup relations,
+        q `bind` UInt.lookup relations,
+        r `bind` UInt.lookup relations
+      )
+  where
+    bind :: Either RefU U -> (RefU -> Either RefU U) -> Either RefU U
+    bind (Right val) _ = Right val
+    bind (Left var) f = f var
 
 ------------------------------------------------------------------------------
 
