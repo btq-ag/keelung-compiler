@@ -250,48 +250,48 @@ assertEqU (ValU w a) b = do
   compileExprU out b
   writeValU w out a
 assertEqU (VarU w a) (ValU _ b) = writeValU w (RefUX w a) b
-assertEqU (VarU w a) (VarU _ b) = writeEqU w (RefUX w a) (RefUX w b)
-assertEqU (VarU w a) (VarUO _ b) = writeEqU w (RefUX w a) (RefUO w b)
-assertEqU (VarU w a) (VarUI _ b) = writeEqU w (RefUX w a) (RefUI w b)
-assertEqU (VarU w a) (VarUP _ b) = writeEqU w (RefUX w a) (RefUP w b)
+assertEqU (VarU w a) (VarU _ b) = writeEqU (RefUX w a) (RefUX w b)
+assertEqU (VarU w a) (VarUO _ b) = writeEqU (RefUX w a) (RefUO w b)
+assertEqU (VarU w a) (VarUI _ b) = writeEqU (RefUX w a) (RefUI w b)
+assertEqU (VarU w a) (VarUP _ b) = writeEqU (RefUX w a) (RefUP w b)
 assertEqU (VarU w a) b = do
   out <- freshRefU w
   compileExprU out b
-  writeEqU w (RefUX w a) out
+  writeEqU (RefUX w a) out
 assertEqU (VarUO w a) (ValU _ b) = writeValU w (RefUO w a) b
-assertEqU (VarUO w a) (VarU _ b) = writeEqU w (RefUO w a) (RefUX w b)
-assertEqU (VarUO w a) (VarUO _ b) = writeEqU w (RefUO w a) (RefUO w b)
-assertEqU (VarUO w a) (VarUI _ b) = writeEqU w (RefUO w a) (RefUI w b)
-assertEqU (VarUO w a) (VarUP _ b) = writeEqU w (RefUO w a) (RefUP w b)
+assertEqU (VarUO w a) (VarU _ b) = writeEqU (RefUO w a) (RefUX w b)
+assertEqU (VarUO w a) (VarUO _ b) = writeEqU (RefUO w a) (RefUO w b)
+assertEqU (VarUO w a) (VarUI _ b) = writeEqU (RefUO w a) (RefUI w b)
+assertEqU (VarUO w a) (VarUP _ b) = writeEqU (RefUO w a) (RefUP w b)
 assertEqU (VarUO w a) b = do
   out <- freshRefU w
   compileExprU out b
-  writeEqU w (RefUO w a) out
+  writeEqU (RefUO w a) out
 assertEqU (VarUI w a) (ValU _ b) = writeValU w (RefUI w a) b
-assertEqU (VarUI w a) (VarU _ b) = writeEqU w (RefUI w a) (RefUX w b)
-assertEqU (VarUI w a) (VarUO _ b) = writeEqU w (RefUI w a) (RefUO w b)
-assertEqU (VarUI w a) (VarUI _ b) = writeEqU w (RefUI w a) (RefUI w b)
-assertEqU (VarUI w a) (VarUP _ b) = writeEqU w (RefUI w a) (RefUP w b)
+assertEqU (VarUI w a) (VarU _ b) = writeEqU (RefUI w a) (RefUX w b)
+assertEqU (VarUI w a) (VarUO _ b) = writeEqU (RefUI w a) (RefUO w b)
+assertEqU (VarUI w a) (VarUI _ b) = writeEqU (RefUI w a) (RefUI w b)
+assertEqU (VarUI w a) (VarUP _ b) = writeEqU (RefUI w a) (RefUP w b)
 assertEqU (VarUI w a) b = do
   out <- freshRefU w
   compileExprU out b
-  writeEqU w (RefUI w a) out
+  writeEqU (RefUI w a) out
 assertEqU (VarUP w a) (ValU _ b) = writeValU w (RefUP w a) b
-assertEqU (VarUP w a) (VarU _ b) = writeEqU w (RefUP w a) (RefUX w b)
-assertEqU (VarUP w a) (VarUO _ b) = writeEqU w (RefUP w a) (RefUO w b)
-assertEqU (VarUP w a) (VarUI _ b) = writeEqU w (RefUP w a) (RefUI w b)
-assertEqU (VarUP w a) (VarUP _ b) = writeEqU w (RefUP w a) (RefUP w b)
+assertEqU (VarUP w a) (VarU _ b) = writeEqU (RefUP w a) (RefUX w b)
+assertEqU (VarUP w a) (VarUO _ b) = writeEqU (RefUP w a) (RefUO w b)
+assertEqU (VarUP w a) (VarUI _ b) = writeEqU (RefUP w a) (RefUI w b)
+assertEqU (VarUP w a) (VarUP _ b) = writeEqU (RefUP w a) (RefUP w b)
 assertEqU (VarUP w a) b = do
   out <- freshRefU w
   compileExprU out b
-  writeEqU w (RefUP w a) out
+  writeEqU (RefUP w a) out
 assertEqU a b = do
   let width = widthOf a
   a' <- freshRefU width
   b' <- freshRefU width
   compileExprU a' a
   compileExprU b' b
-  writeEqU width a' b'
+  writeEqU a' b'
 
 --------------------------------------------------------------------------------
 

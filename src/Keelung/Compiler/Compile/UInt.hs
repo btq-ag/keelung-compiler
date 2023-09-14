@@ -10,7 +10,6 @@ module Keelung.Compiler.Compile.UInt
 where
 
 import Control.Monad.Except
-import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
@@ -20,9 +19,7 @@ import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.Multiplication
 import Keelung.Compiler.Compile.Util
-import Keelung.Compiler.ConstraintModule (ConstraintModule (cmField))
 import Keelung.Compiler.Syntax.Internal
-import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.Reference
 import Keelung.Syntax (HasWidth (widthOf))
 
@@ -31,21 +28,10 @@ import Keelung.Syntax (HasWidth (widthOf))
 compile :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compile out expr = case expr of
   ValU width val -> writeValU width out val
-  VarU width var -> do
-    -- fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-    -- zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUX width var)) (refUToLimbs fieldWidth out)
-    -- writeEqU width out (RefUX width var)
-    writeEqU2 out (RefUX width var)
-  VarUO width var -> do
-    fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-    zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUO width var)) (refUToLimbs fieldWidth out)
-  -- writeEqU2 out (RefUO width var)
-  VarUI width var -> do
-    fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-    zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUI width var)) (refUToLimbs fieldWidth out)
-  VarUP width var -> do
-    fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-    zipWithM_ writeEqL (refUToLimbs fieldWidth (RefUP width var)) (refUToLimbs fieldWidth out)
+  VarU width var -> writeEqU out (RefUX width var)
+  VarUO width var -> writeEqU out (RefUO width var)
+  VarUI width var -> writeEqU out (RefUI width var)
+  VarUP width var -> writeEqU out (RefUP width var)
   AddU w xs -> do
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = Either.partitionEithers mixed
@@ -88,7 +74,7 @@ compile out expr = case expr of
     y' <- wireU y
     result <- compileIfU w p' x' y'
     case result of
-      Left var -> writeEqU w out var
+      Left var -> writeEqU out var
       Right val -> writeValU w out val
   RoLU w n x -> do
     result <- wireU x
@@ -105,7 +91,7 @@ compile out expr = case expr of
     x' <- wireU x
     case compare n 0 of
       EQ -> case x' of
-        Left var -> writeEqU w out var
+        Left var -> writeEqU out var
         Right val -> writeValU w out val
       GT -> do
         -- fill lower bits with 0s

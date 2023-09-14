@@ -242,11 +242,8 @@ writeEqB a b = addC [CVarEqB a b]
 writeNEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
 writeNEqB a b = addC [CVarNEqB a b]
 
-writeEqU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
-writeEqU width a b = forM_ [0 .. width - 1] $ \i -> writeEqB (RefUBit width a i) (RefUBit width b i)
-
-writeEqU2 :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
-writeEqU2 a b = addC [CVarEqU a b]
+writeEqU :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
+writeEqU a b = addC [CVarEqU a b]
 
 writeEqL :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
 writeEqL a b = addC [CVarEqL a b]
