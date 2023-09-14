@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Keelung.Compiler.Compile.UInt.Addition (Dimensions (..), addLimbColumn, compileAddU, compileSubU, allocLimb) where
 
 import Control.Monad.Except

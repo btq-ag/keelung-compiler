@@ -27,8 +27,8 @@ import Keelung.Compiler.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as Relations
-import Keelung.Compiler.Relations.UInt (UIntRelations)
-import Keelung.Compiler.Relations.UInt qualified as UIntRelations
+import Keelung.Compiler.Relations.Limb (LimbRelations)
+import Keelung.Compiler.Relations.Limb qualified as LimbRelations
 import Keelung.Data.Constraint
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
@@ -135,18 +135,18 @@ linkConstraintModule cm =
           result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
        in Seq.fromList (map (linkConstraint occurrences) result)
 
-    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
-    extractUIntRelations relations =
+    extractLimbRelations :: (GaloisField n, Integral n) => LimbRelations -> Seq (Linked.Constraint n)
+    extractLimbRelations relations =
       let convert :: (GaloisField n, Integral n) => (Limb, Either Limb Integer) -> Constraint n
           convert (var, Right val) = CVarBindL var val
           convert (var, Left root) = CVarEqL var root
 
-          result = map convert $ Map.toList $ UIntRelations.toMap limbShouldBeKept relations
+          result = map convert $ Map.toList $ LimbRelations.toMap limbShouldBeKept relations
        in Seq.fromList (map (linkConstraint occurrences) result)
 
     varEqFs = extractFieldRelations (cmRelations cm)
     varEqBs = extractBooleanRelations (Relations.exportBooleanRelations (cmRelations cm))
-    varEqLs = extractUIntRelations (Relations.exportUIntRelations (cmRelations cm))
+    varEqLs = extractLimbRelations (Relations.exportLimbRelations (cmRelations cm))
 
     addFs = Seq.fromList $ map (linkConstraint occurrences . CAddG) $ cmAddF cm
     addLs = Seq.fromList $ map (linkConstraint occurrences . CAddL) $ cmAddL cm

@@ -16,7 +16,7 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as Relations
-import Keelung.Compiler.Relations.UInt qualified as UInt
+import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL
@@ -496,6 +496,18 @@ relateL var1 var2 = do
       modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
       return True
 
+-- -- | Relates two RefUs. Returns 'True' if a new relation has been established.
+-- relateU :: (GaloisField n, Integral n) => Limb -> Limb -> RoundM n Bool
+-- relateU var1 var2 = do
+--   cm <- get
+--   result <- lift $ lift $ EquivClass.runM $ Relations.relateL var1 var2 (cmRelations cm)
+--   case result of
+--     Nothing -> return False
+--     Just relations -> do
+--       markChanged RelationChanged
+--       modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
+--       return True
+
 --------------------------------------------------------------------------------
 
 -- | Add learned additive constraints to the pool
@@ -586,14 +598,14 @@ substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = cas
 substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Set Limb, Set Limb)
 substPolyL relations poly = do
   let (c, xs) = PolyL.view poly
-  case foldl (substPolyL_ (Relations.exportUIntRelations relations)) (False, Left c, mempty, mempty) xs of
+  case foldl (substPolyL_ (Relations.exportLimbRelations relations)) (False, Left c, mempty, mempty) xs of
     (False, _, _, _) -> Nothing -- nothing changed
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyL.vars' poly)
 
 substPolyL_ ::
   (Integral n, GaloisField n) =>
-  UInt.UIntRelations ->
+  Limb.LimbRelations ->
   (Bool, Either n (PolyL n), Set Limb, Set Limb) ->
   (Limb, n) ->
   (Bool, Either n (PolyL n), Set Limb, Set Limb)

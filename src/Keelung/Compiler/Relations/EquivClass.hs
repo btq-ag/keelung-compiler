@@ -44,10 +44,17 @@ class Monoid rel => IsRelation rel where
   -- | Computes the inverse of a relation
   invertRel :: rel -> Maybe rel
 
+instance IsRelation () where
+  relationToString (var, ()) = var
+  invertRel () = Just ()
+
 class ExecRelation n rel where
   -- | Given `parent = rel child`, executes `rel` on `child`
   --   such that if `child = n`, then `parent = execRel rel n`
   execRel :: rel -> n -> n
+
+instance ExecRelation Integer () where
+  execRel () value = value
 
 --------------------------------------------------------------------------------
 

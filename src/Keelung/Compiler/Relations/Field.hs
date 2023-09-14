@@ -18,6 +18,7 @@ module Keelung.Compiler.Relations.Field
     lookup,
     Lookup (..),
     exportBooleanRelations,
+    exportLimbRelations,
     exportUIntRelations,
   )
 where
@@ -32,6 +33,7 @@ import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.Boolean qualified as Boolean
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Reference
 import Prelude hiding (lookup)
@@ -41,14 +43,16 @@ type FieldRelations n = EquivClass.EquivClass Ref n (LinRel n)
 data Relations n = Relations
   { relationsF :: FieldRelations n,
     relationsB :: Boolean.BooleanRelations,
+    relationsL :: Limb.LimbRelations,
     relationsU :: UInt.UIntRelations
   }
   deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (Relations n) where
-  show (Relations f b u) =
+  show (Relations f b l u) =
     (if EquivClass.size f == 0 then "" else show f)
       <> (if EquivClass.size b == 0 then "" else show b)
+      <> (if EquivClass.size l == 0 then "" else show l)
       <> (if EquivClass.size u == 0 then "" else show u)
 
 mapError :: EquivClass.M (n, n) a -> EquivClass.M (Error n) a
@@ -70,18 +74,26 @@ updateRelationsB f xs = do
   relations <- f (relationsB xs)
   return $ xs {relationsB = relations}
 
-updateRelationsU ::
-  (UInt.UIntRelations -> EquivClass.M (Error n) UInt.UIntRelations) ->
+updateRelationsL ::
+  (Limb.LimbRelations -> EquivClass.M (Error n) Limb.LimbRelations) ->
   Relations n ->
   EquivClass.M (Error n) (Relations n)
-updateRelationsU f xs = do
-  relations <- f (relationsU xs)
-  return $ xs {relationsU = relations}
+updateRelationsL f xs = do
+  relations <- f (relationsL xs)
+  return $ xs {relationsL = relations}
+
+-- updateRelationsU ::
+--   (UInt.UIntRelations -> EquivClass.M (Error n) UInt.UIntRelations) ->
+--   Relations n ->
+--   EquivClass.M (Error n) (Relations n)
+-- updateRelationsU f xs = do
+--   relations <- f (relationsU xs)
+--   return $ xs {relationsU = relations}
 
 --------------------------------------------------------------------------------
 
 new :: Relations n
-new = Relations (EquivClass.new "Field") Boolean.new UInt.new
+new = Relations (EquivClass.new "Field") Boolean.new Limb.new UInt.new
 
 assignF :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignF var val = updateRelationsF $ EquivClass.assign var val
@@ -90,7 +102,7 @@ assignB :: RefB -> Bool -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignB ref val = updateRelationsB $ Boolean.assign ref val
 
 assignL :: (GaloisField n, Integral n) => Limb -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
-assignL var val = updateRelationsU $ UInt.assign var val
+assignL var val = updateRelationsL $ Limb.assign var val
 
 relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateF var1 slope var2 intercept = updateRelationsF $ EquivClass.relate var1 (LinRel slope intercept) var2
@@ -99,7 +111,7 @@ relateB :: GaloisField n => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M 
 relateB refA (polarity, refB) = updateRelationsB (Boolean.relate refA polarity refB)
 
 relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateL var1 var2 = updateRelationsU $ UInt.relate var1 var2
+relateL var1 var2 = updateRelationsL $ Limb.relate var1 var2
 
 -- var = slope * var2 + intercept
 relateRefs :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
@@ -139,7 +151,7 @@ toInt shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap (relation
         else Nothing
 
 size :: Relations n -> Int
-size (Relations f b u) = EquivClass.size f + Boolean.size b + UInt.size u
+size (Relations f b l u) = EquivClass.size f + Boolean.size b + Limb.size l + UInt.size u
 
 --------------------------------------------------------------------------------
 
@@ -272,6 +284,9 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
 
 exportBooleanRelations :: Relations n -> Boolean.BooleanRelations
 exportBooleanRelations = relationsB
+
+exportLimbRelations :: Relations n -> Limb.LimbRelations
+exportLimbRelations = relationsL
 
 exportUIntRelations :: Relations n -> UInt.UIntRelations
 exportUIntRelations = relationsU

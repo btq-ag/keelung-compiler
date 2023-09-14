@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -52,6 +52,7 @@ library
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.Limb
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
@@ -128,6 +129,7 @@ executable keelungc
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.Limb
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
@@ -235,6 +237,7 @@ test-suite keelung-test
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.Limb
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
