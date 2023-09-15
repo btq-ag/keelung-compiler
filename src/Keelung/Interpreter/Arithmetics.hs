@@ -3,6 +3,7 @@
 
 module Keelung.Interpreter.Arithmetics
   ( U (..),
+    chunksU,
     integerAddU,
     integerSubU,
     integerMulU,
@@ -108,6 +109,7 @@ rotateU a n =
         )
 
 -- | This function shifts left if n is positive and shifts right if n is negative
+--   Numbers gets smaller as you shift right
 shiftU :: U -> Int -> U
 shiftU a n =
   UVal (uintWidth a) $
@@ -124,6 +126,39 @@ clearBitU :: U -> Int -> U
 clearBitU x i =
   let i' = i `mod` uintWidth x
    in UVal (uintWidth x) (Data.Bits.clearBit (uintValue x) i')
+
+-- | Split an integer into chunks of a specified size, the last chunk may be smaller.
+chunksU :: Int -> U -> [U]
+chunksU chunkSize (UVal width num)
+  | width <= 0 = error "[ panic ] U.chunks: Width must be a positive integer"
+  | width < chunkSize = [UVal width num]
+  | otherwise = UVal chunkSize (num .&. mask) : chunksU chunkSize (UVal (width - chunkSize) (num `shiftR` width))
+  where
+    mask = (2 ^ chunkSize) - 1
+
+-- splitU :: Int -> U -> [U]
+-- splitU size (UVal w x) = map (UVal size) (splitInteger x size w)
+--   where
+--     -- Split an integer into chunks of a specified size and return both the split chunks
+--     -- and the last partial chunk (if it exists).
+--     splitInteger :: Integer -> Int -> Int -> ([Integer], Maybe (Integer, Int))
+--     splitInteger n chunkSize totalBits
+--         | totalBits <= 0 || chunkSize <= 0 = ([], Nothing)
+--         | otherwise =
+--             let (chunks, lastChunk) = split n chunkSize totalBits []
+--             in case lastChunk of
+--                 0 -> (chunks, Nothing)  -- The last chunk is full-sized.
+--                 _ -> (chunks, Just (last (n `Data.Bits.shiftR` (totalBits - lastChunk)), lastChunk))
+
+--     -- Split the integer into chunks and calculate the size of the last chunk.
+--     split :: Integer -> Int -> Int -> [Integer] -> ([Integer], Int)
+--     split n chunkSize totalBits chunks
+--         | totalBits <= 0 = (reverse chunks, 0)
+--         | otherwise =
+--             let mask = (1 `shiftL` chunkSize) - 1
+--                 chunk = n Data.Bits..&. mask
+--                 (remainingChunks, lastChunkSize) = split (n `Data.Bits.shiftR` chunkSize) chunkSize (totalBits - chunkSize) (chunk : chunks)
+--             in (remainingChunks, chunkSize + lastChunkSize)
 
 --------------------------------------------------------------------------------
 

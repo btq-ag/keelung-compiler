@@ -9,6 +9,7 @@ module Keelung.Compiler.Relations.Field
     assignF,
     assignB,
     assignL,
+    assignU,
     relateB,
     relateL,
     relateU,
@@ -104,6 +105,9 @@ assignB ref val = updateRelationsB $ Boolean.assign ref val
 
 assignL :: (GaloisField n, Integral n) => Limb -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignL var val = updateRelationsL $ Limb.assign var val
+
+assignU :: (GaloisField n, Integral n) => RefU -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
+assignU var val = updateRelationsU $ UInt.assign var val
 
 relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateF var1 slope var2 intercept = updateRelationsF $ EquivClass.relate var1 (LinRel slope intercept) var2

@@ -171,6 +171,8 @@ addC = mapM_ addOne
       execRelations $ Relations.assignB x c
     addOne (CVarBindL x c) = do
       execRelations $ Relations.assignL x c
+    addOne (CVarBindU x c) = do
+      execRelations $ Relations.assignU x c
     addOne (CVarEq x y) = do
       countBitTestAsOccurU x
       countBitTestAsOccurU y

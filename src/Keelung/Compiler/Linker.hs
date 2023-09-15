@@ -220,6 +220,12 @@ linkConstraint occurrences _ (CVarBindL x n) = do
   case Poly.buildEither (fromInteger (-n)) (toList (reindexLimb occurrences x 1)) of
     Left _ -> error "CVarBindL: impossible"
     Right xs -> [Linked.CAdd xs]
+linkConstraint occurrences fieldWidth (CVarBindU x n) =
+  -- split the Integer into smaller chunks of size `fieldWidth`
+  let number = U.UVal (widthOf x) n
+      chunks = map U.uintValue (U.chunksU fieldWidth number)
+      cVarBindLs = zipWith CVarBindL (refUToLimbs fieldWidth x) chunks
+   in cVarBindLs >>= linkConstraint occurrences fieldWidth
 linkConstraint occurrences _ (CMulF as bs cs) =
   [ Linked.CMul
       (linkPolyGUnsafe occurrences as)
