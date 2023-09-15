@@ -40,9 +40,9 @@ import Keelung.Syntax (Width)
 --
 -- the maximum number of operands when adding these 2w-bit limbs is 2L (with carry from the previous limb)
 compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileMulU width out (Right a) (Right b) = do
+compileMulU _width out (Right a) (Right b) = do
   let val = a * b
-  writeValU width out val
+  writeValU out val
 compileMulU width out (Right a) (Left b) = compileMul width out b (Right a)
 compileMulU width out (Left a) (Right b) = compileMul width out a (Right b)
 compileMulU width out (Left a) (Left b) = compileMul width out a (Left b)

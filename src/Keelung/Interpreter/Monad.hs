@@ -24,9 +24,10 @@ import Keelung.Data.Struct (Struct (..))
 import Keelung.Data.VarGroup
 import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Heap
+import Keelung.Interpreter.Arithmetics (U)
+import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import Keelung.Interpreter.Arithmetics (U (..))
 
 --------------------------------------------------------------------------------
 
@@ -60,12 +61,12 @@ toPartialBindings inputs =
               Struct
                 (getCount counters (PublicInput, ReadField), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
                 (getCount counters (PublicInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (fmap toBool (Inputs.seqBool (Inputs.inputPublic inputs)))))
-                (IntMap.mapWithKey (\w bindings -> (getCount counters (PublicInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (map (UVal w) (toList bindings)))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
+                (IntMap.mapWithKey (\w bindings -> (getCount counters (PublicInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (map (U.new w) (toList bindings)))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
             ofP =
               Struct
                 (getCount counters (PrivateInput, ReadField), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
                 (getCount counters (PrivateInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (fmap toBool (Inputs.seqBool (Inputs.inputPrivate inputs)))))
-                (IntMap.mapWithKey (\w bindings -> (getCount counters (PrivateInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (map (UVal w) (toList bindings)))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
+                (IntMap.mapWithKey (\w bindings -> (getCount counters (PrivateInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (map (U.new w) (toList bindings)))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
             ofX =
               Struct
                 (getCount counters (Intermediate, ReadField), mempty)
@@ -149,7 +150,6 @@ class InterpretB a n where
 class InterpretU a n where
   interpretU :: a -> M n [U]
 
-
 --------------------------------------------------------------------------------
 
 -- | For collecting free variables
@@ -198,7 +198,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "assertion failed: " <> expr
   show DivModDividendIsZeroError =
     "dividend is zero"
-  show DivModDivisorIsZeroError = 
+  show DivModDivisorIsZeroError =
     "divisor is zero"
   show DivModQuotientIsZeroError =
     "quotient is zero"

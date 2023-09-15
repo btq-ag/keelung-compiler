@@ -152,10 +152,9 @@ linkConstraintModule cm =
 
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
     extractUIntRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefU, Either RefU Integer) -> Constraint n
-          convert (_, Right _) = error "[ panic ] CVarBindU is not implemented"
+      let convert :: (GaloisField n, Integral n) => (RefU, Either RefU U) -> Constraint n
+          convert (var, Right val) = CVarBindU var (U.uintValue val)
           convert (var, Left root) = CVarEqU var root
-
           result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
        in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
 
@@ -222,7 +221,7 @@ linkConstraint occurrences _ (CVarBindL x n) = do
     Right xs -> [Linked.CAdd xs]
 linkConstraint occurrences fieldWidth (CVarBindU x n) =
   -- split the Integer into smaller chunks of size `fieldWidth`
-  let number = U.UVal (widthOf x) n
+  let number = U.new (widthOf x) n
       chunks = map U.uintValue (U.chunksU fieldWidth number)
       cVarBindLs = zipWith CVarBindL (refUToLimbs fieldWidth x) chunks
    in cVarBindLs >>= linkConstraint occurrences fieldWidth

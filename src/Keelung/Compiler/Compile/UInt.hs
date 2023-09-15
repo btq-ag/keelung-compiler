@@ -27,7 +27,7 @@ import Keelung.Syntax (HasWidth (widthOf))
 
 compile :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compile out expr = case expr of
-  ValU width val -> writeValU width out val
+  ValU _ val -> writeValU out val
   VarU width var -> writeEqU out (RefUX width var)
   VarUO width var -> writeEqU out (RefUO width var)
   VarUI width var -> writeEqU out (RefUI width var)
@@ -75,7 +75,7 @@ compile out expr = case expr of
     result <- compileIfU w p' x' y'
     case result of
       Left var -> writeEqU out var
-      Right val -> writeValU w out val
+      Right val -> writeValU out val
   RoLU w n x -> do
     result <- wireU x
     case result of
@@ -92,7 +92,7 @@ compile out expr = case expr of
     case compare n 0 of
       EQ -> case x' of
         Left var -> writeEqU out var
-        Right val -> writeValU w out val
+        Right val -> writeValU out val
       GT -> do
         -- fill lower bits with 0s
         forM_ [0 .. n - 1] $ \i -> do

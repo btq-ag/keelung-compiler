@@ -45,7 +45,7 @@ relate var1 var2 xs =
 
 lookup :: UIntRelations -> RefU -> Either RefU U
 lookup xs var = case EquivClass.lookup var xs of
-  EquivClass.IsConstant constant -> Right (U.UVal (widthOf var) constant)
+  EquivClass.IsConstant constant -> Right (U.new (widthOf var) constant)
   EquivClass.IsRoot _ -> Left var
   EquivClass.IsChildOf root () -> Left root
 
@@ -56,13 +56,13 @@ relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
   Just () -> True
 
 -- | Given a predicate, convert the relations to a mapping of RefUs to either some other RefU or a constant value
-toMap :: (RefU -> Bool) -> UIntRelations -> Map RefU (Either RefU Integer)
+toMap :: (RefU -> Bool) -> UIntRelations -> Map RefU (Either RefU U)
 toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
   where
     convert var status = do
       if shouldBeKept var
         then case status of
-          EquivClass.IsConstant val -> Just (Right val)
+          EquivClass.IsConstant val -> Just (Right (U.new (widthOf var) val))
           EquivClass.IsRoot _ -> Nothing
           EquivClass.IsChildOf parent () ->
             if shouldBeKept parent

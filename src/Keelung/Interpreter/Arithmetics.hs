@@ -2,7 +2,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Interpreter.Arithmetics
-  ( U (..),
+  ( U (uintWidth, uintValue),
+    new,
     chunksU,
     integerAddU,
     integerSubU,
@@ -47,6 +48,11 @@ instance Enum U where
 -- instance Integral U where
 --   toInteger = uintValue
 --   quotRem a b = (UVal (uintWidth a) (uintValue a `quot` uintValue b), UVal (uintWidth a) (uintValue a `rem` uintValue b))
+
+--------------------------------------------------------------------------------
+
+new :: Width -> Integer -> U
+new width value = UVal width (value `mod` (2 ^ width))
 
 --------------------------------------------------------------------------------
 
@@ -130,9 +136,10 @@ clearBitU x i =
 -- | Split an integer into chunks of a specified size, the last chunk may be smaller.
 chunksU :: Int -> U -> [U]
 chunksU chunkSize (UVal width num)
-  | width <= 0 = error "[ panic ] U.chunks: Width must be a positive integer"
+  | width < 0 = error "[ panic ] U.chunks: Width must be non-negative"
+  | width == 0 = []
   | width < chunkSize = [UVal width num]
-  | otherwise = UVal chunkSize (num .&. mask) : chunksU chunkSize (UVal (width - chunkSize) (num `shiftR` width))
+  | otherwise = UVal chunkSize (num .&. mask) : chunksU chunkSize (UVal (width - chunkSize) (num `shiftR` chunkSize))
   where
     mask = (2 ^ chunkSize) - 1
 

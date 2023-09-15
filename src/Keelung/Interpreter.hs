@@ -17,6 +17,7 @@ import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Data.VarGroup
 import Keelung.Interpreter.Arithmetics
+import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Interpreter.Monad
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Encode.Syntax
@@ -77,11 +78,11 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
       -- now that we don't know the dividend, we can only solve the relation if we know the divisor, quotient, and remainder
       -- case (divisor, quotient, remainder) of
       --   (Right divisorVal, Right quotientVal, Right remainderVal) -> do
-      --     let dividendVal = UVal width (uintValue divisorVal * uintValue quotientVal + uintValue remainderVal)
+      --     let dividendVal = U.new width (uintValue divisorVal * uintValue quotientVal + uintValue remainderVal)
       --     addU width dividendVar [dividendVal]
       --   _ -> do
-          let unsolvedVars = dividendVar : Either.lefts [divisor, quotient, remainder]
-          throwError $ DivModStuckError unsolvedVars
+      let unsolvedVars = dividendVar : Either.lefts [divisor, quotient, remainder]
+      throwError $ DivModStuckError unsolvedVars
     Right dividendVal -> do
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisor, quotient, remainder) of
@@ -295,7 +296,7 @@ instance (GaloisField n, Integral n) => Interpret Field n where
 
 instance (GaloisField n, Integral n) => InterpretU UInt n where
   interpretU expr = case expr of
-    ValU w n -> return [UVal w n]
+    ValU w n -> return [U.new w n]
     VarU w var -> pure <$> lookupU w var
     VarUI w var -> pure <$> lookupUI w var
     VarUP w var -> pure <$> lookupUP w var
@@ -307,7 +308,7 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
       case x' of
         [x''] -> case modInv x'' p of
           Just v -> do
-            return [UVal w v]
+            return [U.new w v]
           _ -> throwError $ ModInvError x'' p
         _ -> throwError $ ResultSizeError 1 (length x')
     AndU _ x y -> zipWith (.&.) <$> interpretU x <*> interpretU y
@@ -325,8 +326,8 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
     BtoU w x -> do
       result <- interpretB x
       case result of
-        [True] -> return [UVal w 1]
-        _ -> return [UVal w 0]
+        [True] -> return [U.new w 1]
+        _ -> return [U.new w 0]
 
 -- instance (GaloisField n, Integral n) => Interpret Expr n where
 --   interpret expr = case expr of

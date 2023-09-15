@@ -23,7 +23,7 @@ import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Interpreter.Arithmetics (U (UVal))
+import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Solver.BinRep
 import Keelung.Solver.Monad
@@ -123,8 +123,8 @@ lookupBitsEither (width, Left var) = do
     Nothing -> return Nothing
     Just bitVals -> do
       -- all bit variables are assigned values!
-      return $ Just $ UVal width $ sum [toInteger bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
-lookupBitsEither (width, Right val) = return (Just (UVal width val))
+      return $ Just $ U.new width $ sum [toInteger bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
+lookupBitsEither (width, Right val) = return (Just (U.new width val))
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
@@ -401,9 +401,9 @@ shrinkModInv (aVar, outVar, nVar, p) = do
         Just result -> do
           let (width, _) = aVar
           -- aVal * result = n * p + 1
-          let nVal = (aVal `U.integerMulU` UVal width result `U.integerSubU` UVal width 1) `U.integerDivU` UVal width p
+          let nVal = (aVal `U.integerMulU` U.new width result `U.integerSubU` U.new width 1) `U.integerDivU` U.new width p
           bindBitsEither "ModInv n" nVar nVal
-          bindBitsEither "ModInv" outVar (UVal width result)
+          bindBitsEither "ModInv" outVar (U.new width result)
           return Eliminated
         Nothing -> throwError $ ModInvError aVar p
     Nothing -> return $ Stuck (aVar, outVar, nVar, p)

@@ -25,7 +25,7 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
-import Keelung.Interpreter.Arithmetics (U (UVal))
+import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
@@ -226,8 +226,8 @@ writeValF a x = addC [CVarBindF (F a) x]
 writeValB :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
 writeValB a x = addC [CVarBindB a x]
 
-writeValU :: (GaloisField n, Integral n) => Width -> RefU -> Integer -> M n ()
-writeValU width a x = forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width a i) (Data.Bits.testBit x i)
+writeValU :: (GaloisField n, Integral n) => RefU -> Integer -> M n ()
+writeValU a x = addC [CVarBindU a x]
 
 writeValL :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
 writeValL a x = addC [CVarBindL a x]
@@ -265,10 +265,10 @@ addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
 addDivModHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> M n ()
-addDivModHint w x y q r = modify' $ \cs -> cs {cmDivMods = (right (UVal w) x, right (UVal w) y, right (UVal w) q, right (UVal w) r) : cmDivMods cs}
+addDivModHint w x y q r = modify' $ \cs -> cs {cmDivMods = (right (U.new w) x, right (U.new w) y, right (U.new w) q, right (U.new w) r) : cmDivMods cs}
 
 addModInvHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Integer -> M n ()
-addModInvHint w a output n p = modify' $ \cs -> cs {cmModInvs = (right (UVal w) a, right (UVal w) output, right (UVal w) n, UVal w p) : cmModInvs cs}
+addModInvHint w a output n p = modify' $ \cs -> cs {cmModInvs = (right (U.new w) a, right (U.new w) output, right (U.new w) n, U.new w p) : cmModInvs cs}
 
 --------------------------------------------------------------------------------
 
