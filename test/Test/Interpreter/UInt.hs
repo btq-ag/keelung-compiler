@@ -18,6 +18,7 @@ import Test.Interpreter.UInt.DivMod qualified as DivMod
 import Test.Interpreter.UInt.Multiplication qualified as Multiplication
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
+import qualified Test.Interpreter.UInt.CLMul as CLMul
 
 run :: IO ()
 run = hspec tests
@@ -36,6 +37,7 @@ tests = do
       Addition.tests
 
       Multiplication.tests
+      CLMul.tests
 
       DivMod.tests
       Comparison.tests

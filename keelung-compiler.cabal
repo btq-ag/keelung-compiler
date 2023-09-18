@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -35,6 +35,7 @@ library
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Multiplication
       Keelung.Compiler.Compile.Util
@@ -112,6 +113,7 @@ executable keelungc
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Multiplication
       Keelung.Compiler.Compile.Util
@@ -194,6 +196,7 @@ test-suite keelung-test
       Test.Interpreter.UInt
       Test.Interpreter.UInt.Addition
       Test.Interpreter.UInt.Bitwise
+      Test.Interpreter.UInt.CLMul
       Test.Interpreter.UInt.Comparison
       Test.Interpreter.UInt.DivMod
       Test.Interpreter.UInt.ModInv
@@ -220,6 +223,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Multiplication
       Keelung.Compiler.Compile.Util

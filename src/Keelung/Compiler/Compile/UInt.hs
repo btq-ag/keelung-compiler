@@ -18,6 +18,7 @@ import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.Multiplication
+import Keelung.Compiler.Compile.UInt.CLMul
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference
@@ -43,7 +44,7 @@ compile out expr = case expr of
   CLMulU w x y -> do
     x' <- wireU x
     y' <- wireU y
-    compileMulU w out x' y'
+    compileCLMulU w out x' y'
   MMIU w a p -> do
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
     a' <- wireU a
