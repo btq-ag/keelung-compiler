@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.Boolean (compile) where
+module Keelung.Compiler.Compile.Boolean (compile, andBs, xorBs) where
 
 import Control.Monad.State
 import Data.Bits qualified
@@ -222,8 +222,6 @@ orBs xs =
           let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece))
           mapM (eqZero False . seqToLC) pieces >>= orBs
 
---  polynomal
-
 xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 xorB (Right True) (Right True) = return $ Right False
 xorB (Right True) (Right False) = return $ Right True
@@ -243,6 +241,10 @@ xorB (Left x) (Left y) = do
     (1, [(B y, 1)])
     (1, [(B x, -3), (B out, 1)])
   return $ Left out
+
+-- | Naive O(n) way of computing XOR of a list of Boolean values. TODO: optimize this to O(1)
+xorBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
+xorBs = foldM xorB (Right False)
 
 eqB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 eqB (Right x) (Right y) = return $ Right $ x == y
