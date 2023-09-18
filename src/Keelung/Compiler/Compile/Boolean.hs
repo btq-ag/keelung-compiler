@@ -30,7 +30,7 @@ compile compileU expr = case expr of
   XorB x y -> do
     x' <- compileExprB x
     y' <- compileExprB y
-    xorB x' y'
+    xorBs [x', y']
   NotB x -> do
     x' <- compileExprB x
     case x' of
@@ -222,29 +222,86 @@ orBs xs =
           let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece))
           mapM (eqZero False . seqToLC) pieces >>= orBs
 
-xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
-xorB (Right True) (Right True) = return $ Right False
-xorB (Right True) (Right False) = return $ Right True
-xorB (Right False) (Right True) = return $ Right True
-xorB (Right False) (Right False) = return $ Right False
-xorB (Right True) (Left y) = do
-  out <- freshRefB
-  writeNEqB out y
-  return $ Left out
-xorB (Right False) (Left y) = return $ Left y
-xorB (Left x) (Right y) = xorB (Right y) (Left x)
-xorB (Left x) (Left y) = do
-  -- (1 - 2x) * (y + 1) = (1 + out - 3x)
-  out <- freshRefB
-  writeMul
-    (1, [(B x, -2)])
-    (1, [(B y, 1)])
-    (1, [(B x, -3), (B out, 1)])
-  return $ Left out
+-- xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
+-- xorB (Right True) (Right True) = return $ Right False
+-- xorB (Right True) (Right False) = return $ Right True
+-- xorB (Right False) (Right True) = return $ Right True
+-- xorB (Right False) (Right False) = return $ Right False
+-- xorB (Right True) (Left y) = do
+--   out <- freshRefB
+--   writeNEqB out y
+--   return $ Left out
+-- xorB (Right False) (Left y) = return $ Left y
+-- xorB (Left x) (Right y) = xorB (Right y) (Left x)
+-- xorB (Left x) (Left y) = do
+--   -- (1 - 2x) * (y + 1) = (1 + out - 3x)
+--   out <- freshRefB
+--   writeMul
+--     (1, [(B x, -2)])
+--     (1, [(B y, 1)])
+--     (1, [(B x, -3), (B out, 1)])
+--   return $ Left out
 
 -- | Naive O(n) way of computing XOR of a list of Boolean values. TODO: optimize this to O(1)
 xorBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
-xorBs = foldM xorB (Right False)
+-- xorBs [] = return (Right False)
+-- xorBs [x] = return x
+-- xorBs [x, y] = xorB x y
+-- xorBs xs = xorB x y
+xorBs xs =
+  let (vars, constants) = Either.partitionEithers xs
+      constantVal = odd (length (filter id constants)) -- if number of True is odd
+   in if constantVal
+        then do
+          -- flip the result
+          result <- go vars
+          case result of
+            Right False -> return $ Right True
+            Right True -> return $ Right False
+            Left var -> do
+              out <- freshRefB
+              writeNEqB var out
+              return $ Left out
+        else go vars
+  where
+    xorB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
+    xorB x y = do
+      -- (1 - 2x) * (y + 1) = (1 + out - 3x)
+      out <- freshRefB
+      writeMul
+        (1, [(B x, -2)])
+        (1, [(B y, 1)])
+        (1, [(B x, -3), (B out, 1)])
+      return out
+
+    -- rewrite as even/odd relationship instead:
+    --      if the sum of all operands is even then 0 else 1
+    go :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
+    go [] = return $ Right False
+    go [var] = return $ Left var
+    go [var1, var2] = Left <$> xorB var1 var2
+    go (var : vars) = do
+      -- split operands into chunks in case that the order of field is too small
+      -- each chunks has at most (order - 1) operands
+      order <- gets (fieldOrder . cmField)
+      if order == 2
+        then do
+          -- the degenrate case, recursion won't terminate, all field elements are also Boolean
+          result <- go vars
+          case result of
+            Right False -> return $ Right False
+            Right True -> return $ Left var
+            Left resultVar -> Left <$> xorB var resultVar
+        else do
+          let chunks = List.chunksOf (fromInteger order - 1) (var : vars)
+          mapM compileChunk chunks >>= xorBs
+
+    -- sum of a chunk = 2q + r
+    compileChunk :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
+    compileChunk [] = return $ Right False
+    compileChunk [var] = return $ Left var
+    compileChunk [var1, var2] = Left <$> xorB var1 var2
+    compileChunk vars = isOdd (mconcat (fmap (\x -> 1 @ B x) vars))
 
 eqB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 eqB (Right x) (Right y) = return $ Right $ x == y

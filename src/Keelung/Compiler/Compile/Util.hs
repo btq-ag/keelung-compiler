@@ -309,6 +309,20 @@ eqZero isEq (Polynomial polynomial) = do
   addEqZeroHintWithPoly (Right polynomial) m
   return (Left out)
 
+-- | See if a LC is odd.
+--    introduce a new Field variable q
+--    introduce a new Boolean variable r
+--    constraint:
+--      polynomial = q * 2 + r
+--    return r as the result
+isOdd :: (GaloisField n, Integral n) => LC n -> M n (Either RefB Bool)
+isOdd (Constant constant) = return $ Right $ odd constant
+isOdd (Polynomial polynomial) = do
+  q <- freshRefF
+  r <- freshRefB
+  writeAddWithLC (Polynomial polynomial <> neg (2 @ F q) <> neg (1 @ B r)) -- polynomial - 2 * q - r
+  return (Left r)
+
 --------------------------------------------------------------------------------
 
 -- | Calculate the number of bits required to represent an Integer.
