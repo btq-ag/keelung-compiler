@@ -8,6 +8,7 @@ module Keelung.Interpreter.Arithmetics
     integerAddU,
     integerSubU,
     integerMulU,
+    integerCLMulU,
     integerDivU,
     integerModU,
     modInv,
@@ -64,6 +65,21 @@ integerSubU a b = UVal (uintWidth a) ((uintValue a - uintValue b) `mod` 2 ^ uint
 
 integerMulU :: U -> U -> U
 integerMulU a b = UVal (uintWidth a) ((uintValue a * uintValue b) `mod` 2 ^ uintWidth a)
+
+-- | Carry-less multiplication of two unsigned integers.
+integerCLMulU :: U -> U -> U
+integerCLMulU a b = UVal width result
+  where
+    width :: Width
+    width = uintWidth a
+
+    -- calculate the bits
+    bits :: Int -> Bool
+    bits index = foldl Data.Bits.xor False [Data.Bits.testBit (uintValue a) i Data.Bits..&. Data.Bits.testBit (uintValue b) (index - i) | i <- [0 .. index]]
+
+    -- assemble the bits
+    result :: Integer
+    result = foldl (\acc i -> if bits i then Data.Bits.setBit acc i else acc) 0 [0 .. width - 1]
 
 integerDivU :: U -> U -> U
 integerDivU a b =

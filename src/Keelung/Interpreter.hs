@@ -302,6 +302,7 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
     VarUP w var -> pure <$> lookupUP w var
     AddU _ x y -> zipWith integerAddU <$> interpretU x <*> interpretU y
     SubU _ x y -> zipWith integerSubU <$> interpretU x <*> interpretU y
+    CLMulU _ x y -> zipWith integerCLMulU <$> interpretU x <*> interpretU y
     MulU _ x y -> zipWith integerMulU <$> interpretU x <*> interpretU y
     MMIU w x p -> do
       x' <- map uintValue <$> interpretU x
@@ -441,6 +442,7 @@ instance FreeVar UInt where
     AddU _ x y -> freeVars x <> freeVars y
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y
+    CLMulU _ x y -> freeVars x <> freeVars y
     MMIU _ x _ -> freeVars x
     AndU _ x y -> freeVars x <> freeVars y
     OrU _ x y -> freeVars x <> freeVars y

@@ -147,6 +147,7 @@ data ExprU n
   | -- arithmetic operators
     AddU Width (Seq (ExprU n, Bool))
   | MulU Width (ExprU n) (ExprU n)
+  | CLMulU Width (ExprU n) (ExprU n)
   | MMIU Width (ExprU n) Integer -- modular multiplicative inverse
   | -- logical operators
     AndU Width (Seq (ExprU n))
@@ -171,6 +172,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     VarUP _ var -> showString "UP" . shows var
     AddU _ xs -> chain prec " + " 6 xs
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
+    CLMulU _ x y -> chain prec " .*. " 7 $ x :<| y :<| Empty
     MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
     AndU _ xs -> chain prec " ∧ " 3 xs
     OrU _ xs -> chain prec " ∨ " 2 xs
@@ -191,6 +193,7 @@ instance HasWidth (ExprU n) where
     VarUP w _ -> w
     AddU w _ -> w
     MulU w _ _ -> w
+    CLMulU w _ _ -> w
     MMIU w _ _ -> w
     AndU w _ -> w
     OrU w _ -> w
@@ -201,23 +204,6 @@ instance HasWidth (ExprU n) where
     ShLU w _ _ -> w
     SetU w _ _ _ -> w
     BtoU w _ -> w
-
--- --------------------------------------------------------------------------------
-
--- data Assignment n
---   = AssignmentF Ref (ExprF n)
---   | AssignmentU RefU (ExprU n)
---   | AssignmentB RefB (ExprB n)
-
--- instance (Integral n, Show n) => Show (Assignment n) where
---   show (AssignmentF var expr) = show var ++ " := " ++ show expr
---   show (AssignmentU var expr) = show var ++ " := " ++ show expr
---   show (AssignmentB var expr) = show var ++ " := " ++ show expr
-
--- instance Functor Assignment where
---   fmap f (AssignmentF var expr) = AssignmentF var (fmap f expr)
---   fmap f (AssignmentU var expr) = AssignmentU var (fmap f expr)
---   fmap f (AssignmentB var expr) = AssignmentB var (fmap f expr)
 
 --------------------------------------------------------------------------------
 
