@@ -232,6 +232,14 @@ tests = describe "BinRep Detection" $ do
       let expected = Just (IntMap.fromList [(0, False)], IntMap.fromList [(10, 0)])
       actual `shouldBe` expected
 
+    it "-$B0 - 2$F10 = -3 (mod 37) EVEN or ODD" $ do
+      let polynomial = case Poly.buildEither 3 [(0, -1), (10, -2)] of
+            Left _ -> error "Poly.buildEither"
+            Right p -> p :: Poly (Prime 37)
+      let actual = assignBinRep 5 (< 10) polynomial -- let $0 be Boolean and $10 be Field
+      let expected = Just (IntMap.fromList [(0, True)], IntMap.fromList [(10, 1)])
+      actual `shouldBe` expected
+
     it "$B0 + 2$F10 = 1 (mod 37) EVEN or ODD" $ do
       let polynomial = case Poly.buildEither (-1) [(0, 1), (10, 2)] of
             Left _ -> error "Poly.buildEither"
@@ -240,11 +248,35 @@ tests = describe "BinRep Detection" $ do
       let expected = Just (IntMap.fromList [(0, True)], IntMap.fromList [(10, 0)])
       actual `shouldBe` expected
 
-    it "$B0 + 2$F10 = 3 (mod 37) EVEN or ODD" $ do
-      let polynomial = case Poly.buildEither (-3) [(0, 1), (10, 2)] of
+    it "$B0 - 2$F10 = 1 (mod 13) EVEN or ODD" $ do
+      let polynomial = case Poly.buildEither (-1) [(0, 1), (10, -2)] of
             Left _ -> error "Poly.buildEither"
-            Right p -> p :: Poly (Prime 37)
-      let actual = assignBinRep 5 (< 10) polynomial -- let $0 be Boolean and $10 be Field
+            Right p -> p :: Poly (Prime 13)
+      let actual = assignBinRep 3 (< 10) polynomial -- let $0 be Boolean and $10 be Field
+      let expected = Just (IntMap.fromList [(0, True)], IntMap.fromList [(10, 0)])
+      actual `shouldBe` expected
+
+    it "$B0 - 2$F10 = 0 (mod 13) EVEN or ODD" $ do
+      let polynomial = case Poly.buildEither 0 [(0, 1), (10, -2)] of
+            Left _ -> error "Poly.buildEither"
+            Right p -> p :: Poly (Prime 13)
+      let actual = assignBinRep 3 (< 10) polynomial -- let $0 be Boolean and $10 be Field
+      let expected = Just (IntMap.fromList [(0, False)], IntMap.fromList [(10, 0)])
+      actual `shouldBe` expected
+
+    it "$B0 - 2$F10 = -1 (mod 13) EVEN or ODD" $ do
+      let polynomial = case Poly.buildEither 1 [(0, 1), (10, -2)] of
+            Left _ -> error "Poly.buildEither"
+            Right p -> p :: Poly (Prime 13)
+      let actual = assignBinRep 3 (< 10) polynomial -- let $0 be Boolean and $10 be Field
+      let expected = Just (IntMap.fromList [(0, True)], IntMap.fromList [(10, 1)])
+      actual `shouldBe` expected
+      
+    it "-$B0 + 2$F10 = 1 (mod 13) EVEN or ODD" $ do
+      let polynomial = case Poly.buildEither (-1) [(0, -1), (10, 2)] of
+            Left _ -> error "Poly.buildEither"
+            Right p -> p :: Poly (Prime 13)
+      let actual = assignBinRep 3 (< 10) polynomial -- let $0 be Boolean and $10 be Field
       let expected = Just (IntMap.fromList [(0, True)], IntMap.fromList [(10, 1)])
       actual `shouldBe` expected
 

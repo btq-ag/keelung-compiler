@@ -203,23 +203,48 @@ detectBinRep fieldBitWidth isBoolean xs =
               Just (maxPower, _) -> not (power > maxPower && power - minPower > k - 1 || power < minPower && maxPower - power > k - 1)
 
 -- | Detects a special case of BinRep where the polynomial only have 2 terms:
---      $BooleanVar + 2$FieldVar = some constant
+--      2$FieldVar + $BooleanVar = some constant
+--      2$FieldVar - $BooleanVar = some constant
 detectBinRepEvenOdd :: (GaloisField n, Integral n) => (Var -> Bool) -> Poly n -> Maybe (IntMap Bool, IntMap n)
 detectBinRepEvenOdd isBoolean polynomial = case IntMap.toList (Poly.coeffs polynomial) of
-  [(var1, coeff1), (var2, coeff2)] ->
-    if isBoolean var1 && not (isBoolean var2) && coeff2 / coeff1 == 2
-      then assignBinRepEvenOdd var1 var2 (Poly.constant polynomial / coeff1)
-      else
-        if isBoolean var2 && not (isBoolean var1) && coeff1 / coeff2 == 2
-          then assignBinRepEvenOdd var2 var1 (Poly.constant polynomial / coeff2)
-          else Nothing
+  [(var1, coeff1), (var2, coeff2)]
+    | isBoolean var1 && not (isBoolean var2) -> go (var1, coeff1) (var2, coeff2) (Poly.constant polynomial)
+    | isBoolean var2 && not (isBoolean var1) -> go (var2, coeff2) (var1, coeff1) (Poly.constant polynomial)
+    | otherwise -> Nothing
   _ -> Nothing
   where
+    go (boolVar, 1) (fieldVar, 2) constant =
+      -- B + 2F + C = 0
+      -- B + 2F = -c
+      assignBinRepEvenOddPos boolVar fieldVar (-constant)
+    go (boolVar, -1) (fieldVar, -2) constant =
+      -- -B - 2F + C = 0
+      -- B + 2F = C
+      assignBinRepEvenOddPos boolVar fieldVar constant
+    go (boolVar, 1) (fieldVar, -2) constant =
+      -- B - 2F + C = 0
+      -- B - 2F = -C
+      assignBinRepEvenOddNeg boolVar fieldVar (-constant)
+    go (boolVar, -1) (fieldVar, 2) constant =
+      -- - B + 2F + C = 0
+      -- B - 2F = C
+      assignBinRepEvenOddNeg boolVar fieldVar constant
+    go _ _ _ = Nothing
+
     -- \$boolVar + 2$fieldVar + constant = 0
-    assignBinRepEvenOdd :: (GaloisField n, Integral n) => Var -> Var -> n -> Maybe (IntMap Bool, IntMap n)
-    assignBinRepEvenOdd boolVar fieldVar constant =
-      let (quotient, remainder) = toInteger (-constant) `divMod` 2
+    assignBinRepEvenOddPos :: (GaloisField n, Integral n) => Var -> Var -> n -> Maybe (IntMap Bool, IntMap n)
+    assignBinRepEvenOddPos boolVar fieldVar constant =
+      let (quotient, remainder) = toInteger constant `divMod` 2
        in Just (IntMap.singleton boolVar (remainder == 1), IntMap.singleton fieldVar (fromInteger quotient))
+
+    assignBinRepEvenOddNeg :: (GaloisField n, Integral n) => Var -> Var -> n -> Maybe (IntMap Bool, IntMap n)
+    assignBinRepEvenOddNeg boolVar fieldVar constant =
+      let outOfBound = toInteger constant > 1 -- flip the sign of everything if the constant is out of bound
+          normalizedConstant = if outOfBound then toInteger (-constant) else toInteger constant
+          (quotient, remainder) = normalizedConstant `divMod` 2
+       in if outOfBound
+            then Just (IntMap.singleton boolVar (remainder == 1), IntMap.singleton fieldVar (fromInteger quotient + 1))
+            else Just (IntMap.singleton boolVar (remainder == 1), IntMap.singleton fieldVar (fromInteger quotient + 0))
 
 -- | See if a coefficient is a power of 2 (except for 2^0)
 isPowerOf2 :: (GaloisField n, Integral n) => Width -> n -> Maybe Int

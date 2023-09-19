@@ -99,6 +99,40 @@ tests = describe "Boolean" $ do
           runAll (Prime 13) program [x, y, z] [] expected
           runAll gf181 program [x, y, z] [] expected
 
+    it "2 variables with constant" $ do
+      let program = do
+            x <- inputBool Public
+            y <- inputBool Public
+            return $ x .^. y .^. true
+      forAll
+        ( do
+            x <- choose (0, 1)
+            y <- choose (0, 1)
+            return (x, y)
+        )
+        $ \(x, y) -> do
+          let expected = [x `Data.Bits.xor` y `Data.Bits.xor` 1]
+          runAll (Prime 13) program [x, y] [] expected
+          runAll gf181 program [x, y] [] expected
+
+    it "3 variables with constant" $ do
+      let program = do
+            x <- inputBool Public
+            y <- inputBool Public
+            z <- inputBool Public
+            return $ x .^. y .^. z .^. true
+      forAll
+        ( do
+            x <- choose (0, 1)
+            y <- choose (0, 1)
+            z <- choose (0, 1)
+            return (x, y, z)
+        )
+        $ \(x, y, z) -> do
+          let expected = [x `Data.Bits.xor` y `Data.Bits.xor` z `Data.Bits.xor` 1]
+          runAll (Prime 13) program [x, y, z] [] expected
+          runAll gf181 program [x, y, z] [] expected
+
   it "mixed 1" $ do
     let program = do
           x <- input Public
