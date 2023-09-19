@@ -92,7 +92,7 @@ data ExprB n
   | -- logical operators
     AndB (Seq (ExprB n))
   | OrB (Seq (ExprB n))
-  | XorB (ExprB n) (ExprB n)
+  | XorB (Seq (ExprB n))
   | NotB (ExprB n)
   | IfB (ExprB n) (ExprB n) (ExprB n)
   | -- comparison operators
@@ -120,7 +120,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
     VarBP var -> showString "BP" . shows var
     AndB xs -> chain prec " ∧ " 3 xs
     OrB xs -> chain prec " ∨ " 2 xs
-    XorB x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
+    XorB xs -> chain prec " ⊕ " 4 xs
     NotB x -> chain prec "¬ " 5 $ x :<| Empty
     IfB p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     NEqB x0 x1 -> chain prec " ≠ " 5 $ x0 :<| x1 :<| Empty

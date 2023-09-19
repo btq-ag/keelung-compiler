@@ -62,7 +62,7 @@ convertExprB expr = case expr of
   T.VarBP var -> return $ VarBP var
   T.AndB x y -> chainExprsOfAssocOpAndB <$> convertExprB x <*> convertExprB y
   T.OrB x y -> chainExprsOfAssocOpOrB <$> convertExprB x <*> convertExprB y
-  T.XorB x y -> XorB <$> convertExprB x <*> convertExprB y
+  T.XorB x y -> chainExprsOfAssocOpXorB <$> convertExprB x <*> convertExprB y
   T.NotB x -> NotB <$> convertExprB x
   T.IfB p x y -> IfB <$> convertExprB p <*> convertExprB x <*> convertExprB y
   T.EqB x y -> EqB <$> convertExprB x <*> convertExprB y
@@ -207,6 +207,17 @@ chainExprsOfAssocOpOrB x y = case (x, y) of
     OrB (x :<| ys)
   -- there's nothing left we can do
   _ -> OrB (x :<| y :<| mempty)
+
+chainExprsOfAssocOpXorB :: ExprB n -> ExprB n -> ExprB n
+chainExprsOfAssocOpXorB x y = case (x, y) of
+  (XorB xs, XorB ys) ->
+    XorB (xs <> ys)
+  (XorB xs, _) ->
+    XorB (xs |> y)
+  (_, XorB ys) ->
+    XorB (x :<| ys)
+  -- there's nothing left we can do
+  _ -> XorB (x :<| y :<| mempty)
 
 chainExprsOfAssocOpOrU :: Width -> ExprU n -> ExprU n -> ExprU n
 chainExprsOfAssocOpOrU w x y = case (x, y) of

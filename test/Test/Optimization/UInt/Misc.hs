@@ -23,21 +23,3 @@ tests = describe "Misc" $ do
         return (x .*. y)
       cs `shouldHaveSize` 75
       cs' `shouldHaveSize` 67
-
-  describe "XOR" $ do
-    it "2 variables" $ do
-      (cs, cs') <- executeGF181 $ do
-        xs <- inputList Public 2 :: Comp [Boolean]
-        return $ foldl (.^.) false xs
-      -- print cs
-      -- print $ linkConstraintModule cs'
-      cs `shouldHaveSize` 5
-      cs' `shouldHaveSize` 4
-
-    it "3 variables" $ do
-      (cs, cs') <- executeGF181 $ do
-        xs <- inputList Public 3 :: Comp [Boolean]
-        return $ foldl (.^.) false xs
-      -- print $ linkConstraintModule cs'
-      cs `shouldHaveSize` 7
-      cs' `shouldHaveSize` 6

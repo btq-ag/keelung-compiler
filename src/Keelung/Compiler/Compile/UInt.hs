@@ -14,11 +14,12 @@ import Data.Bits qualified
 import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
+import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.UInt.Addition
+import Keelung.Compiler.Compile.UInt.CLMul
 import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.Multiplication
-import Keelung.Compiler.Compile.UInt.CLMul
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference
@@ -63,7 +64,7 @@ compile out expr = case expr of
         Right val -> writeValB (RefUBit w out i) val
   XorU w x y -> do
     forM_ [0 .. w - 1] $ \i -> do
-      result <- compileExprB (XorB (BitU x i) (BitU y i))
+      result <- compileExprB (XorB (Seq.fromList [BitU x i, BitU y i]))
       case result of
         Left var -> writeEqB (RefUBit w out i) var
         Right val -> writeValB (RefUBit w out i) val

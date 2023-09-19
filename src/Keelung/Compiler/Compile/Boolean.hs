@@ -6,6 +6,7 @@ import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.List.Split qualified as List
+import Data.Sequence qualified as Seq
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
@@ -27,10 +28,9 @@ compile compileU expr = case expr of
   OrB xs -> do
     xs' <- mapM compileExprB xs
     orBs (toList xs')
-  XorB x y -> do
-    x' <- compileExprB x
-    y' <- compileExprB y
-    xorBs [x', y']
+  XorB xs -> do
+    xs' <- mapM compileExprB xs
+    xorBs (toList xs')
   NotB x -> do
     x' <- compileExprB x
     case x' of
@@ -44,7 +44,7 @@ compile compileU expr = case expr of
     x' <- compileExprB x
     y' <- compileExprB y
     compileIfB p' x' y'
-  NEqB x y -> compileExprB (XorB x y)
+  NEqB x y -> compileExprB (XorB (Seq.fromList [x, y]))
   NEqF x y -> do
     x' <- compileExprF x
     y' <- compileExprF y

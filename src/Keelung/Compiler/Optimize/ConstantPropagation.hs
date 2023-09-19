@@ -131,7 +131,7 @@ propagateExprB e = do
     VarBP _ -> return e -- no constant propagation for private input variables
     AndB xs -> AndB <$> mapM propagateExprB xs
     OrB xs -> OrB <$> mapM propagateExprB xs
-    XorB x y -> XorB <$> propagateExprB x <*> propagateExprB y
+    XorB xs -> XorB <$> mapM propagateExprB xs
     NotB x -> NotB <$> propagateExprB x
     IfB p x y -> IfB <$> propagateExprB p <*> propagateExprB x <*> propagateExprB y
     NEqB x y -> NEqB <$> propagateExprB x <*> propagateExprB y

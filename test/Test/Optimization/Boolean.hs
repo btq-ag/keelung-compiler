@@ -118,6 +118,20 @@ tests = do
         cs `shouldHaveSize` 2
         cs' `shouldHaveSize` 2
 
+      it "2 variables" $ do
+        (cs, cs') <- executeGF181 $ do
+          xs <- inputList Public 2 :: Comp [Boolean]
+          return $ foldl (.^.) false xs
+        cs `shouldHaveSize` 5
+        cs' `shouldHaveSize` 4
+
+      it "10 variables" $ do
+        (cs, cs') <- executeGF181 $ do
+          xs <- inputList Public 10 :: Comp [Boolean]
+          return $ foldl (.^.) false xs
+        cs `shouldHaveSize` 13
+        cs' `shouldHaveSize` 12
+
 --------------------------------------------------------------------------------
 
 run :: IO ()
