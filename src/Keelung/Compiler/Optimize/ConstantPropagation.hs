@@ -106,7 +106,7 @@ propagateExprU e = do
     MMIU w x p -> MMIU w <$> propagateExprU x <*> pure p
     AndU w xs -> AndU w <$> mapM propagateExprU xs
     OrU w xs -> OrU w <$> mapM propagateExprU xs
-    XorU w x y -> XorU w <$> propagateExprU x <*> propagateExprU y
+    XorU w xs -> XorU w <$> mapM propagateExprU xs
     NotU w x -> NotU w <$> propagateExprU x
     IfU w p x y -> IfU w <$> propagateExprB p <*> propagateExprU x <*> propagateExprU y
     RoLU w i x -> RoLU w i <$> propagateExprU x

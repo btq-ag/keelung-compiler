@@ -4,8 +4,8 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
-import Keelung.Data.FieldInfo
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.FieldInfo
 import Keelung.Syntax (HasWidth (widthOf), Var)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax qualified as T
@@ -102,7 +102,7 @@ convertExprU expr = case expr of
   T.MMIU w x p -> MMIU w <$> convertExprU x <*> pure p
   T.AndU w x y -> chainExprsOfAssocOpAndU w <$> convertExprU x <*> convertExprU y
   T.OrU w x y -> chainExprsOfAssocOpOrU w <$> convertExprU x <*> convertExprU y
-  T.XorU w x y -> XorU w <$> convertExprU x <*> convertExprU y
+  T.XorU w x y -> chainExprsOfAssocOpXorU w <$> convertExprU x <*> convertExprU y
   T.NotU w x -> NotU w <$> convertExprU x
   T.RoLU w i x -> RoLU w i <$> convertExprU x
   T.ShLU w i x -> ShLU w i <$> convertExprU x
@@ -229,3 +229,14 @@ chainExprsOfAssocOpOrU w x y = case (x, y) of
     OrU w (x :<| ys)
   -- there's nothing left we can do
   _ -> OrU w (x :<| y :<| mempty)
+
+chainExprsOfAssocOpXorU :: Width -> ExprU n -> ExprU n -> ExprU n
+chainExprsOfAssocOpXorU w x y = case (x, y) of
+  (XorU _ xs, XorU _ ys) ->
+    XorU w (xs <> ys)
+  (XorU _ xs, _) ->
+    XorU w (xs |> y)
+  (_, XorU _ ys) ->
+    XorU w (x :<| ys)
+  -- there's nothing left we can do
+  _ -> XorU w (x :<| y :<| mempty)

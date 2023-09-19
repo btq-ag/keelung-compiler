@@ -152,7 +152,7 @@ data ExprU n
   | -- logical operators
     AndU Width (Seq (ExprU n))
   | OrU Width (Seq (ExprU n))
-  | XorU Width (ExprU n) (ExprU n)
+  | XorU Width (Seq (ExprU n))
   | NotU Width (ExprU n)
   | IfU Width (ExprB n) (ExprU n) (ExprU n)
   | -- bit operators
@@ -176,7 +176,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
     AndU _ xs -> chain prec " ∧ " 3 xs
     OrU _ xs -> chain prec " ∨ " 2 xs
-    XorU _ x0 x1 -> chain prec " ⊕ " 4 $ x0 :<| x1 :<| Empty
+    XorU _ xs -> chain prec " ⊕ " 4 xs
     NotU _ x -> showParen (prec > 8) $ showString "¬ " . showsPrec 9 x
     IfU _ p x y -> showParen (prec > 1) $ showString "if " . showsPrec 2 p . showString " then " . showsPrec 2 x . showString " else " . showsPrec 2 y
     RoLU _ n x -> showParen (prec > 8) $ showString "RoL " . showsPrec 9 n . showString " " . showsPrec 9 x
@@ -197,7 +197,7 @@ instance HasWidth (ExprU n) where
     MMIU w _ _ -> w
     AndU w _ -> w
     OrU w _ -> w
-    XorU w _ _ -> w
+    XorU w _ -> w
     NotU w _ -> w
     IfU w _ _ _ -> w
     RoLU w _ _ -> w

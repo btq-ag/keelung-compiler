@@ -61,7 +61,43 @@ tests = describe "Boolean" $ do
     runAll (Prime 2) program [1, 1] [] [1]
 
   it "or" $ testProgram (||) Or
-  it "xor" $ testProgram Data.Bits.xor Xor
+
+  describe "xor" $ do
+    it "mixed" $ testProgram Data.Bits.xor Xor
+
+    it "2 variables" $ do
+      let program = do
+            x <- inputBool Public
+            y <- inputBool Public
+            return $ x .^. y
+      forAll
+        ( do
+            x <- choose (0, 1)
+            y <- choose (0, 1)
+            return (x, y)
+        )
+        $ \(x, y) -> do
+          let expected = [Data.Bits.xor x y]
+          runAll (Prime 13) program [x, y] [] expected
+          runAll gf181 program [x, y] [] expected
+
+    it "3 variables" $ do
+      let program = do
+            x <- inputBool Public
+            y <- inputBool Public
+            z <- inputBool Public
+            return $ x .^. y .^. z
+      forAll
+        ( do
+            x <- choose (0, 1)
+            y <- choose (0, 1)
+            z <- choose (0, 1)
+            return (x, y, z)
+        )
+        $ \(x, y, z) -> do
+          let expected = [x `Data.Bits.xor` y `Data.Bits.xor` z]
+          runAll (Prime 13) program [x, y, z] [] expected
+          runAll gf181 program [x, y, z] [] expected
 
   it "mixed 1" $ do
     let program = do
