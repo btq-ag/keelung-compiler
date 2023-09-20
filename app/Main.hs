@@ -29,6 +29,7 @@ import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.FieldInfo
 import Keelung.Field
+import Keelung.CircuitFormat
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
@@ -103,14 +104,26 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputInterpretedResultAndWriteFile filepath (generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Prime n)) (Counters, Vector (Prime n), Vector (Prime n)))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputInterpretedResultAndWriteFile filepath (generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Binary n)) (Counters, Vector (Binary n), Vector (Binary n)))
+            -- witness file for Aurora doesn't contain the prime field info, so providing 0 is enough.
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputInterpretedResultAndWriteFile Aurora 0 filepath (generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Prime n)) (Counters, Vector (Prime n), Vector (Prime n)))
+            handleBinary _ _ = error "wtns format doesn't support binary fields."
+    Protocol (GenWtns filepath) -> do
+      blob <- getContents
+      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
+      case decoded of
+        Left err -> print err
+        Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> caseFieldType fieldType handlePrime handleBinary
+          where
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = case fieldTypeData fieldInfo of
+              (Prime p) -> outputInterpretedResultAndWriteFile Snarkjs p filepath (generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Prime n)) (Counters, Vector (Prime n), Vector (Prime n)))
+              (Binary _) -> error "IMPOSSIBLE"
+            handleBinary _ _ = error "wtns format doesn't support binary fields."
     Version -> putStrLn $ "Keelung v" ++ versionString
   where
     outputCircuit :: Serialize a => a -> IO ()
     outputCircuit = putStrLn . BSC.unpack . encode
 
-    outputCircuitAndWriteFile :: (Serialize n, GaloisField n, Integral n) => CircuitFormat -> FilePath -> Either String (R1CS n) -> IO ()
+    outputCircuitAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Format -> FilePath -> Either String (R1CS n) -> IO ()
     outputCircuitAndWriteFile format filepath r1cs = do
       outputCircuit r1cs
       case r1cs of
@@ -121,13 +134,15 @@ main = withUtf8 $ do
     outputInterpretedResult :: (Serialize a, Serialize n) => Either a (Vector n) -> IO ()
     outputInterpretedResult = putStrLn . BSC.unpack . encode . fmap toList
 
-    outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => FilePath -> Either (Error n) (Counters, Vector n, Vector n) -> IO ()
-    outputInterpretedResultAndWriteFile filepath result = do
+    outputInterpretedResultAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Format -> Integer -> FilePath -> Either (Error n) (Counters, Vector n, Vector n) -> IO ()
+    outputInterpretedResultAndWriteFile format p filepath result = do
       case result of
         Left err -> putStrLn $ BSC.unpack $ encode err
         Right (counters, _, witness) -> do
           outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
-          BS.writeFile filepath (serializeInputAndWitness counters witness)
+          case format of
+            Aurora  -> BS.writeFile filepath (serializeInputAndWitness counters witness)
+            Snarkjs -> BS.writeFile filepath (serializeInputAndWitnessToBin p counters witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do

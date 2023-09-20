@@ -37,6 +37,7 @@ data ProtocolOptions
   | Interpret
   | GenCircuit String
   | GenWitness String
+  | GenWtns String
   | GenCircuitBin String
   deriving (Show)
 
@@ -105,6 +106,14 @@ protocol =
               (GenWitness <$> pathArg "witness.jsonl" <**> helper)
               ( fullDesc
                   <> progDesc "Interpret (-O1) a Keelung program with inputs and output the witnesses it as \"witness.jsonl\""
+              )
+          )
+        <> command
+          "genWtns"
+          ( info
+              (GenWtns <$> pathArg "witness.wtns" <**> helper)
+              ( fullDesc
+                  <> progDesc "Interpret (-O1) a Keelung program with inputs and output the witnesses it as Snarkjs' binary format \"witness.wtns\""
               )
           )
     )
