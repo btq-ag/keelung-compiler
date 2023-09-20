@@ -2,10 +2,13 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Interpreter.Arithmetics
-  ( U (..),
+  ( U (uintWidth, uintValue),
+    new,
+    chunksU,
     integerAddU,
     integerSubU,
     integerMulU,
+    integerCLMulU,
     integerDivU,
     integerModU,
     modInv,
@@ -49,6 +52,11 @@ instance Enum U where
 
 --------------------------------------------------------------------------------
 
+new :: Width -> Integer -> U
+new width value = UVal width (value `mod` (2 ^ width))
+
+--------------------------------------------------------------------------------
+
 integerAddU :: U -> U -> U
 integerAddU a b = UVal (uintWidth a) ((uintValue a + uintValue b) `mod` 2 ^ uintWidth a)
 
@@ -57,6 +65,21 @@ integerSubU a b = UVal (uintWidth a) ((uintValue a - uintValue b) `mod` 2 ^ uint
 
 integerMulU :: U -> U -> U
 integerMulU a b = UVal (uintWidth a) ((uintValue a * uintValue b) `mod` 2 ^ uintWidth a)
+
+-- | Carry-less multiplication of two unsigned integers.
+integerCLMulU :: U -> U -> U
+integerCLMulU a b = UVal width result
+  where
+    width :: Width
+    width = uintWidth a
+
+    -- calculate the bits
+    bits :: Int -> Bool
+    bits index = foldl Data.Bits.xor False [Data.Bits.testBit (uintValue a) i Data.Bits..&. Data.Bits.testBit (uintValue b) (index - i) | i <- [0 .. index]]
+
+    -- assemble the bits
+    result :: Integer
+    result = foldl (\acc i -> if bits i then Data.Bits.setBit acc i else acc) 0 [0 .. width - 1]
 
 integerDivU :: U -> U -> U
 integerDivU a b =
@@ -108,6 +131,7 @@ rotateU a n =
         )
 
 -- | This function shifts left if n is positive and shifts right if n is negative
+--   Numbers gets smaller as you shift right
 shiftU :: U -> Int -> U
 shiftU a n =
   UVal (uintWidth a) $
@@ -124,6 +148,40 @@ clearBitU :: U -> Int -> U
 clearBitU x i =
   let i' = i `mod` uintWidth x
    in UVal (uintWidth x) (Data.Bits.clearBit (uintValue x) i')
+
+-- | Split an integer into chunks of a specified size, the last chunk may be smaller.
+chunksU :: Int -> U -> [U]
+chunksU chunkSize (UVal width num)
+  | width < 0 = error "[ panic ] U.chunks: Width must be non-negative"
+  | width == 0 = []
+  | width < chunkSize = [UVal width num]
+  | otherwise = UVal chunkSize (num .&. mask) : chunksU chunkSize (UVal (width - chunkSize) (num `shiftR` chunkSize))
+  where
+    mask = (2 ^ chunkSize) - 1
+
+-- splitU :: Int -> U -> [U]
+-- splitU size (UVal w x) = map (UVal size) (splitInteger x size w)
+--   where
+--     -- Split an integer into chunks of a specified size and return both the split chunks
+--     -- and the last partial chunk (if it exists).
+--     splitInteger :: Integer -> Int -> Int -> ([Integer], Maybe (Integer, Int))
+--     splitInteger n chunkSize totalBits
+--         | totalBits <= 0 || chunkSize <= 0 = ([], Nothing)
+--         | otherwise =
+--             let (chunks, lastChunk) = split n chunkSize totalBits []
+--             in case lastChunk of
+--                 0 -> (chunks, Nothing)  -- The last chunk is full-sized.
+--                 _ -> (chunks, Just (last (n `Data.Bits.shiftR` (totalBits - lastChunk)), lastChunk))
+
+--     -- Split the integer into chunks and calculate the size of the last chunk.
+--     split :: Integer -> Int -> Int -> [Integer] -> ([Integer], Int)
+--     split n chunkSize totalBits chunks
+--         | totalBits <= 0 = (reverse chunks, 0)
+--         | otherwise =
+--             let mask = (1 `shiftL` chunkSize) - 1
+--                 chunk = n Data.Bits..&. mask
+--                 (remainingChunks, lastChunkSize) = split (n `Data.Bits.shiftR` chunkSize) chunkSize (totalBits - chunkSize) (chunk : chunks)
+--             in (remainingChunks, chunkSize + lastChunkSize)
 
 --------------------------------------------------------------------------------
 

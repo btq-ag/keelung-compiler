@@ -16,12 +16,14 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as Relations
+import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Interpreter.Arithmetics (U)
 
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
@@ -35,67 +37,78 @@ import Keelung.Data.Reference
 --    6. ModInvs
 --    7. EqZeros
 run :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (ConstraintModule n)
-run cm = goThroughEqZeros . goThroughModInvs . goThroughDivMods . snd <$> optimizeAddF cm
+run cm = do
+  cm' <- runStateMachine cm ShouldRunAddF
+  return $ (goThroughEqZeros . goThroughModInvs) cm'
 
--- | TODO: reexamine the state transitions
+-- | Next optimization pass to run
+data Action
+  = Accept
+  | ShouldRunAddF
+  | ShouldRunAddL
+  | ShouldRunMulF
+  | ShouldRunMulL
+  | ShouldRunDivMod
+  deriving (Eq, Show)
+
+-- | Decide what to do next based on the result of the previous optimization pass
+transition :: WhatChanged -> Action -> Action
+transition _ Accept = Accept
+transition NothingChanged ShouldRunAddF = ShouldRunAddL
+transition NothingChanged ShouldRunAddL = ShouldRunMulF
+transition NothingChanged ShouldRunMulF = ShouldRunMulL
+transition NothingChanged ShouldRunMulL = ShouldRunDivMod
+transition NothingChanged ShouldRunDivMod = Accept
+transition RelationChanged _ = ShouldRunAddF -- restart from optimizeAddF
+transition AdditiveFieldConstraintChanged _ = ShouldRunAddL -- restart from optimizeAddL
+transition AdditiveLimbConstraintChanged _ = ShouldRunMulF -- restart from optimizeMulF
+transition MultiplicativeConstraintChanged _ = ShouldRunMulL -- restart from optimizeMulL
+transition MultiplicativeLimbConstraintChanged _ = ShouldRunMulL -- restart from optimizeMulL
+
+-- | Run the state machine until it reaches the 'Accept' state
+runStateMachine :: (GaloisField n, Integral n) => ConstraintModule n -> Action -> Either (Compile.Error n) (ConstraintModule n)
+runStateMachine cm action = do
+  -- decide which optimization pass to run and see if it changed anything
+  (changed, cm') <- case action of
+    Accept -> return (NothingChanged, cm)
+    ShouldRunAddF -> optimizeAddF cm
+    ShouldRunAddL -> optimizeAddL cm
+    ShouldRunMulF -> optimizeMulF cm
+    ShouldRunMulL -> optimizeMulL cm
+    ShouldRunDivMod -> optimizeDivMod cm
+  -- derive the next action based on the result of the previous optimization pass
+  let action' = transition changed action
+  -- keep running the state machine until it reaches the 'Accept' state
+  if action' == Accept
+    then return cm'
+    else runStateMachine cm' action'
+
+------------------------------------------------------------------------------
+
 optimizeAddF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
-optimizeAddF cm = do
-  (changed, cm') <- runOptiM cm goThroughAddF
-  case changed of
-    NothingChanged -> optimizeAddL cm -- proceed to AddL?
-    RelationChanged -> optimizeAddF cm' -- restart from AddF
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
-    MultiplicativeConstraintChanged -> optimizeMulF cm' -- proceed to MulL?
-    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
+optimizeAddF cm = runOptiM cm $ runRoundM $ do
+  result <- foldMaybeM reduceAddF [] (cmAddF cm)
+  modify' $ \cm' -> cm' {cmAddF = result}
 
--- | TODO: reexamine the state transitions
 optimizeAddL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
-optimizeAddL cm = do
-  (changed, cm') <- runOptiM cm goThroughAddL
-  case changed of
-    NothingChanged -> optimizeMulF cm -- proceed to MulF?
-    RelationChanged -> optimizeAddF cm' -- restart from AddF
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
-    MultiplicativeConstraintChanged -> optimizeMulL cm' -- proceed to MulL?
-    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
+optimizeAddL cm = runOptiM cm $ runRoundM $ do
+  result <- foldMaybeM reduceAddL [] (cmAddL cm)
+  modify' $ \cm' -> cm' {cmAddL = result}
 
 optimizeMulF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
-optimizeMulF cm = do
-  (changed, cm') <- runOptiM cm goThroughMulF
-  case changed of
-    NothingChanged -> optimizeMulL cm' -- proceed to MulL?
-    RelationChanged -> optimizeAddF cm' -- restart from AddF
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
-    MultiplicativeConstraintChanged -> optimizeMulL cm' -- proceed to MulL?
-    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
+optimizeMulF cm = runOptiM cm $ runRoundM $ do
+  cmMulF' <- foldMaybeM reduceMulF [] (cmMulF cm)
+  modify' $ \cm' -> cm' {cmMulF = cmMulF'}
 
 optimizeMulL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
-optimizeMulL cm = do
-  (changed, cm') <- runOptiM cm goThroughMulL
-  case changed of
-    NothingChanged -> return (changed, cm')
-    RelationChanged -> optimizeAddF cm' -- restart from AddF
-    AdditiveFieldConstraintChanged -> optimizeAddL cm' -- proceed to AddL?
-    AdditiveLimbConstraintChanged -> optimizeMulF cm' -- proceed to MulF?
-    MultiplicativeConstraintChanged -> optimizeMulL cm' -- proceed to MulL?
-    MultiplicativeLimbConstraintChanged -> optimizeMulL cm' -- back to MulL
+optimizeMulL cm = runOptiM cm $ runRoundM $ do
+  cmMulL' <- foldMaybeM reduceMulL [] (cmMulL cm)
+  modify' $ \cm' -> cm' {cmMulL = cmMulL'}
 
-goThroughAddF :: (GaloisField n, Integral n) => OptiM n WhatChanged
-goThroughAddF = do
-  cm <- get
-  runRoundM $ do
-    result <- foldMaybeM reduceAddF [] (cmAddF cm)
-    modify' $ \cm' -> cm' {cmAddF = result}
-
-goThroughAddL :: (GaloisField n, Integral n) => OptiM n WhatChanged
-goThroughAddL = do
-  cm <- get
-  runRoundM $ do
-    result <- foldMaybeM reduceAddL [] (cmAddL cm)
-    modify' $ \cm' -> cm' {cmAddL = result}
+optimizeDivMod :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeDivMod cm = runOptiM cm $ runRoundM $ do
+  result <- foldMaybeM reduceDivMod [] (cmDivMods cm)
+  modify' $ \cm' -> cm' {cmDivMods = result}
 
 goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughEqZeros cm =
@@ -108,29 +121,10 @@ goThroughEqZeros cm =
       Just (Left _constant, _, _) -> Nothing
       Just (Right reducePolynomial, _, _) -> Just (reducePolynomial, m)
 
-goThroughDivMods :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
-goThroughDivMods cm =
-  let substDivMod (a, b, q, r) = (a, b, q, r)
-   in cm {cmDivMods = map substDivMod (cmDivMods cm)}
-
 goThroughModInvs :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughModInvs cm =
   let substModInv (a, b, c, d) = (a, b, c, d)
    in cm {cmModInvs = map substModInv (cmModInvs cm)}
-
-goThroughMulF :: (GaloisField n, Integral n) => OptiM n WhatChanged
-goThroughMulF = do
-  cm <- get
-  runRoundM $ do
-    cmMulF' <- foldMaybeM reduceMulF [] (cmMulF cm)
-    modify' $ \cm'' -> cm'' {cmMulF = cmMulF'}
-
-goThroughMulL :: (GaloisField n, Integral n) => OptiM n WhatChanged
-goThroughMulL = do
-  cm <- get
-  runRoundM $ do
-    cmMulL' <- foldMaybeM reduceMulL [] (cmMulL cm)
-    modify' $ \cm'' -> cm'' {cmMulL = cmMulL'}
 
 foldMaybeM :: Monad m => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
 foldMaybeM f = foldM $ \acc x -> do
@@ -138,6 +132,8 @@ foldMaybeM f = foldM $ \acc x -> do
   case result of
     Nothing -> return acc
     Just x' -> return (x' : acc)
+
+------------------------------------------------------------------------------
 
 reduceAddF :: (GaloisField n, Integral n) => PolyG n -> RoundM n (Maybe (PolyG n))
 reduceAddF polynomial = do
@@ -366,6 +362,25 @@ reduceMulLCPP a polyB polyC = do
 
 ------------------------------------------------------------------------------
 
+type DivMod = (Either RefU U, Either RefU U, Either RefU U, Either RefU U)
+
+reduceDivMod :: (GaloisField n, Integral n) => DivMod -> RoundM n (Maybe DivMod)
+reduceDivMod (a, b, q, r) = do
+  relations <- gets (Relations.exportUIntRelations . cmRelations)
+  return $
+    Just
+      ( a `bind` UInt.lookup relations,
+        b `bind` UInt.lookup relations,
+        q `bind` UInt.lookup relations,
+        r `bind` UInt.lookup relations
+      )
+  where
+    bind :: Either RefU U -> (RefU -> Either RefU U) -> Either RefU U
+    bind (Right val) _ = Right val
+    bind (Left var) f = f var
+
+------------------------------------------------------------------------------
+
 data WhatChanged
   = NothingChanged
   | RelationChanged
@@ -462,7 +477,7 @@ assign (F var) value = do
       markChanged RelationChanged
       put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 
-assignL :: (GaloisField n, Integral n) => RefL -> Integer -> RoundM n ()
+assignL :: (GaloisField n, Integral n) => Limb -> Integer -> RoundM n ()
 assignL var value = do
   cm <- get
   result <- lift $ lift $ EquivClass.runM $ Relations.assignL var value (cmRelations cm)
@@ -484,8 +499,8 @@ relateF var1 (slope, var2, intercept) = do
       modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
       return True
 
--- | Relates two RefLs. Returns 'True' if a new relation has been established.
-relateL :: (GaloisField n, Integral n) => RefL -> RefL -> RoundM n Bool
+-- | Relates two Limbs. Returns 'True' if a new relation has been established.
+relateL :: (GaloisField n, Integral n) => Limb -> Limb -> RoundM n Bool
 relateL var1 var2 = do
   cm <- get
   result <- lift $ lift $ EquivClass.runM $ Relations.relateL var1 var2 (cmRelations cm)
@@ -495,6 +510,18 @@ relateL var1 var2 = do
       markChanged RelationChanged
       modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
       return True
+
+-- -- | Relates two RefUs. Returns 'True' if a new relation has been established.
+-- relateU :: (GaloisField n, Integral n) => Limb -> Limb -> RoundM n Bool
+-- relateU var1 var2 = do
+--   cm <- get
+--   result <- lift $ lift $ EquivClass.runM $ Relations.relateL var1 var2 (cmRelations cm)
+--   case result of
+--     Nothing -> return False
+--     Just relations -> do
+--       markChanged RelationChanged
+--       modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
+--       return True
 
 --------------------------------------------------------------------------------
 
@@ -581,22 +608,22 @@ substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = cas
 
 --------------------------------------------------------------------------------
 
--- | Substitutes RefLs in a PolyL.
+-- | Substitutes Limbs in a PolyL.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Set RefL, Set RefL)
+substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Set Limb, Set Limb)
 substPolyL relations poly = do
   let (c, xs) = PolyL.view poly
-  case foldl (substPolyL_ (Relations.exportUIntRelations relations)) (False, Left c, mempty, mempty) xs of
+  case foldl (substPolyL_ (Relations.exportLimbRelations relations)) (False, Left c, mempty, mempty) xs of
     (False, _, _, _) -> Nothing -- nothing changed
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyL.vars' poly)
 
 substPolyL_ ::
   (Integral n, GaloisField n) =>
-  UInt.UIntRelations ->
-  (Bool, Either n (PolyL n), Set RefL, Set RefL) ->
-  (RefL, n) ->
-  (Bool, Either n (PolyL n), Set RefL, Set RefL)
+  Limb.LimbRelations ->
+  (Bool, Either n (PolyL n), Set Limb, Set Limb) ->
+  (Limb, n) ->
+  (Bool, Either n (PolyL n), Set Limb, Set Limb)
 substPolyL_ relations (changed, accPoly, removedRefs, addedRefs) (ref, multiplier) = case EquivClass.lookup ref relations of
   EquivClass.IsConstant constant ->
     let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs

@@ -6,6 +6,7 @@ module Test.Optimization.UInt (tests, run) where
 import Control.Monad (forM_)
 import Keelung hiding (compileO0)
 import Test.Hspec
+import Test.Optimization.UInt.Misc qualified as Misc
 import Test.Optimization.Util
 
 run :: IO ()
@@ -157,8 +158,8 @@ tests = do
         (cs, cs') <- executeGF181 $ do
           return $ 2 * (4 :: UInt 4)
         -- print $ linkConstraintModule cs'
-        cs `shouldHaveSize` 8
-        cs' `shouldHaveSize` 8
+        cs `shouldHaveSize` 5
+        cs' `shouldHaveSize` 5
 
     describe "Constants" $ do
       -- TODO: should be just 4
@@ -166,8 +167,31 @@ tests = do
         (cs, cs') <- executeGF181 $ do
           return (0 :: UInt 4)
         -- print $ linkConstraintModule cs'
-        cs `shouldHaveSize` 8
-        cs' `shouldHaveSize` 8
+        cs `shouldHaveSize` 5
+        cs' `shouldHaveSize` 5
+
+    -- describe "Bitwise Operators" $ do
+    --   it "setBit twice" $ do
+    --     (cs, cs') <- executeGF181 $ do
+    --       x <- inputUInt @8 Public
+    --       return $ setBit (setBit x 0 true) 1 true
+    --     print cs
+    --     -- print $ linkConstraintModule cs'
+    --     cs `shouldHaveSize` 24
+    --     cs' `shouldHaveSize` 24
+
+    --     it "U8 -> U16" $ do
+    --       (cs, cs') <- executeGF181 $ do
+    --         x <- inputUInt @8 Public
+    --         y <- inputUInt @8 Public
+    --         return $ u8ToU16 x y
+    --       print cs
+    --       cs `shouldHaveSize` 528
+    --       cs' `shouldHaveSize` 528
+    -- where
+    --   u8ToU16 :: UInt 8 -> UInt 8 -> UInt 16
+    --   u8ToU16 x y =
+    --     foldl (\n index -> setBit n (index + 8) (y !!! index)) (foldl (\n index -> setBit n index (x !!! index)) 0 [0 .. 7]) [0 .. 7]
 
     describe "Comparison computation" $ do
       it "x ≤ y" $ do
@@ -289,7 +313,7 @@ tests = do
             (12, 6), -- trailing zero: 2
             (13, 6), -- special case: only 3 possible values
             (14, 5), -- special case: only 2 possible values
-            (15, 8) -- special case: only 1 possible value
+            (15, 5) -- special case: only 1 possible value
           ]
           $ \(bound, expectedSize) -> do
             it ("x ≥ " <> show bound) $ do
@@ -341,7 +365,7 @@ tests = do
             (12, 6), -- trailing zero: 2
             (13, 8), -- special case: only 3 possible values
             (14, 7), -- special case: only 2 possible values
-            (15, 8) -- special case: only 1 possible value
+            (15, 6) -- special case: only 1 possible value
           ]
           $ \(bound, expectedSize) -> do
             it ("x ≥ " <> show bound) $ do
@@ -353,7 +377,7 @@ tests = do
               x <- inputUInt @4 Public
               assert $ x `lte` (bound :: UInt 4)
         forM_
-          [ (0, 8), -- special case: only 1 possible value
+          [ (0, 5), -- special case: only 1 possible value
             (1, 5), -- special case: only 2 possible value
             (2, 6), -- special case: only 3 possible value
             (3, 6), -- trailing one: 1
@@ -380,3 +404,5 @@ tests = do
             assert $ 0 `lte` (0 :: UInt 4)
           cs `shouldHaveSize` 0
           cs' `shouldHaveSize` 0
+
+    Misc.tests

@@ -32,7 +32,7 @@ import GHC.Num (integerLogBase)
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
 compilerVersion :: (Int, Int)
-compilerVersion = (0, 15)
+compilerVersion = (0, 16)
 
 patchVersion :: Int
 patchVersion = 0
@@ -47,18 +47,18 @@ versionString = intercalate "." [show (fst compilerVersion), show (snd compilerV
 --   the "inputs" field should contain both outputs & public inputs
 --   the "witnesses" field should contain private inputs & rest of the witnesses
 serializeInputAndWitness :: Integral n => Counters -> Vector n -> ByteString
-serializeInputAndWitness counters witness =
+serializeInputAndWitness counters witnessVec =
   let outputAndPublicInputCount = getCount counters Output + getCount counters PublicInput
-      (inputs, witnesses) = splitAt outputAndPublicInputCount $ toList witness
+      (inputs, witnesses) = splitAt outputAndPublicInputCount $ toList witnessVec
    in encodingToLazyByteString $
         pairs $
           pairStr "inputs" (list (integerText . toInteger) inputs)
             <> pairStr "witnesses" (list (integerText . toInteger) witnesses)
 
 serializeInputAndWitnessToBin :: Integral n => Integer -> Counters -> Vector n -> ByteString
-serializeInputAndWitnessToBin p counters witness =
+serializeInputAndWitnessToBin p counters witnessVec =
   let outputAndPublicInputCount = getCount counters Output + getCount counters PublicInput
-      (_, witnesses) = splitAt outputAndPublicInputCount $ toList witness
+      (_, witnesses) = splitAt outputAndPublicInputCount $ toList witnessVec
       -- Encode header (section 1) in little Endian style
       primeBS  = extendByteString primeLen $ integerToByteString p
       header   = toLazyByteString $ int32LE (fromIntegral primeLen)

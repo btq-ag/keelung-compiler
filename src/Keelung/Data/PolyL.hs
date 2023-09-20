@@ -29,7 +29,7 @@ import GHC.Generics (Generic)
 import Keelung.Data.Reference
 
 -- | Polynomial made of Limbs + a constant
-data PolyL n = PolyL n (Seq (RefL, n))
+data PolyL n = PolyL n (Seq (Limb, n))
   deriving (Eq, Functor, Ord, Generic, NFData)
 
 instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
@@ -44,7 +44,7 @@ instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
         [] -> error "[ panic ] Empty PolyG"
         (x' : xs') -> (x', xs')
       -- return a pair of the sign ("+" or "-") and the string representation
-      printTerm :: (Show n, Ord n, Eq n, Num n) => (RefL, n) -> [String]
+      printTerm :: (Show n, Ord n, Eq n, Num n) => (Limb, n) -> [String]
       printTerm (x, c)
         | c == 0 = error "printTerm: coefficient of 0"
         | c == 1 = [" + ", show x]
@@ -52,14 +52,14 @@ instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
         | c < 0 = [" - ", show (Prelude.negate c) <> show x]
         | otherwise = [" + ", show c <> show x]
 
-buildWithSeq :: (Num n, Eq n) => n -> Seq (RefL, n) -> PolyL n
+buildWithSeq :: (Num n, Eq n) => n -> Seq (Limb, n) -> PolyL n
 buildWithSeq = PolyL
 
-singleton :: (Num n, Eq n) => n -> (RefL, n) -> Either n (PolyL n)
+singleton :: (Num n, Eq n) => n -> (Limb, n) -> Either n (PolyL n)
 singleton c (_, 0) = Left c
 singleton c (x, coeff) = Right $ PolyL c (Seq.singleton (x, coeff))
 
-insert :: (Num n, Eq n) => n -> (RefL, n) -> PolyL n -> PolyL n
+insert :: (Num n, Eq n) => n -> (Limb, n) -> PolyL n -> PolyL n
 insert c' x (PolyL c xs) = PolyL (c + c') (x Seq.<| xs)
 
 addConstant :: Num n => n -> PolyL n -> PolyL n
@@ -70,16 +70,13 @@ multiplyBy :: (Num n, Eq n) => n -> PolyL n -> Either n (PolyL n)
 multiplyBy 0 _ = Left 0
 multiplyBy m (PolyL c xs) = Right $ PolyL (m * c) (fmap (second (m *)) xs)
 
-view :: PolyL n -> (n, Seq (RefL, n))
+view :: PolyL n -> (n, Seq (Limb, n))
 view (PolyL c xs) = (c, xs)
 
 vars :: PolyL n -> Set RefU
-vars (PolyL _ xs) = Set.fromList $ map (toRef . fst) (toList xs)
-  where
-    toRef :: RefL -> RefU
-    toRef (RefL (Limb ref _ _ _) _) = ref
+vars (PolyL _ xs) = Set.fromList $ map (lmbRef . fst) (toList xs)
 
-vars' :: PolyL n -> Set RefL
+vars' :: PolyL n -> Set Limb
 vars' (PolyL _ xs) = Set.fromList $ map fst (toList xs)
 
 merge :: (Num n, Eq n) => PolyL n -> PolyL n -> PolyL n
@@ -87,7 +84,4 @@ merge (PolyL c1 xs1) (PolyL c2 xs2) = PolyL (c1 + c2) (xs1 <> xs2)
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int
-size (PolyL c xs) = sum (fmap (widthOfRefL . fst) xs) + if c == 0 then 0 else 1
-  where
-    widthOfRefL :: RefL -> Int
-    widthOfRefL (RefL limb _) = lmbWidth limb
+size (PolyL c xs) = sum (fmap (lmbWidth . fst) xs) + if c == 0 then 0 else 1

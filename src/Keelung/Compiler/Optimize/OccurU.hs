@@ -26,7 +26,7 @@ import Keelung.Syntax.Counters
 import Prelude hiding (null)
 
 newtype OccurU
-  = OccurU (IntMap (IntMap Int))
+  = OccurU (IntMap (IntMap Int)) -- mapping of width to (mapping of var to count)
   deriving (Show, Eq, Generic)
 
 instance NFData OccurU

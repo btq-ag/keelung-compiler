@@ -133,21 +133,21 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       showMulF = adapt "MulF" (cmMulF cm) showMulF'
       showMulL = adapt "MulL" (cmMulL cm) showMulL'
 
-      showEqs = adapt "Eqs" (cmEqZeros cm) $ \(poly, m) ->
-        "Eqs " <> show poly <> " / " <> show m
+      showEqs = adapt "EqZeros" (cmEqZeros cm) $ \(poly, m) ->
+        "EqZeros " <> show poly <> " / " <> show m
 
       showOccurrencesF =
         if OccurF.null $ cmOccurrenceF cm
           then ""
-          else "  OccruencesF:\n  " <> indent (showList' (map (\(var, n) -> show (RefFX var) <> ": " <> show n) (OccurF.toList $ cmOccurrenceF cm)))
+          else "  OccurrencesF:\n  " <> indent (showList' (map (\(var, n) -> show (RefFX var) <> ": " <> show n) (OccurF.toList $ cmOccurrenceF cm)))
       showOccurrencesB =
         if OccurB.null $ cmOccurrenceB cm
           then ""
-          else "  OccruencesB:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurB.toList $ cmOccurrenceB cm)))
+          else "  OccurrencesB:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurB.toList $ cmOccurrenceB cm)))
       showOccurrencesU =
         if OccurU.null $ cmOccurrenceU cm
           then ""
-          else "  OccruencesU:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurU.toList $ cmOccurrenceU cm)))
+          else "  OccurrencesU:\n  " <> indent (showList' (map (\(width, occurs) -> "UInt " <> show width <> ": " <> showList' (map (\(var, n) -> show (RefUX width var) <> ": " <> show n) (IntMap.toList occurs))) (OccurU.toList $ cmOccurrenceU cm)))
 
       showAdd xs = "0 = " <> show xs
 
@@ -397,6 +397,6 @@ instance UpdateOccurrences RefU where
           )
       )
 
-instance UpdateOccurrences RefL where
-  addOccurrences = addOccurrences . Set.map (lmbRef . refLLimb)
-  removeOccurrences = removeOccurrences . Set.map (lmbRef . refLLimb)
+instance UpdateOccurrences Limb where
+  addOccurrences = addOccurrences . Set.map lmbRef
+  removeOccurrences = removeOccurrences . Set.map lmbRef

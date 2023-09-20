@@ -5,6 +5,7 @@ module Keelung.Compiler.Relations.UInt
     new,
     assign,
     relate,
+    lookup,
     relationBetween,
     toMap,
     size,
@@ -12,56 +13,56 @@ module Keelung.Compiler.Relations.UInt
   )
 where
 
--- import Control.DeepSeq (NFData)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
--- import GHC.Generics (Generic)
+import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Data.Reference
+import Keelung.Interpreter.Arithmetics (U)
+import Keelung.Interpreter.Arithmetics qualified as U
 import Prelude hiding (lookup)
 
 type UIntRelations =
   EquivClass.EquivClass
-    RefL
+    RefU -- relations on RefUs
     Integer -- constants can be represented as integers
-    () -- only allowing RefLs of the same width to be related (as equal) at the moment
+    () -- only allowing RefU of the same width to be related (as equal) at the moment
 
 new :: UIntRelations
-new = EquivClass.new "UInt (RefL Equivalence)"
+new = EquivClass.new "UInt (RefU Equivalence)"
 
-instance EquivClass.IsRelation () where
-  relationToString (var, ()) = var
-  invertRel () = Just ()
-
-instance EquivClass.ExecRelation Integer () where
-  execRel () value = value
-
--- | Assigning a constant value to a limb
-assign :: RefL -> Integer -> UIntRelations -> EquivClass.M (Error n) UIntRelations
+-- | Assigning a constant value to a RefU
+assign :: RefU -> Integer -> UIntRelations -> EquivClass.M (Error n) UIntRelations
 assign var val xs = mapError $ EquivClass.assign var val xs
 
--- | Relate two limbs (that has the same width)
-relate :: RefL -> RefL -> UIntRelations -> EquivClass.M (Error n) UIntRelations
+-- | Relate two RefUs of the same width
+relate :: RefU -> RefU -> UIntRelations -> EquivClass.M (Error n) UIntRelations
 relate var1 var2 xs =
-  if lmbWidth (refLLimb var1) /= lmbWidth (refLLimb var2) || refLPowerOffset var1 /= refLPowerOffset var2
+  if widthOf var1 /= widthOf var2
     then pure xs
     else mapError $ EquivClass.relate var1 () var2 xs
 
--- | Examine the relation between two limbs
-relationBetween :: RefL -> RefL -> UIntRelations -> Bool
+lookup :: UIntRelations -> RefU -> Either RefU U
+lookup xs var = case EquivClass.lookup var xs of
+  EquivClass.IsConstant constant -> Right (U.new (widthOf var) constant)
+  EquivClass.IsRoot _ -> Left var
+  EquivClass.IsChildOf root () -> Left root
+
+-- | Examine the relation between two RefUs
+relationBetween :: RefU -> RefU -> UIntRelations -> Bool
 relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
   Nothing -> False
   Just () -> True
 
--- | Given a predicate, convert the relations to a mapping of Limbs to either some other Limb or a constant value
-toMap :: (RefL -> Bool) -> UIntRelations -> Map RefL (Either RefL Integer)
+-- | Given a predicate, convert the relations to a mapping of RefUs to either some other RefU or a constant value
+toMap :: (RefU -> Bool) -> UIntRelations -> Map RefU (Either RefU U)
 toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
   where
     convert var status = do
       if shouldBeKept var
         then case status of
-          EquivClass.IsConstant val -> Just (Right val)
+          EquivClass.IsConstant val -> Just (Right (U.new (widthOf var) val))
           EquivClass.IsRoot _ -> Nothing
           EquivClass.IsChildOf parent () ->
             if shouldBeKept parent

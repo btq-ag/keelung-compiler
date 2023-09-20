@@ -4,8 +4,8 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
-import Keelung.Data.FieldInfo
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.FieldInfo
 import Keelung.Syntax (HasWidth (widthOf), Var)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax qualified as T
@@ -62,7 +62,7 @@ convertExprB expr = case expr of
   T.VarBP var -> return $ VarBP var
   T.AndB x y -> chainExprsOfAssocOpAndB <$> convertExprB x <*> convertExprB y
   T.OrB x y -> chainExprsOfAssocOpOrB <$> convertExprB x <*> convertExprB y
-  T.XorB x y -> XorB <$> convertExprB x <*> convertExprB y
+  T.XorB x y -> chainExprsOfAssocOpXorB <$> convertExprB x <*> convertExprB y
   T.NotB x -> NotB <$> convertExprB x
   T.IfB p x y -> IfB <$> convertExprB p <*> convertExprB x <*> convertExprB y
   T.EqB x y -> EqB <$> convertExprB x <*> convertExprB y
@@ -98,10 +98,11 @@ convertExprU expr = case expr of
   T.AddU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure True
   T.SubU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure False
   T.MulU w x y -> MulU w <$> convertExprU x <*> convertExprU y
+  T.CLMulU w x y -> CLMulU w <$> convertExprU x <*> convertExprU y
   T.MMIU w x p -> MMIU w <$> convertExprU x <*> pure p
   T.AndU w x y -> chainExprsOfAssocOpAndU w <$> convertExprU x <*> convertExprU y
   T.OrU w x y -> chainExprsOfAssocOpOrU w <$> convertExprU x <*> convertExprU y
-  T.XorU w x y -> XorU w <$> convertExprU x <*> convertExprU y
+  T.XorU w x y -> chainExprsOfAssocOpXorU w <$> convertExprU x <*> convertExprU y
   T.NotU w x -> NotU w <$> convertExprU x
   T.RoLU w i x -> RoLU w i <$> convertExprU x
   T.ShLU w i x -> ShLU w i <$> convertExprU x
@@ -207,6 +208,17 @@ chainExprsOfAssocOpOrB x y = case (x, y) of
   -- there's nothing left we can do
   _ -> OrB (x :<| y :<| mempty)
 
+chainExprsOfAssocOpXorB :: ExprB n -> ExprB n -> ExprB n
+chainExprsOfAssocOpXorB x y = case (x, y) of
+  (XorB xs, XorB ys) ->
+    XorB (xs <> ys)
+  (XorB xs, _) ->
+    XorB (xs |> y)
+  (_, XorB ys) ->
+    XorB (x :<| ys)
+  -- there's nothing left we can do
+  _ -> XorB (x :<| y :<| mempty)
+
 chainExprsOfAssocOpOrU :: Width -> ExprU n -> ExprU n -> ExprU n
 chainExprsOfAssocOpOrU w x y = case (x, y) of
   (OrU _ xs, OrU _ ys) ->
@@ -217,3 +229,14 @@ chainExprsOfAssocOpOrU w x y = case (x, y) of
     OrU w (x :<| ys)
   -- there's nothing left we can do
   _ -> OrU w (x :<| y :<| mempty)
+
+chainExprsOfAssocOpXorU :: Width -> ExprU n -> ExprU n -> ExprU n
+chainExprsOfAssocOpXorU w x y = case (x, y) of
+  (XorU _ xs, XorU _ ys) ->
+    XorU w (xs <> ys)
+  (XorU _ xs, _) ->
+    XorU w (xs |> y)
+  (_, XorU _ ys) ->
+    XorU w (x :<| ys)
+  -- there's nothing left we can do
+  _ -> XorU w (x :<| y :<| mempty)

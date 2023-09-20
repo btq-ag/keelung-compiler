@@ -8,6 +8,7 @@ import Data.Bits qualified
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq)
+import Data.Word (Word32)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.ConstraintModule
@@ -24,9 +25,8 @@ import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
-import Keelung.Interpreter.Arithmetics (U (UVal))
+import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax.Counters
-import Data.Word (Word32)
 
 --------------------------------------------------------------------------------
 
@@ -168,11 +168,11 @@ addC = mapM_ addOne
     addOne (CVarBindF x c) = do
       execRelations $ Relations.assignF x c
     addOne (CVarBindB x c) = do
-      countBitTestAsOccurU (B x)
       execRelations $ Relations.assignB x c
     addOne (CVarBindL x c) = do
-      -- countBitTestAsOccurU (B x)
       execRelations $ Relations.assignL x c
+    addOne (CVarBindU x c) = do
+      execRelations $ Relations.assignU x c
     addOne (CVarEq x y) = do
       countBitTestAsOccurU x
       countBitTestAsOccurU y
@@ -185,6 +185,8 @@ addC = mapM_ addOne
       execRelations $ Relations.relateB x (True, y)
     addOne (CVarEqL x y) = do
       execRelations $ Relations.relateL x y
+    addOne (CVarEqU x y) = do
+      execRelations $ Relations.relateU x y
     addOne (CVarNEqB x y) = do
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
@@ -199,8 +201,8 @@ addC = mapM_ addOne
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
 writeMul as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.build as) (fromEither $ uncurry PolyG.build bs) (fromEither $ uncurry PolyG.build cs)
 
-writeMulWithRefLs :: (GaloisField n, Integral n) => (n, Seq (RefL, n)) -> (n, Seq (RefL, n)) -> (n, Seq (RefL, n)) -> M n ()
-writeMulWithRefLs as bs cs =
+writeMulWithLimbs :: (GaloisField n, Integral n) => (n, Seq (Limb, n)) -> (n, Seq (Limb, n)) -> (n, Seq (Limb, n)) -> M n ()
+writeMulWithLimbs as bs cs =
   addC
     [ CMulL
         (uncurry PolyL.buildWithSeq as)
@@ -211,8 +213,8 @@ writeMulWithRefLs as bs cs =
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPolyG (PolyG.build c as)
 
-writeAddWithRefLs :: (GaloisField n, Integral n) => n -> Seq (RefL, n) -> M n ()
-writeAddWithRefLs c as = addC [CAddL (PolyL.buildWithSeq c as)]
+writeAddWithLimbs :: (GaloisField n, Integral n) => n -> Seq (Limb, n) -> M n ()
+writeAddWithLimbs c as = addC [CAddL (PolyL.buildWithSeq c as)]
 
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x
@@ -224,10 +226,10 @@ writeValF a x = addC [CVarBindF (F a) x]
 writeValB :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
 writeValB a x = addC [CVarBindB a x]
 
-writeValU :: (GaloisField n, Integral n) => Width -> RefU -> Integer -> M n ()
-writeValU width a x = forM_ [0 .. width - 1] $ \i -> writeValB (RefUBit width a i) (Data.Bits.testBit x i)
+writeValU :: (GaloisField n, Integral n) => RefU -> Integer -> M n ()
+writeValU a x = addC [CVarBindU a x]
 
-writeValL :: (GaloisField n, Integral n) => RefL -> Integer -> M n ()
+writeValL :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
 writeValL a x = addC [CVarBindL a x]
 
 writeEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
@@ -242,10 +244,10 @@ writeEqB a b = addC [CVarEqB a b]
 writeNEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
 writeNEqB a b = addC [CVarNEqB a b]
 
-writeEqU :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n ()
-writeEqU width a b = forM_ [0 .. width - 1] $ \i -> writeEqB (RefUBit width a i) (RefUBit width b i)
+writeEqU :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
+writeEqU a b = addC [CVarEqU a b]
 
-writeEqL :: (GaloisField n, Integral n) => RefL -> RefL -> M n ()
+writeEqL :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
 writeEqL a b = addC [CVarEqL a b]
 
 --------------------------------------------------------------------------------
@@ -263,10 +265,10 @@ addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
 addDivModHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> M n ()
-addDivModHint w x y q r = modify' $ \cs -> cs {cmDivMods = (right (UVal w) x, right (UVal w) y, right (UVal w) q, right (UVal w) r) : cmDivMods cs}
+addDivModHint w x y q r = modify' $ \cs -> cs {cmDivMods = (right (U.new w) x, right (U.new w) y, right (U.new w) q, right (U.new w) r) : cmDivMods cs}
 
 addModInvHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Integer -> M n ()
-addModInvHint w a output n p = modify' $ \cs -> cs {cmModInvs = (right (UVal w) a, right (UVal w) output, right (UVal w) n, UVal w p) : cmModInvs cs}
+addModInvHint w a output n p = modify' $ \cs -> cs {cmModInvs = (right (U.new w) a, right (U.new w) output, right (U.new w) n, U.new w p) : cmModInvs cs}
 
 --------------------------------------------------------------------------------
 
@@ -306,6 +308,20 @@ eqZero isEq (Polynomial polynomial) = do
   --  keep track of the relation between (x - y) and m
   addEqZeroHintWithPoly (Right polynomial) m
   return (Left out)
+
+-- | See if a LC is odd.
+--    introduce a new Field variable q
+--    introduce a new Boolean variable r
+--    constraint:
+--      polynomial = q * 2 + r
+--    return r as the result
+isOdd :: (GaloisField n, Integral n) => LC n -> M n (Either RefB Bool)
+isOdd (Constant constant) = return $ Right $ odd constant
+isOdd (Polynomial polynomial) = do
+  q <- freshRefF
+  r <- freshRefB
+  writeAddWithLC (Polynomial polynomial <> neg (2 @ F q) <> neg (1 @ B r)) -- polynomial - 2 * q - r
+  return (Left r)
 
 --------------------------------------------------------------------------------
 

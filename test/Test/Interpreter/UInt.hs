@@ -7,7 +7,9 @@ import Data.Bits qualified
 import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compiler
+import Keelung.Interpreter qualified as Interpreter
 import Keelung.Interpreter.Arithmetics qualified as Arithmetics
+import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Solver qualified as Solver
 import Test.Hspec
 import Test.Interpreter.UInt.Addition qualified as Addition
@@ -16,7 +18,7 @@ import Test.Interpreter.UInt.DivMod qualified as DivMod
 import Test.Interpreter.UInt.Multiplication qualified as Multiplication
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
-import qualified Keelung.Interpreter as Interpreter
+import qualified Test.Interpreter.UInt.CLMul as CLMul
 
 run :: IO ()
 run = hspec tests
@@ -35,6 +37,7 @@ tests = do
       Addition.tests
 
       Multiplication.tests
+      CLMul.tests
 
       DivMod.tests
       Comparison.tests
@@ -198,7 +201,7 @@ tests = do
                 x <- inputUInt @8 Public
                 return $ complement x
           forAll (choose (0, 255)) $ \x -> do
-            let uint = Arithmetics.UVal 8 x
+            let uint = U.new 8 x
             let expected = [Arithmetics.uintValue (Data.Bits.complement uint)]
             runAll (Prime 13) program [Arithmetics.uintValue uint] [] expected
 
@@ -206,7 +209,7 @@ tests = do
           let program x = do
                 return $ complement (x :: UInt 8)
           forAll (choose (0, 255)) $ \x -> do
-            let uint = Arithmetics.UVal 8 x
+            let uint = U.new 8 x
             let expected = [Arithmetics.uintValue (Data.Bits.complement uint)]
             runAll (Prime 13) (program (fromInteger x)) [] [] expected
 

@@ -24,7 +24,7 @@ assertLTE width (Left a) bound
   | bound >= 2 ^ width - 1 = throwError $ Error.AssertLTEBoundTooLargeError bound width
   | bound == 0 = do
       -- there's only 1 possible value for `a`, which is `0`
-      writeValU width a 0
+      writeValU a 0
   | bound == 1 = do
       -- there are 2 possible values for `a`, which are `0` and `1`
       -- we can use these 2 values as the only roots of the following multiplicative polynomial
@@ -132,7 +132,7 @@ assertGTE width (Left a) bound
   | bound >= 2 ^ width = throwError $ Error.AssertGTEBoundTooLargeError bound width
   | bound == 2 ^ width - 1 = do
       -- there's only 1 possible value for `a`, which is `2^width - 1`
-      writeValU width a (2 ^ width - 1)
+      writeValU a (2 ^ width - 1)
   | bound == 2 ^ width - 2 = do
       -- there's only 2 possible value for `a`, which is `2^width - 1` or `2^width - 2`
       -- we can use these 2 values as the only roots of the following multiplicative polynomial

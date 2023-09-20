@@ -35,6 +35,7 @@ library
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Multiplication
       Keelung.Compiler.Compile.Util
@@ -52,6 +53,7 @@ library
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.Limb
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
@@ -111,6 +113,7 @@ executable keelungc
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Multiplication
       Keelung.Compiler.Compile.Util
@@ -128,6 +131,7 @@ executable keelungc
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.Limb
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
@@ -192,6 +196,7 @@ test-suite keelung-test
       Test.Interpreter.UInt
       Test.Interpreter.UInt.Addition
       Test.Interpreter.UInt.Bitwise
+      Test.Interpreter.UInt.CLMul
       Test.Interpreter.UInt.Comparison
       Test.Interpreter.UInt.DivMod
       Test.Interpreter.UInt.ModInv
@@ -201,6 +206,7 @@ test-suite keelung-test
       Test.Optimization.Boolean
       Test.Optimization.Field
       Test.Optimization.UInt
+      Test.Optimization.UInt.Misc
       Test.Optimization.Util
       Test.PolyG
       Test.Relations.Boolean
@@ -217,6 +223,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Multiplication
       Keelung.Compiler.Compile.Util
@@ -234,6 +241,7 @@ test-suite keelung-test
       Keelung.Compiler.Relations.Boolean
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Field
+      Keelung.Compiler.Relations.Limb
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs

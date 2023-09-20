@@ -1,5 +1,5 @@
 name:                keelung-compiler
-version:             0.15.0
+version:             0.16.0
 github:              "btq-ag/keelung-compiler"
 license:             BSD3
 author:              "BTQ AG"

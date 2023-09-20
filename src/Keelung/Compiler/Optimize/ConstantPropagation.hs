@@ -102,10 +102,11 @@ propagateExprU e = do
     VarUP _ _ -> return e -- no constant propagation for private input variables
     AddU w xs -> AddU w <$> mapM (\(x, sign) -> (,sign) <$> propagateExprU x) xs
     MulU w x y -> MulU w <$> propagateExprU x <*> propagateExprU y
+    CLMulU w x y -> CLMulU w <$> propagateExprU x <*> propagateExprU y
     MMIU w x p -> MMIU w <$> propagateExprU x <*> pure p
     AndU w xs -> AndU w <$> mapM propagateExprU xs
     OrU w xs -> OrU w <$> mapM propagateExprU xs
-    XorU w x y -> XorU w <$> propagateExprU x <*> propagateExprU y
+    XorU w xs -> XorU w <$> mapM propagateExprU xs
     NotU w x -> NotU w <$> propagateExprU x
     IfU w p x y -> IfU w <$> propagateExprB p <*> propagateExprU x <*> propagateExprU y
     RoLU w i x -> RoLU w i <$> propagateExprU x
@@ -130,7 +131,7 @@ propagateExprB e = do
     VarBP _ -> return e -- no constant propagation for private input variables
     AndB xs -> AndB <$> mapM propagateExprB xs
     OrB xs -> OrB <$> mapM propagateExprB xs
-    XorB x y -> XorB <$> propagateExprB x <*> propagateExprB y
+    XorB xs -> XorB <$> mapM propagateExprB xs
     NotB x -> NotB <$> propagateExprB x
     IfB p x y -> IfB <$> propagateExprB p <*> propagateExprB x <*> propagateExprB y
     NEqB x y -> NEqB <$> propagateExprB x <*> propagateExprB y

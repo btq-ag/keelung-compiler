@@ -16,6 +16,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.UInt.Addition
+import Keelung.Compiler.Compile.UInt.CLMul
 import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.Multiplication
 import Keelung.Compiler.Compile.Util
@@ -27,11 +28,11 @@ import Keelung.Syntax (HasWidth (widthOf))
 
 compile :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compile out expr = case expr of
-  ValU width val -> writeValU width out val
-  VarU width var -> writeEqU width out (RefUX width var)
-  VarUO width var -> writeEqU width out (RefUX width var)
-  VarUI width var -> writeEqU width out (RefUI width var)
-  VarUP width var -> writeEqU width out (RefUP width var)
+  ValU _ val -> writeValU out val
+  VarU width var -> writeEqU out (RefUX width var)
+  VarUO width var -> writeEqU out (RefUO width var)
+  VarUI width var -> writeEqU out (RefUI width var)
+  VarUP width var -> writeEqU out (RefUP width var)
   AddU w xs -> do
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = Either.partitionEithers mixed
@@ -40,6 +41,10 @@ compile out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileMulU w out x' y'
+  CLMulU w x y -> do
+    x' <- wireU x
+    y' <- wireU y
+    compileCLMulU w out x' y'
   MMIU w a p -> do
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
     a' <- wireU a
@@ -56,9 +61,9 @@ compile out expr = case expr of
       case result of
         Left var -> writeEqB (RefUBit w out i) var
         Right val -> writeValB (RefUBit w out i) val
-  XorU w x y -> do
+  XorU w xs -> do
     forM_ [0 .. w - 1] $ \i -> do
-      result <- compileExprB (XorB (BitU x i) (BitU y i))
+      result <- compileExprB (XorB (fmap (`BitU` i) xs))
       case result of
         Left var -> writeEqB (RefUBit w out i) var
         Right val -> writeValB (RefUBit w out i) val
@@ -74,8 +79,8 @@ compile out expr = case expr of
     y' <- wireU y
     result <- compileIfU w p' x' y'
     case result of
-      Left var -> writeEqU w out var
-      Right val -> writeValU w out val
+      Left var -> writeEqU out var
+      Right val -> writeValU out val
   RoLU w n x -> do
     result <- wireU x
     case result of
@@ -91,8 +96,8 @@ compile out expr = case expr of
     x' <- wireU x
     case compare n 0 of
       EQ -> case x' of
-        Left var -> writeEqU w out var
-        Right val -> writeValU w out val
+        Left var -> writeEqU out var
+        Right val -> writeValU out val
       GT -> do
         -- fill lower bits with 0s
         forM_ [0 .. n - 1] $ \i -> do

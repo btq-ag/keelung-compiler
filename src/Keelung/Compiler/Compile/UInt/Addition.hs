@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Keelung.Compiler.Compile.UInt.Addition (Dimensions (..), addLimbColumn, compileAddU, compileSubU, allocLimb) where
 
 import Control.Monad.Except
@@ -155,20 +157,20 @@ splitLimbStack dimensions (LimbColumn constant limbs) =
 addLimbStack :: (GaloisField n, Integral n) => Limb -> LimbStack -> M n LimbColumn
 addLimbStack resultLimb (OneConstantOnly constant) = do
   -- no limb => result = constant, no carry
-  writeValL (RefL resultLimb 0) constant
+  writeValL resultLimb constant
   return mempty
 addLimbStack resultLimb (OneLimbOnly limb) = do
-  writeEqL (RefL resultLimb 0) (RefL limb 0)
+  writeEqL resultLimb limb
   return mempty
 addLimbStack resultLimb (Ordinary constant limbs) = do
   let carrySigns = calculateCarrySigns (lmbWidth resultLimb) constant limbs
   carryLimb <- allocCarryLimb (length carrySigns) (lmbOffset resultLimb) carrySigns
-  writeAddWithRefLs (fromInteger constant) $
+  writeAddWithLimbs (fromInteger constant) $
     -- positive side
-    fmap (toRefL True) limbs
+    fmap (, 1) limbs
       -- negative side
-      Seq.:|> toRefL False resultLimb
-      Seq.:|> toRefLShifted (lmbWidth resultLimb) False carryLimb
+      Seq.:|> (resultLimb, -1)
+      Seq.:|> (carryLimb, -(2 ^ lmbWidth resultLimb))
   return $ LimbColumn.singleton carryLimb
 
 allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb

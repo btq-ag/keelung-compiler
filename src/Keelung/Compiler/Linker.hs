@@ -27,9 +27,12 @@ import Keelung.Compiler.Relations.Boolean (BooleanRelations)
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as Relations
+import Keelung.Compiler.Relations.Limb (LimbRelations)
+import Keelung.Compiler.Relations.Limb qualified as LimbRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Data.Constraint
+import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL
@@ -53,6 +56,7 @@ linkConstraintModule cm =
         varEqFs
           <> varEqBs
           <> varEqLs
+          <> varEqUs
           <> addFs
           <> addLs
           <> mulFs
@@ -65,6 +69,8 @@ linkConstraintModule cm =
     !occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
     !counters = updateCounters occurrences (cmCounters cm)
     uncurry3 f (a, b, c) = f a b c
+
+    fieldWidth = FieldInfo.fieldWidth (cmField cm)
 
     extractFieldRelations :: (GaloisField n, Integral n) => Relations n -> Seq (Linked.Constraint n)
     extractFieldRelations relations =
@@ -79,7 +85,7 @@ linkConstraintModule cm =
                 Right poly -> CAddG poly
 
           result = map convert $ Map.toList $ Relations.toInt shouldBeKept relations
-       in Seq.fromList (map (linkConstraint occurrences) result)
+       in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
 
     shouldBeKept :: Ref -> Bool
     shouldBeKept (F ref) = refFShouldBeKept ref
@@ -106,8 +112,8 @@ linkConstraintModule cm =
         -- it's a pinned UInt variable
         True
 
-    refLShouldBeKept :: RefL -> Bool
-    refLShouldBeKept = refUShouldBeKept . lmbRef . refLLimb
+    limbShouldBeKept :: Limb -> Bool
+    limbShouldBeKept = refUShouldBeKept . lmbRef
 
     refBShouldBeKept :: RefB -> Bool
     refBShouldBeKept ref = case ref of
@@ -133,25 +139,34 @@ linkConstraintModule cm =
               else CVarNEqB var root
 
           result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
-       in Seq.fromList (map (linkConstraint occurrences) result)
+       in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
 
-    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
-    extractUIntRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefL, Either RefL Integer) -> Constraint n
+    extractLimbRelations :: (GaloisField n, Integral n) => LimbRelations -> Seq (Linked.Constraint n)
+    extractLimbRelations relations =
+      let convert :: (GaloisField n, Integral n) => (Limb, Either Limb Integer) -> Constraint n
           convert (var, Right val) = CVarBindL var val
           convert (var, Left root) = CVarEqL var root
 
-          result = map convert $ Map.toList $ UIntRelations.toMap refLShouldBeKept relations
-       in Seq.fromList (map (linkConstraint occurrences) result)
+          result = map convert $ Map.toList $ LimbRelations.toMap limbShouldBeKept relations
+       in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
+
+    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
+    extractUIntRelations relations =
+      let convert :: (GaloisField n, Integral n) => (RefU, Either RefU U) -> Constraint n
+          convert (var, Right val) = CVarBindU var (U.uintValue val)
+          convert (var, Left root) = CVarEqU var root
+          result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
+       in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
 
     varEqFs = extractFieldRelations (cmRelations cm)
     varEqBs = extractBooleanRelations (Relations.exportBooleanRelations (cmRelations cm))
-    varEqLs = extractUIntRelations (Relations.exportUIntRelations (cmRelations cm))
+    varEqLs = extractLimbRelations (Relations.exportLimbRelations (cmRelations cm))
+    varEqUs = extractUIntRelations (Relations.exportUIntRelations (cmRelations cm))
 
-    addFs = Seq.fromList $ map (linkConstraint occurrences . CAddG) $ cmAddF cm
-    addLs = Seq.fromList $ map (linkConstraint occurrences . CAddL) $ cmAddL cm
-    mulFs = Seq.fromList $ map (linkConstraint occurrences . uncurry3 CMulF) $ cmMulF cm
-    mulLs = Seq.fromList $ map (linkConstraint occurrences . uncurry3 CMulL) $ cmMulL cm
+    addFs = Seq.fromList $ linkConstraint occurrences fieldWidth . CAddG =<< cmAddF cm
+    addLs = Seq.fromList $ linkConstraint occurrences fieldWidth . CAddL =<< cmAddL cm
+    mulFs = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry3 CMulF =<< cmMulF cm
+    mulLs = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry3 CMulL =<< cmMulL cm
     eqZeros = Seq.fromList $ map (bimap (linkPolyGUnsafe occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
@@ -163,60 +178,71 @@ linkConstraintModule cm =
 
 -------------------------------------------------------------------------------
 
-linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Constraint n -> Linked.Constraint n
-linkConstraint occurrences (CAddG as) = Linked.CAdd (linkPolyGUnsafe occurrences as)
-linkConstraint occurrences (CAddL as) = Linked.CAdd (linkPolyLUnsafe occurrences as)
-linkConstraint occurrences (CVarEq x y) =
+linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Width -> Constraint n -> [Linked.Constraint n]
+linkConstraint occurrences _ (CAddG as) = [Linked.CAdd (linkPolyGUnsafe occurrences as)]
+linkConstraint occurrences _ (CAddL as) = [Linked.CAdd (linkPolyLUnsafe occurrences as)]
+linkConstraint occurrences _ (CVarEq x y) =
   case Poly.buildEither 0 [(reindexRef occurrences x, 1), (reindexRef occurrences y, -1)] of
     Left _ -> error "CVarEq: two variables are the same"
-    Right xs -> Linked.CAdd xs
-linkConstraint occurrences (CVarEqF x y) =
+    Right xs -> [Linked.CAdd xs]
+linkConstraint occurrences _ (CVarEqF x y) =
   case Poly.buildEither 0 [(reindexRefF occurrences x, 1), (reindexRefF occurrences y, -1)] of
     Left _ -> error "CVarEqF: two variables are the same"
-    Right xs -> Linked.CAdd xs
-linkConstraint occurrences (CVarEqB x y) =
+    Right xs -> [Linked.CAdd xs]
+linkConstraint occurrences _ (CVarEqB x y) =
   case Poly.buildEither 0 [(reindexRefB occurrences x, 1), (reindexRefB occurrences y, -1)] of
     Left _ -> error $ "CVarEqB: two variables are the same" ++ show x ++ " " ++ show y
-    Right xs -> Linked.CAdd xs
-linkConstraint occurrences (CVarNEqB x y) =
+    Right xs -> [Linked.CAdd xs]
+linkConstraint occurrences _ (CVarNEqB x y) =
   case Poly.buildEither 1 [(reindexRefB occurrences x, -1), (reindexRefB occurrences y, -1)] of
     Left _ -> error "CVarNEqB: two variables are the same"
-    Right xs -> Linked.CAdd xs
-linkConstraint occurrences (CVarEqL x y) =
-  if lmbWidth (refLLimb x) /= lmbWidth (refLLimb y)
+    Right xs -> [Linked.CAdd xs]
+linkConstraint occurrences _ (CVarEqL x y) =
+  if lmbWidth x /= lmbWidth y
     then error "[ panic ] CVarEqL: Limbs are of different width"
     else do
-      let pairsX = reindexRefL occurrences x 1
-      let pairsY = reindexRefL occurrences y (-1)
+      let pairsX = reindexLimb occurrences x 1
+      let pairsY = reindexLimb occurrences y (-1)
       let pairs = toList (pairsX <> pairsY)
       case Poly.buildEither 0 pairs of
         Left _ -> error "CVarEqL: two variables are the same"
-        Right xs -> Linked.CAdd xs
-linkConstraint occurrences (CVarBindF x n) = case Poly.buildEither (-n) [(reindexRef occurrences x, 1)] of
+        Right xs -> [Linked.CAdd xs]
+linkConstraint occurrences fieldWidth (CVarEqU x y) =
+  let cVarEqLs = zipWith CVarEqL (refUToLimbs fieldWidth x) (refUToLimbs fieldWidth y)
+   in cVarEqLs >>= linkConstraint occurrences fieldWidth
+linkConstraint occurrences _ (CVarBindF x n) = case Poly.buildEither (-n) [(reindexRef occurrences x, 1)] of
   Left _ -> error "CVarBindF: impossible"
-  Right xs -> Linked.CAdd xs
-linkConstraint occurrences (CVarBindB x True) = Linked.CAdd (Poly.bind (reindexRefB occurrences x) 1)
-linkConstraint occurrences (CVarBindB x False) = Linked.CAdd (Poly.bind (reindexRefB occurrences x) 0)
-linkConstraint occurrences (CVarBindL x n) = do
-  case Poly.buildEither (fromInteger (-n)) (toList (reindexRefL occurrences x 1)) of
+  Right xs -> [Linked.CAdd xs]
+linkConstraint occurrences _ (CVarBindB x True) = [Linked.CAdd (Poly.bind (reindexRefB occurrences x) 1)]
+linkConstraint occurrences _ (CVarBindB x False) = [Linked.CAdd (Poly.bind (reindexRefB occurrences x) 0)]
+linkConstraint occurrences _ (CVarBindL x n) = do
+  case Poly.buildEither (fromInteger (-n)) (toList (reindexLimb occurrences x 1)) of
     Left _ -> error "CVarBindL: impossible"
-    Right xs -> Linked.CAdd xs
-linkConstraint occurrences (CMulF as bs cs) =
-  Linked.CMul
-    (linkPolyGUnsafe occurrences as)
-    (linkPolyGUnsafe occurrences bs)
-    ( case cs of
-        Left n -> Left n
-        Right xs -> linkPolyG occurrences xs
-    )
-linkConstraint occurrences (CMulL as bs cs) =
-  Linked.CMul
-    (linkPolyLUnsafe occurrences as)
-    (linkPolyLUnsafe occurrences bs)
-    ( case cs of
-        Left n -> Left n
-        Right xs -> linkPolyL occurrences xs
-    )
+    Right xs -> [Linked.CAdd xs]
+linkConstraint occurrences fieldWidth (CVarBindU x n) =
+  -- split the Integer into smaller chunks of size `fieldWidth`
+  let number = U.new (widthOf x) n
+      chunks = map U.uintValue (U.chunksU fieldWidth number)
+      cVarBindLs = zipWith CVarBindL (refUToLimbs fieldWidth x) chunks
+   in cVarBindLs >>= linkConstraint occurrences fieldWidth
+linkConstraint occurrences _ (CMulF as bs cs) =
+  [ Linked.CMul
+      (linkPolyGUnsafe occurrences as)
+      (linkPolyGUnsafe occurrences bs)
+      ( case cs of
+          Left n -> Left n
+          Right xs -> linkPolyG occurrences xs
+      )
+  ]
+linkConstraint occurrences _ (CMulL as bs cs) =
+  [ Linked.CMul
+      (linkPolyLUnsafe occurrences as)
+      (linkPolyLUnsafe occurrences bs)
+      ( case cs of
+          Left n -> Left n
+          Right xs -> linkPolyL occurrences xs
+      )
+  ]
 
 updateCounters :: Occurrences -> Counters -> Counters
 updateCounters occurrences counters =
@@ -239,7 +265,9 @@ linkPolyGUnsafe occurrences xs = case linkPolyG occurrences xs of
   Right p -> p
 
 linkPolyL :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Either n (Poly n)
-linkPolyL occurrences poly = let (constant, limbs) = PolyL.view poly in Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexRefL occurrences)) (toList limbs))
+linkPolyL occurrences poly =
+  let (constant, limbs) = PolyL.view poly
+   in Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexLimb occurrences)) (toList limbs))
 
 linkPolyLUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Poly n
 linkPolyLUnsafe occurrences xs = case linkPolyL occurrences xs of
@@ -252,15 +280,15 @@ reindexRef :: Occurrences -> Ref -> Var
 reindexRef occurrences (F x) = reindexRefF occurrences x
 reindexRef occurrences (B x) = reindexRefB occurrences x
 
-reindexRefL :: (Integral n, GaloisField n) => Occurrences -> RefL -> n -> Seq (Var, n)
-reindexRefL occurrences (RefL limb powerOffset) multiplier = case lmbSigns limb of
+reindexLimb :: (Integral n, GaloisField n) => Occurrences -> Limb -> n -> Seq (Var, n)
+reindexLimb occurrences limb multiplier = case lmbSigns limb of
   Left sign ->
     Seq.fromList
       [ ( reindexRefU
             occurrences
             (lmbRef limb)
             (i + lmbOffset limb),
-          (2 ^ (i + powerOffset)) * if sign then multiplier else (-multiplier)
+          (2 ^ i) * if sign then multiplier else (-multiplier)
         )
         | i <- [0 .. lmbWidth limb - 1]
       ]
@@ -270,7 +298,7 @@ reindexRefL occurrences (RefL limb powerOffset) multiplier = case lmbSigns limb 
             occurrences
             (lmbRef limb)
             (i + lmbOffset limb),
-          (2 ^ (i + powerOffset)) * if sign then multiplier else (-multiplier)
+          (2 ^ i) * if sign then multiplier else (-multiplier)
         )
         | (i, sign) <- zip [0 .. lmbWidth limb - 1] signs
       ]
