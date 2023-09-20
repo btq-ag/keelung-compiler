@@ -136,8 +136,8 @@ relateRefs x slope y intercept xs =
         refB
         slope
         intercept
-        (lookup' refA xs)
-        (lookup' refB xs)
+        (lookup refA xs)
+        (lookup refB xs)
 
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> Maybe (n, n)
 relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 (relationsF xs) of
@@ -163,21 +163,37 @@ size (Relations f b l u) = EquivClass.size f + Boolean.size b + Limb.size l + UI
 
 --------------------------------------------------------------------------------
 
--- \| Result of looking up a variable in the Relations
+-- | Result of looking up a variable in the Relations
 data Lookup n = Root | Value n | ChildOf n Ref n
-  deriving (Eq, Show)
+  deriving
+    ( -- | ChildOfU RefU
+      Eq,
+      Show
+    )
 
 lookup :: GaloisField n => Ref -> Relations n -> Lookup n
-lookup var xs = fromLinRel $ lookup' var xs
+lookup (B var) xs =
+  case var of
+    RefUBit _ refU _index -> case EquivClass.lookup refU (relationsU xs) of
+      EquivClass.IsConstant _value -> Root -- traceShow (var, value) Root
+      -- Value (if Data.Bits.testBit value index then 1 else 0)
+      -- Root -- Value (if Data.Bits.testBit value index then 1 else 0)
+      EquivClass.IsRoot _ -> Root
+      EquivClass.IsChildOf _parent () -> Root
+    _ ->
+      case EquivClass.lookup var (relationsB xs) of
+        EquivClass.IsConstant True -> Value 1
+        EquivClass.IsConstant False -> Value 0
+        EquivClass.IsRoot _ -> Root
+        EquivClass.IsChildOf parent (Boolean.Polarity True) -> ChildOf 1 (B parent) 0
+        EquivClass.IsChildOf parent (Boolean.Polarity False) -> ChildOf (-1) (B parent) 1
+lookup (F var) xs = case EquivClass.lookup (F var) (relationsF xs) of
+  EquivClass.IsConstant value -> Value value
+  EquivClass.IsRoot _ -> Root
+  EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
 
-lookup' :: GaloisField n => Ref -> Relations n -> EquivClass.VarStatus Ref n (LinRel n)
-lookup' (B var) xs = fromBooleanLookup $ EquivClass.lookup var (relationsB xs)
-lookup' (F var) xs = EquivClass.lookup (F var) (relationsF xs)
-
-fromLinRel :: EquivClass.VarStatus Ref n (LinRel n) -> Lookup n
-fromLinRel (EquivClass.IsRoot _) = Root
-fromLinRel (EquivClass.IsConstant val) = Value val
-fromLinRel (EquivClass.IsChildOf parent (LinRel a b)) = ChildOf a parent b
+-- fromBooleanLookup :: GaloisField n => EquivClass.VarStatus RefB Bool Boolean.Polarity -> EquivClass.VarStatus Ref n (LinRel n)
+-- fromBooleanLookup (EquivClass.IsRoot children) = EquivClass.IsRoot $ Map.mapKeys B $ Map.map (\b -> if Boolean.unPolarity b then LinRel 1 0 else LinRel (-1) 1) children
 
 --------------------------------------------------------------------------------
 
@@ -225,34 +241,27 @@ instance (GaloisField n, Integral n) => EquivClass.ExecRelation n (LinRel n) whe
 
 --------------------------------------------------------------------------------
 
-fromBooleanLookup :: GaloisField n => EquivClass.VarStatus RefB Bool Boolean.Polarity -> EquivClass.VarStatus Ref n (LinRel n)
-fromBooleanLookup (EquivClass.IsRoot children) = EquivClass.IsRoot $ Map.mapKeys B $ Map.map (\b -> if Boolean.unPolarity b then LinRel 1 0 else LinRel (-1) 1) children
-fromBooleanLookup (EquivClass.IsConstant True) = EquivClass.IsConstant 1
-fromBooleanLookup (EquivClass.IsConstant False) = EquivClass.IsConstant 0
-fromBooleanLookup (EquivClass.IsChildOf parent (Boolean.Polarity True)) = EquivClass.IsChildOf (B parent) (LinRel 1 0)
-fromBooleanLookup (EquivClass.IsChildOf parent (Boolean.Polarity False)) = EquivClass.IsChildOf (B parent) (LinRel (-1) 1)
-
-composeLookup :: (GaloisField n, Integral n) => Relations n -> Ref -> Ref -> n -> n -> EquivClass.VarStatus Ref n (LinRel n) -> EquivClass.VarStatus Ref n (LinRel n) -> EquivClass.M (Error n) (Relations n)
+composeLookup :: (GaloisField n, Integral n) => Relations n -> Ref -> Ref -> n -> n -> Lookup n -> Lookup n -> EquivClass.M (Error n) (Relations n)
 composeLookup xs refA refB slope intercept relationA relationB = case (relationA, relationB) of
-  (EquivClass.IsRoot _, EquivClass.IsRoot _) ->
+  (Root, Root) ->
     -- rootA = slope * rootB + intercept
     relateF refA slope refB intercept xs
-  (EquivClass.IsRoot _, EquivClass.IsConstant n) ->
+  (Root, Value n) ->
     -- rootA = slope * n + intercept
     assignF refA (slope * n + intercept) xs
-  (EquivClass.IsRoot _, EquivClass.IsChildOf rootB (LinRel slopeB interceptB)) ->
+  (Root, ChildOf slopeB rootB interceptB) ->
     -- rootA = slope * refB + intercept && refB = slopeB * rootB + interceptB
     -- =>
     -- rootA = slope * (slopeB * rootB + interceptB) + intercept
     -- =>
     -- rootA = slope * slopeB * rootB + slope * interceptB + intercept
     relateF refA (slope * slopeB) rootB (slope * interceptB + intercept) xs
-  (EquivClass.IsConstant n, EquivClass.IsRoot _) ->
+  (Value n, Root) ->
     -- n = slope * rootB + intercept
     -- =>
     -- rootB = (n - intercept) / slope
     assignF refB ((n - intercept) / slope) xs
-  (EquivClass.IsConstant n, EquivClass.IsConstant m) ->
+  (Value n, Value m) ->
     -- n = slope * m + intercept
     -- =>
     -- n - intercept = slope * m
@@ -261,7 +270,7 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     if m == (n - intercept) / slope
       then return xs
       else throwError $ ConflictingValuesF m ((n - intercept) / slope)
-  (EquivClass.IsConstant n, EquivClass.IsChildOf rootB (LinRel slopeB interceptB)) ->
+  (Value n, ChildOf slopeB rootB interceptB) ->
     -- n = slope * (slopeB * rootB + interceptB) + intercept
     -- =>
     -- slope * (slopeB * rootB + interceptB) = n - intercept
@@ -272,17 +281,17 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     -- =>
     -- rootB = ((n - intercept) / slope - interceptB) / slopeB
     assignF rootB (((n - intercept) / slope - interceptB) / slopeB) xs
-  (EquivClass.IsChildOf rootA (LinRel slopeA interceptA), EquivClass.IsRoot _) ->
+  (ChildOf slopeA rootA interceptA, Root) ->
     -- refA = slopeA * rootA + interceptA = slope * rootB + intercept
     -- =>
     -- rootA = (slope * rootB + intercept - interceptA) / slopeA
     relateF rootA (slope / slopeA) refB ((intercept - interceptA) / slopeA) xs
-  (EquivClass.IsChildOf rootA (LinRel slopeA interceptA), EquivClass.IsConstant n) ->
+  (ChildOf slopeA rootA interceptA, Value n) ->
     -- refA = slopeA * rootA + interceptA = slope * n + intercept
     -- =>
     -- rootA = (slope * n + intercept - interceptA) / slopeA
     assignF rootA ((slope * n + intercept - interceptA) / slopeA) xs
-  (EquivClass.IsChildOf rootA (LinRel slopeA interceptA), EquivClass.IsChildOf rootB (LinRel slopeB interceptB)) ->
+  (ChildOf slopeA rootA interceptA, ChildOf slopeB rootB interceptB) ->
     -- refA = slopeA * rootA + interceptA = slope * (slopeB * rootB + interceptB) + intercept
     -- =>
     -- slopeA * rootA = slope * slopeB * rootB + slope * interceptB + intercept - interceptA
