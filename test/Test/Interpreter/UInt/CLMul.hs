@@ -57,16 +57,6 @@ tests =
       let program y = do
             x <- inputUInt @8 Public
             return $ x .*. fromInteger y
-      -- debug (Prime 17) (program 32)
-      -- debug (Prime 1031) (program 32)
-      -- runAll (Prime 17) (program 16) [3] [] [48]
-      -- runAll (Prime 17) (program 32) [29] [] [160]
-      -- runAll (Prime 257) (program 32) [29] [] [160]
-      -- runAll (Prime 1031) (program 32) [29] [] [160]
-      -- runAll (Prime 17) (program 26) [25] [] [138]
-      -- runAll (Prime 257) (program 26) [25] [] [138]
-      -- runAll (Prime 1031) (program 26) [25] [] [138]
-
       let genPair = do
             x <- (arbitrary :: Gen Word8)
             y <- (arbitrary :: Gen Word8)
@@ -76,3 +66,37 @@ tests =
         runAll (Prime 17) (program y) [x] [] expected
         runAll (Prime 257) (program y) [x] [] expected
         runAll (Prime 1031) (program y) [x] [] expected
+
+    it "2 variables / 1 constant" $ do
+      let program c = do
+            x <- inputUInt @8 Public
+            y <- inputUInt @8 Public
+            return $ x .*. y .*. fromInteger c
+      let genPair = do
+            x <- (arbitrary :: Gen Word8)
+            y <- (arbitrary :: Gen Word8)
+            c <- (arbitrary :: Gen Word8)
+            return (toInteger x, toInteger y, toInteger c)
+      forAll genPair $ \(x, y, c) -> do
+        let expected = [U.uintValue (U.new 8 (toInteger x) `U.integerCLMulU` U.new 8 (toInteger y) `U.integerCLMulU` U.new 8 (toInteger c))]
+        runAll (Prime 17) (program c) [x, y] [] expected
+        runAll (Prime 257) (program c) [x, y] [] expected
+        runAll (Prime 1031) (program c) [x, y] [] expected
+
+    it "3 variables / 1 constant" $ do
+      let program c = do
+            x <- inputUInt @8 Public
+            y <- inputUInt @8 Public
+            z <- inputUInt @8 Public
+            return $ x .*. y .*. z .*. fromInteger c
+      let genPair = do
+            x <- (arbitrary :: Gen Word8)
+            y <- (arbitrary :: Gen Word8)
+            z <- (arbitrary :: Gen Word8)
+            c <- (arbitrary :: Gen Word8)
+            return (toInteger x, toInteger y, toInteger z, toInteger c)
+      forAll genPair $ \(x, y, z, c) -> do
+        let expected = [U.uintValue (U.new 8 (toInteger x) `U.integerCLMulU` U.new 8 (toInteger y) `U.integerCLMulU` U.new 8 (toInteger z) `U.integerCLMulU` U.new 8 (toInteger c))]
+        runAll (Prime 17) (program c) [x, y, z] [] expected
+        runAll (Prime 257) (program c) [x, y, z] [] expected
+        runAll (Prime 1031) (program c) [x, y, z] [] expected
