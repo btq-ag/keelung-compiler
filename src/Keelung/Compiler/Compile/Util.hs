@@ -153,7 +153,7 @@ writeAddWithLCAndLimbs lc constant limbs = case lc of
   Constant _ -> return ()
   Polynomial poly -> case NonEmpty.nonEmpty limbs of
     Nothing -> return ()
-    Just xs -> addC [CAdd poly (PolyL.buildWithSeq constant xs)]
+    Just xs -> addC [CAdd poly (PolyL.newL constant xs)]
 
 -- writeAddWithPolyGAndLimbs :: (GaloisField n, Integral n) => PolyG n -> n -> Seq (Limb, n) -> M n ()
 -- writeAddWithPolyGAndLimbs poly constant limbs = addC [CAdd poly (PolyL.buildWithSeq constant limbs)]
@@ -176,10 +176,10 @@ addC = mapM_ addOne
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddG xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
-    addOne (CAddL xs) = modify' (\cs -> addOccurrences (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
+    addOne (CAddL xs) = modify' (\cs -> addOccurrencesLB (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
     addOne (CAdd xs ys) =
       modify'
-        ( \cs -> addOccurrences (PolyG.vars xs) $ addOccurrences (PolyL.vars ys) $ cs {cmAdd = (xs, ys) : cmAdd cs}
+        ( \cs -> addOccurrences (PolyG.vars xs) $ addOccurrencesLB (PolyL.vars ys) $ cs {cmAdd = (xs, ys) : cmAdd cs}
         )
     addOne (CVarBindF x c) = do
       execRelations $ Relations.assignF x c
@@ -209,8 +209,8 @@ addC = mapM_ addOne
       execRelations $ Relations.relateB x (False, y)
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {cmMulF = (x, y, Left c) : cmMulF cs})
     addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {cmMulF = (x, y, Right z) : cmMulF cs})
-    addOne (CMulL x y (Left c)) = modify' (\cs -> addOccurrences (PolyL.vars x) $ addOccurrences (PolyL.vars y) $ cs {cmMulL = (x, y, Left c) : cmMulL cs})
-    addOne (CMulL x y (Right z)) = modify (\cs -> addOccurrences (PolyL.vars x) $ addOccurrences (PolyL.vars y) $ addOccurrences (PolyL.vars z) $ cs {cmMulL = (x, y, Right z) : cmMulL cs})
+    addOne (CMulL x y (Left c)) = modify' (\cs -> addOccurrencesLB (PolyL.vars x) $ addOccurrencesLB (PolyL.vars y) $ cs {cmMulL = (x, y, Left c) : cmMulL cs})
+    addOne (CMulL x y (Right z)) = modify (\cs -> addOccurrencesLB (PolyL.vars x) $ addOccurrencesLB (PolyL.vars y) $ addOccurrencesLB (PolyL.vars z) $ cs {cmMulL = (x, y, Right z) : cmMulL cs})
 
 --------------------------------------------------------------------------------
 
@@ -221,9 +221,9 @@ writeMulWithLimbs :: (GaloisField n, Integral n) => (n, NonEmpty (Limb, n)) -> (
 writeMulWithLimbs as bs cs =
   addC
     [ CMulL
-        (uncurry PolyL.buildWithSeq as)
-        (uncurry PolyL.buildWithSeq bs)
-        (Right (uncurry PolyL.buildWithSeq cs))
+        (uncurry PolyL.newL as)
+        (uncurry PolyL.newL bs)
+        (Right (uncurry PolyL.newL cs))
     ]
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
@@ -232,7 +232,7 @@ writeAdd c as = writeAddWithPolyG (PolyG.build c as)
 writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Limb, n)] -> M n ()
 writeAddWithLimbs c ls = case NonEmpty.nonEmpty ls of
   Nothing -> return ()
-  Just xs -> addC [CAddL (PolyL.buildWithSeq c xs)]
+  Just xs -> addC [CAddL (PolyL.newL c xs)]
 
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x

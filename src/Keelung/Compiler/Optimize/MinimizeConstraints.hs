@@ -6,7 +6,6 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
-import Data.List.NonEmpty qualified as NonEmpty
 import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
 import Data.Set (Set)
@@ -335,7 +334,7 @@ reduceMulLCPC a bs c = do
   case PolyL.multiplyBy (-a) bs of
     Left constant ->
       if constant == c
-        then modify' $ removeOccurrences (PolyL.vars bs)
+        then modify' $ removeOccurrencesLB (PolyL.vars bs)
         else throwError $ Compile.ConflictingValuesU (toInteger constant) (toInteger c)
     Right xs -> addAddL $ PolyL.addConstant c xs
 
@@ -351,14 +350,14 @@ reduceMulLCPP a polyB polyC = do
         then do
           -- a * bs = 0
           -- cm = 0
-          modify' $ removeOccurrences (PolyL.vars polyB)
+          modify' $ removeOccurrencesLB (PolyL.vars polyB)
           addAddL polyC
         else do
           -- a * bs = constant = cm
           -- => cm - constant = 0
-          modify' $ removeOccurrences (PolyL.vars polyB)
+          modify' $ removeOccurrencesLB (PolyL.vars polyB)
           addAddL (PolyL.addConstant (-constant) polyC)
-    Right polyBa -> addAddL (PolyL.merge polyC polyBa)
+    Right polyBa -> addAddL (polyC <> polyBa)
 
 ------------------------------------------------------------------------------
 
@@ -444,13 +443,14 @@ learnFromAddF poly = case PolyG.view poly of
 --   Returns 'True' if the constraint has been reduced.
 learnFromAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n Bool
 learnFromAddL poly = case PolyL.view poly of
-  (constant, (var1, multiplier1) NonEmpty.:| []) -> do
+  (_, []) -> error "[ panic ] Empty PolyL"
+  (constant, [(var1, multiplier1)]) -> do
     --  constant + var1 * multiplier1  = 0
     --    =>
     --  var1 = - constant / multiplier1
     assignL var1 (toInteger (-constant / multiplier1))
     return True
-  (constant, (var1, multiplier1) NonEmpty.:| [(var2, multiplier2)]) ->
+  (constant, [(var1, multiplier1), (var2, multiplier2)]) ->
     if constant == 0 && multiplier1 == -multiplier2
       then do
         --  var1 * multiplier1 = var2 * multiplier2
@@ -546,12 +546,13 @@ addAddF poly = case PolyG.view poly of
 -- | Add learned additive limb constraints to the pool
 addAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n ()
 addAddL poly = case PolyL.view poly of
-  (constant, (var1, multiplier1) NonEmpty.:| []) -> do
+  (_, []) -> error "[ panic ] Empty PolyL"
+  (constant, [(var1, multiplier1)]) -> do
     --  constant + var1 * multiplier1  = 0
     --    =>
     --  var1 = - constant / multiplier1
     assignL var1 (toInteger (-constant / multiplier1))
-  (constant, (var1, multiplier1) NonEmpty.:| [(var2, multiplier2)]) ->
+  (constant, [(var1, multiplier1), (var2, multiplier2)]) ->
     --  var1 * multiplier1 = var2 * multiplier2
     when (constant == 0 && multiplier1 == -multiplier2) $
       void $
@@ -614,7 +615,7 @@ substPolyL relations poly = do
   case foldl (substPolyL_ (Relations.exportLimbRelations relations)) (False, Left c, mempty, mempty) xs of
     (False, _, _, _) -> Nothing -- nothing changed
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
-    (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyL.vars' poly)
+    (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyL.limbsSet poly)
 
 substPolyL_ ::
   (Integral n, GaloisField n) =>
@@ -629,17 +630,17 @@ substPolyL_ relations (changed, accPoly, removedRefs, addedRefs) (ref, multiplie
           Left c -> (True, Left (fromInteger constant * multiplier + c), removedRefs', addedRefs)
           Right xs -> (True, Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removedRefs', addedRefs)
   EquivClass.IsRoot _ -> case accPoly of
-    Left c -> (changed, PolyL.singleton c (ref, multiplier), removedRefs, addedRefs)
-    Right xs -> (changed, Right (PolyL.insert 0 (ref, multiplier) xs), removedRefs, addedRefs)
+    Left c -> (changed, PolyL.singletonL c (ref, multiplier), removedRefs, addedRefs)
+    Right xs -> (changed, Right (PolyL.insertL 0 (ref, multiplier) xs), removedRefs, addedRefs)
   EquivClass.IsChildOf root () ->
     if root == ref
       then case accPoly of
-        Left c -> (changed, PolyL.singleton c (ref, multiplier), removedRefs, addedRefs)
-        Right xs -> (changed, Right (PolyL.insert 0 (ref, multiplier) xs), removedRefs, addedRefs)
+        Left c -> (changed, PolyL.singletonL c (ref, multiplier), removedRefs, addedRefs)
+        Right xs -> (changed, Right (PolyL.insertL 0 (ref, multiplier) xs), removedRefs, addedRefs)
       else
         let removedRefs' = Set.insert ref removedRefs
             addedRefs' = Set.insert root addedRefs
          in case accPoly of
               -- replace `ref` with `root`
-              Left c -> (True, PolyL.singleton c (root, multiplier), removedRefs', addedRefs')
-              Right accPoly' -> (True, Right (PolyL.insert 0 (root, multiplier) accPoly'), removedRefs', addedRefs')
+              Left c -> (True, PolyL.singletonL c (root, multiplier), removedRefs', addedRefs')
+              Right accPoly' -> (True, Right (PolyL.insertL 0 (root, multiplier) accPoly'), removedRefs', addedRefs')
