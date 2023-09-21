@@ -31,14 +31,12 @@ shrinkBinRep (Stuck (AddConstraint polynomial)) = do
         Just (index, len) -> var < index + len
   case assignBinRep fieldBitWidth isBoolean polynomial of
     Nothing -> return (Stuck (AddConstraint polynomial))
-    Just (boolAssignments, fieldAssignments) -> do
+    Just boolAssignments -> do
       tryLog $ LogBinRepDetection polynomial (IntMap.toList boolAssignments)
       -- we have a binary representation
       -- we can now assign the variables
       forM_ (IntMap.toList boolAssignments) $ \(var, val) -> do
         bindVar "bin rep bool" var (if val then 1 else 0)
-      forM_ (IntMap.toList fieldAssignments) $ \(var, val) -> do
-        bindVar "bin rep field" var val
       return Eliminated
 shrinkBinRep (Stuck polynomial) = return (Stuck polynomial)
 
@@ -68,33 +66,28 @@ deriveAssignments (lowerBound, upperBound) rawConstant polynomial =
 --    1. There can be at most `k` coefficients that are multiples of powers of 2 if the polynomial is a binary representation.
 --    2. These coefficients cannot be too far apart, i.e., the quotient of any 2 coefficients cannot be greater than `2^(k-1)`.
 --    3. For any 2 coefficients `a` and `b`, either `a / b` or `b / a` must be a power of 2 smaller than `2^k`.
-assignBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe (IntMap Bool, IntMap n)
+assignBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe (IntMap Bool)
 assignBinRep fieldBitWidth isBoolean polynomial =
   if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
     then Nothing
     else case detectBinRep fieldBitWidth isBoolean (Poly.coeffs polynomial) of
-      Nothing -> detectBinRepEvenOdd isBoolean polynomial
+      Nothing -> Nothing
       Just (binPoly, multiplier) ->
         case IntMap.lookupMin (binPolyCoeffs binPoly) of
           Nothing -> Just mempty
           Just (minPower, _) ->
             let constant = -Poly.constant polynomial / multiplier
-                boolAssignments =
-                  if minPower < 0
-                    then
-                      deriveAssignments
-                        (toInteger (binPolyLowerBound binPoly * (2 ^ (-minPower))), toInteger (binPolyUpperBound binPoly * (2 ^ (-minPower))))
-                        (constant * (2 ^ (-minPower)))
-                        (IntMap.mapKeys (\i -> i - minPower) (binPolyCoeffs binPoly))
-                    else
-                      deriveAssignments
-                        (toInteger (binPolyLowerBound binPoly), toInteger (binPolyUpperBound binPoly))
-                        constant
-                        (binPolyCoeffs binPoly)
-                fieldAssignments = mempty
-             in case boolAssignments of
-                  Nothing -> Nothing
-                  Just boolAssignments' -> Just (boolAssignments', fieldAssignments)
+             in if minPower < 0
+                  then
+                    deriveAssignments
+                      (toInteger (binPolyLowerBound binPoly * (2 ^ (-minPower))), toInteger (binPolyUpperBound binPoly * (2 ^ (-minPower))))
+                      (constant * (2 ^ (-minPower)))
+                      (IntMap.mapKeys (\i -> i - minPower) (binPolyCoeffs binPoly))
+                  else
+                    deriveAssignments
+                      (toInteger (binPolyLowerBound binPoly), toInteger (binPolyUpperBound binPoly))
+                      constant
+                      (binPolyCoeffs binPoly)
 
 -- | Polynomial with coefficients that are multiples of powers of 2
 data BinRep n = BinRep
@@ -201,50 +194,6 @@ detectBinRep fieldBitWidth isBoolean xs =
             Just (minPower, _) -> case IntMap.lookupMax coeffs of
               Nothing -> False
               Just (maxPower, _) -> not (power > maxPower && power - minPower > k - 1 || power < minPower && maxPower - power > k - 1)
-
--- | Detects a special case of BinRep where the polynomial only have 2 terms:
---      2$FieldVar + $BooleanVar = some constant
---      2$FieldVar - $BooleanVar = some constant
-detectBinRepEvenOdd :: (GaloisField n, Integral n) => (Var -> Bool) -> Poly n -> Maybe (IntMap Bool, IntMap n)
-detectBinRepEvenOdd isBoolean polynomial = case IntMap.toList (Poly.coeffs polynomial) of
-  [(var1, coeff1), (var2, coeff2)]
-    | isBoolean var1 && not (isBoolean var2) -> go (var1, coeff1) (var2, coeff2) (Poly.constant polynomial)
-    | isBoolean var2 && not (isBoolean var1) -> go (var2, coeff2) (var1, coeff1) (Poly.constant polynomial)
-    | otherwise -> Nothing
-  _ -> Nothing
-  where
-    go (boolVar, 1) (fieldVar, 2) constant =
-      -- B + 2F + C = 0
-      -- B + 2F = -c
-      assignBinRepEvenOddPos boolVar fieldVar (-constant)
-    go (boolVar, -1) (fieldVar, -2) constant =
-      -- -B - 2F + C = 0
-      -- B + 2F = C
-      assignBinRepEvenOddPos boolVar fieldVar constant
-    go (boolVar, 1) (fieldVar, -2) constant =
-      -- B - 2F + C = 0
-      -- B - 2F = -C
-      assignBinRepEvenOddNeg boolVar fieldVar (-constant)
-    go (boolVar, -1) (fieldVar, 2) constant =
-      -- - B + 2F + C = 0
-      -- B - 2F = C
-      assignBinRepEvenOddNeg boolVar fieldVar constant
-    go _ _ _ = Nothing
-
-    -- \$boolVar + 2$fieldVar + constant = 0
-    assignBinRepEvenOddPos :: (GaloisField n, Integral n) => Var -> Var -> n -> Maybe (IntMap Bool, IntMap n)
-    assignBinRepEvenOddPos boolVar fieldVar constant =
-      let (quotient, remainder) = toInteger constant `divMod` 2
-       in Just (IntMap.singleton boolVar (remainder == 1), IntMap.singleton fieldVar (fromInteger quotient))
-
-    assignBinRepEvenOddNeg :: (GaloisField n, Integral n) => Var -> Var -> n -> Maybe (IntMap Bool, IntMap n)
-    assignBinRepEvenOddNeg boolVar fieldVar constant =
-      let outOfBound = toInteger constant > 1 -- flip the sign of everything if the constant is out of bound
-          normalizedConstant = if outOfBound then toInteger (-constant) else toInteger constant
-          (quotient, remainder) = normalizedConstant `divMod` 2
-       in if outOfBound
-            then Just (IntMap.singleton boolVar (remainder == 1), IntMap.singleton fieldVar (fromInteger quotient + 1))
-            else Just (IntMap.singleton boolVar (remainder == 1), IntMap.singleton fieldVar (fromInteger quotient + 0))
 
 -- | See if a coefficient is a power of 2 (except for 2^0)
 isPowerOf2 :: (GaloisField n, Integral n) => Width -> n -> Maybe Int
