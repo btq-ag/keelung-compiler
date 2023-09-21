@@ -8,6 +8,7 @@ module Keelung.Data.PolyL
     vars,
     vars',
     buildWithSeq,
+    null,
     insert,
     singleton,
     addConstant,
@@ -27,6 +28,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
+import Prelude hiding (null)
 
 -- | Polynomial made of Limbs + a constant
 data PolyL n = PolyL n (Seq (Limb, n))
@@ -61,6 +63,9 @@ singleton c (x, coeff) = Right $ PolyL c (Seq.singleton (x, coeff))
 
 insert :: (Num n, Eq n) => n -> (Limb, n) -> PolyL n -> PolyL n
 insert c' x (PolyL c xs) = PolyL (c + c') (x Seq.<| xs)
+
+null :: (Eq n, Num n) => PolyL n -> Bool
+null (PolyL c xs) = Seq.null xs && c == 0
 
 addConstant :: Num n => n -> PolyL n -> PolyL n
 addConstant c' (PolyL c xs) = PolyL (c + c') xs

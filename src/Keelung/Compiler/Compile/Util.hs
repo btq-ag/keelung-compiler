@@ -39,7 +39,7 @@ runM compilers fieldInfo counters program =
   runExcept
     ( execStateT
         (runReaderT program compilers)
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new Relations.new mempty mempty mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new Relations.new mempty mempty mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -146,6 +146,14 @@ writeAddWithLC xs = case xs of
   Constant _ -> return ()
   Polynomial poly -> addC [CAddG poly]
 
+writeAddWithLCAndLimbs :: (GaloisField n, Integral n) => LC n -> n -> Seq (Limb, n) -> M n ()
+writeAddWithLCAndLimbs lc constant limbs = case lc of
+  Constant _ -> return ()
+  Polynomial poly -> addC [CAdd poly (PolyL.buildWithSeq constant limbs)]
+
+-- writeAddWithPolyGAndLimbs :: (GaloisField n, Integral n) => PolyG n -> n -> Seq (Limb, n) -> M n ()
+-- writeAddWithPolyGAndLimbs poly constant limbs = addC [CAdd poly (PolyL.buildWithSeq constant limbs)]
+
 addC :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 addC = mapM_ addOne
   where
@@ -167,9 +175,7 @@ addC = mapM_ addOne
     addOne (CAddL xs) = modify' (\cs -> addOccurrences (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
     addOne (CAdd xs ys) =
       modify'
-        ( \cs ->
-            let cs' = addOccurrences (PolyL.vars ys) (cs {cmAddL = ys : cmAddL cs})
-             in addOccurrences (PolyG.vars xs) (cs' {cmAddF = xs : cmAddF cs'})
+        ( \cs -> addOccurrences (PolyG.vars xs) $ addOccurrences (PolyL.vars ys) $ cs {cmAdd = (xs, ys) : cmAdd cs}
         )
     addOne (CVarBindF x c) = do
       execRelations $ Relations.assignF x c
@@ -314,15 +320,6 @@ eqZero isEq (Polynomial polynomial) = do
   --  keep track of the relation between (x - y) and m
   addEqZeroHintWithPoly (Right polynomial) m
   return (Left out)
-
--- | See if a LC is odd.
-isOdd :: (GaloisField n, Integral n) => LC n -> M n (Either RefB Bool)
-isOdd (Constant constant) = return $ Right $ odd constant
-isOdd (Polynomial polynomial) = do
-  q <- freshRefF
-  r <- freshRefB
-  writeAddWithLC (Polynomial polynomial <> neg (2 @ F q) <> neg (1 @ B r)) -- polynomial - 2 * q - r
-  return (Left r)
 
 --------------------------------------------------------------------------------
 

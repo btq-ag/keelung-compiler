@@ -59,6 +59,7 @@ linkConstraintModule cm =
           <> varEqUs
           <> addFs
           <> addLs
+          <> adds
           <> mulFs
           <> mulLs,
       csEqZeros = toList eqZeros,
@@ -165,6 +166,7 @@ linkConstraintModule cm =
 
     addFs = Seq.fromList $ linkConstraint occurrences fieldWidth . CAddG =<< cmAddF cm
     addLs = Seq.fromList $ linkConstraint occurrences fieldWidth . CAddL =<< cmAddL cm
+    adds = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry CAdd =<< cmAdd cm
     mulFs = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry3 CMulF =<< cmMulF cm
     mulLs = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry3 CMulL =<< cmMulL cm
     eqZeros = Seq.fromList $ map (bimap (linkPolyGUnsafe occurrences) (reindexRefF occurrences)) $ cmEqZeros cm

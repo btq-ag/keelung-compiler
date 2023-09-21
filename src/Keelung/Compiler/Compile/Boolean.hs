@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Keelung.Compiler.Compile.Boolean (compile, andBs, xorBs) where
 
 import Control.Monad.State
@@ -12,7 +14,7 @@ import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Syntax.Internal
-import Keelung.Data.FieldInfo
+import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.Reference
 
 compile :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> ExprB n -> M n (Either RefB Bool)
@@ -92,7 +94,7 @@ compile compileU expr = case expr of
 compileEqU :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> M n (Either RefB Bool)
 compileEqU width x y = do
   fieldInfo <- gets cmField
-  result <- zipWithM (\a b -> eqZero True (a <> neg b)) (fromRefU width (fieldWidth fieldInfo) x) (fromRefU width (fieldWidth fieldInfo) y)
+  result <- zipWithM (\a b -> eqZero True (a <> neg b)) (fromRefU width (FieldInfo.fieldWidth fieldInfo) x) (fromRefU width (FieldInfo.fieldWidth fieldInfo) y)
   case result of
     [] -> return $ Right True
     [result'] -> return result'
@@ -165,7 +167,7 @@ andBs xs =
     go (var : vars) True = do
       -- split operands into pieces in case that the order of field is too small
       -- each pieces has at most (order - 1) operands
-      order <- gets (fieldOrder . cmField)
+      order <- gets (FieldInfo.fieldOrder . cmField)
       if order == 2
         then do
           -- the degenrate case, recursion won't terminate, all field elements are also Boolean
@@ -208,7 +210,7 @@ orBs xs =
     go (var : vars) False = do
       -- split operands into pieces in case that the order of field is too small
       -- each pieces has at most (order - 1) operands
-      order <- gets (fieldOrder . cmField)
+      order <- gets (FieldInfo.fieldOrder . cmField)
       if order == 2
         then do
           -- the degenrate case, recursion won't terminate, all field elements are also Boolean
@@ -283,7 +285,7 @@ xorBs xs =
     go (var : vars) = do
       -- split operands into chunks in case that the order of field is too small
       -- each chunks has at most (order - 1) operands
-      order <- gets (fieldOrder . cmField)
+      order <- gets (FieldInfo.fieldOrder . cmField)
       if order == 2
         then do
           -- the degenrate case, recursion won't terminate, all field elements are also Boolean
@@ -296,12 +298,38 @@ xorBs xs =
           let chunks = List.chunksOf (fromInteger order - 1) (var : vars)
           mapM compileChunk chunks >>= xorBs
 
-    -- sum of a chunk = 2q + r
     compileChunk :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
     compileChunk [] = return $ Right False
     compileChunk [var] = return $ Left var
     compileChunk [var1, var2] = Left <$> xorB var1 var2
-    compileChunk vars = isOdd (mconcat (fmap (\x -> 1 @ B x) vars))
+    compileChunk vars = do
+      -- devise an unsigned integer for expressing the sum of vars
+      let width = widthOfInteger (toInteger (length vars))
+      refU <- freshRefU width
+      fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+      let limbs = refUToLimbs fieldWidth refU
+      -- compose the LC for the sum
+      let lc = mconcat (fmap (\x -> 1 @ B x) vars)
+      -- equate the LC with the unsigned integer
+      writeAddWithLCAndLimbs lc 0 (Seq.fromList (map (,-1) limbs))
+      -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
+      return $ Left $ RefUBit width refU 0
+
+-- -- | See if a LC is odd.
+-- isOdd :: (GaloisField n, Integral n) => LC n -> M n (Either RefB Bool)
+-- isOdd (Constant constant) = return $ Right $ odd constant
+-- isOdd (Polynomial polynomial) = do
+--   -- -- calculate the upper bound of the polynomial
+--   -- let upperBound = PolyG.upperBound polynomial
+
+--   -- writeAddWithPolyGAndLimbs polynomial
+
+--   q <- freshRefF
+--   r <- freshRefB
+--   writeAddWithLC (Polynomial polynomial <> neg (2 @ F q) <> neg (1 @ B r)) -- polynomial - 2 * q - r
+--   return (Left r)
+
+-- isOdd (mconcat (fmap (\x -> 1 @ B x) vars))
 
 eqB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 eqB (Right x) (Right y) = return $ Right $ x == y

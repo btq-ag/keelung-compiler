@@ -161,6 +161,20 @@ tests = do
         cs `shouldHaveSize` 5
         cs' `shouldHaveSize` 5
 
+    describe "Carry-less Multiplication" $ do
+      -- TODO: bring this down
+      it "2 byte variables" $ do
+        -- constraint breakdown:
+        -- I/O: 24 = 2 * 8 + 8
+        -- ANDs: 36 = 8 * 9 / 2
+        -- XORs: 7
+        (cs, cs') <- executeGF181 $ do
+          x <- input Public :: Comp (UInt 8)
+          y <- input Public :: Comp (UInt 8)
+          return (x .*. y)
+        -- print $ linkConstraintModule cs'
+        cs `shouldHaveSize` 93
+        cs' `shouldHaveSize` 91
     describe "Constants" $ do
       -- TODO: should be just 4
       it "`return 0`" $ do

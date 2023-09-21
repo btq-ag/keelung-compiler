@@ -54,6 +54,7 @@ data ConstraintModule n = ConstraintModule
     -- addative constraints
     cmAddF :: [PolyG n],
     cmAddL :: [PolyL n],
+    cmAdd :: [(PolyG n, PolyL n)],
     -- multiplicative constraints
     cmMulF :: [(PolyG n, PolyG n, Either n (PolyG n))],
     cmMulL :: [(PolyL n, PolyL n, Either n (PolyL n))],
@@ -73,6 +74,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> showVarEqF
       <> showAddF
       <> showAddL
+      <> showAdd
       <> showMulF
       <> showMulL
       <> showEqs
@@ -127,8 +129,13 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       --     then ""
       --     else "  UInt relations:\n" <> indent (indent (show (cmRelations cm)))
 
-      showAddF = adapt "AddF" (cmAddF cm) showAdd
-      showAddL = adapt "AddL" (cmAddL cm) showAdd
+      showAddF = adapt "AddF" (cmAddF cm) $ \xs -> "0 = " <> show xs
+      showAddL = adapt "AddL" (cmAddL cm) $ \xs -> "0 = " <> show xs
+      showAdd = adapt "Add" (cmAdd cm) $ \(gs, ls) -> case (PolyG.null gs, PolyL.null ls) of
+        (True, True) -> "<empty addative constraint>"
+        (True, False) -> show ls
+        (False, True) -> show gs
+        (False, False) -> show gs <> " + " <> show ls
 
       showMulF = adapt "MulF" (cmMulF cm) showMulF'
       showMulL = adapt "MulL" (cmMulL cm) showMulL'
@@ -148,8 +155,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
         if OccurU.null $ cmOccurrenceU cm
           then ""
           else "  OccurrencesU:\n  " <> indent (showList' (map (\(width, occurs) -> "UInt " <> show width <> ": " <> showList' (map (\(var, n) -> show (RefUX width var) <> ": " <> show n) (IntMap.toList occurs))) (OccurU.toList $ cmOccurrenceU cm)))
-
-      showAdd xs = "0 = " <> show xs
 
       showMulF' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
