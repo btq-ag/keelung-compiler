@@ -165,6 +165,12 @@ addC = mapM_ addOne
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddG xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
     addOne (CAddL xs) = modify' (\cs -> addOccurrences (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
+    addOne (CAdd xs ys) =
+      modify'
+        ( \cs ->
+            let cs' = addOccurrences (PolyL.vars ys) (cs {cmAddL = ys : cmAddL cs})
+             in addOccurrences (PolyG.vars xs) (cs' {cmAddF = xs : cmAddF cs'})
+        )
     addOne (CVarBindF x c) = do
       execRelations $ Relations.assignF x c
     addOne (CVarBindB x c) = do
@@ -310,11 +316,6 @@ eqZero isEq (Polynomial polynomial) = do
   return (Left out)
 
 -- | See if a LC is odd.
---    introduce a new Field variable q
---    introduce a new Boolean variable r
---    constraint:
---      polynomial = q * 2 + r
---    return r as the result
 isOdd :: (GaloisField n, Integral n) => LC n -> M n (Either RefB Bool)
 isOdd (Constant constant) = return $ Right $ odd constant
 isOdd (Polynomial polynomial) = do

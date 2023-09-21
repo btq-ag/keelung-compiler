@@ -181,6 +181,9 @@ linkConstraintModule cm =
 linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Width -> Constraint n -> [Linked.Constraint n]
 linkConstraint occurrences _ (CAddG as) = [Linked.CAdd (linkPolyGUnsafe occurrences as)]
 linkConstraint occurrences _ (CAddL as) = [Linked.CAdd (linkPolyLUnsafe occurrences as)]
+linkConstraint occurrences _ (CAdd gs ls) = case Poly.merge (linkPolyGUnsafe occurrences gs) (linkPolyLUnsafe occurrences ls) of
+  Left _ -> []
+  Right xs -> [Linked.CAdd xs]
 linkConstraint occurrences _ (CVarEq x y) =
   case Poly.buildEither 0 [(reindexRef occurrences x, 1), (reindexRef occurrences y, -1)] of
     Left _ -> error "CVarEq: two variables are the same"
