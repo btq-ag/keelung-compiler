@@ -7,6 +7,8 @@ import Control.Monad.State
 import Data.Bits qualified
 import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
+import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.Sequence (Seq)
 import Data.Word (Word32)
 import Keelung.Compiler.Compile.Error
@@ -146,10 +148,12 @@ writeAddWithLC xs = case xs of
   Constant _ -> return ()
   Polynomial poly -> addC [CAddG poly]
 
-writeAddWithLCAndLimbs :: (GaloisField n, Integral n) => LC n -> n -> Seq (Limb, n) -> M n ()
+writeAddWithLCAndLimbs :: (GaloisField n, Integral n) => LC n -> n -> [(Limb, n)] -> M n ()
 writeAddWithLCAndLimbs lc constant limbs = case lc of
   Constant _ -> return ()
-  Polynomial poly -> addC [CAdd poly (PolyL.buildWithSeq constant limbs)]
+  Polynomial poly -> case NonEmpty.nonEmpty limbs of
+    Nothing -> return ()
+    Just xs -> addC [CAdd poly (PolyL.buildWithSeq constant xs)]
 
 -- writeAddWithPolyGAndLimbs :: (GaloisField n, Integral n) => PolyG n -> n -> Seq (Limb, n) -> M n ()
 -- writeAddWithPolyGAndLimbs poly constant limbs = addC [CAdd poly (PolyL.buildWithSeq constant limbs)]
@@ -213,7 +217,7 @@ addC = mapM_ addOne
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
 writeMul as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.build as) (fromEither $ uncurry PolyG.build bs) (fromEither $ uncurry PolyG.build cs)
 
-writeMulWithLimbs :: (GaloisField n, Integral n) => (n, Seq (Limb, n)) -> (n, Seq (Limb, n)) -> (n, Seq (Limb, n)) -> M n ()
+writeMulWithLimbs :: (GaloisField n, Integral n) => (n, NonEmpty (Limb, n)) -> (n, NonEmpty (Limb, n)) -> (n, NonEmpty (Limb, n)) -> M n ()
 writeMulWithLimbs as bs cs =
   addC
     [ CMulL
@@ -225,8 +229,10 @@ writeMulWithLimbs as bs cs =
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPolyG (PolyG.build c as)
 
-writeAddWithLimbs :: (GaloisField n, Integral n) => n -> Seq (Limb, n) -> M n ()
-writeAddWithLimbs c as = addC [CAddL (PolyL.buildWithSeq c as)]
+writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Limb, n)] -> M n ()
+writeAddWithLimbs c ls = case NonEmpty.nonEmpty ls of
+  Nothing -> return ()
+  Just xs -> addC [CAddL (PolyL.buildWithSeq c xs)]
 
 writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 writeVal (F a) x = writeValF a x

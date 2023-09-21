@@ -311,7 +311,7 @@ xorBs xs =
       -- compose the LC for the sum
       let lc = mconcat (fmap (\x -> 1 @ B x) vars)
       -- equate the LC with the unsigned integer
-      writeAddWithLCAndLimbs lc 0 (Seq.fromList (map (,-1) limbs))
+      writeAddWithLCAndLimbs lc 0 (map (,-1) limbs)
       -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
       return $ Left $ RefUBit width refU 0
 

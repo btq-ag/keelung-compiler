@@ -130,10 +130,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
 
       showAddF = adapt "AddF" (cmAddF cm) $ \xs -> "0 = " <> show xs
       showAddL = adapt "AddL" (cmAddL cm) $ \xs -> "0 = " <> show xs
-      showAdd = adapt "Add" (cmAdd cm) $ \(gs, ls) ->
-        if PolyL.null ls
-          then show gs
-          else show gs <> " + " <> show ls
+      showAdd = adapt "Add" (cmAdd cm) $ \(gs, ls) -> show gs <> " + " <> show ls
 
       showMulF = adapt "MulF" (cmMulF cm) showMulF'
       showMulL = adapt "MulL" (cmMulL cm) showMulL'

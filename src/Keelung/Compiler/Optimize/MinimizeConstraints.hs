@@ -6,9 +6,9 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
-import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
@@ -444,14 +444,13 @@ learnFromAddF poly = case PolyG.view poly of
 --   Returns 'True' if the constraint has been reduced.
 learnFromAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n Bool
 learnFromAddL poly = case PolyL.view poly of
-  (_, Seq.Empty) -> error "[ panic ] Empty PolyL"
-  (constant, (var1, multiplier1) Seq.:<| Seq.Empty) -> do
+  (constant, (var1, multiplier1) NonEmpty.:| []) -> do
     --  constant + var1 * multiplier1  = 0
     --    =>
     --  var1 = - constant / multiplier1
     assignL var1 (toInteger (-constant / multiplier1))
     return True
-  (constant, (var1, multiplier1) Seq.:<| (var2, multiplier2) Seq.:<| Seq.Empty) ->
+  (constant, (var1, multiplier1) NonEmpty.:| [(var2, multiplier2)]) ->
     if constant == 0 && multiplier1 == -multiplier2
       then do
         --  var1 * multiplier1 = var2 * multiplier2
@@ -547,13 +546,12 @@ addAddF poly = case PolyG.view poly of
 -- | Add learned additive limb constraints to the pool
 addAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n ()
 addAddL poly = case PolyL.view poly of
-  (_, Seq.Empty) -> error "[ panic ] Empty PolyL"
-  (constant, (var1, multiplier1) Seq.:<| Seq.Empty) -> do
+  (constant, (var1, multiplier1) NonEmpty.:| []) -> do
     --  constant + var1 * multiplier1  = 0
     --    =>
     --  var1 = - constant / multiplier1
     assignL var1 (toInteger (-constant / multiplier1))
-  (constant, (var1, multiplier1) Seq.:<| (var2, multiplier2) Seq.:<| Seq.Empty) ->
+  (constant, (var1, multiplier1) NonEmpty.:| [(var2, multiplier2)]) ->
     --  var1 * multiplier1 = var2 * multiplier2
     when (constant == 0 && multiplier1 == -multiplier2) $
       void $

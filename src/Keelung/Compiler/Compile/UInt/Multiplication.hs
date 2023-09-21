@@ -5,7 +5,7 @@ import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
-import Data.Sequence qualified as Seq
+import Data.List.NonEmpty qualified as NonEmpty
 import Keelung (FieldType (..))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
@@ -95,26 +95,26 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
     Left constant -> do
       upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
-      writeAddWithLimbs (a * constant) $
-        Seq.fromList
-          [ -- operand side
-            (x, constant),
-            -- negative side
-            (lowerLimb, -1),
-            (upperLimb, -(2 ^ currentLimbWidth))
-          ]
+      writeAddWithLimbs
+        (a * constant)
+        [ -- operand side
+          (x, constant),
+          -- negative side
+          (lowerLimb, -1),
+          (upperLimb, -(2 ^ currentLimbWidth))
+        ]
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
       let carryLimbWidth = lmbWidth x + lmbWidth y - currentLimbWidth
       upperLimb <- allocLimb carryLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
       writeMulWithLimbs
-        (a, Seq.singleton (x, 1))
-        (b, Seq.singleton (y, 1))
+        (a, NonEmpty.singleton (x, 1))
+        (b, NonEmpty.singleton (y, 1))
         ( 0,
-          Seq.fromList
+          NonEmpty.fromList
             [ (lowerLimb, 1),
-              (upperLimb,  2 ^ currentLimbWidth)
+              (upperLimb, 2 ^ currentLimbWidth)
             ]
         )
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)

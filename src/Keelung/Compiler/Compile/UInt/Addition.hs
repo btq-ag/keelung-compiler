@@ -6,6 +6,7 @@ import Control.Monad.Except
 import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (Foldable (toList))
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.Error qualified as Error
@@ -166,11 +167,11 @@ addLimbStack resultLimb (Ordinary constant limbs) = do
   let carrySigns = calculateCarrySigns (lmbWidth resultLimb) constant limbs
   carryLimb <- allocCarryLimb (length carrySigns) (lmbOffset resultLimb) carrySigns
   writeAddWithLimbs (fromInteger constant) $
-    -- positive side
-    fmap (, 1) limbs
-      -- negative side
-      Seq.:|> (resultLimb, -1)
-      Seq.:|> (carryLimb, -(2 ^ lmbWidth resultLimb))
+    -- negative side
+    (resultLimb, -1)
+      : (carryLimb, -(2 ^ lmbWidth resultLimb))
+      -- positive side
+      : fmap (,1) (toList limbs)
   return $ LimbColumn.singleton carryLimb
 
 allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
