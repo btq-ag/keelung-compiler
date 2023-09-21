@@ -28,7 +28,7 @@ import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as Relations
-import Keelung.Compiler.Util (indent)
+import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
@@ -36,7 +36,6 @@ import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Struct
-import Keelung.Data.VarGroup (showList', toSubscript)
 import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
 
@@ -81,9 +80,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> showBooleanConstraints
       <> showDivModHints
       <> showModInvHints
-      <> showOccurrencesF
-      <> showOccurrencesB
-      <> showOccurrencesU
+      <> show (cmOccurrenceF cm)
+      <> show (cmOccurrenceB cm)
+      <> show (cmOccurrenceU cm)
       <> prettyVariables (cmCounters cm)
       <> "}"
     where
@@ -131,30 +130,16 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
 
       showAddF = adapt "AddF" (cmAddF cm) $ \xs -> "0 = " <> show xs
       showAddL = adapt "AddL" (cmAddL cm) $ \xs -> "0 = " <> show xs
-      showAdd = adapt "Add" (cmAdd cm) $ \(gs, ls) -> case (PolyG.null gs, PolyL.null ls) of
-        (True, True) -> "<empty addative constraint>"
-        (True, False) -> show ls
-        (False, True) -> show gs
-        (False, False) -> show gs <> " + " <> show ls
+      showAdd = adapt "Add" (cmAdd cm) $ \(gs, ls) ->
+        if PolyL.null ls
+          then show gs
+          else show gs <> " + " <> show ls
 
       showMulF = adapt "MulF" (cmMulF cm) showMulF'
       showMulL = adapt "MulL" (cmMulL cm) showMulL'
 
       showEqs = adapt "EqZeros" (cmEqZeros cm) $ \(poly, m) ->
         "EqZeros " <> show poly <> " / " <> show m
-
-      showOccurrencesF =
-        if OccurF.null $ cmOccurrenceF cm
-          then ""
-          else "  OccurrencesF:\n  " <> indent (showList' (map (\(var, n) -> show (RefFX var) <> ": " <> show n) (OccurF.toList $ cmOccurrenceF cm)))
-      showOccurrencesB =
-        if OccurB.null $ cmOccurrenceB cm
-          then ""
-          else "  OccurrencesB:\n  " <> indent (showList' (map (\(var, n) -> show var <> ": " <> show n) (OccurB.toList $ cmOccurrenceB cm)))
-      showOccurrencesU =
-        if OccurU.null $ cmOccurrenceU cm
-          then ""
-          else "  OccurrencesU:\n  " <> indent (showList' (map (\(width, occurs) -> "UInt " <> show width <> ": " <> showList' (map (\(var, n) -> show (RefUX width var) <> ": " <> show n) (IntMap.toList occurs))) (OccurU.toList $ cmOccurrenceU cm)))
 
       showMulF' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where

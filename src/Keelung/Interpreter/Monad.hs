@@ -20,6 +20,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
+import Keelung.Compiler.Util
 import Keelung.Data.Struct (Struct (..))
 import Keelung.Data.VarGroup
 import Keelung.Data.VarGroup qualified as VarGroup

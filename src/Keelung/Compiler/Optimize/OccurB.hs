@@ -11,6 +11,7 @@ import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
+import Keelung.Compiler.Util
 import Keelung.Data.Reference
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
@@ -20,6 +21,23 @@ newtype OccurB = MapB (IntMap Int)
   deriving (Eq, Generic)
 
 instance NFData OccurB
+
+instance Show OccurB where
+  show xs =
+    if null xs
+      then ""
+      else
+        "  OccurrencesB:\n  "
+          <> indent
+            ( showList'
+                ( map
+                    (\(var, n) -> show var <> ": " <> show n)
+                    ( filter
+                        (\(_, n) -> n > 0) -- only show variables that are used
+                        (toList xs)
+                    )
+                )
+            )
 
 -- | O(1). Construct an empty OccurB
 new :: Bool -> OccurB

@@ -21,15 +21,16 @@ import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
+import Keelung.Compiler.Util
 import Keelung.Constraint.R1C
 import Keelung.Data.FieldInfo
 import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.VarGroup
 import Keelung.Interpreter.Arithmetics (U)
 import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax
 import Keelung.Syntax.Counters
-import qualified Keelung.Data.Polynomial as Poly
 
 --------------------------------------------------------------------------------
 
@@ -53,7 +54,7 @@ tryLog x = do
   when inDebugMode $ tell (pure x)
 
 tryLogResult :: (GaloisField n, Integral n) => Constraint n -> Result (Constraint n) -> M n ()
-tryLogResult before result = do 
+tryLogResult before result = do
   inDebugMode <- asks envDebugMode
   when inDebugMode $ case result of
     Shrinked after -> tell (pure $ LogShrinkConstraint before after)
@@ -201,9 +202,10 @@ instance (Integral n, GaloisField n) => Show (Log n) where
   show (LogEliminateConstraint c) = "  ELIM  " <> show (fmap N c)
   show (LogShrinkConstraint c1 c2) = "  SHNK  " <> show (fmap N c1) <> "\n    ->  " <> show (fmap N c2)
   show (LogBinRepDetection poly assignments) =
-    "  BREP  " <> show (fmap N poly) <> "\n"
+    "  BREP  "
+      <> show (fmap N poly)
+      <> "\n"
       <> concatMap (\(var, val) -> "    ->  $" <> show var <> " := " <> show (if val then 1 else 0 :: Int) <> "\n") assignments
-
 
 --------------------------------------------------------------------------------
 

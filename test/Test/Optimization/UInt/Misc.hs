@@ -1,39 +1,35 @@
--- {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds #-}
+
 -- {-# LANGUAGE TypeApplications #-}
 
 module Test.Optimization.UInt.Misc (tests, run) where
 
--- import Keelung
+import Keelung
+-- import Keelung.Compiler.Linker
 import Test.Hspec
+import Test.Optimization.Util
 
--- -- import qualified Data.Bits
--- -- import Test.Optimization.Util
--- -- import Keelung.Compiler.Linker
--- import Test.QuickCheck
--- import Test.Interpreter.Util
--- -- import Keelung.Compiler.Linker
--- import qualified Data.Bits
 -- --
 run :: IO ()
 run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Misc" $ do
-  return ()
+  describe "Carry-less Multiplication" $ do
+    it "2 byte variables" $ do
+      -- constraint breakdown:
+      -- I/O: 24 = 2 * 8 + 8
+      -- ANDs: 36 = 8 * 9 / 2
+      -- XORs: 7
+      (_cs, cs') <- executeGF181 $ do
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public :: Comp (UInt 8)
+        return (x .*. y)
+      -- print cs'
+      -- print $ linkConstraintModule cs'
 
--- describe "Carry-less Multiplication" $ do
--- it "2 byte variables" $ do
---   -- constraint breakdown:
---   -- I/O: 24 = 2 * 8 + 8
---   -- ANDs: 36 = 8 * 9 / 2
---   -- XORs: 7
---   (cs, cs') <- executeGF181 $ do
---     x <- input Public :: Comp (UInt 8)
---     y <- input Public :: Comp (UInt 8)
---     return (x .*. y)
---   -- print $ linkConstraintModule cs'
---   cs `shouldHaveSize` 75
---   cs' `shouldHaveSize` 67
+      _cs `shouldHaveSize` 93
+      cs' `shouldHaveSize` 91
 
 -- it "1 variable / 1 constant" $ do
 --   -- constraint breakdown:

@@ -1,10 +1,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE DerivingStrategies #-}
 
 module Keelung.Data.VarGroup where
 
@@ -16,18 +16,18 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Data.List qualified as List
 import Data.Maybe qualified as Maybe
 import Data.Serialize (Serialize)
 import Data.Validation
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import GHC.Generics (Generic)
+import Keelung.Compiler.Util hiding (Witness)
 import Keelung.Data.N (N (N))
 import Keelung.Data.Struct
+import Keelung.Interpreter.Arithmetics (U (..))
 import Keelung.Syntax (Width)
 import Keelung.Syntax.Counters
-import Keelung.Interpreter.Arithmetics (U (..))
 
 --------------------------------------------------------------------------------
 
@@ -159,9 +159,6 @@ convertWitness (VarGroups o i p x) = VarGroups (convertStruct o) (convertStruct 
 
 type VarSet n = VarGroups (Struct IntSet IntSet IntSet)
 
-showList' :: [String] -> String
-showList' xs = "[" <> List.intercalate ", " xs <> "]"
-
 instance {-# OVERLAPPING #-} Show (VarSet n) where
   show (VarGroups o i p x) =
     showList' $
@@ -172,22 +169,6 @@ instance {-# OVERLAPPING #-} Show (VarSet n) where
         map (\var -> "B" <> prefix <> show var) (IntSet.toList b)
           <> map (\var -> "F" <> prefix <> show var) (IntSet.toList f)
           <> concatMap (\(width, xs) -> map (\var -> "U" <> toSubscript width <> prefix <> show var) (IntSet.toList xs)) (IntMap.toList u)
-
-toSubscript :: Int -> String
-toSubscript = map go . show
-  where
-    go c = case c of
-      '0' -> '₀'
-      '1' -> '₁'
-      '2' -> '₂'
-      '3' -> '₃'
-      '4' -> '₄'
-      '5' -> '₅'
-      '6' -> '₆'
-      '7' -> '₇'
-      '8' -> '₈'
-      '9' -> '₉'
-      _ -> c
 
 --------------------------------------------------------------------------------
 

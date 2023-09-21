@@ -17,7 +17,7 @@ where
 
 import Control.DeepSeq (NFData)
 import GHC.Generics (Generic)
-import Keelung.Data.VarGroup (toSubscript)
+import Keelung.Compiler.Util
 import Keelung.Syntax
 
 -- | For representing mixed variables in constraints

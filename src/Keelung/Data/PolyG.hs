@@ -9,7 +9,6 @@ module Keelung.Data.PolyG
     build,
     buildWithSeq,
     buildWithMap,
-    null,
     view,
     viewAsMap,
     insert,
@@ -79,9 +78,6 @@ buildWithMap c xs =
    in if Map.null result
         then Left c
         else Right (PolyG c result)
-
-null :: (Num n, Eq n) => PolyG n -> Bool
-null (PolyG c xs) = Map.null xs && c == 0
 
 singleton :: (Num n, Eq n) => n -> (Ref, n) -> Either n (PolyG n)
 singleton c (_, 0) = Left c

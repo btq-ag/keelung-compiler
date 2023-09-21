@@ -21,15 +21,43 @@ import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
+import Keelung.Compiler.Util
+import Keelung.Data.Reference (RefU (RefUX))
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
 import Prelude hiding (null)
 
 newtype OccurU
   = OccurU (IntMap (IntMap Int)) -- mapping of width to (mapping of var to count)
-  deriving (Show, Eq, Generic)
+  deriving (Eq, Generic)
 
 instance NFData OccurU
+
+instance Show OccurU where
+  show xs =
+    if null xs
+      then ""
+      else
+        "  OccurrencesU:\n  "
+          <> indent
+            ( showList'
+                ( map
+                    ( \(width, occurs) ->
+                        "UInt "
+                          <> show width
+                          <> ": "
+                          <> showList'
+                            ( map
+                                (\(var, n) -> show (RefUX width var) <> ": " <> show n)
+                                ( filter
+                                    (\(_, n) -> n > 0) -- only show variables that are used
+                                    (IntMap.toList occurs)
+                                )
+                            )
+                    )
+                    (toList xs)
+                )
+            )
 
 -- | O(1). Construct an empty OccurU
 new :: OccurU
@@ -48,7 +76,7 @@ toIntMap (OccurU xs) = xs
 
 -- | O(lg n). To an IndexTable
 toIndexTable :: Counters -> OccurU -> IndexTable
-toIndexTable counters (OccurU xs) = 
+toIndexTable counters (OccurU xs) =
   let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IndexTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
    in bitsPart
 

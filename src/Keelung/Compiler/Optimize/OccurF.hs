@@ -20,6 +20,8 @@ import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
+import Keelung.Compiler.Util
+import Keelung.Data.Reference (RefF (RefFX))
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
 import Prelude hiding (null)
@@ -29,6 +31,23 @@ newtype OccurF
   deriving (Eq, Generic)
 
 instance NFData OccurF
+
+instance Show OccurF where
+  show xs =
+    if null xs
+      then ""
+      else
+        "  OccurrencesF:\n  "
+          <> indent
+            ( showList'
+                ( map
+                    (\(var, n) -> show (RefFX var) <> ": " <> show n)
+                    ( filter
+                        (\(_, n) -> n > 0) -- only show variables that are used
+                        (toList xs)
+                    )
+                )
+            )
 
 -- | O(1). Construct an empty OccurF
 new :: OccurF
@@ -54,5 +73,6 @@ increase var (OccurF xs) = OccurF $ IntMap.insertWith (+) var 1 xs
 decrease :: Var -> OccurF -> OccurF
 decrease var (OccurF xs) = OccurF $ IntMap.adjust (\count -> pred count `max` 0) var xs
 
+-- | O(n). Get the set of RefF that occured
 occuredSet :: OccurF -> IntSet
 occuredSet (OccurF xs) = IntMap.keysSet $ IntMap.filter (> 0) xs
