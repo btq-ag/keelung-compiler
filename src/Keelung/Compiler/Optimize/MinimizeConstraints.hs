@@ -334,7 +334,7 @@ reduceMulLCPC a bs c = do
   case PolyL.multiplyBy (-a) bs of
     Left constant ->
       if constant == c
-        then modify' $ removeOccurrencesLB (PolyL.vars bs)
+        then modify' $ removeOccurrencesTuple (PolyL.varsSet bs)
         else throwError $ Compile.ConflictingValuesU (toInteger constant) (toInteger c)
     Right xs -> addAddL $ PolyL.addConstant c xs
 
@@ -350,12 +350,12 @@ reduceMulLCPP a polyB polyC = do
         then do
           -- a * bs = 0
           -- cm = 0
-          modify' $ removeOccurrencesLB (PolyL.vars polyB)
+          modify' $ removeOccurrencesTuple (PolyL.varsSet polyB)
           addAddL polyC
         else do
           -- a * bs = constant = cm
           -- => cm - constant = 0
-          modify' $ removeOccurrencesLB (PolyL.vars polyB)
+          modify' $ removeOccurrencesTuple (PolyL.varsSet polyB)
           addAddL (PolyL.addConstant (-constant) polyC)
     Right polyBa -> addAddL (polyC <> polyBa)
 

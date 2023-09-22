@@ -176,10 +176,10 @@ addC = mapM_ addOne
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddG xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
-    addOne (CAddL xs) = modify' (\cs -> addOccurrencesLB (PolyL.vars xs) $ cs {cmAddL = xs : cmAddL cs})
+    addOne (CAddL xs) = modify' (\cs -> addOccurrencesTuple (PolyL.varsSet xs) $ cs {cmAddL = xs : cmAddL cs})
     addOne (CAdd xs ys) =
       modify'
-        ( \cs -> addOccurrences (PolyG.vars xs) $ addOccurrencesLB (PolyL.vars ys) $ cs {cmAdd = (xs, ys) : cmAdd cs}
+        ( \cs -> addOccurrences (PolyG.vars xs) $ addOccurrencesTuple (PolyL.varsSet ys) $ cs {cmAdd = (xs, ys) : cmAdd cs}
         )
     addOne (CVarBindF x c) = do
       execRelations $ Relations.assignF x c
@@ -209,8 +209,8 @@ addC = mapM_ addOne
       execRelations $ Relations.relateB x (False, y)
     addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {cmMulF = (x, y, Left c) : cmMulF cs})
     addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {cmMulF = (x, y, Right z) : cmMulF cs})
-    addOne (CMulL x y (Left c)) = modify' (\cs -> addOccurrencesLB (PolyL.vars x) $ addOccurrencesLB (PolyL.vars y) $ cs {cmMulL = (x, y, Left c) : cmMulL cs})
-    addOne (CMulL x y (Right z)) = modify (\cs -> addOccurrencesLB (PolyL.vars x) $ addOccurrencesLB (PolyL.vars y) $ addOccurrencesLB (PolyL.vars z) $ cs {cmMulL = (x, y, Right z) : cmMulL cs})
+    addOne (CMulL x y (Left c)) = modify' (\cs -> addOccurrencesTuple (PolyL.varsSet x) $ addOccurrencesTuple (PolyL.varsSet y) $ cs {cmMulL = (x, y, Left c) : cmMulL cs})
+    addOne (CMulL x y (Right z)) = modify (\cs -> addOccurrencesTuple (PolyL.varsSet x) $ addOccurrencesTuple (PolyL.varsSet y) $ addOccurrencesTuple (PolyL.varsSet z) $ cs {cmMulL = (x, y, Right z) : cmMulL cs})
 
 --------------------------------------------------------------------------------
 

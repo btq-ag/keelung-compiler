@@ -8,8 +8,8 @@ module Keelung.Compiler.ConstraintModule
     prettyVariables,
     getBooleanConstraintCount,
     UpdateOccurrences (..),
-    addOccurrencesLB,
-    removeOccurrencesLB
+    addOccurrencesTuple,
+    removeOccurrencesTuple
   )
 where
 
@@ -280,11 +280,11 @@ class UpdateOccurrences ref where
   addOccurrences :: Set ref -> ConstraintModule n -> ConstraintModule n
   removeOccurrences :: Set ref -> ConstraintModule n -> ConstraintModule n
 
-addOccurrencesLB :: (GaloisField n, Integral n) => (Set RefU, Set RefB) -> ConstraintModule n -> ConstraintModule n
-addOccurrencesLB (ls, bs) = addOccurrences ls . addOccurrences bs
+addOccurrencesTuple :: (GaloisField n, Integral n) => (Set RefU, Set Ref) -> ConstraintModule n -> ConstraintModule n
+addOccurrencesTuple (ls, vars) = addOccurrences ls . addOccurrences vars
 
-removeOccurrencesLB :: (GaloisField n, Integral n) => (Set RefU, Set RefB) -> ConstraintModule n -> ConstraintModule n
-removeOccurrencesLB (ls, bs) = addOccurrences ls . addOccurrences bs
+removeOccurrencesTuple :: (GaloisField n, Integral n) => (Set RefU, Set Ref) -> ConstraintModule n -> ConstraintModule n
+removeOccurrencesTuple (ls, vars) = addOccurrences ls . addOccurrences vars
 
 instance UpdateOccurrences Ref where
   addOccurrences =
