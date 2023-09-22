@@ -271,7 +271,9 @@ linkPolyGUnsafe occurrences xs = case linkPolyG occurrences xs of
 
 linkPolyL :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Either n (Poly n)
 linkPolyL occurrences poly =
-  let (constant, limbs) = PolyL.view poly
+  -- let (constant, terms) = PolyL.viewAsRefMap poly in Poly.buildEither constant $ fmap (first (reindexRef occurrences)) (Map.toList terms)
+  let constant = PolyL.polyConstant poly
+      limbs = PolyL.polyLimbs poly
    in Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexLimb occurrences)) (toList limbs))
 
 linkPolyLUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Poly n

@@ -443,20 +443,34 @@ learnFromAddF poly = case PolyG.view poly of
 --   Returns 'True' if the constraint has been reduced.
 learnFromAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n Bool
 learnFromAddL poly = case PolyL.view poly of
-  (_, []) -> error "[ panic ] Empty PolyL"
-  (constant, [(var1, multiplier1)]) -> do
+  PolyL.RefMonomial intercept (var, slope) -> do
+    --    intercept + slope * var = 0
+    --  =>
+    --    var = - intercept / slope
+    assign var (-intercept / slope)
+    return True
+  PolyL.RefBinomial intercept (var1, slope1) (var2, slope2) -> do
+    --    intercept + slope1 * var1 + slope2 * var2 = 0
+    --  =>
+    --    slope1 * var1 = - slope2 * var2 - intercept
+    --  =>
+    --    var1 = - slope2 * var2 / slope1 - intercept / slope1
+    relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
+  PolyL.RefPolynomial _ _ -> return False
+  PolyL.LimbMonomial constant (var1, multiplier1) -> do
     --  constant + var1 * multiplier1  = 0
     --    =>
     --  var1 = - constant / multiplier1
     assignL var1 (toInteger (-constant / multiplier1))
     return True
-  (constant, [(var1, multiplier1), (var2, multiplier2)]) ->
+  PolyL.LimbBinomial constant (var1, multiplier1) (var2, multiplier2) -> do
     if constant == 0 && multiplier1 == -multiplier2
       then do
         --  var1 * multiplier1 = var2 * multiplier2
         relateL var1 var2
       else return False
-  _ -> return False
+  PolyL.LimbPolynomial _ _ -> return False
+  PolyL.MixedPolynomial {} -> return False
 
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
@@ -546,18 +560,40 @@ addAddF poly = case PolyG.view poly of
 -- | Add learned additive limb constraints to the pool
 addAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n ()
 addAddL poly = case PolyL.view poly of
-  (_, []) -> error "[ panic ] Empty PolyL"
-  (constant, [(var1, multiplier1)]) -> do
+  PolyL.RefMonomial constant (var1, coeff1) -> do
+    --    constant + coeff1 * var1 = 0
+    --      =>
+    --    var1 = - constant / coeff1
+    assign var1 (-constant / coeff1)
+  PolyL.RefBinomial constant (var1, coeff1) (var2, coeff2) -> do
+    --    constant + coeff1 * var1 + coeff2 * var2 = 0
+    --      =>
+    --    coeff1 * var1 = - coeff2 * var2 - constant
+    --      =>
+    --    var1 = - coeff2 * var2 / coeff1 - constant / coeff1
+    void $ relateF var1 (-coeff2 / coeff1, var2, -constant / coeff1)
+  PolyL.RefPolynomial _ _ -> do
+    markChanged AdditiveFieldConstraintChanged
+    modify' $ \cm' -> cm' {cmAddL = poly : cmAddL cm'}
+  PolyL.LimbMonomial constant (var1, multiplier1) -> do
     --  constant + var1 * multiplier1  = 0
     --    =>
     --  var1 = - constant / multiplier1
     assignL var1 (toInteger (-constant / multiplier1))
-  (constant, [(var1, multiplier1), (var2, multiplier2)]) ->
-    --  var1 * multiplier1 = var2 * multiplier2
-    when (constant == 0 && multiplier1 == -multiplier2) $
-      void $
-        relateL var1 var2
-  _ -> return ()
+  PolyL.LimbBinomial constant (var1, multiplier1) (var2, multiplier2) -> do
+    if constant == 0 && multiplier1 == -multiplier2
+      then do
+        --  var1 * multiplier1 = var2 * multiplier2
+        void $ relateL var1 var2
+      else do
+        markChanged AdditiveLimbConstraintChanged
+        modify' $ \cm' -> cm' {cmAddL = poly : cmAddL cm'}
+  PolyL.LimbPolynomial _ _ -> do
+    markChanged AdditiveLimbConstraintChanged
+    modify' $ \cm' -> cm' {cmAddL = poly : cmAddL cm'}
+  PolyL.MixedPolynomial {} -> do
+    markChanged AdditiveFieldConstraintChanged
+    modify' $ \cm' -> cm' {cmAddL = poly : cmAddL cm'}
 
 --------------------------------------------------------------------------------
 
@@ -611,7 +647,8 @@ substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = cas
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
 substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Set Limb, Set Limb)
 substPolyL relations poly = do
-  let (c, xs) = PolyL.view poly
+  let c = PolyL.polyConstant poly
+      xs = PolyL.polyLimbs poly
   case foldl (substPolyL_ (Relations.exportLimbRelations relations)) (False, Left c, mempty, mempty) xs of
     (False, _, _, _) -> Nothing -- nothing changed
     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant

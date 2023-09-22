@@ -4,7 +4,7 @@
 
 -- | Polynomial made of Limbs
 module Keelung.Data.PolyL
-  ( PolyL,
+  ( PolyL(polyConstant, polyLimbs, polyRefs),
     varsSet,
     limbsSet,
     newL,
@@ -15,6 +15,8 @@ module Keelung.Data.PolyL
     multiplyBy,
     size,
     view,
+    View(..),
+    viewAsRefMap
   )
 where
 
@@ -102,8 +104,36 @@ multiplyBy :: (Num n, Eq n) => n -> PolyL n -> Either n (PolyL n)
 multiplyBy 0 _ = Left 0
 multiplyBy m (PolyL c ls vars) = Right $ PolyL (m * c) (fmap (second (m *)) ls) (fmap (m *) vars)
 
-view :: PolyL n -> (n, [(Limb, n)])
-view (PolyL c ls vars) = (c, ls)
+-- | View a PolyL as a Monomial, Binomial, or Polynomial
+data View n
+  = RefMonomial n (Ref, n)
+  | RefBinomial n (Ref, n) (Ref, n)
+  | RefPolynomial n (Map Ref n)
+  | LimbMonomial n (Limb, n)
+  | LimbBinomial n (Limb, n) (Limb, n)
+  | LimbPolynomial n [(Limb, n)]
+  | MixedPolynomial n (Map Ref n) [(Limb, n)]
+  deriving (Eq, Show)
+
+-- | View a PolyL as a Monomial, Binomial, or Polynomial
+view :: PolyL n -> View n
+view (PolyL constant limbs vars) =
+  case (Map.toList vars, limbs) of
+    ([], []) -> error "[ panic ] Empty PolyL"
+    ([], [term]) -> LimbMonomial constant term
+    ([], [term1, term2]) -> LimbBinomial constant term1 term2
+    ([] , _) -> LimbPolynomial constant limbs
+    ([term], []) -> RefMonomial constant term
+    ([term1, term2], []) -> RefBinomial constant term1 term2
+    (_, []) -> RefPolynomial constant vars
+    _ -> MixedPolynomial constant vars limbs
+
+-- | Convert all Limbs to Refs and return a map of Refs to coefficients
+viewAsRefMap :: PolyL n -> (n, Map Ref n)
+viewAsRefMap (PolyL constant limbs vars) = (constant, vars <> Map.fromList (limbs >>= limbToTerms))
+  where
+    limbToTerms :: (Limb, n) -> [(Ref, n)]
+    limbToTerms (limb, n) = [(B (RefUBit (lmbWidth limb) (lmbRef limb) i), n) | i <- [0 .. lmbWidth limb - 1]]
 
 varsSet :: PolyL n -> (Set RefU, Set Ref)
 varsSet (PolyL _ ls vars) = (Set.fromList (map (lmbRef . fst) (toList ls)), Map.keysSet vars)
