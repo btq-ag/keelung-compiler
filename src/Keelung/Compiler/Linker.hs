@@ -208,8 +208,8 @@ linkConstraint occurrences _ (CVarEqL x y) =
     else do
       let pairsX = reindexLimb occurrences x 1
       let pairsY = reindexLimb occurrences y (-1)
-      let pairs = toList (pairsX <> pairsY)
-      case Poly.buildEither 0 pairs of
+      let pairs = IntMap.unionWith (+) pairsX pairsY
+      case Poly.buildWithIntMap 0 pairs of
         Left _ -> error "CVarEqL: two variables are the same"
         Right xs -> [Linked.CAdd xs]
 linkConstraint occurrences fieldWidth (CVarEqU x y) =
@@ -220,8 +220,8 @@ linkConstraint occurrences _ (CVarBindF x n) = case Poly.buildEither (-n) [(rein
   Right xs -> [Linked.CAdd xs]
 linkConstraint occurrences _ (CVarBindB x True) = [Linked.CAdd (Poly.bind (reindexRefB occurrences x) 1)]
 linkConstraint occurrences _ (CVarBindB x False) = [Linked.CAdd (Poly.bind (reindexRefB occurrences x) 0)]
-linkConstraint occurrences _ (CVarBindL x n) = do
-  case Poly.buildEither (fromInteger (-n)) (toList (reindexLimb occurrences x 1)) of
+linkConstraint occurrences _ (CVarBindL x n) =
+  case Poly.buildWithIntMap (fromInteger (-n)) (reindexLimb occurrences x 1) of
     Left _ -> error "CVarBindL: impossible"
     Right xs -> [Linked.CAdd xs]
 linkConstraint occurrences fieldWidth (CVarBindU x n) =
@@ -271,10 +271,10 @@ linkPolyGUnsafe occurrences xs = case linkPolyG occurrences xs of
 
 linkPolyL :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Either n (Poly n)
 linkPolyL occurrences poly =
-  -- let (constant, terms) = PolyL.viewAsRefMap poly in Poly.buildEither constant $ fmap (first (reindexRef occurrences)) (Map.toList terms)
   let constant = PolyL.polyConstant poly
       limbs = PolyL.polyLimbs poly
-   in Poly.buildEither constant $ toList $ mconcat (fmap (uncurry (reindexLimb occurrences)) (toList limbs))
+      limbPolynomial = IntMap.unionsWith (+) (map (uncurry (reindexLimb occurrences)) limbs)
+   in Poly.buildWithIntMap constant limbPolynomial
 
 linkPolyLUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Poly n
 linkPolyLUnsafe occurrences xs = case linkPolyL occurrences xs of
@@ -287,10 +287,11 @@ reindexRef :: Occurrences -> Ref -> Var
 reindexRef occurrences (F x) = reindexRefF occurrences x
 reindexRef occurrences (B x) = reindexRefB occurrences x
 
-reindexLimb :: (Integral n, GaloisField n) => Occurrences -> Limb -> n -> Seq (Var, n)
+reindexLimb :: (Integral n, GaloisField n) => Occurrences -> Limb -> n -> IntMap n
 reindexLimb occurrences limb multiplier = case lmbSigns limb of
   Left sign ->
-    Seq.fromList
+    IntMap.fromListWith
+      (+)
       [ ( reindexRefU
             occurrences
             (lmbRef limb)
@@ -300,7 +301,8 @@ reindexLimb occurrences limb multiplier = case lmbSigns limb of
         | i <- [0 .. lmbWidth limb - 1]
       ]
   Right signs ->
-    Seq.fromList
+    IntMap.fromListWith
+      (+)
       [ ( reindexRefU
             occurrences
             (lmbRef limb)

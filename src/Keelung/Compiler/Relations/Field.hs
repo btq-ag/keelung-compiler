@@ -175,7 +175,7 @@ lookup :: GaloisField n => Ref -> Relations n -> Lookup n
 lookup (B var) xs =
   case var of
     RefUBit _ refU _index -> case EquivClass.lookup refU (relationsU xs) of
-      EquivClass.IsConstant _value -> Root -- traceShow (var, value) Root
+      EquivClass.IsConstant _value -> Root
       -- Value (if Data.Bits.testBit value index then 1 else 0)
       -- Root -- Value (if Data.Bits.testBit value index then 1 else 0)
       EquivClass.IsRoot _ -> Root
