@@ -136,7 +136,7 @@ writeMulWithLC as bs cs = case (as, bs, cs) of
         Right poly -> addC [CAddL $ PolyL.fromPolyG poly]
   (Polynomial xs, Constant y, Constant z) -> writeMulWithLC (Constant y) (Polynomial xs) (Constant z)
   (Polynomial xs, Constant y, Polynomial zs) -> writeMulWithLC (Constant y) (Polynomial xs) (Polynomial zs)
-  (Polynomial xs, Polynomial ys, _) -> addC [CMulL (PolyL.fromPolyG xs) (PolyL.fromPolyG ys) (toEither cs)]
+  (Polynomial xs, Polynomial ys, _) -> addC [CMulL (PolyL.fromPolyG xs) (PolyL.fromPolyG ys) (toPolyL cs)]
 
 writeAddWithPolyG :: (GaloisField n, Integral n) => Either n (PolyG n) -> M n ()
 writeAddWithPolyG xs = case xs of
@@ -212,7 +212,7 @@ addC = mapM_ addOne
 --------------------------------------------------------------------------------
 
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
-writeMul as bs cs = writeMulWithLC (fromEither $ uncurry PolyG.build as) (fromEither $ uncurry PolyG.build bs) (fromEither $ uncurry PolyG.build cs)
+writeMul as bs cs = writeMulWithLC (fromPolyG $ uncurry PolyG.build as) (fromPolyG $ uncurry PolyG.build bs) (fromPolyG $ uncurry PolyG.build cs)
 
 writeMulWithLimbs :: (GaloisField n, Integral n) => (n, [(Limb, n)]) -> (n, [(Limb, n)]) -> (n, [(Limb, n)]) -> M n ()
 writeMulWithLimbs as bs cs = case (uncurry PolyL.fromLimbs as, uncurry PolyL.fromLimbs bs) of

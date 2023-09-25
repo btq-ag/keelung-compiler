@@ -16,6 +16,7 @@ module Keelung.Data.PolyL
     view,
     View (..),
     viewAsRefMap,
+    merge,
   )
 where
 
@@ -139,9 +140,19 @@ viewAsRefMap (PolyL constant limbs vars) = (constant, vars <> Map.fromList (toLi
     limbToTerms :: (Limb, n) -> [(Ref, n)]
     limbToTerms (limb, n) = [(B (RefUBit (lmbWidth limb) (lmbRef limb) i), n) | i <- [0 .. lmbWidth limb - 1]]
 
+-- | Return a set of all Refs in the PolyL
 varsSet :: PolyL n -> (Set RefU, Set Ref)
 varsSet (PolyL _ ls vars) = (Set.fromList (map (lmbRef . fst) (toList ls)), Map.keysSet vars)
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int
 size (PolyL c ls vars) = if c == 0 then 0 else 1 + sum (fmap (lmbWidth . fst) ls) + Map.size vars
+
+-- | Merge two PolyLs
+merge :: (Num n, Eq n) => PolyL n -> PolyL n -> Either n (PolyL n)
+merge (PolyL c1 ls1 vars1) (PolyL c2 ls2 vars2) =
+  let limbs = ls1 <> ls2
+      vars = Map.filter (/= 0) $ Map.unionWith (+) vars1 vars2
+   in if null limbs && Map.null vars
+        then Left (c1 + c2)
+        else Right (PolyL (c1 + c2) limbs vars)

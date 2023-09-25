@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.LC (LC (..), fromEither, toEither, fromRefU, (@), neg, scale) where
+module Keelung.Compiler.Compile.LC (LC (..), fromPolyG, toPolyL, fromRefU, (@), neg, scale) where
 
 import Data.Bits qualified
 import Data.Field.Galois
@@ -16,10 +16,10 @@ data LC n
   deriving (Eq, Show)
 
 -- | Converting from a 'Either n (PolyG n)' to a 'LC n'.
-fromEither :: Either n (PolyG n) -> LC n
-fromEither = either Constant Polynomial
+fromPolyG :: Either n (PolyG n) -> LC n
+fromPolyG = either Constant Polynomial
 
--- | Converting from a 'Either RefU n' to a 'LC n'.
+-- | Converting from a 'Either RefU Integer' to a list of 'LC n'.
 fromRefU :: (Num n, Eq n) => Width -> Int -> Either RefU Integer -> [LC n]
 fromRefU width fieldWidth (Right val) =
   let limbWidth = fieldWidth
@@ -37,20 +37,16 @@ fromRefU width fieldWidth (Left var) =
     go limbWidth limbStart = do
       let range = [limbStart .. (limbStart + limbWidth - 1) `min` (width - 1)]
       let bits = [(B (RefUBit width var i), 2 ^ i) | i <- range]
-      fromEither (PolyG.build 0 bits)
+      fromPolyG (PolyG.build 0 bits)
 
--- let width = widthOf var
---     bits = [(B (RefUBit width var i), 2 ^ i) | i <- [0 .. width - 1]]
---  in fromEither (PolyG.build 0 bits)
-
-toEither :: (Num n, Eq n) => LC n -> Either n (PolyL n)
-toEither (Constant c) = Left c
-toEither (Polynomial xs) = Right (PolyL.fromPolyG xs)
+toPolyL :: (Num n, Eq n) => LC n -> Either n (PolyL n)
+toPolyL (Constant c) = Left c
+toPolyL (Polynomial xs) = Right (PolyL.fromPolyG xs)
 
 -- | A LC is a semigroup under addition.
 instance (Semigroup n, GaloisField n) => Semigroup (LC n) where
   Constant c <> Constant d = Constant (c + d)
-  Polynomial xs <> Polynomial ys = fromEither (PolyG.merge xs ys)
+  Polynomial xs <> Polynomial ys = fromPolyG (PolyG.merge xs ys)
   Polynomial xs <> Constant c = Polynomial (PolyG.addConstant c xs)
   Constant c <> Polynomial xs = Polynomial (PolyG.addConstant c xs)
 
@@ -59,14 +55,14 @@ instance (Semigroup n, GaloisField n) => Monoid (LC n) where
   mempty = Constant 0
 
 -- var :: GaloisField n => Ref -> LC n
--- var x = fromEither (PolyG.singleton 0 (x, 1))
+-- var x = fromPolyG (PolyG.singleton 0 (x, 1))
 
 (@) :: GaloisField n => n -> Ref -> LC n
-n @ x = fromEither (PolyG.singleton 0 (x, n))
+n @ x = fromPolyG (PolyG.singleton 0 (x, n))
 
 neg :: GaloisField n => LC n -> LC n
 neg = scale (-1)
 
 scale :: GaloisField n => n -> LC n -> LC n
 scale n (Constant c) = Constant (n * c)
-scale n (Polynomial xs) = fromEither (PolyG.multiplyBy n xs)
+scale n (Polynomial xs) = fromPolyG (PolyG.multiplyBy n xs)

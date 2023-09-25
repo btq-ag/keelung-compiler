@@ -117,8 +117,8 @@ fastExp (Polynomial base) acc e =
     -- \| Compute the multiplication of two variables
     mul :: (GaloisField n, Integral n) => LC n -> LC n -> M n (LC n)
     mul (Constant x) (Constant y) = return $ Constant (x * y)
-    mul (Constant x) (Polynomial ys) = return $ fromEither $ PolyG.multiplyBy x ys
-    mul (Polynomial xs) (Constant y) = return $ fromEither $ PolyG.multiplyBy y xs
+    mul (Constant x) (Polynomial ys) = return $ fromPolyG $ PolyG.multiplyBy x ys
+    mul (Polynomial xs) (Constant y) = return $ fromPolyG $ PolyG.multiplyBy y xs
     mul (Polynomial xs) (Polynomial ys) = do
       out <- freshRefF
       let result = 1 @ F out
