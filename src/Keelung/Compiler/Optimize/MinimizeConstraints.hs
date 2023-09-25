@@ -118,8 +118,8 @@ goThroughEqZeros cm =
     reduceEqZeros :: (GaloisField n, Integral n) => Relations n -> (PolyG n, RefF) -> Maybe (PolyG n, RefF)
     reduceEqZeros relations (polynomial, m) = case substPolyG relations polynomial of
       Nothing -> Just (polynomial, m) -- nothing changed
-      Just (Left _constant, _, _) -> Nothing
-      Just (Right reducePolynomial, _, _) -> Just (reducePolynomial, m)
+      Just (Left _constant, _) -> Nothing
+      Just (Right reducePolynomial, _) -> Just (reducePolynomial, m)
 
 goThroughModInvs :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughModInvs cm =
@@ -144,19 +144,19 @@ reduceAddF polynomial = do
       relations <- gets cmRelations
       case substPolyG relations polynomial of
         Nothing -> return (Just polynomial) -- nothing changed
-        Just (Left constant, removedRefs, _) -> do
+        Just (Left constant, changes) -> do
           when (constant /= 0) $
             error "[ panic ] Additive reduced to some constant other than 0"
           -- the polynomial has been reduced to nothing
           markChanged AdditiveFieldConstraintChanged
           -- remove all variables in the polynomial from the occurrence list
-          modify' $ removeOccurrences removedRefs
+          modify' $ removeOccurrences (removedRefs changes)
           return Nothing
-        Just (Right reducePolynomial, removedRefs, addedRefs) -> do
+        Just (Right reducePolynomial, changes) -> do
           -- the polynomial has been reduced to something
           markChanged AdditiveFieldConstraintChanged
           -- remove variables that has been reduced in the polynomial from the occurrence list
-          modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
+          modify' $ removeOccurrences (removedRefs changes) . addOccurrences (addedRefs changes)
           -- keep reducing the reduced polynomial
           reduceAddF reducePolynomial
 
@@ -169,19 +169,19 @@ reduceAddL polynomial = do
       relations <- gets cmRelations
       case substPolyL relations polynomial of
         Nothing -> return (Just polynomial) -- nothing changed
-        Just (Left constant, removedRefs, _) -> do
+        Just (Left constant, changes) -> do
           when (constant /= 0) $
             error "[ panic ] Additive reduced to some constant other than 0"
           -- the polynomial has been reduced to nothing
           markChanged AdditiveLimbConstraintChanged
           -- remove all variables in the polynomial from the occurrence list
-          modify' $ removeOccurrences removedRefs
+          modify' $ removeOccurrences (removedLimbs changes)
           return Nothing
-        Just (Right reducePolynomial, removedRefs, addedRefs) -> do
+        Just (Right reducePolynomial, changes) -> do
           -- the polynomial has been reduced to something
           markChanged AdditiveLimbConstraintChanged
           -- remove variables that has been reduced in the polynomial from the occurrence list
-          modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
+          modify' $ removeOccurrences (removedLimbs changes) . addOccurrences (addedLimbs changes)
           -- keep reducing the reduced polynomial
           reduceAddL reducePolynomial
 
@@ -201,17 +201,17 @@ reduceMulF (polyA, polyB, polyC) = do
       relations <- gets cmRelations
       case substPolyG relations polynomial of
         Nothing -> return (Right polynomial) -- nothing changed
-        Just (Left constant, removedRefs, _) -> do
+        Just (Left constant, changes) -> do
           -- the polynomial has been reduced to nothing
           markChanged typeOfChange
           -- remove all variables in the polynomial from the occurrence list
-          modify' $ removeOccurrences removedRefs
+          modify' $ removeOccurrences (removedRefs changes)
           return (Left constant)
-        Just (Right reducePolynomial, removedRefs, addedRefs) -> do
+        Just (Right reducePolynomial, changes) -> do
           -- the polynomial has been reduced to something
           markChanged typeOfChange
           -- remove all variables in the polynomial from the occurrence list
-          modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
+          modify' $ removeOccurrences (removedRefs changes) . addOccurrences (addedRefs changes)
           return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative constaint, returns the reduced constraint if it is reduced
@@ -293,17 +293,17 @@ reduceMulL (polyA, polyB, polyC) = do
       relations <- gets cmRelations
       case substPolyL relations polynomial of
         Nothing -> return (Right polynomial) -- nothing changed
-        Just (Left constant, removedRefs, _) -> do
+        Just (Left constant, changes) -> do
           -- the polynomial has been reduced to nothing
           markChanged typeOfChange
-          -- remove all variables in the polynomial from the occurrence list
-          modify' $ removeOccurrences removedRefs
+          -- remove all referenced RefUs in the Limbs of the polynomial from the occurrence list
+          modify' $ removeOccurrences (removedLimbs changes)
           return (Left constant)
-        Just (Right reducePolynomial, removedRefs, addedRefs) -> do
+        Just (Right reducePolynomial, changes) -> do
           -- the polynomial has been reduced to something
           markChanged typeOfChange
-          -- remove all variables in the polynomial from the occurrence list
-          modify' $ removeOccurrences removedRefs . addOccurrences addedRefs
+          -- remove all referenced RefUs in the Limbs of the polynomial from the occurrence list and add the new ones
+          modify' $ removeOccurrences (removedLimbs changes) . addOccurrences (addedLimbs changes)
           return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative limb constaint, returns the reduced constraint if it is reduced
@@ -600,85 +600,150 @@ addAddL poly = case PolyL.view poly of
 
 -- | Substitutes variables in a polynomial.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyG :: (GaloisField n, Integral n) => Relations n -> PolyG n -> Maybe (Either n (PolyG n), Set Ref, Set Ref)
+-- substPolyG :: (GaloisField n, Integral n) => Relations n -> PolyG n -> Maybe (Either n (PolyG n), Set Ref, Set Ref)
+-- substPolyG relations poly = do
+--   let (c, xs) = PolyG.viewAsMap poly
+--   case Map.foldlWithKey' (substPolyG_ relations) (False, Left c, mempty, mempty) xs of
+--     (False, _, _, _) -> Nothing -- nothing changed
+--     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
+--     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyG.vars poly)
+
+-- substPolyG_ ::
+--   (Integral n, GaloisField n) =>
+--   Relations n ->
+--   (Bool, Either n (PolyG n), Set Ref, Set Ref) ->
+--   Ref ->
+--   n ->
+--   (Bool, Either n (PolyG n), Set Ref, Set Ref)
+-- substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = case Relations.lookup ref relations of
+--   Relations.Root -> case accPoly of
+--     Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
+--     Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+--   Relations.Value intercept ->
+--     -- ref = intercept
+--     let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
+--      in case accPoly of
+--           Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
+--           Right xs -> (True, Right $ PolyG.addConstant (intercept * coeff) xs, removedRefs', addedRefs)
+--   Relations.ChildOf slope root intercept ->
+--     if root == ref
+--       then
+--         if slope == 1 && intercept == 0
+--           then -- ref = root, nothing changed
+--           case accPoly of
+--             Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
+--             Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+--           else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
+--       else
+--         let removedRefs' = Set.insert ref removedRefs
+--             addedRefs' = Set.insert root addedRefs
+--          in case accPoly of
+--               -- ref = slope * root + intercept
+--               Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), removedRefs', addedRefs')
+--               Right accPoly' -> (True, PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', removedRefs', addedRefs')
+
+-- | Substitutes variables in a polynomial.
+--   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the set of substituted variables.
+substPolyG :: (GaloisField n, Integral n) => Relations n -> PolyG n -> Maybe (Either n (PolyG n), Changes)
 substPolyG relations poly = do
   let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' (substPolyG_ relations) (False, Left c, mempty, mempty) xs of
-    (False, _, _, _) -> Nothing -- nothing changed
-    (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
-    (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyG.vars poly)
+  case Map.foldlWithKey' (substPolyG_ relations) (Left c, Nothing) xs of
+    (_, Nothing) -> Nothing -- nothing changed
+    (result, Just changes) -> Just (result, changes)
 
 substPolyG_ ::
   (Integral n, GaloisField n) =>
   Relations n ->
-  (Bool, Either n (PolyG n), Set Ref, Set Ref) ->
+  (Either n (PolyG n), Maybe Changes) ->
   Ref ->
   n ->
-  (Bool, Either n (PolyG n), Set Ref, Set Ref)
-substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = case Relations.lookup ref relations of
-  Relations.Root -> case accPoly of
-    Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
-    Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+  (Either n (PolyG n), Maybe Changes)
+substPolyG_ relations (accPoly, changes) ref coeff = case Relations.lookup ref relations of
+  Relations.Root -> case accPoly of -- ref already a root, no need to substitute
+    Left c -> (PolyG.singleton c (ref, coeff), changes)
+    Right xs -> (PolyG.insert 0 (ref, coeff) xs, changes)
   Relations.Value intercept ->
     -- ref = intercept
-    let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
-     in case accPoly of
-          Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
-          Right xs -> (True, Right $ PolyG.addConstant (intercept * coeff) xs, removedRefs', addedRefs)
+    case accPoly of
+      Left c -> (Left (intercept * coeff + c), removeRef ref changes)
+      Right xs -> (Right $ PolyG.addConstant (intercept * coeff) xs, removeRef ref changes)
   Relations.ChildOf slope root intercept ->
     if root == ref
       then
         if slope == 1 && intercept == 0
           then -- ref = root, nothing changed
           case accPoly of
-            Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
-            Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
+            Left c -> (PolyG.singleton c (ref, coeff), changes)
+            Right xs -> (PolyG.insert 0 (ref, coeff) xs, changes)
           else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
-      else
-        let removedRefs' = Set.insert ref removedRefs
-            addedRefs' = Set.insert root addedRefs
-         in case accPoly of
-              -- ref = slope * root + intercept
-              Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), removedRefs', addedRefs')
-              Right accPoly' -> (True, PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', removedRefs', addedRefs')
+      else case accPoly of
+        -- ref = slope * root + intercept
+        Left c -> (PolyG.singleton (intercept * coeff + c) (root, slope * coeff), addRef root $ removeRef ref changes)
+        Right accPoly' -> (PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', addRef root $ removeRef ref changes)
+
+--------------------------------------------------------------------------------
+
+-- | Keep track of what has been changed in the substitution
+data Changes = Changes
+  { addedLimbs :: Set Limb,
+    removedLimbs :: Set Limb,
+    addedRefs :: Set Ref,
+    removedRefs :: Set Ref
+  }
+
+-- | Mark a limb as added
+addLimb :: Limb -> Maybe Changes -> Maybe Changes
+addLimb limb (Just changes) = Just (changes {addedLimbs = Set.insert limb (addedLimbs changes)})
+addLimb limb Nothing = Just (Changes (Set.singleton limb) mempty mempty mempty)
+
+-- | Mark a Limb as removed
+removeLimb :: Limb -> Maybe Changes -> Maybe Changes
+removeLimb limb (Just changes) = Just (changes {removedLimbs = Set.insert limb (removedLimbs changes)})
+removeLimb limb Nothing = Just (Changes mempty (Set.singleton limb) mempty mempty)
+
+-- | Mark a Ref as added
+addRef :: Ref -> Maybe Changes -> Maybe Changes
+addRef ref (Just changes) = Just (changes {addedRefs = Set.insert ref (addedRefs changes)})
+addRef ref Nothing = Just (Changes mempty mempty (Set.singleton ref) mempty)
+
+-- | Mark a Ref as removed
+removeRef :: Ref -> Maybe Changes -> Maybe Changes
+removeRef ref (Just changes) = Just (changes {removedRefs = Set.insert ref (removedRefs changes)})
+removeRef ref Nothing = Just (Changes mempty mempty mempty (Set.singleton ref))
 
 --------------------------------------------------------------------------------
 
 -- | Substitutes Limbs in a PolyL.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Set Limb, Set Limb)
+substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Changes)
 substPolyL relations poly = do
   let c = PolyL.polyConstant poly
       xs = PolyL.polyLimbs poly
-  case foldl (substPolyL_ (Relations.exportLimbRelations relations)) (False, Left c, mempty, mempty) xs of
-    (False, _, _, _) -> Nothing -- nothing changed
-    (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
-    (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyL.limbsSet poly)
+  case foldl (substPolyL_ (Relations.exportLimbRelations relations)) (Left c, Nothing) xs of
+    (_, Nothing) -> Nothing -- nothing changed
+    (result, Just changes) -> Just (result, changes)
+
+-- (Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyL.limbsSet poly)
 
 substPolyL_ ::
   (Integral n, GaloisField n) =>
   Limb.LimbRelations ->
-  (Bool, Either n (PolyL n), Set Limb, Set Limb) ->
+  (Either n (PolyL n), Maybe Changes) ->
   (Limb, n) ->
-  (Bool, Either n (PolyL n), Set Limb, Set Limb)
-substPolyL_ relations (changed, accPoly, removedRefs, addedRefs) (ref, multiplier) = case EquivClass.lookup ref relations of
-  EquivClass.IsConstant constant ->
-    let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
-     in case accPoly of
-          Left c -> (True, Left (fromInteger constant * multiplier + c), removedRefs', addedRefs)
-          Right xs -> (True, Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removedRefs', addedRefs)
+  (Either n (PolyL n), Maybe Changes)
+substPolyL_ relations (accPoly, changes) (limb, multiplier) = case EquivClass.lookup limb relations of
+  EquivClass.IsConstant constant -> case accPoly of
+    Left c -> (Left (fromInteger constant * multiplier + c), removeLimb limb changes)
+    Right xs -> (Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removeLimb limb changes)
   EquivClass.IsRoot _ -> case accPoly of
-    Left c -> (changed, PolyL.newWithLimbs c [(ref, multiplier)], removedRefs, addedRefs)
-    Right xs -> (changed, Right (PolyL.insertLimbs 0 [(ref, multiplier)] xs), removedRefs, addedRefs)
+    Left c -> (PolyL.newWithLimbs c [(limb, multiplier)], changes)
+    Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
   EquivClass.IsChildOf root () ->
-    if root == ref
-      then case accPoly of
-        Left c -> (changed, PolyL.newWithLimbs c [(ref, multiplier)], removedRefs, addedRefs)
-        Right xs -> (changed, Right (PolyL.insertLimbs 0 [(ref, multiplier)] xs), removedRefs, addedRefs)
-      else
-        let removedRefs' = Set.insert ref removedRefs
-            addedRefs' = Set.insert root addedRefs
-         in case accPoly of
-              -- replace `ref` with `root`
-              Left c -> (True, PolyL.newWithLimbs c [(root, multiplier)], removedRefs', addedRefs')
-              Right accPoly' -> (True, Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), removedRefs', addedRefs')
+    if root == limb
+      then case accPoly of -- nothing changed. TODO: see if this is necessary
+        Left c -> (PolyL.newWithLimbs c [(limb, multiplier)], changes)
+        Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+      else case accPoly of
+        -- replace `limb` with `root`
+        Left c -> (PolyL.newWithLimbs c [(root, multiplier)], (addLimb root . removeLimb limb) changes)
+        Right accPoly' -> (Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), (addLimb root . removeLimb limb) changes)
