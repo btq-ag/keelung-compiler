@@ -668,17 +668,17 @@ substPolyL_ relations (changed, accPoly, removedRefs, addedRefs) (ref, multiplie
           Left c -> (True, Left (fromInteger constant * multiplier + c), removedRefs', addedRefs)
           Right xs -> (True, Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removedRefs', addedRefs)
   EquivClass.IsRoot _ -> case accPoly of
-    Left c -> (changed, PolyL.singletonL c (ref, multiplier), removedRefs, addedRefs)
-    Right xs -> (changed, Right (PolyL.insertL 0 (ref, multiplier) xs), removedRefs, addedRefs)
+    Left c -> (changed, PolyL.newWithLimbs c [(ref, multiplier)], removedRefs, addedRefs)
+    Right xs -> (changed, Right (PolyL.insertLimbs 0 [(ref, multiplier)] xs), removedRefs, addedRefs)
   EquivClass.IsChildOf root () ->
     if root == ref
       then case accPoly of
-        Left c -> (changed, PolyL.singletonL c (ref, multiplier), removedRefs, addedRefs)
-        Right xs -> (changed, Right (PolyL.insertL 0 (ref, multiplier) xs), removedRefs, addedRefs)
+        Left c -> (changed, PolyL.newWithLimbs c [(ref, multiplier)], removedRefs, addedRefs)
+        Right xs -> (changed, Right (PolyL.insertLimbs 0 [(ref, multiplier)] xs), removedRefs, addedRefs)
       else
         let removedRefs' = Set.insert ref removedRefs
             addedRefs' = Set.insert root addedRefs
          in case accPoly of
               -- replace `ref` with `root`
-              Left c -> (True, PolyL.singletonL c (root, multiplier), removedRefs', addedRefs')
-              Right accPoly' -> (True, Right (PolyL.insertL 0 (root, multiplier) accPoly'), removedRefs', addedRefs')
+              Left c -> (True, PolyL.newWithLimbs c [(root, multiplier)], removedRefs', addedRefs')
+              Right accPoly' -> (True, Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), removedRefs', addedRefs')

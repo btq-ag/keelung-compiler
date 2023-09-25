@@ -7,10 +7,8 @@ module Keelung.Data.PolyL
   ( PolyL (polyConstant, polyLimbs, polyRefs),
     varsSet,
     limbsSet,
-    newL,
-    new,
-    insertL,
-    singletonL,
+    newWithLimbs,
+    insertLimbs,
     addConstant,
     multiplyBy,
     size,
@@ -22,8 +20,7 @@ where
 
 import Control.DeepSeq (NFData)
 import Data.Bifunctor (Bifunctor (second))
-import Data.Foldable (toList)
-import Data.List.NonEmpty (NonEmpty)
+import Data.Foldable (Foldable (..), toList)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq)
@@ -40,7 +37,7 @@ data PolyL n = PolyL
   { -- | constant term
     polyConstant :: n,
     -- | (Limb, multiplier)
-    polyLimbs :: [(Limb, n)],
+    polyLimbs :: Seq (Limb, n),
     -- | (Ref, coefficient)
     polyRefs :: Map Ref n
   }
@@ -50,52 +47,48 @@ instance (Semigroup n, Num n) => Semigroup (PolyL n) where
   PolyL c1 ls1 vars1 <> PolyL c2 ls2 vars2 = PolyL (c1 + c2) (ls1 <> ls2) (vars1 <> vars2)
 
 instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
-  show (PolyL n ls vars)
-    | n == 0 =
+  show (PolyL constant limbs vars)
+    | constant == 0 =
         if firstSign == " + "
           then concat restOfTerms
           else "- " <> concat restOfTerms
-    | otherwise = concat (show n : firstSign : toList restOfTerms)
+    | otherwise = concat (show constant : firstSign : toList restOfTerms)
     where
-      limbTerms = mconcat $ fmap printTermL ls
-      varTerms = mconcat $ fmap printTerm (Map.toList vars)
-
-      (firstSign, restOfTerms) = case varTerms <> limbTerms of
-        Seq.Empty -> error "[ panic ] Empty PolyG"
+      limbTerms = mconcat $ fmap printTermL (toList limbs)
+      varTerms = show vars -- mconcat $ fmap printTerm (Map.toList vars)
+      (firstSign, restOfTerms) = case varTerms Seq.<| limbTerms of
+        Seq.Empty -> error "[ panic ] Empty PolyL"
         (x Seq.:<| xs) -> (x, xs)
 
       -- return a pair of the sign ("+" or "-") and the string representation
       printTermL :: (Show n, Ord n, Eq n, Num n) => (Limb, n) -> Seq String
       printTermL (x, c)
-        | c == 0 = error "printTerm: coefficient of 0"
+        | c == 0 = error "[ panic ] PolyL: coefficient of 0"
         | c == 1 = Seq.fromList [" + ", show x]
         | c == -1 = Seq.fromList [" - ", show x]
         | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
         | otherwise = Seq.fromList [" + ", show c <> show x]
 
-      printTerm :: (Show n, Ord n, Eq n, Num n) => (Ref, n) -> Seq String
-      printTerm (x, c)
-        | c == 0 = error "printTerm: coefficient of 0"
-        | c == 1 = Seq.fromList [" + ", show x]
-        | c == -1 = Seq.fromList [" - ", show x]
-        | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
-        | otherwise = Seq.fromList [" + ", show c <> show x]
+-- printTerm :: (Show n, Ord n, Eq n, Num n) => (Ref, n) -> Seq String
+-- printTerm (x, c)
+--   | c == 0 = error "printTerm: coefficient of 0"
+--   | c == 1 = Seq.fromList [" + ", show x]
+--   | c == -1 = Seq.fromList [" - ", show x]
+--   | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
+--   | otherwise = Seq.fromList [" + ", show c <> show x]
 
-newL :: (Num n, Eq n) => n -> NonEmpty (Limb, n) -> PolyL n
-newL c ls = PolyL c (toList ls) mempty
+newWithLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> Either n (PolyL n)
+newWithLimbs constant limbs =
+  let limbs' = filter ((/= 0) . snd) limbs
+   in if null limbs'
+        then Left constant
+        else Right (PolyL constant (Seq.fromList limbs') mempty)
 
-new :: (Num n, Eq n) => n -> Map Ref n -> Either n (PolyL n)
-new c vars =
-  if Map.null vars
-    then Left c
-    else Right (PolyL c mempty vars)
+-- newWithPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
+-- newWithPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars
 
-singletonL :: (Num n, Eq n) => n -> (Limb, n) -> Either n (PolyL n)
-singletonL c (_, 0) = Left c
-singletonL c (x, coeff) = Right $ PolyL c [(x, coeff)] mempty
-
-insertL :: (Num n, Eq n) => n -> (Limb, n) -> PolyL n -> PolyL n
-insertL c' x (PolyL c ls vars) = PolyL (c + c') (x : ls) vars
+insertLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
+insertLimbs c' limbs (PolyL c ls vars) = PolyL (c + c') (Seq.fromList limbs <> ls) vars
 
 addConstant :: Num n => n -> PolyL n -> PolyL n
 addConstant c' (PolyL c ls vars) = PolyL (c + c') ls vars
@@ -119,19 +112,19 @@ data View n
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 view :: PolyL n -> View n
 view (PolyL constant limbs vars) =
-  case (Map.toList vars, limbs) of
+  case (Map.toList vars, toList limbs) of
     ([], []) -> error "[ panic ] Empty PolyL"
     ([], [term]) -> LimbMonomial constant term
     ([], [term1, term2]) -> LimbBinomial constant term1 term2
-    ([], _) -> LimbPolynomial constant limbs
+    ([], _) -> LimbPolynomial constant (toList limbs)
     ([term], []) -> RefMonomial constant term
     ([term1, term2], []) -> RefBinomial constant term1 term2
     (_, []) -> RefPolynomial constant vars
-    _ -> MixedPolynomial constant vars limbs
+    _ -> MixedPolynomial constant vars (toList limbs)
 
 -- | Convert all Limbs to Refs and return a map of Refs to coefficients
 viewAsRefMap :: PolyL n -> (n, Map Ref n)
-viewAsRefMap (PolyL constant limbs vars) = (constant, vars <> Map.fromList (limbs >>= limbToTerms))
+viewAsRefMap (PolyL constant limbs vars) = (constant, vars <> Map.fromList (toList limbs >>= limbToTerms))
   where
     limbToTerms :: (Limb, n) -> [(Ref, n)]
     limbToTerms (limb, n) = [(B (RefUBit (lmbWidth limb) (lmbRef limb) i), n) | i <- [0 .. lmbWidth limb - 1]]

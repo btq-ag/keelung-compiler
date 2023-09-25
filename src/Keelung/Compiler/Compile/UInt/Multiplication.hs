@@ -5,7 +5,6 @@ import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
-import Data.List.NonEmpty qualified as NonEmpty
 import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
@@ -111,10 +110,9 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
       upperLimb <- allocLimb carryLimbWidth (limbStart + currentLimbWidth) True
       lowerLimb <- allocLimb currentLimbWidth limbStart True
       writeMulWithLimbs
-        (a, NonEmpty.singleton (x, 1))
-        (b, NonEmpty.singleton (y, 1))
+        (a, [(x, 1)])
+        (b, [(y, 1)])
         ( 0,
-          NonEmpty.fromList
             [ (lowerLimb, 1),
               (upperLimb, 2 ^ currentLimbWidth)
             ]

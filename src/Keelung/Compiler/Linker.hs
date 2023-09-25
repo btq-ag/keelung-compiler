@@ -275,7 +275,7 @@ linkPolyL :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Either n (
 linkPolyL occurrences poly =
   let constant = PolyL.polyConstant poly
       limbs = PolyL.polyLimbs poly
-      limbPolynomial = IntMap.unionsWith (+) (map (uncurry (reindexLimb occurrences)) limbs)
+      limbPolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexLimb occurrences)) limbs)
    in Poly.buildWithIntMap constant limbPolynomial
 
 linkPolyLUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Poly n
