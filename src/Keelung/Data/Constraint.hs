@@ -7,6 +7,7 @@ module Keelung.Data.Constraint
 where
 
 import Data.Field.Galois (GaloisField)
+import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.Reference

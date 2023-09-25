@@ -33,6 +33,8 @@ import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo qualified as FieldInfo
+import Keelung.Data.Limb (Limb (..))
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL
@@ -213,7 +215,7 @@ linkConstraint occurrences _ (CVarEqL x y) =
         Left _ -> error "CVarEqL: two variables are the same"
         Right xs -> [Linked.CAdd xs]
 linkConstraint occurrences fieldWidth (CVarEqU x y) =
-  let cVarEqLs = zipWith CVarEqL (refUToLimbs fieldWidth x) (refUToLimbs fieldWidth y)
+  let cVarEqLs = zipWith CVarEqL (Limb.refUToLimbs fieldWidth x) (Limb.refUToLimbs fieldWidth y)
    in cVarEqLs >>= linkConstraint occurrences fieldWidth
 linkConstraint occurrences _ (CVarBindF x n) = case Poly.buildEither (-n) [(reindexRef occurrences x, 1)] of
   Left _ -> error "CVarBindF: impossible"
@@ -228,7 +230,7 @@ linkConstraint occurrences fieldWidth (CVarBindU x n) =
   -- split the Integer into smaller chunks of size `fieldWidth`
   let number = U.new (widthOf x) n
       chunks = map U.uintValue (U.chunksU fieldWidth number)
-      cVarBindLs = zipWith CVarBindL (refUToLimbs fieldWidth x) chunks
+      cVarBindLs = zipWith CVarBindL (Limb.refUToLimbs fieldWidth x) chunks
    in cVarBindLs >>= linkConstraint occurrences fieldWidth
 linkConstraint occurrences _ (CMulF as bs cs) =
   [ Linked.CMul

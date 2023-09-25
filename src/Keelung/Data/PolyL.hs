@@ -4,7 +4,7 @@
 
 -- | Polynomial made of Limbs
 module Keelung.Data.PolyL
-  ( PolyL(polyConstant, polyLimbs, polyRefs),
+  ( PolyL (polyConstant, polyLimbs, polyRefs),
     varsSet,
     limbsSet,
     newL,
@@ -15,8 +15,8 @@ module Keelung.Data.PolyL
     multiplyBy,
     size,
     view,
-    View(..),
-    viewAsRefMap
+    View (..),
+    viewAsRefMap,
   )
 where
 
@@ -31,6 +31,7 @@ import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
+import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Reference
 import Prelude hiding (null)
 
@@ -122,7 +123,7 @@ view (PolyL constant limbs vars) =
     ([], []) -> error "[ panic ] Empty PolyL"
     ([], [term]) -> LimbMonomial constant term
     ([], [term1, term2]) -> LimbBinomial constant term1 term2
-    ([] , _) -> LimbPolynomial constant limbs
+    ([], _) -> LimbPolynomial constant limbs
     ([term], []) -> RefMonomial constant term
     ([term1, term2], []) -> RefBinomial constant term1 term2
     (_, []) -> RefPolynomial constant vars

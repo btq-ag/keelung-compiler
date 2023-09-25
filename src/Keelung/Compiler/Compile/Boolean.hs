@@ -15,6 +15,7 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 
 compile :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> ExprB n -> M n (Either RefB Bool)
@@ -307,7 +308,7 @@ xorBs xs =
       let width = widthOfInteger (toInteger (length vars))
       refU <- freshRefU width
       fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-      let limbs = refUToLimbs fieldWidth refU
+      let limbs = Limb.refUToLimbs fieldWidth refU
       -- compose the LC for the sum
       let lc = mconcat (fmap (\x -> 1 @ B x) vars)
       -- equate the LC with the unsigned integer

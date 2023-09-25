@@ -14,6 +14,8 @@ import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo
+import Keelung.Data.Limb (Limb (..))
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Syntax (Width)
 
@@ -148,10 +150,10 @@ mulnxn dimensions limbWidth arity out var operand = do
           let currentLimbWidthX = limbWidth `min` (dimUIntWidth dimensions - (limbWidth * xi))
           let currentLimbWidthY = limbWidth `min` (dimUIntWidth dimensions - (limbWidth * yi))
 
-          let x = Limb var currentLimbWidthX (limbWidth * xi) (Left True)
+          let x = Limb.new var currentLimbWidthX (limbWidth * xi) (Left True)
           let y = case operand of
                 Right constant -> Left $ sum [(if Data.Bits.testBit constant (limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
-                Left variable -> Right (0, Limb variable currentLimbWidthY (limbWidth * yi) (Left True))
+                Left variable -> Right (0, Limb.new variable currentLimbWidthY (limbWidth * yi) (Left True))
           let index = xi + yi
 
           (lowerLimb, upperLimb) <- mul2Limbs limbWidth (limbWidth * index) (0, x) y
@@ -169,7 +171,7 @@ mulnxn dimensions limbWidth arity out var operand = do
     ( \previousCarryLimbs (index, limbs) -> do
         let limbStart = limbWidth * index
         let currentLimbWidth = limbWidth `min` (dimUIntWidth dimensions - limbStart)
-        let resultLimb = Limb out currentLimbWidth limbStart (Left True)
+        let resultLimb = Limb.new out currentLimbWidth limbStart (Left True)
         addLimbColumn dimensions resultLimb (previousCarryLimbs <> limbs)
     )
     mempty

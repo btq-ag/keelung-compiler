@@ -9,7 +9,7 @@ module Keelung.Compiler.ConstraintModule
     getBooleanConstraintCount,
     UpdateOccurrences (..),
     addOccurrencesTuple,
-    removeOccurrencesTuple
+    removeOccurrencesTuple,
   )
 where
 
@@ -32,6 +32,8 @@ import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
+import Keelung.Data.Limb (Limb (..))
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL (PolyL)
@@ -393,5 +395,5 @@ instance UpdateOccurrences RefU where
       )
 
 instance UpdateOccurrences Limb where
-  addOccurrences = addOccurrences . Set.map lmbRef
-  removeOccurrences = removeOccurrences . Set.map lmbRef
+  addOccurrences = addOccurrences . Set.map Limb.lmbRef
+  removeOccurrences = removeOccurrences . Set.map Limb.lmbRef

@@ -15,6 +15,8 @@ import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo
+import Keelung.Data.Limb (Limb (..))
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Field (FieldType (..))
 import Keelung.Syntax (Width)
@@ -84,9 +86,9 @@ compileAddU width out vars constant = do
                   let currentLimbWidth = limbWidth `min` (width - start)
                       -- positive limbs
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                      column = LimbColumn.new constantSegment [Limb var currentLimbWidth start (Left sign) | (var, sign) <- vars]
+                      column = LimbColumn.new constantSegment [Limb.new var currentLimbWidth start (Left sign) | (var, sign) <- vars]
                       -- negative limbs
-                      resultLimb = Limb out currentLimbWidth start (Left True)
+                      resultLimb = Limb.new out currentLimbWidth start (Left True)
                    in (column, resultLimb)
               )
               [0, limbWidth .. width - 1] -- index of the first bit of each limb
@@ -136,12 +138,12 @@ addLimbColumn dimensions finalResultLimb limbs = do
 splitLimbStack :: Dimensions -> LimbColumn -> (LimbStack, LimbColumn)
 splitLimbStack _ (LimbColumn constant Seq.Empty) = (OneConstantOnly constant, mempty)
 splitLimbStack _ (LimbColumn constant (limb Seq.:<| Seq.Empty)) =
-  if constant == 0 && limbIsPositive limb
+  if constant == 0 && Limb.isPositive limb
     then (OneLimbOnly limb, mempty)
     else (Ordinary constant (Seq.singleton limb), mempty)
 splitLimbStack dimensions (LimbColumn constant limbs) =
   let (currentBatch, nextBatch) = Seq.splitAt (dimMaxHeight dimensions - 1) limbs
-      currentBatchAllNegative = not (any limbIsPositive currentBatch)
+      currentBatchAllNegative = not (any Limb.isPositive currentBatch)
    in if currentBatchAllNegative
         then (Ordinary constant currentBatch, LimbColumn 0 nextBatch)
         else case Seq.viewl nextBatch of
@@ -177,21 +179,9 @@ addLimbStack resultLimb (Ordinary constant limbs) = do
 allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
 allocCarryLimb w offset signs = do
   refU <- freshRefU w
-  return $
-    Limb
-      { lmbRef = refU,
-        lmbWidth = w,
-        lmbOffset = offset,
-        lmbSigns = Right signs
-      }
+  return $ Limb.new refU w offset (Right signs)
 
 allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
 allocLimb w offset sign = do
   refU <- freshRefU w
-  return $
-    Limb
-      { lmbRef = refU,
-        lmbWidth = w,
-        lmbOffset = offset,
-        lmbSigns = Left sign
-      }
+  return $ Limb.new refU w offset (Left sign)

@@ -23,6 +23,8 @@ import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo
+import Keelung.Data.Limb (Limb (..))
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL qualified as PolyL
@@ -344,9 +346,10 @@ calculateBounds :: Integer -> Seq Limb -> (Integer, Integer)
 calculateBounds constant = foldl step (constant, constant)
   where
     step :: (Integer, Integer) -> Limb -> (Integer, Integer)
-    step (lower, upper) (Limb _ width _ (Left True)) = (lower, upper + 2 ^ width - 1)
-    step (lower, upper) (Limb _ width _ (Left False)) = (lower - 2 ^ width + 1, upper)
-    step (lower, upper) (Limb _ _ _ (Right xs)) = let (lower', upper') = calculateBoundsOfigns (lower, upper) xs in (lower + lower', upper + upper')
+    step (lower, upper) limb = case Limb.lmbSigns limb of
+      Left True -> (lower, upper + 2 ^ Limb.lmbWidth limb - 1)
+      Left False -> (lower - 2 ^ Limb.lmbWidth limb + 1, upper)
+      Right xs -> let (lower', upper') = calculateBoundsOfigns (lower, upper) xs in (lower + lower', upper + upper')
 
     calculateBoundsOfigns :: (Integer, Integer) -> [Bool] -> (Integer, Integer)
     calculateBoundsOfigns (_, _) [] = (0, 0)

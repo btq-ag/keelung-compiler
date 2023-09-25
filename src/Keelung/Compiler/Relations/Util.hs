@@ -1,6 +1,7 @@
 module Keelung.Compiler.Relations.Util (Seniority (..)) where
 
 import Data.Function (on)
+import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Reference
 
 --------------------------------------------------------------------------------

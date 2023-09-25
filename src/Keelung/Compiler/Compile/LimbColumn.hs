@@ -2,7 +2,8 @@ module Keelung.Compiler.Compile.LimbColumn where
 
 import Data.Sequence (Seq, (<|))
 import Data.Sequence qualified as Seq
-import Keelung.Data.Reference
+import Keelung.Data.Limb (Limb (..))
+import Keelung.Data.Limb qualified as Limb
 
 --------------------------------------------------------------------------------
 
@@ -43,8 +44,4 @@ addConstant c (LimbColumn c' xs) = LimbColumn (c + c') xs
 
 -- | Trim all Limbs in a 'LimbColumn' to a given width.
 trim :: Int -> LimbColumn -> LimbColumn
-trim width (LimbColumn c xs) = LimbColumn c (fmap trimLimb xs)
-  where
-    trimLimb :: Limb -> Limb
-    trimLimb (Limb ref w offset (Left sign)) = Limb ref (w `min` width) offset (Left sign)
-    trimLimb (Limb ref w offset (Right signs)) = Limb ref (w `min` width) offset (Right (take (w `min` width) signs))
+trim width (LimbColumn c xs) = LimbColumn c (fmap (Limb.trim width) xs)

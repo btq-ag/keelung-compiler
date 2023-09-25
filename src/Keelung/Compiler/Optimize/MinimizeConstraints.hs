@@ -17,6 +17,7 @@ import Keelung.Compiler.Relations.Field (Relations)
 import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.UInt qualified as UInt
+import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL

@@ -37,6 +37,7 @@ import Keelung.Compiler.Relations.Boolean qualified as Boolean
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.UInt qualified as UInt
+import Keelung.Data.Limb (Limb)
 import Keelung.Data.Reference
 import Prelude hiding (lookup)
 
