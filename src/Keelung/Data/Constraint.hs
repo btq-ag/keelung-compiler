@@ -44,8 +44,7 @@ pinnedRefU (RefUX _ _) = False
 --      CMul: ax * by = c or ax * by = cz
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
-  = CAddG !(PolyG n)
-  | CAddL !(PolyL n)
+  = CAddL !(PolyL n)
   | CMulF !(PolyG n) !(PolyG n) !(Either n (PolyG n))
   | CMulL !(PolyL n) !(PolyL n) !(Either n (PolyL n))
   | CVarEq Ref Ref -- when x == y
@@ -61,7 +60,6 @@ data Constraint n
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
-    (CAddG x, CAddG y) -> x == y
     (CAddL x, CAddL y) -> x == y
     (CMulF x y z, CMulF u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
@@ -74,7 +72,6 @@ instance GaloisField n => Eq (Constraint n) where
     _ -> False
 
 instance Functor Constraint where
-  fmap f (CAddG x) = CAddG (fmap f x)
   fmap f (CAddL x) = CAddL (fmap f x)
   fmap _ (CVarEq x y) = CVarEq x y
   fmap _ (CVarEqF x y) = CVarEqF x y
@@ -92,7 +89,6 @@ instance Functor Constraint where
   fmap f (CMulL x y (Right z)) = CMulL (fmap f x) (fmap f y) (Right (fmap f z))
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
-  show (CAddG xs) = "AF " <> show xs <> " = 0"
   show (CAddL xs) = "AL " <> show xs <> " = 0"
   show (CVarEq x y) = "EQ " <> show x <> " = " <> show y
   show (CVarEqF x y) = "EF " <> show x <> " = " <> show y

@@ -55,7 +55,6 @@ data ConstraintModule n = ConstraintModule
     cmOccurrenceU :: !OccurU,
     cmRelations :: Relations n,
     -- addative constraints
-    cmAddF :: [PolyG n],
     cmAddL :: [PolyL n],
     -- multiplicative constraints
     cmMulF :: [(PolyG n, PolyG n, Either n (PolyG n))],
@@ -74,7 +73,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
   show cm =
     "Constraint Module {\n"
       <> showVarEqF
-      <> showAddF
       <> showAddL
       <> showMulF
       <> showMulL
@@ -130,7 +128,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       --     then ""
       --     else "  UInt relations:\n" <> indent (indent (show (cmRelations cm)))
 
-      showAddF = adapt "AddF" (cmAddF cm) $ \xs -> "0 = " <> show xs
       showAddL = adapt "AddL" (cmAddL cm) $ \xs -> "0 = " <> show xs
 
       showMulF = adapt "MulF" (cmMulF cm) showMulF'
@@ -271,9 +268,12 @@ sizeOfConstraintModule :: ConstraintModule n -> Int
 sizeOfConstraintModule cm =
   Relations.size (cmRelations cm)
     + BooleanRelations.size (Relations.exportBooleanRelations (cmRelations cm))
-    + length (cmAddF cm)
+    + length (cmAddL cm)
     + length (cmMulF cm)
+    + length (cmMulL cm)
     + length (cmEqZeros cm)
+    + length (cmDivMods cm)
+    + length (cmModInvs cm)
 
 class UpdateOccurrences ref where
   addOccurrences :: Set ref -> ConstraintModule n -> ConstraintModule n

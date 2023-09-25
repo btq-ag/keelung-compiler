@@ -38,13 +38,12 @@ import Keelung.Interpreter.Arithmetics (U)
 --    7. EqZeros
 run :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (ConstraintModule n)
 run cm = do
-  cm' <- runStateMachine cm ShouldRunAddF
+  cm' <- runStateMachine cm ShouldRunAddL
   return $ (goThroughEqZeros . goThroughModInvs) cm'
 
 -- | Next optimization pass to run
 data Action
   = Accept
-  | ShouldRunAddF
   | ShouldRunAddL
   | ShouldRunMulF
   | ShouldRunMulL
@@ -54,12 +53,11 @@ data Action
 -- | Decide what to do next based on the result of the previous optimization pass
 transition :: WhatChanged -> Action -> Action
 transition _ Accept = Accept
-transition NothingChanged ShouldRunAddF = ShouldRunAddL
 transition NothingChanged ShouldRunAddL = ShouldRunMulF
 transition NothingChanged ShouldRunMulF = ShouldRunMulL
 transition NothingChanged ShouldRunMulL = ShouldRunDivMod
 transition NothingChanged ShouldRunDivMod = Accept
-transition RelationChanged _ = ShouldRunAddF -- restart from optimizeAddF
+transition RelationChanged _ = ShouldRunAddL -- restart from optimizeAddF
 transition AdditiveFieldConstraintChanged _ = ShouldRunAddL -- restart from optimizeAddL
 transition AdditiveLimbConstraintChanged _ = ShouldRunMulF -- restart from optimizeMulF
 transition MultiplicativeConstraintChanged _ = ShouldRunMulL -- restart from optimizeMulL
@@ -71,7 +69,6 @@ runStateMachine cm action = do
   -- decide which optimization pass to run and see if it changed anything
   (changed, cm') <- case action of
     Accept -> return (NothingChanged, cm)
-    ShouldRunAddF -> optimizeAddF cm
     ShouldRunAddL -> optimizeAddL cm
     ShouldRunMulF -> optimizeMulF cm
     ShouldRunMulL -> optimizeMulL cm
@@ -85,10 +82,10 @@ runStateMachine cm action = do
 
 ------------------------------------------------------------------------------
 
-optimizeAddF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
-optimizeAddF cm = runOptiM cm $ runRoundM $ do
-  result <- foldMaybeM reduceAddF [] (cmAddF cm)
-  modify' $ \cm' -> cm' {cmAddF = result}
+-- optimizeAddF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+-- optimizeAddF cm = runOptiM cm $ runRoundM $ do
+--   result <- foldMaybeM reduceAddF [] (cmAddF cm)
+--   modify' $ \cm' -> cm' {cmAddF = result}
 
 optimizeAddL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeAddL cm = runOptiM cm $ runRoundM $ do
@@ -134,31 +131,6 @@ foldMaybeM f = foldM $ \acc x -> do
     Just x' -> return (x' : acc)
 
 ------------------------------------------------------------------------------
-
-reduceAddF :: (GaloisField n, Integral n) => PolyG n -> RoundM n (Maybe (PolyG n))
-reduceAddF polynomial = do
-  changed <- learnFromAddF polynomial
-  if changed
-    then return Nothing
-    else do
-      relations <- gets cmRelations
-      case substPolyG relations polynomial of
-        Nothing -> return (Just polynomial) -- nothing changed
-        Just (Left constant, changes) -> do
-          when (constant /= 0) $
-            error "[ panic ] Additive reduced to some constant other than 0"
-          -- the polynomial has been reduced to nothing
-          markChanged AdditiveFieldConstraintChanged
-          -- remove all variables in the polynomial from the occurrence list
-          modify' $ removeOccurrences (removedRefs changes)
-          return Nothing
-        Just (Right reducePolynomial, changes) -> do
-          -- the polynomial has been reduced to something
-          markChanged AdditiveFieldConstraintChanged
-          -- remove variables that has been reduced in the polynomial from the occurrence list
-          modify' $ removeOccurrences (removedRefs changes) . addOccurrences (addedRefs changes)
-          -- keep reducing the reduced polynomial
-          reduceAddF reducePolynomial
 
 reduceAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Maybe (PolyL n))
 reduceAddL polynomial = do
@@ -423,25 +395,6 @@ markChanged = tell
 
 -- | Go through additive constraints and classify them into relation constraints when possible.
 --   Returns 'True' if the constraint has been reduced.
-learnFromAddF :: (GaloisField n, Integral n) => PolyG n -> RoundM n Bool
-learnFromAddF poly = case PolyG.view poly of
-  PolyG.Monomial intercept (var, slope) -> do
-    --    intercept + slope * var = 0
-    --  =>
-    --    var = - intercept / slope
-    assign var (-intercept / slope)
-    return True
-  PolyG.Binomial intercept (var1, slope1) (var2, slope2) -> do
-    --    intercept + slope1 * var1 + slope2 * var2 = 0
-    --  =>
-    --    slope1 * var1 = - slope2 * var2 - intercept
-    --  =>
-    --    var1 = - slope2 * var2 / slope1 - intercept / slope1
-    relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
-  PolyG.Polynomial _ _ -> return False
-
--- | Go through additive constraints and classify them into relation constraints when possible.
---   Returns 'True' if the constraint has been reduced.
 learnFromAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n Bool
 learnFromAddL poly = case PolyL.view poly of
   PolyL.RefMonomial intercept (var, slope) -> do
@@ -556,7 +509,7 @@ addAddF poly = case PolyG.view poly of
     void $ relateF var1 (-coeff2 / coeff1, var2, -constant / coeff1)
   PolyG.Polynomial _ _ -> do
     markChanged AdditiveFieldConstraintChanged
-    modify' $ \cm' -> cm' {cmAddF = poly : cmAddF cm'}
+    modify' $ \cm' -> cm' {cmAddL = PolyL.fromPolyG poly : cmAddL cm'}
 
 -- | Add learned additive limb constraints to the pool
 addAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n ()
@@ -742,16 +695,16 @@ substLimb relations (accPoly, changes) (limb, multiplier) = case EquivClass.look
     Left c -> (Left (fromInteger constant * multiplier + c), removeLimb limb changes)
     Right xs -> (Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removeLimb limb changes)
   EquivClass.IsRoot _ -> case accPoly of
-    Left c -> (PolyL.newWithLimbs c [(limb, multiplier)], changes)
+    Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
     Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
   EquivClass.IsChildOf root () ->
     if root == limb
       then case accPoly of -- nothing changed. TODO: see if this is necessary
-        Left c -> (PolyL.newWithLimbs c [(limb, multiplier)], changes)
+        Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
         Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
       else case accPoly of
         -- replace `limb` with `root`
-        Left c -> (PolyL.newWithLimbs c [(root, multiplier)], (addLimb root . removeLimb limb) changes)
+        Left c -> (PolyL.fromLimbs c [(root, multiplier)], (addLimb root . removeLimb limb) changes)
         Right accPoly' -> (Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), (addLimb root . removeLimb limb) changes)
 
 -- | Substitutes a Ref in a PolyL.
@@ -764,7 +717,7 @@ substRef ::
   (Either n (PolyL n), Maybe Changes)
 substRef relations (accPoly, changes) ref coeff = case Relations.lookup ref relations of
   Relations.Root -> case accPoly of -- ref already a root, no need to substitute
-    Left c -> (PolyL.newWithPolyG <$> PolyG.singleton c (ref, coeff), changes)
+    Left c -> (PolyL.fromPolyG <$> PolyG.singleton c (ref, coeff), changes)
     Right xs -> (PolyL.insertRefs 0 [(ref, coeff)] xs, changes)
   Relations.Value intercept ->
     -- ref = intercept
@@ -777,10 +730,10 @@ substRef relations (accPoly, changes) ref coeff = case Relations.lookup ref rela
         if slope == 1 && intercept == 0
           then -- ref = root, nothing changed
           case accPoly of
-            Left c -> (PolyL.newWithPolyG <$> PolyG.singleton c (ref, coeff), changes)
+            Left c -> (PolyL.fromPolyG <$> PolyG.singleton c (ref, coeff), changes)
             Right xs -> (PolyL.insertRefs 0 [(ref, coeff)] xs, changes)
           else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
       else case accPoly of
         -- ref = slope * root + intercept
-        Left c -> (PolyL.newWithPolyG <$> PolyG.singleton (intercept * coeff + c) (root, slope * coeff), addRef root $ removeRef ref changes)
+        Left c -> (PolyL.fromPolyG <$> PolyG.singleton (intercept * coeff + c) (root, slope * coeff), addRef root $ removeRef ref changes)
         Right accPoly' -> (PolyL.insertRefs (intercept * coeff) [(root, slope * coeff)] accPoly', addRef root $ removeRef ref changes)

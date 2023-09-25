@@ -6,8 +6,8 @@
 module Keelung.Data.PolyL
   ( PolyL (polyConstant, polyLimbs, polyRefs),
     varsSet,
-    newWithLimbs,
-    newWithPolyG,
+    fromLimbs,
+    fromPolyG,
     insertLimbs,
     insertRefs,
     addConstant,
@@ -80,15 +80,15 @@ instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
 --   | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
 --   | otherwise = Seq.fromList [" + ", show c <> show x]
 
-newWithLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> Either n (PolyL n)
-newWithLimbs constant limbs =
+fromLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> Either n (PolyL n)
+fromLimbs constant limbs =
   let limbs' = filter ((/= 0) . snd) limbs
    in if null limbs'
         then Left constant
         else Right (PolyL constant (Seq.fromList limbs') mempty)
 
-newWithPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
-newWithPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars
+fromPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
+fromPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars
 
 insertLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
 insertLimbs c' limbs (PolyL c ls vars) = PolyL (c + c') (Seq.fromList limbs <> ls) vars
