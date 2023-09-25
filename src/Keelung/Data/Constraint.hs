@@ -46,7 +46,6 @@ pinnedRefU (RefUX _ _) = False
 data Constraint n
   = CAddG !(PolyG n)
   | CAddL !(PolyL n)
-  | CAdd !(PolyG n) !(PolyL n) -- a mix of both PolyG & PolyL
   | CMulF !(PolyG n) !(PolyG n) !(Either n (PolyG n))
   | CMulL !(PolyL n) !(PolyL n) !(Either n (PolyL n))
   | CVarEq Ref Ref -- when x == y
@@ -77,7 +76,6 @@ instance GaloisField n => Eq (Constraint n) where
 instance Functor Constraint where
   fmap f (CAddG x) = CAddG (fmap f x)
   fmap f (CAddL x) = CAddL (fmap f x)
-  fmap f (CAdd g l) = CAdd (fmap f g) (fmap f l)
   fmap _ (CVarEq x y) = CVarEq x y
   fmap _ (CVarEqF x y) = CVarEqF x y
   fmap _ (CVarEqB x y) = CVarEqB x y
@@ -96,7 +94,6 @@ instance Functor Constraint where
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddG xs) = "AF " <> show xs <> " = 0"
   show (CAddL xs) = "AL " <> show xs <> " = 0"
-  show (CAdd xs ys) = "AM " <> show xs <> " + " <> show ys <> " = 0"
   show (CVarEq x y) = "EQ " <> show x <> " = " <> show y
   show (CVarEqF x y) = "EF " <> show x <> " = " <> show y
   show (CVarEqB x y) = "EB " <> show x <> " = " <> show y

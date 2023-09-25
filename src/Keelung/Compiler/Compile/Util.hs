@@ -41,7 +41,7 @@ runM compilers fieldInfo counters program =
   runExcept
     ( execStateT
         (runReaderT program compilers)
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new Relations.new mempty mempty mempty mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new Relations.new mempty mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -151,9 +151,13 @@ writeAddWithLC xs = case xs of
 writeAddWithLCAndLimbs :: (GaloisField n, Integral n) => LC n -> n -> [(Limb, n)] -> M n ()
 writeAddWithLCAndLimbs lc constant limbs = case lc of
   Constant _ -> return ()
-  Polynomial poly -> case PolyL.newWithLimbs constant limbs of
-    Left _ -> return ()
-    Right poly' -> addC [CAdd poly poly']
+  Polynomial poly ->
+    --  PolyL.newWithLimbs constant limbs
+
+    --  case PolyL.insertLimbs constant limbs (PolyL.newWithPolyG poly) of
+    --       Left _ -> return ()
+    --       Right polyL ->
+    addC [CAddL (PolyL.insertLimbs constant limbs (PolyL.newWithPolyG poly))]
 
 -- writeAddWithPolyGAndLimbs :: (GaloisField n, Integral n) => PolyG n -> n -> Seq (Limb, n) -> M n ()
 -- writeAddWithPolyGAndLimbs poly constant limbs = addC [CAdd poly (PolyL.buildWithSeq constant limbs)]
@@ -177,10 +181,6 @@ addC = mapM_ addOne
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddG xs) = modify' (\cs -> addOccurrences (PolyG.vars xs) $ cs {cmAddF = xs : cmAddF cs})
     addOne (CAddL xs) = modify' (\cs -> addOccurrencesTuple (PolyL.varsSet xs) $ cs {cmAddL = xs : cmAddL cs})
-    addOne (CAdd xs ys) =
-      modify'
-        ( \cs -> addOccurrences (PolyG.vars xs) $ addOccurrencesTuple (PolyL.varsSet ys) $ cs {cmAdd = (xs, ys) : cmAdd cs}
-        )
     addOne (CVarBindF x c) = do
       execRelations $ Relations.assignF x c
     addOne (CVarBindB x c) = do
@@ -229,7 +229,7 @@ writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPolyG (PolyG.build c as)
 
 writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Limb, n)] -> M n ()
-writeAddWithLimbs constant limbs =  case PolyL.newWithLimbs constant limbs of
+writeAddWithLimbs constant limbs = case PolyL.newWithLimbs constant limbs of
   Left _ -> return ()
   Right poly -> addC [CAddL poly]
 

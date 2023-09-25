@@ -57,7 +57,6 @@ data ConstraintModule n = ConstraintModule
     -- addative constraints
     cmAddF :: [PolyG n],
     cmAddL :: [PolyL n],
-    cmAdd :: [(PolyG n, PolyL n)],
     -- multiplicative constraints
     cmMulF :: [(PolyG n, PolyG n, Either n (PolyG n))],
     cmMulL :: [(PolyL n, PolyL n, Either n (PolyL n))],
@@ -77,7 +76,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> showVarEqF
       <> showAddF
       <> showAddL
-      <> showAdd
       <> showMulF
       <> showMulL
       <> showEqs
@@ -134,7 +132,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
 
       showAddF = adapt "AddF" (cmAddF cm) $ \xs -> "0 = " <> show xs
       showAddL = adapt "AddL" (cmAddL cm) $ \xs -> "0 = " <> show xs
-      showAdd = adapt "Add" (cmAdd cm) $ \(gs, ls) -> show gs <> " + " <> show ls
 
       showMulF = adapt "MulF" (cmMulF cm) showMulF'
       showMulL = adapt "MulL" (cmMulL cm) showMulL'

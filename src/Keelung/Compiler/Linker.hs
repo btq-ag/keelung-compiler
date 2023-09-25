@@ -61,7 +61,6 @@ linkConstraintModule cm =
           <> varEqUs
           <> addFs
           <> addLs
-          <> adds
           <> mulFs
           <> mulLs,
       csEqZeros = toList eqZeros,
@@ -168,7 +167,6 @@ linkConstraintModule cm =
 
     addFs = Seq.fromList $ linkConstraint occurrences fieldWidth . CAddG =<< cmAddF cm
     addLs = Seq.fromList $ linkConstraint occurrences fieldWidth . CAddL =<< cmAddL cm
-    adds = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry CAdd =<< cmAdd cm
     mulFs = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry3 CMulF =<< cmMulF cm
     mulLs = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry3 CMulL =<< cmMulL cm
     eqZeros = Seq.fromList $ map (bimap (linkPolyGUnsafe occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
@@ -185,9 +183,6 @@ linkConstraintModule cm =
 linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Width -> Constraint n -> [Linked.Constraint n]
 linkConstraint occurrences _ (CAddG as) = [Linked.CAdd (linkPolyGUnsafe occurrences as)]
 linkConstraint occurrences _ (CAddL as) = [Linked.CAdd (linkPolyLUnsafe occurrences as)]
-linkConstraint occurrences _ (CAdd gs ls) = case Poly.merge (linkPolyGUnsafe occurrences gs) (linkPolyLUnsafe occurrences ls) of
-  Left _ -> []
-  Right xs -> [Linked.CAdd xs]
 linkConstraint occurrences _ (CVarEq x y) =
   case Poly.buildEither 0 [(reindexRef occurrences x, 1), (reindexRef occurrences y, -1)] of
     Left _ -> error "CVarEq: two variables are the same"
@@ -274,9 +269,9 @@ linkPolyGUnsafe occurrences xs = case linkPolyG occurrences xs of
 linkPolyL :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Either n (Poly n)
 linkPolyL occurrences poly =
   let constant = PolyL.polyConstant poly
-      limbs = PolyL.polyLimbs poly
-      limbPolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexLimb occurrences)) limbs)
-   in Poly.buildWithIntMap constant limbPolynomial
+      limbPolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexLimb occurrences)) (PolyL.polyLimbs poly))
+      varPolynomial = IntMap.fromList (map (first (reindexRef occurrences)) (Map.toList (PolyL.polyRefs poly)))
+   in Poly.buildWithIntMap constant (IntMap.unionWith (+) limbPolynomial varPolynomial)
 
 linkPolyLUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Poly n
 linkPolyLUnsafe occurrences xs = case linkPolyL occurrences xs of

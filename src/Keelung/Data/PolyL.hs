@@ -8,6 +8,7 @@ module Keelung.Data.PolyL
     varsSet,
     limbsSet,
     newWithLimbs,
+    newWithPolyG,
     insertLimbs,
     addConstant,
     multiplyBy,
@@ -29,6 +30,8 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Data.Limb (Limb (..))
+import Keelung.Data.PolyG (PolyG)
+import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Reference
 import Prelude hiding (null)
 
@@ -84,8 +87,8 @@ newWithLimbs constant limbs =
         then Left constant
         else Right (PolyL constant (Seq.fromList limbs') mempty)
 
--- newWithPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
--- newWithPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars
+newWithPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
+newWithPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars
 
 insertLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
 insertLimbs c' limbs (PolyL c ls vars) = PolyL (c + c') (Seq.fromList limbs <> ls) vars
