@@ -60,7 +60,6 @@ linkConstraintModule cm =
           <> varEqLs
           <> varEqUs
           <> addLs
-          <> mulFs
           <> mulLs,
       csEqZeros = toList eqZeros,
       csDivMods = divMods,
@@ -165,7 +164,6 @@ linkConstraintModule cm =
     varEqUs = extractUIntRelations (Relations.exportUIntRelations (cmRelations cm))
 
     addLs = Seq.fromList $ linkConstraint occurrences fieldWidth . CAddL =<< cmAddL cm
-    mulFs = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry3 CMulF =<< cmMulF cm
     mulLs = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry3 CMulL =<< cmMulL cm
     eqZeros = Seq.fromList $ map (bimap (linkPolyGUnsafe occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
 
@@ -224,15 +222,6 @@ linkConstraint occurrences fieldWidth (CVarBindU x n) =
       chunks = map U.uintValue (U.chunksU fieldWidth number)
       cVarBindLs = zipWith CVarBindL (Limb.refUToLimbs fieldWidth x) chunks
    in cVarBindLs >>= linkConstraint occurrences fieldWidth
-linkConstraint occurrences _ (CMulF as bs cs) =
-  [ Linked.CMul
-      (linkPolyGUnsafe occurrences as)
-      (linkPolyGUnsafe occurrences bs)
-      ( case cs of
-          Left n -> Left n
-          Right xs -> linkPolyG occurrences xs
-      )
-  ]
 linkConstraint occurrences _ (CMulL as bs cs) =
   [ Linked.CMul
       (linkPolyLUnsafe occurrences as)

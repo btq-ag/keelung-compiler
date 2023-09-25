@@ -5,6 +5,8 @@ import Data.Field.Galois
 import Keelung (Width)
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL (PolyL)
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 
 -- | Linear combination of variables and constants.
@@ -41,9 +43,9 @@ fromRefU width fieldWidth (Left var) =
 --     bits = [(B (RefUBit width var i), 2 ^ i) | i <- [0 .. width - 1]]
 --  in fromEither (PolyG.build 0 bits)
 
-toEither :: LC n -> Either n (PolyG n)
+toEither :: (Num n, Eq n) => LC n -> Either n (PolyL n)
 toEither (Constant c) = Left c
-toEither (Polynomial xs) = Right xs
+toEither (Polynomial xs) = Right (PolyL.fromPolyG xs)
 
 -- | A LC is a semigroup under addition.
 instance (Semigroup n, GaloisField n) => Semigroup (LC n) where

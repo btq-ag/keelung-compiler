@@ -8,7 +8,6 @@ where
 
 import Data.Field.Galois (GaloisField)
 import Keelung.Data.Limb (Limb)
-import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.Reference
 
@@ -45,7 +44,6 @@ pinnedRefU (RefUX _ _) = False
 --      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
 data Constraint n
   = CAddL !(PolyL n)
-  | CMulF !(PolyG n) !(PolyG n) !(Either n (PolyG n))
   | CMulL !(PolyL n) !(PolyL n) !(Either n (PolyL n))
   | CVarEq Ref Ref -- when x == y
   | CVarEqF RefF RefF -- when x == y
@@ -61,8 +59,6 @@ data Constraint n
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAddL x, CAddL y) -> x == y
-    (CMulF x y z, CMulF u v w) ->
-      (x == u && y == v || x == v && y == u) && z == w
     (CMulL x y z, CMulL u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
     (CVarBindF x y, CVarBindF u v) -> x == u && y == v
@@ -83,8 +79,6 @@ instance Functor Constraint where
   fmap _ (CVarBindB x y) = CVarBindB x y
   fmap _ (CVarBindL x y) = CVarBindL x y
   fmap _ (CVarBindU x y) = CVarBindU x y
-  fmap f (CMulF x y (Left z)) = CMulF (fmap f x) (fmap f y) (Left (f z))
-  fmap f (CMulF x y (Right z)) = CMulF (fmap f x) (fmap f y) (Right (fmap f z))
   fmap f (CMulL x y (Left z)) = CMulL (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulL x y (Right z)) = CMulL (fmap f x) (fmap f y) (Right (fmap f z))
 
@@ -100,5 +94,4 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CVarBindB x n) = "VB " <> show x <> " = " <> show n
   show (CVarBindL x n) = "VL " <> show x <> " = " <> show n
   show (CVarBindU x n) = "VU " <> show x <> " = " <> show n
-  show (CMulF aV bV cV) = "MF " <> show aV <> " * " <> show bV <> " = " <> show cV
   show (CMulL aV bV cV) = "ML " <> show aV <> " * " <> show bV <> " = " <> show cV

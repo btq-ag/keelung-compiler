@@ -17,7 +17,6 @@ import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet qualified as IntSet
-import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
@@ -35,7 +34,6 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyG (PolyG)
-import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -57,7 +55,6 @@ data ConstraintModule n = ConstraintModule
     -- addative constraints
     cmAddL :: [PolyL n],
     -- multiplicative constraints
-    cmMulF :: [(PolyG n, PolyG n, Either n (PolyG n))],
     cmMulL :: [(PolyL n, PolyL n, Either n (PolyL n))],
     -- hits for computing equality
     cmEqZeros :: [(PolyG n, RefF)],
@@ -74,7 +71,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
     "Constraint Module {\n"
       <> showVarEqF
       <> showAddL
-      <> showMulF
       <> showMulL
       <> showEqs
       <> showBooleanConstraints
@@ -123,38 +119,31 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
           then ""
           else "  Relations:\n" <> indent (indent (show (cmRelations cm)))
 
-      -- showVarEqL =
-      --   if UIntRelations.size (Relations.exportUIntRelations (cmRelations cm)) == 0
-      --     then ""
-      --     else "  UInt relations:\n" <> indent (indent (show (cmRelations cm)))
-
       showAddL = adapt "AddL" (cmAddL cm) $ \xs -> "0 = " <> show xs
-
-      showMulF = adapt "MulF" (cmMulF cm) showMulF'
       showMulL = adapt "MulL" (cmMulL cm) showMulL'
 
       showEqs = adapt "EqZeros" (cmEqZeros cm) $ \(poly, m) ->
         "EqZeros " <> show poly <> " / " <> show m
 
-      showMulF' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
-        where
-          showVec :: (Show n, Ord n, Eq n, Num n) => Either n (PolyG n) -> String
-          showVec (Left c) = show c
-          showVec (Right xs) = show xs
+      -- showMulF' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
+      --   where
+      --     showVec :: (Show n, Ord n, Eq n, Num n) => Either n (PolyG n) -> String
+      --     showVec (Left c) = show c
+      --     showVec (Right xs) = show xs
 
-          -- wrap the string with parenthesis if it has more than 1 term
-          showVecWithParen :: (Show n, Ord n, Eq n, Num n) => PolyG n -> String
-          showVecWithParen xs =
-            let termNumber = case PolyG.view xs of
-                  PolyG.Monomial 0 _ -> 1
-                  PolyG.Monomial _ _ -> 2
-                  PolyG.Binomial 0 _ _ -> 2
-                  PolyG.Binomial {} -> 3
-                  PolyG.Polynomial 0 xss -> Map.size xss
-                  PolyG.Polynomial _ xss -> 1 + Map.size xss
-             in if termNumber < 2
-                  then showVec (Right xs)
-                  else "(" ++ showVec (Right xs) ++ ")"
+      --     -- wrap the string with parenthesis if it has more than 1 term
+      --     showVecWithParen :: (Show n, Ord n, Eq n, Num n) => PolyG n -> String
+      --     showVecWithParen xs =
+      --       let termNumber = case PolyG.view xs of
+      --             PolyG.Monomial 0 _ -> 1
+      --             PolyG.Monomial _ _ -> 2
+      --             PolyG.Binomial 0 _ _ -> 2
+      --             PolyG.Binomial {} -> 3
+      --             PolyG.Polynomial 0 xss -> Map.size xss
+      --             PolyG.Polynomial _ xss -> 1 + Map.size xss
+      --        in if termNumber < 2
+      --             then showVec (Right xs)
+      --             else "(" ++ showVec (Right xs) ++ ")"
 
       showMulL' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
@@ -269,7 +258,6 @@ sizeOfConstraintModule cm =
   Relations.size (cmRelations cm)
     + BooleanRelations.size (Relations.exportBooleanRelations (cmRelations cm))
     + length (cmAddL cm)
-    + length (cmMulF cm)
     + length (cmMulL cm)
     + length (cmEqZeros cm)
     + length (cmDivMods cm)

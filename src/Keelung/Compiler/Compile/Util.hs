@@ -41,7 +41,7 @@ runM compilers fieldInfo counters program =
   runExcept
     ( execStateT
         (runReaderT program compilers)
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new Relations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new Relations.new mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -136,7 +136,7 @@ writeMulWithLC as bs cs = case (as, bs, cs) of
         Right poly -> addC [CAddL $ PolyL.fromPolyG poly]
   (Polynomial xs, Constant y, Constant z) -> writeMulWithLC (Constant y) (Polynomial xs) (Constant z)
   (Polynomial xs, Constant y, Polynomial zs) -> writeMulWithLC (Constant y) (Polynomial xs) (Polynomial zs)
-  (Polynomial xs, Polynomial ys, _) -> addC [CMulF xs ys (toEither cs)]
+  (Polynomial xs, Polynomial ys, _) -> addC [CMulL (PolyL.fromPolyG xs) (PolyL.fromPolyG ys) (toEither cs)]
 
 writeAddWithPolyG :: (GaloisField n, Integral n) => Either n (PolyG n) -> M n ()
 writeAddWithPolyG xs = case xs of
@@ -206,8 +206,6 @@ addC = mapM_ addOne
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
       execRelations $ Relations.relateB x (False, y)
-    addOne (CMulF x y (Left c)) = modify' (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ cs {cmMulF = (x, y, Left c) : cmMulF cs})
-    addOne (CMulF x y (Right z)) = modify (\cs -> addOccurrences (PolyG.vars x) $ addOccurrences (PolyG.vars y) $ addOccurrences (PolyG.vars z) $ cs {cmMulF = (x, y, Right z) : cmMulF cs})
     addOne (CMulL x y (Left c)) = modify' (\cs -> addOccurrencesTuple (PolyL.varsSet x) $ addOccurrencesTuple (PolyL.varsSet y) $ cs {cmMulL = (x, y, Left c) : cmMulL cs})
     addOne (CMulL x y (Right z)) = modify (\cs -> addOccurrencesTuple (PolyL.varsSet x) $ addOccurrencesTuple (PolyL.varsSet y) $ addOccurrencesTuple (PolyL.varsSet z) $ cs {cmMulL = (x, y, Right z) : cmMulL cs})
 
