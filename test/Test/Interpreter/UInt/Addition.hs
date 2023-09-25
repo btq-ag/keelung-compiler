@@ -11,6 +11,7 @@ import Keelung.Data.Limb qualified as Limb
 import Test.Hspec
 import Test.Interpreter.Util
 import Test.QuickCheck
+import Keelung.Data.Reference (RefU(RefUX))
 
 run :: IO ()
 run = hspec tests
@@ -21,72 +22,72 @@ tests :: SpecWith ()
 tests =
   describe "Limb Bound Calculation" $ do
     it "0" $ do
-      let limbs = (0, Seq.fromList [Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True)])
+      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True)])
       uncurry calculateBounds limbs `shouldBe` (0, 6)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [True]
 
     it "1" $ do
-      let limbs = (3, Seq.fromList [Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True)])
+      let limbs = (3, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True)])
       uncurry calculateBounds limbs `shouldBe` (3, 9)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [True, True]
 
     it "2" $ do
-      let limbs = (0, Seq.fromList [Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left False)])
+      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False)])
       uncurry calculateBounds limbs `shouldBe` (-3, 3)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [False]
 
     it "3" $ do
-      let limbs = (1, Seq.fromList [Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Right [False, True])])
+      let limbs = (1, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Right [False, True])])
       uncurry calculateBounds limbs `shouldBe` (0, 9)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [True, True]
 
     it "4" $ do
-      let limbs = (3, Seq.fromList [Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left False), Limb.new undefined 2 0 (Right [False, True])])
+      let limbs = (3, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Right [False, True])])
       uncurry calculateBounds limbs `shouldBe` (-1, 11)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
 
     it "5" $ do
-      let limbs = (3, Seq.fromList [Limb.new undefined 2 0 (Left False), Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left False), Limb.new undefined 2 0 (Right [False, True])])
+      let limbs = (3, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Right [False, True])])
       uncurry calculateBounds limbs `shouldBe` (-4, 8)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
 
     it "5" $ do
-      let limbs = (3, Seq.fromList [Limb.new undefined 2 0 (Left False), Limb.new undefined 2 0 (Left False), Limb.new undefined 2 0 (Left False), Limb.new undefined 2 0 (Right [False, True])])
+      let limbs = (3, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Right [False, True])])
       uncurry calculateBounds limbs `shouldBe` (-7, 5)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [True, False]
 
     it "6" $ do
-      let limbs = (0, Seq.fromList [Limb.new undefined 2 0 (Left False), Limb.new undefined 2 0 (Left False)])
+      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left False)])
       uncurry calculateBounds limbs `shouldBe` (-6, 0)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [True, False]
 
     it "7" $ do
-      let limbs = (0, Seq.fromList [Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left False)])
+      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False)])
       uncurry calculateBounds limbs `shouldBe` (-3, 9)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
 
     it "8" $ do
-      let limbs = (0, Seq.fromList [Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left False)])
+      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False)])
       uncurry calculateBounds limbs `shouldBe` (-3, 9)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
 
     it "9" $ do
-      let limbs = (0, Seq.fromList [Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Right [False, True])])
+      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Right [False, True])])
       uncurry calculateBounds limbs `shouldBe` (-1, 11)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
 
     it "10" $ do
-      let limbs = (0, Seq.fromList [Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left True), Limb.new undefined 2 0 (Left False), Limb.new undefined 2 0 (Left False)])
+      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left False)])
       uncurry calculateBounds limbs `shouldBe` (-6, 6)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [True, False]
 
     it "11" $ do
-      let limbs = (3, Seq.fromList [Limb.new undefined 1 0 (Left False), Limb.new undefined 2 0 (Left False), Limb.new undefined 2 0 (Left True)])
+      let limbs = (3, Seq.fromList [Limb.new (RefUX 2 0) 1 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left True)])
       uncurry calculateBounds limbs `shouldBe` (-1, 6)
       uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
 
     it "12" $ do
-      let limbs = (0, Seq.fromList [Limb.new undefined 178 0 (Left True), Limb.new undefined 178 0 (Left True)])
+      let limbs = (0, Seq.fromList [Limb.new (RefUX 180 0) 178 0 (Left True), Limb.new (RefUX 180 0) 178 0 (Left True)])
       uncurry calculateBounds limbs `shouldBe` (0, 2 ^ (179 :: Int) - 2)
       uncurry (calculateCarrySigns 178) limbs `shouldBe` [True]
 

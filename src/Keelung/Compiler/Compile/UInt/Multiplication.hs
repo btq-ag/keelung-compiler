@@ -6,7 +6,7 @@ import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List.NonEmpty qualified as NonEmpty
-import Keelung (FieldType (..))
+import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
@@ -146,9 +146,11 @@ mulnxn dimensions limbWidth arity out var operand = do
   limbColumns <-
     foldM
       ( \columns (xi, yi) -> do
-          -- current limb width may be smaller than the default limb width in the highest limbs
-          let currentLimbWidthX = limbWidth `min` (dimUIntWidth dimensions - (limbWidth * xi))
-          let currentLimbWidthY = limbWidth `min` (dimUIntWidth dimensions - (limbWidth * yi))
+          -- current limb width may be smaller than
+          --    1. the default limb width in the highest limbs
+          --    2. the width of the RefU
+          let currentLimbWidthX = limbWidth `min` widthOf var `min` (dimUIntWidth dimensions - (limbWidth * xi))
+          let currentLimbWidthY = limbWidth `min` widthOf var `min` (dimUIntWidth dimensions - (limbWidth * yi))
 
           let x = Limb.new var currentLimbWidthX (limbWidth * xi) (Left True)
           let y = case operand of

@@ -55,14 +55,18 @@ toSuperscript = map convert . show
     convert _ = '⁹'
 
 -- | Construct a new 'Limb'
+--   invariant: the width of the limb must be less than or equal to the width of the RefU
 new :: RefU -> Width -> Int -> Either Bool [Bool] -> Limb
 new refU width offset signs =
-  Limb
-    { lmbRef = refU,
-      lmbWidth = width,
-      lmbOffset = offset,
-      lmbSigns = signs
-    }
+  if width > widthOf refU
+    then error "[ panic ] Limb.new: Limb width exceeds RefU width"
+    else
+      Limb
+        { lmbRef = refU,
+          lmbWidth = width,
+          lmbOffset = offset,
+          lmbSigns = signs
+        }
 
 -- | A limb is considered "positive" if all of its bits are positive
 isPositive :: Limb -> Bool
