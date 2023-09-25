@@ -292,8 +292,8 @@ reindexRef occurrences (B x) = reindexRefB occurrences x
 reindexLimb :: (Integral n, GaloisField n) => Occurrences -> Limb -> n -> IntMap n
 reindexLimb occurrences limb multiplier = case lmbSigns limb of
   Left sign ->
-    IntMap.fromListWith
-      (+)
+    -- precondition of `fromDistinctAscList` is that the keys are in ascending order
+    IntMap.fromDistinctAscList
       [ ( reindexRefU
             occurrences
             (lmbRef limb)
@@ -303,8 +303,8 @@ reindexLimb occurrences limb multiplier = case lmbSigns limb of
         | i <- [0 .. lmbWidth limb - 1]
       ]
   Right signs ->
-    IntMap.fromListWith
-      (+)
+    -- precondition of `fromDistinctAscList` is that the keys are in ascending order
+    IntMap.fromDistinctAscList
       [ ( reindexRefU
             occurrences
             (lmbRef limb)

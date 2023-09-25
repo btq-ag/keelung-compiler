@@ -60,14 +60,14 @@ toPartialBindings inputs =
                 (IntMap.mapWithKey (\w _ -> (getCount counters (Output, ReadUInt w), mempty)) (Inputs.seqUInt (Inputs.inputPublic inputs))),
             ofI =
               Struct
-                (getCount counters (PublicInput, ReadField), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
-                (getCount counters (PublicInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (fmap toBool (Inputs.seqBool (Inputs.inputPublic inputs)))))
-                (IntMap.mapWithKey (\w bindings -> (getCount counters (PublicInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (map (U.new w) (toList bindings)))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
+                (getCount counters (PublicInput, ReadField), IntMap.fromDistinctAscList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPublic inputs))))
+                (getCount counters (PublicInput, ReadBool), IntMap.fromDistinctAscList $ zip [0 ..] (toList (fmap toBool (Inputs.seqBool (Inputs.inputPublic inputs)))))
+                (IntMap.mapWithKey (\w bindings -> (getCount counters (PublicInput, ReadUInt w), IntMap.fromDistinctAscList $ zip [0 ..] (map (U.new w) (toList bindings)))) (Inputs.seqUInt (Inputs.inputPublic inputs))),
             ofP =
               Struct
-                (getCount counters (PrivateInput, ReadField), IntMap.fromList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
-                (getCount counters (PrivateInput, ReadBool), IntMap.fromList $ zip [0 ..] (toList (fmap toBool (Inputs.seqBool (Inputs.inputPrivate inputs)))))
-                (IntMap.mapWithKey (\w bindings -> (getCount counters (PrivateInput, ReadUInt w), IntMap.fromList $ zip [0 ..] (map (U.new w) (toList bindings)))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
+                (getCount counters (PrivateInput, ReadField), IntMap.fromDistinctAscList $ zip [0 ..] (toList (Inputs.seqField (Inputs.inputPrivate inputs))))
+                (getCount counters (PrivateInput, ReadBool), IntMap.fromDistinctAscList $ zip [0 ..] (toList (fmap toBool (Inputs.seqBool (Inputs.inputPrivate inputs)))))
+                (IntMap.mapWithKey (\w bindings -> (getCount counters (PrivateInput, ReadUInt w), IntMap.fromDistinctAscList $ zip [0 ..] (map (U.new w) (toList bindings)))) (Inputs.seqUInt (Inputs.inputPrivate inputs))),
             ofX =
               Struct
                 (getCount counters (Intermediate, ReadField), mempty)
