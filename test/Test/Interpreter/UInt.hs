@@ -13,12 +13,13 @@ import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Solver qualified as Solver
 import Test.Hspec
 import Test.Interpreter.UInt.Addition qualified as Addition
+import Test.Interpreter.UInt.CLMul qualified as CLMul
 import Test.Interpreter.UInt.Comparison qualified as Comparison
 import Test.Interpreter.UInt.DivMod qualified as DivMod
+import Test.Interpreter.UInt.ModInv qualified as ModInv
 import Test.Interpreter.UInt.Multiplication qualified as Multiplication
 import Test.Interpreter.Util
 import Test.QuickCheck hiding ((.&.))
-import qualified Test.Interpreter.UInt.CLMul as CLMul
 
 run :: IO ()
 run = hspec tests
@@ -41,6 +42,7 @@ tests = do
 
       DivMod.tests
       Comparison.tests
+      ModInv.tests
 
       it "arithmetics 1" $ do
         let program = do
@@ -61,10 +63,6 @@ tests = do
               x <- inputUInt @4 Public
               assert $ 2 `eq` (x + 1)
         runAll gf181 program [1] [] []
-
-      it "modInv 123 2833" $ do
-        let program = return $ modInv (123 :: UInt 32) 2833
-        runAll gf181 program [] [] [2119]
 
     describe "Conditionals" $ do
       it "with inputs" $ do
