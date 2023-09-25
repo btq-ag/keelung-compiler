@@ -19,7 +19,7 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo (FieldInfo)
-import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Syntax (widthOf)
 
@@ -236,7 +236,7 @@ assertEqF a b = do
     (Polynomial as, Constant valB) -> do
       assertLC valB (Polynomial as)
     (Polynomial as, Polynomial bs) -> do
-      writeAddWithPolyG $ PolyG.merge as (PolyG.negate bs)
+      writeAddWithPolyL $ PolyL.merge as (PolyL.negate bs)
 
 -- | Assert that two UInt expressions are equal
 assertEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()
@@ -298,11 +298,12 @@ assertEqU a b = do
 -- | Relates a RefF to a LC
 relateLC :: (GaloisField n, Integral n) => RefF -> LC n -> M n ()
 relateLC out (Constant val) = writeValF out val
-relateLC out (Polynomial poly) = case PolyG.view poly of
-  PolyG.Monomial 0 (x, 1) -> writeEq x (F out)
-  PolyG.Monomial c (x, a) -> writeAdd c [(F out, -1), (x, a)]
-  PolyG.Binomial c (x, a) (y, b) -> writeAdd c [(F out, -1), (x, a), (y, b)]
-  PolyG.Polynomial c xs -> writeAdd c $ (F out, -1) : Map.toList xs
+relateLC out (Polynomial poly) = case PolyL.view poly of
+  PolyL.RefMonomial 0 (x, 1) -> writeEq x (F out)
+  PolyL.RefMonomial c (x, a) -> writeAdd c [(F out, -1), (x, a)]
+  PolyL.RefBinomial c (x, a) (y, b) -> writeAdd c [(F out, -1), (x, a), (y, b)]
+  PolyL.RefPolynomial c xs -> writeAdd c $ (F out, -1) : Map.toList xs
+  _ -> return () -- TODO: dunno how to handle this yet
 
 -- | Assign a value to a LC
 assertLC :: (GaloisField n, Integral n) => n -> LC n -> M n ()
@@ -310,13 +311,14 @@ assertLC val (Constant val') =
   if val == val'
     then return ()
     else throwError $ Error.ConflictingValuesF val val'
-assertLC val (Polynomial poly) = case PolyG.view poly of
-  PolyG.Monomial c (x, a) ->
+assertLC val (Polynomial poly) = case PolyL.view poly of
+  PolyL.RefMonomial c (x, a) ->
     -- c + ax = val => x = (val - c) / a
     writeVal x ((val - c) / a)
-  PolyG.Binomial c (x, a) (y, b) ->
+  PolyL.RefBinomial c (x, a) (y, b) ->
     -- val = c + ax + by
     writeAdd (c - val) [(x, a), (y, b)]
-  PolyG.Polynomial c xs ->
+  PolyL.RefPolynomial c xs ->
     -- val = c + xs...
     writeAdd (c - val) (Map.toList xs)
+  _ -> return () -- TODO: dunno how to handle this yet

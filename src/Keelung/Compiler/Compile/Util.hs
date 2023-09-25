@@ -25,6 +25,7 @@ import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
+import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Interpreter.Arithmetics qualified as U
@@ -117,50 +118,41 @@ writeMulWithLC as bs cs = case (as, bs, cs) of
   (Constant _, Constant _, Constant _) -> return ()
   (Constant x, Constant y, Polynomial zs) ->
     -- z - x * y = 0
-    addC [CAddL $ PolyL.fromPolyG $ PolyG.addConstant (-x * y) zs]
+    addC [CAddL $ PolyL.addConstant (-x * y) zs]
   (Constant x, Polynomial ys, Constant z) ->
     -- x * ys = z
     -- x * ys - z = 0
-    case PolyG.multiplyBy x ys of
+    case PolyL.multiplyBy x ys of
       Left _ -> return ()
-      Right poly -> addC [CAddL $ PolyL.fromPolyG $ PolyG.addConstant (-z) poly]
+      Right poly -> addC [CAddL $ PolyL.addConstant (-z) poly]
   (Constant x, Polynomial ys, Polynomial zs) -> do
     -- x * ys = zs
     -- x * ys - zs = 0
-    case PolyG.multiplyBy x ys of
+    case PolyL.multiplyBy x ys of
       Left c ->
         -- c - zs = 0
-        addC [CAddL $ PolyL.fromPolyG $ PolyG.addConstant (-c) zs]
-      Right ys' -> case PolyG.merge ys' (PolyG.negate zs) of
+        addC [CAddL $ PolyL.addConstant (-c) zs]
+      Right ys' -> case PolyL.merge ys' (PolyL.negate zs) of
         Left _ -> return ()
-        Right poly -> addC [CAddL $ PolyL.fromPolyG poly]
+        Right poly -> addC [CAddL poly]
   (Polynomial xs, Constant y, Constant z) -> writeMulWithLC (Constant y) (Polynomial xs) (Constant z)
   (Polynomial xs, Constant y, Polynomial zs) -> writeMulWithLC (Constant y) (Polynomial xs) (Polynomial zs)
-  (Polynomial xs, Polynomial ys, _) -> addC [CMulL (PolyL.fromPolyG xs) (PolyL.fromPolyG ys) (toPolyL cs)]
+  (Polynomial xs, Polynomial ys, _) -> addC [CMulL xs ys (toPolyL cs)]
 
-writeAddWithPolyG :: (GaloisField n, Integral n) => Either n (PolyG n) -> M n ()
-writeAddWithPolyG xs = case xs of
+writeAddWithPolyL :: (GaloisField n, Integral n) => Either n (PolyL n) -> M n ()
+writeAddWithPolyL xs = case xs of
   Left _ -> return ()
-  Right poly -> addC [CAddL (PolyL.fromPolyG poly)]
+  Right poly -> addC [CAddL poly]
 
 writeAddWithLC :: (GaloisField n, Integral n) => LC n -> M n ()
 writeAddWithLC xs = case xs of
   Constant _ -> return ()
-  Polynomial poly -> addC [CAddL (PolyL.fromPolyG poly)]
+  Polynomial poly -> addC [CAddL poly]
 
 writeAddWithLCAndLimbs :: (GaloisField n, Integral n) => LC n -> n -> [(Limb, n)] -> M n ()
 writeAddWithLCAndLimbs lc constant limbs = case lc of
   Constant _ -> return ()
-  Polynomial poly ->
-    --  PolyL.fromLimbs constant limbs
-
-    --  case PolyL.insertLimbs constant limbs (PolyL.fromPolyG poly) of
-    --       Left _ -> return ()
-    --       Right polyL ->
-    addC [CAddL (PolyL.insertLimbs constant limbs (PolyL.fromPolyG poly))]
-
--- writeAddWithPolyGAndLimbs :: (GaloisField n, Integral n) => PolyG n -> n -> Seq (Limb, n) -> M n ()
--- writeAddWithPolyGAndLimbs poly constant limbs = addC [CAdd poly (PolyL.buildWithSeq constant limbs)]
+  Polynomial poly -> addC [CAddL (PolyL.insertLimbs constant limbs poly)]
 
 addC :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 addC = mapM_ addOne
@@ -223,7 +215,7 @@ writeMulWithLimbs as bs cs = case (uncurry PolyL.fromLimbs as, uncurry PolyL.fro
   _ -> return ()
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
-writeAdd c as = writeAddWithPolyG (PolyG.build c as)
+writeAdd c as = writeAddWithPolyL (PolyL.fromPolyG <$> PolyG.build c as)
 
 writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Limb, n)] -> M n ()
 writeAddWithLimbs constant limbs = case PolyL.fromLimbs constant limbs of
@@ -268,12 +260,12 @@ writeEqL a b = addC [CVarEqL a b]
 
 -- | Hints
 addEqZeroHint :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> RefF -> M n ()
-addEqZeroHint c xs m = case PolyG.build c xs of
+addEqZeroHint c xs m = case PolyL.fromPolyG <$> PolyG.build c xs of
   Left 0 -> writeValF m 0
   Left constant -> writeValF m (recip constant)
   Right poly -> modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
-addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyG n) -> RefF -> M n ()
+addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyL n) -> RefF -> M n ()
 addEqZeroHintWithPoly (Left 0) m = writeValF m 0
 addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}

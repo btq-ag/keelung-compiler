@@ -6,8 +6,8 @@ import Data.Sequence (Seq (..))
 import Keelung.Compiler.Compile.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Syntax.Internal
-import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Reference
+import qualified Keelung.Data.PolyL as PolyL
 
 ----------------------------------------------------------------
 
@@ -117,8 +117,8 @@ fastExp (Polynomial base) acc e =
     -- \| Compute the multiplication of two variables
     mul :: (GaloisField n, Integral n) => LC n -> LC n -> M n (LC n)
     mul (Constant x) (Constant y) = return $ Constant (x * y)
-    mul (Constant x) (Polynomial ys) = return $ fromPolyG $ PolyG.multiplyBy x ys
-    mul (Polynomial xs) (Constant y) = return $ fromPolyG $ PolyG.multiplyBy y xs
+    mul (Constant x) (Polynomial ys) = return $ fromPolyL $ PolyL.multiplyBy x ys
+    mul (Polynomial xs) (Constant y) = return $ fromPolyL $ PolyL.multiplyBy y xs
     mul (Polynomial xs) (Polynomial ys) = do
       out <- freshRefF
       let result = 1 @ F out

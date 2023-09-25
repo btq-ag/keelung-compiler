@@ -18,7 +18,6 @@ import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Limb (Limb)
-import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
@@ -104,8 +103,8 @@ goThroughEqZeros cm =
   let relations = cmRelations cm
    in cm {cmEqZeros = mapMaybe (reduceEqZeros relations) (cmEqZeros cm)}
   where
-    reduceEqZeros :: (GaloisField n, Integral n) => Relations n -> (PolyG n, RefF) -> Maybe (PolyG n, RefF)
-    reduceEqZeros relations (polynomial, m) = case substPolyG relations polynomial of
+    reduceEqZeros :: (GaloisField n, Integral n) => Relations n -> (PolyL n, RefF) -> Maybe (PolyL n, RefF)
+    reduceEqZeros relations (polynomial, m) = case substPolyL relations polynomial of
       Nothing -> Just (polynomial, m) -- nothing changed
       Just (Left _constant, _) -> Nothing
       Just (Right reducePolynomial, _) -> Just (reducePolynomial, m)
@@ -433,89 +432,6 @@ addAddL poly = case PolyL.view poly of
     modify' $ \cm' -> cm' {cmAddL = poly : cmAddL cm'}
 
 --------------------------------------------------------------------------------
-
--- | Substitutes variables in a polynomial.
---   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
--- substPolyG :: (GaloisField n, Integral n) => Relations n -> PolyG n -> Maybe (Either n (PolyG n), Set Ref, Set Ref)
--- substPolyG relations poly = do
---   let (c, xs) = PolyG.viewAsMap poly
---   case Map.foldlWithKey' (substPolyG_ relations) (False, Left c, mempty, mempty) xs of
---     (False, _, _, _) -> Nothing -- nothing changed
---     (True, Left constant, removedRefs, addedRefs) -> Just (Left constant, removedRefs, addedRefs) -- the polynomial has been reduced to a constant
---     (True, Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyG.vars poly)
-
--- substPolyG_ ::
---   (Integral n, GaloisField n) =>
---   Relations n ->
---   (Bool, Either n (PolyG n), Set Ref, Set Ref) ->
---   Ref ->
---   n ->
---   (Bool, Either n (PolyG n), Set Ref, Set Ref)
--- substPolyG_ relations (changed, accPoly, removedRefs, addedRefs) ref coeff = case Relations.lookup ref relations of
---   Relations.Root -> case accPoly of
---     Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
---     Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
---   Relations.Value intercept ->
---     -- ref = intercept
---     let removedRefs' = Set.insert ref removedRefs -- add ref to removedRefs
---      in case accPoly of
---           Left c -> (True, Left (intercept * coeff + c), removedRefs', addedRefs)
---           Right xs -> (True, Right $ PolyG.addConstant (intercept * coeff) xs, removedRefs', addedRefs)
---   Relations.ChildOf slope root intercept ->
---     if root == ref
---       then
---         if slope == 1 && intercept == 0
---           then -- ref = root, nothing changed
---           case accPoly of
---             Left c -> (changed, PolyG.singleton c (ref, coeff), removedRefs, addedRefs)
---             Right xs -> (changed, PolyG.insert 0 (ref, coeff) xs, removedRefs, addedRefs)
---           else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
---       else
---         let removedRefs' = Set.insert ref removedRefs
---             addedRefs' = Set.insert root addedRefs
---          in case accPoly of
---               -- ref = slope * root + intercept
---               Left c -> (True, PolyG.singleton (intercept * coeff + c) (root, slope * coeff), removedRefs', addedRefs')
---               Right accPoly' -> (True, PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', removedRefs', addedRefs')
-
--- | Substitutes variables in a polynomial.
---   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the set of substituted variables.
-substPolyG :: (GaloisField n, Integral n) => Relations n -> PolyG n -> Maybe (Either n (PolyG n), Changes)
-substPolyG relations poly = do
-  let (c, xs) = PolyG.viewAsMap poly
-  case Map.foldlWithKey' (substPolyG_ relations) (Left c, Nothing) xs of
-    (_, Nothing) -> Nothing -- nothing changed
-    (result, Just changes) -> Just (result, changes)
-
-substPolyG_ ::
-  (Integral n, GaloisField n) =>
-  Relations n ->
-  (Either n (PolyG n), Maybe Changes) ->
-  Ref ->
-  n ->
-  (Either n (PolyG n), Maybe Changes)
-substPolyG_ relations (accPoly, changes) ref coeff = case Relations.lookup ref relations of
-  Relations.Root -> case accPoly of -- ref already a root, no need to substitute
-    Left c -> (PolyG.singleton c (ref, coeff), changes)
-    Right xs -> (PolyG.insert 0 (ref, coeff) xs, changes)
-  Relations.Value intercept ->
-    -- ref = intercept
-    case accPoly of
-      Left c -> (Left (intercept * coeff + c), removeRef ref changes)
-      Right xs -> (Right $ PolyG.addConstant (intercept * coeff) xs, removeRef ref changes)
-  Relations.ChildOf slope root intercept ->
-    if root == ref
-      then
-        if slope == 1 && intercept == 0
-          then -- ref = root, nothing changed
-          case accPoly of
-            Left c -> (PolyG.singleton c (ref, coeff), changes)
-            Right xs -> (PolyG.insert 0 (ref, coeff) xs, changes)
-          else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
-      else case accPoly of
-        -- ref = slope * root + intercept
-        Left c -> (PolyG.singleton (intercept * coeff + c) (root, slope * coeff), addRef root $ removeRef ref changes)
-        Right accPoly' -> (PolyG.insert (intercept * coeff) (root, slope * coeff) accPoly', addRef root $ removeRef ref changes)
 
 --------------------------------------------------------------------------------
 

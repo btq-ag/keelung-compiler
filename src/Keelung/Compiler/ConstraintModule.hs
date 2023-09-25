@@ -33,7 +33,6 @@ import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -57,7 +56,7 @@ data ConstraintModule n = ConstraintModule
     -- multiplicative constraints
     cmMulL :: [(PolyL n, PolyL n, Either n (PolyL n))],
     -- hits for computing equality
-    cmEqZeros :: [(PolyG n, RefF)],
+    cmEqZeros :: [(PolyL n, RefF)],
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
     cmDivMods :: [(Either RefU U, Either RefU U, Either RefU U, Either RefU U)],

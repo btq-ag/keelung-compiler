@@ -323,7 +323,7 @@ xorBs xs =
 --   -- -- calculate the upper bound of the polynomial
 --   -- let upperBound = PolyG.upperBound polynomial
 
---   -- writeAddWithPolyGAndLimbs polynomial
+--   -- writeAddWithPolyLAndLimbs polynomial
 
 --   q <- freshRefF
 --   r <- freshRefB

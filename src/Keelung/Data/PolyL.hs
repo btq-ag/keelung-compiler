@@ -17,6 +17,7 @@ module Keelung.Data.PolyL
     View (..),
     viewAsRefMap,
     merge,
+    negate,
   )
 where
 
@@ -34,7 +35,8 @@ import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Reference
-import Prelude hiding (null)
+import Prelude hiding (negate, null)
+import Prelude qualified
 
 -- | Polynomial made of Limbs + a constant
 data PolyL n = PolyL
@@ -156,3 +158,7 @@ merge (PolyL c1 ls1 vars1) (PolyL c2 ls2 vars2) =
    in if null limbs && Map.null vars
         then Left (c1 + c2)
         else Right (PolyL (c1 + c2) limbs vars)
+
+-- | Negate a polynomial
+negate :: (Num n, Eq n) => PolyL n -> PolyL n
+negate (PolyL c ls vars) = PolyL (-c) (fmap (second Prelude.negate) ls) (fmap Prelude.negate vars)

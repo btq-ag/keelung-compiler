@@ -35,7 +35,6 @@ import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.PolyG (PolyG)
 import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
@@ -165,7 +164,7 @@ linkConstraintModule cm =
 
     addLs = Seq.fromList $ linkConstraint occurrences fieldWidth . CAddL =<< cmAddL cm
     mulLs = Seq.fromList $ linkConstraint occurrences fieldWidth . uncurry3 CMulL =<< cmMulL cm
-    eqZeros = Seq.fromList $ map (bimap (linkPolyGUnsafe occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
+    eqZeros = Seq.fromList $ map (bimap (linkPolyLUnsafe occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
     fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB occurrences (RefUBit width var 0)))
@@ -240,17 +239,6 @@ updateCounters occurrences counters =
    in foldr (\(selector, reducedAmount) -> addCount (Intermediate, selector) (-reducedAmount)) counters $ reducedFX : reducedBX : IntMap.elems reducedUXs
 
 --------------------------------------------------------------------------------
-
-linkPolyG :: (Integral n, GaloisField n) => Occurrences -> PolyG n -> Either n (Poly n)
-linkPolyG occurrences poly = case PolyG.view poly of
-  PolyG.Monomial constant (var, coeff) -> Poly.buildEither constant [(reindexRef occurrences var, coeff)]
-  PolyG.Binomial constant (var1, coeff1) (var2, coeff2) -> Poly.buildEither constant [(reindexRef occurrences var1, coeff1), (reindexRef occurrences var2, coeff2)]
-  PolyG.Polynomial constant xs -> Poly.buildEither constant $ fmap (first (reindexRef occurrences)) (Map.toList xs)
-
-linkPolyGUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyG n -> Poly n
-linkPolyGUnsafe occurrences xs = case linkPolyG occurrences xs of
-  Left _ -> error "[ panic ] linkPolyGUnsafe: Left"
-  Right p -> p
 
 linkPolyL :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Either n (Poly n)
 linkPolyL occurrences poly =
