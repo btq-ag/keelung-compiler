@@ -9,6 +9,7 @@ module Keelung.Data.PolyL
     newWithLimbs,
     newWithPolyG,
     insertLimbs,
+    insertRefs,
     addConstant,
     multiplyBy,
     size,
@@ -91,6 +92,13 @@ newWithPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constan
 
 insertLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
 insertLimbs c' limbs (PolyL c ls vars) = PolyL (c + c') (Seq.fromList limbs <> ls) vars
+
+insertRefs :: (Num n, Eq n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
+insertRefs c' xs (PolyL c limbs vars) =
+  let vars' = Map.filter (/= 0) $ Map.unionWith (+) vars (Map.fromList xs)
+   in if Seq.null limbs && Map.null vars'
+        then Left c
+        else Right $ PolyL (c + c') limbs vars'
 
 addConstant :: Num n => n -> PolyL n -> PolyL n
 addConstant c' (PolyL c ls vars) = PolyL (c + c') ls vars

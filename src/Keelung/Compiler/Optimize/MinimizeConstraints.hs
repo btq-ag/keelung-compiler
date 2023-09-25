@@ -717,21 +717,22 @@ removeRef ref Nothing = Just (Changes mempty mempty mempty (Set.singleton ref))
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
 substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Changes)
 substPolyL relations poly = do
-  let c = PolyL.polyConstant poly
-      xs = PolyL.polyLimbs poly
-  case foldl (substPolyL_ (Relations.exportLimbRelations relations)) (Left c, Nothing) xs of
+  let constant = PolyL.polyConstant poly
+      initState = (Left constant, Nothing)
+      afterSubstLimb = foldl (substLimb (Relations.exportLimbRelations relations)) initState (PolyL.polyLimbs poly)
+      afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstLimb (PolyL.polyRefs poly)
+  case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed
     (result, Just changes) -> Just (result, changes)
 
--- (Right poly', removedRefs, addedRefs) -> Just (Right poly', removedRefs, addedRefs `Set.difference` PolyL.limbsSet poly)
-
-substPolyL_ ::
+-- | Substitutes a Limb in a PolyL.
+substLimb ::
   (Integral n, GaloisField n) =>
   Limb.LimbRelations ->
   (Either n (PolyL n), Maybe Changes) ->
   (Limb, n) ->
   (Either n (PolyL n), Maybe Changes)
-substPolyL_ relations (accPoly, changes) (limb, multiplier) = case EquivClass.lookup limb relations of
+substLimb relations (accPoly, changes) (limb, multiplier) = case EquivClass.lookup limb relations of
   EquivClass.IsConstant constant -> case accPoly of
     Left c -> (Left (fromInteger constant * multiplier + c), removeLimb limb changes)
     Right xs -> (Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removeLimb limb changes)
@@ -747,3 +748,34 @@ substPolyL_ relations (accPoly, changes) (limb, multiplier) = case EquivClass.lo
         -- replace `limb` with `root`
         Left c -> (PolyL.newWithLimbs c [(root, multiplier)], (addLimb root . removeLimb limb) changes)
         Right accPoly' -> (Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), (addLimb root . removeLimb limb) changes)
+
+-- | Substitutes a Ref in a PolyL.
+substRef ::
+  (Integral n, GaloisField n) =>
+  Relations n ->
+  (Either n (PolyL n), Maybe Changes) ->
+  Ref ->
+  n ->
+  (Either n (PolyL n), Maybe Changes)
+substRef relations (accPoly, changes) ref coeff = case Relations.lookup ref relations of
+  Relations.Root -> case accPoly of -- ref already a root, no need to substitute
+    Left c -> (PolyL.newWithPolyG <$> PolyG.singleton c (ref, coeff), changes)
+    Right xs -> (PolyL.insertRefs 0 [(ref, coeff)] xs, changes)
+  Relations.Value intercept ->
+    -- ref = intercept
+    case accPoly of
+      Left c -> (Left (intercept * coeff + c), removeRef ref changes)
+      Right xs -> (Right $ PolyL.addConstant (intercept * coeff) xs, removeRef ref changes)
+  Relations.ChildOf slope root intercept ->
+    if root == ref
+      then
+        if slope == 1 && intercept == 0
+          then -- ref = root, nothing changed
+          case accPoly of
+            Left c -> (PolyL.newWithPolyG <$> PolyG.singleton c (ref, coeff), changes)
+            Right xs -> (PolyL.insertRefs 0 [(ref, coeff)] xs, changes)
+          else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
+      else case accPoly of
+        -- ref = slope * root + intercept
+        Left c -> (PolyL.newWithPolyG <$> PolyG.singleton (intercept * coeff + c) (root, slope * coeff), addRef root $ removeRef ref changes)
+        Right accPoly' -> (PolyL.insertRefs (intercept * coeff) [(root, slope * coeff)] accPoly', addRef root $ removeRef ref changes)
