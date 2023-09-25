@@ -175,13 +175,13 @@ reduceAddL polynomial = do
           -- the polynomial has been reduced to nothing
           markChanged AdditiveLimbConstraintChanged
           -- remove all variables in the polynomial from the occurrence list
-          modify' $ removeOccurrences (removedLimbs changes)
+          applyChanges changes
           return Nothing
         Just (Right reducePolynomial, changes) -> do
           -- the polynomial has been reduced to something
           markChanged AdditiveLimbConstraintChanged
           -- remove variables that has been reduced in the polynomial from the occurrence list
-          modify' $ removeOccurrences (removedLimbs changes) . addOccurrences (addedLimbs changes)
+          applyChanges changes
           -- keep reducing the reduced polynomial
           reduceAddL reducePolynomial
 
@@ -297,13 +297,13 @@ reduceMulL (polyA, polyB, polyC) = do
           -- the polynomial has been reduced to nothing
           markChanged typeOfChange
           -- remove all referenced RefUs in the Limbs of the polynomial from the occurrence list
-          modify' $ removeOccurrences (removedLimbs changes)
+          applyChanges changes
           return (Left constant)
         Just (Right reducePolynomial, changes) -> do
           -- the polynomial has been reduced to something
           markChanged typeOfChange
           -- remove all referenced RefUs in the Limbs of the polynomial from the occurrence list and add the new ones
-          modify' $ removeOccurrences (removedLimbs changes) . addOccurrences (addedLimbs changes)
+          applyChanges changes
           return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative limb constaint, returns the reduced constraint if it is reduced
@@ -690,6 +690,11 @@ data Changes = Changes
     addedRefs :: Set Ref,
     removedRefs :: Set Ref
   }
+  deriving (Eq, Show)
+
+applyChanges :: (GaloisField n, Integral n) => Changes -> RoundM n ()
+applyChanges changes = do
+  modify' $ removeOccurrences (removedLimbs changes) . addOccurrences (addedLimbs changes) . removeOccurrences (removedRefs changes) . addOccurrences (addedRefs changes)
 
 -- | Mark a limb as added
 addLimb :: Limb -> Maybe Changes -> Maybe Changes

@@ -141,12 +141,12 @@ writeMulWithLC as bs cs = case (as, bs, cs) of
 writeAddWithPolyG :: (GaloisField n, Integral n) => Either n (PolyG n) -> M n ()
 writeAddWithPolyG xs = case xs of
   Left _ -> return ()
-  Right poly -> addC [CAddG poly]
+  Right poly -> addC [CAddL (PolyL.newWithPolyG poly)]
 
 writeAddWithLC :: (GaloisField n, Integral n) => LC n -> M n ()
 writeAddWithLC xs = case xs of
   Constant _ -> return ()
-  Polynomial poly -> addC [CAddG poly]
+  Polynomial poly -> addC [CAddL (PolyL.newWithPolyG poly)]
 
 writeAddWithLCAndLimbs :: (GaloisField n, Integral n) => LC n -> n -> [(Limb, n)] -> M n ()
 writeAddWithLCAndLimbs lc constant limbs = case lc of
