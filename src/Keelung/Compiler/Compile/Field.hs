@@ -3,7 +3,7 @@ module Keelung.Compiler.Compile.Field (compile) where
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.Sequence (Seq (..))
-import Keelung.Compiler.Compile.LC
+import Keelung.Data.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference

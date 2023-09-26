@@ -9,7 +9,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq)
 import Data.Word (Word32)
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Compile.LC
+import Keelung.Data.LC
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF

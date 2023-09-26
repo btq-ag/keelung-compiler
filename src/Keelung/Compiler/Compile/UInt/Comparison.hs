@@ -6,7 +6,7 @@ import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Keelung (HasWidth (widthOf), Width)
 import Keelung.Compiler.Compile.Error qualified as Error
-import Keelung.Compiler.Compile.LC ((@))
+import Keelung.Data.LC ((@))
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo

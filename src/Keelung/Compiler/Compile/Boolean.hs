@@ -10,7 +10,7 @@ import Data.Foldable (toList)
 import Data.List.Split qualified as List
 import Data.Sequence qualified as Seq
 import Keelung (HasWidth (widthOf))
-import Keelung.Compiler.Compile.LC
+import Keelung.Data.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Syntax.Internal

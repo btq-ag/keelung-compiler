@@ -31,7 +31,6 @@ library
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
-      Keelung.Compiler.Compile.LC
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
@@ -61,6 +60,7 @@ library
       Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.Constraint
+      Keelung.Data.LC
       Keelung.Data.Limb
       Keelung.Data.PolyL
       Keelung.Data.Reference
@@ -109,7 +109,6 @@ executable keelungc
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
-      Keelung.Compiler.Compile.LC
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
@@ -139,6 +138,7 @@ executable keelungc
       Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.Constraint
+      Keelung.Data.LC
       Keelung.Data.Limb
       Keelung.Data.PolyL
       Keelung.Data.Reference
@@ -219,7 +219,6 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
-      Keelung.Compiler.Compile.LC
       Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
@@ -249,6 +248,7 @@ test-suite keelung-test
       Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.Constraint
+      Keelung.Data.LC
       Keelung.Data.Limb
       Keelung.Data.PolyL
       Keelung.Data.Reference

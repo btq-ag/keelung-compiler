@@ -12,7 +12,7 @@ import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Compile.Boolean qualified as Boolean
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Field qualified as Field
-import Keelung.Compiler.Compile.LC
+import Keelung.Data.LC
 import Keelung.Compiler.Compile.UInt qualified as UInt
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule

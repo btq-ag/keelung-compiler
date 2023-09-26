@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.LC (LC (..), fromPolyL, toPolyL, fromRefU, (@), neg, scale) where
+module Keelung.Data.LC (LC (..), fromPolyL, toPolyL, fromRefU, (@), neg, scale) where
 
 import Data.Bits qualified
 import Data.Field.Galois
