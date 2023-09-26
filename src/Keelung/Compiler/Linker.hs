@@ -35,7 +35,6 @@ import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Polynomial (Poly)
@@ -79,9 +78,9 @@ linkConstraintModule cm =
             case (slope, intercept) of
               (0, _) -> CVarBindF var intercept
               (1, 0) -> CVarEq var root
-              (_, _) -> case PolyG.build intercept [(var, -1), (root, slope)] of
+              (_, _) -> case PolyL.fromRefs intercept [(var, -1), (root, slope)] of
                 Left _ -> error "[ panic ] extractFieldRelations: failed to build polynomial"
-                Right poly -> CAddL $ PolyL.fromPolyG poly
+                Right poly -> CAddL poly
 
           result = map convert $ Map.toList $ Relations.toInt shouldBeKept relations
        in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)

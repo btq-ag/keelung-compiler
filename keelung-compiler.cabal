@@ -62,7 +62,6 @@ library
       Keelung.Compiler.Util
       Keelung.Data.Constraint
       Keelung.Data.Limb
-      Keelung.Data.PolyG
       Keelung.Data.PolyL
       Keelung.Data.Reference
       Keelung.Data.VarGroup
@@ -141,7 +140,6 @@ executable keelungc
       Keelung.Compiler.Util
       Keelung.Data.Constraint
       Keelung.Data.Limb
-      Keelung.Data.PolyG
       Keelung.Data.PolyL
       Keelung.Data.Reference
       Keelung.Data.VarGroup
@@ -252,7 +250,6 @@ test-suite keelung-test
       Keelung.Compiler.Util
       Keelung.Data.Constraint
       Keelung.Data.Limb
-      Keelung.Data.PolyG
       Keelung.Data.PolyL
       Keelung.Data.Reference
       Keelung.Data.VarGroup

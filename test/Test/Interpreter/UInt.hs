@@ -82,8 +82,6 @@ tests = do
         let program = do
               x <- inputUInt @4 Public
               return (x `eq` 13)
-        -- runAll (Prime 13) program [0] [] [0]
-        -- runAll (Prime 13) program [4, 4] [] [1]
         forAll (choose (0, 15)) $ \x -> do
           let expected = [if x == 13 then 1 else 0]
           runAll (Prime 13) program [x `mod` 16] [] expected

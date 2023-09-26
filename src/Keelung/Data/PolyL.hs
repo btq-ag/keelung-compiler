@@ -7,7 +7,8 @@ module Keelung.Data.PolyL
   ( PolyL (polyConstant, polyLimbs, polyRefs),
     varsSet,
     fromLimbs,
-    fromPolyG,
+    -- fromPolyG,
+    fromRefs,
     insertLimbs,
     insertRefs,
     addConstant,
@@ -32,8 +33,6 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Data.Limb (Limb (..))
-import Keelung.Data.PolyG (PolyG)
-import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.Reference
 import Prelude hiding (negate, null)
 import Prelude qualified
@@ -61,8 +60,8 @@ instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
     | otherwise = concat (show constant : firstSign : toList restOfTerms)
     where
       limbTerms = mconcat $ fmap printTermL (toList limbs)
-      varTerms = show vars -- mconcat $ fmap printTerm (Map.toList vars)
-      (firstSign, restOfTerms) = case varTerms Seq.<| limbTerms of
+      varTerms = mconcat $ fmap printTerm (Map.toList vars)
+      (firstSign, restOfTerms) = case varTerms <> limbTerms of
         Seq.Empty -> error "[ panic ] Empty PolyL"
         (x Seq.:<| xs) -> (x, xs)
 
@@ -75,13 +74,13 @@ instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
         | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
         | otherwise = Seq.fromList [" + ", show c <> show x]
 
--- printTerm :: (Show n, Ord n, Eq n, Num n) => (Ref, n) -> Seq String
--- printTerm (x, c)
---   | c == 0 = error "printTerm: coefficient of 0"
---   | c == 1 = Seq.fromList [" + ", show x]
---   | c == -1 = Seq.fromList [" - ", show x]
---   | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
---   | otherwise = Seq.fromList [" + ", show c <> show x]
+      printTerm :: (Show n, Ord n, Eq n, Num n) => (Ref, n) -> Seq String
+      printTerm (x, c)
+        | c == 0 = error "printTerm: coefficient of 0"
+        | c == 1 = Seq.fromList [" + ", show x]
+        | c == -1 = Seq.fromList [" - ", show x]
+        | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
+        | otherwise = Seq.fromList [" + ", show c <> show x]
 
 fromLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> Either n (PolyL n)
 fromLimbs constant limbs =
@@ -90,15 +89,23 @@ fromLimbs constant limbs =
         then Left constant
         else Right (PolyL constant (Seq.fromList limbs') mempty)
 
-fromPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
-fromPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars
+-- fromPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
+-- fromPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars
+
+-- | Build a PolyL from a constant and a list of (Ref, coefficient) pairs
+fromRefs :: (Num n, Eq n) => n -> [(Ref, n)] -> Either n (PolyL n)
+fromRefs constant xs =
+  let xs' = filter ((/= 0) . snd) xs
+   in if null xs'
+        then Left constant
+        else Right (PolyL constant mempty (Map.fromList xs'))
 
 insertLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
 insertLimbs c' limbs (PolyL c ls vars) = PolyL (c + c') (Seq.fromList limbs <> ls) vars
 
 insertRefs :: (Num n, Eq n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
 insertRefs c' xs (PolyL c limbs vars) =
-  let vars' = Map.filter (/= 0) $ Map.unionWith (+) vars (Map.fromList xs)
+  let vars' = cleanVars $ Map.unionWith (+) vars (Map.fromList xs)
    in if Seq.null limbs && Map.null vars'
         then Left c
         else Right $ PolyL (c + c') limbs vars'
@@ -154,7 +161,7 @@ size (PolyL c ls vars) = if c == 0 then 0 else 1 + sum (fmap (lmbWidth . fst) ls
 merge :: (Num n, Eq n) => PolyL n -> PolyL n -> Either n (PolyL n)
 merge (PolyL c1 ls1 vars1) (PolyL c2 ls2 vars2) =
   let limbs = ls1 <> ls2
-      vars = Map.filter (/= 0) $ Map.unionWith (+) vars1 vars2
+      vars = cleanVars $ Map.unionWith (+) vars1 vars2
    in if null limbs && Map.null vars
         then Left (c1 + c2)
         else Right (PolyL (c1 + c2) limbs vars)
@@ -162,3 +169,9 @@ merge (PolyL c1 ls1 vars1) (PolyL c2 ls2 vars2) =
 -- | Negate a polynomial
 negate :: (Num n, Eq n) => PolyL n -> PolyL n
 negate (PolyL c ls vars) = PolyL (-c) (fmap (second Prelude.negate) ls) (fmap Prelude.negate vars)
+
+--------------------------------------------------------------------------------
+
+-- | Helper function for cleaning a Map of Refs
+cleanVars :: (Num n, Eq n) => Map Ref n -> Map Ref n
+cleanVars = Map.filter (/= 0)

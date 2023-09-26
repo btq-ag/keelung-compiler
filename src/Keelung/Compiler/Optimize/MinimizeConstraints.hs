@@ -18,7 +18,6 @@ import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Limb (Limb)
-import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -516,7 +515,7 @@ substRef ::
   (Either n (PolyL n), Maybe Changes)
 substRef relations (accPoly, changes) ref coeff = case Relations.lookup ref relations of
   Relations.Root -> case accPoly of -- ref already a root, no need to substitute
-    Left c -> (PolyL.fromPolyG <$> PolyG.singleton c (ref, coeff), changes)
+    Left c -> (PolyL.fromRefs c [(ref, coeff)], changes)
     Right xs -> (PolyL.insertRefs 0 [(ref, coeff)] xs, changes)
   Relations.Value intercept ->
     -- ref = intercept
@@ -529,10 +528,10 @@ substRef relations (accPoly, changes) ref coeff = case Relations.lookup ref rela
         if slope == 1 && intercept == 0
           then -- ref = root, nothing changed
           case accPoly of
-            Left c -> (PolyL.fromPolyG <$> PolyG.singleton c (ref, coeff), changes)
+            Left c -> (PolyL.fromRefs c [(ref, coeff)], changes)
             Right xs -> (PolyL.insertRefs 0 [(ref, coeff)] xs, changes)
           else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
       else case accPoly of
         -- ref = slope * root + intercept
-        Left c -> (PolyL.fromPolyG <$> PolyG.singleton (intercept * coeff + c) (root, slope * coeff), addRef root $ removeRef ref changes)
+        Left c -> (PolyL.fromRefs (intercept * coeff + c) [(root, slope * coeff)], addRef root $ removeRef ref changes)
         Right accPoly' -> (PolyL.insertRefs (intercept * coeff) [(root, slope * coeff)] accPoly', addRef root $ removeRef ref changes)

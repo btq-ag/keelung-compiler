@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Data.Limb
   ( Limb (lmbRef, lmbWidth, lmbOffset, lmbSigns),

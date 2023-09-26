@@ -138,6 +138,6 @@ module Test.PolyG () where
 --           n <- choose (0, 99)
 --           return (var, n)
 --         constant <- choose (0, 99)
---         case PolyG.build constant xs of
+--         case PolyL.build constant xs of
 --           Left _ -> genPolyG varList
 --           Right polyG -> pure polyG

@@ -5,7 +5,6 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bits qualified
-import Data.Either (partitionEithers)
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq)
 import Data.Word (Word32)
@@ -23,8 +22,6 @@ import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.PolyG (PolyG)
-import Keelung.Data.PolyG qualified as PolyG
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -100,18 +97,6 @@ compileExprU out expr = do
   compiler out expr
 
 --------------------------------------------------------------------------------
-
--- | Compile a linear combination of expressions into a polynomial
-toPoly :: (GaloisField n, Integral n) => (Expr n -> M n (Either Ref n)) -> (n, [(Expr n, n)]) -> M n (Either n (PolyG n))
-toPoly compile (c, xs) = do
-  (constants, terms) <- partitionEithers <$> mapM compileTerm xs
-  return $ PolyG.build (c + sum constants) terms
-  where
-    compileTerm (expr, coeff) = do
-      result <- compile expr
-      case result of
-        Left variable -> return $ Right (variable, coeff)
-        Right constant -> return $ Left (constant * coeff)
 
 writeMulWithLC :: (GaloisField n, Integral n) => LC n -> LC n -> LC n -> M n ()
 writeMulWithLC as bs cs = case (as, bs, cs) of
@@ -204,7 +189,7 @@ addC = mapM_ addOne
 --------------------------------------------------------------------------------
 
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
-writeMul as bs cs = writeMulWithLC (fromPolyG $ uncurry PolyG.build as) (fromPolyG $ uncurry PolyG.build bs) (fromPolyG $ uncurry PolyG.build cs)
+writeMul as bs cs = writeMulWithLC (fromPolyL $ uncurry PolyL.fromRefs as) (fromPolyL $ uncurry PolyL.fromRefs bs) (fromPolyL $ uncurry PolyL.fromRefs cs)
 
 writeMulWithLimbs :: (GaloisField n, Integral n) => (n, [(Limb, n)]) -> (n, [(Limb, n)]) -> (n, [(Limb, n)]) -> M n ()
 writeMulWithLimbs as bs cs = case (uncurry PolyL.fromLimbs as, uncurry PolyL.fromLimbs bs) of
@@ -215,7 +200,7 @@ writeMulWithLimbs as bs cs = case (uncurry PolyL.fromLimbs as, uncurry PolyL.fro
   _ -> return ()
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
-writeAdd c as = writeAddWithPolyL (PolyL.fromPolyG <$> PolyG.build c as)
+writeAdd c as = writeAddWithPolyL (PolyL.fromRefs c as)
 
 writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Limb, n)] -> M n ()
 writeAddWithLimbs constant limbs = case PolyL.fromLimbs constant limbs of
@@ -260,7 +245,7 @@ writeEqL a b = addC [CVarEqL a b]
 
 -- | Hints
 addEqZeroHint :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> RefF -> M n ()
-addEqZeroHint c xs m = case PolyL.fromPolyG <$> PolyG.build c xs of
+addEqZeroHint c xs m = case PolyL.fromRefs c xs of
   Left 0 -> writeValF m 0
   Left constant -> writeValF m (recip constant)
   Right poly -> modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
