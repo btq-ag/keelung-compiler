@@ -1,17 +1,12 @@
-module Test.WitnessGeneration (run, tests) where
+module Test.Solver (run, tests) where
 
--- import Data.Vector qualified as Vector
-
--- import Keelung.Data.VarGroup (VarGroup (..), VarGroups (VarGroups))
-
--- import Data.Foldable (Foldable(toList))
 import Data.Vector qualified as Vec
 import Keelung
 import Keelung.Compiler (ConstraintSystem (..), generateWitness)
 import Keelung.Compiler qualified as Compiler
+import Test.Compilation.Util (gf181Info)
 import Test.Hspec
-import Test.Interpreter.Util (gf181Info)
-import qualified Test.Solver.BinRep as Solver.BinRep
+import Test.Solver.BinRep qualified as Solver.BinRep
 
 run :: IO ()
 run = hspec tests

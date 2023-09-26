@@ -1,12 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 
-module Test.Interpreter.UInt.ModInv (tests, run) where
+module Test.Compilation.UInt.ModInv (tests, run) where
 
 import Keelung hiding (compile)
 import Keelung.Interpreter.Arithmetics qualified as Arith
 import Test.HUnit
 import Test.Hspec
-import Test.Interpreter.Util
+import Test.Compilation.Util
 import Test.QuickCheck
 
 run :: IO ()

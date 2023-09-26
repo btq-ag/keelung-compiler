@@ -2,12 +2,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Test.Interpreter.UInt.Multiplication (tests, run) where
+module Test.Compilation.UInt.Multiplication (tests, run) where
 
 import Data.Word
 import Keelung hiding (compile)
 import Test.Hspec
-import Test.Interpreter.Util
+import Test.Compilation.Util
 import Test.QuickCheck hiding ((.&.))
 
 run :: IO ()

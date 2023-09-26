@@ -187,32 +187,33 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Test.Compilation
+      Test.Compilation.Boolean
+      Test.Compilation.Field
+      Test.Compilation.Misc
+      Test.Compilation.UInt
+      Test.Compilation.UInt.Addition
+      Test.Compilation.UInt.Bitwise
+      Test.Compilation.UInt.CLMul
+      Test.Compilation.UInt.Comparison
+      Test.Compilation.UInt.DivMod
+      Test.Compilation.UInt.Logical
+      Test.Compilation.UInt.ModInv
+      Test.Compilation.UInt.Multiplication
+      Test.Compilation.Util
       Test.IndexTable
-      Test.Interpreter
-      Test.Interpreter.Boolean
-      Test.Interpreter.Field
-      Test.Interpreter.Misc
-      Test.Interpreter.Statement
-      Test.Interpreter.UInt
-      Test.Interpreter.UInt.Addition
-      Test.Interpreter.UInt.Bitwise
-      Test.Interpreter.UInt.CLMul
-      Test.Interpreter.UInt.Comparison
-      Test.Interpreter.UInt.DivMod
-      Test.Interpreter.UInt.ModInv
-      Test.Interpreter.UInt.Multiplication
-      Test.Interpreter.Util
+      Test.Intergration
       Test.Optimization
       Test.Optimization.Boolean
       Test.Optimization.Field
       Test.Optimization.UInt
       Test.Optimization.UInt.Misc
       Test.Optimization.Util
-      Test.PolyG
+      Test.Relations
       Test.Relations.Boolean
       Test.Relations.Field
+      Test.Solver
       Test.Solver.BinRep
-      Test.WitnessGeneration
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Boolean

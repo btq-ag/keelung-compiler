@@ -1,9 +1,9 @@
-module Test.Interpreter.Boolean (tests, run) where
+module Test.Compilation.Boolean (tests, run) where
 
 import Data.Bits qualified
 import Keelung hiding (compile)
 import Test.Hspec
-import Test.Interpreter.Util
+import Test.Compilation.Util
 import Test.QuickCheck hiding ((.&.))
 
 run :: IO ()

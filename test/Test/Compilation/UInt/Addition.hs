@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Test.Interpreter.UInt.Addition (tests, run) where
+module Test.Compilation.UInt.Addition (tests, run) where
 
 import Control.Monad (replicateM)
 import Data.Sequence qualified as Seq
@@ -9,7 +9,7 @@ import Keelung hiding (compile)
 import Keelung.Compiler.Compile.Util
 import Keelung.Data.Limb qualified as Limb
 import Test.Hspec
-import Test.Interpreter.Util
+import Test.Compilation.Util
 import Test.QuickCheck
 import Keelung.Data.Reference (RefU(RefUX))
 

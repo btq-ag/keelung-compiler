@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 
-module Test.Interpreter.UInt.DivMod (tests, run) where
+module Test.Compilation.UInt.DivMod (tests, run) where
 
 import Data.Field.Galois (Prime)
 import Keelung hiding (compile)
@@ -8,7 +8,7 @@ import Keelung.Compiler.Error (Error (..))
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver.Monad qualified as Solver
 import Test.Hspec
-import Test.Interpreter.Util
+import Test.Compilation.Util
 import Test.QuickCheck hiding ((.&.))
 
 run :: IO ()

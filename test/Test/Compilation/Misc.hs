@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 
-module Test.Interpreter.Misc (tests, run) where
+module Test.Compilation.Misc (tests, run) where
 
 import Hash.Poseidon qualified as Poseidon
 import Keelung hiding (compile)
@@ -8,7 +8,7 @@ import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Test.Hspec
-import Test.Interpreter.Util
+import Test.Compilation.Util
 import qualified Keelung.Interpreter as Interpreter
 
 run :: IO ()

@@ -1,11 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Test.Interpreter.Field (tests, run) where
+module Test.Compilation.Field (tests, run) where
 
 import Control.Monad
 import Keelung hiding (compile)
 import Test.Hspec
-import Test.Interpreter.Util
+import Test.Compilation.Util
 import Test.QuickCheck hiding ((.&.))
 
 run :: IO ()

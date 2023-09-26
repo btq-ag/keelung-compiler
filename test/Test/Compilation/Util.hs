@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Test.Interpreter.Util (debug, debugUnoptimized, assertSize, gf181Info, runAll, throwR1CS, throwBoth, printLog, printLogUnoptimized) where
+module Test.Compilation.Util (debug, debugUnoptimized, assertSize, gf181Info, runAll, throwR1CS, throwBoth, printLog, printLogUnoptimized) where
 
 import Control.Arrow (left)
 import Data.Field.Galois

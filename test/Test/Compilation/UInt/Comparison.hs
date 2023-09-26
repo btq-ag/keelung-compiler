@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Test.Interpreter.UInt.Comparison (tests, run) where
+module Test.Compilation.UInt.Comparison (tests, run) where
 
 import Control.Monad
 import Data.Field.Galois (Prime)
@@ -11,7 +11,7 @@ import Keelung.Compiler.Error (Error (..))
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver qualified as Solver
 import Test.Hspec
-import Test.Interpreter.Util
+import Test.Compilation.Util
 import Test.QuickCheck hiding ((.&.))
 
 run :: IO ()

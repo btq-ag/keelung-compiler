@@ -14,9 +14,9 @@ import Keelung.Compiler.ConstraintSystem qualified as ConstraintSystem
 import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Data.FieldInfo
+import Test.Compilation.Util (gf181Info)
 import Test.HUnit (assertFailure)
 import Test.Hspec
-import Test.Interpreter.Util (gf181Info)
 
 --------------------------------------------------------------------------------
 
