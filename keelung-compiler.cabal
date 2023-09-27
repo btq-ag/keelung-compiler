@@ -65,9 +65,9 @@ library
       Keelung.Data.Limb
       Keelung.Data.PolyL
       Keelung.Data.Reference
+      Keelung.Data.U
       Keelung.Data.VarGroup
       Keelung.Interpreter
-      Keelung.Interpreter.Arithmetics
       Keelung.Interpreter.Monad
       Keelung.Solver
       Keelung.Solver.BinRep
@@ -144,9 +144,9 @@ executable keelungc
       Keelung.Data.Limb
       Keelung.Data.PolyL
       Keelung.Data.Reference
+      Keelung.Data.U
       Keelung.Data.VarGroup
       Keelung.Interpreter
-      Keelung.Interpreter.Arithmetics
       Keelung.Interpreter.Monad
       Keelung.Solver
       Keelung.Solver.BinRep
@@ -256,9 +256,9 @@ test-suite keelung-test
       Keelung.Data.Limb
       Keelung.Data.PolyL
       Keelung.Data.Reference
+      Keelung.Data.U
       Keelung.Data.VarGroup
       Keelung.Interpreter
-      Keelung.Interpreter.Arithmetics
       Keelung.Interpreter.Monad
       Keelung.Solver
       Keelung.Solver.BinRep

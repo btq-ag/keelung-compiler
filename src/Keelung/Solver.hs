@@ -23,8 +23,8 @@ import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Interpreter.Arithmetics (U)
-import Keelung.Interpreter.Arithmetics qualified as U
+import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Keelung.Solver.BinRep
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
@@ -305,48 +305,48 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisorResult, quotientResult, remainderResult) of
         (Just divisorVal, Just actualQuotientVal, Just actualRemainderVal) -> do
-          when (U.uintValue divisorVal == 0) $
+          when (U.uValue divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
-          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
-              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
+          let expectedQuotientVal = dividendVal `U.div` divisorVal
+              expectedRemainderVal = dividendVal `U.mod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError ConflictingValues
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
           return Eliminated
         (Just divisorVal, Just actualQuotientVal, Nothing) -> do
-          when (U.uintValue divisorVal == 0) $
+          when (U.uValue divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
-          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
-              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
+          let expectedQuotientVal = dividendVal `U.div` divisorVal
+              expectedRemainderVal = dividendVal `U.mod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError ConflictingValues
           bindBitsEither "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
-          when (U.uintValue divisorVal == 0) $
+          when (U.uValue divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
-          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
-              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
+          let expectedQuotientVal = dividendVal `U.div` divisorVal
+              expectedRemainderVal = dividendVal `U.mod` divisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
           bindBitsEither "quotient" quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
-          when (U.uintValue divisorVal == 0) $
+          when (U.uValue divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
-          let expectedQuotientVal = dividendVal `U.integerDivU` divisorVal
-              expectedRemainderVal = dividendVal `U.integerModU` divisorVal
+          let expectedQuotientVal = dividendVal `U.div` divisorVal
+              expectedRemainderVal = dividendVal `U.mod` divisorVal
           bindBitsEither "quotient" quotientVar expectedQuotientVal
           bindBitsEither "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Just actualRemainderVal) -> do
-          let expectedDivisorVal = dividendVal `U.integerDivU` actualQuotientVal
-              expectedRemainderVal = dividendVal `U.integerModU` expectedDivisorVal
+          let expectedDivisorVal = dividendVal `U.div` actualQuotientVal
+              expectedRemainderVal = dividendVal `U.mod` expectedDivisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
           bindBitsEither "divisor" divisorVar expectedDivisorVal
@@ -356,12 +356,12 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           --  1. the remainder = the dividend
           --  2. the divisor > the dividend
           (expectedDivisorVal, expectedRemainderVal) <-
-            if U.uintValue actualQuotientVal == 0
+            if U.uValue actualQuotientVal == 0
               then throwError $ QuotientIsZeroError quotientVar
               else
-                if U.uintValue dividendVal == 0
+                if U.uValue dividendVal == 0
                   then throwError $ DividendIsZeroError dividendVar
-                  else return (dividendVal `U.integerDivU` actualQuotientVal, dividendVal `U.integerModU` actualQuotientVal)
+                  else return (dividendVal `U.div` actualQuotientVal, dividendVal `U.mod` actualQuotientVal)
           bindBitsEither "divisor" divisorVar expectedDivisorVal
           bindBitsEither "remainder" remainderVar expectedRemainderVal
           return Eliminated
@@ -371,7 +371,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
       case (divisorResult, quotientResult, remainderResult) of
         -- divisor, quotient, and remainder are all known
         (Just divisorVal, Just quotientVal, Just remainderVal) -> do
-          let dividendVal = (divisorVal `U.integerMulU` quotientVal) `U.integerAddU` remainderVal
+          let dividendVal = (divisorVal `U.mul` quotientVal) `U.add` remainderVal
           bindBitsEither "divident" dividendVar dividendVal
           return Eliminated
         _ -> do
@@ -397,11 +397,11 @@ shrinkModInv (aVar, outVar, nVar, p) = do
   aResult <- lookupBitsEither aVar
   case aResult of
     Just aVal -> do
-      case U.modInv (U.uintValue aVal) p of
+      case U.modInv (U.uValue aVal) p of
         Just result -> do
           let (width, _) = aVar
           -- aVal * result = n * p + 1
-          let nVal = (aVal `U.integerMulU` U.new width result `U.integerSubU` U.new width 1) `U.integerDivU` U.new width p
+          let nVal = (aVal `U.mul` U.new width result `U.sub` U.new width 1) `U.div` U.new width p
           bindBitsEither "ModInv n" nVar nVal
           bindBitsEither "ModInv" outVar (U.new width result)
           return Eliminated

@@ -37,7 +37,7 @@ import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Struct
-import Keelung.Interpreter.Arithmetics (U)
+import Keelung.Data.U (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
 
 --------------------------------------------------------------------------------
@@ -172,9 +172,9 @@ prettyVariables counters =
           <> padLeft12 (getCount counters (Intermediate, typ))
       uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (ReadUInt w)
       -- Bit widths existed in the system
-      uintWidthEntries (Counters o i p x _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
+      uWidthEntries (Counters o i p x _ _) = IntMap.keysSet (structU o) <> IntMap.keysSet (structU i) <> IntMap.keysSet (structU p) <> IntMap.keysSet (structU x)
       showUInts =
-        let entries = uintWidthEntries counters
+        let entries = uWidthEntries counters
          in if IntSet.null entries
               then ""
               else mconcat $ fmap uint (IntSet.toList entries)

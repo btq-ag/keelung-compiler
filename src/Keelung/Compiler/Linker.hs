@@ -40,8 +40,8 @@ import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Reference
-import Keelung.Interpreter.Arithmetics (U)
-import Keelung.Interpreter.Arithmetics qualified as U
+import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf), Var, Width)
 import Keelung.Syntax.Counters
 
@@ -151,7 +151,7 @@ linkConstraintModule cm =
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
     extractUIntRelations relations =
       let convert :: (GaloisField n, Integral n) => (RefU, Either RefU U) -> Constraint n
-          convert (var, Right val) = CVarBindU var (U.uintValue val)
+          convert (var, Right val) = CVarBindU var (U.uValue val)
           convert (var, Left root) = CVarEqU var root
           result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
        in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
@@ -167,10 +167,10 @@ linkConstraintModule cm =
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
     fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB occurrences (RefUBit width var 0)))
-    fromEitherRefU (Right val) = let width = U.uintWidth val in (width, Right (U.uintValue val))
+    fromEitherRefU (Right val) = let width = U.uWidth val in (width, Right (U.uValue val))
 
     divMods = map (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) $ cmDivMods cm
-    modInvs = map (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, U.uintValue p)) $ cmModInvs cm
+    modInvs = map (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, U.uValue p)) $ cmModInvs cm
 
 -------------------------------------------------------------------------------
 
@@ -217,7 +217,7 @@ linkConstraint occurrences _ (CVarBindL x n) =
 linkConstraint occurrences fieldWidth (CVarBindU x n) =
   -- split the Integer into smaller chunks of size `fieldWidth`
   let number = U.new (widthOf x) n
-      chunks = map U.uintValue (U.chunksU fieldWidth number)
+      chunks = map U.uValue (U.chunks fieldWidth number)
       cVarBindLs = zipWith CVarBindL (Limb.refUToLimbs fieldWidth x) chunks
    in cVarBindLs >>= linkConstraint occurrences fieldWidth
 linkConstraint occurrences _ (CMulL as bs cs) =

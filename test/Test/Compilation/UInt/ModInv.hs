@@ -3,7 +3,7 @@
 module Test.Compilation.UInt.ModInv (tests, run) where
 
 import Keelung hiding (compile)
-import Keelung.Interpreter.Arithmetics qualified as Arith
+import Keelung.Data.U qualified as U
 import Test.Compilation.Util
 import Test.HUnit
 import Test.Hspec
@@ -40,7 +40,7 @@ tests =
       let genPair = do
             -- only choosing from 1 to prime - 1
             a <- choose (1, prime - 1)
-            let expected = Arith.modInv a prime
+            let expected = U.modInv a prime
             return (a, expected)
       forAll genPair $ \(a, result) -> do
         case result of
@@ -61,7 +61,7 @@ tests =
             return $ modInv x prime
       let genPair = do
             a <- choose (1, prime)
-            let expected = Arith.modInv a prime
+            let expected = U.modInv a prime
             return (a, expected)
       forAll genPair $ \(a, result) -> do
         case result of

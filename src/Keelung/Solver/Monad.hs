@@ -27,8 +27,8 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.VarGroup
-import Keelung.Interpreter.Arithmetics (U)
-import Keelung.Interpreter.Arithmetics qualified as U
+import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
@@ -70,7 +70,7 @@ bindVar msg var val = do
 bindBitsEither :: (GaloisField n, Integral n) => String -> (Width, Either Var Integer) -> U -> M n ()
 bindBitsEither msg (width, Left var) val = do
   forM_ [0 .. width - 1] $ \i -> do
-    bindVar msg (var + i) (if Data.Bits.testBit (U.uintValue val) i then 1 else 0)
+    bindVar msg (var + i) (if Data.Bits.testBit (U.uValue val) i then 1 else 0)
 bindBitsEither _ (_, Right _) _ = return ()
 
 --------------------------------------------------------------------------------

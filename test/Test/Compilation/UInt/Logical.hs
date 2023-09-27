@@ -6,7 +6,7 @@ module Test.Compilation.UInt.Logical (tests, run) where
 
 import Data.Bits qualified
 import Keelung hiding (compile)
-import Keelung.Interpreter.Arithmetics qualified as U
+import Keelung.Data.U qualified as U
 import Test.Hspec
 import Test.Compilation.Util
 import Test.QuickCheck hiding ((.&.))
@@ -25,15 +25,15 @@ tests = describe "Logical" $ do
             return $ complement x
       forAll (choose (0, 255)) $ \x -> do
         let uint = U.new 8 x
-        let expected = [U.uintValue (Data.Bits.complement uint)]
-        runAll (Prime 13) program [U.uintValue uint] [] expected
+        let expected = [U.uValue (Data.Bits.complement uint)]
+        runAll (Prime 13) program [U.uValue uint] [] expected
 
     it "constant / byte / Prime 13" $ do
       let program x = do
             return $ complement (x :: UInt 8)
       forAll (choose (0, 255)) $ \x -> do
         let uint = U.new 8 x
-        let expected = [U.uintValue (Data.Bits.complement uint)]
+        let expected = [U.uValue (Data.Bits.complement uint)]
         runAll (Prime 13) (program (fromInteger x)) [] [] expected
 
   describe "conjunction" $ do

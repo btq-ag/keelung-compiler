@@ -6,7 +6,7 @@ module Test.Compilation.UInt.CLMul (tests, run) where
 
 import Data.Word
 import Keelung hiding (compile)
-import Keelung.Interpreter.Arithmetics qualified as U
+import Keelung.Data.U qualified as U
 import Test.Hspec
 import Test.Compilation.Util
 import Test.QuickCheck hiding ((.&.))
@@ -27,7 +27,7 @@ tests =
             y <- choose (-63, 63)
             return (x, y)
       forAll genPair $ \(x, y) -> do
-        let expected = [U.uintValue (U.integerCLMulU (U.new 6 x) (U.new 6 y))]
+        let expected = [U.uValue (U.clMul (U.new 6 x) (U.new 6 y))]
         runAll (Prime 5) (program (fromInteger x) (fromInteger y)) [] [] expected
         runAll (Prime 257) (program (fromInteger x) (fromInteger y)) [] [] expected
 
@@ -37,7 +37,7 @@ tests =
             y <- inputUInt @8 Public
             return $ x .*. y
       forAll arbitrary $ \(x :: Word8, y :: Word8) -> do
-        let expected = [U.uintValue (U.integerCLMulU (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
+        let expected = [U.uValue (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
         runAll (Prime 17) program [toInteger x, toInteger y] [] expected
         runAll (Prime 257) program [toInteger x, toInteger y] [] expected
         runAll (Prime 1031) program [toInteger x, toInteger y] [] expected
@@ -48,7 +48,7 @@ tests =
     --             y <- inputUInt @64 Public
     --             return $ x .*. y
     --       forAll arbitrary $ \(x :: Word64, y :: Word64) -> do
-    --         let expected = [U.uintValue (U.integerCLMulU (U.new 64 (toInteger x)) (U.new 64 (toInteger y)))]
+    --         let expected = [U.uValue (U.clMul (U.new 64 (toInteger x)) (U.new 64 (toInteger y)))]
     --         --   runAll (Prime 17) program [toInteger x, toInteger y] [] expected
     --         --   runAll (Prime 1031) program [toInteger x, toInteger y] [] expected
     --         runAll gf181 program [toInteger x, toInteger y] [] expected
@@ -62,7 +62,7 @@ tests =
             y <- (arbitrary :: Gen Word8)
             return (toInteger x, toInteger y)
       forAll genPair $ \(x, y) -> do
-        let expected = [U.uintValue (U.integerCLMulU (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
+        let expected = [U.uValue (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
         runAll (Prime 17) (program y) [x] [] expected
         runAll (Prime 257) (program y) [x] [] expected
         runAll (Prime 1031) (program y) [x] [] expected
@@ -78,7 +78,7 @@ tests =
             c <- (arbitrary :: Gen Word8)
             return (toInteger x, toInteger y, toInteger c)
       forAll genPair $ \(x, y, c) -> do
-        let expected = [U.uintValue (U.new 8 (toInteger x) `U.integerCLMulU` U.new 8 (toInteger y) `U.integerCLMulU` U.new 8 (toInteger c))]
+        let expected = [U.uValue (U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger c))]
         runAll (Prime 17) (program c) [x, y] [] expected
         runAll (Prime 257) (program c) [x, y] [] expected
         runAll (Prime 1031) (program c) [x, y] [] expected
@@ -96,7 +96,7 @@ tests =
             c <- (arbitrary :: Gen Word8)
             return (toInteger x, toInteger y, toInteger z, toInteger c)
       forAll genPair $ \(x, y, z, c) -> do
-        let expected = [U.uintValue (U.new 8 (toInteger x) `U.integerCLMulU` U.new 8 (toInteger y) `U.integerCLMulU` U.new 8 (toInteger z) `U.integerCLMulU` U.new 8 (toInteger c))]
+        let expected = [U.uValue (U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger z) `U.clMul` U.new 8 (toInteger c))]
         runAll (Prime 17) (program c) [x, y, z] [] expected
         runAll (Prime 257) (program c) [x, y, z] [] expected
         runAll (Prime 1031) (program c) [x, y, z] [] expected

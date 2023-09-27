@@ -19,8 +19,8 @@ import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Data.Reference
-import Keelung.Interpreter.Arithmetics (U)
-import Keelung.Interpreter.Arithmetics qualified as U
+import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Prelude hiding (lookup)
 
 type UIntRelations =

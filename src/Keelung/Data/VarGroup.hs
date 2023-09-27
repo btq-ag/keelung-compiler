@@ -25,7 +25,7 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Util hiding (Witness)
 import Keelung.Data.N (N (N))
 import Keelung.Data.Struct
-import Keelung.Interpreter.Arithmetics (U (..))
+import Keelung.Data.U (U (..))
 import Keelung.Syntax (Width)
 import Keelung.Syntax.Counters
 
@@ -153,7 +153,7 @@ convertWitness :: Integral a => Witness a Bool U -> Witness Integer Integer Inte
 convertWitness (VarGroups o i p x) = VarGroups (convertStruct o) (convertStruct i) (convertStruct p) (convertStruct x)
   where
     convertStruct :: Integral a => Struct (Vector a) (Vector Bool) (Vector U) -> Struct (Vector Integer) (Vector Integer) (Vector Integer)
-    convertStruct (Struct f b us) = Struct (fmap toInteger f) (fmap (\val -> if val then 1 else 0) b) (IntMap.map (fmap uintValue) us)
+    convertStruct (Struct f b us) = Struct (fmap toInteger f) (fmap (\val -> if val then 1 else 0) b) (IntMap.map (fmap uValue) us)
 
 --------------------------------------------------------------------------------
 

@@ -5,7 +5,7 @@ import Data.Field.Galois (GaloisField)
 import Keelung.Compiler.Compile.Boolean qualified as Boolean
 import Keelung.Compiler.Compile.Monad
 import Keelung.Data.Reference
-import Keelung.Interpreter.Arithmetics qualified as U
+import Keelung.Data.U qualified as U
 import Keelung.Syntax (Width)
 
 --------------------------------------------------------------------------------
@@ -14,7 +14,7 @@ import Keelung.Syntax (Width)
 
 compileCLMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileCLMulU width out (Right a) (Right b) = do
-  let val = U.uintValue (U.integerCLMulU (U.new width a) (U.new width b))
+  let val = U.uValue (U.clMul (U.new width a) (U.new width b))
   writeValU out val
 compileCLMulU width out (Right a) (Left b) = do
   temp <- freshRefU width

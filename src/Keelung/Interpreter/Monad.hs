@@ -25,8 +25,8 @@ import Keelung.Data.Struct (Struct (..))
 import Keelung.Data.VarGroup
 import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Heap
-import Keelung.Interpreter.Arithmetics (U)
-import Keelung.Interpreter.Arithmetics qualified as U
+import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 

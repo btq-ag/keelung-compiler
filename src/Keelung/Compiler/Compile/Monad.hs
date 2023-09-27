@@ -21,7 +21,7 @@ import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
-import Keelung.Interpreter.Arithmetics qualified as U
+import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
