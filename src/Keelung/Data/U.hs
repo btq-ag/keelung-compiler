@@ -4,11 +4,6 @@
 module Keelung.Data.U
   ( U (uValue),
     new,
-    add,
-    sub,
-    mul,
-    div,
-    mod,
     modInv,
     clMul,
     clDivMod,
@@ -22,8 +17,6 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Util
 import Keelung.Syntax (HasWidth (..), Width)
-import Prelude hiding (div, mod)
-import Prelude qualified
 
 --------------------------------------------------------------------------------
 
@@ -40,23 +33,24 @@ instance HasWidth U where
   widthOf (U (Just w) _) = w
 
 instance Enum U where
-  toEnum = error "[ panic ] toEnum not implemented for U"
-  fromEnum = error "[ panic ] fromEnum not implemented for U"
+  toEnum = fromIntegral
+  fromEnum = fromIntegral
 
--- instance Num U where
---   a + b = U (uWidth a) ((uValue a + uValue b) `mod` 2 ^ uWidth a)
---   a - b = U (uWidth a) ((uValue a - uValue b) `mod` 2 ^ uWidth a)
---   a * b = U (uWidth a) ((uValue a * uValue b) `mod` 2 ^ uWidth a)
---   abs = id
---   signum = const 1
---   fromInteger _ = error "[ panic ] fromInteger not implemented for U"
+instance Num U where
+  (+) = add
+  (-) = sub
+  (*) = mul
+  abs = id
+  signum = const 1
+  fromInteger = U (Just 32)
 
--- instance Real U where
---   toRational = toRational . uValue
+instance Real U where
+  toRational = toRational . uValue
 
--- instance Integral U where
---   toInteger = uValue
---   quotRem a b = (U (uWidth a) (uValue a `quot` uValue b), U (uWidth a) (uValue a `rem` uValue b))
+instance Integral U where
+  toInteger = uValue
+  quotRem = divModU
+  divMod = divModU
 
 --------------------------------------------------------------------------------
 
@@ -80,14 +74,12 @@ mul a b =
   let width = mergeWidths a b
    in U (Just width) ((uValue a * uValue b) `Prelude.mod` 2 ^ width)
 
-div :: U -> U -> U
-div a b =
-  if uValue b == 0
-    then error "[ panic ] U.div: division by zero in "
-    else U (Just (mergeWidths a b)) (uValue a `Prelude.div` uValue b)
-
-mod :: U -> U -> U
-mod a b = U (Just (mergeWidths a b)) (uValue a `Prelude.mod` uValue b)
+divModU :: U -> U -> (U, U)
+divModU a b
+  | uValue b == 0 = error "[ panic ] U.divMod: division by zero"
+  | otherwise =
+      let width = mergeWidths a b
+       in (U (Just width) (uValue a `Prelude.div` uValue b), U (Just width) (uValue a `Prelude.mod` uValue b))
 
 -- | Carry-less multiplication of two unsigned integers.
 clMul :: U -> U -> U

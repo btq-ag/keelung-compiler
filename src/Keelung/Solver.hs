@@ -308,8 +308,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           when (U.uValue divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
-          let expectedQuotientVal = dividendVal `U.div` divisorVal
-              expectedRemainderVal = dividendVal `U.mod` divisorVal
+          let (expectedQuotientVal, expectedRemainderVal) = dividendVal `divMod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError ConflictingValues
           when (expectedRemainderVal /= actualRemainderVal) $
@@ -319,8 +318,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           when (U.uValue divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
-          let expectedQuotientVal = dividendVal `U.div` divisorVal
-              expectedRemainderVal = dividendVal `U.mod` divisorVal
+          let (expectedQuotientVal, expectedRemainderVal) = dividendVal `divMod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError ConflictingValues
           bindBitsEither "remainder" remainderVar expectedRemainderVal
@@ -329,8 +327,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           when (U.uValue divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
-          let expectedQuotientVal = dividendVal `U.div` divisorVal
-              expectedRemainderVal = dividendVal `U.mod` divisorVal
+          let (expectedQuotientVal, expectedRemainderVal) = dividendVal `divMod` divisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
           bindBitsEither "quotient" quotientVar expectedQuotientVal
@@ -339,14 +336,13 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
           when (U.uValue divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
-          let expectedQuotientVal = dividendVal `U.div` divisorVal
-              expectedRemainderVal = dividendVal `U.mod` divisorVal
+          let (expectedQuotientVal, expectedRemainderVal) = dividendVal `divMod` divisorVal
           bindBitsEither "quotient" quotientVar expectedQuotientVal
           bindBitsEither "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Just actualRemainderVal) -> do
-          let expectedDivisorVal = dividendVal `U.div` actualQuotientVal
-              expectedRemainderVal = dividendVal `U.mod` expectedDivisorVal
+          let expectedDivisorVal = dividendVal `div` actualQuotientVal
+              expectedRemainderVal = dividendVal `mod` expectedDivisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
           bindBitsEither "divisor" divisorVar expectedDivisorVal
@@ -361,7 +357,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
               else
                 if U.uValue dividendVal == 0
                   then throwError $ DividendIsZeroError dividendVar
-                  else return (dividendVal `U.div` actualQuotientVal, dividendVal `U.mod` actualQuotientVal)
+                  else return (dividendVal `divMod` actualQuotientVal)
           bindBitsEither "divisor" divisorVar expectedDivisorVal
           bindBitsEither "remainder" remainderVar expectedRemainderVal
           return Eliminated
@@ -371,7 +367,7 @@ shrinkDivMod (dividendVar, divisorVar, quotientVar, remainderVar) = do
       case (divisorResult, quotientResult, remainderResult) of
         -- divisor, quotient, and remainder are all known
         (Just divisorVal, Just quotientVal, Just remainderVal) -> do
-          let dividendVal = (divisorVal `U.mul` quotientVal) `U.add` remainderVal
+          let dividendVal = divisorVal * quotientVal + remainderVal
           bindBitsEither "divident" dividendVar dividendVal
           return Eliminated
         _ -> do
@@ -401,7 +397,7 @@ shrinkModInv (aVar, outVar, nVar, p) = do
         Just result -> do
           let (width, _) = aVar
           -- aVal * result = n * p + 1
-          let nVal = (aVal `U.mul` U.new width result `U.sub` U.new width 1) `U.div` U.new width p
+          let nVal = (aVal * U.new width result - U.new width 1) `div` U.new width p
           bindBitsEither "ModInv n" nVar nVal
           bindBitsEither "ModInv" outVar (U.new width result)
           return Eliminated

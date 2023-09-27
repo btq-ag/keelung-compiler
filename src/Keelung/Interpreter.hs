@@ -89,8 +89,8 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
         (Right divisorVal, Right actualQuotientVal, Right actualRemainderVal) -> do
           when (U.uValue divisorVal == 0) $
             throwError DivModDivisorIsZeroError
-          let expectedQuotientVal = dividendVal `U.div` divisorVal
-              expectedRemainderVal = dividendVal `U.mod` divisorVal
+          let expectedQuotientVal = dividendVal `div` divisorVal
+              expectedRemainderVal = dividendVal `mod` divisorVal
           if expectedQuotientVal == actualQuotientVal
             then return ()
             else throwError $ DivModQuotientError (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedQuotientVal) (U.uValue actualQuotientVal)
@@ -100,15 +100,15 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
         (Right divisorVal, Left quotientVar, Left remainderVar) -> do
           when (U.uValue divisorVal == 0) $
             throwError DivModDivisorIsZeroError
-          let quotientVal = dividendVal `U.div` divisorVal
-              remainderVal = dividendVal `U.mod` divisorVal
+          let quotientVal = dividendVal `div` divisorVal
+              remainderVal = dividendVal `mod` divisorVal
           addU width quotientVar [quotientVal]
           addU width remainderVar [remainderVal]
         (Right divisorVal, Left quotientVar, Right actualRemainderVal) -> do
           when (U.uValue divisorVal == 0) $
             throwError DivModDivisorIsZeroError
-          let quotientVal = dividendVal `U.div` divisorVal
-              expectedRemainderVal = dividendVal `U.mod` divisorVal
+          let quotientVal = dividendVal `div` divisorVal
+              expectedRemainderVal = dividendVal `mod` divisorVal
           if expectedRemainderVal == actualRemainderVal
             then addU width quotientVar [quotientVal]
             else throwError $ DivModRemainderError (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedRemainderVal) (U.uValue actualRemainderVal)
@@ -122,12 +122,12 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
               else
                 if U.uValue dividendVal == 0
                   then throwError DivModDividendIsZeroError
-                  else return (dividendVal `U.div` quotientVal, dividendVal `U.mod` quotientVal)
+                  else return (dividendVal `divMod` quotientVal)
           addU width divisorVar [divisorVal]
           addU width remainderVar [remainderVal]
         (Left divisorVar, Right quotientVal, Right actualRemainderVal) -> do
-          let divisorVal = dividendVal `U.div` quotientVal
-              expectedRemainderVal = dividendVal `U.mod` divisorVal
+          let divisorVal = dividendVal `div` quotientVal
+              expectedRemainderVal = dividendVal `mod` divisorVal
           if expectedRemainderVal == actualRemainderVal
             then addU width divisorVar [divisorVal]
             else throwError $ DivModRemainderError (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedRemainderVal) (U.uValue actualRemainderVal)
@@ -300,10 +300,10 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
     VarU w var -> pure <$> lookupU w var
     VarUI w var -> pure <$> lookupUI w var
     VarUP w var -> pure <$> lookupUP w var
-    AddU _ x y -> zipWith U.add <$> interpretU x <*> interpretU y
-    SubU _ x y -> zipWith U.sub <$> interpretU x <*> interpretU y
+    AddU _ x y -> zipWith (+) <$> interpretU x <*> interpretU y
+    SubU _ x y -> zipWith (-) <$> interpretU x <*> interpretU y
     CLMulU _ x y -> zipWith U.clMul <$> interpretU x <*> interpretU y
-    MulU _ x y -> zipWith U.mul <$> interpretU x <*> interpretU y
+    MulU _ x y -> zipWith (*) <$> interpretU x <*> interpretU y
     MMIU w x p -> do
       x' <- map U.uValue <$> interpretU x
       case x' of
