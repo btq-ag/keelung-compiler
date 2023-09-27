@@ -11,7 +11,7 @@ module Keelung.Data.U
     mod,
     modInv,
     clMul,
-    -- integerCLModU,
+    clDivMod,
     chunks,
   )
 where
@@ -20,6 +20,7 @@ import Control.DeepSeq (NFData)
 import Data.Bits (Bits (..))
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung.Compiler.Compile.Util
 import Keelung.Syntax (Width)
 import Prelude hiding (div, mod)
 import Prelude qualified
@@ -72,7 +73,7 @@ mul a b = UVal (uWidth a) ((uValue a * uValue b) `Prelude.mod` 2 ^ uWidth a)
 div :: U -> U -> U
 div a b =
   if uValue b == 0
-    then error "[ panic ] division by zero in U.integerDivU"
+    then error "[ panic ] U.div: division by zero in "
     else UVal (uWidth a) (uValue a `Prelude.div` uValue b)
 
 mod :: U -> U -> U
@@ -93,20 +94,28 @@ clMul a b = UVal width result
     result :: Integer
     result = foldl (\acc i -> if bits i then Data.Bits.setBit acc i else acc) 0 [0 .. width - 1]
 
--- -- | Carry-less modulo of two unsigned integers.
--- integerCLModU :: U -> U -> U
--- integerCLModU a b
---  | uValue b == 0 = error "[ panic ] U.integerCLModU: division by zero"
---  | otherwise = UVal width result
---   where
---     width :: Width
---     width = uWidth a
+-- | Carry-less DivMod of two unsigned integers.
+clDivMod :: U -> U -> (U, U)
+clDivMod a b
+  | uValue b == 0 = error "[ panic ] U.clDivMod: division by zero"
+  | otherwise =
+      let (quotient, remainder) = longDivision (uValue a) (uValue b)
+       in (UVal width quotient, UVal width remainder)
+  where
+    width :: Width
+    width = uWidth a
 
---     widthOfDivisor :: Width
---     widthOfDivisor = widthOfInteger (uValue b)
-
---     result :: Integer
---     result = _
+    -- schoolbook long division
+    longDivision :: Integer -> Integer -> (Integer, Integer)
+    longDivision dividend divisor =
+      let dividendWidth = widthOfInteger dividend
+          divisorWidth = widthOfInteger divisor
+       in if divisorWidth > dividendWidth
+            then (0, dividend)
+            else
+              let power = dividendWidth - divisorWidth
+                  (quotient, remainder) = longDivision (dividend `Data.Bits.xor` (divisor `Data.Bits.shiftL` power)) divisor
+               in (quotient `Data.Bits.setBit` power, remainder)
 
 instance Bits U where
   (.&.) = bitWiseAndU
