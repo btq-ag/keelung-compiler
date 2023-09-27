@@ -4,9 +4,9 @@ module Test.Compilation.UInt.ModInv (tests, run) where
 
 import Keelung hiding (compile)
 import Keelung.Interpreter.Arithmetics qualified as Arith
+import Test.Compilation.Util
 import Test.HUnit
 import Test.Hspec
-import Test.Compilation.Util
 import Test.QuickCheck
 
 run :: IO ()
@@ -38,7 +38,8 @@ tests =
             x <- input Public :: Comp (UInt 32)
             return $ modInv x prime
       let genPair = do
-            a <- choose (1, prime)
+            -- only choosing from 1 to prime - 1
+            a <- choose (1, prime - 1)
             let expected = Arith.modInv a prime
             return (a, expected)
       forAll genPair $ \(a, result) -> do
@@ -47,7 +48,6 @@ tests =
           Just inverse -> do
             let expected = [fromInteger inverse]
             runAll gf181 program [a] [] expected
-    -- runAll (Prime 17) program [a] [] expected
 
     it "modInv 345 (mod 7919)" $ do
       let program = return $ modInv (345 :: UInt 32) 7919
