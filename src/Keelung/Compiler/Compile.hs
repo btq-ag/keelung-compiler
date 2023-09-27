@@ -12,13 +12,13 @@ import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Compile.Boolean qualified as Boolean
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Field qualified as Field
-import Keelung.Data.LC
+import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt qualified as UInt
-import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo (FieldInfo)
+import Keelung.Data.LC
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Syntax (widthOf)

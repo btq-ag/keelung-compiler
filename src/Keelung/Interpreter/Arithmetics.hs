@@ -8,9 +8,10 @@ module Keelung.Interpreter.Arithmetics
     integerAddU,
     integerSubU,
     integerMulU,
-    integerCLMulU,
     integerDivU,
     integerModU,
+    integerCLMulU,
+    -- integerCLModU,
     modInv,
   )
 where
@@ -20,6 +21,8 @@ import Data.Bits (Bits (..))
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Syntax (Width)
+
+-- import Keelung.Compiler.Compile.Util
 
 --------------------------------------------------------------------------------
 
@@ -80,6 +83,21 @@ integerCLMulU a b = UVal width result
     -- assemble the bits
     result :: Integer
     result = foldl (\acc i -> if bits i then Data.Bits.setBit acc i else acc) 0 [0 .. width - 1]
+
+-- -- | Carry-less modulo of two unsigned integers.
+-- integerCLModU :: U -> U -> U
+-- integerCLModU a b
+--  | uintValue b == 0 = error "[ panic ] U.integerCLModU: division by zero"
+--  | otherwise = UVal width result
+--   where
+--     width :: Width
+--     width = uintWidth a
+
+--     widthOfDivisor :: Width
+--     widthOfDivisor = widthOfInteger (uintValue b)
+
+--     result :: Integer
+--     result = _
 
 integerDivU :: U -> U -> U
 integerDivU a b =

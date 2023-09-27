@@ -12,6 +12,7 @@ import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn (LimbColumn))
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
+import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo

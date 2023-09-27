@@ -20,6 +20,7 @@ import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
+import Keelung.Compiler.Compile.Monad
 
 compile :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> ExprB n -> M n (Either RefB Bool)
 compile compileU expr = case expr of

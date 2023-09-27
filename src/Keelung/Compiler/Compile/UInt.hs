@@ -15,11 +15,11 @@ import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Keelung.Compiler.Compile.Error qualified as Error
+import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.Compile.UInt.CLMul
 import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.Multiplication
-import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference
 import Keelung.Syntax (HasWidth (widthOf))

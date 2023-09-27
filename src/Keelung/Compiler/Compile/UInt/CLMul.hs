@@ -3,7 +3,7 @@ module Keelung.Compiler.Compile.UInt.CLMul (compileCLMulU) where
 import Control.Monad.Except
 import Data.Field.Galois (GaloisField)
 import Keelung.Compiler.Compile.Boolean qualified as Boolean
-import Keelung.Compiler.Compile.Util
+import Keelung.Compiler.Compile.Monad
 import Keelung.Data.Reference
 import Keelung.Interpreter.Arithmetics qualified as U
 import Keelung.Syntax (Width)

@@ -3,11 +3,11 @@ module Keelung.Compiler.Compile.Field (compile) where
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.Sequence (Seq (..))
-import Keelung.Data.LC
-import Keelung.Compiler.Compile.Util
+import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.LC
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
-import qualified Keelung.Data.PolyL as PolyL
 
 ----------------------------------------------------------------
 

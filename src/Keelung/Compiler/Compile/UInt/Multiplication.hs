@@ -9,8 +9,8 @@ import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
+import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt.Addition
-import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
@@ -113,9 +113,9 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
         (a, [(x, 1)])
         (b, [(y, 1)])
         ( 0,
-            [ (lowerLimb, 1),
-              (upperLimb, 2 ^ currentLimbWidth)
-            ]
+          [ (lowerLimb, 1),
+            (upperLimb, 2 ^ currentLimbWidth)
+          ]
         )
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
 

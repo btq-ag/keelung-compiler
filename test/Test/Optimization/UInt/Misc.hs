@@ -28,8 +28,8 @@ tests = describe "Misc" $ do
       -- print cs'
       -- print $ linkConstraintModule cs'
 
-      _cs `shouldHaveSize` 92
-      cs' `shouldHaveSize` 92
+      _cs `shouldHaveSize` 91
+      cs' `shouldHaveSize` 87
 
 -- it "1 variable / 1 constant" $ do
 --   -- constraint breakdown:
