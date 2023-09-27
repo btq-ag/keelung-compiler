@@ -173,8 +173,9 @@ tests = do
           y <- input Public :: Comp (UInt 8)
           return (x .*. y)
         -- print $ linkConstraintModule cs'
-        cs `shouldHaveSize` 93
-        cs' `shouldHaveSize` 91
+        cs `shouldHaveSize` 92
+        cs' `shouldHaveSize` 92
+
     describe "Constants" $ do
       -- TODO: should be just 4
       it "`return 0`" $ do

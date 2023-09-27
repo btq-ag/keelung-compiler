@@ -7,14 +7,17 @@ import Data.Bits qualified
 import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.List.Split qualified as List
+import Data.Maybe qualified
 import Data.Sequence qualified as Seq
 import Keelung (HasWidth (widthOf))
-import Keelung.Data.LC
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
+import Keelung.Data.LC
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 
@@ -229,47 +232,31 @@ orBs xs =
           let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece))
           mapM (eqZero False . seqToLC) pieces >>= orBs
 
--- xorB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
--- xorB (Right True) (Right True) = return $ Right False
--- xorB (Right True) (Right False) = return $ Right True
--- xorB (Right False) (Right True) = return $ Right True
--- xorB (Right False) (Right False) = return $ Right False
--- xorB (Right True) (Left y) = do
---   out <- freshRefB
---   writeNEqB out y
---   return $ Left out
--- xorB (Right False) (Left y) = return $ Left y
--- xorB (Left x) (Right y) = xorB (Right y) (Left x)
--- xorB (Left x) (Left y) = do
---   -- (1 - 2x) * (y + 1) = (1 + out - 3x)
---   out <- freshRefB
---   writeMul
---     (1, [(B x, -2)])
---     (1, [(B y, 1)])
---     (1, [(B x, -3), (B out, 1)])
---   return $ Left out
-
--- | Naive O(n) way of computing XOR of a list of Boolean values. TODO: optimize this to O(1)
+-- | O(lg n) XOR
+--
+--    There two ways of calculating consecutive XORs:
+--      * O(n)    linear fold       : a + b - 2ab
+--      * O(lg n) divide and conquer: if the sum of operands is odd then 1 else 0
+--
+--    Cost of these two approaches:
+--      arity     linear fold       divide and conquer
+--      2         1             <   2
+--      3         2             =   2
+--      4         3             =   3
+--      5         4             >   3
 xorBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
--- xorBs [] = return (Right False)
--- xorBs [x] = return x
--- xorBs [x, y] = xorB x y
--- xorBs xs = xorB x y
-xorBs xs =
-  let (vars, constants) = Either.partitionEithers xs
-      constantVal = odd (length (filter id constants)) -- if number of True is odd
-   in if constantVal
-        then do
-          -- flip the result
-          result <- go vars
-          case result of
-            Right False -> return $ Right True
-            Right True -> return $ Right False
-            Left var -> do
-              out <- freshRefB
-              writeNEqB var out
-              return $ Left out
-        else go vars
+xorBs xs = do
+  -- if the order of field is 2, then we can't use the divide and conquer approach
+  order <- gets (FieldInfo.fieldOrder . cmField)
+  if order == 2
+    then linearFold xs
+    else do
+      -- separate the operands into variables and constants
+      let (vars, constants) = Either.partitionEithers xs
+          constantVal = odd (length (filter id constants)) -- if number of True is odd
+      if constantVal
+        then divideAndConquer (fromInteger order) vars >>= flipResult
+        else divideAndConquer (fromInteger order) vars
   where
     xorB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
     xorB x y = do
@@ -281,33 +268,49 @@ xorBs xs =
         (1, [(B x, -3), (B out, 1)])
       return out
 
+    flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
+    flipResult (Right False) = return $ Right True
+    flipResult (Right True) = return $ Right False
+    flipResult (Left var) = do
+      out <- freshRefB
+      writeNEqB var out
+      return $ Left out
+
+    -- the degenrate case, divide and conquer won't terminate, use a linear fold instead
+    linearFold :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
+    linearFold [] = return $ Right False
+    linearFold (Right True : vars) = linearFold vars >>= flipResult
+    linearFold (Right False : vars) = linearFold vars
+    linearFold (Left var : vars) = do
+      result <- linearFold vars
+      case result of
+        Right False -> return (Left var)
+        Right True -> flipResult (Left var)
+        Left resultVar -> Left <$> xorB var resultVar
+
     -- rewrite as even/odd relationship instead:
     --      if the sum of all operands is even then 0 else 1
-    go :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
-    go [] = return $ Right False
-    go [var] = return $ Left var
-    go [var1, var2] = Left <$> xorB var1 var2
-    go (var : vars) = do
+    divideAndConquer :: (GaloisField n, Integral n) => Int -> [RefB] -> M n (Either RefB Bool)
+    divideAndConquer order vars = do
       -- split operands into chunks in case that the order of field is too small
       -- each chunks has at most (order - 1) operands
-      order <- gets (FieldInfo.fieldOrder . cmField)
-      if order == 2
-        then do
-          -- the degenrate case, recursion won't terminate, all field elements are also Boolean
-          result <- go vars
-          case result of
-            Right False -> return $ Right False
-            Right True -> return $ Left var
-            Left resultVar -> Left <$> xorB var resultVar
-        else do
-          let chunks = List.chunksOf (fromInteger order - 1) (var : vars)
-          mapM compileChunk chunks >>= xorBs
+      let lists = List.chunksOf (order - 1) vars
+      let nonEmptyChunks = Data.Maybe.mapMaybe NonEmpty.nonEmpty lists
 
-    compileChunk :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
-    compileChunk [] = return $ Right False
-    compileChunk [var] = return $ Left var
-    compileChunk [var1, var2] = Left <$> xorB var1 var2
-    compileChunk vars = do
+      case nonEmptyChunks of
+        [] -> return $ Right False
+        [var NonEmpty.:| []] -> do
+          return $ Left var
+        _ -> do
+          mapM compileChunk nonEmptyChunks >>= divideAndConquer order
+
+    compileChunk :: (GaloisField n, Integral n) => NonEmpty RefB -> M n RefB
+    compileChunk (var1 NonEmpty.:| []) = return var1
+    compileChunk (var1 NonEmpty.:| [var2]) = xorB var1 var2
+    compileChunk (var1 NonEmpty.:| [var2, var3]) = xorB var1 var2 >>= xorB var3
+    compileChunk (var1 NonEmpty.:| [var2, var3, var4]) = xorB var1 var2 >>= xorB var3 >>= xorB var4
+    compileChunk (var NonEmpty.:| vars') = do
+      let vars = var : vars'
       -- devise an unsigned integer for expressing the sum of vars
       let width = widthOfInteger (toInteger (length vars))
       refU <- freshRefU width
@@ -318,7 +321,7 @@ xorBs xs =
       -- equate the LC with the unsigned integer
       writeAddWithLCAndLimbs lc 0 (map (,-1) limbs)
       -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
-      return $ Left $ RefUBit width refU 0
+      return $ RefUBit width refU 0
 
 -- -- | See if a LC is odd.
 -- isOdd :: (GaloisField n, Integral n) => LC n -> M n (Either RefB Bool)

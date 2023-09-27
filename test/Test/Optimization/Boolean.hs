@@ -118,19 +118,46 @@ tests = do
         cs `shouldHaveSize` 2
         cs' `shouldHaveSize` 2
 
+      it "1 variable" $ do
+        (cs, cs') <- executeGF181 $ do
+          xs <- inputList Public 1 :: Comp [Boolean]
+          return $ foldl (.^.) false xs
+        cs `shouldHaveSize` 3
+        cs' `shouldHaveSize` 3
+
       it "2 variables" $ do
         (cs, cs') <- executeGF181 $ do
           xs <- inputList Public 2 :: Comp [Boolean]
           return $ foldl (.^.) false xs
         cs `shouldHaveSize` 5
-        cs' `shouldHaveSize` 4
-
-      it "10 variables" $ do
+        cs' `shouldHaveSize` 4 -- 3 + 1
+      it "3 variables" $ do
         (cs, cs') <- executeGF181 $ do
-          xs <- inputList Public 10 :: Comp [Boolean]
+          xs <- inputList Public 3 :: Comp [Boolean]
           return $ foldl (.^.) false xs
-        cs `shouldHaveSize` 13
-        cs' `shouldHaveSize` 12
+        cs `shouldHaveSize` 7
+        cs' `shouldHaveSize` 6 -- 4 + 2
+    it "4 variables" $ do
+      (cs, cs') <- executeGF181 $ do
+        xs <- inputList Public 4 :: Comp [Boolean]
+        return $ foldl (.^.) false xs
+      cs `shouldHaveSize` 9
+      cs' `shouldHaveSize` 8
+
+    -- TODO: should be just 9
+    it "5 variables" $ do
+      (cs, cs') <- executeGF181 $ do
+        xs <- inputList Public 5 :: Comp [Boolean]
+        return $ foldl (.^.) false xs
+      cs `shouldHaveSize` 11
+      cs' `shouldHaveSize` 11
+
+    it "10 variables" $ do
+      (cs, cs') <- executeGF181 $ do
+        xs <- inputList Public 10 :: Comp [Boolean]
+        return $ foldl (.^.) false xs
+      cs `shouldHaveSize` 17
+      cs' `shouldHaveSize` 17
 
 --------------------------------------------------------------------------------
 
