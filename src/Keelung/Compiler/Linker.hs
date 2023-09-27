@@ -167,7 +167,7 @@ linkConstraintModule cm =
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
     fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB occurrences (RefUBit width var 0)))
-    fromEitherRefU (Right val) = let width = U.uWidth val in (width, Right (U.uValue val))
+    fromEitherRefU (Right val) = let width = widthOf val in (width, Right (U.uValue val))
 
     divMods = map (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) $ cmDivMods cm
     modInvs = map (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, U.uValue p)) $ cmModInvs cm

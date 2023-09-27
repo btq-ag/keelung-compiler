@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Data.U
-  ( U (uWidth, uValue),
+  ( U (uValue),
     new,
     add,
     sub,
@@ -21,28 +21,32 @@ import Data.Bits (Bits (..))
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Util
-import Keelung.Syntax (Width)
+import Keelung.Syntax (HasWidth (..), Width)
 import Prelude hiding (div, mod)
 import Prelude qualified
 
 --------------------------------------------------------------------------------
 
-data U = UVal {uWidth :: Width, uValue :: Integer}
+data U = U {uWidth :: Maybe Width, uValue :: Integer}
   deriving (Eq, Ord, Generic, NFData)
 
 instance Serialize U
 
 instance Show U where
-  show (UVal _ value) = show value
+  show (U _ value) = show value
+
+instance HasWidth U where
+  widthOf (U Nothing _) = 32 -- default width is 32
+  widthOf (U (Just w) _) = w
 
 instance Enum U where
   toEnum = error "[ panic ] toEnum not implemented for U"
   fromEnum = error "[ panic ] fromEnum not implemented for U"
 
 -- instance Num U where
---   a + b = UVal (uWidth a) ((uValue a + uValue b) `mod` 2 ^ uWidth a)
---   a - b = UVal (uWidth a) ((uValue a - uValue b) `mod` 2 ^ uWidth a)
---   a * b = UVal (uWidth a) ((uValue a * uValue b) `mod` 2 ^ uWidth a)
+--   a + b = U (uWidth a) ((uValue a + uValue b) `mod` 2 ^ uWidth a)
+--   a - b = U (uWidth a) ((uValue a - uValue b) `mod` 2 ^ uWidth a)
+--   a * b = U (uWidth a) ((uValue a * uValue b) `mod` 2 ^ uWidth a)
 --   abs = id
 --   signum = const 1
 --   fromInteger _ = error "[ panic ] fromInteger not implemented for U"
@@ -52,39 +56,45 @@ instance Enum U where
 
 -- instance Integral U where
 --   toInteger = uValue
---   quotRem a b = (UVal (uWidth a) (uValue a `quot` uValue b), UVal (uWidth a) (uValue a `rem` uValue b))
+--   quotRem a b = (U (uWidth a) (uValue a `quot` uValue b), U (uWidth a) (uValue a `rem` uValue b))
 
 --------------------------------------------------------------------------------
 
 new :: Width -> Integer -> U
-new width value = UVal width (value `Prelude.mod` (2 ^ width))
+new width value = U (Just width) (value `Prelude.mod` (2 ^ width))
 
 --------------------------------------------------------------------------------
 
 add :: U -> U -> U
-add a b = UVal (uWidth a) ((uValue a + uValue b) `Prelude.mod` 2 ^ uWidth a)
+add a b =
+  let width = mergeWidths a b
+   in U (Just width) ((uValue a + uValue b) `Prelude.mod` 2 ^ width)
 
 sub :: U -> U -> U
-sub a b = UVal (uWidth a) ((uValue a - uValue b) `Prelude.mod` 2 ^ uWidth a)
+sub a b =
+  let width = mergeWidths a b
+   in U (Just width) ((uValue a - uValue b) `Prelude.mod` 2 ^ width)
 
 mul :: U -> U -> U
-mul a b = UVal (uWidth a) ((uValue a * uValue b) `Prelude.mod` 2 ^ uWidth a)
+mul a b =
+  let width = mergeWidths a b
+   in U (Just width) ((uValue a * uValue b) `Prelude.mod` 2 ^ width)
 
 div :: U -> U -> U
 div a b =
   if uValue b == 0
     then error "[ panic ] U.div: division by zero in "
-    else UVal (uWidth a) (uValue a `Prelude.div` uValue b)
+    else U (Just (mergeWidths a b)) (uValue a `Prelude.div` uValue b)
 
 mod :: U -> U -> U
-mod a b = UVal (uWidth a) (uValue a `Prelude.mod` uValue b)
+mod a b = U (Just (mergeWidths a b)) (uValue a `Prelude.mod` uValue b)
 
 -- | Carry-less multiplication of two unsigned integers.
 clMul :: U -> U -> U
-clMul a b = UVal width result
+clMul a b = U (Just width) result
   where
     width :: Width
-    width = uWidth a
+    width = mergeWidths a b
 
     -- calculate the bits
     bits :: Int -> Bool
@@ -100,10 +110,10 @@ clDivMod a b
   | uValue b == 0 = error "[ panic ] U.clDivMod: division by zero"
   | otherwise =
       let (quotient, remainder) = longDivision (uValue a) (uValue b)
-       in (UVal width quotient, UVal width remainder)
+       in (U width quotient, U width remainder)
   where
-    width :: Width
-    width = uWidth a
+    width :: Maybe Width
+    width = Just (mergeWidths a b)
 
     -- schoolbook long division
     longDivision :: Integer -> Integer -> (Integer, Integer)
@@ -124,34 +134,34 @@ instance Bits U where
   complement = bitWiseNotU
   shift = shiftU
   rotate = rotateU
-  bitSizeMaybe = Just . uWidth
-  bitSize = uWidth
+  bitSizeMaybe = uWidth
+  bitSize = widthOf
   isSigned = const False
   testBit a = testBit (uValue a)
-  bit = UVal 1 . bit
+  bit = U (Just 1) . bit
   popCount = popCount . uValue
   setBit = setBitU
   clearBit = clearBitU
 
 bitWiseAndU :: U -> U -> U
-bitWiseAndU a b = UVal (uWidth a) (uValue a .&. uValue b)
+bitWiseAndU a b = U (Just (mergeWidths a b)) (uValue a .&. uValue b)
 
 bitWiseOrU :: U -> U -> U
-bitWiseOrU a b = UVal (uWidth a) (uValue a .|. uValue b)
+bitWiseOrU a b = U (Just (mergeWidths a b)) (uValue a .|. uValue b)
 
 bitWiseXorU :: U -> U -> U
-bitWiseXorU a b = UVal (uWidth a) (uValue a `xor` uValue b)
+bitWiseXorU a b = U (Just (mergeWidths a b)) (uValue a `xor` uValue b)
 
 bitWiseNotU :: U -> U
-bitWiseNotU a = UVal (uWidth a) (foldl complementBit (fromInteger (uValue a)) [0 .. uWidth a - 1])
+bitWiseNotU a = U (uWidth a) (foldl complementBit (fromInteger (uValue a)) [0 .. widthOf a - 1])
 
 -- | w is the bit width of the result
 --   n is the amount to rotate left by
 --   x is the value to be rotated
 rotateU :: U -> Int -> U
 rotateU a n =
-  let w = uWidth a
-   in UVal
+  let w = widthOf a
+   in U
         (uWidth a)
         ( (uValue a `Data.Bits.shiftL` fromIntegral (n `Prelude.mod` w) Data.Bits..&. (2 ^ w - 1))
             Data.Bits..|. (uValue a `Data.Bits.shiftR` fromIntegral (w - (n `Prelude.mod` w)))
@@ -161,54 +171,31 @@ rotateU a n =
 --   Numbers gets smaller as you shift right
 shiftU :: U -> Int -> U
 shiftU a n =
-  UVal (uWidth a) $
+  U (uWidth a) $
     if n < 0
       then Data.Bits.shiftR (uValue a) (-n)
-      else Data.Bits.shiftL (uValue a) n Data.Bits..&. (2 ^ uWidth a - 1)
+      else Data.Bits.shiftL (uValue a) n Data.Bits..&. (2 ^ widthOf a - 1)
 
 setBitU :: U -> Int -> U
 setBitU x i =
-  let i' = i `Prelude.mod` uWidth x
-   in UVal (uWidth x) (Data.Bits.setBit (uValue x) i')
+  let i' = i `Prelude.mod` widthOf x
+   in U (uWidth x) (Data.Bits.setBit (uValue x) i')
 
 clearBitU :: U -> Int -> U
 clearBitU x i =
-  let i' = i `Prelude.mod` uWidth x
-   in UVal (uWidth x) (Data.Bits.clearBit (uValue x) i')
+  let i' = i `Prelude.mod` widthOf x
+   in U (uWidth x) (Data.Bits.clearBit (uValue x) i')
 
 -- | Split an integer into chunks of a specified size, the last chunk may be smaller.
 chunks :: Int -> U -> [U]
-chunks chunkSize (UVal width num)
+chunks chunkSize (U Nothing num) = chunks chunkSize (U (Just 32) num)
+chunks chunkSize (U (Just width) num)
   | width < 0 = error "[ panic ] U.chunks: Width must be non-negative"
   | width == 0 = []
-  | width < chunkSize = [UVal width num]
-  | otherwise = UVal chunkSize (num .&. mask) : chunks chunkSize (UVal (width - chunkSize) (num `shiftR` chunkSize))
+  | width < chunkSize = [U (Just width) num]
+  | otherwise = U (Just chunkSize) (num .&. mask) : chunks chunkSize (U (Just (width - chunkSize)) (num `shiftR` chunkSize))
   where
     mask = (2 ^ chunkSize) - 1
-
--- splitU :: Int -> U -> [U]
--- splitU size (UVal w x) = map (UVal size) (splitInteger x size w)
---   where
---     -- Split an integer into chunks of a specified size and return both the split chunks
---     -- and the last partial chunk (if it exists).
---     splitInteger :: Integer -> Int -> Int -> ([Integer], Maybe (Integer, Int))
---     splitInteger n chunkSize totalBits
---         | totalBits <= 0 || chunkSize <= 0 = ([], Nothing)
---         | otherwise =
---             let (chunks, lastChunk) = split n chunkSize totalBits []
---             in case lastChunk of
---                 0 -> (chunks, Nothing)  -- The last chunk is full-sized.
---                 _ -> (chunks, Just (last (n `Data.Bits.shiftR` (totalBits - lastChunk)), lastChunk))
-
---     -- Split the integer into chunks and calculate the size of the last chunk.
---     split :: Integer -> Int -> Int -> [Integer] -> ([Integer], Int)
---     split n chunkSize totalBits chunks
---         | totalBits <= 0 = (reverse chunks, 0)
---         | otherwise =
---             let mask = (1 `shiftL` chunkSize) - 1
---                 chunk = n Data.Bits..&. mask
---                 (remainingChunks, lastChunkSize) = split (n `Data.Bits.shiftR` chunkSize) chunkSize (totalBits - chunkSize) (chunk : chunks)
---             in (remainingChunks, chunkSize + lastChunkSize)
 
 --------------------------------------------------------------------------------
 
@@ -227,3 +214,12 @@ modInv x p =
       let (q, r) = a `quotRem` b
           (s, t, g) = gcdExt b r
        in (t, s - q * t, g)
+
+--------------------------------------------------------------------------------
+
+-- | Helper function for joining two widths.
+mergeWidths :: U -> U -> Width
+mergeWidths (U Nothing _) (U Nothing _) = 32
+mergeWidths (U (Just a) _) (U Nothing _) = a
+mergeWidths (U Nothing _) (U (Just b) _) = b
+mergeWidths (U (Just a) _) (U (Just b) _) = a `max` b
