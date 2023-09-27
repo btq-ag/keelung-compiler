@@ -103,6 +103,7 @@ propagateExprU e = do
     AddU w xs -> AddU w <$> mapM (\(x, sign) -> (,sign) <$> propagateExprU x) xs
     MulU w x y -> MulU w <$> propagateExprU x <*> propagateExprU y
     CLMulU w x y -> CLMulU w <$> propagateExprU x <*> propagateExprU y
+    CLModU w x y -> CLModU w <$> propagateExprU x <*> propagateExprU y
     MMIU w x p -> MMIU w <$> propagateExprU x <*> pure p
     AndU w xs -> AndU w <$> mapM propagateExprU xs
     OrU w xs -> OrU w <$> mapM propagateExprU xs

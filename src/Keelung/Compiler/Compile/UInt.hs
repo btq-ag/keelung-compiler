@@ -45,6 +45,10 @@ compile out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileCLMulU w out x' y'
+  CLModU w x y -> do
+    x' <- wireU x
+    y' <- wireU y
+    compileCLMulU w out x' y'
   MMIU w a p -> do
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
     a' <- wireU a
