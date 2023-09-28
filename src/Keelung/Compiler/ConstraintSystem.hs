@@ -91,17 +91,18 @@ data ConstraintSystem n = ConstraintSystem
     csCounters :: Counters,
     csEqZeros :: [(Poly n, Var)],
     csDivMods :: [((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))],
+    csCLDivMods :: [((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))],
     csModInvs :: [((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer)]
   }
   deriving (Eq, Generic, NFData, Functor)
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem _ cs counters _eqs _divMods _modInvs) =
+numberOfConstraints (ConstraintSystem _ cs counters _eqs _divMods _clDivMods _modInvs) =
   length cs + getBooleanConstraintCount counters
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem _ constraints counters _eqs _divMods _modInvs) =
+  show (ConstraintSystem _ constraints counters _eqs _divMods _clDivMods _modInvs) =
     "ConstraintSystem {\n"
       <> prettyConstraints counters (toList constraints)
       <> prettyVariables counters

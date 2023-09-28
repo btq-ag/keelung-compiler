@@ -161,6 +161,8 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
   interpret (DivMod width dividend divisor quotient remainder) = do
     interpretDivMod width (dividend, divisor, quotient, remainder)
     return []
+  interpret (CLDivMod width dividend divisor quotient remainder) = do
+    error "Interpret SideEffect CLDivMod"
   interpret (AssertLTE width value bound) = do
     -- check if the bound is within the range of the UInt
     when (bound < 0) $
@@ -393,6 +395,7 @@ instance FreeVar SideEffect where
   freeVars (AssignmentB var bool) = modifyX (modifyB (IntSet.insert var)) (freeVars bool)
   freeVars (AssignmentU width var uint) = modifyX (modifyU width mempty (IntSet.insert var)) (freeVars uint)
   freeVars (DivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
+  freeVars (CLDivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
   freeVars (AssertLTE _width x _) = freeVars x
   freeVars (AssertLT _width x _) = freeVars x
   freeVars (AssertGTE _width x _) = freeVars x

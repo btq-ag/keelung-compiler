@@ -60,6 +60,9 @@ data ConstraintModule n = ConstraintModule
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
     cmDivMods :: [(Either RefU U, Either RefU U, Either RefU U, Either RefU U)],
+    -- hints for generating witnesses for carry-less DivMod constraints
+    -- a = b .*. q .^. r
+    cmCLDivMods :: [(Either RefU U, Either RefU U, Either RefU U, Either RefU U)],
     -- hints for generating witnesses for ModInv constraints
     cmModInvs :: [(Either RefU U, Either RefU U, Either RefU U, U)]
   }

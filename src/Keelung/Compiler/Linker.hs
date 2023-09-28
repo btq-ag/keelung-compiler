@@ -61,6 +61,7 @@ linkConstraintModule cm =
           <> mulLs,
       csEqZeros = toList eqZeros,
       csDivMods = divMods,
+      csCLDivMods = clDivMods,
       csModInvs = modInvs
     }
   where
@@ -170,6 +171,7 @@ linkConstraintModule cm =
     fromEitherRefU (Right val) = let width = widthOf val in (width, Right (U.uValue val))
 
     divMods = map (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) $ cmDivMods cm
+    clDivMods = map (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) $ cmCLDivMods cm
     modInvs = map (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, U.uValue p)) $ cmModInvs cm
 
 -------------------------------------------------------------------------------

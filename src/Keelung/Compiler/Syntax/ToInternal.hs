@@ -47,6 +47,7 @@ convertSideEffect (T.AssignmentF var val) = AssignmentF var <$> convertExprF val
 convertSideEffect (T.AssignmentB var val) = AssignmentB var <$> convertExprB val
 convertSideEffect (T.AssignmentU width var val) = AssignmentU width var <$> convertExprU val
 convertSideEffect (T.DivMod width dividend divisor quotient remainder) = DivMod width <$> convertExprU dividend <*> convertExprU divisor <*> convertExprU quotient <*> convertExprU remainder
+convertSideEffect (T.CLDivMod width dividend divisor quotient remainder) = CLDivMod width <$> convertExprU dividend <*> convertExprU divisor <*> convertExprU quotient <*> convertExprU remainder
 convertSideEffect (T.AssertLTE width val bound) = AssertLTE width <$> convertExprU val <*> pure bound
 convertSideEffect (T.AssertLT width val bound) = AssertLT width <$> convertExprU val <*> pure bound
 convertSideEffect (T.AssertGTE width val bound) = AssertGTE width <$> convertExprU val <*> pure bound

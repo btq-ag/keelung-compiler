@@ -64,6 +64,7 @@ compileSideEffect (AssignmentF var val) = do
   relateLC (RefFX var) result
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
 compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
+compileSideEffect (CLDivMod width dividend divisor quotient remainder) = error "TODO: CLDivMod"
 compileSideEffect (AssertLTE width value bound) = do
   x <- UInt.wireU value
   UInt.assertLTE width x bound

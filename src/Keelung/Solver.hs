@@ -61,13 +61,14 @@ run' debugMode r1cs inputs = do
 --   3. binary representation constraints
 --   4. CNEQ constraints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Either (Error n) (Seq (Constraint n))
-fromOrdinaryConstraints (R1CS _ ordinaryConstraints counters eqZeros divMods modInvs) = do
+fromOrdinaryConstraints (R1CS _ ordinaryConstraints counters eqZeros divMods clDivMods modInvs) = do
   constraints <- concat <$> mapM differentiate ordinaryConstraints
   return $
     Seq.fromList constraints
       <> Seq.fromList (map BooleanConstraint booleanInputVarConstraints)
       <> Seq.fromList (map EqZeroConstraint eqZeros)
       <> Seq.fromList (map DivModConstaint divMods)
+      <> Seq.fromList (map CLDivModConstaint clDivMods)
       <> Seq.fromList (map ModInvConstraint modInvs)
   where
     booleanInputVarConstraints =
@@ -141,6 +142,7 @@ shrink (AddConstraint as) = do
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod divModTuple
+shrink (CLDivModConstaint divModTuple) = fmap (pure . CLDivModConstaint) <$> shrinkDivMod divModTuple
 shrink (ModInvConstraint modInvHint) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInvHint
 
 shrinkAdd :: (GaloisField n, Integral n) => Poly n -> M n (Result (Constraint n))

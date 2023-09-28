@@ -247,6 +247,7 @@ data SideEffect n
   | AssignmentB Var (ExprB n)
   | AssignmentU Width Var (ExprU n)
   | DivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
+  | CLDivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
   | AssertLTE Width (ExprU n) Integer
   | AssertLT Width (ExprU n) Integer
   | AssertGTE Width (ExprU n) Integer

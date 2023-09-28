@@ -82,6 +82,7 @@ data Constraint n
   | EqZeroConstraint (Poly n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
     DivModConstaint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))
+  | CLDivModConstaint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))
   | ModInvConstraint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer)
   deriving (Eq, Generic, NFData)
 
@@ -101,7 +102,15 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
       <> show quotient
       <> " + $"
       <> show remainder
-  -- show (BinRepConstraint2 segments) = "(BinRep)    " <> show segments
+  show (CLDivModConstaint (dividend, divisor, quotient, remainder)) =
+    "(CLDivMod)    $"
+      <> show dividend
+      <> " = $"
+      <> show divisor
+      <> " .*. $"
+      <> show quotient
+      <> " .^. $"
+      <> show remainder
   show (ModInvConstraint (var, _, _, p)) = "(ModInv)    $" <> show var <> "⁻¹ (mod " <> show p <> ")"
 
 instance Functor Constraint where
@@ -112,6 +121,7 @@ instance Functor Constraint where
   fmap _ (BooleanConstraint var) = BooleanConstraint var
   fmap f (EqZeroConstraint (xs, m)) = EqZeroConstraint (fmap f xs, m)
   fmap _ (DivModConstaint (a, b, q, r)) = DivModConstaint (a, b, q, r)
+  fmap _ (CLDivModConstaint (a, b, q, r)) = CLDivModConstaint (a, b, q, r)
   fmap _ (ModInvConstraint (a, output, n, p)) = ModInvConstraint (a, output, n, p)
 
 --------------------------------------------------------------------------------

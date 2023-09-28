@@ -56,6 +56,12 @@ propagateSideEffect sideEffect = case sideEffect of
       <*> propagateExprU divisor
       <*> propagateExprU quotient
       <*> propagateExprU remainder
+  CLDivMod width dividend divisor quotient remainder ->
+    CLDivMod width
+      <$> propagateExprU dividend
+      <*> propagateExprU divisor
+      <*> propagateExprU quotient
+      <*> propagateExprU remainder
   AssertLTE width expr n -> AssertLTE width <$> propagateExprU expr <*> pure n
   AssertLT width expr n -> AssertLT width <$> propagateExprU expr <*> pure n
   AssertGTE width expr n -> AssertGTE width <$> propagateExprU expr <*> pure n

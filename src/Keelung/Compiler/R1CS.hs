@@ -29,6 +29,7 @@ toR1CS cs =
       r1csCounters = csCounters cs,
       r1csEqZeros = csEqZeros cs,
       r1csDivMods = csDivMods cs,
+      r1csCLDivMods = csCLDivMods cs,
       r1csModInvs = csModInvs cs
     }
   where

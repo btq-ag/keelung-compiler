@@ -196,6 +196,7 @@ test-suite keelung-test
       Test.Compilation.UInt
       Test.Compilation.UInt.Addition
       Test.Compilation.UInt.Bitwise
+      Test.Compilation.UInt.CLDivMod
       Test.Compilation.UInt.CLMul
       Test.Compilation.UInt.Comparison
       Test.Compilation.UInt.DivMod
