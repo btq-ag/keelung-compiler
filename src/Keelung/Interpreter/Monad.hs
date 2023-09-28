@@ -22,11 +22,11 @@ import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Util
 import Keelung.Data.Struct (Struct (..))
+import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Keelung.Data.VarGroup
 import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Heap
-import Keelung.Data.U (U)
-import Keelung.Data.U qualified as U
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
@@ -167,9 +167,9 @@ data Error n
   | DivModDividendIsZeroError
   | DivModDivisorIsZeroError
   | DivModQuotientIsZeroError
-  | DivModQuotientError Integer Integer Integer Integer
-  | DivModRemainderError Integer Integer Integer Integer
-  | DivModStuckError [Var]
+  | DivModQuotientError Bool Integer Integer Integer Integer
+  | DivModRemainderError Bool Integer Integer Integer Integer
+  | DivModStuckError Bool [Var]
   | AssertLTEError Integer Integer
   | AssertLTEBoundTooSmallError Integer
   | AssertLTEBoundTooLargeError Integer Width
@@ -203,11 +203,15 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "divisor is zero"
   show DivModQuotientIsZeroError =
     "quotient is zero"
-  show (DivModQuotientError dividend divisor expected actual) =
-    "expected the result of `" <> show dividend <> " / " <> show divisor <> "` to be `" <> show expected <> "` but got `" <> show actual <> "`"
-  show (DivModRemainderError dividend divisor expected actual) =
-    "expected the result of `" <> show dividend <> " % " <> show divisor <> "` to be `" <> show expected <> "` but got `" <> show actual <> "`"
-  show (DivModStuckError msg) =
+  show (DivModQuotientError isCarryLess dividend divisor expected actual) =
+    "expected the result of `" <> show dividend <> if isCarryLess then " ./. " else " / " <> show divisor <> "` to be `" <> show expected <> "` but got `" <> show actual <> "`"
+  show (DivModRemainderError isCarryLess dividend divisor expected actual) =
+    "expected the result of `" <> show dividend <> if isCarryLess then " .%. " else " % " <> show divisor <> "` to be `" <> show expected <> "` but got `" <> show actual <> "`"
+  show (DivModStuckError True msg) =
+    "stuck when trying to perform carry-less Div/Mod operation because the value of these variables "
+      <> show msg
+      <> " are not known "
+  show (DivModStuckError False msg) =
     "stuck when trying to perform Div/Mod operation because the value of these variables "
       <> show msg
       <> " are not known "

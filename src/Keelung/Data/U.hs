@@ -7,6 +7,8 @@ module Keelung.Data.U
     modInv,
     clMul,
     clDivMod,
+    clDiv,
+    clMod,
     chunks,
   )
 where
@@ -118,6 +120,14 @@ clDivMod a b
               let power = dividendWidth - divisorWidth
                   (quotient, remainder) = longDivision (dividend `Data.Bits.xor` (divisor `Data.Bits.shiftL` power)) divisor
                in (quotient `Data.Bits.setBit` power, remainder)
+
+-- | Carry-less division of two unsigned integers.
+clDiv :: U -> U -> U
+clDiv a b = fst (clDivMod a b)
+
+-- | Carry-less modulo of two unsigned integers.
+clMod :: U -> U -> U
+clMod a b = snd (clDivMod a b)
 
 instance Bits U where
   (.&.) = bitWiseAndU

@@ -68,7 +68,7 @@ tests =
         program
         []
         []
-        (InterpreterError (Interpreter.DivModQuotientError 7 3 2 3))
+        (InterpreterError (Interpreter.DivModQuotientError False 7 3 2 3))
         (SolverError Solver.ConflictingValues :: Error (Prime 17))
 
     it "assertDivMod (with wrong remainder constant)" $ do
@@ -78,7 +78,7 @@ tests =
         program
         []
         []
-        (InterpreterError (Interpreter.DivModRemainderError 7 3 1 0))
+        (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
         (SolverError Solver.ConflictingValues :: Error (Prime 17))
 
     it "assertDivMod (multiple statements)" $ do
