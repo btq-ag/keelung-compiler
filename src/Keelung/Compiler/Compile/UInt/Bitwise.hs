@@ -11,7 +11,6 @@ import Keelung.Compiler.Compile.Boolean qualified as Boolean
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference
-
 -- | Compile a consecutive sequence of XORs
 compileXorUs :: (GaloisField n, Integral n) => Width -> RefU -> Seq (ExprU n) -> M n ()
 compileXorUs width out xs = do

@@ -213,8 +213,8 @@ assertCLDivModU compileAssertion width dividend divisor quotient remainder = do
   compileAssertion $ ExprB (LTU remainder divisor)
   -- 0 < divisor
   assertGT width divisorRef 0
-  -- add hint for DivMod
-  addDivModHint width dividendRef divisorRef quotientRef remainderRef
+  -- add hint for CLDivMod
+  addCLDivModHint width dividendRef divisorRef quotientRef remainderRef
 
 -- | Assert that a UInt is less than some constant
 assertLT :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
