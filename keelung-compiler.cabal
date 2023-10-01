@@ -35,6 +35,7 @@ library
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Bitwise
       Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Multiplication
@@ -114,6 +115,7 @@ executable keelungc
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Bitwise
       Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Multiplication
@@ -227,6 +229,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Bitwise
       Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Multiplication

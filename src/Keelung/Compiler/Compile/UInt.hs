@@ -6,6 +6,7 @@ module Keelung.Compiler.Compile.UInt
     assertGTE,
     assertGT,
     assertDivModU,
+    assertCLDivModU
   )
 where
 
@@ -17,6 +18,7 @@ import Data.Foldable (Foldable (toList))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt.Addition
+import Keelung.Compiler.Compile.UInt.Bitwise
 import Keelung.Compiler.Compile.UInt.CLMul
 import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.Multiplication
@@ -65,12 +67,7 @@ compile out expr = case expr of
       case result of
         Left var -> writeEqB (RefUBit w out i) var
         Right val -> writeValB (RefUBit w out i) val
-  XorU w xs -> do
-    forM_ [0 .. w - 1] $ \i -> do
-      result <- compileExprB (XorB (fmap (`BitU` i) xs))
-      case result of
-        Left var -> writeEqB (RefUBit w out i) var
-        Right val -> writeValB (RefUBit w out i) val
+  XorU w xs -> compileXorUs w out xs
   NotU w x -> do
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (NotB (BitU x i))
@@ -186,6 +183,31 @@ assertDivModU compileAssertion width dividend divisor quotient remainder = do
   productDQ <- freshRefU width
   compileMulU width productDQ divisorRef quotientRef
   compileSubU width productDQ dividendRef remainderRef
+
+  -- 0 ≤ remainder < divisor
+  compileAssertion $ ExprB (LTU remainder divisor)
+  -- 0 < divisor
+  assertGT width divisorRef 0
+  -- add hint for DivMod
+  addDivModHint width dividendRef divisorRef quotientRef remainderRef
+
+-- | Carry-less division with remainder on UInts
+--    1. dividend = divisor .*. quotient .^. remainder
+--    2. 0 ≤ remainder < divisor
+--    3. 0 < divisor
+assertCLDivModU :: (GaloisField n, Integral n) => (Expr n -> M n ()) -> Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
+assertCLDivModU compileAssertion width dividend divisor quotient remainder = do
+  --    dividend = divisor .*. quotient .^. remainder
+  --  =>
+  --    dividend .^. remainder = divisor .*. quotient
+  dividendRef <- wireU dividend
+  divisorRef <- wireU divisor
+  quotientRef <- wireU quotient
+  remainderRef <- wireU remainder
+
+  productDQ <- freshRefU width
+  compileCLMulU width productDQ divisorRef quotientRef
+  compileXorUs2 width productDQ [dividendRef, remainderRef]
 
   -- 0 ≤ remainder < divisor
   compileAssertion $ ExprB (LTU remainder divisor)
