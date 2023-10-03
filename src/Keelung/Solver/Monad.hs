@@ -26,9 +26,9 @@ import Keelung.Constraint.R1C
 import Keelung.Data.FieldInfo
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Data.VarGroup
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
+import Keelung.Data.VarGroup
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
@@ -53,14 +53,14 @@ tryLog x = do
   inDebugMode <- asks envDebugMode
   when inDebugMode $ tell (pure x)
 
-tryLogResult :: (GaloisField n, Integral n) => Constraint n -> Result (Constraint n) -> M n ()
-tryLogResult before result = do
-  inDebugMode <- asks envDebugMode
-  when inDebugMode $ case result of
-    Shrinked after -> tell (pure $ LogShrinkConstraint before after)
-    Stuck _ -> return ()
-    Eliminated -> tell (pure $ LogEliminateConstraint before)
-    NothingToDo -> return ()
+-- tryLogResult :: (GaloisField n, Integral n) => Constraint n -> Result (Constraint n) -> M n ()
+-- tryLogResult before result = do
+--   inDebugMode <- asks envDebugMode
+--   when inDebugMode $ case result of
+--     Shrinked after -> tell (pure $ LogShrinkConstraint before after)
+--     Stuck _ -> return ()
+--     Eliminated -> tell (pure $ LogEliminateConstraint before)
+--     NothingToDo -> return ()
 
 bindVar :: (GaloisField n, Integral n) => String -> Var -> n -> M n ()
 bindVar msg var val = do
@@ -89,7 +89,8 @@ data Constraint n
 instance Serialize n => Serialize (Constraint n)
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
-  show (MulConstraint a b c) = "(Mul)       (" <> show a <> ") * (" <> show b <> ") = (" <> show c <> ")"
+  show (MulConstraint a b (Left c)) = "(Mul)       (" <> show a <> ") * (" <> show b <> ") = (" <> show c <> ")"
+  show (MulConstraint a b (Right c)) = "(Mul)       (" <> show a <> ") * (" <> show b <> ") = (" <> show c <> ")"
   show (AddConstraint a) = "(Add)       " <> show a
   show (BooleanConstraint var) = "(Boolean)   $" <> show var <> " = $" <> show var <> " * $" <> show var
   show (EqZeroConstraint eqZero) = "(EqZero)     " <> show eqZero
@@ -245,8 +246,9 @@ instance Functor Result where
   fmap _ Eliminated = Eliminated
   fmap _ NothingToDo = NothingToDo
 
+-- | If any of the changes is True, then the result is Shrinked
 shrinkedOrStuck :: [Bool] -> a -> Result a
-shrinkedOrStuck changeds r1c = if or changeds then Shrinked r1c else Stuck r1c
+shrinkedOrStuck changes r1c = if or changes then Shrinked r1c else Stuck r1c
 
 -- | Substitute varaibles with values in a polynomial
 substAndView :: (Num n, Eq n) => IntMap n -> Poly n -> PolyResult n

@@ -7,8 +7,8 @@ module Test.Compilation.UInt.Logical (tests, run) where
 import Data.Bits qualified
 import Keelung hiding (compile)
 import Keelung.Data.U qualified as U
-import Test.Hspec
 import Test.Compilation.Util
+import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 
 run :: IO ()

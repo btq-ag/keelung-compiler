@@ -11,6 +11,7 @@ where
 
 import Control.Monad.Except
 import Control.Monad.RWS
+import Data.Bits qualified
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Sequence (Seq)
@@ -28,7 +29,6 @@ import Keelung.Data.U qualified as U
 import Keelung.Solver.BinRep
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
-import qualified Data.Bits
 
 -- | Execute the R1CS solver
 run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
@@ -162,29 +162,25 @@ shrinkMul as bs (Left c) = do
   bindings <- get
   case (substAndView bindings as, substAndView bindings bs) of
     (Constant a, Constant b) -> eliminateIfHold (a * b) c
+    (Constant 0, Uninomial {}) -> eliminateIfHold 0 c -- 'c' should be 0
     (Constant a, Uninomial _ _ b (var, coeff)) -> do
-      if a == 0
-        then eliminateIfHold (a * b) c
-        else do
-          -- a * (b + coeff var) = c
-          --    =>
-          -- a * b + a * coeff * var = c
-          --    =>
-          -- a * coeff * var = c - a * b
-          --    =>
-          -- var = (c - a * b) / (coeff * a)
-          bindVar "mul 1" var ((c - a * b) / (coeff * a))
-          return Eliminated
+      -- a * (b + coeff var) = c
+      --    =>
+      -- a * b + a * coeff * var = c
+      --    =>
+      -- a * coeff * var = c - a * b
+      --    =>
+      -- var = (c - a * b) / (coeff * a)
+      bindVar "mul 1" var ((c - a * b) / (coeff * a))
+      return Eliminated
     (Constant a, Polynomial _ bs') -> case Poly.multiplyBy a bs' of
       Left constant -> eliminateIfHold constant c
       Right poly -> return $ Shrinked $ AddConstraint $ Poly.addConstant (-c) poly
+    (Uninomial {}, Constant 0) -> eliminateIfHold 0 c -- 'c' should be 0
     (Uninomial _ _ a (var, coeff), Constant b) -> do
-      if b == 0
-        then eliminateIfHold (a * b) c
-        else do
-          -- (a + coeff var) * b = c
-          bindVar "mul 2" var ((c - a * b) / (coeff * b))
-          return Eliminated
+      -- (a + coeff var) * b = c
+      bindVar "mul 2" var ((c - a * b) / (coeff * b))
+      return Eliminated
     (Uninomial av as' _ _, Uninomial bv bs' _ _) -> return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
     (Uninomial av as' _ _, Polynomial bv bs') -> return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
     (Polynomial _ as', Constant b) -> case Poly.multiplyBy b as' of
@@ -371,9 +367,10 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
       case (divisorResult, quotientResult, remainderResult) of
         -- divisor, quotient, and remainder are all known
         (Just divisorVal, Just quotientVal, Just remainderVal) -> do
-          let dividendVal = if isCarryLess 
-                then (divisorVal `U.clMul` quotientVal) `Data.Bits.xor` remainderVal
-                else divisorVal * quotientVal + remainderVal
+          let dividendVal =
+                if isCarryLess
+                  then (divisorVal `U.clMul` quotientVal) `Data.Bits.xor` remainderVal
+                  else divisorVal * quotientVal + remainderVal
           bindBitsEither "dividend" dividendVar dividendVal
           return Eliminated
         _ -> do

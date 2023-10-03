@@ -155,7 +155,7 @@ varsSet (PolyL _ ls vars) = (Set.fromList (map (lmbRef . fst) (toList ls)), Map.
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int
-size (PolyL c ls vars) = if c == 0 then 0 else 1 + sum (fmap (lmbWidth . fst) ls) + Map.size vars
+size (PolyL c ls vars) = (if c == 0 then 0 else 1) + sum (fmap (lmbWidth . fst) ls) + Map.size vars
 
 -- | Merge two PolyLs
 merge :: (Num n, Eq n) => PolyL n -> PolyL n -> Either n (PolyL n)

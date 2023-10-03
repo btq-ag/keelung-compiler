@@ -8,7 +8,6 @@ import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver qualified as Solver
-import Test.Hspec
 import Test.Compilation.UInt.Addition qualified as Addition
 import Test.Compilation.UInt.Bitwise qualified as Bitwise
 import Test.Compilation.UInt.CLMul qualified as CLMul
@@ -18,6 +17,7 @@ import Test.Compilation.UInt.Logical qualified as Logical
 import Test.Compilation.UInt.ModInv qualified as ModInv
 import Test.Compilation.UInt.Multiplication qualified as Multiplication
 import Test.Compilation.Util
+import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 
 run :: IO ()

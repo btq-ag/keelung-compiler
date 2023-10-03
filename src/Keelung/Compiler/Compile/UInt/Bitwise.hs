@@ -1,27 +1,19 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use lambda-case" #-}
-module Keelung.Compiler.Compile.UInt.Bitwise (compileXorUs, compileXorUs2) where
+module Keelung.Compiler.Compile.UInt.Bitwise (compileXorUs) where
 
 import Control.Monad
 import Data.Bits qualified
 import Data.Field.Galois
-import Data.Sequence (Seq)
 import Keelung.Compiler.Compile.Boolean qualified as Boolean
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference
--- | Compile a consecutive sequence of XORs
-compileXorUs :: (GaloisField n, Integral n) => Width -> RefU -> Seq (ExprU n) -> M n ()
-compileXorUs width out xs = do
-  forM_ [0 .. width - 1] $ \i -> do
-    result <- compileExprB (XorB (fmap (`BitU` i) xs))
-    case result of
-      Left var -> writeEqB (RefUBit width out i) var
-      Right val -> writeValB (RefUBit width out i) val
 
-compileXorUs2 :: (GaloisField n, Integral n) => Width -> RefU -> [Either RefU Integer] -> M n ()
-compileXorUs2 width out xs = do
+-- | Compile a consecutive sequence of XORs
+compileXorUs :: (GaloisField n, Integral n) => Width -> RefU -> [Either RefU Integer] -> M n ()
+compileXorUs width out xs = do
   forM_ [0 .. width - 1] $ \i -> do
     let column =
           map

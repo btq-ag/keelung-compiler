@@ -6,7 +6,7 @@ module Keelung.Compiler.Compile.UInt
     assertGTE,
     assertGT,
     assertDivModU,
-    assertCLDivModU
+    assertCLDivModU,
   )
 where
 
@@ -67,7 +67,9 @@ compile out expr = case expr of
       case result of
         Left var -> writeEqB (RefUBit w out i) var
         Right val -> writeValB (RefUBit w out i) val
-  XorU w xs -> compileXorUs w out xs
+  XorU w xs -> do
+    xs' <- mapM wireU xs
+    compileXorUs w out (toList xs')
   NotU w x -> do
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (NotB (BitU x i))
@@ -207,7 +209,7 @@ assertCLDivModU compileAssertion width dividend divisor quotient remainder = do
 
   productDQ <- freshRefU width
   compileCLMulU width productDQ divisorRef quotientRef
-  compileXorUs2 width productDQ [dividendRef, remainderRef]
+  compileXorUs width productDQ [dividendRef, remainderRef]
 
   -- 0 ≤ remainder < divisor
   compileAssertion $ ExprB (LTU remainder divisor)

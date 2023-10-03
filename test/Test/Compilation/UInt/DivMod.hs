@@ -81,7 +81,7 @@ tests =
         (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
         (SolverError Solver.ConflictingValues :: Error (Prime 17))
 
-    it "assertDivMod (multiple statements)" $ do
+    it "performDivMod (multiple statements)" $ do
       let program = do
             a <- input Public :: Comp (UInt 5)
             b <- input Public
@@ -92,7 +92,7 @@ tests =
             return [q0, r0, q1, r1]
       runAll (Prime 17) program [20, 7, 8] [21] [2, 6, 2, 5]
 
-    it "assertDivMod (multiple statements chained together)" $ do
+    it "performDivMod (multiple statements chained together)" $ do
       let program = do
             a <- input Public :: Comp (UInt 5)
             b <- input Public
