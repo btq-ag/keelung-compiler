@@ -73,41 +73,26 @@ tests =
             (q0, r0) <- performCLDivMod a b
             return [q0, r0]
       runAll (Prime 17) program [20, 7] [] [7, 1]
-      -- debug (Prime 17) program
 
-    -- it "performCLDivMod (multiple statements)" $ do
-    --   let program = do
-    --         a <- input Public :: Comp (UInt 5)
-    --         b <- input Public
-    --         c <- input Public
-    --         d <- input Public
-    --         (q0, r0) <- performCLDivMod a b
-    --         (q1, r1) <- performCLDivMod c d
-    --         -- let q1 = c .^. d
-    --         -- let r1 = c .*. d
-    --         return [q0, r0, q1, r1]
-    --   runAll gf181 program [20, 7, 21, 8] [] [7, 1, 2, 5]
-    -- -- printLog (Prime 17) program [20, 7, 21, 8] []
-
-    it "performDivMod (multiple statements)" $ do
+    it "performCLDivMod (multiple statements)" $ do
       let program = do
             a <- input Public :: Comp (UInt 5)
             b <- input Public
-            c <- input Private
+            (q0, r0) <- performCLDivMod a b
+            c <- input Public
             d <- input Public
-            (q0, r0) <- performDivMod a b
-            (q1, r1) <- performDivMod c d
+            (q1, r1) <- performCLDivMod c d
             return [q0, r0, q1, r1]
-      runAll (Prime 17) program [20, 7, 8] [21] [2, 6, 2, 5]
+      runAll gf181 program [20, 7, 21, 8] [] [7, 1, 2, 5]
 
-    -- it "performCLDivMod (multiple statements chained together)" $ do
-    --   let program = do
-    --         a <- input Public :: Comp (UInt 5)
-    --         b <- input Public
-    --         (q0, r0) <- performCLDivMod a b
-    --         (q1, r1) <- performCLDivMod q0 b
-    --         return [q0, r0, q1, r1]
-    --   runAll (Prime 17) program [25, 3] [] [8, 1, 7, 1]
+    it "performCLDivMod (multiple statements chained together)" $ do
+      let program = do
+            a <- input Public :: Comp (UInt 5)
+            b <- input Public
+            (q0, r0) <- performCLDivMod a b
+            (q1, r1) <- performCLDivMod q0 b
+            return [q0, r0, q1, r1]
+      runAll (Prime 17) program [25, 3] [] [8, 1, 7, 1]
 
     it "performCLDivMod (before assertions)" $ do
       let program = do

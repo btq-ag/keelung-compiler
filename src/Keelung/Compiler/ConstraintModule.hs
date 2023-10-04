@@ -77,6 +77,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> showEqs
       <> showBooleanConstraints
       <> showDivModHints
+      <> showCLDivModHints
       <> showModInvHints
       <> show (cmOccurrenceF cm)
       <> show (cmOccurrenceB cm)
@@ -110,6 +111,11 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
         if null $ cmDivMods cm
           then ""
           else "  DivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (cmDivMods cm))))
+
+      showCLDivModHints =
+        if null $ cmCLDivMods cm
+          then ""
+          else "  CLDivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (cmCLDivMods cm))))
 
       showModInvHints =
         if null $ cmModInvs cm
