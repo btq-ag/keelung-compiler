@@ -15,22 +15,37 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Misc" $ do
+  -- describe "Carry-less Multiplication" $ do
+  --   it "2 byte variables" $ do
+  --     -- constraint breakdown:
+  --     -- I/O: 24 = 2 * 8 + 8
+  --     -- ANDs: 36 = 8 * 9 / 2
+  --     -- XORs: 7
+  --     (_cs, cs') <- executeGF181 $ do
+  --       x <- input Public :: Comp (UInt 8)
+  --       y <- input Public :: Comp (UInt 8)
+  --       return (x .*. y)
+  --     -- print cs'
+  --     -- print $ linkConstraintModule cs'
+
+  --     _cs `shouldHaveSize` 91
+  --     cs' `shouldHaveSize` 87
+
   describe "Carry-less Multiplication" $ do
-    it "2 byte variables" $ do
+    it "2 2-bit variables" $ do
       -- constraint breakdown:
       -- I/O: 24 = 2 * 8 + 8
       -- ANDs: 36 = 8 * 9 / 2
       -- XORs: 7
       (_cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 8)
-        y <- input Public :: Comp (UInt 8)
-        return (x .*. y)
+        x <- input Public :: Comp (UInt 2)
+        y <- input Public :: Comp (UInt 2)
+        performCLDivMod x y
+      -- print _cs
       -- print cs'
       -- print $ linkConstraintModule cs'
-
-      _cs `shouldHaveSize` 91
-      cs' `shouldHaveSize` 87
-
+      _cs `shouldHaveSize` 33
+      cs' `shouldHaveSize` 26
 -- it "1 variable / 1 constant" $ do
 --   -- constraint breakdown:
 --   -- I/O: 24 = 2 * 8 + 8

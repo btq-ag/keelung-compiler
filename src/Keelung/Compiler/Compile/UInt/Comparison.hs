@@ -129,6 +129,10 @@ assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Inte
 assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Error.AssertComparisonError (succ (toInteger a)) GT c
 assertGTE width (Left a) bound
   | bound < 1 = throwError $ Error.AssertGTEBoundTooSmallError bound
+  | bound == 1 = do
+      -- a ≥ 1 → a > 0 → a is not zero
+      -- there exists a number m such that the product of a and m is 1
+      assertNonZero width a
   | bound >= 2 ^ width = throwError $ Error.AssertGTEBoundTooLargeError bound width
   | bound == 2 ^ width - 1 = do
       -- there's only 1 possible value for `a`, which is `2^width - 1`
@@ -183,10 +187,6 @@ assertGTE width (Left a) bound
           -- assign the rest of the limbs to `1`
           forM_ [limbWidth .. width - 1] $ \j ->
             writeValB (RefUBit width a j) True
-  | bound == 1 = do
-      -- a ≥ 1 → a > 0 → a is not zero
-      -- there exists a number m such that the product of a and m is 1
-      assertNonZero width a
   | otherwise = runDefault
   where
     runDefault = do
