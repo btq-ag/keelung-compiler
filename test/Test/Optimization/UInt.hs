@@ -6,6 +6,7 @@ module Test.Optimization.UInt (tests, run) where
 import Control.Monad (forM_)
 import Keelung hiding (compileO0)
 import Test.Hspec
+import Test.Optimization.UInt.CLDivMod qualified as UInt.CLDivMod
 import Test.Optimization.UInt.Misc qualified as Misc
 import Test.Optimization.Util
 
@@ -175,6 +176,8 @@ tests = do
         -- print $ linkConstraintModule cs'
         cs `shouldHaveSize` 91
         cs' `shouldHaveSize` 87
+
+    UInt.CLDivMod.tests
 
     describe "Constants" $ do
       -- TODO: should be just 4

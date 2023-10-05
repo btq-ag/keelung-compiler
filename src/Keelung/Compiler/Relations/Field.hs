@@ -175,12 +175,12 @@ data Lookup n = Root | Value n | ChildOf n Ref n
 lookup :: GaloisField n => Ref -> Relations n -> Lookup n
 lookup (B var) xs =
   case var of
-    RefUBit _ refU _index -> case EquivClass.lookup refU (relationsU xs) of
+    RefUBit width refU index -> case EquivClass.lookup refU (relationsU xs) of
       EquivClass.IsConstant _value -> Root
       -- Value (if Data.Bits.testBit value index then 1 else 0)
       -- Root -- Value (if Data.Bits.testBit value index then 1 else 0)
       EquivClass.IsRoot _ -> Root
-      EquivClass.IsChildOf _parent () -> Root
+      EquivClass.IsChildOf parent () -> ChildOf 1 (B (RefUBit width parent index)) 0
     _ ->
       case EquivClass.lookup var (relationsB xs) of
         EquivClass.IsConstant True -> Value 1
