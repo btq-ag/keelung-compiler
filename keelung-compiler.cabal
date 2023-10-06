@@ -203,6 +203,7 @@ test-suite keelung-test
       Test.Compilation.UInt.Comparison
       Test.Compilation.UInt.DivMod
       Test.Compilation.UInt.Logical
+      Test.Compilation.UInt.Misc
       Test.Compilation.UInt.ModInv
       Test.Compilation.UInt.Multiplication
       Test.Compilation.Util

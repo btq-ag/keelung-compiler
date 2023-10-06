@@ -28,6 +28,7 @@ import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Data.Reference
 import Prelude hiding (lookup)
 import Keelung.Compiler.Relations.UInt (UIntRelations)
+import qualified Data.Bits
 
 type RefRelations n = EquivClass.EquivClass Ref n (LinRel n)
 
@@ -90,19 +91,11 @@ data Lookup n = Root | Value n | ChildOf n Ref n
     )
 
 lookup :: GaloisField n => UIntRelations -> Ref -> RefRelations n -> Lookup n
-lookup relationsU (B var) relations =
-  case var of
-    RefUBit width refU index -> case EquivClass.lookup refU relationsU of
-      EquivClass.IsConstant _value -> Root
-      -- Value (if Data.Bits.testBit value index then 1 else 0)
-      -- Root -- Value (if Data.Bits.testBit value index then 1 else 0)
+lookup relationsU (B (RefUBit width refU index)) _relations =case EquivClass.lookup refU relationsU of
+      EquivClass.IsConstant value -> Value (if Data.Bits.testBit value index then 1 else 0)
       EquivClass.IsRoot _ -> Root
       EquivClass.IsChildOf parent () -> ChildOf 1 (B (RefUBit width parent index)) 0
-    _ -> case EquivClass.lookup (B var) relations of
-            EquivClass.IsConstant value -> Value value
-            EquivClass.IsRoot _ -> Root
-            EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
-lookup _ (F var) relations = case EquivClass.lookup (F var) relations of
+lookup _ var relations = case EquivClass.lookup var relations of
   EquivClass.IsConstant value -> Value value
   EquivClass.IsRoot _ -> Root
   EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b

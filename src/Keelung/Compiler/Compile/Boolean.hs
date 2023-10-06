@@ -261,12 +261,12 @@ xorBs xs = do
   where
     xorB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
     xorB x y = do
-      -- (1 - 2x) * (y + 1) = (1 + out - 3x)
+      -- 2 x * y = x + y - out
       out <- freshRefB
       writeMul
-        (1, [(B x, -2)])
-        (1, [(B y, 1)])
-        (1, [(B x, -3), (B out, 1)])
+        (0, [(B x, 2)])
+        (0, [(B y, 1)])
+        (0, [(B x, 1), (B y, 1), (B out, -1)])
       return out
 
     flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
