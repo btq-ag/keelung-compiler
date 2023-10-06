@@ -25,8 +25,6 @@ import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
-import Keelung.Compiler.Relations.Boolean (BooleanRelations)
-import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Relations.Limb (LimbRelations)
 import Keelung.Compiler.Relations.Limb qualified as LimbRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
@@ -54,7 +52,6 @@ linkConstraintModule cm =
       csCounters = counters,
       csConstraints =
         varEqFs
-          <> varEqBs
           <> varEqLs
           <> varEqUs
           <> addLs
@@ -128,18 +125,6 @@ linkConstraintModule cm =
         -- it's a pinned Field variable
         True
 
-    extractBooleanRelations :: (GaloisField n, Integral n) => BooleanRelations -> Seq (Linked.Constraint n)
-    extractBooleanRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefB, Either (Bool, RefB) Bool) -> Constraint n
-          convert (var, Right val) = CVarBindB var val
-          convert (var, Left (dontFlip, root)) =
-            if dontFlip
-              then CVarEqB var root
-              else CVarNEqB var root
-
-          result = map convert $ Map.toList $ BooleanRelations.toMap refBShouldBeKept relations
-       in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
-
     extractLimbRelations :: (GaloisField n, Integral n) => LimbRelations -> Seq (Linked.Constraint n)
     extractLimbRelations relations =
       let convert :: (GaloisField n, Integral n) => (Limb, Either Limb Integer) -> Constraint n
@@ -158,7 +143,6 @@ linkConstraintModule cm =
        in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
 
     varEqFs = extractFieldRelations (cmRelations cm)
-    varEqBs = extractBooleanRelations (Relations.exportBooleanRelations (cmRelations cm))
     varEqLs = extractLimbRelations (Relations.exportLimbRelations (cmRelations cm))
     varEqUs = extractUIntRelations (Relations.exportUIntRelations (cmRelations cm))
 

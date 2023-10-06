@@ -19,7 +19,6 @@ module Keelung.Compiler.Relations
     size,
     lookup,
     Lookup (..),
-    exportBooleanRelations,
     exportLimbRelations,
     exportUIntRelations,
   )
@@ -33,7 +32,6 @@ import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Relations.Boolean qualified as Boolean
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.UInt qualified as UInt
@@ -45,16 +43,14 @@ type FieldRelations n = EquivClass.EquivClass Ref n (LinRel n)
 
 data Relations n = Relations
   { relationsF :: FieldRelations n,
-    relationsB :: Boolean.BooleanRelations,
     relationsL :: Limb.LimbRelations,
     relationsU :: UInt.UIntRelations
   }
   deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (Relations n) where
-  show (Relations f b l u) =
+  show (Relations f l u) =
     (if EquivClass.size f == 0 then "" else show f)
-      <> (if EquivClass.size b == 0 then "" else show b)
       <> (if EquivClass.size l == 0 then "" else show l)
       <> (if EquivClass.size u == 0 then "" else show u)
 
@@ -68,14 +64,6 @@ updateRelationsF ::
 updateRelationsF f xs = mapError $ do
   relations <- f (relationsF xs)
   return $ xs {relationsF = relations}
-
-updateRelationsB ::
-  (Boolean.BooleanRelations -> EquivClass.M (Error n) Boolean.BooleanRelations) ->
-  Relations n ->
-  EquivClass.M (Error n) (Relations n)
-updateRelationsB f xs = do
-  relations <- f (relationsB xs)
-  return $ xs {relationsB = relations}
 
 updateRelationsL ::
   (Limb.LimbRelations -> EquivClass.M (Error n) Limb.LimbRelations) ->
@@ -96,13 +84,13 @@ updateRelationsU f xs = do
 --------------------------------------------------------------------------------
 
 new :: Relations n
-new = Relations (EquivClass.new "Field") Boolean.new Limb.new UInt.new
+new = Relations (EquivClass.new "Field") Limb.new UInt.new
 
 assignF :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignF var val = updateRelationsF $ EquivClass.assign var val
 
-assignB :: RefB -> Bool -> Relations n -> EquivClass.M (Error n) (Relations n)
-assignB ref val = updateRelationsB $ Boolean.assign ref val
+assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> EquivClass.M (Error n) (Relations n)
+assignB ref val = assignF (B ref) (if val then 1 else 0)
 
 assignL :: (GaloisField n, Integral n) => Limb -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignL var val = updateRelationsL $ Limb.assign var val
@@ -110,11 +98,8 @@ assignL var val = updateRelationsL $ Limb.assign var val
 assignU :: (GaloisField n, Integral n) => RefU -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignU var val = updateRelationsU $ UInt.assign var val
 
-relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateF var1 slope var2 intercept = updateRelationsF $ EquivClass.relate var1 (LinRel slope intercept) var2
-
-relateB :: GaloisField n => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateB refA (polarity, refB) = updateRelationsB (Boolean.relate refA polarity refB)
+relateB :: (GaloisField n, Integral n) => GaloisField n => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateB refA (polarity, refB) = updateRelationsF (EquivClass.relate (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB))
 
 relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateL var1 var2 = updateRelationsL $ Limb.relate var1 var2
@@ -128,8 +113,8 @@ relateRefs x slope y intercept xs =
   case (x, y, slope, intercept) of
     (B refB, _, 0, value) -> assignB refB (value == 1) xs
     (_, _, 0, value) -> assignF x value xs
-    (B refA, B refB, 1, 0) -> relateB refA (True, refB) xs
-    (B refA, B refB, -1, 1) -> relateB refA (False, refB) xs
+    -- (B refA, B refB, 1, 0) -> relateB refA (True, refB) xs
+    -- (B refA, B refB, -1, 1) -> relateB refA (False, refB) xs
     (refA, refB, _, _) ->
       composeLookup
         xs
@@ -160,7 +145,7 @@ toInt shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap (relation
         else Nothing
 
 size :: Relations n -> Int
-size (Relations f b l u) = EquivClass.size f + Boolean.size b + Limb.size l + UInt.size u
+size (Relations f l u) = EquivClass.size f + Limb.size l + UInt.size u
 
 --------------------------------------------------------------------------------
 
@@ -181,13 +166,16 @@ lookup (B var) xs =
       -- Root -- Value (if Data.Bits.testBit value index then 1 else 0)
       EquivClass.IsRoot _ -> Root
       EquivClass.IsChildOf parent () -> ChildOf 1 (B (RefUBit width parent index)) 0
-    _ ->
-      case EquivClass.lookup var (relationsB xs) of
-        EquivClass.IsConstant True -> Value 1
-        EquivClass.IsConstant False -> Value 0
-        EquivClass.IsRoot _ -> Root
-        EquivClass.IsChildOf parent (Boolean.Polarity True) -> ChildOf 1 (B parent) 0
-        EquivClass.IsChildOf parent (Boolean.Polarity False) -> ChildOf (-1) (B parent) 1
+    _ -> case EquivClass.lookup (B var) (relationsF xs) of
+            EquivClass.IsConstant value -> Value value
+            EquivClass.IsRoot _ -> Root
+            EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
+      -- case EquivClass.lookup var (relationsB xs) of
+      --   EquivClass.IsConstant True -> Value 1
+      --   EquivClass.IsConstant False -> Value 0
+      --   EquivClass.IsRoot _ -> Root
+      --   EquivClass.IsChildOf parent (Boolean.Polarity True) -> ChildOf 1 (B parent) 0
+      --   EquivClass.IsChildOf parent (Boolean.Polarity False) -> ChildOf (-1) (B parent) 1
 lookup (F var) xs = case EquivClass.lookup (F var) (relationsF xs) of
   EquivClass.IsConstant value -> Value value
   EquivClass.IsRoot _ -> Root
@@ -201,10 +189,8 @@ lookup (F var) xs = case EquivClass.lookup (F var) (relationsF xs) of
 -- | Relation representing a linear function between two variables, i.e. x = ay + b
 data LinRel n
   = LinRel
-      n
-      -- ^ slope
-      n
-      -- ^ intercept
+      n -- | slope
+      n -- | intercept
   deriving (Show, Eq, NFData, Generic)
 
 instance Num n => Semigroup (LinRel n) where
@@ -219,16 +205,16 @@ instance Num n => Monoid (LinRel n) where
   mempty = LinRel 1 0
 
 instance (GaloisField n, Integral n) => EquivClass.IsRelation (LinRel n) where
-  relationToString (var, LinRel x y) = f (LinRel (recip x) (-y / x))
+  relationToString (var, LinRel x y) = go (LinRel (recip x) (-y / x))
     where
-      f (LinRel a b) =
+      go (LinRel (-1) 1) = "¬" <> "var"
+      go (LinRel a b) =
         let slope = case a of
               1 -> var
               (-1) -> "-" <> var
               _ -> show (N a) <> var
             intercept = case b of
               0 -> ""
-              -- -1 -> " - 1"
               _ -> " + " <> show (N b)
          in slope <> intercept
 
@@ -299,9 +285,9 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     -- =>
     -- rootA = (slope * slopeB * rootB + slope * interceptB + intercept - interceptA) / slopeA
     relateF rootA (slope * slopeB / slopeA) rootB ((slope * interceptB + intercept - interceptA) / slopeA) xs
-
-exportBooleanRelations :: Relations n -> Boolean.BooleanRelations
-exportBooleanRelations = relationsB
+  where
+    relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
+    relateF var1 slope' var2 intercept' = updateRelationsF $ EquivClass.relate var1 (LinRel slope' intercept') var2
 
 exportLimbRelations :: Relations n -> Limb.LimbRelations
 exportLimbRelations = relationsL

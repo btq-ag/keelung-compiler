@@ -28,7 +28,6 @@ import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
-import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
@@ -264,7 +263,6 @@ prettyBooleanConstraints counters =
 sizeOfConstraintModule :: ConstraintModule n -> Int
 sizeOfConstraintModule cm =
   Relations.size (cmRelations cm)
-    + BooleanRelations.size (Relations.exportBooleanRelations (cmRelations cm))
     + length (cmAddL cm)
     + length (cmMulL cm)
     + length (cmEqZeros cm)
