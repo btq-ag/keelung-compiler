@@ -10,9 +10,9 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
+import Keelung.Compiler.Relations (Relations)
+import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Field (Relations)
-import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo

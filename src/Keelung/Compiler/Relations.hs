@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Keelung.Compiler.Relations.Field
+module Keelung.Compiler.Relations
   ( Relations,
     new,
     assignF,

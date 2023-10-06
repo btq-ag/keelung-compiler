@@ -26,9 +26,9 @@ import Keelung.Compiler.Optimize.OccurF (OccurF)
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
+import Keelung.Compiler.Relations (Relations)
+import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Relations.Field (Relations)
-import Keelung.Compiler.Relations.Field qualified as Relations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))

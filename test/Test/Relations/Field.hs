@@ -5,8 +5,8 @@ import Control.Monad.State
 import Keelung
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Field (Relations)
-import Keelung.Compiler.Relations.Field qualified as FieldRelations
+import Keelung.Compiler.Relations (Relations)
+import Keelung.Compiler.Relations qualified as FieldRelations
 import Keelung.Data.Reference
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
