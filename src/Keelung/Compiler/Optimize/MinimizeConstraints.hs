@@ -337,7 +337,7 @@ assign (B var) value = do
       put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 assign (F var) value = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ Relations.assignF (F var) value (cmRelations cm)
+  result <- lift $ lift $ EquivClass.runM $ Relations.assignR (F var) value (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -358,7 +358,7 @@ assignL var value = do
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ Relations.relateRefs var1 slope var2 intercept (cmRelations cm)
+  result <- lift $ lift $ EquivClass.runM $ Relations.relateR var1 slope var2 intercept (cmRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do
@@ -530,7 +530,7 @@ substRef relations (accPoly, changes) ref coeff = case Relations.lookup ref rela
           case accPoly of
             Left c -> (PolyL.fromRefs c [(ref, coeff)], changes)
             Right xs -> (PolyL.insertRefs 0 [(ref, coeff)] xs, changes)
-          else error "[ panic ] Invalid relation in FieldRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
+          else error "[ panic ] Invalid relation in RefRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
       else case accPoly of
         -- ref = slope * root + intercept
         Left c -> (PolyL.fromRefs (intercept * coeff + c) [(root, slope * coeff)], addRef root $ removeRef ref changes)

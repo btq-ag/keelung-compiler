@@ -68,8 +68,8 @@ linkConstraintModule cm =
 
     fieldWidth = FieldInfo.fieldWidth (cmField cm)
 
-    extractFieldRelations :: (GaloisField n, Integral n) => Relations n -> Seq (Linked.Constraint n)
-    extractFieldRelations relations =
+    extractRefRelations :: (GaloisField n, Integral n) => Relations n -> Seq (Linked.Constraint n)
+    extractRefRelations relations =
       let convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Constraint n
           convert (var, Right val) = CVarBindF var val
           convert (var, Left (slope, root, intercept)) =
@@ -77,7 +77,7 @@ linkConstraintModule cm =
               (0, _) -> CVarBindF var intercept
               (1, 0) -> CVarEq var root
               (_, _) -> case PolyL.fromRefs intercept [(var, -1), (root, slope)] of
-                Left _ -> error "[ panic ] extractFieldRelations: failed to build polynomial"
+                Left _ -> error "[ panic ] extractRefRelations: failed to build polynomial"
                 Right poly -> CAddL poly
 
           result = map convert $ Map.toList $ Relations.toInt shouldBeKept relations
@@ -142,7 +142,7 @@ linkConstraintModule cm =
           result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
        in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
 
-    varEqFs = extractFieldRelations (cmRelations cm)
+    varEqFs = extractRefRelations (cmRelations cm)
     varEqLs = extractLimbRelations (Relations.exportLimbRelations (cmRelations cm))
     varEqUs = extractUIntRelations (Relations.exportUIntRelations (cmRelations cm))
 

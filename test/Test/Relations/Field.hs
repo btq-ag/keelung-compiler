@@ -6,7 +6,7 @@ import Keelung
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations (Relations)
-import Keelung.Compiler.Relations qualified as FieldRelations
+import Keelung.Compiler.Relations qualified as RefRelations
 import Keelung.Data.Reference
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
@@ -16,7 +16,7 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = do
-  describe "FieldRelations" $ do
+  describe "RefRelations" $ do
     describe "assign" $ do
       it "$0 = 0" $
         runM $ do
@@ -63,12 +63,12 @@ tests = do
 type M = StateT (Relations GF181) IO
 
 runM :: M a -> IO a
-runM p = evalStateT p FieldRelations.new
+runM p = evalStateT p RefRelations.new
 
 assign :: Ref -> GF181 -> M ()
 assign var val = do
   xs <- get
-  case runExcept (EquivClass.runM $ FieldRelations.assignF var val xs) of
+  case runExcept (EquivClass.runM $ RefRelations.assignR var val xs) of
     Left err -> error $ show (err :: Error GF181)
     Right Nothing -> return ()
     Right (Just result) -> put result
@@ -76,7 +76,7 @@ assign var val = do
 relate :: RefF -> (GF181, RefF, GF181) -> M ()
 relate var (slope, val, intercept) = do
   xs <- get
-  case runExcept (EquivClass.runM $ FieldRelations.relateRefs (F var) slope (F val) intercept xs) of
+  case runExcept (EquivClass.runM $ RefRelations.relateR (F var) slope (F val) intercept xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result
@@ -85,14 +85,14 @@ relate var (slope, val, intercept) = do
 assertRelation :: RefF -> GF181 -> RefF -> GF181 -> M ()
 assertRelation var1 slope var2 intercept = do
   xs <- get
-  FieldRelations.relationBetween (F var1) (F var2) xs `shouldBe` Just (slope, intercept)
+  RefRelations.relationBetween (F var1) (F var2) xs `shouldBe` Just (slope, intercept)
 
 ------------------------------------------------------------------------
 
--- instance (Arbitrary n, GaloisField n) => Arbitrary (FieldRelations n) where
+-- instance (Arbitrary n, GaloisField n) => Arbitrary (RefRelations n) where
 --   arbitrary = do
 --     relations <- Arbitrary.vector 100
 
---     return $ foldl go FieldRelations.new relations
+--     return $ foldl go RefRelations.new relations
 --     where
---       go xs (var, slope, ref, intercept) = Maybe.fromMaybe xs (FieldRelations.relate var (slope, ref, intercept) xs)
+--       go xs (var, slope, ref, intercept) = Maybe.fromMaybe xs (RefRelations.relate var (slope, ref, intercept) xs)

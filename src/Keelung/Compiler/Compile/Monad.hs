@@ -160,7 +160,7 @@ addC = mapM_ addOne
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddL xs) = modify' (\cs -> addOccurrencesTuple (PolyL.varsSet xs) $ cs {cmAddL = xs : cmAddL cs})
     addOne (CVarBindF x c) = do
-      execRelations $ Relations.assignF x c
+      execRelations $ Relations.assignR x c
     addOne (CVarBindB x c) = do
       execRelations $ Relations.assignB x c
     addOne (CVarBindL x c) = do
@@ -170,9 +170,9 @@ addC = mapM_ addOne
     addOne (CVarEq x y) = do
       countBitTestAsOccurU x
       countBitTestAsOccurU y
-      execRelations $ Relations.relateRefs x 1 y 0
+      execRelations $ Relations.relateR x 1 y 0
     addOne (CVarEqF x y) = do
-      execRelations $ Relations.relateRefs (F x) 1 (F y) 0
+      execRelations $ Relations.relateR (F x) 1 (F y) 0
     addOne (CVarEqB x y) = do
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
