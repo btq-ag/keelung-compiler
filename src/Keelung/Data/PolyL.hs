@@ -24,7 +24,6 @@ where
 
 import Control.DeepSeq (NFData)
 import Data.Bifunctor (Bifunctor (second))
-import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (..), toList)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -35,7 +34,6 @@ import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.N qualified as N
 import Keelung.Data.Reference
 import Prelude hiding (negate, null)
 import Prelude qualified
@@ -54,7 +52,7 @@ data PolyL n = PolyL
 instance (Semigroup n, Num n) => Semigroup (PolyL n) where
   PolyL c1 ls1 vars1 <> PolyL c2 ls2 vars2 = PolyL (c1 + c2) (ls1 <> ls2) (vars1 <> vars2)
 
-instance (GaloisField n, Integral n) => Show (PolyL n) where
+instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
   show (PolyL constant limbs vars)
     | constant == 0 =
         if firstSign == " + "
@@ -69,19 +67,19 @@ instance (GaloisField n, Integral n) => Show (PolyL n) where
         (x Seq.:<| xs) -> (x, xs)
 
       -- return a pair of the sign ("+" or "-") and the string representation
-      printLimb :: (GaloisField n, Integral n) => (Limb, n) -> Seq String
+      printLimb :: (Limb, n) -> Seq String
       printLimb (x, c) =
         let (sign, terms) = Limb.showAsTerms x
          in case c of
               0 -> error "[ panic ] PolyL: coefficient of 0"
               1 -> Seq.fromList [if sign then " + " else " - ", terms]
               -1 -> Seq.fromList [if sign then " - " else " + ", terms]
-              _ ->
-                if N.isPositive c
-                  then Seq.fromList [if sign then " + " else " - ", show c <> terms]
-                  else Seq.fromList [if sign then " - " else " + ", show (Prelude.negate c) <> terms]
+              _ -> Seq.fromList [if sign then " + " else " - ", show c <> terms]
+                -- if N.isPositive c
+                --   then traceShow ("POS", c, Prelude.negate c) $ Seq.fromList [if sign then " + " else " - ", show c <> terms]
+                --   else traceShow "NEG" $ Seq.fromList [if sign then " - " else " + ", show (Prelude.negate c) <> terms]
 
-      printTerm :: (GaloisField n, Integral n) => (Ref, n) -> Seq String
+      printTerm :: (Ref, n) -> Seq String
       printTerm (x, c)
         | c == 0 = error "printTerm: coefficient of 0"
         | c == 1 = Seq.fromList [" + ", show x]

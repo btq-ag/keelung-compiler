@@ -13,7 +13,7 @@ run = hspec tests
 --------------------------------------------------------------------------------
 
 tests :: SpecWith ()
-tests =
+tests = do
   describe "DivMod" $ do
     it "performDivMod (on constants) (issue #18)" $ do
       let program dividend divisor = performDivMod (fromInteger dividend) (fromInteger divisor :: UInt 4)
