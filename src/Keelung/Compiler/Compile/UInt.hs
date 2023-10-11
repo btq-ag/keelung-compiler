@@ -43,6 +43,10 @@ compile out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileMulU w out x' y'
+  AESMulU w x y -> do
+    x' <- wireU x
+    y' <- wireU y
+    compileMulU w out x' y'
   CLMulU w x y -> do
     x' <- wireU x
     y' <- wireU y

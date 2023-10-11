@@ -108,6 +108,7 @@ propagateExprU e = do
     VarUP _ _ -> return e -- no constant propagation for private input variables
     AddU w xs -> AddU w <$> mapM (\(x, sign) -> (,sign) <$> propagateExprU x) xs
     MulU w x y -> MulU w <$> propagateExprU x <*> propagateExprU y
+    AESMulU w x y -> AESMulU w <$> propagateExprU x <*> propagateExprU y
     CLMulU w x y -> CLMulU w <$> propagateExprU x <*> propagateExprU y
     CLModU w x y -> CLModU w <$> propagateExprU x <*> propagateExprU y
     MMIU w x p -> MMIU w <$> propagateExprU x <*> pure p
