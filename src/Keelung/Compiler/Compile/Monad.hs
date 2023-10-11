@@ -5,6 +5,7 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
+import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
@@ -240,8 +241,17 @@ writeNEqB a b = addC [CVarNEqB a b]
 writeEqU :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
 writeEqU a b = addC [CVarEqU a b]
 
+-- | Assert that two limbs are equal
+--   If the width of the limb happens to the same as the width of the RefU, then we can use CVarEqU instead
 writeEqL :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
-writeEqL a b = addC [CVarEqL a b]
+writeEqL a b =
+  let widthOfA = lmbWidth a
+      widthOfB = lmbWidth b
+      widthOfARefU = widthOf (lmbRef a)
+      widthOfBRefU = widthOf (lmbRef b)
+   in if widthOfA == widthOfB && widthOfA == widthOfARefU && widthOfB == widthOfBRefU
+        then writeEqU (lmbRef a) (lmbRef b)
+        else addC [CVarEqL a b]
 
 --------------------------------------------------------------------------------
 

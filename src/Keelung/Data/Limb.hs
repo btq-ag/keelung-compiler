@@ -3,6 +3,7 @@
 
 module Keelung.Data.Limb
   ( Limb (lmbRef, lmbWidth, lmbOffset, lmbSigns),
+    showAsTerms,
     new,
     isPositive,
     refUToLimbs,
@@ -31,14 +32,21 @@ data Limb = Limb
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show Limb where
-  show (Limb ref limbWidth i sign') = case (limbWidth, sign') of
-    (0, _) -> "<Empty Limb>"
-    (1, Left sign) -> (if sign then "" else "-") <> "$" <> show (RefUBit 1 ref i)
-    (1, Right signs) -> (if head signs then "" else "-") <> "$" <> show (RefUBit 1 ref i)
-    (2, Left sign) -> (if sign then "" else "-") <> "{$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " 2" <> toSuperscript 1 <> "$" <> show (RefUBit 1 ref (i + 1)) <> "}"
-    (2, Right signs) -> (if head signs then "" else "-") <> "{$" <> show (RefUBit 1 ref i) <> " " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript 1 <> "$" <> show (RefUBit 1 ref (i + 1)) <> "}"
-    (_, Left sign) -> (if sign then "" else "-") <> "$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " ... " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1))
-    (_, Right signs) -> (if head signs then "" else "-") <> "$" <> show (RefUBit 1 ref i) <> " ... " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1))
+  show limb =
+    let (sign, terms) = showAsTerms limb
+     in if sign then terms else "-" <> terms
+
+-- | For printing limbs as terms in a polynomial (signs are handled by the caller)
+--   returns (isPositive, string of the term)
+showAsTerms :: Limb -> (Bool, String)
+showAsTerms (Limb ref limbWidth i sign') = case (limbWidth, sign') of
+  (0, _) -> (True, "{Empty Limb}")
+  (1, Left sign) -> (sign, "{$" <> show (RefUBit 1 ref i) <> "}")
+  (2, Left sign) -> (sign, "{$" <> show (RefUBit 1 ref i) <> " + 2" <> toSuperscript 1 <> "$" <> show (RefUBit 1 ref (i + 1)) <> "}")
+  (_, Left sign) -> (sign, "{$" <> show (RefUBit 1 ref i) <> " + ... + 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1)) <> "}")
+  (_, Right signs) ->
+    let terms = mconcat [if signs !! j then " + " else " - " <> "$2" <> toSuperscript j <> show (RefUBit 1 ref (i + j)) | j <- [0 .. limbWidth - 1]]
+     in (True, "{" <> terms <> "}")
 
 -- | Helper function for converting integers to superscript strings
 toSuperscript :: Int -> String

@@ -59,8 +59,8 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuit (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuit (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuit (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
+            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuit (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
     Protocol CompileO2 -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -68,8 +68,8 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuit (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuit (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuit (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
+            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuit (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
     Protocol Interpret -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
@@ -86,8 +86,8 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
           where 
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile Aurora filepath (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuitAndWriteFile Aurora filepath (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile Aurora filepath (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
+            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuitAndWriteFile Aurora filepath (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
     Protocol (GenCircuitBin filepath) -> do
        blob <- getContents
        let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -95,7 +95,7 @@ main = withUtf8 $ do
          Left err -> print err
          Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
           where 
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile Snarkjs filepath (left show $ toR1CS <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile Snarkjs filepath (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
             handleBinary _ _ = error "Binary R1CS format doesn't support binary fields."
     Protocol (GenWitness filepath) -> do
       blob <- getContents
