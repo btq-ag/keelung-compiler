@@ -8,7 +8,6 @@ module Keelung.Compiler.Relations.UInt
     assign,
     relate,
     lookup,
-    relationBetween,
     toMap,
     size,
     isValid,
@@ -36,14 +35,16 @@ type UIntRelations =
 --------------------------------------------------------------------------------
 
 -- | Relation on RefUs
-data Relation = Equal
-  deriving (Eq, Generic, NFData)
-
-instance Show Relation where
-  show Equal = "="
+data Relation
+  = Equal -- a = b
+  deriving (-- | ShiftLeft Int -- a = b << n
+            Eq, Generic, NFData)
 
 instance Semigroup Relation where
-  Equal <> Equal = Equal
+  Equal <> r = r
+
+-- r <> Equal = r
+-- ShiftLeft n <> ShiftLeft m = ShiftLeft (n + m)
 
 instance Monoid Relation where
   mempty = Equal
@@ -52,11 +53,18 @@ instance EquivClass.IsRelation Relation where
   -- Render a relation to some child as a string
   relationToString (var, Equal) = " = " <> var
 
+  -- relationToString (var, ShiftLeft n) = " = " <> var <> " << " <> show n
+
   -- Computes the inverse of a relation
   invertRel Equal = Just Equal
 
+-- invertRel (ShiftLeft 0) = Just Equal
+-- invertRel (ShiftLeft _) = Nothing
+
 instance EquivClass.ExecRelation Integer Relation where
-  execRel Equal refU = refU
+  execRel Equal val = val
+
+-- execRel (ShiftLeft n) val = val `Data.Bits.shiftL` n
 
 --------------------------------------------------------------------------------
 
@@ -78,17 +86,19 @@ lookup :: UIntRelations -> RefU -> Either RefU U
 lookup xs var = case EquivClass.lookup var xs of
   EquivClass.IsConstant constant -> Right (U.new (widthOf var) constant)
   EquivClass.IsRoot _ -> Left var
-  EquivClass.IsChildOf root Equal -> Left root
+  EquivClass.IsChildOf parent Equal -> Left parent
+
+-- EquivClass.IsChildOf parent (ShiftLeft n) -> Left root
 
 -- | Examine the relation between two RefUs
-relationBetween :: RefU -> RefU -> UIntRelations -> Bool
-relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
-  Nothing -> False
-  Just Equal -> True
+-- relationBetween :: RefU -> RefU -> UIntRelations -> Bool
+-- relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
+--   Nothing -> False
+--   Just Equal -> True
 
 -- | Given a predicate, convert the relations to a mapping of RefUs to either some other RefU or a constant value
 toMap :: (RefU -> Bool) -> UIntRelations -> Map RefU (Either RefU U)
-toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
+toMap shouldBeKept = Map.mapMaybeWithKey convert . EquivClass.toMap
   where
     convert var status = do
       if shouldBeKept var

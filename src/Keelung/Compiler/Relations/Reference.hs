@@ -92,10 +92,22 @@ data Lookup n = Root | Value n | ChildOf n Ref n
     )
 
 lookup :: GaloisField n => UIntRelations -> Ref -> RefRelations n -> Lookup n
-lookup relationsU (B (RefUBit width refU index)) _relations =case EquivClass.lookup refU relationsU of
+lookup relationsU (B (RefUBit width refU index)) _relations = case EquivClass.lookup refU relationsU of
       EquivClass.IsConstant value -> Value (if Data.Bits.testBit value index then 1 else 0)
       EquivClass.IsRoot _ -> Root
       EquivClass.IsChildOf parent UInt.Equal -> ChildOf 1 (B (RefUBit width parent index)) 0
+      -- EquivClass.IsChildOf parent (UInt.ShiftLeft 0) -> ChildOf 1 (B (RefUBit width parent index)) 0
+      -- EquivClass.IsChildOf parent (UInt.ShiftLeft n) -> 
+      --     -- parent  ┌─┬─┬─┬─┬─┬─┬─┬─┐
+      --     --         └─┴─┴─┴─┴─┴─┴─┴─┘
+      --     --                  │
+      --     --              ┌───┘  shift left by n bits
+      --     --              ▼
+      --     -- refU    ┌─┬─┬─┬─┬─┬─┬─┬─┐
+      --     --         └─┴─┴─┴─┴─┴─┴─┴─┘
+      --     if index < n
+      --       then Value 0 -- zeroed out
+      --       else ChildOf 1 (B (RefUBit width parent (index - n))) 0
 lookup _ var relations = case EquivClass.lookup var relations of
   EquivClass.IsConstant value -> Value value
   EquivClass.IsRoot _ -> Root
