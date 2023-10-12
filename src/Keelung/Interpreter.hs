@@ -379,7 +379,7 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
     SubU _ x y -> zipWith (-) <$> interpretU x <*> interpretU y
     CLMulU _ x y -> zipWith U.clMul <$> interpretU x <*> interpretU y
     MulU _ x y -> zipWith (*) <$> interpretU x <*> interpretU y
-    AESMulU _ x y -> zipWith (*) <$> interpretU x <*> interpretU y
+    AESMulU _ x y -> zipWith U.aesMul <$> interpretU x <*> interpretU y
     MMIU w x p -> do
       x' <- map U.uValue <$> interpretU x
       case x' of

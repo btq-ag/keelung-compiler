@@ -17,6 +17,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Monad
+import Keelung.Compiler.Compile.UInt.AESMul
 import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.Compile.UInt.Bitwise
 import Keelung.Compiler.Compile.UInt.CLMul
@@ -46,7 +47,7 @@ compile out expr = case expr of
   AESMulU w x y -> do
     x' <- wireU x
     y' <- wireU y
-    compileMulU w out x' y'
+    compileAESMulU w out x' y'
   CLMulU w x y -> do
     x' <- wireU x
     y' <- wireU y
