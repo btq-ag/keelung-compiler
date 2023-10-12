@@ -67,7 +67,7 @@ instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
         (x Seq.:<| xs) -> (x, xs)
 
       -- return a pair of the sign ("+" or "-") and the string representation
-      printLimb :: (Limb, n) -> Seq String
+      printLimb :: (Eq n, Num n, Ord n, Show n) => (Limb, n) -> Seq String
       printLimb (x, c) =
         let (sign, terms) = Limb.showAsTerms x
          in case c of
@@ -79,7 +79,7 @@ instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
                 --   then traceShow ("POS", c, Prelude.negate c) $ Seq.fromList [if sign then " + " else " - ", show c <> terms]
                 --   else traceShow "NEG" $ Seq.fromList [if sign then " - " else " + ", show (Prelude.negate c) <> terms]
 
-      printTerm :: (Ref, n) -> Seq String
+      printTerm :: (Eq n, Num n, Ord n, Show n) => (Ref, n) -> Seq String
       printTerm (x, c)
         | c == 0 = error "printTerm: coefficient of 0"
         | c == 1 = Seq.fromList [" + ", show x]

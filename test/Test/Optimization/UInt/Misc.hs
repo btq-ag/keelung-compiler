@@ -51,7 +51,7 @@ tests = describe "Misc" $ do
 
       -- print cs
       -- print cs'
-      debug cs'
+      -- debug cs'
 
       cs `shouldHaveSize` 18
       cs' `shouldHaveSize` 13

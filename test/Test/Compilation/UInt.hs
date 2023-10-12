@@ -8,6 +8,7 @@ import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver qualified as Solver
+import Test.Compilation.UInt.AESMul qualified as AESMul
 import Test.Compilation.UInt.Addition qualified as Addition
 import Test.Compilation.UInt.Bitwise qualified as Bitwise
 import Test.Compilation.UInt.CLMul qualified as CLMul
@@ -31,6 +32,7 @@ tests = do
     Addition.tests
     Multiplication.tests
     CLMul.tests
+    AESMul.tests
 
     DivMod.tests
     ModInv.tests

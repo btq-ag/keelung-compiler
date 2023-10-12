@@ -154,12 +154,12 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
 
       showMulL' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
-          showVec :: Either n (PolyL n) -> String
+          showVec :: (Eq n, Num n, Ord n, Show n) => Either n (PolyL n) -> String
           showVec (Left c) = show c
           showVec (Right xs) = show xs
 
           -- wrap the string with parenthesis if it has more than 1 term
-          showVecWithParen :: PolyL n -> String
+          showVecWithParen :: (Eq n, Num n, Ord n, Show n) => PolyL n -> String
           showVecWithParen xs =
             if PolyL.size xs < 2
               then showVec (Right xs)

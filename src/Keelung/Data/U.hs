@@ -5,6 +5,7 @@ module Keelung.Data.U
   ( U (uValue),
     new,
     modInv,
+    aesMul,
     clMul,
     clDivMod,
     clDiv,
@@ -82,6 +83,14 @@ divModU a b
   | otherwise =
       let width = mergeWidths a b
        in (U (Just width) (uValue a `Prelude.div` uValue b), U (Just width) (uValue a `Prelude.mod` uValue b))
+
+-- | Hardcoded GF(256) multiplication for AES
+aesMul :: U -> U -> U
+aesMul (U w a) (U _ b) =
+  let a' = U (fmap succ w) a
+      b' = U (fmap succ w) b
+      U _ c' = snd $ (a' `clMul` b') `clDivMod` U (fmap succ w) 0b100011011
+   in U w c'
 
 -- | Carry-less multiplication of two unsigned integers.
 clMul :: U -> U -> U
