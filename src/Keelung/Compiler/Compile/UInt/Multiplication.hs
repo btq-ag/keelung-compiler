@@ -43,7 +43,7 @@ import Keelung.Syntax (Width)
 compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileMulU _width out (Right a) (Right b) = do
   let val = a * b
-  writeValU out val
+  writeRefUVal out val
 compileMulU width out (Right a) (Left b) = compileMul width out b (Right a)
 compileMulU width out (Left a) (Right b) = compileMul width out a (Right b)
 compileMulU width out (Left a) (Left b) = compileMul width out a (Left b)

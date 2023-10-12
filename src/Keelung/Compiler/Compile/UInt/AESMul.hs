@@ -15,19 +15,19 @@ import Keelung.Syntax (Width)
 compileAESMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileAESMulU width out (Right a) (Right b) = do
   let val = U.uValue (U.aesMul (U.new width a) (U.new width b))
-  writeValU out val
+  writeRefUVal out val
 compileAESMulU width out (Right a) (Left b) = compileAESMulCV width out a b
 compileAESMulU width out (Left a) (Right b) = compileAESMulCV width out b a
 compileAESMulU width out (Left a) (Left b) = compileCLMul width out a b
 
 compileAESMulCV :: (GaloisField n, Integral n) => Width -> RefU -> Integer -> RefU -> M n ()
-compileAESMulCV _ out 0 _ = writeValU out 0
-compileAESMulCV _ out 1 x = writeEqU out x
+compileAESMulCV _ out 0 _ = writeRefUVal out 0
+compileAESMulCV _ out 1 x = writeRefUEq out x
 -- compileAESMulCV width out 2 x = do
 --   let shiftedLimb = Limb.new x
 
---   error "writeEqU out x"
-compileAESMulCV _ _ _ _ = error "writeEqU out x"
+--   error "writeRefUEq out x"
+compileAESMulCV _ _ _ _ = error "writeRefUEq out x"
 
 -- compileAESMulCV width out constant x = forM_ [0 .. width - 1] $ \i -> do
 --   -- pairs of bits to be conjuncted
@@ -37,8 +37,8 @@ compileAESMulCV _ _ _ _ = error "writeEqU out x"
 --   -- xor the conjuncted pairs
 --   result <- Boolean.xorBs conjunctedPairs
 --   case result of
---     Left var -> writeEqB (RefUBit width out i) var
---     Right val -> writeValB (RefUBit width out i) val
+--     Left var -> writeRefBEq (RefUBit width out i) var
+--     Right val -> writeRefBVal (RefUBit width out i) val
 
 compileCLMul :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
 compileCLMul width out x y = forM_ [0 .. width - 1] $ \i -> do
@@ -49,5 +49,5 @@ compileCLMul width out x y = forM_ [0 .. width - 1] $ \i -> do
   -- xor the conjuncted pairs
   result <- Boolean.xorBs conjunctedPairs
   case result of
-    Left var -> writeEqB (RefUBit width out i) var
-    Right val -> writeValB (RefUBit width out i) val
+    Left var -> writeRefBEq (RefUBit width out i) var
+    Right val -> writeRefBVal (RefUBit width out i) val

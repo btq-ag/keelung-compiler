@@ -43,7 +43,7 @@ compile compileU expr = case expr of
     case x' of
       Left var -> do
         out <- freshRefB
-        writeNEqB var out
+        writeRefBNEq var out
         return $ Left out
       Right val -> return $ Right (not val)
   IfB p x y -> do
@@ -123,7 +123,7 @@ compileIfB (Left _) (Right True) (Right True) = return $ Right True
 compileIfB (Left p) (Right True) (Right False) = return $ Left p
 compileIfB (Left p) (Right False) (Right True) = do
   out <- freshRefB
-  writeNEqB p out
+  writeRefBNEq p out
   return $ Left out
 compileIfB (Left _) (Right False) (Right False) = return $ Right False
 compileIfB (Left p) (Right x) (Left y) = do
@@ -274,7 +274,7 @@ xorBs xs = do
     flipResult (Right True) = return $ Right False
     flipResult (Left var) = do
       out <- freshRefB
-      writeNEqB var out
+      writeRefBNEq var out
       return $ Left out
 
     -- the degenrate case, divide and conquer won't terminate, use a linear fold instead
@@ -345,7 +345,7 @@ eqB (Right x) (Right y) = return $ Right $ x == y
 eqB (Right True) (Left y) = return $ Left y
 eqB (Right False) (Left y) = do
   out <- freshRefB
-  writeNEqB out y
+  writeRefBNEq out y
   return $ Left out
 eqB (Left x) (Right y) = eqB (Right y) (Left x)
 eqB (Left x) (Left y) = do
@@ -458,11 +458,11 @@ compileLTEUVarConstPrim (Left acc) (x, False) = do
 compileLTEUVarConstPrim (Right True) (_, True) = return $ Right True
 compileLTEUVarConstPrim (Right True) (x, False) = do
   acc <- freshRefB
-  writeNEqB acc x
+  writeRefBNEq acc x
   return $ Left acc
 compileLTEUVarConstPrim (Right False) (x, True) = do
   acc <- freshRefB
-  writeNEqB acc x
+  writeRefBNEq acc x
   return $ Left acc
 compileLTEUVarConstPrim (Right False) (_, False) = return $ Right False
 

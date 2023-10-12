@@ -15,14 +15,14 @@ import Keelung.Syntax (Width)
 compileCLMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileCLMulU width out (Right a) (Right b) = do
   let val = U.uValue (U.clMul (U.new width a) (U.new width b))
-  writeValU out val
+  writeRefUVal out val
 compileCLMulU width out (Right a) (Left b) = do
   temp <- freshRefU width
-  writeValU temp a
+  writeRefUVal temp a
   compileCLMul width out temp b
 compileCLMulU width out (Left a) (Right b) = do
   temp <- freshRefU width
-  writeValU temp b
+  writeRefUVal temp b
   compileCLMul width out a temp
 compileCLMulU width out (Left a) (Left b) = compileCLMul width out a b
 
@@ -35,5 +35,5 @@ compileCLMul width out x y = forM_ [0 .. width - 1] $ \i -> do
   -- xor the conjuncted pairs
   result <- Boolean.xorBs conjunctedPairs
   case result of
-    Left var -> writeEqB (RefUBit width out i) var
-    Right val -> writeValB (RefUBit width out i) val
+    Left var -> writeRefBEq (RefUBit width out i) var
+    Right val -> writeRefBVal (RefUBit width out i) val

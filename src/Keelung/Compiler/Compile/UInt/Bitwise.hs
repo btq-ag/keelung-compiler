@@ -24,8 +24,8 @@ compileXorUs width out xs = do
             xs
     result <- Boolean.xorBs column
     case result of
-      Left var -> writeEqB (RefUBit width out i) var
-      Right val -> writeValB (RefUBit width out i) val
+      Left var -> writeRefBEq (RefUBit width out i) var
+      Right val -> writeRefBVal (RefUBit width out i) val
 
 -- --   -- trim the limbs so that their width does not exceed that of the result limb
 -- --   let trimmedLimbs = LimbColumn.trim (lmbWidth finalResultLimb) limbs

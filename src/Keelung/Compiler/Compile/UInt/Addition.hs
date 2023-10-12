@@ -161,10 +161,10 @@ splitLimbStack dimensions (LimbColumn constant limbs) =
 addLimbStack :: (GaloisField n, Integral n) => Limb -> LimbStack -> M n LimbColumn
 addLimbStack resultLimb (OneConstantOnly constant) = do
   -- no limb => result = constant, no carry
-  writeValL resultLimb constant
+  writeLimbVal resultLimb constant
   return mempty
 addLimbStack resultLimb (OneLimbOnly limb) = do
-  writeEqL resultLimb limb
+  writeLimbEq resultLimb limb
   return mempty
 addLimbStack resultLimb (Ordinary constant limbs) = do
   let carrySigns = calculateCarrySigns (lmbWidth resultLimb) constant limbs

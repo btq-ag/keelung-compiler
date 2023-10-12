@@ -71,11 +71,11 @@ linkConstraintModule cm =
     extractRefRelations :: (GaloisField n, Integral n) => Relations n -> Seq (Linked.Constraint n)
     extractRefRelations relations =
       let convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Constraint n
-          convert (var, Right val) = CVarBindF var val
+          convert (var, Right val) = CRefFVal var val
           convert (var, Left (slope, root, intercept)) =
             case (slope, intercept) of
-              (0, _) -> CVarBindF var intercept
-              (1, 0) -> CVarEq var root
+              (0, _) -> CRefFVal var intercept
+              (1, 0) -> CRefEq var root
               (_, _) -> case PolyL.fromRefs intercept [(var, -1), (root, slope)] of
                 Left _ -> error "[ panic ] extractRefRelations: failed to build polynomial"
                 Right poly -> CAddL poly
@@ -128,8 +128,8 @@ linkConstraintModule cm =
     extractLimbRelations :: (GaloisField n, Integral n) => LimbRelations -> Seq (Linked.Constraint n)
     extractLimbRelations relations =
       let convert :: (GaloisField n, Integral n) => (Limb, Either Limb Integer) -> Constraint n
-          convert (var, Right val) = CVarBindL var val
-          convert (var, Left root) = CVarEqL var root
+          convert (var, Right val) = CLimbVal var val
+          convert (var, Left root) = CLimbEq var root
 
           result = map convert $ Map.toList $ LimbRelations.toMap limbShouldBeKept relations
        in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
@@ -137,8 +137,8 @@ linkConstraintModule cm =
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
     extractUIntRelations relations =
       let convert :: (GaloisField n, Integral n) => (RefU, Either RefU U) -> Constraint n
-          convert (var, Right val) = CVarBindU var (U.uValue val)
-          convert (var, Left root) = CVarEqU var root
+          convert (var, Right val) = CRefUVal var (U.uValue val)
+          convert (var, Left root) = CRefUEq var root
           result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
        in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
 
@@ -162,49 +162,39 @@ linkConstraintModule cm =
 
 linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Width -> Constraint n -> [Linked.Constraint n]
 linkConstraint occurrences _ (CAddL as) = [Linked.CAdd (linkPolyLUnsafe occurrences as)]
-linkConstraint occurrences _ (CVarEq x y) =
+linkConstraint occurrences _ (CRefEq x y) =
   case Poly.buildEither 0 [(reindexRef occurrences x, 1), (reindexRef occurrences y, -1)] of
-    Left _ -> error "CVarEq: two variables are the same"
+    Left _ -> error "CRefEq: two references are the same"
     Right xs -> [Linked.CAdd xs]
-linkConstraint occurrences _ (CVarEqF x y) =
-  case Poly.buildEither 0 [(reindexRefF occurrences x, 1), (reindexRefF occurrences y, -1)] of
-    Left _ -> error "CVarEqF: two variables are the same"
-    Right xs -> [Linked.CAdd xs]
-linkConstraint occurrences _ (CVarEqB x y) =
-  case Poly.buildEither 0 [(reindexRefB occurrences x, 1), (reindexRefB occurrences y, -1)] of
-    Left _ -> error $ "CVarEqB: two variables are the same" ++ show x ++ " " ++ show y
-    Right xs -> [Linked.CAdd xs]
-linkConstraint occurrences _ (CVarNEqB x y) =
+linkConstraint occurrences _ (CRefBNEq x y) =
   case Poly.buildEither 1 [(reindexRefB occurrences x, -1), (reindexRefB occurrences y, -1)] of
-    Left _ -> error "CVarNEqB: two variables are the same"
+    Left _ -> error "CRefBNEq: two variables are the same"
     Right xs -> [Linked.CAdd xs]
-linkConstraint occurrences _ (CVarEqL x y) =
+linkConstraint occurrences _ (CLimbEq x y) =
   if lmbWidth x /= lmbWidth y
-    then error "[ panic ] CVarEqL: Limbs are of different width"
+    then error "[ panic ] CLimbEq: Limbs are of different width"
     else do
       let pairsX = reindexLimb occurrences x 1
       let pairsY = reindexLimb occurrences y (-1)
       let pairs = IntMap.unionWith (+) pairsX pairsY
       case Poly.buildWithIntMap 0 pairs of
-        Left _ -> error "CVarEqL: two variables are the same"
+        Left _ -> error "CLimbEq: two variables are the same"
         Right xs -> [Linked.CAdd xs]
-linkConstraint occurrences fieldWidth (CVarEqU x y) =
-  let cVarEqLs = zipWith CVarEqL (Limb.refUToLimbs fieldWidth x) (Limb.refUToLimbs fieldWidth y)
+linkConstraint occurrences fieldWidth (CRefUEq x y) =
+  let cVarEqLs = zipWith CLimbEq (Limb.refUToLimbs fieldWidth x) (Limb.refUToLimbs fieldWidth y)
    in cVarEqLs >>= linkConstraint occurrences fieldWidth
-linkConstraint occurrences _ (CVarBindF x n) = case Poly.buildEither (-n) [(reindexRef occurrences x, 1)] of
-  Left _ -> error "CVarBindF: impossible"
+linkConstraint occurrences _ (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef occurrences x, 1)] of
+  Left _ -> error "CRefFVal: impossible"
   Right xs -> [Linked.CAdd xs]
-linkConstraint occurrences _ (CVarBindB x True) = [Linked.CAdd (Poly.bind (reindexRefB occurrences x) 1)]
-linkConstraint occurrences _ (CVarBindB x False) = [Linked.CAdd (Poly.bind (reindexRefB occurrences x) 0)]
-linkConstraint occurrences _ (CVarBindL x n) =
+linkConstraint occurrences _ (CLimbVal x n) =
   case Poly.buildWithIntMap (fromInteger (-n)) (reindexLimb occurrences x 1) of
-    Left _ -> error "CVarBindL: impossible"
+    Left _ -> error "CLimbVal: impossible"
     Right xs -> [Linked.CAdd xs]
-linkConstraint occurrences fieldWidth (CVarBindU x n) =
+linkConstraint occurrences fieldWidth (CRefUVal x n) =
   -- split the Integer into smaller chunks of size `fieldWidth`
   let number = U.new (widthOf x) n
       chunks = map U.uValue (U.chunks fieldWidth number)
-      cVarBindLs = zipWith CVarBindL (Limb.refUToLimbs fieldWidth x) chunks
+      cVarBindLs = zipWith CLimbVal (Limb.refUToLimbs fieldWidth x) chunks
    in cVarBindLs >>= linkConstraint occurrences fieldWidth
 linkConstraint occurrences _ (CMulL as bs cs) =
   [ Linked.CMul

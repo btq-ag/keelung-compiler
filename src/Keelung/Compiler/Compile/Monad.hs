@@ -159,29 +159,21 @@ addC = mapM_ addOne
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddL xs) = modify' (\cs -> addOccurrencesTuple (PolyL.varsSet xs) $ cs {cmAddL = xs : cmAddL cs})
-    addOne (CVarBindF x c) = do
+    addOne (CRefFVal x c) = do
       execRelations $ Relations.assignR x c
-    addOne (CVarBindB x c) = do
-      execRelations $ Relations.assignB x c
-    addOne (CVarBindL x c) = do
+    addOne (CLimbVal x c) = do
       execRelations $ Relations.assignL x c
-    addOne (CVarBindU x c) = do
+    addOne (CRefUVal x c) = do
       execRelations $ Relations.assignU x c
-    addOne (CVarEq x y) = do
+    addOne (CRefEq x y) = do
       countBitTestAsOccurU x
       countBitTestAsOccurU y
       execRelations $ Relations.relateR x 1 y 0
-    addOne (CVarEqF x y) = do
-      execRelations $ Relations.relateR (F x) 1 (F y) 0
-    addOne (CVarEqB x y) = do
-      countBitTestAsOccurU (B x)
-      countBitTestAsOccurU (B y)
-      execRelations $ Relations.relateB x (True, y)
-    addOne (CVarEqL x y) = do
+    addOne (CLimbEq x y) = do
       execRelations $ Relations.relateL x y
-    addOne (CVarEqU x y) = do
+    addOne (CRefUEq x y) = do
       execRelations $ Relations.relateU x y
-    addOne (CVarNEqB x y) = do
+    addOne (CRefBNEq x y) = do
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
       execRelations $ Relations.relateB x (False, y)
@@ -209,62 +201,73 @@ writeAddWithLimbs constant limbs = case PolyL.fromLimbs constant limbs of
   Left _ -> return ()
   Right poly -> addC [CAddL poly]
 
-writeVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
-writeVal (F a) x = writeValF a x
-writeVal (B a) x = writeValB a (x /= 0)
+-- | Assign a field element to a Ref
+writeRefVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
+writeRefVal (F a) x = writeRefFVal a x
+writeRefVal (B a) x = writeRefBVal a (x /= 0)
 
-writeValF :: (GaloisField n, Integral n) => RefF -> n -> M n ()
-writeValF a x = addC [CVarBindF (F a) x]
+-- | Assign a field element to a RefF
+writeRefFVal :: (GaloisField n, Integral n) => RefF -> n -> M n ()
+writeRefFVal a x = addC [CRefFVal (F a) x]
 
-writeValB :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
-writeValB a x = addC [CVarBindB a x]
+-- | Assign a Bool to a RefB
+writeRefBVal :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
+writeRefBVal a True = addC [CRefFVal (B a) 1]
+writeRefBVal a False = addC [CRefFVal (B a) 0]
 
-writeValU :: (GaloisField n, Integral n) => RefU -> Integer -> M n ()
-writeValU a x = addC [CVarBindU a x]
+-- | Assign a Integer to a RefU
+writeRefUVal :: (GaloisField n, Integral n) => RefU -> Integer -> M n ()
+writeRefUVal a x = addC [CRefUVal a x]
 
-writeValL :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
-writeValL a x = addC [CVarBindL a x]
+-- | Assign an Integer to a Limb
+writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
+writeLimbVal a x = addC [CLimbVal a x]
 
-writeEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
-writeEq a b = addC [CVarEq a b]
+-- | Assert that two Refs are equal
+writeRefEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
+writeRefEq a b = addC [CRefEq a b]
 
-writeEqF :: (GaloisField n, Integral n) => RefF -> RefF -> M n ()
-writeEqF a b = addC [CVarEqF a b]
+-- | Assert that two RefFs are equal
+writeRefFEq :: (GaloisField n, Integral n) => RefF -> RefF -> M n ()
+writeRefFEq a b = addC [CRefEq (F a) (F b)]
 
-writeEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
-writeEqB a b = addC [CVarEqB a b]
+-- | Assert that two RefBs are equal
+writeRefBEq :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
+writeRefBEq a b = addC [CRefEq (B a) (B b)]
 
-writeNEqB :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
-writeNEqB a b = addC [CVarNEqB a b]
+-- | Assert that one RefB is the negation of another RefB
+writeRefBNEq :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
+writeRefBNEq a b = addC [CRefBNEq a b]
 
-writeEqU :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
-writeEqU a b = addC [CVarEqU a b]
+-- | Assert that two RefUs are equal
+writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
+writeRefUEq a b = addC [CRefUEq a b]
 
--- | Assert that two limbs are equal
-writeEqL :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
-writeEqL a b = addC [CVarEqL a b]
+-- | Assert that two Limbs are equal
+writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
+writeLimbEq a b = addC [CLimbEq a b]
 
---   I f the width of the limb happens to the same as the width of the RefU, then we can use CVarEqU instead
+--   I f the width of the limb happens to the same as the width of the RefU, then we can use CRefUEq instead
 -- let widthOfA = lmbWidth a
 --     widthOfB = lmbWidth b
 --     widthOfARefU = widthOf (lmbRef a)
 --     widthOfBRefU = widthOf (lmbRef b)
 --  in if widthOfA == widthOfB && widthOfA == widthOfARefU && widthOfB == widthOfBRefU
---       then writeEqU (lmbRef a) (lmbRef b)
---       else addC [CVarEqL a b]
+--       then writeRefUEq (lmbRef a) (lmbRef b)
+--       else addC [CLimbEq a b]
 
 --------------------------------------------------------------------------------
 
 -- | Hints
 addEqZeroHint :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> RefF -> M n ()
 addEqZeroHint c xs m = case PolyL.fromRefs c xs of
-  Left 0 -> writeValF m 0
-  Left constant -> writeValF m (recip constant)
+  Left 0 -> writeRefFVal m 0
+  Left constant -> writeRefFVal m (recip constant)
   Right poly -> modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
 addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyL n) -> RefF -> M n ()
-addEqZeroHintWithPoly (Left 0) m = writeValF m 0
-addEqZeroHintWithPoly (Left constant) m = writeValF m (recip constant)
+addEqZeroHintWithPoly (Left 0) m = writeRefFVal m 0
+addEqZeroHintWithPoly (Left constant) m = writeRefFVal m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
 addDivModHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> M n ()
