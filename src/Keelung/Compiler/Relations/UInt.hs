@@ -56,8 +56,6 @@ instance EquivClass.IsRelation Relation where
   invertRel Equal = Just Equal
 
 instance EquivClass.ExecRelation Integer Relation where
-  -- Given `parent = rel child`, executes `rel` on `child`
-  --  such that if `child = n`, then `parent = execRel rel n`
   execRel Equal refU = refU
 
 --------------------------------------------------------------------------------
