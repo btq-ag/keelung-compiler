@@ -28,6 +28,7 @@ import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Data.Reference
 import Prelude hiding (lookup)
 import Keelung.Compiler.Relations.UInt (UIntRelations)
+import Keelung.Compiler.Relations.UInt qualified as UInt
 import qualified Data.Bits
 
 type RefRelations n = EquivClass.EquivClass Ref n (LinRel n)
@@ -94,7 +95,7 @@ lookup :: GaloisField n => UIntRelations -> Ref -> RefRelations n -> Lookup n
 lookup relationsU (B (RefUBit width refU index)) _relations =case EquivClass.lookup refU relationsU of
       EquivClass.IsConstant value -> Value (if Data.Bits.testBit value index then 1 else 0)
       EquivClass.IsRoot _ -> Root
-      EquivClass.IsChildOf parent () -> ChildOf 1 (B (RefUBit width parent index)) 0
+      EquivClass.IsChildOf parent UInt.Equal -> ChildOf 1 (B (RefUBit width parent index)) 0
 lookup _ var relations = case EquivClass.lookup var relations of
   EquivClass.IsConstant value -> Value value
   EquivClass.IsRoot _ -> Root
@@ -126,7 +127,7 @@ instance Num n => Monoid (LinRel n) where
 instance (GaloisField n, Integral n) => EquivClass.IsRelation (LinRel n) where
   relationToString (var, LinRel x y) = go (LinRel (recip x) (-y / x))
     where
-      go (LinRel (-1) 1) = "¬" <> "var"
+      go (LinRel (-1) 1) = "¬" <> var
       go (LinRel a b) =
         let slope = case a of
               1 -> var

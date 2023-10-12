@@ -216,6 +216,7 @@ test-suite keelung-test
       Test.Optimization.Boolean
       Test.Optimization.Field
       Test.Optimization.UInt
+      Test.Optimization.UInt.Bitwise
       Test.Optimization.UInt.CLDivMod
       Test.Optimization.UInt.Misc
       Test.Optimization.Util
