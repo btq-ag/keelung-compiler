@@ -86,13 +86,17 @@ isPositive limb = case lmbSigns limb of
 -- | Convert a RefU to a bunch of Limbs
 --   (in case that the field width is not large enough to hold the RefU)
 refUToLimbs :: Width -> RefU -> [Limb]
-refUToLimbs fieldWidth refU = step (widthOf refU) 0
+refUToLimbs desiredWidth refU = step (widthOf refU) 0
   where
     step remainingWidth offset
-      | remainingWidth <= fieldWidth = [Limb refU remainingWidth offset (Left True)]
-      | otherwise = Limb refU fieldWidth offset (Left True) : step (remainingWidth - fieldWidth) (offset + fieldWidth)
+      | remainingWidth <= desiredWidth = [Limb refU remainingWidth offset (Left True)]
+      | otherwise = Limb refU desiredWidth offset (Left True) : step (remainingWidth - desiredWidth) (offset + desiredWidth)
 
 -- | Trim a 'Limb' to a given width.
 trim :: Width -> Limb -> Limb
 trim width (Limb ref w offset (Left sign)) = Limb ref (w `min` width) offset (Left sign)
 trim width (Limb ref w offset (Right signs)) = Limb ref (w `min` width) offset (Right (take (w `min` width) signs))
+
+-- | Given a series of limbs, shift them left by a given amount
+-- shiftLeft :: Int -> [Either Limb U] -> [Either Limb U]
+-- shiftLeft amount limbs 

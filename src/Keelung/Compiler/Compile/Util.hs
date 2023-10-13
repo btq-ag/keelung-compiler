@@ -1,22 +1,12 @@
-module Keelung.Compiler.Compile.Util where
+module Keelung.Compiler.Compile.Util (widthOfInteger, calculateBounds, calculateCarrySigns) where
 
 import Data.Bits qualified
 import Data.Sequence (Seq)
-import Data.Word (Word32)
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
+import Keelung.Data.U (widthOfInteger)
 
 --------------------------------------------------------------------------------
-
--- | Calculate the number of bits required to represent an Integer.
-widthOfInteger :: Integer -> Int
-widthOfInteger 0 = 0
-widthOfInteger x =
-  let lowerBits = fromInteger x :: Word32
-      higherBits = x `Data.Bits.shiftR` 32
-   in if higherBits == 0
-        then 32 - Data.Bits.countLeadingZeros lowerBits
-        else 32 + widthOfInteger higherBits
 
 -- | Calculate the lower bound and upper bound
 calculateBounds :: Integer -> Seq Limb -> (Integer, Integer)

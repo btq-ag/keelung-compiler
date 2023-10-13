@@ -1,6 +1,6 @@
 {-# LANGUAGE BinaryLiterals #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Data.U
   ( U (uValue),
@@ -12,14 +12,16 @@ module Keelung.Data.U
     clDiv,
     clMod,
     chunks,
+    widthOfInteger,
   )
 where
 
 import Control.DeepSeq (NFData)
 import Data.Bits (Bits (..))
+import Data.Bits qualified
 import Data.Serialize (Serialize)
+import Data.Word (Word32)
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.Util
 import Keelung.Syntax (HasWidth (..), Width)
 
 --------------------------------------------------------------------------------
@@ -57,7 +59,7 @@ instance Integral U where
   divMod = divModU
 
 -- | Merging two U values by placing them side by side.
-instance Semigroup U where  
+instance Semigroup U where
   (<>) a b = U (Just (widthOf a + widthOf b)) (uValue a `Data.Bits.shiftL` widthOf b Data.Bits..|. uValue b)
 
 instance Monoid U where
@@ -242,3 +244,15 @@ mergeWidths (U Nothing _) (U Nothing _) = 32
 mergeWidths (U (Just a) _) (U Nothing _) = a
 mergeWidths (U Nothing _) (U (Just b) _) = b
 mergeWidths (U (Just a) _) (U (Just b) _) = a `max` b
+
+--------------------------------------------------------------------------------
+
+-- | Calculate the number of bits required to represent an Integer.
+widthOfInteger :: Integer -> Int
+widthOfInteger 0 = 0
+widthOfInteger x =
+  let lowerBits = fromInteger x :: Word32
+      higherBits = x `Data.Bits.shiftR` 32
+   in if higherBits == 0
+        then 32 - Data.Bits.countLeadingZeros lowerBits
+        else 32 + widthOfInteger higherBits

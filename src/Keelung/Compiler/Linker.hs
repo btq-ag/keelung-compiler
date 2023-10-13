@@ -135,13 +135,7 @@ linkConstraintModule cm =
        in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
 
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
-    extractUIntRelations relations =
-      let -- convert :: (GaloisField n, Integral n) => (UIntRelations.Element, Either RefU U) -> Constraint n
-          -- convert (var, Right val) = CRefUVal var (U.uValue val)
-          -- convert (var, Left root) = CRefUEq var root
-          result = UIntRelations.toConstraints refUShouldBeKept relations
-       in -- map convert $ Map.toList $ UIntRelations.toConstraints refUShouldBeKept relations
-          result >>= Seq.fromList . linkConstraint occurrences fieldWidth
+    extractUIntRelations relations = UIntRelations.toConstraints refUShouldBeKept relations >>= Seq.fromList . linkConstraint occurrences fieldWidth
 
     varEqFs = extractRefRelations (cmRelations cm)
     varEqLs = extractLimbRelations (Relations.exportLimbRelations (cmRelations cm))
@@ -161,6 +155,7 @@ linkConstraintModule cm =
 
 -------------------------------------------------------------------------------
 
+-- | Link a specialized constraint to a list of constraints
 linkConstraint :: (GaloisField n, Integral n) => Occurrences -> Width -> Constraint n -> [Linked.Constraint n]
 linkConstraint occurrences _ (CAddL as) = [Linked.CAdd (linkPolyLUnsafe occurrences as)]
 linkConstraint occurrences _ (CRefEq x y) =
@@ -182,6 +177,7 @@ linkConstraint occurrences _ (CLimbEq x y) =
         Left _ -> error "CLimbEq: two variables are the same"
         Right xs -> [Linked.CAdd xs]
 linkConstraint occurrences fieldWidth (CRefUEq x y) =
+  -- split `x` and `y` into smaller limbs and pair them up with `CLimbEq`
   let cVarEqLs = zipWith CLimbEq (Limb.refUToLimbs fieldWidth x) (Limb.refUToLimbs fieldWidth y)
    in cVarEqLs >>= linkConstraint occurrences fieldWidth
 linkConstraint occurrences _ (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef occurrences x, 1)] of

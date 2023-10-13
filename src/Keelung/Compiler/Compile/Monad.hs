@@ -247,15 +247,6 @@ writeRefUEq a b = addC [CRefUEq a b]
 writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
 writeLimbEq a b = addC [CLimbEq a b]
 
---   I f the width of the limb happens to the same as the width of the RefU, then we can use CRefUEq instead
--- let widthOfA = lmbWidth a
---     widthOfB = lmbWidth b
---     widthOfARefU = widthOf (lmbRef a)
---     widthOfBRefU = widthOf (lmbRef b)
---  in if widthOfA == widthOfB && widthOfA == widthOfARefU && widthOfB == widthOfBRefU
---       then writeRefUEq (lmbRef a) (lmbRef b)
---       else addC [CLimbEq a b]
-
 --------------------------------------------------------------------------------
 
 -- | Hints
