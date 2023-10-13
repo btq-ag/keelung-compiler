@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Keelung.Data.U
   ( U (uValue),
@@ -54,6 +55,13 @@ instance Integral U where
   toInteger = uValue
   quotRem = divModU
   divMod = divModU
+
+-- | Merging two U values by placing them side by side.
+instance Semigroup U where  
+  (<>) a b = U (Just (widthOf a + widthOf b)) (uValue a `Data.Bits.shiftL` widthOf b Data.Bits..|. uValue b)
+
+instance Monoid U where
+  mempty = U (Just 0) 0
 
 --------------------------------------------------------------------------------
 
