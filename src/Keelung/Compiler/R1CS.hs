@@ -28,9 +28,9 @@ toR1CS cs =
       r1csConstraints = map toR1C (toList (csConstraints cs)),
       r1csCounters = csCounters cs,
       r1csEqZeros = csEqZeros cs,
-      r1csDivMods = map (\(a, b, c, d) -> ([a], [b], [c], [d])) (csDivMods cs),
-      r1csCLDivMods = map (\(a, b, c, d) -> ([a], [b], [c], [d])) (csCLDivMods cs),
-      r1csModInvs = map (\(a, b, c, d) -> ([a], [b], [c], d)) (csModInvs cs)
+      r1csDivMods = csDivMods cs,
+      r1csCLDivMods = csCLDivMods cs,
+      r1csModInvs = csModInvs cs
     }
   where
     toR1C :: GaloisField n => Constraint n -> R1C n

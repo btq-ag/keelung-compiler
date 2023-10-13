@@ -241,10 +241,10 @@ reduceDivMod (a, b, q, r) = do
   relations <- gets (Relations.exportUIntRelations . cmRelations)
   return $
     Just
-      ( a `bind` UInt.lookup relations,
-        b `bind` UInt.lookup relations,
-        q `bind` UInt.lookup relations,
-        r `bind` UInt.lookup relations
+      ( a `bind` UInt.lookupRefU relations,
+        b `bind` UInt.lookupRefU relations,
+        q `bind` UInt.lookupRefU relations,
+        r `bind` UInt.lookupRefU relations
       )
   where
     bind :: Either RefU U -> (RefU -> Either RefU U) -> Either RefU U

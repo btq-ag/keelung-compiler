@@ -57,9 +57,9 @@ linkConstraintModule cm =
           <> addLs
           <> mulLs,
       csEqZeros = toList eqZeros,
-      csDivMods = divMods,
-      csCLDivMods = clDivMods,
-      csModInvs = modInvs
+      csDivMods = map (\(a, b, c, d) -> ([a], [b], [c], [d])) divMods,
+      csCLDivMods = map (\(a, b, c, d) -> ([a], [b], [c], [d])) clDivMods,
+      csModInvs = map (\(a, b, c, d) -> ([a], [b], [c], d)) modInvs
     }
   where
     !occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
@@ -136,11 +136,12 @@ linkConstraintModule cm =
 
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
     extractUIntRelations relations =
-      let convert :: (GaloisField n, Integral n) => (RefU, Either RefU U) -> Constraint n
-          convert (var, Right val) = CRefUVal var (U.uValue val)
-          convert (var, Left root) = CRefUEq var root
-          result = map convert $ Map.toList $ UIntRelations.toMap refUShouldBeKept relations
-       in Seq.fromList (linkConstraint occurrences fieldWidth =<< result)
+      let -- convert :: (GaloisField n, Integral n) => (UIntRelations.Element, Either RefU U) -> Constraint n
+          -- convert (var, Right val) = CRefUVal var (U.uValue val)
+          -- convert (var, Left root) = CRefUEq var root
+          result = UIntRelations.toConstraints refUShouldBeKept relations
+       in -- map convert $ Map.toList $ UIntRelations.toConstraints refUShouldBeKept relations
+          result >>= Seq.fromList . linkConstraint occurrences fieldWidth
 
     varEqFs = extractRefRelations (cmRelations cm)
     varEqLs = extractLimbRelations (Relations.exportLimbRelations (cmRelations cm))
