@@ -75,9 +75,6 @@ instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
               1 -> Seq.fromList [if sign then " + " else " - ", terms]
               -1 -> Seq.fromList [if sign then " - " else " + ", terms]
               _ -> Seq.fromList [if sign then " + " else " - ", show c <> terms]
-                -- if N.isPositive c
-                --   then traceShow ("POS", c, Prelude.negate c) $ Seq.fromList [if sign then " + " else " - ", show c <> terms]
-                --   else traceShow "NEG" $ Seq.fromList [if sign then " - " else " + ", show (Prelude.negate c) <> terms]
 
       printTerm :: (Eq n, Num n, Ord n, Show n) => (Ref, n) -> Seq String
       printTerm (x, c)

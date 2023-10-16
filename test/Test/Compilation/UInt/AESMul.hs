@@ -37,8 +37,7 @@ tests =
             return $ x `aesMul` fromInteger constant
       let genPair = do
             x <- (arbitrary :: Gen Word8)
-            constant <- choose (0, 1) :: Gen Word8
-            -- constant <- (arbitrary :: Gen Word8)
+            constant <- (arbitrary :: Gen Word8)
             return (toInteger x, toInteger constant)
       forAll genPair $ \(x, constant) -> do
         let expected = [U.uValue (U.aesMul (U.new 8 (toInteger x)) (U.new 8 (toInteger constant)))]

@@ -215,6 +215,14 @@ writeRefBVal :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
 writeRefBVal a True = addC [CRefFVal (B a) 1]
 writeRefBVal a False = addC [CRefFVal (B a) 0]
 
+-- | Assert that two RefBs are equal
+writeRefBEq :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
+writeRefBEq a b = addC [CRefEq (B a) (B b)]
+
+writeRefB :: (GaloisField n, Integral n) => RefB -> Either RefB Bool -> M n ()
+writeRefB a (Left b) = writeRefBEq a b
+writeRefB a (Right b) = writeRefBVal a b
+
 -- | Assign a Integer to a RefU
 writeRefUVal :: (GaloisField n, Integral n) => RefU -> Integer -> M n ()
 writeRefUVal a x = addC [CRefUVal a x]
@@ -230,10 +238,6 @@ writeRefEq a b = addC [CRefEq a b]
 -- | Assert that two RefFs are equal
 writeRefFEq :: (GaloisField n, Integral n) => RefF -> RefF -> M n ()
 writeRefFEq a b = addC [CRefEq (F a) (F b)]
-
--- | Assert that two RefBs are equal
-writeRefBEq :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
-writeRefBEq a b = addC [CRefEq (B a) (B b)]
 
 -- | Assert that one RefB is the negation of another RefB
 writeRefBNEq :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()

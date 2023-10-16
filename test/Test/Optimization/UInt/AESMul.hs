@@ -2,7 +2,7 @@
 
 -- {-# LANGUAGE TypeApplications #-}
 
-module Test.Optimization.UInt.Misc (tests, run) where
+module Test.Optimization.UInt.AESMul (tests, run) where
 
 import Keelung
 -- import Keelung.Compiler.Linker
@@ -14,8 +14,7 @@ run :: IO ()
 run = hspec tests
 
 tests :: SpecWith ()
-tests = describe "Misc" $ do
-  describe "AES Multiplication" $ do
+tests = describe "AES Multiplication" $ do
     -- constraint breakdown:
     --  I/O: 8*2 = 16
     --  var eq: 1*5 = 5

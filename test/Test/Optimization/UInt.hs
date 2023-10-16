@@ -9,13 +9,16 @@ import Test.Hspec
 import Test.Optimization.UInt.CLDivMod qualified as UInt.CLDivMod
 import Test.Optimization.UInt.Misc qualified as Misc
 import Test.Optimization.Util
+import qualified Test.Optimization.UInt.AESMul as UInt.AESMul
 
 run :: IO ()
 run = hspec tests
 
 tests :: SpecWith ()
-tests = do
-  describe "UInt" $ do
+tests = describe "UInt" $ do
+    UInt.CLDivMod.tests
+    UInt.AESMul.tests
+
     describe "Variable management" $ do
       -- can be lower
       it "keelung Issue #17" $ do
@@ -177,7 +180,7 @@ tests = do
         cs `shouldHaveSize` 91
         cs' `shouldHaveSize` 87
 
-    UInt.CLDivMod.tests
+    
 
     describe "Constants" $ do
       -- TODO: should be just 4

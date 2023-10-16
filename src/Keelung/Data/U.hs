@@ -97,9 +97,9 @@ divModU a b
 -- | Hardcoded GF(256) multiplication for AES
 aesMul :: U -> U -> U
 aesMul (U w a) (U _ b) =
-  let a' = U (fmap succ w) a
-      b' = U (fmap succ w) b
-      U _ c' = snd $ (a' `clMul` b') `clDivMod` U (fmap succ w) 0b100011011
+  let a' = U (fmap (*2) w) a
+      b' = U (fmap (*2) w) b
+      U _ c' = snd $ (a' `clMul` b') `clDivMod` U (fmap (*2) w) 0b100011011
    in U w c'
 
 -- | Carry-less multiplication of two unsigned integers.
