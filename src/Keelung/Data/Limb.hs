@@ -15,6 +15,8 @@ import Control.DeepSeq (NFData)
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
 import Keelung.Syntax
+-- import Keelung.Data.U (U)
+-- import qualified Keelung.Data.U as U
 
 --------------------------------------------------------------------------------
 
@@ -97,6 +99,29 @@ trim :: Width -> Limb -> Limb
 trim width (Limb ref w offset (Left sign)) = Limb ref (w `min` width) offset (Left sign)
 trim width (Limb ref w offset (Right signs)) = Limb ref (w `min` width) offset (Right (take (w `min` width) signs))
 
--- | Given a series of limbs, shift them left by a given amount
--- shiftLeft :: Int -> [Either Limb U] -> [Either Limb U]
--- shiftLeft amount limbs 
+-- type BitArray = [Either Limb U]
+
+-- -- | Given a series of limbs, shift them left by a given amount
+-- --   the least significant bits (and limb) are filled with zeros
+-- --
+-- --             LSB              
+-- --      input  ┌─┬─┬─┬─┬─┐┌─┬─┬─┐┌─┬─┬─┬─┐
+-- --             └─┴─┴─┴─┴─┘└─┴─┴─┘└─┴─┴─┴─┘
+-- --              │
+-- --              └───┐ shift "left" by n bits
+-- --                  ▼ 
+-- --     output  ┌─┬─┬─┬─┬─┐┌─┬─┬─┐┌─┬─┬─┬─┐
+-- --             └─┴─┴─┴─┴─┘└─┴─┴─┘└─┴─┴─┴─┘
+-- --
+-- shiftLeft :: Int -> LimbList -> LimbList
+-- shiftLeft _ [] = []
+-- shiftLeft amount [Left limb] 
+--   | amount >= lmbWidth limb = [Right (U.new (lmbWidth limb) 0)]
+--   | otherwise = [Left (trim (lmbWidth limb - amount) limb)]
+-- shiftLeft amount [Right val] = _
+-- shiftLeft amount _ = _
+
+--   -- let (quotient, remainder) = amount `divMod` lmbWidth (head limbs)
+--   --  in if remainder == 0
+--   --       then shiftLeftByLimbWidth quotient limbs
+--   --       else shiftLeftByLimbWidth quotient limbs ++ shiftLeftByRemainder remainder limbs
