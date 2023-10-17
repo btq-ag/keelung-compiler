@@ -110,7 +110,7 @@ compileAESMulCC width out x y = do
       Boolean.andBs [Left xBit, Left yBit]
   -- out[0] = 1 # y[0] ⊕ 128 # y[1] ⊕ 64 # y[2] ⊕ 32 # y[3] ⊕ 16 # y[4] ⊕ 136 # y[5] ⊕ 196 # y[6] ⊕ 98 # y[7]
   --        = 0b00000001 # y[0] ⊕ 0b10000000 # y[1] ⊕ 0b01000000 # y[2] ⊕ 0b00100000 # y[3] ⊕ 0b00010000 # y[4] ⊕ 0b10001000 # y[5] ⊕ 0b11000100 # y[6] ⊕ 0b01100010 # y[7]
-  --        = (x[0])y[0] ⊕ (x[7])y[1] ⊕ (x[6])y[2] ⊕ (x[5])y[3] ⊕ (x[4])y[4] ⊕ (x[7] ⊕ x[3])y[5] ⊕ (x[7] ⊕ x[6] ⊕ x[2])y[6] ⊕ (x[6] ⊕ x[5] ⊕ x[2])y[7]
+  --        = (x[0])y[0] ⊕ (x[7])y[1] ⊕ (x[6])y[2] ⊕ (x[5])y[3] ⊕ (x[4])y[4] ⊕ (x[7] ⊕ x[3])y[5] ⊕ (x[7] ⊕ x[6] ⊕ x[2])y[6] ⊕ (x[6] ⊕ x[5] ⊕ x[1])y[7]
   writeRefB (RefUBit width out 0)
     =<< Boolean.xorBs
       [ products !! 0 !! 0,
@@ -125,14 +125,15 @@ compileAESMulCC width out x y = do
         products !! 2 !! 6,
         products !! 6 !! 7,
         products !! 5 !! 7,
-        products !! 2 !! 7
+        products !! 1 !! 7
       ]
   -- out[1] = 2 # y[0] ⊕ 129 # y[1] ⊕ 192 # y[2] ⊕ 96 # y[3] ⊕ 48 # y[4] ⊕ 152 # y[5] ⊕ 76 # y[6] ⊕ 166 # y[7]
   --        = 0b00000010 # y[0] ⊕ 0b10000001 # y[1] ⊕ 0b11000000 # y[2] ⊕ 0b01100000 # y[3] ⊕ 0b00110000 # y[4] ⊕ 0b10011000 # y[5] ⊕ 0b01001100 # y[6] ⊕ 0b10100110 # y[7]
-  --        = (x[1])y[0] ⊕ (x[0])y[1] ⊕ (x[7] ⊕ x[6])y[2] ⊕ (x[6] ⊕ x[5])y[3] ⊕ (x[5] ⊕ x[4])y[4] ⊕ (x[7] ⊕ x[4] ⊕ x[3])y[5] ⊕ (x[6] ⊕ x[3] ⊕ x[2])y[6] ⊕ (x[7] ⊕ x[5] ⊕ x[2] ⊕ x[1])y[7]
+  --        = (x[1])y[0] ⊕ (x[7] + x[0])y[1] ⊕ (x[7] ⊕ x[6])y[2] ⊕ (x[6] ⊕ x[5])y[3] ⊕ (x[5] ⊕ x[4])y[4] ⊕ (x[7] ⊕ x[4] ⊕ x[3])y[5] ⊕ (x[6] ⊕ x[3] ⊕ x[2])y[6] ⊕ (x[7] ⊕ x[5] ⊕ x[2] ⊕ x[1])y[7]
   writeRefB (RefUBit width out 1)
     =<< Boolean.xorBs
       [ products !! 1 !! 0,
+        products !! 7 !! 1,
         products !! 0 !! 1,
         products !! 7 !! 2,
         products !! 6 !! 2,
@@ -175,7 +176,7 @@ compileAESMulCC width out x y = do
       ]
   -- out[3] = 8 # y[0] ⊕ 132 # y[1] ⊕ 66 # y[2] ⊕ 161 # y[3] ⊕ 208 # y[4] ⊕ 232 # y[5] ⊕ 244 # y[6] ⊕ 250 # y[7]
   --        = 0b00001000 # y[0] ⊕ 0b10000100 # y[1] ⊕ 0b01000010 # y[2] ⊕ 0b10100001 # y[3] ⊕ 0b11010000 # y[4] ⊕ 0b11101000 # y[5] ⊕ 0b11110100 # y[6] ⊕ 0b11111010 # y[7] 
-  --        = (x[3])y[0] ⊕ (x[7] ⊕ x[2])y[1] ⊕ (x[6] ⊕ x[1])y[2] ⊕ (x[7] ⊕ x[5] ⊕ x[1])y[3] ⊕ (x[7] ⊕ x[6] ⊕ x[4])y[4] ⊕ (x[7] ⊕ x[6] ⊕ x[5] ⊕ x[3])y[5] ⊕ (x[7] ⊕ x[6] ⊕ x[5] ⊕ x[4] ⊕ x[2])y[6] ⊕ (x[7] ⊕ x[6] ⊕ x[5] ⊕ x[4] ⊕ x[3] ⊕ x[1])y[7]
+  --        = (x[3])y[0] ⊕ (x[7] ⊕ x[2])y[1] ⊕ (x[6] ⊕ x[1])y[2] ⊕ (x[7] ⊕ x[5] ⊕ x[0])y[3] ⊕ (x[7] ⊕ x[6] ⊕ x[4])y[4] ⊕ (x[7] ⊕ x[6] ⊕ x[5] ⊕ x[3])y[5] ⊕ (x[7] ⊕ x[6] ⊕ x[5] ⊕ x[4] ⊕ x[2])y[6] ⊕ (x[7] ⊕ x[6] ⊕ x[5] ⊕ x[4] ⊕ x[3] ⊕ x[1])y[7]
   writeRefB (RefUBit width out 3)
     =<< Boolean.xorBs
       [ products !! 3 !! 0,
@@ -185,7 +186,7 @@ compileAESMulCC width out x y = do
         products !! 1 !! 2,
         products !! 7 !! 3,
         products !! 5 !! 3,
-        products !! 1 !! 3,
+        products !! 0 !! 3,
         products !! 7 !! 4,
         products !! 6 !! 4,
         products !! 4 !! 4,
@@ -207,7 +208,7 @@ compileAESMulCC width out x y = do
       ]
   -- out[4] = 16 # y[0] ⊕ 136 # y[1] ⊕ 196 # y[2] ⊕ 98 # y[3] ⊕ 177 # y[4] ⊕ 88 # y[5] ⊕ 44 # y[6] ⊕ 150 # y[7]
   --        = 0b00010000 # y[0] ⊕ 0b10001000 # y[1] ⊕ 0b11000100 # y[2] ⊕ 0b01100010 # y[3] ⊕ 0b10110001 # y[4] ⊕ 0b01011000 # y[5] ⊕ 0b00101100 # y[6] ⊕ 0b10010110 # y[7]
-  --        = (x[4])y[0] ⊕ (x[7] ⊕ x[3])y[1] ⊕ (x[7] ⊕ x[6] ⊕ x[2])y[2] ⊕ (x[6] ⊕ x[5] ⊕ x[2])y[3] ⊕ (x[7] ⊕ x[5] ⊕ x[4])y[4] ⊕ (x[6] ⊕ x[4] ⊕ x[3])y[5] ⊕ (x[5] ⊕ x[3] ⊕ x[2])y[6] ⊕ (x[7] ⊕ x[4] ⊕ x[2] ⊕ x[1])y[7]
+  --        = (x[4])y[0] ⊕ (x[7] ⊕ x[3])y[1] ⊕ (x[7] ⊕ x[6] ⊕ x[2])y[2] ⊕ (x[6] ⊕ x[5] ⊕ x[1])y[3] ⊕ (x[7] ⊕ x[5] ⊕ x[4] ⊕ x[0])y[4] ⊕ (x[6] ⊕ x[4] ⊕ x[3])y[5] ⊕ (x[5] ⊕ x[3] ⊕ x[2])y[6] ⊕ (x[7] ⊕ x[4] ⊕ x[2] ⊕ x[1])y[7]
   writeRefB (RefUBit width out 4)
     =<< Boolean.xorBs
       [ products !! 4 !! 0,
@@ -218,10 +219,11 @@ compileAESMulCC width out x y = do
         products !! 2 !! 2,
         products !! 6 !! 3,
         products !! 5 !! 3,
-        products !! 2 !! 3,
+        products !! 1 !! 3,
         products !! 7 !! 4,
         products !! 5 !! 4,
         products !! 4 !! 4,
+        products !! 0 !! 4,
         products !! 6 !! 5,
         products !! 4 !! 5,
         products !! 3 !! 5,
@@ -233,23 +235,25 @@ compileAESMulCC width out x y = do
         products !! 2 !! 7,
         products !! 1 !! 7
       ]
-  -- out[5] = 32 # y[0] ⊕ 16 # y[1] ⊕ 136 # y[2] ⊕ 32 # y[3] ⊕ 88 # y[4] ⊕ 177 # y[5] ⊕ 88 # y[6] ⊕ 44 # y[7]
-  --        = 0b00100000 # y[0] ⊕ 0b00010000 # y[1] ⊕ 0b10001000 # y[2] ⊕ 0b00100000 # y[3] ⊕ 0b01011000 # y[4] ⊕ 0b10110001 # y[5] ⊕ 0b01011000 # y[6] ⊕ 0b00101100 # y[7]
-  --        = (x[5])y[0] ⊕ (x[4])y[1] ⊕ (x[7] ⊕ x[3])y[2] ⊕ (x[5])y[3] ⊕ (x[6] ⊕ x[4] ⊕ x[3])y[4] ⊕ (x[7] ⊕ x[5] ⊕ x[4] ⊕ x[1])y[5] ⊕ (x[6] ⊕ x[4] ⊕ x[3])y[6] ⊕ (x[5] ⊕ x[3] ⊕ x[2])y[7]
+  -- out[5] = 32 # y[0] ⊕ 16 # y[1] ⊕ 136 # y[2] ⊕ 196 # y[3] ⊕ 98 # y[4] ⊕ 177 # y[5] ⊕ 88 # y[6] ⊕ 44 # y[7]
+  --        = 0b00100000 # y[0] ⊕ 0b00010000 # y[1] ⊕ 0b10001000 # y[2] ⊕ 0b11000100 # y[3] ⊕ 0b01100010 # y[4] ⊕ 0b10110001 # y[5] ⊕ 0b01011000 # y[6] ⊕ 0b00101100 # y[7]
+  --        = (x[5])y[0] ⊕ (x[4])y[1] ⊕ (x[7] ⊕ x[3])y[2] ⊕ (x[7] ⊕ x[6] ⊕ x[2])y[3] ⊕ (x[6] ⊕ x[5] ⊕ x[1])y[4] ⊕ (x[7] ⊕ x[5] ⊕ x[4] ⊕ x[0])y[5] ⊕ (x[6] ⊕ x[4] ⊕ x[3])y[6] ⊕ (x[5] ⊕ x[3] ⊕ x[2])y[7]
   writeRefB (RefUBit width out 5)
     =<< Boolean.xorBs
       [ products !! 5 !! 0,
         products !! 4 !! 1,
         products !! 7 !! 2,
         products !! 3 !! 2,
-        products !! 5 !! 3,
+        products !! 7 !! 3,
+        products !! 6 !! 3,
+        products !! 2 !! 3,
         products !! 6 !! 4,
-        products !! 4 !! 4,
-        products !! 3 !! 4,
+        products !! 5 !! 4,
+        products !! 1 !! 4,
         products !! 7 !! 5,
         products !! 5 !! 5,
         products !! 4 !! 5,
-        products !! 1 !! 5,
+        products !! 0 !! 5,
         products !! 6 !! 6,
         products !! 4 !! 6,
         products !! 3 !! 6,
@@ -257,9 +261,9 @@ compileAESMulCC width out x y = do
         products !! 3 !! 7,
         products !! 2 !! 7
       ]
-  -- out[6] = 64 # y[0] ⊕ 32 # y[1] ⊕ 16 # y[2] ⊕ 136 # y[3] ⊕ 44 # y[4] ⊕ 88 # y[5] ⊕ 177 # y[6] ⊕ 88 # y[7]
-  --        = 0b01000000 # y[0] ⊕ 0b00100000 # y[1] ⊕ 0b00010000 # y[2] ⊕ 0b10001000 # y[3] ⊕ 0b00101100 # y[4] ⊕ 0b01011000 # y[5] ⊕ 0b10110001 # y[6] ⊕ 0b01011000 # y[7]
-  --        = (x[6])y[0] ⊕ (x[5])y[1] ⊕ (x[4])y[2] ⊕ (x[7] ⊕ x[3])y[3] ⊕ (x[5] ⊕ x[3] ⊕ x[2])y[4] ⊕ (x[6] ⊕ x[4] ⊕ x[3])y[5] ⊕ (x[7] ⊕ x[5] ⊕ x[4] ⊕ x[1])y[6] ⊕ (x[6] ⊕ x[4] ⊕ x[3])y[7]
+  -- out[6] = 64 # y[0] ⊕ 32 # y[1] ⊕ 16 # y[2] ⊕ 136 # y[3] ⊕ 196 # y[4] ⊕ 98 # y[5] ⊕ 177 # y[6] ⊕ 88 # y[7]
+  --        = 0b01000000 # y[0] ⊕ 0b00100000 # y[1] ⊕ 0b00010000 # y[2] ⊕ 0b10001000 # y[3] ⊕ 0b11000100 # y[4] ⊕ 0b01100010 # y[5] ⊕ 0b10110001 # y[6] ⊕ 0b01011000 # y[7]
+  --        = (x[6])y[0] ⊕ (x[5])y[1] ⊕ (x[4])y[2] ⊕ (x[7] ⊕ x[3])y[3] ⊕ (x[7] ⊕ x[6] ⊕ x[2])y[4] ⊕ (x[6] ⊕ x[5] ⊕ x[1])y[5] ⊕ (x[7] ⊕ x[5] ⊕ x[4] ⊕ x[0])y[6] ⊕ (x[6] ⊕ x[4] ⊕ x[3])y[7]
   writeRefB (RefUBit width out 6)
     =<< Boolean.xorBs
       [ products !! 6 !! 0,
@@ -267,24 +271,24 @@ compileAESMulCC width out x y = do
         products !! 4 !! 2,
         products !! 7 !! 3,
         products !! 3 !! 3,
-        products !! 5 !! 4,
-        products !! 3 !! 4,
+        products !! 7 !! 4,
+        products !! 6 !! 4,
         products !! 2 !! 4,
         products !! 6 !! 5,
-        products !! 4 !! 5,
-        products !! 3 !! 5,
+        products !! 5 !! 5,
         products !! 1 !! 5,
         products !! 7 !! 6,
         products !! 5 !! 6,
         products !! 4 !! 6,
-        products !! 1 !! 6,
+        products !! 0 !! 6,
         products !! 6 !! 7,
         products !! 4 !! 7,
         products !! 3 !! 7
       ]
+
   -- out[7] = 128 # y[0] ⊕ 64 # y[1] ⊕ 32 # y[2] ⊕ 16 # y[3] ⊕ 136 # y[4] ⊕ 196 # y[5] ⊕ 98 # y[6] ⊕ 177 # y[7]
   --        = 0b10000000 # y[0] ⊕ 0b01000000 # y[1] ⊕ 0b00100000 # y[2] ⊕ 0b00010000 # y[3] ⊕ 0b10001000 # y[4] ⊕ 0b11000100 # y[5] ⊕ 0b01100010 # y[6] ⊕ 0b10110001 # y[7]
-  --        = (x[7])y[0] ⊕ (x[6])y[1] ⊕ (x[5])y[2] ⊕ (x[4])y[3] ⊕ (x[7] ⊕ x[3])y[4] ⊕ (x[7] ⊕ x[6] ⊕ x[2])y[5] ⊕ (x[6] ⊕ x[5] ⊕ x[2])y[6] ⊕ (x[7] ⊕ x[5] ⊕ x[4] ⊕ x[1])y[7]
+  --        = (x[7])y[0] ⊕ (x[6])y[1] ⊕ (x[5])y[2] ⊕ (x[4])y[3] ⊕ (x[7] ⊕ x[3])y[4] ⊕ (x[7] ⊕ x[6] ⊕ x[2])y[5] ⊕ (x[6] ⊕ x[5] ⊕ x[1])y[6] ⊕ (x[7] ⊕ x[5] ⊕ x[4] ⊕ x[0])y[7]
   writeRefB (RefUBit width out 7)
     =<< Boolean.xorBs
       [ products !! 7 !! 0,
@@ -297,10 +301,10 @@ compileAESMulCC width out x y = do
         products !! 6 !! 5,
         products !! 2 !! 5,
         products !! 6 !! 6,
-        products !! 2 !! 6,
         products !! 5 !! 6,
+        products !! 1 !! 6,
         products !! 7 !! 7,
         products !! 5 !! 7,
         products !! 4 !! 7,
-        products !! 1 !! 7
+        products !! 0 !! 7
       ]

@@ -251,13 +251,14 @@ xorBs xs = do
   order <- gets (FieldInfo.fieldOrder . cmField)
   if order == 2
     then linearFold xs
-    else do
-      -- separate the operands into variables and constants
-      let (vars, constants) = Either.partitionEithers xs
-          constantVal = odd (length (filter id constants)) -- if number of True is odd
-      if constantVal
-        then divideAndConquer (fromInteger order) vars >>= flipResult
-        else divideAndConquer (fromInteger order) vars
+    else linearFold xs
+      -- do
+      -- -- separate the operands into variables and constants
+      -- let (vars, constants) = Either.partitionEithers xs
+      --     constantVal = odd (length (filter id constants)) -- if number of True is odd
+      -- if constantVal
+      --   then divideAndConquer (fromInteger order) vars >>= flipResult
+      --   else divideAndConquer (fromInteger order) vars
   where
     xorB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
     xorB x y = do
