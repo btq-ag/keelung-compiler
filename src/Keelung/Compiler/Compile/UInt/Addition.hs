@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Compile.UInt.Addition (Dimensions (..), addLimbColumn, compileAddU, compileSubU, allocLimb) where
+module Keelung.Compiler.Compile.UInt.Addition (addLimbColumn, compileAddU, compileSubU, allocLimb) where
 
 import Control.Monad.Except
 import Control.Monad.RWS
@@ -65,13 +65,8 @@ compileAddU width out vars constant = do
   -- NOTE, we use the same width for all limbs on the both sides for the moment (they can be different)
   let limbWidth = fieldWidth fieldInfo - carryWidth
 
-  let dimensions =
-        Dimensions
-          { dimUIntWidth = width,
-            dimMaxHeight = if carryWidth > 21 then 1048576 else 2 ^ carryWidth, -- HACK
-            dimCarryWidth = carryWidth
-          }
-
+  -- the maximum number of limbs that can be added up at a time
+  let maxHeight = if carryWidth > 21 then 1048576 else 2 ^ carryWidth -- HACK
   case fieldTypeData fieldInfo of
     Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
@@ -94,17 +89,10 @@ compileAddU width out vars constant = do
               )
               [0, limbWidth .. width - 1] -- index of the first bit of each limb
       foldM_
-        ( \prevCarries (column, resultLimb) -> addLimbColumn dimensions resultLimb (prevCarries <> column)
+        ( \prevCarries (column, resultLimb) -> addLimbColumn maxHeight resultLimb (prevCarries <> column)
         )
         mempty
         ranges
-
-data Dimensions = Dimensions
-  { dimUIntWidth :: Int,
-    dimMaxHeight :: Int,
-    dimCarryWidth :: Int
-  }
-  deriving (Show)
 
 compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileSubU width out (Right a) (Right b) = compileAddU width out [] (a - b)
@@ -113,12 +101,12 @@ compileSubU width out (Left a) (Right b) = compileAddU width out [(a, True)] (-b
 compileSubU width out (Left a) (Left b) = compileAddU width out [(a, True), (b, False)] 0
 
 -- | Add a column of limbs, and return a column of carry limbs
-addLimbColumn :: (GaloisField n, Integral n) => Dimensions -> Limb -> LimbColumn -> M n LimbColumn
-addLimbColumn dimensions finalResultLimb limbs = do
+addLimbColumn :: (GaloisField n, Integral n) => Int -> Limb -> LimbColumn -> M n LimbColumn
+addLimbColumn maxHeight finalResultLimb limbs = do
   -- trim the limbs so that their width does not exceed that of the result limb
   let trimmedLimbs = LimbColumn.trim (lmbWidth finalResultLimb) limbs
   -- split the limbs into a stack of limbs and the rest of the column
-  let (stack, rest) = splitLimbStack dimensions trimmedLimbs
+  let (stack, rest) = splitLimbStack maxHeight trimmedLimbs
   if LimbColumn.isEmpty rest
     then do
       -- base case, there are no more limbs to be processed
@@ -128,7 +116,7 @@ addLimbColumn dimensions finalResultLimb limbs = do
       resultLimb <- allocLimb (lmbWidth finalResultLimb) (lmbOffset finalResultLimb) True
       carryLimb <- addLimbStack resultLimb stack
       -- insert the result limb of the current batch to the next batch
-      moreCarryLimbs <- addLimbColumn dimensions finalResultLimb (LimbColumn.insert resultLimb rest)
+      moreCarryLimbs <- addLimbColumn maxHeight finalResultLimb (LimbColumn.insert resultLimb rest)
       return (carryLimb <> moreCarryLimbs)
 
 -- | Split a column of limbs into a stack of limbs and the rest of the column
@@ -136,14 +124,14 @@ addLimbColumn dimensions finalResultLimb limbs = do
 --    if all limbs are negative
 --      then we can only add `H-1` limbs up at a time
 --      else we can add all `H` limbs up at a time
-splitLimbStack :: Dimensions -> LimbColumn -> (LimbStack, LimbColumn)
+splitLimbStack :: Int -> LimbColumn -> (LimbStack, LimbColumn)
 splitLimbStack _ (LimbColumn constant Seq.Empty) = (OneConstantOnly constant, mempty)
 splitLimbStack _ (LimbColumn constant (limb Seq.:<| Seq.Empty)) =
   if constant == 0 && Limb.isPositive limb
     then (OneLimbOnly limb, mempty)
     else (Ordinary constant (Seq.singleton limb), mempty)
-splitLimbStack dimensions (LimbColumn constant limbs) =
-  let (currentBatch, nextBatch) = Seq.splitAt (dimMaxHeight dimensions - 1) limbs
+splitLimbStack maxHeight (LimbColumn constant limbs) =
+  let (currentBatch, nextBatch) = Seq.splitAt (maxHeight - 1) limbs
       currentBatchAllNegative = not (any Limb.isPositive currentBatch)
    in if currentBatchAllNegative
         then (Ordinary constant currentBatch, LimbColumn 0 nextBatch)

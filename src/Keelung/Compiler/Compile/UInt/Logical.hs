@@ -26,18 +26,3 @@ compileXorUs width out xs = do
     case result of
       Left var -> writeRefBEq (RefUBit width out i) var
       Right val -> writeRefBVal (RefUBit width out i) val
-
--- --   -- trim the limbs so that their width does not exceed that of the result limb
--- --   let trimmedLimbs = LimbColumn.trim (lmbWidth finalResultLimb) limbs
--- --   -- split the limbs into a stack of limbs and the rest of the column
--- --   let (stack, rest) = splitLimbStack dimensions trimmedLimbs
--- --   if LimbColumn.isEmpty rest
--- --     then do
--- --       -- base case, there are no more limbs to be processed
--- --       addLimbStack finalResultLimb stack
--- --     else do
--- -- | XOR a column of limbs
--- addLimbColumn :: (GaloisField n, Integral n) => Dimensions -> Limb -> LimbColumn -> M n ()
--- addLimbColumn dimensions outLimb limbs = do
---     -- trim the limbs so that their width does not exceed that of the result limb
---     let trimmedLimbs = LimbColumn.trim (lmbWidth outLimb) limbs
