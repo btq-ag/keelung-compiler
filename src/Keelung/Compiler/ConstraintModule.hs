@@ -70,6 +70,7 @@ data ConstraintModule n = ConstraintModule
 instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
   show cm =
     "Constraint Module {\n"
+      <> showFieldInfo
       <> showVarEqF
       <> showAddL
       <> showMulL
@@ -94,6 +95,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
          in if size == 0
               then ""
               else "  " <> name <> " (" <> show size <> "):\n\n" <> unlines (map (("    " <>) . f) xs) <> "\n"
+
+      showFieldInfo :: String
+      showFieldInfo = "  Field: " <> show (fieldTypeData (cmField cm)) <> "\n"
 
       -- Boolean constraints
       showBooleanConstraints =

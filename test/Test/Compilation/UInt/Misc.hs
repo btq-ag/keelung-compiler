@@ -25,6 +25,7 @@ tests = describe "UInt arithmetics" $ do
             x <- chooseInteger (0, 3)
             y <- chooseInteger (0, 3)
             return (x, y)
+
       forAll genPair $ \(x, y) -> do
         let expected = [(x + y) `mod` 4]
         runAll (Binary 4) program [x, y] [] expected

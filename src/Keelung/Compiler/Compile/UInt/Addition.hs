@@ -141,9 +141,9 @@ splitLimbStack maxHeight (LimbColumn constant limbs) =
 
 -- | Compress a column of limbs into a single limb and some carry
 --
---              [ operand+ ]
---              [ operand+ ]    positive operands
---  +           [ operand+ ]
+--              [ operand ]
+--              [ operand ]   operands
+--  +           [ operand ]
 -- -----------------------------
 --    [ carry  ][  result  ]
 addLimbStack :: (GaloisField n, Integral n) => Limb -> LimbStack -> M n LimbColumn
@@ -165,11 +165,13 @@ addLimbStack resultLimb (Ordinary constant limbs) = do
       : fmap (,1) (toList limbs)
   return $ LimbColumn.singleton carryLimb
 
+-- | Allocates a carry limb with the given signs
 allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
 allocCarryLimb w offset signs = do
   refU <- freshRefU w
   return $ Limb.new refU w offset (Right signs)
 
+-- | Allocates an ordinary limb with the given sign
 allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
 allocLimb w offset sign = do
   refU <- freshRefU w
