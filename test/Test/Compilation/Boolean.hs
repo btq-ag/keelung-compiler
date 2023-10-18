@@ -1,9 +1,10 @@
 module Test.Compilation.Boolean (tests, run) where
 
+import Control.Monad
 import Data.Bits qualified
 import Keelung hiding (compile)
-import Test.Hspec
 import Test.Compilation.Util
+import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 
 run :: IO ()
@@ -54,7 +55,6 @@ tests = describe "Boolean" $ do
 
   it "and on Prime 2" $ do
     let program = (.&.) <$> inputBool Public <*> inputBool Public
-    -- debugPrime (Prime 2) program
     runAll (Prime 2) program [0, 0] [] [0]
     runAll (Prime 2) program [0, 1] [] [0]
     runAll (Prime 2) program [1, 0] [] [0]
@@ -81,23 +81,21 @@ tests = describe "Boolean" $ do
           runAll (Prime 13) program [x, y] [] expected
           runAll gf181 program [x, y] [] expected
 
-    it "3 variables" $ do
-      let program = do
-            x <- inputBool Public
-            y <- inputBool Public
-            z <- inputBool Public
-            return $ x .^. y .^. z
+    it "more than 2 variables" $ do
+      let program n = do
+            xs <- replicateM n (inputBool Public)
+            return $ foldl (.^.) false xs
       forAll
         ( do
-            x <- choose (0, 1)
-            y <- choose (0, 1)
-            z <- choose (0, 1)
-            return (x, y, z)
+            n <- choose (8, 8)
+            xs <- replicateM n (choose (0, 1))
+            return (n, xs)
         )
-        $ \(x, y, z) -> do
-          let expected = [x `Data.Bits.xor` y `Data.Bits.xor` z]
-          runAll (Prime 13) program [x, y, z] [] expected
-          runAll gf181 program [x, y, z] [] expected
+        $ \(n, xs) -> do
+          let expected = [foldl Data.Bits.xor 0 xs]
+          runAll (Prime 13) (program n) xs [] expected
+          runAll (Prime 257) (program n) xs [] expected
+          runAll gf181 (program n) xs [] expected
 
     it "2 variables with constant" $ do
       let program = do

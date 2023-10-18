@@ -158,7 +158,7 @@ tests = describe "Logical" $ do
             return $ foldl (.^.) 0 xs
       forAll
         ( do
-            n <- choose (8, 8)
+            n <- choose (0, 20)
             xs <- replicateM n (choose (0, 255))
             return (n, xs)
         )
