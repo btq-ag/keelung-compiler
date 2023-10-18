@@ -46,27 +46,6 @@ tests = do
         let program = inputUInt @10 Public
         runAll (Prime 257) program [300] [] [300]
 
-    describe "Arithmetics" $ do
-      it "arithmetics 1" $ do
-        let program = do
-              f <- inputField Public
-              u4 <- inputUInt @4 Public
-              b <- inputBool Public
-              return $
-                cond
-                  (b .&. (u4 !!! 0))
-                  (f + 1)
-                  (f + 2)
-
-        runAll gf181 program [100, 1, 1] [] [101]
-        runAll gf181 program [100, 0, 1] [] [102]
-
-      it "add + assertion" $ do
-        let program = do
-              x <- inputUInt @4 Public
-              assert $ 2 `eq` (x + 1)
-        runAll gf181 program [1] [] []
-
     describe "Conditionals" $ do
       it "with inputs" $ do
         let program = do

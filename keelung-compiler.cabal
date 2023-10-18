@@ -198,6 +198,7 @@ test-suite keelung-test
       Test.Compilation
       Test.Compilation.Boolean
       Test.Compilation.Field
+      Test.Compilation.Field.Arithmetics
       Test.Compilation.Misc
       Test.Compilation.UInt
       Test.Compilation.UInt.Addition
