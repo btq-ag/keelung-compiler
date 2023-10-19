@@ -7,10 +7,8 @@ import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
-import Data.Sequence (Seq)
-import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.Error qualified as Error
-import Keelung.Compiler.Compile.LimbColumn (LimbColumn (LimbColumn))
+import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.Util
@@ -21,13 +19,6 @@ import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Field (FieldType (..))
 import Keelung.Syntax (Width)
-
---------------------------------------------------------------------------------
-
-data LimbStack
-  = Ordinary Integer (Seq Limb)
-  | OneLimbOnly Limb
-  | OneConstantOnly Integer
 
 --------------------------------------------------------------------------------
 
@@ -106,38 +97,23 @@ addLimbColumn maxHeight finalResultLimb limbs = do
   -- trim the limbs so that their width does not exceed that of the result limb
   let trimmedLimbs = LimbColumn.trim (lmbWidth finalResultLimb) limbs
   -- split the limbs into a stack of limbs and the rest of the column
-  let (stack, rest) = splitLimbStack maxHeight trimmedLimbs
-  if LimbColumn.isEmpty rest
-    then do
+  let (stack, rest) = LimbColumn.view maxHeight trimmedLimbs
+  case rest of
+    Nothing -> do
       -- base case, there are no more limbs to be processed
-      addLimbStack finalResultLimb stack
-    else do
+      result <- addLimbColumnView finalResultLimb stack
+      case result of
+        Nothing -> return mempty
+        Just carryLimb -> return (LimbColumn.singleton carryLimb)
+    Just rest' -> do
       -- inductive case, there are more limbs to be processed
       resultLimb <- allocLimb (lmbWidth finalResultLimb) (lmbOffset finalResultLimb) True
-      carryLimb <- addLimbStack resultLimb stack
+      result <- addLimbColumnView resultLimb stack
       -- insert the result limb of the current batch to the next batch
-      moreCarryLimbs <- addLimbColumn maxHeight finalResultLimb (LimbColumn.insert resultLimb rest)
-      return (carryLimb <> moreCarryLimbs)
-
--- | Split a column of limbs into a stack of limbs and the rest of the column
--- Let `H` be the maximum batch size allowed
---    if all limbs are negative
---      then we can only add `H-1` limbs up at a time
---      else we can add all `H` limbs up at a time
-splitLimbStack :: Int -> LimbColumn -> (LimbStack, LimbColumn)
-splitLimbStack _ (LimbColumn constant Seq.Empty) = (OneConstantOnly constant, mempty)
-splitLimbStack _ (LimbColumn constant (limb Seq.:<| Seq.Empty)) =
-  if constant == 0 && Limb.isPositive limb
-    then (OneLimbOnly limb, mempty)
-    else (Ordinary constant (Seq.singleton limb), mempty)
-splitLimbStack maxHeight (LimbColumn constant limbs) =
-  let (currentBatch, nextBatch) = Seq.splitAt (maxHeight - 1) limbs
-      currentBatchAllNegative = not (any Limb.isPositive currentBatch)
-   in if currentBatchAllNegative
-        then (Ordinary constant currentBatch, LimbColumn 0 nextBatch)
-        else case Seq.viewl nextBatch of
-          Seq.EmptyL -> (Ordinary constant currentBatch, mempty)
-          nextBatchHead Seq.:< nextBatchTail -> (Ordinary constant (currentBatch Seq.|> nextBatchHead), LimbColumn 0 nextBatchTail)
+      moreCarryLimbs <- addLimbColumn maxHeight finalResultLimb (LimbColumn.insert resultLimb rest')
+      case result of
+        Nothing -> return moreCarryLimbs
+        Just carryLimb -> return $ LimbColumn.insert carryLimb moreCarryLimbs
 
 -- | Compress a column of limbs into a single limb and some carry
 --
@@ -146,15 +122,15 @@ splitLimbStack maxHeight (LimbColumn constant limbs) =
 --  +           [ operand ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-addLimbStack :: (GaloisField n, Integral n) => Limb -> LimbStack -> M n LimbColumn
-addLimbStack resultLimb (OneConstantOnly constant) = do
+addLimbColumnView :: (GaloisField n, Integral n) => Limb -> LimbColumn.View -> M n (Maybe Limb)
+addLimbColumnView resultLimb (LimbColumn.OneConstantOnly constant) = do
   -- no limb => result = constant, no carry
   writeLimbVal resultLimb constant
-  return mempty
-addLimbStack resultLimb (OneLimbOnly limb) = do
+  return Nothing
+addLimbColumnView resultLimb (LimbColumn.OneLimbOnly limb) = do
   writeLimbEq resultLimb limb
-  return mempty
-addLimbStack resultLimb (Ordinary constant limbs) = do
+  return Nothing
+addLimbColumnView resultLimb (LimbColumn.Ordinary constant limbs) = do
   let carrySigns = calculateCarrySigns (lmbWidth resultLimb) constant limbs
   carryLimb <- allocCarryLimb (length carrySigns) (lmbOffset resultLimb) carrySigns
   writeAddWithLimbs (fromInteger constant) $
@@ -163,7 +139,7 @@ addLimbStack resultLimb (Ordinary constant limbs) = do
       : (carryLimb, -(2 ^ lmbWidth resultLimb))
       -- positive side
       : fmap (,1) (toList limbs)
-  return $ LimbColumn.singleton carryLimb
+  return $ Just carryLimb
 
 -- | Allocates a carry limb with the given signs
 allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
