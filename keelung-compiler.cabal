@@ -31,10 +31,10 @@ library
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
-      Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.LimbColumn
       Keelung.Compiler.Compile.UInt.AESMul
       Keelung.Compiler.Compile.UInt.Bitwise
       Keelung.Compiler.Compile.UInt.CLMul
@@ -113,10 +113,10 @@ executable keelungc
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
-      Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.LimbColumn
       Keelung.Compiler.Compile.UInt.AESMul
       Keelung.Compiler.Compile.UInt.Bitwise
       Keelung.Compiler.Compile.UInt.CLMul
@@ -234,10 +234,10 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
-      Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.LimbColumn
       Keelung.Compiler.Compile.UInt.AESMul
       Keelung.Compiler.Compile.UInt.Bitwise
       Keelung.Compiler.Compile.UInt.CLMul

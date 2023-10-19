@@ -18,6 +18,7 @@ import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.Limb (Limb (..))
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -312,3 +313,17 @@ eqZero isEq (Polynomial polynomial) = do
   --  keep track of the relation between (x - y) and m
   addEqZeroHintWithPoly (Right polynomial) m
   return (Left out)
+
+--------------------------------------------------------------------------------
+
+-- | Allocates a carry limb with the given signs
+allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
+allocCarryLimb w offset signs = do
+  refU <- freshRefU w
+  return $ Limb.new refU w offset (Right signs)
+
+-- | Allocates an ordinary limb with the given sign
+allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
+allocLimb w offset sign = do
+  refU <- freshRefU w
+  return $ Limb.new refU w offset (Left sign)

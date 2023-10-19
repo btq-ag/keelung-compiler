@@ -39,7 +39,7 @@ compile out expr = case expr of
   AddU w xs -> do
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = Either.partitionEithers mixed
-    compileAddU w out vars (sum constants)
+    compileAdd w out vars (sum constants)
   MulU w x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -143,7 +143,7 @@ assertDivModU compileAssertion width dividend divisor quotient remainder = do
 
   productDQ <- freshRefU width
   compileMulU width productDQ divisorRef quotientRef
-  compileSubU width productDQ dividendRef remainderRef
+  compileSub width productDQ dividendRef remainderRef
 
   -- 0 ≤ remainder < divisor
   compileAssertion $ ExprB (LTU remainder divisor)
@@ -270,7 +270,7 @@ compileModInv width out a p = do
   n <- freshRefU width
   np <- freshRefU (width * 2)
   compileMulU (width * 2) np (Left n) (Right p)
-  compileAddU (width * 2) prod [(np, True)] 1
+  compileAdd (width * 2) prod [(np, True)] 1
   -- n ≤ p
   assertLTE width (Left n) p
   addModInvHint (width * 2) a (Left out) (Left n) p

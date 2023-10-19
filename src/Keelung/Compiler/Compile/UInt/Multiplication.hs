@@ -7,8 +7,8 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error qualified as Error
-import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
-import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
+import Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn)
+import Keelung.Compiler.Compile.UInt.Addition.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))

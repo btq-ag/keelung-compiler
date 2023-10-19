@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.LimbColumn (LimbColumn, View (..), new, singleton, trim, view, insert) where
+module Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn, View (..), new, singleton, trim, view, insert) where
 
 import Data.Sequence (Seq, (<|))
 import Data.Sequence qualified as Seq
@@ -8,10 +8,7 @@ import Keelung.Data.Limb qualified as Limb
 --------------------------------------------------------------------------------
 
 -- | A 'LimbColumn' is a sequence of 'Limb's, with a constant value.
-data LimbColumn = LimbColumn
-  { constant :: Integer,
-    limbs :: Seq Limb
-  }
+data LimbColumn = LimbColumn Integer (Seq Limb)
   deriving (Show)
 
 instance Semigroup LimbColumn where

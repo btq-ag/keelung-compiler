@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module Keelung.Compiler.Compile.UInt.Addition (addLimbColumn, compileAddU, compileSubU, allocLimb) where
+module Keelung.Compiler.Compile.UInt.Addition (addLimbColumn, compileAdd, compileSub) where
 
 import Control.Monad.Except
 import Control.Monad.RWS
@@ -8,8 +8,8 @@ import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Keelung.Compiler.Compile.Error qualified as Error
-import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
-import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
+import Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn)
+import Keelung.Compiler.Compile.UInt.Addition.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
@@ -37,8 +37,8 @@ import Keelung.Syntax (Width)
 --       [ carry ]
 --       [ carry ]
 
-compileAddU :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
-compileAddU width out vars constant = do
+compileAdd :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
+compileAdd width out vars constant = do
   fieldInfo <- gets cmField
 
   let arity = length vars + if constant == 0 then 0 else 1
@@ -85,11 +85,11 @@ compileAddU width out vars constant = do
         mempty
         ranges
 
-compileSubU :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileSubU width out (Right a) (Right b) = compileAddU width out [] (a - b)
-compileSubU width out (Right a) (Left b) = compileAddU width out [(b, False)] a
-compileSubU width out (Left a) (Right b) = compileAddU width out [(a, True)] (-b)
-compileSubU width out (Left a) (Left b) = compileAddU width out [(a, True), (b, False)] 0
+compileSub :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
+compileSub width out (Right a) (Right b) = compileAdd width out [] (a - b)
+compileSub width out (Right a) (Left b) = compileAdd width out [(b, False)] a
+compileSub width out (Left a) (Right b) = compileAdd width out [(a, True)] (-b)
+compileSub width out (Left a) (Left b) = compileAdd width out [(a, True), (b, False)] 0
 
 -- | Add a column of limbs, and return a column of carry limbs
 addLimbColumn :: (GaloisField n, Integral n) => Int -> Limb -> LimbColumn -> M n LimbColumn
@@ -140,15 +140,3 @@ addLimbColumnView resultLimb (LimbColumn.Ordinary constant limbs) = do
       -- positive side
       : fmap (,1) (toList limbs)
   return $ Just carryLimb
-
--- | Allocates a carry limb with the given signs
-allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
-allocCarryLimb w offset signs = do
-  refU <- freshRefU w
-  return $ Limb.new refU w offset (Right signs)
-
--- | Allocates an ordinary limb with the given sign
-allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
-allocLimb w offset sign = do
-  refU <- freshRefU w
-  return $ Limb.new refU w offset (Left sign)
