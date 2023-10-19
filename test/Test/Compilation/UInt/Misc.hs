@@ -41,3 +41,16 @@ tests = describe "UInt arithmetics" $ do
       forAll genPair $ \(x, y) -> do
         let expected = [(x + y) `mod` 256]
         runAll (Binary 5) program (map toInteger [x, y]) [] expected
+
+    it "1 positive variable + 1 negative variable / Byte" $ do
+      let program = do
+            x <- inputUInt @8 Public
+            y <- inputUInt @8 Public
+            return $ x - y
+      let genPair = do
+            x <- chooseInteger (0, 255)
+            y <- chooseInteger (0, 255)
+            return (x, y)
+      forAll genPair $ \(x, y) -> do
+        let expected = [(x - y) `mod` 256]
+        runAll (Binary 5) program (map toInteger [x, y]) [] expected

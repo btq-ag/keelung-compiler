@@ -97,11 +97,15 @@ compileSub width out (Left a) (Left b) = compileAdd width out [(a, True), (b, Fa
 -- | Binary field addition
 compileAddB :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
 compileAddB width out [(as, True), (bs, True)] 0 = compileAddB2 width out as bs
+compileAddB width out [(as, True), (bs, False)] 0 = compileSubB width out as bs
 compileAddB _ _ _ _ = error "[ panic ] compileAddB: not implemented"
 
--- | Full adder:
---    out[i] = as[i] + bs[i] + carry[i-1]
---    carry[i] = as[i] * bs[i] + as[i] * carry[i-1] + bs[i] * carry[i-1]
+-- | Full adders that adds two positive variables together
+--   Assume `as` and `bs` to the operands
+--    constraints: 
+--      out[i] = as[i] + bs[i] + carry[i]
+--      carry[i+1] = as[i] * bs[i] + as[i] * carry[i] + bs[i] * carry[i]
+--    edge case: carry[0] = 0
 compileAddB2 :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
 compileAddB2 width out as bs = do
   -- only need `width - 1` carry bits
@@ -143,6 +147,57 @@ compileAddB2 width out as bs = do
         writeMul (0, [(b, 1)]) (0, [(prev, 1)]) (0, [(B bPrev, 1)])
         -- next = ab + aPrev + bPrev
         writeAdd 0 [(B ab, 1), (B aPrev, 1), (B bPrev, 1), (next, -1)]
+
+-- | Full adders that adds one positive variable with one negative variable,
+--   Assume `as` to be the positive operand and `bs` to be the negative operand
+--    constraints: 
+--      out[i] = as[i] + bs[i] + carry[i] + 1
+--      carry[i+1] = as[i] * bs[i] + as[i] * carry[i] + bs[i] * carry[i] + as[i] + carry[i]
+--    edge case: carry[0] = 1
+compileSubB :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
+compileSubB width out as bs = do
+  -- only need `width - 1` carry bits
+  carryBits <- freshRefU (width - 1)
+
+  forM_ [0 .. width - 1] $ \index -> do
+    let a = B (RefUBit width as index)
+    let b = B (RefUBit width bs index)
+    let c = B (RefUBit width out index)
+    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit (width - 1) carryBits (index - 1)))
+    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit (width - 1) carryBits index))
+
+    -- out[index] = a + b + prevCarry + 1
+    -- nextCarry = a * b + a * prevCarry + b * prevCarry + a + prevCarry
+    case (prevCarry, nextCarry) of
+      (Nothing, Nothing) -> do
+        -- c = a + b + prev + 1
+        --   = a + b
+        writeAdd 0 [(a, 1), (b, 1), (c, -1)]
+      (Nothing, Just next) -> do
+        -- c = a + b + prev + 1
+        --   = a + b
+        writeAdd 0 [(a, 1), (b, 1), (c, -1)]
+        -- next = a * b + a * prev + b * prev + a + prev
+        --      = a * b + b + 1
+        writeMul (0, [(a, 1)]) (0, [(b, 1)]) (-1, [(next, 1), (b, -1)])
+      (Just prev, Nothing) -> do
+        -- c = a + b + prev + 1
+        writeAdd 1 [(a, 1), (b, 1), (prev, 1), (c, -1)]
+      (Just prev, Just next) -> do
+        -- c = a + b + prev + 1
+        writeAdd 1 [(a, 1), (b, 1), (prev, 1), (c, -1)]
+        -- next = a * b + a * prev + b * prev + a + prev
+        ab <- freshRefB
+        aPrev <- freshRefB
+        bPrev <- freshRefB
+        -- ab = a * b
+        writeMul (0, [(a, 1)]) (0, [(b, 1)]) (0, [(B ab, 1)])
+        -- aPrev = a * prev
+        writeMul (0, [(a, 1)]) (0, [(prev, 1)]) (0, [(B aPrev, 1)])
+        -- bPrev = b * prev
+        writeMul (0, [(b, 1)]) (0, [(prev, 1)]) (0, [(B bPrev, 1)])
+        -- next = ab + aPrev + bPrev + a + prev
+        writeAdd 0 [(B ab, 1), (B aPrev, 1), (B bPrev, 1), (a, 1), (prev, 1), (next, -1)]
 
 --------------------------------------------------------------------------------
 
