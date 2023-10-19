@@ -56,12 +56,6 @@ freshRefB = do
   modifyCounter $ addCount (Intermediate, WriteBool) 1
   return $ RefBX index
 
-freshRefB' :: M n RefB
-freshRefB' = do
-  counters <- gets cmCounters
-  let index = getCount counters (Intermediate, ReadBool)
-  return $ RefBX index
-
 freshRefU :: Width -> M n RefU
 freshRefU width = do
   counters <- gets cmCounters

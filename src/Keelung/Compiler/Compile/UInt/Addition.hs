@@ -8,9 +8,9 @@ import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Keelung.Compiler.Compile.Error qualified as Error
+import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn qualified as LimbColumn
-import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo
@@ -59,7 +59,7 @@ compileAdd width out vars constant = do
   -- the maximum number of limbs that can be added up at a time
   let maxHeight = if carryWidth > 21 then 1048576 else 2 ^ carryWidth -- HACK
   case fieldTypeData fieldInfo of
-    Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+    Binary _ -> compileAddB width out vars constant
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 5 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
@@ -85,11 +85,66 @@ compileAdd width out vars constant = do
         mempty
         ranges
 
+-- | Subtraction is implemented as addition with negated operands
 compileSub :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileSub width out (Right a) (Right b) = compileAdd width out [] (a - b)
 compileSub width out (Right a) (Left b) = compileAdd width out [(b, False)] a
 compileSub width out (Left a) (Right b) = compileAdd width out [(a, True)] (-b)
 compileSub width out (Left a) (Left b) = compileAdd width out [(a, True), (b, False)] 0
+
+--------------------------------------------------------------------------------
+
+-- | Binary field addition
+compileAddB :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
+compileAddB width out [(as, True), (bs, True)] 0 = compileAddB2 width out as bs
+compileAddB _ _ _ _ = error "[ panic ] compileAddB: not implemented"
+
+-- | Full adder:
+--    out[i] = as[i] + bs[i] + carry[i-1]
+--    carry[i] = as[i] * bs[i] + as[i] * carry[i-1] + bs[i] * carry[i-1]
+compileAddB2 :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
+compileAddB2 width out as bs = do
+  -- only need `width - 1` carry bits
+  carryBits <- freshRefU (width - 1)
+
+  forM_ [0 .. width - 1] $ \index -> do
+    let a = B (RefUBit width as index)
+    let b = B (RefUBit width bs index)
+    let c = B (RefUBit width out index)
+    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit (width - 1) carryBits (index - 1)))
+    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit (width - 1) carryBits index))
+
+    -- out[index] = a + b + prevCarry
+    -- nextCarry = a * b + a * prevCarry + b * prevCarry
+    case (prevCarry, nextCarry) of
+      (Nothing, Nothing) -> do
+        -- c = a + b
+        writeAdd 0 [(a, 1), (b, 1), (c, -1)]
+      (Nothing, Just next) -> do
+        -- c = a + b
+        writeAdd 0 [(a, 1), (b, 1), (c, -1)]
+        -- next = a * b
+        writeMul (0, [(a, 1)]) (0, [(b, 1)]) (0, [(next, 1)])
+      (Just prev, Nothing) -> do
+        -- c = a + b + prev
+        writeAdd 0 [(a, 1), (b, 1), (prev, 1), (c, -1)]
+      (Just prev, Just next) -> do
+        -- c = a + b + prev
+        writeAdd 0 [(a, 1), (b, 1), (prev, 1), (c, -1)]
+        -- next = a * b + a * prev + b * prev
+        ab <- freshRefB
+        aPrev <- freshRefB
+        bPrev <- freshRefB
+        -- ab = a * b
+        writeMul (0, [(a, 1)]) (0, [(b, 1)]) (0, [(B ab, 1)])
+        -- aPrev = a * prev
+        writeMul (0, [(a, 1)]) (0, [(prev, 1)]) (0, [(B aPrev, 1)])
+        -- bPrev = b * prev
+        writeMul (0, [(b, 1)]) (0, [(prev, 1)]) (0, [(B bPrev, 1)])
+        -- next = ab + aPrev + bPrev
+        writeAdd 0 [(B ab, 1), (B aPrev, 1), (B bPrev, 1), (next, -1)]
+
+--------------------------------------------------------------------------------
 
 -- | Add a column of limbs, and return a column of carry limbs
 addLimbColumn :: (GaloisField n, Integral n) => Int -> Limb -> LimbColumn -> M n LimbColumn
