@@ -142,7 +142,7 @@ main = withUtf8 $ do
           outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
           case format of
             Aurora  -> BS.writeFile filepath (serializeInputAndWitness counters witness)
-            Snarkjs -> BS.writeFile filepath (serializeInputAndWitnessToBin p counters witness)
+            Snarkjs -> BS.writeFile filepath (serializeInputAndWitnessToBin p witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()
 run f = do

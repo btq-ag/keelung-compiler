@@ -55,8 +55,8 @@ serializeInputAndWitness counters witnessVec =
           pairStr "inputs" (list (integerText . toInteger) inputs)
             <> pairStr "witnesses" (list (integerText . toInteger) witnesses)
 
-serializeInputAndWitnessToBin :: Integral n => Integer -> Counters -> Vector n -> ByteString
-serializeInputAndWitnessToBin p counters witnessVec =
+serializeInputAndWitnessToBin :: Integral n => Integer -> Vector n -> ByteString
+serializeInputAndWitnessToBin p witnessVec =
   let -- outputAndPublicInputCount = getCount counters Output + getCount counters PublicInput
       witnesses = toList witnessVec
       -- (_, witnesses) = splitAt outputAndPublicInputCount $ toList witnessVec
