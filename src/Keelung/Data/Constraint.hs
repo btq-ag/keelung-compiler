@@ -38,60 +38,47 @@ pinnedRefU (RefUX _ _) = False
 
 --------------------------------------------------------------------------------
 
--- | Constraint
---      CAdd: 0 = c + c₀x₀ + c₁x₁ ... cₙxₙ
---      CMul: ax * by = c or ax * by = cz
---      CNEq: if (x - y) == 0 then m = 0 else m = recip (x - y)
+-- | Specialized constraints
 data Constraint n
-  = CAddL !(PolyL n)
-  | CMulL !(PolyL n) !(PolyL n) !(Either n (PolyL n))
-  | CVarEq Ref Ref -- when x == y
-  | CVarEqF RefF RefF -- when x == y
-  | CVarEqB RefB RefB -- when x == y
-  | CVarEqL Limb Limb -- when x == y
-  | CVarEqU RefU RefU -- when x == y
-  | CVarNEqB RefB RefB -- when x = ¬ y
-  | CVarBindF Ref n -- when x = val
-  | CVarBindB RefB Bool -- when x = val
-  | CVarBindL Limb Integer -- when x = val
-  | CVarBindU RefU Integer -- when x = val
+  = CAddL !(PolyL n) -- additive constraint
+  | CMulL !(PolyL n) !(PolyL n) !(Either n (PolyL n)) -- multiplicative constraint
+  | CRefEq Ref Ref -- Ref equality
+  | CLimbEq Limb Limb -- Limb equality
+  | CRefUEq RefU RefU -- RefU equality
+  | CRefBNEq RefB RefB -- RefB negation
+  | CRefFVal Ref n -- x = val
+  | CLimbVal Limb Integer -- x = val
+  | CRefUVal RefU Integer -- x = val
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAddL x, CAddL y) -> x == y
     (CMulL x y z, CMulL u v w) ->
       (x == u && y == v || x == v && y == u) && z == w
-    (CVarBindF x y, CVarBindF u v) -> x == u && y == v
-    (CVarBindB x y, CVarBindB u v) -> x == u && y == v
-    (CVarBindL x y, CVarBindL u v) -> x == u && y == v
-    (CVarBindU x y, CVarBindU u v) -> x == u && y == v
+    (CRefFVal x y, CRefFVal u v) -> x == u && y == v
+    (CLimbVal x y, CLimbVal u v) -> x == u && y == v
+    (CRefUVal x y, CRefUVal u v) -> x == u && y == v
     _ -> False
 
 instance Functor Constraint where
   fmap f (CAddL x) = CAddL (fmap f x)
-  fmap _ (CVarEq x y) = CVarEq x y
-  fmap _ (CVarEqF x y) = CVarEqF x y
-  fmap _ (CVarEqB x y) = CVarEqB x y
-  fmap _ (CVarEqL x y) = CVarEqL x y
-  fmap _ (CVarEqU x y) = CVarEqU x y
-  fmap _ (CVarNEqB x y) = CVarNEqB x y
-  fmap f (CVarBindF x y) = CVarBindF x (f y)
-  fmap _ (CVarBindB x y) = CVarBindB x y
-  fmap _ (CVarBindL x y) = CVarBindL x y
-  fmap _ (CVarBindU x y) = CVarBindU x y
+  fmap _ (CRefEq x y) = CRefEq x y
+  fmap _ (CLimbEq x y) = CLimbEq x y
+  fmap _ (CRefUEq x y) = CRefUEq x y
+  fmap _ (CRefBNEq x y) = CRefBNEq x y
+  fmap f (CRefFVal x y) = CRefFVal x (f y)
+  fmap _ (CLimbVal x y) = CLimbVal x y
+  fmap _ (CRefUVal x y) = CRefUVal x y
   fmap f (CMulL x y (Left z)) = CMulL (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulL x y (Right z)) = CMulL (fmap f x) (fmap f y) (Right (fmap f z))
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddL xs) = "AL " <> show xs <> " = 0"
-  show (CVarEq x y) = "EQ " <> show x <> " = " <> show y
-  show (CVarEqF x y) = "EF " <> show x <> " = " <> show y
-  show (CVarEqB x y) = "EB " <> show x <> " = " <> show y
-  show (CVarEqL x y) = "EL " <> show x <> " = " <> show y
-  show (CVarEqU x y) = "EU " <> show x <> " = " <> show y
-  show (CVarNEqB x y) = "NB " <> show x <> " = ¬ " <> show y
-  show (CVarBindF x n) = "VF " <> show x <> " = " <> show n
-  show (CVarBindB x n) = "VB " <> show x <> " = " <> show n
-  show (CVarBindL x n) = "VL " <> show x <> " = " <> show n
-  show (CVarBindU x n) = "VU " <> show x <> " = " <> show n
+  show (CRefEq x y) = "EQ " <> show x <> " = " <> show y
+  show (CLimbEq x y) = "EL " <> show x <> " = " <> show y
+  show (CRefUEq x y) = "EU " <> show x <> " = " <> show y
+  show (CRefBNEq x y) = "NB " <> show x <> " = ¬ " <> show y
+  show (CRefFVal x n) = "VF " <> show x <> " = " <> show n
+  show (CLimbVal x n) = "VL " <> show x <> " = " <> show n
+  show (CRefUVal x n) = "VU " <> show x <> " = " <> show n
   show (CMulL aV bV cV) = "ML " <> show aV <> " * " <> show bV <> " = " <> show cV

@@ -7,10 +7,10 @@ import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error qualified as Error
-import Keelung.Compiler.Compile.LimbColumn (LimbColumn)
-import Keelung.Compiler.Compile.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt.Addition
+import Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn)
+import Keelung.Compiler.Compile.UInt.Addition.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
@@ -43,7 +43,7 @@ import Keelung.Syntax (Width)
 compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
 compileMulU _width out (Right a) (Right b) = do
   let val = a * b
-  writeValU out val
+  writeRefUVal out val
 compileMulU width out (Right a) (Left b) = compileMul width out b (Right a)
 compileMulU width out (Left a) (Right b) = compileMul width out a (Right b)
 compileMulU width out (Left a) (Left b) = compileMul width out a (Left b)
@@ -63,13 +63,7 @@ compileMul width out x y = do
   -- the optimal width
   let limbWidth = width `ceilDiv` limbNumber
 
-  let dimensions =
-        Dimensions
-          { dimUIntWidth = width,
-            dimMaxHeight = if limbWidth > 20 then 1048576 else 2 ^ limbWidth, -- HACK
-            dimCarryWidth = limbWidth
-          }
-
+  let maxHeight = if limbWidth > 20 then 1048576 else 2 ^ limbWidth -- HACK
   case fieldTypeData fieldInfo of
     Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
@@ -78,7 +72,7 @@ compileMul width out x y = do
     Prime 7 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 11 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    _ -> mulnxn dimensions limbWidth limbNumber out x y
+    _ -> mulnxn width maxHeight limbWidth limbNumber out x y
   where
     -- like div, but rounds up
     ceilDiv :: Int -> Int -> Int
@@ -136,8 +130,8 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
 --                 x2*y2
 --               .....
 -- ------------------------------------------
-mulnxn :: (GaloisField n, Integral n) => Dimensions -> Width -> Int -> RefU -> RefU -> Either RefU Integer -> M n ()
-mulnxn dimensions limbWidth arity out var operand = do
+mulnxn :: (GaloisField n, Integral n) => Width -> Int -> Width -> Int -> RefU -> RefU -> Either RefU Integer -> M n ()
+mulnxn width maxHeight limbWidth arity out var operand = do
   -- generate pairs of indices for choosing limbs
   let indices = [(xi, columnIndex - xi) | columnIndex <- [0 .. arity - 1], xi <- [0 .. columnIndex]]
   -- generate pairs of limbs to be added together
@@ -147,8 +141,8 @@ mulnxn dimensions limbWidth arity out var operand = do
           -- current limb width may be smaller than
           --    1. the default limb width in the highest limbs
           --    2. the width of the RefU
-          let currentLimbWidthX = limbWidth `min` widthOf var `min` (dimUIntWidth dimensions - (limbWidth * xi))
-          let currentLimbWidthY = limbWidth `min` widthOf var `min` (dimUIntWidth dimensions - (limbWidth * yi))
+          let currentLimbWidthX = limbWidth `min` widthOf var `min` (width - (limbWidth * xi))
+          let currentLimbWidthY = limbWidth `min` widthOf var `min` (width - (limbWidth * yi))
 
           let x = Limb.new var currentLimbWidthX (limbWidth * xi) (Left True)
           let y = case operand of
@@ -170,9 +164,9 @@ mulnxn dimensions limbWidth arity out var operand = do
   foldM_
     ( \previousCarryLimbs (index, limbs) -> do
         let limbStart = limbWidth * index
-        let currentLimbWidth = limbWidth `min` (dimUIntWidth dimensions - limbStart)
+        let currentLimbWidth = limbWidth `min` (width - limbStart)
         let resultLimb = Limb.new out currentLimbWidth limbStart (Left True)
-        addLimbColumn dimensions resultLimb (previousCarryLimbs <> limbs)
+        addLimbColumn maxHeight resultLimb (previousCarryLimbs <> limbs)
     )
     mempty
     (IntMap.toList limbColumns)

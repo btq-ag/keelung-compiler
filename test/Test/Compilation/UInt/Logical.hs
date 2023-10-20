@@ -4,7 +4,9 @@
 
 module Test.Compilation.UInt.Logical (tests, run) where
 
+import Control.Monad
 import Data.Bits qualified
+import Data.Word
 import Keelung hiding (compile)
 import Keelung.Data.U qualified as U
 import Test.Compilation.Util
@@ -137,37 +139,34 @@ tests = describe "Logical" $ do
           runAll (Prime 13) program [x, y, z] [] expected
 
   describe "exclusive disjunction" $ do
-    it "2 variables / byte / Prime 13" $ do
+    it "2 variables / byte" $ do
       let program = do
             x <- inputUInt @8 Public
             y <- inputUInt @8 Public
             return $ x .^. y
-      forAll
-        ( do
-            x <- choose (0, 255)
-            y <- choose (0, 255)
-            return (x, y)
-        )
-        $ \(x, y) -> do
-          let expected = [Data.Bits.xor x y]
-          runAll (Prime 13) program [x, y] [] expected
+      forAll arbitrary $ \(x' :: Word8, y' :: Word8) -> do
+        let x = toInteger x'
+        let y = toInteger y'
+        let expected = [Data.Bits.xor x y]
+        runAll (Prime 13) program [x, y] [] expected
+        runAll (Prime 257) program [x, y] [] expected
+        runAll gf181 program [x, y] [] expected
 
-    it "3 variables / byte / Prime 13" $ do
-      let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
-            z <- inputUInt @8 Public
-            return $ x .^. y .^. z
+    it "more than 2 variables / byte" $ do
+      let program n = do
+            xs <- replicateM n (inputUInt @8 Public)
+            return $ foldl (.^.) 0 xs
       forAll
         ( do
-            x <- choose (0, 255)
-            y <- choose (0, 255)
-            z <- choose (0, 255)
-            return (x, y, z)
+            n <- choose (0, 20)
+            xs <- replicateM n (choose (0, 255))
+            return (n, xs)
         )
-        $ \(x, y, z) -> do
-          let expected = [x `Data.Bits.xor` y `Data.Bits.xor` z]
-          runAll (Prime 13) program [x, y, z] [] expected
+        $ \(n, xs) -> do
+          let expected = [foldl Data.Bits.xor 0 xs]
+          runAll (Prime 13) (program n) xs [] expected
+          runAll (Prime 257) (program n) xs [] expected
+          runAll gf181 (program n) xs [] expected
 
     it "variables with constants / byte / Prime 13" $ do
       let program = do

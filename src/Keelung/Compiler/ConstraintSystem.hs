@@ -83,6 +83,8 @@ instance GaloisField n => Ord (Constraint n) where
 
 --------------------------------------------------------------------------------
 
+type Limbs = [(Width, Either Var Integer)]
+
 -- | Linked Constraint System
 data ConstraintSystem n = ConstraintSystem
   { -- | Constraints
@@ -90,9 +92,9 @@ data ConstraintSystem n = ConstraintSystem
     csConstraints :: !(Seq (Constraint n)),
     csCounters :: Counters,
     csEqZeros :: [(Poly n, Var)],
-    csDivMods :: [((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))],
-    csCLDivMods :: [((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))],
-    csModInvs :: [((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer)]
+    csDivMods :: [(Limbs, Limbs, Limbs, Limbs)],
+    csCLDivMods :: [(Limbs, Limbs, Limbs, Limbs)],
+    csModInvs :: [(Limbs, Limbs, Limbs, Integer)]
   }
   deriving (Eq, Generic, NFData, Functor)
 

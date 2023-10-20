@@ -7,48 +7,15 @@ import Keelung hiding (compile)
 import Test.Hspec
 import Test.Compilation.Util
 import Test.QuickCheck hiding ((.&.))
+import qualified Test.Compilation.Field.Arithmetics
 
 run :: IO ()
 run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Field" $ do
-  it "arithmetics 1" $ do
-    let program = do
-          x <- inputField Public
-          y <- inputField Public
-          return $ x * y + y * 2
-    property $ \(x, y) -> do
-      runAll gf181 program [toInteger (x :: GF181), toInteger y] [] [toInteger $ x * y + y * 2]
 
-  it "arithmetics 2" $ do
-    let program = do
-          x <- inputField Public
-          y <- inputField Private
-          z <- reuse $ x * y + y * 2
-          return $ x * y - z
-    property $ \(x :: GF181, y :: GF181) -> do
-      runAll gf181 program [toInteger x] [toInteger y] [toInteger $ -y * 2]
-
-  it "arithmetics 3" $ do
-    let program = do
-          x <- inputField Private
-          y <- inputField Public
-          let z = 3
-          return $ x * z + y * 2
-
-    property $ \(x :: GF181, y :: GF181) -> do
-      runAll gf181 program [toInteger y] [toInteger x] [toInteger $ x * 3 + y * 2]
-
-  it "summation" $ do
-    let program = do
-          arr <- inputList Public 4
-          reduce 0 [0 .. 3] $ \accum i -> do
-            let x = arr !! i
-            return (accum + x :: Field)
-
-    forAll (vector 4) $ \(xs :: [GF181]) -> do
-      runAll gf181 program (map toInteger xs) [] [toInteger $ sum xs]
+  Test.Compilation.Field.Arithmetics.tests
 
   it "eq (variable / variable)" $ do
     let program = do

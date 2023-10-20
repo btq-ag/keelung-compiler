@@ -24,7 +24,7 @@ assertLTE width (Left a) bound
   | bound >= 2 ^ width - 1 = throwError $ Error.AssertLTEBoundTooLargeError bound width
   | bound == 0 = do
       -- there's only 1 possible value for `a`, which is `0`
-      writeValU a 0
+      writeRefUVal a 0
   | bound == 1 = do
       -- there are 2 possible values for `a`, which are `0` and `1`
       -- we can use these 2 values as the only roots of the following multiplicative polynomial
@@ -41,7 +41,7 @@ assertLTE width (Left a) bound
       writeMul (0, bits) (-1, bits) (0, [])
       -- assign the rest of the limbs to `0`
       forM_ [limbWidth .. width - 1] $ \j ->
-        writeValB (RefUBit width a j) False
+        writeRefBVal (RefUBit width a j) False
   | bound == 2 = do
       -- there are 3 possible values for `a`, which are `0`, `1` and `2`
       -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
@@ -73,7 +73,7 @@ assertLTE width (Left a) bound
           writeMul (0, [(F temp, 1)]) (-2, bits) (0, [])
           -- assign the rest of the limbs to `0`
           forM_ [limbWidth .. width - 1] $ \j ->
-            writeValB (RefUBit width a j) False
+            writeRefBVal (RefUBit width a j) False
   | otherwise = do
       -- because we don't have to execute the `go` function for trailing ones of `c`
       -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
@@ -99,7 +99,7 @@ assertLTE width (Left a) bound
               return $ Just (B aBit) -- when found, return a[i]
             else do
               -- a[i] = 0
-              writeValB aBit False
+              writeRefBVal aBit False
               return Nothing -- otherwise, continue searching
     go ref (Just acc) i =
       let aBit = B (RefUBit width ref i)
@@ -129,10 +129,14 @@ assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Inte
 assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Error.AssertComparisonError (succ (toInteger a)) GT c
 assertGTE width (Left a) bound
   | bound < 1 = throwError $ Error.AssertGTEBoundTooSmallError bound
+  | bound == 1 = do
+      -- a ≥ 1 → a > 0 → a is not zero
+      -- there exists a number m such that the product of a and m is 1
+      assertNonZero width a
   | bound >= 2 ^ width = throwError $ Error.AssertGTEBoundTooLargeError bound width
   | bound == 2 ^ width - 1 = do
       -- there's only 1 possible value for `a`, which is `2^width - 1`
-      writeValU a (2 ^ width - 1)
+      writeRefUVal a (2 ^ width - 1)
   | bound == 2 ^ width - 2 = do
       -- there's only 2 possible value for `a`, which is `2^width - 1` or `2^width - 2`
       -- we can use these 2 values as the only roots of the following multiplicative polynomial
@@ -150,7 +154,7 @@ assertGTE width (Left a) bound
       writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [])
       -- assign the rest of the limbs to `1`
       forM_ [limbWidth .. width - 1] $ \j ->
-        writeValB (RefUBit width a j) True
+        writeRefBVal (RefUBit width a j) True
   | bound == 2 ^ width - 3 = do
       -- there's only 3 possible value for `a`, which is `2^width - 1`, `2^width - 2` or `2^width - 3`
       -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
@@ -182,16 +186,12 @@ assertGTE width (Left a) bound
 
           -- assign the rest of the limbs to `1`
           forM_ [limbWidth .. width - 1] $ \j ->
-            writeValB (RefUBit width a j) True
-  | bound == 1 = do
-      -- a ≥ 1 → a > 0 → a is not zero
-      -- there exists a number m such that the product of a and m is 1
-      assertNonZero width a
+            writeRefBVal (RefUBit width a j) True
   | otherwise = runDefault
   where
     runDefault = do
       flag <- freshRefF
-      writeValF flag 1
+      writeRefFVal flag 1
       -- because we don't have to execute the `go` function for trailing zeros of `bound`
       -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
       foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
@@ -246,10 +246,10 @@ assertNonZero width ref = do
     linearCase :: (GaloisField n, Integral n) => [RefB] -> M n ()
     linearCase bits = do
       nonZero <- freshRefB
-      writeValB nonZero False
+      writeRefBVal nonZero False
       final <- foldM go nonZero bits
       -- assert that the final `nonZero` is 1
-      writeValB final True
+      writeRefBVal final True
       where
         -- we enforce this constraint:
         --    nonZero' = nonZero `or` bit
@@ -272,7 +272,7 @@ assertNonZero width ref = do
       if null nextBatch
         then do
           -- edge case
-          writeValB result True
+          writeRefBVal result True
         else do
           -- inductive case
           fasterCase order (result : nextBatch)

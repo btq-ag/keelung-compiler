@@ -3,6 +3,7 @@
 
 module Keelung.Data.Limb
   ( Limb (lmbRef, lmbWidth, lmbOffset, lmbSigns),
+    showAsTerms,
     new,
     isPositive,
     refUToLimbs,
@@ -14,6 +15,8 @@ import Control.DeepSeq (NFData)
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
 import Keelung.Syntax
+-- import Keelung.Data.U (U)
+-- import qualified Keelung.Data.U as U
 
 --------------------------------------------------------------------------------
 
@@ -31,14 +34,21 @@ data Limb = Limb
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show Limb where
-  show (Limb ref limbWidth i sign') = case (limbWidth, sign') of
-    (0, _) -> "<Empty Limb>"
-    (1, Left sign) -> (if sign then "" else "-") <> "$" <> show (RefUBit 1 ref i)
-    (1, Right signs) -> (if head signs then "" else "-") <> "$" <> show (RefUBit 1 ref i)
-    (2, Left sign) -> (if sign then "" else "-") <> "{$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " 2" <> toSuperscript 1 <> "$" <> show (RefUBit 1 ref (i + 1)) <> "}"
-    (2, Right signs) -> (if head signs then "" else "-") <> "{$" <> show (RefUBit 1 ref i) <> " " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript 1 <> "$" <> show (RefUBit 1 ref (i + 1)) <> "}"
-    (_, Left sign) -> (if sign then "" else "-") <> "$" <> show (RefUBit 1 ref i) <> " " <> (if sign then "+" else "-") <> " ... " <> (if sign then "+" else "-") <> " 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1))
-    (_, Right signs) -> (if head signs then "" else "-") <> "$" <> show (RefUBit 1 ref i) <> " ... " <> (if last signs then "+" else "-") <> " 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1))
+  show limb =
+    let (sign, terms) = showAsTerms limb
+     in if sign then terms else "-" <> terms
+
+-- | For printing limbs as terms in a polynomial (signs are handled by the caller)
+--   returns (isPositive, string of the term)
+showAsTerms :: Limb -> (Bool, String)
+showAsTerms (Limb ref limbWidth i sign') = case (limbWidth, sign') of
+  (0, _) -> (True, "{Empty Limb}")
+  (1, Left sign) -> (sign, "{$" <> show (RefUBit 1 ref i) <> "}")
+  (2, Left sign) -> (sign, "{$" <> show (RefUBit 1 ref i) <> " + 2" <> toSuperscript 1 <> "$" <> show (RefUBit 1 ref (i + 1)) <> "}")
+  (_, Left sign) -> (sign, "{$" <> show (RefUBit 1 ref i) <> " + ... + 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1)) <> "}")
+  (_, Right signs) ->
+    let terms = mconcat [if signs !! j then " + " else " - " <> "$2" <> toSuperscript j <> show (RefUBit 1 ref (i + j)) | j <- [0 .. limbWidth - 1]]
+     in (True, "{" <> terms <> "}")
 
 -- | Helper function for converting integers to superscript strings
 toSuperscript :: Int -> String
@@ -78,13 +88,40 @@ isPositive limb = case lmbSigns limb of
 -- | Convert a RefU to a bunch of Limbs
 --   (in case that the field width is not large enough to hold the RefU)
 refUToLimbs :: Width -> RefU -> [Limb]
-refUToLimbs fieldWidth refU = step (widthOf refU) 0
+refUToLimbs desiredWidth refU = step (widthOf refU) 0
   where
     step remainingWidth offset
-      | remainingWidth <= fieldWidth = [Limb refU remainingWidth offset (Left True)]
-      | otherwise = Limb refU fieldWidth offset (Left True) : step (remainingWidth - fieldWidth) (offset + fieldWidth)
+      | remainingWidth <= desiredWidth = [Limb refU remainingWidth offset (Left True)]
+      | otherwise = Limb refU desiredWidth offset (Left True) : step (remainingWidth - desiredWidth) (offset + desiredWidth)
 
 -- | Trim a 'Limb' to a given width.
 trim :: Width -> Limb -> Limb
 trim width (Limb ref w offset (Left sign)) = Limb ref (w `min` width) offset (Left sign)
 trim width (Limb ref w offset (Right signs)) = Limb ref (w `min` width) offset (Right (take (w `min` width) signs))
+
+-- type BitArray = [Either Limb U]
+
+-- -- | Given a series of limbs, shift them left by a given amount
+-- --   the least significant bits (and limb) are filled with zeros
+-- --
+-- --             LSB              
+-- --      input  ┌─┬─┬─┬─┬─┐┌─┬─┬─┐┌─┬─┬─┬─┐
+-- --             └─┴─┴─┴─┴─┘└─┴─┴─┘└─┴─┴─┴─┘
+-- --              │
+-- --              └───┐ shift "left" by n bits
+-- --                  ▼ 
+-- --     output  ┌─┬─┬─┬─┬─┐┌─┬─┬─┐┌─┬─┬─┬─┐
+-- --             └─┴─┴─┴─┴─┘└─┴─┴─┘└─┴─┴─┴─┘
+-- --
+-- shiftLeft :: Int -> LimbList -> LimbList
+-- shiftLeft _ [] = []
+-- shiftLeft amount [Left limb] 
+--   | amount >= lmbWidth limb = [Right (U.new (lmbWidth limb) 0)]
+--   | otherwise = [Left (trim (lmbWidth limb - amount) limb)]
+-- shiftLeft amount [Right val] = _
+-- shiftLeft amount _ = _
+
+--   -- let (quotient, remainder) = amount `divMod` lmbWidth (head limbs)
+--   --  in if remainder == 0
+--   --       then shiftLeftByLimbWidth quotient limbs
+--   --       else shiftLeftByLimbWidth quotient limbs ++ shiftLeftByRemainder remainder limbs

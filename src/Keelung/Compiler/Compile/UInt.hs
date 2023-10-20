@@ -11,16 +11,17 @@ module Keelung.Compiler.Compile.UInt
 where
 
 import Control.Monad.Except
-import Data.Bits qualified
 import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Monad
+import Keelung.Compiler.Compile.UInt.AESMul
 import Keelung.Compiler.Compile.UInt.Addition
-import Keelung.Compiler.Compile.UInt.Bitwise
+import Keelung.Compiler.Compile.UInt.Bitwise qualified as Bitwise
 import Keelung.Compiler.Compile.UInt.CLMul
 import Keelung.Compiler.Compile.UInt.Comparison
+import Keelung.Compiler.Compile.UInt.Logical
 import Keelung.Compiler.Compile.UInt.Multiplication
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference
@@ -30,19 +31,23 @@ import Keelung.Syntax (HasWidth (widthOf))
 
 compile :: (GaloisField n, Integral n) => RefU -> ExprU n -> M n ()
 compile out expr = case expr of
-  ValU _ val -> writeValU out val
-  VarU width var -> writeEqU out (RefUX width var)
-  VarUO width var -> writeEqU out (RefUO width var)
-  VarUI width var -> writeEqU out (RefUI width var)
-  VarUP width var -> writeEqU out (RefUP width var)
+  ValU _ val -> writeRefUVal out val
+  VarU width var -> writeRefUEq out (RefUX width var)
+  VarUO width var -> writeRefUEq out (RefUO width var)
+  VarUI width var -> writeRefUEq out (RefUI width var)
+  VarUP width var -> writeRefUEq out (RefUP width var)
   AddU w xs -> do
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = Either.partitionEithers mixed
-    compileAddU w out vars (sum constants)
+    compileAdd w out vars (sum constants)
   MulU w x y -> do
     x' <- wireU x
     y' <- wireU y
     compileMulU w out x' y'
+  AESMulU w x y -> do
+    x' <- wireU x
+    y' <- wireU y
+    compileAESMulU w out x' y'
   CLMulU w x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -59,14 +64,14 @@ compile out expr = case expr of
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (AndB (fmap (`BitU` i) xs))
       case result of
-        Left var -> writeEqB (RefUBit w out i) var
-        Right val -> writeValB (RefUBit w out i) val
+        Left var -> writeRefBEq (RefUBit w out i) var
+        Right val -> writeRefBVal (RefUBit w out i) val
   OrU w xs -> do
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (OrB (fmap (`BitU` i) xs))
       case result of
-        Left var -> writeEqB (RefUBit w out i) var
-        Right val -> writeValB (RefUBit w out i) val
+        Left var -> writeRefBEq (RefUBit w out i) var
+        Right val -> writeRefBVal (RefUBit w out i) val
   XorU w xs -> do
     xs' <- mapM wireU xs
     compileXorUs w out (toList xs')
@@ -74,75 +79,29 @@ compile out expr = case expr of
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (NotB (BitU x i))
       case result of
-        Left var -> writeEqB (RefUBit w out i) var
-        Right val -> writeValB (RefUBit w out i) val
+        Left var -> writeRefBEq (RefUBit w out i) var
+        Right val -> writeRefBVal (RefUBit w out i) val
   IfU w p x y -> do
     p' <- compileExprB p
     x' <- wireU x
     y' <- wireU y
     result <- compileIfU w p' x' y'
     case result of
-      Left var -> writeEqU out var
-      Right val -> writeValU out val
+      Left var -> writeRefUEq out var
+      Right val -> writeRefUVal out val
   RoLU w n x -> do
-    result <- wireU x
-    case result of
-      Left var -> do
-        forM_ [0 .. w - 1] $ \i -> do
-          let i' = (i - n) `mod` w
-          writeEqB (RefUBit w out i) (RefUBit w var i') -- out[i] = x[i']
-      Right val -> do
-        forM_ [0 .. w - 1] $ \i -> do
-          let i' = (i - n) `mod` w
-          writeValB (RefUBit w out i) (Data.Bits.testBit val i') -- out[i] = val[i']
+    x' <- wireU x
+    Bitwise.compileRotateL w out n x'
   ShLU w n x -> do
     x' <- wireU x
-    case compare n 0 of
-      EQ -> case x' of
-        Left var -> writeEqU out var
-        Right val -> writeValU out val
-      GT -> do
-        -- fill lower bits with 0s
-        forM_ [0 .. n - 1] $ \i -> do
-          writeValB (RefUBit w out i) False -- out[i] = 0
-          -- shift upper bits
-        forM_ [n .. w - 1] $ \i -> do
-          let i' = i - n
-          case x' of
-            Left var -> writeEqB (RefUBit w out i) (RefUBit w var i') -- out[i] = x'[i']
-            Right val -> writeValB (RefUBit w out i) (Data.Bits.testBit val i') -- out[i] = x'[i']
-      LT -> do
-        -- shift lower bits
-        forM_ [0 .. w + n - 1] $ \i -> do
-          let i' = i - n
-          case x' of
-            Left var -> writeEqB (RefUBit w out i) (RefUBit w var i') -- out[i] = x'[i']
-            Right val -> writeValB (RefUBit w out i) (Data.Bits.testBit val i') -- out[i] = x'[i']
-            -- fill upper bits with 0s
-        forM_ [w + n .. w - 1] $ \i -> do
-          writeValB (RefUBit w out i) False -- out[i] = 0
+    Bitwise.compileShiftL w out n x'
   SetU w x j b -> do
     x' <- wireU x
     b' <- compileExprB b
-    forM_ [0 .. w - 1] $ \i -> do
-      if i == j
-        then case b' of
-          Left var -> writeEqB (RefUBit w out i) var
-          Right val -> writeValB (RefUBit w out i) val
-        else do
-          case x' of
-            Left var -> writeEqB (RefUBit w out i) (RefUBit w var i) -- out[i] = x'[i]
-            Right val -> writeValB (RefUBit w out i) (Data.Bits.testBit val i) -- out[i] = x'[i]
+    Bitwise.compileSetBit w out j x' b'
   BtoU w x -> do
-    -- 1. wire 'out[ZERO]' to 'x'
-    result <- compileExprB x
-
-    case result of
-      Left var -> writeEqB (RefUBit w out 0) var -- out[0] = x
-      Right val -> writeValB (RefUBit w out 0) val -- out[0] = x
-      -- 2. wire 'out[SUCC _]' to '0' for all other bits
-    forM_ [1 .. w - 1] $ \i ->
-      writeValB (RefUBit w out i) False -- out[i] = 0
+    x' <- compileExprB x
+    Bitwise.compileBtoU w out x'
 
 --------------------------------------------------------------------------------
 
@@ -184,7 +143,7 @@ assertDivModU compileAssertion width dividend divisor quotient remainder = do
 
   productDQ <- freshRefU width
   compileMulU width productDQ divisorRef quotientRef
-  compileSubU width productDQ dividendRef remainderRef
+  compileSub width productDQ dividendRef remainderRef
 
   -- 0 ≤ remainder < divisor
   compileAssertion $ ExprB (LTU remainder divisor)
@@ -311,7 +270,7 @@ compileModInv width out a p = do
   n <- freshRefU width
   np <- freshRefU (width * 2)
   compileMulU (width * 2) np (Left n) (Right p)
-  compileAddU (width * 2) prod [(np, True)] 1
+  compileAdd (width * 2) prod [(np, True)] 1
   -- n ≤ p
   assertLTE width (Left n) p
   addModInvHint (width * 2) a (Left out) (Left n) p

@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-
 module Keelung.Compiler.Compile.Boolean (compile, andBs, xorBs) where
 
 import Control.Monad.State
@@ -13,6 +11,7 @@ import Data.List.Split qualified as List
 import Data.Maybe qualified
 import Data.Sequence qualified as Seq
 import Keelung (HasWidth (widthOf))
+import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Syntax.Internal
@@ -20,7 +19,6 @@ import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
-import Keelung.Compiler.Compile.Monad
 
 compile :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> ExprB n -> M n (Either RefB Bool)
 compile compileU expr = case expr of
@@ -43,7 +41,7 @@ compile compileU expr = case expr of
     case x' of
       Left var -> do
         out <- freshRefB
-        writeNEqB var out
+        writeRefBNEq var out
         return $ Left out
       Right val -> return $ Right (not val)
   IfB p x y -> do
@@ -123,7 +121,7 @@ compileIfB (Left _) (Right True) (Right True) = return $ Right True
 compileIfB (Left p) (Right True) (Right False) = return $ Left p
 compileIfB (Left p) (Right False) (Right True) = do
   out <- freshRefB
-  writeNEqB p out
+  writeRefBNEq p out
   return $ Left out
 compileIfB (Left _) (Right False) (Right False) = return $ Right False
 compileIfB (Left p) (Right x) (Left y) = do
@@ -261,12 +259,12 @@ xorBs xs = do
   where
     xorB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
     xorB x y = do
-      -- (1 - 2x) * (y + 1) = (1 + out - 3x)
+      -- 2 x * y = x + y - out
       out <- freshRefB
       writeMul
-        (1, [(B x, -2)])
-        (1, [(B y, 1)])
-        (1, [(B x, -3), (B out, 1)])
+        (0, [(B x, 2)])
+        (0, [(B y, 1)])
+        (0, [(B x, 1), (B y, 1), (B out, -1)])
       return out
 
     flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
@@ -274,7 +272,7 @@ xorBs xs = do
     flipResult (Right True) = return $ Right False
     flipResult (Left var) = do
       out <- freshRefB
-      writeNEqB var out
+      writeRefBNEq var out
       return $ Left out
 
     -- the degenrate case, divide and conquer won't terminate, use a linear fold instead
@@ -294,16 +292,19 @@ xorBs xs = do
     divideAndConquer :: (GaloisField n, Integral n) => Int -> [RefB] -> M n (Either RefB Bool)
     divideAndConquer order vars = do
       -- split operands into chunks in case that the order of field is too small
-      -- each chunks has at most (order - 1) operands
-      let lists = List.chunksOf (order - 1) vars
+      -- each chunk can only has at most `(2 ^ fieldWidth) - 1` operands
+      fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+      let lists =
+             -- trying to avoid having to compute `2 ^ fieldWidth - 1` most of the time
+            let len = length vars
+             in if length vars <= fieldWidth || len < 256 && fieldWidth >= 8
+                  then [vars]
+                  else List.chunksOf (fromInteger (2 ^ fieldWidth - 1)) vars
       let nonEmptyChunks = Data.Maybe.mapMaybe NonEmpty.nonEmpty lists
-
       case nonEmptyChunks of
         [] -> return $ Right False
-        [var NonEmpty.:| []] -> do
-          return $ Left var
-        _ -> do
-          mapM compileChunk nonEmptyChunks >>= divideAndConquer order
+        [var NonEmpty.:| []] -> return $ Left var
+        _ -> mapM compileChunk nonEmptyChunks >>= divideAndConquer order
 
     compileChunk :: (GaloisField n, Integral n) => NonEmpty RefB -> M n RefB
     compileChunk (var1 NonEmpty.:| []) = return var1
@@ -315,12 +316,11 @@ xorBs xs = do
       -- devise an unsigned integer for expressing the sum of vars
       let width = widthOfInteger (toInteger (length vars))
       refU <- freshRefU width
-      fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-      let limbs = Limb.refUToLimbs fieldWidth refU
+      let limb = Limb.new refU width 0 (Left True)
       -- compose the LC for the sum
-      let lc = mconcat (fmap (\x -> 1 @ B x) vars)
+      let sumOfVars = mconcat (fmap (\x -> 1 @ B x) vars)
       -- equate the LC with the unsigned integer
-      writeAddWithLCAndLimbs lc 0 (map (,-1) limbs)
+      writeAddWithLCAndLimbs sumOfVars 0 [(limb, -1)]
       -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
       return $ RefUBit width refU 0
 
@@ -345,7 +345,7 @@ eqB (Right x) (Right y) = return $ Right $ x == y
 eqB (Right True) (Left y) = return $ Left y
 eqB (Right False) (Left y) = do
   out <- freshRefB
-  writeNEqB out y
+  writeRefBNEq out y
   return $ Left out
 eqB (Left x) (Right y) = eqB (Right y) (Left x)
 eqB (Left x) (Left y) = do
@@ -458,11 +458,11 @@ compileLTEUVarConstPrim (Left acc) (x, False) = do
 compileLTEUVarConstPrim (Right True) (_, True) = return $ Right True
 compileLTEUVarConstPrim (Right True) (x, False) = do
   acc <- freshRefB
-  writeNEqB acc x
+  writeRefBNEq acc x
   return $ Left acc
 compileLTEUVarConstPrim (Right False) (x, True) = do
   acc <- freshRefB
-  writeNEqB acc x
+  writeRefBNEq acc x
   return $ Left acc
 compileLTEUVarConstPrim (Right False) (_, False) = return $ Right False
 

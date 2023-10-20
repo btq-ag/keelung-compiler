@@ -1,3 +1,4 @@
+{-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -5,19 +6,22 @@ module Keelung.Data.U
   ( U (uValue),
     new,
     modInv,
+    aesMul,
     clMul,
     clDivMod,
     clDiv,
     clMod,
     chunks,
+    widthOfInteger,
   )
 where
 
 import Control.DeepSeq (NFData)
 import Data.Bits (Bits (..))
+import Data.Bits qualified
 import Data.Serialize (Serialize)
+import Data.Word (Word32)
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.Util
 import Keelung.Syntax (HasWidth (..), Width)
 
 --------------------------------------------------------------------------------
@@ -54,6 +58,13 @@ instance Integral U where
   quotRem = divModU
   divMod = divModU
 
+-- | Merging two U values by placing them side by side.
+instance Semigroup U where
+  (<>) a b = U (Just (widthOf a + widthOf b)) (uValue a `Data.Bits.shiftL` widthOf b Data.Bits..|. uValue b)
+
+instance Monoid U where
+  mempty = U (Just 0) 0
+
 --------------------------------------------------------------------------------
 
 new :: Width -> Integer -> U
@@ -82,6 +93,14 @@ divModU a b
   | otherwise =
       let width = mergeWidths a b
        in (U (Just width) (uValue a `Prelude.div` uValue b), U (Just width) (uValue a `Prelude.mod` uValue b))
+
+-- | Hardcoded GF(256) multiplication for AES
+aesMul :: U -> U -> U
+aesMul (U w a) (U _ b) =
+  let a' = U (fmap (*2) w) a
+      b' = U (fmap (*2) w) b
+      U _ c' = snd $ (a' `clMul` b') `clDivMod` U (fmap (*2) w) 0b100011011
+   in U w c'
 
 -- | Carry-less multiplication of two unsigned integers.
 clMul :: U -> U -> U
@@ -225,3 +244,15 @@ mergeWidths (U Nothing _) (U Nothing _) = 32
 mergeWidths (U (Just a) _) (U Nothing _) = a
 mergeWidths (U Nothing _) (U (Just b) _) = b
 mergeWidths (U (Just a) _) (U (Just b) _) = a `max` b
+
+--------------------------------------------------------------------------------
+
+-- | Calculate the number of bits required to represent an Integer.
+widthOfInteger :: Integer -> Int
+widthOfInteger 0 = 0
+widthOfInteger x =
+  let lowerBits = fromInteger x :: Word32
+      higherBits = x `Data.Bits.shiftR` 32
+   in if higherBits == 0
+        then 32 - Data.Bits.countLeadingZeros lowerBits
+        else 32 + widthOfInteger higherBits

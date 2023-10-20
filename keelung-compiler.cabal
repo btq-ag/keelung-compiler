@@ -31,13 +31,16 @@ library
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
-      Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.Binary
+      Keelung.Compiler.Compile.UInt.Addition.LimbColumn
+      Keelung.Compiler.Compile.UInt.AESMul
       Keelung.Compiler.Compile.UInt.Bitwise
       Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
+      Keelung.Compiler.Compile.UInt.Logical
       Keelung.Compiler.Compile.UInt.Multiplication
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.ConstraintModule
@@ -51,10 +54,10 @@ library
       Keelung.Compiler.Optimize.OccurF
       Keelung.Compiler.Optimize.OccurU
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Relations.Boolean
+      Keelung.Compiler.Relations
       Keelung.Compiler.Relations.EquivClass
-      Keelung.Compiler.Relations.Field
       Keelung.Compiler.Relations.Limb
+      Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
@@ -111,13 +114,16 @@ executable keelungc
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
-      Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.Binary
+      Keelung.Compiler.Compile.UInt.Addition.LimbColumn
+      Keelung.Compiler.Compile.UInt.AESMul
       Keelung.Compiler.Compile.UInt.Bitwise
       Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
+      Keelung.Compiler.Compile.UInt.Logical
       Keelung.Compiler.Compile.UInt.Multiplication
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.ConstraintModule
@@ -131,10 +137,10 @@ executable keelungc
       Keelung.Compiler.Optimize.OccurF
       Keelung.Compiler.Optimize.OccurU
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Relations.Boolean
+      Keelung.Compiler.Relations
       Keelung.Compiler.Relations.EquivClass
-      Keelung.Compiler.Relations.Field
       Keelung.Compiler.Relations.Limb
+      Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
@@ -194,15 +200,19 @@ test-suite keelung-test
       Test.Compilation
       Test.Compilation.Boolean
       Test.Compilation.Field
+      Test.Compilation.Field.Arithmetics
       Test.Compilation.Misc
       Test.Compilation.UInt
       Test.Compilation.UInt.Addition
+      Test.Compilation.UInt.AdditionB
+      Test.Compilation.UInt.AESMul
       Test.Compilation.UInt.Bitwise
       Test.Compilation.UInt.CLDivMod
       Test.Compilation.UInt.CLMul
       Test.Compilation.UInt.Comparison
       Test.Compilation.UInt.DivMod
       Test.Compilation.UInt.Logical
+      Test.Compilation.UInt.Misc
       Test.Compilation.UInt.ModInv
       Test.Compilation.UInt.Multiplication
       Test.Compilation.Util
@@ -212,10 +222,12 @@ test-suite keelung-test
       Test.Optimization.Boolean
       Test.Optimization.Field
       Test.Optimization.UInt
+      Test.Optimization.UInt.AESMul
+      Test.Optimization.UInt.Bitwise
+      Test.Optimization.UInt.CLDivMod
       Test.Optimization.UInt.Misc
       Test.Optimization.Util
       Test.Relations
-      Test.Relations.Boolean
       Test.Relations.Field
       Test.Solver
       Test.Solver.BinRep
@@ -225,13 +237,16 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.IndexTable
-      Keelung.Compiler.Compile.LimbColumn
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.Binary
+      Keelung.Compiler.Compile.UInt.Addition.LimbColumn
+      Keelung.Compiler.Compile.UInt.AESMul
       Keelung.Compiler.Compile.UInt.Bitwise
       Keelung.Compiler.Compile.UInt.CLMul
       Keelung.Compiler.Compile.UInt.Comparison
+      Keelung.Compiler.Compile.UInt.Logical
       Keelung.Compiler.Compile.UInt.Multiplication
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.ConstraintModule
@@ -245,10 +260,10 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.OccurF
       Keelung.Compiler.Optimize.OccurU
       Keelung.Compiler.R1CS
-      Keelung.Compiler.Relations.Boolean
+      Keelung.Compiler.Relations
       Keelung.Compiler.Relations.EquivClass
-      Keelung.Compiler.Relations.Field
       Keelung.Compiler.Relations.Limb
+      Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs

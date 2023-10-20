@@ -118,15 +118,25 @@ goThroughOnce constraints = mconcat <$> mapM shrink (toList constraints)
 lookupVar :: Var -> M n (Maybe n)
 lookupVar var = gets (IntMap.lookup var)
 
-lookupBitsEither :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> M n (Maybe U)
-lookupBitsEither (width, Left var) = do
-  vals <- mapM lookupVar [var .. var + width - 1]
+-- | If all limbs are assigned values, then return the combined value of the limbs
+lookupLimbs :: (GaloisField n, Integral n) => Limbs -> M n (Maybe U)
+lookupLimbs limbs = do
+  vals <- mapM lookupLimb limbs
   case sequence vals of
     Nothing -> return Nothing
-    Just bitVals -> do
-      -- all bit variables are assigned values!
-      return $ Just $ U.new width $ sum [toInteger bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
-lookupBitsEither (width, Right val) = return (Just (U.new width val))
+    Just limbVals -> do
+      -- all limbs are assigned values, concatenate them all!
+      return $ Just $ mconcat limbVals
+  where
+    lookupLimb :: (GaloisField n, Integral n) => (Width, Either Var Integer) -> M n (Maybe U)
+    lookupLimb (width, Left var) = do
+      vals <- mapM lookupVar [var .. var + width - 1]
+      case sequence vals of
+        Nothing -> return Nothing
+        Just bitVals -> do
+          -- all bit variables are assigned values!
+          return $ Just $ U.new width $ sum [toInteger bitVal * (2 ^ i) | (i, bitVal) <- zip [0 :: Int ..] bitVals]
+    lookupLimb (width, Right val) = return (Just (U.new width val))
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
@@ -290,15 +300,15 @@ eliminateIfHold expected actual =
 shrinkDivMod ::
   (GaloisField n, Integral n) =>
   Bool ->
-  ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer)) ->
-  M n (Result ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer)))
+  (Limbs, Limbs, Limbs, Limbs) ->
+  M n (Result (Limbs, Limbs, Limbs, Limbs))
 shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = do
   -- check the value of the dividend first,
   -- if it's unknown, then its value can only be determined from other variables
-  dividendResult <- lookupBitsEither dividendVar
-  divisorResult <- lookupBitsEither divisorVar
-  quotientResult <- lookupBitsEither quotientVar
-  remainderResult <- lookupBitsEither remainderVar
+  dividendResult <- lookupLimbs dividendVar
+  divisorResult <- lookupLimbs divisorVar
+  quotientResult <- lookupLimbs quotientVar
+  remainderResult <- lookupLimbs remainderVar
 
   case dividendResult of
     Just dividendVal -> do
@@ -321,7 +331,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError ConflictingValues
-          bindBitsEither "remainder" remainderVar expectedRemainderVal
+          bindLimbs "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
           when (U.uValue divisorVal == 0) $
@@ -330,22 +340,22 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
-          bindBitsEither "quotient" quotientVar expectedQuotientVal
+          bindLimbs "quotient" quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
           when (U.uValue divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
-          bindBitsEither "quotient" quotientVar expectedQuotientVal
-          bindBitsEither "remainder" remainderVar expectedRemainderVal
+          bindLimbs "quotient" quotientVar expectedQuotientVal
+          bindLimbs "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Just actualRemainderVal) -> do
           let expectedDivisorVal = if isCarryLess then dividendVal `U.clDiv` actualQuotientVal else dividendVal `div` actualQuotientVal
               expectedRemainderVal = if isCarryLess then dividendVal `U.clMod` expectedDivisorVal else dividendVal `mod` expectedDivisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError ConflictingValues
-          bindBitsEither "divisor" divisorVar expectedDivisorVal
+          bindLimbs "divisor" divisorVar expectedDivisorVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Nothing) -> do
           -- if the quotient is 0, then we know that:
@@ -358,8 +368,8 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
                 if U.uValue dividendVal == 0
                   then throwError $ DividendIsZeroError dividendVar
                   else return $ if isCarryLess then dividendVal `U.clDivMod` actualQuotientVal else dividendVal `divMod` actualQuotientVal
-          bindBitsEither "divisor" divisorVar expectedDivisorVal
-          bindBitsEither "remainder" remainderVar expectedRemainderVal
+          bindLimbs "divisor" divisorVar expectedDivisorVal
+          bindLimbs "remainder" remainderVar expectedRemainderVal
           return Eliminated
         _ -> return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
     Nothing -> do
@@ -371,7 +381,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
                 if isCarryLess
                   then (divisorVal `U.clMul` quotientVal) `Data.Bits.xor` remainderVal
                   else divisorVal * quotientVal + remainderVal
-          bindBitsEither "dividend" dividendVar dividendVal
+          bindLimbs "dividend" dividendVar dividendVal
           return Eliminated
         _ -> do
           return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
@@ -390,22 +400,22 @@ shrinkBooleanConstraint var = do
 -- | Trying to reduce a ModInv constraint
 shrinkModInv ::
   (GaloisField n, Integral n) =>
-  ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer) ->
-  M n (Result ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer))
-shrinkModInv (aVar, outVar, nVar, p) = do
-  aResult <- lookupBitsEither aVar
+  (Limbs, Limbs, Limbs, Integer) ->
+  M n (Result (Limbs, Limbs, Limbs, Integer))
+shrinkModInv (aLimbs, outLimbs, nLimbs, p) = do
+  aResult <- lookupLimbs aLimbs
   case aResult of
     Just aVal -> do
       case U.modInv (U.uValue aVal) p of
         Just result -> do
-          let (width, _) = aVar
+          let width = sum (map fst aLimbs)
           -- aVal * result = n * p + 1
           let nVal = (aVal * U.new width result - U.new width 1) `div` U.new width p
-          bindBitsEither "ModInv n" nVar nVal
-          bindBitsEither "ModInv" outVar (U.new width result)
+          bindLimbs "ModInv n" nLimbs nVal
+          bindLimbs "ModInv" outLimbs (U.new width result)
           return Eliminated
-        Nothing -> throwError $ ModInvError aVar p
-    Nothing -> return $ Stuck (aVar, outVar, nVar, p)
+        Nothing -> throwError $ ModInvError aLimbs p
+    Nothing -> return $ Stuck (aLimbs, outLimbs, nLimbs, p)
 
 -- if (x - y) = 0 then m = 0 else m = recip (x - y)
 shrinkEqZero :: (GaloisField n, Integral n) => (Poly n, Var) -> M n (Result (Poly n, Var))

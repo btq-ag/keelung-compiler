@@ -33,6 +33,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Data.Limb (Limb (..))
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Prelude hiding (negate, null)
 import Prelude qualified
@@ -51,7 +52,7 @@ data PolyL n = PolyL
 instance (Semigroup n, Num n) => Semigroup (PolyL n) where
   PolyL c1 ls1 vars1 <> PolyL c2 ls2 vars2 = PolyL (c1 + c2) (ls1 <> ls2) (vars1 <> vars2)
 
-instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
+instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
   show (PolyL constant limbs vars)
     | constant == 0 =
         if firstSign == " + "
@@ -59,22 +60,23 @@ instance (Show n, Ord n, Eq n, Num n) => Show (PolyL n) where
           else "- " <> concat restOfTerms
     | otherwise = concat (show constant : firstSign : toList restOfTerms)
     where
-      limbTerms = mconcat $ fmap printTermL (toList limbs)
+      limbTerms = mconcat $ fmap printLimb (toList limbs)
       varTerms = mconcat $ fmap printTerm (Map.toList vars)
       (firstSign, restOfTerms) = case varTerms <> limbTerms of
         Seq.Empty -> error "[ panic ] Empty PolyL"
         (x Seq.:<| xs) -> (x, xs)
 
       -- return a pair of the sign ("+" or "-") and the string representation
-      printTermL :: (Show n, Ord n, Eq n, Num n) => (Limb, n) -> Seq String
-      printTermL (x, c)
-        | c == 0 = error "[ panic ] PolyL: coefficient of 0"
-        | c == 1 = Seq.fromList [" + ", show x]
-        | c == -1 = Seq.fromList [" - ", show x]
-        | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
-        | otherwise = Seq.fromList [" + ", show c <> show x]
+      printLimb :: (Eq n, Num n, Ord n, Show n) => (Limb, n) -> Seq String
+      printLimb (x, c) =
+        let (sign, terms) = Limb.showAsTerms x
+         in case c of
+              0 -> error "[ panic ] PolyL: coefficient of 0"
+              1 -> Seq.fromList [if sign then " + " else " - ", terms]
+              -1 -> Seq.fromList [if sign then " - " else " + ", terms]
+              _ -> Seq.fromList [if sign then " + " else " - ", show c <> terms]
 
-      printTerm :: (Show n, Ord n, Eq n, Num n) => (Ref, n) -> Seq String
+      printTerm :: (Eq n, Num n, Ord n, Show n) => (Ref, n) -> Seq String
       printTerm (x, c)
         | c == 0 = error "printTerm: coefficient of 0"
         | c == 1 = Seq.fromList [" + ", show x]

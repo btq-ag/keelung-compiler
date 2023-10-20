@@ -67,13 +67,19 @@ bindVar msg var val = do
   tryLog $ LogBindVar msg var val
   modify' $ IntMap.insert var val
 
-bindBitsEither :: (GaloisField n, Integral n) => String -> (Width, Either Var Integer) -> U -> M n ()
-bindBitsEither msg (width, Left var) val = do
-  forM_ [0 .. width - 1] $ \i -> do
-    bindVar msg (var + i) (if Data.Bits.testBit (U.uValue val) i then 1 else 0)
-bindBitsEither _ (_, Right _) _ = return ()
+bindLimbs :: (GaloisField n, Integral n) => String -> Limbs -> U -> M n ()
+bindLimbs msg limbs val = foldM_ bindLimb 0 limbs
+  where
+    bindLimb :: (GaloisField n, Integral n) => Int -> (Width, Either Var Integer) -> M n Int
+    bindLimb offset (width, Left var) = do
+      forM_ [0 .. width - 1] $ \i -> do
+        bindVar msg (var + i) (if Data.Bits.testBit (U.uValue val) (offset + i) then 1 else 0)
+      return (offset + width)
+    bindLimb offset (width, Right _) = return (offset + width)
 
 --------------------------------------------------------------------------------
+
+type Limbs = [(Width, Either Var Integer)]
 
 data Constraint n
   = MulConstraint (Poly n) (Poly n) (Either n (Poly n))
@@ -81,9 +87,9 @@ data Constraint n
   | BooleanConstraint Var
   | EqZeroConstraint (Poly n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
-    DivModConstaint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))
-  | CLDivModConstaint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer))
-  | ModInvConstraint ((Width, Either Var Integer), (Width, Either Var Integer), (Width, Either Var Integer), Integer)
+    DivModConstaint (Limbs, Limbs, Limbs, Limbs)
+  | CLDivModConstaint (Limbs, Limbs, Limbs, Limbs)
+  | ModInvConstraint (Limbs, Limbs, Limbs, Integer)
   deriving (Eq, Generic, NFData)
 
 instance Serialize n => Serialize (Constraint n)
@@ -133,10 +139,10 @@ data Error n
   | ConflictingValues
   | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
-  | ModInvError (Width, Either Var Integer) Integer
-  | DividendIsZeroError (Width, Either Var Integer)
-  | DivisorIsZeroError (Width, Either Var Integer)
-  | QuotientIsZeroError (Width, Either Var Integer)
+  | ModInvError Limbs Integer
+  | DividendIsZeroError Limbs
+  | DivisorIsZeroError Limbs
+  | QuotientIsZeroError Limbs
   deriving (Eq, Generic, NFData, Functor)
 
 instance Serialize n => Serialize (Error n)
@@ -157,22 +163,21 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints
       <> "while these variables have been solved: \n"
       <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList context)
-  show (ModInvError (_, Left var) p) =
-    "Unable to calculate '$" <> show var <> " `modInv` " <> show p <> "'"
-  show (ModInvError (_, Right val) p) =
-    "Unable to calculate '" <> show val <> " `modInv` " <> show p <> "'"
-  show (DividendIsZeroError (width, Left var)) =
-    "Unable to perform division because the bits representing the dividend '$" <> show var <> " ~ $" <> show (var + width - 1) <> "' evaluates to 0"
-  show (DividendIsZeroError (_, Right _)) =
-    "Unable to perform division because the dividend is 0"
-  show (DivisorIsZeroError (width, Left var)) =
-    "Unable to perform division because the bits representing the divisor '$" <> show var <> " ~ $" <> show (var + width - 1) <> "' evaluates to 0"
-  show (DivisorIsZeroError (_, Right _)) =
-    "Unable to perform division because the divisor is 0"
-  show (QuotientIsZeroError (width, Left var)) =
-    "Unable to perform division because the bits representing the quotient '$" <> show var <> " ~ $" <> show (var + width - 1) <> "' evaluates to 0"
-  show (QuotientIsZeroError (_, Right _)) =
-    "Unable to perform division because the quotient is 0"
+  show (ModInvError limbs p) =
+    "Unable to calculate '" <> showLimbs limbs <> " `modInv` " <> show p <> "'"
+  show (DividendIsZeroError limbs) =
+    "Unable to perform division because the bits representing the dividend " <> showLimbs limbs <> " evaluates to 0"
+  show (DivisorIsZeroError limbs) =
+    "Unable to perform division because the bits representing the divisor " <> showLimbs limbs <> " evaluates to 0"
+  show (QuotientIsZeroError limbs) =
+    "Unable to perform division because the bits representing the quotient " <> showLimbs limbs <> " evaluates to 0"
+
+showLimbs :: Limbs -> String
+showLimbs limbs = "[" <> unwords (map showLimb limbs) <> "]"
+  where
+    showLimb :: (Width, Either Var Integer) -> String
+    showLimb (width, Left var) = "$" <> show var <> "..$" <> show (var + width - 1)
+    showLimb (width, Right val) = concat [if Data.Bits.testBit val i then "1" else "0" | i <- [0 .. width - 1]]
 
 --------------------------------------------------------------------------------
 

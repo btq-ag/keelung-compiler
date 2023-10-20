@@ -172,7 +172,7 @@ tests =
           [dividend, 0]
           []
           (InterpreterError Interpreter.DivModQuotientIsZeroError)
-          (SolverError (Solver.QuotientIsZeroError (4, Left 12)) :: Error (Prime 17))
+          (SolverError (Solver.QuotientIsZeroError [(4, Left 12)]) :: Error (Prime 17))
 
     it "assertDivMod (divisor & remainder unknown & dividend = 0)" $ do
       let program = do
@@ -190,7 +190,7 @@ tests =
           [0, quotient]
           []
           (InterpreterError Interpreter.DivModDividendIsZeroError)
-          (SolverError (Solver.DividendIsZeroError (4, Left 8)) :: Error (Prime 17))
+          (SolverError (Solver.DividendIsZeroError [(4, Left 8)]) :: Error (Prime 17))
 
     it "assertDivMod (divisor & remainder unknown)" $ do
       let program = do

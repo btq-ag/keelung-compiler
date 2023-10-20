@@ -20,17 +20,15 @@ module Keelung.Compiler
     -- genInputsOutputsWitnesses,
     generateWitness,
     compileWithoutConstProp,
-    compile,
-    -- compileO0Old,
+    -- results in ConstraintModule
     compileO0,
-    -- compileO1Old,
     compileO1,
-    compileToModules,
-    -- optimizeWithInput,
-    --
-    -- compileO0OldElab,
+    -- results in ConstraintSystem
+    compileAndLink,
+    compileAndLinkO0,
+    compileAndLinkO1,
+    -- takes elaborated programs as input
     compileO0Elab,
-    -- compileO1OldElab,
     compileO1Elab,
     interpretElab,
     generateWitnessElab,
@@ -71,6 +69,7 @@ import Keelung.Syntax.Encode.Syntax qualified as Encoded
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts Keelung programs
 
+-- | Elaborates a Keelung program
 elaborateAndEncode :: Encode t => Comp t -> Either (Error n) Elaborated
 elaborateAndEncode = left LangError . Lang.elaborateAndEncode
 
@@ -89,37 +88,45 @@ generateWitness fieldInfo program rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode program
   generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs
 
--- elaborate => rewrite => to internal syntax
+-- elaborate => to internal syntax
 convertToInternal :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (Internal n)
 convertToInternal fieldInfo prog = ToInternal.run fieldInfo <$> elaborateAndEncode prog
 
--- elaborate => rewrite => to internal syntax => compile => link
-compileWithoutConstProp :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
-compileWithoutConstProp fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . Linker.linkConstraintModule
-
 -- elaborate => rewrite => to internal syntax => constant propagation => compile
-compileO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
-compileO0 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . Linker.linkConstraintModule
-
--- elaborate => rewrite => to internal syntax => constant propagation => compile => optimisation (new) => link
-compileO1 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
-compileO1 fieldInfo prog = elaborateAndEncode prog >>= compileO1Elab fieldInfo
-
--- elaborate => rewrite => to internal syntax => constant propagation => compile => optimisation (new)
-compileToModules ::
+compileO0 ::
   (GaloisField n, Integral n, Encode t) =>
   FieldInfo ->
   Comp t ->
   Either (Error n) (ConstraintModule n)
-compileToModules fieldInfo prog = elaborateAndEncode prog >>= Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run fieldInfo >>= left CompilerError . Optimizer.run
+compileO0 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo
 
--- | 'compile' defaults to 'compileO1'
-compile ::
+-- elaborate => rewrite => to internal syntax => constant propagation => compile => optimize
+compileO1 ::
+  (GaloisField n, Integral n, Encode t) =>
+  FieldInfo ->
+  Comp t ->
+  Either (Error n) (ConstraintModule n)
+compileO1 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= left CompilerError . Optimizer.run
+
+-- elaborate => to internal syntax => constant propagation => compile => link
+compileAndLinkO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
+compileAndLinkO0 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . Linker.linkConstraintModule
+
+-- elaborate => to internal syntax => constant propagation => compile => optimize => link
+compileAndLinkO1 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
+compileAndLinkO1 fieldInfo prog = elaborateAndEncode prog >>= compileO1Elab fieldInfo >>= return . Linker.linkConstraintModule
+
+-- | 'compileAndLink' defaults to 'compileAndLinkO1'
+compileAndLink ::
   (GaloisField n, Integral n, Encode t) =>
   FieldInfo ->
   Comp t ->
   Either (Error n) (ConstraintSystem n)
-compile = compileO1
+compileAndLink = compileAndLinkO1
+
+-- elaborate => to internal syntax => compile => link
+compileWithoutConstProp :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
+compileWithoutConstProp fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . Linker.linkConstraintModule
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
@@ -132,7 +139,7 @@ interpretElab elab rawPublicInputs rawPrivateInputs = do
 
 generateWitnessElab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
 generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS <$> compileO1Elab fieldInfo elab
+  r1cs <- toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elab
   let counters = r1csCounters r1cs
   inputs <- left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
   (outputs, witness) <- left SolverError (Solver.run r1cs inputs)
@@ -141,8 +148,8 @@ generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
 compileO0Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintModule n)
 compileO0Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run fieldInfo
 
-compileO1Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintSystem n)
-compileO1Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run fieldInfo >=> left CompilerError . Optimizer.run >=> return . Linker.linkConstraintModule
+compileO1Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintModule n)
+compileO1Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run fieldInfo >=> left CompilerError . Optimizer.run
 
 --------------------------------------------------------------------------------
 

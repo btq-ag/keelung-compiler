@@ -60,7 +60,8 @@ tests =
             x <- input Public :: Comp (UInt 32)
             return $ modInv x prime
       let genPair = do
-            a <- choose (1, prime)
+            -- only choosing from 1 to prime - 1
+            a <- choose (1, prime - 1)
             let expected = U.modInv a prime
             return (a, expected)
       forAll genPair $ \(a, result) -> do

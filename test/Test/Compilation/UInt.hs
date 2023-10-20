@@ -8,7 +8,9 @@ import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver qualified as Solver
+import Test.Compilation.UInt.AESMul qualified as AESMul
 import Test.Compilation.UInt.Addition qualified as Addition
+import Test.Compilation.UInt.AdditionB qualified as AdditionB
 import Test.Compilation.UInt.Bitwise qualified as Bitwise
 import Test.Compilation.UInt.CLMul qualified as CLMul
 import Test.Compilation.UInt.Comparison qualified as Comparison
@@ -29,8 +31,10 @@ tests :: SpecWith ()
 tests = do
   describe "Unsigned Integers" $ do
     Addition.tests
+    AdditionB.tests
     Multiplication.tests
     CLMul.tests
+    AESMul.tests
 
     DivMod.tests
     ModInv.tests
@@ -43,27 +47,6 @@ tests = do
       it "10 bit / GF257" $ do
         let program = inputUInt @10 Public
         runAll (Prime 257) program [300] [] [300]
-
-    describe "Arithmetics" $ do
-      it "arithmetics 1" $ do
-        let program = do
-              f <- inputField Public
-              u4 <- inputUInt @4 Public
-              b <- inputBool Public
-              return $
-                cond
-                  (b .&. (u4 !!! 0))
-                  (f + 1)
-                  (f + 2)
-
-        runAll gf181 program [100, 1, 1] [] [101]
-        runAll gf181 program [100, 0, 1] [] [102]
-
-      it "add + assertion" $ do
-        let program = do
-              x <- inputUInt @4 Public
-              assert $ 2 `eq` (x + 1)
-        runAll gf181 program [1] [] []
 
     describe "Conditionals" $ do
       it "with inputs" $ do

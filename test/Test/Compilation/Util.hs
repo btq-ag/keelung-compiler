@@ -33,7 +33,7 @@ interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
 -- | R1CS witness solver (on optimized R1CS)
 solverR1CS :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
 solverR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS <$> Compiler.compileO1 fieldInfo prog
+  r1cs <- toR1CS <$> Compiler.compileAndLinkO1 fieldInfo prog
   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case Solver.run r1cs inputs of
     Left err -> Left (SolverError err)
@@ -42,7 +42,7 @@ solverR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
 -- | Generate R1CS witness solver report (on optimized R1CS)
 solverR1CSCollectLog :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
 solverR1CSCollectLog fieldInfo prog rawPublicInputs rawPrivateInputs = case do
-  r1cs <- toR1CS <$> Compiler.compileO1 fieldInfo prog
+  r1cs <- toR1CS <$> Compiler.compileAndLinkO1 fieldInfo prog
   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   return (r1cs, inputs) of
   Left err -> (Just err, Nothing)
@@ -53,7 +53,7 @@ solverR1CSCollectLog fieldInfo prog rawPublicInputs rawPrivateInputs = case do
 -- | R1CS witness solver (on unoptimized R1CS)
 solverR1CSUnoptimized :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
 solverR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS <$> Compiler.compileO0 fieldInfo prog
+  r1cs <- toR1CS <$> Compiler.compileAndLinkO0 fieldInfo prog
   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case Solver.run r1cs inputs of
     Left err -> Left (SolverError err)
@@ -62,7 +62,7 @@ solverR1CSUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = do
 -- | Generate R1CS witness solver report (on unoptimized R1CS)
 solverR1CSCollectLogUnoptimized :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
 solverR1CSCollectLogUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs = case do
-  r1cs <- toR1CS <$> Compiler.compileO0 fieldInfo prog
+  r1cs <- toR1CS <$> Compiler.compileAndLinkO0 fieldInfo prog
   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   return (r1cs, inputs) of
   Left err -> (Just err, Nothing)
@@ -77,29 +77,25 @@ debug :: Encode t => FieldType -> Comp t -> IO ()
 debug fieldType program = caseFieldType fieldType handlePrime handleBinary
   where
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
-      print (Compiler.compileToModules fieldInfo program :: Either (Error (N (Prime n))) (ConstraintModule (N (Prime n))))
-      print (toR1CS <$> Compiler.compileO1 fieldInfo program :: Either (Error (N (Prime n))) (R1CS (N (Prime n))))
+      print (Compiler.compileO1 fieldInfo program :: Either (Error (N (Prime n))) (ConstraintModule (N (Prime n))))
+      print (toR1CS <$> Compiler.compileAndLinkO1 fieldInfo program :: Either (Error (N (Prime n))) (R1CS (N (Prime n))))
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
-      print (Compiler.compileToModules fieldInfo program :: Either (Error (N (Binary n))) (ConstraintModule (N (Binary n))))
-      print (toR1CS <$> Compiler.compileO1 fieldInfo program :: Either (Error (N (Binary n))) (R1CS (N (Binary n))))
+      print (Compiler.compileO1 fieldInfo program :: Either (Error (N (Binary n))) (ConstraintModule (N (Binary n))))
+      print (toR1CS <$> Compiler.compileAndLinkO1 fieldInfo program :: Either (Error (N (Binary n))) (R1CS (N (Binary n))))
 
 debugUnoptimized :: Encode t => FieldType -> Comp t -> IO ()
 debugUnoptimized fieldType program = caseFieldType fieldType handlePrime handleBinary
   where
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
-      print (Compiler.compileToModules fieldInfo program :: Either (Error (N (Prime n))) (ConstraintModule (N (Prime n))))
-      print (toR1CS <$> Compiler.compileO0 fieldInfo program :: Either (Error (N (Prime n))) (R1CS (N (Prime n))))
+      print (Compiler.compileO0 fieldInfo program :: Either (Error (N (Prime n))) (ConstraintModule (N (Prime n))))
+      print (toR1CS <$> Compiler.compileAndLinkO0 fieldInfo program :: Either (Error (N (Prime n))) (R1CS (N (Prime n))))
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
-      print (Compiler.compileToModules fieldInfo program :: Either (Error (N (Binary n))) (ConstraintModule (N (Binary n))))
-      print (toR1CS <$> Compiler.compileO0 fieldInfo program :: Either (Error (N (Binary n))) (R1CS (N (Binary n))))
+      print (Compiler.compileO0 fieldInfo program :: Either (Error (N (Binary n))) (ConstraintModule (N (Binary n))))
+      print (toR1CS <$> Compiler.compileAndLinkO0 fieldInfo program :: Either (Error (N (Binary n))) (R1CS (N (Binary n))))
 
 assertSize :: Encode t => Int -> Comp t -> IO ()
 assertSize afterSize program = do
-  -- case Compiler.asGF181N (Compiler.compileO0 program) of
-  --   Left err -> print err
-  --   Right cs -> do
-  --     CS.numberOfConstraints (linkConstraintModule cs) `shouldBe` beforeSize
-  case Compiler.asGF181N (Compiler.compileO1 gf181Info program) of
+  case Compiler.asGF181N (Compiler.compileAndLinkO1 gf181Info program) of
     Left err -> print err
     Right cs -> do
       CS.numberOfConstraints cs `shouldBe` afterSize
@@ -124,17 +120,17 @@ runAll fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldTy
       -- constraint system interpreters
       solverR1CS fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
-    -- solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-    --   `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+      -- solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+      --   `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
 
     handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
       interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
       -- constraint system interpreters
       solverR1CS fieldInfo program rawPublicInputs rawPrivateInputs
-        `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+        `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
       solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-        `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+        `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
 
 printLog :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
 printLog fieldType program rawPublicInputs rawPrivateInputs = caseFieldType fieldType handlePrime handleBinary

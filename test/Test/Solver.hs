@@ -24,7 +24,7 @@ tests = do
               return [x, y]
         let actual = generateWitness gf181Info program [1] [2]
         let expected = do
-              cs <- Compiler.asGF181N $ Compiler.compile gf181Info program
+              cs <- Compiler.asGF181N $ Compiler.compileAndLink gf181Info program
               return (csCounters cs, Vec.fromList [1, 2], Vec.fromList [1, 2, 1, 2])
         actual `shouldBe` expected
 
@@ -35,7 +35,7 @@ tests = do
               return [x * y]
         let actual = generateWitness gf181Info program [2] [3]
         let expected = do
-              cs <- Compiler.asGF181N $ Compiler.compile gf181Info program
+              cs <- Compiler.asGF181N $ Compiler.compileAndLink gf181Info program
               return (csCounters cs, Vec.fromList [6], Vec.fromList [6, 2, 3])
         actual `shouldBe` expected
 
@@ -47,7 +47,7 @@ tests = do
               return [x1 * y1, y1, x2 * y1]
         let actual = generateWitness gf181Info program [2, 3] [4]
         let expected = do
-              cs <- Compiler.asGF181N $ Compiler.compile gf181Info program
+              cs <- Compiler.asGF181N $ Compiler.compileAndLink gf181Info program
               return (csCounters cs, Vec.fromList [8, 4, 12], Vec.fromList [8, 4, 12, 2, 3, 4])
         actual `shouldBe` expected
 
@@ -59,7 +59,7 @@ tests = do
               return $ cond p x y
         let actual = generateWitness gf181Info program [3] [1, 2]
         let expected = do
-              cs <- Compiler.asGF181N $ Compiler.compile gf181Info program
+              cs <- Compiler.asGF181N $ Compiler.compileAndLink gf181Info program
               return (csCounters cs, Vec.fromList [3], Vec.fromList [3, 3, 2, 1])
         actual `shouldBe` expected
 
@@ -69,6 +69,6 @@ tests = do
               return (head list)
         let actual = generateWitness gf181Info program [] [0, 1, 2, 3]
         let expected = do
-              cs <- Compiler.asGF181N $ Compiler.compile gf181Info program
+              cs <- Compiler.asGF181N $ Compiler.compileAndLink gf181Info program
               return (csCounters cs, Vec.fromList [0], Vec.fromList [0, 0, 1, 2, 3])
         actual `shouldBe` expected

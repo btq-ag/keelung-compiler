@@ -26,9 +26,8 @@ import Keelung.Compiler.Optimize.OccurF (OccurF)
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
-import Keelung.Compiler.Relations.Boolean qualified as BooleanRelations
-import Keelung.Compiler.Relations.Field (Relations)
-import Keelung.Compiler.Relations.Field qualified as Relations
+import Keelung.Compiler.Relations (Relations)
+import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
@@ -71,6 +70,7 @@ data ConstraintModule n = ConstraintModule
 instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
   show cm =
     "Constraint Module {\n"
+      <> showFieldInfo
       <> showVarEqF
       <> showAddL
       <> showMulL
@@ -95,6 +95,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
          in if size == 0
               then ""
               else "  " <> name <> " (" <> show size <> "):\n\n" <> unlines (map (("    " <>) . f) xs) <> "\n"
+
+      showFieldInfo :: String
+      showFieldInfo = "  Field: " <> show (fieldTypeData (cmField cm)) <> "\n"
 
       -- Boolean constraints
       showBooleanConstraints =
@@ -155,12 +158,12 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
 
       showMulL' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
-          showVec :: (Show n, Ord n, Eq n, Num n) => Either n (PolyL n) -> String
+          showVec :: (Eq n, Num n, Ord n, Show n) => Either n (PolyL n) -> String
           showVec (Left c) = show c
           showVec (Right xs) = show xs
 
           -- wrap the string with parenthesis if it has more than 1 term
-          showVecWithParen :: (Show n, Ord n, Eq n, Num n) => PolyL n -> String
+          showVecWithParen :: (Eq n, Num n, Ord n, Show n) => PolyL n -> String
           showVecWithParen xs =
             if PolyL.size xs < 2
               then showVec (Right xs)
@@ -264,7 +267,6 @@ prettyBooleanConstraints counters =
 sizeOfConstraintModule :: ConstraintModule n -> Int
 sizeOfConstraintModule cm =
   Relations.size (cmRelations cm)
-    + BooleanRelations.size (Relations.exportBooleanRelations (cmRelations cm))
     + length (cmAddL cm)
     + length (cmMulL cm)
     + length (cmEqZeros cm)

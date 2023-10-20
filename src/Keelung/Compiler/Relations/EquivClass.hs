@@ -49,8 +49,7 @@ instance IsRelation () where
   invertRel () = Just ()
 
 class ExecRelation n rel where
-  -- | Given `parent = rel child`, executes `rel` on `child`
-  --   such that if `child = n`, then `parent = execRel rel n`
+  -- | `execRel relation parent = child`
   execRel :: rel -> n -> n
 
 instance ExecRelation Integer () where
@@ -81,13 +80,13 @@ data VarStatus var n rel
   = IsConstant n
   | -- | contains the relations to the children
     IsRoot (Map var rel)
-  | -- | var = relation root
+  | -- | child = relation parent
     IsChildOf var rel
   deriving (Show, Eq, Generic, NFData)
 
 data EquivClass var n rel = EquivClass
   { eqPoolName :: String,
-    eqPoolEquivClass :: Map var (VarStatus var n rel)
+    eqPoolEquivClass :: Map var (VarStatus var n rel) -- relation to the parent
   }
   deriving (Eq, Generic)
 
@@ -103,7 +102,7 @@ instance {-# OVERLAPS #-} (KnownNat n, Show var, IsRelation rel) => Show (EquivC
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
       toString (var, IsConstant value) = [showVar var <> " = " <> show (N value)]
-      toString (var, IsRoot children) = case map relationToString (Map.toList $ Map.mapKeys show children) of
+      toString (var, IsRoot toChildren) = case map relationToString (Map.toList $ Map.mapKeys show toChildren) of
         [] -> [showVar var <> " = []"] -- should never happen
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
@@ -118,7 +117,7 @@ instance {-# OVERLAPPING #-} (KnownNat n, Show var, IsRelation rel) => Show (Equ
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
       toString (var, IsConstant value) = [showVar var <> " = " <> show (N value)]
-      toString (var, IsRoot children) = case map relationToString (Map.toList $ Map.mapKeys show children) of
+      toString (var, IsRoot toChildren) = case map relationToString (Map.toList $ Map.mapKeys show toChildren) of
         [] -> [showVar var <> " = []"]
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
@@ -132,7 +131,7 @@ instance (Show var, IsRelation rel, Show n) => Show (EquivClass var n rel) where
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
       toString (var, IsConstant value) = [showVar var <> " = " <> show value]
-      toString (var, IsRoot children) = case map relationToString (Map.toList $ Map.mapKeys show children) of
+      toString (var, IsRoot toChildren) = case map relationToString (Map.toList $ Map.mapKeys show toChildren) of
         [] -> [showVar var <> " = []"] -- should never happen
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
@@ -162,28 +161,32 @@ assign var value (EquivClass name relations) = case Map.lookup var relations of
   -- The variable is already a root, so we:
   --    1. Make its children constants
   --    2. Make the root itself a constant
-  Just (IsRoot children) -> do
+  Just (IsRoot toChildren) -> do
     markChanged
     return $
       EquivClass name $
         foldl
-          ( \rels (child, relationWithParent) ->
+          ( \rels (child, relationToChild) ->
+              -- child = relationToChild var
+              -- var = value
+              --    =>
+              -- child = relationToChild value
               Map.insert
                 child
-                (IsConstant (execRel relationWithParent value))
+                (IsConstant (execRel relationToChild value))
                 rels
           )
           (Map.insert var (IsConstant value) relations)
-          (Map.toList children)
+          (Map.toList toChildren)
   -- The variable is already a child of another variable, so we:
   --    1. Make the parent a constant (by calling `assign` recursively)
-  -- child = relation root
+  -- child = relation parent
   -- =>
-  -- root = relation^-1 child
-  Just (IsChildOf root relation) ->
-    case invertRel relation of
+  -- parent = relation^-1 child
+  Just (IsChildOf parent relationToChild) ->
+    case invertRel relationToChild of
       Nothing -> error "[ panic ] assign: relation is not invertible"
-      Just rel -> assign root (execRel rel value) (EquivClass name relations)
+      Just relationToParent -> assign parent (execRel relationToParent value) (EquivClass name relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
 relate :: (Seniority var, IsRelation rel, Ord var, Eq n, ExecRelation n rel) => var -> rel -> var -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
@@ -206,80 +209,81 @@ relate a relation b relations =
           IsChildOf parent _ -> childrenSizeOf parent
 
 -- | Relates a child to a parent, O(lg n)
+--   child = relation parent
 relateChildToParent :: (Ord var, IsRelation rel, Eq n, Seniority var, ExecRelation n rel) => var -> rel -> var -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
-relateChildToParent child relation parent relations =
+relateChildToParent child relationToChild parent relations =
   if child == parent
     then return relations
     else case lookup parent relations of
       -- The parent is a constant, so we make the child a constant:
       --    * for the parent: do nothing
-      --    * for the child: assign it the value of the parent with the inverted relation applied
-      IsConstant value -> case invertRel relation of
-        Nothing -> error "[ panic ] relateChildToParent: relation is not invertible"
-        Just rel -> assign child (execRel rel value) relations
+      --    * for the child: assign it the value of the parent with `relationToChild` applied
+      IsConstant value -> assign child (execRel relationToChild value) relations
       -- The parent has other children
       IsRoot children -> case lookup child relations of
         -- The child also has its grandchildren, so we relate all these grandchildren to the parent, too:
         --    * for the parent: add the child and its grandchildren to the children map
         --    * for the child: point the child to the parent and add the relation
         --    * for the grandchildren: point them to the new parent
-        IsRoot grandchildren -> do
+        IsRoot toGrandChildren -> do
           markChanged
-          let newSiblings = Map.insert child relation $ Map.map (<> relation) grandchildren
+          let newSiblings = Map.insert child relationToChild $ Map.map (relationToChild <>) toGrandChildren
           return $
             EquivClass (eqPoolName relations) $
               Map.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
-                Map.insert child (IsChildOf parent relation) $ -- point the child to the parent
+                Map.insert child (IsChildOf parent relationToChild) $ -- point the child to the parent
                   Map.foldlWithKey' -- point the grandchildren to the new parent
-                    ( \rels grandchild rel -> Map.insert grandchild (IsChildOf parent (rel <> relation)) rels
+                    ( \rels grandchild relationToGrandChild -> Map.insert grandchild (IsChildOf parent (relationToGrandChild <> relationToChild)) rels
                     )
                     (eqPoolEquivClass relations)
-                    grandchildren
+                    toGrandChildren
         --
         -- The child is a constant, so we make the parent a constant, too:
-        --  * for the parent: assign it the value of the child with the relation applied
+        --  * for the parent: assign it the value of the child with the inverted relation applied
         --  * for the child: do nothing
-        IsConstant value -> assign parent (execRel relation value) relations
-        -- The child is already a child of another variable:
-        --    * for the another variable: point it to the parent with `invertRel relationWithParent <> relation`
-        --    * for the parent: add the child and the another variable to the children map
-        --    * for the child: point it to the parent with `relation`
-        IsChildOf parent' relationWithParent ->
-          if parent' `compareSeniority` parent == GT
+        IsConstant value -> case invertRel relationToChild of
+          Nothing -> error "[ panic ] relate: relation is not invertible"
+          Just relationToParent -> assign parent (execRel relationToParent value) relations
+        -- The child is already a child of another variable `parent2`:
+        --    * for the another variable `parent2`: point `parent2` to `parent` with `invertRel parent2ToChild <> relationToChild`
+        --    * for the parent: add the child and `parent2` to the children map
+        --    * for the child: point it to the `parent` with `relationToParent`
+        IsChildOf parent2 parent2ToChild ->
+          if parent2 `compareSeniority` parent == GT
             then --
-            -- child = relation parent
-            -- child = relationWithParent parent'
-            -- => parent = (invertRel relation <> relationWithParent) parent'
-            -- or parent' = (invertRel relationWithParent <> relation) parent
-            case invertRel relation of
-              Just rel -> relate parent (rel <> relationWithParent) parent' relations
-              Nothing -> case invertRel relationWithParent of
-                Just rel -> relate parent' (rel <> relation) parent relations
+            -- child = relationToChild parent
+            -- child = parent2ToChild parent2
+            --    => parent = (invertRel relationToChild <> parent2ToChild) parent2
+            --    or parent2 = (invertRel parent2ToChild <> relationToChild) parent
+            case invertRel relationToChild of
+              Just relationToChild' -> relate parent (relationToChild' <> parent2ToChild) parent2 relations
+              Nothing -> case invertRel parent2ToChild of
+                Just parent2ToChild' -> relate parent2 (parent2ToChild' <> relationToChild) parent relations
                 Nothing -> error "[ panic ] relateChildToParent: relation is not transitive!"
             else do
               --
-              -- child = relation parent
-              -- child = relationWithParent parent'
-              -- => parent' = (invertRel relationWithParent <> relation) parent
-              -- or parent = (invertRel relation <> relationWithParent) parent'
-              case invertRel relationWithParent of
-                Just rel -> do
+              -- child = relationToChild parent
+              -- child = parent2ToChild parent2
+              --    => parent2 = (invertRel parent2ToChild <> relationToChild) parent
+              --    or parent = (invertRel relationToChild <> parent2ToChild) parent2
+              case invertRel parent2ToChild of
+                Just parent2ToChild' -> do
                   markChanged
-                  relate parent' (rel <> relation) parent $
+                  relate parent2 (parent2ToChild' <> relationToChild) parent $
                     EquivClass (eqPoolName relations) $
-                      Map.insert child (IsChildOf parent relation) $
+                      Map.insert child (IsChildOf parent relationToChild) $
                         eqPoolEquivClass relations
-                Nothing -> case invertRel relation of
-                  Just rel -> do
+                Nothing -> case invertRel relationToChild of
+                  Just relationToChild' -> do
                     markChanged
-                    relate parent (rel <> relationWithParent) parent' $
+                    relate parent (relationToChild' <> parent2ToChild) parent2 $
                       EquivClass (eqPoolName relations) $
-                        Map.insert child (IsChildOf parent relation) $
+                        Map.insert child (IsChildOf parent relationToChild) $
                           eqPoolEquivClass relations
                   Nothing -> return relations -- cannot relate parent' to parent, so we do nothing
 
       -- The parent is a child of another variable, so we relate the child to the grandparent instead
-      IsChildOf grandparent relationWithGrandparent -> relate child (relation <> relationWithGrandparent) grandparent relations
+      IsChildOf grandparent relationFromGrandparent -> relate child (relationToChild <> relationFromGrandparent) grandparent relations
 
 -- | Calculates the relation between two variables, O(lg n)
 relationBetween :: (Ord var, IsRelation rel) => var -> var -> EquivClass var n rel -> Maybe rel
