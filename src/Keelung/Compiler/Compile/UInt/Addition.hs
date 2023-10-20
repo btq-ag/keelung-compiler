@@ -9,6 +9,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Monad
+import Keelung.Compiler.Compile.UInt.Addition.Binary (compileAddB)
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Util
@@ -19,7 +20,6 @@ import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Field (FieldType (..))
 import Keelung.Syntax (Width)
-import Keelung.Compiler.Compile.UInt.Addition.Binary (compileAddB)
 
 --------------------------------------------------------------------------------
 

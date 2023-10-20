@@ -1,15 +1,17 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Test.Compilation.UInt.AESMul (tests, run) where
 
 -- import Data.Word
+
+import Data.Word (Word8)
 import Keelung hiding (compile)
 import Keelung.Data.U qualified as U
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
-import Data.Word (Word8)
 
 run :: IO ()
 run = hspec tests

@@ -1,13 +1,14 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Test.Compilation.UInt.Misc (tests, run) where
 
+import Control.Monad
 import Keelung hiding (compile)
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck
-import Control.Monad
 
 run :: IO ()
 run = hspec tests
@@ -85,7 +86,7 @@ tests = describe "UInt arithmetics" $ do
             x <- inputUInt @8 Public
             return $ -x
       forAll (chooseInteger (0, 255)) $ \x -> do
-        let expected = [(- x) `mod` 256]
+        let expected = [(-x) `mod` 256]
         runAll (Binary 5) program (map toInteger [x]) [] expected
 
     it "mixed (positive / negative / constnat) / Byte" $ do
@@ -94,10 +95,10 @@ tests = describe "UInt arithmetics" $ do
             return $ constant + sum (zipWith (\sign x -> if sign then x else -x) signs inputs)
       let genPair = do
             n <- choose (1, 10)
-            signs <- replicateM n $ do 
-                  sign <- arbitrary
-                  x <- chooseInteger (0, 255)
-                  return (sign, x)
+            signs <- replicateM n $ do
+              sign <- arbitrary
+              x <- chooseInteger (0, 255)
+              return (sign, x)
             constant <- chooseInteger (0, 255)
             return (constant, signs)
       forAll genPair $ \(constant, pairs) -> do

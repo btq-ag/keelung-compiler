@@ -8,10 +8,10 @@ import Data.Sequence qualified as Seq
 import Keelung hiding (compile)
 import Keelung.Compiler.Compile.Util
 import Keelung.Data.Limb qualified as Limb
-import Test.Hspec
+import Keelung.Data.Reference (RefU (RefUX))
 import Test.Compilation.Util
+import Test.Hspec
 import Test.QuickCheck
-import Keelung.Data.Reference (RefU(RefUX))
 
 run :: IO ()
 run = hspec tests
@@ -290,10 +290,10 @@ tests = do
             return $ constant + sum (zipWith (\sign x -> if sign then x else -x) signs inputs)
       let genPair = do
             n <- choose (2, 10)
-            signs <- replicateM n $ do 
-                  sign <- arbitrary
-                  x <- chooseInteger (0, 255)
-                  return (sign, x)
+            signs <- replicateM n $ do
+              sign <- arbitrary
+              x <- chooseInteger (0, 255)
+              return (sign, x)
             constant <- chooseInteger (0, 255)
             return (constant, signs)
       forAll genPair $ \(constant, pairs) -> do

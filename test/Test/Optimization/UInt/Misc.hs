@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
-
--- {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Test.Optimization.UInt.Misc (tests, run) where
 
