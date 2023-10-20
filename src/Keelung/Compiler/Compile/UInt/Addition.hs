@@ -59,7 +59,7 @@ compileAdd width out vars constant = do
   -- the maximum number of limbs that can be added up at a time
   let maxHeight = if carryWidth > 21 then 1048576 else 2 ^ carryWidth -- HACK
   case fieldTypeData fieldInfo of
-    Binary _ -> compileAddB width out vars constant
+    Binary _ -> compileAddOnBinaryField width out vars constant
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 5 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
@@ -95,19 +95,22 @@ compileSub width out (Left a) (Left b) = compileAdd width out [(a, True), (b, Fa
 --------------------------------------------------------------------------------
 
 -- | Binary field addition
-compileAddB :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
-compileAddB width out [(as, True), (bs, True)] 0 = compileAddB2 width out as bs
-compileAddB width out [(as, True), (bs, False)] 0 = compileSubB width out as bs
-compileAddB _ _ _ _ = error "[ panic ] compileAddB: not implemented"
+compileAddOnBinaryField :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
+compileAddOnBinaryField _ out [(as, True)] 0 = writeRefUEq out as
+compileAddOnBinaryField width out [(as, True)] c = compileAddBPosConst width out as c
+compileAddOnBinaryField width out [(as, False)] c = compileAddBNegConst width out as c
+compileAddOnBinaryField width out [(as, True), (bs, True)] 0 = compileAddBPosPos width out as bs
+compileAddOnBinaryField width out [(as, True), (bs, False)] 0 = compileAddBPosNeg width out as bs
+compileAddOnBinaryField _ _ _ _ = error "[ panic ] compileAddB: not implemented"
 
--- | Full adders that adds two positive variables together
+-- | Adds two positive variables together on a binary field:
 --   Assume `as` and `bs` to the operands
---    constraints: 
+--    constraints of a full adder: 
 --      out[i] = as[i] + bs[i] + carry[i]
 --      carry[i+1] = as[i] * bs[i] + as[i] * carry[i] + bs[i] * carry[i]
 --    edge case: carry[0] = 0
-compileAddB2 :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
-compileAddB2 width out as bs = do
+compileAddBPosPos :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
+compileAddBPosPos width out as bs = do
   -- only need `width - 1` carry bits
   carryBits <- freshRefU (width - 1)
 
@@ -148,14 +151,101 @@ compileAddB2 width out as bs = do
         -- next = ab + aPrev + bPrev
         writeAdd 0 [(B ab, 1), (B aPrev, 1), (B bPrev, 1), (next, -1)]
 
--- | Full adders that adds one positive variable with one negative variable,
+-- | Adds a positive variable and a constant together on a binary field:
+--   Assume `as` to the variable and `bs` to be the constant
+--    constraints of a full adder: 
+--      out[i] = as[i] + bs[i] + carry[i]
+--      carry[i+1] = as[i] * bs[i] + as[i] * carry[i] + bs[i] * carry[i]
+--    edge case: carry[0] = 0
+compileAddBPosConst :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Integer -> M n ()
+compileAddBPosConst width out as bs = do
+  -- only need `width - 1` carry bits
+  carryBits <- freshRefU (width - 1)
+
+  forM_ [0 .. width - 1] $ \index -> do
+    let a = B (RefUBit width as index)
+    let b = if Data.Bits.testBit bs index then 1 else 0
+    let c = B (RefUBit width out index)
+    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit (width - 1) carryBits (index - 1)))
+    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit (width - 1) carryBits index))
+
+    -- out[index] = a + b + prevCarry
+    -- nextCarry = a * b + a * prevCarry + b * prevCarry
+    case (prevCarry, nextCarry) of
+      (Nothing, Nothing) -> do
+        -- c = a + b
+        writeAdd b [(a, 1), (c, -1)]
+      (Nothing, Just next) -> do
+        -- c = a + b
+        writeAdd b [(a, 1), (c, -1)]
+        -- next = a * b
+        writeAdd 0 [(a, b), (next, -1)]
+      (Just prev, Nothing) -> do
+        -- c = a + b + prev
+        writeAdd b [(a, 1), (prev, 1), (c, -1)]
+      (Just prev, Just next) -> do
+        -- c = a + b + prev
+        writeAdd b [(a, 1), (prev, 1), (c, -1)]
+        aPrev <- freshRefB
+        -- aPrev = a * prev
+        writeMul (0, [(a, 1)]) (0, [(prev, 1)]) (0, [(B aPrev, 1)])
+        -- next = ab + aPrev + bPrev
+        writeAdd 0 [(a, b), (B aPrev, 1), (prev, b), (next, -1)]
+
+-- | Adds a negative variable and a constant together on a binary field:
+--   Assume `as` to the variable and `bs` to be the constant
+--    constraints of a full adder: 
+--      out[i] = as[i] + bs[i] + carry[i] + 1
+--      carry[i+1] = (1 + as[i]) * bs[i] + (1 + as[i]) * carry[i] + bs[i] * carry[i]
+--      carry[i+1] = as[i] * bs[i] + as[i] * carry[i] + bs[i] * carry[i] + bs[i] + carry[i]
+--    edge case: carry[0] = 1
+compileAddBNegConst :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Integer -> M n ()
+compileAddBNegConst width out as bs = do
+  -- only need `width - 1` carry bits
+  carryBits <- freshRefU (width - 1)
+
+  forM_ [0 .. width - 1] $ \index -> do
+    let a = B (RefUBit width as index)
+    let b = if Data.Bits.testBit bs index then 1 else 0
+    let c = B (RefUBit width out index)
+    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit (width - 1) carryBits (index - 1)))
+    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit (width - 1) carryBits index))
+
+    -- out[index] = a + b + prevCarry + 1
+    -- nextCarry = a * b + a * prevCarry + b * prevCarry + b + prevCarry
+    case (prevCarry, nextCarry) of
+      (Nothing, Nothing) -> do
+        -- c = a + b + prev + 1
+        --   = a + b
+        writeAdd b [(a, 1), (c, -1)]
+      (Nothing, Just next) -> do
+        -- c = a + b + prev + 1
+        --   = a + b
+        writeAdd b [(a, 1), (c, -1)]
+        -- next = a * b + a * prev + b * prev + b + prev
+        --      = a * (b + 1) + 1
+        writeAdd 1 [(a, b + 1), (next, -1)]
+      (Just prev, Nothing) -> do
+        -- c = a + b + prev + 1
+        writeAdd (b + 1) [(a, 1), (prev, 1), (c, -1)]
+      (Just prev, Just next) -> do
+        -- c = a + b + prev + 1
+        writeAdd (b + 1) [(a, 1), (prev, 1), (c, -1)]
+        -- next = a * b + a * prev + (b + 1) * prev + b + prev
+        aPrev <- freshRefB
+        -- aPrev = a * prev
+        writeMul (0, [(a, 1)]) (0, [(prev, 1)]) (0, [(B aPrev, 1)])
+        -- next = ab + aPrev + bPrev + b + prev
+        writeAdd b [(a, b), (B aPrev, 1), (prev, b + 1), (next, -1)]
+
+-- | Adds a positive variable with a negative variable on a binary field:
 --   Assume `as` to be the positive operand and `bs` to be the negative operand
---    constraints: 
+--    constraints of a full adder: 
 --      out[i] = as[i] + bs[i] + carry[i] + 1
 --      carry[i+1] = as[i] * bs[i] + as[i] * carry[i] + bs[i] * carry[i] + as[i] + carry[i]
 --    edge case: carry[0] = 1
-compileSubB :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
-compileSubB width out as bs = do
+compileAddBPosNeg :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
+compileAddBPosNeg width out as bs = do
   -- only need `width - 1` carry bits
   carryBits <- freshRefU (width - 1)
 
