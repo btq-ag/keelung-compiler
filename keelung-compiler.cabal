@@ -34,6 +34,7 @@ library
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.Binary
       Keelung.Compiler.Compile.UInt.Addition.LimbColumn
       Keelung.Compiler.Compile.UInt.AESMul
       Keelung.Compiler.Compile.UInt.Bitwise
@@ -116,6 +117,7 @@ executable keelungc
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.Binary
       Keelung.Compiler.Compile.UInt.Addition.LimbColumn
       Keelung.Compiler.Compile.UInt.AESMul
       Keelung.Compiler.Compile.UInt.Bitwise
@@ -202,6 +204,7 @@ test-suite keelung-test
       Test.Compilation.Misc
       Test.Compilation.UInt
       Test.Compilation.UInt.Addition
+      Test.Compilation.UInt.AdditionB
       Test.Compilation.UInt.AESMul
       Test.Compilation.UInt.Bitwise
       Test.Compilation.UInt.CLDivMod
@@ -237,6 +240,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.Binary
       Keelung.Compiler.Compile.UInt.Addition.LimbColumn
       Keelung.Compiler.Compile.UInt.AESMul
       Keelung.Compiler.Compile.UInt.Bitwise

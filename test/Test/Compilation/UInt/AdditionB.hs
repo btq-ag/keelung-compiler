@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Test.Compilation.UInt.Misc (tests, run) where
+module Test.Compilation.UInt.AdditionB (tests, run) where
 
 import Keelung hiding (compile)
 import Test.Compilation.Util
@@ -15,21 +15,7 @@ run = hspec tests
 --------------------------------------------------------------------------------
 
 tests :: SpecWith ()
-tests = describe "UInt arithmetics" $ do
-  describe "Binary field" $ do
-    it "2 positive variables / UInt 2" $ do
-      let program = do
-            x <- inputUInt @2 Public
-            y <- inputUInt @2 Public
-            return $ x + y
-      let genPair = do
-            x <- chooseInteger (0, 3)
-            y <- chooseInteger (0, 3)
-            return (x, y)
-      forAll genPair $ \(x, y) -> do
-        let expected = [(x + y) `mod` 4]
-        runAll (Binary 5) program (map toInteger [x, y]) [] expected
-
+tests = describe "Addition / Subtraction (Binary field)" $ do
     it "2 positive variables / Byte" $ do
       let program = do
             x <- inputUInt @8 Public

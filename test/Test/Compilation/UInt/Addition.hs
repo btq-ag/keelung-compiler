@@ -284,15 +284,19 @@ tests = do
         let expected = [(-x - y - z - w) `mod` 1024]
         runAll (Prime 17) program [x, y, z, w] [] expected
 
-    it "more than 2 mixed (positive / negative) variables / constant" $ do
-      let program signs = do
+    it "more than 2 mixed (positive / negative / constant) / UInt 4" $ do
+      let program constant signs = do
             inputs <- replicateM (length signs) (inputUInt @4 Public)
-            return $ -4 + sum (zipWith (\sign x -> if sign then x else -x) signs inputs)
+            return $ constant + sum (zipWith (\sign x -> if sign then x else -x) signs inputs)
       let genPair = do
-            sign <- arbitrary
-            x <- chooseInteger (0, 15)
-            return (sign, x)
-      forAll (choose (2, 2) >>= flip replicateM genPair) $ \pairs -> do
+            n <- choose (2, 10)
+            signs <- replicateM n $ do 
+                  sign <- arbitrary
+                  x <- chooseInteger (0, 255)
+                  return (sign, x)
+            constant <- chooseInteger (0, 255)
+            return (constant, signs)
+      forAll genPair $ \(constant, pairs) -> do
         let (signs, values) = unzip pairs
-        let expected = [(-4 + sum (zipWith (\sign x -> if sign then x else -x) signs values)) `mod` 16]
-        runAll (Prime 17) (program signs) values [] expected
+        let expected = [(constant + sum (zipWith (\sign x -> if sign then x else -x) signs values)) `mod` 16]
+        runAll (Prime 17) (program (fromInteger constant) signs) values [] expected
