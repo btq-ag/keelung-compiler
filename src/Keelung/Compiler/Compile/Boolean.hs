@@ -388,58 +388,7 @@ xorBs xs = do
         (0, [(B x, 1), (B y, 1), (B out, -1)])
       return out
 
--- xorBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
--- xorBs xs = do
---   -- if the order of field is 2, then we can't use the divide and conquer approach
---   order <- gets (FieldInfo.fieldOrder . cmField)
---   if order == 2
---     then linearFold xs
---     else do
---       -- separate the operands into variables and constants
---       let (vars, constants) = Either.partitionEithers xs
---           constantVal = odd (length (filter id constants)) -- if number of True is odd
---       if constantVal
---         then divideAndConquer (fromInteger order) vars >>= flipResult
---         else divideAndConquer (fromInteger order) vars
---   where
---     xorB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
---     xorB x y = do
---       -- 2 x * y = x + y - out
---       out <- freshRefB
---       writeMul
---         (0, [(B x, 2)])
---         (0, [(B y, 1)])
---         (0, [(B x, 1), (B y, 1), (B out, -1)])
---       return out
-
---     -- the degenrate case, divide and conquer won't terminate, use a linear fold instead
---     linearFold :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
---     linearFold [] = return $ Right False
---     linearFold (Right True : vars) = linearFold vars >>= flipResult
---     linearFold (Right False : vars) = linearFold vars
---     linearFold (Left var : vars) = do
---       result <- linearFold vars
---       case result of
---         Right False -> return (Left var)
---         Right True -> flipResult (Left var)
---         Left resultVar -> Left <$> xorB var resultVar
-
--- -- | See if a LC is odd.
--- isOdd :: (GaloisField n, Integral n) => LC n -> M n (Either RefB Bool)
--- isOdd (Constant constant) = return $ Right $ odd constant
--- isOdd (Polynomial polynomial) = do
---   -- -- calculate the upper bound of the polynomial
---   -- let upperBound = PolyG.upperBound polynomial
-
---   -- writeAddWithPolyLAndLimbs polynomial
-
---   q <- freshRefF
---   r <- freshRefB
---   writeAddWithLC (Polynomial polynomial <> neg (2 @ F q) <> neg (1 @ B r)) -- polynomial - 2 * q - r
---   return (Left r)
-
--- isOdd (mconcat (fmap (\x -> 1 @ B x) vars))
-
+-- | Basically specialized version of `xorBs`
 eqB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)
 eqB (Right x) (Right y) = return $ Right $ x == y
 eqB (Right True) (Left y) = return $ Left y
@@ -449,15 +398,30 @@ eqB (Right False) (Left y) = do
   return $ Left out
 eqB (Left x) (Right y) = eqB (Right y) (Left x)
 eqB (Left x) (Left y) = do
-  --     x * y + (1 - x) * (1 - y) = out
-  -- =>
-  --    (1 - x) * (1 - 2y) = (out - y)
-  out <- freshRefB
-  writeMul
-    (1, [(B x, -1)])
-    (1, [(B y, -2)])
-    (0, [(B out, 1), (B y, -1)])
-  return (Left out)
+  fieldType <- gets (FieldInfo.fieldTypeData . cmField)
+  case fieldType of
+    Binary _ -> binary
+    Prime 2 -> binary
+    Prime _ -> prime
+  where 
+    binary :: (GaloisField n, Integral n) => M n (Either RefB Bool)
+    binary = do 
+      --  1 + x + y = out
+      out <- freshRefB
+      writeAdd 1 [(B x, 1), (B y, 1), (B out, -1)]
+      return (Left out)
+
+    prime :: (GaloisField n, Integral n) => M n (Either RefB Bool)
+    prime = do
+      --     x * y + (1 - x) * (1 - y) = out
+      -- =>
+      --    (1 - x) * (1 - 2y) = (out - y)
+      out <- freshRefB
+      writeMul
+        (1, [(B x, -1)])
+        (1, [(B y, -2)])
+        (0, [(B out, 1), (B y, -1)])
+      return (Left out)
 
 --------------------------------------------------------------------------------
 
