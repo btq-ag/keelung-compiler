@@ -10,6 +10,7 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Keelung (FieldType (..))
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations (Relations)
@@ -17,6 +18,7 @@ import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.UInt qualified as UInt
+import Keelung.Data.FieldInfo (FieldInfo (..))
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
@@ -293,6 +295,14 @@ runRoundM = execWriterT
 markChanged :: WhatChanged -> RoundM n ()
 markChanged = tell
 
+-- | Only execute the given function if we are not on a binary field
+primeFieldOnly :: RoundM n Bool -> RoundM n Bool
+primeFieldOnly f = do
+  cm <- get
+  case fieldTypeData (cmField cm) of
+    Binary _ -> return False
+    _ -> f
+
 -- | Go through additive constraints and classify them into relation constraints when possible.
 --   Returns 'True' if the constraint has been reduced.
 learnFromAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n Bool
@@ -303,7 +313,7 @@ learnFromAddL poly = case PolyL.view poly of
     --    var = - intercept / slope
     assign var (-intercept / slope)
     return True
-  PolyL.RefBinomial intercept (var1, slope1) (var2, slope2) -> do
+  PolyL.RefBinomial intercept (var1, slope1) (var2, slope2) -> primeFieldOnly $ do
     --    intercept + slope1 * var1 + slope2 * var2 = 0
     --  =>
     --    slope1 * var1 = - slope2 * var2 - intercept
