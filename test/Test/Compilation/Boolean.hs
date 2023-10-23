@@ -12,104 +12,130 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Boolean" $ do
-  it "complement / constant true" $ do
-    let program = return $ complement true
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [] [] [0]
+  describe "complement" $ do
+    it "constant true" $ do
+      let program = return $ complement true
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [] [] [0]
 
-  it "complement / constant false" $ do
-    let program = return $ complement false
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [] [] [1]
+    it "constant false" $ do
+      let program = return $ complement false
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [] [] [1]
 
-  it "complement / variable" $ do
-    let program = complement <$> inputBool Public
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [0] [] [1]
-      runAll field program [1] [] [0]
+    it "variable" $ do
+      let program = complement <$> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0] [] [1]
+        runAll field program [1] [] [0]
 
-  it "and / variable + constant true" $ do
-    let program = (.&.) true <$> inputBool Public
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [0] [] [0]
-      runAll field program [1] [] [1]
+  describe "and" $ do
+    it "variable + constant true" $ do
+      let program = (.&.) true <$> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0] [] [0]
+        runAll field program [1] [] [1]
 
-  it "and / variable + constant false" $ do
-    let program = (.&.) false <$> inputBool Public
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [0] [] [0]
-      runAll field program [1] [] [0]
+    it "variable + constant false" $ do
+      let program = (.&.) false <$> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0] [] [0]
+        runAll field program [1] [] [0]
 
-  it "and / 2 variables" $ do
-    let program = (.&.) <$> inputBool Public <*> inputBool Public
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [0, 0] [] [0]
-      runAll field program [0, 1] [] [0]
-      runAll field program [1, 0] [] [0]
-      runAll field program [1, 1] [] [1]
+    it "2 variables" $ do
+      let program = (.&.) <$> inputBool Public <*> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0, 0] [] [0]
+        runAll field program [0, 1] [] [0]
+        runAll field program [1, 0] [] [0]
+        runAll field program [1, 1] [] [1]
 
-  it "and / 3 variables" $ do
-    let program = (.&.) <$> ((.&.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [0, 0, 0] [] [0]
-      runAll field program [0, 0, 1] [] [0]
-      runAll field program [0, 1, 0] [] [0]
-      runAll field program [0, 1, 1] [] [0]
-      runAll field program [1, 0, 0] [] [0]
-      runAll field program [1, 0, 1] [] [0]
-      runAll field program [1, 1, 0] [] [0]
-      runAll field program [1, 1, 1] [] [1]
+    it "3 variables" $ do
+      let program = (.&.) <$> ((.&.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0, 0, 0] [] [0]
+        runAll field program [0, 0, 1] [] [0]
+        runAll field program [0, 1, 0] [] [0]
+        runAll field program [0, 1, 1] [] [0]
+        runAll field program [1, 0, 0] [] [0]
+        runAll field program [1, 0, 1] [] [0]
+        runAll field program [1, 1, 0] [] [0]
+        runAll field program [1, 1, 1] [] [1]
+  describe "or" $ do
+    it "variable + constant true" $ do
+      let program = (.|.) true <$> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0] [] [1]
+        runAll field program [1] [] [1]
 
-  it "or / variable + constant true" $ do
-    let program = (.|.) true <$> inputBool Public
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [0] [] [1]
-      runAll field program [1] [] [1]
+    it "variable + constant false" $ do
+      let program = (.|.) false <$> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0] [] [0]
+        runAll field program [1] [] [1]
 
-  it "or / variable + constant false" $ do
-    let program = (.|.) false <$> inputBool Public
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [0] [] [0]
-      runAll field program [1] [] [1]
+    it "2 variables" $ do
+      let program = (.|.) <$> inputBool Public <*> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0, 0] [] [0]
+        runAll field program [0, 1] [] [1]
+        runAll field program [1, 0] [] [1]
+        runAll field program [1, 1] [] [1]
 
-  it "or / 2 variables" $ do
-    let program = (.|.) <$> inputBool Public <*> inputBool Public
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [0, 0] [] [0]
-      runAll field program [0, 1] [] [1]
-      runAll field program [1, 0] [] [1]
-      runAll field program [1, 1] [] [1]
-
-  it "or / 3 variables" $ do
-    let program = (.|.) <$> ((.|.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
-      runAll field program [0, 0, 0] [] [0]
-      runAll field program [0, 0, 1] [] [1]
-      runAll field program [0, 1, 0] [] [1]
-      runAll field program [0, 1, 1] [] [1]
-      runAll field program [1, 0, 0] [] [1]
-      runAll field program [1, 0, 1] [] [1]
-      runAll field program [1, 1, 0] [] [1]
-      runAll field program [1, 1, 1] [] [1]
+    it "3 variables" $ do
+      let program = (.|.) <$> ((.|.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0, 0, 0] [] [0]
+        runAll field program [0, 0, 1] [] [1]
+        runAll field program [0, 1, 0] [] [1]
+        runAll field program [0, 1, 1] [] [1]
+        runAll field program [1, 0, 0] [] [1]
+        runAll field program [1, 0, 1] [] [1]
+        runAll field program [1, 1, 0] [] [1]
+        runAll field program [1, 1, 1] [] [1]
 
   describe "xor" $ do
     it "mixed" $ testProgram Data.Bits.xor Xor
 
+    it "variable + constant true" $ do
+      let program = (.^.) true <$> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0] [] [1]
+        runAll field program [1] [] [0]
+
+    it "variable + constant false" $ do
+      let program = (.^.) false <$> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0] [] [0]
+        runAll field program [1] [] [1]
+
     it "2 variables" $ do
-      let program = do
-            x <- inputBool Public
-            y <- inputBool Public
-            return $ x .^. y
-      forAll
-        ( do
-            x <- choose (0, 1)
-            y <- choose (0, 1)
-            return (x, y)
-        )
-        $ \(x, y) -> do
-          let expected = [Data.Bits.xor x y]
-          runAll (Prime 13) program [x, y] [] expected
-          runAll gf181 program [x, y] [] expected
+      let program = (.^.) <$> inputBool Public <*> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0, 0] [] [0]
+        runAll field program [0, 1] [] [1]
+        runAll field program [1, 0] [] [1]
+        runAll field program [1, 1] [] [0]
+
+    it "4 variables" $ do
+      let program = (.^.) <$> ((.^.) <$> ((.^.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public) <*> inputBool Public
+      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+        runAll field program [0, 0, 0, 0] [] [0]
+        runAll field program [0, 0, 0, 1] [] [1]
+        runAll field program [0, 0, 1, 0] [] [1]
+        runAll field program [0, 0, 1, 1] [] [0]
+        runAll field program [0, 1, 0, 0] [] [1]
+        runAll field program [0, 1, 0, 1] [] [0]
+        runAll field program [0, 1, 1, 0] [] [0]
+        runAll field program [0, 1, 1, 1] [] [1]
+        runAll field program [1, 0, 0, 0] [] [1]
+        runAll field program [1, 0, 0, 1] [] [0]
+        runAll field program [1, 0, 1, 0] [] [0]
+        runAll field program [1, 0, 1, 1] [] [1]
+        runAll field program [1, 1, 0, 0] [] [0]
+        runAll field program [1, 1, 0, 1] [] [1]
+        runAll field program [1, 1, 1, 0] [] [1]
+        runAll field program [1, 1, 1, 1] [] [0]
 
     it "more than 2 variables" $ do
       let program n = do
@@ -123,9 +149,8 @@ tests = describe "Boolean" $ do
         )
         $ \(n, xs) -> do
           let expected = [foldl Data.Bits.xor 0 xs]
-          runAll (Prime 13) (program n) xs [] expected
-          runAll (Prime 257) (program n) xs [] expected
-          runAll gf181 (program n) xs [] expected
+          forM_ [gf181, Prime 2, Prime 13, Prime 257, Binary 5] $ \field -> do
+            runAll field (program n) xs [] expected
 
     it "2 variables with constant" $ do
       let program = do
@@ -140,8 +165,8 @@ tests = describe "Boolean" $ do
         )
         $ \(x, y) -> do
           let expected = [x `Data.Bits.xor` y `Data.Bits.xor` 1]
-          runAll (Prime 13) program [x, y] [] expected
-          runAll gf181 program [x, y] [] expected
+          forM_ [gf181, Prime 2, Prime 13, Prime 257, Binary 5] $ \field -> do
+            runAll field program [x, y] [] expected
 
     it "3 variables with constant" $ do
       let program = do
@@ -158,8 +183,8 @@ tests = describe "Boolean" $ do
         )
         $ \(x, y, z) -> do
           let expected = [x `Data.Bits.xor` y `Data.Bits.xor` z `Data.Bits.xor` 1]
-          runAll (Prime 13) program [x, y, z] [] expected
-          runAll gf181 program [x, y, z] [] expected
+          forM_ [gf181, Prime 2, Prime 13, Prime 257, Binary 5] $ \field -> do
+            runAll field program [x, y, z] [] expected
 
   it "mixed 1" $ do
     let program = do

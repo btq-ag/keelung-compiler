@@ -151,7 +151,7 @@ compileIfB (Left p) (Left x) (Left y) = do
 
 -- | O(lg n) OR
 --
---    There two ways of calculating consecutive ORs on prime fields:
+--    There are two ways of calculating consecutive ORs on prime fields:
 --      * O(n)    linear fold       : a + b - ab
 --      * O(lg n) divide and conquer: if the sum of operands is not 0
 --
@@ -217,7 +217,7 @@ orBs xs = do
 
 -- | O(lg n) AND
 --
---    There two ways of calculating consecutive ANDs on prime fields:
+--    There are two ways of calculating consecutive ANDs on prime fields:
 --      * O(n)    linear fold       : a * b
 --      * O(lg n) divide and conquer: if the sum of N operands is N
 --
@@ -280,58 +280,63 @@ andBs xs = do
         (0, [(B out, 1)])
       return out
 
--- | O(lg n) XOR
+-- | XOR, O(lg n) on prime fields and O(1) on binary fields
 --
---    There two ways of calculating consecutive XORs:
+--    There are two ways of calculating consecutive XORs on Prime fields:
 --      * O(n)    linear fold       : a + b - 2ab
 --      * O(lg n) divide and conquer: if the sum of operands is odd then 1 else 0
 --
---    Cost of these two approaches:
---      arity     linear fold       divide and conquer
---      2         1             <   2
---      3         2             =   2
---      4         3             =   3
---      5         4             >   3
+--      Cost of these two approaches:
+--        arity     linear fold       divide and conquer
+--        2         1             <   2
+--        3         2             =   2
+--        4         3             =   3
+--        5         4             >   3
+--
+--    One way of calculating consecutive XORs on Binary fields:
+--      * O(1)    linear fold       : a + b + ... + z
 xorBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
 xorBs xs = do
-  -- if the order of field is 2, then we can't use the divide and conquer approach
-  order <- gets (FieldInfo.fieldOrder . cmField)
-  if order == 2
-    then linearFold xs
-    else do
-      -- separate the operands into variables and constants
-      let (vars, constants) = Either.partitionEithers xs
-          constantVal = odd (length (filter id constants)) -- if number of True is odd
-      if constantVal
-        then divideAndConquer (fromInteger order) vars >>= flipResult
-        else divideAndConquer (fromInteger order) vars
-  where
-    xorB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
-    xorB x y = do
-      -- 2 x * y = x + y - out
-      out <- freshRefB
-      writeMul
-        (0, [(B x, 2)])
-        (0, [(B y, 1)])
-        (0, [(B x, 1), (B y, 1), (B out, -1)])
-      return out
+  -- separate the operands into variables and constants
+  let (vars, constants) = Either.partitionEithers xs
+  let constant = odd (length (filter id constants)) -- if number of True is odd
+  resultFromVars <- do
+    fieldType <- gets (FieldInfo.fieldTypeData . cmField)
+    case fieldType of
+      Binary _ -> constantFold vars
+      Prime 2 -> linearFold vars
+      Prime _ -> divideAndConquer vars
 
-    -- the degenrate case, divide and conquer won't terminate, use a linear fold instead
-    linearFold :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
-    linearFold [] = return $ Right False
-    linearFold (Right True : vars) = linearFold vars >>= flipResult
-    linearFold (Right False : vars) = linearFold vars
-    linearFold (Left var : vars) = do
-      result <- linearFold vars
-      case result of
-        Right False -> return (Left var)
-        Right True -> flipResult (Left var)
-        Left resultVar -> Left <$> xorB var resultVar
+  if constant
+    then flipResult resultFromVars
+    else return resultFromVars
+  where
+    -- special case for binary fields, simply sum up all operands
+    constantFold :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
+    constantFold [] = return $ Right False
+    constantFold [x] = return $ Left x
+    constantFold vars = do
+      out <- freshRefB
+      -- compose the LC for the sum
+      let sumOfVars = mconcat (fmap (\x -> 1 @ B x) vars)
+      writeAddWithLC $ sumOfVars <> neg (1 @ B out)
+      return $ Left out
+
+    -- for Prime 2 fields, we can't use the divide and conquer approach
+    linearFold :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
+    linearFold =
+      foldM
+        ( \acc var -> case acc of
+            Right True -> flipResult (Left var)
+            Right False -> return $ Left var
+            Left accVar -> Left <$> xorB accVar var
+        )
+        (Right False)
 
     -- rewrite as even/odd relationship instead:
     --      if the sum of all operands is even then 0 else 1
-    divideAndConquer :: (GaloisField n, Integral n) => Int -> [RefB] -> M n (Either RefB Bool)
-    divideAndConquer order vars = do
+    divideAndConquer :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
+    divideAndConquer vars = do
       -- split operands into chunks in case that the order of field is too small
       -- each chunk can only has at most `(2 ^ fieldWidth) - 1` operands
       fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
@@ -345,7 +350,7 @@ xorBs xs = do
       case nonEmptyChunks of
         [] -> return $ Right False
         [var NonEmpty.:| []] -> return $ Left var
-        _ -> mapM compileChunk nonEmptyChunks >>= divideAndConquer order
+        _ -> mapM compileChunk nonEmptyChunks >>= divideAndConquer
 
     compileChunk :: (GaloisField n, Integral n) => NonEmpty RefB -> M n RefB
     compileChunk (var1 NonEmpty.:| []) = return var1
@@ -365,13 +370,59 @@ xorBs xs = do
       -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
       return $ RefUBit width refU 0
 
-flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
-flipResult (Right False) = return $ Right True
-flipResult (Right True) = return $ Right False
-flipResult (Left var) = do
-  out <- freshRefB
-  writeRefBNEq var out
-  return $ Left out
+    flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
+    flipResult (Right False) = return $ Right True
+    flipResult (Right True) = return $ Right False
+    flipResult (Left var) = do
+      out <- freshRefB
+      writeRefBNEq var out
+      return $ Left out
+
+    xorB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
+    xorB x y = do
+      -- 2 x * y = x + y - out
+      out <- freshRefB
+      writeMul
+        (0, [(B x, 2)])
+        (0, [(B y, 1)])
+        (0, [(B x, 1), (B y, 1), (B out, -1)])
+      return out
+
+-- xorBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
+-- xorBs xs = do
+--   -- if the order of field is 2, then we can't use the divide and conquer approach
+--   order <- gets (FieldInfo.fieldOrder . cmField)
+--   if order == 2
+--     then linearFold xs
+--     else do
+--       -- separate the operands into variables and constants
+--       let (vars, constants) = Either.partitionEithers xs
+--           constantVal = odd (length (filter id constants)) -- if number of True is odd
+--       if constantVal
+--         then divideAndConquer (fromInteger order) vars >>= flipResult
+--         else divideAndConquer (fromInteger order) vars
+--   where
+--     xorB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
+--     xorB x y = do
+--       -- 2 x * y = x + y - out
+--       out <- freshRefB
+--       writeMul
+--         (0, [(B x, 2)])
+--         (0, [(B y, 1)])
+--         (0, [(B x, 1), (B y, 1), (B out, -1)])
+--       return out
+
+--     -- the degenrate case, divide and conquer won't terminate, use a linear fold instead
+--     linearFold :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
+--     linearFold [] = return $ Right False
+--     linearFold (Right True : vars) = linearFold vars >>= flipResult
+--     linearFold (Right False : vars) = linearFold vars
+--     linearFold (Left var : vars) = do
+--       result <- linearFold vars
+--       case result of
+--         Right False -> return (Left var)
+--         Right True -> flipResult (Left var)
+--         Left resultVar -> Left <$> xorB var resultVar
 
 -- -- | See if a LC is odd.
 -- isOdd :: (GaloisField n, Integral n) => LC n -> M n (Either RefB Bool)
