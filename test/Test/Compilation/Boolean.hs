@@ -15,36 +15,36 @@ tests = describe "Boolean" $ do
   describe "complement" $ do
     it "constant true" $ do
       let program = return $ complement true
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [] [] [0]
 
     it "constant false" $ do
       let program = return $ complement false
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [] [] [1]
 
     it "variable" $ do
       let program = complement <$> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [1]
         runAll field program [1] [] [0]
 
   describe "and" $ do
     it "variable + constant true" $ do
       let program = (.&.) true <$> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [0]
         runAll field program [1] [] [1]
 
     it "variable + constant false" $ do
       let program = (.&.) false <$> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [0]
         runAll field program [1] [] [0]
 
     it "2 variables" $ do
       let program = (.&.) <$> inputBool Public <*> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0, 0] [] [0]
         runAll field program [0, 1] [] [0]
         runAll field program [1, 0] [] [0]
@@ -52,7 +52,7 @@ tests = describe "Boolean" $ do
 
     it "3 variables" $ do
       let program = (.&.) <$> ((.&.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0, 0, 0] [] [0]
         runAll field program [0, 0, 1] [] [0]
         runAll field program [0, 1, 0] [] [0]
@@ -75,25 +75,25 @@ tests = describe "Boolean" $ do
         )
         $ \(n, constant, xs) -> do
           let expected = [foldl (Data.Bits..|.) (if constant then 1 else 0) xs]
-          forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+          forM_ [gf181, Prime 2, Binary 7] $ \field -> do
             runAll field (program constant n) xs [] expected
 
   describe "or" $ do
     it "variable + constant true" $ do
       let program = (.|.) true <$> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [1]
         runAll field program [1] [] [1]
 
     it "variable + constant false" $ do
       let program = (.|.) false <$> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [0]
         runAll field program [1] [] [1]
 
     it "2 variables" $ do
       let program = (.|.) <$> inputBool Public <*> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0, 0] [] [0]
         runAll field program [0, 1] [] [1]
         runAll field program [1, 0] [] [1]
@@ -101,7 +101,7 @@ tests = describe "Boolean" $ do
 
     it "3 variables" $ do
       let program = (.|.) <$> ((.|.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0, 0, 0] [] [0]
         runAll field program [0, 0, 1] [] [1]
         runAll field program [0, 1, 0] [] [1]
@@ -124,25 +124,25 @@ tests = describe "Boolean" $ do
         )
         $ \(n, constant, xs) -> do
           let expected = [foldl (Data.Bits..&.) (if constant then 1 else 0) xs]
-          forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+          forM_ [gf181, Prime 2, Binary 7] $ \field -> do
             runAll field (program constant n) xs [] expected
 
   describe "xor" $ do
     it "variable + constant true" $ do
       let program = (.^.) true <$> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [1]
         runAll field program [1] [] [0]
 
     it "variable + constant false" $ do
       let program = (.^.) false <$> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [0]
         runAll field program [1] [] [1]
 
     it "2 variables" $ do
       let program = (.^.) <$> inputBool Public <*> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0, 0] [] [0]
         runAll field program [0, 1] [] [1]
         runAll field program [1, 0] [] [1]
@@ -150,7 +150,7 @@ tests = describe "Boolean" $ do
 
     it "4 variables" $ do
       let program = (.^.) <$> ((.^.) <$> ((.^.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public) <*> inputBool Public
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0, 0, 0, 0] [] [0]
         runAll field program [0, 0, 0, 1] [] [1]
         runAll field program [0, 0, 1, 0] [] [1]
@@ -181,7 +181,7 @@ tests = describe "Boolean" $ do
         )
         $ \(n, constant, xs) -> do
           let expected = [foldl Data.Bits.xor (if constant then 1 else 0) xs]
-          forM_ [gf181, Prime 2, Prime 13, Prime 257, Binary 5] $ \field -> do
+          forM_ [gf181, Prime 2, Prime 13, Prime 257, Binary 7] $ \field -> do
             runAll field (program constant n) xs [] expected
 
   it "mixed 1" $ do
@@ -190,7 +190,7 @@ tests = describe "Boolean" $ do
           y <- input Private
           let z = true
           return $ x `Or` y `And` z
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+    forM_ [gf181, Prime 2, Binary 7] $ \field -> do
       runAll field program [0] [0] [0]
       runAll field program [0] [1] [1]
       runAll field program [1] [0] [1]
@@ -203,7 +203,7 @@ tests = describe "Boolean" $ do
           let z = false
           w <- reuse $ x `Or` y
           return $ x `And` w `Or` z
-    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+    forM_ [gf181, Prime 2, Binary 7] $ \field -> do
       runAll field program [0] [0] [0]
       runAll field program [0] [1] [0]
       runAll field program [1] [0] [1]
@@ -214,7 +214,7 @@ tests = describe "Boolean" $ do
       let program = do
             x <- input Public
             return $ x `eq` false
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [1]
         runAll field program [1] [] [0]
 
@@ -222,7 +222,7 @@ tests = describe "Boolean" $ do
       let program = do
             x <- input Public
             return $ x `eq` true
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [0]
         runAll field program [1] [] [1]
 
@@ -231,7 +231,7 @@ tests = describe "Boolean" $ do
             x <- inputBool Public
             y <- inputBool Public
             return $ x `eq` y
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0, 0] [] [1]
         runAll field program [0, 1] [] [0]
         runAll field program [1, 0] [] [0]
@@ -242,7 +242,7 @@ tests = describe "Boolean" $ do
       let program = do
             x <- input Public
             return $ x `neq` false
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [0]
         runAll field program [1] [] [1]
 
@@ -250,7 +250,7 @@ tests = describe "Boolean" $ do
       let program = do
             x <- input Public
             return $ x `neq` true
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0] [] [1]
         runAll field program [1] [] [0]
 
@@ -259,7 +259,7 @@ tests = describe "Boolean" $ do
             x <- inputBool Public
             y <- inputBool Public
             return $ x `neq` y
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [0, 0] [] [0]
         runAll field program [0, 1] [] [1]
         runAll field program [1, 0] [] [1]
@@ -272,7 +272,7 @@ tests = describe "Boolean" $ do
   --           return $ x `eq` 3
   --     property $ \x -> do
   --       let expectedOutput = if x == 3 then [1] else [0]
-  --       forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+  --       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
   --         runAll field program [x] [] expectedOutput
 
   --   it "constant true" $ do
@@ -281,7 +281,7 @@ tests = describe "Boolean" $ do
   --           return $ cond (x `eq` 3) true false
   --     property $ \x -> do
   --       let expectedOutput = if x == 3 then [1] else [0]
-  --       forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+  --       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
   --         runAll field program [x] [] expectedOutput
 
   describe "conversion to Field" $ do
@@ -289,5 +289,5 @@ tests = describe "Boolean" $ do
       let program = do
             x <- input Public
             return $ BtoF x
-      forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [1] [] [1]

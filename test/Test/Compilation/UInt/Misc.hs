@@ -29,7 +29,7 @@ tests = describe "UInt arithmetics" $ do
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x + y) `mod` 4]
-        runAll (Binary 5) program (map toInteger [x, y]) [] expected
+        runAll (Binary 7) program (map toInteger [x, y]) [] expected
 
     it "2 positive variables / Byte" $ do
       let program = do
@@ -42,7 +42,7 @@ tests = describe "UInt arithmetics" $ do
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x + y) `mod` 256]
-        runAll (Binary 5) program (map toInteger [x, y]) [] expected
+        runAll (Binary 7) program (map toInteger [x, y]) [] expected
 
     it "1 positive variable + 1 negative variable / Byte" $ do
       let program = do
@@ -55,7 +55,7 @@ tests = describe "UInt arithmetics" $ do
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x - y) `mod` 256]
-        runAll (Binary 5) program (map toInteger [x, y]) [] expected
+        runAll (Binary 7) program (map toInteger [x, y]) [] expected
 
     it "1 positive variable + 1 constant / Byte" $ do
       let program y = do
@@ -67,7 +67,7 @@ tests = describe "UInt arithmetics" $ do
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x + y) `mod` 256]
-        runAll (Binary 5) (program (fromInteger y)) (map toInteger [x]) [] expected
+        runAll (Binary 7) (program (fromInteger y)) (map toInteger [x]) [] expected
 
     it "1 negative variable + 1 constant / Byte" $ do
       let program y = do
@@ -79,7 +79,7 @@ tests = describe "UInt arithmetics" $ do
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(y - x) `mod` 256]
-        runAll (Binary 5) (program (fromInteger y)) (map toInteger [x]) [] expected
+        runAll (Binary 7) (program (fromInteger y)) (map toInteger [x]) [] expected
 
     it "1 negative variable / Byte" $ do
       let program = do
@@ -87,7 +87,7 @@ tests = describe "UInt arithmetics" $ do
             return $ -x
       forAll (chooseInteger (0, 255)) $ \x -> do
         let expected = [(-x) `mod` 256]
-        runAll (Binary 5) program (map toInteger [x]) [] expected
+        runAll (Binary 7) program (map toInteger [x]) [] expected
 
     it "mixed (positive / negative / constnat) / Byte" $ do
       let program constant signs = do
@@ -104,4 +104,4 @@ tests = describe "UInt arithmetics" $ do
       forAll genPair $ \(constant, pairs) -> do
         let (signs, values) = unzip pairs
         let expected = [(constant + sum (zipWith (\sign x -> if sign then x else -x) signs values)) `mod` 256]
-        runAll (Binary 5) (program (fromInteger constant) signs) values [] expected
+        runAll (Binary 7) (program (fromInteger constant) signs) values [] expected

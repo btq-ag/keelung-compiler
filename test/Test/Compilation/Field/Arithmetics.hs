@@ -35,11 +35,11 @@ tests = describe "arithmetics" $ do
           let expected = [toInteger (constant + sum (zipWith (\sign x -> if sign then x else -x) signs values))]
           runAll (Prime 2) (program constant signs) (map toInteger values) [] expected
 
-      it "Binary 5" $ do
-        forAll arbitrary $ \(constant :: Galois.Binary 5, pairs :: [(Bool, Galois.Binary 5)]) -> do
+      it "Binary 7" $ do
+        forAll arbitrary $ \(constant :: Galois.Binary 7, pairs :: [(Bool, Galois.Binary 7)]) -> do
           let (signs, values) = unzip pairs
           let expected = [toInteger (constant + sum (zipWith (\sign x -> if sign then x else -x) signs values))]
-          runAll (Binary 5) (program constant signs) (map toInteger values) [] expected
+          runAll (Binary 7) (program constant signs) (map toInteger values) [] expected
 
   describe "multiplication" $ do
     describe "variables + constant" $ do
@@ -57,10 +57,10 @@ tests = describe "arithmetics" $ do
           let expected = [toInteger (constant * product vars)]
           runAll (Prime 2) (program constant vars) (map toInteger vars) [] expected
 
-      it "Binary 5" $ do
-        forAll arbitrary $ \(constant :: Galois.Binary 5, vars :: [Galois.Binary 5]) -> do
+      it "Binary 7" $ do
+        forAll arbitrary $ \(constant :: Galois.Binary 7, vars :: [Galois.Binary 7]) -> do
           let expected = [toInteger (constant * product vars)]
-          runAll (Binary 5) (program constant vars) (map toInteger vars) [] expected
+          runAll (Binary 7) (program constant vars) (map toInteger vars) [] expected
 
   it "Mixed 1 / GF181" $ do
     let program = do

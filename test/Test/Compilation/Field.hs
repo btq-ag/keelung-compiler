@@ -4,49 +4,21 @@ module Test.Compilation.Field (tests, run) where
 
 import Control.Monad
 import Keelung hiding (compile)
-import Test.Hspec
+import Test.Compilation.Field.Arithmetics qualified
+import Test.Compilation.Field.Equality qualified
+import Test.Compilation.Field.Inequality qualified
 import Test.Compilation.Util
+import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
-import qualified Test.Compilation.Field.Arithmetics
 
 run :: IO ()
 run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Field" $ do
-
   Test.Compilation.Field.Arithmetics.tests
-
-  it "eq (variable / variable)" $ do
-    let program = do
-          x <- inputField Public
-          y <- inputField Public
-          return $ x `eq` y
-    property $ \(x' :: GF181, y' :: GF181) -> do
-      let x = x' `mod` 4
-          y = y' `mod` 4
-      let expectedOutput = if x == y then [1] else [0]
-      runAll gf181 program [toInteger x, toInteger y] [] expectedOutput
-
-  it "eq (variable / constant)" $ do
-    let program y = do
-          x <- inputField Public
-          return $ x `eq` fromInteger y
-    property $ \(x' :: GF181, y' :: GF181) -> do
-      let x = x' `mod` 4
-          y = y' `mod` 4
-      let expectedOutput = if x == y then [1] else [0]
-      runAll gf181 (program (toInteger y)) [toInteger x] [] expectedOutput
-
-  it "eq (constant / constant)" $ do
-    let program x y = do
-          return $ fromInteger x `eq` (fromInteger y :: Field)
-
-    property $ \(x' :: GF181, y' :: GF181) -> do
-      let x = x' `mod` 4
-          y = y' `mod` 4
-      let expectedOutput = if x == y then [1] else [0]
-      runAll gf181 (program (toInteger x) (toInteger y)) [] [] expectedOutput
+  Test.Compilation.Field.Equality.tests
+  Test.Compilation.Field.Inequality.tests
 
   it "conditional (variable)" $ do
     let program = do
