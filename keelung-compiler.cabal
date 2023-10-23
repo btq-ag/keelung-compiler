@@ -201,7 +201,9 @@ test-suite keelung-test
       Test.Compilation.Boolean
       Test.Compilation.Field
       Test.Compilation.Field.Arithmetics
+      Test.Compilation.Field.Conditional
       Test.Compilation.Field.Equality
+      Test.Compilation.Field.Exponentiation
       Test.Compilation.Field.Inequality
       Test.Compilation.Misc
       Test.Compilation.UInt
