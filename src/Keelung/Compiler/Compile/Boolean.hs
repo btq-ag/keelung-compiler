@@ -149,45 +149,6 @@ compileIfB (Left p) (Left x) (Left y) = do
     (0, [(B y, -1), (B out, 1)])
   return $ Left out
 
-andBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
-andBs xs =
-  let (vars, constants) = Either.partitionEithers xs
-   in go vars (and constants)
-  where
-    andB :: (GaloisField n, Integral n) => RefB -> RefB -> M n (Either RefB Bool)
-    andB var1 var2 = do
-      out <- freshRefB
-      writeMul
-        (0, [(B var1, 1)])
-        (0, [(B var2, 1)])
-        (0, [(B out, 1)])
-      return $ Left out
-    -- rewrite as an equality instead:
-    --      if all operands are 1           then 1 else 0
-    --  =>  if the sum of operands is N     then 1 else 0
-    --  =>  the sum of operands is N
-    go :: (GaloisField n, Integral n) => [RefB] -> Bool -> M n (Either RefB Bool)
-    go _ False = return $ Right False
-    go [] True = return $ Right True
-    go [var] True = return $ Left var
-    go [var1, var2] True = andB var1 var2
-    go (var : vars) True = do
-      -- split operands into pieces in case that the order of field is too small
-      -- each pieces has at most (order - 1) operands
-      order <- gets (FieldInfo.fieldOrder . cmField)
-      if order == 2
-        then do
-          -- the degenrate case, recursion won't terminate, all field elements are also Boolean
-          result <- go vars True
-          case result of
-            Right False -> return $ Right False
-            Right True -> return $ Left var
-            Left resultVar -> andB var resultVar
-        else do
-          let pieces = List.chunksOf (fromInteger order - 1) (var : vars)
-          let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece)) <> neg (Constant (fromIntegral (length piece)))
-          mapM (eqZero True . seqToLC) pieces >>= andBs
-
 -- | O(lg n) OR
 --
 --    There two ways of calculating consecutive ORs on prime fields:
@@ -252,6 +213,71 @@ orBs xs = do
         (1, [(B var1, -1)])
         (0, [(B var2, 1)])
         (0, [(B var1, -1), (B out, 1)])
+      return out
+
+-- | O(lg n) AND
+--
+--    There two ways of calculating consecutive ANDs on prime fields:
+--      * O(n)    linear fold       : a * b
+--      * O(lg n) divide and conquer: if the sum of N operands is N
+--
+--    Cost of these two approaches:
+--      arity     linear fold       divide and conquer
+--      2         1             <   2
+--      3         2             =   2
+--      4         3             >   2
+andBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
+andBs xs = do
+  -- separate the operands into variables and constants
+  let (vars, constants) = Either.partitionEithers xs
+  let constant = and constants
+
+  if constant
+    then do
+      -- the divide and conquer approach only works on Prime fields >= 3
+      fieldType <- gets (FieldInfo.fieldTypeData . cmField)
+      case fieldType of
+        Binary _ -> linearFold vars
+        Prime 2 -> linearFold vars
+        Prime _ -> divideAndConquer vars
+    else return $ Right False -- short circuit
+  where
+    linearFold :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
+    linearFold =
+      foldM
+        ( \acc var -> case acc of
+            Right True -> return $ Left var
+            Right False -> return $ Right False
+            Left accVar -> Left <$> andB accVar var
+        )
+        (Right True)
+
+    --  rewrite as an inequality instead:
+    --       if all operands are 1           then 1 else 0
+    --   =>  if the sum of operands is N     then 1 else 0
+    --   =>  the sum of operands is N
+    divideAndConquer :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
+    divideAndConquer [] = return $ Right True
+    divideAndConquer [var] = return $ Left var
+    divideAndConquer [var1, var2] = Left <$> andB var1 var2
+    divideAndConquer (var : vars) = do
+      -- split operands into pieces in case that the order of field is too small
+      -- each pieces has at most (order - 1) operands
+      order <- gets (FieldInfo.fieldOrder . cmField)
+
+      let pieces = List.chunksOf (fromInteger order - 1) (var : vars)
+      let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece)) <> neg (Constant (fromIntegral (length piece)))
+      mapM (eqZero True . seqToLC) pieces >>= andBs
+
+    -- 2 operands only, works on both Prime and Binary fields
+    -- x * y = out
+    andB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
+    andB var1 var2 = do
+      out <- freshRefB
+      writeMul
+        (0, [(B var1, 1)])
+        (0, [(B var2, 1)])
+        (0, [(B out, 1)])
       return out
 
 -- | O(lg n) XOR

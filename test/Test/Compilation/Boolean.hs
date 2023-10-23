@@ -12,41 +12,60 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Boolean" $ do
-  it "complement / constant" $ do
+  it "complement / constant true" $ do
     let program = return $ complement true
-    runAll gf181 program [] [] [0]
-    runAll (Binary 5) program [] [] [0]
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [] [] [0]
+
+  it "complement / constant false" $ do
+    let program = return $ complement false
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [] [] [1]
 
   it "complement / variable" $ do
     let program = complement <$> inputBool Public
-    runAll gf181 program [0] [] [1]
-    runAll gf181 program [1] [] [0]
-    runAll (Binary 5) program [0] [] [1]
-    runAll (Binary 5) program [1] [] [0]
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [0] [] [1]
+      runAll field program [1] [] [0]
 
-  it "and" $ testProgram (&&) And
+  it "and / variable + constant true" $ do
+    let program = (.&.) true <$> inputBool Public
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [0] [] [0]
+      runAll field program [1] [] [1]
 
-  it "and / Prime 2" $ do
+  it "and / variable + constant false" $ do
+    let program = (.&.) false <$> inputBool Public
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [0] [] [0]
+      runAll field program [1] [] [0]
+
+  it "and / 2 variables" $ do
     let program = (.&.) <$> inputBool Public <*> inputBool Public
-    runAll (Prime 2) program [0, 0] [] [0]
-    runAll (Prime 2) program [0, 1] [] [0]
-    runAll (Prime 2) program [1, 0] [] [0]
-    runAll (Prime 2) program [1, 1] [] [1]
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [0, 0] [] [0]
+      runAll field program [0, 1] [] [0]
+      runAll field program [1, 0] [] [0]
+      runAll field program [1, 1] [] [1]
 
-  it "and / Binary 5" $ do
-    let program = (.&.) <$> inputBool Public <*> inputBool Public
-    runAll (Binary 5) program [0, 0] [] [0]
-    runAll (Binary 5) program [0, 1] [] [0]
-    runAll (Binary 5) program [1, 0] [] [0]
-    runAll (Binary 5) program [1, 1] [] [1]
-
-  it "or" $ testProgram (||) Or
+  it "and / 3 variables" $ do
+    let program = (.&.) <$> ((.&.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [0, 0, 0] [] [0]
+      runAll field program [0, 0, 1] [] [0]
+      runAll field program [0, 1, 0] [] [0]
+      runAll field program [0, 1, 1] [] [0]
+      runAll field program [1, 0, 0] [] [0]
+      runAll field program [1, 0, 1] [] [0]
+      runAll field program [1, 1, 0] [] [0]
+      runAll field program [1, 1, 1] [] [1]
 
   it "or / variable + constant true" $ do
     let program = (.|.) true <$> inputBool Public
     forM_ [gf181, Prime 2, Binary 5] $ \field -> do
       runAll field program [0] [] [1]
       runAll field program [1] [] [1]
+
   it "or / variable + constant false" $ do
     let program = (.|.) false <$> inputBool Public
     forM_ [gf181, Prime 2, Binary 5] $ \field -> do
