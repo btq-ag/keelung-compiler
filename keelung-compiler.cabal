@@ -199,6 +199,10 @@ test-suite keelung-test
   other-modules:
       Test.Compilation
       Test.Compilation.Boolean
+      Test.Compilation.Boolean.Conditional
+      Test.Compilation.Boolean.Equality
+      Test.Compilation.Boolean.Inequality
+      Test.Compilation.Boolean.Logical
       Test.Compilation.Field
       Test.Compilation.Field.Arithmetics
       Test.Compilation.Field.Conditional
