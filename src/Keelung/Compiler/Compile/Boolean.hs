@@ -10,7 +10,7 @@ import Data.List.NonEmpty qualified as NonEmpty
 import Data.List.Split qualified as List
 import Data.Maybe qualified
 import Data.Sequence qualified as Seq
-import Keelung (HasWidth (widthOf))
+import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
@@ -188,48 +188,71 @@ andBs xs =
           let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece)) <> neg (Constant (fromIntegral (length piece)))
           mapM (eqZero True . seqToLC) pieces >>= andBs
 
+-- | O(lg n) OR
+--
+--    There two ways of calculating consecutive ORs on prime fields:
+--      * O(n)    linear fold       : a + b - ab
+--      * O(lg n) divide and conquer: if the sum of operands is not 0
+--
+--    Cost of these two approaches:
+--      arity     linear fold       divide and conquer
+--      2         1             <   2
+--      3         2             =   2
+--      4         3             >   2
 orBs :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
-orBs xs =
+orBs xs = do
+  -- separate the operands into variables and constants
   let (vars, constants) = Either.partitionEithers xs
-   in go vars (or constants)
+  let constant = or constants
+
+  if constant
+    then return $ Right True -- short circuit
+    else do
+      -- the divide and conquer approach only works on Prime fields >= 3
+      fieldType <- gets (FieldInfo.fieldTypeData . cmField)
+      case fieldType of
+        Binary _ -> linearFold vars
+        Prime 2 -> linearFold vars
+        Prime _ -> divideAndConquer vars
   where
-    -- 2 operands only
+    linearFold :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
+    linearFold =
+      foldM
+        ( \acc var -> case acc of
+            Right True -> return $ Right True
+            Right False -> return $ Left var
+            Left accVar -> Left <$> orB accVar var
+        )
+        (Right False)
+
+    --  rewrite as an inequality instead:
+    --       if all operands are 0           then 0 else 1
+    --   =>  if the sum of operands is 0     then 0 else 1
+    --   =>  if the sum of operands is not 0 then 1 else 0
+    --   =>  the sum of operands is not 0
+    divideAndConquer :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
+    divideAndConquer [] = return $ Right False
+    divideAndConquer [var] = return $ Left var
+    divideAndConquer [var1, var2] = Left <$> orB var1 var2
+    divideAndConquer (var : vars) = do
+      -- split operands into pieces in case that the order of field is too small
+      -- each pieces has at most (order - 1) operands
+      order <- gets (FieldInfo.fieldOrder . cmField)
+
+      let pieces = List.chunksOf (fromInteger order - 1) (var : vars)
+      let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece))
+      mapM (eqZero False . seqToLC) pieces >>= orBs
+
+    -- 2 operands only, works on both Prime and Binary fields
     -- (1 - x) * y = (out - x)
-    orB :: (GaloisField n, Integral n) => RefB -> RefB -> M n (Either RefB Bool)
+    orB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
     orB var1 var2 = do
       out <- freshRefB
       writeMul
         (1, [(B var1, -1)])
         (0, [(B var2, 1)])
         (0, [(B var1, -1), (B out, 1)])
-      return $ Left out
-
-    -- rewrite as an inequality instead:
-    --      if all operands are 0           then 0 else 1
-    --  =>  if the sum of operands is 0     then 0 else 1
-    --  =>  if the sum of operands is not 0 then 1 else 0
-    --  =>  the sum of operands is not 0
-    go :: (GaloisField n, Integral n) => [RefB] -> Bool -> M n (Either RefB Bool)
-    go _ True = return $ Right True
-    go [] False = return $ Right False
-    go [var] False = return $ Left var
-    go [var1, var2] False = orB var1 var2
-    go (var : vars) False = do
-      -- split operands into pieces in case that the order of field is too small
-      -- each pieces has at most (order - 1) operands
-      order <- gets (FieldInfo.fieldOrder . cmField)
-      if order == 2
-        then do
-          -- the degenrate case, recursion won't terminate, all field elements are also Boolean
-          result <- go vars False
-          case result of
-            Right True -> return $ Right True
-            Right False -> return $ Left var
-            Left resultVar -> orB var resultVar
-        else do
-          let pieces = List.chunksOf (fromInteger order - 1) (var : vars)
-          let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece))
-          mapM (eqZero False . seqToLC) pieces >>= orBs
+      return out
 
 -- | O(lg n) XOR
 --
@@ -267,14 +290,6 @@ xorBs xs = do
         (0, [(B x, 1), (B y, 1), (B out, -1)])
       return out
 
-    flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
-    flipResult (Right False) = return $ Right True
-    flipResult (Right True) = return $ Right False
-    flipResult (Left var) = do
-      out <- freshRefB
-      writeRefBNEq var out
-      return $ Left out
-
     -- the degenrate case, divide and conquer won't terminate, use a linear fold instead
     linearFold :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
     linearFold [] = return $ Right False
@@ -295,7 +310,7 @@ xorBs xs = do
       -- each chunk can only has at most `(2 ^ fieldWidth) - 1` operands
       fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
       let lists =
-             -- trying to avoid having to compute `2 ^ fieldWidth - 1` most of the time
+            -- trying to avoid having to compute `2 ^ fieldWidth - 1` most of the time
             let len = length vars
              in if length vars <= fieldWidth || len < 256 && fieldWidth >= 8
                   then [vars]
@@ -323,6 +338,14 @@ xorBs xs = do
       writeAddWithLCAndLimbs sumOfVars 0 [(limb, -1)]
       -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
       return $ RefUBit width refU 0
+
+flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
+flipResult (Right False) = return $ Right True
+flipResult (Right True) = return $ Right False
+flipResult (Left var) = do
+  out <- freshRefB
+  writeRefBNEq var out
+  return $ Left out
 
 -- -- | See if a LC is odd.
 -- isOdd :: (GaloisField n, Integral n) => LC n -> M n (Either RefB Bool)

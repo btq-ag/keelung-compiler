@@ -10,57 +10,68 @@ import Test.QuickCheck hiding ((.&.))
 run :: IO ()
 run = hspec tests
 
-fromBool :: Bool -> Integer
-fromBool True = 1
-fromBool False = 0
-
-makeProgram :: (Boolean -> Boolean -> Boolean) -> Int -> Boolean -> Boolean -> [Boolean] -> Comp Boolean
-makeProgram op mode a b cs = case mode `mod` 4 of
-  0 -> do
-    x <- inputBool Public
-    y <- inputBool Public
-    return $ foldl op (x `op` y) cs
-  1 -> do
-    y <- inputBool Public
-    return $ foldl op (a `op` y) cs
-  2 -> do
-    x <- inputBool Public
-    return $ foldl op (x `op` b) cs
-  _ -> do
-    return $ foldl op (a `op` b) cs
-
-testProgram :: (Bool -> Bool -> Bool) -> (Boolean -> Boolean -> Boolean) -> Property
-testProgram opH opK = do
-  property $ \(mode, a, b, cs) -> do
-    let expectedOutput = [fromInteger (fromBool (foldl opH (a `opH` b) cs))]
-    let inputs = case mode `mod` 4 of
-          0 -> [fromBool a, fromBool b]
-          1 -> [fromBool b]
-          2 -> [fromBool a]
-          _ -> []
-    runAll gf181 (makeProgram opK (mode `mod` 4 :: Int) (Boolean a) (Boolean b) (map Boolean cs)) inputs [] expectedOutput
-
 tests :: SpecWith ()
 tests = describe "Boolean" $ do
-  it "not 1" $ do
+  it "complement / constant" $ do
     let program = return $ complement true
     runAll gf181 program [] [] [0]
+    runAll (Binary 5) program [] [] [0]
 
-  it "not 2" $ do
+  it "complement / variable" $ do
     let program = complement <$> inputBool Public
     runAll gf181 program [0] [] [1]
     runAll gf181 program [1] [] [0]
+    runAll (Binary 5) program [0] [] [1]
+    runAll (Binary 5) program [1] [] [0]
 
   it "and" $ testProgram (&&) And
 
-  it "and on Prime 2" $ do
+  it "and / Prime 2" $ do
     let program = (.&.) <$> inputBool Public <*> inputBool Public
     runAll (Prime 2) program [0, 0] [] [0]
     runAll (Prime 2) program [0, 1] [] [0]
     runAll (Prime 2) program [1, 0] [] [0]
     runAll (Prime 2) program [1, 1] [] [1]
 
+  it "and / Binary 5" $ do
+    let program = (.&.) <$> inputBool Public <*> inputBool Public
+    runAll (Binary 5) program [0, 0] [] [0]
+    runAll (Binary 5) program [0, 1] [] [0]
+    runAll (Binary 5) program [1, 0] [] [0]
+    runAll (Binary 5) program [1, 1] [] [1]
+
   it "or" $ testProgram (||) Or
+
+  it "or / variable + constant true" $ do
+    let program = (.|.) true <$> inputBool Public
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [0] [] [1]
+      runAll field program [1] [] [1]
+  it "or / variable + constant false" $ do
+    let program = (.|.) false <$> inputBool Public
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [0] [] [0]
+      runAll field program [1] [] [1]
+
+  it "or / 2 variables" $ do
+    let program = (.|.) <$> inputBool Public <*> inputBool Public
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [0, 0] [] [0]
+      runAll field program [0, 1] [] [1]
+      runAll field program [1, 0] [] [1]
+      runAll field program [1, 1] [] [1]
+
+  it "or / 3 variables" $ do
+    let program = (.|.) <$> ((.|.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public
+    forM_ [gf181, Prime 2, Binary 5] $ \field -> do
+      runAll field program [0, 0, 0] [] [0]
+      runAll field program [0, 0, 1] [] [1]
+      runAll field program [0, 1, 0] [] [1]
+      runAll field program [0, 1, 1] [] [1]
+      runAll field program [1, 0, 0] [] [1]
+      runAll field program [1, 0, 1] [] [1]
+      runAll field program [1, 1, 0] [] [1]
+      runAll field program [1, 1, 1] [] [1]
 
   describe "xor" $ do
     it "mixed" $ testProgram Data.Bits.xor Xor
@@ -177,3 +188,36 @@ tests = describe "Boolean" $ do
           y <- input Private
           return $ BtoF x * BtoF y
     runAll gf181 program [1] [1] [1]
+
+--------------------------------------------------------------------------------
+
+fromBool :: Bool -> Integer
+fromBool True = 1
+fromBool False = 0
+
+makeProgram :: (Boolean -> Boolean -> Boolean) -> Int -> Boolean -> Boolean -> [Boolean] -> Comp Boolean
+makeProgram op mode a b cs = case mode `mod` 4 of
+  0 -> do
+    x <- inputBool Public
+    y <- inputBool Public
+    return $ foldl op (x `op` y) cs
+  1 -> do
+    y <- inputBool Public
+    return $ foldl op (a `op` y) cs
+  2 -> do
+    x <- inputBool Public
+    return $ foldl op (x `op` b) cs
+  _ -> do
+    return $ foldl op (a `op` b) cs
+
+testProgram :: (Bool -> Bool -> Bool) -> (Boolean -> Boolean -> Boolean) -> Property
+testProgram opH opK = do
+  property $ \(mode, a, b, cs) -> do
+    let expectedOutput = [fromInteger (fromBool (foldl opH (a `opH` b) cs))]
+    let inputs = case mode `mod` 4 of
+          0 -> [fromBool a, fromBool b]
+          1 -> [fromBool b]
+          2 -> [fromBool a]
+          _ -> []
+    runAll gf181 (makeProgram opK (mode `mod` 4 :: Int) (Boolean a) (Boolean b) (map Boolean cs)) inputs [] expectedOutput
+    runAll (Binary 5) (makeProgram opK (mode `mod` 4 :: Int) (Boolean a) (Boolean b) (map Boolean cs)) inputs [] expectedOutput
