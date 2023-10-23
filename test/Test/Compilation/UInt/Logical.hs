@@ -19,168 +19,74 @@ run = hspec tests
 --------------------------------------------------------------------------------
 
 tests :: SpecWith ()
-tests = describe "Logical" $ do
+tests = describe "logical" $ do
   describe "complement" $ do
-    it "variable / byte / Prime 13" $ do
+    it "constant / byte" $ do
+      let program x = do
+            return $ complement (x :: UInt 8)
+      forAll (choose (0, 255)) $ \x -> do
+        let uint = U.new 8 x
+        let expected = [U.uValue (Data.Bits.complement uint)]
+        forM_ [Prime 13, Prime 257, gf181] $ \field -> do
+          runAll field (program (fromInteger x)) [] [] expected
+
+    it "variable / byte" $ do
       let program = do
             x <- inputUInt @8 Public
             return $ complement x
       forAll (choose (0, 255)) $ \x -> do
         let uint = U.new 8 x
         let expected = [U.uValue (Data.Bits.complement uint)]
-        runAll (Prime 13) program [U.uValue uint] [] expected
-
-    it "constant / byte / Prime 13" $ do
-      let program x = do
-            return $ complement (x :: UInt 8)
-      forAll (choose (0, 255)) $ \x -> do
-        let uint = U.new 8 x
-        let expected = [U.uValue (Data.Bits.complement uint)]
-        runAll (Prime 13) (program (fromInteger x)) [] [] expected
+        forM_ [Prime 13, Prime 257, gf181] $ \field -> do
+          runAll field program [U.uValue uint] [] expected
 
   describe "conjunction" $ do
-    it "2 variables / byte / Prime 13" $ do
-      let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
-            return $ x .&. y
+    it "1~10 variables + constant / byte" $ do
+      let program n constant = do
+            xs <- replicateM n (inputUInt @8 Public)
+            return $ foldl (.&.) constant xs
       forAll
         ( do
-            x <- choose (0, 255)
-            y <- choose (0, 255)
-            return (x, y)
+            n <- choose (1, 10)
+            xs <- replicateM n arbitrary
+            constant <- arbitrary
+            return (n, constant, xs)
         )
-        $ \(x, y) -> do
-          let expected = [x Data.Bits..&. y]
-          runAll (Prime 13) program [x, y] [] expected
-
-    it "3 variables / byte / Prime 13" $ do
-      let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
-            z <- inputUInt @8 Public
-            return $ x .&. y .&. z
-      forAll
-        ( do
-            x <- choose (0, 255)
-            y <- choose (0, 255)
-            z <- choose (0, 255)
-            return (x, y, z)
-        )
-        $ \(x, y, z) -> do
-          let expected = [x Data.Bits..&. y Data.Bits..&. z]
-          runAll (Prime 13) program [x, y, z] [] expected
-
-    it "variables with constants / byte / Prime 13" $ do
-      let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
-            z <- inputUInt @8 Public
-            return $ x .&. y .&. z .&. 3
-      forAll
-        ( do
-            x <- choose (0, 255)
-            y <- choose (0, 255)
-            z <- choose (0, 255)
-            return (x, y, z)
-        )
-        $ \(x, y, z) -> do
-          let expected = [x Data.Bits..&. y Data.Bits..&. z Data.Bits..&. 3]
-          runAll (Prime 13) program [x, y, z] [] expected
+        $ \(n, constant, xs :: [Word8]) -> do
+          let expected = map toInteger [foldl (Data.Bits..&.) constant xs]
+          forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+            runAll field (program n (fromIntegral constant)) (map toInteger xs) [] expected
 
   describe "disjunction" $ do
-    it "2 variables / byte / Prime 13" $ do
-      let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
-            return $ x .|. y
+    it "1~10 variables + constant / byte" $ do
+      let program n constant = do
+            xs <- replicateM n (inputUInt @8 Public)
+            return $ foldl (.|.) constant xs
       forAll
         ( do
-            x <- choose (0, 255)
-            y <- choose (0, 255)
-            return (x, y)
+            n <- choose (1, 10)
+            xs <- replicateM n arbitrary
+            constant <- arbitrary
+            return (n, constant, xs)
         )
-        $ \(x, y) -> do
-          let expected = [x Data.Bits..|. y]
-          runAll (Prime 13) program [x, y] [] expected
-
-    it "3 variables / byte / Prime 13" $ do
-      let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
-            z <- inputUInt @8 Public
-            return $ x .|. y .|. z
-      forAll
-        ( do
-            x <- choose (0, 255)
-            y <- choose (0, 255)
-            z <- choose (0, 255)
-            return (x, y, z)
-        )
-        $ \(x, y, z) -> do
-          let expected = [x Data.Bits..|. y Data.Bits..|. z]
-          runAll (Prime 13) program [x, y, z] [] expected
-
-    it "variables with constants / byte / Prime 13" $ do
-      let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
-            z <- inputUInt @8 Public
-            return $ x .|. y .|. z .|. 3
-      forAll
-        ( do
-            x <- choose (0, 255)
-            y <- choose (0, 255)
-            z <- choose (0, 255)
-            return (x, y, z)
-        )
-        $ \(x, y, z) -> do
-          let expected = [x Data.Bits..|. y Data.Bits..|. z Data.Bits..|. 3]
-          runAll (Prime 13) program [x, y, z] [] expected
+        $ \(n, constant, xs :: [Word8]) -> do
+          let expected = map toInteger [foldl (Data.Bits..|.) constant xs]
+          forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+            runAll field (program n (fromIntegral constant)) (map toInteger xs) [] expected
 
   describe "exclusive disjunction" $ do
-    it "2 variables / byte" $ do
-      let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
-            return $ x .^. y
-      forAll arbitrary $ \(x' :: Word8, y' :: Word8) -> do
-        let x = toInteger x'
-        let y = toInteger y'
-        let expected = [Data.Bits.xor x y]
-        runAll (Prime 13) program [x, y] [] expected
-        runAll (Prime 257) program [x, y] [] expected
-        runAll gf181 program [x, y] [] expected
-
-    it "more than 2 variables / byte" $ do
-      let program n = do
+    it "1~10 variables + constant / byte" $ do
+      let program n constant = do
             xs <- replicateM n (inputUInt @8 Public)
-            return $ foldl (.^.) 0 xs
+            return $ foldl (.^.) constant xs
       forAll
         ( do
-            n <- choose (0, 20)
-            xs <- replicateM n (choose (0, 255))
-            return (n, xs)
+            n <- choose (1, 10)
+            xs <- replicateM n arbitrary
+            constant <- arbitrary
+            return (n, constant, xs)
         )
-        $ \(n, xs) -> do
-          let expected = [foldl Data.Bits.xor 0 xs]
-          runAll (Prime 13) (program n) xs [] expected
-          runAll (Prime 257) (program n) xs [] expected
-          runAll gf181 (program n) xs [] expected
-
-    it "variables with constants / byte / Prime 13" $ do
-      let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
-            z <- inputUInt @8 Public
-            return $ x .^. y .^. z .^. 3
-      forAll
-        ( do
-            x <- choose (0, 255)
-            y <- choose (0, 255)
-            z <- choose (0, 255)
-            return (x, y, z)
-        )
-        $ \(x, y, z) -> do
-          let expected = [x `Data.Bits.xor` y `Data.Bits.xor` z `Data.Bits.xor` 3]
-          runAll (Prime 13) program [x, y, z] [] expected
+        $ \(n, constant, xs :: [Word8]) -> do
+          let expected = map toInteger [foldl Data.Bits.xor constant xs]
+          forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+            runAll field (program n (fromIntegral constant)) (map toInteger xs) [] expected

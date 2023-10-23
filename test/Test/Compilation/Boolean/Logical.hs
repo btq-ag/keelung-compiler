@@ -29,7 +29,7 @@ tests = describe "logical" $ do
         runAll field program [0] [] [1]
         runAll field program [1] [] [0]
 
-  describe "and" $ do
+  describe "conjunction" $ do
     it "variable + constant true" $ do
       let program = (.&.) true <$> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
@@ -78,7 +78,7 @@ tests = describe "logical" $ do
           forM_ [gf181, Prime 2, Binary 7] $ \field -> do
             runAll field (program constant n) xs [] expected
 
-  describe "or" $ do
+  describe "disjunction" $ do
     it "variable + constant true" $ do
       let program = (.|.) true <$> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
@@ -127,7 +127,7 @@ tests = describe "logical" $ do
           forM_ [gf181, Prime 2, Binary 7] $ \field -> do
             runAll field (program constant n) xs [] expected
 
-  describe "xor" $ do
+  describe "exclusive disjunction" $ do
     it "variable + constant true" $ do
       let program = (.^.) true <$> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
