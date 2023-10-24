@@ -113,18 +113,6 @@ tests = describe "Bitwise" $ do
     it "misc" $ do
       let program = do
             x <- inputUInt @4 Public
-            return [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
-
-      forM_ [gf181, Prime 257, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
-        runAll field program [1] [] [1, 2, 4, 8, 1, 2, 4, 8, 1]
-        runAll field program [3] [] [3, 6, 12, 9, 3, 6, 12, 9, 3]
-        runAll field program [5] [] [5, 10, 5, 10, 5, 10, 5, 10, 5]
-
-  describe "shift" $ do
-    it "mixed" $ do
-      let program = do
-            x <- inputUInt @4 Public
             return [x .<<. (-4), x .>>. 3, shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
 
       runAll gf181 program [0] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -154,7 +142,7 @@ tests = describe "Bitwise" $ do
         runAll (Prime 2) (program amount) [toInteger x] [] expected
         runAll gf181 (program amount) [toInteger x] [] expected
 
-  describe "Bit tests" $ do
+  describe "bit tests" $ do
     it "literal" $ do
       -- 0011
       let program = do

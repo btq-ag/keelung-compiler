@@ -90,9 +90,10 @@ isPositive limb = case lmbSigns limb of
 refUToLimbs :: Width -> RefU -> [Limb]
 refUToLimbs desiredWidth refU = step (widthOf refU) 0
   where
+    width = widthOf refU `min` desiredWidth
     step remainingWidth offset
-      | remainingWidth <= desiredWidth = [Limb refU remainingWidth offset (Left True)]
-      | otherwise = Limb refU desiredWidth offset (Left True) : step (remainingWidth - desiredWidth) (offset + desiredWidth)
+      | remainingWidth <= width = [Limb refU remainingWidth offset (Left True)]
+      | otherwise = Limb refU width offset (Left True) : step (remainingWidth - width) (offset + width)
 
 -- | Trim a 'Limb' to a given width.
 trim :: Width -> Limb -> Limb

@@ -219,11 +219,13 @@ test-suite keelung-test
       Test.Compilation.UInt.CLMul
       Test.Compilation.UInt.Comparison
       Test.Compilation.UInt.DivMod
+      Test.Compilation.UInt.Equality
       Test.Compilation.UInt.Logical
       Test.Compilation.UInt.Misc
       Test.Compilation.UInt.ModInv
       Test.Compilation.UInt.Multiplication
       Test.Compilation.Util
+      Test.Data.LC
       Test.IndexTable
       Test.Intergration
       Test.Optimization

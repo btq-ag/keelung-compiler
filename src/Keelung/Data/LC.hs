@@ -2,11 +2,12 @@ module Keelung.Data.LC (LC (..), fromPolyL, toPolyL, fromRefU, (@), neg, scale) 
 
 import Data.Bits qualified
 import Data.Field.Galois
-import Keelung (Width)
+import Keelung (Width, HasWidth (widthOf))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
 
 -- | Linear combination of variables and constants.
 data LC n
@@ -19,18 +20,18 @@ fromPolyL :: Either n (PolyL n) -> LC n
 fromPolyL = either Constant Polynomial
 
 -- | Converting from a 'Either RefU Integer' to a list of 'LC n'.
-fromRefU :: (Num n, Eq n, Show n, Ord n) => Width -> Int -> Either RefU Integer -> [LC n]
-fromRefU width fieldWidth (Right val) =
-  let limbWidth = fieldWidth
-   in map (go limbWidth) [0, limbWidth .. width - 1]
+fromRefU :: (Num n, Eq n, Show n, Ord n) => Width -> Either RefU U -> [LC n]
+fromRefU fieldWidth (Right val) =
+  map go [0, fieldWidth .. width - 1]
   where
-    go :: (Num n, Eq n) => Int -> Int -> LC n
-    go limbWidth limbStart = do
-      let range = [limbStart .. (limbStart + limbWidth - 1) `min` (width - 1)]
-      Constant $ fromInteger $ sum [2 ^ i | i <- range, Data.Bits.testBit val i]
-fromRefU width fieldWidth (Left var) =
-  let limbs = Limb.refUToLimbs (width `min` fieldWidth) var
-   in map (\limb -> fromPolyL $ PolyL.fromLimbs 0 [(limb, 2 ^ Limb.lmbOffset limb)]) limbs
+    width = widthOf val
+    go :: (Num n, Eq n) => Int -> LC n
+    go limbStart = do
+      let range = [0 .. (fieldWidth `min` width) - 1]
+      Constant $ fromInteger $ sum [2 ^ i | i <- range, Data.Bits.testBit val (limbStart + i)]
+fromRefU fieldWidth (Left var) =
+  let limbs = Limb.refUToLimbs fieldWidth var
+   in map (\limb -> fromPolyL $ PolyL.fromLimbs 0 [(limb, 1)]) limbs
 
 toPolyL :: (Num n, Eq n) => LC n -> Either n (PolyL n)
 toPolyL (Constant c) = Left c

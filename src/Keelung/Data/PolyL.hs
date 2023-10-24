@@ -7,7 +7,7 @@ module Keelung.Data.PolyL
   ( PolyL (polyConstant, polyLimbs, polyRefs),
     varsSet,
     fromLimbs,
-    -- fromPolyG,
+    fromLimb,
     fromRefs,
     insertLimbs,
     insertRefs,
@@ -90,6 +90,9 @@ fromLimbs constant limbs =
    in if null limbs'
         then Left constant
         else Right (PolyL constant (Seq.fromList limbs') mempty)
+
+fromLimb :: (Num n, Eq n) => n -> Limb -> PolyL n
+fromLimb constant limb = PolyL constant (Seq.singleton (limb, 1)) mempty
 
 -- fromPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
 -- fromPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars

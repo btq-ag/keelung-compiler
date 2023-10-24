@@ -19,6 +19,7 @@ import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
+import Keelung.Data.U qualified as U
 
 compile :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> ExprB n -> M n (Either RefB Bool)
 compile compileU expr = case expr of
@@ -96,12 +97,12 @@ compile compileU expr = case expr of
 
 compileEqU :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> M n (Either RefB Bool)
 compileEqU width x y = do
-  fieldInfo <- gets cmField
+  fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
   result <-
     zipWithM
-      (\a b -> eqZero True (a <> neg b))
-      (fromRefU width (FieldInfo.fieldWidth fieldInfo) x)
-      (fromRefU width (FieldInfo.fieldWidth fieldInfo) y)
+      (\a b -> eqZero True (a <> neg b)) -- a - b ==? 0
+      (fromRefU fieldWidth (U.new width <$> x))
+      (fromRefU fieldWidth (U.new width <$> y))
   case result of
     [] -> return $ Right True
     [result'] -> return result'
@@ -403,9 +404,9 @@ eqB (Left x) (Left y) = do
     Binary _ -> binary
     Prime 2 -> binary
     Prime _ -> prime
-  where 
+  where
     binary :: (GaloisField n, Integral n) => M n (Either RefB Bool)
-    binary = do 
+    binary = do
       --  1 + x + y = out
       out <- freshRefB
       writeAdd 1 [(B x, 1), (B y, 1), (B out, -1)]

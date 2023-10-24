@@ -3,6 +3,7 @@
 module Main where
 
 import Test.Compilation qualified as Compilation
+import Test.Data.LC qualified as Data.LC
 import Test.Hspec (hspec)
 import Test.IndexTable qualified as IndexTable
 import Test.Intergration qualified as Intergration
@@ -18,3 +19,4 @@ main = hspec $ do
   IndexTable.tests
   Relations.tests
   Intergration.tests
+  Data.LC.tests
