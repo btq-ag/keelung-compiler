@@ -3,6 +3,7 @@
 module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Occurrences, constructOccurrences) where
 
 import Data.Bifunctor (Bifunctor (bimap, first))
+import Data.Bits qualified
 import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -196,11 +197,17 @@ linkConstraint _ occurrences _ (CLimbVal x n) =
     Left _ -> error "CLimbVal: impossible"
     Right xs -> [Linked.CAdd xs]
 linkConstraint fieldInfo occurrences fieldWidth (CRefUVal x n) =
-  -- split the Integer into smaller chunks of size `fieldWidth`
-  let number = U.new (widthOf x) n
-      chunks = map U.uValue (U.chunks fieldWidth number)
-      cVarBindLs = zipWith CLimbVal (Limb.refUToLimbs fieldWidth x) chunks
-   in cVarBindLs >>= linkConstraint fieldInfo occurrences fieldWidth
+  case FieldInfo.fieldTypeData fieldInfo of
+    Binary _ ->
+      let width = widthOf x
+          cRefFVals = [CRefFVal (B (RefUBit width x i)) (if Data.Bits.testBit n i then 1 else 0) | i <- [0 .. widthOf x - 1]]
+       in cRefFVals >>= linkConstraint fieldInfo occurrences fieldWidth
+    Prime _ -> do
+      -- split the Integer into smaller chunks of size `fieldWidth`
+      let number = U.new (widthOf x) n
+          chunks = map U.uValue (U.chunks fieldWidth number)
+          cLimbVals = zipWith CLimbVal (Limb.refUToLimbs fieldWidth x) chunks
+       in cLimbVals >>= linkConstraint fieldInfo occurrences fieldWidth
 linkConstraint _ occurrences _ (CMulL as bs cs) =
   [ Linked.CMul
       (linkPolyLUnsafe occurrences as)

@@ -27,7 +27,7 @@ tests = describe "logical" $ do
       forAll (choose (0, 255)) $ \x -> do
         let uint = U.new 8 x
         let expected = [U.uValue (Data.Bits.complement uint)]
-        forM_ [Prime 13, Prime 257, gf181] $ \field -> do
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           runAll field (program (fromInteger x)) [] [] expected
 
     it "variable / byte" $ do
@@ -37,7 +37,7 @@ tests = describe "logical" $ do
       forAll (choose (0, 255)) $ \x -> do
         let uint = U.new 8 x
         let expected = [U.uValue (Data.Bits.complement uint)]
-        forM_ [Prime 13, Prime 257, gf181] $ \field -> do
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           runAll field program [U.uValue uint] [] expected
 
   describe "conjunction" $ do

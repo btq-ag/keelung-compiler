@@ -4,8 +4,9 @@
 
 module Test.Compilation.UInt.Bitwise (tests, run) where
 
+import Control.Monad
 import Data.Bits qualified
-import Data.Word (Word64)
+import Data.Word (Word64, Word8)
 import Keelung hiding (compile)
 import Test.Compilation.Util
 import Test.Hspec
@@ -19,35 +20,106 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "Bitwise" $ do
   describe "rotate" $ do
-    it "mixed" $ do
+    describe "constant / byte" $ do
+      let program constant i = do
+            return $ rotate (constant :: UInt 8) i
+
+      it "GF181" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.rotate x i]
+          runAll gf181 (program (fromIntegral x) i) [] [] expected
+
+      it "Prime 2" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.rotate x i]
+          runAll (Prime 2) (program (fromIntegral x) i) [] [] expected
+
+      it "Binary 7" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.rotate x i]
+          runAll (Binary 7) (program (fromIntegral x) i) [] [] expected
+
+    describe "variable / byte" $ do
+      let program i = do
+            x <- inputUInt @8 Public
+            return $ rotate x i
+
+      it "GF181" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.rotate x i]
+          runAll gf181 (program i) (map toInteger [x]) [] expected
+
+      it "Prime 2" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.rotate x i]
+          runAll (Prime 2) (program i) (map toInteger [x]) [] expected
+
+      it "Binary 7" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.rotate x i]
+          runAll (Binary 7) (program i) (map toInteger [x]) [] expected
+
+    it "misc" $ do
       let program = do
             x <- inputUInt @4 Public
             return [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
 
-      runAll gf181 program [0] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
-      runAll gf181 program [1] [] [1, 2, 4, 8, 1, 2, 4, 8, 1]
-      runAll gf181 program [3] [] [3, 6, 12, 9, 3, 6, 12, 9, 3]
-      runAll gf181 program [5] [] [5, 10, 5, 10, 5, 10, 5, 10, 5]
+      forM_ [gf181, Prime 257, Prime 2, Binary 7] $ \field -> do
+        runAll field program [0] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        runAll field program [1] [] [1, 2, 4, 8, 1, 2, 4, 8, 1]
+        runAll field program [3] [] [3, 6, 12, 9, 3, 6, 12, 9, 3]
+        runAll field program [5] [] [5, 10, 5, 10, 5, 10, 5, 10, 5]
 
-    it "rotate left" $ do
-      let program n = do
-            x <- inputUInt @64 Public
-            return $ x `rotate` n
+  describe "shift" $ do
+    describe "constant / byte" $ do
+      let program constant i = do
+            return $ shift (constant :: UInt 8) i
 
-      forAll arbitrary $ \(x :: Word64, n :: Int) -> do
-        let expected = [toInteger (x `Data.Bits.rotateL` n)]
-        runAll (Prime 2) (program n) [toInteger x] [] expected
-        runAll gf181 (program n) [toInteger x] [] expected
+      it "GF181" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.shift x i]
+          runAll gf181 (program (fromIntegral x) i) [] [] expected
 
-    it "rotate right" $ do
-      let program n = do
-            x <- inputUInt @64 Public
-            return $ x `rotate` (-n)
+      it "Prime 2" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.shift x i]
+          runAll (Prime 2) (program (fromIntegral x) i) [] [] expected
 
-      forAll arbitrary $ \(x :: Word64, n :: Int) -> do
-        let expected = [toInteger (x `Data.Bits.rotateR` n)]
-        runAll (Prime 2) (program n) [toInteger x] [] expected
-        runAll gf181 (program n) [toInteger x] [] expected
+      it "Binary 7" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.shift x i]
+          runAll (Binary 7) (program (fromIntegral x) i) [] [] expected
+
+    describe "variable / byte" $ do
+      let program i = do
+            x <- inputUInt @8 Public
+            return $ shift x i
+
+      it "GF181" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.shift x i]
+          runAll gf181 (program i) (map toInteger [x]) [] expected
+
+      it "Prime 2" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.shift x i]
+          runAll (Prime 2) (program i) (map toInteger [x]) [] expected
+
+      it "Binary 7" $ do
+        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+          let expected = map toInteger [Data.Bits.shift x i]
+          runAll (Binary 7) (program i) (map toInteger [x]) [] expected
+
+    it "misc" $ do
+      let program = do
+            x <- inputUInt @4 Public
+            return [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
+
+      forM_ [gf181, Prime 257, Prime 2, Binary 7] $ \field -> do
+        runAll field program [0] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        runAll field program [1] [] [1, 2, 4, 8, 1, 2, 4, 8, 1]
+        runAll field program [3] [] [3, 6, 12, 9, 3, 6, 12, 9, 3]
+        runAll field program [5] [] [5, 10, 5, 10, 5, 10, 5, 10, 5]
 
   describe "shift" $ do
     it "mixed" $ do
