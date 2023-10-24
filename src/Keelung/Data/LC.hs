@@ -2,7 +2,7 @@ module Keelung.Data.LC (LC (..), fromPolyL, toPolyL, fromRefU, (@), neg, scale) 
 
 import Data.Bits qualified
 import Data.Field.Galois
-import Keelung (Width, HasWidth (widthOf))
+import Keelung (HasWidth (widthOf), Width)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
@@ -31,7 +31,7 @@ fromRefU fieldWidth (Right val) =
       Constant $ fromInteger $ sum [2 ^ i | i <- range, Data.Bits.testBit val (limbStart + i)]
 fromRefU fieldWidth (Left var) =
   let limbs = Limb.refUToLimbs fieldWidth var
-   in map (\limb -> fromPolyL $ PolyL.fromLimbs 0 [(limb, 1)]) limbs
+   in map (Polynomial . PolyL.fromLimb 0) limbs
 
 toPolyL :: (Num n, Eq n) => LC n -> Either n (PolyL n)
 toPolyL (Constant c) = Left c

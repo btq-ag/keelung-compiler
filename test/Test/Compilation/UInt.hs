@@ -16,6 +16,7 @@ import Test.Compilation.UInt.CLMul qualified as CLMul
 import Test.Compilation.UInt.Comparison qualified as Comparison
 import Test.Compilation.UInt.DivMod qualified as DivMod
 import Test.Compilation.UInt.Equality qualified as Equality
+import Test.Compilation.UInt.Inequality qualified as Inequality
 import Test.Compilation.UInt.Logical qualified as Logical
 import Test.Compilation.UInt.ModInv qualified as ModInv
 import Test.Compilation.UInt.Multiplication qualified as Multiplication
@@ -39,6 +40,7 @@ tests = do
 
     DivMod.tests
     Equality.tests
+    Inequality.tests
     ModInv.tests
 
     Comparison.tests
