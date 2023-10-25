@@ -300,3 +300,44 @@ tests = do
         let (signs, values) = unzip pairs
         let expected = [(constant + sum (zipWith (\sign x -> if sign then x else -x) signs values)) `mod` 16]
         runAll (Prime 17) (program (fromInteger constant) signs) values [] expected
+
+  describe "`bitSignsToRange . rangeToBitSigns`" $ do
+    it "should yield wider ranges" $ do
+      let genRange = do
+            lower <- chooseInteger (-100, 100)
+            range <- chooseInteger (0, 200)
+            return (lower, lower + range)
+      forAll genRange $ \(lower, upper) -> do
+        let signs = rangeToBitSigns (lower, upper)
+        let (lower', upper') = bitSignsToRange signs
+        lower' <= lower `shouldBe` True
+        upper' >= upper `shouldBe` True
+
+  describe "`calculateSignsOfLimbs`" $ do
+    it "should make non-carry bits positive" $ do
+      let genLimbs = do
+            width <- chooseInt (2, 8)
+            let refU = RefUX width 0
+            limbSize <- chooseInt (0, 8)
+            signs <- replicateM limbSize arbitrary
+            let limbs = map (Limb.new refU width 0 . Left) signs
+            constant <- chooseInteger (0, 2 ^ width - 1)
+            return (width, constant, Seq.fromList limbs)
+
+      forAll genLimbs $ \(width, constant, limbs) -> do
+        let signs = calculateSignsOfLimbs width constant limbs
+        -- should be long enough
+        length signs >= width `shouldBe` True
+        -- should be positive
+        take width signs `shouldBe` replicate width True
+
+  describe "one special cases of `calculateCarrySigns`" $ do
+    it "1 + 2bit - 2bit - 2bit - 2bit" $ do
+      let limbs =
+            Seq.fromList
+              [ Limb.new (RefUX 2 0) 2 0 (Left True),
+                Limb.new (RefUX 2 0) 2 0 (Left False),
+                Limb.new (RefUX 2 0) 2 0 (Left False),
+                Limb.new (RefUX 2 0) 2 0 (Left False)
+              ]
+      calculateCarrySigns 2 1 limbs `shouldBe` [True, False]
