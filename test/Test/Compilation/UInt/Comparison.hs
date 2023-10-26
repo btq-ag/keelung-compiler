@@ -123,6 +123,7 @@ tests = describe "Comparisons" $ do
                   []
                   (InterpreterError (Interpreter.AssertLTEError (fromInteger x) bound))
                   (SolverError Solver.ConflictingValues :: Error (Binary 7))
+
   describe "assertLT" $ do
     let program bound = do
           x <- inputUInt @4 Public
@@ -225,87 +226,209 @@ tests = describe "Comparisons" $ do
                   (InterpreterError (Interpreter.AssertLTError (fromInteger x) bound))
                   (SolverError Solver.ConflictingValues :: Error (Binary 7))
 
--- it "assertGTE on Prime 2" $ do
---   forAll (choose (-2, 16)) $ \bound -> do
---     let width = 4
+  describe "assertGTE" $ do
+    let program bound = do
+          x <- inputUInt @4 Public
+          assertGTE x bound
+    let width = 4
+    describe "bound too small" $ do
+      let bound = 0
+      let x = 1
+      it "GF181" $ do
+        throwBoth
+          gf181
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTEBoundTooSmallError bound))
+          (CompilerError (Compiler.AssertGTEBoundTooSmallError bound) :: Error GF181)
+      it "Prime 2" $ do
+        throwBoth
+          (Prime 2)
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTEBoundTooSmallError bound))
+          (CompilerError (Compiler.AssertGTEBoundTooSmallError bound) :: Error (Prime 2))
+      it "Binary 7" $ do
+        throwBoth
+          (Binary 7)
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTEBoundTooSmallError bound))
+          (CompilerError (Compiler.AssertGTEBoundTooSmallError bound) :: Error (Binary 7))
 
---     let program = do
---           x <- inputUInt @4 Public
---           assertGTE x bound
+    describe "bound too large" $ do
+      let bound = 16
+      let x = 1
+      it "GF181" $ do
+        throwBoth
+          gf181
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTEBoundTooLargeError bound width))
+          (CompilerError (Compiler.AssertGTEBoundTooLargeError bound width) :: Error GF181)
+      it "Prime 2" $ do
+        throwBoth
+          (Prime 2)
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTEBoundTooLargeError bound width))
+          (CompilerError (Compiler.AssertGTEBoundTooLargeError bound width) :: Error (Prime 2))
+      it "Binary 7" $ do
+        throwBoth
+          (Binary 7)
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTEBoundTooLargeError bound width))
+          (CompilerError (Compiler.AssertGTEBoundTooLargeError bound width) :: Error (Binary 7))
+    
+    describe "bound normal" $ do
+      it "GF181" $ do
+        forAll (choose (1, 15)) $ \bound -> do
+          forM_ [0 .. 15] $ \x -> do
+            if x >= bound
+              then runAll gf181 (program bound) [fromInteger x] [] []
+              else
+                throwBoth
+                  gf181
+                  (program bound)
+                  [fromInteger x]
+                  []
+                  (InterpreterError (Interpreter.AssertGTEError (fromInteger x) bound))
+                  (SolverError Solver.ConflictingValues :: Error GF181)
+      it "Prime 2" $ do
+        forAll (choose (1, 15)) $ \bound -> do
+          forM_ [0 .. 15] $ \x -> do
+            if x >= bound
+              then runAll (Prime 2) (program bound) [fromInteger x] [] []
+              else
+                throwBoth
+                  (Prime 2)
+                  (program bound)
+                  [fromInteger x]
+                  []
+                  (InterpreterError (Interpreter.AssertGTEError (fromInteger x) bound))
+                  (SolverError Solver.ConflictingValues :: Error (Prime 2))
+      it "Binary 7" $ do
+        forAll (choose (1, 15)) $ \bound -> do
+          forM_ [0 .. 15] $ \x -> do
+            if x >= bound
+              then runAll (Binary 7) (program bound) [fromInteger x] [] []
+              else
+                throwBoth
+                  (Binary 7)
+                  (program bound)
+                  [fromInteger x]
+                  []
+                  (InterpreterError (Interpreter.AssertGTEError (fromInteger x) bound))
+                  (SolverError Solver.ConflictingValues :: Error (Binary 7))
 
---     when (bound < 1) $ do
---       forM_ [0 .. 15] $ \x -> do
---         throwBoth
---           (Prime 2)
---           program
---           [fromInteger x]
---           []
---           (InterpreterError (Interpreter.AssertGTEBoundTooSmallError bound))
---           (CompilerError (Compiler.AssertGTEBoundTooSmallError bound) :: Error (Prime 2))
+  describe "assertGT" $ do
+    let program bound = do
+          x <- inputUInt @4 Public
+          assertGT x bound
+    let width = 4
+    describe "bound too small" $ do
+      let bound = -1
+      let x = 1
+      it "GF181" $ do
+        throwBoth
+          gf181
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTBoundTooSmallError bound))
+          (CompilerError (Compiler.AssertGTBoundTooSmallError bound) :: Error GF181)
+      it "Prime 2" $ do
+        throwBoth
+          (Prime 2)
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTBoundTooSmallError bound))
+          (CompilerError (Compiler.AssertGTBoundTooSmallError bound) :: Error (Prime 2))
+      it "Binary 7" $ do
+        throwBoth
+          (Binary 7)
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTBoundTooSmallError bound))
+          (CompilerError (Compiler.AssertGTBoundTooSmallError bound) :: Error (Binary 7))
 
---     when (bound >= 1 && bound < 16) $ do
---       forM_ [0 .. 15] $ \x -> do
---         if x >= bound
---           then runAll (Prime 2) program [fromInteger x] [] []
---           else do
---             throwBoth
---               (Prime 2)
---               program
---               [fromInteger x]
---               []
---               (InterpreterError (Interpreter.AssertGTEError (fromInteger x) bound))
---               (SolverError Solver.ConflictingValues :: Error (Prime 2))
+    describe "bound too large" $ do
+      let bound = 15
+      let x = 1
+      it "GF181" $ do
+        throwBoth
+          gf181
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTBoundTooLargeError bound width))
+          (CompilerError (Compiler.AssertGTBoundTooLargeError bound width) :: Error GF181)
+      it "Prime 2" $ do
+        throwBoth
+          (Prime 2)
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTBoundTooLargeError bound width))
+          (CompilerError (Compiler.AssertGTBoundTooLargeError bound width) :: Error (Prime 2))
+      it "Binary 7" $ do
+        throwBoth
+          (Binary 7)
+          (program bound)
+          [fromInteger x]
+          []
+          (InterpreterError (Interpreter.AssertGTBoundTooLargeError bound width))
+          (CompilerError (Compiler.AssertGTBoundTooLargeError bound width) :: Error (Binary 7))
 
---     when (bound >= 16) $ do
---       forM_ [0 .. 15] $ \x -> do
---         throwBoth
---           (Prime 2)
---           program
---           [fromInteger x]
---           []
---           (InterpreterError (Interpreter.AssertGTEBoundTooLargeError bound width))
---           (CompilerError (Compiler.AssertGTEBoundTooLargeError bound width) :: Error (Prime 2))
-
--- it "assertGT" $ do
---   forAll (choose (-2, 16)) $ \bound -> do
---     let width = 4
-
---     let program = do
---           x <- inputUInt @4 Public
---           assertGT x bound
-
---     when (bound < 0) $ do
---       forM_ [0 .. 15] $ \x -> do
---         throwBoth
---           gf181
---           program
---           [fromInteger x]
---           []
---           (InterpreterError (Interpreter.AssertGTBoundTooSmallError bound))
---           (CompilerError (Compiler.AssertGTBoundTooSmallError bound) :: Error GF181)
-
---     when (bound >= 0 && bound < 15) $ do
---       forM_ [0 .. 15] $ \x -> do
---         if x > bound
---           then runAll gf181 program [fromInteger x] [] []
---           else do
---             throwBoth
---               gf181
---               program
---               [fromInteger x]
---               []
---               (InterpreterError (Interpreter.AssertGTError (fromInteger x) bound))
---               (SolverError Solver.ConflictingValues :: Error GF181)
-
---     when (bound >= 15) $ do
---       forM_ [0 .. 15] $ \x -> do
---         throwBoth
---           gf181
---           program
---           [fromInteger x]
---           []
---           (InterpreterError (Interpreter.AssertGTBoundTooLargeError bound width))
---           (CompilerError (Compiler.AssertGTBoundTooLargeError bound width) :: Error GF181)
+    describe "bound normal" $ do
+      it "GF181" $ do
+        forAll (choose (0, 14)) $ \bound -> do
+          forM_ [0 .. 15] $ \x -> do
+            if x > bound
+              then runAll gf181 (program bound) [fromInteger x] [] []
+              else
+                throwBoth
+                  gf181
+                  (program bound)
+                  [fromInteger x]
+                  []
+                  (InterpreterError (Interpreter.AssertGTError (fromInteger x) bound))
+                  (SolverError Solver.ConflictingValues :: Error GF181)
+      it "Prime 2" $ do
+        forAll (choose (0, 14)) $ \bound -> do
+          forM_ [0 .. 15] $ \x -> do
+            if x > bound
+              then runAll (Prime 2) (program bound) [fromInteger x] [] []
+              else
+                throwBoth
+                  (Prime 2)
+                  (program bound)
+                  [fromInteger x]
+                  []
+                  (InterpreterError (Interpreter.AssertGTError (fromInteger x) bound))
+                  (SolverError Solver.ConflictingValues :: Error (Prime 2))
+      it "Binary 7" $ do
+        forAll (choose (0, 14)) $ \bound -> do
+          forM_ [0 .. 15] $ \x -> do
+            if x > bound
+              then runAll (Binary 7) (program bound) [fromInteger x] [] []
+              else
+                throwBoth
+                  (Binary 7)
+                  (program bound)
+                  [fromInteger x]
+                  []
+                  (InterpreterError (Interpreter.AssertGTError (fromInteger x) bound))
+                  (SolverError Solver.ConflictingValues :: Error (Binary 7))
 
 -- it "lte (variable / variable)" $ do
 --   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)

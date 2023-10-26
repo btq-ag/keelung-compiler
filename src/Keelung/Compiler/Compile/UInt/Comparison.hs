@@ -136,19 +136,32 @@ assertGTE width (Left a) bound
       -- we can use these 2 values as the only roots of the following multiplicative polynomial
       -- (a - 2^width + 1) * (a - 2^width + 2) = 0
       -- that is, either all bits are 1 or only the smallest bit is 0
-
       fieldInfo <- gets cmField
 
       let maxLimbWidth = fieldWidth fieldInfo
       let minLimbWidth = 1
       let limbWidth = minLimbWidth `max` widthOf a `min` maxLimbWidth
 
-      -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) = 0` on the smallest limb
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
-      writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [])
-      -- assign the rest of the limbs to `1`
-      forM_ [limbWidth .. width - 1] $ \j ->
-        writeRefBVal (RefUBit width a j) True
+      let isBinaryField = case fieldTypeData fieldInfo of
+            Binary _ -> True
+            Prime _ -> False
+
+      if isBinaryField
+        then do
+          -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) = 0`
+          -- the LSB is either 0 or 1
+          let lsb = B (RefUBit width a 0)
+          writeMul (0, [(lsb, 1)]) (1, [(lsb, 1)]) (0, [])
+          -- the other bits are all 1
+          forM_ [1 .. width - 1] $ \i ->
+            writeRefBVal (RefUBit width a i) True
+        else do
+          -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) = 0` on the smallest limb
+          let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
+          writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [])
+          -- assign the rest of the limbs to `1`
+          forM_ [limbWidth .. width - 1] $ \j ->
+            writeRefBVal (RefUBit width a j) True
   | bound == 2 ^ width - 3 = do
       -- there's only 3 possible value for `a`, which is `2^width - 1`, `2^width - 2` or `2^width - 3`
       -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
@@ -231,7 +244,7 @@ assertNonZero width ref = do
     assertNonZeroOnRefBs bits = do
       fieldInfo <- gets cmField
       case fieldTypeData fieldInfo of
-        Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+        Binary _ -> linearCase bits
         Prime 2 -> linearCase bits
         Prime 3 -> linearCase bits
         Prime n -> fasterCase (fromInteger n) bits
