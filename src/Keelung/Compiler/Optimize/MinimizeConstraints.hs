@@ -124,28 +124,61 @@ foldMaybeM f = foldM $ \acc x -> do
 
 reduceAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Maybe (PolyL n))
 reduceAddL polynomial = do
-  changed <- learnFromAddL polynomial
-  if changed
-    then return Nothing
-    else do
-      relations <- gets cmRelations
-      case substPolyL relations polynomial of
-        Nothing -> return (Just polynomial) -- nothing changed
-        Just (Left constant, changes) -> do
-          when (constant /= 0) $
-            error "[ panic ] Additive reduced to some constant other than 0"
-          -- the polynomial has been reduced to nothing
-          markChanged AdditiveLimbConstraintChanged
-          -- remove all variables in the polynomial from the occurrence list
-          applyChanges changes
-          return Nothing
-        Just (Right reducePolynomial, changes) -> do
-          -- the polynomial has been reduced to something
-          markChanged AdditiveLimbConstraintChanged
-          -- remove variables that has been reduced in the polynomial from the occurrence list
-          applyChanges changes
-          -- keep reducing the reduced polynomial
-          reduceAddL reducePolynomial
+  relations <- gets cmRelations
+  substituted <- case substPolyL relations polynomial of
+    Nothing -> do
+      reduced <- learnFromAddL polynomial -- learn from the polynomial
+      if reduced
+        then return Nothing -- polynomial has been reduced to nothing
+        else return (Just polynomial) -- nothing changed
+    Just (Left constant, changes) -> do
+      when (constant /= 0) $ error "[ panic ] Additive reduced to some constant other than 0"
+      -- the polynomial has been reduced to nothing
+      markChanged AdditiveLimbConstraintChanged
+      -- remove all variables in the polynomial from the occurrence list
+      applyChanges changes
+      return Nothing
+    Just (Right substitutedPolynomial, changes) -> do
+      -- the polynomial has been reduced to something
+      markChanged AdditiveLimbConstraintChanged
+      -- remove variables that has been reduced in the polynomial from the occurrence list
+      applyChanges changes
+
+      -- learn from the substituted Polynomial
+      reduced <- learnFromAddL substitutedPolynomial
+      if reduced
+        then return Nothing -- polynomial has been reduced to nothing
+        else -- keep substituting the substituted polynomial
+          reduceAddL substitutedPolynomial
+
+  -- learn from the substituted polynomial
+  _ <- case substituted of
+    Nothing -> learnFromAddL polynomial
+    Just poly -> learnFromAddL poly
+  return substituted
+
+-- changed <- learnFromAddL polynomial
+-- if changed
+--   then return Nothing
+--   else do
+--     relations <- gets cmRelations
+--     case substPolyL relations polynomial of
+--       Nothing -> return (Just polynomial) -- nothing changed
+--       Just (Left constant, changes) -> do
+--         when (constant /= 0) $
+--           error "[ panic ] Additive reduced to some constant other than 0"
+--         -- the polynomial has been reduced to nothing
+--         markChanged AdditiveLimbConstraintChanged
+--         -- remove all variables in the polynomial from the occurrence list
+--         applyChanges changes
+--         return Nothing
+--       Just (Right reducePolynomial, changes) -> do
+--         -- the polynomial has been reduced to something
+--         markChanged AdditiveLimbConstraintChanged
+--         -- remove variables that has been reduced in the polynomial from the occurrence list
+--         applyChanges changes
+--         -- keep reducing the reduced polynomial
+--         reduceAddL reducePolynomial
 
 ------------------------------------------------------------------------------
 
@@ -532,6 +565,6 @@ substRef relations (accPoly, changes) ref coeff = case Relations.lookup ref rela
             Right xs -> (PolyL.insertRefs 0 [(ref, coeff)] xs, changes)
           else error "[ panic ] Invalid relation in RefRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
       else case accPoly of
-        -- ref = slope * root + intercept
+        -- coeff * ref = coeff * slope * root + coeff * intercept
         Left c -> (PolyL.fromRefs (intercept * coeff + c) [(root, slope * coeff)], addRef root $ removeRef ref changes)
         Right accPoly' -> (PolyL.insertRefs (intercept * coeff) [(root, slope * coeff)] accPoly', addRef root $ removeRef ref changes)

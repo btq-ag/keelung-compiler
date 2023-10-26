@@ -218,6 +218,7 @@ test-suite keelung-test
       Test.Compilation.UInt.CLDivMod
       Test.Compilation.UInt.CLMul
       Test.Compilation.UInt.Comparison
+      Test.Compilation.UInt.Conditional
       Test.Compilation.UInt.DivMod
       Test.Compilation.UInt.Equality
       Test.Compilation.UInt.Inequality

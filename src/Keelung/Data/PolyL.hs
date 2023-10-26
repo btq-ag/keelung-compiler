@@ -112,7 +112,7 @@ insertRefs :: (Num n, Eq n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
 insertRefs c' xs (PolyL c limbs vars) =
   let vars' = cleanVars $ Map.unionWith (+) vars (Map.fromList xs)
    in if Seq.null limbs && Map.null vars'
-        then Left c
+        then Left (c + c')
         else Right $ PolyL (c + c') limbs vars'
 
 addConstant :: Num n => n -> PolyL n -> PolyL n

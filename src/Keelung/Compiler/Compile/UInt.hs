@@ -11,6 +11,7 @@ module Keelung.Compiler.Compile.UInt
 where
 
 import Control.Monad.Except
+import Control.Monad.RWS
 import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
@@ -23,8 +24,11 @@ import Keelung.Compiler.Compile.UInt.CLMul
 import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.Logical
 import Keelung.Compiler.Compile.UInt.Multiplication
+import Keelung.Compiler.ConstraintModule qualified as CM
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.LC qualified as LC
 import Keelung.Data.Reference
+import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf))
 
 --------------------------------------------------------------------------------
@@ -217,9 +221,31 @@ compileIfU width (Left p) (Right x) (Right y) = do
     then return $ Right x
     else do
       out <- freshRefU width
-      let bits = [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
+      fieldType <- gets CM.cmField
       -- (x - y) * p - out + y = 0
-      writeAdd (fromInteger y) $ (B p, fromInteger (x - y)) : bits
+      let outLCs = LC.fromRefU2 fieldType (Left out)
+      let xyLCs =
+            zip
+              (LC.fromRefU2 fieldType (Right (U.new width x)))
+              (LC.fromRefU2 fieldType (Right (U.new width y)))
+      zipWithM_
+        ( \outLC (xLC, yLC) -> do
+            case (xLC, yLC) of
+              (LC.Constant xVal, LC.Constant yVal) -> do
+                -- if both branches are constants, we can express it as addative constraints
+                -- (x - y) * p - out + y = 0
+                writeAddWithLC $ (xVal - yVal) LC.@ B p <> LC.neg outLC <> yLC
+              _ ->
+                -- (out - y) = p * (x - y)
+                writeMulWithLC (1 LC.@ B p) (xLC <> LC.neg yLC) (outLC <> LC.neg yLC)
+        )
+        outLCs
+        xyLCs
+      -- let xLimbs = Limb.refUToLimbs fieldWidth (RefUVal width x)
+
+      -- let bits = [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
+      -- -- (x - y) * p - out + y = 0
+      -- writeAdd (fromInteger y) $ (B p, fromInteger (x - y)) : bits
       return $ Left out
 compileIfU width (Left p) (Right x) (Left y) = do
   out <- freshRefU width
