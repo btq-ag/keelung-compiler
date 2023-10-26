@@ -223,7 +223,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> show bound
       <> "` is too large, since all UInt of bit width `"
       <> show width
-      <> "` are less than`"
+      <> "` are less than `"
       <> show ((2 ^ width) :: Integer)
       <> "`"
   show (AssertLTError actual bound) =

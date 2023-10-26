@@ -11,8 +11,8 @@ import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo
 import Keelung.Data.LC ((@))
 import Keelung.Data.Reference
-import Keelung.Field
 import Keelung.Data.U (U)
+import Keelung.Field
 
 --------------------------------------------------------------------------------
 
@@ -30,18 +30,11 @@ assertLTE width (Left a) bound
       -- there are 2 possible values for `a`, which are `0` and `1`
       -- we can use these 2 values as the only roots of the following multiplicative polynomial
       -- (a - 0) * (a - 1) = 0
-
-      fieldInfo <- gets cmField
-
-      let maxLimbWidth = fieldWidth fieldInfo
-      let minLimbWidth = 1
-      let limbWidth = minLimbWidth `max` widthOf a `min` maxLimbWidth
-
-      -- `(a - 0) * (a - 1) = 0` on the smallest limb
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
+      -- `(a - 0) * (a - 1) = 0` on the LSB
+      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
       writeMul (0, bits) (-1, bits) (0, [])
-      -- assign the rest of the limbs to `0`
-      forM_ [limbWidth .. width - 1] $ \j ->
+      -- assign the rest of the bits to `0`
+      forM_ [1 .. width - 1] $ \j ->
         writeRefBVal (RefUBit width a j) False
   | bound == 2 = do
       -- there are 3 possible values for `a`, which are `0`, `1` and `2`
