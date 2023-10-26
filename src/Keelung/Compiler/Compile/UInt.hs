@@ -28,6 +28,7 @@ import Keelung.Compiler.ConstraintModule qualified as CM
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.LC qualified as LC
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf))
 
@@ -87,12 +88,12 @@ compile out expr = case expr of
         Right val -> writeRefBVal (RefUBit w out i) val
   IfU w p x y -> do
     p' <- compileExprB p
-    x' <- wireU x
-    y' <- wireU y
+    x' <- wireU2 x
+    y' <- wireU2 y
     result <- compileIfU w p' x' y'
     case result of
       Left var -> writeRefUEq out var
-      Right val -> writeRefUVal out val
+      Right val -> writeRefUVal out (U.uValue val)
   RoLU w n x -> do
     x' <- wireU x
     Bitwise.compileRotateL w out n x'
@@ -116,6 +117,17 @@ wireU (VarUO w ref) = return (Left (RefUO w ref))
 wireU (VarUI w ref) = return (Left (RefUI w ref))
 wireU (VarUP w ref) = return (Left (RefUP w ref))
 wireU expr = do
+  out <- freshRefU (widthOf expr)
+  compile out expr
+  return (Left out)
+
+wireU2 :: (GaloisField n, Integral n) => ExprU n -> M n (Either RefU U)
+wireU2 (ValU w val) = return (Right (U.new w val))
+wireU2 (VarU w ref) = return (Left (RefUX w ref))
+wireU2 (VarUO w ref) = return (Left (RefUO w ref))
+wireU2 (VarUI w ref) = return (Left (RefUI w ref))
+wireU2 (VarUP w ref) = return (Left (RefUP w ref))
+wireU2 expr = do
   out <- freshRefU (widthOf expr)
   compile out expr
   return (Left out)
@@ -213,12 +225,12 @@ assertGT width a c = do
 --  out = p * x + y - p * y
 --      =>
 --  (out - y) = p * (x - y)
-compileIfU :: (GaloisField n, Integral n) => Width -> Either RefB Bool -> Either RefU Integer -> Either RefU Integer -> M n (Either RefU Integer)
+compileIfU :: (GaloisField n, Integral n) => Width -> Either RefB Bool -> Either RefU U -> Either RefU U -> M n (Either RefU U)
 compileIfU _ (Right True) x _ = return x
 compileIfU _ (Right False) _ y = return y
-compileIfU width (Left p) (Right x) (Right y) = do
+compileIfU width (Left p) x y = do
   if x == y
-    then return $ Right x
+    then return x
     else do
       out <- freshRefU width
       fieldType <- gets CM.cmField
@@ -226,8 +238,8 @@ compileIfU width (Left p) (Right x) (Right y) = do
       let outLCs = LC.fromRefU2 fieldType (Left out)
       let xyLCs =
             zip
-              (LC.fromRefU2 fieldType (Right (U.new width x)))
-              (LC.fromRefU2 fieldType (Right (U.new width y)))
+              (LC.fromRefU2 fieldType x)
+              (LC.fromRefU2 fieldType y)
       zipWithM_
         ( \outLC (xLC, yLC) -> do
             case (xLC, yLC) of
@@ -247,37 +259,69 @@ compileIfU width (Left p) (Right x) (Right y) = do
       -- -- (x - y) * p - out + y = 0
       -- writeAdd (fromInteger y) $ (B p, fromInteger (x - y)) : bits
       return $ Left out
-compileIfU width (Left p) (Right x) (Left y) = do
-  out <- freshRefU width
-  let bitsY = [(B (RefUBit width y i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-  -- (out - y) = p * (x - y)
-  writeMul
-    (0, [(B p, 1)])
-    (fromInteger x, bitsY)
-    (0, bitsY <> bitsOut)
-  return $ Left out
-compileIfU width (Left p) (Left x) (Right y) = do
-  out <- freshRefU width
-  let bitsX = [(B (RefUBit width x i), 2 ^ i) | i <- [0 .. width - 1]]
-  let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-  -- (out - y) = p * (x - y)
-  writeMul
-    (0, [(B p, 1)])
-    (fromInteger (-y), bitsX)
-    (fromInteger (-y), bitsOut)
-  return $ Left out
-compileIfU width (Left p) (Left x) (Left y) = do
-  out <- freshRefU width
-  let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
-  let bitsX = [(B (RefUBit width x i), 2 ^ i) | i <- [0 .. width - 1]]
-  let bitsY = [(B (RefUBit width y i), -(2 ^ i)) | i <- [0 .. width - 1]]
-  -- (out - y) = p * (x - y)
-  writeMul
-    (0, [(B p, 1)])
-    (0, bitsX <> bitsY)
-    (0, bitsOut <> bitsY)
-  return $ Left out
+
+-- compileIfU width (Left p) (Right x) (Right y) = do
+--   if x == y
+--     then return $ Right x
+--     else do
+--       out <- freshRefU width
+--       fieldType <- gets CM.cmField
+--       -- (x - y) * p - out + y = 0
+--       let outLCs = LC.fromRefU2 fieldType (Left out)
+--       let xyLCs =
+--             zip
+--               (LC.fromRefU2 fieldType (Right x))
+--               (LC.fromRefU2 fieldType (Right y))
+--       zipWithM_
+--         ( \outLC (xLC, yLC) -> do
+--             case (xLC, yLC) of
+--               (LC.Constant xVal, LC.Constant yVal) -> do
+--                 -- if both branches are constants, we can express it as addative constraints
+--                 -- (x - y) * p - out + y = 0
+--                 writeAddWithLC $ (xVal - yVal) LC.@ B p <> LC.neg outLC <> yLC
+--               _ ->
+--                 -- (out - y) = p * (x - y)
+--                 writeMulWithLC (1 LC.@ B p) (xLC <> LC.neg yLC) (outLC <> LC.neg yLC)
+--         )
+--         outLCs
+--         xyLCs
+--       -- let xLimbs = Limb.refUToLimbs fieldWidth (RefUVal width x)
+
+--       -- let bits = [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
+--       -- -- (x - y) * p - out + y = 0
+--       -- writeAdd (fromInteger y) $ (B p, fromInteger (x - y)) : bits
+--       return $ Left out
+-- compileIfU width (Left p) (Right x) (Left y) = do
+--   out <- freshRefU width
+--   let bitsY = [(B (RefUBit width y i), -(2 ^ i)) | i <- [0 .. width - 1]]
+--   let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+--   -- (out - y) = p * (x - y)
+--   writeMul
+--     (0, [(B p, 1)])
+--     (fromInteger (U.uValue x), bitsY)
+--     (0, bitsY <> bitsOut)
+--   return $ Left out
+-- compileIfU width (Left p) (Left x) (Right y) = do
+--   out <- freshRefU width
+--   let bitsX = [(B (RefUBit width x i), 2 ^ i) | i <- [0 .. width - 1]]
+--   let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+--   -- (out - y) = p * (x - y)
+--   writeMul
+--     (0, [(B p, 1)])
+--     (fromInteger (-(U.uValue y)), bitsX)
+--     (fromInteger (-(U.uValue y)), bitsOut)
+--   return $ Left out
+-- compileIfU width (Left p) (Left x) (Left y) = do
+--   out <- freshRefU width
+--   let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
+--   let bitsX = [(B (RefUBit width x i), 2 ^ i) | i <- [0 .. width - 1]]
+--   let bitsY = [(B (RefUBit width y i), -(2 ^ i)) | i <- [0 .. width - 1]]
+--   -- (out - y) = p * (x - y)
+--   writeMul
+--     (0, [(B p, 1)])
+--     (0, bitsX <> bitsY)
+--     (0, bitsOut <> bitsY)
+--   return $ Left out
 
 --------------------------------------------------------------------------------
 
