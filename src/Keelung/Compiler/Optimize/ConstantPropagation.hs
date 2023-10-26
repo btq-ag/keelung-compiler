@@ -8,6 +8,7 @@ import Data.IntMap (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Struct (Struct (..))
+import Keelung.Data.U qualified as U
 import Keelung.Syntax (Var)
 
 --------------------------------------------------------------------------------
@@ -47,7 +48,7 @@ propagateSideEffect sideEffect = case sideEffect of
   AssignmentU width var val -> do
     val' <- propagateExprU val
     case val' of
-      ValU _ v -> modify' $ \bindings -> bindings {structU = IntMap.insertWith (<>) width (IntMap.singleton width v) (structU bindings)}
+      ValU v -> modify' $ \bindings -> bindings {structU = IntMap.insertWith (<>) width (IntMap.singleton width (toInteger v)) (structU bindings)}
       _ -> return ()
     return $ AssignmentU width var val'
   DivMod width dividend divisor quotient remainder ->
@@ -99,10 +100,10 @@ propagateExprU :: (Eq n, Num n) => ExprU n -> M n (ExprU n)
 propagateExprU e = do
   bindings <- get
   case e of
-    ValU _ _ -> return e
+    ValU _ -> return e
     VarU w var -> case lookupU w var bindings of
       Nothing -> return e
-      Just val -> return (ValU w val)
+      Just val -> return (ValU (U.new w val))
     VarUO _ _ -> return e -- no constant propagation for output variables
     VarUI _ _ -> return e -- no constant propagation for public input variables
     VarUP _ _ -> return e -- no constant propagation for private input variables

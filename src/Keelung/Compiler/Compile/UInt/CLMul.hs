@@ -5,6 +5,7 @@ import Data.Field.Galois (GaloisField)
 import Keelung.Compiler.Compile.Boolean qualified as Boolean
 import Keelung.Compiler.Compile.Monad
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (Width)
 
@@ -12,10 +13,9 @@ import Keelung.Syntax (Width)
 
 -- Model of carry-less multiplication: see https://en.wikipedia.org/wiki/Carry-less_product
 
-compileCLMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileCLMulU width out (Right a) (Right b) = do
-  let val = U.uValue (U.clMul (U.new width a) (U.new width b))
-  writeRefUVal out val
+compileCLMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU U -> Either RefU U -> M n ()
+compileCLMulU _ out (Right a) (Right b) = do
+  writeRefUVal out (U.clMul a b)
 compileCLMulU width out (Right a) (Left b) = do
   temp <- freshRefU width
   writeRefUVal temp a

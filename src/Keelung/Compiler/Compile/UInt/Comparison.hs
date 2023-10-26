@@ -12,16 +12,17 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.LC ((@))
 import Keelung.Data.Reference
 import Keelung.Field
+import Keelung.Data.U (U)
 
 --------------------------------------------------------------------------------
 
 -- | Assert that a UInt is less than or equal to some constant
 -- reference doc: A.3.2.2 Range Check https://zips.z.cash/protocol/protocol.pdf
-assertLTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
+assertLTE :: (GaloisField n, Integral n) => Width -> Either RefU U -> Integer -> M n ()
 assertLTE _ (Right a) bound = if fromIntegral a <= bound then return () else throwError $ Error.AssertComparisonError (toInteger a) LT (succ bound)
 assertLTE width (Left a) bound
-  | bound < 0 = throwError $ Error.AssertLTEBoundTooSmallError bound
-  | bound >= 2 ^ width - 1 = throwError $ Error.AssertLTEBoundTooLargeError bound width
+  | bound < 0 = throwError $ Error.AssertLTEBoundTooSmallError (toInteger bound)
+  | bound >= 2 ^ width - 1 = throwError $ Error.AssertLTEBoundTooLargeError (toInteger bound) width
   | bound == 0 = do
       -- there's only 1 possible value for `a`, which is `0`
       writeRefUVal a 0
@@ -125,15 +126,15 @@ assertLTE width (Left a) bound
 --------------------------------------------------------------------------------
 
 -- | Assert that a UInt is greater than or equal to some constant
-assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Integer -> M n ()
+assertGTE :: (GaloisField n, Integral n) => Width -> Either RefU U -> Integer -> M n ()
 assertGTE _ (Right a) c = if fromIntegral a >= c then return () else throwError $ Error.AssertComparisonError (succ (toInteger a)) GT c
 assertGTE width (Left a) bound
-  | bound < 1 = throwError $ Error.AssertGTEBoundTooSmallError bound
+  | bound < 1 = throwError $ Error.AssertGTEBoundTooSmallError (toInteger bound)
   | bound == 1 = do
       -- a ≥ 1 → a > 0 → a is not zero
       -- there exists a number m such that the product of a and m is 1
       assertNonZero width a
-  | bound >= 2 ^ width = throwError $ Error.AssertGTEBoundTooLargeError bound width
+  | bound >= 2 ^ width = throwError $ Error.AssertGTEBoundTooLargeError (toInteger bound) width
   | bound == 2 ^ width - 1 = do
       -- there's only 1 possible value for `a`, which is `2^width - 1`
       writeRefUVal a (2 ^ width - 1)

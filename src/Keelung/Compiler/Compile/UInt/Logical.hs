@@ -10,9 +10,10 @@ import Keelung.Compiler.Compile.Boolean qualified as Boolean
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
 
 -- | Compile a consecutive sequence of XORs
-compileXorUs :: (GaloisField n, Integral n) => Width -> RefU -> [Either RefU Integer] -> M n ()
+compileXorUs :: (GaloisField n, Integral n) => Width -> RefU -> [Either RefU U] -> M n ()
 compileXorUs width out xs = do
   forM_ [0 .. width - 1] $ \i -> do
     let column =

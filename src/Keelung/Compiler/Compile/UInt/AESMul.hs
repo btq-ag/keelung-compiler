@@ -10,6 +10,7 @@ import Data.Word (Word8)
 import Keelung.Compiler.Compile.Boolean qualified as Boolean
 import Keelung.Compiler.Compile.Monad
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf), Width)
 
@@ -17,10 +18,8 @@ import Keelung.Syntax (HasWidth (widthOf), Width)
 
 -- | GF(256) multiplication for AES
 --   See https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.197-upd1.pdf for more
-compileAESMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileAESMulU width out (Right a) (Right b) = do
-  let val = U.uValue (U.aesMul (U.new width a) (U.new width b))
-  writeRefUVal out val
+compileAESMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU U -> Either RefU U -> M n ()
+compileAESMulU _ out (Right a) (Right b) = writeRefUVal out (U.aesMul a b)
 compileAESMulU width out (Right a) (Left b) = compileAESMulCV width out a b
 compileAESMulU width out (Left a) (Right b) = compileAESMulCV width out b a
 compileAESMulU width out (Left a) (Left b) = compileAESMulCC width out a b
@@ -40,9 +39,9 @@ compileAESMulU width out (Left a) (Left b) = compileAESMulCC width out a b
 --      (0b10000000, 0b10000001, 0b00000010, 0b10000100, 0b10001000, 0b00010000, 0b00100000, 0b01000000)
 type XorCode = (Word8, Word8, Word8, Word8, Word8, Word8, Word8, Word8)
 
-compileAESMulCV :: (GaloisField n, Integral n) => Width -> RefU -> Integer -> RefU -> M n ()
+compileAESMulCV :: (GaloisField n, Integral n) => Width -> RefU -> U -> RefU -> M n ()
 compileAESMulCV width out c x = do
-  let (code0, code1, code2, code3, code4, code5, code6, code7) = calculateXorCode c
+  let (code0, code1, code2, code3, code4, code5, code6, code7) = calculateXorCode (toInteger c)
   Boolean.xorBs (codeToXors x code0) >>= writeRefB (RefUBit width out 0)
   Boolean.xorBs (codeToXors x code1) >>= writeRefB (RefUBit width out 1)
   Boolean.xorBs (codeToXors x code2) >>= writeRefB (RefUBit width out 2)
@@ -96,7 +95,7 @@ compileAESMulCV width out c x = do
 --  XOR with y[6]: [196,  76, 152, 244,  44,  88, 177,  98]
 --  XOR with y[7]: [ 98, 166,  76, 250, 150,  44,  88, 177]
 --
---  notation in the following comment: 
+--  notation in the following comment:
 --    192 # y[2] => 0b11000000 # y[2] => (x[7] ⊕ x[6])y[2]
 --    161 # y[3] => 0b10100001 # y[3] => (x[7] ⊕ x[5] ⊕ x[2])y[3]
 --    208 # y[4] => 0b11010000 # y[4] => (x[7] ⊕ x[6] ⊕ x[4])y[4]
@@ -175,7 +174,7 @@ compileAESMulCC width out x y = do
         products !! 2 !! 7
       ]
   -- out[3] = 8 # y[0] ⊕ 132 # y[1] ⊕ 66 # y[2] ⊕ 161 # y[3] ⊕ 208 # y[4] ⊕ 232 # y[5] ⊕ 244 # y[6] ⊕ 250 # y[7]
-  --        = 0b00001000 # y[0] ⊕ 0b10000100 # y[1] ⊕ 0b01000010 # y[2] ⊕ 0b10100001 # y[3] ⊕ 0b11010000 # y[4] ⊕ 0b11101000 # y[5] ⊕ 0b11110100 # y[6] ⊕ 0b11111010 # y[7] 
+  --        = 0b00001000 # y[0] ⊕ 0b10000100 # y[1] ⊕ 0b01000010 # y[2] ⊕ 0b10100001 # y[3] ⊕ 0b11010000 # y[4] ⊕ 0b11101000 # y[5] ⊕ 0b11110100 # y[6] ⊕ 0b11111010 # y[7]
   --        = (x[3])y[0] ⊕ (x[7] ⊕ x[2])y[1] ⊕ (x[6] ⊕ x[1])y[2] ⊕ (x[7] ⊕ x[5] ⊕ x[0])y[3] ⊕ (x[7] ⊕ x[6] ⊕ x[4])y[4] ⊕ (x[7] ⊕ x[6] ⊕ x[5] ⊕ x[3])y[5] ⊕ (x[7] ⊕ x[6] ⊕ x[5] ⊕ x[4] ⊕ x[2])y[6] ⊕ (x[7] ⊕ x[6] ⊕ x[5] ⊕ x[4] ⊕ x[3] ⊕ x[1])y[7]
   writeRefB (RefUBit width out 3)
     =<< Boolean.xorBs

@@ -5,6 +5,7 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
+import Keelung (widthOf)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
@@ -22,6 +23,7 @@ import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
 
@@ -219,8 +221,8 @@ writeRefB a (Left b) = writeRefBEq a b
 writeRefB a (Right b) = writeRefBVal a b
 
 -- | Assign a Integer to a RefU
-writeRefUVal :: (GaloisField n, Integral n) => RefU -> Integer -> M n ()
-writeRefUVal a x = addC [CRefUVal a x]
+writeRefUVal :: (GaloisField n, Integral n) => RefU -> U -> M n ()
+writeRefUVal a x = addC [CRefUVal a (toInteger x)]
 
 -- | Assign an Integer to a Limb
 writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
@@ -260,14 +262,15 @@ addEqZeroHintWithPoly (Left 0) m = writeRefFVal m 0
 addEqZeroHintWithPoly (Left constant) m = writeRefFVal m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
 
-addDivModHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> M n ()
-addDivModHint w x y q r = modify' $ \cs -> cs {cmDivMods = (right (U.new w) x, right (U.new w) y, right (U.new w) q, right (U.new w) r) : cmDivMods cs}
+addDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
+addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (x, y, q, r) : cmDivMods cs}
 
-addCLDivModHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> M n ()
-addCLDivModHint w x y q r = modify' $ \cs -> cs {cmCLDivMods = (right (U.new w) x, right (U.new w) y, right (U.new w) q, right (U.new w) r) : cmCLDivMods cs}
+addCLDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
+addCLDivModHint x y q r = modify' $ \cs -> cs {cmCLDivMods = (x, y, q, r) : cmCLDivMods cs}
 
-addModInvHint :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> Either RefU Integer -> Integer -> M n ()
-addModInvHint w a output n p = modify' $ \cs -> cs {cmModInvs = (right (U.new w) a, right (U.new w) output, right (U.new w) n, U.new w p) : cmModInvs cs}
+-- | Width of all values are doubled in this hint
+addModInvHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> U -> M n ()
+addModInvHint a output n p = modify' $ \cs -> cs {cmModInvs = (right (U.widen (widthOf p)) a, right (U.widen (widthOf p)) output, right (U.widen (widthOf p)) n, U.widen (widthOf p) p) : cmModInvs cs}
 
 --------------------------------------------------------------------------------
 

@@ -19,6 +19,7 @@ import Keelung.Field (N (..))
 import Keelung.Syntax (HasWidth (..), Var, Width)
 import Keelung.Syntax.Counters (Counters)
 import Keelung.Syntax.Counters qualified as Counters
+import Keelung.Data.U (U)
 
 --------------------------------------------------------------------------------
 
@@ -139,7 +140,7 @@ instance (Integral n, Show n) => Show (ExprB n) where
 
 -- | UInt expressions
 data ExprU n
-  = ValU Width Integer
+  = ValU U
   | VarU Width Var
   | VarUO Width Var
   | VarUI Width Var
@@ -150,7 +151,7 @@ data ExprU n
   | AESMulU Width (ExprU n) (ExprU n) -- hardcoded multiplication for AES
   | CLMulU Width (ExprU n) (ExprU n)
   | CLModU Width (ExprU n) (ExprU n)
-  | MMIU Width (ExprU n) Integer -- modular multiplicative inverse
+  | MMIU Width (ExprU n) U -- modular multiplicative inverse
   | -- logical operators
     AndU Width (Seq (ExprU n))
   | OrU Width (Seq (ExprU n))
@@ -167,7 +168,7 @@ data ExprU n
 
 instance (Show n, Integral n) => Show (ExprU n) where
   showsPrec prec expr = case expr of
-    ValU _ n -> shows n
+    ValU n -> shows n
     VarU _ var -> showString "U" . shows var
     VarUO _ var -> showString "UO" . shows var
     VarUI _ var -> showString "UI" . shows var
@@ -190,7 +191,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
 
 instance HasWidth (ExprU n) where
   widthOf expr = case expr of
-    ValU w _ -> w
+    ValU x -> widthOf x
     VarU w _ -> w
     VarUO w _ -> w
     VarUI w _ -> w

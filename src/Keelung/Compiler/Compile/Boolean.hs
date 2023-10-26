@@ -19,9 +19,9 @@ import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
-import Keelung.Data.U qualified as U
+import Keelung.Data.U (U)
 
-compile :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU Integer)) -> ExprB n -> M n (Either RefB Bool)
+compile :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU U)) -> ExprB n -> M n (Either RefB Bool)
 compile compileU expr = case expr of
   ValB val -> return $ Right val -- out = val
   VarB var -> return $ Left (RefBX var) -- out = var
@@ -66,7 +66,7 @@ compile compileU expr = case expr of
   EqU x y -> do
     x' <- compileU x
     y' <- compileU y
-    compileEqU (widthOf x) x' y'
+    compileEqU x' y'
   LTEU x y -> do
     x' <- compileU x
     y' <- compileU y
@@ -95,14 +95,14 @@ compile compileU expr = case expr of
 
 --------------------------------------------------------------------------------
 
-compileEqU :: (GaloisField n, Integral n) => Width -> Either RefU Integer -> Either RefU Integer -> M n (Either RefB Bool)
-compileEqU width x y = do
+compileEqU :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> M n (Either RefB Bool)
+compileEqU x y = do
   fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
   result <-
     zipWithM
       (\a b -> eqZero True (a <> neg b)) -- a - b ==? 0
-      (fromRefU fieldWidth (U.new width <$> x))
-      (fromRefU fieldWidth (U.new width <$> y))
+      (fromRefU fieldWidth x)
+      (fromRefU fieldWidth y)
   case result of
     [] -> return $ Right True
     [result'] -> return result'
@@ -442,14 +442,14 @@ computeLTEUVarVar x y = do
   -- starting from the least significant bit
   Left <$> foldM (compileLTEUVarVarPrim width x y) result [1 .. width - 1]
 
-computeLTEUVarConst :: (GaloisField n, Integral n) => RefU -> Integer -> M n (Either RefB Bool)
+computeLTEUVarConst :: (GaloisField n, Integral n) => RefU -> U -> M n (Either RefB Bool)
 computeLTEUVarConst x y = do
   let width = widthOf x
   -- starting from the least significant bit
   let pairs = [(RefUBit width x i, Data.Bits.testBit y i) | i <- [0 .. width - 1]]
   foldM compileLTEUVarConstPrim (Right True) pairs
 
-computeLTEUConstVar :: (GaloisField n, Integral n) => Integer -> RefU -> M n (Either RefB Bool)
+computeLTEUConstVar :: (GaloisField n, Integral n) => U -> RefU -> M n (Either RefB Bool)
 computeLTEUConstVar x y = do
   let width = widthOf y
   -- starting from the least significant bit
@@ -495,14 +495,14 @@ compileLTEUVarVarPrim width x y acc i = do
 
   return result
 
-computeLTUVarConst :: (GaloisField n, Integral n) => RefU -> Integer -> M n (Either RefB Bool)
+computeLTUVarConst :: (GaloisField n, Integral n) => RefU -> U -> M n (Either RefB Bool)
 computeLTUVarConst x y = do
   let width = widthOf x
   -- starting from the least significant bit
   let pairs = [(RefUBit width x i, Data.Bits.testBit y i) | i <- [0 .. width - 1]]
   foldM compileLTEUVarConstPrim (Right False) pairs
 
-computeLTUConstVar :: (GaloisField n, Integral n) => Integer -> RefU -> M n (Either RefB Bool)
+computeLTUConstVar :: (GaloisField n, Integral n) => U -> RefU -> M n (Either RefB Bool)
 computeLTUConstVar x y = do
   let width = widthOf y
   -- starting from the least significant bit

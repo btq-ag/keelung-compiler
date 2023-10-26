@@ -85,30 +85,30 @@ compileAssertion expr = case expr of
   ExprB (EqF x y) -> assertEqF x y
   ExprB (EqU x y) -> assertEqU x y
   -- rewriting `assert (x <= y)` width `UInt.assertLTE x y`
-  ExprB (LTEU x (ValU width bound)) -> do
+  ExprB (LTEU x (ValU bound)) -> do
     x' <- UInt.wireU x
-    UInt.assertLTE width x' (toInteger bound)
-  ExprB (LTEU (ValU width bound) x) -> do
+    UInt.assertLTE (widthOf bound) x' (toInteger bound)
+  ExprB (LTEU (ValU bound) x) -> do
     x' <- UInt.wireU x
-    UInt.assertGTE width x' (toInteger bound)
-  ExprB (LTU x (ValU width bound)) -> do
+    UInt.assertGTE (widthOf bound) x' (toInteger bound)
+  ExprB (LTU x (ValU bound)) -> do
     x' <- UInt.wireU x
-    UInt.assertLT width x' (toInteger bound)
-  ExprB (LTU (ValU width bound) x) -> do
+    UInt.assertLT (widthOf bound) x' (toInteger bound)
+  ExprB (LTU (ValU bound) x) -> do
     x' <- UInt.wireU x
-    UInt.assertGT width x' (toInteger bound)
-  ExprB (GTEU x (ValU width bound)) -> do
+    UInt.assertGT (widthOf bound) x' (toInteger bound)
+  ExprB (GTEU x (ValU bound)) -> do
     x' <- UInt.wireU x
-    UInt.assertGTE width x' (toInteger bound)
-  ExprB (GTEU (ValU width bound) x) -> do
+    UInt.assertGTE (widthOf bound) x' (toInteger bound)
+  ExprB (GTEU (ValU bound) x) -> do
     x' <- UInt.wireU x
-    UInt.assertLTE width x' (toInteger bound)
-  ExprB (GTU x (ValU width bound)) -> do
+    UInt.assertLTE (widthOf bound) x' (toInteger bound)
+  ExprB (GTU x (ValU bound)) -> do
     x' <- UInt.wireU x
-    UInt.assertGT width x' (toInteger bound)
-  ExprB (GTU (ValU width bound) x) -> do
+    UInt.assertGT (widthOf bound) x' (toInteger bound)
+  ExprB (GTU (ValU bound) x) -> do
     x' <- UInt.wireU x
-    UInt.assertLT width x' (toInteger bound)
+    UInt.assertLT (widthOf bound) x' (toInteger bound)
   ExprB x -> do
     -- out <- freshRefB
     result <- compileExprB x
@@ -241,16 +241,16 @@ assertEqF a b = do
 
 -- | Assert that two UInt expressions are equal
 assertEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()
-assertEqU (ValU _ a) (ValU _ b) = when (a /= b) $ throwError $ Error.ConflictingValuesU a b
-assertEqU (ValU w a) (VarU _ b) = writeRefUVal (RefUX w b) a
-assertEqU (ValU w a) (VarUO _ b) = writeRefUVal (RefUO w b) a
-assertEqU (ValU w a) (VarUI _ b) = writeRefUVal (RefUI w b) a
-assertEqU (ValU w a) (VarUP _ b) = writeRefUVal (RefUP w b) a
-assertEqU (ValU w a) b = do
-  out <- freshRefU w
+assertEqU (ValU a) (ValU b) = when (a /= b) $ throwError $ Error.ConflictingValuesU (toInteger a) (toInteger b)
+assertEqU (ValU a) (VarU w b) = writeRefUVal (RefUX w b) a
+assertEqU (ValU a) (VarUO w b) = writeRefUVal (RefUO w b) a
+assertEqU (ValU a) (VarUI w b) = writeRefUVal (RefUI w b) a
+assertEqU (ValU a) (VarUP w b) = writeRefUVal (RefUP w b) a
+assertEqU (ValU a) b = do
+  out <- freshRefU (widthOf a)
   compileExprU out b
   writeRefUVal out a
-assertEqU (VarU w a) (ValU _ b) = writeRefUVal (RefUX w a) b
+assertEqU (VarU w a) (ValU b) = writeRefUVal (RefUX w a) b
 assertEqU (VarU w a) (VarU _ b) = writeRefUEq (RefUX w a) (RefUX w b)
 assertEqU (VarU w a) (VarUO _ b) = writeRefUEq (RefUX w a) (RefUO w b)
 assertEqU (VarU w a) (VarUI _ b) = writeRefUEq (RefUX w a) (RefUI w b)
@@ -259,7 +259,7 @@ assertEqU (VarU w a) b = do
   out <- freshRefU w
   compileExprU out b
   writeRefUEq (RefUX w a) out
-assertEqU (VarUO w a) (ValU _ b) = writeRefUVal (RefUO w a) b
+assertEqU (VarUO w a) (ValU b) = writeRefUVal (RefUO w a) b
 assertEqU (VarUO w a) (VarU _ b) = writeRefUEq (RefUO w a) (RefUX w b)
 assertEqU (VarUO w a) (VarUO _ b) = writeRefUEq (RefUO w a) (RefUO w b)
 assertEqU (VarUO w a) (VarUI _ b) = writeRefUEq (RefUO w a) (RefUI w b)
@@ -268,7 +268,7 @@ assertEqU (VarUO w a) b = do
   out <- freshRefU w
   compileExprU out b
   writeRefUEq (RefUO w a) out
-assertEqU (VarUI w a) (ValU _ b) = writeRefUVal (RefUI w a) b
+assertEqU (VarUI w a) (ValU b) = writeRefUVal (RefUI w a) b
 assertEqU (VarUI w a) (VarU _ b) = writeRefUEq (RefUI w a) (RefUX w b)
 assertEqU (VarUI w a) (VarUO _ b) = writeRefUEq (RefUI w a) (RefUO w b)
 assertEqU (VarUI w a) (VarUI _ b) = writeRefUEq (RefUI w a) (RefUI w b)
@@ -277,7 +277,7 @@ assertEqU (VarUI w a) b = do
   out <- freshRefU w
   compileExprU out b
   writeRefUEq (RefUI w a) out
-assertEqU (VarUP w a) (ValU _ b) = writeRefUVal (RefUP w a) b
+assertEqU (VarUP w a) (ValU b) = writeRefUVal (RefUP w a) b
 assertEqU (VarUP w a) (VarU _ b) = writeRefUEq (RefUP w a) (RefUX w b)
 assertEqU (VarUP w a) (VarUO _ b) = writeRefUEq (RefUP w a) (RefUO w b)
 assertEqU (VarUP w a) (VarUI _ b) = writeRefUEq (RefUP w a) (RefUI w b)

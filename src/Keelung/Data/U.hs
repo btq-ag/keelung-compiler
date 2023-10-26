@@ -5,6 +5,7 @@
 module Keelung.Data.U
   ( U (uValue),
     new,
+    widen,
     modInv,
     aesMul,
     clMul,
@@ -27,7 +28,13 @@ import Keelung.Syntax (HasWidth (..), Width)
 --------------------------------------------------------------------------------
 
 data U = U {uWidth :: Maybe Width, uValue :: Integer}
-  deriving (Eq, Ord, Generic, NFData)
+  deriving (Generic, NFData)
+
+instance Eq U where
+  a == b = uValue a == uValue b
+
+instance Ord U where
+  compare a b = compare (uValue a) (uValue b)
 
 instance Serialize U
 
@@ -70,6 +77,10 @@ instance Monoid U where
 new :: Width -> Integer -> U
 new width value = U (Just width) (value `Prelude.mod` (2 ^ width))
 
+widen :: Width -> U -> U
+widen w (U Nothing value) = U (Just (w + 32)) value
+widen w (U (Just v) value) = U (Just (w + v)) value
+
 --------------------------------------------------------------------------------
 
 add :: U -> U -> U
@@ -97,9 +108,9 @@ divModU a b
 -- | Hardcoded GF(256) multiplication for AES
 aesMul :: U -> U -> U
 aesMul (U w a) (U _ b) =
-  let a' = U (fmap (*2) w) a
-      b' = U (fmap (*2) w) b
-      U _ c' = snd $ (a' `clMul` b') `clDivMod` U (fmap (*2) w) 0b100011011
+  let a' = U (fmap (* 2) w) a
+      b' = U (fmap (* 2) w) b
+      U _ c' = snd $ (a' `clMul` b') `clDivMod` U (fmap (* 2) w) 0b100011011
    in U w c'
 
 -- | Carry-less multiplication of two unsigned integers.

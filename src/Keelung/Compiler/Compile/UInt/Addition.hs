@@ -18,6 +18,7 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
 import Keelung.Field (FieldType (..))
 import Keelung.Syntax (Width)
 
@@ -38,7 +39,7 @@ import Keelung.Syntax (Width)
 --       [ carry ]
 --       [ carry ]
 
-compileAdd :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
+compileAdd :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> U -> M n ()
 compileAdd width out vars constant = do
   fieldInfo <- gets cmField
 
@@ -87,7 +88,7 @@ compileAdd width out vars constant = do
         ranges
 
 -- | Subtraction is implemented as addition with negated operands
-compileSub :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
+compileSub :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> Either RefU U -> M n ()
 compileSub width out (Right a) (Right b) = compileAdd width out [] (a - b)
 compileSub width out (Right a) (Left b) = compileAdd width out [(b, False)] a
 compileSub width out (Left a) (Right b) = compileAdd width out [(a, True)] (-b)

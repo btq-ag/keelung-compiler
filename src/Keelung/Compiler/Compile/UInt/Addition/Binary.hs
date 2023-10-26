@@ -5,12 +5,13 @@ import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Keelung.Compiler.Compile.Monad
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
 import Keelung.Syntax (Width)
 
 --------------------------------------------------------------------------------
 
 -- | Binary field addition
-compileAddB :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> Integer -> M n ()
+compileAddB :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> U -> M n ()
 compileAddB _ out [] constant = writeRefUVal out constant
 compileAddB width out [(var, True)] constant = compileAddBPosConst width out var constant
 compileAddB width out [(var, False)] constant = compileAddBNegConst width out var constant
@@ -90,7 +91,7 @@ compileAddBPosPos width out as bs = do
 --      out[i] = as[i] + bs[i] + carry[i]
 --      carry[i+1] = as[i] * bs[i] + as[i] * carry[i] + bs[i] * carry[i]
 --    edge case: carry[0] = 0
-compileAddBPosConst :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Integer -> M n ()
+compileAddBPosConst :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> U -> M n ()
 compileAddBPosConst width out as bs = do
   -- only need `width - 1` carry bits
   carryBits <- freshRefU (width - 1)
@@ -132,7 +133,7 @@ compileAddBPosConst width out as bs = do
 --      carry[i+1] = (1 + as[i]) * bs[i] + (1 + as[i]) * carry[i] + bs[i] * carry[i]
 --      carry[i+1] = as[i] * bs[i] + as[i] * carry[i] + bs[i] * carry[i] + bs[i] + carry[i]
 --    edge case: carry[0] = 1
-compileAddBNegConst :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Integer -> M n ()
+compileAddBNegConst :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> U -> M n ()
 compileAddBNegConst width out as bs = do
   -- only need `width - 1` carry bits
   carryBits <- freshRefU (width - 1)

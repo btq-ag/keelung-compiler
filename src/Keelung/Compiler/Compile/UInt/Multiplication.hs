@@ -16,6 +16,7 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
 import Keelung.Syntax (Width)
 
 --------------------------------------------------------------------------------
@@ -40,15 +41,13 @@ import Keelung.Syntax (Width)
 -- ------------------------------------------
 --
 -- the maximum number of operands when adding these 2w-bit limbs is 2L (with carry from the previous limb)
-compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU Integer -> Either RefU Integer -> M n ()
-compileMulU _width out (Right a) (Right b) = do
-  let val = a * b
-  writeRefUVal out val
+compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU U -> Either RefU U -> M n ()
+compileMulU _width out (Right a) (Right b) = writeRefUVal out (a * b)
 compileMulU width out (Right a) (Left b) = compileMul width out b (Right a)
 compileMulU width out (Left a) (Right b) = compileMul width out a (Right b)
 compileMulU width out (Left a) (Left b) = compileMul width out a (Left b)
 
-compileMul :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU Integer -> M n ()
+compileMul :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU U -> M n ()
 compileMul width out x y = do
   fieldInfo <- gets cmField
 
@@ -130,7 +129,7 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
 --                 x2*y2
 --               .....
 -- ------------------------------------------
-mulnxn :: (GaloisField n, Integral n) => Width -> Int -> Width -> Int -> RefU -> RefU -> Either RefU Integer -> M n ()
+mulnxn :: (GaloisField n, Integral n) => Width -> Int -> Width -> Int -> RefU -> RefU -> Either RefU U -> M n ()
 mulnxn width maxHeight limbWidth arity out var operand = do
   -- generate pairs of indices for choosing limbs
   let indices = [(xi, columnIndex - xi) | columnIndex <- [0 .. arity - 1], xi <- [0 .. columnIndex]]

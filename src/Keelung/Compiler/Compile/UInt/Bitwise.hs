@@ -6,9 +6,10 @@ import Data.Field.Galois
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
 
 -- | Compile a shift left operation
-compileShiftL :: (GaloisField n, Integral n) => Width -> RefU -> Int -> Either RefU Integer -> M n ()
+compileShiftL :: (GaloisField n, Integral n) => Width -> RefU -> Int -> Either RefU U -> M n ()
 compileShiftL width out n (Left var) = do
   case compare n 0 of
     EQ -> writeRefUEq out var
@@ -49,7 +50,7 @@ compileShiftL width out n (Right val) = do
         writeRefBVal (RefUBit width out i) False -- out[i] = 0
 
 -- | Compile a rotate left operation
-compileRotateL :: (GaloisField n, Integral n) => Width -> RefU -> Int -> Either RefU Integer -> M n ()
+compileRotateL :: (GaloisField n, Integral n) => Width -> RefU -> Int -> Either RefU U -> M n ()
 compileRotateL width out n (Left var) = do
   forM_ [0 .. width - 1] $ \i -> do
     let i' = (i - n) `mod` width
@@ -60,7 +61,7 @@ compileRotateL width out n (Right val) = do
     writeRefBVal (RefUBit width out i) (Data.Bits.testBit val i') -- out[i] = val[i']
 
 -- | Compile a set bit operation
-compileSetBit :: (GaloisField n, Integral n) => Width -> RefU -> Int -> Either RefU Integer -> Either RefB Bool -> M n ()
+compileSetBit :: (GaloisField n, Integral n) => Width -> RefU -> Int -> Either RefU U -> Either RefB Bool -> M n ()
 compileSetBit width out j lhs rhs = do
   forM_ [0 .. width - 1] $ \i -> do
     if i == j

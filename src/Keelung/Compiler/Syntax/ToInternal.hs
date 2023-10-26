@@ -9,6 +9,7 @@ import Keelung.Data.FieldInfo
 import Keelung.Syntax (HasWidth (widthOf), Var)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax qualified as T
+import qualified Keelung.Data.U as U
 
 run :: (GaloisField n, Integral n) => FieldInfo -> T.Elaborated -> Internal n
 run fieldInfo (T.Elaborated expr comp) =
@@ -92,7 +93,7 @@ convertExprF expr = case expr of
 
 convertExprU :: (GaloisField n, Integral n) => T.UInt -> M n (ExprU n)
 convertExprU expr = case expr of
-  T.ValU w n -> return $ ValU w (fromIntegral n)
+  T.ValU w n -> return $ ValU (U.new w n)
   T.VarU w var -> return $ VarU w var
   T.VarUI w var -> return $ VarUI w var
   T.VarUP w var -> return $ VarUP w var
@@ -101,7 +102,7 @@ convertExprU expr = case expr of
   T.AESMulU w x y -> AESMulU w <$> convertExprU x <*> convertExprU y
   T.MulU w x y -> MulU w <$> convertExprU x <*> convertExprU y
   T.CLMulU w x y -> CLMulU w <$> convertExprU x <*> convertExprU y
-  T.MMIU w x p -> MMIU w <$> convertExprU x <*> pure p
+  T.MMIU w x p -> MMIU w <$> convertExprU x <*> pure (U.new w p)
   T.AndU w x y -> chainExprsOfAssocOpAndU w <$> convertExprU x <*> convertExprU y
   T.OrU w x y -> chainExprsOfAssocOpOrU w <$> convertExprU x <*> convertExprU y
   T.XorU w x y -> chainExprsOfAssocOpXorU w <$> convertExprU x <*> convertExprU y
