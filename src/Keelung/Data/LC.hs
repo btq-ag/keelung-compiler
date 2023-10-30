@@ -22,16 +22,16 @@ fromPolyL = either Constant Polynomial
 
 -- | Converting from a 'Either RefU U' to a list of 'LC n'.
 fromRefU :: (Num n, Eq n, Show n, Ord n) => Width -> Either RefU U -> [LC n]
-fromRefU fieldWidth (Right val) =
-  map go [0, fieldWidth .. width - 1]
+fromRefU desiredWidth (Right val) =
+  map go [0, desiredWidth .. width - 1]
   where
     width = widthOf val
     go :: (Num n, Eq n) => Int -> LC n
     go limbStart = do
-      let range = [0 .. (fieldWidth `min` width) - 1]
+      let range = [0 .. (desiredWidth `min` width) - 1]
       Constant $ fromInteger $ sum [2 ^ i | i <- range, Data.Bits.testBit val (limbStart + i)]
-fromRefU fieldWidth (Left var) =
-  let limbs = Limb.refUToLimbs fieldWidth var
+fromRefU desiredWidth (Left var) =
+  let limbs = Limb.refUToLimbs desiredWidth var
    in map (Polynomial . PolyL.fromLimb 0) limbs
 
 -- | Converting from a 'Either RefU U' to a list of 'LC n'.

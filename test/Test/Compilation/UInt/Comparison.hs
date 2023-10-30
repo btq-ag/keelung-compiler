@@ -5,6 +5,7 @@ module Test.Compilation.UInt.Comparison (tests, run) where
 
 import Control.Monad
 import Data.Field.Galois (Binary, Prime)
+import Data.Word (Word8)
 import Keelung hiding (compile)
 import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Compiler.Error (Error (..))
@@ -286,7 +287,7 @@ tests = describe "Comparisons" $ do
           []
           (InterpreterError (Interpreter.AssertGTEBoundTooLargeError bound width))
           (CompilerError (Compiler.AssertGTEBoundTooLargeError bound width) :: Error (Binary 7))
-    
+
     describe "bound normal" $ do
       it "GF181" $ do
         forAll (choose (1, 15)) $ \bound -> do
@@ -430,178 +431,70 @@ tests = describe "Comparisons" $ do
                   (InterpreterError (Interpreter.AssertGTError (fromInteger x) bound))
                   (SolverError Solver.ConflictingValues :: Error (Binary 7))
 
--- it "lte (variable / variable)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program = do
---         x <- inputUInt @4 Public
---         y <- inputUInt @4 Public
---         return $ x `lte` y
+  describe "computeLTE" $ do
+    it "2 variables" $ do
+      let program = do
+            x <- inputUInt @8 Public
+            y <- inputUInt @8 Public
+            return $ x `lte` y
 
---   forAll genPair $ \(x, y) -> do
---     if x <= y
---       then runAll (Prime 2) program [fromInteger x, fromInteger y] [] [1]
---       else runAll (Prime 2) program [fromInteger x, fromInteger y] [] [0]
+      forAll arbitrary $ \(x, y :: Word8) -> do
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+          if x <= y
+            then runAll field program [fromIntegral x, fromIntegral y] [] [1]
+            else runAll field program [fromIntegral x, fromIntegral y] [] [0]
 
--- it "lte (variable / constant)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program y = do
---         x <- inputUInt @4 Public
---         return $ x `lte` y
+    it "variable + constant" $ do
+      let program x = do
+            y <- inputUInt @8 Public
+            return $ x `lte` y
 
---   forAll genPair $ \(x, y) -> do
---     if x <= y
---       then runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [1]
---       else runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [0]
+      forAll arbitrary $ \(x, y :: Word8) -> do
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+          if x <= y
+            then runAll field (program (fromIntegral x)) [fromIntegral y] [] [1]
+            else runAll field (program (fromIntegral x)) [fromIntegral y] [] [0]
 
--- it "lte (constant / variable)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program x = do
---         y <- inputUInt @4 Public
---         return $ x `lte` y
+    it "2 constants" $ do
+      let program x y = do
+            return $ x `lte` (y :: UInt 8)
 
---   forAll genPair $ \(x, y) -> do
---     if x <= y
---       then runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [1]
---       else runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [0]
+      forAll arbitrary $ \(x, y :: Word8) -> do
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+          if x <= y
+            then runAll field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
+            else runAll field (program (fromIntegral x) (fromIntegral y)) [] [] [0]
 
--- it "lte (constant / constant)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program x y = do
---         return $ x `lte` (y :: UInt 4)
+  describe "computeLT" $ do
+    it "2 variables" $ do
+      let program = do
+            x <- inputUInt @8 Public
+            y <- inputUInt @8 Public
+            return $ x `lt` y
 
---   forAll genPair $ \(x, y) -> do
---     if x <= y
---       then runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [1]
---       else runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [0]
+      forAll arbitrary $ \(x, y :: Word8) -> do
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+          if x < y
+            then runAll field program [fromIntegral x, fromIntegral y] [] [1]
+            else runAll field program [fromIntegral x, fromIntegral y] [] [0]
 
--- it "lt (variable / variable)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program = do
---         x <- inputUInt @4 Public
---         y <- inputUInt @4 Public
---         return $ x `lt` y
+    it "variable + constant" $ do
+      let program x = do
+            y <- inputUInt @8 Public
+            return $ x `lt` y
 
---   forAll genPair $ \(x, y) -> do
---     if x < y
---       then runAll (Prime 2) program [fromInteger x, fromInteger y] [] [1]
---       else runAll (Prime 2) program [fromInteger x, fromInteger y] [] [0]
+      forAll arbitrary $ \(x, y :: Word8) -> do
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+          if x < y
+            then runAll field (program (fromIntegral x)) [fromIntegral y] [] [1]
+            else runAll field (program (fromIntegral x)) [fromIntegral y] [] [0]
 
--- it "lt (variable / constant)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program y = do
---         x <- inputUInt @4 Public
---         return $ x `lt` y
+    it "2 constants" $ do
+      let program x y = do
+            return $ x `lt` (y :: UInt 8)
 
---   forAll genPair $ \(x, y) -> do
---     if x < y
---       then runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [1]
---       else runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [0]
-
--- it "lt (constant / variable)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program x = do
---         y <- inputUInt @4 Public
---         return $ x `lt` y
-
---   forAll genPair $ \(x, y) -> do
---     if x < y
---       then runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [1]
---       else runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [0]
-
--- it "lt (constant / constant)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program x y = do
---         return $ x `lt` (y :: UInt 4)
-
---   forAll genPair $ \(x, y) -> do
---     if x < y
---       then runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [1]
---       else runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [0]
-
--- it "gte (variable / variable)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program = do
---         x <- inputUInt @4 Public
---         y <- inputUInt @4 Public
---         return $ x `gte` y
-
---   forAll genPair $ \(x, y) -> do
---     if x >= y
---       then runAll (Prime 2) program [fromInteger x, fromInteger y] [] [1]
---       else runAll (Prime 2) program [fromInteger x, fromInteger y] [] [0]
-
--- it "gte (variable / constant)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program y = do
---         x <- inputUInt @4 Public
---         return $ x `gte` y
-
---   forAll genPair $ \(x, y) -> do
---     if x >= y
---       then runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [1]
---       else runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [0]
-
--- it "gte (constant / variable)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program x = do
---         y <- inputUInt @4 Public
---         return $ x `gte` y
-
---   forAll genPair $ \(x, y) -> do
---     if x >= y
---       then runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [1]
---       else runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [0]
-
--- it "gte (constant / constant)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program x y = do
---         return $ x `gte` (y :: UInt 4)
-
---   forAll genPair $ \(x, y) -> do
---     if x >= y
---       then runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [1]
---       else runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [0]
-
--- it "gt (variable / variable)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program = do
---         x <- inputUInt @4 Public
---         y <- inputUInt @4 Public
---         return $ x `gt` y
-
---   forAll genPair $ \(x, y) -> do
---     if x > y
---       then runAll (Prime 2) program [fromInteger x, fromInteger y] [] [1]
---       else runAll (Prime 2) program [fromInteger x, fromInteger y] [] [0]
-
--- it "gt (variable / constant)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program y = do
---         x <- inputUInt @4 Public
---         return $ x `gt` y
-
---   forAll genPair $ \(x, y) -> do
---     if x > y
---       then runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [1]
---       else runAll (Prime 2) (program (fromInteger y)) [fromInteger x] [] [0]
-
--- it "gt (constant / variable)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program x = do
---         y <- inputUInt @4 Public
---         return $ x `gt` y
-
---   forAll genPair $ \(x, y) -> do
---     if x > y
---       then runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [1]
---       else runAll (Prime 2) (program (fromInteger x)) [fromInteger y] [] [0]
-
--- it "gt (constant / constant)" $ do
---   let genPair = (,) <$> choose (0, 15) <*> choose (0, 15)
---   let program x y = do
---         return $ x `gt` (y :: UInt 4)
-
---   forAll genPair $ \(x, y) -> do
---     if x > y
---       then runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [1]
---       else runAll (Prime 2) (program (fromInteger x) (fromInteger y)) [] [] [0]
+      forAll arbitrary $ \(x, y :: Word8) -> do
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+          if x < y
+            then runAll field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
+            else runAll field (program (fromIntegral x) (fromIntegral y)) [] [] [0]

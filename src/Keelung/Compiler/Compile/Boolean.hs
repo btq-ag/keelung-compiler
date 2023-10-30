@@ -17,6 +17,7 @@ import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
+import Keelung.Data.LC qualified as LC
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.U (U)
@@ -445,9 +446,16 @@ computeLTEUVarVar x y = do
 computeLTEUVarConst :: (GaloisField n, Integral n) => RefU -> U -> M n (Either RefB Bool)
 computeLTEUVarConst x y = do
   let width = widthOf x
-  -- starting from the least significant bit
-  let pairs = [(RefUBit width x i, Data.Bits.testBit y i) | i <- [0 .. width - 1]]
-  foldM compileLTEUVarConstPrim (Right True) pairs
+  case toInteger y of
+    0 -> do
+      -- see if x is 0
+      fieldInfo <- gets cmField
+      let chunks = LC.fromRefU2 fieldInfo (Left x)
+      mapM (eqZero True) chunks >>= andBs
+    _ -> do
+      -- starting from the least significant bit
+      let pairs = [(RefUBit width x i, Data.Bits.testBit y i) | i <- [0 .. width - 1]]
+      foldM compileLTEUVarConstPrim (Right True) pairs
 
 computeLTEUConstVar :: (GaloisField n, Integral n) => U -> RefU -> M n (Either RefB Bool)
 computeLTEUConstVar x y = do
@@ -476,10 +484,16 @@ computeLTUVarVar x y = do
 -- output = if a
 --    then if b then x else 0
 --    else if b then 1 else x
--- output = 2abx + b + x - bx - ab - ax
---  =>
---  1. z = bx
---  2. output - z = (1-a)(b + x - 2z)
+-- on prime fields:
+--    output = 2abx + b + x - bx - ab - ax
+--      =>
+--        1. z = bx
+--        2. output - z = (1-a)(b + x - 2z)
+-- on binary fields:
+--    output = b + x + bx + ab + ax
+--      =>
+--        1. z = bx
+--        2. output + b + x + z = (a)(b + x)
 compileLTEUVarVarPrim :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefB -> Int -> M n RefB
 compileLTEUVarVarPrim width x y acc i = do
   let xBit = B (RefUBit width x i)
@@ -489,11 +503,18 @@ compileLTEUVarVarPrim width x y acc i = do
   yacc <- freshRefB
   writeMul (0, [(yBit, 1)]) (0, [(B acc, 1)]) (0, [(B yacc, 1)])
 
-  -- result - yacc = (1 - x[i]) * (y[i] + acc - 2 * yacc)
-  result <- freshRefB
-  writeMul (1, [(xBit, -1)]) (0, [(yBit, 1), (B acc, 1), (B yacc, -2)]) (0, [(B result, 1), (B yacc, -1)])
-
-  return result
+  characteristic <- gets (FieldInfo.fieldChar . cmField)
+  if characteristic == 2
+    then do
+      -- result + yacc + y[i] + acc = (x[i]) * (y[i] + acc)
+      result <- freshRefB
+      writeMul (0, [(xBit, 1)]) (0, [(yBit, 1), (B acc, 1)]) (0, [(B result, 1), (B yacc, 1), (yBit, 1), (B acc, 1)])
+      return result
+    else do
+      -- result - yacc = (1 - x[i]) * (y[i] + acc - 2 * yacc)
+      result <- freshRefB
+      writeMul (1, [(xBit, -1)]) (0, [(yBit, 1), (B acc, 1), (B yacc, -2)]) (0, [(B result, 1), (B yacc, -1)])
+      return result
 
 computeLTUVarConst :: (GaloisField n, Integral n) => RefU -> U -> M n (Either RefB Bool)
 computeLTUVarConst x y = do

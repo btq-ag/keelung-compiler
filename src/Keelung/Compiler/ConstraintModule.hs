@@ -136,26 +136,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       showEqs = adapt "EqZeros" (cmEqZeros cm) $ \(poly, m) ->
         "EqZeros " <> show poly <> " / " <> show m
 
-      -- showMulF' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
-      --   where
-      --     showVec :: (Show n, Ord n, Eq n, Num n) => Either n (PolyG n) -> String
-      --     showVec (Left c) = show c
-      --     showVec (Right xs) = show xs
-
-      --     -- wrap the string with parenthesis if it has more than 1 term
-      --     showVecWithParen :: (Show n, Ord n, Eq n, Num n) => PolyG n -> String
-      --     showVecWithParen xs =
-      --       let termNumber = case PolyG.view xs of
-      --             PolyG.Monomial 0 _ -> 1
-      --             PolyG.Monomial _ _ -> 2
-      --             PolyG.Binomial 0 _ _ -> 2
-      --             PolyG.Binomial {} -> 3
-      --             PolyG.Polynomial 0 xss -> Map.size xss
-      --             PolyG.Polynomial _ xss -> 1 + Map.size xss
-      --        in if termNumber < 2
-      --             then showVec (Right xs)
-      --             else "(" ++ showVec (Right xs) ++ ")"
-
       showMulL' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
         where
           showVec :: (Eq n, Num n, Ord n, Show n) => Either n (PolyL n) -> String
