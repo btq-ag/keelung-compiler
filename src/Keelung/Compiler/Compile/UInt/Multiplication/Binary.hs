@@ -1,6 +1,7 @@
 module Keelung.Compiler.Compile.UInt.Multiplication.Binary (compileMulB) where
 
 import Control.Monad
+import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Keelung (Width, widthOf)
 import Keelung.Compiler.Compile.Monad
@@ -8,11 +9,7 @@ import Keelung.Data.Reference
 import Keelung.Data.U (U)
 
 compileMulB :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU U -> M n ()
-compileMulB _ _ _ (Right _) = error "[ panic ] compileMulB: not implemented"
-compileMulB width out x (Left y) = do
-  columns <- formHalfColumns width x y
-  _carries <- foldColumns out columns
-  return ()
+compileMulB width out x y = formHalfColumns width x y >>= foldColumns out
 
 -- wallace ::
 
@@ -42,17 +39,23 @@ _formAllColumns width x y = do
 --      x₂y₁    x₁y₁    x₀y₁
 --      x₁y₂    x₀y₂
 --      x₀y₃
-formHalfColumns :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n [(Int, [RefB])]
-formHalfColumns width x y = do
+formHalfColumns :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> M n [(Int, [RefB])]
+formHalfColumns width x (Left y) = do
   let numberOfColumns = width
-  let pairs = [(indexSum, [(RefUBit width x (indexSum - i), RefUBit width y i) | i <- [0 `max` 0 .. indexSum]]) | indexSum <- [0 .. numberOfColumns - 1]]
-  forM pairs $ \(i, xs) -> do
-    xs' <- mapM multiplyBits xs
+  forM [0 .. numberOfColumns - 1] $ \i -> do
+    let pairs = [(RefUBit width x (i - j), RefUBit width y j) | j <- [0 `max` 0 .. i]]
+    xs' <- mapM multiplyBits pairs
     return (i, xs')
+formHalfColumns width x (Right y) = do
+  let numberOfColumns = width
+  forM [0 .. numberOfColumns - 1] $ \i -> do
+    -- put the bits of x into the column if `Data.Bits.testBit y j` is True
+    let vars = [RefUBit width x (i - j) | j <- [0 `max` 0 .. i], Data.Bits.testBit y j]
+    return (i, vars)
 
 -- | Starting from the least significant column, add the columns together and propagate the carry to the next column
-foldColumns :: (GaloisField n, Integral n) => RefU -> [(Int, [RefB])] -> M n [RefB]
-foldColumns out = foldM step []
+foldColumns :: (GaloisField n, Integral n) => RefU -> [(Int, [RefB])] -> M n ()
+foldColumns out = foldM_ step []
   where
     step :: (GaloisField n, Integral n) => [RefB] -> (Int, [RefB]) -> M n [RefB]
     step prevCarries (columnIndex, column)
@@ -61,7 +64,8 @@ foldColumns out = foldM step []
 
 -- | Add up a column of bits and propagate the carry to the next column
 foldColumn :: (GaloisField n, Integral n) => RefB -> [RefB] -> M n [RefB]
-foldColumn _ [] = do
+foldColumn out [] = do
+  writeRefVal (B out) 0
   return [] -- no carry
 foldColumn out [a] = do
   combine1Bit out a
