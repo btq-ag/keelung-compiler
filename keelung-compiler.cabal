@@ -42,6 +42,7 @@ library
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Logical
       Keelung.Compiler.Compile.UInt.Multiplication
+      Keelung.Compiler.Compile.UInt.Multiplication.Binary
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
@@ -125,6 +126,7 @@ executable keelungc
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Logical
       Keelung.Compiler.Compile.UInt.Multiplication
+      Keelung.Compiler.Compile.UInt.Multiplication.Binary
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem
@@ -226,6 +228,7 @@ test-suite keelung-test
       Test.Compilation.UInt.Misc
       Test.Compilation.UInt.ModInv
       Test.Compilation.UInt.Multiplication
+      Test.Compilation.UInt.MultiplicationB
       Test.Compilation.Util
       Test.Data.LC
       Test.IndexTable
@@ -260,6 +263,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.UInt.Comparison
       Keelung.Compiler.Compile.UInt.Logical
       Keelung.Compiler.Compile.UInt.Multiplication
+      Keelung.Compiler.Compile.UInt.Multiplication.Binary
       Keelung.Compiler.Compile.Util
       Keelung.Compiler.ConstraintModule
       Keelung.Compiler.ConstraintSystem

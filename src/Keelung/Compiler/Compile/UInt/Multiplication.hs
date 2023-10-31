@@ -18,6 +18,7 @@ import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Syntax (Width)
+import Keelung.Compiler.Compile.UInt.Multiplication.Binary (compileMulB)
 
 --------------------------------------------------------------------------------
 
@@ -64,7 +65,7 @@ compileMul width out x y = do
 
   let maxHeight = if limbWidth > 20 then 1048576 else 2 ^ limbWidth -- HACK
   case fieldTypeData fieldInfo of
-    Binary _ -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
+    Binary _ -> compileMulB width out x y
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 5 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
