@@ -438,7 +438,7 @@ tests = describe "Comparisons" $ do
             y <- inputUInt @8 Public
             return $ x `lte` y
 
-      forAll arbitrary $ \(x, y :: Word8) -> do
+      property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x <= y
             then runAll field program [fromIntegral x, fromIntegral y] [] [1]
@@ -449,7 +449,7 @@ tests = describe "Comparisons" $ do
             y <- inputUInt @8 Public
             return $ x `lte` y
 
-      forAll arbitrary $ \(x, y :: Word8) -> do
+      property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x <= y
             then runAll field (program (fromIntegral x)) [fromIntegral y] [] [1]
@@ -459,7 +459,7 @@ tests = describe "Comparisons" $ do
       let program x y = do
             return $ x `lte` (y :: UInt 8)
 
-      forAll arbitrary $ \(x, y :: Word8) -> do
+      property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x <= y
             then runAll field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
@@ -472,7 +472,7 @@ tests = describe "Comparisons" $ do
             y <- inputUInt @8 Public
             return $ x `lt` y
 
-      forAll arbitrary $ \(x, y :: Word8) -> do
+      property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x < y
             then runAll field program [fromIntegral x, fromIntegral y] [] [1]
@@ -483,7 +483,7 @@ tests = describe "Comparisons" $ do
             y <- inputUInt @8 Public
             return $ x `lt` y
 
-      forAll arbitrary $ \(x, y :: Word8) -> do
+      property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x < y
             then runAll field (program (fromIntegral x)) [fromIntegral y] [] [1]
@@ -493,7 +493,7 @@ tests = describe "Comparisons" $ do
       let program x y = do
             return $ x `lt` (y :: UInt 8)
 
-      forAll arbitrary $ \(x, y :: Word8) -> do
+      property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x < y
             then runAll field (program (fromIntegral x) (fromIntegral y)) [] [] [1]

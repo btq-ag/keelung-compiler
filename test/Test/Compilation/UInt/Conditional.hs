@@ -21,7 +21,7 @@ tests = describe "conditional" $ do
     let program p x y = do
           return $ cond p x (y :: UInt 8)
 
-    forAll arbitrary $ \(p :: Bool, x, y :: Word8) -> do
+    property $ \(p :: Bool, x, y :: Word8) -> do
       let expected = map toInteger [if p then x else y]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field (program (if p then true else false) (fromIntegral x) (fromIntegral y)) [] [] expected
@@ -31,7 +31,7 @@ tests = describe "conditional" $ do
           p <- input Public
           return $ cond p x (y :: UInt 8)
 
-    forAll arbitrary $ \(p :: Bool, x, y :: Word8) -> do
+    property $ \(p :: Bool, x, y :: Word8) -> do
       let expected = map toInteger [if p then x else y]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field (program (fromIntegral x) (fromIntegral y)) [if p then 1 else 0] [] expected
@@ -41,7 +41,7 @@ tests = describe "conditional" $ do
           p <- input Public
           x <- input Public
           return $ cond p constant (x :: UInt 8)
-    forAll arbitrary $ \(p :: Bool, constant, x :: Word8) -> do
+    property $ \(p :: Bool, constant, x :: Word8) -> do
       let expected = map toInteger [if p then constant else x]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field (program (fromIntegral constant)) [if p then 1 else 0, fromIntegral x] [] expected
@@ -51,7 +51,7 @@ tests = describe "conditional" $ do
           p <- input Public
           x <- input Public
           return $ cond p (x :: UInt 8) constant
-    forAll arbitrary $ \(p :: Bool, x :: Word8, constant) -> do
+    property $ \(p :: Bool, x :: Word8, constant) -> do
       let expected = map toInteger [if p then x else constant]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field (program (fromIntegral constant)) [if p then 1 else 0, fromIntegral x] [] expected
@@ -62,7 +62,7 @@ tests = describe "conditional" $ do
           x <- input Public
           y <- input Public
           return $ cond p x (y :: UInt 8)
-    forAll arbitrary $ \(p :: Bool, x, y :: Word8) -> do
+    property $ \(p :: Bool, x, y :: Word8) -> do
       let expected = map toInteger [if p then x else y]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
         runAll field program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected

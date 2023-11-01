@@ -21,17 +21,17 @@ tests = describe "inequality" $ do
           return $ x `neq` (y :: Field)
 
     it "GF181" $ do
-      forAll arbitrary $ \(x, y :: GF181) -> do
+      property $ \(x, y :: GF181) -> do
         let expected = [if x == y then 0 else 1]
         runAll gf181 (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
     it "Prime 2" $ do
-      forAll arbitrary $ \(x, y :: Galois.Prime 2) -> do
+      property $ \(x, y :: Galois.Prime 2) -> do
         let expected = [if x == y then 0 else 1]
         runAll (Prime 2) (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
     it "Binary 7" $ do
-      forAll arbitrary $ \(x, y :: Galois.Binary 7) -> do
+      property $ \(x, y :: Galois.Binary 7) -> do
         let expected = [if x == y then 0 else 1]
         runAll (Binary 7) (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
@@ -41,17 +41,17 @@ tests = describe "inequality" $ do
           return $ x `neq` constant
 
     it "GF181" $ do
-      forAll arbitrary $ \(constant, value :: GF181) -> do
+      property $ \(constant, value :: GF181) -> do
         let expected = [if constant == value then 0 else 1]
         runAll gf181 (program (fromIntegral constant)) [toInteger value] [] expected
 
     it "Prime 2" $ do
-      forAll arbitrary $ \(constant, value :: Galois.Prime 2) -> do
+      property $ \(constant, value :: Galois.Prime 2) -> do
         let expected = [if constant == value then 0 else 1]
         runAll (Prime 2) (program (fromIntegral constant)) [toInteger value] [] expected
 
     it "Binary 7" $ do
-      forAll arbitrary $ \(constant, value :: Galois.Binary 7) -> do
+      property $ \(constant, value :: Galois.Binary 7) -> do
         let expected = [if constant == value then 0 else 1]
         runAll (Binary 7) (program (fromIntegral constant)) [toInteger value] [] expected
 
@@ -62,16 +62,16 @@ tests = describe "inequality" $ do
           return $ x `neq` y
 
     it "GF181" $ do
-      forAll arbitrary $ \(x, y :: GF181) -> do
+      property $ \(x, y :: GF181) -> do
         let expected = [if x == y then 0 else 1]
         runAll gf181 program [toInteger x, toInteger y] [] expected
 
     it "Prime 2" $ do
-      forAll arbitrary $ \(x, y :: Galois.Prime 2) -> do
+      property $ \(x, y :: Galois.Prime 2) -> do
         let expected = [if x == y then 0 else 1]
         runAll (Prime 2) program [toInteger x, toInteger y] [] expected
 
     it "Binary 7" $ do
-      forAll arbitrary $ \(x, y :: Galois.Binary 7) -> do
+      property $ \(x, y :: Galois.Binary 7) -> do
         let expected = [if x == y then 0 else 1]
         runAll (Binary 7) program [toInteger x, toInteger y] [] expected

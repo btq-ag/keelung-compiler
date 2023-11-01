@@ -25,17 +25,17 @@ tests = describe "Bitwise" $ do
             return $ rotate (constant :: UInt 8) i
 
       it "GF181" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.rotate x i]
           runAll gf181 (program (fromIntegral x) i) [] [] expected
 
       it "Prime 2" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.rotate x i]
           runAll (Prime 2) (program (fromIntegral x) i) [] [] expected
 
       it "Binary 7" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.rotate x i]
           runAll (Binary 7) (program (fromIntegral x) i) [] [] expected
 
@@ -45,17 +45,17 @@ tests = describe "Bitwise" $ do
             return $ rotate x i
 
       it "GF181" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.rotate x i]
           runAll gf181 (program i) (map toInteger [x]) [] expected
 
       it "Prime 2" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.rotate x i]
           runAll (Prime 2) (program i) (map toInteger [x]) [] expected
 
       it "Binary 7" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.rotate x i]
           runAll (Binary 7) (program i) (map toInteger [x]) [] expected
 
@@ -76,17 +76,17 @@ tests = describe "Bitwise" $ do
             return $ shift (constant :: UInt 8) i
 
       it "GF181" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.shift x i]
           runAll gf181 (program (fromIntegral x) i) [] [] expected
 
       it "Prime 2" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.shift x i]
           runAll (Prime 2) (program (fromIntegral x) i) [] [] expected
 
       it "Binary 7" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.shift x i]
           runAll (Binary 7) (program (fromIntegral x) i) [] [] expected
 
@@ -96,17 +96,17 @@ tests = describe "Bitwise" $ do
             return $ shift x i
 
       it "GF181" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.shift x i]
           runAll gf181 (program i) (map toInteger [x]) [] expected
 
       it "Prime 2" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.shift x i]
           runAll (Prime 2) (program i) (map toInteger [x]) [] expected
 
       it "Binary 7" $ do
-        forAll arbitrary $ \(i :: Int, x :: Word8) -> do
+        property $ \(i :: Int, x :: Word8) -> do
           let expected = map toInteger [Data.Bits.shift x i]
           runAll (Binary 7) (program i) (map toInteger [x]) [] expected
 
@@ -125,7 +125,7 @@ tests = describe "Bitwise" $ do
             x <- inputUInt @64 Public
             return $ x `shiftL` n
 
-      forAll arbitrary $ \(x :: Word64, n :: Int) -> do
+      property $ \(x :: Word64, n :: Int) -> do
         let amount = abs n
         let expected = [toInteger (x `Data.Bits.shiftL` amount)]
         runAll (Prime 2) (program amount) [toInteger x] [] expected
@@ -136,7 +136,7 @@ tests = describe "Bitwise" $ do
             x <- inputUInt @64 Public
             return $ x `shiftR` n
 
-      forAll arbitrary $ \(x :: Word64, n :: Int) -> do
+      property $ \(x :: Word64, n :: Int) -> do
         let amount = abs n
         let expected = [toInteger (x `Data.Bits.shiftR` amount)]
         runAll (Prime 2) (program amount) [toInteger x] [] expected

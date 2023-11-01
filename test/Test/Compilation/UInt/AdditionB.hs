@@ -23,7 +23,7 @@ tests = describe "Addition / Subtraction (Binary field)" $ do
           x <- inputUInt @8 Public
           y <- inputUInt @8 Public
           return $ x + y
-    forAll arbitrary $ \(x, y :: Word8) -> do
+    property $ \(x, y :: Word8) -> do
       let expected = map toInteger [x + y]
       runAll (Binary 7) program (map toInteger [x, y]) [] expected
 
@@ -32,15 +32,15 @@ tests = describe "Addition / Subtraction (Binary field)" $ do
           x <- inputUInt @8 Public
           y <- inputUInt @8 Public
           return $ x - y
-    forAll arbitrary $ \(x, y :: Word8) -> do
-      let expected = map toInteger [x + y]
+    property $ \(x, y :: Word8) -> do
+      let expected = map toInteger [x - y]
       runAll (Binary 7) program (map toInteger [x, y]) [] expected
 
   it "1 positive variable + 1 constant / Byte" $ do
     let program y = do
           x <- inputUInt @8 Public
           return $ x + y
-    forAll arbitrary $ \(x, y :: Word8) -> do
+    property $ \(x, y :: Word8) -> do
       let expected = map toInteger [x + y]
       runAll (Binary 7) (program (fromIntegral y)) (map toInteger [x]) [] expected
 
@@ -48,15 +48,15 @@ tests = describe "Addition / Subtraction (Binary field)" $ do
     let program y = do
           x <- inputUInt @8 Public
           return $ -x + y
-    forAll arbitrary $ \(x, y :: Word8) -> do
-      let expected = map toInteger [x - y]
+    property $ \(x, y :: Word8) -> do
+      let expected = map toInteger [-x + y]
       runAll (Binary 7) (program (fromIntegral y)) (map toInteger [x]) [] expected
 
   it "1 negative variable / Byte" $ do
     let program = do
           x <- inputUInt @8 Public
           return $ -x
-    forAll arbitrary $ \(x :: Word8) -> do
+    property $ \(x :: Word8) -> do
       let expected = map toInteger [-x]
       runAll (Binary 7) program (map toInteger [x]) [] expected
 

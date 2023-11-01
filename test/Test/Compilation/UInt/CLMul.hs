@@ -36,7 +36,7 @@ tests =
             x <- inputUInt @8 Public
             y <- inputUInt @8 Public
             return $ x .*. y
-      forAll arbitrary $ \(x :: Word8, y :: Word8) -> do
+      property $ \(x :: Word8, y :: Word8) -> do
         let expected = [U.uValue (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
         runAll (Prime 17) program [toInteger x, toInteger y] [] expected
         runAll (Prime 257) program [toInteger x, toInteger y] [] expected
@@ -47,7 +47,7 @@ tests =
     --             x <- inputUInt @64 Public
     --             y <- inputUInt @64 Public
     --             return $ x .*. y
-    --       forAll arbitrary $ \(x :: Word64, y :: Word64) -> do
+    --       property $ \(x :: Word64, y :: Word64) -> do
     --         let expected = [U.uValue (U.clMul (U.new 64 (toInteger x)) (U.new 64 (toInteger y)))]
     --         --   runAll (Prime 17) program [toInteger x, toInteger y] [] expected
     --         --   runAll (Prime 1031) program [toInteger x, toInteger y] [] expected
