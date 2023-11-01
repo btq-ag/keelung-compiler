@@ -10,7 +10,6 @@ import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver qualified as Solver
 import Test.Compilation.UInt.AESMul qualified as AESMul
 import Test.Compilation.UInt.Addition qualified as Addition
-import Test.Compilation.UInt.AdditionB qualified as AdditionB
 import Test.Compilation.UInt.Bitwise qualified as Bitwise
 import Test.Compilation.UInt.CLMul qualified as CLMul
 import Test.Compilation.UInt.Comparison qualified as Comparison
@@ -33,7 +32,6 @@ tests :: SpecWith ()
 tests = do
   describe "Unsigned Integers" $ do
     Addition.tests
-    AdditionB.tests
     Multiplication.tests
     CLMul.tests
     AESMul.tests

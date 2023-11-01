@@ -1,14 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Test.Compilation.UInt.Addition (tests, run) where
 
 import Control.Monad (replicateM)
-import Data.Sequence qualified as Seq
+import Data.Word (Word8)
 import Keelung hiding (compile)
-import Keelung.Compiler.Compile.Util
-import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.Reference (RefU (RefUX))
+import Test.Compilation.UInt.Addition.LimbBound qualified as LimbBound
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck
@@ -19,79 +18,10 @@ run = hspec tests
 --------------------------------------------------------------------------------
 
 tests :: SpecWith ()
-tests = do
-  describe "Limb Bound Calculation" $ do
-    it "0" $ do
-      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True)])
-      uncurry calculateBounds limbs `shouldBe` (0, 6)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [True]
+tests = describe "Addition / Subtraction" $ do
+  LimbBound.tests
 
-    it "1" $ do
-      let limbs = (3, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True)])
-      uncurry calculateBounds limbs `shouldBe` (3, 9)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [True, True]
-
-    it "2" $ do
-      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False)])
-      uncurry calculateBounds limbs `shouldBe` (-3, 3)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [False]
-
-    it "3" $ do
-      let limbs = (1, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Right [False, True])])
-      uncurry calculateBounds limbs `shouldBe` (0, 9)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [True, True]
-
-    it "4" $ do
-      let limbs = (3, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Right [False, True])])
-      uncurry calculateBounds limbs `shouldBe` (-1, 11)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
-
-    it "5" $ do
-      let limbs = (3, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Right [False, True])])
-      uncurry calculateBounds limbs `shouldBe` (-4, 8)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
-
-    it "5" $ do
-      let limbs = (3, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Right [False, True])])
-      uncurry calculateBounds limbs `shouldBe` (-7, 5)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [True, False]
-
-    it "6" $ do
-      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left False)])
-      uncurry calculateBounds limbs `shouldBe` (-6, 0)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [True, False]
-
-    it "7" $ do
-      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False)])
-      uncurry calculateBounds limbs `shouldBe` (-3, 9)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
-
-    it "8" $ do
-      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False)])
-      uncurry calculateBounds limbs `shouldBe` (-3, 9)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
-
-    it "9" $ do
-      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Right [False, True])])
-      uncurry calculateBounds limbs `shouldBe` (-1, 11)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
-
-    it "10" $ do
-      let limbs = (0, Seq.fromList [Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left True), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left False)])
-      uncurry calculateBounds limbs `shouldBe` (-6, 6)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [True, False]
-
-    it "11" $ do
-      let limbs = (3, Seq.fromList [Limb.new (RefUX 2 0) 1 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left False), Limb.new (RefUX 2 0) 2 0 (Left True)])
-      uncurry calculateBounds limbs `shouldBe` (-1, 6)
-      uncurry (calculateCarrySigns 2) limbs `shouldBe` [False, True]
-
-    it "12" $ do
-      let limbs = (0, Seq.fromList [Limb.new (RefUX 180 0) 178 0 (Left True), Limb.new (RefUX 180 0) 178 0 (Left True)])
-      uncurry calculateBounds limbs `shouldBe` (0, 2 ^ (179 :: Int) - 2)
-      uncurry (calculateCarrySigns 178) limbs `shouldBe` [True]
-
-  describe "Addition / Subtraction" $ do
+  describe "Prime field" $ do
     it "2 positive variables" $ do
       let program = do
             x <- inputUInt @2 Public
@@ -301,43 +231,62 @@ tests = do
         let expected = [(constant + sum (zipWith (\sign x -> if sign then x else -x) signs values)) `mod` 16]
         runAll (Prime 17) (program (fromInteger constant) signs) values [] expected
 
-  describe "`bitSignsToRange . rangeToBitSigns`" $ do
-    it "should yield wider ranges" $ do
-      let genRange = do
-            lower <- chooseInteger (-100, 100)
-            range <- chooseInteger (0, 200)
-            return (lower, lower + range)
-      forAll genRange $ \(lower, upper) -> do
-        let signs = rangeToBitSigns (lower, upper)
-        let (lower', upper') = bitSignsToRange signs
-        lower' <= lower `shouldBe` True
-        upper' >= upper `shouldBe` True
+  describe "Binary field" $ do
+    it "2 positive variables / Byte" $ do
+      let program = do
+            x <- inputUInt @8 Public
+            y <- inputUInt @8 Public
+            return $ x + y
+      property $ \(x, y :: Word8) -> do
+        let expected = map toInteger [x + y]
+        runAll (Binary 7) program (map toInteger [x, y]) [] expected
 
-  describe "`calculateSignsOfLimbs`" $ do
-    it "should make non-carry bits positive" $ do
-      let genLimbs = do
-            width <- chooseInt (2, 8)
-            let refU = RefUX width 0
-            limbSize <- chooseInt (0, 8)
-            signs <- replicateM limbSize arbitrary
-            let limbs = map (Limb.new refU width 0 . Left) signs
-            constant <- chooseInteger (0, 2 ^ width - 1)
-            return (width, constant, Seq.fromList limbs)
+    it "1 positive variable + 1 negative variable / Byte" $ do
+      let program = do
+            x <- inputUInt @8 Public
+            y <- inputUInt @8 Public
+            return $ x - y
+      property $ \(x, y :: Word8) -> do
+        let expected = map toInteger [x - y]
+        runAll (Binary 7) program (map toInteger [x, y]) [] expected
 
-      forAll genLimbs $ \(width, constant, limbs) -> do
-        let signs = calculateSignsOfLimbs width constant limbs
-        -- should be long enough
-        length signs >= width `shouldBe` True
-        -- should be positive
-        take width signs `shouldBe` replicate width True
+    it "1 positive variable + 1 constant / Byte" $ do
+      let program y = do
+            x <- inputUInt @8 Public
+            return $ x + y
+      property $ \(x, y :: Word8) -> do
+        let expected = map toInteger [x + y]
+        runAll (Binary 7) (program (fromIntegral y)) (map toInteger [x]) [] expected
 
-  describe "one special cases of `calculateCarrySigns`" $ do
-    it "1 + 2bit - 2bit - 2bit - 2bit" $ do
-      let limbs =
-            Seq.fromList
-              [ Limb.new (RefUX 2 0) 2 0 (Left True),
-                Limb.new (RefUX 2 0) 2 0 (Left False),
-                Limb.new (RefUX 2 0) 2 0 (Left False),
-                Limb.new (RefUX 2 0) 2 0 (Left False)
-              ]
-      calculateCarrySigns 2 1 limbs `shouldBe` [True, False]
+    it "1 negative variable + 1 constant / Byte" $ do
+      let program y = do
+            x <- inputUInt @8 Public
+            return $ -x + y
+      property $ \(x, y :: Word8) -> do
+        let expected = map toInteger [-x + y]
+        runAll (Binary 7) (program (fromIntegral y)) (map toInteger [x]) [] expected
+
+    it "1 negative variable / Byte" $ do
+      let program = do
+            x <- inputUInt @8 Public
+            return $ -x
+      property $ \(x :: Word8) -> do
+        let expected = map toInteger [-x]
+        runAll (Binary 7) program (map toInteger [x]) [] expected
+
+    it "mixed (positive / negative / constnat) / Byte" $ do
+      let program constant signs = do
+            inputs <- replicateM (length signs) (inputUInt @8 Public)
+            return $ constant + sum (zipWith (\sign x -> if sign then x else -x) signs inputs)
+      let genPair = do
+            n <- choose (1, 10)
+            signs <- replicateM n $ do
+              sign <- arbitrary
+              x <- chooseInteger (0, 255)
+              return (sign, x)
+            constant <- chooseInteger (0, 255)
+            return (constant, signs)
+      forAll genPair $ \(constant, pairs) -> do
+        let (signs, values) = unzip pairs
+        let expected = [(constant + sum (zipWith (\sign x -> if sign then x else -x) signs values)) `mod` 256]
+        runAll (Binary 7) (program (fromInteger constant) signs) values [] expected
