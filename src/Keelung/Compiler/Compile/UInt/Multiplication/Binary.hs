@@ -11,8 +11,6 @@ import Keelung.Data.U (U)
 compileMulB :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU U -> M n ()
 compileMulB width out x y = formHalfColumns width x y >>= foldColumns out
 
--- wallace ::
-
 -- | Form columns of bits to be added together after multiplication
 --
 --                                x₃      x₂      x₁      x₀
@@ -53,7 +51,7 @@ formHalfColumns width x (Right y) = do
     let vars = [RefUBit width x (i - j) | j <- [0 `max` 0 .. i], Data.Bits.testBit y j]
     return (i, vars)
 
--- | Starting from the least significant column, add the columns together and propagate the carry to the next column
+-- | Starting from the least significant column, add the bits together and propagate the carry to the next column
 foldColumns :: (GaloisField n, Integral n) => RefU -> [(Int, [RefB])] -> M n ()
 foldColumns out = foldM_ step []
   where
@@ -64,43 +62,44 @@ foldColumns out = foldM_ step []
 
 -- | Add up a column of bits and propagate the carry to the next column
 foldColumn :: (GaloisField n, Integral n) => RefB -> [RefB] -> M n [RefB]
-foldColumn out [] = do
+foldColumn out xs = do
+  let (chunk, rest) = splitAt 3 xs
+  if null rest
+    then do
+      -- last chunk
+      combineBits out chunk
+    else do
+      -- handle the chunk
+      tempOut <- freshRefB
+      carry <- combineBits tempOut chunk
+      -- push the result of the chunk back to the stack
+      carries <- foldColumn out (tempOut : rest)
+      return $ carry <> carries
+
+-- | Add up a limited number of bits and return the carry
+combineBits :: (GaloisField n, Integral n) => RefB -> [RefB] -> M n [RefB]
+combineBits out [] = do
   writeRefVal (B out) 0
   return [] -- no carry
-foldColumn out [a] = do
-  combine1Bit out a
+combineBits out [a] = do
+  addBits' out [a]
   return [] -- no carry
-foldColumn out [a, b] = do
-  carry <- combine2Bits out a b
-  return [carry]
-foldColumn out [a, b, c] = do
-  carry <- combine3Bits out a b c
-  return [carry]
-foldColumn out (a : b : c : rest) = do
-  tempOut <- freshRefB
-  carry <- combine3Bits tempOut a b c
-  carries <- foldColumn out (tempOut : rest)
-  return $ carry : carries
-
-combine1Bit :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
-combine1Bit out a = addBits' out [a]
-
-combine2Bits :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> M n RefB
-combine2Bits out a b = do
+combineBits out [a, b] = do
   -- out[i] = a + b
   addBits' out [a, b]
   -- carry = a * b
-  multiplyBits (a, b)
-
-combine3Bits :: (GaloisField n, Integral n) => RefB -> RefB -> RefB -> RefB -> M n RefB
-combine3Bits out a b c = do
+  carry <- multiplyBits (a, b)
+  return [carry]
+combineBits out [a, b, c] = do
   -- out[i] = a + b + c
   addBits' out [a, b, c]
   -- carry = a * b + a * c + b * c
   ab <- multiplyBits (a, b)
   ac <- multiplyBits (a, c)
   bc <- multiplyBits (b, c)
-  addBits [ab, ac, bc]
+  carry <- addBits [ab, ac, bc]
+  return [carry]
+combineBits _ _ = error "[ panic ] combineBits: cannot handle too many bits"
 
 -- | Add up a list of bits
 addBits :: (GaloisField n, Integral n) => [RefB] -> M n RefB
