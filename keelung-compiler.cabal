@@ -225,10 +225,8 @@ test-suite keelung-test
       Test.Compilation.UInt.Equality
       Test.Compilation.UInt.Inequality
       Test.Compilation.UInt.Logical
-      Test.Compilation.UInt.Misc
       Test.Compilation.UInt.ModInv
       Test.Compilation.UInt.Multiplication
-      Test.Compilation.UInt.MultiplicationB
       Test.Compilation.Util
       Test.Data.LC
       Test.IndexTable
