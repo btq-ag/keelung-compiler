@@ -76,13 +76,13 @@ interpretDivMod width (dividendExpr, divisorExpr, quotientExpr, remainderExpr) =
   case dividend of
     Left dividendVar -> do
       -- now that we don't know the dividend, we can only solve the relation if we know the divisor, quotient, and remainder
-      -- case (divisor, quotient, remainder) of
-      --   (Right divisorVal, Right quotientVal, Right remainderVal) -> do
-      --     let dividendVal = U.new width (U.uValue divisorVal * U.uValue quotientVal + U.uValue remainderVal)
-      --     addU width dividendVar [dividendVal]
-      --   _ -> do
-      let unsolvedVars = dividendVar : Either.lefts [divisor, quotient, remainder]
-      throwError $ DivModStuckError False unsolvedVars
+      case (divisor, quotient, remainder) of
+        (Right divisorVal, Right quotientVal, Right remainderVal) -> do
+          let dividendVal = U.new width (U.uValue divisorVal * U.uValue quotientVal + U.uValue remainderVal)
+          addU width dividendVar [dividendVal]
+        _ -> do
+          let unsolvedVars = dividendVar : Either.lefts [divisor, quotient, remainder]
+          throwError $ DivModStuckError False unsolvedVars
     Right dividendVal -> do
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisor, quotient, remainder) of
