@@ -241,7 +241,7 @@ reduceMulLCPC a bs c = do
     Left constant ->
       if constant == c
         then modify' $ removeOccurrencesTuple (PolyL.varsSet bs)
-        else throwError $ Compile.ConflictingValuesU (toInteger constant) (toInteger c)
+        else throwError $ Compile.ConflictingValuesF constant c
     Right xs -> addAddL $ PolyL.addConstant c xs
 
 -- | Trying to reduce a multiplicative limb constaint of (Constant / Polynomial / Polynomial)
