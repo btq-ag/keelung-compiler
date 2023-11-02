@@ -45,6 +45,7 @@ data Action
   | ShouldRunAddL
   | ShouldRunMulL
   | ShouldRunDivMod
+  | ShouldRunCLDivMod
   deriving (Eq, Show)
 
 -- | Decide what to do next based on the result of the previous optimization pass
@@ -52,7 +53,8 @@ transition :: WhatChanged -> Action -> Action
 transition _ Accept = Accept
 transition NothingChanged ShouldRunAddL = ShouldRunMulL
 transition NothingChanged ShouldRunMulL = ShouldRunDivMod
-transition NothingChanged ShouldRunDivMod = Accept
+transition NothingChanged ShouldRunDivMod = ShouldRunCLDivMod
+transition NothingChanged ShouldRunCLDivMod = Accept
 transition RelationChanged _ = ShouldRunAddL -- restart from optimizeAddF
 transition AdditiveFieldConstraintChanged _ = ShouldRunAddL -- restart from optimizeAddL
 transition AdditiveLimbConstraintChanged _ = ShouldRunMulL -- restart from optimizeMulL
@@ -68,6 +70,7 @@ runStateMachine cm action = do
     ShouldRunAddL -> optimizeAddL cm
     ShouldRunMulL -> optimizeMulL cm
     ShouldRunDivMod -> optimizeDivMod cm
+    ShouldRunCLDivMod -> optimizeCLDivMod cm
   -- derive the next action based on the result of the previous optimization pass
   let action' = transition changed action
   -- keep running the state machine until it reaches the 'Accept' state
@@ -96,6 +99,11 @@ optimizeDivMod :: (GaloisField n, Integral n) => ConstraintModule n -> Either (C
 optimizeDivMod cm = runOptiM cm $ runRoundM $ do
   result <- foldMaybeM reduceDivMod [] (cmDivMods cm)
   modify' $ \cm' -> cm' {cmDivMods = result}
+
+optimizeCLDivMod :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeCLDivMod cm = runOptiM cm $ runRoundM $ do
+  result <- foldMaybeM reduceDivMod [] (cmCLDivMods cm)
+  modify' $ \cm' -> cm' {cmCLDivMods = result}
 
 goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughEqZeros cm =

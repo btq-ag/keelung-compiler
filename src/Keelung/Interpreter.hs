@@ -9,7 +9,6 @@ module Keelung.Interpreter (runAndOutputWitnesses, run, interpretDivMod, interpr
 
 import Control.Monad.Except
 import Data.Bits (Bits (..))
-import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntSet qualified as IntSet
@@ -86,9 +85,10 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
       -- now that we don't know the dividend, we can only solve the relation if we know the divisor, quotient, and remainder
       case (divisor, quotient, remainder) of
         (Right divisorVal, Right quotientVal, Right remainderVal) -> do
-          let dividendVal = if isCarryLess
-                then U.clMul quotientVal divisorVal `U.clAdd`  remainderVal
-                else U.new width (U.uValue divisorVal * U.uValue quotientVal + U.uValue remainderVal)
+          let dividendVal =
+                if isCarryLess
+                  then U.clMul quotientVal divisorVal `U.clAdd` remainderVal
+                  else U.new width (U.uValue divisorVal * U.uValue quotientVal + U.uValue remainderVal)
           addU width dividendVar [dividendVal]
         (Right _, Right _, Left _) -> throwError $ DivModCannotInferDividendError True True False
         (Right _, Left _, Right _) -> throwError $ DivModCannotInferDividendError True False True
@@ -164,9 +164,10 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
               else
                 if U.uValue dividendVal == 0
                   then throwError DivModDividendIsZeroError
-                  else if isCarryLess 
-                    then return (dividendVal `U.clDivMod` quotientVal)
-                    else return (dividendVal `divMod` quotientVal)
+                  else
+                    if isCarryLess
+                      then return (dividendVal `U.clDivMod` quotientVal)
+                      else return (dividendVal `divMod` quotientVal)
           addU width divisorVar [divisorVal]
           addU width remainderVar [remainderVal]
         (Left _, Left _, Right _) -> throwError DivModDivisorAndQuotientUnknownError
