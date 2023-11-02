@@ -169,7 +169,9 @@ data Error n
   | DivModQuotientIsZeroError
   | DivModQuotientError Bool Integer Integer Integer Integer
   | DivModRemainderError Bool Integer Integer Integer Integer
-  | DivModStuckError Bool [Var]
+  | DivModCannotInferDividendError Bool Bool Bool
+  | DivModDivisorAndQuotientUnknownError
+  | DivModDivisorAndQuotientAndRemainderUnknownError
   | AssertLTEError Integer Integer
   | AssertLTEBoundTooSmallError Integer
   | AssertLTEBoundTooLargeError Integer Width
@@ -207,14 +209,20 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "expected the result of `" <> show dividend <> if isCarryLess then " ./. " else " / " <> show divisor <> "` to be `" <> show expected <> "` but got `" <> show actual <> "`"
   show (DivModRemainderError isCarryLess dividend divisor expected actual) =
     "expected the result of `" <> show dividend <> if isCarryLess then " .%. " else " % " <> show divisor <> "` to be `" <> show expected <> "` but got `" <> show actual <> "`"
-  show (DivModStuckError True msg) =
-    "stuck when trying to perform carry-less Div/Mod operation because the value of these variables "
-      <> show msg
-      <> " are not known "
-  show (DivModStuckError False msg) =
-    "stuck when trying to perform Div/Mod operation because the value of these variables "
-      <> show msg
-      <> " are not known "
+  show (DivModCannotInferDividendError divisor quotient remainder) =
+    "cannot infer the dividend because" <> case (divisor, quotient, remainder) of
+      (False, False, False) -> "the values of the divisor, quotient, and remainder are unknown"
+      (False, False, True) -> "the values of the divisor and quotient are unknown"
+      (False, True, False) -> "the values of the divisor and remainder are unknown"
+      (False, True, True) -> "the value of the divisor is unknown"
+      (True, False, False) -> "the values of the quotient and remainder are unknown"
+      (True, False, True) -> "the value of the quotient is unknown"
+      (True, True, False) -> "the value of the remainder is unknown"
+      (True, True, True) -> "the value of the dividend is unknown"
+  show DivModDivisorAndQuotientUnknownError =
+    "divisor and quotient are both unknown"
+  show DivModDivisorAndQuotientAndRemainderUnknownError =
+    "divisor, quotient, and remainder are all unknown"
   show (AssertLTEError actual bound) =
     "`" <> show actual <> "` is not less than or equal to `" <> show bound <> "`"
   show (AssertLTEBoundTooSmallError bound) = "assertLTE: the bound `" <> show bound <> "` is too restrictive, no UInt can be less than or equal to it"
