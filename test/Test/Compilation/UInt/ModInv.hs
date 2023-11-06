@@ -8,6 +8,7 @@ import Test.Compilation.Util
 import Test.HUnit
 import Test.Hspec
 import Test.QuickCheck
+import Control.Monad
 
 run :: IO ()
 run = hspec tests
@@ -69,4 +70,23 @@ tests =
           Nothing -> assertFailure "[ panic ] modInv: cannot find the inverse"
           Just inverse -> do
             let expected = [fromInteger inverse]
-            runAll gf181 program [a] [] expected
+            forM_ [gf181] $ \field -> do
+              runAll field program [a] [] expected
+
+    it "modInv N (mod 71)" $ do
+      let prime = 71
+      let program = do
+            x <- input Public :: Comp (UInt 8)
+            return $ modInv x prime
+      let genPair = do
+            -- only choosing from 1 to prime - 1
+            a <- choose (1, prime - 1)
+            let expected = U.modInv a prime
+            return (a, expected)
+      forAll genPair $ \(a, result) -> do
+        case result of
+          Nothing -> assertFailure "[ panic ] modInv: cannot find the inverse"
+          Just inverse -> do
+            let expected = [fromInteger inverse]
+            forM_ [Prime 17] $ \field -> do
+              runAll field program [a] [] expected

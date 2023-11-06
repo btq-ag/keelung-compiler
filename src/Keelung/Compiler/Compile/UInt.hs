@@ -322,13 +322,13 @@ compileIfU width (Left p) x y = do
 compileModInv :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> U -> M n ()
 compileModInv width out a p = do
   -- prod = a * out
-  prod <- freshRefU (width * 2)
+  prod <- freshRefU width
   compileMulU width prod a (Left out)
   -- prod = np + 1
   n <- freshRefU width
-  np <- freshRefU (width * 2)
-  compileMulU (width * 2) np (Left n) (Right p)
-  compileAdd (width * 2) prod [(np, True)] 1
+  np <- freshRefU width
+  compileMulU width np (Left n) (Right p)
+  compileAdd width prod [(np, True)] 1
   -- n ≤ p
   assertLTE width (Left n) (toInteger p)
   addModInvHint a (Left out) (Left n) p
