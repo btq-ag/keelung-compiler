@@ -75,3 +75,12 @@ tests = describe "Multiplication" $ do
       let expected = map toInteger [x * y - z]
       forM_ [gf181, Prime 257, Prime 17, Binary 7] $ \field -> do
         runAll field program (map toInteger [x, y, z]) [] expected
+
+  describe "extended (double width)" $ do
+    it "2 constants / Byte" $ do
+      let program x y = do
+            return $ x * (y :: UInt 8)
+      property $ \(x, y :: Word8) -> do
+        let expected = map toInteger [x * y]
+        forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+          runAll field (program (fromIntegral x) (fromIntegral y)) [] [] expected
