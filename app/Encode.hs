@@ -130,7 +130,7 @@ serializeR1CS Snarkjs r1cs = let info = r1csField r1cs in
                                    , mConstraints = length $ r1csConstraints r1cs
                                    }
                      (primeLen, header) = encodeHeader binHeader
-                     constraints = toSnarkjsBin r1cConstraints primeLen
+                     constraints = toSnarkjsBin r1cConstraints p primeLen
                      labels = toLazyByteString $ genLabels (nLabels binHeader)
                   in meta
                   <> pack [0x01, 0x00, 0x00, 0x00] <> secLength header
@@ -156,7 +156,7 @@ serializeR1CS Snarkjs r1cs = let info = r1csField r1cs in
        in ( primeLen
           , toLazyByteString $ int32LE (fromIntegral primeLen)
                             <> lazyByteString primeBS
-                            <> word32LE (fromIntegral wires)
+                            <> word32LE (fromIntegral (wires + 1))
                             <> word32LE (fromIntegral pubout)
                             <> word32LE (fromIntegral pubin)
                             <> word32LE (fromIntegral prvIn)
@@ -209,8 +209,8 @@ encodeVarCoeff (v, c) = list f [Left v, Right c]
 -- instance Monoid BuilderL where
 --     mempty = BuilderL 0 mempty
   
-toSnarkjsBin :: [R1C Integer] -> Int64 -> ByteString
-toSnarkjsBin r1cs primeLen =
+toSnarkjsBin :: [R1C Integer] -> Integer -> Int64 -> ByteString
+toSnarkjsBin r1cs p primeLen =
   toLazyByteString $ mconcat $ map (\(R1C x y z) -> encodePoly x <> encodePoly y <> encodePoly z) r1cs
   where
     encodePoly :: Either Integer (Poly Integer) -> Builder
@@ -230,7 +230,7 @@ toSnarkjsBin r1cs primeLen =
 
     -- Snakrjs' variable indices start at 1, ours start at 0.
     coeffsToBuilder :: (Int, Integer) -> Builder
-    coeffsToBuilder (k, c) = word32LE (fromIntegral (k + 1)) <> toPrimeLE c
+    coeffsToBuilder (k, c) = word32LE (fromIntegral (k + 1)) <> (toPrimeLE (mod c p))
 
     toPrimeLE :: Integer -> Builder
     toPrimeLE x = (lazyByteString . extendByteString primeLen) (BS.reverse $ integerToByteString x)
