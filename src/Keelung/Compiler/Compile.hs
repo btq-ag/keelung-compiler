@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -66,8 +65,12 @@ compileSideEffect (AssignmentF var val) = do
   relateLC (RefFX var) result
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
 compileSideEffect (RelateUF width varU varF) = do
+  -- convert the RefU to a bunch of Limbs
   let limbs = Limb.refUToLimbs width (RefUX width varU)
-  writeAddWithLimbs 0 [(F (RefFX varF), -1)] (map (,1) limbs)
+  -- only matching the first Limb with the RefF
+  case limbs of
+    [] -> writeRefFVal (RefFX varF) 0
+    (limb : _) -> writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
 compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do

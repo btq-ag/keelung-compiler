@@ -4,8 +4,8 @@ module Test.Compilation.Statement where
 
 import Control.Monad
 import Keelung
-import Test.Hspec
 import Test.Compilation.Util
+import Test.Hspec
 
 run :: IO ()
 run = hspec tests
@@ -19,7 +19,7 @@ tests = describe "Statement" $ do
       let program = do
             x <- input Public :: Comp (UInt 8)
             toField x
-    --   forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-    --     runAll field program [100] [] [100]
+      forM_ [gf181] $ \field -> do
+        --   forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+        runAll field program [100] [] [100]
       debug gf181 program
-

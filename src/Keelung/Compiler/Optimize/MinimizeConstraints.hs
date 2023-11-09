@@ -15,9 +15,9 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Limb (Limb)
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -516,35 +516,62 @@ substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Ei
 substPolyL relations poly = do
   let constant = PolyL.polyConstant poly
       initState = (Left constant, Nothing)
-      afterSubstLimb = foldl (substLimb (Relations.exportLimbRelations relations)) initState (PolyL.polyLimbs poly)
-      afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstLimb (PolyL.polyRefs poly)
+      afterSubstRefU = foldl (substRefU (Relations.exportUIntRelations relations)) initState (PolyL.polyLimbs poly)
+      -- afterSubstLimb = foldl (substLimb (Relations.exportLimbRelations relations)) afterSubstRefU (PolyL.polyLimbs poly)
+      afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstRefU (PolyL.polyRefs poly)
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed
     (result, Just changes) -> Just (result, changes)
 
--- | Substitutes a Limb in a PolyL.
-substLimb ::
+-- -- | Substitutes a Limb in a PolyL.
+-- substLimb ::
+--   (Integral n, GaloisField n) =>
+--   Limb.LimbRelations ->
+--   (Either n (PolyL n), Maybe Changes) ->
+--   (Limb, n) ->
+--   (Either n (PolyL n), Maybe Changes)
+-- substLimb relations (accPoly, changes) (limb, multiplier) = case EquivClass.lookup limb relations of
+--   EquivClass.IsConstant constant -> case accPoly of
+--     Left c -> (Left (fromInteger constant * multiplier + c), removeLimb limb changes)
+--     Right xs -> (Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removeLimb limb changes)
+--   EquivClass.IsRoot _ -> case accPoly of
+--     Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+--     Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+--   EquivClass.IsChildOf root () ->
+--     if root == limb
+--       then case accPoly of -- nothing changed. TODO: see if this is necessary
+--         Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+--         Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+--       else case accPoly of
+--         -- replace `limb` with `root`
+--         Left c -> (PolyL.fromLimbs c [(root, multiplier)], (addLimb root . removeLimb limb) changes)
+--         Right accPoly' -> (Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), (addLimb root . removeLimb limb) changes)
+
+-- | Substitutes RefUs in the Limbs of a PolyL.
+substRefU ::
   (Integral n, GaloisField n) =>
-  Limb.LimbRelations ->
+  UInt.UIntRelations ->
   (Either n (PolyL n), Maybe Changes) ->
   (Limb, n) ->
   (Either n (PolyL n), Maybe Changes)
-substLimb relations (accPoly, changes) (limb, multiplier) = case EquivClass.lookup limb relations of
+substRefU relations (accPoly, changes) (limb, multiplier) = case EquivClass.lookup (UInt.Ref (Limb.lmbRef limb)) relations of
   EquivClass.IsConstant constant -> case accPoly of
     Left c -> (Left (fromInteger constant * multiplier + c), removeLimb limb changes)
     Right xs -> (Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removeLimb limb changes)
   EquivClass.IsRoot _ -> case accPoly of
     Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
     Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
-  EquivClass.IsChildOf root () ->
-    if root == limb
+  EquivClass.IsChildOf (UInt.Ref root) _ ->
+    if root == Limb.lmbRef limb
       then case accPoly of -- nothing changed. TODO: see if this is necessary
         Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
         Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
-      else case accPoly of
-        -- replace `limb` with `root`
-        Left c -> (PolyL.fromLimbs c [(root, multiplier)], (addLimb root . removeLimb limb) changes)
-        Right accPoly' -> (Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), (addLimb root . removeLimb limb) changes)
+      else
+        let newLimb = limb {Limb.lmbRef = root}
+         in case accPoly of
+              -- replace `limb` with `newLimb`
+              Left c -> (PolyL.fromLimbs c [(newLimb, multiplier)], (addLimb newLimb . removeLimb limb) changes)
+              Right accPoly' -> (Right (PolyL.insertLimbs 0 [(newLimb, multiplier)] accPoly'), (addLimb newLimb . removeLimb limb) changes)
 
 -- | Substitutes a Ref in a PolyL.
 substRef ::
