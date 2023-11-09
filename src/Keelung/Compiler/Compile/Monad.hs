@@ -193,10 +193,12 @@ writeMulWithLimbs as bs cs = case (uncurry PolyL.fromLimbs as, uncurry PolyL.fro
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPolyL (PolyL.fromRefs c as)
 
-writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Limb, n)] -> M n ()
-writeAddWithLimbs constant limbs = case PolyL.fromLimbs constant limbs of
+writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Limb, n)] -> M n ()
+writeAddWithLimbs constant refs limbs = case PolyL.fromLimbs constant limbs of
   Left _ -> return ()
-  Right poly -> addC [CAddL poly]
+  Right poly -> case PolyL.insertRefs 0 refs poly of
+    Left _ -> return ()
+    Right poly' -> addC [CAddL poly']
 
 -- | Assign a field element to a Ref
 writeRefVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()

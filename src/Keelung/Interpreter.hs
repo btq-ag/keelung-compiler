@@ -271,6 +271,11 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
   interpret (AssignmentU width var val) = do
     interpretU val >>= addU width var
     return []
+  interpret (RelateUF width varU varF) = do
+    -- TODO: not sure if this is correct
+    valU <- lookupU width varU
+    addF varF [fromIntegral valU]
+    return []
   interpret (DivMod width dividend divisor quotient remainder) = do
     interpretDivMod width (dividend, divisor, quotient, remainder)
     return []
@@ -509,6 +514,7 @@ instance FreeVar SideEffect where
   freeVars (AssignmentF var field) = modifyX (modifyF (IntSet.insert var)) (freeVars field)
   freeVars (AssignmentB var bool) = modifyX (modifyB (IntSet.insert var)) (freeVars bool)
   freeVars (AssignmentU width var uint) = modifyX (modifyU width mempty (IntSet.insert var)) (freeVars uint)
+  freeVars (RelateUF width varU varF) = modifyX (modifyU width mempty (IntSet.insert varU)) $ modifyX (modifyF (IntSet.insert varF)) mempty
   freeVars (DivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
   freeVars (CLDivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
   freeVars (AssertLTE _width x _) = freeVars x

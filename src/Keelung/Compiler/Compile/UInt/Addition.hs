@@ -138,7 +138,7 @@ addLimbColumnView resultLimb (LimbColumn.OneLimbOnly limb) = do
 addLimbColumnView resultLimb (LimbColumn.Ordinary constant limbs) = do
   let carrySigns = calculateCarrySigns (lmbWidth resultLimb) constant limbs
   carryLimb <- allocCarryLimb (length carrySigns) (lmbOffset resultLimb) carrySigns
-  writeAddWithLimbs (fromInteger constant) $
+  writeAddWithLimbs (fromInteger constant) [] $
     -- negative side
     (resultLimb, -1)
       : (carryLimb, -(2 ^ lmbWidth resultLimb))

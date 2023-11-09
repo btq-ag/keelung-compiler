@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -19,6 +20,7 @@ import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.LC
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Syntax (widthOf)
@@ -63,6 +65,9 @@ compileSideEffect (AssignmentF var val) = do
   result <- compileExprF val
   relateLC (RefFX var) result
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
+compileSideEffect (RelateUF width varU varF) = do
+  let limbs = Limb.refUToLimbs width (RefUX width varU)
+  writeAddWithLimbs 0 [(F (RefFX varF), -1)] (map (,1) limbs)
 compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do

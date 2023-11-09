@@ -212,6 +212,7 @@ test-suite keelung-test
       Test.Compilation.Field.Exponentiation
       Test.Compilation.Field.Inequality
       Test.Compilation.Misc
+      Test.Compilation.Statement
       Test.Compilation.UInt
       Test.Compilation.UInt.Addition
       Test.Compilation.UInt.Addition.LimbBound

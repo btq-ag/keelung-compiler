@@ -51,6 +51,7 @@ propagateSideEffect sideEffect = case sideEffect of
       ValU v -> modify' $ \bindings -> bindings {structU = IntMap.insertWith (<>) width (IntMap.singleton width (toInteger v)) (structU bindings)}
       _ -> return ()
     return $ AssignmentU width var val'
+  RelateUF width varU varF -> return $ RelateUF width varU varF
   DivMod width dividend divisor quotient remainder ->
     DivMod width
       <$> propagateExprU dividend
