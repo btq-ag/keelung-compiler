@@ -36,10 +36,9 @@ tests = describe "Statement" $ do
       it "Prime 2" $ do
         forAll (chooseInteger (-10, 4)) $ \n -> do
           runAll (Prime 2) (program (fromInteger n)) [] [] [n `mod` 2]
-      -- it "Binary 7" $ do
-      --   -- forAll (chooseInteger (-10, 8)) $ \n -> do
-      --   --   runAll (Binary 7) (program (fromInteger n)) [] [] [n `mod` 4]
-      --   runAll (Binary 7) (program 7) [] [] [3]
+      it "Binary 7" $ do
+        forAll (chooseInteger (-10, 8)) $ \n -> do
+          runAll (Binary 7) (program (fromInteger n)) [] [] [n `mod` 4]
 
   -- describe "toUInt" $ do
   --   it "from variable" $ do

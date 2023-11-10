@@ -129,8 +129,8 @@ runAll fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldTy
       -- constraint system interpreters
       solverR1CS fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
-      -- solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-      --   `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
+      solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+        `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
 
 printLog :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
 printLog fieldType program rawPublicInputs rawPrivateInputs = caseFieldType fieldType handlePrime handleBinary

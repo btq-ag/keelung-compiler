@@ -70,13 +70,10 @@ compileSideEffect (RelateUF width varU varF) = do
   fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
   -- convert the RefU to a bunch of Limbs
   let limbs = Limb.refUToLimbs fieldWidth (RefUX width varU)
+  -- only matching the first Limb with the RefF
   case limbs of
     [] -> writeRefFVal (RefFX varF) 0
-    (limb : rest) -> do
-      -- only matching the first Limb with the RefF
-      writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
-      -- assign the rest of the Limbs as 0
-      forM_ rest $ \lmb -> writeLimbVal lmb 0
+    (limb : _) -> writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
 compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do

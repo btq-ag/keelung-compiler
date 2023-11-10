@@ -5,6 +5,7 @@ module Keelung.Compiler.Optimize.MinimizeConstraints (run) where
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
@@ -555,9 +556,11 @@ substRefU ::
   (Limb, n) ->
   (Either n (PolyL n), Maybe Changes)
 substRefU relations (accPoly, changes) (limb, multiplier) = case EquivClass.lookup (UInt.Ref (Limb.lmbRef limb)) relations of
-  EquivClass.IsConstant constant -> case accPoly of
-    Left c -> (Left (fromInteger constant * multiplier + c), removeLimb limb changes)
-    Right xs -> (Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removeLimb limb changes)
+  EquivClass.IsConstant constant ->
+    let constantSegment = sum [(if Data.Bits.testBit constant i then 1 else 0) * (2 ^ i) | i <- [Limb.lmbOffset limb .. Limb.lmbOffset limb + Limb.lmbWidth limb - 1]]
+     in case accPoly of
+          Left c -> (Left (fromInteger constantSegment * multiplier + c), removeLimb limb changes)
+          Right xs -> (Right $ PolyL.addConstant (fromInteger constantSegment * multiplier) xs, removeLimb limb changes)
   EquivClass.IsRoot _ -> case accPoly of
     Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
     Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
