@@ -107,6 +107,14 @@ lookupFI = lookupVar "FI" (getF . ofI)
 lookupFP :: (GaloisField n, Integral n) => Var -> M n n
 lookupFP = lookupVar "FP" (getF . ofP)
 
+-- | Like `lookupF` but returns `Nothing` if the variable is unbound
+existsF :: (GaloisField n, Integral n) => Var -> M n (Maybe n)
+existsF var = do
+  (_, f) <- gets (getF . ofX)
+  case IntMap.lookup var f of
+    Nothing -> return Nothing
+    Just val -> return (Just val)
+
 lookupB :: (GaloisField n, Integral n) => Var -> M n Bool
 lookupB = lookupVarB "B" (getB . ofX)
 
@@ -133,6 +141,16 @@ lookupUI w = lookupVarU ("UI" <> toSubscript w) ofI w
 
 lookupUP :: (GaloisField n, Integral n) => Width -> Var -> M n U
 lookupUP w = lookupVarU ("UP" <> toSubscript w) ofP w
+
+-- | Like `lookupF` but returns `Nothing` if the variable is unbound
+existsU :: (GaloisField n, Integral n) => Width -> Var -> M n (Maybe U)
+existsU width var =  do
+  gets (getU width . ofX) >>= \case
+    Nothing -> return Nothing
+    Just (_, f) -> do
+      case IntMap.lookup var f of
+        Nothing -> return Nothing
+        Just val -> return (Just val)
 
 -- | TODO: remove this
 unsafeLookup :: Maybe a -> a
@@ -184,6 +202,7 @@ data Error n
   | AssertGTError Integer Integer
   | AssertGTBoundTooSmallError Integer
   | AssertGTBoundTooLargeError Integer Width
+  | RelateUFError U n
   | ModInvError Integer Integer
   deriving (Eq, Generic, NFData, Functor)
 
@@ -223,6 +242,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "divisor and quotient are both unknown"
   show DivModDivisorAndQuotientAndRemainderUnknownError =
     "divisor, quotient, and remainder are all unknown"
+  show (RelateUFError uVal fVal) = "cannot relate a UInt with a Field element because they have conflicting values `" <> show uVal <> "` and `" <> show fVal <> "`"
   show (AssertLTEError actual bound) =
     "`" <> show actual <> "` is not less than or equal to `" <> show bound <> "`"
   show (AssertLTEBoundTooSmallError bound) = "assertLTE: the bound `" <> show bound <> "` is too restrictive, no UInt can be less than or equal to it"

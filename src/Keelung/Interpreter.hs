@@ -272,9 +272,14 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
     interpretU val >>= addU width var
     return []
   interpret (RelateUF width varU varF) = do
-    -- TODO: not sure if this is correct
-    valU <- lookupU width varU
-    addF varF [fromIntegral valU]
+    valU <- existsU width varU
+    valF <- existsF varF
+    case (valU, valF) of
+      (Nothing, Nothing) -> return () -- both are not in the bindings
+      (Just u, Nothing) -> addF varF [fromIntegral u]
+      (Nothing, Just f) -> addU width varU [U.new width (fromIntegral f)]
+      (Just u, Just f) -> do
+        when (toInteger u /= toInteger f) $ throwError $ RelateUFError u f
     return []
   interpret (DivMod width dividend divisor quotient remainder) = do
     interpretDivMod width (dividend, divisor, quotient, remainder)
