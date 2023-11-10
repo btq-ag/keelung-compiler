@@ -20,12 +20,15 @@ import Keelung.Data.VarGroup
 import Keelung.Interpreter.Monad
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Encode.Syntax
+import Keelung.Data.FieldInfo (FieldInfo)
+import Control.Monad.RWS
+import qualified Keelung.Data.FieldInfo as FieldInfo
 
 --------------------------------------------------------------------------------
 
 -- | Interpret a program with inputs and return outputs along with the witness
-runAndOutputWitnesses :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) ([Integer], Witness Integer Integer Integer)
-runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
+runAndOutputWitnesses :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Inputs n -> Either (Error n) ([Integer], Witness Integer Integer Integer)
+runAndOutputWitnesses fieldInfo (Elaborated expr comp) inputs = runM mempty fieldInfo inputs $ do
   -- interpret side-effects
   forM_ (compSideEffects comp) $ \sideEffect -> void $ interpret sideEffect
 
@@ -42,8 +45,8 @@ runAndOutputWitnesses (Elaborated expr comp) inputs = runM mempty inputs $ do
   interpretExpr expr
 
 -- | Interpret a program with inputs.
-run :: (GaloisField n, Integral n) => Elaborated -> Inputs n -> Either (Error n) [Integer]
-run elab inputs = fst <$> runAndOutputWitnesses elab inputs
+run :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Inputs n -> Either (Error n) [Integer]
+run fieldInfo elab inputs = fst <$> runAndOutputWitnesses fieldInfo elab inputs
 
 --------------------------------------------------------------------------------
 
@@ -272,15 +275,21 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
     interpretU val >>= addU width var
     return []
   interpret (RelateUF width varU varF) = do
+    -- get the bit width of the underlying field
+    fieldWidth <- asks (FieldInfo.fieldWidth .  snd)
+    -- UInt bits beyond `fieldWidth` are ignored
     valU <- existsU width varU
     valF <- existsF varF
     case (valU, valF) of
       (Nothing, Nothing) -> return () -- both are not in the bindings
-      (Just u, Nothing) -> addF varF [fromIntegral u]
+      (Just u, Nothing) -> addF varF [fromInteger $ truncateUInt fieldWidth u]
       (Nothing, Just f) -> addU width varU [U.new width (fromIntegral f)]
       (Just u, Just f) -> do
-        when (toInteger u /= toInteger f) $ throwError $ RelateUFError u f
+        when (truncateUInt fieldWidth u /= toInteger f) $ throwError $ RelateUFError u f
     return []
+    where 
+      truncateUInt :: Width -> U -> Integer
+      truncateUInt desiredWidth u = toInteger u `mod` (2 ^ desiredWidth)
   interpret (DivMod width dividend divisor quotient remainder) = do
     interpretDivMod width (dividend, divisor, quotient, remainder)
     return []

@@ -29,6 +29,7 @@ import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Heap
 import Keelung.Syntax
 import Keelung.Syntax.Counters
+import Keelung.Data.FieldInfo (FieldInfo)
 
 --------------------------------------------------------------------------------
 
@@ -36,12 +37,12 @@ toBool :: (GaloisField n, Integral n) => n -> Bool
 toBool = (/= 0)
 
 -- | The interpreter monad
-type M n = ReaderT Heap (StateT (Partial n) (Except (Error n)))
+type M n = ReaderT (Heap, FieldInfo) (StateT (Partial n) (Except (Error n)))
 
-runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n [Integer] -> Either (Error n) ([Integer], VarGroup.Witness Integer Integer Integer)
-runM heap inputs p = do
+runM :: (GaloisField n, Integral n) => Heap -> FieldInfo -> Inputs n -> M n [Integer] -> Either (Error n) ([Integer], VarGroup.Witness Integer Integer Integer)
+runM heap fieldInfo inputs p = do
   partialBindings <- toPartialBindings inputs
-  (result, partialBindings') <- runExcept (runStateT (runReaderT p heap) partialBindings)
+  (result, partialBindings') <- runExcept (runStateT (runReaderT p (heap, fieldInfo)) partialBindings)
   -- make the partial Bindings total
   case toTotal partialBindings' of
     Left unbound -> Left (VarUnassignedError unbound)

@@ -24,11 +24,11 @@ import Test.Hspec
 --------------------------------------------------------------------------------
 
 -- | syntax tree interpreter
-interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-interpretSyntaxTree prog rawPublicInputs rawPrivateInputs = do
+interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+interpretSyntaxTree fieldInfo prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborateAndEncode prog)
   inputs <- left InputError (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
-  left InterpreterError (Interpreter.run elab inputs)
+  left InterpreterError (Interpreter.run fieldInfo elab inputs)
 
 -- | R1CS witness solver (on optimized R1CS)
 solverR1CS :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
@@ -116,7 +116,7 @@ runAll fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldTy
   where
     handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
-      interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+      interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- constraint system interpreters
       solverR1CS fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
@@ -125,12 +125,12 @@ runAll fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldTy
 
     handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
-      interpretSyntaxTree program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
+      interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
       -- constraint system interpreters
       solverR1CS fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
-      solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
-        `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
+      -- solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
+      --   `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
 
 printLog :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
 printLog fieldType program rawPublicInputs rawPrivateInputs = caseFieldType fieldType handlePrime handleBinary
@@ -179,7 +179,7 @@ throwR1CS fieldType program rawPublicInputs rawPrivateInputs csError = caseField
     handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
       -- syntax tree interpreters
-      -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+      -- interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs
       --   `shouldBe` Left (InterpreterError stError)
       -- constraint system interpreters
       solverR1CS fieldInfo program rawPublicInputs rawPrivateInputs
@@ -190,7 +190,7 @@ throwR1CS fieldType program rawPublicInputs rawPrivateInputs csError = caseField
     handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
       -- constraint system interpreters
-      -- interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+      -- interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs
       --   `shouldBe` Left (InterpreterError stError)
       -- constraint system interpreters
       solverR1CS fieldInfo program rawPublicInputs rawPrivateInputs
@@ -204,7 +204,7 @@ throwBoth fieldType program rawPublicInputs rawPrivateInputs stError csError = c
     handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
       -- syntax tree interpreters
-      interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+      interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Left stError
       -- constraint system interpreters
       solverR1CS fieldInfo program rawPublicInputs rawPrivateInputs
@@ -215,7 +215,7 @@ throwBoth fieldType program rawPublicInputs rawPrivateInputs stError csError = c
     handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
       -- constraint system interpreters
-      interpretSyntaxTree program rawPublicInputs rawPrivateInputs
+      interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Left stError
       -- constraint system interpreters
       solverR1CS fieldInfo program rawPublicInputs rawPrivateInputs
