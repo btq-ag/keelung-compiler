@@ -8,21 +8,21 @@
 module Keelung.Interpreter (runAndOutputWitnesses, run, interpretDivMod, interpretCLDivMod, Error (..)) where
 
 import Control.Monad.Except
+import Control.Monad.RWS
 import Data.Bits (Bits (..))
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntSet qualified as IntSet
 import Data.Semiring (Semiring (..))
 import Keelung.Compiler.Syntax.Inputs (Inputs)
+import Keelung.Data.FieldInfo (FieldInfo)
+import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Data.VarGroup
 import Keelung.Interpreter.Monad
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Encode.Syntax
-import Keelung.Data.FieldInfo (FieldInfo)
-import Control.Monad.RWS
-import qualified Keelung.Data.FieldInfo as FieldInfo
 
 --------------------------------------------------------------------------------
 
@@ -274,9 +274,9 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
   interpret (AssignmentU width var val) = do
     interpretU val >>= addU width var
     return []
-  interpret (RelateUF width varU varF) = do
+  interpret (ToUInt width varU varF) = do
     -- get the bit width of the underlying field
-    fieldWidth <- asks (FieldInfo.fieldWidth .  snd)
+    fieldWidth <- asks (FieldInfo.fieldWidth . snd)
     -- UInt bits beyond `fieldWidth` are ignored
     valU <- existsU width varU
     valF <- existsF varF
@@ -287,7 +287,23 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
       (Just u, Just f) -> do
         when (truncateUInt fieldWidth u /= toInteger f) $ throwError $ RelateUFError u f
     return []
-    where 
+    where
+      truncateUInt :: Width -> U -> Integer
+      truncateUInt desiredWidth u = toInteger u `mod` (2 ^ desiredWidth)
+  interpret (ToField width varU varF) = do
+    -- get the bit width of the underlying field
+    fieldWidth <- asks (FieldInfo.fieldWidth . snd)
+    -- UInt bits beyond `fieldWidth` are ignored
+    valU <- existsU width varU
+    valF <- existsF varF
+    case (valU, valF) of
+      (Nothing, Nothing) -> return () -- both are not in the bindings
+      (Just u, Nothing) -> addF varF [fromInteger $ truncateUInt fieldWidth u]
+      (Nothing, Just f) -> addU width varU [U.new width (fromIntegral f)]
+      (Just u, Just f) -> do
+        when (truncateUInt fieldWidth u /= toInteger f) $ throwError $ RelateUFError u f
+    return []
+    where
       truncateUInt :: Width -> U -> Integer
       truncateUInt desiredWidth u = toInteger u `mod` (2 ^ desiredWidth)
   interpret (DivMod width dividend divisor quotient remainder) = do
@@ -528,7 +544,8 @@ instance FreeVar SideEffect where
   freeVars (AssignmentF var field) = modifyX (modifyF (IntSet.insert var)) (freeVars field)
   freeVars (AssignmentB var bool) = modifyX (modifyB (IntSet.insert var)) (freeVars bool)
   freeVars (AssignmentU width var uint) = modifyX (modifyU width mempty (IntSet.insert var)) (freeVars uint)
-  freeVars (RelateUF width varU varF) = modifyX (modifyU width mempty (IntSet.insert varU)) $ modifyX (modifyF (IntSet.insert varF)) mempty
+  freeVars (ToUInt width varU varF) = modifyX (modifyU width mempty (IntSet.insert varU)) $ modifyX (modifyF (IntSet.insert varF)) mempty
+  freeVars (ToField width varU varF) = modifyX (modifyU width mempty (IntSet.insert varU)) $ modifyX (modifyF (IntSet.insert varF)) mempty
   freeVars (DivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
   freeVars (CLDivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
   freeVars (AssertLTE _width x _) = freeVars x
