@@ -49,24 +49,17 @@ tests = describe "Statement" $ do
       it "Prime 2" $ do
         forAll (chooseInteger (0, 1)) $ \n -> do
           runAll (Prime 2) program [n] [] [n `mod` 2]
-      -- it "Binary 7" $ do
-      --   debug (Binary 7) program
-        -- runAll (Binary 7) program [3] [] [3]
-      -- it "Binary 7" $ do
-      --   forAll (chooseInteger (0, 3)) $ \n -> do
-      --     runAll (Binary 7) program [n] [] [n `mod` 4]
-
---     runAll gf181 program [100] [] [100]
---     runAll (Prime 2) program [100] [] [0]
---   runAll (Prime 2) program [101] [] [1]
---   -- runAll (Binary 7) program [1] [] [1]
---   -- runAll (Binary 7) program [2] [] [2]
---   -- runAll (Binary 7) program [3] [] [3]
---   -- runAll (Binary 7) program [4] [] [3]
---   -- runAll (Binary 7) program [5] [] [2]
--- it "from constant" $ do
---   let program = toUInt @8 8
---   runAll gf181 (program 3) [] [] [3]
---   runAll (Prime 2) (program 100) [] [] [0]
---   runAll (Prime 2) (program 101) [] [] [1]
---   runAll (Binary 7) (program 1) [] [] [1]
+      it "Binary 7" $ do
+        forAll (chooseInteger (0, 3)) $ \n -> do
+          runAll (Binary 7) program [n] [] [n `mod` 4]
+    describe "from constant" $ do
+      let program n = toUInt 8 (n :: Field) :: Comp (UInt 8)
+      it "GF181" $ do
+        forAll (chooseInteger (0, 255)) $ \n -> do
+          runAll gf181 (program (fromInteger n)) [] [] [n `mod` 256]
+      it "Prime 2" $ do
+        forAll (chooseInteger (0, 1)) $ \n -> do
+          runAll (Prime 2) (program (fromInteger n)) [] [] [n `mod` 2]
+      it "Binary 7" $ do
+        forAll (chooseInteger (0, 3)) $ \n -> do
+          runAll (Binary 7) (program (fromInteger n)) [] [] [n `mod` 4]

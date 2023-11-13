@@ -52,8 +52,9 @@ tests = describe "Binary field" $ do
   --   forM_ [gf181, Prime 17, Binary 7] $ \field -> do
   --     runAll field program [6] [] expected
 
-    describe "from constant" $ do
-      let program n = toUInt 8 (n :: Field) :: Comp (UInt 8)
-      it "GF181" $ do
-        debug gf181 (program 47)
-        -- runAll gf181 (program 47) [] [] [47]
+  describe "from constant" $ do
+    let program n = toUInt 8 (n :: Field) :: Comp (UInt 8)
+    it "GF181" $ do
+      debug (Binary 7) (program 47)
+
+-- runAll gf181 (program 47) [] [] [47]
