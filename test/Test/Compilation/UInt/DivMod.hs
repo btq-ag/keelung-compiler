@@ -200,14 +200,14 @@ tests =
             []
             []
             (InterpreterError (Interpreter.DivModQuotientError False 7 3 2 3))
-            (SolverError Solver.ConflictingValues :: Error GF181)
+            (CompilerError (Compiler.ConflictingValuesU 9 6) :: Error GF181)
           throwBoth
             (Prime 17)
             program
             []
             []
             (InterpreterError (Interpreter.DivModQuotientError False 7 3 2 3))
-            (SolverError Solver.ConflictingValues :: Error (Prime 17))
+            (CompilerError (Compiler.ConflictingValuesU 9 2) :: Error (Prime 17))
           throwBoth
             (Binary 7)
             program
@@ -224,14 +224,15 @@ tests =
             []
             []
             (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
-            (SolverError Solver.ConflictingValues :: Error GF181)
+            (CompilerError (Compiler.ConflictingValuesU 6 7) :: Error GF181)
+          -- (SolverError Solver.ConflictingValues :: Error GF181)
           throwBoth
             (Prime 17)
             program
             []
             []
             (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
-            (SolverError Solver.ConflictingValues :: Error (Prime 17))
+            (CompilerError (Compiler.ConflictingValuesU 6 3) :: Error (Prime 17))
           throwBoth
             (Binary 7)
             program

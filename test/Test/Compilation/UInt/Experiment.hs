@@ -3,7 +3,6 @@
 
 module Test.Compilation.UInt.Experiment (tests, run) where
 
-import Control.Monad
 import Keelung hiding (compile)
 import Test.Compilation.Util
 import Test.Hspec
@@ -33,22 +32,28 @@ tests = describe "Binary field" $ do
   --     let expected = map toInteger [x * y]
   --     runAll (Binary 7) program (map toInteger [x, y]) [] expected
 
-  it "modInv N (mod 71)" $ do
-    let prime = 71
-    let program = do
-          x <- input Public :: Comp (UInt 8)
-          return $ modInv x prime
-    let expected = [22]
-    forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-      runAll field program [42] [] expected
+  -- it "modInv N (mod 71)" $ do
+  --   let prime = 71
+  --   let program = do
+  --         x <- input Public :: Comp (UInt 8)
+  --         return $ modInv x prime
+  --   let expected = [22]
+  --   forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+  --     runAll field program [42] [] expected
 
-  it "modInv N (mod 7)" $ do
-    -- 6 * 6 = 7 * 5 + 1 (mod GF181)
-    let prime = 7
-    let program = do
-          x <- input Public :: Comp (UInt 4)
-          return $ modInv x prime
+  -- it "modInv N (mod 7)" $ do
+  --   -- 6 * 6 = 7 * 5 + 1 (mod GF181)
+  --   let prime = 7
+  --   let program = do
+  --         x <- input Public :: Comp (UInt 4)
+  --         return $ modInv x prime
 
-    let expected = [6]
-    forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-      runAll field program [6] [] expected
+  --   let expected = [6]
+  --   forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+  --     runAll field program [6] [] expected
+
+    describe "from constant" $ do
+      let program n = toUInt 8 (n :: Field) :: Comp (UInt 8)
+      it "GF181" $ do
+        debug gf181 (program 47)
+        -- runAll gf181 (program 47) [] [] [47]

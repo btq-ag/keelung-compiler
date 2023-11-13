@@ -39,7 +39,7 @@ mapError = EquivClass.mapError (uncurry ConflictingValuesF)
 --------------------------------------------------------------------------------
 
 new :: RefRelations n
-new = EquivClass.new "References"
+new = EquivClass.new "References Relations"
 
 assignF :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
 assignF var val xs = mapError $ EquivClass.assign var val xs
