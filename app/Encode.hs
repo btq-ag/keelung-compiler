@@ -32,7 +32,7 @@ import GHC.Num (integerLogBase)
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
 compilerVersion :: (Int, Int)
-compilerVersion = (0, 18)
+compilerVersion = (0, 19)
 
 patchVersion :: Int
 patchVersion = 0

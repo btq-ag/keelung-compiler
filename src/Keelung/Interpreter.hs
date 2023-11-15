@@ -432,7 +432,11 @@ instance (GaloisField n, Integral n) => Interpret Field n where
     AddF x y -> zipWith (+) <$> interpret x <*> interpret y
     SubF x y -> zipWith (-) <$> interpret x <*> interpret y
     MulF x y -> zipWith (*) <$> interpret x <*> interpret y
-    ExpF x n -> map (^ n) <$> interpret x
+    ExpF x n -> do
+      x' <- interpret x
+      if x' == [0] && n == 0
+        then return [1]
+        else map (^ n) <$> interpret x
     DivF x y -> zipWith (/) <$> interpret x <*> interpret y
     IfF p x y -> do
       p' <- interpretB p

@@ -12,7 +12,6 @@ import Data.IntSet qualified as IntSet
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Debug.Trace
 import Keelung
 import Keelung.Compiler.Compile.IndexTable (IndexTable)
 import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
@@ -198,7 +197,7 @@ linkConstraint fieldInfo occurrences _ (CLimbVal x n) =
   let negatedConstant = case FieldInfo.fieldTypeData fieldInfo of
         Prime _ -> fromInteger (-n)
         Binary _ -> fromInteger n
-   in case Poly.buildWithIntMap negatedConstant (traceShowId $ traceShow x $ reindexLimb occurrences x 1) of
+   in case Poly.buildWithIntMap negatedConstant (reindexLimb occurrences x 1) of
         Left _ -> error "CLimbVal: impossible"
         Right xs -> [Linked.CAdd xs]
 linkConstraint fieldInfo occurrences fieldWidth (CRefUVal x n) =
