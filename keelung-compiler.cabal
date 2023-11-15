@@ -30,6 +30,7 @@ library
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Exponentiation
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
@@ -114,6 +115,7 @@ executable keelungc
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Exponentiation
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
@@ -235,6 +237,7 @@ test-suite keelung-test
       Test.Intergration
       Test.Optimization
       Test.Optimization.Boolean
+      Test.Optimization.Experiment
       Test.Optimization.Field
       Test.Optimization.UInt
       Test.Optimization.UInt.AESMul
@@ -251,6 +254,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Exponentiation
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt

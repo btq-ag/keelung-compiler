@@ -3,10 +3,10 @@ module Keelung.Compiler.Compile.Field (compile) where
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
 import Data.Sequence (Seq (..))
+import Keelung.Compiler.Compile.Field.Exponentiation qualified as Exponentiation
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.LC
-import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 
 ----------------------------------------------------------------
@@ -34,7 +34,7 @@ compile expr = case expr of
     return result
   ExpF x n -> do
     base <- toLC x
-    fastExp base 1 n
+    Exponentiation.compile base n
   DivF x y -> do
     x' <- toLC x
     y' <- toLC y
@@ -99,31 +99,6 @@ compileIfF (Left p) (Polynomial x) (Polynomial y) = do
     (Polynomial x <> neg (Polynomial y)) -- (x - y)
     (result <> neg (Polynomial y)) -- (out - y)
   return result
-
--- | Fast exponentiation on field
-fastExp :: (GaloisField n, Integral n) => LC n -> n -> Integer -> M n (LC n)
-fastExp _ acc 0 = return $ Constant acc
-fastExp (Constant base) acc e = return $ Constant $ (base ^ e) * acc
-fastExp (Polynomial base) acc e =
-  let (q, r) = e `divMod` 2
-   in if r == 1
-        then do
-          result <- fastExp (Polynomial base) acc (e - 1)
-          mul result (Polynomial base)
-        else do
-          result <- fastExp (Polynomial base) acc q
-          mul result result
-  where
-    -- \| Compute the multiplication of two variables
-    mul :: (GaloisField n, Integral n) => LC n -> LC n -> M n (LC n)
-    mul (Constant x) (Constant y) = return $ Constant (x * y)
-    mul (Constant x) (Polynomial ys) = return $ fromPolyL $ PolyL.multiplyBy x ys
-    mul (Polynomial xs) (Constant y) = return $ fromPolyL $ PolyL.multiplyBy y xs
-    mul (Polynomial xs) (Polynomial ys) = do
-      out <- freshRefF
-      let result = 1 @ F out
-      writeMulWithLC (Polynomial xs) (Polynomial ys) result
-      return result
 
 toLC :: (GaloisField n, Integral n) => ExprF n -> M n (LC n)
 toLC (MulF (ValF m) (ValF n)) = return $ Constant (m * n)

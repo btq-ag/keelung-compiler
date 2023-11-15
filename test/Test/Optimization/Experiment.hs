@@ -12,6 +12,25 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Experiment" $ do
+  -- describe "pow" $ do
+  --   let program power = do
+  --         n <- input Public
+  --         return (n `pow` power)
+  --   describe "Frobenius endomorphism" $ do
+  --     it "n^256 = n (Binary 283)" $ do
+  --       (cs, cs') <- executeGF181 $ do
+  --         x <- inputUInt @8 Public
+  --         y <- inputUInt @8 Public
+  --         return $ x * y
+  --       cs `shouldHaveSize` 42
+  --       cs' `shouldHaveSize` 33
+      -- it "n^255 = n (Binary 283)" $ do
+      --   property $ \(n :: Binary 283) -> do
+      --     runAll (Binary 283) (program 255) [toInteger n] [] [1]
+      -- it "n^254 = n (Binary 283)" $ do
+      --   property $ \(n :: Binary 283) -> do
+      --     runAll (Binary 283) (program 254) [toInteger n] [] [toInteger (n ^ (254 :: Int))]
+
   -- 8 * 3 for input / output
   -- 8 for carry bit
   -- 1 for multiplication

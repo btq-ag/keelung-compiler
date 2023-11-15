@@ -3,9 +3,11 @@
 
 module Test.Compilation.UInt.Experiment (tests, run) where
 
+import Data.Field.Galois (Binary)
 import Keelung hiding (compile)
 import Test.Compilation.Util
 import Test.Hspec
+import Test.QuickCheck
 
 run :: IO ()
 run = hspec tests
@@ -13,48 +15,22 @@ run = hspec tests
 --------------------------------------------------------------------------------
 
 tests :: SpecWith ()
-tests = describe "Binary field" $ do
-  -- it "2 positive variables / Byte" $ do
-  --   let program = do
-  --         x <- inputUInt @8 Public
-  --         y <- inputUInt @8 Public
-  --         return $ x * y
-  --   property $ \(x, y :: Word8) -> do
-  --     let expected = map toInteger [x * y]
-  --     runAll (Binary 7) program (map toInteger [x, y]) [] expected
+tests = describe "Compilation Experiment" $ do
+  describe "Field pow" $ do
+    let program power = do
+          n <- input Public
+          return (n `pow` power)
+    describe "Frobenius endomorphism" $ do
+      it "n^256 = n (Binary 283)" $ do
+        property $ \(n :: Binary 283) -> do
+          runAll (Binary 283) (program 256) [toInteger n] [] [toInteger n]
+      it "n^255 = n (Binary 283)" $ do
+        property $ \(n :: Binary 283) -> do
+          runAll (Binary 283) (program 255) [toInteger n] [] [1]
+      it "n^254 = n (Binary 283)" $ do
+        property $ \(n :: Binary 283) -> do
+          runAll (Binary 283) (program 254) [toInteger n] [] [toInteger (n ^ (254 :: Int))]
 
-  -- it "2 positive variables / Word64" $ do
-  --   let program = do
-  --         x <- inputUInt @64 Public
-  --         y <- inputUInt @64 Public
-  --         return $ x * y
-  --   property $ \(x, y :: Word64) -> do
-  --     let expected = map toInteger [x * y]
-  --     runAll (Binary 7) program (map toInteger [x, y]) [] expected
-
-  -- it "modInv N (mod 71)" $ do
-  --   let prime = 71
-  --   let program = do
-  --         x <- input Public :: Comp (UInt 8)
-  --         return $ modInv x prime
-  --   let expected = [22]
-  --   forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-  --     runAll field program [42] [] expected
-
-  -- it "modInv N (mod 7)" $ do
-  --   -- 6 * 6 = 7 * 5 + 1 (mod GF181)
-  --   let prime = 7
-  --   let program = do
-  --         x <- input Public :: Comp (UInt 4)
-  --         return $ modInv x prime
-
-  --   let expected = [6]
-  --   forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-  --     runAll field program [6] [] expected
-
-  describe "from constant" $ do
-    let program n = toUInt 8 (n :: Field) :: Comp (UInt 8)
-    it "GF181" $ do
-      debug (Binary 7) (program 47)
+-- debug (Binary 283) program
 
 -- runAll gf181 (program 47) [] [] [47]
