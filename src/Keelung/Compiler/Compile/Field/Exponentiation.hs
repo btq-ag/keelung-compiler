@@ -1,40 +1,45 @@
 module Keelung.Compiler.Compile.Field.Exponentiation (compile) where
 
+import Control.Monad.RWS
 import Data.Field.Galois
+import Keelung.Compiler.Compile.Field.Conditional qualified as Conditiona
 import Keelung.Compiler.Compile.Monad
+import Keelung.Compiler.ConstraintModule (ConstraintModule (cmField))
+import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 
 compile :: (GaloisField n, Integral n) => LC n -> Integer -> M n (LC n)
-compile = fastExp 1
+compile base power = do
+  ord <- gets (FieldInfo.fieldOrder . cmField)
+  compile_ base ord power
 
--- compile :: (GaloisField n, Integral n) => LC n -> Integer -> M n (LC n)
--- compile base power = do
---   ord <- gets (FieldInfo.fieldOrder . cmField)
---   compile_ base ord power
+compile_ :: (GaloisField n, Integral n) => LC n -> Integer -> Integer -> M n (LC n)
+compile_ base ord power
+  | power == 0 = return $ Constant 1 -- _ ^ 0 = 1
+  | power == 1 = return base
+  | power < ord - 1 = commonCase -- the most common case
+  | power == ord - 1 = specialCase1
+  | power == ord = specialCase2
+  | power < (ord * ord) - 1 = commonCase -- the second most common case
+  | power == (ord * ord) - 1 = specialCase1
+  | power == (ord * ord) = specialCase2
+  | otherwise = commonCase -- no optimization after this point
+  where
+    -- when power == ord - 1
+    --  if base == 0 then 0 else 1
+    specialCase1 = do
+      baseIsZero <- eqZero True base
+      Conditiona.compileIfF baseIsZero (Constant 0) (Constant 1)
 
--- compile_ :: (GaloisField n, Integral n) => LC n -> Integer -> Integer -> M n (LC n)
--- compile_ base ord power
---   | power == 0 = return $ Constant 1
---   | power == 1 = return base
---   | power < ord - 1 = fastExp 1 base power -- most common case
---   | power == ord - 1 = return $ Constant 1
---   | power == ord = return base
---   | power < (ord * ord) - 1 = fastExp 1 base power -- second most common case
---   | power == (ord * ord) - 1 = return $ Constant 1
---   | power == (ord * ord) = return base
---   | otherwise = fastExp 1 base power -- no optimization after this point
---   where 
---     -- if base == 0 && power > 0
---     --    then 0
---     --    else OTHERWISE
---     whenBaseIsZero other = do 
---       notZero <- eqZero False base
---       case notZero of
---         Left _ -> return $ Constant 1
---         Right False -> return $ Constant 1 -- 0 ^ 0 = 1
---         Right True -> return $ Constant 1
+    -- when power == ord
+    --  if base == 0 then 0 else base
+    --    =>
+    --  base
+    specialCase2 = return base
+
+    commonCase = fastExp 1 base power
 
 -- | Fast exponentiation on field
 fastExp :: (GaloisField n, Integral n) => n -> LC n -> Integer -> M n (LC n)

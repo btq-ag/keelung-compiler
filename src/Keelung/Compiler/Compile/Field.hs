@@ -8,6 +8,7 @@ import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.LC
 import Keelung.Data.Reference
+import qualified Keelung.Compiler.Compile.Field.Conditional as Conditional
 
 ----------------------------------------------------------------
 
@@ -46,59 +47,13 @@ compile expr = case expr of
     p' <- compileExprB p
     x' <- toLC x
     y' <- toLC y
-    compileIfF p' x' y'
+    Conditional.compileIfF p' x' y'
   BtoF x -> do
     result <- compileExprB x
     case result of
       Left var -> return $ 1 @ B var
       Right True -> return $ Constant 1
       Right False -> return $ Constant 0
-
--- | Conditional
---  out = p * x + (1 - p) * y
---      =>
---  out = p * x + y - p * y
---      =>
---  (out - y) = p * (x - y)
-compileIfF :: (GaloisField n, Integral n) => Either RefB Bool -> LC n -> LC n -> M n (LC n)
-compileIfF (Right True) x _ = return x
-compileIfF (Right False) _ y = return y
-compileIfF (Left p) (Constant x) (Constant y) = do
-  if x == y
-    then return $ Constant x
-    else do
-      out <- freshRefF
-      -- (x - y) * p - out + y = 0
-      let result = 1 @ F out
-      writeAddWithLC $ (x - y) @ B p <> result <> Constant y
-      return result
-compileIfF (Left p) (Constant x) (Polynomial y) = do
-  out <- freshRefF
-  -- p * (x - y) = (out - y)
-  let result = 1 @ F out
-  writeMulWithLC
-    (1 @ B p) -- p
-    (Constant x <> neg (Polynomial y)) -- (x - y)
-    (result <> neg (Polynomial y)) -- (out - y)
-  return result
-compileIfF (Left p) (Polynomial x) (Constant y) = do
-  out <- freshRefF
-  -- p * (x - y) = (out - y)
-  let result = 1 @ F out
-  writeMulWithLC
-    (1 @ B p) -- p
-    (Polynomial x <> neg (Constant y)) -- (x - y)
-    (result <> neg (Constant y)) -- (out - y)
-  return result
-compileIfF (Left p) (Polynomial x) (Polynomial y) = do
-  out <- freshRefF
-  -- p * (x - y) = out - y
-  let result = 1 @ F out
-  writeMulWithLC
-    (1 @ B p) -- p
-    (Polynomial x <> neg (Polynomial y)) -- (x - y)
-    (result <> neg (Polynomial y)) -- (out - y)
-  return result
 
 toLC :: (GaloisField n, Integral n) => ExprF n -> M n (LC n)
 toLC (MulF (ValF m) (ValF n)) = return $ Constant (m * n)

@@ -30,6 +30,7 @@ library
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Conditional
       Keelung.Compiler.Compile.Field.Exponentiation
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
@@ -115,6 +116,7 @@ executable keelungc
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Conditional
       Keelung.Compiler.Compile.Field.Exponentiation
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
@@ -254,6 +256,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Conditional
       Keelung.Compiler.Compile.Field.Exponentiation
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
