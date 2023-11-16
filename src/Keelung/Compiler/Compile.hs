@@ -85,6 +85,7 @@ compileSideEffect (ToUInt width varU varF) = do
       writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
       -- assign the rest of the Limbs as 0 
       forM_ rest $ \lmb -> writeLimbVal lmb 0
+compileSideEffect (BitsToUInt _width _bits) = error "[ panic ] BitsToUInt compilation not implemented"
 compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do

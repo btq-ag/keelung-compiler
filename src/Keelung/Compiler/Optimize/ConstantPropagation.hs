@@ -53,6 +53,7 @@ propagateSideEffect sideEffect = case sideEffect of
     return $ AssignmentU width var val'
   ToUInt width varF varU -> return $ ToUInt width varF varU
   ToField width varU varF -> return $ ToField width varU varF
+  BitsToUInt width bits -> return $ BitsToUInt width bits
   DivMod width dividend divisor quotient remainder ->
     DivMod width
       <$> propagateExprU dividend

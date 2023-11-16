@@ -252,6 +252,7 @@ data SideEffect n
   | AssignmentU Width Var (ExprU n)
   | ToUInt Width Var Var
   | ToField Width Var Var
+  | BitsToUInt Width [ExprB n]
   | DivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
   | CLDivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
   | AssertLTE Width (ExprU n) Integer
