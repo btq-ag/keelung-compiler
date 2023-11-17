@@ -80,12 +80,23 @@ compileSideEffect (ToUInt width varU varF) = do
   let limbs = Limb.refUToLimbs fieldWidth (RefUX width varU)
   case limbs of
     [] -> writeRefFVal (RefFX varF) 0
-    (limb : rest) -> do 
+    (limb : rest) -> do
       -- only matching the first Limb with the RefF
       writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
-      -- assign the rest of the Limbs as 0 
+      -- assign the rest of the Limbs as 0
       forM_ rest $ \lmb -> writeLimbVal lmb 0
-compileSideEffect (BitsToUInt _width _bits) = error "[ panic ] BitsToUInt compilation not implemented"
+compileSideEffect (BitsToUInt width varU bits) = do
+  let refU = RefUX width varU
+  forM_ (zip [0 .. width - 1] bits) $ \(i, bit) -> do
+    result <- compileExprB bit
+    case result of
+      Left var -> writeAdd 0 [(B (RefUBit width refU i), -1), (B var, 1)]
+      Right True -> writeAdd 1 [(B (RefUBit width refU i), -1)]
+      Right False -> writeAdd 0 [(B (RefUBit width refU i), 1)]
+
+-- zip and convert the RefU to a bunch of Limbs with a chunk of bits
+-- let limbAndChunks = Limb.zipAndConvertRefUToLimbs fieldWidth (RefUX width varU) bits
+-- forM_ limbAndChunks $ \(limb, chunk) ->
 compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do
