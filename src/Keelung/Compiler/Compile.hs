@@ -93,7 +93,6 @@ compileSideEffect (BitsToUInt width varU bits) = do
       Left var -> writeAdd 0 [(B (RefUBit width refU i), -1), (B var, 1)]
       Right True -> writeAdd 1 [(B (RefUBit width refU i), -1)]
       Right False -> writeAdd 0 [(B (RefUBit width refU i), 1)]
-
 compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do

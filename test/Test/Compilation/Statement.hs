@@ -1,11 +1,14 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Test.Compilation.Statement where
 
+import Data.Bits qualified
 import Keelung
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck
+import Control.Monad
 
 run :: IO ()
 run = hspec tests
@@ -63,3 +66,20 @@ tests = describe "Statement" $ do
       it "Binary 7" $ do
         forAll (chooseInteger (0, 3)) $ \n -> do
           runAll (Binary 7) (program (fromInteger n)) [] [] [n `mod` 4]
+
+  describe "pack" $ do
+    it "from variables" $ do
+      let program = do
+            xs <- inputList Public 8
+            pack xs :: Comp (UInt 8)
+      property $ \(x :: Word) -> do
+        let bits = map (\b -> if b then 1 else 0) $ Data.Bits.testBit x <$> [0 .. 7]
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+          runAll field program bits [] [fromIntegral x]
+    it "from constants" $ do
+      let program xs = do
+            pack xs :: Comp (UInt 8)
+      property $ \(x :: Word) -> do
+        let bits = map (\b -> if b then true else false) $ Data.Bits.testBit x <$> [0 .. 7]
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+          runAll field (program bits) [] [] [fromIntegral x]

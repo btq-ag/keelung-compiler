@@ -29,7 +29,11 @@ deserializeBinReps counters outputs =
       bitArrays = concatMap sliceBits binRepRanges
       (start, _) = getRange counters (Output, ReadAllUInts)
       beforeBinReps = Vec.take start outputs
-   in Vec.map toInteger beforeBinReps <> Vec.fromList (map (foldr (\x acc -> toInteger x + Data.Bits.shiftL acc 1) 0 . toList) bitArrays)
+   in Vec.map toInteger beforeBinReps <> Vec.fromList (map (packBits . toList) bitArrays)
+
+   where 
+      packBits :: (GaloisField n, Integral n) => [n] -> Integer
+      packBits = foldr (\x acc -> toInteger x + Data.Bits.shiftL acc 1) 0
 
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs

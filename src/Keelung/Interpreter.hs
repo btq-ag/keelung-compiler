@@ -30,7 +30,7 @@ import Keelung.Syntax.Encode.Syntax
 runAndOutputWitnesses :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Inputs n -> Either (Error n) ([Integer], Witness Integer Integer Integer)
 runAndOutputWitnesses fieldInfo (Elaborated expr comp) inputs = runM mempty fieldInfo inputs $ do
   -- interpret side-effects
-  forM_ (compSideEffects comp) $ \sideEffect -> void $ interpret sideEffect
+  forM_ (compSideEffects comp) $ \sideEffect -> void (interpretU sideEffect)
 
   -- interpret the assertions next
   -- throw error if any assertion fails
@@ -262,17 +262,17 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
 
 --------------------------------------------------------------------------------
 
-instance (GaloisField n, Integral n) => Interpret SideEffect n where
-  interpret (AssignmentB var val) = do
+instance (GaloisField n, Integral n) => InterpretU SideEffect n where
+  interpretU (AssignmentB var val) = do
     interpretB val >>= addB var
     return []
-  interpret (AssignmentF var val) = do
+  interpretU (AssignmentF var val) = do
     interpret val >>= addF var
     return []
-  interpret (AssignmentU width var val) = do
+  interpretU (AssignmentU width var val) = do
     interpretU val >>= addU width var
     return []
-  interpret (ToUInt width varU varF) = do
+  interpretU (ToUInt width varU varF) = do
     -- get the bit width of the underlying field
     fieldWidth <- asks (FieldInfo.fieldWidth . snd)
     -- UInt bits beyond `fieldWidth` are ignored
@@ -288,7 +288,7 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
     where
       truncateUInt :: Width -> U -> Integer
       truncateUInt desiredWidth u = toInteger u `mod` (2 ^ desiredWidth)
-  interpret (ToField width varU varF) = do
+  interpretU (ToField width varU varF) = do
     -- get the bit width of the underlying field
     fieldWidth <- asks (FieldInfo.fieldWidth . snd)
     -- UInt bits beyond `fieldWidth` are ignored
@@ -304,18 +304,18 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
     where
       truncateUInt :: Width -> U -> Integer
       truncateUInt desiredWidth u = toInteger u `mod` (2 ^ desiredWidth)
-  interpret (BitsToUInt width varU bools) = do
+  interpretU (BitsToUInt width varU bools) = do
     bools' <- mapM interpretB bools
-    let value = foldl (\acc b -> acc * 2 + if b == [True] then 1 else 0) 0 bools'
-    addU width varU [U.new width value]
-    return []
-  interpret (DivMod width dividend divisor quotient remainder) = do
+    let value = U.new width $ foldr (\b acc -> acc * 2 + if b then 1 else 0) 0 (concat bools')
+    addU width varU [value]
+    return [value]
+  interpretU (DivMod width dividend divisor quotient remainder) = do
     interpretDivMod width (dividend, divisor, quotient, remainder)
     return []
-  interpret (CLDivMod width dividend divisor quotient remainder) = do
+  interpretU (CLDivMod width dividend divisor quotient remainder) = do
     interpretCLDivMod width (dividend, divisor, quotient, remainder)
     return []
-  interpret (AssertLTE width value bound) = do
+  interpretU (AssertLTE width value bound) = do
     -- check if the bound is within the range of the UInt
     when (bound < 0) $
       throwError $
@@ -329,7 +329,7 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
         when (U.uValue v > bound) $ throwError $ AssertLTEError (U.uValue v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
-  interpret (AssertLT width value bound) = do
+  interpretU (AssertLT width value bound) = do
     -- check if the bound is within the range of the UInt
     when (bound < 1) $
       throwError $
@@ -343,7 +343,7 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
         when (U.uValue v >= bound) $ throwError $ AssertLTError (U.uValue v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
-  interpret (AssertGTE width value bound) = do
+  interpretU (AssertGTE width value bound) = do
     -- check if the bound is within the range of the UInt
     when (bound < 1) $
       throwError $
@@ -357,7 +357,7 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
         when (U.uValue v < bound) $ throwError $ AssertGTEError (U.uValue v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
-  interpret (AssertGT width value bound) = do
+  interpretU (AssertGT width value bound) = do
     -- check if the bound is within the range of the UInt
     when (bound < 0) $
       throwError $
