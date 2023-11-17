@@ -49,6 +49,7 @@ convertSideEffect (T.AssignmentB var val) = AssignmentB var <$> convertExprB val
 convertSideEffect (T.AssignmentU width var val) = AssignmentU width var <$> convertExprU val
 convertSideEffect (T.ToUInt width varU varF) = return $ ToUInt width varU varF
 convertSideEffect (T.ToField width varU varF) = return $ ToField width varU varF
+convertSideEffect (T.BitsToUInt width varU vals) = BitsToUInt width varU <$> mapM convertExprB vals
 convertSideEffect (T.DivMod width dividend divisor quotient remainder) = DivMod width <$> convertExprU dividend <*> convertExprU divisor <*> convertExprU quotient <*> convertExprU remainder
 convertSideEffect (T.CLDivMod width dividend divisor quotient remainder) = CLDivMod width <$> convertExprU dividend <*> convertExprU divisor <*> convertExprU quotient <*> convertExprU remainder
 convertSideEffect (T.AssertLTE width val bound) = AssertLTE width <$> convertExprU val <*> pure bound

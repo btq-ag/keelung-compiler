@@ -9,7 +9,7 @@ module Encode (versionString, serializeR1CS, serializeInputAndWitness, serialize
 
 import Data.Aeson
 import Data.Aeson.Encoding
-import Data.ByteString.Lazy (ByteString, pack)
+import Data.ByteString.Lazy (ByteString)
 import Data.ByteString.Lazy qualified as BS
 import Data.ByteString.Builder
 import Data.Binary qualified as B
@@ -67,15 +67,15 @@ serializeInputAndWitnessToBin p witnessVec =
                                  <> int32LE (fromIntegral $ length witnesses)
       wtnses   = mconcat (toPrimeLE 1 : map (toPrimeLE . mod p . fromIntegral) witnesses)
    in meta
-   <> pack [0x01, 0x00, 0x00, 0x00] <> secLength header
+   <> BS.pack [0x01, 0x00, 0x00, 0x00] <> secLength header
    <> header
-   <> pack [0x02, 0x00, 0x00, 0x00] <> secLength wtnses
+   <> BS.pack [0x02, 0x00, 0x00, 0x00] <> secLength wtnses
    <> wtnses
   where
     secLength = toLazyByteString . word64LE . fromIntegral . BS.length
     -- "wtns, version 2, 2 sections"
     meta :: ByteString
-    meta = pack [0x77, 0x74, 0x6e, 0x73, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]
+    meta = BS.pack [0x77, 0x74, 0x6e, 0x73, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]
 
     primeLen = 32
 
@@ -134,11 +134,11 @@ serializeR1CS Snarkjs r1cs = let info = r1csField r1cs in
                      constraints = toSnarkjsBin r1cConstraints p primeLen
                      labels = toLazyByteString $ genLabels (nLabels binHeader)
                   in meta
-                  <> pack [0x01, 0x00, 0x00, 0x00] <> secLength header
+                  <> BS.pack [0x01, 0x00, 0x00, 0x00] <> secLength header
                   <> header
-                  <> pack [0x02, 0x00, 0x00, 0x00] <> secLength constraints
+                  <> BS.pack [0x02, 0x00, 0x00, 0x00] <> secLength constraints
                   <> constraints
-                  <> pack [0x03, 0x00, 0x00, 0x00] <> secLength labels
+                  <> BS.pack [0x03, 0x00, 0x00, 0x00] <> secLength labels
                   <> labels
   where
     r1cConstraints = map (fmap toInteger) (toR1Cs r1cs)
@@ -146,7 +146,7 @@ serializeR1CS Snarkjs r1cs = let info = r1csField r1cs in
 
     -- "r1cs, version 1, 3 sections"
     meta :: ByteString
-    meta = pack [0x72, 0x31, 0x63, 0x73, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00]
+    meta = BS.pack [0x72, 0x31, 0x63, 0x73, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00]
     -- Encode header (section 1) in little Endian style, return length of the prime number in bytes and the content.
     encodeHeader :: R1CSBinHeader -> (Int64, ByteString)
     encodeHeader (R1CSBinHeader p wires pubout pubin prvIn labels mcons) =

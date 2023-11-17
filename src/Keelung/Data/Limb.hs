@@ -7,7 +7,6 @@ module Keelung.Data.Limb
     new,
     isPositive,
     refUToLimbs,
-    zipAndConvertRefUToLimbs,
     trim,
   )
 where
@@ -95,16 +94,6 @@ refUToLimbs desiredWidth refU = step (widthOf refU) 0
     step remainingWidth offset
       | remainingWidth <= width = [Limb refU remainingWidth offset (Left True)]
       | otherwise = Limb refU width offset (Left True) : step (remainingWidth - width) (offset + width)
-
--- | Convert a RefU and a list of other stuff to a list of Limbs with chunks of that other stuff
---   (in case that the field width is not large enough to hold the RefU)
-zipAndConvertRefUToLimbs :: Width -> RefU -> [a] -> [(Limb, [a])]
-zipAndConvertRefUToLimbs desiredWidth refU = step (widthOf refU) 0
-  where
-    width = widthOf refU `min` desiredWidth
-    step remainingWidth offset xs
-      | remainingWidth <= width = [(Limb refU remainingWidth offset (Left True), take remainingWidth xs)]
-      | otherwise = (Limb refU width offset (Left True), take width xs) : step (remainingWidth - width) (offset + width) (drop width xs)
 
 -- | Trim a 'Limb' to a given width.
 trim :: Width -> Limb -> Limb

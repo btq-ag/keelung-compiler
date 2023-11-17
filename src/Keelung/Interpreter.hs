@@ -37,8 +37,6 @@ runAndOutputWitnesses fieldInfo (Elaborated expr comp) inputs = runM mempty fiel
   forM_ (compAssertions comp) $ \e -> do
     values <- interpretExpr e
     when (values /= [1]) $ do
-      -- bindings <- get
-      -- let bindingsInExpr = Bindings.restrictVars bindings (freeVars e)
       -- collect variables and their bindings in the expression and report them
       throwError $ AssertionError (show e)
   -- lastly interpret the expression and return the result
@@ -306,6 +304,11 @@ instance (GaloisField n, Integral n) => Interpret SideEffect n where
     where
       truncateUInt :: Width -> U -> Integer
       truncateUInt desiredWidth u = toInteger u `mod` (2 ^ desiredWidth)
+  interpret (BitsToUInt width varU bools) = do
+    bools' <- mapM interpretB bools
+    let value = foldl (\acc b -> acc * 2 + if b == [True] then 1 else 0) 0 bools'
+    addU width varU [U.new width value]
+    return []
   interpret (DivMod width dividend divisor quotient remainder) = do
     interpretDivMod width (dividend, divisor, quotient, remainder)
     return []
@@ -510,19 +513,6 @@ instance (Interpret t1 n, Interpret t2 n, GaloisField n) => Interpret (t1, t2) n
 instance (Interpret t n, GaloisField n) => Interpret [t] n where
   interpret xs = concat <$> mapM interpret xs
 
--- instance (GaloisField n, Integral n) => Interpret (ArrM t) n where
---   interpret val = case val of
---     ArrayRef _elemType _len addr -> do
---       heap <- ask
---       case IntMap.lookup addr heap of
---         Nothing -> error "[ panic ] address not found when trying to read heap"
---         Just (elemType, vars) -> case elemType of
---           ElemF -> interpret $ map VarF (toList vars)
---           ElemB -> interpret $ map VarB (toList vars)
---           ElemU width -> mapM (lookupU width) (toList vars)
---           ElemArr elemType' len -> concat <$> mapM (interpret . ArrayRef elemType' len) (toList vars)
---           EmptyArr -> return []
-
 --------------------------------------------------------------------------------
 
 instance FreeVar Expr where
@@ -550,6 +540,7 @@ instance FreeVar SideEffect where
   freeVars (AssignmentU width var uint) = modifyX (modifyU width mempty (IntSet.insert var)) (freeVars uint)
   freeVars (ToUInt width varU varF) = modifyX (modifyU width mempty (IntSet.insert varU)) $ modifyX (modifyF (IntSet.insert varF)) mempty
   freeVars (ToField width varU varF) = modifyX (modifyU width mempty (IntSet.insert varU)) $ modifyX (modifyF (IntSet.insert varF)) mempty
+  freeVars (BitsToUInt width varU bools) = modifyX (modifyU width mempty (IntSet.insert varU)) $ mconcat (map freeVars bools)
   freeVars (DivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
   freeVars (CLDivMod _width x y q r) = freeVars x <> freeVars y <> freeVars q <> freeVars r
   freeVars (AssertLTE _width x _) = freeVars x

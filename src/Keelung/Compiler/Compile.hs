@@ -94,9 +94,6 @@ compileSideEffect (BitsToUInt width varU bits) = do
       Right True -> writeAdd 1 [(B (RefUBit width refU i), -1)]
       Right False -> writeAdd 0 [(B (RefUBit width refU i), 1)]
 
--- zip and convert the RefU to a bunch of Limbs with a chunk of bits
--- let limbAndChunks = Limb.zipAndConvertRefUToLimbs fieldWidth (RefUX width varU) bits
--- forM_ limbAndChunks $ \(limb, chunk) ->
 compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do
