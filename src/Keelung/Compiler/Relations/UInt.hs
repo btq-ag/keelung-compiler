@@ -57,7 +57,7 @@ data Relation
   = Equal -- a = b
   deriving
     ( -- | ShiftLeft Int -- a = b << n
-      Eq,
+      Show, Eq,
       Generic,
       NFData
     )

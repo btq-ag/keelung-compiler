@@ -37,6 +37,8 @@ import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
+import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Prelude hiding (lookup)
 
 data Relations n = Relations
@@ -103,15 +105,47 @@ assignU var val = updateRelationsU $ UInt.assignRefU var val
 relateB :: (GaloisField n, Integral n) => GaloisField n => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateB refA (polarity, refB) = updateRelationsR (Ref.relateB refA (polarity, refB))
 
--- | Lookup the relation between the RefUs of the Limbs first before relating the Limbs
+-- -- | Lookup the relation between the RefUs of the Limbs first before relating the Limbs
+-- relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
+-- relateL var1 var2 relations =
+--   let var1' = UInt.lookupRefU (exportUIntRelations relations) (Limb.lmbRef var1)
+--       var2' = UInt.lookupRefU (exportUIntRelations relations) (Limb.lmbRef var2)
+--   in case (var1', var2') of
+--       (Left varU1', Left varU2') -> do
+--         let limb1' = var1 {Limb.lmbRef = varU1'}
+--         let limb2' = var2 {Limb.lmbRef = varU2'}
+--         -- both Limbs have RefUs, so we relate the RefUs instead
+--         relateLimbs limb1' limb2' relations
+--       (Left varU1', Right val2') -> do
+
 relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateL var1 var2 relations = case EquivClass.relationBetween (UInt.Ref (Limb.lmbRef var1)) (UInt.Ref (Limb.lmbRef var2)) (exportUIntRelations relations) of
-  Nothing ->
-    -- no relations between the RefUs of the Limbs, so we relate the Limbs instead
-    updateRelationsL (LimbRelations.relate var1 var2) relations
-  Just UInt.Equal ->
-    -- the RefUs of the Limbs are equal, so we do nothing (no need to relate the Limbs)
-    return relations
+relateL limb1 limb2 relations =
+  let result1 = lookupLimb limb1 relations
+      result2 = lookupLimb limb2 relations
+   in case (result1, result2) of
+        (Left limb1', Left limb2') -> case EquivClass.relationBetween (UInt.Ref (Limb.lmbRef limb1)) (UInt.Ref (Limb.lmbRef limb2)) (exportUIntRelations relations) of
+          Nothing ->
+            -- no relations between the RefUs of the Limbs, so we relate the Limbs instead
+            updateRelationsL (LimbRelations.relate limb1' limb2') relations
+          Just UInt.Equal ->
+            -- the RefUs of the Limbs are equal, so we do nothing (no need to relate the Limbs)
+            return relations
+        (Left limb1', Right val2') -> updateRelationsL (LimbRelations.assign limb1' (toInteger val2')) relations
+        (Right val1', Left limb2') -> updateRelationsL (LimbRelations.assign limb2' (toInteger val1')) relations
+        (Right val1', Right val2') -> if val1' == val2' then return relations else throwError $ ConflictingValuesU (toInteger val1') (toInteger val2')
+
+lookupLimb :: (GaloisField n, Integral n) => Limb -> Relations n -> Either Limb U
+lookupLimb limb relations = case UInt.lookupRefU (exportUIntRelations relations) (Limb.lmbRef limb) of
+  Left rootVar -> Left (limb {Limb.lmbRef = rootVar}) -- replace the RefU of the Limb with the root of that RefU
+  Right rootVal -> Right (U.adjustWidth (Limb.lmbWidth limb) rootVal) -- the parent of this limb turned out to be a constant
+
+-- in traceShow ("relateL", var1, var2, EquivClass.relationBetween (UInt.Ref (Limb.lmbRef var1)) (UInt.Ref (Limb.lmbRef var2)) (exportUIntRelations relations)) $ case EquivClass.relationBetween (UInt.Ref (Limb.lmbRef var1)) (UInt.Ref (Limb.lmbRef var2)) (exportUIntRelations relations) of
+-- Nothing ->
+--   -- no relations between the RefUs of the Limbs, so we relate the Limbs instead
+--   updateRelationsL (LimbRelations.relate var1 var2) relations
+-- Just UInt.Equal ->
+--   -- the RefUs of the Limbs are equal, so we do nothing (no need to relate the Limbs)
+--   return relations
 
 relateU :: (GaloisField n, Integral n) => RefU -> RefU -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateU var1 var2 = updateRelationsU $ UInt.relateRefU var1 var2

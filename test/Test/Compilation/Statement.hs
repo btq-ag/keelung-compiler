@@ -83,3 +83,20 @@ tests = describe "Statement" $ do
         let bits = map (\b -> if b then true else false) $ Data.Bits.testBit x <$> [0 .. 7]
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           runAll field (program bits) [] [] [fromIntegral x]
+
+    it "from Field element" $ do
+      let program = do
+            x' <- input Public
+            x <- toUInt 2 x' :: Comp (UInt 2)
+            pack [x !!! 0, x !!! 1] :: Comp (UInt 2)
+      property $ \(x :: Word) -> do
+        let set (i, b) x' = if b then Data.Bits.setBit x' i else x'
+            expected = foldr set (0 :: Word) $ [ (i, Data.Bits.testBit x i) | i <- [0 .. 1] ]
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+          runAll field program [fromIntegral x] [] [fromIntegral expected]
+
+      -- let x = 2 :: Word
+      -- let set (i, b) x' = if b then Data.Bits.setBit x' i else x'
+      --     expected = foldr set (0 :: Word) $ [ (i, Data.Bits.testBit x i) | i <- [0 .. 1] ]
+      -- debug (Prime 17) program
+      -- -- runAll (Prime 17) program [fromIntegral x] [] [fromIntegral expected]

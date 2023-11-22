@@ -76,20 +76,38 @@ compileSideEffect (ToField width varU varF) = do
     (limb : _) -> writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
 compileSideEffect (ToUInt width varU varF) = do
   fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
-  -- convert the RefU to a bunch of Limbs
-  let limbs = Limb.refUToLimbs fieldWidth (RefUX width varU)
-  case limbs of
-    [] -> writeRefFVal (RefFX varF) 0
-    (limb : rest) -> do
-      -- only matching the first Limb with the RefF
-      writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
-      -- assign the rest of the Limbs as 0
-      forM_ rest $ \lmb -> writeLimbVal lmb 0
+  -- convert the RefU to a bunch of Limbs all with width of 1
+  -- there should be `fieldWidth` number of limbs here
+  let limbs = [ Limb.new (RefUX width varU) 1 i (Left True) | i <- [0 .. fieldWidth - 1] ]
+
+  let (toF, rest) = splitAt width limbs
+
+  -- only matching the first `width` Limbs with the RefF
+  writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 2 ^ Limb.lmbOffset limb) | limb <- toF]
+  -- assing the rest of the Limbs as 0
+  forM_ rest $ \lmb -> writeLimbVal lmb 0
+
+-- compileSideEffect (ToUInt width varU varF) = do
+--   fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+--   -- convert the RefU to a bunch of Limbs
+--   let limbs = Limb.refUToLimbs fieldWidth (RefUX width varU)
+--   case limbs of
+--     [] -> writeRefFVal (RefFX varF) 0
+--     (limb : rest) -> do
+--       -- only matching the first Limb with the RefF
+--       writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
+--       -- assign the rest of the Limbs as 0
+--       forM_ rest $ \lmb -> writeLimbVal lmb 0
 compileSideEffect (BitsToUInt width varU bits) = do
   let refU = RefUX width varU
   forM_ (zip [0 .. width - 1] bits) $ \(i, bit) -> do
     result <- compileExprB bit
     case result of
+      Left (RefUBit _ refU2 j) -> do 
+        let limb1 = Limb.new refU 1 i (Left True)
+        let limb2 = Limb.new refU2 1 j (Left True)
+        writeLimbEq  limb1 limb2
+        -- writeAdd 0 [(B (RefUBit width refU i), -1), (B var, 1)]
       Left var -> writeAdd 0 [(B (RefUBit width refU i), -1), (B var, 1)]
       Right True -> writeAdd 1 [(B (RefUBit width refU i), -1)]
       Right False -> writeAdd 0 [(B (RefUBit width refU i), 1)]

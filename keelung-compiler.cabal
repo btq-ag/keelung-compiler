@@ -209,6 +209,7 @@ test-suite keelung-test
       Test.Compilation.Boolean.Equality
       Test.Compilation.Boolean.Inequality
       Test.Compilation.Boolean.Logical
+      Test.Compilation.Experiment
       Test.Compilation.Field
       Test.Compilation.Field.Arithmetics
       Test.Compilation.Field.Conditional
