@@ -3,12 +3,10 @@
 
 module Test.Compilation.Experiment where
 
-import Data.Bits qualified
 import Keelung
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck
-import Control.Monad
 
 run :: IO ()
 run = hspec tests
@@ -24,15 +22,22 @@ tests = describe "Experiment" $ do
             x <- toUInt 2 x' :: Comp (UInt 2)
             pack [x !!! 0, x !!! 1] :: Comp (UInt 3)
       property $ \(x :: Word) -> do
-        let set (i, b) x' = if b then Data.Bits.setBit x' i else x'
-            expected = foldr set (0 :: Word) $ [ (i, Data.Bits.testBit x i) | i <- [0 .. 1] ]
-        forM_ [Prime 7] $ \field -> do
-        -- forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-          runAll field program [fromIntegral (x `mod` 4)] [] [fromIntegral expected]
+        runAll gf181 program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
+        runAll (Prime 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
+        runAll (Prime 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
+        runAll (Binary 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
+        runAll (Binary 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
 
-      -- let x = 1 :: Word
-      -- let set (i, b) x' = if b then Data.Bits.setBit x' i else x'
-      --     expected = foldr set (0 :: Word) $ [ (i, Data.Bits.testBit x i) | i <- [0 .. 1] ]
-      -- debug (Prime 2) program
-      -- debugUnoptimized (Prime 17) program
-      -- runAll (Prime 2) program [fromIntegral x] [] [fromIntegral expected]
+    it "from Field element" $ do
+      let program = do
+            x' <- input Public
+            x <- toUInt 8 x' :: Comp (UInt 8)
+            pack [x !!! 0, x !!! 1] :: Comp (UInt 3)
+      -- property $ \(x :: Word) -> do
+      --   runAll gf181 program [fromIntegral x] [] [fromIntegral x]
+      debug gf181 program
+
+-- runAll (Prime 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
+-- runAll (Prime 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
+-- runAll (Binary 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
+-- runAll (Binary 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]

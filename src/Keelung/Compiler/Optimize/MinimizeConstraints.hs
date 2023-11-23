@@ -15,8 +15,8 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Compiler.Relations.Limb qualified as Limb
+import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
