@@ -1,5 +1,5 @@
 -- For RefU Limb segement reference counting
-module Keelung.Data.IntervalTree (IntervalTree, new, increase, totalCount, isValid) where
+module Keelung.Data.IntervalTree (IntervalTree, new, adjust, totalCount, isValid) where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -17,12 +17,11 @@ type Interval = (Int, Int) -- start, (end, amount)
 new :: IntervalTree
 new = IntervalTree mempty
 
--- | O(min(n, W)): Increase the count of an interval.
-increase :: Interval -> Int -> IntervalTree -> IntervalTree
-increase interval amount (IntervalTree xs) =
+-- | O(min(n, W)): Adjust the count of an interval.
+adjust :: Interval -> Int -> IntervalTree -> IntervalTree
+adjust interval amount (IntervalTree xs) =
   let actions = calculateAction interval amount (IntervalTree xs)
    in executeActions actions (IntervalTree xs)
-
 
 -- | O(n): Compute the total count of all intervals in the tree (for testing purposes)
 totalCount :: IntervalTree -> Int
@@ -32,12 +31,13 @@ totalCount (IntervalTree xs) = IntMap.foldlWithKey' (\acc start (end, amount) ->
 --   Invariants:
 --      1. no two intervals overlap
 --      2. no interval has zero length
+--      3. no interval has 0 count
 isValid :: IntervalTree -> Bool
 isValid (IntervalTree xs) = fst $ IntMap.foldlWithKey' step (True, 0) xs
   where
     step :: (Bool, Int) -> Int -> (Int, Int) -> (Bool, Int)
-    step (valid, previousEnd) start (end, _) =
-      ( valid && start < end && previousEnd <= start,
+    step (valid, previousEnd) start (end, count) =
+      ( valid && start < end && previousEnd <= start && count /= 0,
         end
       )
 
@@ -137,7 +137,7 @@ executeActions actions (IntervalTree tree) = IntervalTree $ List.foldl' step tre
   where
     step :: IntMap Interval -> Action -> IntMap Interval
     step xs (InsertNew (start, end) amount) =
-      if start == end
+      if start == end || amount == 0
         then xs
         else IntMap.insert start (end, amount) xs
     step xs (RemoveExisting (start, end)) = case IntMap.lookup start xs of

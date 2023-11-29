@@ -12,8 +12,8 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Interval Tree" $ do
-  describe "insert" $ do
-    it "randomized" $ do
+  describe "IntervalTree.adjust" $ do
+    it "should preserve invariants after applying randomized adjustments" $ do
       property $ \operations -> do
         let tree = foldr applyOperation IntervalTree.new operations
         IntervalTree.totalCount tree `shouldBe` sum (map countOperation operations)
@@ -22,7 +22,7 @@ tests = describe "Interval Tree" $ do
 --------------------------------------------------------------------------------
 
 -- | Datatype for testing operations on interval trees
-data Operation = Increase (Int, Int) Int deriving (Eq, Show)
+data Operation = Adjust (Int, Int) Int deriving (Eq, Show)
 
 -- | Generate a random operation
 instance Arbitrary Operation where
@@ -30,13 +30,13 @@ instance Arbitrary Operation where
     start <- chooseInt (0, 100)
     len <- chooseInt (0, 100)
     let end = start + len
-    amount <- chooseInt (0, 100)
-    pure $ Increase (start, end) amount
+    amount <- chooseInt (-100, 100)
+    pure $ Adjust (start, end) amount
 
 -- | Apply an operation to an interval tree
 applyOperation :: Operation -> IntervalTree -> IntervalTree
-applyOperation (Increase interval amount) = IntervalTree.increase interval amount
+applyOperation (Adjust interval amount) = IntervalTree.adjust interval amount
 
 -- | Calculate the total count of an operation
 countOperation :: Operation -> Int
-countOperation (Increase (start, end) amount) = amount * (end - start)
+countOperation (Adjust (start, end) amount) = amount * (end - start)
