@@ -1,9 +1,9 @@
 {-# LANGUAGE DataKinds #-}
 
-module Test.Data.IntervalTree (tests, run) where
+module Test.Data.IntervalSet (tests, run) where
 
-import Keelung.Data.IntervalTree (IntervalTree)
-import Keelung.Data.IntervalTree qualified as IntervalTree
+import Keelung.Data.IntervalSet (IntervalSet)
+import Keelung.Data.IntervalSet qualified as IntervalSet
 import Test.Hspec
 import Test.QuickCheck
 
@@ -11,17 +11,17 @@ run :: IO ()
 run = hspec tests
 
 tests :: SpecWith ()
-tests = describe "Interval Tree" $ do
-  describe "IntervalTree.adjust" $ do
+tests = describe "Interval Sets" $ do
+  describe "IntervalSet.adjust" $ do
     it "should preserve invariants after applying randomized adjustments" $ do
       property $ \operations -> do
-        let tree = foldr applyOperation IntervalTree.new operations
-        IntervalTree.count tree `shouldBe` sum (map countOfOperation operations)
-        IntervalTree.isValid tree `shouldBe` True
+        let set = foldr applyOperation IntervalSet.new operations
+        IntervalSet.count set `shouldBe` sum (map countOfOperation operations)
+        IntervalSet.isValid set `shouldBe` True
 
 --------------------------------------------------------------------------------
 
--- | Datatype for testing operations on interval trees
+-- | Datatype for testing operations on interval sets
 data Operation = Adjust (Int, Int) Int deriving (Eq, Show)
 
 -- | Generate a random operation
@@ -33,9 +33,9 @@ instance Arbitrary Operation where
     amount <- chooseInt (-100, 100)
     pure $ Adjust (start, end) amount
 
--- | Apply an operation to an interval tree
-applyOperation :: Operation -> IntervalTree -> IntervalTree
-applyOperation (Adjust interval amount) = IntervalTree.adjust interval amount
+-- | Apply an operation to an interval set
+applyOperation :: Operation -> IntervalSet -> IntervalSet
+applyOperation (Adjust interval amount) = IntervalSet.adjust interval amount
 
 -- | Calculate the total count of an operation
 countOfOperation :: Operation -> Int

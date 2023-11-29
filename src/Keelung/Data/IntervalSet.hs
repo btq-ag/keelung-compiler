@@ -1,59 +1,58 @@
 -- For RefU Limb segement reference counting
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Data.IntervalTree (IntervalTree, new, adjust, size, count, member, toIntervals, isValid) where
+module Keelung.Data.IntervalSet (IntervalSet, new, adjust, size, count, member, toIntervals, isValid) where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List qualified as List
-import Debug.Trace
 import GHC.Generics (Generic)
 
 -- | Key: start of an interval
 --   Value: (end of the interval, count of the interval)
 --    invariant: no two intervals overlap
-newtype IntervalTree = IntervalTree (IntMap Interval) deriving (Eq, Show, Generic)
+newtype IntervalSet = IntervalSet (IntMap Interval) deriving (Eq, Show, Generic)
 
-instance NFData IntervalTree
+instance NFData IntervalSet
 
 type Interval = (Int, Int) -- start, (end, amount)
 
--- | O(1): Create an empty interval tree
-new :: IntervalTree
-new = IntervalTree mempty
+-- | O(1): Create an empty interval set
+new :: IntervalSet
+new = IntervalSet mempty
 
 -- | O(min(n, W)): Adjust the count of an interval.
-adjust :: Interval -> Int -> IntervalTree -> IntervalTree
-adjust interval amount (IntervalTree xs) =
-  let actions = calculateAction interval amount (IntervalTree xs)
-   in executeActions actions (IntervalTree xs)
+adjust :: Interval -> Int -> IntervalSet -> IntervalSet
+adjust interval amount (IntervalSet xs) =
+  let actions = calculateAction interval amount (IntervalSet xs)
+   in executeActions actions (IntervalSet xs)
 
--- | O(n): Compute the total size of all intervals in the tree (ignoring count)
-size :: IntervalTree -> Int
-size (IntervalTree xs) = IntMap.foldlWithKey' (\acc start (end, _) -> acc + (end - start)) 0 xs
+-- | O(n): Compute the total size of all intervals (ignoring count)
+size :: IntervalSet -> Int
+size (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, _) -> acc + (end - start)) 0 xs
 
--- | O(n): Compute the total count of all intervals in the tree (for testing purposes)
-count :: IntervalTree -> Int
-count (IntervalTree xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
+-- | O(n): Compute the total count of all intervals (for testing purposes)
+count :: IntervalSet -> Int
+count (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
 
--- | O(n): Get all intervals in an interval tree
-toIntervals :: IntervalTree -> [Interval]
-toIntervals (IntervalTree xs) = map (\(start, (end, _)) -> (start, end)) $ IntMap.toList xs
+-- | O(n): Get all intervals
+toIntervals :: IntervalSet -> [Interval]
+toIntervals (IntervalSet xs) = map (\(start, (end, _)) -> (start, end)) $ IntMap.toList xs
 
--- | O(min(n, W)): Check if an variable is in an interval tree
-member :: Int -> IntervalTree -> Bool
-member x (IntervalTree xs) = case IntMap.lookupLE x xs of
+-- | O(min(n, W)): Check if an variable is in one of the intervals
+member :: Int -> IntervalSet -> Bool
+member x (IntervalSet xs) = case IntMap.lookupLE x xs of
   Nothing -> False
   Just (start, (end, _)) -> start <= x && x < end
 
--- | O(n): Check if an interval tree is valid (for testing purposes)
+-- | O(n): Check if these intervals are valid (for testing purposes)
 --   Invariants:
 --      1. no two intervals overlap
 --      2. no interval has zero length
 --      3. no interval has 0 count
-isValid :: IntervalTree -> Bool
-isValid (IntervalTree xs) = fst $ IntMap.foldlWithKey' step (True, 0) xs
+isValid :: IntervalSet -> Bool
+isValid (IntervalSet xs) = fst $ IntMap.foldlWithKey' step (True, 0) xs
   where
     step :: (Bool, Int) -> Int -> (Int, Int) -> (Bool, Int)
     step (valid, previousEnd) start (end, n) =
@@ -63,7 +62,7 @@ isValid (IntervalTree xs) = fst $ IntMap.foldlWithKey' step (True, 0) xs
 
 --------------------------------------------------------------------------------
 
--- | Actions to be executed on an interval tree
+-- | Actions to be executed on an interval set
 data Action
   = InsertNew
       Interval -- interval to be inserted
@@ -72,19 +71,19 @@ data Action
       (Int, Int) -- interval of existing interval to be removed
   deriving (Eq, Show)
 
--- | Calculate the actions needed to insert an interval into an interval tree
-calculateAction :: Interval -> Int -> IntervalTree -> [Action]
-calculateAction inserted@(start, end) amount (IntervalTree xs) = case IntMap.lookupLT start xs of
+-- | Calculate the actions needed to insert an interval into an interval set
+calculateAction :: Interval -> Int -> IntervalSet -> [Action]
+calculateAction inserted@(start, end) amount (IntervalSet xs) = case IntMap.lookupLT start xs of
   Nothing ->
     --   inserted      ├─────────────────┤
     --   existing
-    calculateActionAfter inserted amount (IntervalTree xs)
+    calculateActionAfter inserted amount (IntervalSet xs)
   Just (existingStart, (existingEnd, existingAmount)) ->
     if start >= existingEnd
       then --
       -- inserted                  ├─────┤
       -- existing      ├─────┤
-        calculateActionAfter inserted amount (IntervalTree xs)
+        calculateActionAfter inserted amount (IntervalSet xs)
       else
         if end >= existingEnd
           then --
@@ -98,7 +97,7 @@ calculateAction inserted@(start, end) amount (IntervalTree xs) = case IntMap.loo
             let removeExisting = RemoveExisting (existingStart, existingEnd)
                 insertPart1 = InsertNew (existingStart, start) existingAmount
                 insertPart2 = InsertNew (start, existingEnd) (existingAmount + amount)
-                restActions = calculateActionAfter (existingEnd, end) amount (IntervalTree xs)
+                restActions = calculateActionAfter (existingEnd, end) amount (IntervalSet xs)
              in removeExisting : insertPart1 : insertPart2 : restActions
           else --
           -- inserted            ├─────┤
@@ -114,9 +113,9 @@ calculateAction inserted@(start, end) amount (IntervalTree xs) = case IntMap.loo
                 insertPart3 = InsertNew (end, existingEnd) existingAmount
              in [removeExisting, insertPart1, insertPart2, insertPart3]
 
--- | Calculate the actions needed to insert an interval into an interval tree with existing intervals after it
-calculateActionAfter :: Interval -> Int -> IntervalTree -> [Action]
-calculateActionAfter inserted@(start, end) amount (IntervalTree xs) = case IntMap.lookupGE start xs of
+-- | Calculate the actions needed to insert an interval into an interval set with existing intervals after it
+calculateActionAfter :: Interval -> Int -> IntervalSet -> [Action]
+calculateActionAfter inserted@(start, end) amount (IntervalSet xs) = case IntMap.lookupGE start xs of
   Nothing ->
     -- inserted          ├─────────────────┤
     -- existing
@@ -148,12 +147,12 @@ calculateActionAfter inserted@(start, end) amount (IntervalTree xs) = case IntMa
         let removeExisting = RemoveExisting (existingStart, existingEnd)
             insertPart1 = InsertNew (start, existingStart) amount
             insertPart2 = InsertNew (existingStart, existingEnd) (existingAmount + amount)
-            restActions = calculateActionAfter (existingEnd, end) amount (IntervalTree xs)
+            restActions = calculateActionAfter (existingEnd, end) amount (IntervalSet xs)
          in removeExisting : insertPart1 : insertPart2 : restActions
 
--- | Execute a list of actions on an interval tree
-executeActions :: [Action] -> IntervalTree -> IntervalTree
-executeActions actions (IntervalTree tree) = IntervalTree $ List.foldl' step tree actions
+-- | Execute a list of actions on an interval set
+executeActions :: [Action] -> IntervalSet -> IntervalSet
+executeActions actions (IntervalSet set) = IntervalSet $ List.foldl' step set actions
   where
     step :: IntMap Interval -> Action -> IntMap Interval
     step xs (InsertNew (start, end) amount) =
@@ -161,8 +160,8 @@ executeActions actions (IntervalTree tree) = IntervalTree $ List.foldl' step tre
         then xs
         else IntMap.insert start (end, amount) xs
     step xs (RemoveExisting (start, end)) = case IntMap.lookup start xs of
-      Nothing -> error "[ panic ] IntervalTree: trying to remove non-existing interval"
+      Nothing -> error "[ panic ] IntervalSet: trying to remove non-existing interval"
       Just (existingEnd, existingAmount) ->
         if existingEnd <= end
           then IntMap.delete start xs
-          else IntMap.insert end (existingEnd, existingAmount) $ traceShow ("delete", (start, end), xs, IntMap.delete start xs) $ IntMap.delete start xs
+          else IntMap.insert end (existingEnd, existingAmount) (IntMap.delete start xs)

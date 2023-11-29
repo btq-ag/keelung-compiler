@@ -33,11 +33,6 @@ tests = describe "Experiment" $ do
             x' <- input Public
             x <- toUInt 8 x' :: Comp (UInt 8)
             pack [x !!! 0, x !!! 1] :: Comp (UInt 3)
-      -- property $ \(x :: Word) -> do
-      --   runAll gf181 program [fromIntegral x] [] [fromIntegral x]
-      debug gf181 program
-
--- runAll (Prime 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
--- runAll (Prime 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
--- runAll (Binary 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
--- runAll (Binary 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
+      property $ \(x :: Word) -> do
+        runAll gf181 program [fromIntegral x] [] [fromIntegral x]
+      -- debug gf181 program

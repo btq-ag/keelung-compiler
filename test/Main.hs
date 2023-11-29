@@ -3,7 +3,7 @@
 module Main where
 
 import Test.Compilation qualified as Compilation
-import Test.Data.IntervalTree qualified as Data.IntervalTree
+import Test.Data.IntervalSet qualified as Data.IntervalSet
 import Test.Data.LC qualified as Data.LC
 import Test.Hspec (hspec)
 import Test.IndexTable qualified as IndexTable
@@ -21,4 +21,4 @@ main = hspec $ do
   Relations.tests
   Intergration.tests
   Data.LC.tests
-  Data.IntervalTree.tests
+  Data.IntervalSet.tests
