@@ -1,15 +1,21 @@
 -- For RefU Limb segement reference counting
-module Keelung.Data.IntervalTree (IntervalTree, new, adjust, toIntervals, totalCount, isValid) where
+{-# LANGUAGE DeriveGeneric #-}
 
+module Keelung.Data.IntervalTree (IntervalTree, new, adjust, size, count, member, toIntervals, isValid) where
+
+import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List qualified as List
 import Debug.Trace
+import GHC.Generics (Generic)
 
 -- | Key: start of an interval
 --   Value: (end of the interval, count of the interval)
 --    invariant: no two intervals overlap
-newtype IntervalTree = IntervalTree (IntMap Interval) deriving (Eq, Show)
+newtype IntervalTree = IntervalTree (IntMap Interval) deriving (Eq, Show, Generic)
+
+instance NFData IntervalTree
 
 type Interval = (Int, Int) -- start, (end, amount)
 
@@ -23,9 +29,23 @@ adjust interval amount (IntervalTree xs) =
   let actions = calculateAction interval amount (IntervalTree xs)
    in executeActions actions (IntervalTree xs)
 
+-- | O(n): Compute the total size of all intervals in the tree (ignoring count)
+size :: IntervalTree -> Int
+size (IntervalTree xs) = IntMap.foldlWithKey' (\acc start (end, _) -> acc + (end - start)) 0 xs
+
 -- | O(n): Compute the total count of all intervals in the tree (for testing purposes)
-totalCount :: IntervalTree -> Int
-totalCount (IntervalTree xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
+count :: IntervalTree -> Int
+count (IntervalTree xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
+
+-- | O(n): Get all intervals in an interval tree
+toIntervals :: IntervalTree -> [Interval]
+toIntervals (IntervalTree xs) = map (\(start, (end, _)) -> (start, end)) $ IntMap.toList xs
+
+-- | O(min(n, W)): Check if an variable is in an interval tree
+member :: Int -> IntervalTree -> Bool
+member x (IntervalTree xs) = case IntMap.lookupLE x xs of
+  Nothing -> False
+  Just (start, (end, _)) -> start <= x && x < end
 
 -- | O(n): Check if an interval tree is valid (for testing purposes)
 --   Invariants:
@@ -36,14 +56,10 @@ isValid :: IntervalTree -> Bool
 isValid (IntervalTree xs) = fst $ IntMap.foldlWithKey' step (True, 0) xs
   where
     step :: (Bool, Int) -> Int -> (Int, Int) -> (Bool, Int)
-    step (valid, previousEnd) start (end, count) =
-      ( valid && start < end && previousEnd <= start && count /= 0,
+    step (valid, previousEnd) start (end, n) =
+      ( valid && start < end && previousEnd <= start && n /= 0,
         end
       )
-
--- | O(n): Get all intervals in an interval tree
-toIntervals :: IntervalTree -> [Interval]
-toIntervals (IntervalTree xs) = map (\(start, (end, _)) -> (start, end)) $ IntMap.toList xs
 
 --------------------------------------------------------------------------------
 

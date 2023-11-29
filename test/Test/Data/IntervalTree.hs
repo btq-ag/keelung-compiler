@@ -16,7 +16,7 @@ tests = describe "Interval Tree" $ do
     it "should preserve invariants after applying randomized adjustments" $ do
       property $ \operations -> do
         let tree = foldr applyOperation IntervalTree.new operations
-        IntervalTree.totalCount tree `shouldBe` sum (map countOperation operations)
+        IntervalTree.count tree `shouldBe` sum (map countOfOperation operations)
         IntervalTree.isValid tree `shouldBe` True
 
 --------------------------------------------------------------------------------
@@ -38,5 +38,5 @@ applyOperation :: Operation -> IntervalTree -> IntervalTree
 applyOperation (Adjust interval amount) = IntervalTree.adjust interval amount
 
 -- | Calculate the total count of an operation
-countOperation :: Operation -> Int
-countOperation (Adjust (start, end) amount) = amount * (end - start)
+countOfOperation :: Operation -> Int
+countOfOperation (Adjust (start, end) amount) = amount * (end - start)
