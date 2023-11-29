@@ -17,6 +17,7 @@ tests = describe "Interval Tree" $ do
       property $ \operations -> do
         let tree = foldr applyOperation IntervalTree.new operations
         IntervalTree.totalCount tree `shouldBe` sum (map countOperation operations)
+        IntervalTree.isValid tree `shouldBe` True
 
 --------------------------------------------------------------------------------
 

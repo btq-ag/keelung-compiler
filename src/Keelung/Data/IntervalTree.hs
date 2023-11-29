@@ -1,5 +1,5 @@
 -- For RefU Limb segement reference counting
-module Keelung.Data.IntervalTree (IntervalTree, new, increase, totalCount) where
+module Keelung.Data.IntervalTree (IntervalTree, new, increase, totalCount, isValid) where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -17,15 +17,29 @@ type Interval = (Int, Int) -- start, (end, amount)
 new :: IntervalTree
 new = IntervalTree mempty
 
--- | O(min(n, W)): Increase the count of an interval
+-- | O(min(n, W)): Increase the count of an interval.
 increase :: Interval -> Int -> IntervalTree -> IntervalTree
 increase interval amount (IntervalTree xs) =
   let actions = calculateAction interval amount (IntervalTree xs)
    in executeActions actions (IntervalTree xs)
 
+
 -- | O(n): Compute the total count of all intervals in the tree (for testing purposes)
 totalCount :: IntervalTree -> Int
 totalCount (IntervalTree xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
+
+-- | O(n): Check if an interval tree is valid (for testing purposes)
+--   Invariants:
+--      1. no two intervals overlap
+--      2. no interval has zero length
+isValid :: IntervalTree -> Bool
+isValid (IntervalTree xs) = fst $ IntMap.foldlWithKey' step (True, 0) xs
+  where
+    step :: (Bool, Int) -> Int -> (Int, Int) -> (Bool, Int)
+    step (valid, previousEnd) start (end, _) =
+      ( valid && start < end && previousEnd <= start,
+        end
+      )
 
 --------------------------------------------------------------------------------
 
