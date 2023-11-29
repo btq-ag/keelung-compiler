@@ -5,107 +5,94 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 
 -- | Key: start of an interval
---   Value: (length of the interval, count of the interval)
+--   Value: (end of the interval, count of the interval)
 --    invariant: no two intervals overlap
 newtype IntervalTree = IntervalTree (IntMap (Int, Int)) deriving (Eq, Show)
 
-type Interval = (Int, (Int, Int)) -- start, length
-
--- data Interval = Interval
---   { intervalStart :: Int,
---     intervalLength :: Int,
---     intervalCount :: Int
---   } deriving (Eq, Show)
+type Interval = (Int, (Int, Int)) -- start, (end, amount)
 
 new :: IntervalTree
 new = IntervalTree mempty
 
--- lookup :: Interval -> IntervalTree -> [(Interval, Int)]
--- lookup (start, len) (IntervalTree xs) = case IntMap.lookupLE start xs of
---   Nothing ->  -- no intervals before start
---     case IntMap.lookupGT start xs of
---         Nothing -> [] -- no intervals after start
---         Just (startAfter, lenAfter) -> if startAfter < start + len -- overlap with the interval after
---             then _
---             else []
---   Just (startBefore, lenBefore) -> _
+insert :: Interval -> IntervalTree -> IntervalTree
+insert interval (IntervalTree xs) =
+  let actions = calculateAction interval (IntervalTree xs)
+   in executeActions actions (IntervalTree xs)
 
--- | Increase the count of an interval by a given amount
--- insert :: Interval -> IntervalTree -> IntervalTree
--- insert (start, (len, amount)) (IntervalTree xs) =
---   let (before, after) = IntMap.spanAntitone (>= start) xs
---    in case IntMap.lookupMax before of
---         Nothing -> case IntMap.lookupMin after of
---           Nothing -> IntervalTree $ IntMap.singleton start (len, amount)
---           Just (startAfter, (lenAfter, amountAfter)) ->
---             --      existing        ├───────────────┤
---             --      new      ├──────────────┤
---             --      paers    └───1──┴───2───┴───3───┘
---             --      existing        ├───────┤
---             --      new      ├──────────────────────┤
---             --      paers    └───1──┴───2───┴───3───┘
---             if startAfter < start + len
---               then
---               else IntervalTree $ IntMap.insert start (len, amount) xs -- no overlap
---         Just (startBefore, (lenBefore, amountBefore)) -> _
+data Action
+  = InsertNew
+      Interval -- inserted
+  | RemoveExisting
+      Int -- start of the existing interval
 
--- data Overlap
---   = NoOverlap
---       Interval -- existing               ├──────┤
---       Interval -- new      ├──────┤
---   | Overlap
---       Interval -- existing        ├─────────────┤
---       Interval -- new      ├─────────────┤
---   deriving (Eq, Show)
+-- | Calculate the actions needed to insert an interval into an interval tree
+calculateAction :: Interval -> IntervalTree -> [Action]
+calculateAction inserted@(start, (end, amount)) (IntervalTree xs) = case IntMap.lookupLE start xs of
+  Nothing ->
+    --   inserted      ├─────────────────┤
+    --   existing
+    calculateActionAfter inserted (IntervalTree xs)
+  Just (existingStart, (existingEnd, existingAmount)) ->
+    if start >= existingEnd
+      then --
+      -- inserted                  ├─────┤
+      -- existing      ├─────┤
+        calculateActionAfter inserted (IntervalTree xs)
+      else --
+      -- inserted            ├───────────┤
+      -- existing      ├───────────┤
+      --            =>
+      -- inserted            ╠═════╣─────┤
+      -- existing      ├─────╠═════╣
+      --    parts         1     2
 
--- | Possible cases of overlap between the inserted interval and the existing interval before it
-data OverlapBefore
-  = NothingBefore
-      Interval -- inserted        ├─────────────┤
-  | NoOverlapBefore
-      Interval -- inserted        ├─────────────┤
-      Interval -- existing ├──┤
-  | OverlapBefore
-      Interval -- inserted        ├─────────────┤
-      Interval -- existing ├─────────────┤
---   | SubsumeBefore
---       Interval -- inserted        ├─────────────┤
---       Interval -- existing        ├──────┤
-  | SubsumedByBefore
-      Interval -- inserted        ├─────────────┤
-      Interval -- existing ├───────────────────────────┤
-  deriving (Eq, Show)
+        let removeExisting = RemoveExisting existingStart
+            insertPart1 = InsertNew (start, (existingStart, amount))
+            insertPart2 = InsertNew (existingStart, (end, existingAmount + amount))
+            restActions = calculateActionAfter (existingEnd, (end, amount)) (IntervalTree xs)
+         in removeExisting : insertPart1 : insertPart2 : restActions
 
-lookupOverlapBefore :: Interval -> IntervalTree -> OverlapBefore
-lookupOverlapBefore inserted@(start, (len, amount)) (IntervalTree xs) = case IntMap.lookupLE start xs of
-  Nothing -> NothingBefore inserted
-  Just before@(startBefore, (lenBefore, amountBefore)) ->
-    let endBefore = startBefore + lenBefore
-     in if endBefore < start
-          then NoOverlapBefore inserted before
-          else
-            if endBefore < start + len
-              then OverlapBefore inserted before
-              else SubsumedByBefore inserted before
+-- | Calculate the actions needed to insert an interval into an interval tree with existing intervals after it
+calculateActionAfter :: Interval -> IntervalTree -> [Action]
+calculateActionAfter inserted@(start, (end, amount)) (IntervalTree xs) = case IntMap.lookupGT start xs of
+  Nothing ->
+    -- inserted          ├─────────────────┤
+    -- existing
+    [InsertNew inserted]
+  Just (existingStart, (existingEnd, existingAmount))
+    | end <= existingStart ->
+        -- inserted      ├─────┤
+        -- existing                  ├─────┤
+        [InsertNew inserted]
+    | end <= existingEnd ->
+        -- inserted      ├───────────┤
+        -- existing            ├───────────┤
+        --            =>
+        -- inserted      ├─────╠═════╣
+        -- existing            ╠═════╣─────┤
+        --    parts         1     2     3
+        let removeExisting = RemoveExisting existingStart
+            insertPart1 = InsertNew (start, (existingStart, amount))
+            insertPart2 = InsertNew (existingStart, (end, existingAmount + amount))
+            insertPart3 = InsertNew (end, (existingEnd, existingAmount))
+         in [removeExisting, insertPart1, insertPart2, insertPart3]
+    | otherwise -> -- end > existingEnd
+    --     inserted      ├─────────────────┤
+    --     existing            ├─────┤
+    --                =>
+    --     inserted      ├─────╠═════╣─────┤
+    --     existing            ╠═════╣
+    --        parts         1     2     3
+        let removeExisting = RemoveExisting existingStart
+            insertPart1 = InsertNew (start, (existingStart, amount))
+            insertPart2 = InsertNew (existingStart, (existingEnd, existingAmount + amount))
+            restParts = calculateActionAfter (existingEnd, (end, amount)) (IntervalTree xs)
+         in removeExisting : insertPart1 : insertPart2 : restParts
 
---    in case (IntMap.lookupMax before, IntMap.lookupMin after) of
---         (Nothing, Nothing) -> IntervalTree $ IntMap.singleton start (len, amount)
---         (Nothing, Just theOneAfter) -> _
---         (Just theOneBefore, Nothing) -> _
---         (Just theOneBefore, Just theOneAfter) -> _
-
--- | Increase the count of an interval by a given amount
--- insert :: Interval -> IntervalTree -> IntervalTree
--- insert (start, (len, amount)) xs = IntervalTree $ case lookBack start xs of
---     Nothing -> case lookAhead start xs of
---         Nothing -> IntMap.singleton start (len, amount)
---         Just _ -> _
---     Just (startBefore, lenBefore) -> _
-
--- -- | Lookup the interval that ends at or before the given start
--- lookBack :: Int -> IntervalTree -> Maybe Interval
--- lookBack start (IntervalTree xs) = IntMap.lookupLE start xs
-
--- -- | Lookup the interval that starts at or after the given start
--- lookAhead :: Int -> IntervalTree -> Maybe Interval
--- lookAhead start (IntervalTree xs) = IntMap.lookupGE start xs
+-- | Execute a list of actions on an interval tree
+executeActions :: [Action] -> IntervalTree -> IntervalTree
+executeActions actions (IntervalTree tree) = IntervalTree $ foldl step tree actions
+  where
+    step :: IntMap (Int, Int) -> Action -> IntMap (Int, Int)
+    step xs (InsertNew (index, inserted)) = IntMap.insert index inserted xs
+    step xs (RemoveExisting index) = IntMap.delete index xs
