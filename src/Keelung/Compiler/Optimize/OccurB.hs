@@ -55,8 +55,6 @@ toList (MapB xs) = map (first RefBX) $ IntMap.toList xs
 toIndexTable :: Counters -> OccurB -> IndexTable
 toIndexTable counters (MapB xs) = IndexTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadBool), xs)
 
--- toIndexTable (MapB xs) = IndexTable.fromOccurrenceMap xs
-
 -- | O(1). Bump the count of a RefB
 increase :: Var -> OccurB -> OccurB
 increase var (MapB xs) = MapB $ IntMap.insertWith (+) var 1 xs

@@ -1,22 +1,26 @@
 -- For RefU Limb segement reference counting
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Data.IntervalSet (IntervalSet, new, adjust, size, count, member, toIntervals, isValid) where
+module Keelung.Data.IntervalSet (IntervalSet, new, adjust, expose, count, isValid) where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List qualified as List
 import GHC.Generics (Generic)
+import Keelung.Compiler.Util (showList')
 
 -- | Key: start of an interval
 --   Value: (end of the interval, count of the interval)
 --    invariant: no two intervals overlap
-newtype IntervalSet = IntervalSet (IntMap Interval) deriving (Eq, Show, Generic)
+newtype IntervalSet = IntervalSet (IntMap Interval) deriving (Eq, Generic)
+
+instance Show IntervalSet where
+  show (IntervalSet xs) = showList' $ map (\(start, (end, _)) -> show start <> " ~ " <> show end) $ IntMap.toList xs
 
 instance NFData IntervalSet
 
-type Interval = (Int, Int) -- start, (end, amount)
+type Interval = (Int, Int) -- (start, end)
 
 -- | O(1): Create an empty interval set
 new :: IntervalSet
@@ -28,23 +32,13 @@ adjust interval amount (IntervalSet xs) =
   let actions = calculateAction interval amount (IntervalSet xs)
    in executeActions actions (IntervalSet xs)
 
--- | O(n): Compute the total size of all intervals (ignoring count)
-size :: IntervalSet -> Int
-size (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, _) -> acc + (end - start)) 0 xs
-
 -- | O(n): Compute the total count of all intervals (for testing purposes)
 count :: IntervalSet -> Int
 count (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
 
--- | O(n): Get all intervals
-toIntervals :: IntervalSet -> [Interval]
-toIntervals (IntervalSet xs) = map (\(start, (end, _)) -> (start, end)) $ IntMap.toList xs
-
--- | O(min(n, W)): Check if an variable is in one of the intervals
-member :: Int -> IntervalSet -> Bool
-member x (IntervalSet xs) = case IntMap.lookupLE x xs of
-  Nothing -> False
-  Just (start, (end, _)) -> start <= x && x < end
+-- | O(1): Get the underlying IntMap (key: start, value: (end, count))
+expose :: IntervalSet -> IntMap Interval
+expose (IntervalSet xs) = xs
 
 -- | O(n): Check if these intervals are valid (for testing purposes)
 --   Invariants:

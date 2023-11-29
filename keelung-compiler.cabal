@@ -55,8 +55,8 @@ library
       Keelung.Compiler.Optimize.MinimizeConstraints
       Keelung.Compiler.Optimize.OccurB
       Keelung.Compiler.Optimize.OccurF
-      Keelung.Compiler.Optimize.OccurLimbBits
       Keelung.Compiler.Optimize.OccurU
+      Keelung.Compiler.Optimize.OccurUB
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations
       Keelung.Compiler.Relations.EquivClass
@@ -143,8 +143,8 @@ executable keelungc
       Keelung.Compiler.Optimize.MinimizeConstraints
       Keelung.Compiler.Optimize.OccurB
       Keelung.Compiler.Optimize.OccurF
-      Keelung.Compiler.Optimize.OccurLimbBits
       Keelung.Compiler.Optimize.OccurU
+      Keelung.Compiler.Optimize.OccurUB
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations
       Keelung.Compiler.Relations.EquivClass
@@ -287,8 +287,8 @@ test-suite keelung-test
       Keelung.Compiler.Optimize.MinimizeConstraints
       Keelung.Compiler.Optimize.OccurB
       Keelung.Compiler.Optimize.OccurF
-      Keelung.Compiler.Optimize.OccurLimbBits
       Keelung.Compiler.Optimize.OccurU
+      Keelung.Compiler.Optimize.OccurUB
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations
       Keelung.Compiler.Relations.EquivClass
