@@ -1,5 +1,5 @@
 -- For RefU Limb segement reference counting
-module Keelung.Data.IntervalTree (IntervalTree, new, increase, tally, expose) where
+module Keelung.Data.IntervalTree (IntervalTree, new, increase, totalCount) where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -13,21 +13,23 @@ newtype IntervalTree = IntervalTree (IntMap Interval) deriving (Eq, Show)
 
 type Interval = (Int, Int) -- start, (end, amount)
 
+-- | O(1): Create an empty interval tree
 new :: IntervalTree
 new = IntervalTree mempty
 
+-- | O(min(n, W)): Increase the count of an interval
 increase :: Interval -> Int -> IntervalTree -> IntervalTree
 increase interval amount (IntervalTree xs) =
   let actions = calculateAction interval amount (IntervalTree xs)
    in executeActions actions (IntervalTree xs)
 
--- | Tally the counts of all intervals in the tree (for testing purposes)
-tally :: IntervalTree -> Int
-tally (IntervalTree xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
+-- | O(n): Compute the total count of all intervals in the tree (for testing purposes)
+totalCount :: IntervalTree -> Int
+totalCount (IntervalTree xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
 
-expose :: IntervalTree -> IntMap (Int, Int)
-expose (IntervalTree xs) = xs
+--------------------------------------------------------------------------------
 
+-- | Actions to be executed on an interval tree
 data Action
   = InsertNew
       Interval -- interval to be inserted
@@ -42,13 +44,13 @@ calculateAction inserted@(start, end) amount (IntervalTree xs) = case IntMap.loo
   Nothing ->
     --   inserted      ├─────────────────┤
     --   existing
-    traceShow "before 0" calculateActionAfter inserted amount (IntervalTree xs)
+    calculateActionAfter inserted amount (IntervalTree xs)
   Just (existingStart, (existingEnd, existingAmount)) ->
     if start >= existingEnd
       then --
       -- inserted                  ├─────┤
       -- existing      ├─────┤
-        traceShow "before 1" calculateActionAfter inserted amount (IntervalTree xs)
+        calculateActionAfter inserted amount (IntervalTree xs)
       else
         if end >= existingEnd
           then --
@@ -63,7 +65,7 @@ calculateAction inserted@(start, end) amount (IntervalTree xs) = case IntMap.loo
                 insertPart1 = InsertNew (existingStart, start) existingAmount
                 insertPart2 = InsertNew (start, existingEnd) (existingAmount + amount)
                 restActions = calculateActionAfter (existingEnd, end) amount (IntervalTree xs)
-             in traceShow "before 2" removeExisting : insertPart1 : insertPart2 : restActions
+             in removeExisting : insertPart1 : insertPart2 : restActions
           else --
           -- inserted            ├─────┤
           -- existing      ├─────────────────┤
@@ -76,7 +78,7 @@ calculateAction inserted@(start, end) amount (IntervalTree xs) = case IntMap.loo
                 insertPart1 = InsertNew (existingStart, start) existingAmount
                 insertPart2 = InsertNew (start, end) (existingAmount + amount)
                 insertPart3 = InsertNew (end, existingEnd) existingAmount
-             in traceShow "before 3" [removeExisting, insertPart1, insertPart2, insertPart3]
+             in [removeExisting, insertPart1, insertPart2, insertPart3]
 
 -- | Calculate the actions needed to insert an interval into an interval tree with existing intervals after it
 calculateActionAfter :: Interval -> Int -> IntervalTree -> [Action]
@@ -84,12 +86,12 @@ calculateActionAfter inserted@(start, end) amount (IntervalTree xs) = case IntMa
   Nothing ->
     -- inserted          ├─────────────────┤
     -- existing
-    traceShow "after 0" [InsertNew inserted amount]
+    [InsertNew inserted amount]
   Just (existingStart, (existingEnd, existingAmount))
     | end <= existingStart ->
         -- inserted      ├─────┤
         -- existing                  ├─────┤
-        traceShow "after 1" [InsertNew inserted amount]
+        [InsertNew inserted amount]
     | end <= existingEnd ->
         -- inserted      ├───────────┤
         -- existing            ├───────────┤
@@ -101,7 +103,7 @@ calculateActionAfter inserted@(start, end) amount (IntervalTree xs) = case IntMa
             insertPart1 = InsertNew (start, existingStart) amount
             insertPart2 = InsertNew (existingStart, end) (existingAmount + amount)
             insertPart3 = InsertNew (end, existingEnd) existingAmount
-         in traceShow "after 2" [removeExisting, insertPart1, insertPart2, insertPart3]
+         in [removeExisting, insertPart1, insertPart2, insertPart3]
     | otherwise -> -- end > existingEnd
     --     inserted      ├─────────────────┤
     --     existing            ├─────┤
@@ -113,23 +115,20 @@ calculateActionAfter inserted@(start, end) amount (IntervalTree xs) = case IntMa
             insertPart1 = InsertNew (start, existingStart) amount
             insertPart2 = InsertNew (existingStart, existingEnd) (existingAmount + amount)
             restActions = calculateActionAfter (existingEnd, end) amount (IntervalTree xs)
-         in traceShow "after 3" removeExisting : insertPart1 : insertPart2 : restActions
+         in removeExisting : insertPart1 : insertPart2 : restActions
 
 -- | Execute a list of actions on an interval tree
 executeActions :: [Action] -> IntervalTree -> IntervalTree
-executeActions actions (IntervalTree tree) = traceShowId $ IntervalTree $ List.foldl' step tree actions
+executeActions actions (IntervalTree tree) = IntervalTree $ List.foldl' step tree actions
   where
     step :: IntMap Interval -> Action -> IntMap Interval
     step xs (InsertNew (start, end) amount) =
-      let inserted = if start == end 
-            then xs
-            else IntMap.insert start (end, amount) xs
-      in traceShow ("insert", (start, end), amount, xs, inserted)  inserted
+      if start == end
+        then xs
+        else IntMap.insert start (end, amount) xs
     step xs (RemoveExisting (start, end)) = case IntMap.lookup start xs of
       Nothing -> error "[ panic ] IntervalTree: trying to remove non-existing interval"
       Just (existingEnd, existingAmount) ->
         if existingEnd <= end
-          then traceShow ("delete", (start, end), xs, IntMap.delete start xs) $ IntMap.delete start xs
-          else traceShow ("update", (end, existingEnd), xs, IntMap.insert end (existingEnd, existingAmount) (IntMap.delete start xs)) $ IntMap.insert end (existingEnd, existingAmount) $ traceShow ("delete", (start, end), xs, IntMap.delete start xs) $ IntMap.delete start xs
-
--- traceShow ("delete", (start, end), xs) $ IntMap.delete start xs
+          then IntMap.delete start xs
+          else IntMap.insert end (existingEnd, existingAmount) $ traceShow ("delete", (start, end), xs, IntMap.delete start xs) $ IntMap.delete start xs
