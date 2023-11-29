@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.0.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
@@ -237,6 +237,7 @@ test-suite keelung-test
       Test.Compilation.UInt.ModInv
       Test.Compilation.UInt.Multiplication
       Test.Compilation.Util
+      Test.Data.IntervalTree
       Test.Data.LC
       Test.IndexTable
       Test.Intergration
