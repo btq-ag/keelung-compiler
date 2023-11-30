@@ -14,6 +14,16 @@ Visit the [Releases](https://github.com/btq-ag/keelung-compiler/releases) page t
 
 ## For Developers
 
+### Install
+
+After cloning the repository, run the following command in the root of the repository to build the project:
+
+```bash
+stack build
+```
+
+[Stack](https://docs.haskellstack.org/en/stable/README/) is the recommended build tool for Keelung, which can be installed via [GHCup](https://www.haskell.org/ghcup/).
+
 ### How to dockerize `keelungc`
 
 To dockerize the executable `keelungc`, run the following command in the root of the repository:

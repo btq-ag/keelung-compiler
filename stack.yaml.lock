@@ -70,7 +70,7 @@ packages:
     hackage: primitive-0.7.4.0@sha256:c2f0ed97b3dce97f2f43b239c3be8b136e4368f1eb7b61322ee9ac98f604622b,2982
 snapshots:
 - completed:
-    sha256: 7d4b649cf368f9076d8aa049aa44efe58950971d105892734e9957b2a26a2186
-    size: 640060
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/21.yaml
-  original: lts-21.21
+    sha256: 5a59b2a405b3aba3c00188453be172b85893cab8ebc352b1ef58b0eae5d248a2
+    size: 650475
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/26.yaml
+  original: lts-20.26

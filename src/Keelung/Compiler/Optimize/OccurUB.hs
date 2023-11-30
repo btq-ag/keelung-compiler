@@ -17,11 +17,7 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import GHC.Generics (Generic)
 import Keelung (Var, Width)
-import Keelung.Compiler.Compile.IndexTable (IndexTable)
-import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Util
-import Keelung.Data.IntervalSet (IntervalSet)
-import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.Reference
 import Prelude hiding (null)
 
