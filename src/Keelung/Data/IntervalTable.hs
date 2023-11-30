@@ -1,4 +1,4 @@
-module Keelung.Data.IntervalTable (IntervalTable (IntervalTable), empty, fromOccurrenceMap, reindex, merge) where
+module Keelung.Data.IntervalTable (IntervalTable (IntervalTable), empty, member, size, fromOccurrenceMap, reindex, merge) where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -55,8 +55,14 @@ empty :: IntervalTable
 empty = IntervalTable 0 0 mempty
 
 -- | O(1). Is this variable used?
--- member :: IntervalTable -> Int -> Bool
--- member (IntervalTable _ _ xs) var = IntMap.member var xs
+member :: Int -> IntervalTable -> Bool
+member var (IntervalTable _ _ xs) = case IntMap.lookupLE var xs of
+  Nothing -> False
+  Just (start, (end, _)) -> start <= var && var < end
+
+-- | O(1). The number of used variables
+size :: IntervalTable -> Int
+size (IntervalTable _ totalUsedSize _) = totalUsedSize
 
 -- | O(n). Construct an IntervalTable from an ocurence map
 fromOccurrenceMap :: Width -> (Int, IntMap Int) -> IntervalTable

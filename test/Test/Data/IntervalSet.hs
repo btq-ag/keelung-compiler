@@ -2,8 +2,10 @@
 
 module Test.Data.IntervalSet (tests, run) where
 
+import Control.Monad (foldM, forM_)
 import Keelung.Data.IntervalSet (IntervalSet)
 import Keelung.Data.IntervalSet qualified as IntervalSet
+import Keelung.Data.IntervalTable qualified as IntervalTable
 import Test.Hspec
 import Test.QuickCheck
 
@@ -18,6 +20,15 @@ tests = describe "Interval Sets" $ do
         let intervals = foldr applyOperation IntervalSet.new operations
         IntervalSet.count intervals `shouldBe` sum (map countOfOperation operations)
         IntervalSet.isValid intervals `shouldBe` True
+
+  describe "IntervalSet.toIntervalTable" $ do
+    it "should generate well-behaved IntervalTable" $ do
+      property $ \(NonOverlappingOperations operations points) -> do
+        let intervals = foldr applyOperation IntervalSet.new operations
+        let table = IntervalSet.toIntervalTable 200 intervals
+        IntervalTable.size table `shouldBe` sum (map sizeOfOperation operations)
+        forM_ points $ \point -> do
+          IntervalTable.member point table `shouldBe` memberOfNonOverlappingOperations (NonOverlappingOperations operations points) point
 
 --------------------------------------------------------------------------------
 
@@ -40,3 +51,42 @@ applyOperation (Adjust interval amount) = IntervalSet.adjust interval amount
 -- | Calculate the total count of an operation
 countOfOperation :: Operation -> Int
 countOfOperation (Adjust (start, end) amount) = amount * (end - start)
+
+-- | Calculate the total size of an operation
+sizeOfOperation :: Operation -> Int
+sizeOfOperation (Adjust (start, end) amount) = if amount == 0 then 0 else end - start
+
+--------------------------------------------------------------------------------
+
+-- | Datatype for testing operations on non-overlapping interval sets
+data NonOverlappingOperations = NonOverlappingOperations [Operation] [Int] deriving (Eq, Show)
+
+-- | Generate a random operation
+instance Arbitrary NonOverlappingOperations where
+  arbitrary = do
+    numberOfEntries <- chooseInt (0, 10)
+    entries <-
+      fst
+        <$> foldM
+          ( \(acc, prevEnd) _ -> do
+              gap <- chooseInt (0, 10)
+              let start = prevEnd + gap
+              x@(Adjust (_, end) _) <- genOperation start
+              return (x : acc, end)
+          )
+          ([], 0)
+          [1 .. numberOfEntries]
+
+    points <- listOf $ chooseInt (0, 200)
+
+    return $ NonOverlappingOperations entries points
+    where
+      genOperation start = do
+        len <- chooseInt (0, 10)
+        let end = start + len
+        amount <- chooseInt (0, 10)
+        pure (Adjust (start, end) amount)
+
+memberOfNonOverlappingOperations :: NonOverlappingOperations -> Int -> Bool
+memberOfNonOverlappingOperations (NonOverlappingOperations operations _) point =
+  any (\(Adjust (start, end) amount) -> amount /= 0 && start <= point && point < end) operations
