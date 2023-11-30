@@ -7,7 +7,7 @@ module Keelung.Compiler.Optimize.OccurU
     null,
     toList,
     toIntMap,
-    toIndexTable,
+    toIntervalTable,
     increase,
     decrease,
     occuredSet,
@@ -19,9 +19,9 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.IndexTable (IndexTable)
-import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Util
+import Keelung.Data.IntervalTable (IntervalTable)
+import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Reference (RefU (RefUX))
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
@@ -74,10 +74,10 @@ toList (OccurU xs) = IntMap.toList xs
 toIntMap :: OccurU -> IntMap (IntMap Int)
 toIntMap (OccurU xs) = xs
 
--- | O(lg n). To an IndexTable
-toIndexTable :: Counters -> OccurU -> IndexTable
-toIndexTable counters (OccurU xs) =
-  let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IndexTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
+-- | O(lg n). To an IntervalTable
+toIntervalTable :: Counters -> OccurU -> IntervalTable
+toIntervalTable counters (OccurU xs) =
+  let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
    in bitsPart
 
 -- | O(1). Bump the count of a RefF

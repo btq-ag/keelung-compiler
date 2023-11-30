@@ -32,7 +32,6 @@ library
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.Field.Conditional
       Keelung.Compiler.Compile.Field.Exponentiation
-      Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
@@ -70,6 +69,7 @@ library
       Keelung.Compiler.Util
       Keelung.Data.Constraint
       Keelung.Data.IntervalSet
+      Keelung.Data.IntervalTable
       Keelung.Data.LC
       Keelung.Data.Limb
       Keelung.Data.PolyL
@@ -120,7 +120,6 @@ executable keelungc
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.Field.Conditional
       Keelung.Compiler.Compile.Field.Exponentiation
-      Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
@@ -158,6 +157,7 @@ executable keelungc
       Keelung.Compiler.Util
       Keelung.Data.Constraint
       Keelung.Data.IntervalSet
+      Keelung.Data.IntervalTable
       Keelung.Data.LC
       Keelung.Data.Limb
       Keelung.Data.PolyL
@@ -240,8 +240,8 @@ test-suite keelung-test
       Test.Compilation.UInt.Multiplication
       Test.Compilation.Util
       Test.Data.IntervalSet
+      Test.Data.IntervalTable
       Test.Data.LC
-      Test.IndexTable
       Test.Intergration
       Test.Optimization
       Test.Optimization.Boolean
@@ -264,7 +264,6 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Field
       Keelung.Compiler.Compile.Field.Conditional
       Keelung.Compiler.Compile.Field.Exponentiation
-      Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
       Keelung.Compiler.Compile.UInt.Addition
@@ -302,6 +301,7 @@ test-suite keelung-test
       Keelung.Compiler.Util
       Keelung.Data.Constraint
       Keelung.Data.IntervalSet
+      Keelung.Data.IntervalTable
       Keelung.Data.LC
       Keelung.Data.Limb
       Keelung.Data.PolyL

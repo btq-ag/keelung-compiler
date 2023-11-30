@@ -15,9 +15,9 @@ tests = describe "Interval Sets" $ do
   describe "IntervalSet.adjust" $ do
     it "should preserve invariants after applying randomized adjustments" $ do
       property $ \operations -> do
-        let set = foldr applyOperation IntervalSet.new operations
-        IntervalSet.count set `shouldBe` sum (map countOfOperation operations)
-        IntervalSet.isValid set `shouldBe` True
+        let intervals = foldr applyOperation IntervalSet.new operations
+        IntervalSet.count intervals `shouldBe` sum (map countOfOperation operations)
+        IntervalSet.isValid intervals `shouldBe` True
 
 --------------------------------------------------------------------------------
 

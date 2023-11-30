@@ -6,7 +6,7 @@ module Keelung.Compiler.Optimize.OccurF
     new,
     null,
     toList,
-    toIndexTable,
+    toIntervalTable,
     increase,
     decrease,
     occuredSet,
@@ -18,9 +18,9 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.IndexTable (IndexTable)
-import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Util
+import Keelung.Data.IntervalTable (IntervalTable)
+import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Reference (RefF (RefFX))
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
@@ -61,9 +61,9 @@ null (OccurF xs) = IntMap.null xs
 toList :: OccurF -> [(Int, Int)]
 toList (OccurF xs) = IntMap.toList xs
 
--- | O(lg n). To an IndexTable
-toIndexTable :: Counters -> OccurF -> IndexTable
-toIndexTable counters (OccurF xs) = IndexTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadField), xs)
+-- | O(lg n). To an IntervalTable
+toIntervalTable :: Counters -> OccurF -> IntervalTable
+toIntervalTable counters (OccurF xs) = IntervalTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadField), xs)
 
 -- | O(1). Bump the count of a RefF
 increase :: Var -> OccurF -> OccurF

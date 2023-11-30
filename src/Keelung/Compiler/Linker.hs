@@ -13,8 +13,6 @@ import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung
-import Keelung.Compiler.Compile.IndexTable (IndexTable)
-import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
 import Keelung.Compiler.ConstraintSystem qualified as Linked
@@ -33,6 +31,8 @@ import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.FieldInfo qualified as FieldInfo
+import Keelung.Data.IntervalTable (IntervalTable)
+import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL
@@ -278,20 +278,20 @@ reindexRefF :: Occurrences -> RefF -> Var
 reindexRefF occurrences (RefFO x) = reindex (occurCounters occurrences) Output ReadField x
 reindexRefF occurrences (RefFI x) = reindex (occurCounters occurrences) PublicInput ReadField x
 reindexRefF occurrences (RefFP x) = reindex (occurCounters occurrences) PrivateInput ReadField x
-reindexRefF occurrences (RefFX x) = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadField x - pinnedSize occurrences) + pinnedSize occurrences
+reindexRefF occurrences (RefFX x) = IntervalTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadField x - pinnedSize occurrences) + pinnedSize occurrences
 
 reindexRefB :: Occurrences -> RefB -> Var
 reindexRefB occurrences (RefBO x) = reindex (occurCounters occurrences) Output ReadBool x
 reindexRefB occurrences (RefBI x) = reindex (occurCounters occurrences) PublicInput ReadBool x
 reindexRefB occurrences (RefBP x) = reindex (occurCounters occurrences) PrivateInput ReadBool x
-reindexRefB occurrences (RefBX x) = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadBool x - pinnedSize occurrences) + pinnedSize occurrences
+reindexRefB occurrences (RefBX x) = IntervalTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadBool x - pinnedSize occurrences) + pinnedSize occurrences
 reindexRefB occurrences (RefUBit _ x i) = reindexRefU occurrences x i
 
 reindexRefU :: Occurrences -> RefU -> Int -> Var
 reindexRefU occurrences (RefUO w x) i = reindex (occurCounters occurrences) Output (ReadUInt w) x + (i `mod` w)
 reindexRefU occurrences (RefUI w x) i = reindex (occurCounters occurrences) PublicInput (ReadUInt w) x + (i `mod` w)
 reindexRefU occurrences (RefUP w x) i = reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x + (i `mod` w)
-reindexRefU occurrences (RefUX w x) i = IndexTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
+reindexRefU occurrences (RefUX w x) i = IntervalTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
 
 -------------------------------------------------------------------------------
 
@@ -302,7 +302,7 @@ data Occurrences = Occurrences
     refBsInOccurrencesB :: !IntSet,
     refUsInOccurrencesU :: !(IntMap IntSet),
     -- refBsInOccurrencesUBits :: !(IntMap IntSet),
-    indexTable :: !IndexTable,
+    indexTable :: !IntervalTable,
     pinnedSize :: !Int
   }
   deriving (Show)
@@ -316,8 +316,8 @@ constructOccurrences counters occurF occurB occurU =
       refBsInOccurrencesB = OccurB.occuredSet occurB,
       refUsInOccurrencesU = OccurU.occuredSet occurU,
       indexTable =
-        OccurF.toIndexTable counters occurF
-          <> OccurB.toIndexTable counters occurB
-          <> OccurU.toIndexTable counters occurU,
+        OccurF.toIntervalTable counters occurF
+          <> OccurB.toIntervalTable counters occurB
+          <> OccurU.toIntervalTable counters occurU,
       pinnedSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
     }

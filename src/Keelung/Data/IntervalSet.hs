@@ -1,15 +1,15 @@
 -- For RefU Limb segement reference counting
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Data.IntervalSet (IntervalSet, new, adjust, toIndexTable, count, isValid) where
+module Keelung.Data.IntervalSet (IntervalSet, new, adjust, toIntervalTable, count, isValid) where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List qualified as List
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.IndexTable (IndexTable (IndexTable))
 import Keelung.Compiler.Util (showList')
+import Keelung.Data.IntervalTable (IntervalTable (IntervalTable))
 
 -- | Key: start of an interval
 --   Value: (end of the interval, count of the interval)
@@ -37,16 +37,16 @@ adjust interval amount (IntervalSet xs) =
 count :: IntervalSet -> Int
 count (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
 
--- | O(n). To an IndexTable
-toIndexTable :: Int -> IntervalSet -> IndexTable
-toIndexTable domainSize (IntervalSet intervals) =
+-- | O(n). To an IntervalTable
+toIntervalTable :: Int -> IntervalSet -> IntervalTable
+toIntervalTable domainSize (IntervalSet intervals) =
   let FoldState table occupiedSize = IntMap.foldlWithKey' step (FoldState mempty 0) intervals
-   in IndexTable domainSize occupiedSize table
+   in IntervalTable domainSize occupiedSize table
   where
     step :: FoldState -> Int -> (Int, Int) -> FoldState
     step (FoldState acc occupiedSize) start (end, _) =
       FoldState
-        (IntMap.insert start (start - occupiedSize) acc) -- insert the total size of "holes" before this interval
+        (IntMap.insert start (end, start - occupiedSize) acc) -- insert the total size of "holes" before this interval
         (occupiedSize + end - start)
 
 -- | O(n): Check if these intervals are valid (for testing purposes)
@@ -171,10 +171,10 @@ executeActions actions (IntervalSet set) = IntervalSet $ List.foldl' step set ac
 
 --------------------------------------------------------------------------------
 
--- | Temporary data structure for constructing an IndexTable
+-- | Temporary data structure for constructing an IntervalTable
 data FoldState = FoldState
   { -- | The resulting table
-    _stateTable :: IntMap Int,
+    _stateTable :: IntMap (Int, Int),
     -- | The total size of intervals so far
     _stateEndOfLastInterval :: Int
   }

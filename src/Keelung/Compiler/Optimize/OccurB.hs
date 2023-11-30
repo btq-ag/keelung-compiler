@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | Module for RefB bookkeeping
-module Keelung.Compiler.Optimize.OccurB (OccurB, new, null, toList, toIndexTable, increase, decrease, occuredSet) where
+module Keelung.Compiler.Optimize.OccurB (OccurB, new, null, toList, toIntervalTable, increase, decrease, occuredSet) where
 
 import Control.Arrow (Arrow (first))
 import Control.DeepSeq (NFData)
@@ -9,9 +9,9 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.IndexTable (IndexTable)
-import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Util
+import Keelung.Data.IntervalTable (IntervalTable)
+import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Reference
 import Keelung.Syntax (Var)
 import Keelung.Syntax.Counters
@@ -51,9 +51,9 @@ null (MapB xs) = IntMap.null xs
 toList :: OccurB -> [(RefB, Int)]
 toList (MapB xs) = map (first RefBX) $ IntMap.toList xs
 
--- | O(lg n). To an IndexTable
-toIndexTable :: Counters -> OccurB -> IndexTable
-toIndexTable counters (MapB xs) = IndexTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadBool), xs)
+-- | O(lg n). To an IntervalTable
+toIntervalTable :: Counters -> OccurB -> IntervalTable
+toIntervalTable counters (MapB xs) = IntervalTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadBool), xs)
 
 -- | O(1). Bump the count of a RefB
 increase :: Var -> OccurB -> OccurB

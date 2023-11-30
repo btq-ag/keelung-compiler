@@ -8,7 +8,7 @@ module Keelung.Compiler.Optimize.OccurUB
     size,
     null,
     -- fromIntervalSet,
-    -- toIndexTable
+    -- toIntervalTable
   )
 where
 
@@ -90,16 +90,16 @@ null = (== 0) . size
 --           then (acc, n, Just (previousStart, end)) -- merge with previous interval
 --           else (IntMap.insert previousStart (previousEnd - previousStart) acc, n + previousEnd - previousStart, Just (start, end)) -- add previous interval to acc
 
--- -- | O(n). To an IndexTable
--- toIndexTable :: OccurUB -> IndexTable
--- toIndexTable (OccurUB xs) = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width varMaps -> mconcat $ IntMap.elems $ IntMap.map (_ width) varMaps) xs
---   where 
---     convert :: Width -> (Int, IntMap Int) -> IndexTable
---     convert width (n, intervals) 
+-- -- | O(n). To an IntervalTable
+-- toIntervalTable :: OccurUB -> IntervalTable
+-- toIntervalTable (OccurUB xs) = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width varMaps -> mconcat $ IntMap.elems $ IntMap.map (_ width) varMaps) xs
+--   where
+--     convert :: Width -> (Int, IntMap Int) -> IntervalTable
+--     convert width (n, intervals)
 
--- -- toIndexTable :: Counters -> OccurU -> IndexTable
--- -- toIndexTable counters (OccurU xs) =
--- --   let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IndexTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
+-- -- toIntervalTable :: Counters -> OccurU -> IntervalTable
+-- -- toIntervalTable counters (OccurU xs) =
+-- --   let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
 -- --    in bitsPart
 
 -- -- -- | O(1). Bump the count of a RefF
