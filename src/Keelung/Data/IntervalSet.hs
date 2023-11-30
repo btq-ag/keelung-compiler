@@ -1,19 +1,20 @@
 -- For RefU Limb segement reference counting
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Data.IntervalSet (IntervalSet, new, adjust, expose, count, isValid) where
+module Keelung.Data.IntervalSet (IntervalSet, new, adjust, toIndexTable, count, isValid) where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List qualified as List
 import GHC.Generics (Generic)
+import Keelung.Compiler.Compile.IndexTable (IndexTable (IndexTable))
 import Keelung.Compiler.Util (showList')
 
 -- | Key: start of an interval
 --   Value: (end of the interval, count of the interval)
 --    invariant: no two intervals overlap
-newtype IntervalSet = IntervalSet (IntMap Interval) deriving (Eq, Generic)
+newtype IntervalSet = IntervalSet (IntMap (Int, Int)) deriving (Eq, Generic)
 
 instance Show IntervalSet where
   show (IntervalSet xs) = showList' $ map (\(start, (end, _)) -> show start <> " ~ " <> show end) $ IntMap.toList xs
@@ -36,9 +37,17 @@ adjust interval amount (IntervalSet xs) =
 count :: IntervalSet -> Int
 count (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
 
--- | O(1): Get the underlying IntMap (key: start, value: (end, count))
-expose :: IntervalSet -> IntMap Interval
-expose (IntervalSet xs) = xs
+-- | O(n). To an IndexTable
+toIndexTable :: Int -> IntervalSet -> IndexTable
+toIndexTable domainSize (IntervalSet intervals) =
+  let FoldState table occupiedSize = IntMap.foldlWithKey' step (FoldState mempty 0) intervals
+   in IndexTable domainSize occupiedSize table
+  where
+    step :: FoldState -> Int -> (Int, Int) -> FoldState
+    step (FoldState acc occupiedSize) start (end, _) =
+      FoldState
+        (IntMap.insert start (start - occupiedSize) acc) -- insert the total size of "holes" before this interval
+        (occupiedSize + end - start)
 
 -- | O(n): Check if these intervals are valid (for testing purposes)
 --   Invariants:
@@ -159,3 +168,13 @@ executeActions actions (IntervalSet set) = IntervalSet $ List.foldl' step set ac
         if existingEnd <= end
           then IntMap.delete start xs
           else IntMap.insert end (existingEnd, existingAmount) (IntMap.delete start xs)
+
+--------------------------------------------------------------------------------
+
+-- | Temporary data structure for constructing an IndexTable
+data FoldState = FoldState
+  { -- | The resulting table
+    _stateTable :: IntMap Int,
+    -- | The total size of intervals so far
+    _stateEndOfLastInterval :: Int
+  }

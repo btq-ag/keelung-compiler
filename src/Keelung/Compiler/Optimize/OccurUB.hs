@@ -7,14 +7,8 @@ module Keelung.Compiler.Optimize.OccurUB
     member,
     size,
     null,
-    fromIntervalSet,
-    -- new,
-    -- toList,
-    -- toIntMap,
-    -- toIndexTable,
-    -- increase,
-    -- decrease,
-    -- occuredSet,
+    -- fromIntervalSet,
+    -- toIndexTable
   )
 where
 
@@ -23,13 +17,15 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import GHC.Generics (Generic)
 import Keelung (Var, Width)
+import Keelung.Compiler.Compile.IndexTable (IndexTable)
+import Keelung.Compiler.Compile.IndexTable qualified as IndexTable
 import Keelung.Compiler.Util
 import Keelung.Data.IntervalSet (IntervalSet)
 import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.Reference
 import Prelude hiding (null)
 
-newtype OccurUB = OccurUB (IntMap (IntMap (IntMap Int))) -- width to var to intervals of (start, length)
+newtype OccurUB = OccurUB (IntMap (IntMap (Int, IntMap Int))) -- width to var to intervals of (start, length)
   deriving (Eq, Generic)
 
 instance NFData OccurUB
@@ -49,7 +45,7 @@ instance Show OccurUB where
                           <> ": "
                           <> showList'
                             ( map
-                                (\(var, intervals) -> show (RefUX width var) <> ": " <> showIntervals intervals)
+                                (\(var, (_, intervals)) -> show (RefUX width var) <> ": " <> showIntervals intervals)
                                 (IntMap.toList varMap)
                             )
                     )
@@ -70,50 +66,41 @@ member (OccurUB xs) width var index = case IntMap.lookup width xs of
   Nothing -> False
   Just varMap -> case IntMap.lookup var varMap of
     Nothing -> False
-    Just intervals -> case IntMap.lookupLE index intervals of
+    Just (_, intervals) -> case IntMap.lookupLE index intervals of
       Nothing -> False
       Just (start, len) -> start <= index && index < start + len
 
 -- | O(min(n, W)): Get the total number of bits used in this OccurUB
 size :: OccurUB -> Int
-size (OccurUB xs) = IntMap.foldl' (\acc varMap -> acc + IntMap.foldl' (\acc' intervals -> acc' + sum (IntMap.elems intervals)) 0 varMap) 0 xs
+size (OccurUB xs) = IntMap.foldl' (\acc varMap -> acc + IntMap.foldl' (\acc' (n, _) -> acc' + n) 0 varMap) 0 xs
 
 -- | O(min(n, W)). Test whether a OccurUB is empty
 null :: OccurUB -> Bool
 null = (== 0) . size
 
--- | O(n): Get a IntMap (key: start, value: length) of all intervals. Counts are ignored. Adjacent intervals are merged.
-fromIntervalSet :: IntervalSet -> IntMap Int
-fromIntervalSet intervalSet =
-  let (acc, previous) = IntMap.foldlWithKey' step (mempty, Nothing) $ IntervalSet.expose intervalSet
-   in case previous of
-        Nothing -> acc
-        Just (start, end) -> IntMap.insert start (end - start) acc
-  where
-    step :: (IntMap Int, Maybe (Int, Int)) -> Int -> (Int, Int) -> (IntMap Int, Maybe (Int, Int))
-    step (acc, previousInterval) start (end, _) = case previousInterval of
-      Nothing -> (acc, Just (start, end))
-      Just (previousStart, previousEnd) ->
-        if start == previousEnd
-          then (acc, Just (previousStart, end)) -- merge with previous interval
-          else (IntMap.insert previousStart (previousEnd - previousStart) acc, Just (start, end)) -- add previous interval to acc
+-- -- | O(n): Get a IntMap (key: start, value: length) of all intervals. Counts are ignored. Adjacent intervals are merged.
+-- fromIntervalSet :: IntervalSet -> (Int, IntMap Int)
+-- fromIntervalSet intervalSet =
+--   let (acc, n, previous) = IntMap.foldlWithKey' step (mempty, 0, Nothing) $ IntervalSet.expose intervalSet
+--    in case previous of
+--         Nothing -> (n, acc)
+--         Just (start, end) -> (n + end - start, IntMap.insert start (end - start) acc)
+--   where
+--     step :: (IntMap Int, Int, Maybe (Int, Int)) -> Int -> (Int, Int) -> (IntMap Int, Int, Maybe (Int, Int))
+--     step (acc, n, previousInterval) start (end, _) = case previousInterval of
+--       Nothing -> (acc, n, Just (start, end))
+--       Just (previousStart, previousEnd) ->
+--         if start == previousEnd
+--           then (acc, n, Just (previousStart, end)) -- merge with previous interval
+--           else (IntMap.insert previousStart (previousEnd - previousStart) acc, n + previousEnd - previousStart, Just (start, end)) -- add previous interval to acc
 
--- -- -- | O(1). Construct an empty OccurU
--- -- new :: OccurU
--- -- new = OccurU mempty
+-- -- | O(n). To an IndexTable
+-- toIndexTable :: OccurUB -> IndexTable
+-- toIndexTable (OccurUB xs) = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width varMaps -> mconcat $ IntMap.elems $ IntMap.map (_ width) varMaps) xs
+--   where 
+--     convert :: Width -> (Int, IntMap Int) -> IndexTable
+--     convert width (n, intervals) 
 
--- -- -- | O(1). Test whether a OccurU is empty
--- -- null :: OccurU -> Bool
--- -- null (OccurU xs) = IntMap.null xs
-
--- -- -- | O(1).  To a list of (RefF, Int) pairs
--- -- toList :: OccurU -> [(Int, IntMap Int)]
--- -- toList (OccurU xs) = IntMap.toList xs
-
--- -- toIntMap :: OccurU -> IntMap (IntMap Int)
--- -- toIntMap (OccurU xs) = xs
-
--- -- -- | O(lg n). To an IndexTable
 -- -- toIndexTable :: Counters -> OccurU -> IndexTable
 -- -- toIndexTable counters (OccurU xs) =
 -- --   let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IndexTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
