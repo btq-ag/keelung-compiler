@@ -20,7 +20,6 @@ import Data.IntSet qualified as IntSet
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung (widthOf)
 import Keelung.Compiler.Optimize.OccurB (OccurB)
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF (OccurF)
@@ -34,7 +33,6 @@ import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference

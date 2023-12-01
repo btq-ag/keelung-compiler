@@ -8,7 +8,7 @@ module Keelung.Compiler.Optimize.OccurUB
     -- size,
     null,
     -- fromIntervalSet,
-    -- toIntervalTable
+    toIntervalTables,
     increase,
     decrease,
   )
@@ -22,6 +22,7 @@ import Keelung (Var, Width)
 import Keelung.Compiler.Util
 import Keelung.Data.IntervalSet (IntervalSet)
 import Keelung.Data.IntervalSet qualified as IntervalSet
+import Keelung.Data.IntervalTable (IntervalTable)
 import Keelung.Data.Reference
 import Prelude hiding (null)
 
@@ -79,21 +80,14 @@ new = OccurUB mempty
 null :: OccurUB -> Bool
 null (OccurUB xs) = IntMap.null xs
 
--- -- | O(n): Get a IntMap (key: start, value: length) of all intervals. Counts are ignored. Adjacent intervals are merged.
--- fromIntervalSet :: IntervalSet -> (Int, IntMap Int)
--- fromIntervalSet intervalSet =
---   let (acc, n, previous) = IntMap.foldlWithKey' step (mempty, 0, Nothing) $ IntervalSet.expose intervalSet
---    in case previous of
---         Nothing -> (n, acc)
---         Just (start, end) -> (n + end - start, IntMap.insert start (end - start) acc)
---   where
---     step :: (IntMap Int, Int, Maybe (Int, Int)) -> Int -> (Int, Int) -> (IntMap Int, Int, Maybe (Int, Int))
---     step (acc, n, previousInterval) start (end, _) = case previousInterval of
---       Nothing -> (acc, n, Just (start, end))
---       Just (previousStart, previousEnd) ->
---         if start == previousEnd
---           then (acc, n, Just (previousStart, end)) -- merge with previous interval
---           else (IntMap.insert previousStart (previousEnd - previousStart) acc, n + previousEnd - previousStart, Just (start, end)) -- add previous interval to acc
+-- | O(n). To an IntMap of widths to IntMap of vars to IntervalTable
+toIntervalTables :: OccurUB -> IntMap (IntMap IntervalTable)
+toIntervalTables (OccurUB xs) = IntMap.mapWithKey (fmap . IntervalSet.toIntervalTable) xs
+
+
+-- where
+--   convert :: Width -> IntervalSet -> IntervalTable
+--   convert width intervals = IntervalTable.IntervalTable width _ _
 
 -- -- | O(n). To an IntervalTable
 -- toIntervalTable :: OccurUB -> IntervalTable
@@ -102,10 +96,10 @@ null (OccurUB xs) = IntMap.null xs
 --     convert :: Width -> (Int, IntMap Int) -> IntervalTable
 --     convert width (n, intervals)
 
--- -- toIntervalTable :: Counters -> OccurU -> IntervalTable
--- -- toIntervalTable counters (OccurU xs) =
--- --   let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
--- --    in bitsPart
+-- toIntervalTable :: Counters -> OccurU -> IntervalTable
+-- toIntervalTable counters (OccurU xs) =
+--   let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
+--    in bitsPart
 
 -- | O(1). Bump the count of an interval of bits in a RefU
 adjust :: Int -> Width -> Var -> (Int, Int) -> OccurUB -> OccurUB

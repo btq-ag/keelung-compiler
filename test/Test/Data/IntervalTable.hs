@@ -123,7 +123,7 @@ tests =
         (_cm, cm) <- executeGF181 $ do
           x <- inputUInt @4 Public
           assert $ 2 `eq` (x + 1)
-        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
+        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm) 
         let inputVar = RefUI 4 0
         reindexRef occurrences (B (RefUBit 4 inputVar 0)) `shouldBe` 0
         reindexRef occurrences (B (RefUBit 4 inputVar 1)) `shouldBe` 1
@@ -142,7 +142,7 @@ tests =
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           return $ (x .&. y) !!! 0
-        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
+        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm) 
 
         reindexRef occurrences (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
@@ -167,7 +167,7 @@ tests =
           y <- inputUInt @4 Private
           z <- inputUInt @4 Public
           return $ (x .&. y .&. z) !!! 0
-        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
+        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm) 
 
         reindexRef occurrences (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0

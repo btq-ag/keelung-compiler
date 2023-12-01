@@ -22,6 +22,8 @@ import Keelung.Compiler.Optimize.OccurF (OccurF)
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
+import Keelung.Compiler.Optimize.OccurUB (OccurUB)
+import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.Limb (LimbRelations)
@@ -63,7 +65,7 @@ linkConstraintModule cm =
       csModInvs = map (\(a, b, c, d) -> ([a], [b], [c], d)) modInvs
     }
   where
-    !occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm)
+    !occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
     !counters = updateCounters occurrences (cmCounters cm)
     uncurry3 f (a, b, c) = f a b c
 
@@ -301,23 +303,29 @@ data Occurrences = Occurrences
     refFsInOccurrencesF :: !IntSet,
     refBsInOccurrencesB :: !IntSet,
     refUsInOccurrencesU :: !(IntMap IntSet),
-    -- refBsInOccurrencesUB :: !(IntMap (IntMap IntervalTable)),
+    refBsInOccurrencesUB :: !(IntMap (IntMap IntervalTable)),
     indexTable :: !IntervalTable,
     pinnedSize :: !Int
   }
   deriving (Show)
 
 -- | Smart constructor for 'Occurrences'
-constructOccurrences :: Counters -> OccurF -> OccurB -> OccurU -> Occurrences
-constructOccurrences counters occurF occurB occurU =
-  Occurrences
-    { occurCounters = counters,
-      refFsInOccurrencesF = OccurF.occuredSet occurF,
-      refBsInOccurrencesB = OccurB.occuredSet occurB,
-      refUsInOccurrencesU = OccurU.occuredSet occurU,
-      indexTable =
-        OccurF.toIntervalTable counters occurF
-          <> OccurB.toIntervalTable counters occurB
-          <> OccurU.toIntervalTable counters occurU,
-      pinnedSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
-    }
+constructOccurrences :: Counters -> OccurF -> OccurB -> OccurU -> OccurUB -> Occurrences
+constructOccurrences counters occurF occurB occurU occurUB =
+  let tablesUB = OccurUB.toIntervalTables occurUB
+   in Occurrences
+        { occurCounters = counters,
+          refFsInOccurrencesF = OccurF.occuredSet occurF,
+          refBsInOccurrencesB = OccurB.occuredSet occurB,
+          refUsInOccurrencesU = OccurU.occuredSet occurU,
+          refBsInOccurrencesUB = tablesUB,
+          indexTable =
+            OccurF.toIntervalTable counters occurF
+              <> OccurB.toIntervalTable counters occurB
+              <> OccurU.toIntervalTable counters occurU
+              <> mergeIntervalTables tablesUB,
+          pinnedSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
+        }
+  where
+    mergeIntervalTables :: IntMap (IntMap IntervalTable) -> IntervalTable
+    mergeIntervalTables = mconcat . IntMap.elems . fmap (mconcat . IntMap.elems)
