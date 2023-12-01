@@ -20,12 +20,15 @@ import Data.IntSet qualified as IntSet
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
+import Keelung (widthOf)
 import Keelung.Compiler.Optimize.OccurB (OccurB)
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF (OccurF)
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
+import Keelung.Compiler.Optimize.OccurUB (OccurUB)
+import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Util
@@ -49,6 +52,7 @@ data ConstraintModule n = ConstraintModule
     cmOccurrenceF :: !OccurF,
     cmOccurrenceB :: !OccurB,
     cmOccurrenceU :: !OccurU,
+    cmOccurrenceUB :: !OccurUB,
     cmRelations :: Relations n,
     -- addative constraints
     cmAddL :: [PolyL n],
@@ -82,6 +86,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> show (cmOccurrenceF cm)
       <> show (cmOccurrenceB cm)
       <> show (cmOccurrenceU cm)
+      <> show (cmOccurrenceUB cm)
       <> prettyVariables (cmCounters cm)
       <> "}"
     where
@@ -370,5 +375,29 @@ instance UpdateOccurrences RefU where
       )
 
 instance UpdateOccurrences Limb where
-  addOccurrences = addOccurrences . Set.map Limb.lmbRef
-  removeOccurrences = removeOccurrences . Set.map Limb.lmbRef
+  addOccurrences =
+    flip
+      ( foldl
+          ( \cm limb ->
+              case lmbRef limb of
+                RefUX width var ->
+                  cm
+                    { cmOccurrenceUB = OccurUB.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
+                    }
+                _ -> cm
+          )
+      )
+  removeOccurrences =
+    flip
+      ( foldl
+          ( \cm limb ->
+              case lmbRef limb of
+                RefUX width var ->
+                  cm
+                    { cmOccurrenceUB = OccurUB.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
+                    }
+                _ -> cm
+          )
+      )
+  -- addOccurrences = addOccurrences . Set.map Limb.lmbRef
+  -- removeOccurrences = removeOccurrences . Set.map Limb.lmbRef

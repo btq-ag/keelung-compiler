@@ -26,6 +26,7 @@ import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
+import qualified Keelung.Compiler.Optimize.OccurUB as OccurUB
 
 --------------------------------------------------------------------------------
 
@@ -38,7 +39,7 @@ runM compilers fieldInfo counters program =
   runExcept
     ( execStateT
         (runReaderT program compilers)
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new Relations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new OccurUB.new Relations.new mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()

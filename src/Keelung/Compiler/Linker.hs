@@ -301,7 +301,7 @@ data Occurrences = Occurrences
     refFsInOccurrencesF :: !IntSet,
     refBsInOccurrencesB :: !IntSet,
     refUsInOccurrencesU :: !(IntMap IntSet),
-    -- refBsInOccurrencesUBits :: !(IntMap IntSet),
+    -- refBsInOccurrencesUB :: !(IntMap (IntMap IntervalTable)),
     indexTable :: !IntervalTable,
     pinnedSize :: !Int
   }
