@@ -31,16 +31,17 @@ import Data.Map.Strict (Map)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Limb qualified as Limb
+import Keelung.Compiler.Relations.Limb qualified as LimbRelations
 import Keelung.Compiler.Relations.Reference qualified as Ref
 import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Limb (Limb)
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Prelude hiding (lookup)
 
 data Relations n = Relations
   { relationsR :: Ref.RefRelations n,
-    relationsL :: Limb.LimbRelations,
+    relationsL :: LimbRelations.LimbRelations,
     relationsU :: UInt.UIntRelations
   }
   deriving (Eq, Generic, NFData)
@@ -60,7 +61,7 @@ updateRelationsR f xs = do
   return $ xs {relationsR = relations}
 
 updateRelationsL ::
-  (Limb.LimbRelations -> EquivClass.M (Error n) Limb.LimbRelations) ->
+  (LimbRelations.LimbRelations -> EquivClass.M (Error n) LimbRelations.LimbRelations) ->
   Relations n ->
   EquivClass.M (Error n) (Relations n)
 updateRelationsL f xs = do
@@ -78,7 +79,7 @@ updateRelationsU f xs = do
 --------------------------------------------------------------------------------
 
 new :: Relations n
-new = Relations Ref.new Limb.new UInt.new
+new = Relations Ref.new LimbRelations.new UInt.new
 
 assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignR var val = updateRelationsR $ Ref.assignF var val
@@ -86,8 +87,15 @@ assignR var val = updateRelationsR $ Ref.assignF var val
 assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignB ref val = assignR (B ref) (if val then 1 else 0)
 
+-- | Lookup the RefU of the Limb first before assigning value to it
 assignL :: (GaloisField n, Integral n) => Limb -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
-assignL var val = updateRelationsL $ Limb.assign var val
+assignL var val relations = case UInt.lookupRefU (exportUIntRelations relations) (Limb.lmbRef var) of
+  Left rootVar -> updateRelationsL (LimbRelations.assign (var {Limb.lmbRef = rootVar}) val) relations
+  Right rootVal ->
+    -- the parent of this limb turned out to be a constant
+    if toInteger rootVal == val
+      then return relations -- do nothing
+      else throwError $ ConflictingValuesU (toInteger rootVal) val
 
 assignU :: (GaloisField n, Integral n) => RefU -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignU var val = updateRelationsU $ UInt.assignRefU var val
@@ -95,8 +103,15 @@ assignU var val = updateRelationsU $ UInt.assignRefU var val
 relateB :: (GaloisField n, Integral n) => GaloisField n => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateB refA (polarity, refB) = updateRelationsR (Ref.relateB refA (polarity, refB))
 
+-- | Lookup the relation between the RefUs of the Limbs first before relating the Limbs
 relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateL var1 var2 = updateRelationsL $ Limb.relate var1 var2
+relateL var1 var2 relations = case EquivClass.relationBetween (UInt.Ref (Limb.lmbRef var1)) (UInt.Ref (Limb.lmbRef var2)) (exportUIntRelations relations) of
+  Nothing ->
+    -- no relations between the RefUs of the Limbs, so we relate the Limbs instead
+    updateRelationsL (LimbRelations.relate var1 var2) relations
+  Just UInt.Equal ->
+    -- the RefUs of the Limbs are equal, so we do nothing (no need to relate the Limbs)
+    return relations
 
 relateU :: (GaloisField n, Integral n) => RefU -> RefU -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateU var1 var2 = updateRelationsU $ UInt.relateRefU var1 var2
@@ -112,7 +127,7 @@ toInt :: (Ref -> Bool) -> Relations n -> Map Ref (Either (n, Ref, n) n)
 toInt shouldBeKept = Ref.toInt shouldBeKept . relationsR
 
 size :: Relations n -> Int
-size (Relations f l u) = EquivClass.size f + Limb.size l + UInt.size u
+size (Relations f l u) = EquivClass.size f + LimbRelations.size l + UInt.size u
 
 --------------------------------------------------------------------------------
 
@@ -121,7 +136,7 @@ lookup var xs = Ref.lookup (relationsU xs) var (relationsR xs)
 
 --------------------------------------------------------------------------------
 
-exportLimbRelations :: Relations n -> Limb.LimbRelations
+exportLimbRelations :: Relations n -> LimbRelations.LimbRelations
 exportLimbRelations = relationsL
 
 exportUIntRelations :: Relations n -> UInt.UIntRelations

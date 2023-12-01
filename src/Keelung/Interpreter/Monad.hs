@@ -29,6 +29,7 @@ import Keelung.Data.VarGroup qualified as VarGroup
 import Keelung.Heap
 import Keelung.Syntax
 import Keelung.Syntax.Counters
+import Keelung.Data.FieldInfo (FieldInfo)
 
 --------------------------------------------------------------------------------
 
@@ -36,12 +37,12 @@ toBool :: (GaloisField n, Integral n) => n -> Bool
 toBool = (/= 0)
 
 -- | The interpreter monad
-type M n = ReaderT Heap (StateT (Partial n) (Except (Error n)))
+type M n = ReaderT (Heap, FieldInfo) (StateT (Partial n) (Except (Error n)))
 
-runM :: (GaloisField n, Integral n) => Heap -> Inputs n -> M n [Integer] -> Either (Error n) ([Integer], VarGroup.Witness Integer Integer Integer)
-runM heap inputs p = do
+runM :: (GaloisField n, Integral n) => Heap -> FieldInfo -> Inputs n -> M n [Integer] -> Either (Error n) ([Integer], VarGroup.Witness Integer Integer Integer)
+runM heap fieldInfo inputs p = do
   partialBindings <- toPartialBindings inputs
-  (result, partialBindings') <- runExcept (runStateT (runReaderT p heap) partialBindings)
+  (result, partialBindings') <- runExcept (runStateT (runReaderT p (heap, fieldInfo)) partialBindings)
   -- make the partial Bindings total
   case toTotal partialBindings' of
     Left unbound -> Left (VarUnassignedError unbound)
@@ -107,6 +108,14 @@ lookupFI = lookupVar "FI" (getF . ofI)
 lookupFP :: (GaloisField n, Integral n) => Var -> M n n
 lookupFP = lookupVar "FP" (getF . ofP)
 
+-- | Like `lookupF` but returns `Nothing` if the variable is unbound
+existsF :: (GaloisField n, Integral n) => Var -> M n (Maybe n)
+existsF var = do
+  (_, f) <- gets (getF . ofX)
+  case IntMap.lookup var f of
+    Nothing -> return Nothing
+    Just val -> return (Just val)
+
 lookupB :: (GaloisField n, Integral n) => Var -> M n Bool
 lookupB = lookupVarB "B" (getB . ofX)
 
@@ -133,6 +142,16 @@ lookupUI w = lookupVarU ("UI" <> toSubscript w) ofI w
 
 lookupUP :: (GaloisField n, Integral n) => Width -> Var -> M n U
 lookupUP w = lookupVarU ("UP" <> toSubscript w) ofP w
+
+-- | Like `lookupF` but returns `Nothing` if the variable is unbound
+existsU :: (GaloisField n, Integral n) => Width -> Var -> M n (Maybe U)
+existsU width var =  do
+  gets (getU width . ofX) >>= \case
+    Nothing -> return Nothing
+    Just (_, f) -> do
+      case IntMap.lookup var f of
+        Nothing -> return Nothing
+        Just val -> return (Just val)
 
 -- | TODO: remove this
 unsafeLookup :: Maybe a -> a
@@ -169,7 +188,9 @@ data Error n
   | DivModQuotientIsZeroError
   | DivModQuotientError Bool Integer Integer Integer Integer
   | DivModRemainderError Bool Integer Integer Integer Integer
-  | DivModStuckError Bool [Var]
+  | DivModCannotInferDividendError Bool Bool Bool
+  | DivModDivisorAndQuotientUnknownError
+  | DivModDivisorAndQuotientAndRemainderUnknownError
   | AssertLTEError Integer Integer
   | AssertLTEBoundTooSmallError Integer
   | AssertLTEBoundTooLargeError Integer Width
@@ -182,6 +203,7 @@ data Error n
   | AssertGTError Integer Integer
   | AssertGTBoundTooSmallError Integer
   | AssertGTBoundTooLargeError Integer Width
+  | RelateUFError U n
   | ModInvError Integer Integer
   deriving (Eq, Generic, NFData, Functor)
 
@@ -207,14 +229,21 @@ instance (GaloisField n, Integral n) => Show (Error n) where
     "expected the result of `" <> show dividend <> if isCarryLess then " ./. " else " / " <> show divisor <> "` to be `" <> show expected <> "` but got `" <> show actual <> "`"
   show (DivModRemainderError isCarryLess dividend divisor expected actual) =
     "expected the result of `" <> show dividend <> if isCarryLess then " .%. " else " % " <> show divisor <> "` to be `" <> show expected <> "` but got `" <> show actual <> "`"
-  show (DivModStuckError True msg) =
-    "stuck when trying to perform carry-less Div/Mod operation because the value of these variables "
-      <> show msg
-      <> " are not known "
-  show (DivModStuckError False msg) =
-    "stuck when trying to perform Div/Mod operation because the value of these variables "
-      <> show msg
-      <> " are not known "
+  show (DivModCannotInferDividendError divisor quotient remainder) =
+    "cannot infer the dividend because" <> case (divisor, quotient, remainder) of
+      (False, False, False) -> "the values of the divisor, quotient, and remainder are unknown"
+      (False, False, True) -> "the values of the divisor and quotient are unknown"
+      (False, True, False) -> "the values of the divisor and remainder are unknown"
+      (False, True, True) -> "the value of the divisor is unknown"
+      (True, False, False) -> "the values of the quotient and remainder are unknown"
+      (True, False, True) -> "the value of the quotient is unknown"
+      (True, True, False) -> "the value of the remainder is unknown"
+      (True, True, True) -> "the value of the dividend is unknown"
+  show DivModDivisorAndQuotientUnknownError =
+    "divisor and quotient are both unknown"
+  show DivModDivisorAndQuotientAndRemainderUnknownError =
+    "divisor, quotient, and remainder are all unknown"
+  show (RelateUFError uVal fVal) = "cannot relate a UInt with a Field element because they have conflicting values `" <> show uVal <> "` and `" <> show fVal <> "`"
   show (AssertLTEError actual bound) =
     "`" <> show actual <> "` is not less than or equal to `" <> show bound <> "`"
   show (AssertLTEBoundTooSmallError bound) = "assertLTE: the bound `" <> show bound <> "` is too restrictive, no UInt can be less than or equal to it"

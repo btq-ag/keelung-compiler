@@ -28,7 +28,7 @@ type LimbRelations =
     () -- only allowing Limbs of the same width to be related (as equal) at the moment
 
 new :: LimbRelations
-new = EquivClass.new "UInt (Limb Equivalence)"
+new = EquivClass.new "Limb Equivalence"
 
 -- | Assigning a constant value to a limb
 assign :: Limb -> Integer -> LimbRelations -> EquivClass.M (Error n) LimbRelations

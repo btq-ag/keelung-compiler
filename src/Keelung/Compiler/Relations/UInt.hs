@@ -73,7 +73,7 @@ instance Monoid Relation where
 
 instance EquivClass.IsRelation Relation where
   -- Render a relation to some child as a string
-  relationToString (var, Equal) = " = " <> var
+  relationToString (var, Equal) = var -- " = " <> var
 
   -- relationToString (var, ShiftLeft n) = " = " <> var <> " << " <> show n
 

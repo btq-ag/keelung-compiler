@@ -74,12 +74,12 @@ elaborateAndEncode :: Encode t => Comp t -> Either (Error n) Elaborated
 elaborateAndEncode = left LangError . Lang.elaborateAndEncode
 
 -- elaboration => interpretation
-interpret :: (GaloisField n, Integral n, Encode t) => Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-interpret prog rawPublicInputs rawPrivateInputs = do
+interpret :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+interpret fieldInfo prog rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode prog
   let counters = Encoded.compCounters (Encoded.elabComp elab)
   inputs <- left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
-  map toInteger <$> left InterpreterError (Interpreter.run elab inputs)
+  map toInteger <$> left InterpreterError (Interpreter.run fieldInfo elab inputs)
 
 -- | Given a Keelung program and a list of raw public inputs and private inputs,
 --   Generate (structured inputs, outputs, witness)
@@ -131,11 +131,11 @@ compileWithoutConstProp fieldInfo prog = elaborateAndEncode prog >>= compileO0El
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
 
-interpretElab :: (GaloisField n, Integral n) => Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-interpretElab elab rawPublicInputs rawPrivateInputs = do
+interpretElab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+interpretElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   let counters = Encoded.compCounters (Encoded.elabComp elab)
   inputs <- left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
-  left InterpreterError (Interpreter.run elab inputs)
+  left InterpreterError (Interpreter.run fieldInfo elab inputs)
 
 generateWitnessElab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
 generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do

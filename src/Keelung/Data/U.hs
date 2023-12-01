@@ -8,6 +8,7 @@ module Keelung.Data.U
     widen,
     modInv,
     aesMul,
+    clAdd,
     clMul,
     clDivMod,
     clDiv,
@@ -112,6 +113,12 @@ aesMul (U w a) (U _ b) =
       b' = U (fmap (* 2) w) b
       U _ c' = snd $ (a' `clMul` b') `clDivMod` U (fmap (* 2) w) 0b100011011
    in U w c'
+
+clAdd :: U -> U -> U
+clAdd a b = U (Just width) (toInteger a `Data.Bits.xor` toInteger b)
+  where
+    width :: Width
+    width = mergeWidths a b
 
 -- | Carry-less multiplication of two unsigned integers.
 clMul :: U -> U -> U

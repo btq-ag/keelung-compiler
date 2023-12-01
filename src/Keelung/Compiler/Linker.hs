@@ -192,10 +192,14 @@ linkConstraint fieldInfo occurrences fieldWidth (CRefUEq x y) =
 linkConstraint _ occurrences _ (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef occurrences x, 1)] of
   Left _ -> error "CRefFVal: impossible"
   Right xs -> [Linked.CAdd xs]
-linkConstraint _ occurrences _ (CLimbVal x n) =
-  case Poly.buildWithIntMap (fromInteger (-n)) (reindexLimb occurrences x 1) of
-    Left _ -> error "CLimbVal: impossible"
-    Right xs -> [Linked.CAdd xs]
+linkConstraint fieldInfo occurrences _ (CLimbVal x n) =
+  -- "ArithException: arithmetic underflow" will be thrown if `n` is negative in Binary fields
+  let negatedConstant = case FieldInfo.fieldTypeData fieldInfo of
+        Prime _ -> fromInteger (-n)
+        Binary _ -> fromInteger n
+   in case Poly.buildWithIntMap negatedConstant (reindexLimb occurrences x 1) of
+        Left _ -> error "CLimbVal: impossible"
+        Right xs -> [Linked.CAdd xs]
 linkConstraint fieldInfo occurrences fieldWidth (CRefUVal x n) =
   case FieldInfo.fieldTypeData fieldInfo of
     Binary _ ->

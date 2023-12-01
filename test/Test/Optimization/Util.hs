@@ -49,6 +49,33 @@ executePrime n program = caseFieldType (Prime n) handlePrime undefined
           cmCounters cm `shouldBe` cmCounters cm'
           return (cm, cm')
 
+-- execute :: Encode t => FieldType -> Comp t -> IO (ConstraintModule Integer, ConstraintModule Integer)
+-- execute fieldType program = caseFieldType fieldType handlePrime handleBinary
+--   where
+--     handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO (ConstraintModule Integer, ConstraintModule Integer)
+--     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
+--       cm <- case compile (fieldInfo :: FieldInfo) program of
+--         Left err -> assertFailure $ show err
+--         Right result -> return (fmap toInteger result)
+--       case optimize cm of
+--         Left err -> assertFailure $ show err
+--         Right cm' -> do
+--           -- var counters should remain the same
+--           cmCounters cm `shouldBe` cmCounters cm'
+--           return (cm, cm')
+
+--     handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO (ConstraintModule Integer, ConstraintModule Integer)
+--     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
+--       cm <- case compile (fieldInfo :: FieldInfo) program of
+--         Left err -> assertFailure $ show err
+--         Right result -> return result
+--       case optimize cm of
+--         Left err -> assertFailure $ show err
+--         Right cm' -> do
+--           -- var counters should remain the same
+--           cmCounters cm `shouldBe` cmCounters cm'
+--           return (cm, cm')
+
 shouldHaveSize :: ConstraintModule (N GF181) -> Int -> IO ()
 shouldHaveSize cm expectedBeforeSize = do
   -- compare the number of constraints

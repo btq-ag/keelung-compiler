@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           keelung-compiler
-version:        0.18.0
+version:        0.19.0
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung-compiler#readme>
 homepage:       https://github.com/btq-ag/keelung-compiler#readme
 bug-reports:    https://github.com/btq-ag/keelung-compiler/issues
@@ -30,6 +30,7 @@ library
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Exponentiation
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
@@ -114,6 +115,7 @@ executable keelungc
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Exponentiation
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt
@@ -212,9 +214,10 @@ test-suite keelung-test
       Test.Compilation.Field.Exponentiation
       Test.Compilation.Field.Inequality
       Test.Compilation.Misc
+      Test.Compilation.Statement
       Test.Compilation.UInt
       Test.Compilation.UInt.Addition
-      Test.Compilation.UInt.AdditionB
+      Test.Compilation.UInt.Addition.LimbBound
       Test.Compilation.UInt.AESMul
       Test.Compilation.UInt.Bitwise
       Test.Compilation.UInt.CLDivMod
@@ -223,6 +226,7 @@ test-suite keelung-test
       Test.Compilation.UInt.Conditional
       Test.Compilation.UInt.DivMod
       Test.Compilation.UInt.Equality
+      Test.Compilation.UInt.Experiment
       Test.Compilation.UInt.Inequality
       Test.Compilation.UInt.Logical
       Test.Compilation.UInt.ModInv
@@ -233,6 +237,7 @@ test-suite keelung-test
       Test.Intergration
       Test.Optimization
       Test.Optimization.Boolean
+      Test.Optimization.Experiment
       Test.Optimization.Field
       Test.Optimization.UInt
       Test.Optimization.UInt.AESMul
@@ -249,6 +254,7 @@ test-suite keelung-test
       Keelung.Compiler.Compile.Boolean
       Keelung.Compiler.Compile.Error
       Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Exponentiation
       Keelung.Compiler.Compile.IndexTable
       Keelung.Compiler.Compile.Monad
       Keelung.Compiler.Compile.UInt

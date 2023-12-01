@@ -77,19 +77,8 @@ tests = do
       it "[0]" $ do
         runAll gf181 (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385]
 
-    -- describe "Tests on the optimizer" $ do
-    --   it "Multiplicative 0" $ do
-    --     let program msg = do
-    --           msg0 <- reuse msg
-    --           msg1 <- reuse (msg0 + 1)
-    --           reuse ((msg1 + 1) * (msg1 + 1))
-    --     runAndCompare gf181Info (program 0 :: Comp Field) [0 :: N GF181] []
-    --   it "Multiplicative 1" $ do
-    --     let program = do
-    --           let initState = (2, 3)
-    --           let round' (a, b) = (a + b, a * a + b * 2)
-    --           state1 <- reuse (round' initState) -- (5, 10)
-    --           state2 <- reuse (round' state1) -- (15, 45)
-    --           state3 <- reuse (round' state2) -- (60, 2025)
-    --           return $ fst state3
-    --     runAndCompare gf181Info (program :: Comp Field) [0 :: N GF181] []
+      it "[0, 0]" $ do
+        runAll gf181 (Poseidon.hash [0, 0]) [] [] [1463644445890192529906304324019268768608065984595443732]
+
+      it "[0, 0, 0]" $ do
+        runAll gf181 (Poseidon.hash [0, 0, 0]) [] [] [30188980558117151136401211469358799167139495293483122]

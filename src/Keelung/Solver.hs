@@ -410,7 +410,7 @@ shrinkModInv (aLimbs, outLimbs, nLimbs, p) = do
         Just result -> do
           let width = sum (map fst aLimbs)
           -- aVal * result = n * p + 1
-          let nVal = (aVal * U.new width result - U.new width 1) `div` U.new width p
+          let nVal = U.new width ((U.uValue aVal * result - 1) `div` p)
           bindLimbs "ModInv n" nLimbs nVal
           bindLimbs "ModInv" outLimbs (U.new width result)
           return Eliminated

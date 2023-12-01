@@ -77,8 +77,8 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) _fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (interpretElab elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) [Integer]))
-            handleBinary (Proxy :: Proxy (Binary n)) _fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (interpretElab elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Binary n)) [Integer]))
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (interpretElab fieldInfo elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) [Integer]))
+            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (interpretElab fieldInfo elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Binary n)) [Integer]))
     Protocol (GenCircuit filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)

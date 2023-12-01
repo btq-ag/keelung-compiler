@@ -169,7 +169,7 @@ detectBinRep fieldBitWidth isBoolean xs =
     checkCoeffDiff :: (GaloisField n, Integral n) => Var -> n -> n -> Candidate n -> [Candidate n]
     checkCoeffDiff var picked coeff (coeffMap, lowerBound, upperBound, multiplier) = do
       pickedAsDenominator <- [True, False] -- whether `picked` is the denominator
-      negated <- [True, False] -- whether the coefficient is negated
+      negated <- [False, True] -- whether the coefficient is negated
       let coeff' = if negated then -coeff else coeff
       let diff = if pickedAsDenominator then coeff' / picked else picked / coeff'
       case isPowerOf2 fieldBitWidth diff of

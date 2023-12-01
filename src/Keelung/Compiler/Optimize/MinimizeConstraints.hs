@@ -15,8 +15,8 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.UInt qualified as UInt
+import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
@@ -45,6 +45,7 @@ data Action
   | ShouldRunAddL
   | ShouldRunMulL
   | ShouldRunDivMod
+  | ShouldRunCLDivMod
   deriving (Eq, Show)
 
 -- | Decide what to do next based on the result of the previous optimization pass
@@ -52,7 +53,8 @@ transition :: WhatChanged -> Action -> Action
 transition _ Accept = Accept
 transition NothingChanged ShouldRunAddL = ShouldRunMulL
 transition NothingChanged ShouldRunMulL = ShouldRunDivMod
-transition NothingChanged ShouldRunDivMod = Accept
+transition NothingChanged ShouldRunDivMod = ShouldRunCLDivMod
+transition NothingChanged ShouldRunCLDivMod = Accept
 transition RelationChanged _ = ShouldRunAddL -- restart from optimizeAddF
 transition AdditiveFieldConstraintChanged _ = ShouldRunAddL -- restart from optimizeAddL
 transition AdditiveLimbConstraintChanged _ = ShouldRunMulL -- restart from optimizeMulL
@@ -68,6 +70,7 @@ runStateMachine cm action = do
     ShouldRunAddL -> optimizeAddL cm
     ShouldRunMulL -> optimizeMulL cm
     ShouldRunDivMod -> optimizeDivMod cm
+    ShouldRunCLDivMod -> optimizeCLDivMod cm
   -- derive the next action based on the result of the previous optimization pass
   let action' = transition changed action
   -- keep running the state machine until it reaches the 'Accept' state
@@ -96,6 +99,11 @@ optimizeDivMod :: (GaloisField n, Integral n) => ConstraintModule n -> Either (C
 optimizeDivMod cm = runOptiM cm $ runRoundM $ do
   result <- foldMaybeM reduceDivMod [] (cmDivMods cm)
   modify' $ \cm' -> cm' {cmDivMods = result}
+
+optimizeCLDivMod :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
+optimizeCLDivMod cm = runOptiM cm $ runRoundM $ do
+  result <- foldMaybeM reduceDivMod [] (cmCLDivMods cm)
+  modify' $ \cm' -> cm' {cmCLDivMods = result}
 
 goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughEqZeros cm =
@@ -241,7 +249,7 @@ reduceMulLCPC a bs c = do
     Left constant ->
       if constant == c
         then modify' $ removeOccurrencesTuple (PolyL.varsSet bs)
-        else throwError $ Compile.ConflictingValuesU (toInteger constant) (toInteger c)
+        else throwError $ Compile.ConflictingValuesF constant c
     Right xs -> addAddL $ PolyL.addConstant c xs
 
 -- | Trying to reduce a multiplicative limb constaint of (Constant / Polynomial / Polynomial)
@@ -508,6 +516,7 @@ substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Ei
 substPolyL relations poly = do
   let constant = PolyL.polyConstant poly
       initState = (Left constant, Nothing)
+      -- afterSubstRefU = foldl (substRefU (Relations.exportUIntRelations relations)) initState (PolyL.polyLimbs poly)
       afterSubstLimb = foldl (substLimb (Relations.exportLimbRelations relations)) initState (PolyL.polyLimbs poly)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstLimb (PolyL.polyRefs poly)
   case afterSubstRef of
@@ -537,6 +546,34 @@ substLimb relations (accPoly, changes) (limb, multiplier) = case EquivClass.look
         -- replace `limb` with `root`
         Left c -> (PolyL.fromLimbs c [(root, multiplier)], (addLimb root . removeLimb limb) changes)
         Right accPoly' -> (Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), (addLimb root . removeLimb limb) changes)
+
+-- -- | Substitutes RefUs in the Limbs of a PolyL.
+-- substRefU ::
+--   (Integral n, GaloisField n) =>
+--   UInt.UIntRelations ->
+--   (Either n (PolyL n), Maybe Changes) ->
+--   (Limb, n) ->
+--   (Either n (PolyL n), Maybe Changes)
+-- substRefU relations (accPoly, changes) (limb, multiplier) = case EquivClass.lookup (UInt.Ref (Limb.lmbRef limb)) relations of
+--   EquivClass.IsConstant constant ->
+--     let constantSegment = sum [(if Data.Bits.testBit constant i then 1 else 0) * (2 ^ i) | i <- [Limb.lmbOffset limb .. Limb.lmbOffset limb + Limb.lmbWidth limb - 1]]
+--      in case accPoly of
+--           Left c -> (Left (fromInteger constantSegment * multiplier + c), removeLimb limb changes)
+--           Right xs -> (Right $ PolyL.addConstant (fromInteger constantSegment * multiplier) xs, removeLimb limb changes)
+--   EquivClass.IsRoot _ -> case accPoly of
+--     Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+--     Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+--   EquivClass.IsChildOf (UInt.Ref root) _ ->
+--     if root == Limb.lmbRef limb
+--       then case accPoly of -- nothing changed. TODO: see if this is necessary
+--         Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+--         Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+--       else
+--         let newLimb = limb {Limb.lmbRef = root}
+--          in case accPoly of
+--               -- replace `limb` with `newLimb`
+--               Left c -> (PolyL.fromLimbs c [(newLimb, multiplier)], (addLimb newLimb . removeLimb limb) changes)
+--               Right accPoly' -> (Right (PolyL.insertLimbs 0 [(newLimb, multiplier)] accPoly'), (addLimb newLimb . removeLimb limb) changes)
 
 -- | Substitutes a Ref in a PolyL.
 substRef ::

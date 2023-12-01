@@ -7,6 +7,7 @@ module Keelung.Compiler.Compile (run) where
 
 import Control.Arrow (left)
 import Control.Monad.Except
+import Control.Monad.RWS
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Compile.Boolean qualified as Boolean
@@ -18,7 +19,9 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo (FieldInfo)
+import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Syntax (widthOf)
@@ -63,6 +66,25 @@ compileSideEffect (AssignmentF var val) = do
   result <- compileExprF val
   relateLC (RefFX var) result
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
+compileSideEffect (ToField width varU varF) = do
+  fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+  -- convert the RefU to a bunch of Limbs
+  let limbs = Limb.refUToLimbs fieldWidth (RefUX width varU)
+  -- only convert the first Limb to a RefF because that's the maximum width of a RefF allowed
+  case limbs of
+    [] -> writeRefFVal (RefFX varF) 0
+    (limb : _) -> writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
+compileSideEffect (ToUInt width varU varF) = do
+  fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+  -- convert the RefU to a bunch of Limbs
+  let limbs = Limb.refUToLimbs fieldWidth (RefUX width varU)
+  case limbs of
+    [] -> writeRefFVal (RefFX varF) 0
+    (limb : rest) -> do 
+      -- only matching the first Limb with the RefF
+      writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
+      -- assign the rest of the Limbs as 0 
+      forM_ rest $ \lmb -> writeLimbVal lmb 0
 compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do

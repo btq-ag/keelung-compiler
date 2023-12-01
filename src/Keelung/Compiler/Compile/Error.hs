@@ -32,9 +32,9 @@ data Error n
 instance Serialize n => Serialize (Error n)
 
 instance (GaloisField n, Integral n) => Show (Error n) where
-  show (ConflictingValuesB b1 b2) = "Cannot unify conflicting values: " <> show b1 <> " and " <> show b2
-  show (ConflictingValuesF f1 f2) = "Cannot unify conflicting values: " <> show (N f1) <> " and " <> show (N f2)
-  show (ConflictingValuesU u1 u2) = "Cannot unify conflicting values: " <> show u1 <> " and " <> show u2
+  show (ConflictingValuesB b1 b2) = "Cannot unify conflicting Boolean values: " <> show b1 <> " and " <> show b2
+  show (ConflictingValuesF f1 f2) = "Cannot unify conflicting Field elements: " <> show (N f1) <> " and " <> show (N f2)
+  show (ConflictingValuesU u1 u2) = "Cannot unify conflicting UInt values: " <> show u1 <> " and " <> show u2
   show (AssertComparisonError x op y) = "Assertion on comparison doesn't hold: " <> show x <> " " <> op' <> " " <> show y
     where
       op' = case op of

@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.UInt.Multiplication.Binary (compileMulB) where
+module Keelung.Compiler.Compile.UInt.Multiplication.Binary (compileMulB, compileMulBExtended) where
 
 import Control.Monad
 import Data.Bits qualified
@@ -8,8 +8,12 @@ import Keelung.Compiler.Compile.Monad
 import Keelung.Data.Reference
 import Keelung.Data.U (U)
 
+-- | Multiply two unsigned integers, get the result of the same width
 compileMulB :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU U -> M n ()
 compileMulB width out x y = formHalfColumns width x y >>= foldColumns out
+
+compileMulBExtended :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU U -> M n ()
+compileMulBExtended width out x y = formAllColumns width x y >>= foldColumns out
 
 -- | Form columns of bits to be added together after multiplication
 --
@@ -20,13 +24,19 @@ compileMulB width out x y = formHalfColumns width x y >>= foldColumns out
 --                      x₃y₁    x₂y₁    x₁y₁    x₀y₁
 --              x₃y₂    x₂y₂    x₁y₂    x₀y₂
 --      x₃y₃    x₂y₃    x₁y₃    x₀y₃
-_formAllColumns :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> M n [(Int, [RefB])]
-_formAllColumns width x y = do
+formAllColumns :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> M n [(Int, [RefB])]
+formAllColumns width x (Left y) = do
   let numberOfColumns = 2 * width - 1
   let pairs = [(indexSum, [(RefUBit width x (indexSum - i), RefUBit width y i) | i <- [(indexSum - width + 1) `max` 0 .. indexSum `min` (width - 1)]]) | indexSum <- [0 .. numberOfColumns - 1]]
   forM pairs $ \(i, xs) -> do
     xs' <- mapM multiplyBits xs
     return (i, xs')
+formAllColumns width x (Right y) = do
+  let numberOfColumns = 2 * width - 1
+  forM [0 .. numberOfColumns - 1] $ \i -> do
+    -- put the bits of x into the column if `Data.Bits.testBit y j` is True
+    let vars = [RefUBit width x (i - j) | j <- [(i - width + 1) `max` 0 .. i `min` (width - 1)], Data.Bits.testBit y j]
+    return (i, vars)
 
 -- | Form only the right half of columns of bits to be added together after multiplication
 --

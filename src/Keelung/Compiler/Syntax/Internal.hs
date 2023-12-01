@@ -250,6 +250,8 @@ data SideEffect n
   = AssignmentF Var (ExprF n)
   | AssignmentB Var (ExprB n)
   | AssignmentU Width Var (ExprU n)
+  | ToUInt Width Var Var
+  | ToField Width Var Var
   | DivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
   | CLDivMod Width (ExprU n) (ExprU n) (ExprU n) (ExprU n)
   | AssertLTE Width (ExprU n) Integer

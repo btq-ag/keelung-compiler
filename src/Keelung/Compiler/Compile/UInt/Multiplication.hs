@@ -92,6 +92,7 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
       lowerLimb <- allocLimb currentLimbWidth limbStart True
       writeAddWithLimbs
         (a * constant)
+        []
         [ -- operand side
           (x, constant),
           -- negative side

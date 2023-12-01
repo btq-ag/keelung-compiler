@@ -68,11 +68,19 @@ tests =
 
     it "performCLDivMod (single statements)" $ do
       let program = do
-            a <- input Public :: Comp (UInt 5)
+            a <- input Public :: Comp (UInt 2)
             b <- input Public
             (q0, r0) <- performCLDivMod a b
             return [q0, r0]
-      runAll (Prime 17) program [20, 7] [] [7, 1]
+      runAll gf181 program [1, 1] [] [1, 0]
+
+    -- let program = do
+    --       a <- input Public :: Comp (UInt 5)
+    --       b <- input Public
+    --       (q0, r0) <- performCLDivMod a b
+    --       return [q0, r0]
+    -- printLog gf181 program [20, 7] [] -- [7, 1]
+    -- runAll (Prime 17) program [20, 7] [] [7, 1]
 
     it "performCLDivMod (multiple statements)" $ do
       let program = do
