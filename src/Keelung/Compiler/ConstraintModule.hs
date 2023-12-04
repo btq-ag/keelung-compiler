@@ -27,12 +27,12 @@ import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Optimize.OccurUB (OccurUB)
-import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -373,29 +373,29 @@ instance UpdateOccurrences RefU where
       )
 
 instance UpdateOccurrences Limb where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cm limb ->
-              case lmbRef limb of
-                RefUX width var ->
-                  cm
-                    { cmOccurrenceUB = OccurUB.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
-                    }
-                _ -> cm
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cm limb ->
-              case lmbRef limb of
-                RefUX width var ->
-                  cm
-                    { cmOccurrenceUB = OccurUB.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
-                    }
-                _ -> cm
-          )
-      )
-  -- addOccurrences = addOccurrences . Set.map Limb.lmbRef
-  -- removeOccurrences = removeOccurrences . Set.map Limb.lmbRef
+  -- addOccurrences =
+  --   flip
+  --     ( foldl
+  --         ( \cm limb ->
+  --             case lmbRef limb of
+  --               RefUX width var ->
+  --                 cm
+  --                   { cmOccurrenceUB = OccurUB.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
+  --                   }
+  --               _ -> cm
+  --         )
+  --     )
+  -- removeOccurrences =
+  --   flip
+  --     ( foldl
+  --         ( \cm limb ->
+  --             case lmbRef limb of
+  --               RefUX width var ->
+  --                 cm
+  --                   { cmOccurrenceUB = OccurUB.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
+  --                   }
+  --               _ -> cm
+  --         )
+  --     )
+  addOccurrences = addOccurrences . Set.map Limb.lmbRef
+  removeOccurrences = removeOccurrences . Set.map Limb.lmbRef
