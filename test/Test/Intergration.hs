@@ -1,6 +1,7 @@
 module Test.Intergration (tests, run) where
 
 import Basic qualified
+import Hash.Poseidon qualified
 import Control.Arrow
 import Keelung
 import Keelung.Compiler (ConstraintSystem)
@@ -62,3 +63,18 @@ tests = describe "Intergration tests" $ do
       let expected = left show (Compiler.interpret gf181Info Basic.eq1 [3] [] :: Either (Compiler.Error GF181) [Integer])
       actual <- right (map toInteger) . left show <$> Keelung.interpretEither gf181 Basic.eq1 [3] []
       actual `shouldBe` expected
+
+  describe "Keelung `compile`" $ do
+    let test program = do 
+          let expected = right Compiler.toR1CS $ left show (Compiler.compileAndLinkO1 gf181Info program :: Either (Compiler.Error GF181) (ConstraintSystem GF181))
+          actual <- right (fmap fromIntegral) . left show <$> Keelung.compile gf181 program
+          actual `shouldBe` expected
+
+    it "Basic.eq1" $ do
+      test Basic.eq1
+
+    it "Hash.Poseidon.hash" $ do
+      test $ do 
+        x <- input Public
+        result <- Hash.Poseidon.hash [x]
+        return [result]
