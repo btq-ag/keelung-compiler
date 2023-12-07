@@ -293,7 +293,9 @@ reindexRefU :: Occurrences -> RefU -> Int -> Var
 reindexRefU occurrences (RefUO w x) i = reindex (occurCounters occurrences) Output (ReadUInt w) x + (i `mod` w)
 reindexRefU occurrences (RefUI w x) i = reindex (occurCounters occurrences) PublicInput (ReadUInt w) x + (i `mod` w)
 reindexRefU occurrences (RefUP w x) i = reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x + (i `mod` w)
-reindexRefU occurrences (RefUX w x) i = IntervalTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate (ReadUInt w) x - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
+reindexRefU occurrences (RefUX w x) i =
+  let offset = getOffset (occurCounters occurrences) (Intermediate, ReadUInt w) + w * x
+   in IntervalTable.reindex (indexTable occurrences) (offset - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
 
 -------------------------------------------------------------------------------
 
