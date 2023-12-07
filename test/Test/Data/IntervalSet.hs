@@ -28,7 +28,7 @@ tests = describe "Interval Sets" $ do
         let table = IntervalSet.toIntervalTable 200 intervals
         IntervalTable.size table `shouldBe` sum (map sizeOfOperation operations)
         forM_ points $ \point -> do
-          IntervalTable.member point table `shouldBe` memberOfNonOverlappingOperations (NonOverlappingOperations operations points) point
+          IntervalTable.member (point, point + 1) table `shouldBe` memberOfNonOverlappingOperations (NonOverlappingOperations operations points) point
 
 --------------------------------------------------------------------------------
 

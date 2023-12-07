@@ -22,7 +22,7 @@ import Keelung (Width)
 --   Unused so far      0       2         4
 --
 --   We create a table with the following entries:
---      [(0, (2, 0)), (4, (3, 2)), (9, (1, 4))]
+--      [(0, (2, 0)), (4, (6, 2)), (9, (10, 4))]
 --
 --   The keys represent the positions of the start of the intervals, and the values represent (end of this interval, total hole size before this interval).
 --
@@ -54,11 +54,14 @@ instance Monoid IntervalTable where
 empty :: IntervalTable
 empty = IntervalTable 0 0 mempty
 
--- | O(1). Is this variable used?
-member :: Int -> IntervalTable -> Bool
-member var (IntervalTable _ _ xs) = case IntMap.lookupLE var xs of
-  Nothing -> False
-  Just (start, (end, _)) -> start <= var && var < end
+-- | O(1). Is any variable within the given interval used?
+--         the interval is inclusive on the left and exclusive on the right
+member :: (Int, Int) -> IntervalTable -> Bool
+member (start, end) (IntervalTable _ _ xs) =
+  (end - start > 0)
+    && case IntMap.lookupLE start xs of
+      Just (_, (beforeEnd, _)) -> beforeEnd > start -- see if the end of an existing interval is within the given interval
+      Nothing -> False -- no existing interval starts before the end of the given interval
 
 -- | O(1). The number of used variables
 size :: IntervalTable -> Int
