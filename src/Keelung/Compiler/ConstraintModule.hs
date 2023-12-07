@@ -39,6 +39,8 @@ import Keelung.Data.Reference
 import Keelung.Data.Struct
 import Keelung.Data.U (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
+import qualified Keelung.Compiler.Optimize.OccurUB as OccurUB
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -260,11 +262,11 @@ class UpdateOccurrences ref where
   addOccurrences :: Set ref -> ConstraintModule n -> ConstraintModule n
   removeOccurrences :: Set ref -> ConstraintModule n -> ConstraintModule n
 
-addOccurrencesTuple :: (GaloisField n, Integral n) => (Set RefU, Set Ref) -> ConstraintModule n -> ConstraintModule n
-addOccurrencesTuple (ls, vars) = addOccurrences ls . addOccurrences vars
+addOccurrencesTuple :: (GaloisField n, Integral n) => (Set RefU, Set Limb, Set Ref) -> ConstraintModule n -> ConstraintModule n
+addOccurrencesTuple (refUs, limbs, refs) = addOccurrences refUs . addOccurrences limbs . addOccurrences refs
 
-removeOccurrencesTuple :: (GaloisField n, Integral n) => (Set RefU, Set Ref) -> ConstraintModule n -> ConstraintModule n
-removeOccurrencesTuple (ls, vars) = addOccurrences ls . addOccurrences vars
+removeOccurrencesTuple :: (GaloisField n, Integral n) => (Set RefU, Set Limb, Set Ref) -> ConstraintModule n -> ConstraintModule n
+removeOccurrencesTuple (refUs, limbs, refs) = removeOccurrences refUs . removeOccurrences limbs . removeOccurrences refs
 
 instance UpdateOccurrences Ref where
   addOccurrences =
@@ -318,9 +320,10 @@ instance UpdateOccurrences RefB where
       ( foldl
           ( \cm ref ->
               case ref of
-                RefUBit _ (RefUX width var) _ ->
+                RefUBit _ (RefUX width var) i ->
                   cm
                     { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm)
+                    , cmOccurrenceUB = OccurUB.increase width var (i, i) (cmOccurrenceUB cm)
                     }
                 RefBX var ->
                   cm
@@ -334,9 +337,10 @@ instance UpdateOccurrences RefB where
       ( foldl
           ( \cm ref ->
               case ref of
-                RefUBit _ (RefUX width var) _ ->
+                RefUBit _ (RefUX width var) i ->
                   cm
                     { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm)
+                    , cmOccurrenceUB = OccurUB.decrease width var (i, i) (cmOccurrenceUB cm)
                     }
                 RefBX var ->
                   cm
@@ -373,29 +377,29 @@ instance UpdateOccurrences RefU where
       )
 
 instance UpdateOccurrences Limb where
-  -- addOccurrences =
-  --   flip
-  --     ( foldl
-  --         ( \cm limb ->
-  --             case lmbRef limb of
-  --               RefUX width var ->
-  --                 cm
-  --                   { cmOccurrenceUB = OccurUB.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
-  --                   }
-  --               _ -> cm
-  --         )
-  --     )
-  -- removeOccurrences =
-  --   flip
-  --     ( foldl
-  --         ( \cm limb ->
-  --             case lmbRef limb of
-  --               RefUX width var ->
-  --                 cm
-  --                   { cmOccurrenceUB = OccurUB.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
-  --                   }
-  --               _ -> cm
-  --         )
-  --     )
-  addOccurrences = addOccurrences . Set.map Limb.lmbRef
-  removeOccurrences = removeOccurrences . Set.map Limb.lmbRef
+  addOccurrences =
+    flip
+      ( foldl
+          ( \cm limb ->
+              case lmbRef limb of
+                RefUX width var ->
+                  cm
+                    { cmOccurrenceUB = traceShow ("add", limb) OccurUB.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
+                    }
+                _ -> cm
+          )
+      )
+  removeOccurrences =
+    flip
+      ( foldl
+          ( \cm limb ->
+              case lmbRef limb of
+                RefUX width var ->
+                  cm
+                    { cmOccurrenceUB = traceShow ("remove", limb) OccurUB.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
+                    }
+                _ -> cm
+          )
+      )
+  -- addOccurrences = addOccurrences . Set.map Limb.lmbRef
+  -- removeOccurrences = removeOccurrences . Set.map Limb.lmbRef

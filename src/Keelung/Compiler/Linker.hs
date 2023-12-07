@@ -112,6 +112,13 @@ linkConstraintModule cm =
         True
 
     limbShouldBeKept :: Limb -> Bool
+    -- limbShouldBeKept limb = case IntMap.lookup (lmbWidth limb) (refBsInOccurrencesUB occurrences) of
+    --   Nothing -> False
+    --   Just varMap -> case lmbRef limb of
+    --     RefUX _ var -> case IntMap.lookup var varMap of
+    --       Nothing -> False
+    --       Just table -> IntervalTable.member (lmbOffset limb) (lmbWidth limb) table
+    --     _ -> True -- it's a pinned UInt variable
     limbShouldBeKept = refUShouldBeKept . lmbRef
 
     refBShouldBeKept :: RefB -> Bool
