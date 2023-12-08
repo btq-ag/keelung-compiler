@@ -11,9 +11,11 @@ import Test.Intergration qualified as Intergration
 import Test.Optimization qualified as Optimization
 import Test.Relations qualified as Relations
 import Test.Solver qualified as Solver
+import Test.Snarkjs qualified as Snarkjs
 
 main :: IO ()
 main = hspec $ do
+  Snarkjs.testQuad
   Solver.tests
   Compilation.tests
   Optimization.tests

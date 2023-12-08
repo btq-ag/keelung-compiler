@@ -80,15 +80,15 @@ packages:
     commit: 0ee60d64bfe65e8b757eb0ef8ff3d875c7aa9ff8
     git: git@github.com:btq-ag/keelung-examples.git
 - completed:
-    commit: d06c557da696e52f937713573694ed0e0a521013
+    commit: db50428609ff511a5f4f2b10fa40e96d7f10a35a
     git: git@github.com:btq-ag/keelung-stdlib.git
     name: keelung-stdlib
     pantry-tree:
-      sha256: 10888c3fa475681da7589d82f587b37a0e86309831ffc4d402adcc950e4107af
+      sha256: 3d72737512142a084c8996867d6a0e2f99efb808531be7ee8fffad0c83ab7282
       size: 2097
     version: 0.1.0.0
   original:
-    commit: d06c557da696e52f937713573694ed0e0a521013
+    commit: db50428609ff511a5f4f2b10fa40e96d7f10a35a
     git: git@github.com:btq-ag/keelung-stdlib.git
 snapshots:
 - completed:
