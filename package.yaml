@@ -78,12 +78,14 @@ tests:
       - examples/
     dependencies:
     - keelung-compiler
-    # - keelung-examples
+    - keelung-examples
+    - keelung-stdlib
     - hspec
     - hspec-expectations-lifted
     - HUnit
     - QuickCheck
     - quickcheck-transformer
+    - process
 
 
     ghc-options:

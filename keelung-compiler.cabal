@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.2.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -255,6 +255,7 @@ test-suite keelung-test
       Test.Optimization.Util
       Test.Relations
       Test.Relations.Field
+      Test.Snarkjs
       Test.Solver
       Test.Solver.BinRep
       Keelung.Compiler
@@ -340,8 +341,11 @@ test-suite keelung-test
     , hspec-expectations-lifted
     , keelung
     , keelung-compiler
+    , keelung-examples
+    , keelung-stdlib
     , mtl
     , optparse-applicative
+    , process
     , quickcheck-transformer
     , random
     , semirings

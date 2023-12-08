@@ -68,6 +68,28 @@ packages:
       size: 1655
   original:
     hackage: primitive-0.7.4.0@sha256:c2f0ed97b3dce97f2f43b239c3be8b136e4368f1eb7b61322ee9ac98f604622b,2982
+- completed:
+    commit: 0ee60d64bfe65e8b757eb0ef8ff3d875c7aa9ff8
+    git: git@github.com:btq-ag/keelung-examples.git
+    name: keelung-examples
+    pantry-tree:
+      sha256: e8cf80d12d266958cd1b208c0772daa3cef7de808eac6f1d495b71a670d18c72
+      size: 1270
+    version: 0.1.0.0
+  original:
+    commit: 0ee60d64bfe65e8b757eb0ef8ff3d875c7aa9ff8
+    git: git@github.com:btq-ag/keelung-examples.git
+- completed:
+    commit: d06c557da696e52f937713573694ed0e0a521013
+    git: git@github.com:btq-ag/keelung-stdlib.git
+    name: keelung-stdlib
+    pantry-tree:
+      sha256: 10888c3fa475681da7589d82f587b37a0e86309831ffc4d402adcc950e4107af
+      size: 2097
+    version: 0.1.0.0
+  original:
+    commit: d06c557da696e52f937713573694ed0e0a521013
+    git: git@github.com:btq-ag/keelung-stdlib.git
 snapshots:
 - completed:
     sha256: 5a59b2a405b3aba3c00188453be172b85893cab8ebc352b1ef58b0eae5d248a2
