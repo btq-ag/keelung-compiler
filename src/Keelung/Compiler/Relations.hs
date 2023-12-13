@@ -139,14 +139,6 @@ lookupLimb limb relations = case UInt.lookupRefU (exportUIntRelations relations)
   Left rootVar -> Left (limb {Limb.lmbRef = rootVar}) -- replace the RefU of the Limb with the root of that RefU
   Right rootVal -> Right (U.adjustWidth (Limb.lmbWidth limb) rootVal) -- the parent of this limb turned out to be a constant
 
--- in traceShow ("relateL", var1, var2, EquivClass.relationBetween (UInt.Ref (Limb.lmbRef var1)) (UInt.Ref (Limb.lmbRef var2)) (exportUIntRelations relations)) $ case EquivClass.relationBetween (UInt.Ref (Limb.lmbRef var1)) (UInt.Ref (Limb.lmbRef var2)) (exportUIntRelations relations) of
--- Nothing ->
---   -- no relations between the RefUs of the Limbs, so we relate the Limbs instead
---   updateRelationsL (LimbRelations.relate var1 var2) relations
--- Just UInt.Equal ->
---   -- the RefUs of the Limbs are equal, so we do nothing (no need to relate the Limbs)
---   return relations
-
 relateU :: (GaloisField n, Integral n) => RefU -> RefU -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateU var1 var2 = updateRelationsU $ UInt.relateRefU var1 var2
 

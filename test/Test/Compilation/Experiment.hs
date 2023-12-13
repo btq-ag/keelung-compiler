@@ -6,7 +6,7 @@ module Test.Compilation.Experiment where
 import Keelung
 import Test.Compilation.Util
 import Test.Hspec
-import Test.QuickCheck
+-- import Test.QuickCheck
 
 run :: IO ()
 run = hspec tests
@@ -41,7 +41,7 @@ tests = describe "Experiment" $ do
       let program = do
             x <- input Public :: Comp (UInt 8)
             y <- input Public :: Comp (UInt 8)
-            return $ x * 2
+            return $ x * y
       debug gf181 program
 
   -- it "should reveal variable layout" $ do

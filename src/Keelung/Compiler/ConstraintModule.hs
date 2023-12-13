@@ -27,20 +27,18 @@ import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Optimize.OccurUB (OccurUB)
+import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Struct
 import Keelung.Data.U (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
-import qualified Keelung.Compiler.Optimize.OccurUB as OccurUB
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -322,8 +320,8 @@ instance UpdateOccurrences RefB where
               case ref of
                 RefUBit _ (RefUX width var) i ->
                   cm
-                    { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm)
-                    , cmOccurrenceUB = OccurUB.increase width var (i, i) (cmOccurrenceUB cm)
+                    { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm),
+                      cmOccurrenceUB = OccurUB.increase width var (i, i) (cmOccurrenceUB cm)
                     }
                 RefBX var ->
                   cm
@@ -339,8 +337,8 @@ instance UpdateOccurrences RefB where
               case ref of
                 RefUBit _ (RefUX width var) i ->
                   cm
-                    { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm)
-                    , cmOccurrenceUB = OccurUB.decrease width var (i, i) (cmOccurrenceUB cm)
+                    { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm),
+                      cmOccurrenceUB = OccurUB.decrease width var (i, i) (cmOccurrenceUB cm)
                     }
                 RefBX var ->
                   cm
@@ -384,7 +382,7 @@ instance UpdateOccurrences Limb where
               case lmbRef limb of
                 RefUX width var ->
                   cm
-                    { cmOccurrenceUB = traceShow ("add", limb) OccurUB.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
+                    { cmOccurrenceUB = OccurUB.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
                     }
                 _ -> cm
           )
@@ -396,10 +394,11 @@ instance UpdateOccurrences Limb where
               case lmbRef limb of
                 RefUX width var ->
                   cm
-                    { cmOccurrenceUB = traceShow ("remove", limb) OccurUB.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
+                    { cmOccurrenceUB = OccurUB.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
                     }
                 _ -> cm
           )
       )
-  -- addOccurrences = addOccurrences . Set.map Limb.lmbRef
-  -- removeOccurrences = removeOccurrences . Set.map Limb.lmbRef
+
+-- addOccurrences = addOccurrences . Set.map Limb.lmbRef
+-- removeOccurrences = removeOccurrences . Set.map Limb.lmbRef
