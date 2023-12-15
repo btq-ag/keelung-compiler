@@ -74,7 +74,7 @@ fromOrdinaryConstraints (R1CS _ ordinaryConstraints counters eqZeros divMods clD
   where
     booleanInputVarConstraints =
       let generateRange (start, end) = [start .. end - 1]
-       in concatMap generateRange (getBooleanConstraintRanges counters)
+       in concatMap generateRange (IntMap.toList (getBooleanConstraintRanges counters))
 
     differentiate :: (GaloisField n, Integral n) => R1C n -> Either (Error n) [Constraint n]
     differentiate (R1C (Left a) (Left b) (Left c)) = if a * b == c then Right [] else Left ConflictingValues
