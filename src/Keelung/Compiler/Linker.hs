@@ -297,9 +297,9 @@ reindexRefB occurrences (RefBX x) = IntervalTable.reindex (indexTableB occurrenc
 reindexRefB occurrences (RefUBit _ x i) = reindexRefU occurrences x i
 
 reindexRefU :: Occurrences -> RefU -> Int -> Var
-reindexRefU occurrences (RefUO w x) i = reindex (occurCounters occurrences) Output (ReadUInt w) x + (i `mod` w)
-reindexRefU occurrences (RefUI w x) i = reindex (occurCounters occurrences) PublicInput (ReadUInt w) x + (i `mod` w)
-reindexRefU occurrences (RefUP w x) i = reindex (occurCounters occurrences) PrivateInput (ReadUInt w) x + (i `mod` w)
+reindexRefU occurrences (RefUO w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (Output, ReadAllUInts)
+reindexRefU occurrences (RefUI w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (PublicInput, ReadAllUInts)
+reindexRefU occurrences (RefUP w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (PrivateInput, ReadAllUInts)
 reindexRefU occurrences (RefUX w x) i =
   let offset = getOffset (occurCounters occurrences) (Intermediate, ReadUInt w) + w * x
    in IntervalTable.reindex (indexTable occurrences) (offset - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
@@ -312,9 +312,10 @@ data Occurrences = Occurrences
     refFsInOccurrencesF :: !IntSet,
     refBsInOccurrencesB :: !IntSet,
     refUsInOccurrencesU :: !(IntMap IntSet),
-    refBsInOccurrencesUB :: !(IntMap (IntMap IntervalTable)),
+    refBsInOccurrencesUB :: !(IntMap IntervalTable),
     indexTableF :: !IntervalTable,
     indexTableB :: !IntervalTable,
+    -- indexTableUB :: !(IntMap IntervalTable),
     indexTable :: !IntervalTable,
     pinnedSize :: !Int
   }
@@ -332,6 +333,7 @@ constructOccurrences counters occurF occurB occurU occurUB =
           refBsInOccurrencesUB = tablesUB,
           indexTableF = OccurF.toIntervalTable counters occurF,
           indexTableB = OccurB.toIntervalTable counters occurB,
+          -- indexTableUB = fmap (mconcat . IntMap.elems) tablesUB,
           indexTable =
             OccurF.toIntervalTable counters occurF
               <> OccurB.toIntervalTable counters occurB
@@ -340,5 +342,5 @@ constructOccurrences counters occurF occurB occurU occurUB =
           pinnedSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
         }
   where
-    mergeIntervalTables :: IntMap (IntMap IntervalTable) -> IntervalTable
-    mergeIntervalTables = mconcat . IntMap.elems . fmap (mconcat . IntMap.elems)
+    mergeIntervalTables :: IntMap IntervalTable -> IntervalTable
+    mergeIntervalTables = mconcat . IntMap.elems

@@ -80,10 +80,9 @@ new = OccurUB mempty
 null :: OccurUB -> Bool
 null (OccurUB xs) = IntMap.null xs
 
--- | O(n). To an IntMap of widths to IntMap of vars to IntervalTable
-toIntervalTables :: OccurUB -> IntMap (IntMap IntervalTable)
-toIntervalTables (OccurUB xs) = IntMap.mapWithKey (fmap . IntervalSet.toIntervalTable) xs
-
+-- | O(n). To an IntMap of widths to IntervalTable
+toIntervalTables :: OccurUB -> IntMap IntervalTable
+toIntervalTables (OccurUB xss) = IntMap.mapWithKey (\width -> mconcat . map (IntervalSet.toIntervalTable width) . IntMap.elems) xss
 
 -- where
 --   convert :: Width -> IntervalSet -> IntervalTable

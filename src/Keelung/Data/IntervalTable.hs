@@ -88,7 +88,7 @@ reindex (IntervalTable _ _ xs) var = case IntMap.lookupLE var xs of
   Nothing -> var
   Just (_, (_, vacancyCount)) -> var - vacancyCount
 
--- | O(n). Mergin two IntervalTable
+-- | O(n). Merge two IntervalTable
 merge :: IntervalTable -> IntervalTable -> IntervalTable
 merge (IntervalTable domainSize1 totalUsedSize1 xs1) (IntervalTable domainSize2 totalUsedSize2 xs2) =
   let totalUsedSize = totalUsedSize1 + totalUsedSize2

@@ -8,6 +8,8 @@ import Data.IntMap.Strict qualified as IntMap
 import Keelung
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Linker (constructOccurrences, reindexRef)
+import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
+import Keelung.Data.IntervalTable (IntervalTable (..))
 import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Reference
 import Test.Hspec
@@ -93,37 +95,50 @@ tests =
         IntervalTable.reindex table 32 `shouldBe` 22
 
     describe "merge" $ do
-      it "1" $ do
-        let occurrences = IntMap.fromList $ zip [0 ..] [0, 1, 0, 1, 2, 0, 3]
-            table1 = IntervalTable.fromOccurrenceMap 1 (7, occurrences)
+      it "Field or Boolean: 1" $ do
+        let table1 = IntervalTable.fromOccurrenceMap 1 (7, IntMap.fromList $ zip [0 ..] [0, 1, 0, 1, 2, 0, 3])
             table = table1 <> table1
 
-        IntervalTable.reindex table 1 `shouldBe` 0
-        IntervalTable.reindex table 3 `shouldBe` 1
-        IntervalTable.reindex table 4 `shouldBe` 2
-        IntervalTable.reindex table 6 `shouldBe` 3
-        IntervalTable.reindex table 8 `shouldBe` 4
-        IntervalTable.reindex table 10 `shouldBe` 5
-        IntervalTable.reindex table 11 `shouldBe` 6
-        IntervalTable.reindex table 13 `shouldBe` 7
+        map (IntervalTable.reindex table) [1, 3, 4, 6, 8, 10, 11, 13] `shouldBe` [0 .. 7]
 
-      it "2" $ do
+      it "Field or Boolean: 2" $ do
         let table1 = IntervalTable.fromOccurrenceMap 1 (3, IntMap.fromList (zip [0 ..] [0, 0, 0]))
             table2 = IntervalTable.fromOccurrenceMap 1 (3, IntMap.fromList (zip [0 ..] [2, 3, 0]))
             table3 = IntervalTable.fromOccurrenceMap 1 (3, IntMap.fromList (zip [0 ..] [2, 3, 0]))
             table = table1 <> table2 <> table3
 
-        IntervalTable.reindex table 3 `shouldBe` 0
-        IntervalTable.reindex table 4 `shouldBe` 1
-        IntervalTable.reindex table 6 `shouldBe` 2
-        IntervalTable.reindex table 7 `shouldBe` 3
+        map (IntervalTable.reindex table) [3, 4, 6, 7] `shouldBe` [0 .. 3]
+
+      it "UInt 4" $ do
+        let table1 = IntervalTable 4 2 (IntMap.fromList [(0, (2, 0))])
+            table2 = IntervalTable 4 2 (IntMap.fromList [(2, (2, 2))])
+            table = table1 <> table2
+
+        map (IntervalTable.reindex table) [0, 1, 6, 7] `shouldBe` [0 .. 3]
+
+    describe "from OccurUB" $ do
+      it "1" $ do
+        let occurUB = OccurUB.increase 4 1 (2, 4) $ OccurUB.increase 4 0 (0, 2) OccurUB.new
+        let tables = OccurUB.toIntervalTables occurUB
+        case IntMap.lookup 4 tables of
+          Nothing -> error "should not happen"
+          Just table -> do
+            map (IntervalTable.reindex table) [0, 1, 6, 7] `shouldBe` [0 .. 3]
+
+      it "2" $ do
+        let occurUB = OccurUB.increase 4 1 (1, 3) $ OccurUB.increase 4 1 (2, 4) $ OccurUB.increase 4 0 (0, 2) OccurUB.new
+        let tables = OccurUB.toIntervalTables occurUB
+        case IntMap.lookup 4 tables of
+          Nothing -> error "should not happen"
+          Just table -> do
+            map (IntervalTable.reindex table) [0, 1, 5, 6, 7] `shouldBe` [0 .. 4]
 
     describe "fromOccurrences" $ do
       it "add + assertion" $ do
         (_cm, cm) <- executeGF181 $ do
           x <- inputUInt @4 Public
           assert $ 2 `eq` (x + 1)
-        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm) 
+        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
         let inputVar = RefUI 4 0
         reindexRef occurrences (B (RefUBit 4 inputVar 0)) `shouldBe` 0
         reindexRef occurrences (B (RefUBit 4 inputVar 1)) `shouldBe` 1
@@ -142,7 +157,7 @@ tests =
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           return $ (x .&. y) !!! 0
-        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm) 
+        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
 
         reindexRef occurrences (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
@@ -167,7 +182,7 @@ tests =
           y <- inputUInt @4 Private
           z <- inputUInt @4 Public
           return $ (x .&. y .&. z) !!! 0
-        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm) 
+        let occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
 
         reindexRef occurrences (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
