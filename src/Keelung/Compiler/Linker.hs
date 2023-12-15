@@ -284,16 +284,16 @@ reindexLimb occurrences limb multiplier = case lmbSigns limb of
       ]
 
 reindexRefF :: Occurrences -> RefF -> Var
-reindexRefF occurrences (RefFO x) = reindex (occurCounters occurrences) Output ReadField x
-reindexRefF occurrences (RefFI x) = reindex (occurCounters occurrences) PublicInput ReadField x
-reindexRefF occurrences (RefFP x) = reindex (occurCounters occurrences) PrivateInput ReadField x
-reindexRefF occurrences (RefFX x) = IntervalTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadField x - pinnedSize occurrences) + pinnedSize occurrences
+reindexRefF occurrences (RefFO x) = x + getOffset (occurCounters occurrences) (Output, ReadField)
+reindexRefF occurrences (RefFI x) = x + getOffset (occurCounters occurrences) (PublicInput, ReadField)
+reindexRefF occurrences (RefFP x) = x + getOffset (occurCounters occurrences) (PrivateInput, ReadField)
+reindexRefF occurrences (RefFX x) = IntervalTable.reindex (indexTableF occurrences) x + getOffset (occurCounters occurrences) (Intermediate, ReadField)
 
 reindexRefB :: Occurrences -> RefB -> Var
-reindexRefB occurrences (RefBO x) = reindex (occurCounters occurrences) Output ReadBool x
-reindexRefB occurrences (RefBI x) = reindex (occurCounters occurrences) PublicInput ReadBool x
-reindexRefB occurrences (RefBP x) = reindex (occurCounters occurrences) PrivateInput ReadBool x
-reindexRefB occurrences (RefBX x) = IntervalTable.reindex (indexTable occurrences) (reindex (occurCounters occurrences) Intermediate ReadBool x - pinnedSize occurrences) + pinnedSize occurrences
+reindexRefB occurrences (RefBO x) = x + getOffset (occurCounters occurrences) (Output, ReadBool)
+reindexRefB occurrences (RefBI x) = x + getOffset (occurCounters occurrences) (PublicInput, ReadBool)
+reindexRefB occurrences (RefBP x) = x + getOffset (occurCounters occurrences) (PrivateInput, ReadBool)
+reindexRefB occurrences (RefBX x) = IntervalTable.reindex (indexTableB occurrences) x + getOffset (occurCounters occurrences) (Intermediate, ReadBool)
 reindexRefB occurrences (RefUBit _ x i) = reindexRefU occurrences x i
 
 reindexRefU :: Occurrences -> RefU -> Int -> Var
@@ -313,6 +313,8 @@ data Occurrences = Occurrences
     refBsInOccurrencesB :: !IntSet,
     refUsInOccurrencesU :: !(IntMap IntSet),
     refBsInOccurrencesUB :: !(IntMap (IntMap IntervalTable)),
+    indexTableF :: !IntervalTable,
+    indexTableB :: !IntervalTable,
     indexTable :: !IntervalTable,
     pinnedSize :: !Int
   }
@@ -328,6 +330,8 @@ constructOccurrences counters occurF occurB occurU occurUB =
           refBsInOccurrencesB = OccurB.occuredSet occurB,
           refUsInOccurrencesU = OccurU.occuredSet occurU,
           refBsInOccurrencesUB = tablesUB,
+          indexTableF = OccurF.toIntervalTable counters occurF,
+          indexTableB = OccurB.toIntervalTable counters occurB,
           indexTable =
             OccurF.toIntervalTable counters occurF
               <> OccurB.toIntervalTable counters occurB
