@@ -36,7 +36,6 @@ import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
-import Keelung.Data.Struct
 import Keelung.Data.U (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
 
@@ -139,7 +138,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       showEqs = adapt "EqZeros" (cmEqZeros cm) $ \(poly, m) ->
         "EqZeros " <> show poly <> " / " <> show m
 
-      showMulL' (aX, bX, cX) = showVecWithParen aX ++ " * " ++ showVecWithParen bX ++ " = " ++ showVec cX
+      showMulL' (aV, bV, cV) = showVecWithParen aV ++ " * " ++ showVecWithParen bV ++ " = " ++ showVec cV
         where
           showVec :: (Eq n, Num n, Ord n, Show n) => Either n (PolyL n) -> String
           showVec (Left c) = show c
@@ -167,7 +166,7 @@ prettyVariables counters =
           <> padLeft12 (getCount counters (Intermediate, typ))
       uint w = "\n    UInt" <> padRight4 (toSubscript w) <> formLine (ReadUInt w)
       -- Bit widths existed in the system
-      uWidthEntries (Counters o i p x _ _) = IntMap.keysSet (uP o) <> IntMap.keysSet (uP i) <> IntMap.keysSet (uP p) <> IntMap.keysSet (structU x)
+      uWidthEntries (Counters o i p x _ _) = IntMap.keysSet (uP o) <> IntMap.keysSet (uP i) <> IntMap.keysSet (uP p) <> IntMap.keysSet (uX x)
       showUInts =
         let entries = uWidthEntries counters
          in if IntSet.null entries

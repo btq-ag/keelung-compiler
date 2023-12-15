@@ -64,7 +64,7 @@ instance GaloisField n => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
 
   -- CMul
-  compare (CMul aV bV cV) (CMul aX bX cX) = compare (aV, bV, cV) (aX, bX, cX)
+  compare (CMul aV bV cV) (CMul aW bW cW) = compare (aV, bV, cV) (aW, bW, cW)
   compare _ CMul {} = LT
   compare CMul {} _ = GT
   -- CAdd

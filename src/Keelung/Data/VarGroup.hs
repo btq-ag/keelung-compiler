@@ -47,6 +47,11 @@ instance HasF PinnedCounter Int where
   putF f (PinnedCounter _ b u) = PinnedCounter f b u
   modifyF func (PinnedCounter f b u) = PinnedCounter (func f) b u
 
+instance HasF IntermediateCounter Int where
+  getF (IntermediateCounter f _ _) = f
+  putF f (IntermediateCounter _ b u) = IntermediateCounter f b u
+  modifyF func (IntermediateCounter f b u) = IntermediateCounter (func f) b u
+
 --------------------------------------------------------------------------------
 
 class HasB a b | a -> b where
@@ -64,6 +69,11 @@ instance HasB PinnedCounter Int where
   getB (PinnedCounter _ b _) = b
   putB b (PinnedCounter f _ u) = PinnedCounter f b u
   modifyB func (PinnedCounter f b u) = PinnedCounter f (func b) u
+
+instance HasB IntermediateCounter Int where
+  getB (IntermediateCounter _ b _) = b
+  putB b (IntermediateCounter f _ u) = IntermediateCounter f b u
+  modifyB func (IntermediateCounter f b u) = IntermediateCounter f (func b) u
 
 class HasU a u | a -> u where
   getUAll :: a -> IntMap u
@@ -92,6 +102,9 @@ instance HasU PinnedCounter Int where
   getUAll (PinnedCounter _ _ u) = u
   putUAll u (PinnedCounter f b _) = PinnedCounter f b u
 
+instance HasU IntermediateCounter Int where
+  getUAll (IntermediateCounter _ _ u) = u
+  putUAll u (IntermediateCounter f b _) = IntermediateCounter f b u
 --------------------------------------------------------------------------------
 
 data VarGroups n = VarGroups
@@ -279,6 +292,12 @@ structToPinnedCounter (Struct f b u) = PinnedCounter f b u
 structFromPinnedCounter :: PinnedCounter -> Struct Int Int Int
 structFromPinnedCounter (PinnedCounter f b u) = Struct f b u
 
+structToIntermediateCounter :: Struct Int Int Int -> IntermediateCounter
+structToIntermediateCounter (Struct f b u) = IntermediateCounter f b u
+
+structFromIntermediateCounter :: IntermediateCounter -> Struct Int Int Int
+structFromIntermediateCounter (IntermediateCounter f b u) = Struct f b u
+
 ----------------------------------------------------------------------------
 
 instance HasO Counters (Struct Int Int Int) where
@@ -297,9 +316,9 @@ instance HasP Counters (Struct Int Int Int) where
   modifyP f counters = counters {countPrivateInput = structToPinnedCounter (f (structFromPinnedCounter (countOutput counters)))}
 
 instance HasX Counters (Struct Int Int Int) where
-  getX = countIntermediate
-  putX x counters = counters {countIntermediate = x}
-  modifyX f counters = counters {countIntermediate = f (countIntermediate counters)}
+  getX = structFromIntermediateCounter . countIntermediate
+  putX x counters = counters {countIntermediate = structToIntermediateCounter x}
+  modifyX f counters = counters {countIntermediate = structToIntermediateCounter (f (structFromIntermediateCounter (countIntermediate counters)))}
 
 instance HasF Counters (VarGroups Int) where
   getF counters = VarGroups (getF (getO counters)) (getF (getI counters)) (getF (getP counters)) (getF (getX counters))
@@ -308,7 +327,7 @@ instance HasF Counters (VarGroups Int) where
       { countOutput = putF (getO x) (structToPinnedCounter (getO counters)),
         countPublicInput = putF (getI x) (structToPinnedCounter (getI counters)),
         countPrivateInput = putF (getP x) (structToPinnedCounter (getP counters)),
-        countIntermediate = putF (getX x) (getX counters)
+        countIntermediate = putF (getX x) (structToIntermediateCounter (getX counters))
       }
 
 instance HasB Counters (VarGroups Int) where
@@ -318,7 +337,7 @@ instance HasB Counters (VarGroups Int) where
       { countOutput = putB (getO x) (structToPinnedCounter (getO counters)),
         countPublicInput = putB (getI x) (structToPinnedCounter (getI counters)),
         countPrivateInput = putB (getP x) (structToPinnedCounter (getP counters)),
-        countIntermediate = putB (getX x) (getX counters)
+        countIntermediate = putB (getX x) (structToIntermediateCounter (getX counters))
       }
 
 instance HasU Counters (VarGroups Int) where
@@ -340,7 +359,7 @@ instance HasU Counters (VarGroups Int) where
           { countOutput = putUAll (getO transposed) (structToPinnedCounter (getO counters)),
             countPublicInput = putUAll (getI transposed) (structToPinnedCounter (getI counters)),
             countPrivateInput = putUAll (getP transposed) (structToPinnedCounter (getP counters)),
-            countIntermediate = putUAll (getX transposed) (getX counters)
+            countIntermediate = putUAll (getX transposed) (structToIntermediateCounter (getX counters))
           }
     where
       transpose :: IntMap (VarGroups Int) -> VarGroups (IntMap Int)
