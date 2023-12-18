@@ -326,4 +326,4 @@ allocCarryLimb w offset signs = do
 allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
 allocLimb w offset sign = do
   refU <- freshRefU w
-  return $ Limb.new refU w offset (Left sign)
+  return $ Limb.new2 refU w offset (Left sign)

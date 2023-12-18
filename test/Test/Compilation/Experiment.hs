@@ -41,7 +41,8 @@ tests = describe "Experiment" $ do
       let program = do
             x <- input Public :: Comp (UInt 8)
             y <- input Public :: Comp (UInt 8)
-            return $ x * y
+            z <- input Public :: Comp (UInt 8)
+            return $ x + y + z
       debug gf181 program
 
   -- it "should reveal variable layout" $ do

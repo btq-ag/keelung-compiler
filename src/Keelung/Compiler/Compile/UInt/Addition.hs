@@ -112,7 +112,7 @@ addLimbColumn maxHeight finalResultLimb limbs = do
         Just carryLimb -> return (LimbColumn.singleton carryLimb)
     Just rest' -> do
       -- inductive case, there are more limbs to be processed
-      resultLimb <- allocLimb (lmbWidth finalResultLimb) (lmbOffset finalResultLimb) True
+      resultLimb <- allocLimb (lmbWidth finalResultLimb) 0 True
       result <- addLimbColumnView resultLimb stack
       -- insert the result limb of the current batch to the next batch
       moreCarryLimbs <- addLimbColumn maxHeight finalResultLimb (LimbColumn.insert resultLimb rest')
@@ -137,7 +137,7 @@ addLimbColumnView resultLimb (LimbColumn.OneLimbOnly limb) = do
   return Nothing
 addLimbColumnView resultLimb (LimbColumn.Ordinary constant limbs) = do
   let carrySigns = calculateCarrySigns (lmbWidth resultLimb) constant limbs
-  carryLimb <- allocCarryLimb (length carrySigns) (lmbOffset resultLimb) carrySigns
+  carryLimb <- allocCarryLimb (length carrySigns) 0 carrySigns
   writeAddWithLimbs (fromInteger constant) [] $
     -- negative side
     (resultLimb, -1)

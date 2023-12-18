@@ -88,8 +88,8 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
       -- if the constant is 1, then the resulting limbs should be the same as the input
       return (LimbColumn.new (toInteger a) [x], mempty)
     Left constant -> do
-      upperLimb <- allocLimb currentLimbWidth (limbStart + currentLimbWidth) True
-      lowerLimb <- allocLimb currentLimbWidth limbStart True
+      upperLimb <- allocLimb currentLimbWidth 0 True
+      lowerLimb <- allocLimb currentLimbWidth 0 True
       writeAddWithLimbs
         (a * constant)
         []
@@ -102,8 +102,8 @@ mul2Limbs currentLimbWidth limbStart (a, x) operand = do
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
       let carryLimbWidth = lmbWidth x + lmbWidth y - currentLimbWidth
-      upperLimb <- allocLimb carryLimbWidth (limbStart + currentLimbWidth) True
-      lowerLimb <- allocLimb currentLimbWidth limbStart True
+      upperLimb <- allocLimb carryLimbWidth 0 True
+      lowerLimb <- allocLimb currentLimbWidth 0 True
       writeMulWithLimbs
         (a, [(x, 1)])
         (b, [(y, 1)])

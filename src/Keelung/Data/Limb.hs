@@ -5,6 +5,7 @@ module Keelung.Data.Limb
   ( Limb (lmbRef, lmbWidth, lmbOffset, lmbSigns),
     showAsTerms,
     new,
+    new2,
     isPositive,
     refUToLimbs,
     trim,
@@ -69,8 +70,22 @@ toSuperscript = map convert . show
 --   invariant: the width of the limb must be less than or equal to the width of the RefU
 new :: RefU -> Width -> Int -> Either Bool [Bool] -> Limb
 new refU width offset signs =
-  if width > widthOf refU
+  if width + offset > widthOf refU
     then error "[ panic ] Limb.new: Limb width exceeds RefU width"
+    else
+      Limb
+        { lmbRef = refU,
+          lmbWidth = width,
+          lmbOffset = offset,
+          lmbSigns = signs
+        }
+
+-- | Construct a new 'Limb'
+--   invariant: the width of the limb must be less than or equal to the width of the RefU
+new2 :: RefU -> Width -> Int -> Either Bool [Bool] -> Limb
+new2 refU width offset signs =
+  if width + offset > widthOf refU
+    then error "[ panic ] Limb.new: Limb width exceeds RefU width 2"
     else
       Limb
         { lmbRef = refU,
