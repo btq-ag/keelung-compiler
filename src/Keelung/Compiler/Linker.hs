@@ -301,6 +301,9 @@ reindexRefU occurrences (RefUO w x) i = w * x + (i `mod` w) + getOffset (occurCo
 reindexRefU occurrences (RefUI w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (PublicInput, ReadAllUInts)
 reindexRefU occurrences (RefUP w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (PrivateInput, ReadAllUInts)
 reindexRefU occurrences (RefUX w x) i =
+  -- case IntMap.lookup w (refBsInOccurrencesUB occurrences) of
+  --   Nothing -> error "[ panic ] reindexRefU: impossible"
+  --   Just table -> IntervalTable.reindex table (w * x + (i `mod` w)) + getOffset (occurCounters occurrences) (Intermediate, ReadAllUInts)
   let offset = getOffset (occurCounters occurrences) (Intermediate, ReadUInt w) + w * x
    in IntervalTable.reindex (indexTable occurrences) (offset - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
 
@@ -315,7 +318,6 @@ data Occurrences = Occurrences
     refBsInOccurrencesUB :: !(IntMap IntervalTable),
     indexTableF :: !IntervalTable,
     indexTableB :: !IntervalTable,
-    -- indexTableUB :: !(IntMap IntervalTable),
     indexTable :: !IntervalTable,
     pinnedSize :: !Int
   }
@@ -333,14 +335,9 @@ constructOccurrences counters occurF occurB occurU occurUB =
           refBsInOccurrencesUB = tablesUB,
           indexTableF = OccurF.toIntervalTable counters occurF,
           indexTableB = OccurB.toIntervalTable counters occurB,
-          -- indexTableUB = fmap (mconcat . IntMap.elems) tablesUB,
           indexTable =
             OccurF.toIntervalTable counters occurF
               <> OccurB.toIntervalTable counters occurB
-              <> OccurU.toIntervalTable counters occurU
-              <> mergeIntervalTables tablesUB,
+              <> OccurU.toIntervalTable counters occurU,
           pinnedSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
         }
-  where
-    mergeIntervalTables :: IntMap IntervalTable -> IntervalTable
-    mergeIntervalTables = mconcat . IntMap.elems

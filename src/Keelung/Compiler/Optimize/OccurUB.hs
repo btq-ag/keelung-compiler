@@ -23,10 +23,9 @@ import Keelung.Compiler.Util
 import Keelung.Data.IntervalSet (IntervalSet)
 import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.IntervalTable (IntervalTable)
-import Keelung.Data.Reference
 import Prelude hiding (null)
 
-newtype OccurUB = OccurUB (IntMap (IntMap IntervalSet)) -- width to var to intervals of (start, length)
+newtype OccurUB = OccurUB (IntMap IntervalSet) -- IntMap of (width, IntervalSet) pairs
   deriving (Eq, Generic)
 
 instance NFData OccurUB
@@ -40,15 +39,16 @@ instance Show OccurUB where
           <> indent
             ( showList'
                 ( map
-                    ( \(width, varMap) ->
+                    ( \(width, intervalSet) ->
                         "UInt bits "
                           <> show width
                           <> ": "
-                          <> showList'
-                            ( map
-                                (\(var, intervals) -> show (RefUX width var) <> ": " <> show intervals)
-                                (IntMap.toList varMap)
-                            )
+                          <> show intervalSet
+                          -- showList'
+                          --   ( map
+                          --       (\(var, intervals) -> show (RefUX width var) <> ": " <> show intervals)
+                          --       (IntMap.toList varMap)
+                          --   )
                     )
                     (IntMap.toList xs)
                 )
@@ -82,7 +82,7 @@ null (OccurUB xs) = IntMap.null xs
 
 -- | O(n). To an IntMap of widths to IntervalTable
 toIntervalTables :: OccurUB -> IntMap IntervalTable
-toIntervalTables (OccurUB xss) = IntMap.mapWithKey (\width -> mconcat . map (IntervalSet.toIntervalTable width) . IntMap.elems) xss
+toIntervalTables (OccurUB xs) = IntMap.mapWithKey IntervalSet.toIntervalTable xs
 
 -- where
 --   convert :: Width -> IntervalSet -> IntervalTable
@@ -102,15 +102,22 @@ toIntervalTables (OccurUB xss) = IntMap.mapWithKey (\width -> mconcat . map (Int
 
 -- | O(1). Bump the count of an interval of bits in a RefU
 adjust :: Int -> Width -> Var -> (Int, Int) -> OccurUB -> OccurUB
-adjust amount width var interval (OccurUB xs) = OccurUB $ IntMap.alter increase' width xs
+adjust amount width var (start, end) (OccurUB xs) = OccurUB $ IntMap.alter increase' width xs
   where
-    increase' :: Maybe (IntMap IntervalSet) -> Maybe (IntMap IntervalSet)
-    increase' Nothing = Just $ IntMap.singleton var $ IntervalSet.adjust interval amount IntervalSet.new
-    increase' (Just varMap) = Just $ IntMap.alter increase'' var varMap
+    interval' :: (Int, Int)
+    interval' = (width * var + start, width * var + end)
 
-    increase'' :: Maybe IntervalSet -> Maybe IntervalSet
-    increase'' Nothing = Just $ IntervalSet.adjust interval amount IntervalSet.new
-    increase'' (Just intervals) = Just $ IntervalSet.adjust interval amount intervals
+    increase' :: Maybe IntervalSet -> Maybe IntervalSet
+    increase' Nothing = Just $ IntervalSet.adjust interval' amount IntervalSet.new
+    increase' (Just intervalSet) = Just $ IntervalSet.adjust interval' amount intervalSet
+
+-- increase' :: Maybe (IntMap IntervalSet) -> Maybe (IntMap IntervalSet)
+-- increase' Nothing = Just $ IntMap.singleton var $ IntervalSet.adjust interval amount IntervalSet.new
+-- increase' (Just varMap) = Just $ IntMap.alter increase'' var varMap
+
+-- increase'' :: Maybe IntervalSet -> Maybe IntervalSet
+-- increase'' Nothing = Just $ IntervalSet.adjust interval amount IntervalSet.new
+-- increase'' (Just intervals) = Just $ IntervalSet.adjust interval amount intervals
 
 -- | O(1). Increase the count of an interval of bits in a RefU
 increase :: Width -> Var -> (Int, Int) -> OccurUB -> OccurUB
