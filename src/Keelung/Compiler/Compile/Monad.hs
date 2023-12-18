@@ -11,6 +11,7 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
+import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
@@ -26,7 +27,6 @@ import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
-import qualified Keelung.Compiler.Optimize.OccurUB as OccurUB
 
 --------------------------------------------------------------------------------
 
@@ -34,7 +34,7 @@ import qualified Keelung.Compiler.Optimize.OccurUB as OccurUB
 type M n = ReaderT (BootstrapCompiler n) (StateT (ConstraintModule n) (Except (Error n)))
 
 -- | Run the monad
-runM :: GaloisField n => BootstrapCompiler n -> FieldInfo -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
+runM :: (GaloisField n) => BootstrapCompiler n -> FieldInfo -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
 runM compilers fieldInfo counters program =
   runExcept
     ( execStateT
@@ -317,13 +317,13 @@ eqZero isEq (Polynomial polynomial) = do
 --------------------------------------------------------------------------------
 
 -- | Allocates a carry limb with the given signs
-allocCarryLimb :: (GaloisField n, Integral n) => Width -> Int -> [Bool] -> M n Limb
-allocCarryLimb w offset signs = do
+allocCarryLimb :: (GaloisField n, Integral n) => Width -> [Bool] -> M n Limb
+allocCarryLimb w signs = do
   refU <- freshRefU w
-  return $ Limb.new refU w offset (Right signs)
+  return $ Limb.new refU w 0 (Right signs)
 
--- | Allocates an ordinary limb with the given sign
-allocLimb :: (GaloisField n, Integral n) => Width -> Int -> Bool -> M n Limb
-allocLimb w offset sign = do
+-- | Allocates an ordinary positie limb
+allocLimb :: (GaloisField n, Integral n) => Width -> M n Limb
+allocLimb w = do
   refU <- freshRefU w
-  return $ Limb.new2 refU w offset (Left sign)
+  return $ Limb.new refU w 0 (Left True)

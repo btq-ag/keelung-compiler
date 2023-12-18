@@ -363,14 +363,13 @@ xorBs xs = do
       let vars = var : vars'
       -- devise an unsigned integer for expressing the sum of vars
       let width = widthOfInteger (toInteger (length vars))
-      refU <- freshRefU width
-      let limb = Limb.new refU width 0 (Left True)
+      limb <- allocLimb width
       -- compose the LC for the sum
       let sumOfVars = mconcat (fmap (\x -> 1 @ B x) vars)
       -- equate the LC with the unsigned integer
       writeAddWithLCAndLimbs sumOfVars 0 [(limb, -1)]
       -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
-      return $ RefUBit width refU 0
+      return $ RefUBit width (Limb.lmbRef limb) 0
 
     flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
     flipResult (Right False) = return $ Right True

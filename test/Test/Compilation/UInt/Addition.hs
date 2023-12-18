@@ -238,7 +238,7 @@ tests = describe "Addition / Subtraction" $ do
             y <- inputUInt @8 Public
             return $ x + y
       property $ \(x, y :: Word8) -> do
-        let expected = map toInteger [x + y]
+        let expected = [toInteger (x + y)]
         runAll (Binary 7) program (map toInteger [x, y]) [] expected
 
     it "1 positive variable + 1 negative variable / Byte" $ do
@@ -247,7 +247,7 @@ tests = describe "Addition / Subtraction" $ do
             y <- inputUInt @8 Public
             return $ x - y
       property $ \(x, y :: Word8) -> do
-        let expected = map toInteger [x - y]
+        let expected = [toInteger (x - y)]
         runAll (Binary 7) program (map toInteger [x, y]) [] expected
 
     it "1 positive variable + 1 constant / Byte" $ do
@@ -255,24 +255,24 @@ tests = describe "Addition / Subtraction" $ do
             x <- inputUInt @8 Public
             return $ x + y
       property $ \(x, y :: Word8) -> do
-        let expected = map toInteger [x + y]
-        runAll (Binary 7) (program (fromIntegral y)) (map toInteger [x]) [] expected
+        let expected = [toInteger (x + y)]
+        runAll (Binary 7) (program (fromIntegral y)) [toInteger x] [] expected
 
     it "1 negative variable + 1 constant / Byte" $ do
       let program y = do
             x <- inputUInt @8 Public
             return $ -x + y
       property $ \(x, y :: Word8) -> do
-        let expected = map toInteger [-x + y]
-        runAll (Binary 7) (program (fromIntegral y)) (map toInteger [x]) [] expected
+        let expected = [toInteger (-x + y)]
+        runAll (Binary 7) (program (fromIntegral y)) [toInteger x] [] expected
 
     it "1 negative variable / Byte" $ do
       let program = do
             x <- inputUInt @8 Public
             return $ -x
       property $ \(x :: Word8) -> do
-        let expected = map toInteger [-x]
-        runAll (Binary 7) program (map toInteger [x]) [] expected
+        let expected = [toInteger (-x)]
+        runAll (Binary 7) program [toInteger x] [] expected
 
     it "mixed (positive / negative / constnat) / Byte" $ do
       let program constant signs = do
