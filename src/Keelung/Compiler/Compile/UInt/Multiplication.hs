@@ -11,6 +11,7 @@ import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn qualified as LimbColumn
+import Keelung.Compiler.Compile.UInt.Multiplication.Binary (compileMulB)
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
@@ -18,7 +19,6 @@ import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Syntax (Width)
-import Keelung.Compiler.Compile.UInt.Multiplication.Binary (compileMulB)
 
 --------------------------------------------------------------------------------
 
@@ -78,15 +78,15 @@ compileMul width out x y = do
     ceilDiv :: Int -> Int -> Int
     ceilDiv a b = ((a - 1) `div` b) + 1
 
-mul2Limbs :: (GaloisField n, Integral n) => Width -> Int -> (n, Limb) -> Either n (n, Limb) -> M n (LimbColumn, LimbColumn)
-mul2Limbs currentLimbWidth limbStart (a, x) operand = do
+mul2Limbs :: (GaloisField n, Integral n) => Width -> (n, Limb) -> Either n (n, Limb) -> M n (LimbColumn, LimbColumn)
+mul2Limbs currentLimbWidth (a, x) operand = do
   case operand of
     Left 0 -> do
       -- if the constant is 0, then the resulting limbs should be empty
       return (mempty, mempty)
     Left 1 -> do
       -- if the constant is 1, then the resulting limbs should be the same as the input
-      return (LimbColumn.new (toInteger a) [x], mempty)
+      return (LimbColumn.new 0 [x], mempty)
     Left constant -> do
       upperLimb <- allocLimb currentLimbWidth
       lowerLimb <- allocLimb currentLimbWidth
@@ -151,7 +151,7 @@ mulnxn width maxHeight limbWidth arity out var operand = do
                 Left variable -> Right (0, Limb.new variable currentLimbWidthY (limbWidth * yi) (Left True))
           let index = xi + yi
 
-          (lowerLimb, upperLimb) <- mul2Limbs limbWidth (limbWidth * index) (0, x) y
+          (lowerLimb, upperLimb) <- mul2Limbs limbWidth (0, x) y
           let columns' = IntMap.insertWith (<>) index lowerLimb columns
           let columns'' =
                 if index == arity - 1 -- throw limbs higher than the arity away
