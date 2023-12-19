@@ -90,7 +90,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x <= bound
-              then runAll gf181 (program bound) [fromInteger x] [] []
+              then testCompiler gf181 (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   gf181
@@ -103,7 +103,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x <= bound
-              then runAll (Prime 2) (program bound) [fromInteger x] [] []
+              then testCompiler (Prime 2) (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   (Prime 2)
@@ -116,7 +116,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x <= bound
-              then runAll (Binary 7) (program bound) [fromInteger x] [] []
+              then testCompiler (Binary 7) (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   (Binary 7)
@@ -192,7 +192,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x < bound
-              then runAll gf181 (program bound) [fromInteger x] [] []
+              then testCompiler gf181 (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   gf181
@@ -205,7 +205,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x < bound
-              then runAll (Prime 2) (program bound) [fromInteger x] [] []
+              then testCompiler (Prime 2) (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   (Prime 2)
@@ -218,7 +218,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x < bound
-              then runAll (Binary 7) (program bound) [fromInteger x] [] []
+              then testCompiler (Binary 7) (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   (Binary 7)
@@ -294,7 +294,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x >= bound
-              then runAll gf181 (program bound) [fromInteger x] [] []
+              then testCompiler gf181 (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   gf181
@@ -307,7 +307,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x >= bound
-              then runAll (Prime 2) (program bound) [fromInteger x] [] []
+              then testCompiler (Prime 2) (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   (Prime 2)
@@ -320,7 +320,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x >= bound
-              then runAll (Binary 7) (program bound) [fromInteger x] [] []
+              then testCompiler (Binary 7) (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   (Binary 7)
@@ -396,7 +396,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x > bound
-              then runAll gf181 (program bound) [fromInteger x] [] []
+              then testCompiler gf181 (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   gf181
@@ -409,7 +409,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x > bound
-              then runAll (Prime 2) (program bound) [fromInteger x] [] []
+              then testCompiler (Prime 2) (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   (Prime 2)
@@ -422,7 +422,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x > bound
-              then runAll (Binary 7) (program bound) [fromInteger x] [] []
+              then testCompiler (Binary 7) (program bound) [fromInteger x] [] []
               else
                 throwBoth
                   (Binary 7)
@@ -442,8 +442,8 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x <= y
-            then runAll field program [fromIntegral x, fromIntegral y] [] [1]
-            else runAll field program [fromIntegral x, fromIntegral y] [] [0]
+            then testCompiler field program [fromIntegral x, fromIntegral y] [] [1]
+            else testCompiler field program [fromIntegral x, fromIntegral y] [] [0]
 
     it "variable + constant" $ do
       let program x = do
@@ -453,8 +453,8 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x <= y
-            then runAll field (program (fromIntegral x)) [fromIntegral y] [] [1]
-            else runAll field (program (fromIntegral x)) [fromIntegral y] [] [0]
+            then testCompiler field (program (fromIntegral x)) [fromIntegral y] [] [1]
+            else testCompiler field (program (fromIntegral x)) [fromIntegral y] [] [0]
 
     it "2 constants" $ do
       let program x y = do
@@ -463,8 +463,8 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x <= y
-            then runAll field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
-            else runAll field (program (fromIntegral x) (fromIntegral y)) [] [] [0]
+            then testCompiler field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
+            else testCompiler field (program (fromIntegral x) (fromIntegral y)) [] [] [0]
 
   describe "computeLT" $ do
     it "2 variables" $ do
@@ -476,8 +476,8 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x < y
-            then runAll field program [fromIntegral x, fromIntegral y] [] [1]
-            else runAll field program [fromIntegral x, fromIntegral y] [] [0]
+            then testCompiler field program [fromIntegral x, fromIntegral y] [] [1]
+            else testCompiler field program [fromIntegral x, fromIntegral y] [] [0]
 
     it "variable + constant" $ do
       let program x = do
@@ -487,8 +487,8 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x < y
-            then runAll field (program (fromIntegral x)) [fromIntegral y] [] [1]
-            else runAll field (program (fromIntegral x)) [fromIntegral y] [] [0]
+            then testCompiler field (program (fromIntegral x)) [fromIntegral y] [] [1]
+            else testCompiler field (program (fromIntegral x)) [fromIntegral y] [] [0]
 
     it "2 constants" $ do
       let program x y = do
@@ -497,5 +497,5 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x < y
-            then runAll field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
-            else runAll field (program (fromIntegral x) (fromIntegral y)) [] [] [0]
+            then testCompiler field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
+            else testCompiler field (program (fromIntegral x) (fromIntegral y)) [] [] [0]

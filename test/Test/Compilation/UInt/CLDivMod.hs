@@ -43,8 +43,8 @@ tests =
 
       forAll genPair $ \(dividend, divisor) -> do
         let expected = [clDiv width dividend divisor, clMod width dividend divisor]
-        runAll gf181 program [dividend, divisor] [] expected
-        runAll (Prime 17) program [dividend, divisor] [] expected
+        testCompiler gf181 program [dividend, divisor] [] expected
+        testCompiler (Prime 17) program [dividend, divisor] [] expected
 
     it "assertCLDivMod (with wrong quotient constant)" $ do
       let program = assertCLDivMod 7 (3 :: UInt 4) 3 1
@@ -72,15 +72,15 @@ tests =
             b <- input Public
             (q0, r0) <- performCLDivMod a b
             return [q0, r0]
-      runAll gf181 program [1, 1] [] [1, 0]
+      testCompiler gf181 program [1, 1] [] [1, 0]
 
     -- let program = do
     --       a <- input Public :: Comp (UInt 5)
     --       b <- input Public
     --       (q0, r0) <- performCLDivMod a b
     --       return [q0, r0]
-    -- printLog gf181 program [20, 7] [] -- [7, 1]
-    -- runAll (Prime 17) program [20, 7] [] [7, 1]
+    -- runSolver gf181 program [20, 7] [] -- [7, 1]
+    -- testCompiler (Prime 17) program [20, 7] [] [7, 1]
 
     it "performCLDivMod (multiple statements)" $ do
       let program = do
@@ -91,7 +91,7 @@ tests =
             d <- input Public
             (q1, r1) <- performCLDivMod c d
             return [q0, r0, q1, r1]
-      runAll gf181 program [20, 7, 21, 8] [] [7, 1, 2, 5]
+      testCompiler gf181 program [20, 7, 21, 8] [] [7, 1, 2, 5]
 
     it "performCLDivMod (multiple statements chained together)" $ do
       let program = do
@@ -100,7 +100,7 @@ tests =
             (q0, r0) <- performCLDivMod a b
             (q1, r1) <- performCLDivMod q0 b
             return [q0, r0, q1, r1]
-      runAll (Prime 17) program [25, 3] [] [8, 1, 7, 1]
+      testCompiler (Prime 17) program [25, 3] [] [8, 1, 7, 1]
 
     it "performCLDivMod (before assertions)" $ do
       let program = do
@@ -108,7 +108,7 @@ tests =
             b <- input Public
             (q, r) <- performCLDivMod a b
             assert $ q `eq` r
-      runAll (Prime 17) program [10, 4] [] []
+      testCompiler (Prime 17) program [10, 4] [] []
 
     it "performCLDivMod (before reuse)" $ do
       let program = do
@@ -116,7 +116,7 @@ tests =
             b <- input Public
             (q, _) <- performCLDivMod a b
             reuse q
-      runAll (Prime 17) program [10, 4] [] [2]
+      testCompiler (Prime 17) program [10, 4] [] [2]
 
     it "performCLDivMod (after reuse)" $ do
       let program = do
@@ -124,7 +124,7 @@ tests =
             b <- input Public
             (q, r) <- performCLDivMod a b
             assert $ q `eq` r
-      runAll (Prime 17) program [10, 4] [] []
+      testCompiler (Prime 17) program [10, 4] [] []
 
     it "performCLDivMod (dividend unknown)" $ do
       let program dividend divisor = performCLDivMod (fromInteger dividend) (fromInteger divisor :: UInt 4)
@@ -134,8 +134,8 @@ tests =
             return (dividend, divisor)
       forAll genPair $ \(dividend, divisor) -> do
         let expected = [clDiv 4 dividend divisor, clMod 4 dividend divisor]
-        runAll gf181 (program dividend divisor) [] [] expected
-        runAll (Prime 17) (program dividend divisor) [] [] expected
+        testCompiler gf181 (program dividend divisor) [] [] expected
+        testCompiler (Prime 17) (program dividend divisor) [] [] expected
 
     it "assertCLDivMod (divisor & remainder unknown & quotient = 0)" $ do
       let program = do
@@ -193,8 +193,8 @@ tests =
 
     --   forAll genPair $ \(dividend, quotient) -> do
     --     let expected = [clDiv 4 dividend quotient, clMod 4 dividend quotient]
-    --     runAll (Prime 17) program [dividend, quotient] [] expected
-    --     runAll gf181 program [dividend, quotient] [] expected
+    --     testCompiler (Prime 17) program [dividend, quotient] [] expected
+    --     testCompiler gf181 program [dividend, quotient] [] expected
 
     it "assertCLDivMod (quotient & remainder unknown)" $ do
       let program = do
@@ -211,5 +211,5 @@ tests =
             return (dividend, divisor)
       forAll genPair $ \(dividend, divisor) -> do
         let expected = [clDiv 4 dividend divisor, clMod 4 dividend divisor]
-        runAll gf181 program [dividend, divisor] [] expected
-        runAll (Prime 17) program [dividend, divisor] [] expected
+        testCompiler gf181 program [dividend, divisor] [] expected
+        testCompiler (Prime 17) program [dividend, divisor] [] expected

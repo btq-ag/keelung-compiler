@@ -16,51 +16,51 @@ tests = describe "logical" $ do
     it "constant true" $ do
       let program = return $ complement true
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [] [] [0]
+        testCompiler field program [] [] [0]
 
     it "constant false" $ do
       let program = return $ complement false
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [] [] [1]
+        testCompiler field program [] [] [1]
 
     it "variable" $ do
       let program = complement <$> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0] [] [1]
-        runAll field program [1] [] [0]
+        testCompiler field program [0] [] [1]
+        testCompiler field program [1] [] [0]
 
   describe "conjunction" $ do
     it "variable + constant true" $ do
       let program = (.&.) true <$> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0] [] [0]
-        runAll field program [1] [] [1]
+        testCompiler field program [0] [] [0]
+        testCompiler field program [1] [] [1]
 
     it "variable + constant false" $ do
       let program = (.&.) false <$> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0] [] [0]
-        runAll field program [1] [] [0]
+        testCompiler field program [0] [] [0]
+        testCompiler field program [1] [] [0]
 
     it "2 variables" $ do
       let program = (.&.) <$> inputBool Public <*> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0, 0] [] [0]
-        runAll field program [0, 1] [] [0]
-        runAll field program [1, 0] [] [0]
-        runAll field program [1, 1] [] [1]
+        testCompiler field program [0, 0] [] [0]
+        testCompiler field program [0, 1] [] [0]
+        testCompiler field program [1, 0] [] [0]
+        testCompiler field program [1, 1] [] [1]
 
     it "3 variables" $ do
       let program = (.&.) <$> ((.&.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0, 0, 0] [] [0]
-        runAll field program [0, 0, 1] [] [0]
-        runAll field program [0, 1, 0] [] [0]
-        runAll field program [0, 1, 1] [] [0]
-        runAll field program [1, 0, 0] [] [0]
-        runAll field program [1, 0, 1] [] [0]
-        runAll field program [1, 1, 0] [] [0]
-        runAll field program [1, 1, 1] [] [1]
+        testCompiler field program [0, 0, 0] [] [0]
+        testCompiler field program [0, 0, 1] [] [0]
+        testCompiler field program [0, 1, 0] [] [0]
+        testCompiler field program [0, 1, 1] [] [0]
+        testCompiler field program [1, 0, 0] [] [0]
+        testCompiler field program [1, 0, 1] [] [0]
+        testCompiler field program [1, 1, 0] [] [0]
+        testCompiler field program [1, 1, 1] [] [1]
 
     it "more than 3 variables + constant" $ do
       let program constant n = do
@@ -76,40 +76,40 @@ tests = describe "logical" $ do
         $ \(n, constant, xs) -> do
           let expected = [foldl (Data.Bits..|.) (if constant then 1 else 0) xs]
           forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-            runAll field (program constant n) xs [] expected
+            testCompiler field (program constant n) xs [] expected
 
   describe "disjunction" $ do
     it "variable + constant true" $ do
       let program = (.|.) true <$> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0] [] [1]
-        runAll field program [1] [] [1]
+        testCompiler field program [0] [] [1]
+        testCompiler field program [1] [] [1]
 
     it "variable + constant false" $ do
       let program = (.|.) false <$> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0] [] [0]
-        runAll field program [1] [] [1]
+        testCompiler field program [0] [] [0]
+        testCompiler field program [1] [] [1]
 
     it "2 variables" $ do
       let program = (.|.) <$> inputBool Public <*> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0, 0] [] [0]
-        runAll field program [0, 1] [] [1]
-        runAll field program [1, 0] [] [1]
-        runAll field program [1, 1] [] [1]
+        testCompiler field program [0, 0] [] [0]
+        testCompiler field program [0, 1] [] [1]
+        testCompiler field program [1, 0] [] [1]
+        testCompiler field program [1, 1] [] [1]
 
     it "3 variables" $ do
       let program = (.|.) <$> ((.|.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0, 0, 0] [] [0]
-        runAll field program [0, 0, 1] [] [1]
-        runAll field program [0, 1, 0] [] [1]
-        runAll field program [0, 1, 1] [] [1]
-        runAll field program [1, 0, 0] [] [1]
-        runAll field program [1, 0, 1] [] [1]
-        runAll field program [1, 1, 0] [] [1]
-        runAll field program [1, 1, 1] [] [1]
+        testCompiler field program [0, 0, 0] [] [0]
+        testCompiler field program [0, 0, 1] [] [1]
+        testCompiler field program [0, 1, 0] [] [1]
+        testCompiler field program [0, 1, 1] [] [1]
+        testCompiler field program [1, 0, 0] [] [1]
+        testCompiler field program [1, 0, 1] [] [1]
+        testCompiler field program [1, 1, 0] [] [1]
+        testCompiler field program [1, 1, 1] [] [1]
 
     it "more than 3 variables + constant" $ do
       let program constant n = do
@@ -125,48 +125,48 @@ tests = describe "logical" $ do
         $ \(n, constant, xs) -> do
           let expected = [foldl (Data.Bits..&.) (if constant then 1 else 0) xs]
           forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-            runAll field (program constant n) xs [] expected
+            testCompiler field (program constant n) xs [] expected
 
   describe "exclusive disjunction" $ do
     it "variable + constant true" $ do
       let program = (.^.) true <$> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0] [] [1]
-        runAll field program [1] [] [0]
+        testCompiler field program [0] [] [1]
+        testCompiler field program [1] [] [0]
 
     it "variable + constant false" $ do
       let program = (.^.) false <$> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0] [] [0]
-        runAll field program [1] [] [1]
+        testCompiler field program [0] [] [0]
+        testCompiler field program [1] [] [1]
 
     it "2 variables" $ do
       let program = (.^.) <$> inputBool Public <*> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0, 0] [] [0]
-        runAll field program [0, 1] [] [1]
-        runAll field program [1, 0] [] [1]
-        runAll field program [1, 1] [] [0]
+        testCompiler field program [0, 0] [] [0]
+        testCompiler field program [0, 1] [] [1]
+        testCompiler field program [1, 0] [] [1]
+        testCompiler field program [1, 1] [] [0]
 
     it "4 variables" $ do
       let program = (.^.) <$> ((.^.) <$> ((.^.) <$> inputBool Public <*> inputBool Public) <*> inputBool Public) <*> inputBool Public
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [0, 0, 0, 0] [] [0]
-        runAll field program [0, 0, 0, 1] [] [1]
-        runAll field program [0, 0, 1, 0] [] [1]
-        runAll field program [0, 0, 1, 1] [] [0]
-        runAll field program [0, 1, 0, 0] [] [1]
-        runAll field program [0, 1, 0, 1] [] [0]
-        runAll field program [0, 1, 1, 0] [] [0]
-        runAll field program [0, 1, 1, 1] [] [1]
-        runAll field program [1, 0, 0, 0] [] [1]
-        runAll field program [1, 0, 0, 1] [] [0]
-        runAll field program [1, 0, 1, 0] [] [0]
-        runAll field program [1, 0, 1, 1] [] [1]
-        runAll field program [1, 1, 0, 0] [] [0]
-        runAll field program [1, 1, 0, 1] [] [1]
-        runAll field program [1, 1, 1, 0] [] [1]
-        runAll field program [1, 1, 1, 1] [] [0]
+        testCompiler field program [0, 0, 0, 0] [] [0]
+        testCompiler field program [0, 0, 0, 1] [] [1]
+        testCompiler field program [0, 0, 1, 0] [] [1]
+        testCompiler field program [0, 0, 1, 1] [] [0]
+        testCompiler field program [0, 1, 0, 0] [] [1]
+        testCompiler field program [0, 1, 0, 1] [] [0]
+        testCompiler field program [0, 1, 1, 0] [] [0]
+        testCompiler field program [0, 1, 1, 1] [] [1]
+        testCompiler field program [1, 0, 0, 0] [] [1]
+        testCompiler field program [1, 0, 0, 1] [] [0]
+        testCompiler field program [1, 0, 1, 0] [] [0]
+        testCompiler field program [1, 0, 1, 1] [] [1]
+        testCompiler field program [1, 1, 0, 0] [] [0]
+        testCompiler field program [1, 1, 0, 1] [] [1]
+        testCompiler field program [1, 1, 1, 0] [] [1]
+        testCompiler field program [1, 1, 1, 1] [] [0]
 
     it "more than 4 variables + constant" $ do
       let program constant n = do
@@ -182,7 +182,7 @@ tests = describe "logical" $ do
         $ \(n, constant, xs) -> do
           let expected = [foldl Data.Bits.xor (if constant then 1 else 0) xs]
           forM_ [gf181, Prime 2, Prime 13, Prime 257, Binary 7] $ \field -> do
-            runAll field (program constant n) xs [] expected
+            testCompiler field (program constant n) xs [] expected
 
   it "mixed 1" $ do
     let program = do
@@ -191,10 +191,10 @@ tests = describe "logical" $ do
           let z = true
           return $ x `Or` y `And` z
     forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-      runAll field program [0] [0] [0]
-      runAll field program [0] [1] [1]
-      runAll field program [1] [0] [1]
-      runAll field program [1] [1] [1]
+      testCompiler field program [0] [0] [0]
+      testCompiler field program [0] [1] [1]
+      testCompiler field program [1] [0] [1]
+      testCompiler field program [1] [1] [1]
 
   it "mixed 2" $ do
     let program = do
@@ -204,7 +204,7 @@ tests = describe "logical" $ do
           w <- reuse $ x `Or` y
           return $ x `And` w `Or` z
     forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-      runAll field program [0] [0] [0]
-      runAll field program [0] [1] [0]
-      runAll field program [1] [0] [1]
-      runAll field program [1] [1] [1]
+      testCompiler field program [0] [0] [0]
+      testCompiler field program [0] [1] [0]
+      testCompiler field program [1] [0] [1]
+      testCompiler field program [1] [1] [1]

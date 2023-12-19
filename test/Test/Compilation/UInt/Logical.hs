@@ -28,7 +28,7 @@ tests = describe "logical" $ do
         let uint = U.new 8 x
         let expected = [U.uValue (Data.Bits.complement uint)]
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-          runAll field (program (fromInteger x)) [] [] expected
+          testCompiler field (program (fromInteger x)) [] [] expected
 
     it "variable / byte" $ do
       let program = do
@@ -38,7 +38,7 @@ tests = describe "logical" $ do
         let uint = U.new 8 x
         let expected = [U.uValue (Data.Bits.complement uint)]
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-          runAll field program [U.uValue uint] [] expected
+          testCompiler field program [U.uValue uint] [] expected
 
   describe "conjunction" $ do
     it "1~10 variables + constant / byte" $ do
@@ -55,7 +55,7 @@ tests = describe "logical" $ do
         $ \(n, constant, xs :: [Word8]) -> do
           let expected = map toInteger [foldl (Data.Bits..&.) constant xs]
           forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-            runAll field (program n (fromIntegral constant)) (map toInteger xs) [] expected
+            testCompiler field (program n (fromIntegral constant)) (map toInteger xs) [] expected
 
   describe "disjunction" $ do
     it "1~10 variables + constant / byte" $ do
@@ -72,7 +72,7 @@ tests = describe "logical" $ do
         $ \(n, constant, xs :: [Word8]) -> do
           let expected = map toInteger [foldl (Data.Bits..|.) constant xs]
           forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-            runAll field (program n (fromIntegral constant)) (map toInteger xs) [] expected
+            testCompiler field (program n (fromIntegral constant)) (map toInteger xs) [] expected
 
   describe "exclusive disjunction" $ do
     it "1~10 variables + constant / byte" $ do
@@ -89,4 +89,4 @@ tests = describe "logical" $ do
         $ \(n, constant, xs :: [Word8]) -> do
           let expected = map toInteger [foldl Data.Bits.xor constant xs]
           forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-            runAll field (program n (fromIntegral constant)) (map toInteger xs) [] expected
+            testCompiler field (program n (fromIntegral constant)) (map toInteger xs) [] expected

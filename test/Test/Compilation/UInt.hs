@@ -50,7 +50,7 @@ tests = do
     describe "Big Int I/O" $ do
       it "10 bit / GF257" $ do
         let program = inputUInt @10 Public
-        runAll (Prime 257) program [300] [] [300]
+        testCompiler (Prime 257) program [300] [] [300]
 
     describe "Conditionals" $ do
       it "with inputs" $ do
@@ -58,12 +58,12 @@ tests = do
               x <- input Public :: Comp (UInt 4)
               y <- input Public
               return $ cond true x y
-        runAll gf181 program [5, 6] [] [5]
+        testCompiler gf181 program [5, 6] [] [5]
 
       it "with literals" $ do
         let program = do
               return $ cond true (3 :: UInt 2) 2
-        runAll gf181 program [] [] [3]
+        testCompiler gf181 program [] [] [3]
 
     describe "Equalities" $ do
       it "eq: variable / constant" $ do
@@ -72,7 +72,7 @@ tests = do
               return (x `eq` 13)
         forAll (choose (0, 15)) $ \x -> do
           let expected = [if x == 13 then 1 else 0]
-          runAll (Prime 13) program [x `mod` 16] [] expected
+          testCompiler (Prime 13) program [x `mod` 16] [] expected
 
       it "eq: variables (Prime 13)" $ do
         let program = do
@@ -85,7 +85,7 @@ tests = do
               return (x, y)
         forAll genPair $ \(x, y) -> do
           let expected = [if x == y then 1 else 0]
-          runAll (Prime 13) program [x, y] [] expected
+          testCompiler (Prime 13) program [x, y] [] expected
 
       it "eq: variables (GF181)" $ do
         let program = do
@@ -98,18 +98,18 @@ tests = do
               return (x, y)
         forAll genPair $ \(x, y) -> do
           let expected = [if x == y then 1 else 0]
-          runAll gf181 program [x, y] [] expected
+          testCompiler gf181 program [x, y] [] expected
 
       it "neq: variable / constant" $ do
         let program = do
               x <- inputUInt @4 Public
               return (x `neq` 13)
 
-        -- runAll (Prime 13) program [0] [] [0]
-        -- runAll (Prime 13) program [4, 4] [] [1]
+        -- testCompiler (Prime 13) program [0] [] [0]
+        -- testCompiler (Prime 13) program [4, 4] [] [1]
         forAll (choose (0, 15)) $ \x -> do
           let expected = [if x == 13 then 0 else 1]
-          runAll (Prime 13) program [x `mod` 16] [] expected
+          testCompiler (Prime 13) program [x `mod` 16] [] expected
 
       it "neq: variables (Prime 13)" $ do
         let program = do
@@ -122,7 +122,7 @@ tests = do
               return (x, y)
         forAll genPair $ \(x, y) -> do
           let expected = [if x /= y then 0 else 1]
-          runAll (Prime 13) program [x, y] [] expected
+          testCompiler (Prime 13) program [x, y] [] expected
 
       it "neq: variables (GF181)" $ do
         let program = do
@@ -135,7 +135,7 @@ tests = do
               return (x, y)
         forAll genPair $ \(x, y) -> do
           let expected = [if x /= y then 0 else 1]
-          runAll gf181 program [x, y] [] expected
+          testCompiler gf181 program [x, y] [] expected
 
       it "neq (40 bits / Prime 13)" $ do
         let program = do
@@ -143,22 +143,22 @@ tests = do
               y <- inputUInt @40 Public
               return (x `neq` y)
         -- debugPrime  (Prime 13)  program
-        runAll (Prime 13) program [12345, 12344] [] [1]
-        runAll (Prime 13) program [12340000001, 12340000000] [] [1]
-        runAll (Prime 13) program [1234, 1234] [] [0]
+        testCompiler (Prime 13) program [12345, 12344] [] [1]
+        testCompiler (Prime 13) program [12340000001, 12340000000] [] [1]
+        testCompiler (Prime 13) program [1234, 1234] [] [0]
 
       it "neq 2" $ do
         let program = do
               x <- inputUInt @4 Public
               return (x `neq` 3)
-        runAll gf181 program [5] [] [1]
-        runAll gf181 program [3] [] [0]
+        testCompiler gf181 program [5] [] [1]
+        testCompiler gf181 program [3] [] [0]
 
       it "neq 3" $ do
         let program = do
               x <- inputUInt @4 Public
               assert $ x `neq` 3
-        runAll gf181 program [5] [] []
+        testCompiler gf181 program [5] [] []
         throwBoth
           gf181
           program

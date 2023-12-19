@@ -28,7 +28,7 @@ tests =
       property $ \(x :: Word8, y :: Word8) -> do
         let expected = [U.uValue (U.aesMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
         forM_ [gf181, Prime 5] $ \field -> do
-          runAll field (program (fromIntegral x) (fromIntegral y)) [] [] expected
+          testCompiler field (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
     it "1 variable / 1 constant" $ do
       let program constant = do
@@ -37,7 +37,7 @@ tests =
       property $ \(x :: Word8, constant :: Word8) -> do
         let expected = [U.uValue (U.aesMul (U.new 8 (toInteger x)) (U.new 8 (toInteger constant)))]
         forM_ [gf181, Prime 17] $ \field -> do
-          runAll field (program (fromIntegral constant)) (map toInteger [x]) [] expected
+          testCompiler field (program (fromIntegral constant)) (map toInteger [x]) [] expected
 
     it "2 byte variables" $ do
       let program = do
@@ -47,7 +47,7 @@ tests =
       property $ \(x :: Word8, y :: Word8) -> do
         let expected = map toInteger [U.aesMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y))]
         forM_ [gf181, Prime 17] $ \field -> do
-          runAll field program (map toInteger [x, y]) [] expected
+          testCompiler field program (map toInteger [x, y]) [] expected
 
     it "2 variables / 1 constant" $ do
       let program c = do
@@ -57,7 +57,7 @@ tests =
       property $ \(x, y :: Word8, c :: Word8) -> do
         let expected = map toInteger [U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger c)]
         forM_ [gf181, Prime 17] $ \field -> do
-          runAll field (program (fromIntegral c)) (map toInteger [x, y]) [] expected
+          testCompiler field (program (fromIntegral c)) (map toInteger [x, y]) [] expected
 
     it "3 variables / 1 constant" $ do
       let program c = do
@@ -68,4 +68,4 @@ tests =
       property $ \(x, y, z :: Word8, c :: Word8) -> do
         let expected = map toInteger [U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger z) `U.clMul` U.new 8 (toInteger c)]
         forM_ [gf181, Prime 17] $ \field -> do
-          runAll field (program (fromIntegral c)) (map toInteger [x, y, z]) [] expected
+          testCompiler field (program (fromIntegral c)) (map toInteger [x, y, z]) [] expected

@@ -36,7 +36,7 @@ tests =
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field program [dividend, divisor] [] expected
+            testCompiler field program [dividend, divisor] [] expected
 
       it "constant dividend / variable divisor" $ do
         let program dividend = do
@@ -51,7 +51,7 @@ tests =
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field (program (fromIntegral dividend)) [divisor] [] expected
+            testCompiler field (program (fromIntegral dividend)) [divisor] [] expected
 
       it "variable dividend / constant divisor" $ do
         let program divisor = do
@@ -66,7 +66,7 @@ tests =
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field (program (fromIntegral divisor)) [dividend] [] expected
+            testCompiler field (program (fromIntegral divisor)) [dividend] [] expected
 
       it "constant dividend / constant divisor" $ do
         let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
@@ -77,7 +77,7 @@ tests =
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field (program dividend divisor) [] [] expected
+            testCompiler field (program dividend divisor) [] [] expected
 
       describe "statements" $ do
         it "multiple separate statements" $ do
@@ -91,7 +91,7 @@ tests =
                 return [q0, r0, q1, r1]
 
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field program [20, 7, 8] [21] [2, 6, 2, 5]
+            testCompiler field program [20, 7, 8] [21] [2, 6, 2, 5]
 
         it "multiple statements chained together" $ do
           let program = do
@@ -101,7 +101,7 @@ tests =
                 (q1, r1) <- performDivMod q0 b
                 return [q0, r0, q1, r1]
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field program [25, 3] [] [8, 1, 2, 2]
+            testCompiler field program [25, 3] [] [8, 1, 2, 2]
 
         it "before reuse" $ do
           let program = do
@@ -110,7 +110,7 @@ tests =
                 (q, _) <- performDivMod a b
                 reuse q
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field program [10, 4] [] [2]
+            testCompiler field program [10, 4] [] [2]
 
         it "after reuse" $ do
           let program = do
@@ -119,7 +119,7 @@ tests =
                 (q, r) <- performDivMod a b
                 assert $ q `eq` r
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field program [10, 4] [] []
+            testCompiler field program [10, 4] [] []
 
         it "before assertions" $ do
           let program = do
@@ -128,7 +128,7 @@ tests =
                 (q, r) <- performDivMod a b
                 assert $ q `eq` r
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field program [10, 4] [] []
+            testCompiler field program [10, 4] [] []
 
     describe "assertDivMod" $ do
       it "quotient & remainder unknown" $ do
@@ -147,7 +147,7 @@ tests =
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field program [dividend, divisor] [] expected
+            testCompiler field program [dividend, divisor] [] expected
 
       it "divisor & remainder unknown" $ do
         let program = do
@@ -169,7 +169,7 @@ tests =
         forAll genPair $ \(dividend, quotient) -> do
           let expected = [dividend `div` quotient, dividend `mod` quotient]
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field program [dividend, quotient] [] expected
+            testCompiler field program [dividend, quotient] [] expected
 
       it "dividend unknown" $ do
         let program = do
@@ -189,7 +189,7 @@ tests =
               remainder = dividend `mod` divisor
           let expected = [toInteger dividend]
           forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            runAll field program (map toInteger [divisor, quotient, remainder]) [] expected
+            testCompiler field program (map toInteger [divisor, quotient, remainder]) [] expected
 
       describe "errors" $ do
         it "with wrong quotient constant" $ do

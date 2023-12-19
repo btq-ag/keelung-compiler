@@ -6,6 +6,7 @@ module Test.Compilation.Experiment where
 import Keelung
 import Test.Compilation.Util
 import Test.Hspec
+import Keelung.Compiler.Options
 -- import Test.QuickCheck
 
 run :: IO ()
@@ -22,11 +23,11 @@ tests = describe "Experiment" $ do
   --           x <- toUInt 2 x' :: Comp (UInt 2)
   --           pack [x !!! 0, x !!! 1] :: Comp (UInt 3)
   --     property $ \(x :: Word) -> do
-  --       runAll gf181 program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
-  --       runAll (Prime 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
-  --       runAll (Prime 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
-  --       runAll (Binary 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
-  --       runAll (Binary 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
+  --       testCompiler gf181 program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
+  --       testCompiler (Prime 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
+  --       testCompiler (Prime 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
+  --       testCompiler (Binary 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
+  --       testCompiler (Binary 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
 
     -- it "from Field element" $ do
     --   -- let program = do
@@ -34,7 +35,7 @@ tests = describe "Experiment" $ do
     --   --       x <- toUInt 8 x' :: Comp (UInt 8)
     --   --       pack [x !!! 0, x !!! 1] :: Comp (UInt 3)
     --   -- property $ \(x :: Word) -> do
-    --   --   runAll gf181 program [fromIntegral x] [] [fromIntegral x]
+    --   --   testCompiler gf181 program [fromIntegral x] [] [fromIntegral x]
 
 
   it "should reveal variable layout" $ do
@@ -42,9 +43,9 @@ tests = describe "Experiment" $ do
             x <- input Public :: Comp (UInt 8)
             y <- input Public :: Comp (UInt 8)
             return $ x * y
-      debug (Prime 257) program
-      -- runAll (Prime 257) program [2, 2] [] [4]
-      -- printLog (Prime 257) program [2, 2] []
+      debugWithOpts (defaultOptions { optUseNewLinker = False }) (Prime 257) program
+      -- testCompiler (Prime 257) program [2, 2] [] [4]
+      -- runSolver (Prime 257) program [2, 2] []
 
   -- it "should reveal variable layout" $ do
   --   let program = do

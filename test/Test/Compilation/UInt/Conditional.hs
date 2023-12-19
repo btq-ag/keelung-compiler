@@ -24,7 +24,7 @@ tests = describe "conditional" $ do
     property $ \(p :: Bool, x, y :: Word8) -> do
       let expected = map toInteger [if p then x else y]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field (program (if p then true else false) (fromIntegral x) (fromIntegral y)) [] [] expected
+        testCompiler field (program (if p then true else false) (fromIntegral x) (fromIntegral y)) [] [] expected
 
   it "variable predicate / constant branches" $ do
     let program x y = do
@@ -34,7 +34,7 @@ tests = describe "conditional" $ do
     property $ \(p :: Bool, x, y :: Word8) -> do
       let expected = map toInteger [if p then x else y]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field (program (fromIntegral x) (fromIntegral y)) [if p then 1 else 0] [] expected
+        testCompiler field (program (fromIntegral x) (fromIntegral y)) [if p then 1 else 0] [] expected
 
   it "variable predicate / constant branch + variable branch" $ do
     let program constant = do
@@ -44,7 +44,7 @@ tests = describe "conditional" $ do
     property $ \(p :: Bool, constant, x :: Word8) -> do
       let expected = map toInteger [if p then constant else x]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field (program (fromIntegral constant)) [if p then 1 else 0, fromIntegral x] [] expected
+        testCompiler field (program (fromIntegral constant)) [if p then 1 else 0, fromIntegral x] [] expected
 
   it "variable predicate / variable branch + constant branch" $ do
     let program constant = do
@@ -54,7 +54,7 @@ tests = describe "conditional" $ do
     property $ \(p :: Bool, x :: Word8, constant) -> do
       let expected = map toInteger [if p then x else constant]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field (program (fromIntegral constant)) [if p then 1 else 0, fromIntegral x] [] expected
+        testCompiler field (program (fromIntegral constant)) [if p then 1 else 0, fromIntegral x] [] expected
 
   it "variable predicate / variable branches" $ do
     let program = do
@@ -65,4 +65,4 @@ tests = describe "conditional" $ do
     property $ \(p :: Bool, x, y :: Word8) -> do
       let expected = map toInteger [if p then x else y]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected
+        testCompiler field program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected

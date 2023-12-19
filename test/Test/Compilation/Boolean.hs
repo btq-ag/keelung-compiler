@@ -25,4 +25,4 @@ tests = describe "Boolean" $ do
             x <- input Public
             return $ BtoF x
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [1] [] [1]
+        testCompiler field program [1] [] [1]

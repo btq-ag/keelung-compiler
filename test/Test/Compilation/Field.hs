@@ -30,4 +30,4 @@ tests = describe "Field" $ do
           z <- inputField Public
           assert $ (x * y) `eq` z
     property $ \(x, y) -> do
-      runAll gf181 program [toInteger (x :: GF181), toInteger y, toInteger (x * y)] [] []
+      testCompiler gf181 program [toInteger (x :: GF181), toInteger y, toInteger (x * y)] [] []

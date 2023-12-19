@@ -23,17 +23,17 @@ tests = describe "equality" $ do
     it "GF181" $ do
       property $ \(x, y :: GF181) -> do
         let expected = [if x == y then 1 else 0]
-        runAll gf181 (program (fromIntegral x) (fromIntegral y)) [] [] expected
+        testCompiler gf181 (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
     it "Prime 2" $ do
       property $ \(x, y :: Galois.Prime 2) -> do
         let expected = [if x == y then 1 else 0]
-        runAll (Prime 2) (program (fromIntegral x) (fromIntegral y)) [] [] expected
+        testCompiler (Prime 2) (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
     it "Binary 7" $ do
       property $ \(x, y :: Galois.Binary 7) -> do
         let expected = [if x == y then 1 else 0]
-        runAll (Binary 7) (program (fromIntegral x) (fromIntegral y)) [] [] expected
+        testCompiler (Binary 7) (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
   describe "variable + constant" $ do
     let program constant = do
@@ -43,17 +43,17 @@ tests = describe "equality" $ do
     it "GF181" $ do
       property $ \(constant, value :: GF181) -> do
         let expected = [if constant == value then 1 else 0]
-        runAll gf181 (program (fromIntegral constant)) [toInteger value] [] expected
+        testCompiler gf181 (program (fromIntegral constant)) [toInteger value] [] expected
 
     it "Prime 2" $ do
       property $ \(constant, value :: Galois.Prime 2) -> do
         let expected = [if constant == value then 1 else 0]
-        runAll (Prime 2) (program (fromIntegral constant)) [toInteger value] [] expected
+        testCompiler (Prime 2) (program (fromIntegral constant)) [toInteger value] [] expected
 
     it "Binary 7" $ do
       property $ \(constant, value :: Galois.Binary 7) -> do
         let expected = [if constant == value then 1 else 0]
-        runAll (Binary 7) (program (fromIntegral constant)) [toInteger value] [] expected
+        testCompiler (Binary 7) (program (fromIntegral constant)) [toInteger value] [] expected
 
   describe "2 variable" $ do
     let program = do
@@ -64,14 +64,14 @@ tests = describe "equality" $ do
     it "GF181" $ do
       property $ \(x, y :: GF181) -> do
         let expected = [if x == y then 1 else 0]
-        runAll gf181 program [toInteger x, toInteger y] [] expected
+        testCompiler gf181 program [toInteger x, toInteger y] [] expected
 
     it "Prime 2" $ do
       property $ \(x, y :: Galois.Prime 2) -> do
         let expected = [if x == y then 1 else 0]
-        runAll (Prime 2) program [toInteger x, toInteger y] [] expected
+        testCompiler (Prime 2) program [toInteger x, toInteger y] [] expected
 
     it "Binary 7" $ do
       property $ \(x, y :: Galois.Binary 7) -> do
         let expected = [if x == y then 1 else 0]
-        runAll (Binary 7) program [toInteger x, toInteger y] [] expected
+        testCompiler (Binary 7) program [toInteger x, toInteger y] [] expected

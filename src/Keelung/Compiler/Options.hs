@@ -1,12 +1,16 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-module Keelung.Compiler.Options (Options (..), defaultOptions) where
+module Keelung.Compiler.Options (Options (..), defaultOptions, buildOptionsWithFieldType) where
 
 import Control.DeepSeq
+import Data.Field.Galois
+import Data.Proxy
 import GHC.Generics
 import Keelung.Compiler.Util (gf181Info)
 import Keelung.Data.FieldInfo
+import Keelung.Field (FieldType)
 
 --------------------------------------------------------------------------------
 
@@ -32,3 +36,23 @@ defaultOptions =
       optOptimize = True,
       optUseNewLinker = False
     }
+
+buildOptionsWithFieldType :: FieldType -> IO Options
+buildOptionsWithFieldType fieldType = caseFieldType fieldType handlePrime handleBinary
+  where
+    handlePrime (_ :: Proxy (Prime n)) fieldInfo =
+      return $
+        Options
+          { optFieldInfo = fieldInfo,
+            optConstProp = True,
+            optOptimize = True,
+            optUseNewLinker = False
+          }
+    handleBinary (_ :: Proxy (Binary n)) fieldInfo =
+      return $
+        Options
+          { optFieldInfo = fieldInfo,
+            optConstProp = True,
+            optOptimize = True,
+            optUseNewLinker = False
+          }

@@ -23,14 +23,14 @@ tests = describe "Compilation Experiment" $ do
     describe "Frobenius endomorphism" $ do
       it "n^256 = n (Binary 283)" $ do
         property $ \(n :: Binary 283) -> do
-          runAll (Binary 283) (program 256) [toInteger n] [] [toInteger n]
+          testCompiler (Binary 283) (program 256) [toInteger n] [] [toInteger n]
       it "n^255 = n (Binary 283)" $ do
         property $ \(n :: Binary 283) -> do
-          runAll (Binary 283) (program 255) [toInteger n] [] [1]
+          testCompiler (Binary 283) (program 255) [toInteger n] [] [1]
       it "n^254 = n (Binary 283)" $ do
         property $ \(n :: Binary 283) -> do
-          runAll (Binary 283) (program 254) [toInteger n] [] [toInteger (n ^ (254 :: Int))]
+          testCompiler (Binary 283) (program 254) [toInteger n] [] [toInteger (n ^ (254 :: Int))]
 
 -- debug (Binary 283) program
 
--- runAll gf181 (program 47) [] [] [47]
+-- testCompiler gf181 (program 47) [] [] [47]

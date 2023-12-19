@@ -35,7 +35,7 @@ tests = describe "equality" $ do
     forAll genCase $ \(x, y :: Word8) -> do
       let expected = [if x == y then 1 else 0]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field (program (fromIntegral x) (fromIntegral y)) [] [] expected
+        testCompiler field (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
   it "variable + constant" $ do
     let program constant = do
@@ -45,7 +45,7 @@ tests = describe "equality" $ do
     forAll genCase $ \(x, y :: Word8) -> do
       let expected = [if x == y then 1 else 0]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field (program (fromIntegral x)) [fromIntegral y] [] expected
+        testCompiler field (program (fromIntegral x)) [fromIntegral y] [] expected
 
   it "2 variables" $ do
     let program = do
@@ -56,4 +56,4 @@ tests = describe "equality" $ do
     forAll genCase $ \(x, y :: Word8) -> do
       let expected = [if x == y then 1 else 0]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        runAll field program [fromIntegral x, fromIntegral y] [] expected
+        testCompiler field program [fromIntegral x, fromIntegral y] [] expected

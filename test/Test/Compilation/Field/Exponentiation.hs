@@ -27,17 +27,17 @@ tests = describe "exponentiation" $ do
     it "GF181" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: GF181) ^ power]
-        runAll gf181 (program (fromIntegral base) (fromIntegral power)) [] [] expected
+        testCompiler gf181 (program (fromIntegral base) (fromIntegral power)) [] [] expected
 
     it "Prime 2" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: Galois.Prime 2) ^ power]
-        runAll (Prime 2) (program (fromIntegral base) (fromIntegral power)) [] [] expected
+        testCompiler (Prime 2) (program (fromIntegral base) (fromIntegral power)) [] [] expected
 
     it "Binary 7" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: Galois.Binary 7) ^ power]
-        runAll (Binary 7) (program (fromIntegral base) (fromIntegral power)) [] [] expected
+        testCompiler (Binary 7) (program (fromIntegral base) (fromIntegral power)) [] [] expected
 
   describe "variable base" $ do
     let genCase = do
@@ -51,14 +51,14 @@ tests = describe "exponentiation" $ do
     it "GF181" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: GF181) ^ power]
-        runAll gf181 (program (fromIntegral power)) [fromIntegral base] [] expected
+        testCompiler gf181 (program (fromIntegral power)) [fromIntegral base] [] expected
 
     it "Prime 2" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: Galois.Prime 2) ^ power]
-        runAll (Prime 2) (program (fromIntegral power)) [fromIntegral base] [] expected
+        testCompiler (Prime 2) (program (fromIntegral power)) [fromIntegral base] [] expected
 
     it "Binary 7" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: Galois.Binary 7) ^ power]
-        runAll (Binary 7) (program (fromIntegral power)) [fromIntegral base] [] expected
+        testCompiler (Binary 7) (program (fromIntegral power)) [fromIntegral base] [] expected

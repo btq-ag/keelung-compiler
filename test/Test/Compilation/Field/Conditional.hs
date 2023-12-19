@@ -23,17 +23,17 @@ tests = describe "conditional" $ do
     it "GF181" $ do
       property $ \(p :: Bool, x, y :: GF181) -> do
         let expected = map toInteger [if p then x else y]
-        runAll gf181 (program (if p then true else false) (fromIntegral x) (fromIntegral y)) [] [] expected
+        testCompiler gf181 (program (if p then true else false) (fromIntegral x) (fromIntegral y)) [] [] expected
 
     it "Prime 2" $ do
       property $ \(p :: Bool, x, y :: Galois.Prime 2) -> do
         let expected = map toInteger [if p then x else y]
-        runAll (Prime 2) (program (if p then true else false) (fromIntegral x) (fromIntegral y)) [] [] expected
+        testCompiler (Prime 2) (program (if p then true else false) (fromIntegral x) (fromIntegral y)) [] [] expected
 
     it "Binary 7" $ do
       property $ \(p :: Bool, x, y :: Galois.Binary 7) -> do
         let expected = map toInteger [if p then x else y]
-        runAll (Binary 7) (program (if p then true else false) (fromIntegral x) (fromIntegral y)) [] [] expected
+        testCompiler (Binary 7) (program (if p then true else false) (fromIntegral x) (fromIntegral y)) [] [] expected
 
   describe "variable predicate / variable branches" $ do
     let program = do
@@ -45,14 +45,14 @@ tests = describe "conditional" $ do
     it "GF181" $ do
       property $ \(p :: Bool, x, y :: GF181) -> do
         let expected = map toInteger [if p then x else y]
-        runAll gf181 program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected
+        testCompiler gf181 program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected
 
     it "Prime 2" $ do
       property $ \(p :: Bool, x, y :: Galois.Prime 2) -> do
         let expected = map toInteger [if p then x else y]
-        runAll (Prime 2) program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected
+        testCompiler (Prime 2) program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected
 
     it "Binary 7" $ do
       property $ \(p :: Bool, x, y :: Galois.Binary 7) -> do
         let expected = map toInteger [if p then x else y]
-        runAll (Binary 7) program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected
+        testCompiler (Binary 7) program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected
