@@ -6,7 +6,6 @@ module Keelung.Compiler.ConstraintModule
   ( ConstraintModule (..),
     sizeOfConstraintModule,
     prettyVariables,
-    getBooleanConstraintCount,
     UpdateOccurrences (..),
     addOccurrencesTuple,
     removeOccurrencesTuple,
@@ -76,7 +75,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> showAddL
       <> showMulL
       <> showEqs
-      <> showBooleanConstraints
       <> showDivModHints
       <> showCLDivModHints
       <> showModInvHints
@@ -87,10 +85,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> prettyVariables (cmCounters cm)
       <> "}"
     where
-      counters = cmCounters cm
-      -- sizes of constraint groups
-      booleanConstraintCount = getBooleanConstraintCount counters
-
       adapt :: String -> [a] -> (a -> String) -> String
       adapt name xs f =
         let size = length xs
@@ -100,17 +94,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
 
       showFieldInfo :: String
       showFieldInfo = "  Field: " <> show (fieldTypeData (cmField cm)) <> "\n"
-
-      -- Boolean constraints
-      showBooleanConstraints =
-        if booleanConstraintCount == 0
-          then ""
-          else
-            "  Boolean constriants ("
-              <> show booleanConstraintCount
-              <> "):\n\n"
-              <> unlines (map ("    " <>) (prettyBooleanConstraints counters))
-              <> "\n"
 
       showDivModHints =
         if null $ cmDivMods cm
@@ -187,61 +170,31 @@ prettyVariables counters =
             <> showUInts
             <> "\n"
 
--------------------------------------------------------------------------------
+-- -------------------------------------------------------------------------------
 
--- | Variables that needed to be constrained to be Boolean
---    1. Boolean output variables
---    2. UInt BinReps output variables
---    3. Boolean private input variables
---    4. UInt BinReps private input variables
---    5. Boolean public input variables
---    6. UInt BinReps public input variables
---    7. Boolean intermediate variables
---    8. UInt BinReps public intermediate variables
-booleanConstraintCategories :: [(Category, ReadType)]
-booleanConstraintCategories =
-  [ (Output, ReadBool),
-    (Output, ReadAllUInts),
-    (PublicInput, ReadBool),
-    (PublicInput, ReadAllUInts),
-    (PrivateInput, ReadBool),
-    (PrivateInput, ReadAllUInts),
-    (Intermediate, ReadBool),
-    (Intermediate, ReadAllUInts)
-  ]
+-- -- | Variables that needed to be constrained to be Boolean
+-- --    1. Boolean output variables
+-- --    2. UInt BinReps output variables
+-- --    3. Boolean private input variables
+-- --    4. UInt BinReps private input variables
+-- --    5. Boolean public input variables
+-- --    6. UInt BinReps public input variables
+-- --    7. Boolean intermediate variables
+-- --    8. UInt BinReps public intermediate variables
+-- booleanConstraintCategories :: [(Category, ReadType)]
+-- booleanConstraintCategories =
+--   [ (Output, ReadBool),
+--     (Output, ReadAllUInts),
+--     (PublicInput, ReadBool),
+--     (PublicInput, ReadAllUInts),
+--     (PrivateInput, ReadBool),
+--     (PrivateInput, ReadAllUInts),
+--     (Intermediate, ReadBool),
+--     (Intermediate, ReadAllUInts)
+--   ]
 
-getBooleanConstraintCount :: Counters -> Int
-getBooleanConstraintCount counters = sum $ map (getCount counters) booleanConstraintCategories
-
-getBooleanConstraintRanges :: Counters -> [(Int, Int)]
-getBooleanConstraintRanges counters = IntMap.toList $ getRanges counters booleanConstraintCategories
-
-prettyBooleanConstraints :: Counters -> [String]
-prettyBooleanConstraints counters =
-  concatMap showSegment (getBooleanConstraintRanges counters)
-  where
-    showSegment :: (Int, Int) -> [String]
-    showSegment (start, end) =
-      case end - start of
-        0 -> []
-        1 -> [showBooleanConstraint start]
-        2 ->
-          [ showBooleanConstraint start,
-            showBooleanConstraint (start + 1)
-          ]
-        3 ->
-          [ showBooleanConstraint start,
-            showBooleanConstraint (start + 1),
-            showBooleanConstraint (start + 2)
-          ]
-        _ ->
-          [ showBooleanConstraint start,
-            "  ...",
-            showBooleanConstraint (end - 1)
-          ]
-
-    showBooleanConstraint :: Int -> String
-    showBooleanConstraint n = "$" <> show n <> " = $" <> show n <> " * $" <> show n
+-- getBooleanConstraintCount :: ConstraintModule n -> Int
+-- getBooleanConstraintCount cm = sum (map (getCount (cmCounters cm)) booleanConstraintCategories) + sum (fmap IntervalTable.size (OccurUB.toIntervalTables (cmOccurrenceUB cm)))
 
 -------------------------------------------------------------------------------
 

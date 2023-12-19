@@ -235,7 +235,17 @@ updateCounters :: Occurrences -> Counters -> Counters
 updateCounters occurrences counters =
   let reducedFX = (WriteField, getCount counters (Intermediate, ReadField) - IntSet.size (refFsInOccurrencesF occurrences))
       reducedBX = (WriteBool, getCount counters (Intermediate, ReadBool) - IntSet.size (refBsInOccurrencesB occurrences))
-      reducedUXs = IntMap.mapWithKey (\width set -> (WriteUInt width, getCount counters (Intermediate, ReadUInt width) - IntSet.size set)) (refUsInOccurrencesU occurrences)
+      reducedUXs =
+        if useNewLinker
+          then
+            IntMap.mapWithKey
+              ( \width table ->
+                  let original = getCount counters (Intermediate, ReadUInt width) -- thie is the number of UInt variables used before optimization & linking (regardless of width)
+                      current = IntervalTable.size table -- this is the number of bits used after optimization & linking
+                   in (WriteUInt width, original - current)
+              )
+              (refBsInOccurrencesUB occurrences)
+          else IntMap.mapWithKey (\width set -> (WriteUInt width, getCount counters (Intermediate, ReadUInt width) - IntSet.size set)) (refUsInOccurrencesU occurrences)
    in foldr (\(selector, reducedAmount) -> addCount (Intermediate, selector) (-reducedAmount)) counters $ reducedFX : reducedBX : IntMap.elems reducedUXs
 
 --------------------------------------------------------------------------------
@@ -297,7 +307,7 @@ reindexRefB occurrences (RefBX x) = IntervalTable.reindex (indexTableB occurrenc
 reindexRefB occurrences (RefUBit _ x i) = reindexRefU occurrences x i
 
 useNewLinker :: Bool
-useNewLinker = True
+useNewLinker = False
 
 reindexRefU :: Occurrences -> RefU -> Int -> Var
 reindexRefU occurrences (RefUO w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (Output, ReadAllUInts)
@@ -313,7 +323,6 @@ reindexRefU occurrences (RefUX w x) i =
             let offset = getOffset (occurCounters occurrences) (Intermediate, ReadUInt w) + w * x
              in IntervalTable.reindex (indexTable occurrences) (offset - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
    in result
-    -- trace (show (RefUBit w (RefUX w x) i) <> " (" <> show (w * x + (i `mod` w)) <> ")" <> " => " <> show result) result
 
 -------------------------------------------------------------------------------
 
