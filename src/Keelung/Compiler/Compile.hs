@@ -67,7 +67,7 @@ compileSideEffect (AssignmentF var val) = do
   relateLC (RefFX var) result
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
 compileSideEffect (ToField width varU varF) = do
-  fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+  fieldWidth <- gets (FieldInfo.fieldWidth . optFieldInfo . cmOptions)
   -- convert the RefU to a bunch of Limbs
   let limbs = Limb.refUToLimbs fieldWidth (RefUX width varU)
   -- only convert the first Limb to a RefF because that's the maximum width of a RefF allowed
@@ -75,7 +75,7 @@ compileSideEffect (ToField width varU varF) = do
     [] -> writeRefFVal (RefFX varF) 0
     (limb : _) -> writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
 compileSideEffect (ToUInt width varU varF) = do
-  fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+  fieldWidth <- gets (FieldInfo.fieldWidth . optFieldInfo . cmOptions)
 
   -- convert the RefU into `width` number of width-1 Limbs (for performance reasons of the optimizer)
   let limbs = [Limb.new (RefUX width varU) 1 i (Left True) | i <- [0 .. width - 1]]

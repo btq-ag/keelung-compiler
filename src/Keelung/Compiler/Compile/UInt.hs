@@ -25,6 +25,7 @@ import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.Logical
 import Keelung.Compiler.Compile.UInt.Multiplication
 import Keelung.Compiler.ConstraintModule qualified as CM
+import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.LC qualified as LC
 import Keelung.Data.Reference
@@ -221,7 +222,7 @@ compileIfU width (Left p) x y = do
     then return x
     else do
       out <- freshRefU width
-      fieldType <- gets CM.cmField
+      fieldType <- gets (optFieldInfo . CM.cmOptions)
       -- (x - y) * p - out + y = 0
       let outLCs = LC.fromRefU2 fieldType (Left out)
       let xyLCs =
@@ -253,7 +254,7 @@ compileIfU width (Left p) x y = do
 --     then return $ Right x
 --     else do
 --       out <- freshRefU width
---       fieldType <- gets CM.cmField
+--       fieldType <- gets CM.(optFieldInfo . cmOptions)
 --       -- (x - y) * p - out + y = 0
 --       let outLCs = LC.fromRefU2 fieldType (Left out)
 --       let xyLCs =

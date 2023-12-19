@@ -39,7 +39,7 @@ runM options compilers counters program =
   runExcept
     ( execStateT
         (runReaderT program compilers)
-        (ConstraintModule (optFieldInfo options) (optUseNewLinker options) counters OccurF.new (OccurB.new False) OccurU.new OccurUB.new Relations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintModule options counters OccurF.new (OccurB.new False) OccurU.new OccurUB.new Relations.new mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()

@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 
-module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Occurrences, constructOccurrences) where
+module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Env, constructEnv) where
 
 import Data.Bifunctor (Bifunctor (bimap, first))
 import Data.Bits qualified
@@ -24,6 +24,7 @@ import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Optimize.OccurUB (OccurUB)
 import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
+import Keelung.Compiler.Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.Limb (LimbRelations)
@@ -51,7 +52,7 @@ import Keelung.Syntax.Counters
 linkConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintSystem n
 linkConstraintModule cm =
   ConstraintSystem
-    { csField = cmField cm,
+    { csField = optFieldInfo (cmOptions cm),
       csCounters = counters,
       csConstraints =
         varEqFs
@@ -65,11 +66,11 @@ linkConstraintModule cm =
       csModInvs = map (\(a, b, c, d) -> ([a], [b], [c], d)) modInvs
     }
   where
-    !occurrences = constructOccurrences (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
-    !counters = updateCounters occurrences (cmCounters cm)
+    !env = constructEnv (cmOptions cm) (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
+    !counters = updateCounters env (cmCounters cm)
     uncurry3 f (a, b, c) = f a b c
 
-    fieldWidth = FieldInfo.fieldWidth (cmField cm)
+    -- fieldWidth = FieldInfo.fieldWidth ((optFieldInfo . cmOptions) cm)
 
     extractRefRelations :: (GaloisField n, Integral n) => Relations n -> Seq (Linked.Constraint n)
     extractRefRelations relations =
@@ -84,7 +85,7 @@ linkConstraintModule cm =
                 Right poly -> CAddL poly
 
           result = map convert $ Map.toList $ Relations.toInt shouldBeKept relations
-       in Seq.fromList (linkConstraint (cmField cm) occurrences fieldWidth =<< result)
+       in Seq.fromList (linkConstraint env =<< result)
 
     shouldBeKept :: Ref -> Bool
     shouldBeKept (F ref) = refFShouldBeKept ref
@@ -94,7 +95,7 @@ linkConstraintModule cm =
     refFShouldBeKept ref = case ref of
       RefFX var ->
         -- it's a Field intermediate variable that occurs in the circuit
-        var `IntSet.member` refFsInOccurrencesF occurrences
+        var `IntSet.member` envRefFsInEnvF env
       _ ->
         -- it's a pinned Field variable
         True
@@ -103,7 +104,7 @@ linkConstraintModule cm =
     refUShouldBeKept ref = case ref of
       RefUX width var ->
         -- it's a UInt intermediate variable that occurs in the circuit
-        ( case IntMap.lookup width (refUsInOccurrencesU occurrences) of
+        ( case IntMap.lookup width (envRefUsInEnvU env) of
             Nothing -> False
             Just xs -> IntSet.member var xs
         )
@@ -113,9 +114,9 @@ linkConstraintModule cm =
 
     limbShouldBeKept :: Limb -> Bool
     limbShouldBeKept limb =
-      if useNewLinker
+      if envUseNewLinker env
         then case lmbRef limb of
-          RefUX width var -> case IntMap.lookup width (refBsInOccurrencesUB occurrences) of
+          RefUX width var -> case IntMap.lookup width (envRefBsInEnvUB env) of
             Nothing -> False
             Just table -> IntervalTable.member (width * var + lmbOffset limb, width * var + lmbOffset limb + lmbWidth limb) table
           _ -> True -- it's a pinned UInt variable
@@ -125,8 +126,8 @@ linkConstraintModule cm =
     refBShouldBeKept ref = case ref of
       RefBX var ->
         --  it's a Boolean intermediate variable that occurs in the circuit
-        var `IntSet.member` refBsInOccurrencesB occurrences
-      -- \|| RefBX var `Set.member` refBsInOccurrencesF occurrences
+        var `IntSet.member` envRefBsInEnvB env
+      -- \|| RefBX var `Set.member` refBsInEnvF env
       RefUBit _ var _ ->
         --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
         --  the UInt variable should be kept
@@ -142,21 +143,21 @@ linkConstraintModule cm =
           convert (var, Left root) = CLimbEq var root
 
           result = map convert $ Map.toList $ LimbRelations.toMap limbShouldBeKept relations
-       in Seq.fromList (linkConstraint (cmField cm) occurrences fieldWidth =<< result)
+       in Seq.fromList (linkConstraint env =<< result)
 
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
-    extractUIntRelations relations = UIntRelations.toConstraints refUShouldBeKept relations >>= Seq.fromList . linkConstraint (cmField cm) occurrences fieldWidth
+    extractUIntRelations relations = UIntRelations.toConstraints refUShouldBeKept relations >>= Seq.fromList . linkConstraint env
 
     varEqFs = extractRefRelations (cmRelations cm)
     varEqLs = extractLimbRelations (Relations.exportLimbRelations (cmRelations cm))
     varEqUs = extractUIntRelations (Relations.exportUIntRelations (cmRelations cm))
 
-    addLs = Seq.fromList $ linkConstraint (cmField cm) occurrences fieldWidth . CAddL =<< cmAddL cm
-    mulLs = Seq.fromList $ linkConstraint (cmField cm) occurrences fieldWidth . uncurry3 CMulL =<< cmMulL cm
-    eqZeros = Seq.fromList $ map (bimap (linkPolyLUnsafe occurrences) (reindexRefF occurrences)) $ cmEqZeros cm
+    addLs = Seq.fromList $ linkConstraint env . CAddL =<< cmAddL cm
+    mulLs = Seq.fromList $ linkConstraint env . uncurry3 CMulL =<< cmMulL cm
+    eqZeros = Seq.fromList $ map (bimap (linkPolyLUnsafe env) (reindexRefF env)) $ cmEqZeros cm
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
-    fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB occurrences (RefUBit width var 0)))
+    fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB env (RefUBit width var 0)))
     fromEitherRefU (Right val) = let width = widthOf val in (width, Right (U.uValue val))
 
     divMods = map (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) $ cmDivMods cm
@@ -166,77 +167,77 @@ linkConstraintModule cm =
 -------------------------------------------------------------------------------
 
 -- | Link a specialized constraint to a list of constraints
-linkConstraint :: (GaloisField n, Integral n) => FieldInfo -> Occurrences -> Width -> Constraint n -> [Linked.Constraint n]
-linkConstraint _ occurrences _ (CAddL as) = [Linked.CAdd (linkPolyLUnsafe occurrences as)]
-linkConstraint _ occurrences _ (CRefEq x y) =
-  case Poly.buildEither 0 [(reindexRef occurrences x, 1), (reindexRef occurrences y, -1)] of
+linkConstraint :: (GaloisField n, Integral n) => Env -> Constraint n -> [Linked.Constraint n]
+linkConstraint env (CAddL as) = [Linked.CAdd (linkPolyLUnsafe env as)]
+linkConstraint env (CRefEq x y) =
+  case Poly.buildEither 0 [(reindexRef env x, 1), (reindexRef env y, -1)] of
     Left _ -> error "CRefEq: two references are the same"
     Right xs -> [Linked.CAdd xs]
-linkConstraint _ occurrences _ (CRefBNEq x y) =
-  case Poly.buildEither 1 [(reindexRefB occurrences x, -1), (reindexRefB occurrences y, -1)] of
+linkConstraint env (CRefBNEq x y) =
+  case Poly.buildEither 1 [(reindexRefB env x, -1), (reindexRefB env y, -1)] of
     Left _ -> error "CRefBNEq: two variables are the same"
     Right xs -> [Linked.CAdd xs]
-linkConstraint fieldInfo occurrences _ (CLimbEq x y) =
+linkConstraint env (CLimbEq x y) =
   if lmbWidth x /= lmbWidth y
     then error "[ panic ] CLimbEq: Limbs are of different width"
     else do
-      case FieldInfo.fieldTypeData fieldInfo of
+      case FieldInfo.fieldTypeData (envFieldInfo env) of
         Binary _ -> do
           i <- [0 .. lmbWidth x - 1]
-          let pair = [(reindexRefU occurrences (lmbRef x) (lmbOffset x + i), 1), (reindexRefU occurrences (lmbRef y) (lmbOffset y + i), -1)]
+          let pair = [(reindexRefU env (lmbRef x) (lmbOffset x + i), 1), (reindexRefU env (lmbRef y) (lmbOffset y + i), -1)]
           case Poly.buildEither 0 pair of
             Left _ -> error "CLimbEq: two variables are the same"
             Right xs -> [Linked.CAdd xs]
         Prime _ -> do
-          let pairsX = reindexLimb occurrences x 1
-          let pairsY = reindexLimb occurrences y (-1)
+          let pairsX = reindexLimb env x 1
+          let pairsY = reindexLimb env y (-1)
           let pairs = IntMap.unionWith (+) pairsX pairsY
           case Poly.buildWithIntMap 0 pairs of
             Left _ -> error "CLimbEq: two variables are the same"
             Right xs -> [Linked.CAdd xs]
-linkConstraint fieldInfo occurrences fieldWidth (CRefUEq x y) =
+linkConstraint env (CRefUEq x y) =
   -- split `x` and `y` into smaller limbs and pair them up with `CLimbEq`
-  let cVarEqLs = zipWith CLimbEq (Limb.refUToLimbs fieldWidth x) (Limb.refUToLimbs fieldWidth y)
-   in cVarEqLs >>= linkConstraint fieldInfo occurrences fieldWidth
-linkConstraint _ occurrences _ (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef occurrences x, 1)] of
+  let cVarEqLs = zipWith CLimbEq (Limb.refUToLimbs (envFieldWidth env) x) (Limb.refUToLimbs (envFieldWidth env) y)
+   in cVarEqLs >>= linkConstraint env
+linkConstraint env (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef env x, 1)] of
   Left _ -> error "CRefFVal: impossible"
   Right xs -> [Linked.CAdd xs]
-linkConstraint fieldInfo occurrences _ (CLimbVal x n) =
+linkConstraint env (CLimbVal x n) =
   -- "ArithException: arithmetic underflow" will be thrown if `n` is negative in Binary fields
-  let negatedConstant = case FieldInfo.fieldTypeData fieldInfo of
+  let negatedConstant = case FieldInfo.fieldTypeData (envFieldInfo env) of
         Prime _ -> fromInteger (-n)
         Binary _ -> fromInteger n
-   in case Poly.buildWithIntMap negatedConstant (reindexLimb occurrences x 1) of
+   in case Poly.buildWithIntMap negatedConstant (reindexLimb env x 1) of
         Left _ -> error "CLimbVal: impossible"
         Right xs -> [Linked.CAdd xs]
-linkConstraint fieldInfo occurrences fieldWidth (CRefUVal x n) =
-  case FieldInfo.fieldTypeData fieldInfo of
+linkConstraint env (CRefUVal x n) =
+  case FieldInfo.fieldTypeData (envFieldInfo env) of
     Binary _ ->
       let width = widthOf x
           cRefFVals = [CRefFVal (B (RefUBit width x i)) (if Data.Bits.testBit n i then 1 else 0) | i <- [0 .. widthOf x - 1]]
-       in cRefFVals >>= linkConstraint fieldInfo occurrences fieldWidth
+       in cRefFVals >>= linkConstraint env
     Prime _ -> do
       -- split the Integer into smaller chunks of size `fieldWidth`
       let number = U.new (widthOf x) n
-          chunks = map U.uValue (U.chunks fieldWidth number)
-          cLimbVals = zipWith CLimbVal (Limb.refUToLimbs fieldWidth x) chunks
-       in cLimbVals >>= linkConstraint fieldInfo occurrences fieldWidth
-linkConstraint _ occurrences _ (CMulL as bs cs) =
+          chunks = map U.uValue (U.chunks (envFieldWidth env) number)
+          cLimbVals = zipWith CLimbVal (Limb.refUToLimbs (envFieldWidth env) x) chunks
+       in cLimbVals >>= linkConstraint env
+linkConstraint env (CMulL as bs cs) =
   [ Linked.CMul
-      (linkPolyLUnsafe occurrences as)
-      (linkPolyLUnsafe occurrences bs)
+      (linkPolyLUnsafe env as)
+      (linkPolyLUnsafe env bs)
       ( case cs of
           Left n -> Left n
-          Right xs -> linkPolyL occurrences xs
+          Right xs -> linkPolyL env xs
       )
   ]
 
-updateCounters :: Occurrences -> Counters -> Counters
-updateCounters occurrences counters =
-  let reducedFX = (WriteField, getCount counters (Intermediate, ReadField) - IntSet.size (refFsInOccurrencesF occurrences))
-      reducedBX = (WriteBool, getCount counters (Intermediate, ReadBool) - IntSet.size (refBsInOccurrencesB occurrences))
+updateCounters :: Env -> Counters -> Counters
+updateCounters env counters =
+  let reducedFX = (WriteField, getCount counters (Intermediate, ReadField) - IntSet.size (envRefFsInEnvF env))
+      reducedBX = (WriteBool, getCount counters (Intermediate, ReadBool) - IntSet.size (envRefBsInEnvB env))
       reducedUXs =
-        if useNewLinker
+        if envUseNewLinker env
           then
             IntMap.mapWithKey
               ( \width table ->
@@ -244,37 +245,37 @@ updateCounters occurrences counters =
                       current = IntervalTable.size table -- this is the number of bits used after optimization & linking
                    in (WriteUInt width, original - current)
               )
-              (refBsInOccurrencesUB occurrences)
-          else IntMap.mapWithKey (\width set -> (WriteUInt width, getCount counters (Intermediate, ReadUInt width) - IntSet.size set)) (refUsInOccurrencesU occurrences)
+              (envRefBsInEnvUB env)
+          else IntMap.mapWithKey (\width set -> (WriteUInt width, getCount counters (Intermediate, ReadUInt width) - IntSet.size set)) (envRefUsInEnvU env)
    in foldr (\(selector, reducedAmount) -> addCount (Intermediate, selector) (-reducedAmount)) counters $ reducedFX : reducedBX : IntMap.elems reducedUXs
 
 --------------------------------------------------------------------------------
 
-linkPolyL :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Either n (Poly n)
-linkPolyL occurrences poly =
+linkPolyL :: (Integral n, GaloisField n) => Env -> PolyL n -> Either n (Poly n)
+linkPolyL env poly =
   let constant = PolyL.polyConstant poly
-      limbPolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexLimb occurrences)) (PolyL.polyLimbs poly))
-      varPolynomial = IntMap.fromList (map (first (reindexRef occurrences)) (Map.toList (PolyL.polyRefs poly)))
+      limbPolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexLimb env)) (PolyL.polyLimbs poly))
+      varPolynomial = IntMap.fromList (map (first (reindexRef env)) (Map.toList (PolyL.polyRefs poly)))
    in Poly.buildWithIntMap constant (IntMap.unionWith (+) limbPolynomial varPolynomial)
 
-linkPolyLUnsafe :: (Integral n, GaloisField n) => Occurrences -> PolyL n -> Poly n
-linkPolyLUnsafe occurrences xs = case linkPolyL occurrences xs of
+linkPolyLUnsafe :: (Integral n, GaloisField n) => Env -> PolyL n -> Poly n
+linkPolyLUnsafe env xs = case linkPolyL env xs of
   Left _ -> error "[ panic ] linkPolyLUnsafe: Left"
   Right p -> p
 
 --------------------------------------------------------------------------------
 
-reindexRef :: Occurrences -> Ref -> Var
-reindexRef occurrences (F x) = reindexRefF occurrences x
-reindexRef occurrences (B x) = reindexRefB occurrences x
+reindexRef :: Env -> Ref -> Var
+reindexRef env (F x) = reindexRefF env x
+reindexRef env (B x) = reindexRefB env x
 
-reindexLimb :: (Integral n, GaloisField n) => Occurrences -> Limb -> n -> IntMap n
-reindexLimb occurrences limb multiplier = case lmbSigns limb of
+reindexLimb :: (Integral n, GaloisField n) => Env -> Limb -> n -> IntMap n
+reindexLimb env limb multiplier = case lmbSigns limb of
   Left sign ->
     -- precondition of `fromDistinctAscList` is that the keys are in ascending order
     IntMap.fromDistinctAscList
       [ ( reindexRefU
-            occurrences
+            env
             (lmbRef limb)
             (i + lmbOffset limb),
           (2 ^ i) * if sign then multiplier else (-multiplier)
@@ -285,7 +286,7 @@ reindexLimb occurrences limb multiplier = case lmbSigns limb of
     -- precondition of `fromDistinctAscList` is that the keys are in ascending order
     IntMap.fromDistinctAscList
       [ ( reindexRefU
-            occurrences
+            env
             (lmbRef limb)
             (i + lmbOffset limb),
           (2 ^ i) * if sign then multiplier else (-multiplier)
@@ -293,70 +294,75 @@ reindexLimb occurrences limb multiplier = case lmbSigns limb of
         | (i, sign) <- zip [0 .. lmbWidth limb - 1] signs
       ]
 
-reindexRefF :: Occurrences -> RefF -> Var
-reindexRefF occurrences (RefFO x) = x + getOffset (occurCounters occurrences) (Output, ReadField)
-reindexRefF occurrences (RefFI x) = x + getOffset (occurCounters occurrences) (PublicInput, ReadField)
-reindexRefF occurrences (RefFP x) = x + getOffset (occurCounters occurrences) (PrivateInput, ReadField)
-reindexRefF occurrences (RefFX x) = IntervalTable.reindex (indexTableF occurrences) x + getOffset (occurCounters occurrences) (Intermediate, ReadField)
+reindexRefF :: Env -> RefF -> Var
+reindexRefF env (RefFO x) = x + getOffset (envCounters env) (Output, ReadField)
+reindexRefF env (RefFI x) = x + getOffset (envCounters env) (PublicInput, ReadField)
+reindexRefF env (RefFP x) = x + getOffset (envCounters env) (PrivateInput, ReadField)
+reindexRefF env (RefFX x) = IntervalTable.reindex (envIndexTableF env) x + getOffset (envCounters env) (Intermediate, ReadField)
 
-reindexRefB :: Occurrences -> RefB -> Var
-reindexRefB occurrences (RefBO x) = x + getOffset (occurCounters occurrences) (Output, ReadBool)
-reindexRefB occurrences (RefBI x) = x + getOffset (occurCounters occurrences) (PublicInput, ReadBool)
-reindexRefB occurrences (RefBP x) = x + getOffset (occurCounters occurrences) (PrivateInput, ReadBool)
-reindexRefB occurrences (RefBX x) = IntervalTable.reindex (indexTableB occurrences) x + getOffset (occurCounters occurrences) (Intermediate, ReadBool)
-reindexRefB occurrences (RefUBit _ x i) = reindexRefU occurrences x i
+reindexRefB :: Env -> RefB -> Var
+reindexRefB env (RefBO x) = x + getOffset (envCounters env) (Output, ReadBool)
+reindexRefB env (RefBI x) = x + getOffset (envCounters env) (PublicInput, ReadBool)
+reindexRefB env (RefBP x) = x + getOffset (envCounters env) (PrivateInput, ReadBool)
+reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (envCounters env) (Intermediate, ReadBool)
+reindexRefB env (RefUBit _ x i) = reindexRefU env x i
 
-useNewLinker :: Bool
-useNewLinker = False
-
-reindexRefU :: Occurrences -> RefU -> Int -> Var
-reindexRefU occurrences (RefUO w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (Output, ReadAllUInts)
-reindexRefU occurrences (RefUI w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (PublicInput, ReadAllUInts)
-reindexRefU occurrences (RefUP w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (PrivateInput, ReadAllUInts)
-reindexRefU occurrences (RefUX w x) i =
+reindexRefU :: Env -> RefU -> Int -> Var
+reindexRefU env (RefUO w x) i = w * x + (i `mod` w) + getOffset (envCounters env) (Output, ReadAllUInts)
+reindexRefU env (RefUI w x) i = w * x + (i `mod` w) + getOffset (envCounters env) (PublicInput, ReadAllUInts)
+reindexRefU env (RefUP w x) i = w * x + (i `mod` w) + getOffset (envCounters env) (PrivateInput, ReadAllUInts)
+reindexRefU env (RefUX w x) i =
   let result =
-        if useNewLinker
-          then case IntMap.lookup w (indexTableUBWithOffsets occurrences) of
+        if envUseNewLinker env
+          then case IntMap.lookup w (envIndexTableUBWithOffsets env) of
             Nothing -> error "[ panic ] reindexRefU: impossible"
-            Just (offset, table) -> IntervalTable.reindex table (w * x + (i `mod` w)) + offset + getOffset (occurCounters occurrences) (Intermediate, ReadAllUInts)
+            Just (offset, table) -> IntervalTable.reindex table (w * x + (i `mod` w)) + offset + getOffset (envCounters env) (Intermediate, ReadAllUInts)
           else
-            let offset = getOffset (occurCounters occurrences) (Intermediate, ReadUInt w) + w * x
-             in IntervalTable.reindex (indexTable occurrences) (offset - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
+            let offset = getOffset (envCounters env) (Intermediate, ReadUInt w) + w * x
+             in IntervalTable.reindex (envIndexTable env) (offset - envPinnedSize env) + envPinnedSize env + (i `mod` w)
    in result
 
 -------------------------------------------------------------------------------
 
 -- | Allow us to determine which relations should be extracted from the pool
-data Occurrences = Occurrences
-  { occurCounters :: !Counters,
-    refFsInOccurrencesF :: !IntSet,
-    refBsInOccurrencesB :: !IntSet,
-    refUsInOccurrencesU :: !(IntMap IntSet),
-    refBsInOccurrencesUB :: !(IntMap IntervalTable),
-    indexTableF :: !IntervalTable,
-    indexTableB :: !IntervalTable,
-    indexTableUBWithOffsets :: !(IntMap (Int, IntervalTable)),
-    indexTable :: !IntervalTable,
-    pinnedSize :: !Int
+data Env = Env
+  { envCounters :: !Counters,
+    envRefFsInEnvF :: !IntSet,
+    envRefBsInEnvB :: !IntSet,
+    envRefUsInEnvU :: !(IntMap IntSet),
+    envRefBsInEnvUB :: !(IntMap IntervalTable),
+    envIndexTableF :: !IntervalTable,
+    envIndexTableB :: !IntervalTable,
+    envIndexTableUBWithOffsets :: !(IntMap (Int, IntervalTable)),
+    envIndexTable :: !IntervalTable,
+    envPinnedSize :: !Int,
+    -- field related
+    envFieldInfo :: !FieldInfo,
+    envFieldWidth :: !Width,
+    -- other options
+    envUseNewLinker :: !Bool
   }
   deriving (Show)
 
--- | Smart constructor for 'Occurrences'
-constructOccurrences :: Counters -> OccurF -> OccurB -> OccurU -> OccurUB -> Occurrences
-constructOccurrences counters occurF occurB occurU occurUB =
+-- | Smart constructor for 'Env'
+constructEnv :: Options -> Counters -> OccurF -> OccurB -> OccurU -> OccurUB -> Env
+constructEnv options counters occurF occurB occurU occurUB =
   let tablesUB = OccurUB.toIntervalTables occurUB
-   in Occurrences
-        { occurCounters = counters,
-          refFsInOccurrencesF = OccurF.occuredSet occurF,
-          refBsInOccurrencesB = OccurB.occuredSet occurB,
-          refUsInOccurrencesU = OccurU.occuredSet occurU,
-          refBsInOccurrencesUB = tablesUB,
-          indexTableF = OccurF.toIntervalTable counters occurF,
-          indexTableB = OccurB.toIntervalTable counters occurB,
-          indexTableUBWithOffsets = OccurUB.toIntervalTablesWithOffsets occurUB,
-          indexTable =
+   in Env
+        { envCounters = counters,
+          envRefFsInEnvF = OccurF.occuredSet occurF,
+          envRefBsInEnvB = OccurB.occuredSet occurB,
+          envRefUsInEnvU = OccurU.occuredSet occurU,
+          envRefBsInEnvUB = tablesUB,
+          envIndexTableF = OccurF.toIntervalTable counters occurF,
+          envIndexTableB = OccurB.toIntervalTable counters occurB,
+          envIndexTableUBWithOffsets = OccurUB.toIntervalTablesWithOffsets occurUB,
+          envIndexTable =
             OccurF.toIntervalTable counters occurF
               <> OccurB.toIntervalTable counters occurB
               <> OccurU.toIntervalTable counters occurU,
-          pinnedSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput
+          envPinnedSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput,
+          envFieldInfo = optFieldInfo options,
+          envFieldWidth = FieldInfo.fieldWidth (optFieldInfo options),
+          envUseNewLinker = optUseNewLinker options
         }

@@ -8,6 +8,7 @@ import Keelung (HasWidth (widthOf), Width)
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
+import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo
 import Keelung.Data.LC ((@))
 import Keelung.Data.Reference
@@ -41,7 +42,7 @@ assertLTE width (Left a) bound
       -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
       -- (a - 0) * (a - 1) * (a - 2) = 0
 
-      fieldInfo <- gets cmField
+      fieldInfo <- gets (optFieldInfo . cmOptions)
 
       let maxLimbWidth = fieldWidth fieldInfo
       let minLimbWidth = 1
@@ -136,7 +137,7 @@ assertGTE width (Left a) bound
       -- we can use these 2 values as the only roots of the following multiplicative polynomial
       -- (a - 2^width + 1) * (a - 2^width + 2) = 0
       -- that is, either all bits are 1 or only the smallest bit is 0
-      fieldInfo <- gets cmField
+      fieldInfo <- gets (optFieldInfo . cmOptions)
 
       let maxLimbWidth = fieldWidth fieldInfo
       let minLimbWidth = 1
@@ -166,7 +167,7 @@ assertGTE width (Left a) bound
       -- there's only 3 possible value for `a`, which is `2^width - 1`, `2^width - 2` or `2^width - 3`
       -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
 
-      fieldInfo <- gets cmField
+      fieldInfo <- gets (optFieldInfo . cmOptions)
 
       let maxLimbWidth = fieldWidth fieldInfo
       let minLimbWidth = 1
@@ -242,7 +243,7 @@ assertNonZero width ref = do
   where
     assertNonZeroOnRefBs :: (GaloisField n, Integral n) => [RefB] -> M n ()
     assertNonZeroOnRefBs bits = do
-      fieldInfo <- gets cmField
+      fieldInfo <- gets (optFieldInfo . cmOptions)
       case fieldTypeData fieldInfo of
         Binary _ -> linearCase bits
         Prime 2 -> linearCase bits

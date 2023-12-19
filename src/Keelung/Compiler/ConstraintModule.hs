@@ -27,6 +27,7 @@ import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Optimize.OccurUB (OccurUB)
 import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
+import Keelung.Compiler.Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Util
@@ -43,8 +44,7 @@ import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanCons
 -- | A constraint module is a collection of constraints with some additional information
 data ConstraintModule n = ConstraintModule
   { -- options
-    cmField :: FieldInfo,
-    cmUseNewLinker :: Bool,
+    cmOptions :: Options,
     -- for counting the number of each category of variables
     cmCounters :: !Counters,
     -- for counting the occurrences of variables in constraints (excluding the ones that are in Relations)
@@ -96,7 +96,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
               else "  " <> name <> " (" <> show size <> "):\n\n" <> unlines (map (("    " <>) . f) xs) <> "\n"
 
       showFieldInfo :: String
-      showFieldInfo = "  Field: " <> show (fieldTypeData (cmField cm)) <> "\n"
+      showFieldInfo = "  Field: " <> show (fieldTypeData (optFieldInfo (cmOptions cm))) <> "\n"
 
       showDivModHints =
         if null $ cmDivMods cm

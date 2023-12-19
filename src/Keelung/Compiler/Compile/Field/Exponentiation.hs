@@ -4,7 +4,8 @@ import Control.Monad.RWS
 import Data.Field.Galois
 import Keelung.Compiler.Compile.Field.Conditional qualified as Conditiona
 import Keelung.Compiler.Compile.Monad
-import Keelung.Compiler.ConstraintModule (ConstraintModule (cmField))
+import Keelung.Compiler.ConstraintModule (ConstraintModule (cmOptions))
+import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.PolyL qualified as PolyL
@@ -12,7 +13,7 @@ import Keelung.Data.Reference
 
 compile :: (GaloisField n, Integral n) => LC n -> Integer -> M n (LC n)
 compile base power = do
-  ord <- gets (FieldInfo.fieldOrder . cmField)
+  ord <- gets (FieldInfo.fieldOrder . optFieldInfo . cmOptions)
   compile_ base ord power
 
 compile_ :: (GaloisField n, Integral n) => LC n -> Integer -> Integer -> M n (LC n)

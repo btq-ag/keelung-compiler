@@ -13,6 +13,7 @@ import Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.UInt.Multiplication.Binary (compileMulB)
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
+import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
@@ -50,7 +51,7 @@ compileMulU width out (Left a) (Left b) = compileMul width out a (Left b)
 
 compileMul :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU U -> M n ()
 compileMul width out x y = do
-  fieldInfo <- gets cmField
+  fieldInfo <- gets (optFieldInfo . cmOptions)
 
   -- invariants about widths of carry and limbs:
   --  1. 2 ≤ limb width * 2 ≤ field width

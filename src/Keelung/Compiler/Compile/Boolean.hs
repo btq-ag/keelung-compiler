@@ -14,6 +14,7 @@ import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
+import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
@@ -98,7 +99,7 @@ compile compileU expr = case expr of
 
 compileEqU :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> M n (Either RefB Bool)
 compileEqU x y = do
-  fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+  fieldWidth <- gets (FieldInfo.fieldWidth . optFieldInfo . cmOptions)
   result <-
     zipWithM
       (\a b -> eqZero True (a <> neg b)) -- a - b ==? 0
@@ -172,7 +173,7 @@ orBs xs = do
     then return $ Right True -- short circuit
     else do
       -- the divide and conquer approach only works on Prime fields >= 3
-      fieldType <- gets (FieldInfo.fieldTypeData . cmField)
+      fieldType <- gets (FieldInfo.fieldTypeData . optFieldInfo . cmOptions)
       case fieldType of
         Binary _ -> linearFold vars
         Prime 2 -> linearFold vars
@@ -200,7 +201,7 @@ orBs xs = do
     divideAndConquer (var : vars) = do
       -- split operands into pieces in case that the order of field is too small
       -- each pieces has at most (order - 1) operands
-      order <- gets (FieldInfo.fieldOrder . cmField)
+      order <- gets (FieldInfo.fieldOrder . optFieldInfo . cmOptions)
 
       let pieces = List.chunksOf (fromInteger order - 1) (var : vars)
       let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece))
@@ -237,7 +238,7 @@ andBs xs = do
   if constant
     then do
       -- the divide and conquer approach only works on Prime fields >= 3
-      fieldType <- gets (FieldInfo.fieldTypeData . cmField)
+      fieldType <- gets (FieldInfo.fieldTypeData . optFieldInfo . cmOptions)
       case fieldType of
         Binary _ -> linearFold vars
         Prime 2 -> linearFold vars
@@ -265,7 +266,7 @@ andBs xs = do
     divideAndConquer (var : vars) = do
       -- split operands into pieces in case that the order of field is too small
       -- each pieces has at most (order - 1) operands
-      order <- gets (FieldInfo.fieldOrder . cmField)
+      order <- gets (FieldInfo.fieldOrder . optFieldInfo . cmOptions)
 
       let pieces = List.chunksOf (fromInteger order - 1) (var : vars)
       let seqToLC piece = mconcat (fmap (\x -> 1 @ B x) (toList piece)) <> neg (Constant (fromIntegral (length piece)))
@@ -303,7 +304,7 @@ xorBs xs = do
   let (vars, constants) = Either.partitionEithers xs
   let constant = odd (length (filter id constants)) -- if number of True is odd
   resultFromVars <- do
-    fieldType <- gets (FieldInfo.fieldTypeData . cmField)
+    fieldType <- gets (FieldInfo.fieldTypeData . optFieldInfo . cmOptions)
     case fieldType of
       Binary _ -> constantFold vars
       Prime 2 -> linearFold vars
@@ -341,7 +342,7 @@ xorBs xs = do
     divideAndConquer vars = do
       -- split operands into chunks in case that the order of field is too small
       -- each chunk can only has at most `(2 ^ fieldWidth) - 1` operands
-      fieldWidth <- gets (FieldInfo.fieldWidth . cmField)
+      fieldWidth <- gets (FieldInfo.fieldWidth . optFieldInfo . cmOptions)
       let lists =
             -- trying to avoid having to compute `2 ^ fieldWidth - 1` most of the time
             let len = length vars
@@ -399,7 +400,7 @@ eqB (Right False) (Left y) = do
   return $ Left out
 eqB (Left x) (Right y) = eqB (Right y) (Left x)
 eqB (Left x) (Left y) = do
-  fieldType <- gets (FieldInfo.fieldTypeData . cmField)
+  fieldType <- gets (FieldInfo.fieldTypeData . optFieldInfo . cmOptions)
   case fieldType of
     Binary _ -> binary
     Prime 2 -> binary
@@ -448,7 +449,7 @@ computeLTEUVarConst x y = do
   case toInteger y of
     0 -> do
       -- see if x is 0
-      fieldInfo <- gets cmField
+      fieldInfo <- gets (optFieldInfo . cmOptions)
       let chunks = LC.fromRefU2 fieldInfo (Left x)
       mapM (eqZero True) chunks >>= andBs
     _ -> do
@@ -502,7 +503,7 @@ compileLTEUVarVarPrim width x y acc i = do
   yacc <- freshRefB
   writeMul (0, [(yBit, 1)]) (0, [(B acc, 1)]) (0, [(B yacc, 1)])
 
-  characteristic <- gets (FieldInfo.fieldChar . cmField)
+  characteristic <- gets (FieldInfo.fieldChar . optFieldInfo . cmOptions)
   if characteristic == 2
     then do
       -- result + yacc + y[i] + acc = (x[i]) * (y[i] + acc)

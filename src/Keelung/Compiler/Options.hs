@@ -1,5 +1,10 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Keelung.Compiler.Options (Options (..), defaultOptions) where
 
+import Control.DeepSeq
+import GHC.Generics
 import Keelung.Compiler.Util (gf181Info)
 import Keelung.Data.FieldInfo
 
@@ -16,6 +21,7 @@ data Options = Options
     -- | Whether to use the new linker
     optUseNewLinker :: Bool
   }
+  deriving (Eq, Generic, NFData)
 
 -- | Default options
 defaultOptions :: Options

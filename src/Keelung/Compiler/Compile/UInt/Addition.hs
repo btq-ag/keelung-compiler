@@ -14,6 +14,7 @@ import Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
+import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
@@ -41,7 +42,7 @@ import Keelung.Syntax (Width)
 
 compileAdd :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> U -> M n ()
 compileAdd width out vars constant = do
-  fieldInfo <- gets cmField
+  fieldInfo <- gets (optFieldInfo . cmOptions)
 
   let arity = length vars + if constant == 0 then 0 else 1
   -- calculate the expected width of the carry limbs, which is logarithimic to the number of operands
