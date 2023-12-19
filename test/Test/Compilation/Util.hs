@@ -6,10 +6,10 @@ module Test.Compilation.Util (debug, debugUnoptimized, assertSize, gf181Info, ru
 import Control.Arrow (left)
 import Data.Field.Galois
 import Data.Foldable (toList)
-import Data.Proxy (Proxy (..), asProxyTypeOf)
+import Data.Proxy (Proxy (..))
 import GHC.TypeLits
 import Keelung hiding (Elaborated, compile)
-import Keelung.Compiler (Error (..), toR1CS)
+import Keelung.Compiler (Error (..), gf181Info, toR1CS)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.ConstraintModule (ConstraintModule)
 import Keelung.Compiler.ConstraintSystem qualified as CS
@@ -20,6 +20,7 @@ import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver qualified as Solver
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
+
 --------------------------------------------------------------------------------
 
 -- | syntax tree interpreter
@@ -98,17 +99,6 @@ assertSize afterSize program = do
     Left err -> print err
     Right cs -> do
       CS.numberOfConstraints cs `shouldBe` afterSize
-
-gf181Info :: FieldInfo
-gf181Info =
-  let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy GF181)
-   in FieldInfo
-        { fieldTypeData = gf181,
-          fieldOrder = toInteger (order fieldNumber),
-          fieldChar = char fieldNumber,
-          fieldDeg = fromIntegral (deg fieldNumber),
-          fieldWidth = floor (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
-        }
 
 runAll :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
 runAll fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldType fieldType handlePrime handleBinary

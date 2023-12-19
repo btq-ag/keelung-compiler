@@ -17,17 +17,18 @@ module Keelung.Compiler
     convertToInternal,
     elaborateAndEncode,
     interpret,
-    -- genInputsOutputsWitnesses,
     generateWitness,
-    compileWithoutConstProp,
     -- results in ConstraintModule
+    compileWithOpt,
     compileO0,
     compileO1,
     -- results in ConstraintSystem
+    compileAndLinkWithOpt,
     compileAndLink,
     compileAndLinkO0,
     compileAndLinkO1,
     -- takes elaborated programs as input
+    compileElabWithOpt,
     compileO0Elab,
     compileO1Elab,
     interpretElab,
@@ -35,12 +36,15 @@ module Keelung.Compiler
     --
     asGF181N,
     asGF181,
+    gf181Info,
   )
 where
 
 import Control.Arrow (left)
 import Control.Monad ((>=>))
 import Data.Field.Galois (GaloisField)
+import Data.Field.Galois qualified as Field
+import Data.Proxy
 import Data.Semiring (Semiring (one, zero))
 import Data.Vector (Vector)
 import Keelung (Encode, N (..))
@@ -70,7 +74,7 @@ import Keelung.Syntax.Encode.Syntax qualified as Encoded
 -- Top-level functions that accepts Keelung programs
 
 -- | Elaborates a Keelung program
-elaborateAndEncode :: Encode t => Comp t -> Either (Error n) Elaborated
+elaborateAndEncode :: (Encode t) => Comp t -> Either (Error n) Elaborated
 elaborateAndEncode = left LangError . Lang.elaborateAndEncode
 
 -- elaboration => interpretation
@@ -92,13 +96,17 @@ generateWitness fieldInfo program rawPublicInputs rawPrivateInputs = do
 convertToInternal :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (Internal n)
 convertToInternal fieldInfo prog = ToInternal.run fieldInfo <$> elaborateAndEncode prog
 
+-- | Compile a Keelung program to a constraint module with options
+compileWithOpt :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> Either (Error n) (ConstraintModule n)
+compileWithOpt options program = elaborateAndEncode program >>= compileElabWithOpt options
+
 -- elaborate => rewrite => to internal syntax => constant propagation => compile
 compileO0 ::
   (GaloisField n, Integral n, Encode t) =>
   FieldInfo ->
   Comp t ->
   Either (Error n) (ConstraintModule n)
-compileO0 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo
+compileO0 fieldInfo = compileWithOpt (defaultOptions {optFieldInfo = fieldInfo, optOptimize = False})
 
 -- elaborate => rewrite => to internal syntax => constant propagation => compile => optimize
 compileO1 ::
@@ -106,15 +114,21 @@ compileO1 ::
   FieldInfo ->
   Comp t ->
   Either (Error n) (ConstraintModule n)
-compileO1 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= left CompilerError . Optimizer.run
+compileO1 fieldInfo = compileWithOpt (defaultOptions {optFieldInfo = fieldInfo, optOptimize = True})
+
+-- | Compile a Keelung program to a constraint system with options
+compileAndLinkWithOpt :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> Either (Error n) (ConstraintSystem n)
+compileAndLinkWithOpt options program =
+  compileWithOpt options program
+    >>= return . Linker.linkConstraintModule
 
 -- elaborate => to internal syntax => constant propagation => compile => link
 compileAndLinkO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
-compileAndLinkO0 fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . Linker.linkConstraintModule
+compileAndLinkO0 fieldInfo = compileAndLinkWithOpt (defaultOptions {optFieldInfo = fieldInfo, optOptimize = False})
 
 -- elaborate => to internal syntax => constant propagation => compile => optimize => link
 compileAndLinkO1 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
-compileAndLinkO1 fieldInfo prog = elaborateAndEncode prog >>= compileO1Elab fieldInfo >>= return . Linker.linkConstraintModule
+compileAndLinkO1 fieldInfo = compileAndLinkWithOpt (defaultOptions {optFieldInfo = fieldInfo, optOptimize = True})
 
 -- | 'compileAndLink' defaults to 'compileAndLinkO1'
 compileAndLink ::
@@ -123,10 +137,6 @@ compileAndLink ::
   Comp t ->
   Either (Error n) (ConstraintSystem n)
 compileAndLink = compileAndLinkO1
-
--- elaborate => to internal syntax => compile => link
-compileWithoutConstProp :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> Either (Error n) (ConstraintSystem n)
-compileWithoutConstProp fieldInfo prog = elaborateAndEncode prog >>= compileO0Elab fieldInfo >>= return . Linker.linkConstraintModule
 
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
@@ -145,11 +155,25 @@ generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   (outputs, witness) <- left SolverError (Solver.run r1cs inputs)
   return (counters, outputs, witness)
 
-compileO0Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintModule n)
-compileO0Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run fieldInfo
+-- | Compile an elaborated program to a constraint module with options
+compileElabWithOpt :: (GaloisField n, Integral n) => Options -> Elaborated -> Either (Error n) (ConstraintModule n)
+compileElabWithOpt options =
+  let fieldInfo = optFieldInfo options
+      constProp = optConstProp options
+      optimize = optOptimize options
+   in ( Compile.run fieldInfo -- compile
+          . (if constProp then ConstantPropagation.run else id) -- constant propagation
+          . ToInternal.run fieldInfo -- to internal syntax
+          >=> (if optimize then left CompilerError . Optimizer.run else Right) -- optimize
+      )
 
+-- | `compileElabWithOpt` with optimization turned off
+compileO0Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintModule n)
+compileO0Elab fieldInfo = compileElabWithOpt (defaultOptions {optFieldInfo = fieldInfo, optConstProp = True, optOptimize = False})
+
+-- | `compileElabWithOpt` with optimization turned on
 compileO1Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintModule n)
-compileO1Elab fieldInfo = Compile.run fieldInfo . ConstantPropagation.run . ToInternal.run fieldInfo >=> left CompilerError . Optimizer.run
+compileO1Elab fieldInfo = compileElabWithOpt (defaultOptions {optFieldInfo = fieldInfo, optConstProp = True, optOptimize = True})
 
 --------------------------------------------------------------------------------
 
@@ -158,3 +182,36 @@ asGF181N = id
 
 asGF181 :: Either (Error GF181) a -> Either (Error GF181) a
 asGF181 = id
+
+--------------------------------------------------------------------------------
+
+-- | Options for the compiler
+data Options = Options
+  { -- | Field information
+    optFieldInfo :: FieldInfo,
+    -- | Whether to perform constant propagation
+    optConstProp :: Bool,
+    -- | Whether to perform optimization
+    optOptimize :: Bool
+  }
+
+-- | Default field info for GF181)=
+gf181Info :: FieldInfo
+gf181Info =
+  let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy GF181)
+   in FieldInfo
+        { fieldTypeData = Lang.gf181,
+          fieldOrder = toInteger (Field.order fieldNumber),
+          fieldChar = Field.char fieldNumber,
+          fieldDeg = fromIntegral (Field.deg fieldNumber),
+          fieldWidth = floor (logBase (2 :: Double) (fromIntegral (Field.order fieldNumber)))
+        }
+
+-- | Default options
+defaultOptions :: Options
+defaultOptions =
+  Options
+    { optFieldInfo = gf181Info,
+      optConstProp = True,
+      optOptimize = True
+    }
