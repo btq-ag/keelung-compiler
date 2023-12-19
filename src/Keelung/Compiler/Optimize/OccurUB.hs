@@ -9,6 +9,7 @@ module Keelung.Compiler.Optimize.OccurUB
     null,
     -- fromIntervalSet,
     toIntervalTables,
+    toIntervalTablesWithOffsets,
     increase,
     decrease,
   )
@@ -23,6 +24,7 @@ import Keelung.Compiler.Util
 import Keelung.Data.IntervalSet (IntervalSet)
 import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.IntervalTable (IntervalTable)
+import Keelung.Data.IntervalTable qualified as IntervalTable
 import Prelude hiding (null)
 
 newtype OccurUB = OccurUB (IntMap IntervalSet) -- IntMap of (width, IntervalSet) pairs
@@ -83,6 +85,16 @@ null (OccurUB xs) = IntMap.null xs
 -- | O(n). To an IntMap of widths to IntervalTable
 toIntervalTables :: OccurUB -> IntMap IntervalTable
 toIntervalTables (OccurUB xs) = IntMap.mapWithKey IntervalSet.toIntervalTable xs
+
+toIntervalTablesWithOffsets :: OccurUB -> IntMap (Int, IntervalTable)
+toIntervalTablesWithOffsets (OccurUB xs) = snd $ IntMap.foldlWithKey' step (0, mempty) xs
+  where
+    step :: (Int, IntMap (Int, IntervalTable)) -> Width -> IntervalSet -> (Int, IntMap (Int, IntervalTable))
+    step (offset, acc) width intervalSet =
+      let table = IntervalSet.toIntervalTable width intervalSet
+       in (offset + IntervalTable.size table, IntMap.insert width (offset, table) acc)
+
+-- IntMap.mapWithKey IntervalSet.toIntervalTable xs
 
 -- where
 --   convert :: Width -> IntervalSet -> IntervalTable

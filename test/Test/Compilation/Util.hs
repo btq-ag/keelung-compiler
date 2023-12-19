@@ -20,7 +20,6 @@ import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver qualified as Solver
 import Keelung.Syntax.Encode.Syntax qualified as Encoded
 import Test.Hspec
-
 --------------------------------------------------------------------------------
 
 -- | syntax tree interpreter
@@ -73,7 +72,7 @@ solverR1CSCollectLogUnoptimized fieldInfo prog rawPublicInputs rawPrivateInputs 
 --------------------------------------------------------------------------------
 
 -- | Print out the result of compilation
-debug :: Encode t => FieldType -> Comp t -> IO ()
+debug :: (Encode t) => FieldType -> Comp t -> IO ()
 debug fieldType program = caseFieldType fieldType handlePrime handleBinary
   where
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
@@ -83,7 +82,7 @@ debug fieldType program = caseFieldType fieldType handlePrime handleBinary
       print (Compiler.compileO1 fieldInfo program :: Either (Error (N (Binary n))) (ConstraintModule (N (Binary n))))
       print (toR1CS <$> Compiler.compileAndLinkO1 fieldInfo program :: Either (Error (N (Binary n))) (R1CS (N (Binary n))))
 
-debugUnoptimized :: Encode t => FieldType -> Comp t -> IO ()
+debugUnoptimized :: (Encode t) => FieldType -> Comp t -> IO ()
 debugUnoptimized fieldType program = caseFieldType fieldType handlePrime handleBinary
   where
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
@@ -93,7 +92,7 @@ debugUnoptimized fieldType program = caseFieldType fieldType handlePrime handleB
       print (Compiler.compileO0 fieldInfo program :: Either (Error (N (Binary n))) (ConstraintModule (N (Binary n))))
       print (toR1CS <$> Compiler.compileAndLinkO0 fieldInfo program :: Either (Error (N (Binary n))) (R1CS (N (Binary n))))
 
-assertSize :: Encode t => Int -> Comp t -> IO ()
+assertSize :: (Encode t) => Int -> Comp t -> IO ()
 assertSize afterSize program = do
   case Compiler.asGF181N (Compiler.compileAndLinkO1 gf181Info program) of
     Left err -> print err
@@ -111,10 +110,10 @@ gf181Info =
           fieldWidth = floor (logBase (2 :: Double) (fromIntegral (order fieldNumber)))
         }
 
-runAll :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
+runAll :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
 runAll fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldType fieldType handlePrime handleBinary
   where
-    handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
+    handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- constraint system interpreters
@@ -123,7 +122,7 @@ runAll fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldTy
     -- solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
     --   `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
 
-    handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
+    handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
       -- constraint system interpreters
@@ -132,31 +131,31 @@ runAll fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldTy
       solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
 
-printLog :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
+printLog :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
 printLog fieldType program rawPublicInputs rawPrivateInputs = caseFieldType fieldType handlePrime handleBinary
   where
-    handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
+    handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
       let (err, logs) = solverR1CSCollectLog fieldInfo program rawPublicInputs rawPrivateInputs :: (Maybe (Error (Prime n)), Maybe (Solver.LogReport (Prime n)))
       mapM_ print err
       mapM_ print logs
 
-    handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
+    handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
       let (err, logs) = solverR1CSCollectLog fieldInfo program rawPublicInputs rawPrivateInputs :: (Maybe (Error (Binary n)), Maybe (Solver.LogReport (Binary n)))
       mapM_ print err
       mapM_ print logs
 
-printLogUnoptimized :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
+printLogUnoptimized :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
 printLogUnoptimized fieldType program rawPublicInputs rawPrivateInputs = caseFieldType fieldType handlePrime handleBinary
   where
-    handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
+    handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
       let (err, logs) = solverR1CSCollectLogUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs :: (Maybe (Error (Prime n)), Maybe (Solver.LogReport (Prime n)))
       mapM_ print err
       mapM_ print logs
 
-    handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
+    handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
       let (err, logs) = solverR1CSCollectLogUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs :: (Maybe (Error (Binary n)), Maybe (Solver.LogReport (Binary n)))
       mapM_ print err
@@ -176,7 +175,7 @@ printLogUnoptimized fieldType program rawPublicInputs rawPrivateInputs = caseFie
 throwR1CS :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Error n -> IO ()
 throwR1CS fieldType program rawPublicInputs rawPrivateInputs csError = caseFieldType fieldType handlePrime handleBinary
   where
-    handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
+    handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
       -- syntax tree interpreters
       -- interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs
@@ -187,7 +186,7 @@ throwR1CS fieldType program rawPublicInputs rawPrivateInputs csError = caseField
       solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Left csError
 
-    handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
+    handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
       -- constraint system interpreters
       -- interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs
@@ -201,7 +200,7 @@ throwR1CS fieldType program rawPublicInputs rawPrivateInputs csError = caseField
 throwBoth :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Error n -> Error n -> IO ()
 throwBoth fieldType program rawPublicInputs rawPrivateInputs stError csError = caseFieldType fieldType handlePrime handleBinary
   where
-    handlePrime :: KnownNat n => Proxy (Prime n) -> FieldInfo -> IO ()
+    handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
       -- syntax tree interpreters
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs
@@ -212,7 +211,7 @@ throwBoth fieldType program rawPublicInputs rawPrivateInputs stError csError = c
       solverR1CSUnoptimized fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Left csError
 
-    handleBinary :: KnownNat n => Proxy (Binary n) -> FieldInfo -> IO ()
+    handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
       -- constraint system interpreters
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs

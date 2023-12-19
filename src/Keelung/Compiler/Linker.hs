@@ -112,14 +112,14 @@ linkConstraintModule cm =
         True
 
     limbShouldBeKept :: Limb -> Bool
-    -- limbShouldBeKept limb = case IntMap.lookup (lmbWidth limb) (refBsInOccurrencesUB occurrences) of
-    --   Nothing -> False
-    --   Just varMap -> case lmbRef limb of
-    --     RefUX _ var -> case IntMap.lookup var varMap of
-    --       Nothing -> False
-    --       Just table -> IntervalTable.member (lmbOffset limb) (lmbWidth limb) table
-    --     _ -> True -- it's a pinned UInt variable
-    limbShouldBeKept = refUShouldBeKept . lmbRef
+    limbShouldBeKept limb =
+      if useNewLinker
+        then case lmbRef limb of
+          RefUX width var -> case IntMap.lookup width (refBsInOccurrencesUB occurrences) of
+            Nothing -> False
+            Just table -> IntervalTable.member (width * var + lmbOffset limb, width * var + lmbOffset limb + lmbWidth limb) table
+          _ -> True -- it's a pinned UInt variable
+        else refUShouldBeKept (lmbRef limb)
 
     refBShouldBeKept :: RefB -> Bool
     refBShouldBeKept ref = case ref of
@@ -296,16 +296,24 @@ reindexRefB occurrences (RefBP x) = x + getOffset (occurCounters occurrences) (P
 reindexRefB occurrences (RefBX x) = IntervalTable.reindex (indexTableB occurrences) x + getOffset (occurCounters occurrences) (Intermediate, ReadBool)
 reindexRefB occurrences (RefUBit _ x i) = reindexRefU occurrences x i
 
+useNewLinker :: Bool
+useNewLinker = True
+
 reindexRefU :: Occurrences -> RefU -> Int -> Var
 reindexRefU occurrences (RefUO w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (Output, ReadAllUInts)
 reindexRefU occurrences (RefUI w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (PublicInput, ReadAllUInts)
 reindexRefU occurrences (RefUP w x) i = w * x + (i `mod` w) + getOffset (occurCounters occurrences) (PrivateInput, ReadAllUInts)
 reindexRefU occurrences (RefUX w x) i =
-  -- case IntMap.lookup w (refBsInOccurrencesUB occurrences) of
-  --   Nothing -> error "[ panic ] reindexRefU: impossible"
-  --   Just table -> IntervalTable.reindex table (w * x + (i `mod` w)) + getOffset (occurCounters occurrences) (Intermediate, ReadAllUInts)
-  let offset = getOffset (occurCounters occurrences) (Intermediate, ReadUInt w) + w * x
-   in IntervalTable.reindex (indexTable occurrences) (offset - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
+  let result =
+        if useNewLinker
+          then case IntMap.lookup w (indexTableUBWithOffsets occurrences) of
+            Nothing -> error "[ panic ] reindexRefU: impossible"
+            Just (offset, table) -> IntervalTable.reindex table (w * x + (i `mod` w)) + offset + getOffset (occurCounters occurrences) (Intermediate, ReadAllUInts)
+          else
+            let offset = getOffset (occurCounters occurrences) (Intermediate, ReadUInt w) + w * x
+             in IntervalTable.reindex (indexTable occurrences) (offset - pinnedSize occurrences) + pinnedSize occurrences + (i `mod` w)
+   in result
+    -- trace (show (RefUBit w (RefUX w x) i) <> " (" <> show (w * x + (i `mod` w)) <> ")" <> " => " <> show result) result
 
 -------------------------------------------------------------------------------
 
@@ -318,6 +326,7 @@ data Occurrences = Occurrences
     refBsInOccurrencesUB :: !(IntMap IntervalTable),
     indexTableF :: !IntervalTable,
     indexTableB :: !IntervalTable,
+    indexTableUBWithOffsets :: !(IntMap (Int, IntervalTable)),
     indexTable :: !IntervalTable,
     pinnedSize :: !Int
   }
@@ -335,6 +344,7 @@ constructOccurrences counters occurF occurB occurU occurUB =
           refBsInOccurrencesUB = tablesUB,
           indexTableF = OccurF.toIntervalTable counters occurF,
           indexTableB = OccurB.toIntervalTable counters occurB,
+          indexTableUBWithOffsets = OccurUB.toIntervalTablesWithOffsets occurUB,
           indexTable =
             OccurF.toIntervalTable counters occurF
               <> OccurB.toIntervalTable counters occurB
