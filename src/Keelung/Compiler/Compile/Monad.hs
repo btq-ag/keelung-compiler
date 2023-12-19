@@ -12,12 +12,12 @@ import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
+import Keelung.Compiler.Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Constraint
-import Keelung.Data.FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
@@ -34,12 +34,12 @@ import Keelung.Syntax.Counters
 type M n = ReaderT (BootstrapCompiler n) (StateT (ConstraintModule n) (Except (Error n)))
 
 -- | Run the monad
-runM :: (GaloisField n) => BootstrapCompiler n -> FieldInfo -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
-runM compilers fieldInfo counters program =
+runM :: (GaloisField n) => Options -> BootstrapCompiler n -> Counters -> M n a -> Either (Error n) (ConstraintModule n)
+runM options compilers counters program =
   runExcept
     ( execStateT
         (runReaderT program compilers)
-        (ConstraintModule fieldInfo counters OccurF.new (OccurB.new False) OccurU.new OccurUB.new Relations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintModule (optFieldInfo options) (optUseNewLinker options) counters OccurF.new (OccurB.new False) OccurU.new OccurUB.new Relations.new mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()

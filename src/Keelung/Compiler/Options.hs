@@ -12,11 +12,10 @@ data Options = Options
     -- | Whether to perform constant propagation
     optConstProp :: Bool,
     -- | Whether to perform optimization
-    optOptimize :: Bool
+    optOptimize :: Bool,
+    -- | Whether to use the new linker
+    optUseNewLinker :: Bool
   }
-
--- \| Whether to use the new linker
--- optNewLinker :: Bool
 
 -- | Default options
 defaultOptions :: Options
@@ -24,6 +23,6 @@ defaultOptions =
   Options
     { optFieldInfo = gf181Info,
       optConstProp = True,
-      optOptimize = True
-      --   optNewLinker = False
+      optOptimize = True,
+      optUseNewLinker = False
     }

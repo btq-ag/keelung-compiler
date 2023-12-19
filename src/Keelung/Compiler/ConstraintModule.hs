@@ -42,7 +42,10 @@ import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanCons
 
 -- | A constraint module is a collection of constraints with some additional information
 data ConstraintModule n = ConstraintModule
-  { cmField :: FieldInfo,
+  { -- options
+    cmField :: FieldInfo,
+    cmUseNewLinker :: Bool,
+    -- for counting the number of each category of variables
     cmCounters :: !Counters,
     -- for counting the occurrences of variables in constraints (excluding the ones that are in Relations)
     cmOccurrenceF :: !OccurF,
