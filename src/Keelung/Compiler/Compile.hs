@@ -17,8 +17,8 @@ import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt qualified as UInt
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Error
+import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
-import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.Limb qualified as Limb
@@ -29,8 +29,8 @@ import Keelung.Syntax (widthOf)
 --------------------------------------------------------------------------------
 
 -- | Compile an untyped expression to a constraint system
-run :: (GaloisField n, Integral n) => FieldInfo -> Internal n -> Either (Error n) (ConstraintModule n)
-run fieldInfo (Internal untypedExprs _ counters assertions sideEffects) = left CompilerError $ runM bootstrapCompilers fieldInfo counters $ do
+run :: (GaloisField n, Integral n) => Options -> Internal n -> Either (Error n) (ConstraintModule n)
+run options (Internal untypedExprs _ counters assertions sideEffects) = left CompilerError $ runM bootstrapCompilers (optFieldInfo options) counters $ do
   forM_ untypedExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do

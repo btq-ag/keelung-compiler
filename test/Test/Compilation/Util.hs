@@ -9,11 +9,12 @@ import Data.Foldable (toList)
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits
 import Keelung hiding (Elaborated, compile)
-import Keelung.Compiler (Error (..), gf181Info, toR1CS)
+import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.ConstraintModule (ConstraintModule)
 import Keelung.Compiler.ConstraintSystem qualified as CS
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
+import Keelung.Compiler.Util (gf181Info)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Data.FieldInfo
 import Keelung.Interpreter qualified as Interpreter

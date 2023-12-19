@@ -36,15 +36,12 @@ module Keelung.Compiler
     --
     asGF181N,
     asGF181,
-    gf181Info,
   )
 where
 
 import Control.Arrow (left)
 import Control.Monad ((>=>))
 import Data.Field.Galois (GaloisField)
-import Data.Field.Galois qualified as Field
-import Data.Proxy
 import Data.Semiring (Semiring (one, zero))
 import Data.Vector (Vector)
 import Keelung (Encode, N (..))
@@ -56,6 +53,7 @@ import Keelung.Compiler.Error
 import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
+import Keelung.Compiler.Options
 import Keelung.Compiler.R1CS
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Syntax.Internal (Internal (..))
@@ -161,7 +159,7 @@ compileElabWithOpt options =
   let fieldInfo = optFieldInfo options
       constProp = optConstProp options
       optimize = optOptimize options
-   in ( Compile.run fieldInfo -- compile
+   in ( Compile.run options -- compile
           . (if constProp then ConstantPropagation.run else id) -- constant propagation
           . ToInternal.run fieldInfo -- to internal syntax
           >=> (if optimize then left CompilerError . Optimizer.run else Right) -- optimize
@@ -182,36 +180,3 @@ asGF181N = id
 
 asGF181 :: Either (Error GF181) a -> Either (Error GF181) a
 asGF181 = id
-
---------------------------------------------------------------------------------
-
--- | Options for the compiler
-data Options = Options
-  { -- | Field information
-    optFieldInfo :: FieldInfo,
-    -- | Whether to perform constant propagation
-    optConstProp :: Bool,
-    -- | Whether to perform optimization
-    optOptimize :: Bool
-  }
-
--- | Default field info for GF181)=
-gf181Info :: FieldInfo
-gf181Info =
-  let fieldNumber = asProxyTypeOf 0 (Proxy :: Proxy GF181)
-   in FieldInfo
-        { fieldTypeData = Lang.gf181,
-          fieldOrder = toInteger (Field.order fieldNumber),
-          fieldChar = Field.char fieldNumber,
-          fieldDeg = fromIntegral (Field.deg fieldNumber),
-          fieldWidth = floor (logBase (2 :: Double) (fromIntegral (Field.order fieldNumber)))
-        }
-
--- | Default options
-defaultOptions :: Options
-defaultOptions =
-  Options
-    { optFieldInfo = gf181Info,
-      optConstProp = True,
-      optOptimize = True
-    }
