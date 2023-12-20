@@ -42,10 +42,10 @@ tests = describe "Experiment" $ do
       let program = do
             x <- input Public :: Comp (UInt 8)
             y <- input Public :: Comp (UInt 8)
-            return $ x * y
+            return $ x + y
       let options = defaultOptions { optUseNewLinker = True }
-      debugWithOpts options (Prime 257) program
-      -- testCompilerWithOpts options (Prime 257) program [2, 2] [] [4]
+      debugWithOpts options (Binary 283) program
+      -- testCompilerWithOpts options (Binary 7) program [2, 2] [] [4]
       -- testCompiler (Prime 257) program [2, 2] [] [4]
       -- runSolver (Prime 257) program [2, 2] []
 

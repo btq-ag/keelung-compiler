@@ -13,7 +13,7 @@ import Keelung.Data.IntervalTable (IntervalTable (..))
 import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Reference
 import Test.Hspec
-import Test.Optimization.Util (executeGF181)
+import Test.Optimization.Util
 
 run :: IO ()
 run = hspec tests
@@ -158,7 +158,6 @@ tests =
           y <- inputUInt @4 Private
           return $ (x .&. y) !!! 0
         let env = constructEnv (cmOptions cm) (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
-
         reindexRef env (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
         reindexRef env (B (RefUBit 4 inputVar0 0)) `shouldBe` 1

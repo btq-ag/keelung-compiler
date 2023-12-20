@@ -1,18 +1,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Test.Optimization.Util (debug, executeGF181, executePrime, executeBinary, shouldHaveSize) where
+module Test.Optimization.Util (debug, executeGF181, executeGF181', executePrime, executeBinary, shouldHaveSize) where
 
 import Control.Arrow (left)
-import Control.Monad ((>=>))
-import Data.Field.Galois (Prime, Binary)
+import Data.Field.Galois (Binary, Prime)
 import Data.Proxy (Proxy)
-import Keelung hiding (compile)
-import Keelung.Compiler (Error)
+import Keelung hiding (compileWithOpts)
+import Keelung.Compiler (Error, compileWithOpts)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.ConstraintSystem qualified as ConstraintSystem
 import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Optimize qualified as Optimizer
+import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo
 import Test.Compilation.Util (gf181Info)
 import Test.HUnit (assertFailure)
@@ -21,12 +21,15 @@ import Test.Hspec
 --------------------------------------------------------------------------------
 
 -- | Returns the original and optimized constraint system
-executeGF181 :: Encode t => Comp t -> IO (ConstraintModule (N GF181), ConstraintModule (N GF181))
-executeGF181 program = do
-  cm <- case compile gf181Info program of
+executeGF181WithOpts :: (Encode t) => Options -> Comp t -> IO (ConstraintModule (N GF181), ConstraintModule (N GF181))
+executeGF181WithOpts options program = do
+  let optionsO0 = options {optOptimize = False}
+  -- without optimization
+  cm <- case compileWithOpts optionsO0 program of
     Left err -> assertFailure $ show err
     Right result -> return result
 
+  -- with optimization
   case optimize cm of
     Left err -> assertFailure $ show err
     Right cm' -> do
@@ -34,12 +37,18 @@ executeGF181 program = do
       cmCounters cm `shouldBe` cmCounters cm'
       return (cm, cm')
 
+executeGF181 :: (Encode t) => Comp t -> IO (ConstraintModule (N GF181), ConstraintModule (N GF181))
+executeGF181 = executeGF181WithOpts (defaultOptions {optFieldInfo = gf181Info})
+
+executeGF181' :: (Encode t) => Comp t -> IO (ConstraintModule (N GF181), ConstraintModule (N GF181))
+executeGF181' = executeGF181WithOpts (defaultOptions {optFieldInfo = gf181Info, optUseNewLinker = True})
+
 -- | Returns the original and optimized constraint system
 executePrime :: (Encode t, GaloisField n, Integral n) => Integer -> Comp t -> IO (ConstraintModule n, ConstraintModule n)
 executePrime n program = caseFieldType (Prime n) handlePrime undefined
   where
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
-      cm <- case compile (fieldInfo :: FieldInfo) program of
+      cm <- case compileWithOpts (defaultOptions {optFieldInfo = fieldInfo, optOptimize = False}) program of
         Left err -> assertFailure $ show err
         Right result -> return result
       case optimize cm of
@@ -54,7 +63,7 @@ executeBinary :: (Encode t, GaloisField n, Integral n) => Integer -> Comp t -> I
 executeBinary n program = caseFieldType (Binary n) undefined handleBinary
   where
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
-      cm <- case compile (fieldInfo :: FieldInfo) program of
+      cm <- case compileWithOpts (defaultOptions {optFieldInfo = fieldInfo, optOptimize = False}) program of
         Left err -> assertFailure $ show err
         Right result -> return result
       case optimize cm of
@@ -65,13 +74,10 @@ executeBinary n program = caseFieldType (Binary n) undefined handleBinary
           return (cm, cm')
 
 shouldHaveSize :: ConstraintModule (N GF181) -> Int -> IO ()
-shouldHaveSize cm expectedBeforeSize = do
+shouldHaveSize cm expecteds = do
   -- compare the number of constraints
-  let actualBeforeSize = ConstraintSystem.numberOfConstraints (Linker.linkConstraintModule cm)
-  actualBeforeSize `shouldBe` expectedBeforeSize
-
-compile :: (Encode t, GaloisField n, Integral n) => FieldInfo -> Comp t -> Either (Error n) (ConstraintModule n)
-compile fieldInfo = Compiler.elaborateAndEncode >=> Compiler.compileO0Elab fieldInfo
+  let actual = ConstraintSystem.numberOfConstraints (Linker.linkConstraintModule cm)
+  actual `shouldBe` expecteds
 
 optimize :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Error n) (ConstraintModule n)
 optimize = left Compiler.CompilerError . Optimizer.run
