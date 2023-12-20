@@ -6,6 +6,7 @@ module Test.Compilation.Util
     debugWithOpts,
     debug,
     debugO0,
+    testCompilerWithOpts,
     testCompiler,
     runSolver,
     runSolverO0,
@@ -50,17 +51,12 @@ solveR1CSWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t 
 solveR1CSWithOpts options prog rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS <$> Compiler.compileAndLinkWithOpts options prog
   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
-  case Solver.run r1cs inputs of
+  case Solver.run options r1cs inputs of
     Left err -> Left (SolverError err)
     Right (outputs, _) -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
 
 solveR1CS :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-solveR1CS fieldInfo prog rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS <$> Compiler.compileAndLinkO1 fieldInfo prog
-  inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
-  case Solver.run r1cs inputs of
-    Left err -> Left (SolverError err)
-    Right (outputs, _) -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
+solveR1CS fieldInfo = solveR1CSWithOpts (defaultOptions {optFieldInfo = fieldInfo})
 
 -- | Generate R1CS witness solver report (on optimized R1CS)
 solveR1CSCollectLog :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
@@ -75,12 +71,7 @@ solveR1CSCollectLog fieldInfo prog rawPublicInputs rawPrivateInputs = case do
 
 -- | R1CS witness solver (on unoptimized R1CS)
 solveR1CSO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-solveR1CSO0 fieldInfo prog rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS <$> Compiler.compileAndLinkO0 fieldInfo prog
-  inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
-  case Solver.run r1cs inputs of
-    Left err -> Left (SolverError err)
-    Right (outputs, _) -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
+solveR1CSO0 fieldInfo = solveR1CSWithOpts (defaultOptions {optFieldInfo = fieldInfo, optOptimize = False})
 
 -- | Generate R1CS witness solver report (on unoptimized R1CS)
 solveR1CSCollectLogO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))

@@ -150,7 +150,7 @@ generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   r1cs <- toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elab
   let counters = r1csCounters r1cs
   inputs <- left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
-  (outputs, witness) <- left SolverError (Solver.run r1cs inputs)
+  (outputs, witness) <- left SolverError (Solver.run defaultOptions r1cs inputs)
   return (counters, outputs, witness)
 
 -- | Compile an elaborated program to a constraint module with options

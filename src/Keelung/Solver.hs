@@ -19,6 +19,7 @@ import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Keelung hiding (witness)
+import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
@@ -31,16 +32,16 @@ import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
 
 -- | Execute the R1CS solver
-run :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
-run r1cs inputs = fst (run' False r1cs inputs)
+run :: (GaloisField n, Integral n) => Options -> R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
+run options r1cs inputs = fst (run' False options r1cs inputs)
 
 -- | Like `run`, but with debug logs
 debug :: (GaloisField n, Integral n) => R1CS n -> Inputs n -> (Either (Error n) (Vector n, Vector n), Maybe (LogReport n))
-debug = run' True
+debug = run' True defaultOptions
 
 -- | Returns (interpreted outputs, witnesses, log)s
-run' :: (GaloisField n, Integral n) => Bool -> R1CS n -> Inputs n -> (Either (Error n) (Vector n, Vector n), Maybe (LogReport n))
-run' debugMode r1cs inputs = do
+run' :: (GaloisField n, Integral n) => Bool -> Options -> R1CS n -> Inputs n -> (Either (Error n) (Vector n, Vector n), Maybe (LogReport n))
+run' debugMode _options r1cs inputs = do
   let booleanConstraintCategories = [(Output, ReadBool), (Output, ReadAllUInts), (PublicInput, ReadBool), (PublicInput, ReadAllUInts), (PrivateInput, ReadBool), (PrivateInput, ReadAllUInts), (Intermediate, ReadBool), (Intermediate, ReadAllUInts)]
   let boolVarRanges = getRanges (r1csCounters r1cs) booleanConstraintCategories
   case fromOrdinaryConstraints r1cs of

@@ -43,7 +43,9 @@ tests = describe "Experiment" $ do
             x <- input Public :: Comp (UInt 8)
             y <- input Public :: Comp (UInt 8)
             return $ x * y
-      debugWithOpts (defaultOptions { optUseNewLinker = False }) (Prime 257) program
+      let options = defaultOptions { optUseNewLinker = True }
+      debugWithOpts options (Prime 257) program
+      -- testCompilerWithOpts options (Prime 257) program [2, 2] [] [4]
       -- testCompiler (Prime 257) program [2, 2] [] [4]
       -- runSolver (Prime 257) program [2, 2] []
 
