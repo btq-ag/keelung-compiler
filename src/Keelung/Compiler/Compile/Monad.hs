@@ -39,7 +39,7 @@ runM options compilers counters program =
   runExcept
     ( execStateT
         (runReaderT program compilers)
-        (ConstraintModule options counters OccurF.new (OccurB.new False) OccurU.new OccurUB.new Relations.new mempty mempty mempty mempty mempty mempty)
+        (ConstraintModule options (tempSetFlag counters (optUseNewLinker options)) OccurF.new (OccurB.new False) OccurU.new OccurUB.new Relations.new mempty mempty mempty mempty mempty mempty)
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -63,8 +63,14 @@ freshRefU :: Width -> M n RefU
 freshRefU width = do
   counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadUInt width)
-  modifyCounter $ addCount (Intermediate, WriteUInt width) 1
-  return $ RefUX width index
+  useNewLinker <- gets (optUseNewLinker . cmOptions)
+  if useNewLinker 
+    then do 
+      modifyCounter $ addCount (Intermediate, WriteUInt width) width
+      return $ RefUX width (index `div` width)
+    else do 
+      modifyCounter $ addCount (Intermediate, WriteUInt width) 1
+      return $ RefUX width index
 
 --------------------------------------------------------------------------------
 
