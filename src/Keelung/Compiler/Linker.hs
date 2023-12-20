@@ -67,7 +67,10 @@ linkConstraintModule cm =
     }
   where
     !env = constructEnv (cmOptions cm) (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
-    !counters = updateCounters env (cmCounters cm)
+    !counters =
+      if envUseNewLinker env
+        then updateCountersNew env (cmCounters cm)
+        else updateCountersOld env (cmCounters cm)
     uncurry3 f (a, b, c) = f a b c
 
     -- fieldWidth = FieldInfo.fieldWidth ((optFieldInfo . cmOptions) cm)
@@ -243,22 +246,22 @@ linkConstraint env (CMulL as bs cs) =
       )
   ]
 
-updateCounters :: Env -> Counters -> Counters
-updateCounters env counters =
-  let reducedFX = (WriteField, getCount counters (Intermediate, ReadField) - IntSet.size (envRefFsInEnvF env))
-      reducedBX = (WriteBool, getCount counters (Intermediate, ReadBool) - IntSet.size (envRefBsInEnvB env))
-      reducedUXs =
+updateCountersOld :: Env -> Counters -> Counters
+updateCountersOld env counters =
+  let newFXCount = (WriteField, IntSet.size (envRefFsInEnvF env))
+      newBXCount = (WriteBool, IntSet.size (envRefBsInEnvB env))
+      newUXCounts =
         if envUseNewLinker env
-          then
-            IntMap.mapWithKey
-              ( \width table ->
-                  let original = getCount counters (Intermediate, ReadUInt width) -- thie is the number of UInt variables used before optimization & linking (regardless of width)
-                      current = IntervalTable.size table -- this is the number of bits used after optimization & linking
-                   in (WriteUInt width, original - current)
-              )
-              (envRefBsInEnvUB env)
-          else IntMap.mapWithKey (\width set -> (WriteUInt width, getCount counters (Intermediate, ReadUInt width) - IntSet.size set)) (envRefUsInEnvU env)
-   in foldr (\(selector, reducedAmount) -> addCount (Intermediate, selector) (-reducedAmount)) counters $ reducedFX : reducedBX : IntMap.elems reducedUXs
+          then IntMap.mapWithKey (\width table -> (WriteUInt width, IntervalTable.size table)) (envRefBsInEnvUB env)
+          else IntMap.mapWithKey (\width set -> (WriteUInt width, IntSet.size set)) (envRefUsInEnvU env)
+      actions = newFXCount : newBXCount : IntMap.elems newUXCounts
+   in foldr (\(selector, count) -> setCount (Intermediate, selector) count) counters actions
+
+updateCountersNew :: Env -> Counters -> Counters
+updateCountersNew env =
+  setCount (Intermediate, WriteField) (IntSet.size (envRefFsInEnvF env))
+    . setCount (Intermediate, WriteBool) (IntSet.size (envRefBsInEnvB env))
+    . setCountOfIntermediateUIntBits (fmap IntervalTable.size (envRefBsInEnvUB env))
 
 --------------------------------------------------------------------------------
 

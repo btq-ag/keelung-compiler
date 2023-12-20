@@ -56,7 +56,7 @@ tests = describe "Experiment" $ do
           x <- inputUInt Public :: Comp (UInt 4)
           return $ (x .|. 3) !!! 2
     debugWithOpts options gf181 program
-    -- testCompilerWithOpts options gf181 program [3] [] [0]
+    testCompilerWithOpts options gf181 program [3] [] [0]
     -- testCompilerWithOpts options gf181 program [5] [] [1]
 
 
