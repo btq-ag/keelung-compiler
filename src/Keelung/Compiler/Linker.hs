@@ -122,16 +122,27 @@ linkConstraintModule cm =
           _ -> True -- it's a pinned UInt variable
         else refUShouldBeKept (lmbRef limb)
 
+    refUBitShouldBeKept :: RefU -> Int -> Bool
+    refUBitShouldBeKept refU i = case refU of
+      RefUX width var ->
+        if envUseNewLinker env
+          then case IntMap.lookup width (envRefBsInEnvUB env) of
+            Nothing -> False
+            Just table -> IntervalTable.member (width * var + i, width * var + i + 1) table
+          else refUShouldBeKept refU
+      _ -> True -- it's a pinned UInt variable
     refBShouldBeKept :: RefB -> Bool
     refBShouldBeKept ref = case ref of
       RefBX var ->
         --  it's a Boolean intermediate variable that occurs in the circuit
         var `IntSet.member` envRefBsInEnvB env
       -- \|| RefBX var `Set.member` refBsInEnvF env
-      RefUBit _ var _ ->
-        --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
-        --  the UInt variable should be kept
-        refUShouldBeKept var
+      RefUBit _ var i ->
+        if envUseNewLinker env
+          then refUBitShouldBeKept var i
+          else --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
+          --  the UInt variable should be kept
+            refUShouldBeKept var
       _ ->
         -- it's a pinned Field variable
         True

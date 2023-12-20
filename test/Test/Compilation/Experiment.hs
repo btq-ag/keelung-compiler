@@ -38,16 +38,27 @@ tests = describe "Experiment" $ do
     --   --   testCompiler gf181 program [fromIntegral x] [] [fromIntegral x]
 
 
-  it "should reveal variable layout" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 8)
-            y <- input Public :: Comp (UInt 8)
-            return $ x + y
-      let options = defaultOptions { optUseNewLinker = True }
-      debugWithOpts options (Binary 283) program
-      -- testCompilerWithOpts options (Binary 7) program [2, 2] [] [4]
-      -- testCompiler (Prime 257) program [2, 2] [] [4]
-      -- runSolver (Prime 257) program [2, 2] []
+  -- it "should reveal variable layout" $ do
+  --     let program = do
+  --           x <- input Public :: Comp (UInt 8)
+  --           y <- input Public :: Comp (UInt 8)
+  --           return $ x + y
+  --     let options = defaultOptions { optUseNewLinker = True }
+  --     debugWithOpts options (Binary 283) program
+  --     -- testCompilerWithOpts options (Binary 7) program [2, 2] [] [4]
+  --     -- testCompiler (Prime 257) program [2, 2] [] [4]
+  --     -- runSolver (Prime 257) program [2, 2] []
+
+  let options = defaultOptions { optUseNewLinker = True }
+
+  it "or 2" $ do
+    let program = do
+          x <- inputUInt Public :: Comp (UInt 4)
+          return $ (x .|. 3) !!! 2
+    debugWithOpts options gf181 program
+    -- testCompilerWithOpts options gf181 program [3] [] [0]
+    -- testCompilerWithOpts options gf181 program [5] [] [1]
+
 
   -- it "should reveal variable layout" $ do
   --   let program = do

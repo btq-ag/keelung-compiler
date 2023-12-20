@@ -21,43 +21,36 @@ tests :: SpecWith ()
 tests = describe "Bitwise" $ do
   describe "rotate" $ do
     describe "constant / byte" $ do
-      let program constant i = do
-            return $ rotate (constant :: UInt 8) i
+      let program constant i = return $ rotate (constant :: UInt 8) i
 
-      it "GF181" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.rotate x i]
-          testCompiler gf181 (program (fromIntegral x) i) [] [] expected
+      it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.rotate x i)]
+        testCompiler gf181 (program (fromIntegral x) i) [] [] expected
 
-      it "Prime 2" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.rotate x i]
-          testCompiler (Prime 2) (program (fromIntegral x) i) [] [] expected
+      it "Prime 2" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.rotate x i)]
+        testCompiler (Prime 2) (program (fromIntegral x) i) [] [] expected
 
-      it "Binary 7" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.rotate x i]
-          testCompiler (Binary 7) (program (fromIntegral x) i) [] [] expected
+      it "Binary 7" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.rotate x i)]
+        testCompiler (Binary 7) (program (fromIntegral x) i) [] [] expected
 
     describe "variable / byte" $ do
       let program i = do
             x <- inputUInt @8 Public
             return $ rotate x i
 
-      it "GF181" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.rotate x i]
-          testCompiler gf181 (program i) (map toInteger [x]) [] expected
+      it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.rotate x i)]
+        testCompiler gf181 (program i) [toInteger x] [] expected
 
-      it "Prime 2" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.rotate x i]
-          testCompiler (Prime 2) (program i) (map toInteger [x]) [] expected
+      it "Prime 2" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.rotate x i)]
+        testCompiler (Prime 2) (program i) [toInteger x] [] expected
 
-      it "Binary 7" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.rotate x i]
-          testCompiler (Binary 7) (program i) (map toInteger [x]) [] expected
+      it "Binary 7" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.rotate x i)]
+        testCompiler (Binary 7) (program i) [toInteger x] [] expected
 
     it "misc" $ do
       let program = do
@@ -72,43 +65,36 @@ tests = describe "Bitwise" $ do
 
   describe "shift" $ do
     describe "constant / byte" $ do
-      let program constant i = do
-            return $ shift (constant :: UInt 8) i
+      let program constant i = return $ shift (constant :: UInt 8) i
 
-      it "GF181" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.shift x i]
-          testCompiler gf181 (program (fromIntegral x) i) [] [] expected
+      it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.shift x i)]
+        testCompiler gf181 (program (fromIntegral x) i) [] [] expected
 
-      it "Prime 2" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.shift x i]
-          testCompiler (Prime 2) (program (fromIntegral x) i) [] [] expected
+      it "Prime 2" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.shift x i)]
+        testCompiler (Prime 2) (program (fromIntegral x) i) [] [] expected
 
-      it "Binary 7" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.shift x i]
-          testCompiler (Binary 7) (program (fromIntegral x) i) [] [] expected
+      it "Binary 7" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.shift x i)]
+        testCompiler (Binary 7) (program (fromIntegral x) i) [] [] expected
 
     describe "variable / byte" $ do
       let program i = do
             x <- inputUInt @8 Public
             return $ shift x i
 
-      it "GF181" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.shift x i]
-          testCompiler gf181 (program i) (map toInteger [x]) [] expected
+      it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.shift x i)]
+        testCompiler gf181 (program i) [toInteger x] [] expected
 
-      it "Prime 2" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.shift x i]
-          testCompiler (Prime 2) (program i) (map toInteger [x]) [] expected
+      it "Prime 2" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.shift x i)]
+        testCompiler (Prime 2) (program i) [toInteger x] [] expected
 
-      it "Binary 7" $ do
-        property $ \(i :: Int, x :: Word8) -> do
-          let expected = map toInteger [Data.Bits.shift x i]
-          testCompiler (Binary 7) (program i) (map toInteger [x]) [] expected
+      it "Binary 7" $ property $ \(i :: Int, x :: Word8) -> do
+        let expected = [toInteger (Data.Bits.shift x i)]
+        testCompiler (Binary 7) (program i) [toInteger x] [] expected
 
     it "misc" $ do
       let program = do
