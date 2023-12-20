@@ -23,17 +23,16 @@ import Keelung.Syntax.Counters
 deserializeBinReps :: (GaloisField n, Integral n) => Counters -> Vector n -> Vector Integer
 deserializeBinReps counters outputs =
   let sliceBits (width, count) =
-        let offset = reindex counters Output (ReadUInt width) 0
+        let offset = getOffset counters (Output, ReadUInt width)
          in [Vec.slice (offset + width * index) width outputs | index <- [0 .. count - 1]]
       binRepRanges = IntMap.toList (getUIntMap counters Output)
       bitArrays = concatMap sliceBits binRepRanges
       (start, _) = getRange counters (Output, ReadAllUInts)
       beforeBinReps = Vec.take start outputs
    in Vec.map toInteger beforeBinReps <> Vec.fromList (map (packBits . toList) bitArrays)
-
-   where 
-      packBits :: (GaloisField n, Integral n) => [n] -> Integer
-      packBits = foldr (\x acc -> toInteger x + Data.Bits.shiftL acc 1) 0
+  where
+    packBits :: (GaloisField n, Integral n) => [n] -> Integer
+    packBits = foldr (\x acc -> toInteger x + Data.Bits.shiftL acc 1) 0
 
 -- | Data structure for holding structured inputs
 data Inputs n = Inputs

@@ -52,7 +52,7 @@ import Keelung.Syntax.Counters
 linkConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintSystem n
 linkConstraintModule cm =
   ConstraintSystem
-    { csField = optFieldInfo (cmOptions cm),
+    { csOptions = cmOptions cm,
       csCounters = counters,
       csConstraints =
         varEqFs

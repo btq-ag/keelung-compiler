@@ -10,8 +10,8 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.Sequence (Seq)
 import GHC.Generics (Generic)
+import Keelung.Compiler.Options
 import Keelung.Constraint.R1C (R1C (..))
-import Keelung.Data.FieldInfo
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field
@@ -28,7 +28,7 @@ data Constraint n
   | CMul !(Poly n) !(Poly n) !(Either n (Poly n))
   deriving (Generic, NFData)
 
-instance GaloisField n => Eq (Constraint n) where
+instance (GaloisField n) => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
     (CAdd x, CAdd y) -> x == y
     (CMul x y z, CMul u v w) ->
@@ -41,13 +41,13 @@ instance Functor Constraint where
   fmap f (CMul x y (Right z)) = CMul (fmap f x) (fmap f y) (Right (fmap f z))
 
 -- | Smart constructor for the CAdd constraint
-cadd :: GaloisField n => n -> [(Var, n)] -> [Constraint n]
+cadd :: (GaloisField n) => n -> [(Var, n)] -> [Constraint n]
 cadd !c !xs = map CAdd $ case Poly.buildEither c xs of
   Left _ -> []
   Right xs' -> [xs']
 
 -- | Smart constructor for the CAdd constraint
-cmul :: GaloisField n => [(Var, n)] -> [(Var, n)] -> (n, [(Var, n)]) -> [Constraint n]
+cmul :: (GaloisField n) => [(Var, n)] -> [(Var, n)] -> (n, [(Var, n)]) -> [Constraint n]
 cmul !xs !ys (c, zs) = case ( do
                                 xs' <- Poly.buildEither 0 xs
                                 ys' <- Poly.buildEither 0 ys
@@ -60,7 +60,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAdd xs) = show xs <> " = 0"
   show (CMul aV bV cV) = show (R1C (Right aV) (Right bV) cV)
 
-instance GaloisField n => Ord (Constraint n) where
+instance (GaloisField n) => Ord (Constraint n) where
   {-# SPECIALIZE instance Ord (Constraint GF181) #-}
 
   -- CMul
@@ -87,8 +87,9 @@ type Limbs = [(Width, Either Var Integer)]
 
 -- | Linked Constraint System
 data ConstraintSystem n = ConstraintSystem
-  { -- | Constraints
-    csField :: FieldInfo,
+  { -- options
+    csOptions :: Options,
+    -- | Constraints
     csConstraints :: !(Seq (Constraint n)),
     csCounters :: Counters,
     csEqZeros :: [(Poly n, Var)],
@@ -110,7 +111,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
       <> prettyVariables counters
       <> "\n}"
 
-prettyConstraints :: Show constraint => Counters -> [constraint] -> String
+prettyConstraints :: (Show constraint) => Counters -> [constraint] -> String
 prettyConstraints counters cs =
   showConstraintSummary
     <> showOrdinaryConstraints

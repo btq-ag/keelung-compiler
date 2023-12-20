@@ -372,7 +372,7 @@ instance (GaloisField n, Integral n) => InterpretU SideEffect n where
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
 
-instance GaloisField n => InterpretB Bool n where
+instance (GaloisField n) => InterpretB Bool n where
   interpretB True = return [one]
   interpretB False = return [zero]
 
@@ -503,7 +503,7 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
 
 --------------------------------------------------------------------------------
 
-instance GaloisField n => Interpret () n where
+instance (GaloisField n) => Interpret () n where
   interpret val = case val of
     () -> return []
 
