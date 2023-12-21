@@ -7,6 +7,7 @@ import Keelung
 import Test.Compilation.Util
 import Test.Hspec
 import Keelung.Compiler.Options
+import Control.Monad (forM_, replicateM)
 -- import Test.QuickCheck
 
 run :: IO ()
@@ -51,12 +52,23 @@ tests = describe "Experiment" $ do
 
   let options = defaultOptions { optUseNewLinker = True }
 
-  it "or 2" $ do
-    let program = do
-          x <- inputUInt Public :: Comp (UInt 4)
-          return $ (x .|. 3) !!! 2
-    debugWithOpts options gf181 program
-    testCompilerWithOpts options gf181 program [3] [] [0]
+  it "more than 4 variables + constant" $ do
+    let program constant n = do
+          xs <- replicateM n (inputBool Public)
+          return $ foldl (.^.) (if constant then true else false) xs
+    -- let inputs = [1,0,1,1,1,1,1,1,1,1,0,1,0,0,1,1,0]
+    -- let expected = [1]
+    forM_ [Prime 11] $ \field -> do
+    -- forM_ [gf181, Prime 2, Prime 13, Prime 257, Binary 7] $ \field -> do
+      debugWithOpts options field (program True 17)
+      -- testCompilerWithOpts options field (program True 17) inputs [] expected
+
+  -- it "or 2" $ do
+  --   let program = do
+  --         x <- inputUInt Public :: Comp (UInt 4)
+  --         return $ (x .|. 3) !!! 2
+  --   debugWithOpts options gf181 program
+  --   testCompilerWithOpts options gf181 program [3] [] [0]
     -- testCompilerWithOpts options gf181 program [5] [] [1]
 
 

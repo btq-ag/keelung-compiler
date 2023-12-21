@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 
-module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Env, constructEnv) where
+module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Env, constructEnv, updateCounters) where
 
 import Data.Bifunctor (Bifunctor (bimap, first))
 import Data.Bits qualified
@@ -53,7 +53,7 @@ linkConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> Con
 linkConstraintModule cm =
   ConstraintSystem
     { csOptions = cmOptions cm,
-      csCounters = counters,
+      csCounters = updateCounters cm,
       csConstraints =
         varEqFs
           <> varEqLs
@@ -66,11 +66,10 @@ linkConstraintModule cm =
       csModInvs = map (\(a, b, c, d) -> ([a], [b], [c], d)) modInvs
     }
   where
+    -- new counters after linking
+    -- !counters = updateCounters cm
+
     !env = constructEnv (cmOptions cm) (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
-    !counters =
-      if envUseNewLinker env
-        then updateCountersNew env (cmCounters cm)
-        else updateCountersOld env (cmCounters cm)
     uncurry3 f (a, b, c) = f a b c
 
     -- fieldWidth = FieldInfo.fieldWidth ((optFieldInfo . cmOptions) cm)
@@ -246,22 +245,25 @@ linkConstraint env (CMulL as bs cs) =
       )
   ]
 
-updateCountersOld :: Env -> Counters -> Counters
-updateCountersOld env counters =
-  let newFXCount = (WriteField, IntSet.size (envRefFsInEnvF env))
-      newBXCount = (WriteBool, IntSet.size (envRefBsInEnvB env))
-      newUXCounts =
-        if envUseNewLinker env
-          then IntMap.mapWithKey (\width table -> (WriteUInt width, IntervalTable.size table)) (envRefBsInEnvUB env)
-          else IntMap.mapWithKey (\width set -> (WriteUInt width, IntSet.size set)) (envRefUsInEnvU env)
-      actions = newFXCount : newBXCount : IntMap.elems newUXCounts
-   in foldr (\(selector, count) -> setCount (Intermediate, selector) count) counters actions
+updateCounters :: ConstraintModule n -> Counters
+updateCounters cm = 
+  if optUseNewLinker (cmOptions cm)
+    then updateCountersNew (OccurF.occuredSet (cmOccurrenceF cm)) (OccurB.occuredSet (cmOccurrenceB cm)) (OccurUB.toIntervalTables (cmOccurrenceUB cm)) (cmCounters cm)
+    else updateCountersOld (OccurF.occuredSet (cmOccurrenceF cm)) (OccurB.occuredSet (cmOccurrenceB cm)) (OccurU.occuredSet (cmOccurrenceU cm)) (cmCounters cm)
+  where 
+      updateCountersOld :: IntSet -> IntSet -> IntMap IntSet -> Counters -> Counters
+      updateCountersOld refFsInEnvF refBsInEnvB refUsInEnvU counters =
+        let newFXCount = (WriteField, IntSet.size refFsInEnvF)
+            newBXCount = (WriteBool, IntSet.size refBsInEnvB)
+            newUXCounts = IntMap.mapWithKey (\width set -> (WriteUInt width, IntSet.size set)) refUsInEnvU
+            actions = newFXCount : newBXCount : IntMap.elems newUXCounts
+        in foldr (\(selector, count) -> setCount (Intermediate, selector) count) counters actions
 
-updateCountersNew :: Env -> Counters -> Counters
-updateCountersNew env =
-  setCount (Intermediate, WriteField) (IntSet.size (envRefFsInEnvF env))
-    . setCount (Intermediate, WriteBool) (IntSet.size (envRefBsInEnvB env))
-    . setCountOfIntermediateUIntBits (fmap IntervalTable.size (envRefBsInEnvUB env))
+      updateCountersNew :: IntSet -> IntSet -> IntMap IntervalTable -> Counters -> Counters
+      updateCountersNew refFsInEnvF refBsInEnvB refBsInEnvUB =
+        setCount (Intermediate, WriteField) (IntSet.size refFsInEnvF)
+          . setCount (Intermediate, WriteBool) (IntSet.size refBsInEnvB)
+          . setCountOfIntermediateUIntBits (fmap IntervalTable.size refBsInEnvUB)
 
 --------------------------------------------------------------------------------
 
@@ -380,3 +382,4 @@ constructEnv options counters occurF occurB occurU occurUB =
           envFieldWidth = FieldInfo.fieldWidth (optFieldInfo options),
           envUseNewLinker = optUseNewLinker options
         }
+
