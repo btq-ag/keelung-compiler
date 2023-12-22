@@ -40,19 +40,5 @@ defaultOptions =
 buildOptionsWithFieldType :: FieldType -> IO Options
 buildOptionsWithFieldType fieldType = caseFieldType fieldType handlePrime handleBinary
   where
-    handlePrime (_ :: Proxy (Prime n)) fieldInfo =
-      return $
-        Options
-          { optFieldInfo = fieldInfo,
-            optConstProp = True,
-            optOptimize = True,
-            optUseNewLinker = False
-          }
-    handleBinary (_ :: Proxy (Binary n)) fieldInfo =
-      return $
-        Options
-          { optFieldInfo = fieldInfo,
-            optConstProp = True,
-            optOptimize = True,
-            optUseNewLinker = False
-          }
+    handlePrime (_ :: Proxy (Prime n)) fieldInfo = return $ defaultOptions {optFieldInfo = fieldInfo}
+    handleBinary (_ :: Proxy (Binary n)) fieldInfo = return $ defaultOptions {optFieldInfo = fieldInfo}
