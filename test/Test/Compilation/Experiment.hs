@@ -56,12 +56,12 @@ tests = describe "Experiment" $ do
     let program constant n = do
           xs <- replicateM n (inputBool Public)
           return $ foldl (.^.) (if constant then true else false) xs
-    -- let inputs = [1,0,1,1,1,1,1,1,1,1,0,1,0,0,1,1,0]
-    -- let expected = [1]
-    forM_ [Prime 11] $ \field -> do
-    -- forM_ [gf181, Prime 2, Prime 13, Prime 257, Binary 7] $ \field -> do
-      debugWithOpts options field (program True 17)
-      -- testCompilerWithOpts options field (program True 17) inputs [] expected
+    let inputs = [1,0,1,1,1,1,1,1,1,1,0,1,0,0,1,1,0]
+    let expected = [1]
+    -- forM_ [Prime 11] $ \field -> do
+    forM_ [gf181, Prime 2, Prime 13, Prime 257, Binary 7] $ \field -> do
+      -- debugWithOpts options field (program True 17)
+      testCompilerWithOpts options field (program True 17) inputs [] expected
 
   -- it "or 2" $ do
   --   let program = do

@@ -53,7 +53,7 @@ linkConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> Con
 linkConstraintModule cm =
   ConstraintSystem
     { csOptions = cmOptions cm,
-      csCounters = updateCounters cm,
+      csCounters = counters,
       csConstraints =
         varEqFs
           <> varEqLs
@@ -67,9 +67,9 @@ linkConstraintModule cm =
     }
   where
     -- new counters after linking
-    -- !counters = updateCounters cm
+    !counters = updateCounters cm
 
-    !env = constructEnv (cmOptions cm) (cmCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
+    !env = constructEnv (cmOptions cm) (cmCounters cm) counters (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
     uncurry3 f (a, b, c) = f a b c
 
     -- fieldWidth = FieldInfo.fieldWidth ((optFieldInfo . cmOptions) cm)
@@ -311,30 +311,30 @@ reindexLimb env limb multiplier = case lmbSigns limb of
       ]
 
 reindexRefF :: Env -> RefF -> Var
-reindexRefF env (RefFO x) = x + getOffset (envCounters env) (Output, ReadField)
-reindexRefF env (RefFI x) = x + getOffset (envCounters env) (PublicInput, ReadField)
-reindexRefF env (RefFP x) = x + getOffset (envCounters env) (PrivateInput, ReadField)
-reindexRefF env (RefFX x) = IntervalTable.reindex (envIndexTableF env) x + getOffset (envCounters env) (Intermediate, ReadField)
+reindexRefF env (RefFO x) = x + getOffset (envOldCounters env) (Output, ReadField)
+reindexRefF env (RefFI x) = x + getOffset (envOldCounters env) (PublicInput, ReadField)
+reindexRefF env (RefFP x) = x + getOffset (envOldCounters env) (PrivateInput, ReadField)
+reindexRefF env (RefFX x) = IntervalTable.reindex (envIndexTableF env) x + getOffset (envOldCounters env) (Intermediate, ReadField)
 
 reindexRefB :: Env -> RefB -> Var
-reindexRefB env (RefBO x) = x + getOffset (envCounters env) (Output, ReadBool)
-reindexRefB env (RefBI x) = x + getOffset (envCounters env) (PublicInput, ReadBool)
-reindexRefB env (RefBP x) = x + getOffset (envCounters env) (PrivateInput, ReadBool)
-reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (envCounters env) (Intermediate, ReadBool)
+reindexRefB env (RefBO x) = x + getOffset (envOldCounters env) (Output, ReadBool)
+reindexRefB env (RefBI x) = x + getOffset (envOldCounters env) (PublicInput, ReadBool)
+reindexRefB env (RefBP x) = x + getOffset (envOldCounters env) (PrivateInput, ReadBool)
+reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (envOldCounters env) (Intermediate, ReadBool)
 reindexRefB env (RefUBit _ x i) = reindexRefU env x i
 
 reindexRefU :: Env -> RefU -> Int -> Var
-reindexRefU env (RefUO w x) i = w * x + (i `mod` w) + getOffset (envCounters env) (Output, ReadAllUInts)
-reindexRefU env (RefUI w x) i = w * x + (i `mod` w) + getOffset (envCounters env) (PublicInput, ReadAllUInts)
-reindexRefU env (RefUP w x) i = w * x + (i `mod` w) + getOffset (envCounters env) (PrivateInput, ReadAllUInts)
+reindexRefU env (RefUO w x) i = w * x + (i `mod` w) + getOffset (envOldCounters env) (Output, ReadAllUInts)
+reindexRefU env (RefUI w x) i = w * x + (i `mod` w) + getOffset (envOldCounters env) (PublicInput, ReadAllUInts)
+reindexRefU env (RefUP w x) i = w * x + (i `mod` w) + getOffset (envOldCounters env) (PrivateInput, ReadAllUInts)
 reindexRefU env (RefUX w x) i =
   let result =
         if envUseNewLinker env
           then case IntMap.lookup w (envIndexTableUBWithOffsets env) of
             Nothing -> error "[ panic ] reindexRefU: impossible"
-            Just (offset, table) -> IntervalTable.reindex table (w * x + (i `mod` w)) + offset + getOffset (envCounters env) (Intermediate, ReadAllUInts)
+            Just (offset, table) -> IntervalTable.reindex table (w * x + (i `mod` w)) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
           else
-            let offset = getOffset (envCounters env) (Intermediate, ReadUInt w) + w * x
+            let offset = getOffset (envOldCounters env) (Intermediate, ReadUInt w) + w * x
              in IntervalTable.reindex (envIndexTable env) (offset - envPinnedSize env) + envPinnedSize env + (i `mod` w)
    in result
 
@@ -342,7 +342,8 @@ reindexRefU env (RefUX w x) i =
 
 -- | Allow us to determine which relations should be extracted from the pool
 data Env = Env
-  { envCounters :: !Counters,
+  { envOldCounters :: !Counters,
+    envNewCounters :: !Counters,
     envRefFsInEnvF :: !IntSet,
     envRefBsInEnvB :: !IntSet,
     envRefUsInEnvU :: !(IntMap IntSet),
@@ -361,23 +362,24 @@ data Env = Env
   deriving (Show)
 
 -- | Smart constructor for 'Env'
-constructEnv :: Options -> Counters -> OccurF -> OccurB -> OccurU -> OccurUB -> Env
-constructEnv options counters occurF occurB occurU occurUB =
+constructEnv :: Options -> Counters -> Counters -> OccurF -> OccurB -> OccurU -> OccurUB -> Env
+constructEnv options oldCounters newCounters occurF occurB occurU occurUB =
   let tablesUB = OccurUB.toIntervalTables occurUB
    in Env
-        { envCounters = counters,
+        { envOldCounters = oldCounters,
+          envNewCounters = newCounters,
           envRefFsInEnvF = OccurF.occuredSet occurF,
           envRefBsInEnvB = OccurB.occuredSet occurB,
           envRefUsInEnvU = OccurU.occuredSet occurU,
           envRefBsInEnvUB = tablesUB,
-          envIndexTableF = OccurF.toIntervalTable counters occurF,
-          envIndexTableB = OccurB.toIntervalTable counters occurB,
+          envIndexTableF = OccurF.toIntervalTable oldCounters occurF,
+          envIndexTableB = OccurB.toIntervalTable oldCounters occurB,
           envIndexTableUBWithOffsets = OccurUB.toIntervalTablesWithOffsets occurUB,
           envIndexTable =
-            OccurF.toIntervalTable counters occurF
-              <> OccurB.toIntervalTable counters occurB
-              <> OccurU.toIntervalTable counters occurU,
-          envPinnedSize = getCount counters Output + getCount counters PublicInput + getCount counters PrivateInput,
+            OccurF.toIntervalTable oldCounters occurF
+              <> OccurB.toIntervalTable oldCounters occurB
+              <> OccurU.toIntervalTable oldCounters occurU,
+          envPinnedSize = getCount oldCounters Output + getCount oldCounters PublicInput + getCount oldCounters PrivateInput,
           envFieldInfo = optFieldInfo options,
           envFieldWidth = FieldInfo.fieldWidth (optFieldInfo options),
           envUseNewLinker = optUseNewLinker options
