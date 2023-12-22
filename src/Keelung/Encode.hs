@@ -3,7 +3,7 @@
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 
-module Encode (versionString, serializeR1CS, serializeInputAndWitness, serializeInputAndWitnessToBin) where
+module Keelung.Encode (versionString, serializeR1CS, serializeInputAndWitness, serializeInputAndWitnessToBin) where
 
 -- import Data.Aeson.Encoding
 

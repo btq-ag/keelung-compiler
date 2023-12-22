@@ -15,7 +15,7 @@ import Test.Snarkjs qualified as Snarkjs
 
 main :: IO ()
 main = hspec $ do
-  Snarkjs.testQuad
+  Snarkjs.tests
   Solver.tests
   Compilation.tests
   Optimization.tests

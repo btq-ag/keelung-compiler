@@ -76,6 +76,7 @@ library
       Keelung.Data.Reference
       Keelung.Data.U
       Keelung.Data.VarGroup
+      Keelung.Encode
       Keelung.Interpreter
       Keelung.Interpreter.Monad
       Keelung.Solver
@@ -89,7 +90,8 @@ library
       ImportQualifiedPost
   ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
   build-depends:
-      array
+      aeson
+    , array
     , base >=4.7 && <5
     , binary
     , bytestring
@@ -111,7 +113,6 @@ library
 executable keelungc
   main-is: Main.hs
   other-modules:
-      Encode
       Option
       Keelung.Compiler
       Keelung.Compiler.Compile
@@ -164,6 +165,7 @@ executable keelungc
       Keelung.Data.Reference
       Keelung.Data.U
       Keelung.Data.VarGroup
+      Keelung.Encode
       Keelung.Interpreter
       Keelung.Interpreter.Monad
       Keelung.Solver
@@ -208,6 +210,7 @@ test-suite keelung-test
   main-is: Main.hs
   other-modules:
       Test.Compilation
+      Test.Compilation.Binutil
       Test.Compilation.Boolean
       Test.Compilation.Boolean.Conditional
       Test.Compilation.Boolean.Equality
@@ -309,6 +312,7 @@ test-suite keelung-test
       Keelung.Data.Reference
       Keelung.Data.U
       Keelung.Data.VarGroup
+      Keelung.Encode
       Keelung.Interpreter
       Keelung.Interpreter.Monad
       Keelung.Solver
@@ -328,6 +332,7 @@ test-suite keelung-test
   build-depends:
       HUnit
     , QuickCheck
+    , aeson
     , array
     , base >=4.7 && <5
     , binary

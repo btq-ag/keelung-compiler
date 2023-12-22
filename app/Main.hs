@@ -16,7 +16,7 @@ import Data.Foldable (toList)
 import Data.Serialize (Serialize, decode, encode)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
-import Encode
+import Keelung.Encode
 import Keelung.Compiler
   ( Error (..),
     compileO0Elab,
@@ -115,7 +115,7 @@ main = withUtf8 $ do
         Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> caseFieldType fieldType handlePrime handleBinary
           where
             handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = case fieldTypeData fieldInfo of
-              (Prime p) -> outputInterpretedResultAndWriteFile Snarkjs p filepath (generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Prime n)) (Counters, Vector (Prime n), Vector (Prime n)))
+              (Prime p) -> outputInterpretedResultAndWriteFile Snarkjs p filepath (generateWitnessElab fieldInfo elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) (Counters, Vector (Prime n), Vector (Prime n)))
               (Binary _) -> error "IMPOSSIBLE"
             handleBinary _ _ = error "wtns format doesn't support binary fields."
     Version -> putStrLn $ "Keelung v" ++ versionString

@@ -32,6 +32,7 @@ dependencies:
 - keelung 
 - mtl
 - optparse-applicative
+- aeson
 # - primes
 - random
 - semirings
@@ -77,6 +78,7 @@ tests:
       - src/
       - examples/
     dependencies:
+    - aeson
     - keelung-compiler
     - keelung-examples
     - keelung-stdlib
