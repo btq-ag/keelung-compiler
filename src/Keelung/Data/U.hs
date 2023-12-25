@@ -6,6 +6,7 @@ module Keelung.Data.U
   ( U (uValue),
     new,
     widen,
+    mapWidth,
     adjustWidth,
     modInv,
     aesMul,
@@ -87,11 +88,15 @@ adjustWidth :: Width -> U -> U
 adjustWidth width (U Nothing value) = U (Just width) (adjustWidthOfInteger 32 width value)
 adjustWidth width (U (Just v) value) = U (Just width) (adjustWidthOfInteger v width value)
 
+mapWidth :: (Width -> Width) -> U -> U
+mapWidth _ (U Nothing value) = U Nothing value
+mapWidth f (U (Just v) value) = U (Just (f v)) (adjustWidthOfInteger v (f v) value)
+
 adjustWidthOfInteger :: Width -> Width -> Integer -> Integer
 adjustWidthOfInteger oldWidth newWidth value = case oldWidth `compare` newWidth of
-    EQ -> value -- no change
-    LT -> value -- widen with zeros, no change
-    GT -> value `Prelude.mod` (2 ^ newWidth) -- truncate
+  EQ -> value -- no change
+  LT -> value -- widen with zeros, no change
+  GT -> value `Prelude.mod` (2 ^ newWidth) -- truncate
 
 --------------------------------------------------------------------------------
 

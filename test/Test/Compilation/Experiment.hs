@@ -3,10 +3,13 @@
 
 module Test.Compilation.Experiment where
 
+import Control.Monad (forM_)
 import Keelung
+import Keelung.Compiler.Options
 import Test.Compilation.Util
 import Test.Hspec
-import Keelung.Compiler.Options
+import Test.QuickCheck
+
 -- import Test.QuickCheck
 
 run :: IO ()
@@ -29,14 +32,13 @@ tests = describe "Experiment" $ do
   --       testCompiler (Binary 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
   --       testCompiler (Binary 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
 
-    -- it "from Field element" $ do
-    --   -- let program = do
-    --   --       x' <- input Public
-    --   --       x <- toUInt 8 x' :: Comp (UInt 8)
-    --   --       pack [x !!! 0, x !!! 1] :: Comp (UInt 3)
-    --   -- property $ \(x :: Word) -> do
-    --   --   testCompiler gf181 program [fromIntegral x] [] [fromIntegral x]
-
+  -- it "from Field element" $ do
+  --   -- let program = do
+  --   --       x' <- input Public
+  --   --       x <- toUInt 8 x' :: Comp (UInt 8)
+  --   --       pack [x !!! 0, x !!! 1] :: Comp (UInt 3)
+  --   -- property $ \(x :: Word) -> do
+  --   --   testCompiler gf181 program [fromIntegral x] [] [fromIntegral x]
 
   -- it "should reveal variable layout" $ do
   --     let program = do
@@ -49,29 +51,59 @@ tests = describe "Experiment" $ do
   --     -- testCompiler (Prime 257) program [2, 2] [] [4]
   --     -- runSolver (Prime 257) program [2, 2] []
 
-  let options = defaultOptions { optUseNewLinker = True }
-  it "2 positive variables / Byte" $ do
-        let program = do
-              x <- inputUInt Public :: Comp (UInt 1)
-              y <- inputUInt Public
-              return $ x + y
-        debugWithOpts options (Binary 7) program
-        -- testCompilerWithOpts options (Binary 7) program [0, 0] [] [0]
-
-  -- it "or 2" $ do
+  -- let options = defaultOptions {optUseNewLinker = True}
+  -- it "2 positive variables / Byte" $ do
   --   let program = do
-  --         x <- inputUInt Public :: Comp (UInt 4)
-  --         return $ (x .|. 3) !!! 2
-  --   debugWithOpts options gf181 program
-  --   testCompilerWithOpts options gf181 program [3] [] [0]
-    -- testCompilerWithOpts options gf181 program [5] [] [1]
+  --         x <- inputUInt Public :: Comp (UInt 1)
+  --         y <- inputUInt Public
+  --         return $ x + y
+  --   debugWithOpts options (Binary 7) program
+  --   testCompilerWithOpts options (Binary 7) program [0, 0] [] [0]
 
+  -- it "variable dividend / constant divisor" $ do
+  --   let program divisor = do
+  --         dividend <- input Public :: Comp (UInt 2)
+  --         performDivMod dividend divisor
 
-  -- it "should reveal variable layout" $ do
-  --   let program = do
-  --         u <- inputUInt Public :: Comp (UInt 4)
-  --         -- b <- inputBool Public
-  --         -- f <- inputField Public
-  --         -- return $ cond (f `eq` 0 .|. b) u (u + 1)
-  --         return (u' !!! 0)
-  --   debug gf181 program
+  --   let dividend = 3
+  --   let divisor = 3
+  --   let expected = [dividend `div` divisor, dividend `mod` divisor]
+  --   let options = defaultOptions { optOptimize = False }
+
+  --   forM_ [Binary 7] $ \field -> do
+  --   -- forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+  --     -- debug field (program (fromIntegral divisor))
+  --     -- testCompiler field (program (fromIntegral divisor)) [dividend] [] expected
+  --     debugWithOpts options field (program (fromIntegral divisor))
+  --     testCompilerWithOpts options field (program (fromIntegral divisor)) [dividend] [] expected
+
+  -- it "variable dividend / constant divisor" $ do
+  --   let program divisor = do
+  --         dividend <- input Public :: Comp (UInt 4)
+  --         performDivMod dividend divisor
+
+  --   let dividend = 4
+  --   let divisor = 4
+  --   let expected = [dividend `div` divisor, dividend `mod` divisor]
+  --   let options = defaultOptions { optOptimize = True }
+
+  --   forM_ [Prime 17] $ \field -> do
+  --     debugWithOpts options field (program (fromIntegral divisor))
+  --     testCompilerWithOpts options field (program (fromIntegral divisor)) [dividend] [] expected
+
+  it "variable dividend / constant divisor" $ do
+    let program divisor = do
+          dividend <- input Public :: Comp (UInt 8)
+          performDivMod dividend divisor
+
+    let genPair = do
+          dividend <- choose (0, 3)
+          divisor <- choose (1, 3)
+          return (dividend, divisor)
+    let options = defaultOptions { optOptimize = True }
+
+    forAll genPair $ \(dividend, divisor) -> do
+      let expected = [dividend `div` divisor, dividend `mod` divisor]
+      forM_ [Prime 17] $ \field -> do
+        testCompilerWithOpts options field (program (fromIntegral divisor)) [dividend] [] expected
+        -- testCompiler field (program (fromIntegral divisor)) [dividend] [] expected

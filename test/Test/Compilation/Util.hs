@@ -112,13 +112,14 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
     handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
       -- overwrite fieldInfo & optimization level
+      let optionsO0 = options {optFieldInfo = fieldInfo, optOptimize = False}
       let optionsO1 = options {optFieldInfo = fieldInfo, optOptimize = True}
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- constraint system interpreters
       solveR1CSWithOpts optionsO1 program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
-    -- solveR1CSO0 fieldInfo program rawPublicInputs rawPrivateInputs
-    --   `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+      solveR1CSWithOpts optionsO0 program rawPublicInputs rawPrivateInputs
+        `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
 
     handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do

@@ -28,8 +28,10 @@ import Keelung.Compiler.ConstraintModule qualified as CM
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.LC qualified as LC
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf))
 
 --------------------------------------------------------------------------------
@@ -110,6 +112,7 @@ compile out expr = case expr of
 
 --------------------------------------------------------------------------------
 
+-- | Compile a UInt expression to either a RefU or a constant
 wireU :: (GaloisField n, Integral n) => ExprU n -> M n (Either RefU U)
 wireU (ValU val) = return (Right val)
 wireU (VarU w ref) = return (Left (RefUX w ref))
@@ -131,6 +134,17 @@ wireUWithSign (others, sign) = do
     Right val -> return (Right (if sign then val else -val))
 
 --------------------------------------------------------------------------------
+
+-- | Allocate a new RefU with double the width of the given RefU or U
+_allocDoubleWidth :: (GaloisField n, Integral n) => Either RefU U -> M n (Either RefU U)
+_allocDoubleWidth (Left ref) = do
+  let width = widthOf ref
+  ref' <- freshRefU (width * 2)
+  writeLimbVal (Limb.new ref' width width (Left True)) 0 -- upper half
+  writeLimbEq (Limb.new ref' width 0 (Left True)) (Limb.new ref width 0 (Left True)) -- lower half
+  return (Left ref')
+_allocDoubleWidth (Right val) = return $ Right (U.mapWidth (* 2) val)
+
 
 -- | Division with remainder on UInts
 --    1. dividend = divisor * quotient + remainder
