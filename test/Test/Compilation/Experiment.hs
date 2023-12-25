@@ -91,19 +91,23 @@ tests = describe "Experiment" $ do
   --     debugWithOpts options field (program (fromIntegral divisor))
   --     testCompilerWithOpts options field (program (fromIntegral divisor)) [dividend] [] expected
 
-  it "variable dividend / constant divisor" $ do
-    let program divisor = do
-          dividend <- input Public :: Comp (UInt 8)
-          performDivMod dividend divisor
+    it "variable dividend / variable divisor" $ do
+      let program = do
+            dividend <- input Public :: Comp (UInt 4)
+            divisor <- input Public
+            performDivMod dividend divisor
 
-    let genPair = do
-          dividend <- choose (0, 3)
-          divisor <- choose (1, 3)
-          return (dividend, divisor)
-    let options = defaultOptions { optOptimize = True }
+      -- debug (Prime 17) program 
+      let genPair = do
+            dividend <- choose (0, 15)
+            divisor <- choose (1, 15)
+            return (dividend, divisor)
 
-    forAll genPair $ \(dividend, divisor) -> do
-      let expected = [dividend `div` divisor, dividend `mod` divisor]
-      forM_ [Prime 17] $ \field -> do
-        testCompilerWithOpts options field (program (fromIntegral divisor)) [dividend] [] expected
-        -- testCompiler field (program (fromIntegral divisor)) [dividend] [] expected
+      forAll genPair $ \(dividend, divisor) -> do
+        let expected = [dividend `div` divisor, dividend `mod` divisor]
+        forM_ [gf181, Prime 17] $ \field -> do
+          let options = defaultOptions { optUseNewLinker = True }
+          testCompilerWithOpts options field program [dividend, divisor] [] expected
+        forM_ [Binary 7] $ \field -> do
+          let options = defaultOptions { optUseNewLinker = False }
+          testCompilerWithOpts options field program [dividend, divisor] [] expected

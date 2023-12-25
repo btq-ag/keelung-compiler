@@ -24,6 +24,7 @@ import Keelung.Data.LC
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Field (FieldType (..))
 import Keelung.Syntax (widthOf)
 
 --------------------------------------------------------------------------------
@@ -100,7 +101,16 @@ compileSideEffect (BitsToUInt width varU bits) = do
       Left var -> writeAdd 0 [(B (RefUBit width refU i), -1), (B var, 1)]
       Right True -> writeAdd 1 [(B (RefUBit width refU i), -1)]
       Right False -> writeAdd 0 [(B (RefUBit width refU i), 1)]
-compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
+compileSideEffect (DivMod width dividend divisor quotient remainder) = do
+  useNewLinker <- gets (optUseNewLinker . cmOptions)
+  if useNewLinker
+    then do
+      fieldTypeData <- gets (FieldInfo.fieldTypeData . optFieldInfo . cmOptions)
+      case fieldTypeData of
+        Binary _ -> UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
+        Prime _ -> UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
+          -- UInt.assertDivModU2 width dividend divisor quotient remainder
+    else UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do
   x <- UInt.wireU value

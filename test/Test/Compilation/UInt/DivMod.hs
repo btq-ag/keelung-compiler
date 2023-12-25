@@ -65,7 +65,10 @@ tests =
 
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
-          forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+          forM_ [gf181, Prime 17] $ \field -> do
+            testCompiler field (program (fromIntegral divisor)) [dividend] [] expected
+            -- testCompilerWithOpts (defaultOptions {optUseNewLinker = True}) field (program (fromIntegral divisor)) [dividend] [] expected
+          forM_ [Binary 7] $ \field -> do
             testCompiler field (program (fromIntegral divisor)) [dividend] [] expected
 
       it "constant dividend / constant divisor" $ do
@@ -76,7 +79,9 @@ tests =
               return (dividend, divisor)
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
-          forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+          forM_ [gf181, Prime 17] $ \field -> do
+            testCompiler field (program dividend divisor) [] [] expected
+          forM_ [Binary 7] $ \field -> do
             testCompiler field (program dividend divisor) [] [] expected
 
       describe "statements" $ do

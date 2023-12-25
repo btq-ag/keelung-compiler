@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.Boolean (compile, andBs, xorBs) where
+module Keelung.Compiler.Compile.Boolean (compile, andBs, xorBs, computeLTUVarVar) where
 
 import Control.Monad.State
 import Data.Bits qualified

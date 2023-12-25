@@ -6,6 +6,7 @@ module Keelung.Compiler.Compile.UInt
     assertGTE,
     assertGT,
     assertDivModU,
+    assertDivModU2,
     assertCLDivModU,
   )
 where
@@ -33,6 +34,7 @@ import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf))
+import qualified Keelung.Compiler.Compile.Boolean as Boolean
 
 --------------------------------------------------------------------------------
 
@@ -144,6 +146,64 @@ _allocDoubleWidth (Left ref) = do
   writeLimbEq (Limb.new ref' width 0 (Left True)) (Limb.new ref width 0 (Left True)) -- lower half
   return (Left ref')
 _allocDoubleWidth (Right val) = return $ Right (U.mapWidth (* 2) val)
+
+
+-- | Division with remainder on UInts
+--    1. dividend = divisor * quotient + remainder
+--    2. 0 ≤ remainder < divisor
+--    3. 0 < divisor
+assertDivModU2 :: (GaloisField n, Integral n) => Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
+assertDivModU2 width dividend divisor quotient remainder = do
+  --    dividend = divisor * quotient + remainder
+  --  =>
+  --    divisor * quotient = dividend - remainder
+  dividendRef <- wireU dividend
+  divisorRef <- wireU divisor
+  quotientRef <- wireU quotient
+  remainderRef <- wireU remainder
+
+  -- double the widths of these variables
+  dividendRef' <- _allocDoubleWidth dividendRef
+  divisorRef' <- _allocDoubleWidth divisorRef
+  quotientRef' <- _allocDoubleWidth quotientRef
+  remainderRef' <- _allocDoubleWidth remainderRef
+
+  productDQ <- freshRefU (width * 2)
+  compileMulU (width * 2) productDQ divisorRef' quotientRef'
+  compileSub (width * 2) productDQ dividendRef' remainderRef'
+
+  -- 0 ≤ remainder < divisor
+  -- compileAssertion $ ExprB (LTU remainder divisor)
+  case (remainderRef', divisorRef') of
+      (Left xVar, Left yVar) -> do 
+        result <- Boolean.computeLTUVarVar xVar yVar
+        case result of
+          Left var -> writeRefBVal var True
+          Right True -> return ()
+          Right val -> throwError $ Error.ConflictingValuesB True val
+      (Left xVar, Right yVal) -> do
+        assertLT (width * 2) (Left xVar) (toInteger yVal)
+      (Right xVal, Left yVar) -> do
+        assertGT (width * 2) (Left yVar) (toInteger xVal)
+      (Right xVal, Right yVal) -> do
+        assertLT (width * 2) (Right xVal) (toInteger yVal)
+  -- 0 < divisor
+  assertGT width divisorRef 0
+  -- add hint for DivMod
+  addDivModHint dividendRef' divisorRef' quotientRef' remainderRef'
+
+-- -- | Assert that a UInt is less than some constant
+-- assertLT :: (GaloisField n, Integral n) => Width -> Either RefU U -> Integer -> M n ()
+-- assertLT width a c = do
+--   -- check if the bound is within the range of the UInt
+--   when (c < 1) $
+--     throwError $
+--       Error.AssertLTBoundTooSmallError c
+--   when (c >= 2 ^ width) $
+--     throwError $
+--       Error.AssertLTBoundTooLargeError c width
+--   -- otherwise, assert that a <= c - 1
+--   assertLTE width a (c - 1)
 
 
 -- | Division with remainder on UInts
