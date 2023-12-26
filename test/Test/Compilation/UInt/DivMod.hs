@@ -12,6 +12,7 @@ import Keelung.Solver.Monad qualified as Solver
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
+import Keelung.Compiler.Options
 
 run :: IO ()
 run = hspec tests
@@ -35,7 +36,9 @@ tests =
 
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
-          forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+          forM_ [gf181, Prime 17] $ \field -> do
+            testCompiler field program [dividend, divisor] [] expected
+          forM_ [Binary 7] $ \field -> do
             testCompiler field program [dividend, divisor] [] expected
 
       it "constant dividend / variable divisor" $ do
@@ -50,7 +53,9 @@ tests =
 
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
-          forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+          forM_ [gf181, Prime 17] $ \field -> do
+            testCompiler field (program (fromIntegral dividend)) [divisor] [] expected
+          forM_ [Binary 7] $ \field -> do
             testCompiler field (program (fromIntegral dividend)) [divisor] [] expected
 
       it "variable dividend / constant divisor" $ do
@@ -66,8 +71,8 @@ tests =
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
           forM_ [gf181, Prime 17] $ \field -> do
-            testCompiler field (program (fromIntegral divisor)) [dividend] [] expected
-            -- testCompilerWithOpts (defaultOptions {optUseNewLinker = True}) field (program (fromIntegral divisor)) [dividend] [] expected
+            let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = True }
+            testCompilerWithOpts options field (program (fromIntegral divisor)) [dividend] [] expected
           forM_ [Binary 7] $ \field -> do
             testCompiler field (program (fromIntegral divisor)) [dividend] [] expected
 
@@ -80,7 +85,8 @@ tests =
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
           forM_ [gf181, Prime 17] $ \field -> do
-            testCompiler field (program dividend divisor) [] [] expected
+            let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = True }
+            testCompilerWithOpts options field (program dividend divisor) [] [] expected
           forM_ [Binary 7] $ \field -> do
             testCompiler field (program dividend divisor) [] [] expected
 

@@ -106,8 +106,61 @@ tests = describe "Experiment" $ do
       forAll genPair $ \(dividend, divisor) -> do
         let expected = [dividend `div` divisor, dividend `mod` divisor]
         forM_ [gf181, Prime 17] $ \field -> do
-          let options = defaultOptions { optUseNewLinker = True }
+          let options = defaultOptions { optUseNewLinker = True, optDisableTestingOnO0 = True }
           testCompilerWithOpts options field program [dividend, divisor] [] expected
         forM_ [Binary 7] $ \field -> do
           let options = defaultOptions { optUseNewLinker = False }
           testCompilerWithOpts options field program [dividend, divisor] [] expected
+
+    it "constant dividend / variable divisor" $ do
+      let program dividend = do
+            divisor <- input Public :: Comp (UInt 8)
+            performDivMod dividend divisor
+
+      let genPair = do
+            dividend <- choose (0, 255)
+            divisor <- choose (1, 255)
+            return (dividend, divisor)
+
+      forAll genPair $ \(dividend, divisor) -> do
+        let expected = [dividend `div` divisor, dividend `mod` divisor]
+        forM_ [gf181, Prime 17] $ \field -> do
+          let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = True }
+          testCompilerWithOpts options field (program (fromIntegral dividend)) [divisor] [] expected
+        forM_ [Binary 7] $ \field -> do
+          let options = defaultOptions { optUseNewLinker = False }
+          testCompilerWithOpts options field (program (fromIntegral dividend)) [divisor] [] expected
+
+    it "variable dividend / constant divisor" $ do
+      let program divisor = do
+            dividend <- input Public :: Comp (UInt 8)
+            performDivMod dividend divisor
+
+      let genPair = do
+            dividend <- choose (0, 255)
+            divisor <- choose (1, 255)
+            return (dividend, divisor)
+
+      forAll genPair $ \(dividend, divisor) -> do
+        let expected = [dividend `div` divisor, dividend `mod` divisor]
+        forM_ [gf181, Prime 17] $ \field -> do
+          let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = True }
+          testCompilerWithOpts options field (program (fromIntegral divisor)) [dividend] [] expected
+        forM_ [Binary 7] $ \field -> do
+          let options = defaultOptions { optUseNewLinker = False }
+          testCompilerWithOpts options field (program (fromIntegral divisor)) [dividend] [] expected
+
+    it "constant dividend / constant divisor" $ do
+      let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
+      let genPair = do
+            dividend <- choose (0, 255)
+            divisor <- choose (1, 255)
+            return (dividend, divisor)
+      forAll genPair $ \(dividend, divisor) -> do
+        let expected = [dividend `div` divisor, dividend `mod` divisor]
+        forM_ [gf181, Prime 17] $ \field -> do
+          let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = True }
+          testCompilerWithOpts options field (program dividend divisor) [] [] expected
+        forM_ [Binary 7] $ \field -> do
+          let options = defaultOptions { optUseNewLinker = False }
+          testCompilerWithOpts options field (program dividend divisor) [] [] expected

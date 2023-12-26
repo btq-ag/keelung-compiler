@@ -23,10 +23,10 @@ data Options = Options
     -- | Whether to perform optimization
     optOptimize :: Bool,
     -- | Whether to use the new linker
-    optUseNewLinker :: Bool
+    optUseNewLinker :: Bool,
+    -- | Whether to disable testing on unoptimized program
+    optDisableTestingOnO0 :: Bool
   }
-  -- \| Whether disable testing on unoptimized program
-  -- optTestOnO0 :: Bool
 
   deriving (Eq, Generic, NFData)
 
@@ -37,8 +37,8 @@ defaultOptions =
     { optFieldInfo = gf181Info,
       optConstProp = True,
       optOptimize = True,
-      optUseNewLinker = False
-      -- optTestOnO0 = True
+      optUseNewLinker = False,
+      optDisableTestingOnO0 = False
     }
 
 buildOptionsWithFieldType :: FieldType -> IO Options
