@@ -16,6 +16,7 @@ import Control.Monad.RWS
 import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
+import Keelung.Compiler.Compile.Boolean qualified as Boolean
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt.AESMul
@@ -34,7 +35,6 @@ import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf))
-import qualified Keelung.Compiler.Compile.Boolean as Boolean
 
 --------------------------------------------------------------------------------
 
@@ -147,7 +147,6 @@ _allocDoubleWidth (Left ref) = do
   return (Left ref')
 _allocDoubleWidth (Right val) = return $ Right (U.mapWidth (* 2) val)
 
-
 -- | Division with remainder on UInts
 --    1. dividend = divisor * quotient + remainder
 --    2. 0 ≤ remainder < divisor
@@ -175,18 +174,18 @@ assertDivModU2 width dividend divisor quotient remainder = do
   -- 0 ≤ remainder < divisor
   -- compileAssertion $ ExprB (LTU remainder divisor)
   case (remainderRef', divisorRef') of
-      (Left xVar, Left yVar) -> do 
-        result <- Boolean.computeLTUVarVar xVar yVar
-        case result of
-          Left var -> writeRefBVal var True
-          Right True -> return ()
-          Right val -> throwError $ Error.ConflictingValuesB True val
-      (Left xVar, Right yVal) -> do
-        assertLT (width * 2) (Left xVar) (toInteger yVal)
-      (Right xVal, Left yVar) -> do
-        assertGT (width * 2) (Left yVar) (toInteger xVal)
-      (Right xVal, Right yVal) -> do
-        assertLT (width * 2) (Right xVal) (toInteger yVal)
+    (Left xVar, Left yVar) -> do
+      result <- Boolean.computeLTUVarVar xVar yVar
+      case result of
+        Left var -> writeRefBVal var True
+        Right True -> return ()
+        Right val -> throwError $ Error.ConflictingValuesB True val
+    (Left xVar, Right yVal) -> do
+      assertLT (width * 2) (Left xVar) (toInteger yVal)
+    (Right xVal, Left yVar) -> do
+      assertGT (width * 2) (Left yVar) (toInteger xVal)
+    (Right xVal, Right yVal) -> do
+      assertLT (width * 2) (Right xVal) (toInteger yVal)
   -- 0 < divisor
   assertGT width divisorRef 0
   -- add hint for DivMod
@@ -205,7 +204,6 @@ assertDivModU2 width dividend divisor quotient remainder = do
 --   -- otherwise, assert that a <= c - 1
 --   assertLTE width a (c - 1)
 
-
 -- | Division with remainder on UInts
 --    1. dividend = divisor * quotient + remainder
 --    2. 0 ≤ remainder < divisor
@@ -220,16 +218,39 @@ assertDivModU compileAssertion width dividend divisor quotient remainder = do
   quotientRef <- wireU quotient
   remainderRef <- wireU remainder
 
+  case (dividendRef, divisorRef) of
+    (Right dividendVal, Right divisorVal) -> assertDivModUCC width dividendVal divisorVal quotientRef remainderRef
+    _ -> do
+      productDQ <- freshRefU width
+      compileMulU width productDQ divisorRef quotientRef
+      compileSub width productDQ dividendRef remainderRef
+
+      -- 0 ≤ remainder < divisor
+      compileAssertion $ ExprB (LTU remainder divisor)
+      -- 0 < divisor
+      assertGT width divisorRef 0
+      -- add hint for DivMod
+      addDivModHint dividendRef divisorRef quotientRef remainderRef
+
+-- | Division with remainder on UInts
+assertDivModUCC :: (GaloisField n, Integral n) => Width -> U -> U -> Either RefU U -> Either RefU U -> M n ()
+assertDivModUCC width dividend divisor quotient remainder = do
+  -- 0 < divisor
+  when (divisor == 0) $
+    throwError $
+      Error.AssertComparisonError (toInteger dividend) GT 0
+
+  --    dividend = divisor * quotient + remainder
+  --  =>
+  --    divisor * quotient = dividend - remainder
   productDQ <- freshRefU width
-  compileMulU width productDQ divisorRef quotientRef
-  compileSub width productDQ dividendRef remainderRef
+  compileMulU width productDQ (Right divisor) quotient
+  compileSub width productDQ (Right dividend) remainder
 
   -- 0 ≤ remainder < divisor
-  compileAssertion $ ExprB (LTU remainder divisor)
-  -- 0 < divisor
-  assertGT width divisorRef 0
+  assertLT width remainder (toInteger divisor)
   -- add hint for DivMod
-  addDivModHint dividendRef divisorRef quotientRef remainderRef
+  addDivModHint (Right dividend) (Right divisor) quotient remainder
 
 -- | Carry-less division with remainder on UInts
 --    1. dividend = divisor .*. quotient .^. remainder
@@ -322,69 +343,6 @@ compileIfU width (Left p) x y = do
       -- -- (x - y) * p - out + y = 0
       -- writeAdd (fromInteger y) $ (B p, fromInteger (x - y)) : bits
       return $ Left out
-
--- compileIfU width (Left p) (Right x) (Right y) = do
---   if x == y
---     then return $ Right x
---     else do
---       out <- freshRefU width
---       fieldType <- gets CM.(optFieldInfo . cmOptions)
---       -- (x - y) * p - out + y = 0
---       let outLCs = LC.fromRefU2 fieldType (Left out)
---       let xyLCs =
---             zip
---               (LC.fromRefU2 fieldType (Right x))
---               (LC.fromRefU2 fieldType (Right y))
---       zipWithM_
---         ( \outLC (xLC, yLC) -> do
---             case (xLC, yLC) of
---               (LC.Constant xVal, LC.Constant yVal) -> do
---                 -- if both branches are constants, we can express it as addative constraints
---                 -- (x - y) * p - out + y = 0
---                 writeAddWithLC $ (xVal - yVal) LC.@ B p <> LC.neg outLC <> yLC
---               _ ->
---                 -- (out - y) = p * (x - y)
---                 writeMulWithLC (1 LC.@ B p) (xLC <> LC.neg yLC) (outLC <> LC.neg yLC)
---         )
---         outLCs
---         xyLCs
---       -- let xLimbs = Limb.refUToLimbs fieldWidth (RefUVal width x)
-
---       -- let bits = [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
---       -- -- (x - y) * p - out + y = 0
---       -- writeAdd (fromInteger y) $ (B p, fromInteger (x - y)) : bits
---       return $ Left out
--- compileIfU width (Left p) (Right x) (Left y) = do
---   out <- freshRefU width
---   let bitsY = [(B (RefUBit width y i), -(2 ^ i)) | i <- [0 .. width - 1]]
---   let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
---   -- (out - y) = p * (x - y)
---   writeMul
---     (0, [(B p, 1)])
---     (fromInteger (U.uValue x), bitsY)
---     (0, bitsY <> bitsOut)
---   return $ Left out
--- compileIfU width (Left p) (Left x) (Right y) = do
---   out <- freshRefU width
---   let bitsX = [(B (RefUBit width x i), 2 ^ i) | i <- [0 .. width - 1]]
---   let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
---   -- (out - y) = p * (x - y)
---   writeMul
---     (0, [(B p, 1)])
---     (fromInteger (-(U.uValue y)), bitsX)
---     (fromInteger (-(U.uValue y)), bitsOut)
---   return $ Left out
--- compileIfU width (Left p) (Left x) (Left y) = do
---   out <- freshRefU width
---   let bitsOut = [(B (RefUBit width out i), 2 ^ i) | i <- [0 .. width - 1]]
---   let bitsX = [(B (RefUBit width x i), 2 ^ i) | i <- [0 .. width - 1]]
---   let bitsY = [(B (RefUBit width y i), -(2 ^ i)) | i <- [0 .. width - 1]]
---   -- (out - y) = p * (x - y)
---   writeMul
---     (0, [(B p, 1)])
---     (0, bitsX <> bitsY)
---     (0, bitsOut <> bitsY)
---   return $ Left out
 
 --------------------------------------------------------------------------------
 

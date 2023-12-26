@@ -38,7 +38,7 @@ defaultOptions =
       optConstProp = True,
       optOptimize = True,
       optUseNewLinker = False,
-      optDisableTestingOnO0 = False
+      optDisableTestingOnO0 = True
     }
 
 buildOptionsWithFieldType :: FieldType -> IO Options

@@ -153,22 +153,37 @@ mulnxn width maxHeight limbWidth arity out var operand = do
           let index = xi + yi
 
           (lowerLimb, upperLimb) <- mul2Limbs limbWidth (0, x) y
-          let columns' = IntMap.insertWith (<>) index lowerLimb columns
+          -- insert the lower limb into the columns
+          let columns' =
+                if lowerLimb == mempty
+                  then columns
+                  else IntMap.insertWith (<>) index lowerLimb columns
+          -- insert the upper limb into the columns
           let columns'' =
-                if index == arity - 1 -- throw limbs higher than the arity away
+                if upperLimb == mempty || index == arity - 1 -- throw limbs higher than the arity away
                   then columns'
                   else IntMap.insertWith (<>) (index + 1) upperLimb columns'
           return columns''
       )
       mempty
       indices
-  -- go through each columns and add them up
+  -- write the result to the output RefU
   foldM_
-    ( \previousCarryLimbs (index, limbs) -> do
+    ( \previousCarryLimbs index -> do
+        -- calculate the segment of the output RefU to be written
         let limbStart = limbWidth * index
         let currentLimbWidth = limbWidth `min` (width - limbStart)
-        let resultLimb = Limb.new out currentLimbWidth limbStart (Left True)
-        addLimbColumn maxHeight resultLimb (previousCarryLimbs <> limbs)
+        let outputLimb = Limb.new out currentLimbWidth limbStart (Left True)
+
+        -- see if there's a stack of limbs to be added to the output limb
+        case IntMap.lookup index limbColumns of
+          Just limbs -> addLimbColumn maxHeight outputLimb (previousCarryLimbs <> limbs)
+          Nothing -> do
+            if previousCarryLimbs == mempty
+              then do
+                writeLimbVal outputLimb 0
+                return mempty -- no carry
+              else addLimbColumn maxHeight outputLimb previousCarryLimbs
     )
     mempty
-    (IntMap.toList limbColumns)
+    [0 .. arity - 1]

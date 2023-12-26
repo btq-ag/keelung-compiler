@@ -9,7 +9,7 @@ import Keelung.Data.Limb qualified as Limb
 
 -- | A 'LimbColumn' is a sequence of 'Limb's, with a constant value.
 data LimbColumn = LimbColumn Integer (Seq Limb)
-  deriving (Show)
+  deriving (Show, Eq)
 
 instance Semigroup LimbColumn where
   (LimbColumn const1 limbs1) <> (LimbColumn const2 limbs2) =
