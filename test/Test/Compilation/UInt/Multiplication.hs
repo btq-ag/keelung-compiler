@@ -55,7 +55,10 @@ tests = describe "Multiplication" $ do
   --         return $ x * fromIntegral y + z
   --   property $ \(x, y :: Word8) -> do
   --     let expected = [toInteger (x * y)]
-  --     forM_ [gf181, Prime 257, Prime 17, Binary 7] $ \field -> testCompiler field (program y 0) [toInteger x] [] expected
+  --     forM_ [gf181, Prime 257, Prime 17] $ \field -> do
+  --       let options = defaultOptions { optUseNewLinker = True }
+  --       testCompilerWithOpts options field (program y 0) [toInteger x] [] expected
+  --     forM_ [Binary 7] $ \field -> testCompiler field (program y 0) [toInteger x] [] expected
 
   it "with addition / Byte" $ do
     let program = do

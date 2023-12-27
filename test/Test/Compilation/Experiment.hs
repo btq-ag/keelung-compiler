@@ -8,6 +8,7 @@ import Keelung.Compiler.Options
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck
+import Control.Monad (forM_)
 
 -- import Test.QuickCheck
 
@@ -152,7 +153,7 @@ tests = describe "Experiment" $ do
     -- it "constant dividend / constant divisor" $ do
     --   let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
     --   let genPair = do
-    --         dividend <- choose (0, 255)
+    --         dividend <- choose (75, 75)
     --         --      100
     --         --    10000
     --         --  1000000
@@ -162,30 +163,46 @@ tests = describe "Experiment" $ do
     --     let expected = [dividend `div` divisor, dividend `mod` divisor]
     --     forM_ [Prime 17] $ \field -> do
     --       -- failing on 4, 16, 64
-    --       let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = False }
+    --       let options = defaultOptions { optUseNewLinker = True, optDisableTestingOnO0 = False }
+    --       debugWithOpts options field (program dividend divisor)
     --       testCompilerWithOpts options field (program dividend divisor) [] [] expected
-    --       error ""
-        -- forM_ [gf181, Prime 17] $ \field -> do
-        --   let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = True }
-        --   testCompilerWithOpts options field (program dividend divisor) [] [] expected
-        -- forM_ [Binary 7] $ \field -> do
-        --   let options = defaultOptions { optUseNewLinker = False }
-        --   testCompilerWithOpts options field (program dividend divisor) [] [] expected
-        -- forM_ [Binary 7] $ \field -> do
-        --   let options = defaultOptions { optUseNewLinker = True }
-        --   testCompilerWithOpts options field (program dividend divisor) [] [] expected
+    --     -- forM_ [gf181, Prime 17] $ \field -> do
+    --     --   let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = True }
+    --     --   testCompilerWithOpts options field (program dividend divisor) [] [] expected
+    --     -- forM_ [Binary 7] $ \field -> do
+    --     --   let options = defaultOptions { optUseNewLinker = False }
+    --     --   testCompilerWithOpts options field (program dividend divisor) [] [] expected
+    --     -- forM_ [Binary 7] $ \field -> do
+    --     --   let options = defaultOptions { optUseNewLinker = True }
+    --     --   testCompilerWithOpts options field (program dividend divisor) [] [] expected
 
 
     it "MAD" $ do
       let program y = do 
-            x <- input Public :: Comp (UInt 8)
-            return $ x * fromIntegral y + 0 :: Comp (UInt 8)
+            x <- input Public :: Comp (UInt 4)
+            return $ x + fromIntegral y + 0 :: Comp (UInt 4)
       let genPair = do
-            x <- choose (0, 255)
-            y <- choose (0, 255)
-            return (x, y)
+            x <- choose (0, 15)
+            -- y <- choose (1, 1)
+            return (x, 1)
       forAll genPair $ \(x, y) -> do
-        let expected = [(x * y) `mod` 256]
+        let expected = [(x + y) `mod` 16]
         -- failing on 4, 16, 64
-        let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = False }
-        testCompilerWithOpts options (Prime 17) (program y) [x] [] expected
+        -- forM_ [gf181, Prime 257, Prime 17] $ \field -> do 
+        --   let options = defaultOptions { optUseNewLinker = True, optDisableTestingOnO0 = False }
+        --   testCompilerWithOpts options field (program y) [x] [] expected
+        forM_ [Binary 7] $ \field -> do 
+          let options = defaultOptions { optUseNewLinker = True, optDisableTestingOnO0 = False }
+          debugWithOpts options field (program y)
+          testCompilerWithOpts options field (program y) [x] [] expected
+          error ""
+
+  -- it "variable * constant + 0 / Byte" $ do
+  --   let program y z = do
+  --         x <- inputUInt @8 Public
+  --         return $ x * fromIntegral y + z
+  --   property $ \(x, y :: Word8) -> do
+  --     let expected = [toInteger (x * y)]
+  --       let options = defaultOptions { optUseNewLinker = True }
+  --       testCompilerWithOpts options field (program y 0) [toInteger x] [] expected
+  --     forM_ [Binary 7] $ \field -> testCompiler field (program y 0) [toInteger x] [] expected

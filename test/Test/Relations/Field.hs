@@ -10,6 +10,7 @@ import Keelung.Compiler.Relations qualified as RefRelations
 import Keelung.Data.Reference
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
+import Keelung.Compiler.Options
 
 run :: IO ()
 run = hspec tests
@@ -19,18 +20,18 @@ tests = do
   describe "RefRelations" $ do
     describe "assign" $ do
       it "$0 = 0" $
-        runM $ do
+        runM defaultOptions $ do
           F (RefFX 0) `assign` 0
 
     it "Relate ($0 = $1)" $
-      runM $ do
+      runM defaultOptions $ do
         RefFX 0 `relate` (1, RefFX 1, 0)
 
         assertRelation (RefFX 0) 1 (RefFX 1) 0
         assertRelation (RefFX 1) 1 (RefFX 0) 0
 
     it "Relate ($0 = 2$1)" $
-      runM $ do
+      runM defaultOptions $ do
         RefFX 0 `relate` (2, RefFX 1, 0) -- x = 2y
         assertRelation (RefFX 0) 2 (RefFX 1) 0
         assertRelation (RefFX 0) 1 (RefFX 0) 0
@@ -38,12 +39,12 @@ tests = do
         assertRelation (RefFX 1) 1 (RefFX 1) 0
 
     it "Relate ($0 = 2$1 + 1)" $
-      runM $ do
+      runM defaultOptions $ do
         RefFX 0 `relate` (2, RefFX 1, 1) -- x = 2y + 1
         assertRelation (RefFX 0) 2 (RefFX 1) 1
         assertRelation (RefFX 1) (1 / 2) (RefFX 0) (-1 / 2) -- y = 1/2x - 1/2
     it "Relate ($0 = 2$1 + 1 & $1 = 3$2 + 2)" $
-      runM $ do
+      runM defaultOptions $ do
         RefFX 0 `relate` (2, RefFX 1, 1) -- x = 2y + 1
         RefFX 1 `relate` (3, RefFX 2, 2) -- y = 3z + 2
 
@@ -62,8 +63,8 @@ tests = do
 
 type M = StateT (Relations GF181) IO
 
-runM :: M a -> IO a
-runM p = evalStateT p RefRelations.new
+runM :: Options -> M a -> IO a
+runM options p = evalStateT p (RefRelations.new options)
 
 assign :: Ref -> GF181 -> M ()
 assign var val = do

@@ -40,16 +40,19 @@ import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Prelude hiding (lookup)
+import Keelung.Compiler.Options
+
 
 data Relations n = Relations
   { relationsR :: Ref.RefRelations n,
     relationsL :: LimbRelations.LimbRelations,
-    relationsU :: UInt.UIntRelations
+    relationsU :: UInt.UIntRelations,
+    relationsOptions :: Options
   }
   deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (Relations n) where
-  show (Relations f l u) =
+  show (Relations f l u _) =
     (if EquivClass.size f == 0 then "" else show f)
       <> (if EquivClass.size l == 0 then "" else show l)
       <> (if EquivClass.size u == 0 then "" else show u)
@@ -80,7 +83,7 @@ updateRelationsU f xs = do
 
 --------------------------------------------------------------------------------
 
-new :: Relations n
+new :: Options -> Relations n
 new = Relations Ref.new LimbRelations.new UInt.new
 
 assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
@@ -102,7 +105,7 @@ assignL var val relations = case UInt.lookupRefU (exportUIntRelations relations)
 assignU :: (GaloisField n, Integral n) => RefU -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignU var val = updateRelationsU $ UInt.assignRefU var val
 
-relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateB :: (GaloisField n, Integral n) => GaloisField n => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateB refA (polarity, refB) = updateRelationsR (Ref.relateB refA (polarity, refB))
 
 -- -- | Lookup the relation between the RefUs of the Limbs first before relating the Limbs
@@ -144,7 +147,7 @@ relateU var1 var2 = updateRelationsU $ UInt.relateRefU var1 var2
 
 -- var = slope * var2 + intercept
 relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateR x slope y intercept xs = updateRelationsR (Ref.relateR (relationsU xs) x slope y intercept) xs
+relateR x slope y intercept xs = updateRelationsR (Ref.relateR (relationsOptions xs) (relationsU xs) x slope y intercept) xs
 
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> Maybe (n, n)
 relationBetween var1 var2 = Ref.relationBetween var1 var2 . relationsR
@@ -153,12 +156,12 @@ toInt :: (Ref -> Bool) -> Relations n -> Map Ref (Either (n, Ref, n) n)
 toInt shouldBeKept = Ref.toInt shouldBeKept . relationsR
 
 size :: Relations n -> Int
-size (Relations f l u) = EquivClass.size f + LimbRelations.size l + UInt.size u
+size (Relations f l u _) = EquivClass.size f + LimbRelations.size l + UInt.size u
 
 --------------------------------------------------------------------------------
 
-lookup :: (GaloisField n) => Ref -> Relations n -> Ref.Lookup n
-lookup var xs = Ref.lookup (relationsU xs) var (relationsR xs)
+lookup :: GaloisField n => Ref -> Relations n -> Ref.Lookup n
+lookup var xs = Ref.lookup (relationsOptions xs) (relationsU xs) var (relationsR xs)
 
 --------------------------------------------------------------------------------
 

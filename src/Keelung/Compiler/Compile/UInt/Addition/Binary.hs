@@ -13,7 +13,7 @@ import Keelung.Syntax (Width)
 -- | Binary field addition
 compileAddB :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> U -> M n ()
 compileAddB _ out [] constant = writeRefUVal out constant
-compileAddB _ out [(var, _)] 0 = writeRefUEq out var
+compileAddB _ out [(var, True)] 0 = writeRefUEq out var
 compileAddB width out [(var, True)] constant = compileAddBPosConst width out var constant
 compileAddB width out [(var, False)] constant = compileAddBNegConst width out var constant
 compileAddB width out ((var1, sign1) : (var2, sign2) : vars) constant = do
@@ -87,7 +87,7 @@ compileAddBPosPos width out as bs = do
         writeAdd 0 [(B ab, 1), (B aPrev, 1), (B bPrev, 1), (next, -1)]
 
 -- | Adds a positive variable and a constant together on a binary field:
---   Assume `as` to the variable and `bs` to be the constant
+--   Assume `as` to be the variable and `bs` to be the constant
 --    constraints of a full adder:
 --      out[i] = as[i] + bs[i] + carry[i]
 --      carry[i+1] = as[i] * bs[i] + as[i] * carry[i] + bs[i] * carry[i]

@@ -30,6 +30,7 @@ import Prelude hiding (lookup)
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UInt
 import qualified Data.Bits
+import Keelung.Compiler.Options
 
 type RefRelations n = EquivClass.EquivClass Ref n (LinRel n)
 
@@ -48,8 +49,8 @@ relateB :: (GaloisField n, Integral n) => GaloisField n => RefB -> (Bool, RefB) 
 relateB refA (polarity, refB) xs = mapError $ EquivClass.relate (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB) xs
 
 -- var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => UIntRelations -> Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
-relateR relationsU x slope y intercept xs =
+relateR :: (GaloisField n, Integral n) => Options -> UIntRelations -> Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
+relateR options relationsU x slope y intercept xs =
   case (x, y, slope, intercept) of
     (_, _, 0, value) -> assignF x value xs
     (refA, refB, _, _) ->
@@ -59,8 +60,8 @@ relateR relationsU x slope y intercept xs =
         refB
         slope
         intercept
-        (lookup relationsU refA xs)
-        (lookup relationsU refB xs)
+        (lookup options relationsU refA xs)
+        (lookup options relationsU refB xs)
 
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> RefRelations n -> Maybe (n, n)
 relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
@@ -91,8 +92,8 @@ data Lookup n = Root | Value n | ChildOf n Ref n
       Show
     )
 
-lookup :: GaloisField n => UIntRelations -> Ref -> RefRelations n -> Lookup n
-lookup relationsU (B (RefUBit width refU index)) _relations = case EquivClass.lookup (UInt.Ref refU) relationsU of
+lookup :: GaloisField n => Options -> UIntRelations -> Ref -> RefRelations n -> Lookup n
+lookup _options relationsU (B (RefUBit width refU index)) _relations = case EquivClass.lookup (UInt.Ref refU) relationsU of
       EquivClass.IsConstant value -> Value (if Data.Bits.testBit value index then 1 else 0)
       EquivClass.IsRoot _ -> Root
       EquivClass.IsChildOf (UInt.Ref parent) UInt.Equal -> ChildOf 1 (B (RefUBit width parent index)) 0
@@ -108,7 +109,7 @@ lookup relationsU (B (RefUBit width refU index)) _relations = case EquivClass.lo
       --     if index < n
       --       then Value 0 -- zeroed out
       --       else ChildOf 1 (B (RefUBit width parent (index - n))) 0
-lookup _ var relations = case EquivClass.lookup var relations of
+lookup _ _ var relations = case EquivClass.lookup var relations of
   EquivClass.IsConstant value -> Value value
   EquivClass.IsRoot _ -> Root
   EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
