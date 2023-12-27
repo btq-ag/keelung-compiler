@@ -18,19 +18,19 @@ where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
+import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
+import Keelung.Compiler.Options
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Data.Reference
-import Prelude hiding (lookup)
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UInt
-import qualified Data.Bits
-import Keelung.Compiler.Options
+import Keelung.Data.Reference
+import Prelude hiding (lookup)
 
 type RefRelations n = EquivClass.EquivClass Ref n (LinRel n)
 
@@ -45,7 +45,7 @@ new = EquivClass.new "References Relations"
 assignF :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
 assignF var val xs = mapError $ EquivClass.assign var val xs
 
-relateB :: (GaloisField n, Integral n) => GaloisField n => RefB -> (Bool, RefB) -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
+relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
 relateB refA (polarity, refB) xs = mapError $ EquivClass.relate (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB) xs
 
 -- var = slope * var2 + intercept
@@ -92,23 +92,30 @@ data Lookup n = Root | Value n | ChildOf n Ref n
       Show
     )
 
-lookup :: GaloisField n => Options -> UIntRelations -> Ref -> RefRelations n -> Lookup n
+lookup :: (GaloisField n) => Options -> UIntRelations -> Ref -> RefRelations n -> Lookup n
 lookup _options relationsU (B (RefUBit width refU index)) _relations = case EquivClass.lookup (UInt.Ref refU) relationsU of
-      EquivClass.IsConstant value -> Value (if Data.Bits.testBit value index then 1 else 0)
-      EquivClass.IsRoot _ -> Root
-      EquivClass.IsChildOf (UInt.Ref parent) UInt.Equal -> ChildOf 1 (B (RefUBit width parent index)) 0
-      -- EquivClass.IsChildOf parent (UInt.ShiftLeft 0) -> ChildOf 1 (B (RefUBit width parent index)) 0
-      -- EquivClass.IsChildOf parent (UInt.ShiftLeft n) -> 
-      --     -- parent  ┌─┬─┬─┬─┬─┬─┬─┬─┐
-      --     --         └─┴─┴─┴─┴─┴─┴─┴─┘
-      --     --                  │
-      --     --              ┌───┘  shift left by n bits
-      --     --              ▼
-      --     -- refU    ┌─┬─┬─┬─┬─┬─┬─┬─┐
-      --     --         └─┴─┴─┴─┴─┴─┴─┴─┘
-      --     if index < n
-      --       then Value 0 -- zeroed out
-      --       else ChildOf 1 (B (RefUBit width parent (index - n))) 0
+  EquivClass.IsConstant value -> Value (if Data.Bits.testBit value index then 1 else 0)
+  EquivClass.IsRoot toChildren ->
+    if Map.null toChildren
+      then -- cannot find any result in the UIntRelations, so we look in the RefRelations instead
+      case EquivClass.lookup (B (RefUBit width refU index)) _relations of
+        EquivClass.IsConstant value -> Value value
+        EquivClass.IsRoot _ -> Root
+        EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
+      else Root
+  EquivClass.IsChildOf (UInt.Ref parent) UInt.Equal -> ChildOf 1 (B (RefUBit width parent index)) 0
+-- EquivClass.IsChildOf parent (UInt.ShiftLeft 0) -> ChildOf 1 (B (RefUBit width parent index)) 0
+-- EquivClass.IsChildOf parent (UInt.ShiftLeft n) ->
+--     -- parent  ┌─┬─┬─┬─┬─┬─┬─┬─┐
+--     --         └─┴─┴─┴─┴─┴─┴─┴─┘
+--     --                  │
+--     --              ┌───┘  shift left by n bits
+--     --              ▼
+--     -- refU    ┌─┬─┬─┬─┬─┬─┬─┬─┐
+--     --         └─┴─┴─┴─┴─┴─┴─┴─┘
+--     if index < n
+--       then Value 0 -- zeroed out
+--       else ChildOf 1 (B (RefUBit width parent (index - n))) 0
 lookup _ _ var relations = case EquivClass.lookup var relations of
   EquivClass.IsConstant value -> Value value
   EquivClass.IsRoot _ -> Root
@@ -122,11 +129,18 @@ lookup _ _ var relations = case EquivClass.lookup var relations of
 -- | Relation representing a linear function between two variables, i.e. x = ay + b
 data LinRel n
   = LinRel
-      n -- | slope
-      n -- | intercept
-  deriving (Show, Eq, NFData, Generic)
+      n
+      -- | slope
+      n
+  deriving
+    ( -- | intercept
+      Show,
+      Eq,
+      NFData,
+      Generic
+    )
 
-instance Num n => Semigroup (LinRel n) where
+instance (Num n) => Semigroup (LinRel n) where
   -- x = a1 * y + b1
   -- y = a2 * z + b2
   -- =>
@@ -134,7 +148,7 @@ instance Num n => Semigroup (LinRel n) where
   --   = (a1 * a2) * z + (a1 * b2 + b1)
   LinRel a1 b1 <> LinRel a2 b2 = LinRel (a1 * a2) (a1 * b2 + b1)
 
-instance Num n => Monoid (LinRel n) where
+instance (Num n) => Monoid (LinRel n) where
   mempty = LinRel 1 0
 
 instance (GaloisField n, Integral n) => EquivClass.IsRelation (LinRel n) where

@@ -183,19 +183,23 @@ tests = describe "Experiment" $ do
             return $ x + fromIntegral y + 0 :: Comp (UInt 4)
       let genPair = do
             x <- choose (0, 15)
-            -- y <- choose (1, 1)
-            return (x, 1)
+            y <- choose (0, 15)
+            return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [(x + y) `mod` 16]
         -- failing on 4, 16, 64
-        -- forM_ [gf181, Prime 257, Prime 17] $ \field -> do 
-        --   let options = defaultOptions { optUseNewLinker = True, optDisableTestingOnO0 = False }
-        --   testCompilerWithOpts options field (program y) [x] [] expected
+        forM_ [gf181, Prime 257, Prime 17] $ \field -> do 
+          let options = defaultOptions { optUseNewLinker = True, optDisableTestingOnO0 = False }
+          testCompilerWithOpts options field (program y) [x] [] expected
+        forM_ [gf181, Prime 257, Prime 17] $ \field -> do 
+          let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = False }
+          testCompilerWithOpts options field (program y) [x] [] expected
         forM_ [Binary 7] $ \field -> do 
           let options = defaultOptions { optUseNewLinker = True, optDisableTestingOnO0 = False }
-          debugWithOpts options field (program y)
           testCompilerWithOpts options field (program y) [x] [] expected
-          error ""
+        forM_ [Binary 7] $ \field -> do 
+          let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = False }
+          testCompilerWithOpts options field (program y) [x] [] expected
 
   -- it "variable * constant + 0 / Byte" $ do
   --   let program y z = do
