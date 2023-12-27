@@ -8,8 +8,8 @@ module Test.Compilation.Util
     debugO0,
     testCompilerWithOpts,
     testCompiler,
-    runSolver,
-    runSolverO0,
+    debugSolverWithOpts,
+    debugSolver,
     throwR1CS,
     throwBoth,
     assertSize,
@@ -58,31 +58,41 @@ solveR1CSWithOpts options prog rawPublicInputs rawPrivateInputs = do
 solveR1CS :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
 solveR1CS fieldInfo = solveR1CSWithOpts (defaultOptions {optFieldInfo = fieldInfo})
 
--- | Generate R1CS witness solver report (on optimized R1CS)
-solveR1CSCollectLog :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
-solveR1CSCollectLog fieldInfo prog rawPublicInputs rawPrivateInputs = case do
-  r1cs <- toR1CS <$> Compiler.compileAndLinkO1 fieldInfo prog
-  inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
-  return (r1cs, inputs) of
-  Left err -> (Just err, Nothing)
-  Right (r1cs, inputs) -> case Solver.debug r1cs inputs of
-    (Left err, logs) -> (Just (SolverError err), logs)
-    (Right _, logs) -> (Nothing, logs)
-
 -- | R1CS witness solver (on unoptimized R1CS)
 solveR1CSO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
 solveR1CSO0 fieldInfo = solveR1CSWithOpts (defaultOptions {optFieldInfo = fieldInfo, optOptimize = False})
 
--- | Generate R1CS witness solver report (on unoptimized R1CS)
-solveR1CSCollectLogO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
-solveR1CSCollectLogO0 fieldInfo prog rawPublicInputs rawPrivateInputs = case do
-  r1cs <- toR1CS <$> Compiler.compileAndLinkO0 fieldInfo prog
+-- | Generate R1CS witness solver report (on optimized R1CS)
+solveR1CSAndCollectLogWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
+solveR1CSAndCollectLogWithOpts options prog rawPublicInputs rawPrivateInputs = case do
+  r1cs <- toR1CS <$> Compiler.compileAndLinkWithOpts options prog
   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   return (r1cs, inputs) of
   Left err -> (Just err, Nothing)
   Right (r1cs, inputs) -> case Solver.debug r1cs inputs of
     (Left err, logs) -> (Just (SolverError err), logs)
     (Right _, logs) -> (Nothing, logs)
+
+-- solveR1CSAndCollectLog :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
+-- solveR1CSAndCollectLog fieldInfo prog rawPublicInputs rawPrivateInputs = case do
+--   r1cs <- toR1CS <$> Compiler.compileAndLinkO1 fieldInfo prog
+--   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
+--   return (r1cs, inputs) of
+--   Left err -> (Just err, Nothing)
+--   Right (r1cs, inputs) -> case Solver.debug r1cs inputs of
+--     (Left err, logs) -> (Just (SolverError err), logs)
+--     (Right _, logs) -> (Nothing, logs)
+
+-- -- | Generate R1CS witness solver report (on unoptimized R1CS)
+-- solveR1CSAndCollectLogO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
+-- solveR1CSAndCollectLogO0 fieldInfo prog rawPublicInputs rawPrivateInputs = case do
+--   r1cs <- toR1CS <$> Compiler.compileAndLinkO0 fieldInfo prog
+--   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
+--   return (r1cs, inputs) of
+--   Left err -> (Just err, Nothing)
+--   Right (r1cs, inputs) -> case Solver.debug r1cs inputs of
+--     (Left err, logs) -> (Just (SolverError err), logs)
+--     (Right _, logs) -> (Nothing, logs)
 
 --------------------------------------------------------------------------------
 
@@ -141,35 +151,25 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
 testCompiler :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
 testCompiler = testCompilerWithOpts defaultOptions
 
-runSolver :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
-runSolver fieldType program rawPublicInputs rawPrivateInputs = caseFieldType fieldType handlePrime handleBinary
+-- | Runs the solver and prints the log report for debugging
+debugSolverWithOpts :: (Encode t) => Options -> FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
+debugSolverWithOpts options fieldType program rawPublicInputs rawPrivateInputs = caseFieldType fieldType handlePrime handleBinary
   where
     handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
-      let (err, logs) = solveR1CSCollectLog fieldInfo program rawPublicInputs rawPrivateInputs :: (Maybe (Error (Prime n)), Maybe (Solver.LogReport (Prime n)))
+      let (err, logs) = solveR1CSAndCollectLogWithOpts (options {optFieldInfo = fieldInfo}) program rawPublicInputs rawPrivateInputs :: (Maybe (Error (Prime n)), Maybe (Solver.LogReport (Prime n)))
       mapM_ print err
       mapM_ print logs
 
     handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
-      let (err, logs) = solveR1CSCollectLog fieldInfo program rawPublicInputs rawPrivateInputs :: (Maybe (Error (Binary n)), Maybe (Solver.LogReport (Binary n)))
+      let (err, logs) = solveR1CSAndCollectLogWithOpts (options {optFieldInfo = fieldInfo}) program rawPublicInputs rawPrivateInputs :: (Maybe (Error (Binary n)), Maybe (Solver.LogReport (Binary n)))
       mapM_ print err
       mapM_ print logs
 
-runSolverO0 :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
-runSolverO0 fieldType program rawPublicInputs rawPrivateInputs = caseFieldType fieldType handlePrime handleBinary
-  where
-    handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
-    handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
-      let (err, logs) = solveR1CSCollectLogO0 fieldInfo program rawPublicInputs rawPrivateInputs :: (Maybe (Error (Prime n)), Maybe (Solver.LogReport (Prime n)))
-      mapM_ print err
-      mapM_ print logs
-
-    handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
-    handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
-      let (err, logs) = solveR1CSCollectLogO0 fieldInfo program rawPublicInputs rawPrivateInputs :: (Maybe (Error (Binary n)), Maybe (Solver.LogReport (Binary n)))
-      mapM_ print err
-      mapM_ print logs
+-- | Runs the solver and prints the log report for debugging with default options
+debugSolver :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
+debugSolver = debugSolverWithOpts defaultOptions
 
 --------------------------------------------------------------------------
 
