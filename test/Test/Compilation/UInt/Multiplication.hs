@@ -50,15 +50,15 @@ tests = describe "Multiplication" $ do
       forM_ [gf181, Prime 17, Binary 7] $ \field -> testCompiler field (program (fromIntegral y)) [toInteger x] [] expected
 
   -- it "variable * constant + 0 / Byte" $ do
-  --   let program y z = do
+  --   let program y = do
   --         x <- inputUInt @8 Public
-  --         return $ x * fromIntegral y + z
+  --         return $ x * fromIntegral y + 0
   --   property $ \(x, y :: Word8) -> do
   --     let expected = [toInteger (x * y)]
   --     forM_ [gf181, Prime 257, Prime 17] $ \field -> do
   --       let options = defaultOptions { optUseNewLinker = True }
-  --       testCompilerWithOpts options field (program y 0) [toInteger x] [] expected
-  --     forM_ [Binary 7] $ \field -> testCompiler field (program y 0) [toInteger x] [] expected
+  --       testCompilerWithOpts options field (program y) [toInteger x] [] expected
+  --     -- forM_ [Binary 7] $ \field -> testCompiler field (program y 0) [toInteger x] [] expected
 
   it "with addition / Byte" $ do
     let program = do

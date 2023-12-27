@@ -15,8 +15,6 @@ import Control.DeepSeq (NFData)
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
 import Keelung.Syntax
--- import Keelung.Data.U (U)
--- import qualified Keelung.Data.U as U
 
 --------------------------------------------------------------------------------
 
@@ -105,18 +103,18 @@ trim width (Limb ref w offset (Right signs)) = Limb ref (w `min` width) offset (
 -- -- | Given a series of limbs, shift them left by a given amount
 -- --   the least significant bits (and limb) are filled with zeros
 -- --
--- --             LSB              
+-- --             LSB
 -- --      input  ┌─┬─┬─┬─┬─┐┌─┬─┬─┐┌─┬─┬─┬─┐
 -- --             └─┴─┴─┴─┴─┘└─┴─┴─┘└─┴─┴─┴─┘
 -- --              │
 -- --              └───┐ shift "left" by n bits
--- --                  ▼ 
+-- --                  ▼
 -- --     output  ┌─┬─┬─┬─┬─┐┌─┬─┬─┐┌─┬─┬─┬─┐
 -- --             └─┴─┴─┴─┴─┘└─┴─┴─┘└─┴─┴─┴─┘
 -- --
 -- shiftLeft :: Int -> LimbList -> LimbList
 -- shiftLeft _ [] = []
--- shiftLeft amount [Left limb] 
+-- shiftLeft amount [Left limb]
 --   | amount >= lmbWidth limb = [Right (U.new (lmbWidth limb) 0)]
 --   | otherwise = [Left (trim (lmbWidth limb - amount) limb)]
 -- shiftLeft amount [Right val] = _

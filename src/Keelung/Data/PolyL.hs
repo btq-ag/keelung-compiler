@@ -116,7 +116,7 @@ insertRefs c' xs (PolyL c limbs vars) =
         then Left (c + c')
         else Right $ PolyL (c + c') limbs vars'
 
-addConstant :: Num n => n -> PolyL n -> PolyL n
+addConstant :: (Num n) => n -> PolyL n -> PolyL n
 addConstant c' (PolyL c ls vars) = PolyL (c + c') ls vars
 
 -- | Multiply all coefficients and the constant by some non-zero number

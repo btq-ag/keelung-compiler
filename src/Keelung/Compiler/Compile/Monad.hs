@@ -67,7 +67,9 @@ freshRefU width = do
   if useNewLinker
     then do
       modifyCounter $ addCount (Intermediate, WriteUInt width) width
-      return $ RefUX width (index `div` width)
+      if width == 0
+        then return $ RefUX width index -- TODO: examine if allocating a RefU of width 0 is even necessary
+        else return $ RefUX width (index `div` width)
     else do
       modifyCounter $ addCount (Intermediate, WriteUInt width) 1
       return $ RefUX width index
@@ -162,7 +164,8 @@ addC = mapM_ addOne
     countBitTestAsOccurU _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
-    addOne (CAddL xs) = modify' (\cs -> addOccurrencesTuple (PolyL.varsSet xs) $ cs {cmAddL = xs : cmAddL cs})
+    addOne (CAddL xs) = do
+      modify' (\cs -> addOccurrencesTuple (PolyL.varsSet xs) $ cs {cmAddL = xs : cmAddL cs})
     addOne (CRefFVal x c) = do
       execRelations $ Relations.assignR x c
     addOne (CLimbVal x c) = do
