@@ -8,6 +8,7 @@ module Keelung.Data.U
     widen,
     mapWidth,
     adjustWidth,
+    slice,
     modInv,
     aesMul,
     clAdd,
@@ -97,6 +98,10 @@ adjustWidthOfInteger oldWidth newWidth value = case oldWidth `compare` newWidth 
   EQ -> value -- no change
   LT -> value -- widen with zeros, no change
   GT -> value `Prelude.mod` (2 ^ newWidth) -- truncate
+
+-- | Slice a U value into a smaller U value.
+slice :: U -> Int -> Width -> U
+slice (U _ value) offset width = U (Just width) (value `Data.Bits.shiftR` offset) `Prelude.mod` (2 ^ width)
 
 --------------------------------------------------------------------------------
 

@@ -64,11 +64,11 @@ freshRefU width = do
   counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadUInt width)
   useNewLinker <- gets (optUseNewLinker . cmOptions)
-  if useNewLinker 
-    then do 
+  if useNewLinker
+    then do
       modifyCounter $ addCount (Intermediate, WriteUInt width) width
       return $ RefUX width (index `div` width)
-    else do 
+    else do
       modifyCounter $ addCount (Intermediate, WriteUInt width) 1
       return $ RefUX width index
 

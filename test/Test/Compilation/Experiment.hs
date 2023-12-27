@@ -176,23 +176,10 @@ tests = describe "Experiment" $ do
         --   testCompilerWithOpts options field (program dividend divisor) [] [] expected
 
 
-    -- it "MAD" $ do
-    --   let program x y c = do 
-    --         return $ fromIntegral x * fromIntegral y + fromIntegral c :: Comp (UInt 8)
-    --   let genPair = do
-    --         x <- choose (0, 255)
-    --         y <- choose (0, 255)
-    --         c <- choose (0, 0)
-    --         return (x, y, c)
-    --   forAll genPair $ \(x, y, c) -> do
-    --     let expected = [(x * y + c) `mod` 256]
-    --     -- failing on 4, 16, 64
-    --     let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = False }
-    --     testCompilerWithOpts options (Prime 17) (program x y c) [] [] expected
-    it "mul vc" $ do
-      let program c = do 
+    it "MAD" $ do
+      let program y = do 
             x <- input Public :: Comp (UInt 8)
-            return $ x * fromIntegral c
+            return $ x * fromIntegral y + 0 :: Comp (UInt 8)
       let genPair = do
             x <- choose (0, 255)
             y <- choose (0, 255)
@@ -201,4 +188,4 @@ tests = describe "Experiment" $ do
         let expected = [(x * y) `mod` 256]
         -- failing on 4, 16, 64
         let options = defaultOptions { optUseNewLinker = False, optDisableTestingOnO0 = False }
-        testCompilerWithOpts options (Prime 17) (program x) [y] [] expected
+        testCompilerWithOpts options (Prime 17) (program y) [x] [] expected

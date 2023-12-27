@@ -102,7 +102,7 @@ assignL var val relations = case UInt.lookupRefU (exportUIntRelations relations)
 assignU :: (GaloisField n, Integral n) => RefU -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignU var val = updateRelationsU $ UInt.assignRefU var val
 
-relateB :: (GaloisField n, Integral n) => GaloisField n => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateB refA (polarity, refB) = updateRelationsR (Ref.relateB refA (polarity, refB))
 
 -- -- | Lookup the relation between the RefUs of the Limbs first before relating the Limbs
@@ -137,7 +137,7 @@ relateL limb1 limb2 relations =
 lookupLimb :: (GaloisField n, Integral n) => Limb -> Relations n -> Either Limb U
 lookupLimb limb relations = case UInt.lookupRefU (exportUIntRelations relations) (Limb.lmbRef limb) of
   Left rootVar -> Left (limb {Limb.lmbRef = rootVar}) -- replace the RefU of the Limb with the root of that RefU
-  Right rootVal -> Right (U.adjustWidth (Limb.lmbWidth limb) rootVal) -- the parent of this limb turned out to be a constant
+  Right rootVal -> Right (U.slice rootVal (Limb.lmbOffset limb) (Limb.lmbWidth limb)) -- the parent of this limb turned out to be a constant
 
 relateU :: (GaloisField n, Integral n) => RefU -> RefU -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateU var1 var2 = updateRelationsU $ UInt.relateRefU var1 var2
@@ -157,7 +157,7 @@ size (Relations f l u) = EquivClass.size f + LimbRelations.size l + UInt.size u
 
 --------------------------------------------------------------------------------
 
-lookup :: GaloisField n => Ref -> Relations n -> Ref.Lookup n
+lookup :: (GaloisField n) => Ref -> Relations n -> Ref.Lookup n
 lookup var xs = Ref.lookup (relationsU xs) var (relationsR xs)
 
 --------------------------------------------------------------------------------

@@ -246,24 +246,24 @@ linkConstraint env (CMulL as bs cs) =
   ]
 
 updateCounters :: ConstraintModule n -> Counters
-updateCounters cm = 
+updateCounters cm =
   if optUseNewLinker (cmOptions cm)
     then updateCountersNew (OccurF.occuredSet (cmOccurrenceF cm)) (OccurB.occuredSet (cmOccurrenceB cm)) (OccurUB.toIntervalTables (cmOccurrenceUB cm)) (cmCounters cm)
     else updateCountersOld (OccurF.occuredSet (cmOccurrenceF cm)) (OccurB.occuredSet (cmOccurrenceB cm)) (OccurU.occuredSet (cmOccurrenceU cm)) (cmCounters cm)
-  where 
-      updateCountersOld :: IntSet -> IntSet -> IntMap IntSet -> Counters -> Counters
-      updateCountersOld refFsInEnvF refBsInEnvB refUsInEnvU counters =
-        let newFXCount = (WriteField, IntSet.size refFsInEnvF)
-            newBXCount = (WriteBool, IntSet.size refBsInEnvB)
-            newUXCounts = IntMap.mapWithKey (\width set -> (WriteUInt width, IntSet.size set)) refUsInEnvU
-            actions = newFXCount : newBXCount : IntMap.elems newUXCounts
-        in foldr (\(selector, count) -> setCount (Intermediate, selector) count) counters actions
+  where
+    updateCountersOld :: IntSet -> IntSet -> IntMap IntSet -> Counters -> Counters
+    updateCountersOld refFsInEnvF refBsInEnvB refUsInEnvU counters =
+      let newFXCount = (WriteField, IntSet.size refFsInEnvF)
+          newBXCount = (WriteBool, IntSet.size refBsInEnvB)
+          newUXCounts = IntMap.mapWithKey (\width set -> (WriteUInt width, IntSet.size set)) refUsInEnvU
+          actions = newFXCount : newBXCount : IntMap.elems newUXCounts
+       in foldr (\(selector, count) -> setCount (Intermediate, selector) count) counters actions
 
-      updateCountersNew :: IntSet -> IntSet -> IntMap IntervalTable -> Counters -> Counters
-      updateCountersNew refFsInEnvF refBsInEnvB refBsInEnvUB =
-        setCount (Intermediate, WriteField) (IntSet.size refFsInEnvF)
-          . setCount (Intermediate, WriteBool) (IntSet.size refBsInEnvB)
-          . setCountOfIntermediateUIntBits (fmap IntervalTable.size refBsInEnvUB)
+    updateCountersNew :: IntSet -> IntSet -> IntMap IntervalTable -> Counters -> Counters
+    updateCountersNew refFsInEnvF refBsInEnvB refBsInEnvUB =
+      setCount (Intermediate, WriteField) (IntSet.size refFsInEnvF)
+        . setCount (Intermediate, WriteBool) (IntSet.size refBsInEnvB)
+        . setCountOfIntermediateUIntBits (fmap IntervalTable.size refBsInEnvUB)
 
 --------------------------------------------------------------------------------
 
@@ -384,4 +384,3 @@ constructEnv options oldCounters newCounters occurF occurB occurU occurUB =
           envFieldWidth = FieldInfo.fieldWidth (optFieldInfo options),
           envUseNewLinker = optUseNewLinker options
         }
-

@@ -27,7 +27,6 @@ data Options = Options
     -- | Whether to disable testing on unoptimized program
     optDisableTestingOnO0 :: Bool
   }
-
   deriving (Eq, Generic, NFData)
 
 -- | Default options
@@ -38,7 +37,7 @@ defaultOptions =
       optConstProp = True,
       optOptimize = True,
       optUseNewLinker = False,
-      optDisableTestingOnO0 = True
+      optDisableTestingOnO0 = False
     }
 
 buildOptionsWithFieldType :: FieldType -> IO Options

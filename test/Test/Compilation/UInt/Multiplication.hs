@@ -49,6 +49,14 @@ tests = describe "Multiplication" $ do
       let expected = [toInteger (x * y)]
       forM_ [gf181, Prime 17, Binary 7] $ \field -> testCompiler field (program (fromIntegral y)) [toInteger x] [] expected
 
+  -- it "variable * constant + 0 / Byte" $ do
+  --   let program y z = do
+  --         x <- inputUInt @8 Public
+  --         return $ x * fromIntegral y + z
+  --   property $ \(x, y :: Word8) -> do
+  --     let expected = [toInteger (x * y)]
+  --     forM_ [gf181, Prime 257, Prime 17, Binary 7] $ \field -> testCompiler field (program y 0) [toInteger x] [] expected
+
   it "with addition / Byte" $ do
     let program = do
           x <- inputUInt @8 Public

@@ -42,6 +42,7 @@ data View
   = Ordinary Integer (Seq Limb)
   | OneLimbOnly Limb
   | OneConstantOnly Integer
+  deriving (Show, Eq)
 
 -- | Split a column of limbs into a stack of limbs and the rest of the column
 -- Let `H` be the maximum batch size allowed
