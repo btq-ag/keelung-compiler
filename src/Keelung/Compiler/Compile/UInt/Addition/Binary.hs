@@ -13,6 +13,7 @@ import Keelung.Syntax (Width)
 -- | Binary field addition
 compileAddB :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> U -> M n ()
 compileAddB _ out [] constant = writeRefUVal out constant
+compileAddB _ out [(var, _)] 0 = writeRefUEq out var
 compileAddB width out [(var, True)] constant = compileAddBPosConst width out var constant
 compileAddB width out [(var, False)] constant = compileAddBNegConst width out var constant
 compileAddB width out ((var1, sign1) : (var2, sign2) : vars) constant = do
