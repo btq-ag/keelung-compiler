@@ -276,7 +276,7 @@ instance UpdateOccurrences RefB where
                 RefUBit _ (RefUX width var) i ->
                   cm
                     { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm),
-                      cmOccurrenceUB = OccurUB.increase width var (i, i) (cmOccurrenceUB cm)
+                      cmOccurrenceUB = OccurUB.increase width var (i, i + 1) (cmOccurrenceUB cm)
                     }
                 RefBX var ->
                   cm
@@ -293,7 +293,7 @@ instance UpdateOccurrences RefB where
                 RefUBit _ (RefUX width var) i ->
                   cm
                     { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm),
-                      cmOccurrenceUB = OccurUB.decrease width var (i, i) (cmOccurrenceUB cm)
+                      cmOccurrenceUB = OccurUB.decrease width var (i, i + 1) (cmOccurrenceUB cm)
                     }
                 RefBX var ->
                   cm

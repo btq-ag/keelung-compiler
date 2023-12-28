@@ -200,14 +200,14 @@ tests = describe "Experiment" $ do
       let program = do
             x <- input Public
             y <- input Public
-            return $ x + y :: Comp (UInt 2)
+            return $ x + y :: Comp (UInt 4)
       let genPair = do
-            x <- choose (0, 3)
-            y <- choose (0, 3)
+            x <- choose (0, 15)
+            y <- choose (0, 15)
             return (x, y)
       forAll genPair $ \(x, y) -> do
-        let expected = [toInteger (x + y) `mod` 4]
-        let options = defaultOptions {optUseNewLinker = True}
-        debugWithOpts options (Binary 7) program
-        debugSolverWithOpts options (Binary 7) program [x, y] []
-        testCompilerWithOpts options (Binary 7) program [x, y] [] expected
+        let expected = [toInteger (x + y) `mod` 16]
+        testCompilerWithOpts (defaultOptions {optUseNewLinker = False, optOptimize = False}) (Binary 7) program [x, y] [] expected
+        testCompilerWithOpts (defaultOptions {optUseNewLinker = False, optOptimize = True}) (Binary 7) program [x, y] [] expected
+        testCompilerWithOpts (defaultOptions {optUseNewLinker = True, optOptimize = False}) (Binary 7) program [x, y] [] expected
+        testCompilerWithOpts (defaultOptions {optUseNewLinker = True, optOptimize = True}) (Binary 7) program [x, y] [] expected
