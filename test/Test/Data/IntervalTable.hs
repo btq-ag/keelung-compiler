@@ -9,6 +9,7 @@ import Keelung
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Linker (constructEnv, reindexRef, updateCounters)
 import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
+import Keelung.Compiler.Options
 import Keelung.Data.IntervalTable (IntervalTable (..))
 import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Reference
@@ -152,8 +153,8 @@ tests =
         reindexRef env (B (RefUBit 4 intermediate4 2)) `shouldBe` 7
         reindexRef env (B (RefUBit 4 intermediate4 3)) `shouldBe` 8
 
-      it "Bit test / and 1" $ do
-        (_, cm) <- executeGF181 $ do
+      it "Bit test / and 1 (old linker)" $ do
+        (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           return $ (x .&. y) !!! 0
@@ -175,8 +176,30 @@ tests =
         reindexRef env (B (RefUBit 4 intermediateVar0 2)) `shouldBe` 11
         reindexRef env (B (RefUBit 4 intermediateVar0 3)) `shouldBe` 12
 
-      it "Bit test / and 2" $ do
-        (_, cm) <- executeGF181 $ do
+      it "Bit test / and 1" $ do
+        (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          return $ (x .&. y) !!! 0
+        let env = constructEnv (cmOptions cm) (cmCounters cm) (updateCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
+        reindexRef env (B (RefBO 0)) `shouldBe` 0
+        let inputVar0 = RefUI 4 0
+        reindexRef env (B (RefUBit 4 inputVar0 0)) `shouldBe` 1
+        reindexRef env (B (RefUBit 4 inputVar0 1)) `shouldBe` 2
+        reindexRef env (B (RefUBit 4 inputVar0 2)) `shouldBe` 3
+        reindexRef env (B (RefUBit 4 inputVar0 3)) `shouldBe` 4
+        let inputVar1 = RefUP 4 0
+        reindexRef env (B (RefUBit 4 inputVar1 0)) `shouldBe` 5
+        reindexRef env (B (RefUBit 4 inputVar1 1)) `shouldBe` 6
+        reindexRef env (B (RefUBit 4 inputVar1 2)) `shouldBe` 7
+        reindexRef env (B (RefUBit 4 inputVar1 3)) `shouldBe` 8
+        let intermediateVar0 = RefUX 4 0
+        reindexRef env (B (RefUBit 4 intermediateVar0 1)) `shouldBe` 9
+        reindexRef env (B (RefUBit 4 intermediateVar0 2)) `shouldBe` 10
+        reindexRef env (B (RefUBit 4 intermediateVar0 3)) `shouldBe` 11
+
+      it "Bit test / and 2 (old linker)" $ do
+        (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           z <- inputUInt @4 Public
@@ -207,3 +230,29 @@ tests =
         reindexRef env (B (RefUBit 4 (RefUX 4 0) 1)) `shouldBe` 18
         reindexRef env (B (RefUBit 4 (RefUX 4 0) 2)) `shouldBe` 19
         reindexRef env (B (RefUBit 4 (RefUX 4 0) 3)) `shouldBe` 20
+
+      it "Bit test / and 2" $ do
+        (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
+          x <- inputUInt @4 Public
+          y <- inputUInt @4 Private
+          z <- inputUInt @4 Public
+          return $ (x .&. y .&. z) !!! 0
+        let env = constructEnv (cmOptions cm) (cmCounters cm) (updateCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
+
+        reindexRef env (B (RefBO 0)) `shouldBe` 0
+        let inputVar0 = RefUI 4 0
+        reindexRef env (B (RefUBit 4 inputVar0 0)) `shouldBe` 1
+        reindexRef env (B (RefUBit 4 inputVar0 1)) `shouldBe` 2
+        reindexRef env (B (RefUBit 4 inputVar0 2)) `shouldBe` 3
+        reindexRef env (B (RefUBit 4 inputVar0 3)) `shouldBe` 4
+        let inputVar2 = RefUI 4 1
+        reindexRef env (B (RefUBit 4 inputVar2 0)) `shouldBe` 5
+        reindexRef env (B (RefUBit 4 inputVar2 1)) `shouldBe` 6
+        reindexRef env (B (RefUBit 4 inputVar2 2)) `shouldBe` 7
+        reindexRef env (B (RefUBit 4 inputVar2 3)) `shouldBe` 8
+        let inputVar1 = RefUP 4 0
+        reindexRef env (B (RefUBit 4 inputVar1 0)) `shouldBe` 9
+        reindexRef env (B (RefUBit 4 inputVar1 1)) `shouldBe` 10
+        reindexRef env (B (RefUBit 4 inputVar1 2)) `shouldBe` 11
+        reindexRef env (B (RefUBit 4 inputVar1 3)) `shouldBe` 12
+        reindexRef env (F (RefFX 0)) `shouldBe` 13

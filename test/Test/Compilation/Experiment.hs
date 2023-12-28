@@ -8,6 +8,8 @@ import Keelung.Compiler.Options
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck
+import qualified Keelung.Data.U as U
+import Control.Monad (forM_)
 
 -- import Test.QuickCheck
 
@@ -195,19 +197,34 @@ tests = describe "Experiment" $ do
   --   debug (Prime 257) program
   --   testCompiler (Prime 257) program [100] [] [0]
 
-  describe "Binary field" $ do
-    it "2 positive variables / Nimble" $ do
-      let program = do
-            x <- input Public
-            y <- input Public
-            return $ x + y :: Comp (UInt 4)
-      let genPair = do
-            x <- choose (0, 15)
-            y <- choose (0, 15)
-            return (x, y)
-      forAll genPair $ \(x, y) -> do
-        let expected = [toInteger (x + y) `mod` 16]
-        testCompilerWithOpts (defaultOptions {optUseNewLinker = False, optOptimize = False}) (Binary 7) program [x, y] [] expected
-        testCompilerWithOpts (defaultOptions {optUseNewLinker = False, optOptimize = True}) (Binary 7) program [x, y] [] expected
-        testCompilerWithOpts (defaultOptions {optUseNewLinker = True, optOptimize = False}) (Binary 7) program [x, y] [] expected
-        testCompilerWithOpts (defaultOptions {optUseNewLinker = True, optOptimize = True}) (Binary 7) program [x, y] [] expected
+  -- describe "Binary field" $ do
+  --   it "2 positive variables / Nimble" $ do
+  --     let program = do
+  --           x <- input Public
+  --           y <- input Public
+  --           return $ x + y :: Comp (UInt 4)
+  --     let genPair = do
+  --           x <- choose (0, 15)
+  --           y <- choose (0, 15)
+  --           return (x, y)
+  --     forAll genPair $ \(x, y) -> do
+  --       let expected = [toInteger (x + y) `mod` 16]
+  --       testCompilerWithOpts (defaultOptions {optUseNewLinker = False, optOptimize = False}) (Binary 7) program [x, y] [] expected
+  --       testCompilerWithOpts (defaultOptions {optUseNewLinker = False, optOptimize = True}) (Binary 7) program [x, y] [] expected
+  --       testCompilerWithOpts (defaultOptions {optUseNewLinker = True, optOptimize = False}) (Binary 7) program [x, y] [] expected
+  --       testCompilerWithOpts (defaultOptions {optUseNewLinker = True, optOptimize = True}) (Binary 7) program [x, y] [] expected
+
+  describe "Carry-less Multiplication" $ do
+      it "1 variable / 1 constant" $ do
+        let program y = do
+              x <- input Public
+              return $ x .*. fromInteger y :: Comp (UInt 8)
+        let genPair = do
+              x <- choose (0, 255)
+              -- y <- choose (0, 255)
+              return (x, 0)
+        forAll genPair $ \(x, y) -> do
+          let expected = [toInteger (U.clMul (U.new 8 x) (U.new 8 y))]
+          forM_ [gf181, Prime 17] $ \field -> do
+            debugWithOpts (defaultOptions {optUseNewLinker = True}) field (program (fromIntegral y))
+            testCompilerWithOpts (defaultOptions {optUseNewLinker = True}) field (program (fromIntegral y)) [toInteger x] [] expected

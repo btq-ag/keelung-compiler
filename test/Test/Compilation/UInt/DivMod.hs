@@ -7,12 +7,12 @@ import Data.Field.Galois (Binary, Prime)
 import Keelung hiding (compile)
 import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Compiler.Error (Error (..))
+import Keelung.Compiler.Options
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver.Monad qualified as Solver
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
-import Keelung.Compiler.Options
 
 run :: IO ()
 run = hspec tests
@@ -71,7 +71,7 @@ tests =
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
           forM_ [gf181, Prime 17] $ \field -> do
-            let options = defaultOptions { optDisableTestingOnO0 = True }
+            let options = defaultOptions {optDisableTestingOnO0 = True}
             testCompilerWithOpts options field (program (fromIntegral divisor)) [dividend] [] expected
           forM_ [Binary 7] $ \field -> do
             testCompiler field (program (fromIntegral divisor)) [dividend] [] expected
@@ -85,7 +85,7 @@ tests =
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
           forM_ [gf181, Prime 17] $ \field -> do
-            let options = defaultOptions { optDisableTestingOnO0 = True }
+            let options = defaultOptions {optDisableTestingOnO0 = True}
             testCompilerWithOpts options field (program dividend divisor) [] [] expected
           forM_ [Binary 7] $ \field -> do
             testCompiler field (program dividend divisor) [] [] expected

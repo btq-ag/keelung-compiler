@@ -1,6 +1,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Test.Optimization.Util (debug, executeGF181, executeGF181', executePrime, executeBinary, shouldHaveSize) where
+module Test.Optimization.Util
+  ( debug,
+    executeGF181WithOpts,
+    executeGF181,
+    executeGF181',
+    executePrimeWithOpts,
+    executePrime,
+    executeBinaryWithOpts,
+    executeBinary,
+    shouldHaveSize,
+  )
+where
 
 import Control.Arrow (left)
 import Data.Field.Galois (Binary, Prime)
@@ -44,11 +55,11 @@ executeGF181' :: (Encode t) => Comp t -> IO (ConstraintModule (N GF181), Constra
 executeGF181' = executeGF181WithOpts (defaultOptions {optFieldInfo = gf181Info, optUseNewLinker = True})
 
 -- | Returns the original and optimized constraint system
-executePrime :: (Encode t, GaloisField n, Integral n) => Integer -> Comp t -> IO (ConstraintModule n, ConstraintModule n)
-executePrime n program = caseFieldType (Prime n) handlePrime undefined
+executePrimeWithOpts :: (Encode t, GaloisField n, Integral n) => Options -> Integer -> Comp t -> IO (ConstraintModule n, ConstraintModule n)
+executePrimeWithOpts options n program = caseFieldType (Prime n) handlePrime undefined
   where
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
-      cm <- case compileWithOpts (defaultOptions {optFieldInfo = fieldInfo, optOptimize = False}) program of
+      cm <- case compileWithOpts (options {optFieldInfo = fieldInfo, optOptimize = False}) program of
         Left err -> assertFailure $ show err
         Right result -> return result
       case optimize cm of
@@ -58,12 +69,15 @@ executePrime n program = caseFieldType (Prime n) handlePrime undefined
           cmCounters cm `shouldBe` cmCounters cm'
           return (cm, cm')
 
+executePrime :: (Encode t, GaloisField n, Integral n) => Integer -> Comp t -> IO (ConstraintModule n, ConstraintModule n)
+executePrime = executePrimeWithOpts defaultOptions
+
 -- | Returns the original and optimized constraint system
-executeBinary :: (Encode t, GaloisField n, Integral n) => Integer -> Comp t -> IO (ConstraintModule n, ConstraintModule n)
-executeBinary n program = caseFieldType (Binary n) undefined handleBinary
+executeBinaryWithOpts :: (Encode t, GaloisField n, Integral n) => Options -> Integer -> Comp t -> IO (ConstraintModule n, ConstraintModule n)
+executeBinaryWithOpts options n program = caseFieldType (Binary n) undefined handleBinary
   where
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
-      cm <- case compileWithOpts (defaultOptions {optFieldInfo = fieldInfo, optOptimize = False}) program of
+      cm <- case compileWithOpts (options {optFieldInfo = fieldInfo, optOptimize = False}) program of
         Left err -> assertFailure $ show err
         Right result -> return result
       case optimize cm of
@@ -72,6 +86,9 @@ executeBinary n program = caseFieldType (Binary n) undefined handleBinary
           -- var counters should remain the same
           cmCounters cm `shouldBe` cmCounters cm'
           return (cm, cm')
+
+executeBinary :: (Encode t, GaloisField n, Integral n) => Integer -> Comp t -> IO (ConstraintModule n, ConstraintModule n)
+executeBinary = executeBinaryWithOpts defaultOptions
 
 shouldHaveSize :: ConstraintModule (N GF181) -> Int -> IO ()
 shouldHaveSize cm expecteds = do

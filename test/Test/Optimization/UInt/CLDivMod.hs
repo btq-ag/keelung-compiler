@@ -7,6 +7,7 @@ module Test.Optimization.UInt.CLDivMod (tests, run) where
 import Keelung
 -- import Keelung.Compiler.Linker
 
+import Keelung.Compiler.Options
 import Test.Hspec
 import Test.Optimization.Util
 
@@ -23,12 +24,17 @@ tests = describe "Carry-less Div/Mod" $ do
     -- remainder addition: 2
     -- divisor non-zero: 1
     -- divisor > remainder: 3
-    (_cs, cs') <- executeGF181 $ do
+
+    (_cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
       x <- input Public :: Comp (UInt 2)
       y <- input Public :: Comp (UInt 2)
       performCLDivMod x y
-    -- print _cs
-    -- print cs'
-    -- print $ linkConstraintModule cs'
     _cs `shouldHaveSize` 33
     cs' `shouldHaveSize` 20
+
+    (_cs2, cs2') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
+      x <- input Public :: Comp (UInt 2)
+      y <- input Public :: Comp (UInt 2)
+      performCLDivMod x y
+    _cs2 `shouldHaveSize` 31
+    cs2' `shouldHaveSize` 19
