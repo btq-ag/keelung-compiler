@@ -6,10 +6,10 @@ import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo
+import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf), Var)
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax qualified as T
-import qualified Keelung.Data.U as U
 
 run :: (GaloisField n, Integral n) => FieldInfo -> T.Elaborated -> Internal n
 run fieldInfo (T.Elaborated expr comp) =
@@ -102,7 +102,7 @@ convertExprU expr = case expr of
   T.VarUP w var -> return $ VarUP w var
   T.AddU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure True
   T.SubU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure False
-  T.AESMulU w x y -> AESMulU w <$> convertExprU x <*> convertExprU y
+  T.AESMulU _ x y -> AESMulU <$> convertExprU x <*> convertExprU y
   T.MulU w x y -> MulU w <$> convertExprU x <*> convertExprU y
   T.CLMulU w x y -> CLMulU w <$> convertExprU x <*> convertExprU y
   T.MMIU w x p -> MMIU w <$> convertExprU x <*> pure (U.new w p)

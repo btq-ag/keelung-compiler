@@ -53,10 +53,10 @@ compile out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     compileMulU w out x' y'
-  AESMulU w x y -> do
+  AESMulU x y -> do
     x' <- wireU x
     y' <- wireU y
-    compileAESMulU w out x' y'
+    compileAESMulU out x' y'
   CLMulU w x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -73,14 +73,14 @@ compile out expr = case expr of
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (AndB (fmap (`BitU` i) xs))
       case result of
-        Left var -> writeRefBEq (RefUBit w out i) var
-        Right val -> writeRefBVal (RefUBit w out i) val
+        Left var -> writeRefBEq (RefUBit out i) var
+        Right val -> writeRefBVal (RefUBit out i) val
   OrU w xs -> do
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (OrB (fmap (`BitU` i) xs))
       case result of
-        Left var -> writeRefBEq (RefUBit w out i) var
-        Right val -> writeRefBVal (RefUBit w out i) val
+        Left var -> writeRefBEq (RefUBit out i) var
+        Right val -> writeRefBVal (RefUBit out i) val
   XorU w xs -> do
     xs' <- mapM wireU xs
     compileXorUs w out (toList xs')
@@ -88,8 +88,8 @@ compile out expr = case expr of
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (NotB (BitU x i))
       case result of
-        Left var -> writeRefBEq (RefUBit w out i) var
-        Right val -> writeRefBVal (RefUBit w out i) val
+        Left var -> writeRefBEq (RefUBit out i) var
+        Right val -> writeRefBVal (RefUBit out i) val
   IfU w p x y -> do
     p' <- compileExprB p
     x' <- wireU x
@@ -339,7 +339,7 @@ compileIfU width (Left p) x y = do
         xyLCs
       -- let xLimbs = Limb.refUToLimbs fieldWidth (RefUVal width x)
 
-      -- let bits = [(B (RefUBit width out i), -(2 ^ i)) | i <- [0 .. width - 1]]
+      -- let bits = [(B (RefUBit out i), -(2 ^ i)) | i <- [0 .. width - 1]]
       -- -- (x - y) * p - out + y = 0
       -- writeAdd (fromInteger y) $ (B p, fromInteger (x - y)) : bits
       return $ Left out

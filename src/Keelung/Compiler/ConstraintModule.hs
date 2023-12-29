@@ -273,7 +273,7 @@ instance UpdateOccurrences RefB where
       ( foldl
           ( \cm ref ->
               case ref of
-                RefUBit _ (RefUX width var) i ->
+                RefUBit (RefUX width var) i ->
                   cm
                     { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm),
                       cmOccurrenceUB = OccurUB.increase width var (i, i + 1) (cmOccurrenceUB cm)
@@ -290,7 +290,7 @@ instance UpdateOccurrences RefB where
       ( foldl
           ( \cm ref ->
               case ref of
-                RefUBit _ (RefUX width var) i ->
+                RefUBit (RefUX width var) i ->
                   cm
                     { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm),
                       cmOccurrenceUB = OccurUB.decrease width var (i, i + 1) (cmOccurrenceUB cm)

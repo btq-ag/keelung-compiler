@@ -27,7 +27,7 @@ pinnedRefB :: RefB -> Bool
 pinnedRefB (RefBI _) = True
 pinnedRefB (RefBP _) = True
 pinnedRefB (RefBO _) = True
-pinnedRefB (RefUBit _ ref _) = pinnedRefU ref
+pinnedRefB (RefUBit ref _) = pinnedRefU ref
 pinnedRefB (RefBX _) = False
 
 pinnedRefU :: RefU -> Bool

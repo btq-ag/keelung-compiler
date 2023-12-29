@@ -48,7 +48,7 @@ fromRefU2 fieldInfo (Right val) =
 fromRefU2 fieldInfo (Left var) =
   let width = widthOf var
    in case fieldTypeData fieldInfo of
-        Binary _ -> [1 @ B (RefUBit width var i) | i <- [0 .. width - 1]]
+        Binary _ -> [1 @ B (RefUBit var i) | i <- [0 .. width - 1]]
         Prime _ ->
           let limbs = Limb.refUToLimbs (fieldWidth fieldInfo) var
            in map (Polynomial . PolyL.fromLimb 0) limbs

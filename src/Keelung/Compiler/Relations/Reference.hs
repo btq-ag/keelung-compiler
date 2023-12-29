@@ -93,18 +93,18 @@ data Lookup n = Root | Value n | ChildOf n Ref n
     )
 
 lookup :: (GaloisField n) => Options -> UIntRelations -> Ref -> RefRelations n -> Lookup n
-lookup _options relationsU (B (RefUBit width refU index)) _relations = case EquivClass.lookup (UInt.Ref refU) relationsU of
+lookup _options relationsU (B (RefUBit refU index)) _relations = case EquivClass.lookup (UInt.Ref refU) relationsU of
   EquivClass.IsConstant value -> Value (if Data.Bits.testBit value index then 1 else 0)
   EquivClass.IsRoot toChildren ->
     if Map.null toChildren
       then -- cannot find any result in the UIntRelations, so we look in the RefRelations instead
-      case EquivClass.lookup (B (RefUBit width refU index)) _relations of
+      case EquivClass.lookup (B (RefUBit refU index)) _relations of
         EquivClass.IsConstant value -> Value value
         EquivClass.IsRoot _ -> Root
         EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
       else Root
-  EquivClass.IsChildOf (UInt.Ref parent) UInt.Equal -> ChildOf 1 (B (RefUBit width parent index)) 0
--- EquivClass.IsChildOf parent (UInt.ShiftLeft 0) -> ChildOf 1 (B (RefUBit width parent index)) 0
+  EquivClass.IsChildOf (UInt.Ref parent) UInt.Equal -> ChildOf 1 (B (RefUBit parent index)) 0
+-- EquivClass.IsChildOf parent (UInt.ShiftLeft 0) -> ChildOf 1 (B (RefUBit parent index)) 0
 -- EquivClass.IsChildOf parent (UInt.ShiftLeft n) ->
 --     -- parent  ┌─┬─┬─┬─┬─┬─┬─┬─┐
 --     --         └─┴─┴─┴─┴─┴─┴─┴─┘
@@ -115,7 +115,7 @@ lookup _options relationsU (B (RefUBit width refU index)) _relations = case Equi
 --     --         └─┴─┴─┴─┴─┴─┴─┴─┘
 --     if index < n
 --       then Value 0 -- zeroed out
---       else ChildOf 1 (B (RefUBit width parent (index - n))) 0
+--       else ChildOf 1 (B (RefUBit parent (index - n))) 0
 lookup _ _ var relations = case EquivClass.lookup var relations of
   EquivClass.IsConstant value -> Value value
   EquivClass.IsRoot _ -> Root

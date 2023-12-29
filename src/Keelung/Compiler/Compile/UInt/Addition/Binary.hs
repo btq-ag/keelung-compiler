@@ -50,11 +50,11 @@ compileAddBPosPos width out as bs = do
   carryBits <- freshRefU (width - 1)
 
   forM_ [0 .. width - 1] $ \index -> do
-    let a = B (RefUBit width as index)
-    let b = B (RefUBit width bs index)
-    let c = B (RefUBit width out index)
-    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit (width - 1) carryBits (index - 1)))
-    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit (width - 1) carryBits index))
+    let a = B (RefUBit as index)
+    let b = B (RefUBit bs index)
+    let c = B (RefUBit out index)
+    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit carryBits (index - 1)))
+    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit carryBits index))
 
     -- out[index] = a + b + prevCarry
     -- nextCarry = a * b + a * prevCarry + b * prevCarry
@@ -98,11 +98,11 @@ compileAddBPosConst width out as bs = do
   carryBits <- freshRefU (width - 1)
 
   forM_ [0 .. width - 1] $ \index -> do
-    let a = B (RefUBit width as index)
+    let a = B (RefUBit as index)
     let b = if Data.Bits.testBit bs index then 1 else 0
-    let c = B (RefUBit width out index)
-    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit (width - 1) carryBits (index - 1)))
-    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit (width - 1) carryBits index))
+    let c = B (RefUBit out index)
+    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit carryBits (index - 1)))
+    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit carryBits index))
 
     -- out[index] = a + b + prevCarry
     -- nextCarry = a * b + a * prevCarry + b * prevCarry
@@ -140,11 +140,11 @@ compileAddBNegConst width out as bs = do
   carryBits <- freshRefU (width - 1)
 
   forM_ [0 .. width - 1] $ \index -> do
-    let a = B (RefUBit width as index)
+    let a = B (RefUBit as index)
     let b = if Data.Bits.testBit bs index then 1 else 0
-    let c = B (RefUBit width out index)
-    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit (width - 1) carryBits (index - 1)))
-    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit (width - 1) carryBits index))
+    let c = B (RefUBit out index)
+    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit carryBits (index - 1)))
+    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit carryBits index))
 
     -- out[index] = a + b + prevCarry + 1
     -- nextCarry = a * b + a * prevCarry + b * prevCarry + b + prevCarry
@@ -185,11 +185,11 @@ compileAddBPosNeg width out as bs = do
   carryBits <- freshRefU (width - 1)
 
   forM_ [0 .. width - 1] $ \index -> do
-    let a = B (RefUBit width as index)
-    let b = B (RefUBit width bs index)
-    let c = B (RefUBit width out index)
-    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit (width - 1) carryBits (index - 1)))
-    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit (width - 1) carryBits index))
+    let a = B (RefUBit as index)
+    let b = B (RefUBit bs index)
+    let c = B (RefUBit out index)
+    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit carryBits (index - 1)))
+    let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit carryBits index))
 
     -- out[index] = a + b + prevCarry + 1
     -- nextCarry = a * b + a * prevCarry + b * prevCarry + a + prevCarry

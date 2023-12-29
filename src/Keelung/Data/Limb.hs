@@ -41,11 +41,11 @@ instance Show Limb where
 showAsTerms :: Limb -> (Bool, String)
 showAsTerms (Limb ref limbWidth i sign') = case (limbWidth, sign') of
   (0, _) -> (True, "{Empty Limb}")
-  (1, Left sign) -> (sign, "{$" <> show (RefUBit 1 ref i) <> "}")
-  (2, Left sign) -> (sign, "{$" <> show (RefUBit 1 ref i) <> " + 2" <> toSuperscript 1 <> "$" <> show (RefUBit 1 ref (i + 1)) <> "}")
-  (_, Left sign) -> (sign, "{$" <> show (RefUBit 1 ref i) <> " + ... + 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit 1 ref (i + limbWidth - 1)) <> "}")
+  (1, Left sign) -> (sign, "{$" <> show (RefUBit ref i) <> "}")
+  (2, Left sign) -> (sign, "{$" <> show (RefUBit ref i) <> " + 2" <> toSuperscript 1 <> "$" <> show (RefUBit ref (i + 1)) <> "}")
+  (_, Left sign) -> (sign, "{$" <> show (RefUBit ref i) <> " + ... + 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit ref (i + limbWidth - 1)) <> "}")
   (_, Right signs) ->
-    let terms = mconcat [(if signs !! j then " + " else " - ") <> "2" <> toSuperscript j <> "$" <> show (RefUBit 1 ref (i + j)) | j <- [0 .. limbWidth - 1]]
+    let terms = mconcat [(if signs !! j then " + " else " - ") <> "2" <> toSuperscript j <> "$" <> show (RefUBit ref (i + j)) | j <- [0 .. limbWidth - 1]]
      in (True, "{" <> terms <> "}")
 
 -- | Helper function for converting integers to superscript strings

@@ -15,11 +15,11 @@ where
 
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..))
+import Keelung.Data.U (U)
 import Keelung.Field (N (..))
 import Keelung.Syntax (HasWidth (..), Var, Width)
 import Keelung.Syntax.Counters (Counters)
 import Keelung.Syntax.Counters qualified as Counters
-import Keelung.Data.U (U)
 
 --------------------------------------------------------------------------------
 
@@ -30,10 +30,10 @@ data Expr n
   | ExprU (ExprU n) -- UInt expression
   deriving (Functor)
 
-chain :: Show n => Int -> String -> Int -> Seq n -> ShowS
+chain :: (Show n) => Int -> String -> Int -> Seq n -> ShowS
 chain prec delim n = showParen (prec > n) . go
   where
-    go :: Show n => Seq n -> String -> String
+    go :: (Show n) => Seq n -> String -> String
     go Empty = showString ""
     go (x :<| Empty) = showsPrec (succ n) x
     go (x :<| xs') = showsPrec (succ n) x . showString delim . go xs'
@@ -148,7 +148,7 @@ data ExprU n
   | -- arithmetic operators
     AddU Width (Seq (ExprU n, Bool))
   | MulU Width (ExprU n) (ExprU n)
-  | AESMulU Width (ExprU n) (ExprU n) -- hardcoded multiplication for AES
+  | AESMulU (ExprU n) (ExprU n) -- hardcoded multiplication for AES
   | CLMulU Width (ExprU n) (ExprU n)
   | CLModU Width (ExprU n) (ExprU n)
   | MMIU Width (ExprU n) U -- modular multiplicative inverse
@@ -175,7 +175,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     VarUP _ var -> showString "UP" . shows var
     AddU _ xs -> chain prec " + " 6 xs
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
-    AESMulU _ x y -> chain prec " AES* " 7 $ x :<| y :<| Empty
+    AESMulU x y -> chain prec " AES* " 7 $ x :<| y :<| Empty
     CLMulU _ x y -> chain prec " .*. " 7 $ x :<| y :<| Empty
     CLModU _ x y -> chain prec " .%. " 8 $ x :<| y :<| Empty
     MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
@@ -198,7 +198,7 @@ instance HasWidth (ExprU n) where
     VarUP w _ -> w
     AddU w _ -> w
     MulU w _ _ -> w
-    AESMulU w _ _ -> w
+    AESMulU x _ -> widthOf x
     CLMulU w _ _ -> w
     CLModU w _ _ -> w
     MMIU w _ _ -> w

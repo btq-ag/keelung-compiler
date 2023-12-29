@@ -39,7 +39,7 @@ data RefB
   | -- | Boolean intermediate variable
     RefBX Var
   | -- | UInt bit variable
-    RefUBit Width RefU Int
+    RefUBit RefU Int
   deriving (Eq, Ord, Generic, NFData)
 
 instance Show RefB where
@@ -47,7 +47,7 @@ instance Show RefB where
   show (RefBI x) = "BI" ++ show x
   show (RefBP x) = "BP" ++ show x
   show (RefBX x) = "B" ++ show x
-  show (RefUBit _ x i) = show x ++ "[" ++ show i ++ "]"
+  show (RefUBit x i) = show x ++ "[" ++ show i ++ "]"
 
 -- | For representing Field variables in constraints
 data RefF

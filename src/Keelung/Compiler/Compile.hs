@@ -93,14 +93,14 @@ compileSideEffect (BitsToUInt width varU bits) = do
   forM_ (zip [0 .. width - 1] bits) $ \(i, bit) -> do
     result <- compileExprB bit
     case result of
-      Left (RefUBit _ refU2 j) -> do
+      Left (RefUBit refU2 j) -> do
         let limb1 = Limb.new refU 1 i (Left True)
         let limb2 = Limb.new refU2 1 j (Left True)
         writeLimbEq limb1 limb2
-      -- writeAdd 0 [(B (RefUBit width refU i), -1), (B var, 1)]
-      Left var -> writeAdd 0 [(B (RefUBit width refU i), -1), (B var, 1)]
-      Right True -> writeAdd 1 [(B (RefUBit width refU i), -1)]
-      Right False -> writeAdd 0 [(B (RefUBit width refU i), 1)]
+      -- writeAdd 0 [(B (RefUBit refU i), -1), (B var, 1)]
+      Left var -> writeAdd 0 [(B (RefUBit refU i), -1), (B var, 1)]
+      Right True -> writeAdd 1 [(B (RefUBit refU i), -1)]
+      Right False -> writeAdd 0 [(B (RefUBit refU i), 1)]
 compileSideEffect (DivMod width dividend divisor quotient remainder) = do
   useNewLinker <- gets (optUseNewLinker . cmOptions)
   if useNewLinker

@@ -19,11 +19,11 @@ compileXorUs width out xs = do
     let column =
           map
             ( \x -> case x of
-                Left refU -> Left (RefUBit width refU i)
+                Left refU -> Left (RefUBit refU i)
                 Right value -> Right (value `Data.Bits.testBit` i)
             )
             xs
     result <- Boolean.xorBs column
     case result of
-      Left var -> writeRefBEq (RefUBit width out i) var
-      Right val -> writeRefBVal (RefUBit width out i) val
+      Left var -> writeRefBEq (RefUBit out i) var
+      Right val -> writeRefBVal (RefUBit out i) val

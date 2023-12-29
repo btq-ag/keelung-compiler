@@ -92,7 +92,7 @@ compile compileU expr = case expr of
     let index = i `mod` width
     result <- compileU x
     case result of
-      Left var -> return $ Left (RefUBit width var (i `mod` width)) -- out = x'[i]
+      Left var -> return $ Left (RefUBit var (i `mod` width)) -- out = x'[i]
       Right val -> return $ Right (Data.Bits.testBit val index)
 
 --------------------------------------------------------------------------------
@@ -370,7 +370,7 @@ xorBs xs = do
       -- equate the LC with the unsigned integer
       writeAddWithLCAndLimbs sumOfVars 0 [(limb, -1)]
       -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
-      return $ RefUBit width (Limb.lmbRef limb) 0
+      return $ RefUBit (Limb.lmbRef limb) 0
 
     flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
     flipResult (Right False) = return $ Right True
@@ -435,13 +435,13 @@ computeLTEUVarVar :: (GaloisField n, Integral n) => RefU -> RefU -> M n (Either 
 computeLTEUVarVar x y = do
   let width = widthOf x
   -- last bit
-  let xBit = B (RefUBit width x 0)
-      yBit = B (RefUBit width y 0)
+  let xBit = B (RefUBit x 0)
+      yBit = B (RefUBit y 0)
   -- x[0] * y[0] = result + x[0] - 1
   result <- freshRefB
   writeMul (0, [(xBit, 1)]) (0, [(yBit, 1)]) (-1, [(B result, 1), (xBit, 1)])
   -- starting from the least significant bit
-  Left <$> foldM (compileLTEUVarVarPrim width x y) result [1 .. width - 1]
+  Left <$> foldM (compileLTEUVarVarPrim x y) result [1 .. width - 1]
 
 computeLTEUVarConst :: (GaloisField n, Integral n) => RefU -> U -> M n (Either RefB Bool)
 computeLTEUVarConst x y = do
@@ -454,14 +454,14 @@ computeLTEUVarConst x y = do
       mapM (eqZero True) chunks >>= andBs
     _ -> do
       -- starting from the least significant bit
-      let pairs = [(RefUBit width x i, Data.Bits.testBit y i) | i <- [0 .. width - 1]]
+      let pairs = [(RefUBit x i, Data.Bits.testBit y i) | i <- [0 .. width - 1]]
       foldM compileLTEUVarConstPrim (Right True) pairs
 
 computeLTEUConstVar :: (GaloisField n, Integral n) => U -> RefU -> M n (Either RefB Bool)
 computeLTEUConstVar x y = do
   let width = widthOf y
   -- starting from the least significant bit
-  let pairs = [(Data.Bits.testBit x i, RefUBit width y i) | i <- [0 .. width - 1]]
+  let pairs = [(Data.Bits.testBit x i, RefUBit y i) | i <- [0 .. width - 1]]
   foldM compileLTEUConstVarPrim (Right True) pairs
 
 -- Compiling a < b, where a and b are both variables
@@ -473,13 +473,13 @@ computeLTUVarVar :: (GaloisField n, Integral n) => RefU -> RefU -> M n (Either R
 computeLTUVarVar x y = do
   let width = widthOf x
   -- last bit
-  let xBit = B (RefUBit width x 0)
-      yBit = B (RefUBit width y 0)
+  let xBit = B (RefUBit x 0)
+      yBit = B (RefUBit y 0)
   -- (y - lastBit) = (x)(y)
   lastBit <- freshRefB
   writeMul (0, [(xBit, 1)]) (0, [(yBit, 1)]) (0, [(B lastBit, -1), (yBit, 1)])
   -- starting from the least significant bit
-  Left <$> foldM (compileLTEUVarVarPrim width x y) lastBit [1 .. width - 1]
+  Left <$> foldM (compileLTEUVarVarPrim x y) lastBit [1 .. width - 1]
 
 -- output = if a
 --    then if b then x else 0
@@ -494,10 +494,10 @@ computeLTUVarVar x y = do
 --      =>
 --        1. z = bx
 --        2. output + b + x + z = (a)(b + x)
-compileLTEUVarVarPrim :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefB -> Int -> M n RefB
-compileLTEUVarVarPrim width x y acc i = do
-  let xBit = B (RefUBit width x i)
-      yBit = B (RefUBit width y i)
+compileLTEUVarVarPrim :: (GaloisField n, Integral n) => RefU -> RefU -> RefB -> Int -> M n RefB
+compileLTEUVarVarPrim x y acc i = do
+  let xBit = B (RefUBit x i)
+      yBit = B (RefUBit y i)
 
   -- yacc = y[i] * acc
   yacc <- freshRefB
@@ -520,14 +520,14 @@ computeLTUVarConst :: (GaloisField n, Integral n) => RefU -> U -> M n (Either Re
 computeLTUVarConst x y = do
   let width = widthOf x
   -- starting from the least significant bit
-  let pairs = [(RefUBit width x i, Data.Bits.testBit y i) | i <- [0 .. width - 1]]
+  let pairs = [(RefUBit x i, Data.Bits.testBit y i) | i <- [0 .. width - 1]]
   foldM compileLTEUVarConstPrim (Right False) pairs
 
 computeLTUConstVar :: (GaloisField n, Integral n) => U -> RefU -> M n (Either RefB Bool)
 computeLTUConstVar x y = do
   let width = widthOf y
   -- starting from the least significant bit
-  let pairs = [(Data.Bits.testBit x i, RefUBit width y i) | i <- [0 .. width - 1]]
+  let pairs = [(Data.Bits.testBit x i, RefUBit y i) | i <- [0 .. width - 1]]
   foldM compileLTEUConstVarPrim (Right False) pairs
 
 compileLTEUVarConstPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (RefB, Bool) -> M n (Either RefB Bool)

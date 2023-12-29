@@ -139,7 +139,7 @@ linkConstraintModule cm =
         --  it's a Boolean intermediate variable that occurs in the circuit
         var `IntSet.member` envRefBsInEnvB env
       -- \|| RefBX var `Set.member` refBsInEnvF env
-      RefUBit _ var i ->
+      RefUBit var i ->
         if envUseNewLinker env
           then refUBitShouldBeKept var i
           else --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
@@ -170,7 +170,7 @@ linkConstraintModule cm =
     eqZeros = Seq.fromList $ map (bimap (linkPolyLUnsafe env) (reindexRefF env)) $ cmEqZeros cm
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
-    fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB env (RefUBit width var 0)))
+    fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB env (RefUBit var 0)))
     fromEitherRefU (Right val) = let width = widthOf val in (width, Right (U.uValue val))
 
     divMods = map (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) $ cmDivMods cm
@@ -226,8 +226,7 @@ linkConstraint env (CLimbVal x n) =
 linkConstraint env (CRefUVal x n) =
   case FieldInfo.fieldTypeData (envFieldInfo env) of
     Binary _ ->
-      let width = widthOf x
-          cRefFVals = [CRefFVal (B (RefUBit width x i)) (if Data.Bits.testBit n i then 1 else 0) | i <- [0 .. widthOf x - 1]]
+      let cRefFVals = [CRefFVal (B (RefUBit x i)) (if Data.Bits.testBit n i then 1 else 0) | i <- [0 .. widthOf x - 1]]
        in cRefFVals >>= linkConstraint env
     Prime _ -> do
       -- split the Integer into smaller chunks of size `fieldWidth`
@@ -321,7 +320,7 @@ reindexRefB env (RefBO x) = x + getOffset (envOldCounters env) (Output, ReadBool
 reindexRefB env (RefBI x) = x + getOffset (envOldCounters env) (PublicInput, ReadBool)
 reindexRefB env (RefBP x) = x + getOffset (envOldCounters env) (PrivateInput, ReadBool)
 reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (envOldCounters env) (Intermediate, ReadBool)
-reindexRefB env (RefUBit _ x i) = reindexRefU env x i
+reindexRefB env (RefUBit x i) = reindexRefU env x i
 
 reindexRefU :: Env -> RefU -> Int -> Var
 reindexRefU env (RefUO w x) i = w * x + (i `mod` w) + getOffset (envOldCounters env) (Output, ReadAllUInts)

@@ -27,7 +27,7 @@ compileMulBExtended width out x y = formAllColumns width x y >>= foldColumns out
 formAllColumns :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> M n [(Int, [RefB])]
 formAllColumns width x (Left y) = do
   let numberOfColumns = 2 * width - 1
-  let pairs = [(indexSum, [(RefUBit width x (indexSum - i), RefUBit width y i) | i <- [(indexSum - width + 1) `max` 0 .. indexSum `min` (width - 1)]]) | indexSum <- [0 .. numberOfColumns - 1]]
+  let pairs = [(indexSum, [(RefUBit x (indexSum - i), RefUBit y i) | i <- [(indexSum - width + 1) `max` 0 .. indexSum `min` (width - 1)]]) | indexSum <- [0 .. numberOfColumns - 1]]
   forM pairs $ \(i, xs) -> do
     xs' <- mapM multiplyBits xs
     return (i, xs')
@@ -35,7 +35,7 @@ formAllColumns width x (Right y) = do
   let numberOfColumns = 2 * width - 1
   forM [0 .. numberOfColumns - 1] $ \i -> do
     -- put the bits of x into the column if `Data.Bits.testBit y j` is True
-    let vars = [RefUBit width x (i - j) | j <- [(i - width + 1) `max` 0 .. i `min` (width - 1)], Data.Bits.testBit y j]
+    let vars = [RefUBit x (i - j) | j <- [(i - width + 1) `max` 0 .. i `min` (width - 1)], Data.Bits.testBit y j]
     return (i, vars)
 
 -- | Form only the right half of columns of bits to be added together after multiplication
@@ -51,14 +51,14 @@ formHalfColumns :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U
 formHalfColumns width x (Left y) = do
   let numberOfColumns = width
   forM [0 .. numberOfColumns - 1] $ \i -> do
-    let pairs = [(RefUBit width x (i - j), RefUBit width y j) | j <- [0 `max` 0 .. i]]
+    let pairs = [(RefUBit x (i - j), RefUBit y j) | j <- [0 `max` 0 .. i]]
     xs' <- mapM multiplyBits pairs
     return (i, xs')
 formHalfColumns width x (Right y) = do
   let numberOfColumns = width
   forM [0 .. numberOfColumns - 1] $ \i -> do
     -- put the bits of x into the column if `Data.Bits.testBit y j` is True
-    let vars = [RefUBit width x (i - j) | j <- [0 `max` 0 .. i], Data.Bits.testBit y j]
+    let vars = [RefUBit x (i - j) | j <- [0 `max` 0 .. i], Data.Bits.testBit y j]
     return (i, vars)
 
 -- | Starting from the least significant column, add the bits together and propagate the carry to the next column
@@ -68,7 +68,7 @@ foldColumns out = foldM_ step []
     step :: (GaloisField n, Integral n) => [RefB] -> (Int, [RefB]) -> M n [RefB]
     step prevCarries (columnIndex, column)
       | widthOf out <= columnIndex = return [] -- out of the range of `out`
-      | otherwise = foldColumn (RefUBit (widthOf out) out columnIndex) (prevCarries <> column)
+      | otherwise = foldColumn (RefUBit out columnIndex) (prevCarries <> column)
 
 -- | Add up a column of bits and propagate the carry to the next column
 foldColumn :: (GaloisField n, Integral n) => RefB -> [RefB] -> M n [RefB]

@@ -153,7 +153,7 @@ viewAsRefMap :: PolyL n -> (n, Map Ref n)
 viewAsRefMap (PolyL constant limbs vars) = (constant, vars <> Map.fromList (toList limbs >>= limbToTerms))
   where
     limbToTerms :: (Limb, n) -> [(Ref, n)]
-    limbToTerms (limb, n) = [(B (RefUBit (lmbWidth limb) (lmbRef limb) i), n) | i <- [0 .. lmbWidth limb - 1]]
+    limbToTerms (limb, n) = [(B (RefUBit (lmbRef limb) i), n) | i <- [0 .. lmbWidth limb - 1]]
 
 -- | Return a set of all Refs in the PolyL
 varsSet :: PolyL n -> (Set RefU, Set Limb, Set Ref)

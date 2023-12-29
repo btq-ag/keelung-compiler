@@ -29,11 +29,11 @@ compileCLMulU width out (Left a) (Left b) = compileCLMul width out a b
 compileCLMul :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
 compileCLMul width out x y = forM_ [0 .. width - 1] $ \i -> do
   -- pairs of bits to be conjuncted
-  let pairs = [(RefUBit width x j, RefUBit width y (i - j)) | j <- [0 .. i]]
+  let pairs = [(RefUBit x j, RefUBit y (i - j)) | j <- [0 .. i]]
   -- conjunct the pairs
   conjunctedPairs <- sequence [Boolean.andBs [Left a, Left b] | (a, b) <- pairs]
   -- xor the conjuncted pairs
   result <- Boolean.xorBs conjunctedPairs
   case result of
-    Left var -> writeRefBEq (RefUBit width out i) var
-    Right val -> writeRefBVal (RefUBit width out i) val
+    Left var -> writeRefBEq (RefUBit out i) var
+    Right val -> writeRefBVal (RefUBit out i) val

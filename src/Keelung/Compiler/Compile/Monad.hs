@@ -159,7 +159,7 @@ addC = mapM_ addOne
         Just relations -> put cs {cmRelations = relations}
 
     countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
-    countBitTestAsOccurU (B (RefUBit _ (RefUX width var) _)) =
+    countBitTestAsOccurU (B (RefUBit (RefUX width var) _)) =
       modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cs)})
     countBitTestAsOccurU _ = return ()
 

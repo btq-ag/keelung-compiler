@@ -30,6 +30,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
+import Keelung.Compiler.Options
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Limb qualified as LimbRelations
 import Keelung.Compiler.Relations.Reference qualified as Ref
@@ -40,8 +41,6 @@ import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Prelude hiding (lookup)
-import Keelung.Compiler.Options
-
 
 data Relations n = Relations
   { relationsR :: Ref.RefRelations n,
@@ -105,7 +104,7 @@ assignL var val relations = case UInt.lookupRefU (exportUIntRelations relations)
 assignU :: (GaloisField n, Integral n) => RefU -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignU var val = updateRelationsU $ UInt.assignRefU var val
 
-relateB :: (GaloisField n, Integral n) => GaloisField n => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateB refA (polarity, refB) = updateRelationsR (Ref.relateB refA (polarity, refB))
 
 -- -- | Lookup the relation between the RefUs of the Limbs first before relating the Limbs
@@ -160,7 +159,7 @@ size (Relations f l u _) = EquivClass.size f + LimbRelations.size l + UInt.size 
 
 --------------------------------------------------------------------------------
 
-lookup :: GaloisField n => Ref -> Relations n -> Ref.Lookup n
+lookup :: (GaloisField n) => Ref -> Relations n -> Ref.Lookup n
 lookup var xs = Ref.lookup (relationsOptions xs) (relationsU xs) var (relationsR xs)
 
 --------------------------------------------------------------------------------

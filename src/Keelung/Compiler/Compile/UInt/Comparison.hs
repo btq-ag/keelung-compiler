@@ -32,11 +32,11 @@ assertLTE width (Left a) bound
       -- we can use these 2 values as the only roots of the following multiplicative polynomial
       -- (a - 0) * (a - 1) = 0
       -- `(a - 0) * (a - 1) = 0` on the LSB
-      let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. width - 1]]
+      let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. width - 1]]
       writeMul (0, bits) (-1, bits) (0, [])
       -- assign the rest of the bits to `0`
       forM_ [1 .. width - 1] $ \j ->
-        writeRefBVal (RefUBit width a j) False
+        writeRefBVal (RefUBit a j) False
   | bound == 2 = do
       -- there are 3 possible values for `a`, which are `0`, `1` and `2`
       -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
@@ -62,13 +62,13 @@ assertLTE width (Left a) bound
           foldM_ (go a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
         else do
           -- `(a - 0) * (a - 1) * (a - 2) = 0` on the smallest limb
-          let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
+          let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
           temp <- freshRefF
           writeMul (0, bits) (-1, bits) (0, [(F temp, 1)])
           writeMul (0, [(F temp, 1)]) (-2, bits) (0, [])
           -- assign the rest of the limbs to `0`
           forM_ [limbWidth .. width - 1] $ \j ->
-            writeRefBVal (RefUBit width a j) False
+            writeRefBVal (RefUBit a j) False
   | otherwise = do
       -- because we don't have to execute the `go` function for trailing ones of `c`
       -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
@@ -87,7 +87,7 @@ assertLTE width (Left a) bound
 
     go :: (GaloisField n, Integral n) => RefU -> Maybe Ref -> Int -> M n (Maybe Ref)
     go ref Nothing i =
-      let aBit = RefUBit width ref i
+      let aBit = RefUBit ref i
        in -- have not found the first bit in 'c' that is 1 yet
           if Data.Bits.testBit bound i
             then do
@@ -97,7 +97,7 @@ assertLTE width (Left a) bound
               writeRefBVal aBit False
               return Nothing -- otherwise, continue searching
     go ref (Just acc) i =
-      let aBit = B (RefUBit width ref i)
+      let aBit = B (RefUBit ref i)
        in if Data.Bits.testBit bound i
             then do
               -- constraint for the next accumulator
@@ -151,18 +151,18 @@ assertGTE width (Left a) bound
         then do
           -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) = 0`
           -- the LSB is either 0 or 1
-          let lsb = B (RefUBit width a 0)
+          let lsb = B (RefUBit a 0)
           writeMul (0, [(lsb, 1)]) (1, [(lsb, 1)]) (0, [])
           -- the other bits are all 1
           forM_ [1 .. width - 1] $ \i ->
-            writeRefBVal (RefUBit width a i) True
+            writeRefBVal (RefUBit a i) True
         else do
           -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) = 0` on the smallest limb
-          let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
+          let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
           writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [])
           -- assign the rest of the limbs to `1`
           forM_ [limbWidth .. width - 1] $ \j ->
-            writeRefBVal (RefUBit width a j) True
+            writeRefBVal (RefUBit a j) True
   | bound == 2 ^ width - 3 = do
       -- there's only 3 possible value for `a`, which is `2^width - 1`, `2^width - 2` or `2^width - 3`
       -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
@@ -185,7 +185,7 @@ assertGTE width (Left a) bound
         then runDefault
         else do
           -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) * (a - 2^limbWidth + 3) = 0` on the smallest limb
-          let bits = [(B (RefUBit width a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
+          let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
           -- writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [])
 
           temp <- freshRefF
@@ -194,7 +194,7 @@ assertGTE width (Left a) bound
 
           -- assign the rest of the limbs to `1`
           forM_ [limbWidth .. width - 1] $ \j ->
-            writeRefBVal (RefUBit width a j) True
+            writeRefBVal (RefUBit a j) True
   | otherwise = runDefault
   where
     runDefault = do
@@ -217,7 +217,7 @@ assertGTE width (Left a) bound
 
     go :: (GaloisField n, Integral n) => RefU -> Ref -> Int -> M n Ref
     go ref flag i =
-      let aBit = RefUBit width ref i
+      let aBit = RefUBit ref i
           bBit = Data.Bits.testBit bound i
        in if bBit
             then do
@@ -238,7 +238,7 @@ assertGTE width (Left a) bound
 -- | Assert that the given UInt is not zero.
 assertNonZero :: (GaloisField n, Integral n) => Width -> RefU -> M n ()
 assertNonZero width ref = do
-  let bits = [RefUBit width ref i | i <- [0 .. width - 1]]
+  let bits = [RefUBit ref i | i <- [0 .. width - 1]]
   assertNonZeroOnRefBs bits
   where
     assertNonZeroOnRefBs :: (GaloisField n, Integral n) => [RefB] -> M n ()
