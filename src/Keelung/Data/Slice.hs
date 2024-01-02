@@ -93,7 +93,7 @@ normalize (Slices ref offset xs) =
   where
     glue (acc, Nothing) index slice = (IntMap.insert index slice acc, Just (index, slice))
     glue (acc, Just (prevIndex, prevSlice)) index slice = case (prevSlice, slice) of
-      (Constant val, Constant val') -> (acc, Just (prevIndex, Constant (val <> val')))
+      (Constant val, Constant val') -> (acc, Just (prevIndex, Constant (val' <> val)))
       (ChildOf limb, ChildOf limb') -> case Limb.safeMerge limb limb' of
         Left _ -> (IntMap.insert prevIndex prevSlice acc, Just (index, slice))
         Right limb'' -> (acc, Just (prevIndex, ChildOf limb''))

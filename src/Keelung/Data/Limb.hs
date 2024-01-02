@@ -9,8 +9,8 @@ module Keelung.Data.Limb
     refUToLimbs,
     trim,
     split,
-    MergeError(..),
-    safeMerge
+    MergeError (..),
+    safeMerge,
   )
 where
 
@@ -107,10 +107,37 @@ trim :: Width -> Limb -> Limb
 trim width (Limb ref w offset (Left sign)) = Limb ref (w `min` width) offset (Left sign)
 trim width (Limb ref w offset (Right signs)) = Limb ref (w `min` width) offset (Right (take (w `min` width) signs))
 
--- | Split a 'Limb' into two 'Limb's at a given index (index of the Limb, not the RefU)
+data SplitError = OffsetOutOfBound
+  deriving (Eq)
+
+instance Show SplitError where
+  show OffsetOutOfBound = "Limb.SplitError: offset out of bound"
+
+-- | Split a 'Limb' into two 'Limb's at a given index of the RefU
+safeSplit :: Int -> Limb -> Either SplitError (Limb, Limb)
+safeSplit index (Limb ref w offset s)
+  | index < 0 || index > w = Left OffsetOutOfBound
+  | otherwise = case s of
+      Left sign ->
+        Right
+          ( Limb ref ((index - offset) `max` 0) offset (Left sign),
+            Limb ref ((w - index + offset) `min` w) index (Left sign)
+          )
+      Right signs ->
+        Right
+          ( Limb ref ((index - offset) `max` 0) offset (Right (take (index - offset) signs)),
+            Limb ref ((w - index + offset) `min` w) index (Right (drop (index - offset) signs))
+          )
+
+-- | Split a 'Limb' into two 'Limb's at a given index of the RefU (unsafe exception-throwing version of `safeSplit`)
 split :: Int -> Limb -> (Limb, Limb)
-split index (Limb ref w offset (Left sign)) = (Limb ref index (offset + index) (Left sign), Limb ref (w - index) (offset + index) (Left sign))
-split index (Limb ref w offset (Right signs)) = (Limb ref index (offset + index) (Right (take index signs)), Limb ref (w - index) (offset + index) (Right (drop index signs)))
+split index limb = case safeSplit index limb of
+  Left err -> error $ "[ panic ] " <> show err
+  Right limbs -> limbs
+
+-- split :: Int -> Limb -> (Limb, Limb)
+-- split index (Limb ref w offset (Left sign)) = (Limb ref index (offset + index) (Left sign), Limb ref (w - index) (offset + index) (Left sign))
+-- split index (Limb ref w offset (Right signs)) = (Limb ref index (offset + index) (Right (take index signs)), Limb ref (w - index) (offset + index) (Right (drop index signs)))
 
 --------------------------------------------------------------------------------
 
