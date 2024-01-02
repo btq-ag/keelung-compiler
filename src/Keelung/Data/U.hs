@@ -101,7 +101,7 @@ adjustWidthOfInteger oldWidth newWidth value = case oldWidth `compare` newWidth 
 
 -- | Slice a U value into a smaller U value.
 slice :: U -> Int -> Width -> U
-slice (U _ value) offset width = U (Just width) (value `Data.Bits.shiftR` offset) `Prelude.mod` (2 ^ width)
+slice (U _ value) offset width = U (Just width) ((value `Data.Bits.shiftR` offset) `Prelude.mod` (2 ^ width))
 
 --------------------------------------------------------------------------------
 

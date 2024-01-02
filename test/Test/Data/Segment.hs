@@ -19,11 +19,10 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Segment" $ do
-
   describe "widthOf Segments" $ do
     it "should be the sume of all lengths of its segments" $ do
       property $ \segments -> do
-        widthOf segments `shouldBe` sum (widthOf <$> IntMap.elems (unSegments segments))
+        widthOf segments `shouldBe` sum (widthOf <$> IntMap.elems (segsElems segments))
 
   describe "split" $ do
     it "should preserve lengths of segments" $ do
@@ -33,8 +32,6 @@ tests = describe "Segment" $ do
             pure (segments, index)
       forAll genParam $ \(segments, index) -> do
         let (segments1, segments2) = Segment.splitSegments index segments
-        -- print segments
-        -- print (segments1, segments2)
         widthOf segments1 + widthOf segments2 `shouldBe` widthOf segments
 
   return ()
@@ -62,10 +59,9 @@ instance Arbitrary Limb where
     sign <-
       oneof
         [ Left <$> arbitrary,
-          Right <$> arbitrary
+          Right <$> vectorOf width arbitrary
         ]
-    pure $
-      Limb.new var width offset sign
+    pure $ Limb.new var width offset sign
 
 instance Arbitrary Segment where
   arbitrary =
@@ -77,8 +73,9 @@ instance Arbitrary Segment where
 
 instance Arbitrary Segments where
   arbitrary = do
+    offset <- chooseInt (0, 16)
     segments <- arbitrary :: Gen [Segment]
-    pure $ Segments (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (0, mempty) segments)
+    pure $ Segments offset (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (offset, mempty) segments)
 
 -- describe "reindex" $ do
 --   it "with no holes" $ do

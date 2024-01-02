@@ -29,13 +29,20 @@ instance HasWidth Segment where
   widthOf (Parent len) = len
 
 instance HasWidth Segments where
-  widthOf (Segments xs) = case IntMap.lookupMax xs of
+  widthOf (Segments offset xs) = case IntMap.lookupMax xs of
     Nothing -> 0
-    Just (index, segment) -> index + widthOf segment
+    Just (index, segment) -> index + widthOf segment - offset
 
 -- | A series of non-overlapping `Segment`s.
-newtype Segments = Segments {unSegments :: IntMap Segment} -- segments indexed by their starting offsets
-  deriving (Show, Eq)
+data Segments = Segments
+  { segsOffset :: Int,
+    segsElems :: IntMap Segment
+  }
+  -- segments indexed by their starting offsets
+  deriving (Eq)
+
+instance Show Segments where
+  show (Segments offset xs) = "Segments " <> show offset <> " " <> show (IntMap.toList xs)
 
 data RefUSegments
   = RefUSegments
@@ -47,7 +54,7 @@ data RefUSegments
 
 -- | Constructs a `Segment` with a `RefU` as its own parent
 new :: RefU -> RefUSegments
-new ref = RefUSegments ref (Segments (IntMap.singleton 0 (Parent (widthOf ref))))
+new ref = RefUSegments ref (Segments 0 (IntMap.singleton 0 (Parent (widthOf ref))))
 
 -- setConstant :: Segments -> Int -> U -> Segments
 -- setConstant (Segments ref xs) index val = Segments ref $ IntMap.
@@ -62,19 +69,19 @@ new ref = RefUSegments ref (Segments (IntMap.singleton 0 (Parent (widthOf ref)))
 --           Just (_, _)
 splitSegment :: Int -> Segment -> (Segment, Segment)
 splitSegment index segment = case segment of
-  Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val)))
+  Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val - index)))
   ChildOf limb -> let (limb1, limb2) = Limb.split index limb in (ChildOf limb1, ChildOf limb2)
   Parent len -> (Parent index, Parent (len - index))
 
 -- | Split a `Segments` into two at a given index
 splitSegments :: Int -> Segments -> (Segments, Segments)
-splitSegments index (Segments xs) = case IntMap.splitLookup index xs of
-  (before, Just segment, after) -> (Segments before, Segments (IntMap.insert index segment after))
+splitSegments index (Segments offset xs) = case IntMap.splitLookup index xs of
+  (before, Just segment, after) -> (Segments offset before, Segments index (IntMap.insert index segment after))
   (before, Nothing, after) -> case IntMap.lookupLE index xs of
-    Nothing -> (Segments mempty, Segments after)
+    Nothing -> (Segments offset mempty, Segments offset after)
     Just (index', segment) ->
       let (segment1, segment2) = splitSegment (index - index') segment
-       in (Segments (IntMap.insert index' segment1 before), Segments (IntMap.insert index segment2 after))
+       in (Segments offset (IntMap.insert index' segment1 before), Segments index (IntMap.insert index segment2 after))
 
 split :: Int -> RefUSegments -> (RefUSegments, RefUSegments)
 split index (RefUSegments ref segments) =
