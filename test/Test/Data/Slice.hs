@@ -1,12 +1,12 @@
-module Test.Data.Segment (tests, run) where
+module Test.Data.Slice (tests, run) where
 
 import Data.IntMap qualified as IntMap
 import Keelung (widthOf)
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU (..))
-import Keelung.Data.Segment (Segment (..), Segments (..))
-import Keelung.Data.Segment qualified as Segment
+import Keelung.Data.Slice (Slice (..), Slices (..))
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Test.Hspec
@@ -18,21 +18,21 @@ run :: IO ()
 run = hspec tests
 
 tests :: SpecWith ()
-tests = describe "Segment" $ do
-  describe "widthOf Segments" $ do
-    it "should be the sume of all lengths of its segments" $ do
-      property $ \segments -> do
-        widthOf segments `shouldBe` sum (widthOf <$> IntMap.elems (segsElems segments))
+tests = describe "Slice" $ do
+  describe "widthOf Slices" $ do
+    it "should be the sume of all lengths of its slices" $ do
+      property $ \slices -> do
+        widthOf slices `shouldBe` sum (widthOf <$> IntMap.elems (segsElems slices))
 
   describe "split" $ do
-    it "should preserve lengths of segments" $ do
+    it "should preserve lengths of slices" $ do
       let genParam = do
-            segments <- arbitrary
-            index <- chooseInt (0, widthOf segments - 1)
-            pure (segments, index)
-      forAll genParam $ \(segments, index) -> do
-        let (segments1, segments2) = Segment.splitSegments index segments
-        widthOf segments1 + widthOf segments2 `shouldBe` widthOf segments
+            slices <- arbitrary
+            index <- chooseInt (0, widthOf slices - 1)
+            pure (slices, index)
+      forAll genParam $ \(slices, index) -> do
+        let (slices1, slices2) = Slice.splitSlices index slices
+        widthOf slices1 + widthOf slices2 `shouldBe` widthOf slices
 
   return ()
 
@@ -63,7 +63,7 @@ instance Arbitrary Limb where
         ]
     pure $ Limb.new var width offset sign
 
-instance Arbitrary Segment where
+instance Arbitrary Slice where
   arbitrary =
     oneof
       [ Constant <$> arbitrary,
@@ -71,11 +71,11 @@ instance Arbitrary Segment where
         Parent <$> chooseInt (1, 16)
       ]
 
-instance Arbitrary Segments where
+instance Arbitrary Slices where
   arbitrary = do
     offset <- chooseInt (0, 16)
-    segments <- arbitrary :: Gen [Segment]
-    pure $ Segments offset (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (offset, mempty) segments)
+    slices <- arbitrary :: Gen [Slice]
+    pure $ Slices offset (snd $ foldr (\slice (index, acc) -> (index + widthOf slice, IntMap.insert index slice acc)) (offset, mempty) slices)
 
 -- describe "reindex" $ do
 --   it "with no holes" $ do
