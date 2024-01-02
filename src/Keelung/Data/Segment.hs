@@ -1,0 +1,83 @@
+module Keelung.Data.Segment (Segments (..), Segment (..), new, split) where
+
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IntMap
+import Keelung (HasWidth, widthOf)
+import Keelung.Data.Limb (Limb)
+import Keelung.Data.Limb qualified as Limb
+import Keelung.Data.Reference (RefU)
+import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
+
+--------------------------------------------------------------------------------
+
+-- | A segment of a `RefU`
+data Segment
+  = Constant U
+  | ChildOf Limb -- it's a child of another
+  | Parent Int --  here stores the length of this Segment
+
+instance HasWidth Segment where
+  widthOf (Constant u) = widthOf u
+  widthOf (ChildOf limb) = widthOf limb
+  widthOf (Parent len) = len
+
+-- | A series of non-overlapping `Segment`s.
+newtype Segments = Segments (IntMap Segment) -- segments indexed by their starting offsets
+
+data RefUSegments
+  = RefUSegments
+      RefU -- the `RefU` this series of segments represents
+      Segments -- segments indexed by their starting offsets
+
+--------------------------------------------------------------------------------
+
+-- | Constructs a `Segment` with a `RefU` as its own parent
+new :: RefU -> RefUSegments
+new ref = RefUSegments ref (Segments (IntMap.singleton 0 (Parent (widthOf ref))))
+
+-- setConstant :: Segments -> Int -> U -> Segments
+-- setConstant (Segments ref xs) index val = Segments ref $ IntMap.
+
+-- | Given an interval [start, end), splits one `Segments` into three
+-- split :: (Int, Int) -> Segments -> (Segments, Segments, Segments)
+-- split (start, end) (Segments xs) =
+--   let -- the smallest segment touched by the interval
+--       smallestSegment = case IntMap.lookupLE start xs of
+--         Nothing -> Nothing
+--         Just (index, segment) -> -- divide this segment into two
+--           Just (_, _)
+splitSegment :: Int -> Segment -> (Segment, Segment)
+splitSegment index segment = case segment of
+  Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val)))
+  ChildOf limb -> let (limb1, limb2) = Limb.split index limb in (ChildOf limb1, ChildOf limb2)
+  Parent len -> (Parent index, Parent (len - index))
+
+-- | Split a `Segments` into two at a given index
+splitSegments :: Int -> Segments -> (Segments, Segments)
+splitSegments index (Segments xs) = case IntMap.splitLookup index xs of
+  (before, Just segment, after) -> (Segments before, Segments (IntMap.insert index segment after))
+  (before, Nothing, after) -> case IntMap.lookupLE index xs of
+    Nothing -> (Segments mempty, Segments after)
+    Just (index', segment) ->
+      let (segment1, segment2) = splitSegment (index - index') segment
+       in (Segments (IntMap.insert index' segment1 before), Segments (IntMap.insert index segment2 after))
+
+split :: Int -> RefUSegments -> (RefUSegments, RefUSegments)
+split index (RefUSegments ref segments) =
+  let (before, after) = splitSegments index segments
+   in (RefUSegments ref before, RefUSegments ref after)
+
+-- (Segments before, Segments after)
+
+--       (middle', after') = IntMap.split end middle
+--    in undefined
+
+-- | Given an interval [start, end), returns `Segments` that are contained in the interval.
+-- lookup :: (Int, Int) -> Segments -> Segments
+-- lookup (start, end) (Segments xs) =
+
+--   let a = 0
+--       -- the smallest segment touched by the interval
+--       smallestSegment = IntMap.lookupLE start xs
+--   in Segments $ IntMap.filterWithKey (\k _ -> k >= start && k < end) xs
