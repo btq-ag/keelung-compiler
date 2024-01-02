@@ -8,6 +8,7 @@ module Keelung.Data.Limb
     isPositive,
     refUToLimbs,
     trim,
+    split,
   )
 where
 
@@ -35,6 +36,9 @@ instance Show Limb where
   show limb =
     let (sign, terms) = showAsTerms limb
      in if sign then terms else "-" <> terms
+
+instance HasWidth Limb where
+  widthOf = lmbWidth
 
 -- | For printing limbs as terms in a polynomial (signs are handled by the caller)
 --   returns (isPositive, string of the term)
@@ -97,6 +101,11 @@ refUToLimbs desiredWidth refU = step (widthOf refU) 0
 trim :: Width -> Limb -> Limb
 trim width (Limb ref w offset (Left sign)) = Limb ref (w `min` width) offset (Left sign)
 trim width (Limb ref w offset (Right signs)) = Limb ref (w `min` width) offset (Right (take (w `min` width) signs))
+
+-- | Split a 'Limb' into two 'Limb's at a given index (index of the Limb, not the RefU)
+split :: Int -> Limb -> (Limb, Limb)
+split index (Limb ref w offset (Left sign)) = (Limb ref index (offset + index) (Left sign), Limb ref (w - index) (offset + index) (Left sign))
+split index (Limb ref w offset (Right signs)) = (Limb ref index (offset + index) (Right (take index signs)), Limb ref (w - index) (offset + index) (Right (drop index signs)))
 
 -- type BitArray = [Either Limb U]
 
