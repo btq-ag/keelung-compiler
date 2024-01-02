@@ -1,8 +1,16 @@
 module Test.Data.Segment (tests, run) where
 
+import Data.IntMap qualified as IntMap
+import Keelung (widthOf)
+import Keelung.Data.Limb (Limb)
+import Keelung.Data.Limb qualified as Limb
+import Keelung.Data.Reference (RefU (..))
+import Keelung.Data.Segment (Segment (..), Segments (..))
+import Keelung.Data.Segment qualified as Segment
+import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Test.Hspec
 import Test.QuickCheck
-import Keelung.Data.Reference (RefU)
 
 --------------------------------------------------------------------------------
 
@@ -12,22 +20,65 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "Segment" $ do
 
-  -- describe "split" $ do
-  --   it "should preserve lengths of segments" $ do
-  --     forAll genParam $ \operations -> do
-  --       let intervals = foldr applyOperation IntervalSet.new operations
-  --       IntervalSet.count intervals `shouldBe` sum (map countOfOperation operations)
-  --       IntervalSet.isValid intervals `shouldBe` True
+  describe "widthOf Segments" $ do
+    it "should be the sume of all lengths of its segments" $ do
+      property $ \segments -> do
+        widthOf segments `shouldBe` sum (widthOf <$> IntMap.elems (unSegments segments))
 
-    return ()
+  describe "split" $ do
+    it "should preserve lengths of segments" $ do
+      let genParam = do
+            segments <- arbitrary
+            index <- chooseInt (0, widthOf segments - 1)
+            pure (segments, index)
+      forAll genParam $ \(segments, index) -> do
+        let (segments1, segments2) = Segment.splitSegments index segments
+        -- print segments
+        -- print (segments1, segments2)
+        widthOf segments1 + widthOf segments2 `shouldBe` widthOf segments
+
+  return ()
 
 --------------------------------------------------------------------------------
 
 instance Arbitrary RefU where
   arbitrary = do
-    constructor <- chooseFrom [RefUI, RefUP, RefUX]
+    var <- chooseInt (0, 99)
+    constructor <- elements [RefUO, RefUI, RefUP, RefUX]
     width <- chooseInt (1, 16)
-    pure $ RefUX width 0
+    pure $ constructor width var
+
+instance Arbitrary U where
+  arbitrary = do
+    width <- chooseInt (1, 16)
+    value <- chooseInteger (0, 2 ^ width - 1)
+    pure $ U.new width value
+
+instance Arbitrary Limb where
+  arbitrary = do
+    var <- arbitrary
+    width <- chooseInt (1, widthOf var)
+    offset <- chooseInt (0, widthOf var - width)
+    sign <-
+      oneof
+        [ Left <$> arbitrary,
+          Right <$> arbitrary
+        ]
+    pure $
+      Limb.new var width offset sign
+
+instance Arbitrary Segment where
+  arbitrary =
+    oneof
+      [ Constant <$> arbitrary,
+        ChildOf <$> arbitrary,
+        Parent <$> chooseInt (1, 16)
+      ]
+
+instance Arbitrary Segments where
+  arbitrary = do
+    segments <- arbitrary :: Gen [Segment]
+    pure $ Segments (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (0, mempty) segments)
 
 -- describe "reindex" $ do
 --   it "with no holes" $ do

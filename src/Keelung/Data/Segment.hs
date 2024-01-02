@@ -1,4 +1,4 @@
-module Keelung.Data.Segment (Segments (..), Segment (..), new, split) where
+module Keelung.Data.Segment (Segments (..), Segment (..), RefUSegments (..), new, split, splitSegments) where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -16,19 +16,32 @@ data Segment
   = Constant U
   | ChildOf Limb -- it's a child of another
   | Parent Int --  here stores the length of this Segment
+  deriving (Eq)
+
+instance Show Segment where
+  show (Constant u) = "Constant[" <> show (widthOf u) <> "] " <> show u
+  show (ChildOf limb) = "ChildOf[" <> show (widthOf limb) <> "] " <> show limb
+  show (Parent len) = "Parent[" <> show len <> "]"
 
 instance HasWidth Segment where
   widthOf (Constant u) = widthOf u
   widthOf (ChildOf limb) = widthOf limb
   widthOf (Parent len) = len
 
+instance HasWidth Segments where
+  widthOf (Segments xs) = case IntMap.lookupMax xs of
+    Nothing -> 0
+    Just (index, segment) -> index + widthOf segment
+
 -- | A series of non-overlapping `Segment`s.
-newtype Segments = Segments (IntMap Segment) -- segments indexed by their starting offsets
+newtype Segments = Segments {unSegments :: IntMap Segment} -- segments indexed by their starting offsets
+  deriving (Show, Eq)
 
 data RefUSegments
   = RefUSegments
       RefU -- the `RefU` this series of segments represents
       Segments -- segments indexed by their starting offsets
+  deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 
