@@ -9,6 +9,8 @@ module Keelung.Data.Limb
     refUToLimbs,
     trim,
     split,
+    MergeError(..),
+    safeMerge
   )
 where
 
@@ -39,6 +41,9 @@ instance Show Limb where
 
 instance HasWidth Limb where
   widthOf = lmbWidth
+
+instance Semigroup Limb where
+  (<>) = merge
 
 -- | For printing limbs as terms in a polynomial (signs are handled by the caller)
 --   returns (isPositive, string of the term)
@@ -107,29 +112,37 @@ split :: Int -> Limb -> (Limb, Limb)
 split index (Limb ref w offset (Left sign)) = (Limb ref index (offset + index) (Left sign), Limb ref (w - index) (offset + index) (Left sign))
 split index (Limb ref w offset (Right signs)) = (Limb ref index (offset + index) (Right (take index signs)), Limb ref (w - index) (offset + index) (Right (drop index signs)))
 
--- type BitArray = [Either Limb U]
+--------------------------------------------------------------------------------
 
--- -- | Given a series of limbs, shift them left by a given amount
--- --   the least significant bits (and limb) are filled with zeros
--- --
--- --             LSB
--- --      input  ┌─┬─┬─┬─┬─┐┌─┬─┬─┐┌─┬─┬─┬─┐
--- --             └─┴─┴─┴─┴─┘└─┴─┴─┘└─┴─┴─┴─┘
--- --              │
--- --              └───┐ shift "left" by n bits
--- --                  ▼
--- --     output  ┌─┬─┬─┬─┬─┐┌─┬─┬─┐┌─┬─┬─┬─┐
--- --             └─┴─┴─┴─┴─┘└─┴─┴─┘└─┴─┴─┴─┘
--- --
--- shiftLeft :: Int -> LimbList -> LimbList
--- shiftLeft _ [] = []
--- shiftLeft amount [Left limb]
---   | amount >= lmbWidth limb = [Right (U.new (lmbWidth limb) 0)]
---   | otherwise = [Left (trim (lmbWidth limb - amount) limb)]
--- shiftLeft amount [Right val] = _
--- shiftLeft amount _ = _
+-- | Merge two Limbs into one, unsafe exception-throwing version of `safeMerge`
+merge :: Limb -> Limb -> Limb
+merge limb1 limb2 = case safeMerge limb1 limb2 of
+  Left err -> error $ "[ panic ] " <> show err
+  Right limb -> limb
 
---   -- let (quotient, remainder) = amount `divMod` lmbWidth (head limbs)
---   --  in if remainder == 0
---   --       then shiftLeftByLimbWidth quotient limbs
---   --       else shiftLeftByLimbWidth quotient limbs ++ shiftLeftByRemainder remainder limbs
+data MergeError = NotSameRefU | NotAdjacent | Overlapping
+  deriving (Eq)
+
+instance Show MergeError where
+  show NotSameRefU = "Limb.MergeError: two limbs are not of the same RefU"
+  show NotAdjacent = "Limb.MergeError: two limbs are not adjacent with each other"
+  show Overlapping = "Limb.MergeError: two limbs are overlapping with each other"
+
+-- | Merge two Limbs into one, throwing MergeError if:
+--    1. the two Limbs are not of the same `RefU`
+--    2. the two Limbs are not adjacent
+--    3. the two Limbs are overlapping
+safeMerge :: Limb -> Limb -> Either MergeError Limb
+safeMerge (Limb ref1 width1 offset1 signs1) (Limb ref2 width2 offset2 signs2)
+  | ref1 /= ref2 = Left NotSameRefU
+  | otherwise = case (offset1 + width1) `compare` offset2 of
+      LT -> Left NotAdjacent
+      GT -> Left Overlapping
+      EQ -> Right $ Limb ref1 (width1 + width2) offset1 $ case (signs1, signs2) of
+        (Left True, Left True) -> Left True
+        (Left False, Left False) -> Left True
+        (Left True, Left False) -> Right (replicate width1 True <> replicate width2 False)
+        (Left False, Left True) -> Right (replicate width1 False <> replicate width2 True)
+        (Left sign, Right signs) -> Right (replicate width1 sign <> signs)
+        (Right signs, Left sign) -> Right (signs <> replicate width2 sign)
+        (Right ss1, Right ss2) -> Right (ss1 <> ss2)

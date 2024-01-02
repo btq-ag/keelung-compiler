@@ -22,7 +22,7 @@ tests = describe "Slice" $ do
   describe "widthOf Slices" $ do
     it "should be the sume of all lengths of its slices" $ do
       property $ \slices -> do
-        widthOf slices `shouldBe` sum (widthOf <$> IntMap.elems (segsElems slices))
+        widthOf slices `shouldBe` sum (widthOf <$> IntMap.elems (slicesElems slices))
 
   describe "split" $ do
     it "should preserve lengths of slices" $ do
@@ -31,8 +31,20 @@ tests = describe "Slice" $ do
             index <- chooseInt (0, widthOf slices - 1)
             pure (slices, index)
       forAll genParam $ \(slices, index) -> do
-        let (slices1, slices2) = Slice.splitSlices index slices
+        let (slices1, slices2) = Slice.split index slices
         widthOf slices1 + widthOf slices2 `shouldBe` widthOf slices
+
+  describe "normalize" $ do
+    it "should be the coequalizer of `merge . split` and `id`" $ do
+      let genParam = do
+            slices <- arbitrary
+            index <- chooseInt (0, widthOf slices - 1 `max` 0)
+            pure (slices, index)
+      forAll genParam $ \(slices, index) -> do
+        let (slices1, slices2) = Slice.split index slices
+        print (index, slices)
+        print (slices1, slices2)
+        Slice.normalize (slices1 <> slices2) `shouldBe` Slice.normalize slices
 
   return ()
 
@@ -75,7 +87,8 @@ instance Arbitrary Slices where
   arbitrary = do
     offset <- chooseInt (0, 16)
     slices <- arbitrary :: Gen [Slice]
-    pure $ Slices offset (snd $ foldr (\slice (index, acc) -> (index + widthOf slice, IntMap.insert index slice acc)) (offset, mempty) slices)
+    var <- arbitrary
+    pure $ Slices var offset (snd $ foldr (\slice (index, acc) -> (index + widthOf slice, IntMap.insert index slice acc)) (offset, mempty) slices)
 
 -- describe "reindex" $ do
 --   it "with no holes" $ do
