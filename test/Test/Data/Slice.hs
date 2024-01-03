@@ -5,7 +5,7 @@ import Keelung (widthOf)
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU (..))
-import Keelung.Data.Slice (Slice (..), Slices (..))
+import Keelung.Data.Slice (Segment (..), Slice (..))
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
@@ -19,39 +19,39 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Slice" $ do
-  describe "widthOf Slices" $ do
-    it "should be the sum of all lengths of its slices" $ do
-      property $ \slices -> do
-        widthOf slices `shouldBe` sum (widthOf <$> IntMap.elems (slicesElems slices))
+  describe "widthOf Slice" $ do
+    it "should be the sum of all lengths of its segments" $ do
+      property $ \slice -> do
+        widthOf slice `shouldBe` sum (widthOf <$> IntMap.elems (sliceSegments slice))
 
   describe "split" $ do
-    it "should preserve lengths of slices (`(+) . widthOf . split = widthOf`)" $ do
+    it "should preserve lengths of segments (`(+) . widthOf . split = widthOf`)" $ do
       let genParam = do
-            slices <- arbitrary
-            index <- chooseInt (0, widthOf slices - 1)
-            pure (slices, index)
-      forAll genParam $ \(slices, index) -> do
-        let (slices1, slices2) = Slice.split index slices
-        widthOf slices1 + widthOf slices2 `shouldBe` widthOf slices
+            slice <- arbitrary
+            index <- chooseInt (0, widthOf slice - 1)
+            pure (slice, index)
+      forAll genParam $ \(slice, index) -> do
+        let (slice1, slice2) = Slice.split index slice
+        widthOf slice1 + widthOf slice2 `shouldBe` widthOf slice
 
     it "should be the right inverse of `merge` (`merge . split = id`)" $ do
       let genParam = do
-            slices <- arbitrary
-            index <- chooseInt (0, (widthOf slices - 1) `max` 0)
-            pure (slices, index)
-      forAll genParam $ \(slices, index) -> do
-        let (slices1, slices2) = Slice.split index slices
-        slices1 <> slices2 `shouldBe` slices
+            slice <- arbitrary
+            index <- chooseInt (0, (widthOf slice - 1) `max` 0)
+            pure (slice, index)
+      forAll genParam $ \(slice, index) -> do
+        let (slice1, slice2) = Slice.split index slice
+        slice1 <> slice2 `shouldBe` slice
 
   describe "normalize" $ do
     it "should be the coequalizer of `merge . split` and `id`" $ do
       let genParam = do
-            slices <- arbitrary
-            index <- chooseInt (0, (widthOf slices - 1) `max` 0)
-            pure (slices, index)
-      forAll genParam $ \(slices, index) -> do
-        let (slices1, slices2) = Slice.split index slices
-        Slice.normalize (slices1 <> slices2) `shouldBe` Slice.normalize slices
+            slice <- arbitrary
+            index <- chooseInt (0, (widthOf slice - 1) `max` 0)
+            pure (slice, index)
+      forAll genParam $ \(slice, index) -> do
+        let (slice1, slice2) = Slice.split index slice
+        Slice.normalize (slice1 <> slice2) `shouldBe` Slice.normalize slice
 
   return ()
 
@@ -82,7 +82,7 @@ instance Arbitrary Limb where
         ]
     pure $ Limb.new var width offset sign
 
-instance Arbitrary Slice where
+instance Arbitrary Segment where
   arbitrary =
     oneof
       [ Constant <$> arbitrary,
@@ -90,12 +90,12 @@ instance Arbitrary Slice where
         Parent <$> chooseInt (1, 16)
       ]
 
-instance Arbitrary Slices where
+instance Arbitrary Slice where
   arbitrary = do
     offset <- chooseInt (0, 16)
-    slices <- vectorOf 1 arbitrary :: Gen [Slice]
+    segments <- arbitrary :: Gen [Segment]
     var <- arbitrary
-    pure $ Slices var offset (snd $ foldr (\slice (index, acc) -> (index + widthOf slice, IntMap.insert index slice acc)) (offset, mempty) slices)
+    pure $ Slice var offset (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (offset, mempty) segments)
 
 -- describe "reindex" $ do
 --   it "with no holes" $ do

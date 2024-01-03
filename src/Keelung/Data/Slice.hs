@@ -1,7 +1,7 @@
 module Keelung.Data.Slice
   ( -- * Construction
-    Slices (..),
     Slice (..),
+    Segment (..),
     fromRefU,
 
     -- * Mapping
@@ -34,91 +34,90 @@ import Prelude hiding (map)
 
 --------------------------------------------------------------------------------
 
--- | A slice of a `RefU`
-data Slice
+-- | Either a constant value, or a part of an RefU, or a parent itself
+data Segment
   = Constant U
-  | ChildOf Limb -- it's a child of another
-  | Parent Int --  here stores the length of this Slice
+  | ChildOf Limb -- part of some RefU
+  | Parent Int -- parent itself (with a given length)
   deriving (Eq)
 
-instance Show Slice where
+instance Show Segment where
   show (Constant u) = "Constant[" <> show (widthOf u) <> "] " <> show u
   show (ChildOf limb) = "ChildOf[" <> show (widthOf limb) <> "] " <> show limb
   show (Parent len) = "Parent[" <> show len <> "]"
 
-instance HasWidth Slice where
+instance HasWidth Segment where
   widthOf (Constant u) = widthOf u
   widthOf (ChildOf limb) = widthOf limb
   widthOf (Parent len) = len
 
--- | Non-overlapping Slices of a RefU.
-data Slices = Slices
-  { slicesRefU :: RefU, -- the `RefU` this series of slices belongs to
-    slicesOffset :: Int, -- the starting offset of the first slice
-    slicesElems :: IntMap Slice -- the slices
+-- | A "Slice" of a RefU, with non-overlapping Segments indexed by their starting offset
+data Slice = Slice
+  { sliceRefU :: RefU, -- the `RefU` this series of segments belongs to
+    sliceOffset :: Int, -- the starting offset of the first segment
+    sliceSegments :: IntMap Segment -- the segments
   }
-  -- slices indexed by their starting offsets
   deriving (Eq)
 
-instance Show Slices where
-  show (Slices ref offset xs) = "Slices " <> show ref <> " " <> show offset <> " " <> show (IntMap.toList xs)
+instance Show Slice where
+  show (Slice ref offset xs) = "Slice " <> show ref <> " " <> show offset <> " " <> show (IntMap.toList xs)
 
-instance HasWidth Slices where
-  widthOf (Slices _ offset xs) = case IntMap.lookupMax xs of
+instance HasWidth Slice where
+  widthOf (Slice _ offset xs) = case IntMap.lookupMax xs of
     Nothing -> 0
-    Just (index, slice) -> index + widthOf slice - offset
+    Just (index, segment) -> index + widthOf segment - offset
 
-instance Semigroup Slices where
+instance Semigroup Slice where
   (<>) = merge
 
 --------------------------------------------------------------------------------
 
 -- | Constructs a `Slice` with a `RefU` as its own parent
-fromRefU :: RefU -> Slices
-fromRefU ref = Slices ref 0 (IntMap.singleton 0 (Parent (widthOf ref)))
+fromRefU :: RefU -> Slice
+fromRefU ref = Slice ref 0 (IntMap.singleton 0 (Parent (widthOf ref)))
 
--- | Split a `Slice` into two at a given index
-splitSlice :: Int -> Slice -> (Slice, Slice)
-splitSlice index slice = case slice of
+-- | Split a `Segment` into two at a given index
+splitSegment :: Int -> Segment -> (Segment, Segment)
+splitSegment index segment = case segment of
   Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val - index)))
   ChildOf limb -> let (limb1, limb2) = Limb.split index limb in (ChildOf limb1, ChildOf limb2)
   Parent len -> (Parent index, Parent (len - index))
 
--- | Split a `Slices` into two at a given index
-split :: Int -> Slices -> (Slices, Slices)
-split index (Slices ref offset xs) = case IntMap.splitLookup index xs of
-  (before, Just slice, after) -> (Slices ref offset before, Slices ref index (IntMap.insert index slice after))
+-- | Split a `Slice` into two at a given index
+split :: Int -> Slice -> (Slice, Slice)
+split index (Slice ref offset xs) = case IntMap.splitLookup index xs of
+  (before, Just segment, after) -> (Slice ref offset before, Slice ref index (IntMap.insert index segment after))
   (before, Nothing, after) -> case IntMap.lookupLE index xs of
-    Nothing -> (Slices ref offset mempty, Slices ref offset after)
-    Just (index', slice) ->
-      let (slice1, slice2) = splitSlice (index - index') slice
-       in (Slices ref offset (IntMap.insert index' slice1 before), Slices ref index (IntMap.insert index slice2 after))
+    Nothing -> (Slice ref offset mempty, Slice ref offset after)
+    Just (index', segment) ->
+      let (segment1, segment12) = splitSegment (index - index') segment
+       in (Slice ref offset (IntMap.insert index' segment1 before), Slice ref index (IntMap.insert index segment12 after))
 
--- | Given an interval, get a slice of Slices
-slice :: (Int, Int) -> Slices -> Slices
+-- | Given an interval, get a slice of Slice
+slice :: (Int, Int) -> Slice -> Slice
 slice (start, end) slices = case split start slices of
   (_, after) -> case split (end - start) after of
     (mid, _) -> mid
 
 --------------------------------------------------------------------------------
 
--- | Map a function over all `Slice`s
-map :: (Slice -> Slice) -> Slices -> Slices
-map f (Slices ref offset xs) = Slices ref offset (IntMap.map f xs)
+-- | Map a function over all Segments
+map :: (Segment -> Segment) -> Slice -> Slice
+map f (Slice ref offset xs) = Slice ref offset (IntMap.map f xs)
 
--- | Map a function over a given interval of `Slice`s
-mapInterval :: (Slice -> Slice) -> (Int, Int) -> Slices -> Slices
+-- | Map a function over a given interval of Slice
+mapInterval :: (Segment -> Segment) -> (Int, Int) -> Slice -> Slice
 mapInterval f (start, end) slices = case split start slices of
   (before, after) -> case split (end - start) after of
     (mid, after') -> before <> map f mid <> after'
 
 --------------------------------------------------------------------------------
 
--- | Merging two Slices
+-- | Merging two Slice
 data MergeError
-  = NotSameRefU -- two `Slices` are not of the same `RefU`
-  | NotAdjacent -- two `Slices` are not adjacent
-  | Overlapping -- two `Slices` are overlapping
+  = NotSameRefU -- two `Slice` are not of the same `RefU`
+  | NotAdjacent -- two `Slice` are not adjacent
+  | Overlapping -- two `Slice` are overlapping
   | CannotMergeLimbs
   deriving (Eq)
 
@@ -128,38 +127,38 @@ instance Show MergeError where
   show Overlapping = "Slice.MergeError: two slices are overlapping with each other"
   show CannotMergeLimbs = "Slice.MergeError: cannot merge two Limbs together"
 
--- | Merge two `Slices` into one, throwing MergeError if the slices are:
+-- | Merge two `Slice` into one, throwing MergeError if the slices are:
 --    1. not of the same `RefU`
 --    2. not adjacent
 --    3. overlapping
-safeMerge :: Slices -> Slices -> Either MergeError Slices
-safeMerge slice1@(Slices ref1 offset1 xs1) (Slices ref2 offset2 xs2)
+safeMerge :: Slice -> Slice -> Either MergeError Slice
+safeMerge slice1@(Slice ref1 offset1 xs1) (Slice ref2 offset2 xs2)
   | ref1 /= ref2 = Left NotSameRefU
   | otherwise = case (offset1 + widthOf slice1) `compare` offset2 of
       LT -> Left NotAdjacent
       GT -> Left Overlapping
-      EQ -> case xs1 `glueAdjecentSlices` xs2 of
+      EQ -> case xs1 `glueAdjecentSegments` xs2 of
         Left _ -> Left CannotMergeLimbs
-        Right result -> Right (Slices ref1 offset1 result)
+        Right result -> Right (Slice ref1 offset1 result)
 
 -- | Unsafe version of `safeMerge`
-merge :: Slices -> Slices -> Slices
+merge :: Slice -> Slice -> Slice
 merge xs ys = case safeMerge xs ys of
   Left err -> error $ "[ panic ] " <> show err
   Right result -> result
 
 -- | Merge two `IntMap Slice` and see of both ends can be glued together
-glueAdjecentSlices :: IntMap Slice -> IntMap Slice -> Either Limb.MergeError (IntMap Slice)
-glueAdjecentSlices xs ys = case (IntMap.maxViewWithKey xs, IntMap.minView ys) of
-  (Just ((index1, slice1), xs'), Just (slice2, ys')) -> case glueSlice slice1 slice2 of
+glueAdjecentSegments :: IntMap Segment -> IntMap Segment -> Either Limb.MergeError (IntMap Segment)
+glueAdjecentSegments xs ys = case (IntMap.maxViewWithKey xs, IntMap.minView ys) of
+  (Just ((index1, slice1), xs'), Just (slice2, ys')) -> case glueSegment slice1 slice2 of
     Left err -> Left err
     Right Nothing -> Right $ xs <> ys
     Right (Just result) -> Right $ IntMap.insert index1 result (xs' <> ys')
   _ -> Right $ xs <> ys
 
--- | See if 2 `Slice`s can be glued together
-glueSlice :: Slice -> Slice -> Either Limb.MergeError (Maybe Slice)
-glueSlice xs ys = case (xs, ys) of
+-- | See if 2 Segments can be glued together
+glueSegment :: Segment -> Segment -> Either Limb.MergeError (Maybe Segment)
+glueSegment xs ys = case (xs, ys) of
   (Constant val1, Constant val2) -> Right (Just (Constant (val2 <> val1)))
   (ChildOf limb, ChildOf limb') -> case Limb.safeMerge limb limb' of
     Left err -> Left err
@@ -167,15 +166,15 @@ glueSlice xs ys = case (xs, ys) of
   (Parent len, Parent len') -> Right (Just (Parent (len + len')))
   _ -> Right Nothing
 
--- | Glue all slices that can be glued together, such that `normalize . merge` is the inverse of `split`
-normalize :: Slices -> Slices
-normalize (Slices ref offset xs) =
+-- | Glue all segments that can be glued together, such that `normalize . merge` is the inverse of `split`
+normalize :: Slice -> Slice
+normalize (Slice ref offset xs) =
   let (accumulated, lastSlice) = IntMap.foldlWithKey' glue (mempty, Nothing) xs
-   in Slices ref offset $ case lastSlice of
+   in Slice ref offset $ case lastSlice of
         Nothing -> accumulated
-        Just (index, slice) -> IntMap.insert index slice accumulated
+        Just (index, segment) -> IntMap.insert index segment accumulated
   where
-    glue (acc, Nothing) index slice = (IntMap.insert index slice acc, Just (index, slice))
-    glue (acc, Just (prevIndex, prevSlice)) index slice = case glueSlice prevSlice slice of
+    glue (acc, Nothing) index segment = (IntMap.insert index segment acc, Just (index, segment))
+    glue (acc, Just (prevIndex, prevSlice)) index segment = case glueSegment prevSlice segment of
       Right (Just result) -> (acc, Just (prevIndex, result))
-      _ -> (IntMap.insert prevIndex prevSlice acc, Just (index, slice))
+      _ -> (IntMap.insert prevIndex prevSlice acc, Just (index, segment))
