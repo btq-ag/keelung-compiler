@@ -34,19 +34,14 @@ tests = describe "Slice" $ do
         let (slices1, slices2) = Slice.split index slices
         widthOf slices1 + widthOf slices2 `shouldBe` widthOf slices
 
-  describe "normalize" $ do
-    it "should be the coequalizer of `merge . split` and `id`" $ do
+    it "should be the right inverse of `merge` (`merge . split = id`)" $ do
       let genParam = do
             slices <- arbitrary
             index <- chooseInt (0, (widthOf slices - 1) `max` 0)
             pure (slices, index)
       forAll genParam $ \(slices, index) -> do
         let (slices1, slices2) = Slice.split index slices
-        putStrLn ("parameter      " <> show index <> " " <> show slices)
-        putStrLn ("splitted       " <> show slices1 <> "        " <> show slices2)
-        putStrLn ("merged         " <> show (Slice.merge slices1 slices2))
-        putStrLn ("normalized     " <> show (Slice.normalize (Slice.merge slices1 slices2)))
-        Slice.normalize (slices1 <> slices2) `shouldBe` Slice.normalize slices
+        slices1 <> slices2 `shouldBe` slices
 
   return ()
 
