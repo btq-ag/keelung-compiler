@@ -1,8 +1,17 @@
 module Keelung.Data.Slice
-  ( Slices (..),
+  ( -- * Construction
+    Slices (..),
     Slice (..),
     fromRefU,
+
+    -- * Mapping
+    map,
+    mapInterval,
+
+    -- * Splitting
     split,
+
+    -- * Normalizing
     normalize,
 
     -- * Merging
@@ -20,6 +29,7 @@ import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU)
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
+import Prelude hiding (map)
 
 --------------------------------------------------------------------------------
 
@@ -82,6 +92,18 @@ split index (Slices ref offset xs) = case IntMap.splitLookup index xs of
     Just (index', slice) ->
       let (slice1, slice2) = splitSlice (index - index') slice
        in (Slices ref offset (IntMap.insert index' slice1 before), Slices ref index (IntMap.insert index slice2 after))
+
+--------------------------------------------------------------------------------
+
+-- | Map a function over all `Slice`s
+map :: (Slice -> Slice) -> Slices -> Slices
+map f (Slices ref offset xs) = Slices ref offset (IntMap.map f xs)
+
+-- | Map a function over a given interval of `Slice`s
+mapInterval :: (Slice -> Slice) -> (Int, Int) -> Slices -> Slices
+mapInterval f (start, end) slices = case split start slices of
+  (before, after) -> case split (end - start) after of
+    (mid, after') -> before <> map f mid <> after'
 
 --------------------------------------------------------------------------------
 
