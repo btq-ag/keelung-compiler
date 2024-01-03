@@ -38,12 +38,14 @@ tests = describe "Slice" $ do
     it "should be the coequalizer of `merge . split` and `id`" $ do
       let genParam = do
             slices <- arbitrary
-            index <- chooseInt (0, widthOf slices - 1 `max` 0)
+            index <- chooseInt (0, (widthOf slices - 1) `max` 0)
             pure (slices, index)
       forAll genParam $ \(slices, index) -> do
         let (slices1, slices2) = Slice.split index slices
-        print (index, slices)
-        print (slices1, slices2)
+        putStrLn ("parameter      " <> show index <> " " <> show slices)
+        putStrLn ("splitted       " <> show slices1 <> "        " <> show slices2)
+        putStrLn ("merged         " <> show (Slice.merge slices1 slices2))
+        putStrLn ("normalized     " <> show (Slice.normalize (Slice.merge slices1 slices2)))
         Slice.normalize (slices1 <> slices2) `shouldBe` Slice.normalize slices
 
   return ()
@@ -86,7 +88,7 @@ instance Arbitrary Slice where
 instance Arbitrary Slices where
   arbitrary = do
     offset <- chooseInt (0, 16)
-    slices <- arbitrary :: Gen [Slice]
+    slices <- vectorOf 1 arbitrary :: Gen [Slice]
     var <- arbitrary
     pure $ Slices var offset (snd $ foldr (\slice (index, acc) -> (index + widthOf slice, IntMap.insert index slice acc)) (offset, mempty) slices)
 

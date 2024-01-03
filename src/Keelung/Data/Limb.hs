@@ -113,20 +113,20 @@ data SplitError = OffsetOutOfBound
 instance Show SplitError where
   show OffsetOutOfBound = "Limb.SplitError: offset out of bound"
 
--- | Split a 'Limb' into two 'Limb's at a given index of the RefU
+-- | Split a 'Limb' into two 'Limb's at a given index
 safeSplit :: Int -> Limb -> Either SplitError (Limb, Limb)
 safeSplit index (Limb ref w offset s)
   | index < 0 || index > w = Left OffsetOutOfBound
   | otherwise = case s of
       Left sign ->
         Right
-          ( Limb ref ((index - offset) `max` 0) offset (Left sign),
-            Limb ref ((w - index + offset) `min` w) index (Left sign)
+          ( Limb ref index offset (Left sign),
+            Limb ref (w - index) (offset + index) (Left sign)
           )
       Right signs ->
         Right
-          ( Limb ref ((index - offset) `max` 0) offset (Right (take (index - offset) signs)),
-            Limb ref ((w - index + offset) `min` w) index (Right (drop (index - offset) signs))
+          ( Limb ref index offset (Right (take index signs)),
+            Limb ref (w - index) (offset + index) (Right (drop index signs))
           )
 
 -- | Split a 'Limb' into two 'Limb's at a given index of the RefU (unsafe exception-throwing version of `safeSplit`)
@@ -167,7 +167,7 @@ safeMerge (Limb ref1 width1 offset1 signs1) (Limb ref2 width2 offset2 signs2)
       GT -> Left Overlapping
       EQ -> Right $ Limb ref1 (width1 + width2) offset1 $ case (signs1, signs2) of
         (Left True, Left True) -> Left True
-        (Left False, Left False) -> Left True
+        (Left False, Left False) -> Left False
         (Left True, Left False) -> Right (replicate width1 True <> replicate width2 False)
         (Left False, Left True) -> Right (replicate width1 False <> replicate width2 True)
         (Left sign, Right signs) -> Right (replicate width1 sign <> signs)
