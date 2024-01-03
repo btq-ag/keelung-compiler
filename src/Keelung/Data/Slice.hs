@@ -8,8 +8,9 @@ module Keelung.Data.Slice
     map,
     mapInterval,
 
-    -- * Splitting
+    -- * Splitting and slicing
     split,
+    slice,
 
     -- * Normalizing
     normalize,
@@ -92,6 +93,12 @@ split index (Slices ref offset xs) = case IntMap.splitLookup index xs of
     Just (index', slice) ->
       let (slice1, slice2) = splitSlice (index - index') slice
        in (Slices ref offset (IntMap.insert index' slice1 before), Slices ref index (IntMap.insert index slice2 after))
+
+-- | Given an interval, get a slice of Slices
+slice :: (Int, Int) -> Slices -> Slices
+slice (start, end) slices = case split start slices of
+  (_, after) -> case split (end - start) after of
+    (mid, _) -> mid
 
 --------------------------------------------------------------------------------
 

@@ -62,6 +62,7 @@ library
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Limb
       Keelung.Compiler.Relations.Reference
+      Keelung.Compiler.Relations.Slice
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
@@ -152,6 +153,7 @@ executable keelungc
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Limb
       Keelung.Compiler.Relations.Reference
+      Keelung.Compiler.Relations.Slice
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
@@ -300,6 +302,7 @@ test-suite keelung-test
       Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Limb
       Keelung.Compiler.Relations.Reference
+      Keelung.Compiler.Relations.Slice
       Keelung.Compiler.Relations.UInt
       Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
