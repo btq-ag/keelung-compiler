@@ -135,10 +135,6 @@ split index limb = case safeSplit index limb of
   Left err -> error $ "[ panic ] " <> show err
   Right limbs -> limbs
 
--- split :: Int -> Limb -> (Limb, Limb)
--- split index (Limb ref w offset (Left sign)) = (Limb ref index (offset + index) (Left sign), Limb ref (w - index) (offset + index) (Left sign))
--- split index (Limb ref w offset (Right signs)) = (Limb ref index (offset + index) (Right (take index signs)), Limb ref (w - index) (offset + index) (Right (drop index signs)))
-
 --------------------------------------------------------------------------------
 
 -- | Merge two Limbs into one, unsafe exception-throwing version of `safeMerge`

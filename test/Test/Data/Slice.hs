@@ -20,12 +20,12 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "Slice" $ do
   describe "widthOf Slices" $ do
-    it "should be the sume of all lengths of its slices" $ do
+    it "should be the sum of all lengths of its slices" $ do
       property $ \slices -> do
         widthOf slices `shouldBe` sum (widthOf <$> IntMap.elems (slicesElems slices))
 
   describe "split" $ do
-    it "should preserve lengths of slices" $ do
+    it "should preserve lengths of slices (`(+) . widthOf . split = widthOf`)" $ do
       let genParam = do
             slices <- arbitrary
             index <- chooseInt (0, widthOf slices - 1)
@@ -42,6 +42,16 @@ tests = describe "Slice" $ do
       forAll genParam $ \(slices, index) -> do
         let (slices1, slices2) = Slice.split index slices
         slices1 <> slices2 `shouldBe` slices
+
+  describe "normalize" $ do
+    it "should be the coequalizer of `merge . split` and `id`" $ do
+      let genParam = do
+            slices <- arbitrary
+            index <- chooseInt (0, (widthOf slices - 1) `max` 0)
+            pure (slices, index)
+      forAll genParam $ \(slices, index) -> do
+        let (slices1, slices2) = Slice.split index slices
+        Slice.normalize (slices1 <> slices2) `shouldBe` Slice.normalize slices
 
   return ()
 

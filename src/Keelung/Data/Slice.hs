@@ -3,6 +3,7 @@ module Keelung.Data.Slice
     Slice (..),
     fromRefU,
     split,
+    normalize,
 
     -- * Merging
     MergeError (..),
@@ -108,7 +109,7 @@ safeMerge slice1@(Slices ref1 offset1 xs1) (Slices ref2 offset2 xs2)
   | otherwise = case (offset1 + widthOf slice1) `compare` offset2 of
       LT -> Left NotAdjacent
       GT -> Left Overlapping
-      EQ -> case xs1 `glueSliceIntMap` xs2 of
+      EQ -> case xs1 `glueAdjecentSlices` xs2 of
         Left _ -> Left CannotMergeLimbs
         Right result -> Right (Slices ref1 offset1 result)
 
@@ -119,13 +120,33 @@ merge xs ys = case safeMerge xs ys of
   Right result -> result
 
 -- | Merge two `IntMap Slice` and see of both ends can be glued together
-glueSliceIntMap :: IntMap Slice -> IntMap Slice -> Either Limb.MergeError (IntMap Slice)
-glueSliceIntMap xs ys = case (IntMap.maxViewWithKey xs, IntMap.minView ys) of
-  (Just ((index1, slice1), xs'), Just (slice2, ys')) -> case (slice1, slice2) of
-    (Constant val1, Constant val2) -> Right $ IntMap.insert index1 (Constant (val2 <> val1)) (xs' <> ys')
-    (ChildOf limb, ChildOf limb') -> case Limb.safeMerge limb limb' of
-      Left err -> Left err
-      Right limb'' -> Right $ IntMap.insert index1 (ChildOf limb'') (xs' <> ys')
-    (Parent len, Parent len') -> Right $ IntMap.insert index1 (Parent (len + len')) (xs' <> ys')
-    _ -> Right $ xs <> ys
+glueAdjecentSlices :: IntMap Slice -> IntMap Slice -> Either Limb.MergeError (IntMap Slice)
+glueAdjecentSlices xs ys = case (IntMap.maxViewWithKey xs, IntMap.minView ys) of
+  (Just ((index1, slice1), xs'), Just (slice2, ys')) -> case glueSlice slice1 slice2 of
+    Left err -> Left err
+    Right Nothing -> Right $ xs <> ys
+    Right (Just result) -> Right $ IntMap.insert index1 result (xs' <> ys')
   _ -> Right $ xs <> ys
+
+-- | See if 2 `Slice`s can be glued together
+glueSlice :: Slice -> Slice -> Either Limb.MergeError (Maybe Slice)
+glueSlice xs ys = case (xs, ys) of
+  (Constant val1, Constant val2) -> Right (Just (Constant (val2 <> val1)))
+  (ChildOf limb, ChildOf limb') -> case Limb.safeMerge limb limb' of
+    Left err -> Left err
+    Right limb'' -> Right (Just (ChildOf limb''))
+  (Parent len, Parent len') -> Right (Just (Parent (len + len')))
+  _ -> Right Nothing
+
+-- | Glue all slices that can be glued together, such that `normalize . merge` is the inverse of `split`
+normalize :: Slices -> Slices
+normalize (Slices ref offset xs) =
+  let (accumulated, lastSlice) = IntMap.foldlWithKey' glue (mempty, Nothing) xs
+   in Slices ref offset $ case lastSlice of
+        Nothing -> accumulated
+        Just (index, slice) -> IntMap.insert index slice accumulated
+  where
+    glue (acc, Nothing) index slice = (IntMap.insert index slice acc, Just (index, slice))
+    glue (acc, Just (prevIndex, prevSlice)) index slice = case glueSlice prevSlice slice of
+      Right (Just result) -> (acc, Just (prevIndex, result))
+      _ -> (IntMap.insert prevIndex prevSlice acc, Just (index, slice))
