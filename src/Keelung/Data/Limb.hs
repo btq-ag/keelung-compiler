@@ -6,6 +6,7 @@ module Keelung.Data.Limb
     showAsTerms,
     new,
     isPositive,
+    null,
     refUToLimbs,
     trim,
     split,
@@ -18,6 +19,7 @@ import Control.DeepSeq (NFData)
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
 import Keelung.Syntax
+import Prelude hiding (null)
 
 --------------------------------------------------------------------------------
 
@@ -134,6 +136,12 @@ split :: Int -> Limb -> (Limb, Limb)
 split index limb = case safeSplit index limb of
   Left err -> error $ "[ panic ] " <> show err
   Right limbs -> limbs
+
+--------------------------------------------------------------------------------
+
+-- | See if a Limb is empty
+null :: Limb -> Bool
+null (Limb _ w _ _) = w == 0
 
 --------------------------------------------------------------------------------
 

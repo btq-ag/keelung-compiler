@@ -53,8 +53,6 @@ tests = describe "Slice" $ do
         let (slice1, slice2) = Slice.split index slice
         Slice.normalize (slice1 <> slice2) `shouldBe` Slice.normalize slice
 
-  return ()
-
 --------------------------------------------------------------------------------
 
 instance Arbitrary RefU where

@@ -263,6 +263,7 @@ test-suite keelung-test
       Test.Optimization.Util
       Test.Relations
       Test.Relations.Field
+      Test.Relations.Slice
       Test.Solver
       Test.Solver.BinRep
       Keelung.Compiler

@@ -83,6 +83,12 @@ splitSegment index segment = case segment of
   ChildOf limb -> let (limb1, limb2) = Limb.split index limb in (ChildOf limb1, ChildOf limb2)
   Parent len -> (Parent index, Parent (len - index))
 
+-- | Check if a `Segment` is empty
+nullSegment :: Segment -> Bool
+nullSegment (Constant val) = toInteger val == 0
+nullSegment (ChildOf limb) = Limb.null limb
+nullSegment (Parent len) = len == 0
+
 -- | Split a `Slice` into two at a given index
 split :: Int -> Slice -> (Slice, Slice)
 split index (Slice ref offset xs) = case IntMap.splitLookup index xs of
@@ -96,7 +102,7 @@ split index (Slice ref offset xs) = case IntMap.splitLookup index xs of
 -- | Given an interval, get a slice of Slice
 slice :: (Int, Int) -> Slice -> Slice
 slice (start, end) slices = case split start slices of
-  (_, after) -> case split (end - start) after of
+  (_, afterStart) -> case split end afterStart of
     (mid, _) -> mid
 
 --------------------------------------------------------------------------------
@@ -108,8 +114,8 @@ map f (Slice ref offset xs) = Slice ref offset (IntMap.map f xs)
 -- | Map a function over a given interval of Slice
 mapInterval :: (Segment -> Segment) -> (Int, Int) -> Slice -> Slice
 mapInterval f (start, end) slices = case split start slices of
-  (before, after) -> case split (end - start) after of
-    (mid, after') -> before <> map f mid <> after'
+  (beforeStart, afterStart) -> case split end afterStart of
+    (middle, afterEnd) -> beforeStart <> map f middle <> afterEnd
 
 --------------------------------------------------------------------------------
 
@@ -164,7 +170,13 @@ glueSegment xs ys = case (xs, ys) of
     Left err -> Left err
     Right limb'' -> Right (Just (ChildOf limb''))
   (Parent len, Parent len') -> Right (Just (Parent (len + len')))
-  _ -> Right Nothing
+  _ ->
+    if nullSegment xs
+      then Right (Just ys)
+      else
+        if nullSegment ys
+          then Right (Just xs)
+          else Right Nothing
 
 -- | Glue all segments that can be glued together, such that `normalize . merge` is the inverse of `split`
 normalize :: Slice -> Slice
