@@ -19,12 +19,27 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Slice" $ do
+  it "should be valid" $ do
+    property $ \slice -> do
+      Slice.isValid slice `shouldBe` True
+
   describe "widthOf Slice" $ do
     it "should be the sum of all lengths of its segments" $ do
       property $ \slice -> do
         widthOf slice `shouldBe` sum (widthOf <$> IntMap.elems (sliceSegments slice))
 
-  describe "split" $ do
+  describe "split & merge" $ do
+    it "should result in valid Slices" $ do
+      let genParam = do
+            slice <- arbitrary
+            index <- chooseInt (0, widthOf slice - 1)
+            pure (slice, index)
+      forAll genParam $ \(slice, index) -> do
+        let (slice1, slice2) = Slice.split index slice
+        Slice.isValid slice1 `shouldBe` True
+        Slice.isValid slice2 `shouldBe` True
+        Slice.isValid (slice1 <> slice2) `shouldBe` True
+
     it "should preserve lengths of segments (`(+) . widthOf . split = widthOf`)" $ do
       let genParam = do
             slice <- arbitrary
@@ -53,11 +68,9 @@ tests = describe "Slice" $ do
         let (slice1, slice2) = Slice.split index slice
         Slice.normalize (slice1 <> slice2) `shouldBe` Slice.normalize slice
 
-    it "should remove all null segments" $ do
+    it "should result in valid Slices" $ do
       property $ \slice -> do
-        let segments = IntMap.elems $ Slice.sliceSegments (Slice.normalize slice)
-        let results = map Slice.nullSegment segments
-        results `shouldSatisfy` not . or
+        Slice.isValid (Slice.normalize slice) `shouldBe` True
 
 --------------------------------------------------------------------------------
 

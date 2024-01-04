@@ -4,6 +4,7 @@ module Keelung.Data.Slice
     nullSegment,
     Slice (..),
     fromRefU,
+    isValid,
 
     -- * Mapping
     map,
@@ -191,3 +192,32 @@ normalize (Slice ref offset xs) =
     glue (acc, Just (prevIndex, prevSlice)) index segment = case glueSegment prevSlice segment of
       Right (Just result) -> (acc, Just (prevIndex, result))
       _ -> (IntMap.insert prevIndex prevSlice acc, Just (index, segment))
+
+--------------------------------------------------------------------------------
+
+-- | A Slice is considered valid if:
+--    1. all segments are non-null
+--    3. all segments are adjacent but not overlapping
+--    4. all adjacent segments are not of the same kind
+isValid :: Slice -> Bool
+isValid (Slice _ _ xs) =
+  fst $
+    IntMap.foldlWithKey'
+      ( \(acc, previous) currIndex currSegment ->
+          let notNull = not (nullSegment currSegment)
+              noGapAndAdjecent = case previous of
+                Nothing -> True
+                Just (prevIndex, prevSegment) -> prevIndex + widthOf prevSegment == currIndex
+              notSameKind = case previous of
+                Nothing -> True
+                Just (_, prevSegment) -> not (sameKind (prevSegment, currSegment))
+           in (acc && notNull && noGapAndAdjecent && notSameKind, Just (currIndex, currSegment))
+      )
+      (True, Nothing)
+      xs
+  where
+    sameKind :: (Segment, Segment) -> Bool
+    sameKind (Constant _, Constant _) = True
+    sameKind (ChildOf _, ChildOf _) = True
+    sameKind (Parent _, Parent _) = True
+    sameKind _ = False
