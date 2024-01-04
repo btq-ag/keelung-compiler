@@ -1,7 +1,8 @@
 module Keelung.Data.Slice
   ( -- * Construction
-    Slice (..),
     Segment (..),
+    nullSegment,
+    Slice (..),
     fromRefU,
 
     -- * Mapping
@@ -85,7 +86,7 @@ splitSegment index segment = case segment of
 
 -- | Check if a `Segment` is empty
 nullSegment :: Segment -> Bool
-nullSegment (Constant val) = toInteger val == 0
+nullSegment (Constant val) = widthOf val == 0
 nullSegment (ChildOf limb) = Limb.null limb
 nullSegment (Parent len) = len == 0
 
