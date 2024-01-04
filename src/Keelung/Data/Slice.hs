@@ -123,16 +123,16 @@ mapInterval f (start, end) slices = case split start slices of
 
 -- | Merging two Slice
 data MergeError
-  = NotSameRefU -- two `Slice` are not of the same `RefU`
-  | NotAdjacent -- two `Slice` are not adjacent
-  | Overlapping -- two `Slice` are overlapping
+  = NotSameRefU Slice Slice -- two `Slice` are not of the same `RefU`
+  | NotAdjacent Slice Slice -- two `Slice` are not adjacent
+  | Overlapping Slice Slice -- two `Slice` are overlapping
   | CannotMergeLimbs
   deriving (Eq)
 
 instance Show MergeError where
-  show NotSameRefU = "Slice.MergeError: two slices are not of the same RefU"
-  show NotAdjacent = "Slice.MergeError: two slices are not adjacent with each other"
-  show Overlapping = "Slice.MergeError: two slices are overlapping with each other"
+  show (NotSameRefU a b) = "Slice.MergeError: two slices are not of the same RefU:\n" <> show a <> "\n" <> show b
+  show (NotAdjacent a b) = "Slice.MergeError: two slices are not adjacent with each other:\n" <> show a <> "\n" <> show b
+  show (Overlapping a b) = "Slice.MergeError: two slices are overlapping with each other:\n" <> show a <> "\n" <> show b
   show CannotMergeLimbs = "Slice.MergeError: cannot merge two Limbs together"
 
 -- | Merge two `Slice` into one, throwing MergeError if the slices are:
@@ -140,11 +140,11 @@ instance Show MergeError where
 --    2. not adjacent
 --    3. overlapping
 safeMerge :: Slice -> Slice -> Either MergeError Slice
-safeMerge slice1@(Slice ref1 offset1 xs1) (Slice ref2 offset2 xs2)
-  | ref1 /= ref2 = Left NotSameRefU
+safeMerge slice1@(Slice ref1 offset1 xs1) slice2@(Slice ref2 offset2 xs2)
+  | ref1 /= ref2 = Left (NotSameRefU slice1 slice2)
   | otherwise = case (offset1 + widthOf slice1) `compare` offset2 of
-      LT -> Left NotAdjacent
-      GT -> Left Overlapping
+      LT -> Left (NotAdjacent slice1 slice2)
+      GT -> Left (Overlapping slice1 slice2)
       EQ -> case xs1 `glueAdjecentSegments` xs2 of
         Left _ -> Left CannotMergeLimbs
         Right result -> Right (Slice ref1 offset1 result)

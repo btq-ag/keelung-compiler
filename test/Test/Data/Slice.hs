@@ -72,6 +72,32 @@ tests = describe "Slice" $ do
       property $ \slice -> do
         Slice.isValid (Slice.normalize slice) `shouldBe` True
 
+  describe "map" $ do
+    it "`map id = id`" $ do
+      property $ \slice -> do
+        let mapped = Slice.map id slice
+        Slice.isValid mapped `shouldBe` True
+        mapped `shouldBe` slice
+
+    -- it "should result in valid Slices when all segments are mapped to Constant" $ do
+    --   property $ \slice -> do
+    --     let toConstant segment = Constant (U.new (widthOf segment) 0)
+    --     let mapped = Slice.map toConstant slice
+    --     print mapped
+    --     Slice.isValid mapped `shouldBe` True
+
+  describe "mapInterval" $ do
+    it "`mapInterval id = id`" $ do
+      let genParam = do
+            slice <- arbitrary
+            start <- chooseInt (0, widthOf slice - 1)
+            end <- chooseInt (start, widthOf slice)
+            pure (slice, (start, end))
+      forAll genParam $ \(slice, interval) -> do
+        let mapped = Slice.mapInterval id interval slice
+        Slice.isValid mapped `shouldBe` True
+        mapped `shouldBe` slice
+
 --------------------------------------------------------------------------------
 
 instance Arbitrary RefU where
