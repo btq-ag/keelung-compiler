@@ -145,24 +145,13 @@ safeMerge slice1@(Slice ref1 offset1 xs1) slice2@(Slice ref2 offset2 xs2)
   | otherwise = case (offset1 + widthOf slice1) `compare` offset2 of
       LT -> Left (NotAdjacent slice1 slice2)
       GT -> Left (Overlapping slice1 slice2)
-      EQ -> case xs1 `glueAdjecentSegments` xs2 of
-        Left _ -> Left CannotMergeLimbs
-        Right result -> Right (Slice ref1 offset1 result)
+      EQ -> Right (Slice ref1 offset1 (xs1 <> xs2))
 
 -- | Unsafe version of `safeMerge`
 merge :: Slice -> Slice -> Slice
 merge xs ys = case safeMerge xs ys of
   Left err -> error $ "[ panic ] " <> show err
   Right result -> result
-
--- | Merge two `IntMap Slice` and see of both ends can be glued together
-glueAdjecentSegments :: IntMap Segment -> IntMap Segment -> Either Limb.MergeError (IntMap Segment)
-glueAdjecentSegments xs ys = case (IntMap.maxViewWithKey xs, IntMap.minView ys) of
-  (Just ((index1, slice1), xs'), Just (slice2, ys')) -> case glueSegment slice1 slice2 of
-    Left err -> Left err
-    Right Nothing -> Right $ xs <> ys
-    Right (Just result) -> Right $ IntMap.insert index1 result (xs' <> ys')
-  _ -> Right $ xs <> ys
 
 -- | See if 2 Segments can be glued together
 glueSegment :: Segment -> Segment -> Either Limb.MergeError (Maybe Segment)

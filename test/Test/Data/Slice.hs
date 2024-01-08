@@ -29,7 +29,7 @@ tests = describe "Slice" $ do
         widthOf slice `shouldBe` sum (widthOf <$> IntMap.elems (sliceSegments slice))
 
   describe "split & merge" $ do
-    it "should result in valid Slices" $ do
+    it "should result in valid Slices after normalization" $ do
       let genParam = do
             slice <- arbitrary
             index <- chooseInt (0, widthOf slice - 1)
@@ -38,7 +38,7 @@ tests = describe "Slice" $ do
         let (slice1, slice2) = Slice.split index slice
         Slice.isValid slice1 `shouldBe` True
         Slice.isValid slice2 `shouldBe` True
-        Slice.isValid (slice1 <> slice2) `shouldBe` True
+        Slice.isValid (Slice.normalize (slice1 <> slice2)) `shouldBe` True
 
     it "should preserve lengths of segments (`(+) . widthOf . split = widthOf`)" $ do
       let genParam = do
@@ -48,15 +48,6 @@ tests = describe "Slice" $ do
       forAll genParam $ \(slice, index) -> do
         let (slice1, slice2) = Slice.split index slice
         widthOf slice1 + widthOf slice2 `shouldBe` widthOf slice
-
-    it "should be the right inverse of `merge` (`merge . split = id`)" $ do
-      let genParam = do
-            slice <- arbitrary
-            index <- chooseInt (0, (widthOf slice - 1) `max` 0)
-            pure (slice, index)
-      forAll genParam $ \(slice, index) -> do
-        let (slice1, slice2) = Slice.split index slice
-        slice1 <> slice2 `shouldBe` slice
 
   describe "normalize" $ do
     it "should be the coequalizer of `merge . split` and `id`" $ do
@@ -79,13 +70,6 @@ tests = describe "Slice" $ do
         Slice.isValid mapped `shouldBe` True
         mapped `shouldBe` slice
 
-    -- it "should result in valid Slices when all segments are mapped to Constant" $ do
-    --   property $ \slice -> do
-    --     let toConstant segment = Constant (U.new (widthOf segment) 0)
-    --     let mapped = Slice.map toConstant slice
-    --     print mapped
-    --     Slice.isValid mapped `shouldBe` True
-
   describe "mapInterval" $ do
     it "`mapInterval id = id`" $ do
       let genParam = do
@@ -95,8 +79,8 @@ tests = describe "Slice" $ do
             pure (slice, (start, end))
       forAll genParam $ \(slice, interval) -> do
         let mapped = Slice.mapInterval id interval slice
-        Slice.isValid mapped `shouldBe` True
-        mapped `shouldBe` slice
+        Slice.isValid (Slice.normalize mapped) `shouldBe` True
+        Slice.normalize mapped `shouldBe` Slice.normalize slice
 
 --------------------------------------------------------------------------------
 
@@ -138,7 +122,7 @@ instance Arbitrary Slice where
     offset <- chooseInt (0, 16)
     segments <- removeAdjectSameKind <$> arbitrary :: Gen [Segment]
     var <- arbitrary
-    pure $ Slice var offset (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (offset, mempty) segments)
+    pure $ Slice.normalize $ Slice var offset (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (offset, mempty) segments)
     where
       sameKind :: Segment -> Segment -> Bool
       sameKind (Constant _) (Constant _) = True
