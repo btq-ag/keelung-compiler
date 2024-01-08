@@ -177,7 +177,10 @@ normalize (Slice ref offset xs) =
         Nothing -> accumulated
         Just (index, segment) -> IntMap.insert index segment accumulated
   where
-    glue (acc, Nothing) index segment = (IntMap.insert index segment acc, Just (index, segment))
+    glue (acc, Nothing) index segment =
+      if nullSegment segment
+        then (acc, Nothing) -- drop null segments
+        else (IntMap.insert index segment acc, Just (index, segment))
     glue (acc, Just (prevIndex, prevSlice)) index segment = case glueSegment prevSlice segment of
       Right (Just result) -> (acc, Just (prevIndex, result))
       _ -> (IntMap.insert prevIndex prevSlice acc, Just (index, segment))

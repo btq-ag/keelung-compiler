@@ -14,7 +14,6 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Syntax (Var, Width)
 import Prelude hiding (lookup)
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -79,7 +78,7 @@ assignMapping (RefUDesc ctor width var) interval val (Mapping xs) = Mapping (Int
     mapSlice = Slice.mapInterval (const (Slice.Constant val)) interval
 
     assignVarMap :: Maybe (IntMap Slice) -> Maybe (IntMap Slice)
-    assignVarMap Nothing = traceShowId $ Just (IntMap.singleton var (mapSlice (Slice.fromRefU (ctor var))))
+    assignVarMap Nothing = Just (IntMap.singleton var (mapSlice (Slice.fromRefU (ctor var))))
     assignVarMap (Just varMap) = Just (IntMap.alter assignSlice var varMap)
 
     assignSlice :: Maybe Slice -> Maybe Slice

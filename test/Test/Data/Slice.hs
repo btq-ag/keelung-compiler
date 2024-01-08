@@ -100,7 +100,7 @@ instance Arbitrary U where
 instance Arbitrary Limb where
   arbitrary = do
     var <- arbitrary
-    width <- chooseInt (1, widthOf var)
+    width <- chooseInt (0, widthOf var)
     offset <- chooseInt (0, widthOf var - width)
     sign <-
       oneof
