@@ -13,8 +13,8 @@ import Data.IntMap.Strict qualified as IntMap
 import Keelung (widthOf)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU (..))
-import Keelung.Data.Slice (Segment, Slice (..))
-import Keelung.Data.Slice qualified as Slice
+import Keelung.Data.SliceLookup (Segment, SliceLookup (..))
+import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
 import Keelung.Syntax (Var, Width)
 import Prelude hiding (lookup)
@@ -38,7 +38,7 @@ assign (RefUI width var) interval val relations = relations {srRefI = assignMapp
 assign (RefUP width var) interval val relations = relations {srRefP = assignMapping (RefUDesc RefUP' width var, interval) val (srRefP relations)}
 assign (RefUX width var) interval val relations = relations {srRefX = assignMapping (RefUDesc RefUX' width var, interval) val (srRefX relations)}
 
-lookup :: RefU -> (Int, Int) -> SliceRelations -> Slice
+lookup :: RefU -> (Int, Int) -> SliceRelations -> SliceLookup
 lookup (RefUO width var) interval relations = lookupMapping (RefUDesc RefUO' width var) interval (srRefO relations)
 lookup (RefUI width var) interval relations = lookupMapping (RefUDesc RefUI' width var) interval (srRefI relations)
 lookup (RefUP width var) interval relations = lookupMapping (RefUDesc RefUP' width var) interval (srRefP relations)
@@ -87,7 +87,7 @@ instance Ord RefUDesc where
 
 --------------------------------------------------------------------------------
 
-newtype Mapping = Mapping (IntMap (IntMap Slice))
+newtype Mapping = Mapping (IntMap (IntMap SliceLookup))
   deriving (Eq)
 
 instance Show Mapping where
@@ -99,7 +99,7 @@ instance Show Mapping where
           <> unlines (map (\(width, varMap) -> "  " <> show width <> ": " <> showVarMap varMap) (IntMap.toList xs))
           <> "}"
     where
-      showVarMap :: IntMap Slice -> String
+      showVarMap :: IntMap SliceLookup -> String
       showVarMap varMap =
         if IntMap.null varMap
           then "{}"
@@ -112,35 +112,35 @@ instance Show Mapping where
 assignMapping :: (RefUDesc, (Int, Int)) -> U -> Mapping -> Mapping
 assignMapping (ref@(RefUDesc _ width var), interval) val (Mapping xs) = Mapping (IntMap.alter assignVarMap width xs)
   where
-    mapSlice :: Slice -> Slice
-    mapSlice = Slice.mapInterval (const (Slice.Constant val)) interval
+    mapSliceLookup :: SliceLookup -> SliceLookup
+    mapSliceLookup = SliceLookup.mapInterval (const (SliceLookup.Constant val)) interval
 
-    assignVarMap :: Maybe (IntMap Slice) -> Maybe (IntMap Slice)
-    assignVarMap Nothing = Just (IntMap.singleton var (mapSlice (Slice.fromRefU (toRefU ref))))
-    assignVarMap (Just varMap) = Just (IntMap.alter assignSlice var varMap)
+    assignVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
+    assignVarMap Nothing = Just (IntMap.singleton var (mapSliceLookup (SliceLookup.fromRefU (toRefU ref))))
+    assignVarMap (Just varMap) = Just (IntMap.alter assignSliceLookup var varMap)
 
-    assignSlice :: Maybe Slice -> Maybe Slice
-    assignSlice Nothing = Just (mapSlice (Slice.fromRefU (toRefU ref)))
-    assignSlice (Just slices) = Just (mapSlice slices)
+    assignSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
+    assignSliceLookup Nothing = Just (mapSliceLookup (SliceLookup.fromRefU (toRefU ref)))
+    assignSliceLookup (Just slices) = Just (mapSliceLookup slices)
 
 -- relateMapping :: (RefUDesc, (Int, Int)) -> (RefUDesc, (Int, Int)) -> Mapping -> Mapping
 -- relateMapping (RefUDesc ctor1 width1 var1, interval1) (RefUDesc ctor2 width2 var2, interval2) (Mapping xs) = Mapping (IntMap.alter relateVarMap width1 xs)
 --   where
---     relateVarMap :: Maybe (IntMap Slice) -> Maybe (IntMap Slice)
---     relateVarMap Nothing = Just (IntMap.singleton var1 (Slice.fromRefU (ctor1 var1)))
---     relateVarMap (Just varMap) = Just (IntMap.alter relateSlice var1 varMap)
+--     relateVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
+--     relateVarMap Nothing = Just (IntMap.singleton var1 (SliceLookup.fromRefU (ctor1 var1)))
+--     relateVarMap (Just varMap) = Just (IntMap.alter relateSliceLookup var1 varMap)
 
---     relateSlice :: Maybe Slice -> Maybe Slice
---     relateSlice Nothing = Just (Slice.fromRefU (ctor1 var1))
---     relateSlice (Just slices) = Just (Slice.mapInterval (const (Slice.ChildOf (Limb.new (ctor2 var2) (snd interval2 - fst interval2) (fst interval2) (Left slices)))) interval1 slices)
+--     relateSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
+--     relateSliceLookup Nothing = Just (SliceLookup.fromRefU (ctor1 var1))
+--     relateSliceLookup (Just slices) = Just (SliceLookup.mapInterval (const (SliceLookup.ChildOf (Limb.new (ctor2 var2) (snd interval2 - fst interval2) (fst interval2) (Left slices)))) interval1 slices)
 
 -- | Lookup a slice of a variable
-lookupMapping :: RefUDesc -> (Int, Int) -> Mapping -> Slice
+lookupMapping :: RefUDesc -> (Int, Int) -> Mapping -> SliceLookup
 lookupMapping ref@(RefUDesc _ width var) interval (Mapping xs) = case IntMap.lookup width xs of
-  Nothing -> Slice.fromRefU (toRefU ref)
+  Nothing -> SliceLookup.fromRefU (toRefU ref)
   Just varMap -> case IntMap.lookup var varMap of
-    Nothing -> Slice.fromRefU (toRefU ref)
-    Just slices -> Slice.slice interval slices
+    Nothing -> SliceLookup.fromRefU (toRefU ref)
+    Just slices -> SliceLookup.slice interval slices
 
 --------------------------------------------------------------------------------
 
@@ -155,11 +155,11 @@ toEdits ref1 ref2 ((index1, segment1), (index2, segment2)) =
   let ref1RefUDesc = (ref1, (index1, index1 + widthOf segment1))
       ref2RefUDesc = (ref2, (index2, index2 + widthOf segment2))
    in case (segment1, segment2) of
-        (Slice.Constant _, Slice.Constant _) -> [DoNothing]
-        (Slice.Constant val, Slice.ChildOf _) -> [AssignAs ref2RefUDesc val]
-        (Slice.Constant val, Slice.Parent _) -> [AssignAs ref2RefUDesc val]
-        (Slice.ChildOf _, Slice.Constant val) -> [AssignAs ref1RefUDesc val]
-        (Slice.ChildOf root1, Slice.ChildOf root2) ->
+        (SliceLookup.Constant _, SliceLookup.Constant _) -> [DoNothing]
+        (SliceLookup.Constant val, SliceLookup.ChildOf _) -> [AssignAs ref2RefUDesc val]
+        (SliceLookup.Constant val, SliceLookup.Parent _) -> [AssignAs ref2RefUDesc val]
+        (SliceLookup.ChildOf _, SliceLookup.Constant val) -> [AssignAs ref1RefUDesc val]
+        (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
           -- see who's root is the real boss
           let root1RefUDesc = (fromRefU (Limb.lmbRef root1), (Limb.lmbOffset root1, Limb.lmbOffset root1 + widthOf root1))
               root2RefUDesc = (fromRefU (Limb.lmbRef root2), (Limb.lmbOffset root2, Limb.lmbOffset root2 + widthOf root2))
@@ -172,23 +172,23 @@ toEdits ref1 ref2 ((index1, segment1), (index2, segment2)) =
                   [ root1RefUDesc `RelateTo` root2RefUDesc,
                     ref1RefUDesc `RelateTo` root2RefUDesc
                   ]
-        (Slice.ChildOf root1, Slice.Parent _) ->
+        (SliceLookup.ChildOf root1, SliceLookup.Parent _) ->
           let root1RefUDesc = (fromRefU (Limb.lmbRef root1), (Limb.lmbOffset root1, Limb.lmbOffset root1 + widthOf root1))
            in if root1RefUDesc > ref2RefUDesc
                 then [ref2RefUDesc `RelateTo` root1RefUDesc]
                 else [root1RefUDesc `RelateTo` ref2RefUDesc]
-        (Slice.Parent _, Slice.Constant val) -> [AssignAs ref1RefUDesc val]
-        (Slice.Parent _, Slice.ChildOf root2) ->
+        (SliceLookup.Parent _, SliceLookup.Constant val) -> [AssignAs ref1RefUDesc val]
+        (SliceLookup.Parent _, SliceLookup.ChildOf root2) ->
           let root2RefUDesc = (fromRefU (Limb.lmbRef root2), (Limb.lmbOffset root2, Limb.lmbOffset root2 + widthOf root2))
            in if ref1RefUDesc > root2RefUDesc
                 then [ref1RefUDesc `RelateTo` root2RefUDesc]
                 else [root2RefUDesc `RelateTo` ref1RefUDesc]
-        (Slice.Parent _, Slice.Parent _) ->
+        (SliceLookup.Parent _, SliceLookup.Parent _) ->
           if ref1RefUDesc > ref2RefUDesc
             then [ref1RefUDesc `RelateTo` ref2RefUDesc]
             else [ref2RefUDesc `RelateTo` ref1RefUDesc]
 
--- | Given 2 Slices of the same lengths, generate pairs of aligned segments (indexed with their offsets).
+-- | Given 2 SliceLookups of the same lengths, generate pairs of aligned segments (indexed with their offsets).
 --   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two slices.
 --   Example:
 -- slice 1      ├─────B─────┼──A──┤
@@ -196,7 +196,7 @@ toEdits ref1 ref2 ((index1, segment1), (index2, segment2)) =
 --            =>
 -- pairs        ├──B──┼──B──┼──A──┤
 -- pairs        ├──A──┼──C──┼──C──┤
-toAlignedSegmentPairs :: Slice -> Slice -> [((Int, Segment), (Int, Segment))]
+toAlignedSegmentPairs :: SliceLookup -> SliceLookup -> [((Int, Segment), (Int, Segment))]
 toAlignedSegmentPairs slice1 slice2 = step (IntMap.toList (sliceSegments slice1)) (IntMap.toList (sliceSegments slice2))
   where
     step :: [(Int, Segment)] -> [(Int, Segment)] -> [((Int, Segment), (Int, Segment))]
@@ -207,10 +207,10 @@ toAlignedSegmentPairs slice1 slice2 = step (IntMap.toList (sliceSegments slice1)
             EQ -> ((index1, segment1), (index2, segment2)) : step xs1 xs2
             LT ->
               -- segment1 is shorter, so we split segment2 into two
-              let (segment21, segment22) = Slice.splitSegment width1 segment2
+              let (segment21, segment22) = SliceLookup.splitSegment width1 segment2
                in ((index1, segment1), (index2, segment21)) : step xs1 ((index2 + width1, segment22) : xs2)
             GT ->
               -- segment2 is shorter, so we split segment1 into two
-              let (segment11, segment12) = Slice.splitSegment width2 segment1
+              let (segment11, segment12) = SliceLookup.splitSegment width2 segment1
                in ((index1, segment11), (index2, segment2)) : step ((index1 + width2, segment12) : xs1) xs2
     step _ _ = []

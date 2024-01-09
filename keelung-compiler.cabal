@@ -77,6 +77,7 @@ library
       Keelung.Data.PolyL
       Keelung.Data.Reference
       Keelung.Data.Slice
+      Keelung.Data.SliceLookup
       Keelung.Data.U
       Keelung.Data.VarGroup
       Keelung.Interpreter
@@ -168,6 +169,7 @@ executable keelungc
       Keelung.Data.PolyL
       Keelung.Data.Reference
       Keelung.Data.Slice
+      Keelung.Data.SliceLookup
       Keelung.Data.U
       Keelung.Data.VarGroup
       Keelung.Interpreter
@@ -249,7 +251,7 @@ test-suite keelung-test
       Test.Data.IntervalTable
       Test.Data.IntervalUnionFind
       Test.Data.LC
-      Test.Data.Slice
+      Test.Data.SliceLookup
       Test.Intergration
       Test.Optimization
       Test.Optimization.Boolean
@@ -318,6 +320,7 @@ test-suite keelung-test
       Keelung.Data.PolyL
       Keelung.Data.Reference
       Keelung.Data.Slice
+      Keelung.Data.SliceLookup
       Keelung.Data.U
       Keelung.Data.VarGroup
       Keelung.Interpreter
