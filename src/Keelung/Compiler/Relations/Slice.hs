@@ -3,12 +3,15 @@ module Keelung.Compiler.Relations.Slice
     new,
     assign,
     lookup,
+    toEdits,
+    toAlignedSegmentPairs,
   )
 where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung (widthOf)
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU (..))
 import Keelung.Data.Slice (Segment, Slice (..))
 import Keelung.Data.Slice qualified as Slice
@@ -54,6 +57,12 @@ toRefU (RefUDesc RefUO' width var) = RefUO width var
 toRefU (RefUDesc RefUI' width var) = RefUI width var
 toRefU (RefUDesc RefUP' width var) = RefUP width var
 toRefU (RefUDesc RefUX' width var) = RefUX width var
+
+fromRefU :: RefU -> RefUDesc
+fromRefU (RefUO width var) = RefUDesc RefUO' width var
+fromRefU (RefUI width var) = RefUDesc RefUI' width var
+fromRefU (RefUP width var) = RefUDesc RefUP' width var
+fromRefU (RefUX width var) = RefUDesc RefUX' width var
 
 -- | For UnionFind root competition, larger RefUs gets to be the root
 --    1. compare the kind of RefUs: RefUI = RefUP > RefUO > RefUX
@@ -135,14 +144,51 @@ lookupMapping ref@(RefUDesc _ width var) interval (Mapping xs) = case IntMap.loo
 
 --------------------------------------------------------------------------------
 
--- data Edit
---   = AssignAs (RefUDesc, (Int, Int)) U
---   | RelateTo (RefUDesc, (Int, Int)) (RefUDesc, (Int, Int))
+data Edit
+  = AssignAs (RefUDesc, (Int, Int)) U
+  | RelateTo (RefUDesc, (Int, Int)) (RefUDesc, (Int, Int))
+  | DoNothing
 
--- generateEdits :: Slice -> Slice -> [Edit]
--- generateEdits
+-- | Given a pair of aligned segments, generate a list of edits
+toEdits :: RefUDesc -> RefUDesc -> ((Int, Segment), (Int, Segment)) -> [Edit]
+toEdits ref1 ref2 ((index1, segment1), (index2, segment2)) =
+  let ref1RefUDesc = (ref1, (index1, index1 + widthOf segment1))
+      ref2RefUDesc = (ref2, (index2, index2 + widthOf segment2))
+   in case (segment1, segment2) of
+        (Slice.Constant _, Slice.Constant _) -> [DoNothing]
+        (Slice.Constant val, Slice.ChildOf _) -> [AssignAs ref2RefUDesc val]
+        (Slice.Constant val, Slice.Parent _) -> [AssignAs ref2RefUDesc val]
+        (Slice.ChildOf _, Slice.Constant val) -> [AssignAs ref1RefUDesc val]
+        (Slice.ChildOf root1, Slice.ChildOf root2) ->
+          -- see who's root is the real boss
+          let root1RefUDesc = (fromRefU (Limb.lmbRef root1), (Limb.lmbOffset root1, Limb.lmbOffset root1 + widthOf root1))
+              root2RefUDesc = (fromRefU (Limb.lmbRef root2), (Limb.lmbOffset root2, Limb.lmbOffset root2 + widthOf root2))
+           in if root1RefUDesc > root2RefUDesc
+                then
+                  [ root2RefUDesc `RelateTo` root1RefUDesc,
+                    ref2RefUDesc `RelateTo` root1RefUDesc
+                  ]
+                else
+                  [ root1RefUDesc `RelateTo` root2RefUDesc,
+                    ref1RefUDesc `RelateTo` root2RefUDesc
+                  ]
+        (Slice.ChildOf root1, Slice.Parent _) ->
+          let root1RefUDesc = (fromRefU (Limb.lmbRef root1), (Limb.lmbOffset root1, Limb.lmbOffset root1 + widthOf root1))
+           in if root1RefUDesc > ref2RefUDesc
+                then [ref2RefUDesc `RelateTo` root1RefUDesc]
+                else [root1RefUDesc `RelateTo` ref2RefUDesc]
+        (Slice.Parent _, Slice.Constant val) -> [AssignAs ref1RefUDesc val]
+        (Slice.Parent _, Slice.ChildOf root2) ->
+          let root2RefUDesc = (fromRefU (Limb.lmbRef root2), (Limb.lmbOffset root2, Limb.lmbOffset root2 + widthOf root2))
+           in if ref1RefUDesc > root2RefUDesc
+                then [ref1RefUDesc `RelateTo` root2RefUDesc]
+                else [root2RefUDesc `RelateTo` ref1RefUDesc]
+        (Slice.Parent _, Slice.Parent _) ->
+          if ref1RefUDesc > ref2RefUDesc
+            then [ref1RefUDesc `RelateTo` ref2RefUDesc]
+            else [ref2RefUDesc `RelateTo` ref1RefUDesc]
 
--- | Given 2 Slices of the same lengths, generate all pairs of segments.
+-- | Given 2 Slices of the same lengths, generate pairs of aligned segments (indexed with their offsets).
 --   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two slices.
 --   Example:
 -- slice 1      ├─────B─────┼──A──┤
@@ -150,8 +196,8 @@ lookupMapping ref@(RefUDesc _ width var) interval (Mapping xs) = case IntMap.loo
 --            =>
 -- pairs        ├──B──┼──B──┼──A──┤
 -- pairs        ├──A──┼──C──┼──C──┤
-generateSegmentPairs :: Slice -> Slice -> [((Int, Segment), (Int, Segment))]
-generateSegmentPairs slice1 slice2 = step (IntMap.toList (sliceSegments slice1)) (IntMap.toList (sliceSegments slice2))
+toAlignedSegmentPairs :: Slice -> Slice -> [((Int, Segment), (Int, Segment))]
+toAlignedSegmentPairs slice1 slice2 = step (IntMap.toList (sliceSegments slice1)) (IntMap.toList (sliceSegments slice2))
   where
     step :: [(Int, Segment)] -> [(Int, Segment)] -> [((Int, Segment), (Int, Segment))]
     step ((index1, segment1) : xs1) ((index2, segment2) : xs2) =
