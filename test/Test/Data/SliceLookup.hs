@@ -5,6 +5,7 @@ import Keelung (widthOf)
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU (..))
+import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.SliceLookup (Segment (..), SliceLookup (..))
 import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
@@ -26,7 +27,7 @@ tests = describe "SliceLookup" $ do
   describe "widthOf SliceLookup" $ do
     it "should be the sum of all lengths of its segments" $ do
       property $ \sliceLookup -> do
-        widthOf sliceLookup `shouldBe` sum (widthOf <$> IntMap.elems (sliceSegments sliceLookup))
+        widthOf sliceLookup `shouldBe` sum (widthOf <$> IntMap.elems (lookupSegments sliceLookup))
 
   describe "split & merge" $ do
     it "should result in valid SliceLookups after normalization" $ do
@@ -119,10 +120,15 @@ instance Arbitrary Segment where
 
 instance Arbitrary SliceLookup where
   arbitrary = do
-    offset <- chooseInt (0, 16)
+    start <- chooseInt (0, 16)
     segments <- removeAdjectSameKind <$> arbitrary :: Gen [Segment]
+    let width = sum (map widthOf segments)
     var <- arbitrary
-    pure $ SliceLookup.normalize $ SliceLookup var offset (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (offset, mempty) segments)
+    pure $
+      SliceLookup.normalize $
+        SliceLookup
+          (Slice var start (start + width))
+          (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (start, mempty) segments)
     where
       sameKind :: Segment -> Segment -> Bool
       sameKind (Constant _) (Constant _) = True

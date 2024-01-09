@@ -121,18 +121,7 @@ assignMapping (ref@(RefUDesc _ width var), interval) val (Mapping xs) = Mapping 
 
     assignSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
     assignSliceLookup Nothing = Just (mapSliceLookup (SliceLookup.fromRefU (toRefU ref)))
-    assignSliceLookup (Just slices) = Just (mapSliceLookup slices)
-
--- relateMapping :: (RefUDesc, (Int, Int)) -> (RefUDesc, (Int, Int)) -> Mapping -> Mapping
--- relateMapping (RefUDesc ctor1 width1 var1, interval1) (RefUDesc ctor2 width2 var2, interval2) (Mapping xs) = Mapping (IntMap.alter relateVarMap width1 xs)
---   where
---     relateVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
---     relateVarMap Nothing = Just (IntMap.singleton var1 (SliceLookup.fromRefU (ctor1 var1)))
---     relateVarMap (Just varMap) = Just (IntMap.alter relateSliceLookup var1 varMap)
-
---     relateSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
---     relateSliceLookup Nothing = Just (SliceLookup.fromRefU (ctor1 var1))
---     relateSliceLookup (Just slices) = Just (SliceLookup.mapInterval (const (SliceLookup.ChildOf (Limb.new (ctor2 var2) (snd interval2 - fst interval2) (fst interval2) (Left slices)))) interval1 slices)
+    assignSliceLookup (Just lookups) = Just (mapSliceLookup lookups)
 
 -- | Lookup a slice of a variable
 lookupMapping :: RefUDesc -> (Int, Int) -> Mapping -> SliceLookup
@@ -140,7 +129,7 @@ lookupMapping ref@(RefUDesc _ width var) interval (Mapping xs) = case IntMap.loo
   Nothing -> SliceLookup.fromRefU (toRefU ref)
   Just varMap -> case IntMap.lookup var varMap of
     Nothing -> SliceLookup.fromRefU (toRefU ref)
-    Just slices -> SliceLookup.slice interval slices
+    Just lookups -> SliceLookup.splice interval lookups
 
 --------------------------------------------------------------------------------
 
@@ -189,7 +178,7 @@ toEdits ref1 ref2 ((index1, segment1), (index2, segment2)) =
             else [ref2RefUDesc `RelateTo` ref1RefUDesc]
 
 -- | Given 2 SliceLookups of the same lengths, generate pairs of aligned segments (indexed with their offsets).
---   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two slices.
+--   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two lookups.
 --   Example:
 -- slice 1      ├─────B─────┼──A──┤
 -- slice 2      ├──A──┼─────C─────┤
@@ -197,7 +186,7 @@ toEdits ref1 ref2 ((index1, segment1), (index2, segment2)) =
 -- pairs        ├──B──┼──B──┼──A──┤
 -- pairs        ├──A──┼──C──┼──C──┤
 toAlignedSegmentPairs :: SliceLookup -> SliceLookup -> [((Int, Segment), (Int, Segment))]
-toAlignedSegmentPairs slice1 slice2 = step (IntMap.toList (sliceSegments slice1)) (IntMap.toList (sliceSegments slice2))
+toAlignedSegmentPairs lookup1 lookup2 = step (IntMap.toList (lookupSegments lookup1)) (IntMap.toList (lookupSegments lookup2))
   where
     step :: [(Int, Segment)] -> [(Int, Segment)] -> [((Int, Segment), (Int, Segment))]
     step ((index1, segment1) : xs1) ((index2, segment2) : xs2) =

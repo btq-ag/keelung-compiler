@@ -14,7 +14,7 @@ module Keelung.Data.SliceLookup
     -- * Splitting and slicing
     splitSegment,
     split,
-    slice,
+    splice,
 
     -- * Normalizing
     normalize,
@@ -32,6 +32,7 @@ import Keelung (HasWidth, widthOf)
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU)
+import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Prelude hiding (map)
@@ -57,19 +58,16 @@ instance HasWidth Segment where
 
 -- | A "SliceLookup" of a RefU, with non-overlapping Segments indexed by their starting offset
 data SliceLookup = SliceLookup
-  { sliceRefU :: RefU, -- the `RefU` this series of segments belongs to
-    sliceOffset :: Int, -- the starting offset of the first segment
-    sliceSegments :: IntMap Segment -- the segments
+  { lookupSlice :: Slice, -- the Slice these segments belong to
+    lookupSegments :: IntMap Segment -- the segments
   }
   deriving (Eq)
 
 instance Show SliceLookup where
-  show (SliceLookup ref offset xs) = "SliceLookup " <> show ref <> " " <> show offset <> " " <> show (IntMap.toList xs)
+  show (SliceLookup slice xs) = "SliceLookup " <> show slice <> " " <> show (IntMap.toList xs)
 
 instance HasWidth SliceLookup where
-  widthOf (SliceLookup _ offset xs) = case IntMap.lookupMax xs of
-    Nothing -> 0
-    Just (index, segment) -> index + widthOf segment - offset
+  widthOf (SliceLookup slice _) = widthOf slice
 
 instance Semigroup SliceLookup where
   (<>) = merge
@@ -78,7 +76,7 @@ instance Semigroup SliceLookup where
 
 -- | Constructs a `SliceLookup` with a `RefU` as its own parent
 fromRefU :: RefU -> SliceLookup
-fromRefU ref = SliceLookup ref 0 (IntMap.singleton 0 (Parent (widthOf ref)))
+fromRefU ref = SliceLookup (Slice ref 0 (widthOf ref)) (IntMap.singleton 0 (Parent (widthOf ref)))
 
 -- | Split a `Segment` into two at a given index
 splitSegment :: Int -> Segment -> (Segment, Segment)
@@ -95,17 +93,17 @@ nullSegment (Parent len) = len == 0
 
 -- | Split a `SliceLookup` into two at a given index
 split :: Int -> SliceLookup -> (SliceLookup, SliceLookup)
-split index (SliceLookup ref offset xs) = case IntMap.splitLookup index xs of
-  (before, Just segment, after) -> (SliceLookup ref offset before, SliceLookup ref index (IntMap.insert index segment after))
+split index (SliceLookup (Slice ref start end) xs) = case IntMap.splitLookup index xs of
+  (before, Just segment, after) -> (SliceLookup (Slice ref start index) before, SliceLookup (Slice ref index end) (IntMap.insert index segment after))
   (before, Nothing, after) -> case IntMap.lookupLE index xs of
-    Nothing -> (SliceLookup ref offset mempty, SliceLookup ref offset after)
+    Nothing -> (SliceLookup (Slice ref start start) mempty, SliceLookup (Slice ref start end) after)
     Just (index', segment) ->
       let (segment1, segment12) = splitSegment (index - index') segment
-       in (SliceLookup ref offset (IntMap.insert index' segment1 before), SliceLookup ref index (IntMap.insert index segment12 after))
+       in (SliceLookup (Slice ref start index) (IntMap.insert index' segment1 before), SliceLookup (Slice ref index end) (IntMap.insert index segment12 after))
 
 -- | Given an interval, get a slice of SliceLookup
-slice :: (Int, Int) -> SliceLookup -> SliceLookup
-slice (start, end) slices = case split start slices of
+splice :: (Int, Int) -> SliceLookup -> SliceLookup
+splice (start, end) lookups = case split start lookups of
   (_, afterStart) -> case split end afterStart of
     (mid, _) -> mid
 
@@ -113,11 +111,11 @@ slice (start, end) slices = case split start slices of
 
 -- | Map a function over all Segments
 map :: (Segment -> Segment) -> SliceLookup -> SliceLookup
-map f (SliceLookup ref offset xs) = SliceLookup ref offset (IntMap.map f xs)
+map f (SliceLookup slice xs) = SliceLookup slice (IntMap.map f xs)
 
 -- | Map a function over a given interval of SliceLookup
 mapInterval :: (Segment -> Segment) -> (Int, Int) -> SliceLookup -> SliceLookup
-mapInterval f (start, end) slices = case split start slices of
+mapInterval f (start, end) lookups = case split start lookups of
   (beforeStart, afterStart) -> case split end afterStart of
     (middle, afterEnd) -> beforeStart <> map f middle <> afterEnd
 
@@ -132,22 +130,22 @@ data MergeError
   deriving (Eq)
 
 instance Show MergeError where
-  show (NotSameRefU a b) = "SliceLookup.MergeError: two slices are not of the same RefU:\n" <> show a <> "\n" <> show b
-  show (NotAdjacent a b) = "SliceLookup.MergeError: two slices are not adjacent with each other:\n" <> show a <> "\n" <> show b
-  show (Overlapping a b) = "SliceLookup.MergeError: two slices are overlapping with each other:\n" <> show a <> "\n" <> show b
+  show (NotSameRefU a b) = "SliceLookup.MergeError: two lookups are not of the same RefU:\n" <> show a <> "\n" <> show b
+  show (NotAdjacent a b) = "SliceLookup.MergeError: two lookups are not adjacent with each other:\n" <> show a <> "\n" <> show b
+  show (Overlapping a b) = "SliceLookup.MergeError: two lookups are overlapping with each other:\n" <> show a <> "\n" <> show b
   show CannotMergeLimbs = "SliceLookup.MergeError: cannot merge two Limbs together"
 
--- | Merge two `SliceLookup` into one, throwing MergeError if the slices are:
+-- | Merge two `SliceLookup` into one, throwing MergeError if the lookups are:
 --    1. not of the same `RefU`
 --    2. not adjacent
 --    3. overlapping
 safeMerge :: SliceLookup -> SliceLookup -> Either MergeError SliceLookup
-safeMerge slice1@(SliceLookup ref1 offset1 xs1) slice2@(SliceLookup ref2 offset2 xs2)
-  | ref1 /= ref2 = Left (NotSameRefU slice1 slice2)
-  | otherwise = case (offset1 + widthOf slice1) `compare` offset2 of
-      LT -> Left (NotAdjacent slice1 slice2)
-      GT -> Left (Overlapping slice1 slice2)
-      EQ -> Right (SliceLookup ref1 offset1 (xs1 <> xs2))
+safeMerge lookup1@(SliceLookup (Slice ref1 start1 end1) xs1) lookup2@(SliceLookup (Slice ref2 start2 end2) xs2)
+  | ref1 /= ref2 = Left (NotSameRefU lookup1 lookup2)
+  | otherwise = case end1 `compare` start2 of
+      LT -> Left (NotAdjacent lookup1 lookup2)
+      GT -> Left (Overlapping lookup1 lookup2)
+      EQ -> Right (SliceLookup (Slice ref1 start1 end2) (xs1 <> xs2))
 
 -- | Unsafe version of `safeMerge`
 merge :: SliceLookup -> SliceLookup -> SliceLookup
@@ -173,9 +171,9 @@ glueSegment xs ys = case (xs, ys) of
 
 -- | Glue all segments that can be glued together, such that `normalize . merge` is the inverse of `split`
 normalize :: SliceLookup -> SliceLookup
-normalize (SliceLookup ref offset xs) =
+normalize (SliceLookup (Slice ref start end) xs) =
   let (accumulated, lastSliceLookup) = IntMap.foldlWithKey' glue (mempty, Nothing) xs
-   in SliceLookup ref offset $ case lastSliceLookup of
+   in SliceLookup (Slice ref start end) $ case lastSliceLookup of
         Nothing -> accumulated
         Just (index, segment) -> IntMap.insert index segment accumulated
   where
@@ -194,7 +192,7 @@ normalize (SliceLookup ref offset xs) =
 --    3. all segments are adjacent but not overlapping
 --    4. all adjacent segments are not of the same kind
 isValid :: SliceLookup -> Bool
-isValid (SliceLookup _ _ xs) =
+isValid (SliceLookup _ xs) =
   fst $
     IntMap.foldlWithKey'
       ( \(acc, previous) currIndex currSegment ->
