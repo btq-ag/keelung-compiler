@@ -8,8 +8,9 @@ where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..))
-import Keelung.Data.Slice (Slice)
+import Keelung.Data.Slice (Segment, Slice (..))
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Syntax (Var, Width)
@@ -131,3 +132,39 @@ lookupMapping ref@(RefUDesc _ width var) interval (Mapping xs) = case IntMap.loo
   Just varMap -> case IntMap.lookup var varMap of
     Nothing -> Slice.fromRefU (toRefU ref)
     Just slices -> Slice.slice interval slices
+
+--------------------------------------------------------------------------------
+
+-- data Edit
+--   = AssignAs (RefUDesc, (Int, Int)) U
+--   | RelateTo (RefUDesc, (Int, Int)) (RefUDesc, (Int, Int))
+
+-- generateEdits :: Slice -> Slice -> [Edit]
+-- generateEdits
+
+-- | Given 2 Slices of the same lengths, generate all pairs of segments.
+--   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two slices.
+--   Example:
+-- slice 1      ├─────B─────┼──A──┤
+-- slice 2      ├──A──┼─────C─────┤
+--            =>
+-- pairs        ├──B──┼──B──┼──A──┤
+-- pairs        ├──A──┼──C──┼──C──┤
+generateSegmentPairs :: Slice -> Slice -> [((Int, Segment), (Int, Segment))]
+generateSegmentPairs slice1 slice2 = step (IntMap.toList (sliceSegments slice1)) (IntMap.toList (sliceSegments slice2))
+  where
+    step :: [(Int, Segment)] -> [(Int, Segment)] -> [((Int, Segment), (Int, Segment))]
+    step ((index1, segment1) : xs1) ((index2, segment2) : xs2) =
+      let width1 = widthOf segment1
+          width2 = widthOf segment2
+       in case width1 `compare` width2 of
+            EQ -> ((index1, segment1), (index2, segment2)) : step xs1 xs2
+            LT ->
+              -- segment1 is shorter, so we split segment2 into two
+              let (segment21, segment22) = Slice.splitSegment width1 segment2
+               in ((index1, segment1), (index2, segment21)) : step xs1 ((index2 + width1, segment22) : xs2)
+            GT ->
+              -- segment2 is shorter, so we split segment1 into two
+              let (segment11, segment12) = Slice.splitSegment width2 segment1
+               in ((index1, segment11), (index2, segment2)) : step ((index1 + width2, segment12) : xs1) xs2
+    step _ _ = []

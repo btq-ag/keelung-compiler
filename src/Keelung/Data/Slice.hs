@@ -11,6 +11,7 @@ module Keelung.Data.Slice
     mapInterval,
 
     -- * Splitting and slicing
+    splitSegment,
     split,
     slice,
 
