@@ -8,6 +8,7 @@ module Keelung.Data.Reference
     RefF (..),
     RefB (..),
     RefU (..),
+    refUVar,
   )
 where
 
@@ -77,7 +78,7 @@ data RefU
     RefUP Width Var
   | -- | UInt intermediate variable
     RefUX Width Var
-  deriving (Eq, Ord, Generic, NFData)
+  deriving (Eq, Generic, NFData)
 
 instance Show RefU where
   show ref = case ref of
@@ -91,3 +92,29 @@ instance HasWidth RefU where
   widthOf (RefUI width _) = width
   widthOf (RefUP width _) = width
   widthOf (RefUX width _) = width
+
+-- | "Larger" RefUs gets to be the root in UnionFind:
+--    1. compare the kind of RefUs: RefUI = RefUP > RefUO > RefUX
+--    2. compare the width of RefUs: larger width > smaller width
+--    3. compare the var of RefUs: smaller var > larger var
+instance Ord RefU where
+  (RefUI width1 var1) `compare` (RefUI width2 var2) = compare width1 width2 <> compare var2 var1
+  (RefUI width1 var1) `compare` (RefUP width2 var2) = compare width1 width2 <> compare var2 var1 <> GT
+  (RefUI _ _) `compare` _ = GT
+  (RefUP width1 var1) `compare` (RefUI width2 var2) = compare width1 width2 <> compare var2 var1 <> LT
+  (RefUP width1 var1) `compare` (RefUP width2 var2) = compare width1 width2 <> compare var2 var1
+  (RefUP _ _) `compare` _ = GT
+  (RefUO _ _) `compare` (RefUI _ _) = LT
+  (RefUO _ _) `compare` (RefUP _ _) = LT
+  (RefUO width1 var1) `compare` (RefUO width2 var2) = compare width1 width2 <> compare var2 var1
+  (RefUO _ _) `compare` _ = GT
+  (RefUX _ _) `compare` (RefUI _ _) = LT
+  (RefUX _ _) `compare` (RefUP _ _) = LT
+  (RefUX _ _) `compare` (RefUO _ _) = LT
+  (RefUX width1 var1) `compare` (RefUX width2 var2) = compare width1 width2 <> compare var2 var1
+
+refUVar :: RefU -> Var
+refUVar (RefUO _ var) = var
+refUVar (RefUI _ var) = var
+refUVar (RefUP _ var) = var
+refUVar (RefUX _ var) = var

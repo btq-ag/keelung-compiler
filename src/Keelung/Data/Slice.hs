@@ -27,6 +27,10 @@ instance Show Slice where
 instance HasWidth Slice where
   widthOf (Slice _ start end) = end - start
 
+-- | Slices with larger RefUs gets to be the root in UnionFind:
+instance Ord Slice where
+  (Slice ref1 _ _) `compare` (Slice ref2 _ _) = compare ref1 ref2
+
 --------------------------------------------------------------------------------
 
 -- | Construct a "Slice" from a "Limb"
