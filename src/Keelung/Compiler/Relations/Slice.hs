@@ -115,7 +115,7 @@ toEdits :: (Slice, Segment) -> (Slice, Segment) -> [Edit]
 toEdits (slice1, segment1) (slice2, segment2) = case (segment1, segment2) of
   (SliceLookup.Constant _, SliceLookup.Constant _) -> [DoNothing]
   (SliceLookup.Constant val, SliceLookup.ChildOf _) -> [AssignAs slice1 val]
-  (SliceLookup.Constant val, SliceLookup.Parent _) -> [AssignAs slice2 val]
+  (SliceLookup.Constant val, SliceLookup.Parent _ _) -> [AssignAs slice2 val]
   (SliceLookup.ChildOf _, SliceLookup.Constant val) -> [AssignAs slice1 val]
   (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
     -- see who's root is the real boss
@@ -128,16 +128,16 @@ toEdits (slice1, segment1) (slice2, segment2) = case (segment1, segment2) of
         [ root1 `RelateTo` root2,
           slice1 `RelateTo` root2
         ]
-  (SliceLookup.ChildOf root1, SliceLookup.Parent _) ->
+  (SliceLookup.ChildOf root1, SliceLookup.Parent _ _) ->
     if root1 > slice2
       then [slice2 `RelateTo` root1]
       else [root1 `RelateTo` slice2]
-  (SliceLookup.Parent _, SliceLookup.Constant val) -> [AssignAs slice1 val]
-  (SliceLookup.Parent _, SliceLookup.ChildOf root2) ->
+  (SliceLookup.Parent _ _, SliceLookup.Constant val) -> [AssignAs slice1 val]
+  (SliceLookup.Parent _ _, SliceLookup.ChildOf root2) ->
     if slice1 > root2
       then [slice1 `RelateTo` root2]
       else [root2 `RelateTo` slice1]
-  (SliceLookup.Parent _, SliceLookup.Parent _) ->
+  (SliceLookup.Parent _ _, SliceLookup.Parent _ _) ->
     if slice1 > slice2
       then [slice1 `RelateTo` slice2]
       else [slice2 `RelateTo` slice1]

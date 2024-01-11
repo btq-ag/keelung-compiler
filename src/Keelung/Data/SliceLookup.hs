@@ -3,6 +3,7 @@ module Keelung.Data.SliceLookup
   ( -- * Construction
     Segment (..),
     nullSegment,
+    sameKindOfSegment,
     SliceLookup (..),
     fromRefU,
     isValid,
@@ -28,6 +29,8 @@ where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Keelung (HasWidth, widthOf)
 import Keelung.Data.Reference (RefU)
 import Keelung.Data.Slice (Slice (..))
@@ -42,18 +45,18 @@ import Prelude hiding (map)
 data Segment
   = Constant U
   | ChildOf Slice -- part of some RefU
-  | Parent Int -- parent itself (with a given length)
+  | Parent Int (Map RefU Slice) -- parent itself (with a given length)
   deriving (Eq)
 
 instance Show Segment where
   show (Constant u) = "Constant[" <> show (widthOf u) <> "] " <> show u
   show (ChildOf limb) = "ChildOf[" <> show (widthOf limb) <> "] " <> show limb
-  show (Parent len) = "Parent[" <> show len <> "]"
+  show (Parent len children) = "Parent[" <> show len <> "] with " <> show children <> " children"
 
 instance HasWidth Segment where
   widthOf (Constant u) = widthOf u
   widthOf (ChildOf limb) = widthOf limb
-  widthOf (Parent len) = len
+  widthOf (Parent len _) = len
 
 -- | A "SliceLookup" of a RefU, with non-overlapping Segments indexed by their starting offset
 data SliceLookup = SliceLookup
@@ -71,24 +74,35 @@ instance HasWidth SliceLookup where
 instance Semigroup SliceLookup where
   (<>) = merge
 
+-- | Check if two Segments are of the same kind
+sameKindOfSegment :: Segment -> Segment -> Bool
+sameKindOfSegment (Constant _) (Constant _) = True
+sameKindOfSegment (ChildOf _) (ChildOf _) = True
+sameKindOfSegment (Parent _ _) (Parent _ _) = True
+sameKindOfSegment _ _ = False
+
 --------------------------------------------------------------------------------
 
 -- | Constructs a `SliceLookup` with a `RefU` as its own parent
 fromRefU :: RefU -> SliceLookup
-fromRefU ref = SliceLookup (Slice ref 0 (widthOf ref)) (IntMap.singleton 0 (Parent (widthOf ref)))
+fromRefU ref = SliceLookup (Slice ref 0 (widthOf ref)) (IntMap.singleton 0 (Parent (widthOf ref) mempty))
 
 -- | Split a `Segment` into two at a given index (relative to the starting offset of the Segement)
 splitSegment :: Int -> Segment -> (Segment, Segment)
 splitSegment index segment = case segment of
   Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val - index)))
   ChildOf slice -> let (slice1, slice2) = Slice.split index slice in (ChildOf slice1, ChildOf slice2)
-  Parent len -> (Parent index, Parent (len - index))
+  Parent len children ->
+    let splitted = fmap (Slice.split index) children
+        children1 = fmap fst splitted
+        children2 = fmap snd splitted
+     in (Parent index children1, Parent (len - index) children2)
 
 -- | Check if a `Segment` is empty
 nullSegment :: Segment -> Bool
 nullSegment (Constant val) = widthOf val == 0
 nullSegment (ChildOf slice) = Slice.null slice
-nullSegment (Parent len) = len == 0
+nullSegment (Parent len _) = len == 0
 
 -- | Split a `SliceLookup` into two at a given index
 split :: Int -> SliceLookup -> (SliceLookup, SliceLookup)
@@ -159,7 +173,17 @@ glueSegment xs ys = case (xs, ys) of
   (ChildOf slice1, ChildOf slice2) -> case Slice.safeMerge slice1 slice2 of
     Left err -> Left err
     Right slice -> Right (Just (ChildOf slice))
-  (Parent len, Parent len') -> Right (Just (Parent (len + len')))
+  (Parent len1 children1, Parent len2 children2) ->
+    -- ignoring all erred merges
+    let intersection = snd $ Map.mapEither id $ Map.intersectionWith Slice.safeMerge children1 children2
+     in if len1 + len2 == 0
+          then Right Nothing
+          else Right (Just (Parent (len1 + len2) intersection))
+  -- let intersection = Map.intersectionWith (<>) children1 children2
+  --     valid = Map.size intersection == Map.size children1 && Map.size intersection == Map.size children2
+  --  in if valid
+  --       then Right (Just (Parent (len1 + len2) intersection))
+  --       else Left Slice.Overlapping
   _ ->
     if nullSegment xs
       then Right (Just ys)
@@ -201,14 +225,8 @@ isValid (SliceLookup _ xs) =
                 Just (prevIndex, prevSegment) -> prevIndex + widthOf prevSegment == currIndex
               notSameKind = case previous of
                 Nothing -> True
-                Just (_, prevSegment) -> not (sameKind (prevSegment, currSegment))
+                Just (_, prevSegment) -> not (sameKindOfSegment prevSegment currSegment)
            in (acc && notNull && noGapAndAdjecent && notSameKind, Just (currIndex, currSegment))
       )
       (True, Nothing)
       xs
-  where
-    sameKind :: (Segment, Segment) -> Bool
-    sameKind (Constant _, Constant _) = True
-    sameKind (ChildOf _, ChildOf _) = True
-    sameKind (Parent _, Parent _) = True
-    sameKind _ = False
