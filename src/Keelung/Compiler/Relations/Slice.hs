@@ -3,7 +3,6 @@ module Keelung.Compiler.Relations.Slice
     new,
     assign,
     lookup,
-    toEdits,
     toAlignedSegmentPairs,
   )
 where
@@ -34,16 +33,22 @@ new :: SliceRelations
 new = SliceRelations (Mapping mempty) (Mapping mempty) (Mapping mempty) (Mapping mempty)
 
 assign :: Slice -> U -> SliceRelations -> SliceRelations
-assign (Slice (RefUO width var) start end) val relations = relations {srRefO = assignMapping (Slice (RefUO width var) start end) val (srRefO relations)}
-assign (Slice (RefUI width var) start end) val relations = relations {srRefI = assignMapping (Slice (RefUI width var) start end) val (srRefI relations)}
-assign (Slice (RefUP width var) start end) val relations = relations {srRefP = assignMapping (Slice (RefUP width var) start end) val (srRefP relations)}
-assign (Slice (RefUX width var) start end) val relations = relations {srRefX = assignMapping (Slice (RefUX width var) start end) val (srRefX relations)}
+assign slice value relations = foldr applyEdit relations (assignmentToEdits slice value relations)
 
 lookup :: Slice -> SliceRelations -> SliceLookup
-lookup (Slice (RefUO width var) start end) relations = lookupMapping (Slice (RefUO width var) start end) (srRefO relations)
-lookup (Slice (RefUI width var) start end) relations = lookupMapping (Slice (RefUI width var) start end) (srRefI relations)
-lookup (Slice (RefUP width var) start end) relations = lookupMapping (Slice (RefUP width var) start end) (srRefP relations)
-lookup (Slice (RefUX width var) start end) relations = lookupMapping (Slice (RefUX width var) start end) (srRefX relations)
+lookup slice relations = lookupMapping slice (getMapping slice relations)
+
+getMapping :: Slice -> SliceRelations -> Mapping
+getMapping (Slice (RefUO _ _) _ _) relations = srRefO relations
+getMapping (Slice (RefUI _ _) _ _) relations = srRefI relations
+getMapping (Slice (RefUP _ _) _ _) relations = srRefP relations
+getMapping (Slice (RefUX _ _) _ _) relations = srRefX relations
+
+modifyMapping :: Slice -> (Mapping -> Mapping) -> SliceRelations -> SliceRelations
+modifyMapping (Slice (RefUO _ _) _ _) f relations = relations {srRefO = f (srRefO relations)}
+modifyMapping (Slice (RefUI _ _) _ _) f relations = relations {srRefI = f (srRefI relations)}
+modifyMapping (Slice (RefUP _ _) _ _) f relations = relations {srRefP = f (srRefP relations)}
+modifyMapping (Slice (RefUX _ _) _ _) f relations = relations {srRefX = f (srRefX relations)}
 
 --------------------------------------------------------------------------------
 
@@ -101,45 +106,67 @@ lookupMapping (Slice ref start end) (Mapping xs) =
 
 --------------------------------------------------------------------------------
 
+assignmentToEdits :: Slice -> U -> SliceRelations -> [Edit]
+assignmentToEdits slice value relations =
+  let mapping = getMapping slice relations
+      SliceLookup _ segments = lookupMapping slice mapping
+   in IntMap.elems segments >>= go
+  where
+    go :: Segment -> [Edit]
+    go (SliceLookup.Constant _) = error "[ panic ] assignmentToEdits: Constant"
+    go (SliceLookup.ChildOf _) = error "[ panic ] assignmentToEdits: ChildOf"
+    go (SliceLookup.Parent _ children) = AssignValue slice value : map (`AssignValue` value) (Map.elems children)
+
 data Edit
   = AssignValue Slice U -- assign the slice itself the value
-  | AssignRootValue Slice U -- assign the slice itself (root) and all its children the value, needs further lookup
-  | RelateTo Slice Slice -- relate the slice itself to the other slice
-  | RelateRootTo Slice Slice -- relate the slice itself (root) and all its children to the other slice, needs further lookup
 
--- | Given a pair of aligned segments, generate a list of edits
-toEdits :: (Slice, Segment) -> (Slice, Segment) -> [Edit]
-toEdits (slice1, segment1) (slice2, segment2) = case (segment1, segment2) of
-  (SliceLookup.Constant _, SliceLookup.Constant _) -> []
-  (SliceLookup.Constant val1, SliceLookup.ChildOf root2) -> [AssignRootValue root2 val1]
-  (SliceLookup.Constant val1, SliceLookup.Parent _ children2) -> AssignValue slice2 val1 : map (`AssignValue` val1) (Map.elems children2)
-  (SliceLookup.ChildOf root1, SliceLookup.Constant val2) -> [AssignRootValue root1 val2]
-  (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
-    -- see who's root is the real boss
-    if root1 > root2
-      then -- root1 is the boss
+-- \| AssignRootValue Slice U -- assign the slice itself (root) and all its children the value, needs further lookup
 
-        [ root2 `RelateRootTo` root1,
-          slice2 `RelateTo` root1
-        ]
-      else -- root2 is the boss
+-- \| RelateTo Slice Slice -- relate the slice itself to the other slice
+-- \| RelateRootTo Slice Slice -- relate the slice itself (root) and all its children to the other slice, needs further lookup
 
-        [ root1 `RelateRootTo` root2,
-          slice1 `RelateTo` root2
-        ]
-  (SliceLookup.ChildOf root1, SliceLookup.Parent _ children2) ->
-    if root1 > slice2
-      then RelateTo slice2 root1 : map (`RelateTo` root1) (Map.elems children2)
-      else [RelateRootTo root1 slice2]
-  (SliceLookup.Parent _ children1, SliceLookup.Constant val2) -> AssignValue slice1 val2 : map (`AssignValue` val2) (Map.elems children1)
-  (SliceLookup.Parent _ children1, SliceLookup.ChildOf root2) ->
-    if slice1 > root2
-      then [root2 `RelateRootTo` slice1] -- slice1 is the boss
-      else RelateTo slice1 root2 : map (`RelateTo` root2) (Map.elems children1) -- root2 is the boss
-  (SliceLookup.Parent _ children1, SliceLookup.Parent _ children2) ->
-    if slice1 > slice2
-      then RelateTo slice2 slice1 : map (`RelateTo` slice1) (Map.elems children2) -- slice1 is the boss
-      else RelateTo slice1 slice2 : map (`RelateTo` slice2) (Map.elems children1) -- slice2 is the boss
+applyEdit :: Edit -> SliceRelations -> SliceRelations
+applyEdit (AssignValue slice val) = modifyMapping slice (assignMapping slice val)
+
+-- applyEdit (AssignRootValue root val) xs =
+--   let SliceLookup _ segments = lookup root xs -- collect all children of the root
+--    in _
+-- applyEdit (RelateTo slice1 slice2) xs = _
+-- applyEdit (RelateRootTo root slice) xs = _
+
+-- -- | Given a pair of aligned segments, generate a list of edits
+-- toEdits :: (Slice, Segment) -> (Slice, Segment) -> [Edit]
+-- toEdits (slice1, segment1) (slice2, segment2) = case (segment1, segment2) of
+--   (SliceLookup.Constant _, SliceLookup.Constant _) -> []
+--   (SliceLookup.Constant val1, SliceLookup.ChildOf root2) -> [AssignRootValue root2 val1]
+--   (SliceLookup.Constant val1, SliceLookup.Parent _ children2) -> AssignValue slice2 val1 : map (`AssignValue` val1) (Map.elems children2)
+--   (SliceLookup.ChildOf root1, SliceLookup.Constant val2) -> [AssignRootValue root1 val2]
+--   (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
+--     -- see who's root is the real boss
+--     if root1 > root2
+--       then -- root1 is the boss
+
+--         [ root2 `RelateRootTo` root1,
+--           slice2 `RelateTo` root1
+--         ]
+--       else -- root2 is the boss
+
+--         [ root1 `RelateRootTo` root2,
+--           slice1 `RelateTo` root2
+--         ]
+--   (SliceLookup.ChildOf root1, SliceLookup.Parent _ children2) ->
+--     if root1 > slice2
+--       then RelateTo slice2 root1 : map (`RelateTo` root1) (Map.elems children2)
+--       else [RelateRootTo root1 slice2]
+--   (SliceLookup.Parent _ children1, SliceLookup.Constant val2) -> AssignValue slice1 val2 : map (`AssignValue` val2) (Map.elems children1)
+--   (SliceLookup.Parent _ children1, SliceLookup.ChildOf root2) ->
+--     if slice1 > root2
+--       then [root2 `RelateRootTo` slice1] -- slice1 is the boss
+--       else RelateTo slice1 root2 : map (`RelateTo` root2) (Map.elems children1) -- root2 is the boss
+--   (SliceLookup.Parent _ children1, SliceLookup.Parent _ children2) ->
+--     if slice1 > slice2
+--       then RelateTo slice2 slice1 : map (`RelateTo` slice1) (Map.elems children2) -- slice1 is the boss
+--       else RelateTo slice1 slice2 : map (`RelateTo` slice2) (Map.elems children1) -- slice2 is the boss
 
 -- | Given 2 SliceLookups of the same lengths, generate pairs of aligned segments (indexed with their offsets).
 --   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two lookups.
