@@ -10,6 +10,7 @@ where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Data.Map.Strict qualified as Map
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
@@ -101,46 +102,44 @@ lookupMapping (Slice ref start end) (Mapping xs) =
 --------------------------------------------------------------------------------
 
 data Edit
-  = AssignAs Slice U
-  | RelateTo Slice Slice
-  | DoNothing
-
--- applyEdits :: Edit -> SliceRelations -> SliceRelations
--- applyEdits (AssignAs slice val) relations = assign slice val relations
--- applyEdits (RelateTo slice1 slice2) relations = _
--- applyEdits DoNothing relations = relations
+  = AssignValue Slice U -- assign the slice itself the value
+  | AssignRootValue Slice U -- assign the slice itself (root) and all its children the value, needs further lookup
+  | RelateTo Slice Slice -- relate the slice itself to the other slice
+  | RelateRootTo Slice Slice -- relate the slice itself (root) and all its children to the other slice, needs further lookup
 
 -- | Given a pair of aligned segments, generate a list of edits
 toEdits :: (Slice, Segment) -> (Slice, Segment) -> [Edit]
 toEdits (slice1, segment1) (slice2, segment2) = case (segment1, segment2) of
-  (SliceLookup.Constant _, SliceLookup.Constant _) -> [DoNothing]
-  (SliceLookup.Constant val, SliceLookup.ChildOf _) -> [AssignAs slice1 val]
-  (SliceLookup.Constant val, SliceLookup.Parent _ _) -> [AssignAs slice2 val]
-  (SliceLookup.ChildOf _, SliceLookup.Constant val) -> [AssignAs slice1 val]
+  (SliceLookup.Constant _, SliceLookup.Constant _) -> []
+  (SliceLookup.Constant val1, SliceLookup.ChildOf root2) -> [AssignRootValue root2 val1]
+  (SliceLookup.Constant val1, SliceLookup.Parent _ children2) -> AssignValue slice2 val1 : map (`AssignValue` val1) (Map.elems children2)
+  (SliceLookup.ChildOf root1, SliceLookup.Constant val2) -> [AssignRootValue root1 val2]
   (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
     -- see who's root is the real boss
     if root1 > root2
-      then
-        [ root2 `RelateTo` root1,
+      then -- root1 is the boss
+
+        [ root2 `RelateRootTo` root1,
           slice2 `RelateTo` root1
         ]
-      else
-        [ root1 `RelateTo` root2,
+      else -- root2 is the boss
+
+        [ root1 `RelateRootTo` root2,
           slice1 `RelateTo` root2
         ]
-  (SliceLookup.ChildOf root1, SliceLookup.Parent _ _) ->
+  (SliceLookup.ChildOf root1, SliceLookup.Parent _ children2) ->
     if root1 > slice2
-      then [slice2 `RelateTo` root1]
-      else [root1 `RelateTo` slice2]
-  (SliceLookup.Parent _ _, SliceLookup.Constant val) -> [AssignAs slice1 val]
-  (SliceLookup.Parent _ _, SliceLookup.ChildOf root2) ->
+      then RelateTo slice2 root1 : map (`RelateTo` root1) (Map.elems children2)
+      else [RelateRootTo root1 slice2]
+  (SliceLookup.Parent _ children1, SliceLookup.Constant val2) -> AssignValue slice1 val2 : map (`AssignValue` val2) (Map.elems children1)
+  (SliceLookup.Parent _ children1, SliceLookup.ChildOf root2) ->
     if slice1 > root2
-      then [slice1 `RelateTo` root2]
-      else [root2 `RelateTo` slice1]
-  (SliceLookup.Parent _ _, SliceLookup.Parent _ _) ->
+      then [root2 `RelateRootTo` slice1] -- slice1 is the boss
+      else RelateTo slice1 root2 : map (`RelateTo` root2) (Map.elems children1) -- root2 is the boss
+  (SliceLookup.Parent _ children1, SliceLookup.Parent _ children2) ->
     if slice1 > slice2
-      then [slice1 `RelateTo` slice2]
-      else [slice2 `RelateTo` slice1]
+      then RelateTo slice2 slice1 : map (`RelateTo` slice1) (Map.elems children2) -- slice1 is the boss
+      else RelateTo slice1 slice2 : map (`RelateTo` slice2) (Map.elems children1) -- slice2 is the boss
 
 -- | Given 2 SliceLookups of the same lengths, generate pairs of aligned segments (indexed with their offsets).
 --   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two lookups.
