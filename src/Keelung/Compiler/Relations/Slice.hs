@@ -11,7 +11,6 @@ where
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung (widthOf)
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.SliceLookup (Segment, SliceLookup (..))
@@ -106,6 +105,11 @@ data Edit
   | RelateTo Slice Slice
   | DoNothing
 
+-- applyEdits :: Edit -> SliceRelations -> SliceRelations
+-- applyEdits (AssignAs slice val) relations = assign slice val relations
+-- applyEdits (RelateTo slice1 slice2) relations = _
+-- applyEdits DoNothing relations = relations
+
 -- | Given a pair of aligned segments, generate a list of edits
 toEdits :: (Slice, Segment) -> (Slice, Segment) -> [Edit]
 toEdits (slice1, segment1) (slice2, segment2) = case (segment1, segment2) of
@@ -115,28 +119,24 @@ toEdits (slice1, segment1) (slice2, segment2) = case (segment1, segment2) of
   (SliceLookup.ChildOf _, SliceLookup.Constant val) -> [AssignAs slice1 val]
   (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
     -- see who's root is the real boss
-    let root1Slice = Slice (Limb.lmbRef root1) (Limb.lmbOffset root1) (Limb.lmbOffset root1 + widthOf root1)
-        root2Slice = Slice (Limb.lmbRef root2) (Limb.lmbOffset root2) (Limb.lmbOffset root2 + widthOf root2)
-     in if root1Slice > root2Slice
-          then
-            [ root2Slice `RelateTo` root1Slice,
-              slice2 `RelateTo` root1Slice
-            ]
-          else
-            [ root1Slice `RelateTo` root2Slice,
-              slice1 `RelateTo` root2Slice
-            ]
+    if root1 > root2
+      then
+        [ root2 `RelateTo` root1,
+          slice2 `RelateTo` root1
+        ]
+      else
+        [ root1 `RelateTo` root2,
+          slice1 `RelateTo` root2
+        ]
   (SliceLookup.ChildOf root1, SliceLookup.Parent _) ->
-    let root1Slice = Slice (Limb.lmbRef root1) (Limb.lmbOffset root1) (Limb.lmbOffset root1 + widthOf root1)
-     in if root1Slice > slice2
-          then [slice2 `RelateTo` root1Slice]
-          else [root1Slice `RelateTo` slice2]
+    if root1 > slice2
+      then [slice2 `RelateTo` root1]
+      else [root1 `RelateTo` slice2]
   (SliceLookup.Parent _, SliceLookup.Constant val) -> [AssignAs slice1 val]
   (SliceLookup.Parent _, SliceLookup.ChildOf root2) ->
-    let root2Slice = Slice (Limb.lmbRef root2) (Limb.lmbOffset root2) (Limb.lmbOffset root2 + widthOf root2)
-     in if slice1 > root2Slice
-          then [slice1 `RelateTo` root2Slice]
-          else [root2Slice `RelateTo` slice1]
+    if slice1 > root2
+      then [slice1 `RelateTo` root2]
+      else [root2 `RelateTo` slice1]
   (SliceLookup.Parent _, SliceLookup.Parent _) ->
     if slice1 > slice2
       then [slice1 `RelateTo` slice2]

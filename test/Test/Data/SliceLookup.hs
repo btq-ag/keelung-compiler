@@ -2,8 +2,6 @@ module Test.Data.SliceLookup (tests, run) where
 
 import Data.IntMap qualified as IntMap
 import Keelung (widthOf)
-import Keelung.Data.Limb (Limb)
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU (..))
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.SliceLookup (Segment (..), SliceLookup (..))
@@ -83,6 +81,18 @@ tests = describe "SliceLookup" $ do
         SliceLookup.isValid (SliceLookup.normalize mapped) `shouldBe` True
         SliceLookup.normalize mapped `shouldBe` SliceLookup.normalize sliceLookup
 
+
+    -- describe "split & merge" $ do
+    --   it "should result in valid SliceLookups after normalization" $ do
+    --     -- (SliceLookup U₁28 [9 ... 42) [(9,Parent[7]),(16,Constant[11] 354),(27,ChildOf[5] UO₁₂17 [3 ... 8)),(32,Constant[10] 32)],31)
+    --     let sliceLookup = SliceLookup (Slice (RefUI 28 1) 9 42) (IntMap.fromList [(9,Parent 7),(16,Constant (U.new 11 354)),(27,ChildOf (Slice (RefUO 17 1) 3 8)),(32,Constant (U.new 10 32))]) 
+    --     let index = 31
+    --     let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
+    --     print sliceLookup
+    --     print sliceLookup1
+    --     print sliceLookup2
+    --     SliceLookup.isValid (SliceLookup.normalize sliceLookup1) `shouldBe` True
+    --     SliceLookup.isValid (SliceLookup.normalize sliceLookup2) `shouldBe` True
 --------------------------------------------------------------------------------
 
 instance Arbitrary RefU where
@@ -98,17 +108,17 @@ instance Arbitrary U where
     value <- chooseInteger (0, 2 ^ width - 1)
     pure $ U.new width value
 
-instance Arbitrary Limb where
-  arbitrary = do
-    var <- arbitrary
-    width <- chooseInt (0, widthOf var)
-    offset <- chooseInt (0, widthOf var - width)
-    sign <-
-      oneof
-        [ Left <$> arbitrary,
-          Right <$> vectorOf width arbitrary
-        ]
-    pure $ Limb.new var width offset sign
+-- instance Arbitrary Limb where
+--   arbitrary = do
+--     var <- arbitrary
+--     width <- chooseInt (0, widthOf var)
+--     offset <- chooseInt (0, widthOf var - width)
+--     sign <-
+--       oneof
+--         [ Left <$> arbitrary,
+--           Right <$> vectorOf width arbitrary
+--         ]
+--     pure $ Limb.new var width offset sign
 
 instance Arbitrary Segment where
   arbitrary =
@@ -117,6 +127,14 @@ instance Arbitrary Segment where
         ChildOf <$> arbitrary,
         Parent <$> chooseInt (1, 16)
       ]
+
+instance Arbitrary Slice where
+  arbitrary = do
+    ref <- arbitrary
+    let width = widthOf ref
+    start <- chooseInt (0, width - 1)
+    end <- chooseInt (start, width)
+    pure $ Slice ref start end
 
 instance Arbitrary SliceLookup where
   arbitrary = do

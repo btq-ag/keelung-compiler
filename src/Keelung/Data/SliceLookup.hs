@@ -29,10 +29,9 @@ where
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung (HasWidth, widthOf)
-import Keelung.Data.Limb (Limb)
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU)
 import Keelung.Data.Slice (Slice (..))
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Prelude hiding (map)
@@ -42,7 +41,7 @@ import Prelude hiding (map)
 -- | Either a constant value, or a part of an RefU, or a parent itself
 data Segment
   = Constant U
-  | ChildOf Limb -- part of some RefU
+  | ChildOf Slice -- part of some RefU
   | Parent Int -- parent itself (with a given length)
   deriving (Eq)
 
@@ -78,17 +77,17 @@ instance Semigroup SliceLookup where
 fromRefU :: RefU -> SliceLookup
 fromRefU ref = SliceLookup (Slice ref 0 (widthOf ref)) (IntMap.singleton 0 (Parent (widthOf ref)))
 
--- | Split a `Segment` into two at a given index
+-- | Split a `Segment` into two at a given index (relative to the starting offset of the Segement)
 splitSegment :: Int -> Segment -> (Segment, Segment)
 splitSegment index segment = case segment of
   Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val - index)))
-  ChildOf limb -> let (limb1, limb2) = Limb.split index limb in (ChildOf limb1, ChildOf limb2)
+  ChildOf slice -> let (slice1, slice2) = Slice.split index slice in (ChildOf slice1, ChildOf slice2)
   Parent len -> (Parent index, Parent (len - index))
 
 -- | Check if a `Segment` is empty
 nullSegment :: Segment -> Bool
 nullSegment (Constant val) = widthOf val == 0
-nullSegment (ChildOf limb) = Limb.null limb
+nullSegment (ChildOf slice) = Slice.null slice
 nullSegment (Parent len) = len == 0
 
 -- | Split a `SliceLookup` into two at a given index
@@ -98,8 +97,8 @@ split index (SliceLookup (Slice ref start end) xs) = case IntMap.splitLookup ind
   (before, Nothing, after) -> case IntMap.lookupLE index xs of
     Nothing -> (SliceLookup (Slice ref start start) mempty, SliceLookup (Slice ref start end) after)
     Just (index', segment) ->
-      let (segment1, segment12) = splitSegment (index - index') segment
-       in (SliceLookup (Slice ref start index) (IntMap.insert index' segment1 before), SliceLookup (Slice ref index end) (IntMap.insert index segment12 after))
+      let (segment1, segment2) = splitSegment (index - index') segment
+       in (SliceLookup (Slice ref start index) (IntMap.insert index' segment1 before), SliceLookup (Slice ref index end) (IntMap.insert index segment2 after))
 
 -- | Given an interval, get a slice of SliceLookup
 splice :: (Int, Int) -> SliceLookup -> SliceLookup
@@ -154,12 +153,12 @@ merge xs ys = case safeMerge xs ys of
   Right result -> result
 
 -- | See if 2 Segments can be glued together
-glueSegment :: Segment -> Segment -> Either Limb.MergeError (Maybe Segment)
+glueSegment :: Segment -> Segment -> Either Slice.MergeError (Maybe Segment)
 glueSegment xs ys = case (xs, ys) of
   (Constant val1, Constant val2) -> Right (Just (Constant (val2 <> val1)))
-  (ChildOf limb, ChildOf limb') -> case Limb.safeMerge limb limb' of
+  (ChildOf slice1, ChildOf slice2) -> case Slice.safeMerge slice1 slice2 of
     Left err -> Left err
-    Right limb'' -> Right (Just (ChildOf limb''))
+    Right slice -> Right (Just (ChildOf slice))
   (Parent len, Parent len') -> Right (Just (Parent (len + len')))
   _ ->
     if nullSegment xs
