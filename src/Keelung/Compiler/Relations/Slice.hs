@@ -4,7 +4,7 @@ module Keelung.Compiler.Relations.Slice
     assign,
     lookup,
     toAlignedSegmentPairs,
-    alterSliceLookup,
+    modifySliceLookup,
   )
 where
 
@@ -117,8 +117,8 @@ lookupMapping (Slice ref start end) (Mapping xs) =
 --     alterRoot = _
 
 
-alterSliceLookup :: (Maybe SliceLookup -> Maybe SliceLookup) -> Slice -> Mapping -> Mapping
-alterSliceLookup f slice (Mapping xs) = Mapping (IntMap.alter alterVarMap width xs)
+modifySliceLookup :: (Maybe SliceLookup -> Maybe SliceLookup) -> Slice -> Mapping -> Mapping
+modifySliceLookup f slice (Mapping xs) = Mapping (IntMap.alter alterVarMap width xs)
   where
     width :: Width
     width = widthOf (sliceRefU slice)

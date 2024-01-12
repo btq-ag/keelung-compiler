@@ -11,6 +11,7 @@ module Keelung.Data.SliceLookup
     -- * Mapping
     map,
     mapInterval,
+    pad,
 
     -- * Splitting and slicing
     splitSegment,
@@ -131,6 +132,28 @@ mapInterval :: (Segment -> Segment) -> (Int, Int) -> SliceLookup -> SliceLookup
 mapInterval f (start, end) lookups = case split start lookups of
   (beforeStart, afterStart) -> case split end afterStart of
     (middle, afterEnd) -> beforeStart <> map f middle <> afterEnd
+
+--------------------------------------------------------------------------------
+
+-- | Pad both ends of a SliceLookup with empty Segments (Parent) so that it covers the whole RefU
+pad :: SliceLookup -> SliceLookup
+pad = padStart . padEnd
+
+-- | Pad the starting end of a SliceLookup with empty Segment (Parent) so that the whole SliceLookup starts from 0
+padStart :: SliceLookup -> SliceLookup
+padStart (SliceLookup (Slice ref start end) xs) =
+  SliceLookup (Slice ref 0 end) $
+    if start > 0
+      then IntMap.insert 0 (Parent start mempty) xs
+      else xs
+
+-- | Pad the ending end of a SliceLookup with empty Segment (Parent) so that the whole SliceLookup ends at the width of the RefU
+padEnd :: SliceLookup -> SliceLookup
+padEnd (SliceLookup (Slice ref start end) xs) =
+  SliceLookup (Slice ref start (widthOf ref)) $
+    if end < widthOf ref
+      then IntMap.insert end (Parent (widthOf ref - end) mempty) xs
+      else xs
 
 --------------------------------------------------------------------------------
 

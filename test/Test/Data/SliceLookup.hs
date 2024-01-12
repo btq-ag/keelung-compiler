@@ -85,6 +85,12 @@ tests = describe "SliceLookup" $ do
         SliceLookup.isValid (SliceLookup.normalize mapped) `shouldBe` True
         SliceLookup.normalize mapped `shouldBe` SliceLookup.normalize sliceLookup
 
+  describe "pad" $ do
+    it "should result in valid SliceLookups" $ do
+      property $ \sliceLookup -> do
+        let padded = SliceLookup.pad sliceLookup
+        SliceLookup.isValid (SliceLookup.normalize padded) `shouldBe` True
+
 -- describe "split & merge" $ do
 --   it "should result in valid SliceLookups after normalization" $ do
 --     -- (SliceLookup U₁28 [9 ... 42) [(9,Parent[7]),(16,Constant[11] 354),(27,ChildOf[5] UO₁₂17 [3 ... 8)),(32,Constant[10] 32)],31)
