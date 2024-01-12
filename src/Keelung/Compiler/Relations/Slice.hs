@@ -75,6 +75,22 @@ instance Show Mapping where
               <> "  }"
 
 -- | Assign a value to a slice of a variable
+-- modifySliceLookup :: (Maybe SliceLookup -> Maybe SliceLookup) -> Slice -> Mapping -> Mapping
+
+-- assignMapping :: Slice -> U -> Mapping -> Mapping
+-- assignMapping slice val = modifySliceLookup assignSliceLookup slice
+--   where 
+--     assignSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
+--     assignSliceLookup Nothing = Just (SliceLookup.fromSegment slice (SliceLookup.Constant val))
+--     assignSliceLookup (Just lookups) = Just (SliceLookup.mapInterval assignSegment (sliceStart slice, sliceEnd slice) lookups)
+
+--     assignSegment :: Segment -> Segment
+--     assignSegment (SliceLookup.Constant _) = error "assignSegment: assigning on existing Constant"
+--     assignSegment (SliceLookup.ChildOf root) = _
+--     assignSegment (SliceLookup.Parent _ children) = _
+--     assignSegment (SliceLookup.Empty _) = error "assignSegment: assigning on existing Empty"
+
+
 assignMapping :: Slice -> U -> Mapping -> Mapping
 assignMapping (Slice ref start end) val (Mapping xs) = Mapping (IntMap.alter assignVarMap width xs)
   where

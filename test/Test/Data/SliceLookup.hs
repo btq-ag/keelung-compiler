@@ -85,6 +85,19 @@ tests = describe "SliceLookup" $ do
         SliceLookup.isValid (SliceLookup.normalize mapped) `shouldBe` True
         SliceLookup.normalize mapped `shouldBe` SliceLookup.normalize sliceLookup
 
+  describe "mapIntervalWithSlice" $ do
+    it "`mapIntervalWithSlice (\\_ x -> x) = id`" $ do
+      let genParam = do
+            sliceLookup <- arbitrary
+            start <- chooseInt (0, widthOf sliceLookup - 1)
+            end <- chooseInt (start, widthOf sliceLookup)
+            let slice = Slice (sliceRefU $ lookupSlice sliceLookup) start end
+            pure (sliceLookup, slice)
+      forAll genParam $ \(sliceLookup, slice) -> do
+        let mapped = SliceLookup.mapIntervalWithSlice (\_ x -> x) slice sliceLookup
+        SliceLookup.isValid (SliceLookup.normalize mapped) `shouldBe` True
+        SliceLookup.normalize mapped `shouldBe` SliceLookup.normalize sliceLookup
+
   describe "pad" $ do
     it "should result in valid SliceLookups" $ do
       property $ \sliceLookup -> do
