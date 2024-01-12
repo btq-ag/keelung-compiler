@@ -161,6 +161,7 @@ getFamily slice relations =
     go (SliceLookup.Constant _) = []
     go (SliceLookup.ChildOf root) = getFamily root relations
     go (SliceLookup.Parent _ children) = slice : Map.elems children
+    go (SliceLookup.Empty _) = [slice]
 
 -- -- | Given a pair of aligned segments, generate a list of edits
 -- toEdits :: (Slice, Segment) -> (Slice, Segment) -> [Edit]

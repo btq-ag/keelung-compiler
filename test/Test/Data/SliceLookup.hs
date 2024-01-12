@@ -151,9 +151,9 @@ arbitrarySliceOfWidth width = do
 instance Arbitrary SliceLookup where
   arbitrary = do
     start <- chooseInt (0, 16)
-    segments <- removeAdjectSameKind <$> arbitrary :: Gen [Segment]
+    segments <- removeAdjectSameKind <$> arbitrary
     let width = sum (map widthOf segments)
-    var <- arbitrary
+    var <- arbitraryRefUOfWidth width (width + 16)
     pure $
       SliceLookup.normalize $
         SliceLookup
