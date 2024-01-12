@@ -4,6 +4,7 @@ module Keelung.Compiler.Relations.Slice
     assign,
     lookup,
     toAlignedSegmentPairs,
+    alterSliceLookup,
   )
 where
 
@@ -104,6 +105,31 @@ lookupMapping (Slice ref start end) (Mapping xs) =
           Nothing -> SliceLookup.fromRefU ref
           Just lookups -> SliceLookup.splice (start, end) lookups
 
+-- -- | Relate a child Slice with a parent Slice
+-- relateMapping :: Slice -> Slice -> Mapping -> Mapping
+-- relateMapping child root = alterSliceLookup alterRoot root . alterSliceLookup alterChild child
+--   where 
+--     alterChild :: Maybe SliceLookup -> Maybe SliceLookup
+--     alterChild Nothing = Just (SliceLookup child (IntMap.singleton (sliceStart child) (SliceLookup.ChildOf root)))
+--     alterChild (Just lookups) = _
+
+--     alterRoot :: Maybe SliceLookup -> Maybe SliceLookup
+--     alterRoot = _
+
+
+alterSliceLookup :: (Maybe SliceLookup -> Maybe SliceLookup) -> Slice -> Mapping -> Mapping
+alterSliceLookup f slice (Mapping xs) = Mapping (IntMap.alter alterVarMap width xs)
+  where
+    width :: Width
+    width = widthOf (sliceRefU slice)
+
+    var :: Var
+    var = refUVar (sliceRefU slice)
+
+    alterVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
+    alterVarMap Nothing = f Nothing >>= \lookups -> pure (IntMap.singleton var lookups)
+    alterVarMap (Just varMap) = Just $ IntMap.alter f var varMap
+
 --------------------------------------------------------------------------------
 
 assignmentToEdits :: Slice -> U -> SliceRelations -> [Edit]
@@ -133,12 +159,6 @@ getFamily slice relations =
     go (SliceLookup.Constant _) = []
     go (SliceLookup.ChildOf root) = getFamily root relations
     go (SliceLookup.Parent _ children) = slice : Map.elems children
-
--- applyEdit (AssignRootValue root val) xs =
---   let SliceLookup _ segments = lookup root xs -- collect all children of the root
---    in _
--- applyEdit (RelateTo slice1 slice2) xs = _
--- applyEdit (RelateRootTo root slice) xs = _
 
 -- -- | Given a pair of aligned segments, generate a list of edits
 -- toEdits :: (Slice, Segment) -> (Slice, Segment) -> [Edit]
