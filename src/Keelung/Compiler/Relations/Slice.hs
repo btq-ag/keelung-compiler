@@ -4,7 +4,7 @@ module Keelung.Compiler.Relations.Slice
     assign,
     lookup,
     toAlignedSegmentPairs,
-    modifySliceLookup,
+    -- modifySliceLookup,
   )
 where
 
@@ -107,28 +107,27 @@ lookupMapping (Slice ref start end) (Mapping xs) =
 
 -- -- | Relate a child Slice with a parent Slice
 -- relateMapping :: Slice -> Slice -> Mapping -> Mapping
--- relateMapping child root = alterSliceLookup alterRoot root . alterSliceLookup alterChild child
---   where 
+-- relateMapping child root = modifySliceLookup alterRoot root . modifySliceLookup alterChild child
+--   where
 --     alterChild :: Maybe SliceLookup -> Maybe SliceLookup
---     alterChild Nothing = Just (SliceLookup child (IntMap.singleton (sliceStart child) (SliceLookup.ChildOf root)))
+--     alterChild Nothing = Just (SliceLookup child (IntMap.singleton 0 (SliceLookup.pad (SliceLookup.ChildOf root))))
 --     alterChild (Just lookups) = _
 
 --     alterRoot :: Maybe SliceLookup -> Maybe SliceLookup
 --     alterRoot = _
 
+-- modifySliceLookup :: (Maybe SliceLookup -> Maybe SliceLookup) -> Slice -> Mapping -> Mapping
+-- modifySliceLookup f slice (Mapping xs) = Mapping (IntMap.alter alterVarMap width xs)
+--   where
+--     width :: Width
+--     width = widthOf (sliceRefU slice)
 
-modifySliceLookup :: (Maybe SliceLookup -> Maybe SliceLookup) -> Slice -> Mapping -> Mapping
-modifySliceLookup f slice (Mapping xs) = Mapping (IntMap.alter alterVarMap width xs)
-  where
-    width :: Width
-    width = widthOf (sliceRefU slice)
+--     var :: Var
+--     var = refUVar (sliceRefU slice)
 
-    var :: Var
-    var = refUVar (sliceRefU slice)
-
-    alterVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
-    alterVarMap Nothing = f Nothing >>= \lookups -> pure (IntMap.singleton var lookups)
-    alterVarMap (Just varMap) = Just $ IntMap.alter f var varMap
+--     alterVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
+--     alterVarMap Nothing = f Nothing >>= \lookups -> pure (IntMap.singleton 0 (SliceLookup.pad lookups))
+--     alterVarMap (Just varMap) = Just $ IntMap.alter f var varMap
 
 --------------------------------------------------------------------------------
 

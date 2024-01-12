@@ -6,6 +6,7 @@ module Keelung.Data.SliceLookup
     sameKindOfSegment,
     SliceLookup (..),
     fromRefU,
+    fromSegment,
     isValid,
 
     -- * Mapping
@@ -79,14 +80,45 @@ instance Semigroup SliceLookup where
 sameKindOfSegment :: Segment -> Segment -> Bool
 sameKindOfSegment (Constant _) (Constant _) = True
 sameKindOfSegment (ChildOf _) (ChildOf _) = True
-sameKindOfSegment (Parent _ _) (Parent _ _) = True
+sameKindOfSegment (Parent _ children1) (Parent _ children2) = case (Map.null children1, Map.null children2) of 
+  (True, True) -> True
+  (False, False) -> True
+  _ -> False
 sameKindOfSegment _ _ = False
+
+-- | Check if a `Segment` is empty
+nullSegment :: Segment -> Bool
+nullSegment (Constant val) = widthOf val == 0
+nullSegment (ChildOf slice) = Slice.null slice
+nullSegment (Parent len _) = len == 0
 
 --------------------------------------------------------------------------------
 
 -- | Constructs a `SliceLookup` with a `RefU` as its own parent
 fromRefU :: RefU -> SliceLookup
 fromRefU ref = SliceLookup (Slice ref 0 (widthOf ref)) (IntMap.singleton 0 (Parent (widthOf ref) mempty))
+
+-- | Constructs a `SliceLookup` from a `Segment` and its `Slice`
+fromSegment :: Slice -> Segment -> SliceLookup
+fromSegment (Slice ref start end) segment =
+  let refUWidth = widthOf ref
+      isEmptyParent = case segment of
+        Parent _ children -> Map.null children
+        _ -> False
+   in SliceLookup (Slice ref 0 refUWidth) $
+        IntMap.fromList $
+          if isEmptyParent
+            then [(0, Parent refUWidth mempty)]
+            else
+              if start > 0
+                then
+                  if refUWidth > end
+                    then [(0, Parent start mempty), (start, segment), (end, Parent (refUWidth - end) mempty)]
+                    else [(0, Parent start mempty), (start, segment)]
+                else
+                  if refUWidth > end
+                    then [(0, segment), (end, Parent (refUWidth - end) mempty)]
+                    else [(0, segment)]
 
 -- | Split a `Segment` into two at a given index (relative to the starting offset of the Segement)
 splitSegment :: Int -> Segment -> (Segment, Segment)
@@ -98,12 +130,6 @@ splitSegment index segment = case segment of
         children1 = fmap fst splitted
         children2 = fmap snd splitted
      in (Parent index children1, Parent (len - index) children2)
-
--- | Check if a `Segment` is empty
-nullSegment :: Segment -> Bool
-nullSegment (Constant val) = widthOf val == 0
-nullSegment (ChildOf slice) = Slice.null slice
-nullSegment (Parent len _) = len == 0
 
 -- | Split a `SliceLookup` into two at a given index
 split :: Int -> SliceLookup -> (SliceLookup, SliceLookup)
@@ -202,11 +228,6 @@ glueSegment xs ys = case (xs, ys) of
      in if len1 + len2 == 0
           then Right Nothing
           else Right (Just (Parent (len1 + len2) intersection))
-  -- let intersection = Map.intersectionWith (<>) children1 children2
-  --     valid = Map.size intersection == Map.size children1 && Map.size intersection == Map.size children2
-  --  in if valid
-  --       then Right (Just (Parent (len1 + len2) intersection))
-  --       else Left Slice.Overlapping
   _ ->
     if nullSegment xs
       then Right (Just ys)
