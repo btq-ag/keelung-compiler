@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Keelung.Compiler.Relations.Slice
   ( SliceRelations,
     new,
@@ -5,12 +7,17 @@ module Keelung.Compiler.Relations.Slice
     lookup,
     toAlignedSegmentPairs,
     relateMapping,
+    -- Testing
+    isValid,
   )
 where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
@@ -51,6 +58,33 @@ modifyMapping (Slice (RefUI _ _) _ _) f relations = relations {srRefI = f (srRef
 modifyMapping (Slice (RefUP _ _) _ _) f relations = relations {srRefP = f (srRefP relations)}
 modifyMapping (Slice (RefUX _ _) _ _) f relations = relations {srRefX = f (srRefX relations)}
 
+-- | Fold over all Segments in a SliceRelations
+fold :: (a -> Slice -> Segment -> a) -> a -> SliceRelations -> a
+fold f acc relations =
+  let SliceRelations refO refI refP refX = relations
+   in foldl foldMapping acc [refO, refI, refP, refX]
+  where
+    foldMapping a (Mapping xs) = foldl foldVarMap a xs
+    foldVarMap = foldl foldSliceLookup
+    foldSliceLookup a (SliceLookup slice segments) = foldl (\b (index, segment) -> f b (Slice (sliceRefU slice) index (widthOf segment)) segment) a (IntMap.toList segments)
+
+-- | FOR TESTING: A SliceRelations is valid if:
+--    1. all existing SliceLookups cover the entire width of the variable
+--    2. all children of a Parent Segment has the parent as its root
+isValid :: SliceRelations -> Bool
+isValid relations = all isValidMapping [refO, refI, refP, refX] && hasCorrectKinship
+  where
+    SliceRelations refO refI refP refX = relations
+
+    isValidMapping :: Mapping -> Bool
+    isValidMapping (Mapping xs) = all (all isValidSliceLookup) xs
+
+    isValidSliceLookup :: SliceLookup -> Bool
+    isValidSliceLookup x@(SliceLookup slice _) = sliceStart slice == 0 && sliceEnd slice == widthOf (sliceRefU slice) && SliceLookup.isValid x
+
+    hasCorrectKinship :: Bool
+    hasCorrectKinship = isValidKinship (kinshipFromSliceRelations relations)
+
 --------------------------------------------------------------------------------
 
 newtype Mapping = Mapping (IntMap (IntMap SliceLookup))
@@ -79,7 +113,7 @@ instance Show Mapping where
 
 -- assignMapping :: Slice -> U -> Mapping -> Mapping
 -- assignMapping slice val = modifySliceLookup assignSliceLookup slice
---   where 
+--   where
 --     assignSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
 --     assignSliceLookup Nothing = Just (SliceLookup.fromSegment slice (SliceLookup.Constant val))
 --     assignSliceLookup (Just lookups) = Just (SliceLookup.mapInterval assignSegment (sliceStart slice, sliceEnd slice) lookups)
@@ -89,7 +123,6 @@ instance Show Mapping where
 --     assignSegment (SliceLookup.ChildOf root) = _
 --     assignSegment (SliceLookup.Parent _ children) = _
 --     assignSegment (SliceLookup.Empty _) = error "assignSegment: assigning on existing Empty"
-
 
 assignMapping :: Slice -> U -> Mapping -> Mapping
 assignMapping (Slice ref start end) val (Mapping xs) = Mapping (IntMap.alter assignVarMap width xs)
@@ -249,3 +282,56 @@ toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segment
                   )
                     : step ((index1 + width2, segment12) : xs1) xs2
     step _ _ = []
+
+--------------------------------------------------------------------------------
+
+-- | Data structure for testing the relationship between parent and children
+data Kinship = Kinship
+  { kinshipParents :: Map Slice (Set Slice), -- each parent has a set of children
+    kinshipChildren ::
+      Map -- each child has a parent
+        Slice -- child
+        Slice -- parent
+  }
+  deriving (Eq, Show)
+
+-- | A Kinship is valid if after removing all children, it is empty
+isValidKinship :: Kinship -> Bool
+isValidKinship = nullKinship . removeAllChildren
+  where
+    -- \| Pick a child and remove its existence from the Kinship
+    removeChild :: Kinship -> Kinship
+    removeChild (Kinship parents children) = case Map.lookupMax children of
+      Nothing -> Kinship parents children
+      Just (child, parent) -> Kinship (Map.adjust (Set.delete child) parent parents) (Map.delete child children)
+
+    -- \| The fixed point of 'removeChild'
+    removeAllChildren :: Kinship -> Kinship
+    removeAllChildren xs =
+      let xs' = removeChild xs
+       in if xs' == xs
+            then xs
+            else removeAllChildren xs'
+
+    -- \| See if the Kinship is empty
+    nullKinship :: Kinship -> Bool
+    nullKinship (Kinship parents children) = all Set.null (Map.elems parents) && Map.null children
+
+-- | Add a relationship between a child and a parent to the Kinship
+kinshipFromSliceRelations :: SliceRelations -> Kinship
+kinshipFromSliceRelations = fold addRelation (Kinship Map.empty Map.empty)
+  where
+    addRelation :: Kinship -> Slice -> Segment -> Kinship
+    addRelation kinship slice segment = case segment of
+      SliceLookup.Constant _ -> kinship
+      SliceLookup.ChildOf root ->
+        Kinship
+          { kinshipParents = Map.insertWith Set.union root (Set.singleton slice) (kinshipParents kinship),
+            kinshipChildren = Map.insert slice root (kinshipChildren kinship)
+          }
+      SliceLookup.Parent _ children ->
+        Kinship
+          { kinshipParents = Map.insertWith Set.union slice (Set.fromList $ Map.elems children) (kinshipParents kinship),
+            kinshipChildren = Map.union (kinshipChildren kinship) $ Map.fromList $ map (,slice) (Map.elems children)
+          }
+      SliceLookup.Empty _ -> kinship
