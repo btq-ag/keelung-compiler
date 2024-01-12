@@ -107,26 +107,32 @@ lookupMapping (Slice ref start end) (Mapping xs) =
 --------------------------------------------------------------------------------
 
 assignmentToEdits :: Slice -> U -> SliceRelations -> [Edit]
-assignmentToEdits slice value relations =
-  let mapping = getMapping slice relations
-      SliceLookup _ segments = lookupMapping slice mapping
-   in IntMap.elems segments >>= go
-  where
-    go :: Segment -> [Edit]
-    go (SliceLookup.Constant _) = error "[ panic ] assignmentToEdits: Constant"
-    go (SliceLookup.ChildOf _) = error "[ panic ] assignmentToEdits: ChildOf"
-    go (SliceLookup.Parent _ children) = AssignValue slice value : map (`AssignValue` value) (Map.elems children)
+assignmentToEdits slice value relations = map (`AssignValue` value) (getFamily slice relations)
 
 data Edit
   = AssignValue Slice U -- assign the slice itself the value
-
--- \| AssignRootValue Slice U -- assign the slice itself (root) and all its children the value, needs further lookup
+  | AssignRootValue Slice U -- assign the slice itself (root) and all its children the value, needs further lookup
 
 -- \| RelateTo Slice Slice -- relate the slice itself to the other slice
 -- \| RelateRootTo Slice Slice -- relate the slice itself (root) and all its children to the other slice, needs further lookup
 
+applyEdits :: [Edit] -> SliceRelations -> SliceRelations
+applyEdits edits relations = foldr applyEdit relations edits
+
 applyEdit :: Edit -> SliceRelations -> SliceRelations
-applyEdit (AssignValue slice val) = modifyMapping slice (assignMapping slice val)
+applyEdit (AssignValue slice val) relations = modifyMapping slice (assignMapping slice val) relations
+applyEdit (AssignRootValue root val) relations = applyEdits (map (`AssignValue` val) (getFamily root relations)) relations
+
+-- | Given the slice, return all members of the equivalence class (including the slice itself)
+getFamily :: Slice -> SliceRelations -> [Slice]
+getFamily slice relations =
+  let SliceLookup _ segments = lookup slice relations
+   in IntMap.elems segments >>= go
+  where
+    go :: Segment -> [Slice]
+    go (SliceLookup.Constant _) = []
+    go (SliceLookup.ChildOf root) = getFamily root relations
+    go (SliceLookup.Parent _ children) = slice : Map.elems children
 
 -- applyEdit (AssignRootValue root val) xs =
 --   let SliceLookup _ segments = lookup root xs -- collect all children of the root

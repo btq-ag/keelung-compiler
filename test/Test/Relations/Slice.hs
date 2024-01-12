@@ -16,7 +16,7 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "SliceRelations" $ do
-  describe "SliceRelations.assign2" $ do
+  describe "SliceRelations.assign" $ do
     it "should return the assigned value on lookup" $ do
       let relations = SliceRelations.new
       let genParam = do
