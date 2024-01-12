@@ -4,7 +4,7 @@ module Keelung.Compiler.Relations.Slice
     assign,
     lookup,
     toAlignedSegmentPairs,
-    -- modifySliceLookup,
+    relateMapping,
   )
 where
 
@@ -105,29 +105,32 @@ lookupMapping (Slice ref start end) (Mapping xs) =
           Nothing -> SliceLookup.fromRefU ref
           Just lookups -> SliceLookup.splice (start, end) lookups
 
--- -- | Relate a child Slice with a parent Slice
--- relateMapping :: Slice -> Slice -> Mapping -> Mapping
--- relateMapping child root = modifySliceLookup alterRoot root . modifySliceLookup alterChild child
---   where
---     alterChild :: Maybe SliceLookup -> Maybe SliceLookup
---     alterChild Nothing = Just (SliceLookup child (IntMap.singleton 0 (SliceLookup.pad (SliceLookup.ChildOf root))))
---     alterChild (Just lookups) = _
+-- | Relate a child Slice with a parent Slice
+relateMapping :: Slice -> Slice -> Mapping -> Mapping
+relateMapping child root = modifySliceLookup modifyRoot root . modifySliceLookup modifyChild child
+  where
+    -- modify existing child SliceLookup
+    modifyChild :: Maybe SliceLookup -> Maybe SliceLookup
+    modifyChild Nothing = Just (SliceLookup.fromSegment child (SliceLookup.ChildOf root)) -- creates a new SliceLookup from "ChildOf root"
+    modifyChild (Just lookups) = Just (SliceLookup.mapInterval (const (SliceLookup.ChildOf root)) (sliceStart child, sliceEnd child) lookups)
 
---     alterRoot :: Maybe SliceLookup -> Maybe SliceLookup
---     alterRoot = _
+    -- modify existing root SliceLookup
+    modifyRoot :: Maybe SliceLookup -> Maybe SliceLookup
+    modifyRoot Nothing = Just (SliceLookup.fromSegment root (SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child))) -- creates a new SliceLookup
+    modifyRoot (Just lookups) = Just (SliceLookup.mapInterval (const (SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child))) (sliceStart root, sliceEnd root) lookups)
 
--- modifySliceLookup :: (Maybe SliceLookup -> Maybe SliceLookup) -> Slice -> Mapping -> Mapping
--- modifySliceLookup f slice (Mapping xs) = Mapping (IntMap.alter alterVarMap width xs)
---   where
---     width :: Width
---     width = widthOf (sliceRefU slice)
+modifySliceLookup :: (Maybe SliceLookup -> Maybe SliceLookup) -> Slice -> Mapping -> Mapping
+modifySliceLookup f slice (Mapping xs) = Mapping (IntMap.alter alterVarMap width xs)
+  where
+    width :: Width
+    width = widthOf (sliceRefU slice)
 
---     var :: Var
---     var = refUVar (sliceRefU slice)
+    var :: Var
+    var = refUVar (sliceRefU slice)
 
---     alterVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
---     alterVarMap Nothing = f Nothing >>= \lookups -> pure (IntMap.singleton 0 (SliceLookup.pad lookups))
---     alterVarMap (Just varMap) = Just $ IntMap.alter f var varMap
+    alterVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
+    alterVarMap Nothing = f Nothing >>= \lookups -> pure (IntMap.singleton 0 (SliceLookup.pad lookups))
+    alterVarMap (Just varMap) = Just $ IntMap.alter f var varMap
 
 --------------------------------------------------------------------------------
 
