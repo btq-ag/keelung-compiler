@@ -4,6 +4,7 @@ module Keelung.Compiler.Relations.Slice
   ( SliceRelations,
     new,
     assign,
+    relate,
     lookup,
     toAlignedSegmentPairs,
     relateMapping,
@@ -12,6 +13,7 @@ module Keelung.Compiler.Relations.Slice
   )
 where
 
+import Control.Monad.State
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
@@ -84,6 +86,107 @@ isValid relations = all isValidMapping [refO, refI, refP, refX] && hasCorrectKin
 
     hasCorrectKinship :: Bool
     hasCorrectKinship = isValidKinship (kinshipFromSliceRelations relations)
+
+--------------------------------------------------------------------------------
+
+relate :: Slice -> Slice -> SliceRelations -> SliceRelations
+relate child root relations =
+  let childLookup = lookup child relations
+      rootLookup = lookup root relations
+      pairs = toAlignedSegmentPairs childLookup rootLookup
+   in execState (mapM_ relateSegment pairs) relations
+
+type M = State SliceRelations
+
+getFamilyM :: Slice -> M [Slice]
+getFamilyM = gets . getFamily
+
+-- getRoot :: Slice -> M Slice
+-- getRoot slice = do
+--   relations <- get
+--   pure (head family)
+
+relateSegment :: ((Slice, Segment), (Slice, Segment)) -> M ()
+relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment2) of
+  (SliceLookup.Constant val1, _) -> do
+    family <- getFamilyM slice2
+    mapM_ (assignValueSegment val1) family
+  (_, SliceLookup.Constant val2) -> do
+    family <- getFamilyM slice1
+    mapM_ (assignValueSegment val2) family
+  (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
+    if root1 > root2
+      then do
+        family <- getFamilyM slice2
+        mapM_ (assignRootSegment root1) family
+      else do
+        family <- getFamilyM slice1
+        mapM_ (assignRootSegment root2) family
+  (SliceLookup.ChildOf root1, SliceLookup.Parent _ _) ->
+    if root1 > slice2
+      then do
+        family <- getFamilyM slice2
+        mapM_ (assignRootSegment root1) family
+      else do
+        family <- getFamilyM slice1
+        mapM_ (assignRootSegment slice2) family
+  (SliceLookup.ChildOf root1, SliceLookup.Empty _) -> assignRootSegment root1 slice2
+  (SliceLookup.Parent _ _, SliceLookup.ChildOf root2) ->
+    if slice1 > root2
+      then do
+        family <- getFamilyM slice2
+        mapM_ (assignRootSegment slice1) family
+      else do
+        family <- getFamilyM slice1
+        mapM_ (assignRootSegment root2) family
+  (SliceLookup.Parent _ _, SliceLookup.Parent _ _) ->
+    if slice1 > slice2
+      then do
+        family <- getFamilyM slice2
+        mapM_ (assignRootSegment slice1) family
+      else do
+        family <- getFamilyM slice1
+        mapM_ (assignRootSegment slice2) family
+  (SliceLookup.Parent _ _, SliceLookup.Empty _) -> assignRootSegment slice1 slice2
+  (SliceLookup.Empty _, SliceLookup.ChildOf root2) -> assignRootSegment root2 slice1
+  (SliceLookup.Empty _, SliceLookup.Parent _ _) -> assignRootSegment slice2 slice1
+  (SliceLookup.Empty _, SliceLookup.Empty _) ->
+    if slice1 > slice2
+      then assignRootSegment slice1 slice2
+      else assignRootSegment slice2 slice1
+
+assignValueSegment :: U -> Slice -> M ()
+assignValueSegment val slice = modify (modifyMapping slice (assignMapping slice val))
+
+-- | Relate a child Slice with a parent Slice
+assignRootSegment :: Slice -> Slice -> M ()
+assignRootSegment root child = modify (modifyMapping child (relateMapping child root))
+
+-- (SliceLookup.Constant val1, SliceLookup.ChildOf root2) -> assignMapping slice2 val1 (relateMapping slice2 root2 relations)
+-- (SliceLookup.Constant val1, SliceLookup.Parent _ children2) -> assignMapping slice2 val1 (foldr (\child -> relateMapping child slice2) relations (Map.elems children2))
+-- (SliceLookup.ChildOf root1, SliceLookup.Constant val2) -> assignMapping slice1 val2 (relateMapping slice1 root1 relations)
+-- (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
+--   -- see who's root is the real boss
+--   if root1 > root2
+--     then -- root1 is the boss
+
+--       relateMapping root2 root1 relations
+--     else -- root2 is the boss
+
+--       relateMapping root1 root2 relations
+-- (SliceLookup.ChildOf root1, SliceLookup.Parent _ children2) ->
+--   if root1 > slice2
+--     then foldr (\child -> relateMapping child root1) relations (Map.elems children2)
+--     else relateMapping root1 slice2 relations
+-- (SliceLookup.Parent _ children1, SliceLookup.Constant val2) -> foldr (\child -> assignMapping child val2) relations (Map.elems children1)
+-- (SliceLookup.Parent _ children1, SliceLookup.ChildOf root2) ->
+--   if slice1 > root2
+--     then relateMapping slice1 root2 relations -- slice1 is the boss
+--     else foldr (\child -> relateMapping child root2) relations (Map.elems children1) -- root2 is the boss
+-- (SliceLookup.Parent _ children1, SliceLookup.Parent _ children2) ->
+--   if slice1 > slice2
+--     then foldr (\child -> relateMapping child slice1) relations (Map.elems children2) -- slice1 is the boss
+--     else foldr (\child -> relateMapping child slice2) relations (Map.elems children1) -- slice2 is the boss
 
 --------------------------------------------------------------------------------
 
