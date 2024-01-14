@@ -1,6 +1,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module Test.Data.SliceLookup (tests, run, arbitrarySliceOfWidth) where
+module Test.Data.SliceLookup
+  ( tests,
+    run,
+    arbitraryUOfWidth,
+    arbitrarySliceOfWidth,
+    arbitrarySegmentOfSlice,
+    arbitraryRefUOfWidth,
+  )
+where
 
 import Data.IntMap qualified as IntMap
 import Data.Map.Strict qualified as Map
