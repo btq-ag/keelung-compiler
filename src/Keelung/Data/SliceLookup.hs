@@ -67,7 +67,7 @@ data Segment
 instance Show Segment where
   show (Constant u) = "Constant[" <> show (widthOf u) <> "] " <> show u
   show (ChildOf limb) = "ChildOf[" <> show (widthOf limb) <> "] " <> show limb
-  show (Parent len children _) = "Parent[" <> show len <> "] " <> show (Map.toList children)
+  show (Parent len children selfRefs) = "Parent[" <> show len <> "] " <> show (Map.toList children) <> (if IntMap.null selfRefs then "" else " " <> show (IntMap.elems selfRefs))
   show (Empty len) = "Empty[" <> show len <> "]"
 
 instance HasWidth Segment where
@@ -111,7 +111,7 @@ nullSegment (Empty len) = len == 0
 validSegment :: Segment -> Bool
 validSegment (Constant val) = widthOf val >= 0
 validSegment (ChildOf _) = True
-validSegment (Parent len children _) = len >= 0 && not (Map.null children)
+validSegment (Parent len children selfRefs) = len >= 0 && (not (Map.null children) || not (IntMap.null selfRefs))
 validSegment (Empty len) = len >= 0
 
 --------------------------------------------------------------------------------

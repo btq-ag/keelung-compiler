@@ -33,6 +33,7 @@ import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
 import Keelung.Syntax (Var, Width)
 import Prelude hiding (lookup)
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -198,6 +199,11 @@ assignValueSegment val slice = modify (modifyMapping' slice (assignMapping slice
 -- | Relate a child Slice with a parent Slice
 assignRootSegment :: Slice -> Slice -> M ()
 assignRootSegment root child = do
+  relations <- get
+  traceM $ "\nroot:         " <> show root
+  traceM $ "\nroot lookup:  " <> show (lookup root relations)
+  traceM $ "\nchild:  " <> show child
+  traceM $ "\nchild lookup: " <> show (lookup child relations)
   modify (modifySegment addRootToChild child)
   modify (modifySegment addChildToRoot root)
   where
