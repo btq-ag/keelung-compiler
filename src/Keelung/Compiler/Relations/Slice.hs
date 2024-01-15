@@ -159,7 +159,7 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
       else do
         family <- getFamilyM slice1
         mapM_ (assignRootSegment root2) family
-  (SliceLookup.ChildOf root1, SliceLookup.Parent _ _) ->
+  (SliceLookup.ChildOf root1, SliceLookup.Parent {}) ->
     if root1 > slice2
       then do
         family <- getFamilyM slice2
@@ -168,7 +168,7 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
         family <- getFamilyM slice1
         mapM_ (assignRootSegment slice2) family
   (SliceLookup.ChildOf root1, SliceLookup.Empty _) -> assignRootSegment root1 slice2
-  (SliceLookup.Parent _ _, SliceLookup.ChildOf root2) ->
+  (SliceLookup.Parent {}, SliceLookup.ChildOf root2) ->
     if slice1 > root2
       then do
         family <- getFamilyM slice2
@@ -176,7 +176,7 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
       else do
         family <- getFamilyM slice1
         mapM_ (assignRootSegment root2) family
-  (SliceLookup.Parent _ _, SliceLookup.Parent _ _) ->
+  (SliceLookup.Parent {}, SliceLookup.Parent {}) ->
     if slice1 > slice2
       then do
         family <- getFamilyM slice2
@@ -184,9 +184,9 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
       else do
         family <- getFamilyM slice1
         mapM_ (assignRootSegment slice2) family
-  (SliceLookup.Parent _ _, SliceLookup.Empty _) -> assignRootSegment slice1 slice2
+  (SliceLookup.Parent {}, SliceLookup.Empty _) -> assignRootSegment slice1 slice2
   (SliceLookup.Empty _, SliceLookup.ChildOf root2) -> assignRootSegment root2 slice1
-  (SliceLookup.Empty _, SliceLookup.Parent _ _) -> assignRootSegment slice2 slice1
+  (SliceLookup.Empty _, SliceLookup.Parent {}) -> assignRootSegment slice2 slice1
   (SliceLookup.Empty _, SliceLookup.Empty _) ->
     if slice1 > slice2
       then assignRootSegment slice1 slice2
@@ -207,15 +207,19 @@ assignRootSegment root child = do
     addRootToChild _ = SliceLookup.ChildOf root
 
     addChildToRoot :: Maybe Segment -> Segment
-    addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child)
-    addChildToRoot (Just (SliceLookup.Parent width children)) = SliceLookup.Parent width (Map.insert (sliceRefU child) child children)
+    addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child) mempty
+    addChildToRoot (Just (SliceLookup.Parent width children self)) = 
+      if sliceRefU root == sliceRefU child -- see if the child is the root itself
+        then SliceLookup.Parent width (Map.insert (sliceRefU child) child children) (IntMap.insert (sliceStart child) child self)
+        else SliceLookup.Parent width (Map.insert (sliceRefU child) child children) self
     addChildToRoot (Just (SliceLookup.ChildOf anotherRoot)) =
-      -- it's okay for for a root has itself as the parent
       if sliceRefU root == sliceRefU anotherRoot
-        then SliceLookup.ChildOf anotherRoot -- no-op
+        then -- "root" has self reference to itself
+             -- convert it to a Parent node
+           SliceLookup.Parent (widthOf root) mempty (IntMap.singleton (sliceStart child) child)
         else error "[ panic ] assignRootSegment: child already has a parent"
     addChildToRoot (Just (SliceLookup.Constant _)) = error "[ panic ] assignRootSegment: child already has a value"
-    addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child)
+    addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child) mempty
 
 modifySegment :: (Maybe Segment -> Segment) -> Slice -> SliceRelations -> SliceRelations
 modifySegment f slice xs = case sliceRefU slice of
@@ -382,7 +386,7 @@ getFamily slice relations =
     go :: Segment -> [Slice]
     go (SliceLookup.Constant _) = []
     go (SliceLookup.ChildOf root) = getFamily root relations
-    go (SliceLookup.Parent _ children) = slice : Map.elems children
+    go (SliceLookup.Parent _ children _) = slice : Map.elems children
     go (SliceLookup.Empty _) = [slice]
 
 -- -- | Given a pair of aligned segments, generate a list of edits
@@ -527,7 +531,7 @@ kinshipFromSliceRelations = fold addRelation (Kinship Map.empty Map.empty)
           { kinshipParents = Map.insertWith Set.union root (Set.singleton slice) (kinshipParents kinship),
             kinshipChildren = Map.insert slice root (kinshipChildren kinship)
           }
-      SliceLookup.Parent _ children ->
+      SliceLookup.Parent _ children _ ->
         Kinship
           { kinshipParents = Map.insertWith Set.union slice (Set.fromList $ Map.elems children) (kinshipParents kinship),
             kinshipChildren = Map.union (kinshipChildren kinship) $ Map.fromList $ map (,slice) (Map.elems children)
