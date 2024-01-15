@@ -1,3 +1,7 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use list comprehension" #-}
+
 -- | For representing results of looking up a "Slice" of a "RefU"
 module Keelung.Data.SliceLookup
   ( -- * Construction
@@ -7,7 +11,6 @@ module Keelung.Data.SliceLookup
     SliceLookup (..),
     fromRefU,
     fromSegment,
-    isValid,
 
     -- * Mapping
     map,
@@ -27,6 +30,11 @@ module Keelung.Data.SliceLookup
     MergeError (..),
     merge,
     safeMerge,
+
+    -- * Testing
+    Failure (..),
+    isValid,
+    collectFailure,
   )
 where
 
@@ -297,4 +305,47 @@ isValid (SliceLookup _ xs) =
            in (acc && validSegment currSegment && notNull && noGapAndAdjecent && notSameKind, Just (currIndex, currSegment))
       )
       (True, Nothing)
+      xs
+
+data Failure
+  = FailureNullSegment SliceLookup Segment
+  | FailureHasGapOrNotAdjacent SliceLookup Segment Segment
+  | FailureOfSameKindOfSegment SliceLookup Segment Segment
+  | FailureNotValidSegment SliceLookup Segment
+  deriving (Eq, Show)
+
+collectFailure :: Bool -> SliceLookup -> [Failure]
+collectFailure checkSameKindOfSegment x@(SliceLookup _ xs) =
+  fst $
+    IntMap.foldlWithKey'
+      ( \(acc, previous) currIndex currSegment ->
+          let isValidSegment =
+                if validSegment currSegment
+                  then []
+                  else [FailureNotValidSegment x currSegment]
+              isNull =
+                if nullSegment currSegment
+                  then [FailureNullSegment x currSegment]
+                  else []
+              hasGapOrNotAdjacent = case previous of
+                Nothing -> []
+                Just (prevIndex, prevSegment) ->
+                  if prevIndex + widthOf prevSegment == currIndex
+                    then []
+                    else [FailureHasGapOrNotAdjacent x prevSegment currSegment]
+              notSameKind = case previous of
+                Nothing -> []
+                Just (_, prevSegment) ->
+                  if sameKindOfSegment prevSegment currSegment
+                    then [FailureOfSameKindOfSegment x prevSegment currSegment]
+                    else []
+           in ( isValidSegment
+                  <> isNull
+                  <> hasGapOrNotAdjacent
+                  <> (if checkSameKindOfSegment then notSameKind else [])
+                  <> acc,
+                Just (currIndex, currSegment)
+              )
+      )
+      ([], Nothing)
       xs

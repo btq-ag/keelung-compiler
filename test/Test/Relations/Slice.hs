@@ -30,19 +30,21 @@ tests = describe "SliceRelations" $ do
         actual `shouldBe` expected
 
   describe "SliceRelations.relate" $ do
-    it "should should result in valid SliceRelations" $ do
+    it "should result in valid SliceRelations" $ do
       let relations = SliceRelations.new
+      -- [(0,Empty[7]),
+      --     (7,ChildOf[5] UI₃₉79 [12 ... 17)),
+      --     (12,ChildOf[9] UI₃₉79 [17 ... 26)),
+      --     (21,Parent[14] [(UI₃₉79,UI₃₉79 [7 ... 21))]),
+      --     (26,Empty[13])]
       -- property $ \commands -> do
       --   let relations' = foldr execCommand relations (commands :: [Command])
       --   SliceRelations.collectFailure relations' `shouldBe` []
       -- property $ \(command1, command2, command3) -> do
       --   let relations' = foldr execCommand relations [command1, command2, command3]
       --   SliceRelations.collectFailure relations' `shouldBe` []
-      -- Relate UP₂₅33 [13 ... 15) UO₄₀12 [14 ... 16),Relate UI₃₅36 [6 ... 16) UI₂₈95 [0 ... 10),Relate UI₃₅36 [14 ... 24) UO₄₃9 [9 ... 19)
-      -- let command1 = Relate (Slice (RefUP 25 33) 13 15) (Slice (RefUO 40 12) 14 16)
-      let command2 = Relate (Slice (RefUI 35 36) 6 16) (Slice (RefUI 28 95) 0 10)
-      let command3 = Relate (Slice (RefUI 35 36) 14 24) (Slice (RefUO 43 9) 9 19)
-      let relations' = foldr execCommand relations [command2, command3]
+      let command2 = Relate (Slice (RefUI 39 79) 7 21) (Slice (RefUI 39 79) 12 26)
+      let relations' = foldr execCommand relations [command2]
       SliceRelations.collectFailure relations' `shouldBe` []
 
 --------------------------------------------------------------------------------

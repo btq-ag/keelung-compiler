@@ -95,7 +95,8 @@ isValid relations = all isValidMapping [refO, refI, refP, refX] && hasCorrectKin
 --------------------------------------------------------------------------------
 
 data Failure
-  = InvalidSliceLookup SliceLookup
+  = InvalidSliceLookupNotCoveringAll SliceLookup
+  | InvalidSliceLookup SliceLookup.Failure
   | InvalidKinship Kinship
   deriving (Eq, Show)
 
@@ -104,16 +105,19 @@ collectFailure relations = isInvalidKinship <> invalidMapping
   where
     SliceRelations refO refI refP refX = relations
 
-    invalidMapping = map InvalidSliceLookup $ mconcat (map isValidMapping [refO, refI, refP, refX])
+    invalidMapping = mconcat (map isValidMapping [refO, refI, refP, refX])
 
-    isValidMapping :: Mapping -> [SliceLookup]
+    isValidMapping :: Mapping -> [Failure]
     isValidMapping (Mapping xs) = mconcat $ map (mconcat . map isValidSliceLookup . IntMap.elems) (IntMap.elems xs)
 
-    isValidSliceLookup :: SliceLookup -> [SliceLookup]
-    isValidSliceLookup x@(SliceLookup slice _) =
-      if sliceStart slice == 0 && sliceEnd slice == widthOf (sliceRefU slice) && SliceLookup.isValid x
-        then []
-        else [x]
+    isValidSliceLookup :: SliceLookup -> [Failure]
+    isValidSliceLookup x =
+      if isCoveringAll x
+        then map InvalidSliceLookup (SliceLookup.collectFailure False x)
+        else [InvalidSliceLookupNotCoveringAll x]
+
+    isCoveringAll :: SliceLookup -> Bool
+    isCoveringAll (SliceLookup slice _) = sliceStart slice == 0 && sliceEnd slice == widthOf (sliceRefU slice)
 
     isInvalidKinship :: [Failure]
     isInvalidKinship = case invalidKinship (kinshipFromSliceRelations relations) of
@@ -205,9 +209,13 @@ assignRootSegment root child = do
     addChildToRoot :: Maybe Segment -> Segment
     addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child)
     addChildToRoot (Just (SliceLookup.Parent width children)) = SliceLookup.Parent width (Map.insert (sliceRefU child) child children)
-    addChildToRoot (Just (SliceLookup.ChildOf _)) = error "assignRootSegment: child already has a parent"
-    addChildToRoot (Just (SliceLookup.Constant _)) = error "assignRootSegment: child already has a value"
-    addChildToRoot (Just (SliceLookup.Empty _)) = error "assignRootSegment: child already has a value"
+    addChildToRoot (Just (SliceLookup.ChildOf anotherRoot)) =
+      -- it's okay for for a root has itself as the parent
+      if sliceRefU root == sliceRefU anotherRoot
+        then SliceLookup.ChildOf anotherRoot -- no-op
+        else error "[ panic ] assignRootSegment: child already has a parent"
+    addChildToRoot (Just (SliceLookup.Constant _)) = error "[ panic ] assignRootSegment: child already has a value"
+    addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child)
 
 modifySegment :: (Maybe Segment -> Segment) -> Slice -> SliceRelations -> SliceRelations
 modifySegment f slice xs = case sliceRefU slice of
