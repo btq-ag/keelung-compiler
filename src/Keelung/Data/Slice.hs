@@ -3,6 +3,7 @@ module Keelung.Data.Slice
     Slice (..),
     fromLimb,
     null,
+    overlaps,
     SplitError (..),
     safeSplit,
     split,
@@ -51,6 +52,13 @@ fromLimb limb = Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset l
 
 null :: Slice -> Bool
 null (Slice _ start end) = start == end
+
+overlaps :: Slice -> Slice -> Bool
+overlaps (Slice ref1 start1 end1) (Slice ref2 start2 end2) =
+  ref1 == ref2
+    && ( (start1 < end2 && start2 < end1)
+           || (start2 < end1 && start1 < end2)
+       )
 
 --------------------------------------------------------------------------------
 
