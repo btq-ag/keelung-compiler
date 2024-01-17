@@ -10,6 +10,7 @@ module Keelung.Compiler.Relations.Slice
     relate,
     lookup,
     toAlignedSegmentPairs,
+    toAlignedSegmentPairsOfSelfRefs,
     -- Testing
     isValid,
     Failure (..),
@@ -25,6 +26,7 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Debug.Trace
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
@@ -33,7 +35,6 @@ import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
 import Keelung.Syntax (Var, Width)
 import Prelude hiding (lookup)
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -214,15 +215,15 @@ assignRootSegment root child = do
 
     addChildToRoot :: Maybe Segment -> Segment
     addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child) mempty
-    addChildToRoot (Just (SliceLookup.Parent width children self)) = 
+    addChildToRoot (Just (SliceLookup.Parent width children self)) =
       if sliceRefU root == sliceRefU child -- see if the child is the root itself
         then SliceLookup.Parent width (Map.insert (sliceRefU child) child children) (IntMap.insert (sliceStart child) child self)
         else SliceLookup.Parent width (Map.insert (sliceRefU child) child children) self
     addChildToRoot (Just (SliceLookup.ChildOf anotherRoot)) =
       if sliceRefU root == sliceRefU anotherRoot
         then -- "root" has self reference to itself
-             -- convert it to a Parent node
-           SliceLookup.Parent (widthOf root) mempty (IntMap.singleton (sliceStart child) child)
+        -- convert it to a Parent node
+          SliceLookup.Parent (widthOf root) mempty (IntMap.singleton (sliceStart child) child)
         else error "[ panic ] assignRootSegment: child already has a parent"
     addChildToRoot (Just (SliceLookup.Constant _)) = error "[ panic ] assignRootSegment: child already has a value"
     addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child) mempty
@@ -432,11 +433,11 @@ getFamily slice relations =
 -- | Given 2 SliceLookups of the same lengths, generate pairs of aligned segments (indexed with their offsets).
 --   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two lookups.
 --   Example:
--- slice 1      ├─────B─────┼──A──┤
--- slice 2      ├──A──┼─────C─────┤
---            =>
--- pairs        ├──B──┼──B──┼──A──┤
--- pairs        ├──A──┼──C──┼──C──┤
+--      slice 1      ├─────B─────┼──A──┤
+--      slice 2      ├──A──┼─────C─────┤
+--                          =>
+--      pairs        ├──B──┼──B──┼──A──┤
+--      pairs        ├──A──┼──C──┼──C──┤
 toAlignedSegmentPairs :: SliceLookup -> SliceLookup -> [((Slice, Segment), (Slice, Segment))]
 toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segments2) = step (IntMap.toList segments1) (IntMap.toList segments2)
   where
@@ -465,6 +466,52 @@ toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segment
                   )
                     : step ((index1 + width2, segment12) : xs1) xs2
     step _ _ = []
+
+-- | Like 'toAlignedSegmentPairs', but handles the case where the two Slices belong to the same variable
+--    Example:
+--      slice1     ├───────────╠═══════════╣─────┤
+--      slice2     ├─────╠═══════════╣───────────┤
+--              =>
+--      segments      1     2     3     4     5
+--      slice1     ├─────┼─────╠═════╬═════╣─────┤
+--      slice2     ├─────╠═════╬═════╣─────┼─────┤
+--
+--      segment1:   empty
+--      segment2:   child  of segment3
+--      segment3:   parent of segment2 and child of segment4
+--      segment4:   parent of segment3
+--      segment5:   empty
+--
+--    We split existing segments on the endpoints of the two Slices
+toAlignedSegmentPairsOfSelfRefs :: Slice -> Slice -> IntMap Segment -> [(Slice, Segment)]
+toAlignedSegmentPairsOfSelfRefs slice1 slice2 segments = foldl step [] (IntMap.toList segments)
+  where
+    withinSegment :: Int -> (Int, Segment) -> Bool
+    withinSegment endpoint (index, segment) = index < endpoint && endpoint < index + widthOf segment
+
+    step :: [(Slice, Segment)] -> (Int, Segment) -> [(Slice, Segment)]
+    step acc (index, segment)
+      | sliceStart slice1 `withinSegment` (index, segment) =
+          let (segment1, segment2) = SliceLookup.splitSegment (index - sliceStart slice1) segment
+           in (Slice (sliceRefU slice1) index (index + widthOf segment1), segment1)
+                : (Slice (sliceRefU slice2) index (index + widthOf segment2), segment2)
+                : acc
+      | sliceEnd slice1 `withinSegment` (index, segment) =
+          let (segment1, segment2) = SliceLookup.splitSegment (index - sliceStart slice1) segment
+           in (Slice (sliceRefU slice1) index (index + widthOf segment1), segment1)
+                : (Slice (sliceRefU slice2) index (index + widthOf segment2), segment2)
+                : acc
+      | sliceStart slice2 `withinSegment` (index, segment) =
+          let (segment1, segment2) = SliceLookup.splitSegment (index - sliceStart slice2) segment
+           in (Slice (sliceRefU slice1) index (index + widthOf segment1), segment1)
+                : (Slice (sliceRefU slice2) index (index + widthOf segment2), segment2)
+                : acc
+      | sliceEnd slice2 `withinSegment` (index, segment) =
+          let (segment1, segment2) = SliceLookup.splitSegment (index - sliceStart slice2) segment
+           in (Slice (sliceRefU slice1) index (index + widthOf segment1), segment1)
+                : (Slice (sliceRefU slice2) index (index + widthOf segment2), segment2)
+                : acc
+      | otherwise = (Slice (sliceRefU slice1) index (index + widthOf segment), segment) : acc
 
 --------------------------------------------------------------------------------
 
