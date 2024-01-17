@@ -66,30 +66,65 @@ tests = describe "SliceRelations" $ do
         let actual = SliceRelations.lookup slice relations'
         actual `shouldBe` expected
 
-  -- describe "SliceRelations.relate" $ do
-  --   -- it "should handle self references correctly" $ do
-  --   --   let relations = SliceRelations.new
-  --   --   let command = Relate (Slice (RefUI 40 0) 10 20) (Slice (RefUI 40 0) 15 25)
-  --   --   let relations' = foldr execCommand relations [command]
-  --   --   print relations'
-  --   --   SliceRelations.collectFailure relations' `shouldBe` []
+  describe "SliceRelations.relate" $ do
+    it "should handle this simple case correctly" $ do
+      -- slice1     ├───────────╠═══════════╣─────┤
+      -- slice2     ├─────╠═══════════╣───────────┤
+      --        =>
+      -- segments      1     2     3     4     5
+      -- slice1     ├─────┼─────╠═════╬═════╣─────┤
+      -- slice2     ├─────╠═════╬═════╣─────┼─────┤
+      --
+      -- segment1:   empty
+      -- segment2:   child  of segment3
+      -- segment3:   child  of segment4 and parent of segment2
+      -- segment4:   parent of segment3
+      -- segment5:   empty
 
-  --   -- it "should result in valid SliceRelations" $ do
-  --   --   let relations = SliceRelations.new
-  --   --   -- [(0,Empty[7]),
-  --   --   --     (7,ChildOf[5] UI₃₉79 [12 ... 17)),
-  --   --   --     (12,ChildOf[9] UI₃₉79 [17 ... 26)),
-  --   --   --     (21,Parent[14] [(UI₃₉79,UI₃₉79 [7 ... 21))]),
-  --   --   --     (26,Empty[13])]
-  --   --   -- property $ \commands -> do
-  --   --   --   let relations' = foldr execCommand relations (commands :: [Command])
-  --   --   --   SliceRelations.collectFailure relations' `shouldBe` []
-  --   --   -- property $ \(command1, command2, command3) -> do
-  --   --   --   let relations' = foldr execCommand relations [command1, command2, command3]
-  --   --   --   SliceRelations.collectFailure relations' `shouldBe` []
-  --   --   let command2 = Relate (Slice (RefUI 39 79) 7 21) (Slice (RefUI 39 79) 12 26)
-  --   --   let relations' = foldr execCommand relations [command2]
-  --   --   SliceRelations.collectFailure relations' `shouldBe` []
+      -- let slice1 = Slice (RefUI 25 0) 10 20
+      -- let slice2 = Slice (RefUI 25 0) 5 15
+      -- let segments = IntMap.fromList []
+
+      -- SliceRelations.toAlignedSegmentPairsOfSelfRefs slice1 slice2 segments
+      --   `shouldBe` [ ( Slice (RefUI 25 0) 0 5,
+      --                  SliceLookup.Empty 5
+      --                ),
+      --                ( Slice (RefUI 25 0) 5 10,
+      --                  SliceLookup.Empty 5
+      --                ),
+      --                ( Slice (RefUI 25 0) 10 15,
+      --                  SliceLookup.Empty 5
+      --                ),
+      --                ( Slice (RefUI 25 0) 15 20,
+      --                  SliceLookup.Empty 5
+      --                ),
+      --                ( Slice (RefUI 25 0) 20 25,
+      --                  SliceLookup.Empty 5
+      --                )
+      --              ]
+
+      let relations = SliceRelations.new
+      let command = Relate (Slice (RefUI 25 0) 10 20) (Slice (RefUI 25 0) 5 15)
+      let relations' = foldr execCommand relations [command]
+      print relations'
+      SliceRelations.collectFailure relations' `shouldBe` []
+
+--   -- it "should result in valid SliceRelations" $ do
+--   --   let relations = SliceRelations.new
+--   --   -- [(0,Empty[7]),
+--   --   --     (7,ChildOf[5] UI₃₉79 [12 ... 17)),
+--   --   --     (12,ChildOf[9] UI₃₉79 [17 ... 26)),
+--   --   --     (21,Parent[14] [(UI₃₉79,UI₃₉79 [7 ... 21))]),
+--   --   --     (26,Empty[13])]
+--   --   -- property $ \commands -> do
+--   --   --   let relations' = foldr execCommand relations (commands :: [Command])
+--   --   --   SliceRelations.collectFailure relations' `shouldBe` []
+--   --   -- property $ \(command1, command2, command3) -> do
+--   --   --   let relations' = foldr execCommand relations [command1, command2, command3]
+--   --   --   SliceRelations.collectFailure relations' `shouldBe` []
+--   --   let command2 = Relate (Slice (RefUI 39 79) 7 21) (Slice (RefUI 39 79) 12 26)
+--   --   let relations' = foldr execCommand relations [command2]
+--   --   SliceRelations.collectFailure relations' `shouldBe` []
 
 --------------------------------------------------------------------------------
 

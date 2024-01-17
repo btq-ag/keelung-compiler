@@ -11,6 +11,7 @@ module Keelung.Data.SliceLookup
     SliceLookup (..),
     fromRefU,
     fromSegment,
+    null,
 
     -- * Mapping
     map,
@@ -19,7 +20,7 @@ module Keelung.Data.SliceLookup
     pad,
 
     -- * Splitting and slicing
-    splitSegment,
+    unsafeSplitSegment,
     split,
     splice,
 
@@ -48,7 +49,7 @@ import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
-import Prelude hiding (map)
+import Prelude hiding (map, null)
 
 --------------------------------------------------------------------------------
 
@@ -83,22 +84,6 @@ instance HasWidth Segment where
   widthOf (Parent len _ _ _) = len
   widthOf (Empty len) = len
 
--- | A "SliceLookup" of a RefU, with non-overlapping Segments indexed by their starting offset
-data SliceLookup = SliceLookup
-  { lookupSlice :: Slice, -- the Slice these segments belong to
-    lookupSegments :: IntMap Segment -- the segments
-  }
-  deriving (Eq)
-
-instance Show SliceLookup where
-  show (SliceLookup slice xs) = "SliceLookup " <> show slice <> " " <> show (IntMap.toList xs)
-
-instance HasWidth SliceLookup where
-  widthOf (SliceLookup slice _) = widthOf slice
-
-instance Semigroup SliceLookup where
-  (<>) = merge
-
 -- | Check if two Segments are of the same kind
 sameKindOfSegment :: Segment -> Segment -> Bool
 sameKindOfSegment (Constant _) (Constant _) = True
@@ -116,10 +101,30 @@ nullSegment (Empty len) = len == 0
 
 -- | Check if a `Segment` is valid
 validSegment :: Segment -> Bool
-validSegment (Constant val) = widthOf val >= 0
+validSegment (Constant val) = widthOf val > 0
 validSegment (ChildOf _) = True
-validSegment (Parent len children childSelfRefs parentSelfRefs) = len >= 0 && (not (Map.null children) || not (IntMap.null childSelfRefs) || not (IntMap.null parentSelfRefs))
-validSegment (Empty len) = len >= 0
+validSegment (Parent len children childSelfRefs parentSelfRefs) = len > 0 && (not (Map.null children) || not (IntMap.null childSelfRefs) || not (IntMap.null parentSelfRefs))
+validSegment (Empty len) = len > 0
+
+-- | A "SliceLookup" of a RefU, with non-overlapping Segments indexed by their starting offset
+data SliceLookup = SliceLookup
+  { lookupSlice :: Slice, -- the Slice these segments belong to
+    lookupSegments :: IntMap Segment -- the segments
+  }
+  deriving (Eq)
+
+instance Show SliceLookup where
+  show (SliceLookup slice xs) = "SliceLookup " <> show slice <> " " <> show (IntMap.toList xs)
+
+instance HasWidth SliceLookup where
+  widthOf (SliceLookup slice _) = widthOf slice
+
+instance Semigroup SliceLookup where
+  (<>) = merge
+
+-- | See if a `SliceLookup` is empty
+null :: SliceLookup -> Bool
+null (SliceLookup slice _) = Slice.null slice
 
 --------------------------------------------------------------------------------
 
@@ -150,8 +155,9 @@ fromSegment (Slice ref start end) segment =
                     else [(0, segment)]
 
 -- | Split a `Segment` into two at a given index (relative to the starting offset of the Segement)
-splitSegment :: Int -> Segment -> (Segment, Segment)
-splitSegment index segment = case segment of
+--   Maybe result in invalid empty segments!
+unsafeSplitSegment :: Int -> Segment -> (Segment, Segment)
+unsafeSplitSegment index segment = case segment of
   Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val - index)))
   ChildOf slice -> let (slice1, slice2) = Slice.split index slice in (ChildOf slice1, ChildOf slice2)
   Parent len children childSelfRefs parentSelfRefs ->
@@ -174,8 +180,12 @@ split index (SliceLookup (Slice ref start end) xs) = case IntMap.splitLookup ind
   (before, Nothing, after) -> case IntMap.lookupLE index xs of
     Nothing -> (SliceLookup (Slice ref start start) mempty, SliceLookup (Slice ref start end) after)
     Just (index', segment) ->
-      let (segment1, segment2) = splitSegment (index - index') segment
-       in (SliceLookup (Slice ref start index) (IntMap.insert index' segment1 before), SliceLookup (Slice ref index end) (IntMap.insert index segment2 after))
+      let (segment1, segment2) = unsafeSplitSegment (index - index') segment
+       in case (nullSegment segment1, nullSegment segment2) of
+            (True, True) -> (SliceLookup (Slice ref start index) before, SliceLookup (Slice ref index end) after)
+            (True, False) -> (SliceLookup (Slice ref start index') before, SliceLookup (Slice ref index' end) (IntMap.insert index segment2 after))
+            (False, True) -> (SliceLookup (Slice ref start index) before, SliceLookup (Slice ref index end) (IntMap.insert index' segment1 after))
+            (False, False) -> (SliceLookup (Slice ref start index) (IntMap.insert index' segment1 before), SliceLookup (Slice ref index end) (IntMap.insert index segment2 after))
 
 -- | Given an interval, get a slice of SliceLookup
 splice :: (Int, Int) -> SliceLookup -> SliceLookup

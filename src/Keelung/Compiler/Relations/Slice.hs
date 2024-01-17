@@ -368,7 +368,10 @@ getFamily slice relations =
 --      pairs        ├──B──┼──B──┼──A──┤
 --      pairs        ├──A──┼──C──┼──C──┤
 toAlignedSegmentPairs :: SliceLookup -> SliceLookup -> [((Slice, Segment), (Slice, Segment))]
-toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segments2) = step (IntMap.toList segments1) (IntMap.toList segments2)
+toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segments2) =
+  if sliceRefU slice1 == sliceRefU slice2
+    then map (\x -> (x, x)) $ toAlignedSegmentPairsOfSelfRefs slice1 slice2 segments1
+    else step (IntMap.toList segments1) (IntMap.toList segments2)
   where
     step :: [(Int, Segment)] -> [(Int, Segment)] -> [((Slice, Segment), (Slice, Segment))]
     step ((index1, segment1) : xs1) ((index2, segment2) : xs2) =
@@ -382,14 +385,14 @@ toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segment
                 : step xs1 xs2
             LT ->
               -- segment1 is shorter, so we split segment2 into two
-              let (segment21, segment22) = SliceLookup.splitSegment width1 segment2
+              let (segment21, segment22) = SliceLookup.unsafeSplitSegment width1 segment2
                in ( (Slice (sliceRefU slice1) index1 (index1 + width1), segment1),
                     (Slice (sliceRefU slice2) index2 (index2 + widthOf segment21), segment21)
                   )
                     : step xs1 ((index2 + width1, segment22) : xs2)
             GT ->
               -- segment2 is shorter, so we split segment1 into two
-              let (segment11, segment12) = SliceLookup.splitSegment width2 segment1
+              let (segment11, segment12) = SliceLookup.unsafeSplitSegment width2 segment1
                in ( (Slice (sliceRefU slice1) index1 (index1 + widthOf segment11), segment11),
                     (Slice (sliceRefU slice2) index2 (index2 + width2), segment2)
                   )
