@@ -233,14 +233,12 @@ data MergeError
   = NotSameRefU SliceLookup SliceLookup -- two `SliceLookup` are not of the same `RefU`
   | NotAdjacent SliceLookup SliceLookup -- two `SliceLookup` are not adjacent
   | Overlapping SliceLookup SliceLookup -- two `SliceLookup` are overlapping
-  | CannotMergeLimbs
   deriving (Eq)
 
 instance Show MergeError where
   show (NotSameRefU a b) = "SliceLookup.MergeError: two lookups are not of the same RefU:\n" <> show a <> "\n" <> show b
   show (NotAdjacent a b) = "SliceLookup.MergeError: two lookups are not adjacent with each other:\n" <> show a <> "\n" <> show b
   show (Overlapping a b) = "SliceLookup.MergeError: two lookups are overlapping with each other:\n" <> show a <> "\n" <> show b
-  show CannotMergeLimbs = "SliceLookup.MergeError: cannot merge two Limbs together"
 
 -- | Merge two `SliceLookup` into one, throwing MergeError if the lookups are:
 --    1. not of the same `RefU`

@@ -26,7 +26,6 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe qualified as Maybe
 import Data.Set (Set)
 import Data.Set qualified as Set
-import Debug.Trace
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
@@ -200,11 +199,11 @@ assignValueSegment val slice = modify (modifyMapping' slice (assignMapping slice
 -- | Relate a child Slice with a parent Slice
 assignRootSegment :: Slice -> Slice -> M ()
 assignRootSegment root child = do
-  relations <- get
-  traceM $ "\nroot:         " <> show root
-  traceM $ "\nroot lookup:  " <> show (lookup root relations)
-  traceM $ "\nchild:  " <> show child
-  traceM $ "\nchild lookup: " <> show (lookup child relations)
+  -- relations <- get
+  -- traceM $ "\nroot:         " <> show root
+  -- traceM $ "\nroot lookup:  " <> show (lookup root relations)
+  -- traceM $ "\nchild:  " <> show child
+  -- traceM $ "\nchild lookup: " <> show (lookup child relations)
   modify (modifySegment addRootToChild child)
   modify (modifySegment addChildToRoot root)
   where
@@ -245,32 +244,6 @@ modifySegment f slice xs = case sliceRefU slice of
         alterSliceLookup Nothing = pure (SliceLookup.fromSegment slice (f Nothing))
         alterSliceLookup (Just lookups) = Just $ SliceLookup.mapIntervalWithSlice (const (f . Just)) slice lookups
 
--- (SliceLookup.Constant val1, SliceLookup.ChildOf root2) -> assignMapping slice2 val1 (relateMapping slice2 root2 relations)
--- (SliceLookup.Constant val1, SliceLookup.Parent _ children2) -> assignMapping slice2 val1 (foldr (\child -> relateMapping child slice2) relations (Map.elems children2))
--- (SliceLookup.ChildOf root1, SliceLookup.Constant val2) -> assignMapping slice1 val2 (relateMapping slice1 root1 relations)
--- (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
---   -- see who's root is the real boss
---   if root1 > root2
---     then -- root1 is the boss
-
---       relateMapping root2 root1 relations
---     else -- root2 is the boss
-
---       relateMapping root1 root2 relations
--- (SliceLookup.ChildOf root1, SliceLookup.Parent _ children2) ->
---   if root1 > slice2
---     then foldr (\child -> relateMapping child root1) relations (Map.elems children2)
---     else relateMapping root1 slice2 relations
--- (SliceLookup.Parent _ children1, SliceLookup.Constant val2) -> foldr (\child -> assignMapping child val2) relations (Map.elems children1)
--- (SliceLookup.Parent _ children1, SliceLookup.ChildOf root2) ->
---   if slice1 > root2
---     then relateMapping slice1 root2 relations -- slice1 is the boss
---     else foldr (\child -> relateMapping child root2) relations (Map.elems children1) -- root2 is the boss
--- (SliceLookup.Parent _ children1, SliceLookup.Parent _ children2) ->
---   if slice1 > slice2
---     then foldr (\child -> relateMapping child slice1) relations (Map.elems children2) -- slice1 is the boss
---     else foldr (\child -> relateMapping child slice2) relations (Map.elems children1) -- slice2 is the boss
-
 --------------------------------------------------------------------------------
 
 newtype Mapping = Mapping (IntMap (IntMap SliceLookup))
@@ -290,22 +263,6 @@ instance Show Mapping where
         if IntMap.null varMap
           then ""
           else unlines (map (\(_, slice) -> "    " <> show slice) (IntMap.toList varMap))
-
--- | Assign a value to a slice of a variable
--- modifySliceLookup :: (Maybe SliceLookup -> Maybe SliceLookup) -> Slice -> Mapping -> Mapping
-
--- assignMapping :: Slice -> U -> Mapping -> Mapping
--- assignMapping slice val = modifySliceLookup assignSliceLookup slice
---   where
---     assignSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
---     assignSliceLookup Nothing = Just (SliceLookup.fromSegment slice (SliceLookup.Constant val))
---     assignSliceLookup (Just lookups) = Just (SliceLookup.mapInterval assignSegment (sliceStart slice, sliceEnd slice) lookups)
-
---     assignSegment :: Segment -> Segment
---     assignSegment (SliceLookup.Constant _) = error "assignSegment: assigning on existing Constant"
---     assignSegment (SliceLookup.ChildOf root) = _
---     assignSegment (SliceLookup.Parent _ children) = _
---     assignSegment (SliceLookup.Empty _) = error "assignSegment: assigning on existing Empty"
 
 assignMapping :: Slice -> U -> Mapping -> Mapping
 assignMapping (Slice ref start end) val (Mapping xs) = Mapping (IntMap.alter assignVarMap width xs)
@@ -336,33 +293,6 @@ lookupMapping (Slice ref start end) (Mapping xs) =
         Just varMap -> case IntMap.lookup (refUVar ref) varMap of
           Nothing -> SliceLookup.fromRefU ref
           Just lookups -> lookups
-
--- -- | Relate a child Slice with a parent Slice
--- relateMapping :: Slice -> Slice -> Mapping -> Mapping
--- relateMapping child root = modifySliceLookupMapping modifyRoot root . modifySliceLookupMapping modifyChild child
---   where
---     -- modify existing child SliceLookup
---     modifyChild :: Maybe SliceLookup -> Maybe SliceLookup
---     modifyChild Nothing = Just (SliceLookup.fromSegment child (SliceLookup.ChildOf root)) -- creates a new SliceLookup from "ChildOf root"
---     modifyChild (Just lookups) = Just (SliceLookup.mapInterval (const (SliceLookup.ChildOf root)) (sliceStart child, sliceEnd child) lookups)
-
---     -- modify existing root SliceLookup
---     modifyRoot :: Maybe SliceLookup -> Maybe SliceLookup
---     modifyRoot Nothing = Just (SliceLookup.fromSegment root (SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child))) -- creates a new SliceLookup
---     modifyRoot (Just lookups) = Just (SliceLookup.mapInterval (const (SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child))) (sliceStart root, sliceEnd root) lookups)
-
--- modifySliceLookupMapping :: (Maybe SliceLookup -> Maybe SliceLookup) -> Slice -> Mapping -> Mapping
--- modifySliceLookupMapping f slice (Mapping xs) = Mapping (IntMap.alter alterVarMap width xs)
---   where
---     width :: Width
---     width = widthOf (sliceRefU slice)
-
---     var :: Var
---     var = refUVar (sliceRefU slice)
-
---     alterVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
---     alterVarMap Nothing = f Nothing >>= \lookups -> pure (IntMap.singleton 0 (SliceLookup.pad lookups))
---     alterVarMap (Just varMap) = Just $ IntMap.alter f var varMap
 
 --------------------------------------------------------------------------------
 
@@ -483,34 +413,23 @@ toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segment
 --
 --    We split existing segments on the endpoints of the two Slices
 toAlignedSegmentPairsOfSelfRefs :: Slice -> Slice -> IntMap Segment -> [(Slice, Segment)]
-toAlignedSegmentPairsOfSelfRefs slice1 slice2 segments = foldl step [] (IntMap.toList segments)
+toAlignedSegmentPairsOfSelfRefs slice1 slice2 segments =
+  let sliceLookup = SliceLookup.pad $ SliceLookup (Slice (sliceRefU slice1) 0 0) segments
+   in toList $
+        splitAndMerge (sliceStart slice1) $
+          splitAndMerge (sliceEnd slice1) $
+            splitAndMerge (sliceStart slice2) $
+              splitAndMerge
+                (sliceEnd slice2)
+                sliceLookup
   where
-    withinSegment :: Int -> (Int, Segment) -> Bool
-    withinSegment endpoint (index, segment) = index < endpoint && endpoint < index + widthOf segment
+    splitAndMerge :: Int -> SliceLookup -> SliceLookup
+    splitAndMerge index sliceLookup =
+      let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
+       in sliceLookup1 <> sliceLookup2
 
-    step :: [(Slice, Segment)] -> (Int, Segment) -> [(Slice, Segment)]
-    step acc (index, segment)
-      | sliceStart slice1 `withinSegment` (index, segment) =
-          let (segment1, segment2) = SliceLookup.splitSegment (index - sliceStart slice1) segment
-           in (Slice (sliceRefU slice1) index (index + widthOf segment1), segment1)
-                : (Slice (sliceRefU slice2) index (index + widthOf segment2), segment2)
-                : acc
-      | sliceEnd slice1 `withinSegment` (index, segment) =
-          let (segment1, segment2) = SliceLookup.splitSegment (index - sliceStart slice1) segment
-           in (Slice (sliceRefU slice1) index (index + widthOf segment1), segment1)
-                : (Slice (sliceRefU slice2) index (index + widthOf segment2), segment2)
-                : acc
-      | sliceStart slice2 `withinSegment` (index, segment) =
-          let (segment1, segment2) = SliceLookup.splitSegment (index - sliceStart slice2) segment
-           in (Slice (sliceRefU slice1) index (index + widthOf segment1), segment1)
-                : (Slice (sliceRefU slice2) index (index + widthOf segment2), segment2)
-                : acc
-      | sliceEnd slice2 `withinSegment` (index, segment) =
-          let (segment1, segment2) = SliceLookup.splitSegment (index - sliceStart slice2) segment
-           in (Slice (sliceRefU slice1) index (index + widthOf segment1), segment1)
-                : (Slice (sliceRefU slice2) index (index + widthOf segment2), segment2)
-                : acc
-      | otherwise = (Slice (sliceRefU slice1) index (index + widthOf segment), segment) : acc
+    toList :: SliceLookup -> [(Slice, Segment)]
+    toList (SliceLookup slice xs) = map (\(index, segment) -> (Slice (sliceRefU slice) index (index + widthOf segment), segment)) (IntMap.toList xs)
 
 --------------------------------------------------------------------------------
 
