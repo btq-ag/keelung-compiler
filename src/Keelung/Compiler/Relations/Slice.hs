@@ -214,19 +214,18 @@ assignRootSegment root child = do
     addRootToChild _ = SliceLookup.ChildOf root
 
     addChildToRoot :: Maybe Segment -> Segment
-    addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child) mempty
-    addChildToRoot (Just (SliceLookup.Parent width children self)) =
+    addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child) mempty mempty
+    addChildToRoot (Just (SliceLookup.Parent width children childSelfRefs parentSelfRefs)) =
       if sliceRefU root == sliceRefU child -- see if the child is the root itself
-        then SliceLookup.Parent width (Map.insert (sliceRefU child) child children) (IntMap.insert (sliceStart child) child self)
-        else SliceLookup.Parent width (Map.insert (sliceRefU child) child children) self
+        then SliceLookup.Parent width (Map.insert (sliceRefU child) child children) (IntMap.insert (sliceStart child) child childSelfRefs) parentSelfRefs
+        else SliceLookup.Parent width (Map.insert (sliceRefU child) child children) childSelfRefs parentSelfRefs
     addChildToRoot (Just (SliceLookup.ChildOf anotherRoot)) =
       if sliceRefU root == sliceRefU anotherRoot
-        then -- "root" has self reference to itself
-        -- convert it to a Parent node
-          SliceLookup.Parent (widthOf root) mempty (IntMap.singleton (sliceStart child) child)
+        then -- "root" has self reference to itself, convert it to a Parent node
+          SliceLookup.Parent (widthOf root) mempty (IntMap.singleton (sliceStart child) child) mempty
         else error "[ panic ] assignRootSegment: child already has a parent"
     addChildToRoot (Just (SliceLookup.Constant _)) = error "[ panic ] assignRootSegment: child already has a value"
-    addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child) mempty
+    addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child) mempty mempty
 
 modifySegment :: (Maybe Segment -> Segment) -> Slice -> SliceRelations -> SliceRelations
 modifySegment f slice xs = case sliceRefU slice of
@@ -393,7 +392,7 @@ getFamily slice relations =
     go :: Segment -> [Slice]
     go (SliceLookup.Constant _) = []
     go (SliceLookup.ChildOf root) = getFamily root relations
-    go (SliceLookup.Parent _ children _) = slice : Map.elems children
+    go (SliceLookup.Parent _ children _ _) = slice : Map.elems children
     go (SliceLookup.Empty _) = [slice]
 
 -- -- | Given a pair of aligned segments, generate a list of edits
@@ -584,7 +583,7 @@ kinshipFromSliceRelations = fold addRelation (Kinship Map.empty Map.empty)
           { kinshipParents = Map.insertWith Set.union root (Set.singleton slice) (kinshipParents kinship),
             kinshipChildren = Map.insert slice root (kinshipChildren kinship)
           }
-      SliceLookup.Parent _ children _ ->
+      SliceLookup.Parent _ children _ _ ->
         Kinship
           { kinshipParents = Map.insertWith Set.union slice (Set.fromList $ Map.elems children) (kinshipParents kinship),
             kinshipChildren = Map.union (kinshipChildren kinship) $ Map.fromList $ map (,slice) (Map.elems children)
