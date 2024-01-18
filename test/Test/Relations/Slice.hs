@@ -6,6 +6,7 @@ import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (..))
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup qualified as SliceLookup
 import Test.Data.SliceLookup (arbitrarySliceOfWidth, arbitraryUOfWidth)
 import Test.Hspec
@@ -67,75 +68,84 @@ tests = describe "SliceRelations" $ do
         actual `shouldBe` expected
 
   describe "SliceRelations.relate" $ do
-    it "should handle this simple case correctly" $ do
-      -- slice1     ├───────────╠═══════════╣─────┤
-      -- slice2     ├─────╠═══════════╣───────────┤
-      --        =>
-      -- segments      1     2     3     4     5
-      -- slice1     ├─────┼─────╠═════╬═════╣─────┤
-      -- slice2     ├─────╠═════╬═════╣─────┼─────┤
-      --
-      -- segment1:   empty
-      -- segment2:   child  of segment3
-      -- segment3:   child  of segment4 and parent of segment2
-      -- segment4:   parent of segment3
-      -- segment5:   empty
+    -- it "should handle this simple case correctly" $ do
+    --   -- slice1     ├───────────╠═══════════╣─────┤
+    --   -- slice2     ├─────╠═══════════╣───────────┤
+    --   --        =>
+    --   -- segments      1     2     3     4     5
+    --   -- slice1     ├─────┼─────╠═════╬═════╣─────┤
+    --   -- slice2     ├─────╠═════╬═════╣─────┼─────┤
+    --   --
+    --   -- segment1:   empty
+    --   -- segment2:   child  of segment3
+    --   -- segment3:   child  of segment4 and parent of segment2
+    --   -- segment4:   parent of segment3
+    --   -- segment5:   empty
 
-      -- let slice1 = Slice (RefUI 25 0) 10 20
-      -- let slice2 = Slice (RefUI 25 0) 5 15
-      -- let segments = IntMap.fromList []
+    --   -- let slice1 = Slice (RefUI 25 0) 10 20
+    --   -- let slice2 = Slice (RefUI 25 0) 5 15
+    --   -- let segments = IntMap.fromList []
 
-      -- SliceRelations.toAlignedSegmentPairsOfSelfRefs slice1 slice2 segments
-      --   `shouldBe` [ ( Slice (RefUI 25 0) 0 5,
-      --                  SliceLookup.Empty 5
-      --                ),
-      --                ( Slice (RefUI 25 0) 5 10,
-      --                  SliceLookup.Empty 5
-      --                ),
-      --                ( Slice (RefUI 25 0) 10 15,
-      --                  SliceLookup.Empty 5
-      --                ),
-      --                ( Slice (RefUI 25 0) 15 20,
-      --                  SliceLookup.Empty 5
-      --                ),
-      --                ( Slice (RefUI 25 0) 20 25,
-      --                  SliceLookup.Empty 5
-      --                )
-      --              ]
+    --   -- SliceRelations.toAlignedSegmentPairsOfSelfRefs slice1 slice2 segments
+    --   --   `shouldBe` [ ( Slice (RefUI 25 0) 0 5,
+    --   --                  SliceLookup.Empty 5
+    --   --                ),
+    --   --                ( Slice (RefUI 25 0) 5 10,
+    --   --                  SliceLookup.Empty 5
+    --   --                ),
+    --   --                ( Slice (RefUI 25 0) 10 15,
+    --   --                  SliceLookup.Empty 5
+    --   --                ),
+    --   --                ( Slice (RefUI 25 0) 15 20,
+    --   --                  SliceLookup.Empty 5
+    --   --                ),
+    --   --                ( Slice (RefUI 25 0) 20 25,
+    --   --                  SliceLookup.Empty 5
+    --   --                )
+    --   --              ]
 
+    --   let relations = SliceRelations.new
+    --   let command = Relate (Slice (RefUI 25 0) 10 20) (Slice (RefUI 25 0) 5 15)
+    --   let relations' = foldr execCommand relations [command]
+    --   -- print relations'
+    --   let expected =
+    --         SliceLookup.SliceLookup (Slice (RefUI 25 0) 0 25) $
+    --           IntMap.fromList
+    --             [
+    --               (0, SliceLookup.Empty 5)
+    --             ]
+    --   let actual = SliceRelations.lookup (Slice (RefUI 25 0) 0 25) relations'
+    --   actual `shouldBe` expected
+
+    -- it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
+    --   let relations = SliceRelations.new
+    --   forAll (vectorOf 4 (arbitraryCommandOfOverlapping False)) $ \commands -> do
+    --     let relations' = foldr execCommand relations commands
+    --     SliceRelations.collectFailure relations' `shouldBe` []
+
+    it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
       let relations = SliceRelations.new
-      let command = Relate (Slice (RefUI 25 0) 10 20) (Slice (RefUI 25 0) 5 15)
-      let relations' = foldr execCommand relations [command]
+      let commands =
+            [ Relate (Slice (RefUI 37 38) 15 24) (Slice (RefUI 35 40) 9 18),
+              Relate (Slice (RefUI 52 2) 15 23) (Slice (RefUI 35 40) 17 25)
+            ]
+      let relations' = foldr execCommand relations commands
       print relations'
       SliceRelations.collectFailure relations' `shouldBe` []
-
---   -- it "should result in valid SliceRelations" $ do
---   --   let relations = SliceRelations.new
---   --   -- [(0,Empty[7]),
---   --   --     (7,ChildOf[5] UI₃₉79 [12 ... 17)),
---   --   --     (12,ChildOf[9] UI₃₉79 [17 ... 26)),
---   --   --     (21,Parent[14] [(UI₃₉79,UI₃₉79 [7 ... 21))]),
---   --   --     (26,Empty[13])]
---   --   -- property $ \commands -> do
---   --   --   let relations' = foldr execCommand relations (commands :: [Command])
---   --   --   SliceRelations.collectFailure relations' `shouldBe` []
---   --   -- property $ \(command1, command2, command3) -> do
---   --   --   let relations' = foldr execCommand relations [command1, command2, command3]
---   --   --   SliceRelations.collectFailure relations' `shouldBe` []
---   --   let command2 = Relate (Slice (RefUI 39 79) 7 21) (Slice (RefUI 39 79) 12 26)
---   --   let relations' = foldr execCommand relations [command2]
---   --   SliceRelations.collectFailure relations' `shouldBe` []
 
 --------------------------------------------------------------------------------
 
 data Command = Relate Slice Slice deriving (Show)
 
+arbitraryCommandOfOverlapping :: Bool -> Gen Command
+arbitraryCommandOfOverlapping canOverlap = do
+  width <- chooseInt (1, 16)
+  slice1 <- arbitrarySliceOfWidth width
+  slice2 <- arbitrarySliceOfWidth width `suchThat` \slice2 -> canOverlap || not (Slice.overlaps slice1 slice2)
+  pure $ Relate slice1 slice2
+
 instance Arbitrary Command where
-  arbitrary = do
-    width <- chooseInt (1, 16)
-    Relate
-      <$> arbitrarySliceOfWidth width
-      <*> arbitrarySliceOfWidth width
+  arbitrary = arbitraryCommandOfOverlapping True
 
 execCommand :: Command -> SliceRelations -> SliceRelations
 execCommand (Relate slice1 slice2) = SliceRelations.relate slice1 slice2

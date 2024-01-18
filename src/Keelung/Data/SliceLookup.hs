@@ -74,8 +74,8 @@ instance Show Segment where
       <> show len
       <> "] "
       <> show (Map.toList children)
-      <> (if IntMap.null childSelfRefs then "" else " " <> show (IntMap.elems childSelfRefs))
-      <> (if IntMap.null parentSelfRefs then "" else " " <> show (IntMap.elems parentSelfRefs))
+      <> (if IntMap.null childSelfRefs then "" else " self children " <> show (IntMap.elems childSelfRefs))
+      <> (if IntMap.null parentSelfRefs then "" else " self parent " <> show (IntMap.elems parentSelfRefs))
   show (Empty len) = "Empty[" <> show len <> "]"
 
 instance HasWidth Segment where

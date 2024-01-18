@@ -74,7 +74,7 @@ fold f acc relations =
   where
     foldMapping a (Mapping xs) = foldl foldVarMap a xs
     foldVarMap = foldl foldSliceLookup
-    foldSliceLookup a (SliceLookup slice segments) = foldl (\b (index, segment) -> f b (Slice (sliceRefU slice) index (widthOf segment)) segment) a (IntMap.toList segments)
+    foldSliceLookup a (SliceLookup slice segments) = foldl (\b (index, segment) -> f b (Slice (sliceRefU slice) index (index + widthOf segment)) segment) a (IntMap.toList segments)
 
 -- | FOR TESTING: A SliceRelations is valid if:
 --    1. all existing SliceLookups cover the entire width of the variable
@@ -202,13 +202,11 @@ assignRootSegment root child = do
   -- relations <- get
   -- traceM $ "\nroot:         " <> show root
   -- traceM $ "\nroot lookup:  " <> show (lookup root relations)
-  -- traceM $ "\nchild:  " <> show child
+  -- traceM $ "\nchild:        " <> show child
   -- traceM $ "\nchild lookup: " <> show (lookup child relations)
   modify (modifySegment addRootToChild child)
   modify (modifySegment addChildToRoot root)
   where
-    -- modify root
-
     addRootToChild :: Maybe Segment -> Segment
     addRootToChild _ = SliceLookup.ChildOf root
 
@@ -416,8 +414,8 @@ toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segment
 --
 --    We split existing segments on the endpoints of the two Slices
 toAlignedSegmentPairsOfSelfRefs :: Slice -> Slice -> IntMap Segment -> [(Slice, Segment)]
-toAlignedSegmentPairsOfSelfRefs slice1 slice2 segments =
-  let sliceLookup = SliceLookup.pad $ SliceLookup (Slice (sliceRefU slice1) 0 0) segments
+toAlignedSegmentPairsOfSelfRefs slice1 slice2 _segments =
+  let sliceLookup = SliceLookup.fromRefU (sliceRefU slice1)
    in toList $
         splitAndMerge (sliceStart slice1) $
           splitAndMerge (sliceEnd slice1) $
@@ -501,13 +499,18 @@ kinshipFromSliceRelations = fold addRelation (Kinship Map.empty Map.empty)
     addRelation kinship slice segment = case segment of
       SliceLookup.Constant _ -> kinship
       SliceLookup.ChildOf root ->
+        -- `slice` is a child of `root`
         Kinship
           { kinshipParents = Map.insertWith Set.union root (Set.singleton slice) (kinshipParents kinship),
             kinshipChildren = Map.insert slice root (kinshipChildren kinship)
           }
       SliceLookup.Parent _ children _ _ ->
         Kinship
-          { kinshipParents = Map.insertWith Set.union slice (Set.fromList $ Map.elems children) (kinshipParents kinship),
-            kinshipChildren = Map.union (kinshipChildren kinship) $ Map.fromList $ map (,slice) (Map.elems children)
+          { kinshipParents =
+              Map.insertWith Set.union slice (Set.fromList (Map.elems children)) (kinshipParents kinship),
+            kinshipChildren =
+              kinshipChildren kinship
+                <> Map.fromList (map (,slice) (Map.elems children)) -- add children
+                -- <> Map.fromList (map (,slice) (IntMap.elems childSelfRefs)) -- add child self-references
           }
       SliceLookup.Empty _ -> kinship

@@ -35,9 +35,12 @@ instance Show Slice where
 instance HasWidth Slice where
   widthOf (Slice _ start end) = end - start
 
--- | Slices with larger RefUs gets to be the root in UnionFind:
+-- | A Slice gets to be the root in UnionFind if:
+--    1. it has "larger" RefU
+--    2. it has "smaller" starting offset
+--    3. it has "larger" ending offset
 instance Ord Slice where
-  (Slice ref1 _ _) `compare` (Slice ref2 _ _) = compare ref1 ref2
+  (Slice ref1 start1 end1) `compare` (Slice ref2 start2 end2) = compare ref1 ref2 <> compare start2 start1 <> compare end1 end2
 
 instance Semigroup Slice where
   (<>) = merge
