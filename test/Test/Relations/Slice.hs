@@ -117,21 +117,34 @@ tests = describe "SliceRelations" $ do
     --   let actual = SliceRelations.lookup (Slice (RefUI 25 0) 0 25) relations'
     --   actual `shouldBe` expected
 
-    -- it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
-    --   let relations = SliceRelations.new
-    --   forAll (vectorOf 4 (arbitraryCommandOfOverlapping False)) $ \commands -> do
-    --     let relations' = foldr execCommand relations commands
-    --     SliceRelations.collectFailure relations' `shouldBe` []
-
     it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
       let relations = SliceRelations.new
-      let commands =
-            [ Relate (Slice (RefUI 37 38) 15 24) (Slice (RefUI 35 40) 9 18),
-              Relate (Slice (RefUI 52 2) 15 23) (Slice (RefUI 35 40) 17 25)
-            ]
-      let relations' = foldr execCommand relations commands
-      print relations'
-      SliceRelations.collectFailure relations' `shouldBe` []
+      forAll (vectorOf 4 (arbitraryCommandOfOverlapping False)) $ \commands -> do
+        let relations' = foldr execCommand relations commands
+        SliceRelations.collectFailure relations' `shouldBe` []
+
+    -- it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
+    --   let relations = SliceRelations.new
+    --   let commands =
+    --         [ Relate (Slice (RefUP 30 0) 0 10) (Slice (RefUO 30 99) 8 14),
+    --           Relate (Slice (RefUX 30 1) 0 10) (Slice (RefUO 30 99) 13 23),
+    --           Relate (Slice (RefUP 30 2) 0 10) (Slice (RefUO 30 99) 6 16)
+    --         ]
+
+    --   let relations' = foldr execCommand relations commands
+    --   print relations'
+    --   SliceRelations.collectFailure relations' `shouldBe` []
+
+    -- it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
+    --   let relations = SliceRelations.new
+    --   let commands =
+    --         [ Relate (Slice (RefUP 30 0) 0 10) (Slice (RefUO 30 99) 0 10),
+    --           Relate (Slice (RefUX 30 1) 0 10) (Slice (RefUO 30 99) 10 20),
+    --           Relate (Slice (RefUP 30 2) 0 10) (Slice (RefUO 30 99) 20 30)
+    --         ]
+
+    --   let relations' = foldr execCommand relations commands
+    --   SliceRelations.collectFailure relations' `shouldBe` []
 
 --------------------------------------------------------------------------------
 
