@@ -22,7 +22,6 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Data.Maybe qualified as Maybe
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
@@ -77,22 +76,24 @@ fold f acc relations =
 --    1. all existing SliceLookups cover the entire width of the variable
 --    2. all children of a Parent Segment has the parent as its root
 isValid :: SliceRelations -> Bool
-isValid relations = all isValidMapping [refO, refI, refP, refX] && hasCorrectKinship
-  where
-    SliceRelations refO refI refP refX = relations
+isValid = null . collectFailure
 
-    isValidMapping :: Mapping -> Bool
-    isValidMapping (Mapping xs) = all (all isValidSliceLookup) xs
+-- all isValidMapping [refO, refI, refP, refX] && hasCorrectKinship
+-- where
+--   SliceRelations refO refI refP refX = relations
 
-    isValidSliceLookup :: SliceLookup -> Bool
-    isValidSliceLookup x@(SliceLookup slice _) = sliceStart slice == 0 && sliceEnd slice == widthOf (sliceRefU slice) && SliceLookup.isValid x
+--   isValidMapping :: Mapping -> Bool
+--   isValidMapping (Mapping xs) = all (all isValidSliceLookup) xs
 
-    hasCorrectKinship :: Bool
-    hasCorrectKinship =
-      Maybe.isNothing $
-        nullKinship $
-          destroyKinshipWithParent relations $
-            constructKinshipWithChildOf relations
+--   isValidSliceLookup :: SliceLookup -> Bool
+--   isValidSliceLookup x@(SliceLookup slice _) = sliceStart slice == 0 && sliceEnd slice == widthOf (sliceRefU slice) && SliceLookup.isValid x
+
+--   hasCorrectKinship :: Bool
+--   hasCorrectKinship =
+--     Maybe.isNothing $
+--       nullKinship $
+--         destroyKinshipWithParent relations $
+--           constructKinshipWithChildOf relations
 
 --------------------------------------------------------------------------------
 
@@ -103,11 +104,11 @@ data Failure
   deriving (Eq, Show)
 
 collectFailure :: SliceRelations -> [Failure]
-collectFailure relations = isInvalidKinship <> invalidMapping
+collectFailure relations = fromKinshipConstruction <> fromInvalidSliceLookup
   where
     SliceRelations refO refI refP refX = relations
 
-    invalidMapping = mconcat (map isValidMapping [refO, refI, refP, refX])
+    fromInvalidSliceLookup = mconcat (map isValidMapping [refO, refI, refP, refX])
 
     isValidMapping :: Mapping -> [Failure]
     isValidMapping (Mapping xs) = mconcat $ map (mconcat . map isValidSliceLookup . IntMap.elems) (IntMap.elems xs)
@@ -121,8 +122,8 @@ collectFailure relations = isInvalidKinship <> invalidMapping
     isCoveringAll :: SliceLookup -> Bool
     isCoveringAll (SliceLookup slice _) = sliceStart slice == 0 && sliceEnd slice == widthOf (sliceRefU slice)
 
-    isInvalidKinship :: [Failure]
-    isInvalidKinship = case invalidKinship (constructKinshipWithChildOf relations) of
+    fromKinshipConstruction :: [Failure]
+    fromKinshipConstruction = case nullKinship (destroyKinshipWithParent relations (constructKinshipWithChildOf relations)) of
       Nothing -> []
       Just x -> [InvalidKinship x]
 
@@ -447,9 +448,9 @@ data Kinship = Kinship
 
 instance Show Kinship where
   show (Kinship parents children) =
-    if Map.null parents && Map.null children
-      then "Kinship {}"
-      else
+    case nullKinship (Kinship parents children) of
+      Nothing -> "Kinship {}"
+      Just _ ->
         "Kinship {\n"
           <> showParents
           <> showChildren
@@ -468,8 +469,8 @@ instance Show Kinship where
           <> "  }\n"
 
 -- | A Kinship is valid if after removing all children, it is empty
-invalidKinship :: Kinship -> Maybe Kinship
-invalidKinship = nullKinship . removeAllChildren
+_invalidKinship :: Kinship -> Maybe Kinship
+_invalidKinship = nullKinship . removeAllChildren
   where
     -- pick a child and remove its existence from the Kinship
     removeChild :: Kinship -> Kinship
@@ -512,7 +513,8 @@ invalidKinship = nullKinship . removeAllChildren
 -- return Nothing if the Kinship is valid, otherwise return the invalid Kinship
 nullKinship :: Kinship -> Maybe Kinship
 nullKinship (Kinship parents children) =
-  if all IntMap.null (Map.elems parents) && Map.null children
+  if all IntMap.null (filter (not . IntMap.null) (Map.elems parents))
+    && all IntMap.null (filter (not . IntMap.null) (Map.elems children))
     then Nothing
     else Just (Kinship parents children)
 

@@ -119,32 +119,32 @@ tests = describe "SliceRelations" $ do
 
     it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
       let relations = SliceRelations.new
-      forAll (listOf (arbitraryCommandOfOverlapping False)) $ \commands -> do
+      forAll arbitraryNonOverlappingCommands $ \commands -> do
         let relations' = foldr execCommand relations commands
         SliceRelations.collectFailure relations' `shouldBe` []
 
-    -- it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
-    --   let relations = SliceRelations.new
-    --   let commands =
-    --         [ Relate (Slice (RefUP 30 0) 0 10) (Slice (RefUO 30 99) 8 14),
-    --           Relate (Slice (RefUX 30 1) 0 10) (Slice (RefUO 30 99) 13 23),
-    --           Relate (Slice (RefUP 30 2) 0 10) (Slice (RefUO 30 99) 6 16)
-    --         ]
+-- it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
+--   let relations = SliceRelations.new
+--   let commands =
+--         [ Relate (Slice (RefUP 30 0) 0 10) (Slice (RefUO 30 99) 8 14),
+--           Relate (Slice (RefUX 30 1) 0 10) (Slice (RefUO 30 99) 13 23),
+--           Relate (Slice (RefUP 30 2) 0 10) (Slice (RefUO 30 99) 6 16)
+--         ]
 
-    --   let relations' = foldr execCommand relations commands
-    --   print relations'
-    --   SliceRelations.collectFailure relations' `shouldBe` []
+--   let relations' = foldr execCommand relations commands
+--   print relations'
+--   SliceRelations.collectFailure relations' `shouldBe` []
 
-    -- it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
-    --   let relations = SliceRelations.new
-    --   let commands =
-    --         [ Relate (Slice (RefUP 30 0) 0 10) (Slice (RefUO 30 99) 0 10),
-    --           Relate (Slice (RefUX 30 1) 0 10) (Slice (RefUO 30 99) 10 20),
-    --           Relate (Slice (RefUP 30 2) 0 10) (Slice (RefUO 30 99) 20 30)
-    --         ]
+-- it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
+--   let relations = SliceRelations.new
+--   let commands =
+--         [ Relate (Slice (RefUP 30 0) 0 10) (Slice (RefUO 30 99) 0 10),
+--           Relate (Slice (RefUX 30 1) 0 10) (Slice (RefUO 30 99) 10 20),
+--           Relate (Slice (RefUP 30 2) 0 10) (Slice (RefUO 30 99) 20 30)
+--         ]
 
-    --   let relations' = foldr execCommand relations commands
-    --   SliceRelations.collectFailure relations' `shouldBe` []
+--   let relations' = foldr execCommand relations commands
+--   SliceRelations.collectFailure relations' `shouldBe` []
 
 --------------------------------------------------------------------------------
 
@@ -157,14 +157,21 @@ arbitraryCommandOfOverlapping canOverlap = do
   slice2 <- arbitrarySliceOfWidth width `suchThat` \slice2 -> canOverlap || not (Slice.overlaps slice1 slice2)
   pure $ Relate slice1 slice2
 
--- arbitraryNonOverlappingCommands :: Gen [Command]
--- arbitraryNonOverlappingCommands = do
---   commands <- listOf (arbitraryCommandOfOverlapping False)
---   width <- chooseInt (1, 16)
---   slice1 <- arbitrarySliceOfWidth width
---   slice2 <- arbitrarySliceOfWidth width `suchThat` \slice2 -> canOverlap || not (Slice.overlaps slice1 slice2)
---   pure $ Relate slice1 slice2
+arbitraryNonOverlappingCommands :: Gen [Command]
+arbitraryNonOverlappingCommands = do
+  numOfCommands <- chooseInt (0, 20)
+  gen numOfCommands []
+  where
+    overlaps :: Command -> Command -> Bool
+    overlaps (Relate x y) (Relate v w) = x `Slice.overlaps` v || x `Slice.overlaps` w || y `Slice.overlaps` v || y `Slice.overlaps` w
 
+    gen :: Int -> [Command] -> Gen [Command]
+    gen numOfCommands accumulated =
+      if length accumulated >= numOfCommands
+        then pure accumulated
+        else do
+          command <- arbitraryCommandOfOverlapping False `suchThat` \command -> not $ any (overlaps command) accumulated
+          gen numOfCommands (command : accumulated)
 
 instance Arbitrary Command where
   arbitrary = arbitraryCommandOfOverlapping True
