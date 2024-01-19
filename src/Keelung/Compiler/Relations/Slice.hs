@@ -88,7 +88,11 @@ isValid relations = all isValidMapping [refO, refI, refP, refX] && hasCorrectKin
     isValidSliceLookup x@(SliceLookup slice _) = sliceStart slice == 0 && sliceEnd slice == widthOf (sliceRefU slice) && SliceLookup.isValid x
 
     hasCorrectKinship :: Bool
-    hasCorrectKinship = Maybe.isNothing $ invalidKinship (kinshipFromSliceRelations relations)
+    hasCorrectKinship =
+      Maybe.isNothing $
+        nullKinship $
+          destroyKinshipWithParent relations $
+            constructKinshipWithChildOf relations
 
 --------------------------------------------------------------------------------
 
@@ -118,7 +122,7 @@ collectFailure relations = isInvalidKinship <> invalidMapping
     isCoveringAll (SliceLookup slice _) = sliceStart slice == 0 && sliceEnd slice == widthOf (sliceRefU slice)
 
     isInvalidKinship :: [Failure]
-    isInvalidKinship = case invalidKinship (kinshipFromSliceRelations relations) of
+    isInvalidKinship = case invalidKinship (constructKinshipWithChildOf relations) of
       Nothing -> []
       Just x -> [InvalidKinship x]
 
@@ -505,21 +509,21 @@ invalidKinship = nullKinship . removeAllChildren
             then xs
             else removeAllChildren xs'
 
-    -- return Nothing if the Kinship is valid, otherwise return the invalid Kinship
-    nullKinship :: Kinship -> Maybe Kinship
-    nullKinship (Kinship parents children) =
-      if all IntMap.null (Map.elems parents) && Map.null children
-        then Nothing
-        else Just (Kinship parents children)
+-- return Nothing if the Kinship is valid, otherwise return the invalid Kinship
+nullKinship :: Kinship -> Maybe Kinship
+nullKinship (Kinship parents children) =
+  if all IntMap.null (Map.elems parents) && Map.null children
+    then Nothing
+    else Just (Kinship parents children)
 
 _alter :: (Maybe Slice -> Maybe Slice) -> Slice -> Map RefU (IntMap Slice) -> Map RefU (IntMap Slice)
 _alter f slice = flip Map.alter (sliceRefU slice) $ \case
   Nothing -> f Nothing >>= Just . IntMap.singleton (sliceStart slice)
   Just result1 -> Just (IntMap.alter f (sliceStart slice) result1)
 
--- | Add a relationship between a child and a parent to the Kinship
-kinshipFromSliceRelations :: SliceRelations -> Kinship
-kinshipFromSliceRelations = fold addRelation (Kinship Map.empty Map.empty)
+-- | Construct a Kinship with all Segment.ChildOf in SliceRelations
+constructKinshipWithChildOf :: SliceRelations -> Kinship
+constructKinshipWithChildOf = fold addRelation (Kinship Map.empty Map.empty)
   where
     addRelation :: Kinship -> Slice -> Segment -> Kinship
     addRelation kinship slice segment = case segment of
@@ -579,4 +583,26 @@ kinshipFromSliceRelations = fold addRelation (Kinship Map.empty Map.empty)
         -- the slot is not empty, see if the parent is already there
         (_, Just existing, _) -> error $ "[ panic ] alterParentsOfChild: trying to insert a parent " <> show root <> " but found " <> show existing <> " at slot " <> show slice
 
---------------------------------------------------------------------------------
+destroyKinshipWithParent :: SliceRelations -> Kinship -> Kinship
+destroyKinshipWithParent = flip (fold removeRelation)
+  where
+    removeRelation :: Kinship -> Slice -> Segment -> Kinship
+    removeRelation kinship slice segment = case segment of
+      SliceLookup.Constant _ -> kinship
+      SliceLookup.ChildOf _ -> kinship
+      SliceLookup.Parent _ children _ _ ->
+        Kinship
+          { kinshipParents = Map.alter removeParent (sliceRefU slice) (kinshipParents kinship),
+            kinshipChildren = foldl removeChild (kinshipChildren kinship) children
+          }
+      SliceLookup.Empty _ -> kinship
+
+    removeParent :: Maybe (IntMap Slice) -> Maybe (IntMap Slice)
+    removeParent _ = Nothing
+
+    removeChild :: Map RefU (IntMap Slice) -> Slice -> Map RefU (IntMap Slice)
+    removeChild allChildren child = Map.alter (removeChild' child) (sliceRefU child) allChildren
+
+    removeChild' :: Slice -> Maybe (IntMap Slice) -> Maybe (IntMap Slice)
+    removeChild' _ Nothing = Nothing
+    removeChild' child (Just slices) = Just (IntMap.delete (sliceStart child) slices)

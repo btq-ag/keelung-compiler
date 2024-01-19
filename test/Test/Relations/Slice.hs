@@ -119,7 +119,7 @@ tests = describe "SliceRelations" $ do
 
     it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
       let relations = SliceRelations.new
-      forAll (vectorOf 4 (arbitraryCommandOfOverlapping False)) $ \commands -> do
+      forAll (listOf (arbitraryCommandOfOverlapping False)) $ \commands -> do
         let relations' = foldr execCommand relations commands
         SliceRelations.collectFailure relations' `shouldBe` []
 
@@ -156,6 +156,15 @@ arbitraryCommandOfOverlapping canOverlap = do
   slice1 <- arbitrarySliceOfWidth width
   slice2 <- arbitrarySliceOfWidth width `suchThat` \slice2 -> canOverlap || not (Slice.overlaps slice1 slice2)
   pure $ Relate slice1 slice2
+
+-- arbitraryNonOverlappingCommands :: Gen [Command]
+-- arbitraryNonOverlappingCommands = do
+--   commands <- listOf (arbitraryCommandOfOverlapping False)
+--   width <- chooseInt (1, 16)
+--   slice1 <- arbitrarySliceOfWidth width
+--   slice2 <- arbitrarySliceOfWidth width `suchThat` \slice2 -> canOverlap || not (Slice.overlaps slice1 slice2)
+--   pure $ Relate slice1 slice2
+
 
 instance Arbitrary Command where
   arbitrary = arbitraryCommandOfOverlapping True
