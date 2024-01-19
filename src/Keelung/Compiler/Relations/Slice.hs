@@ -440,7 +440,7 @@ toAlignedSegmentPairsOfSelfRefs slice1 slice2 _segments =
 data Kinship = Kinship
   { kinshipParents :: Map RefU (IntMap Slice), -- each RefU has intervals that are parents of children
     kinshipChildren ::
-      Map -- each child has a parent
+      Map
         RefU -- child
         (IntMap Slice) -- parent
   }
@@ -468,48 +468,6 @@ instance Show Kinship where
           <> unlines (map (\(ref, x) -> "    " <> show ref <> ": " <> show (IntMap.toList x)) (filter (not . IntMap.null . snd) (Map.toList children)))
           <> "  }\n"
 
--- | A Kinship is valid if after removing all children, it is empty
-_invalidKinship :: Kinship -> Maybe Kinship
-_invalidKinship = nullKinship . removeAllChildren
-  where
-    -- pick a child and remove its existence from the Kinship
-    removeChild :: Kinship -> Kinship
-    removeChild (Kinship parents children) = case Map.lookupMax children of
-      Nothing -> Kinship parents children
-      Just (childRefU, parentsOfChild) ->
-        Kinship
-          (foldl (removeChildFromParent childRefU) parents parentsOfChild)
-          (Map.delete childRefU children)
-      where
-        removeChildFromParent :: RefU -> Map RefU (IntMap Slice) -> Slice -> Map RefU (IntMap Slice)
-        removeChildFromParent childRefU allParents parent =
-          Map.alter
-            ( \case
-                Nothing -> error "[ panic ] removeChildFromParent: parent RefU not found"
-                Just result1 ->
-                  Just $
-                    IntMap.alter
-                      ( \case
-                          Nothing -> error $ "[ panic ] removeChildFromParent: parent not found at index " <> show (sliceStart parent)
-                          Just result2 ->
-                            if sliceRefU result2 == childRefU
-                              then Nothing
-                              else error $ "[ panic ] removeChildFromParent: trying to remove child " <> show childRefU <> " but found " <> show (sliceRefU result2) <> " at index " <> show (sliceStart parent)
-                      )
-                      (sliceStart parent)
-                      result1
-            )
-            (sliceRefU parent)
-            allParents
-
-    -- the fixed point of 'removeChild'
-    removeAllChildren :: Kinship -> Kinship
-    removeAllChildren xs =
-      let xs' = removeChild xs
-       in if xs' == xs
-            then xs
-            else removeAllChildren xs'
-
 -- return Nothing if the Kinship is valid, otherwise return the invalid Kinship
 nullKinship :: Kinship -> Maybe Kinship
 nullKinship (Kinship parents children) =
@@ -534,56 +492,34 @@ constructKinshipWithChildOf = fold addRelation (Kinship Map.empty Map.empty)
         -- make `slice` a child of `root`
         -- make `root` the parent of `slice`
         Kinship
-          { kinshipParents = Map.alter (addNewChildToParent slice root) (sliceRefU root) (kinshipParents kinship),
-            kinshipChildren = Map.alter (addParentToChild slice root) (sliceRefU slice) (kinshipChildren kinship)
+          { kinshipParents = Map.alter (insert slice root) (sliceRefU root) (kinshipParents kinship),
+            kinshipChildren = Map.alter (insert root slice) (sliceRefU slice) (kinshipChildren kinship)
           }
       SliceLookup.Parent {} -> kinship
       SliceLookup.Empty _ -> kinship
 
     -- add a child to the children of a parent
-    addNewChildToParent :: Slice -> Slice -> Maybe (IntMap Slice) -> Maybe (IntMap Slice)
-    addNewChildToParent slice root Nothing = Just (IntMap.singleton (sliceStart root) slice)
-    addNewChildToParent slice root (Just children) =
+    insert :: Slice -> Slice -> Maybe (IntMap Slice) -> Maybe (IntMap Slice)
+    insert slice target Nothing = Just (IntMap.singleton (sliceStart target) slice)
+    insert slice target (Just slices) =
       -- see if the slot is empty so that we can insert the child
-      case IntMap.splitLookup (sliceStart root) children of
+      case IntMap.splitLookup (sliceStart target) slices of
         -- the slot is empty, insert the child
         (before, Nothing, after) ->
           let hasSpaceBefore = case IntMap.lookupMax before of
                 Nothing -> True -- there is no child before
-                Just (index, childBefore) -> index + widthOf childBefore <= sliceStart root -- there is a child before, see if there is enough space
+                Just (index, childBefore) -> index + widthOf childBefore <= sliceStart target -- there is a child before, see if there is enough space
               hasSpaceAfter = case IntMap.lookupMin after of
                 Nothing -> True -- there is no child after
-                Just (index, _) -> sliceEnd root <= index -- there is a child after, see if there is enough space
+                Just (index, _) -> sliceEnd target <= index -- there is a child after, see if there is enough space
            in if hasSpaceBefore
                 then
                   if hasSpaceAfter
-                    then Just (IntMap.insert (sliceStart root) slice children)
-                    else error "[ panic ] alterChildrenOfParent: trying to insert a child but there is not enough space after"
-                else error "[ panic ] alterChildrenOfParent: trying to insert a child but there is not enough space before"
+                    then Just (IntMap.insert (sliceStart target) slice slices)
+                    else error "[ panic ] constructKinshipWithChildOf: trying to insert a Slice but there is not enough space after"
+                else error "[ panic ] constructKinshipWithChildOf: trying to insert a Slice but there is not enough space before"
         -- the slot is not empty, see if the child is already there
-        (_, Just existing, _) -> error $ "[ panic ] alterChildrenOfParent: trying to insert a child " <> show slice <> " but found " <> show existing <> " at slot " <> show root
-
-    addParentToChild :: Slice -> Slice -> Maybe (IntMap Slice) -> Maybe (IntMap Slice)
-    addParentToChild slice root Nothing = Just (IntMap.singleton (sliceStart slice) root)
-    addParentToChild slice root (Just parents) =
-      -- see if the slot is empty so that we can insert the parent
-      case IntMap.splitLookup (sliceStart slice) parents of
-        -- the slot is empty, insert the parent
-        (before, Nothing, after) ->
-          let hasSpaceBefore = case IntMap.lookupMax before of
-                Nothing -> True -- there is no parent before
-                Just (index, parentBefore) -> index + widthOf parentBefore <= sliceStart slice -- there is a parent before, see if there is enough space
-              hasSpaceAfter = case IntMap.lookupMin after of
-                Nothing -> True -- there is no parent after
-                Just (index, _) -> sliceEnd slice <= index -- there is a parent after, see if there is enough space
-           in if hasSpaceBefore
-                then
-                  if hasSpaceAfter
-                    then Just (IntMap.insert (sliceStart slice) root parents)
-                    else error "[ panic ] alterParentsOfChild: trying to insert a parent but there is not enough space after"
-                else error "[ panic ] alterParentsOfChild: trying to insert a parent but there is not enough space before"
-        -- the slot is not empty, see if the parent is already there
-        (_, Just existing, _) -> error $ "[ panic ] alterParentsOfChild: trying to insert a parent " <> show root <> " but found " <> show existing <> " at slot " <> show slice
+        (_, Just existing, _) -> error $ "[ panic ] constructKinshipWithChildOf: trying to insert a Slice " <> show slice <> " but found " <> show existing <> " at slot " <> show target
 
 destroyKinshipWithParent :: SliceRelations -> Kinship -> Kinship
 destroyKinshipWithParent = flip (fold removeRelation)
