@@ -9,7 +9,7 @@ module Keelung.Compiler.Relations.Slice
     relate,
     lookup,
     toAlignedSegmentPairs,
-    -- toAlignedSegmentPairsOverlapping,
+    toAlignedSegmentPairsOverlapping,
     toAlignedSegmentPairsOverlapping2,
     -- Testing
     isValid,
@@ -26,6 +26,7 @@ import Data.Map.Strict qualified as Map
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup (Segment, SliceLookup (..))
 import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
@@ -131,17 +132,23 @@ collectFailure relations = fromKinshipConstruction <> fromInvalidSliceLookup
 --------------------------------------------------------------------------------
 
 relate :: Slice -> Slice -> SliceRelations -> SliceRelations
-relate child root relations =
-  -- if Slice.overlaps child root
-  --   then if root > child then relateOverlap child root relations else relateOverlap root child relations
-  --   else
-  let childLookup = lookup child relations
-      rootLookup = lookup root relations
-      pairs = toAlignedSegmentPairs childLookup rootLookup
-   in execState (mapM_ relateSegment pairs) relations
+relate slice1 slice2 relations =
+  if Slice.overlaps slice1 slice2
+    then relateOverlap slice1 slice2 relations
+    else
+      let lookup1 = lookup slice1 relations
+          lookup2 = lookup slice2 relations
+          pairs = toAlignedSegmentPairs lookup1 lookup2
+       in execState (mapM_ relateSegment pairs) relations
 
--- relateOverlap :: Slice -> Slice -> SliceRelations -> SliceRelations
--- relateOverlap root root relations = error $ show child <> " overlaps " <> show root
+relateOverlap :: Slice -> Slice -> SliceRelations -> SliceRelations
+relateOverlap slice1 slice2 relations =
+  let (rootSlice, childSlice) = toAlignedSegmentPairsOverlapping slice1 slice2
+      -- lookup1 = lookup root1 relations
+      rootLookup = lookup rootSlice relations
+      childLookup = lookup childSlice relations
+      pairs = toAlignedSegmentPairs rootLookup childLookup
+   in execState (mapM_ relateSegment pairs) relations
 
 type M = State SliceRelations
 
@@ -337,9 +344,10 @@ getFamily slice relations =
 --      pairs        ├──A──┼──C──┼──C──┤
 toAlignedSegmentPairs :: SliceLookup -> SliceLookup -> [((Slice, Segment), (Slice, Segment))]
 toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segments2) =
-  if sliceRefU slice1 == sliceRefU slice2
-    then map (\x -> (x, x)) $ toAlignedSegmentPairsOverlapping2 slice1 slice2
-    else step (IntMap.toList segments1) (IntMap.toList segments2)
+  -- if sliceRefU slice1 == sliceRefU slice2
+  --   then map (\x -> (x, x)) $ toAlignedSegmentPairsOverlapping2 slice1 slice2
+  --   else
+  step (IntMap.toList segments1) (IntMap.toList segments2)
   where
     step :: [(Int, Segment)] -> [(Int, Segment)] -> [((Slice, Segment), (Slice, Segment))]
     step ((index1, segment1) : xs1) ((index2, segment2) : xs2) =
@@ -376,6 +384,16 @@ toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segment
 --      result     ├─────╠═══════════╬═════╬═════╣─────┤
 --                       ↑           ↑     ↑     ↑
 --                       rS         new    rE    cE
+toAlignedSegmentPairsOverlapping :: Slice -> Slice -> (Slice, Slice)
+toAlignedSegmentPairsOverlapping slice1 slice2 =
+  let (root, child) = if slice1 > slice2 then (slice1, slice2) else (slice2, slice1)
+      newEndpoint = sliceEnd root - (sliceEnd child - sliceEnd root)
+      rootEnd = sliceEnd root
+      childEnd = sliceEnd child
+   in ( Slice (sliceRefU slice1) newEndpoint rootEnd,
+        Slice (sliceRefU slice2) rootEnd childEnd
+      )
+
 toAlignedSegmentPairsOverlapping2 :: Slice -> Slice -> [(Slice, Segment)]
 toAlignedSegmentPairsOverlapping2 slice1 slice2 =
   let (root, child) = if slice1 > slice2 then (slice1, slice2) else (slice2, slice1)
@@ -398,25 +416,6 @@ toAlignedSegmentPairsOverlapping2 slice1 slice2 =
 
     toList :: SliceLookup -> [(Slice, Segment)]
     toList (SliceLookup slice xs) = map (\(index, segment) -> (Slice (sliceRefU slice) index (index + widthOf segment), segment)) (IntMap.toList xs)
-
--- toAlignedSegmentPairsOverlapping :: Slice -> Slice -> [(Slice, Segment)]
--- toAlignedSegmentPairsOverlapping slice1 slice2 =
---   let sliceLookup = SliceLookup.fromRefU (sliceRefU slice1)
---    in toList $
---         splitAndMerge (sliceStart slice1) $
---           splitAndMerge (sliceEnd slice1) $
---             splitAndMerge (sliceStart slice2) $
---               splitAndMerge
---                 (sliceEnd slice2)
---                 sliceLookup
---   where
---     splitAndMerge :: Int -> SliceLookup -> SliceLookup
---     splitAndMerge index sliceLookup =
---       let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
---        in sliceLookup1 <> sliceLookup2
-
---     toList :: SliceLookup -> [(Slice, Segment)]
---     toList (SliceLookup slice xs) = map (\(index, segment) -> (Slice (sliceRefU slice) index (index + widthOf segment), segment)) (IntMap.toList xs)
 
 --------------------------------------------------------------------------------
 

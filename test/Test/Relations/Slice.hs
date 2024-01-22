@@ -22,7 +22,7 @@ tests = describe "SliceRelations" $ do
       -- slice1     ├───────────╠═════════════════╣─────┤
       -- slice2     ├─────╠═════════════════╣───────────┤
       --        =>
-      --                              ┌──w──┬──w──┐ 
+      --                              ┌──w──┬──w──┐
       -- result     ├─────╠═══════════╬═════╬═════╣─────┤
       --                              ↑
       --                             new
@@ -47,40 +47,40 @@ tests = describe "SliceRelations" $ do
                      )
                    ]
 
-    -- it "should handle this simple case correctly" $ do
-    --   -- slice1     ├───────────╠═══════════╣─────┤
-    --   -- slice2     ├─────╠═══════════╣───────────┤
-    --   --        =>
-    --   -- segments      1     2     3     4     5
-    --   -- slice1     ├─────┼─────╠═════╬═════╣─────┤
-    --   -- slice2     ├─────╠═════╬═════╣─────┼─────┤
-    --   --
-    --   -- segment1:   empty
-    --   -- segment2:   child  of segment3
-    --   -- segment3:   child  of segment4 and parent of segment2
-    --   -- segment4:   parent of segment3
-    --   -- segment5:   empty
+  -- it "should handle this simple case correctly" $ do
+  --   -- slice1     ├───────────╠═══════════╣─────┤
+  --   -- slice2     ├─────╠═══════════╣───────────┤
+  --   --        =>
+  --   -- segments      1     2     3     4     5
+  --   -- slice1     ├─────┼─────╠═════╬═════╣─────┤
+  --   -- slice2     ├─────╠═════╬═════╣─────┼─────┤
+  --   --
+  --   -- segment1:   empty
+  --   -- segment2:   child  of segment3
+  --   -- segment3:   child  of segment4 and parent of segment2
+  --   -- segment4:   parent of segment3
+  --   -- segment5:   empty
 
-    --   let slice1 = Slice (RefUI 25 0) 10 20
-    --   let slice2 = Slice (RefUI 25 0) 5 15
+  --   let slice1 = Slice (RefUI 25 0) 10 20
+  --   let slice2 = Slice (RefUI 25 0) 5 15
 
-    --   SliceRelations.toAlignedSegmentPairsOverlapping slice1 slice2
-    --     `shouldBe` [ ( Slice (RefUI 25 0) 0 5,
-    --                    SliceLookup.Empty 5
-    --                  ),
-    --                  ( Slice (RefUI 25 0) 5 10,
-    --                    SliceLookup.Empty 5
-    --                  ),
-    --                  ( Slice (RefUI 25 0) 10 15,
-    --                    SliceLookup.Empty 5
-    --                  ),
-    --                  ( Slice (RefUI 25 0) 15 20,
-    --                    SliceLookup.Empty 5
-    --                  ),
-    --                  ( Slice (RefUI 25 0) 20 25,
-    --                    SliceLookup.Empty 5
-    --                  )
-    --                ]
+  --   SliceRelations.toAlignedSegmentPairsOverlapping slice1 slice2
+  --     `shouldBe` [ ( Slice (RefUI 25 0) 0 5,
+  --                    SliceLookup.Empty 5
+  --                  ),
+  --                  ( Slice (RefUI 25 0) 5 10,
+  --                    SliceLookup.Empty 5
+  --                  ),
+  --                  ( Slice (RefUI 25 0) 10 15,
+  --                    SliceLookup.Empty 5
+  --                  ),
+  --                  ( Slice (RefUI 25 0) 15 20,
+  --                    SliceLookup.Empty 5
+  --                  ),
+  --                  ( Slice (RefUI 25 0) 20 25,
+  --                    SliceLookup.Empty 5
+  --                  )
+  --                ]
 
   describe "SliceRelations.assign" $ do
     it "should return the assigned value on lookup" $ do
@@ -102,17 +102,26 @@ tests = describe "SliceRelations" $ do
         let relations' = foldr execCommand relations commands
         SliceRelations.collectFailure relations' `shouldBe` []
 
-    it "should handle this simple case correctly" $ do
+    it "should handle this simple case correctly 1" $ do
       let relations = SliceRelations.new
       let commands =
             [ Relate (Slice (RefUO 30 0) 10 30) (Slice (RefUO 30 0) 0 20)
             ]
       let relations' = foldr execCommand relations commands
-      print relations'
       SliceRelations.collectFailure relations' `shouldBe` []
 
-
-
+    it "should handle this simple case correctly 2" $ do
+      -- RefUO 50 0     ├───────────╠═══════════╣─────┤
+      -- RefUO 50 0     ├─────╠═══════════╣───────────┤
+      -- RefUX 30 1           ╠═══════════╣
+      let relations = SliceRelations.new
+      let commands =
+            [ Relate (Slice (RefUO 50 0) 20 40) (Slice (RefUO 50 0) 10 30),
+              Relate (Slice (RefUO 50 0) 10 30) (Slice (RefUX 30 1) 0 20)
+            ]
+      let relations' = foldr execCommand relations commands
+      print relations'
+      -- SliceRelations.collectFailure relations' `shouldBe` []
 
 -- describe "SliceRelations.toAlignedSegmentPairsOfSelfRefs" $ do
 --   it "should handle this simple case correctly" $ do
