@@ -23,7 +23,7 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Debug.Trace
+import Data.Set qualified as Set
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
@@ -33,7 +33,6 @@ import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
 import Keelung.Syntax (Var, Width)
 import Prelude hiding (lookup)
-import qualified Data.Set as Set
 
 --------------------------------------------------------------------------------
 
@@ -158,7 +157,7 @@ getFamilyM :: Slice -> M [Slice]
 getFamilyM = gets . getFamily
 
 relateSegment :: ((Slice, Segment), (Slice, Segment)) -> M ()
-relateSegment ((slice1, segment1), (slice2, segment2)) = trace ("\n 1:\t" <> show (slice1, segment1)) $ trace ("\n 2:\t" <> show (slice2, segment2)) $ case (segment1, segment2) of
+relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment2) of
   (SliceLookup.Constant val1, _) -> do
     family <- getFamilyM slice2
     mapM_ (assignValueSegment val1) family
@@ -225,7 +224,7 @@ assignRootSegment root child = do
 
     addChildToRoot :: Maybe Segment -> Segment
     addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
-    addChildToRoot (Just (SliceLookup.Parent width children)) = traceShow ("INSERT", child, children) SliceLookup.Parent width (Map.insertWith (<>) (sliceRefU child) (Set.singleton child) children)
+    addChildToRoot (Just (SliceLookup.Parent width children)) = SliceLookup.Parent width (Map.insertWith (<>) (sliceRefU child) (Set.singleton child) children)
     addChildToRoot (Just (SliceLookup.ChildOf anotherRoot)) =
       if sliceRefU root == sliceRefU anotherRoot
         then -- "root" has self reference to itself, convert it to a Parent node

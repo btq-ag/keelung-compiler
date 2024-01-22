@@ -39,6 +39,7 @@ module Keelung.Data.SliceLookup
   )
 where
 
+import Data.Either qualified as Either
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
@@ -101,7 +102,7 @@ nullSegment (Empty len) = len == 0
 validSegment :: Segment -> Bool
 validSegment (Constant val) = widthOf val > 0
 validSegment (ChildOf _) = True
-validSegment (Parent len children) = len > 0 && (not (Map.null children))
+validSegment (Parent len children) = len > 0 && not (Map.null children)
 validSegment (Empty len) = len > 0
 
 -- | A "SliceLookup" of a RefU, with non-overlapping Segments indexed by their starting offset
@@ -268,8 +269,13 @@ glueSegment xs ys = case (xs, ys) of
     Left err -> Left err
     Right slice -> Right (Just (ChildOf slice))
   (Parent len1 children1, Parent len2 children2) ->
-    -- TODO: REVISIST THIS!!! (ignoring all erred merges)
-    let childrenIntersection = snd $ Map.mapEither id $ Map.intersectionWith (\xss yss -> Right $ Set.fromList (zipWith Slice.merge (Set.toList xss) (Set.toList yss))) children1 children2
+    -- TODO: REVISIST THIS!!!
+    -- intersection children by zipping them together with `Slice.safeMerge`, ignoring all errors
+    let childrenIntersection =
+          Map.intersectionWith
+            (\xss yss -> Set.fromList (Either.rights (zipWith Slice.safeMerge (Set.toList xss) (Set.toList yss))))
+            children1
+            children2
      in if len1 + len2 == 0
           || Map.size childrenIntersection /= Map.size children1
           then Right Nothing

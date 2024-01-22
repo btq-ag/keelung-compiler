@@ -47,33 +47,33 @@ tests = describe "SliceRelations" $ do
   --                    )
   --                  ]
 
-  -- describe "SliceRelations.assign" $ do
-  --   it "should return the assigned value on lookup" $ do
-  --     let relations = SliceRelations.new
-  --     let genParam = do
-  --           slice <- arbitrary
-  --           value <- arbitraryUOfWidth (widthOf slice)
-  --           pure (slice, value)
-  --     forAll genParam $ \(slice, val) -> do
-  --       let expected = SliceLookup.normalize $ SliceLookup.SliceLookup slice (IntMap.singleton (sliceStart slice) (SliceLookup.Constant val)) -- SliceLookup.mapInterval (const (SliceLookup.Constant val)) interval (SliceLookup.fromRefU ref)
-  --       let relations' = SliceRelations.assign slice val relations
-  --       let actual = SliceRelations.lookup slice relations'
-  --       actual `shouldBe` expected
+  describe "SliceRelations.assign" $ do
+    it "should return the assigned value on lookup" $ do
+      let relations = SliceRelations.new
+      let genParam = do
+            slice <- arbitrary
+            value <- arbitraryUOfWidth (widthOf slice)
+            pure (slice, value)
+      forAll genParam $ \(slice, val) -> do
+        let expected = SliceLookup.normalize $ SliceLookup.SliceLookup slice (IntMap.singleton (sliceStart slice) (SliceLookup.Constant val)) -- SliceLookup.mapInterval (const (SliceLookup.Constant val)) interval (SliceLookup.fromRefU ref)
+        let relations' = SliceRelations.assign slice val relations
+        let actual = SliceRelations.lookup slice relations'
+        actual `shouldBe` expected
 
   describe "SliceRelations.relate" $ do
-    -- it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
-    --   let relations = SliceRelations.new
-    --   forAll arbitraryNonOverlappingCommands $ \commands -> do
-    --     let relations' = foldr execCommand relations commands
-    --     SliceRelations.collectFailure relations' `shouldBe` []
+    it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
+      let relations = SliceRelations.new
+      forAll arbitraryNonOverlappingCommands $ \commands -> do
+        let relations' = foldr execCommand relations commands
+        SliceRelations.collectFailure relations' `shouldBe` []
 
-    -- it "should handle this simple case correctly 1" $ do
-    --   let relations = SliceRelations.new
-    --   let commands =
-    --         [ Relate (Slice (RefUO 30 0) 10 30) (Slice (RefUO 30 0) 0 20)
-    --         ]
-    --   let relations' = foldr execCommand relations commands
-    --   SliceRelations.collectFailure relations' `shouldBe` []
+    it "should handle this simple case correctly 1" $ do
+      let relations = SliceRelations.new
+      let commands =
+            [ Relate (Slice (RefUO 30 0) 10 30) (Slice (RefUO 30 0) 0 20)
+            ]
+      let relations' = foldr execCommand relations commands
+      SliceRelations.collectFailure relations' `shouldBe` []
 
     it "should handle this simple case correctly 2" $ do
       -- RefUO 50 0     ├───────────╠═══════════╣─────┤
@@ -87,7 +87,7 @@ tests = describe "SliceRelations" $ do
             ]
       let relations' = foldl (flip execCommand) relations commands
       print relations'
-      return ()
+      SliceRelations.collectFailure relations' `shouldBe` []
 
 --------------------------------------------------------------------------------
 

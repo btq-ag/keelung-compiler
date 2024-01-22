@@ -95,7 +95,7 @@ merge slice1 slice2 = case safeMerge slice1 slice2 of
   Right slice -> slice
 
 data MergeError = NotSameRefU | NotAdjacent | Overlapping
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 instance Show MergeError where
   show NotSameRefU = "Slice.MergeError: two slices are not of the same RefU"
