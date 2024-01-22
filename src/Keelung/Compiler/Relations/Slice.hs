@@ -33,6 +33,7 @@ import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
 import Keelung.Syntax (Var, Width)
 import Prelude hiding (lookup)
+import qualified Data.Set as Set
 
 --------------------------------------------------------------------------------
 
@@ -223,15 +224,15 @@ assignRootSegment root child = do
     addRootToChild _ = SliceLookup.ChildOf root
 
     addChildToRoot :: Maybe Segment -> Segment
-    addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child)
-    addChildToRoot (Just (SliceLookup.Parent width children)) = traceShow ("INSERT", child, children) SliceLookup.Parent width (Map.insertWith (\x y -> if x > y then x <> y else y <> x) (sliceRefU child) child children)
+    addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
+    addChildToRoot (Just (SliceLookup.Parent width children)) = traceShow ("INSERT", child, children) SliceLookup.Parent width (Map.insertWith (<>) (sliceRefU child) (Set.singleton child) children)
     addChildToRoot (Just (SliceLookup.ChildOf anotherRoot)) =
       if sliceRefU root == sliceRefU anotherRoot
         then -- "root" has self reference to itself, convert it to a Parent node
           SliceLookup.Parent (widthOf root) mempty
         else error "[ panic ] assignRootSegment: child already has a parent"
     addChildToRoot (Just (SliceLookup.Constant _)) = error "[ panic ] assignRootSegment: child already has a value"
-    addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child)
+    addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
 
 modifySegment :: (Maybe Segment -> Segment) -> Slice -> SliceRelations -> SliceRelations
 modifySegment f slice xs = case sliceRefU slice of
@@ -329,7 +330,7 @@ getFamily slice relations =
     go :: Segment -> [Slice]
     go (SliceLookup.Constant _) = []
     go (SliceLookup.ChildOf root) = getFamily root relations
-    go (SliceLookup.Parent _ children) = slice : Map.elems children
+    go (SliceLookup.Parent _ children) = slice : Set.toList (Set.unions (Map.elems children))
     go (SliceLookup.Empty _) = [slice]
 
 -- | Given 2 SliceLookups of the same lengths, generate pairs of aligned segments (indexed with their offsets).
@@ -512,7 +513,7 @@ destroyKinshipWithParent = flip (fold removeRelation)
       SliceLookup.Parent _ children ->
         Kinship
           { kinshipParents = Map.alter removeParent (sliceRefU slice) (kinshipParents kinship),
-            kinshipChildren = foldl removeChild (kinshipChildren kinship) children
+            kinshipChildren = foldl removeChild (kinshipChildren kinship) (Set.toList (Set.unions (Map.elems children)))
           }
       SliceLookup.Empty _ -> kinship
 

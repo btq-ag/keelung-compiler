@@ -22,6 +22,7 @@ import Keelung.Data.U qualified as U
 import Keelung.Syntax (Width)
 import Test.Hspec
 import Test.QuickCheck
+import qualified Data.Set as Set
 
 --------------------------------------------------------------------------------
 
@@ -154,7 +155,7 @@ arbitrarySegmentOfSlice (Slice _ start end) =
           do
             childrenCount <- chooseInt (1, 16)
             children <- vectorOf childrenCount $ arbitrarySliceOfWidth width
-            pure $ Parent width (Map.fromList (map (\child -> (sliceRefU child, child)) children))
+            pure $ Parent width (Map.fromList (map (\child -> (sliceRefU child, Set.singleton child)) children))
         ]
 
 instance Arbitrary Slice where

@@ -43,6 +43,8 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Keelung (HasWidth, widthOf)
 import Keelung.Data.Reference (RefU)
 import Keelung.Data.Slice (Slice (..))
@@ -59,7 +61,7 @@ data Segment
   | ChildOf Slice -- part of some RefU
   | Parent
       Int -- length of this segment
-      (Map RefU Slice) -- children
+      (Map RefU (Set Slice)) -- children
   | Empty
       Int -- length of this segment
   deriving (Eq)
@@ -157,9 +159,9 @@ unsafeSplitSegment index segment = case segment of
   Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val - index)))
   ChildOf slice -> let (slice1, slice2) = Slice.split index slice in (ChildOf slice1, ChildOf slice2)
   Parent len children ->
-    let splittedChildren = fmap (Slice.split index) children
-        children1 = fmap fst splittedChildren
-        children2 = fmap snd splittedChildren
+    let splittedChildren = fmap (Set.map (Slice.split index)) children
+        children1 = fmap (Set.map fst) splittedChildren
+        children2 = fmap (Set.map snd) splittedChildren
      in (Parent index children1, Parent (len - index) children2)
   Empty len -> (Empty index, Empty (len - index))
 
@@ -266,8 +268,8 @@ glueSegment xs ys = case (xs, ys) of
     Left err -> Left err
     Right slice -> Right (Just (ChildOf slice))
   (Parent len1 children1, Parent len2 children2) ->
-    -- ignoring all erred merges
-    let childrenIntersection = snd $ Map.mapEither id $ Map.intersectionWith Slice.safeMerge children1 children2
+    -- TODO: REVISIST THIS!!! (ignoring all erred merges)
+    let childrenIntersection = snd $ Map.mapEither id $ Map.intersectionWith (\xss yss -> Right $ Set.fromList (zipWith Slice.merge (Set.toList xss) (Set.toList yss))) children1 children2
      in if len1 + len2 == 0
           || Map.size childrenIntersection /= Map.size children1
           then Right Nothing
