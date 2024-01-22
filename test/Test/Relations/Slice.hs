@@ -17,57 +17,70 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "SliceRelations" $ do
-  describe "SliceRelations.toAlignedSegmentPairsOfSelfRefs" $ do
-    it "should handle this simple case correctly 1" $ do
-      -- slice1     ╠═════1═════╣─────┤
-      -- slice2     ├─────╠═════2═════╣
+  describe "SliceRelations.toAlignedSegmentPairsOverlapping" $ do
+    it "should handle this simple case correctly" $ do
+      -- slice1     ├───────────╠═════════════════╣─────┤
+      -- slice2     ├─────╠═════════════════╣───────────┤
+      --        =>
+      --                              ┌──w──┬──w──┐ 
+      -- result     ├─────╠═══════════╬═════╬═════╣─────┤
+      --                              ↑
+      --                             new
+      let slice1 = Slice (RefUI 60 0) 20 50
+      let slice2 = Slice (RefUI 60 0) 10 40
 
-      let slice1 = Slice (RefUO 30 1) 0 20
-      let slice2 = Slice (RefUO 30 2) 10 30
-
-      SliceRelations.toAlignedSegmentPairsOfSelfRefs slice1 slice2
-        `shouldBe` [ ( Slice (RefUO 30 1) 0 20,
+      SliceRelations.toAlignedSegmentPairsOverlapping2 slice1 slice2
+        `shouldBe` [ ( Slice (RefUI 60 0) 0 10,
+                       SliceLookup.Empty 10
+                     ),
+                     ( Slice (RefUI 60 0) 10 30,
                        SliceLookup.Empty 20
                      ),
-                     ( Slice (RefUO 30 1) 20 30,
+                     ( Slice (RefUI 60 0) 30 40,
+                       SliceLookup.Empty 10
+                     ),
+                     ( Slice (RefUI 60 0) 40 50,
+                       SliceLookup.Empty 10
+                     ),
+                     ( Slice (RefUI 60 0) 50 60,
                        SliceLookup.Empty 10
                      )
                    ]
 
-    it "should handle this simple case correctly 2" $ do
-      -- slice1     ├───────────╠═══════════╣─────┤
-      -- slice2     ├─────╠═══════════╣───────────┤
-      --        =>
-      -- segments      1     2     3     4     5
-      -- slice1     ├─────┼─────╠═════╬═════╣─────┤
-      -- slice2     ├─────╠═════╬═════╣─────┼─────┤
-      --
-      -- segment1:   empty
-      -- segment2:   child  of segment3
-      -- segment3:   child  of segment4 and parent of segment2
-      -- segment4:   parent of segment3
-      -- segment5:   empty
+    -- it "should handle this simple case correctly" $ do
+    --   -- slice1     ├───────────╠═══════════╣─────┤
+    --   -- slice2     ├─────╠═══════════╣───────────┤
+    --   --        =>
+    --   -- segments      1     2     3     4     5
+    --   -- slice1     ├─────┼─────╠═════╬═════╣─────┤
+    --   -- slice2     ├─────╠═════╬═════╣─────┼─────┤
+    --   --
+    --   -- segment1:   empty
+    --   -- segment2:   child  of segment3
+    --   -- segment3:   child  of segment4 and parent of segment2
+    --   -- segment4:   parent of segment3
+    --   -- segment5:   empty
 
-      let slice1 = Slice (RefUI 25 0) 10 20
-      let slice2 = Slice (RefUI 25 0) 5 15
+    --   let slice1 = Slice (RefUI 25 0) 10 20
+    --   let slice2 = Slice (RefUI 25 0) 5 15
 
-      SliceRelations.toAlignedSegmentPairsOfSelfRefs slice1 slice2
-        `shouldBe` [ ( Slice (RefUI 25 0) 0 5,
-                       SliceLookup.Empty 5
-                     ),
-                     ( Slice (RefUI 25 0) 5 10,
-                       SliceLookup.Empty 5
-                     ),
-                     ( Slice (RefUI 25 0) 10 15,
-                       SliceLookup.Empty 5
-                     ),
-                     ( Slice (RefUI 25 0) 15 20,
-                       SliceLookup.Empty 5
-                     ),
-                     ( Slice (RefUI 25 0) 20 25,
-                       SliceLookup.Empty 5
-                     )
-                   ]
+    --   SliceRelations.toAlignedSegmentPairsOverlapping slice1 slice2
+    --     `shouldBe` [ ( Slice (RefUI 25 0) 0 5,
+    --                    SliceLookup.Empty 5
+    --                  ),
+    --                  ( Slice (RefUI 25 0) 5 10,
+    --                    SliceLookup.Empty 5
+    --                  ),
+    --                  ( Slice (RefUI 25 0) 10 15,
+    --                    SliceLookup.Empty 5
+    --                  ),
+    --                  ( Slice (RefUI 25 0) 15 20,
+    --                    SliceLookup.Empty 5
+    --                  ),
+    --                  ( Slice (RefUI 25 0) 20 25,
+    --                    SliceLookup.Empty 5
+    --                  )
+    --                ]
 
   describe "SliceRelations.assign" $ do
     it "should return the assigned value on lookup" $ do
@@ -92,12 +105,34 @@ tests = describe "SliceRelations" $ do
     it "should handle this simple case correctly" $ do
       let relations = SliceRelations.new
       let commands =
-            [ Relate (Slice (RefUO 30 99) 10 30) (Slice (RefUO 30 0) 0 20)
+            [ Relate (Slice (RefUO 30 0) 10 30) (Slice (RefUO 30 0) 0 20)
             ]
       let relations' = foldr execCommand relations commands
       print relations'
       SliceRelations.collectFailure relations' `shouldBe` []
 
+
+
+
+-- describe "SliceRelations.toAlignedSegmentPairsOfSelfRefs" $ do
+--   it "should handle this simple case correctly" $ do
+--     -- slice1     ╠═════1═════╣─────┤
+--     -- slice2     ├─────╠═════2═════╣
+
+--     let slice1 = Slice (RefUO 30 1) 0 20
+--     let slice2 = Slice (RefUO 30 2) 10 30
+
+--     let segments = IntMap.fromList []
+
+--     SliceRelations.toAlignedSegmentPairsOfSelfRefs slice1 slice2 segments
+--       `shouldBe` [ ( Slice (RefUO 30 1) 0 20,
+--                      SliceLookup.Empty 20
+--                    ),
+--                    ( Slice (RefUO 30 1) 20 30,
+--                      SliceLookup.Empty 10
+--                    ),
+--                    )
+--                  ]
 -- it "should handle this simple case correctly" $ do
 -- slice1     ├───────────╠═══════════╣─────┤
 -- slice2     ├─────╠═══════════╣───────────┤
@@ -175,10 +210,14 @@ tests = describe "SliceRelations" $ do
 data Command = Relate Slice Slice deriving (Show)
 
 arbitraryCommandOfOverlapping :: Bool -> Gen Command
-arbitraryCommandOfOverlapping canOverlap = do
+arbitraryCommandOfOverlapping overlap = do
   width <- chooseInt (1, 16)
   slice1 <- arbitrarySliceOfWidth width
-  slice2 <- arbitrarySliceOfWidth width `suchThat` \slice2 -> canOverlap || not (Slice.overlaps slice1 slice2)
+  slice2 <-
+    arbitrarySliceOfWidth width `suchThat` \slice2 ->
+      if overlap
+        then Slice.overlaps slice1 slice2
+        else not (Slice.overlaps slice1 slice2)
   pure $ Relate slice1 slice2
 
 arbitraryNonOverlappingCommands :: Gen [Command]
@@ -196,6 +235,9 @@ arbitraryNonOverlappingCommands = do
         else do
           command <- arbitraryCommandOfOverlapping False `suchThat` \command -> not $ any (overlaps command) accumulated
           gen numOfCommands (command : accumulated)
+
+-- arbitraryOverlappingCommands :: Gen [Command]
+-- arbitraryOverlappingCommands = liseOf(arbitraryCommandOfOverlapping True)
 
 instance Arbitrary Command where
   arbitrary = arbitraryCommandOfOverlapping True
