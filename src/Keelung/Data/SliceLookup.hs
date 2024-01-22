@@ -60,8 +60,6 @@ data Segment
   | Parent
       Int -- length of this segment
       (Map RefU Slice) -- children
-      (IntMap Slice) -- children of the same RefU
-      (IntMap Slice) -- parents of the same RefU
   | Empty
       Int -- length of this segment
   deriving (Eq)
@@ -69,19 +67,17 @@ data Segment
 instance Show Segment where
   show (Constant u) = "Constant[" <> show (widthOf u) <> "] " <> show u
   show (ChildOf limb) = "ChildOf[" <> show (widthOf limb) <> "] " <> show limb
-  show (Parent len children childSelfRefs parentSelfRefs) =
+  show (Parent len children) =
     "Parent["
       <> show len
       <> "] "
       <> show (Map.toList children)
-      <> (if IntMap.null childSelfRefs then "" else " self children " <> show (IntMap.elems childSelfRefs))
-      <> (if IntMap.null parentSelfRefs then "" else " self parent " <> show (IntMap.elems parentSelfRefs))
   show (Empty len) = "Empty[" <> show len <> "]"
 
 instance HasWidth Segment where
   widthOf (Constant u) = widthOf u
   widthOf (ChildOf limb) = widthOf limb
-  widthOf (Parent len _ _ _) = len
+  widthOf (Parent len _) = len
   widthOf (Empty len) = len
 
 -- | Check if two Segments are of the same kind
@@ -96,14 +92,14 @@ sameKindOfSegment _ _ = False
 nullSegment :: Segment -> Bool
 nullSegment (Constant val) = widthOf val == 0
 nullSegment (ChildOf slice) = Slice.null slice
-nullSegment (Parent len _ _ _) = len == 0
+nullSegment (Parent len _) = len == 0
 nullSegment (Empty len) = len == 0
 
 -- | Check if a `Segment` is valid
 validSegment :: Segment -> Bool
 validSegment (Constant val) = widthOf val > 0
 validSegment (ChildOf _) = True
-validSegment (Parent len children childSelfRefs parentSelfRefs) = len > 0 && (not (Map.null children) || not (IntMap.null childSelfRefs) || not (IntMap.null parentSelfRefs))
+validSegment (Parent len children) = len > 0 && (not (Map.null children))
 validSegment (Empty len) = len > 0
 
 -- | A "SliceLookup" of a RefU, with non-overlapping Segments indexed by their starting offset
@@ -160,17 +156,11 @@ unsafeSplitSegment :: Int -> Segment -> (Segment, Segment)
 unsafeSplitSegment index segment = case segment of
   Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val - index)))
   ChildOf slice -> let (slice1, slice2) = Slice.split index slice in (ChildOf slice1, ChildOf slice2)
-  Parent len children childSelfRefs parentSelfRefs ->
+  Parent len children ->
     let splittedChildren = fmap (Slice.split index) children
         children1 = fmap fst splittedChildren
         children2 = fmap snd splittedChildren
-        splittedChildSelfRefs = fmap (Slice.split index) childSelfRefs
-        splittedParentSelfRefs = fmap (Slice.split index) parentSelfRefs
-        childSelfRefs1 = fmap fst splittedChildSelfRefs
-        childSelfRefs2 = fmap snd splittedChildSelfRefs
-        parentSelfRefs1 = fmap fst splittedParentSelfRefs
-        parentSelfRefs2 = fmap snd splittedParentSelfRefs
-     in (Parent index children1 childSelfRefs1 parentSelfRefs1, Parent (len - index) children2 childSelfRefs2 parentSelfRefs2)
+     in (Parent index children1, Parent (len - index) children2)
   Empty len -> (Empty index, Empty (len - index))
 
 -- | Split a `SliceLookup` into two at a given index
@@ -275,17 +265,13 @@ glueSegment xs ys = case (xs, ys) of
   (ChildOf slice1, ChildOf slice2) -> case Slice.safeMerge slice1 slice2 of
     Left err -> Left err
     Right slice -> Right (Just (ChildOf slice))
-  (Parent len1 children1 childSelfRefs1 parentSelfRefs1, Parent len2 children2 childSelfRefs2 parentSelfRefs2) ->
+  (Parent len1 children1, Parent len2 children2) ->
     -- ignoring all erred merges
     let childrenIntersection = snd $ Map.mapEither id $ Map.intersectionWith Slice.safeMerge children1 children2
-        childSelfRefsIntersection = snd $ IntMap.mapEither id $ IntMap.intersectionWith Slice.safeMerge childSelfRefs1 childSelfRefs2
-        parentSelfRefsIntersection = snd $ IntMap.mapEither id $ IntMap.intersectionWith Slice.safeMerge parentSelfRefs1 parentSelfRefs2
      in if len1 + len2 == 0
           || Map.size childrenIntersection /= Map.size children1
-          || IntMap.size childSelfRefsIntersection /= IntMap.size childSelfRefs1
-          || IntMap.size parentSelfRefsIntersection /= IntMap.size parentSelfRefs1
           then Right Nothing
-          else Right (Just (Parent (len1 + len2) childrenIntersection childSelfRefsIntersection parentSelfRefsIntersection))
+          else Right (Just (Parent (len1 + len2) childrenIntersection))
   (Empty len1, Empty len2) ->
     if len1 + len2 == 0
       then Right Nothing

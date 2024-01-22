@@ -154,7 +154,7 @@ arbitrarySegmentOfSlice (Slice _ start end) =
           do
             childrenCount <- chooseInt (1, 16)
             children <- vectorOf childrenCount $ arbitrarySliceOfWidth width
-            pure $ Parent width (Map.fromList (map (\child -> (sliceRefU child, child)) children)) mempty mempty
+            pure $ Parent width (Map.fromList (map (\child -> (sliceRefU child, child)) children))
         ]
 
 instance Arbitrary Slice where

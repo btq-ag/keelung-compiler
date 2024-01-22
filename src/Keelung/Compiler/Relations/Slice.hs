@@ -23,6 +23,7 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Debug.Trace
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
@@ -156,7 +157,7 @@ getFamilyM :: Slice -> M [Slice]
 getFamilyM = gets . getFamily
 
 relateSegment :: ((Slice, Segment), (Slice, Segment)) -> M ()
-relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment2) of
+relateSegment ((slice1, segment1), (slice2, segment2)) = trace ("\n 1:\t" <> show (slice1, segment1)) $ trace ("\n 2:\t" <> show (slice2, segment2)) $ case (segment1, segment2) of
   (SliceLookup.Constant val1, _) -> do
     family <- getFamilyM slice2
     mapM_ (assignValueSegment val1) family
@@ -222,18 +223,15 @@ assignRootSegment root child = do
     addRootToChild _ = SliceLookup.ChildOf root
 
     addChildToRoot :: Maybe Segment -> Segment
-    addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child) mempty mempty
-    addChildToRoot (Just (SliceLookup.Parent width children childSelfRefs parentSelfRefs)) =
-      if sliceRefU root == sliceRefU child -- see if the child is the root itself
-        then SliceLookup.Parent width (Map.insert (sliceRefU child) child children) (IntMap.insert (sliceStart child) child childSelfRefs) parentSelfRefs
-        else SliceLookup.Parent width (Map.insert (sliceRefU child) child children) childSelfRefs parentSelfRefs
+    addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child)
+    addChildToRoot (Just (SliceLookup.Parent width children)) = traceShow ("INSERT", child, children) SliceLookup.Parent width (Map.insertWith (\x y -> if x > y then x <> y else y <> x) (sliceRefU child) child children)
     addChildToRoot (Just (SliceLookup.ChildOf anotherRoot)) =
       if sliceRefU root == sliceRefU anotherRoot
         then -- "root" has self reference to itself, convert it to a Parent node
-          SliceLookup.Parent (widthOf root) mempty (IntMap.singleton (sliceStart child) child) mempty
+          SliceLookup.Parent (widthOf root) mempty
         else error "[ panic ] assignRootSegment: child already has a parent"
     addChildToRoot (Just (SliceLookup.Constant _)) = error "[ panic ] assignRootSegment: child already has a value"
-    addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child) mempty mempty
+    addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) child)
 
 modifySegment :: (Maybe Segment -> Segment) -> Slice -> SliceRelations -> SliceRelations
 modifySegment f slice xs = case sliceRefU slice of
@@ -331,7 +329,7 @@ getFamily slice relations =
     go :: Segment -> [Slice]
     go (SliceLookup.Constant _) = []
     go (SliceLookup.ChildOf root) = getFamily root relations
-    go (SliceLookup.Parent _ children _ _) = slice : Map.elems children
+    go (SliceLookup.Parent _ children) = slice : Map.elems children
     go (SliceLookup.Empty _) = [slice]
 
 -- | Given 2 SliceLookups of the same lengths, generate pairs of aligned segments (indexed with their offsets).
@@ -511,7 +509,7 @@ destroyKinshipWithParent = flip (fold removeRelation)
     removeRelation kinship slice segment = case segment of
       SliceLookup.Constant _ -> kinship
       SliceLookup.ChildOf _ -> kinship
-      SliceLookup.Parent _ children _ _ ->
+      SliceLookup.Parent _ children ->
         Kinship
           { kinshipParents = Map.alter removeParent (sliceRefU slice) (kinshipParents kinship),
             kinshipChildren = foldl removeChild (kinshipChildren kinship) children
