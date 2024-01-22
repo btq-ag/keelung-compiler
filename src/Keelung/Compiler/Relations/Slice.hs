@@ -325,40 +325,6 @@ getFamily slice relations =
     go (SliceLookup.Parent _ children _ _) = slice : Map.elems children
     go (SliceLookup.Empty _) = [slice]
 
--- -- | Given a pair of aligned segments, generate a list of edits
--- toEdits :: (Slice, Segment) -> (Slice, Segment) -> [Edit]
--- toEdits (slice1, segment1) (slice2, segment2) = case (segment1, segment2) of
---   (SliceLookup.Constant _, SliceLookup.Constant _) -> []
---   (SliceLookup.Constant val1, SliceLookup.ChildOf root2) -> [AssignRootValue root2 val1]
---   (SliceLookup.Constant val1, SliceLookup.Parent _ children2) -> AssignValue slice2 val1 : map (`AssignValue` val1) (Map.elems children2)
---   (SliceLookup.ChildOf root1, SliceLookup.Constant val2) -> [AssignRootValue root1 val2]
---   (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
---     -- see who's root is the real boss
---     if root1 > root2
---       then -- root1 is the boss
-
---         [ root2 `RelateRootTo` root1,
---           slice2 `RelateTo` root1
---         ]
---       else -- root2 is the boss
-
---         [ root1 `RelateRootTo` root2,
---           slice1 `RelateTo` root2
---         ]
---   (SliceLookup.ChildOf root1, SliceLookup.Parent _ children2) ->
---     if root1 > slice2
---       then RelateTo slice2 root1 : map (`RelateTo` root1) (Map.elems children2)
---       else [RelateRootTo root1 slice2]
---   (SliceLookup.Parent _ children1, SliceLookup.Constant val2) -> AssignValue slice1 val2 : map (`AssignValue` val2) (Map.elems children1)
---   (SliceLookup.Parent _ children1, SliceLookup.ChildOf root2) ->
---     if slice1 > root2
---       then [root2 `RelateRootTo` slice1] -- slice1 is the boss
---       else RelateTo slice1 root2 : map (`RelateTo` root2) (Map.elems children1) -- root2 is the boss
---   (SliceLookup.Parent _ children1, SliceLookup.Parent _ children2) ->
---     if slice1 > slice2
---       then RelateTo slice2 slice1 : map (`RelateTo` slice1) (Map.elems children2) -- slice1 is the boss
---       else RelateTo slice1 slice2 : map (`RelateTo` slice2) (Map.elems children1) -- slice2 is the boss
-
 -- | Given 2 SliceLookups of the same lengths, generate pairs of aligned segments (indexed with their offsets).
 --   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two lookups.
 --   Example:
@@ -370,7 +336,7 @@ getFamily slice relations =
 toAlignedSegmentPairs :: SliceLookup -> SliceLookup -> [((Slice, Segment), (Slice, Segment))]
 toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segments2) =
   if sliceRefU slice1 == sliceRefU slice2
-    then map (\x -> (x, x)) $ toAlignedSegmentPairsOfSelfRefs slice1 slice2 segments1
+    then map (\x -> (x, x)) $ toAlignedSegmentPairsOfSelfRefs slice1 slice2
     else step (IntMap.toList segments1) (IntMap.toList segments2)
   where
     step :: [(Int, Segment)] -> [(Int, Segment)] -> [((Slice, Segment), (Slice, Segment))]
@@ -415,8 +381,8 @@ toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segment
 --      segment5:   empty
 --
 --    We split existing segments on the endpoints of the two Slices
-toAlignedSegmentPairsOfSelfRefs :: Slice -> Slice -> IntMap Segment -> [(Slice, Segment)]
-toAlignedSegmentPairsOfSelfRefs slice1 slice2 _segments =
+toAlignedSegmentPairsOfSelfRefs :: Slice -> Slice -> [(Slice, Segment)]
+toAlignedSegmentPairsOfSelfRefs slice1 slice2 =
   let sliceLookup = SliceLookup.fromRefU (sliceRefU slice1)
    in toList $
         splitAndMerge (sliceStart slice1) $
