@@ -24,6 +24,7 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
+import Debug.Trace
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
@@ -470,36 +471,89 @@ constructKinshipWithChildOf = fold addRelation (Kinship Map.empty Map.empty)
     addRelation kinship slice segment = case segment of
       SliceLookup.Constant _ -> kinship
       SliceLookup.ChildOf root ->
-        -- make `slice` a child of `root`
-        -- make `root` the parent of `slice`
-        Kinship
-          { kinshipParents = Map.alter (insertChildToParent slice root) (sliceRefU root) (kinshipParents kinship),
-            kinshipChildren = Map.alter (insertParentToChild root slice) (sliceRefU slice) (kinshipChildren kinship)
-          }
+        traceShow kinship $
+          trace ("adding " <> show slice <> " to " <> show root) $
+            -- make `slice` a child of `root`
+            -- make `root` the parent of `slice`
+            Kinship
+              { kinshipParents = Map.alter (insertChildToParent slice root) (sliceRefU root) (kinshipParents kinship),
+                kinshipChildren = Map.alter (insertParentToChild root slice) (sliceRefU slice) (kinshipChildren kinship)
+              }
       SliceLookup.Parent {} -> kinship
       SliceLookup.Empty _ -> kinship
 
     insertChildToParent :: Slice -> Slice -> Maybe (IntMap [Slice]) -> Maybe (IntMap [Slice])
     insertChildToParent slice target Nothing = Just (IntMap.singleton (sliceStart target) [slice])
-    insertChildToParent slice target (Just slices) =
-      -- see if the slot is empty so that we can insert the child
-      case IntMap.splitLookup (sliceStart target) slices of
-        -- the slot is empty, insert the child
-        (before, Nothing, after) ->
-          let hasSpaceBefore = case IntMap.lookupMax before of
-                Nothing -> True -- there is no child before
-                Just (_, []) -> True -- there is no child before
-                Just (index, childBefore : _) -> index + widthOf childBefore <= sliceStart target -- there is a child before, see if there is enough space
-              hasSpaceAfter = case IntMap.lookupMin after of
-                Nothing -> True -- there is no child after
-                Just (index, _) -> sliceEnd target <= index -- there is a child after, see if there is enough space
-           in if hasSpaceBefore
-                then
-                  if hasSpaceAfter
-                    then Just (IntMap.insertWith (<>) (sliceStart target) [slice] slices)
-                    else error "[ panic ] constructKinshipWithChildOf.insertChildToParent: trying to insert a Slice but there is not enough space after"
-                else error "[ panic ] constructKinshipWithChildOf.insertChildToParent: trying to insert a Slice but there is not enough space before"
-        (_, Just _, _) -> Just (IntMap.adjust (slice :) (sliceStart target) slices)
+    insertChildToParent slice target (Just slices) = case IntMap.splitLookup (sliceStart target) slices of
+      (before, Nothing, after) ->
+        let -- see if `target` overlaps with the child before
+            -- if it does, split the child before into 2 parts
+            --
+            -- existing children before     ╠═══════════╣
+            -- child to be inserted               ├───────────...
+            --          =>
+            -- existing children splitted   ╠═════╬═════╣
+            splittedBefore = case IntMap.lookupMax before of
+              Nothing -> Nothing -- no child before
+              Just (_, []) -> Nothing -- no child before
+              Just (index, children) ->
+                let beforeEnd = index + widthOf (head children)
+                 in if beforeEnd <= sliceStart target
+                      then Nothing
+                      else
+                        let (splittedChildren1, splittedChildren2) = unzip $ map (Slice.split (sliceStart target - index)) children
+                         in Just (beforeEnd, (index, splittedChildren1), (sliceStart target, splittedChildren2)) -- there is a child before, this is how much it overlaps with `target`
+
+            -- existing children after        ╠═══════════╣
+            -- child to be inserted   ...───────────┤
+            --          =>
+            -- existing children splitted     ╠═════╬═════╣
+            splittedAfter = case IntMap.lookupMin after of
+              Nothing -> Nothing -- no child after therefore no overlap
+              Just (index, children) ->
+                let afterStart = index
+                 in if sliceEnd target <= afterStart
+                      then Nothing
+                      else
+                        let (splittedChildren1, splittedChildren2) = unzip $ map (Slice.split (sliceEnd target - index)) children
+                         in Just (afterStart, (index, splittedChildren1), (sliceEnd target, splittedChildren2)) -- there is a child after, this is how much it overlaps with `target`
+            insertions = case (splittedBefore, splittedAfter) of
+              (Nothing, Nothing) -> [(sliceStart target, [slice])]
+              (Just (m, (index1, before1), (index2, before2)), Nothing) -> trace ("insertion target: " <> show (sliceStart target, sliceEnd target)) $  trace ("end of the child before: " <> show m) $
+                -- split the child to be inserted into 2 parts
+                let (slicePart1, slicePart2) = Slice.split (m - sliceStart target) slice
+                 in [(index1, before1), (index2, slicePart1 : before2), (sliceStart target, [slicePart2])]
+              (Nothing, Just (n, (index1, after1), (index2, after2))) ->
+                -- split the child to be inserted into 2 parts
+                let (slicePart1, slicePart2) = Slice.split (sliceEnd target - n) slice
+                 in [(sliceStart target, [slicePart1]), (index1, slicePart2 : after1), (index2, after2)]
+              (Just (m, (index1, before1), (index2, before2)), Just (n, (index3, after1), (index4, after2))) ->
+                -- split the child to be inserted into 3 parts
+                let (slicePart1, slicePartRest) = Slice.split (m - sliceStart target) slice
+                    (slicePart2, slicePart3) = Slice.split (sliceEnd target - n) slicePartRest
+                 in [(index1, before1), (index2, slicePart1 : before2), (sliceStart target, [slicePart2]), (index3, slicePart3 : after1), (index4, after2)]
+         in Just $ foldl (\acc (index, children) -> IntMap.insertWith (<>) index children acc) slices insertions
+      (_, Just _, after) ->
+        let -- existing children after        ╠═══════════╣
+            -- child to be inserted   ...───────────┤
+            --          =>
+            -- existing children splitted     ╠═════╬═════╣
+            splittedAfter = case IntMap.lookupMin after of
+              Nothing -> Nothing -- no child after therefore no overlap
+              Just (index, children) ->
+                let afterStart = index
+                 in if sliceEnd target <= afterStart
+                      then Nothing
+                      else
+                        let (splittedChildren1, splittedChildren2) = unzip $ map (Slice.split (sliceEnd target - index)) children
+                         in Just (afterStart, (index, splittedChildren1), (sliceEnd target, splittedChildren2)) -- there is a child after, this is how much it overlaps with `target`
+            insertions = case splittedAfter of
+              Nothing -> [(sliceStart target, [slice])]
+              Just (n, (index1, after1), (index2, after2)) ->
+                -- split the child to be inserted into 2 parts
+                let (slicePart1, slicePart2) = Slice.split (sliceEnd target - n) slice
+                 in [(sliceStart target, [slicePart1]), (index1, slicePart2 : after1), (index2, after2)]
+         in Just $ foldl (\acc (index, children) -> IntMap.insertWith (<>) index children acc) slices insertions
 
     insertParentToChild :: Slice -> Slice -> Maybe (IntMap Slice) -> Maybe (IntMap Slice)
     insertParentToChild slice target Nothing = Just (IntMap.singleton (sliceStart target) slice)

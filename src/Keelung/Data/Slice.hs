@@ -18,6 +18,7 @@ import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU)
 import Prelude hiding (map, null)
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
