@@ -2,6 +2,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Redundant if" #-}
+
 module Keelung.Compiler.Relations.Slice
   ( SliceRelations,
     new,
@@ -32,7 +34,7 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup (Segment, SliceLookup (..))
 import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
-import Keelung.Syntax (Var, Width)
+import Keelung.Syntax (HasWidth, Var, Width)
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -463,6 +465,144 @@ _alter f slice = flip Map.alter (sliceRefU slice) $ \case
   Nothing -> f Nothing >>= Just . IntMap.singleton (sliceStart slice)
   Just result1 -> Just (IntMap.alter f (sliceStart slice) result1)
 
+-- | `Slice.split` on list of slices
+splitMany :: Int -> [Slice] -> ([Slice], [Slice])
+splitMany n = unzip . map (Slice.split n)
+
+-- | Helper function for inserting an interval into existing intervals
+insertInterval :: (Int, Int) -> Slice -> IntMap [Slice] -> IntMap [Slice]
+insertInterval (l, r) inserted intervals =
+  -- see if the left endpoint of the inserted interval is within an existing interval or in empty space
+  case IntMap.lookupLE l intervals of
+    Nothing -> case IntMap.lookupGE r intervals of
+      Nothing -> IntMap.insert l [inserted] intervals
+      Just next -> leftEndpointInSpace (l, r) inserted next intervals
+    Just (l1, existing) ->
+      let r1 = l1 + widthOf (head existing) -- assuming that `existing` is not empty list
+       in if r1 > l
+            then leftEndpointInInterval (l, r) inserted (l1, existing) intervals
+            else case IntMap.lookupGE r intervals of
+              Nothing -> IntMap.insert l [inserted] intervals
+              Just next -> leftEndpointInSpace (l, r) inserted next intervals
+
+-- | When the left endpoint of the inserted interval is within an existing interval
+--    l1 <= l
+--                l1              r1
+--    existing    ├───────────────┤
+--    inserted        ├─
+--                    l
+leftEndpointInInterval :: (Int, Int) -> Slice -> (Int, [Slice]) -> IntMap [Slice] -> IntMap [Slice]
+leftEndpointInInterval (l, r) inserted (l1, existing) =
+  let r1 = l1 + widthOf (head existing) -- assuming that `existing` is not empty list
+   in --  The right endpoint can be one of these 3 cases:
+      case r `compare` r1 of
+        LT ->
+          --    1. r < r1
+          --                l1              r1
+          --    existing    ├─A─┼───B───┼─C─┤
+          --    inserted        ├───X───┤
+          --                    l       r
+          --
+          let (a, bc) = splitMany (l - l1) existing
+              (b, c) = splitMany (r - l) bc
+           in IntMap.insert l1 a
+                . IntMap.insert l (inserted : b)
+                . IntMap.insert r c
+        EQ ->
+          --    1. r = r1
+          --                l1              r1
+          --    existing    ├─A─┼─────B─────┤
+          --    inserted        ├───────────┤
+          --                    l           r
+          --
+          let (a, b) = splitMany (l - l1) existing
+           in IntMap.insert l1 a
+                . IntMap.insert l (inserted : b)
+        GT ->
+          --    1. r > r1
+          --                l1              r1
+          --    existing    ├─A─┼─────B─────┤
+          --    inserted        ├─────X─────┼─Y─┤
+          --                    l               r
+          let (a, b) = splitMany (l - l1) existing
+              (x, y) = Slice.split (r1 - l) inserted
+           in insertInterval (r1, r) y
+                . IntMap.insert l1 a
+                . IntMap.insert l (x : b)
+
+-- | When the left endpoint of the inserted interval is in empty space
+--    r1 < l
+--                r1              l2
+--    existing    ────┤           ├───
+--    inserted            ├─
+--                        l
+leftEndpointInSpace :: (Int, Int) -> Slice -> (Int, [Slice]) -> IntMap [Slice] -> IntMap [Slice]
+leftEndpointInSpace (l, r) inserted (l2, existing) =
+  --  The right endpoint can be one of these 3 cases:
+  case r `compare` l2 of
+    LT ->
+      --    1. r < l2
+      --                                l2
+      --    existing    ────┤           ├───
+      --    inserted            ├─X─┤
+      --                        l   r
+      --
+      IntMap.insert l [inserted]
+    EQ ->
+      --    1. r = l2
+      --                                l2
+      --    existing    ────┤           ├───
+      --    inserted            ├───X───┤
+      --                        l       r
+      --
+      IntMap.insert l [inserted]
+    GT ->
+      --    1. r > l2
+      --                                l2
+      --    existing    ────┤           ├───
+      --    inserted            ├─X─────┼─Y─┤
+      --                        l           r
+      let (x, y) = Slice.split (l2 - l) inserted
+       in leftEndpointInInterval (l2, r) y (l2, existing)
+            . IntMap.insert l [x]
+
+-- lookBackward :: (Int, Int) -> Slice -> IntMap [Slice] -> IntMap [Slice]
+-- -- insertChildToParent2 (start, end) x xs = case (IntMap.lookupLE start xs, IntMap.lookupGT end xs) of
+-- lookBackward (start, end) a xs = case IntMap.lookupLE start xs of
+--   Nothing -> _
+--   Just (existingStart, as) ->
+--     let existingEnd = existingStart + widthOf (head as)
+--      in if existingEnd > start
+--           then -- `start` landed within an existing interval
+--             case existingEnd `compare` end of
+--               EQ -> -- `a` is completely within the existing interval
+--                 let (as1, as2) = unzip $ map (Slice.split (start - existingStart)) as
+--                  in IntMap.insert existingStart (as1 ++ [a] ++ as2) xs
+--               LT -> _
+--               GT -> _
+--           else -- `start` landed on empty space
+--             lookForeward (start, end) a xs
+
+-- lookForeward :: (Int, Int) -> Slice -> IntMap [Slice] -> IntMap [Slice]
+-- lookForeward (start, end) a xs = case IntMap.lookupGE start xs of
+--   Nothing -> _
+--   Just (index, as) -> _
+
+-- --     let existingWidth = widthOf (head as)
+-- --         insertedWidth = end - start
+-- --      in case existingWidth `compare` insertedWidth of
+-- --           EQ -> IntMap.insert index (a : as) xs
+-- --           LT -> _
+-- --           GT -> _
+
+-- if widthOf (head as)
+-- insertInterval (start + widthOf (head as), end) a (IntMap.delete index xs)
+
+-- insertInterval2 :: (HasWidth a) => (Int, Int) -> a -> IntMap [a] -> IntMap [a]
+-- insertInterval2 (start, end) a xs = case IntMap.lookupLE start xs of
+--   Nothing -> _
+--   Just (index, as) -> insertInterval (start + widthOf (head as), end) a (IntMap.delete index xs)
+
 -- | Construct a Kinship with all Segment.ChildOf in SliceRelations
 constructKinshipWithChildOf :: SliceRelations -> Kinship
 constructKinshipWithChildOf = fold addRelation (Kinship Map.empty Map.empty)
@@ -519,10 +659,12 @@ constructKinshipWithChildOf = fold addRelation (Kinship Map.empty Map.empty)
                          in Just (afterStart, (index, splittedChildren1), (sliceEnd target, splittedChildren2)) -- there is a child after, this is how much it overlaps with `target`
             insertions = case (splittedBefore, splittedAfter) of
               (Nothing, Nothing) -> [(sliceStart target, [slice])]
-              (Just (m, (index1, before1), (index2, before2)), Nothing) -> trace ("insertion target: " <> show (sliceStart target, sliceEnd target)) $  trace ("end of the child before: " <> show m) $
-                -- split the child to be inserted into 2 parts
-                let (slicePart1, slicePart2) = Slice.split (m - sliceStart target) slice
-                 in [(index1, before1), (index2, slicePart1 : before2), (sliceStart target, [slicePart2])]
+              (Just (m, (index1, before1), (index2, before2)), Nothing) ->
+                trace ("insertion target: " <> show (sliceStart target, sliceEnd target)) $
+                  trace ("end of the child before: " <> show m) $
+                    -- split the child to be inserted into 2 parts
+                    let (slicePart1, slicePart2) = Slice.split (m - sliceStart target) slice
+                     in [(index1, before1), (index2, slicePart1 : before2), (sliceStart target, [slicePart2])]
               (Nothing, Just (n, (index1, after1), (index2, after2))) ->
                 -- split the child to be inserted into 2 parts
                 let (slicePart1, slicePart2) = Slice.split (sliceEnd target - n) slice
