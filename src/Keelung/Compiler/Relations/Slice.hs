@@ -11,8 +11,6 @@ module Keelung.Compiler.Relations.Slice
     relate,
     lookup,
     toAlignedSegmentPairs,
-    toAlignedSegmentPairsOverlapping,
-    toAlignedSegmentPairsOverlapping2,
     -- Testing
     isValid,
     Failure (..),
@@ -83,23 +81,6 @@ fold f acc relations =
 isValid :: SliceRelations -> Bool
 isValid = null . collectFailure
 
--- all isValidMapping [refO, refI, refP, refX] && hasCorrectKinship
--- where
---   SliceRelations refO refI refP refX = relations
-
---   isValidMapping :: Mapping -> Bool
---   isValidMapping (Mapping xs) = all (all isValidSliceLookup) xs
-
---   isValidSliceLookup :: SliceLookup -> Bool
---   isValidSliceLookup x@(SliceLookup slice _) = sliceStart slice == 0 && sliceEnd slice == widthOf (sliceRefU slice) && SliceLookup.isValid x
-
---   hasCorrectKinship :: Bool
---   hasCorrectKinship =
---     Maybe.isNothing $
---       nullKinship $
---         destroyKinshipWithParent relations $
---           constructKinshipWithChildOf relations
-
 --------------------------------------------------------------------------------
 
 data Failure
@@ -134,24 +115,36 @@ collectFailure relations = fromKinshipConstruction <> fromInvalidSliceLookup
 
 --------------------------------------------------------------------------------
 
+-- | Given 2 Slices, modify the SliceRelations so that they are related
 relate :: Slice -> Slice -> SliceRelations -> SliceRelations
 relate slice1 slice2 relations =
-  if Slice.overlaps slice1 slice2
-    then relateOverlap slice1 slice2 relations
-    else
-      let lookup1 = lookup slice1 relations
-          lookup2 = lookup slice2 relations
-          pairs = toAlignedSegmentPairs lookup1 lookup2
-       in execState (mapM_ relateSegment pairs) relations
-
-relateOverlap :: Slice -> Slice -> SliceRelations -> SliceRelations
-relateOverlap slice1 slice2 relations =
-  let (rootSlice, childSlice) = toAlignedSegmentPairsOverlapping slice1 slice2
-      -- lookup1 = lookup root1 relations
-      rootLookup = lookup rootSlice relations
-      childLookup = lookup childSlice relations
-      pairs = toAlignedSegmentPairs rootLookup childLookup
+  let -- modify the slices if they are overlapping
+      (slice1', slice2') =
+        if Slice.overlaps slice1 slice2
+          then modifyOverlappingSlices slice1 slice2
+          else (slice1, slice2)
+      pairs = toAlignedSegmentPairs (lookup slice1' relations) (lookup slice2' relations)
    in execState (mapM_ relateSegment pairs) relations
+  where
+    -- When 2 Slices belong to the same variable and they are overlapping
+    -- We return only the Slices that are affected by the overlap
+    --    Example:
+    --      slice1     ├───────────╠═════════════════╣─────┤
+    --      slice2     ├─────╠═════════════════╣───────────┤
+    --              =>
+    --                                   ┌──w──┬──w──┐
+    --      result     ├─────╠═══════════╬═════╬═════╣─────┤
+    --                                   ↑     ↑     ↑
+    --                                  new    rE    cE
+    modifyOverlappingSlices :: Slice -> Slice -> (Slice, Slice)
+    modifyOverlappingSlices sliceA sliceB =
+      let (root, child) = if sliceA > sliceB then (sliceA, sliceB) else (sliceB, sliceA)
+          newEndpoint = sliceEnd root - (sliceEnd child - sliceEnd root)
+          rootEnd = sliceEnd root
+          childEnd = sliceEnd child
+       in ( Slice (sliceRefU sliceA) newEndpoint rootEnd,
+            Slice (sliceRefU sliceB) rootEnd childEnd
+          )
 
 type M = State SliceRelations
 
@@ -344,9 +337,6 @@ getFamily slice relations =
 --      pairs        ├──A──┼──C──┼──C──┤
 toAlignedSegmentPairs :: SliceLookup -> SliceLookup -> [((Slice, Segment), (Slice, Segment))]
 toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segments2) =
-  -- if sliceRefU slice1 == sliceRefU slice2
-  --   then map (\x -> (x, x)) $ toAlignedSegmentPairsOverlapping2 slice1 slice2
-  --   else
   step (IntMap.toList segments1) (IntMap.toList segments2)
   where
     step :: [(Int, Segment)] -> [(Int, Segment)] -> [((Slice, Segment), (Slice, Segment))]
@@ -374,48 +364,6 @@ toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segment
                   )
                     : step ((index1 + width2, segment12) : xs1) xs2
     step _ _ = []
-
--- | Like 'toAlignedSegmentPairs', but handles the case where the two Slices belong to the same variable
---    Example:
---      slice1     ├───────────╠═════════════════╣─────┤
---      slice2     ├─────╠═════════════════╣───────────┤
---              =>
---                                   ┌──w──┬──w──┐
---      result     ├─────╠═══════════╬═════╬═════╣─────┤
---                       ↑           ↑     ↑     ↑
---                       rS         new    rE    cE
-toAlignedSegmentPairsOverlapping :: Slice -> Slice -> (Slice, Slice)
-toAlignedSegmentPairsOverlapping slice1 slice2 =
-  let (root, child) = if slice1 > slice2 then (slice1, slice2) else (slice2, slice1)
-      newEndpoint = sliceEnd root - (sliceEnd child - sliceEnd root)
-      rootEnd = sliceEnd root
-      childEnd = sliceEnd child
-   in ( Slice (sliceRefU slice1) newEndpoint rootEnd,
-        Slice (sliceRefU slice2) rootEnd childEnd
-      )
-
-toAlignedSegmentPairsOverlapping2 :: Slice -> Slice -> [(Slice, Segment)]
-toAlignedSegmentPairsOverlapping2 slice1 slice2 =
-  let (root, child) = if slice1 > slice2 then (slice1, slice2) else (slice2, slice1)
-      rootStart = sliceStart root
-      newEndpoint = sliceEnd root - (sliceEnd child - sliceEnd root)
-      rootEnd = sliceEnd root
-      childEnd = sliceEnd child
-   in toList $
-        splitAndMerge rootStart $
-          splitAndMerge newEndpoint $
-            splitAndMerge rootEnd $
-              splitAndMerge
-                childEnd
-                (SliceLookup.fromRefU (sliceRefU slice1))
-  where
-    splitAndMerge :: Int -> SliceLookup -> SliceLookup
-    splitAndMerge index sliceLookup =
-      let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
-       in sliceLookup1 <> sliceLookup2
-
-    toList :: SliceLookup -> [(Slice, Segment)]
-    toList (SliceLookup slice xs) = map (\(index, segment) -> (Slice (sliceRefU slice) index (index + widthOf segment), segment)) (IntMap.toList xs)
 
 --------------------------------------------------------------------------------
 
@@ -564,43 +512,6 @@ leftEndpointInSpace (l, r) inserted (l2, existing) =
       let (x, y) = Slice.split (l2 - l) inserted
        in leftEndpointInInterval (l2, r) y (l2, existing)
             . IntMap.insert l [x]
-
--- lookBackward :: (Int, Int) -> Slice -> IntMap [Slice] -> IntMap [Slice]
--- -- insertChildToParent2 (start, end) x xs = case (IntMap.lookupLE start xs, IntMap.lookupGT end xs) of
--- lookBackward (start, end) a xs = case IntMap.lookupLE start xs of
---   Nothing -> _
---   Just (existingStart, as) ->
---     let existingEnd = existingStart + widthOf (head as)
---      in if existingEnd > start
---           then -- `start` landed within an existing interval
---             case existingEnd `compare` end of
---               EQ -> -- `a` is completely within the existing interval
---                 let (as1, as2) = unzip $ map (Slice.split (start - existingStart)) as
---                  in IntMap.insert existingStart (as1 ++ [a] ++ as2) xs
---               LT -> _
---               GT -> _
---           else -- `start` landed on empty space
---             lookForeward (start, end) a xs
-
--- lookForeward :: (Int, Int) -> Slice -> IntMap [Slice] -> IntMap [Slice]
--- lookForeward (start, end) a xs = case IntMap.lookupGE start xs of
---   Nothing -> _
---   Just (index, as) -> _
-
--- --     let existingWidth = widthOf (head as)
--- --         insertedWidth = end - start
--- --      in case existingWidth `compare` insertedWidth of
--- --           EQ -> IntMap.insert index (a : as) xs
--- --           LT -> _
--- --           GT -> _
-
--- if widthOf (head as)
--- insertInterval (start + widthOf (head as), end) a (IntMap.delete index xs)
-
--- insertInterval2 :: (HasWidth a) => (Int, Int) -> a -> IntMap [a] -> IntMap [a]
--- insertInterval2 (start, end) a xs = case IntMap.lookupLE start xs of
---   Nothing -> _
---   Just (index, as) -> insertInterval (start + widthOf (head as), end) a (IntMap.delete index xs)
 
 -- | Construct a Kinship with all Segment.ChildOf in SliceRelations
 constructKinshipWithChildOf :: SliceRelations -> Kinship

@@ -17,36 +17,6 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "SliceRelations" $ do
-  describe "SliceRelations.toAlignedSegmentPairsOverlapping" $ do
-    it "should handle this simple case correctly" $ do
-      -- slice1     ├───────────╠═════════════════╣─────┤
-      -- slice2     ├─────╠═════════════════╣───────────┤
-      --        =>
-      --                              ┌──w──┬──w──┐
-      -- result     ├─────╠═══════════╬═════╬═════╣─────┤
-      --                              ↑
-      --                             new
-      let slice1 = Slice (RefUI 60 0) 20 50
-      let slice2 = Slice (RefUI 60 0) 10 40
-
-      SliceRelations.toAlignedSegmentPairsOverlapping2 slice1 slice2
-        `shouldBe` [ ( Slice (RefUI 60 0) 0 10,
-                       SliceLookup.Empty 10
-                     ),
-                     ( Slice (RefUI 60 0) 10 30,
-                       SliceLookup.Empty 20
-                     ),
-                     ( Slice (RefUI 60 0) 30 40,
-                       SliceLookup.Empty 10
-                     ),
-                     ( Slice (RefUI 60 0) 40 50,
-                       SliceLookup.Empty 10
-                     ),
-                     ( Slice (RefUI 60 0) 50 60,
-                       SliceLookup.Empty 10
-                     )
-                   ]
-
   describe "SliceRelations.assign" $ do
     it "should return the assigned value on lookup" $ do
       let relations = SliceRelations.new
@@ -132,9 +102,6 @@ arbitraryNonOverlappingCommands = do
         else do
           command <- arbitraryCommandOfOverlapping False `suchThat` \command -> not $ any (overlaps command) accumulated
           gen numOfCommands (command : accumulated)
-
--- arbitraryOverlappingCommands :: Gen [Command]
--- arbitraryOverlappingCommands = liseOf(arbitraryCommandOfOverlapping True)
 
 instance Arbitrary Command where
   arbitrary = arbitraryCommandOfOverlapping True
