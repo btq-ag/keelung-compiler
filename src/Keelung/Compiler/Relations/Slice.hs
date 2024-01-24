@@ -8,6 +8,7 @@ module Keelung.Compiler.Relations.Slice
     relate,
     size,
     lookup,
+    toConstraints,
     -- Testing
     isValid,
     Failure (..),
@@ -21,9 +22,12 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung (widthOf)
+import Keelung.Data.Constraint
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
@@ -111,6 +115,27 @@ lookup (Slice ref start end) relations = lookupMapping (getMapping ref)
             Just varMap -> case IntMap.lookup (refUVar ref) varMap of
               Nothing -> SliceLookup.fromRefU ref
               Just lookups -> lookups
+
+-- | Convert relations to specialized constraints
+toConstraints :: (RefU -> Bool) -> SliceRelations -> Seq (Constraint n)
+toConstraints refUShouldBeKept = fold step mempty
+  where
+    step :: Seq (Constraint n) -> Slice -> Segment -> Seq (Constraint n)
+    step acc slice segment =
+      if refUShouldBeKept (sliceRefU slice)
+        then acc <> convert slice segment
+        else acc
+
+    -- see if a Segment should be converted to a Constraint
+    convert :: Slice -> Segment -> Seq (Constraint n)
+    convert slice segment = case segment of
+      SliceLookup.Constant val -> Seq.singleton (CLimbVal (Slice.toLimb slice) (toInteger val))
+      SliceLookup.ChildOf root ->
+        if refUShouldBeKept (sliceRefU root)
+          then Seq.singleton (CLimbEq (Slice.toLimb slice) (Slice.toLimb root))
+          else mempty
+      SliceLookup.Parent _ _ -> mempty
+      SliceLookup.Empty _ -> mempty
 
 -- | Fold over all Segments in a SliceRelations
 fold :: (a -> Slice -> Segment -> a) -> a -> SliceRelations -> a

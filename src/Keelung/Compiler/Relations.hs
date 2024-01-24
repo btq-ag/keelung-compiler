@@ -60,9 +60,10 @@ data Relations n = Relations
 instance (GaloisField n, Integral n) => Show (Relations n) where
   show (Relations f l u s options) =
     (if EquivClass.size f == 0 then "" else show f)
-      <> (if EquivClass.size l == 0 then "" else show l)
-      <> (if EquivClass.size u == 0 then "" else show u)
-      <> (if SliceRelations.size s /= 0 && optUseUIntUnionFind options then show u else "")
+      <> ( if optUseUIntUnionFind options
+             then (if SliceRelations.size s == 0 then "" else show u)
+             else (if EquivClass.size l == 0 then "" else show l) <> (if EquivClass.size u == 0 then "" else show u)
+         )
 
 updateRelationsR ::
   (Ref.RefRelations n -> EquivClass.M (Error n) (Ref.RefRelations n)) ->

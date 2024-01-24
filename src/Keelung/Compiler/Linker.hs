@@ -29,6 +29,8 @@ import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.Limb (LimbRelations)
 import Keelung.Compiler.Relations.Limb qualified as LimbRelations
+import Keelung.Compiler.Relations.Slice (SliceRelations)
+import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Data.Constraint
@@ -56,8 +58,10 @@ linkConstraintModule cm =
       csCounters = counters,
       csConstraints =
         varEqFs
-          <> varEqLs
-          <> varEqUs
+          <> ( if optUseUIntUnionFind (cmOptions cm)
+                 then varEqSs
+                 else varEqLs <> varEqUs
+             )
           <> addLs
           <> mulLs,
       csEqZeros = toList eqZeros,
@@ -161,9 +165,13 @@ linkConstraintModule cm =
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
     extractUIntRelations relations = UIntRelations.toConstraints refUShouldBeKept relations >>= Seq.fromList . linkConstraint env
 
+    extractSliceRelations :: (GaloisField n, Integral n) => SliceRelations -> Seq (Linked.Constraint n)
+    extractSliceRelations relations = SliceRelations.toConstraints refUShouldBeKept relations >>= Seq.fromList . linkConstraint env
+
     varEqFs = extractRefRelations (cmRelations cm)
     varEqLs = extractLimbRelations (Relations.exportLimbRelations (cmRelations cm))
     varEqUs = extractUIntRelations (Relations.exportUIntRelations (cmRelations cm))
+    varEqSs = extractSliceRelations (Relations.exportSliceRelations (cmRelations cm))
 
     addLs = Seq.fromList $ linkConstraint env . CAddL =<< cmAddL cm
     mulLs = Seq.fromList $ linkConstraint env . uncurry3 CMulL =<< cmMulL cm

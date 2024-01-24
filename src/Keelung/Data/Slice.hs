@@ -3,9 +3,16 @@
 module Keelung.Data.Slice
   ( -- * Construction
     Slice (..),
+
+    -- * Conversion
     fromLimb,
+    toLimb,
+
+    -- * Predicates
     null,
     overlaps,
+
+    -- * Operations
     SplitError (..),
     safeSplit,
     split,
@@ -55,6 +62,9 @@ instance Semigroup Slice where
 -- | Construct a "Slice" from a "Limb"
 fromLimb :: Limb -> Slice
 fromLimb limb = Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb)
+
+toLimb :: Slice -> Limb
+toLimb (Slice ref start end) = Limb.new ref start (end - start) (Left True)
 
 --------------------------------------------------------------------------------
 

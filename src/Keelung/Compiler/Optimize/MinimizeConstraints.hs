@@ -12,6 +12,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
+import Keelung.Compiler.Options qualified as Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
@@ -121,7 +122,7 @@ goThroughModInvs cm =
   let substModInv (a, b, c, d) = (a, b, c, d)
    in cm {cmModInvs = map substModInv (cmModInvs cm)}
 
-foldMaybeM :: Monad m => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
+foldMaybeM :: (Monad m) => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
 foldMaybeM f = foldM $ \acc x -> do
   result <- f x
   case result of
@@ -388,7 +389,10 @@ assign (F var) value = do
 assignL :: (GaloisField n, Integral n) => Limb -> Integer -> RoundM n ()
 assignL var value = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ Relations.assignL var value (cmRelations cm)
+  result <- lift $ lift $ EquivClass.runM $ 
+      if Options.optUseUIntUnionFind (cmOptions cm) 
+        then Relations.assignS var value (cmRelations cm)
+        else Relations.assignL var value (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -411,7 +415,13 @@ relateF var1 (slope, var2, intercept) = do
 relateL :: (GaloisField n, Integral n) => Limb -> Limb -> RoundM n Bool
 relateL var1 var2 = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ Relations.relateL var1 var2 (cmRelations cm)
+  result <-
+    lift $
+      lift $
+        EquivClass.runM $
+          if Options.optUseUIntUnionFind (cmOptions cm)
+            then Relations.relateS var1 var2 (cmRelations cm)
+            else Relations.relateL var1 var2 (cmRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do
