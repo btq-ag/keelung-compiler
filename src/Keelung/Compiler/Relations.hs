@@ -47,6 +47,7 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Prelude hiding (lookup)
+import Keelung.Data.Slice (Slice)
 
 data Relations n = Relations
   { relationsR :: Ref.RefRelations n,
@@ -155,8 +156,8 @@ relateU var1 var2 = updateRelationsU $ UInt.relateRefU var1 var2
 relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateR x slope y intercept xs = updateRelationsR (Ref.relateR (relationsOptions xs) (relationsU xs) x slope y intercept) xs
 
-relateS :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateS limb1 limb2 = updateRelationsS $ return . SliceRelations.relate (Slice.fromLimb limb1) (Slice.fromLimb limb2)
+relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateS slice1 slice2 = updateRelationsS $ return . SliceRelations.relate slice1 slice2
 
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> Maybe (n, n)
 relationBetween var1 var2 = Ref.relationBetween var1 var2 . relationsR

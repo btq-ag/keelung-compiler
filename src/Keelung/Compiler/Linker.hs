@@ -45,6 +45,8 @@ import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Reference
+import Keelung.Data.Slice (Slice)
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
@@ -220,6 +222,26 @@ linkConstraint env (CRefUEq x y) =
   -- split `x` and `y` into smaller limbs and pair them up with `CLimbEq`
   let cVarEqLs = zipWith CLimbEq (Limb.refUToLimbs (envFieldWidth env) x) (Limb.refUToLimbs (envFieldWidth env) y)
    in cVarEqLs >>= linkConstraint env
+linkConstraint env (CSliceEq x y) =
+  let widthX = Slice.sliceEnd x - Slice.sliceStart x
+      widthY = Slice.sliceEnd y - Slice.sliceStart y
+   in if widthX /= widthY
+        then error "[ panic ] CSliceEq: Slices are of different width"
+        else do
+          case FieldInfo.fieldTypeData (envFieldInfo env) of
+            Binary _ -> do
+              i <- [0 .. widthX - 1]
+              let pair = [(reindexRefU env (Slice.sliceRefU x) (Slice.sliceStart x + i), 1), (reindexRefU env (Slice.sliceRefU y) (Slice.sliceStart y + i), -1)]
+              case Poly.buildEither 0 pair of
+                Left _ -> error "CSliceEq: two variables are the same"
+                Right xs -> [Linked.CAdd xs]
+            Prime _ -> do
+              let pairsX = reindexSlice env x True
+              let pairsY = reindexSlice env y False
+              let pairs = IntMap.unionWith (+) pairsX pairsY
+              case Poly.buildWithIntMap 0 pairs of
+                Left _ -> error "CSliceEq: two variables are the same"
+                Right xs -> [Linked.CAdd xs]
 linkConstraint env (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef env x, 1)] of
   Left _ -> error "CRefFVal: impossible"
   Right xs -> [Linked.CAdd xs]
@@ -316,6 +338,19 @@ reindexLimb env limb multiplier = case lmbSigns limb of
         )
         | (i, sign) <- zip [0 .. lmbWidth limb - 1] signs
       ]
+
+reindexSlice :: (Integral n, GaloisField n) => Env -> Slice -> Bool -> IntMap n
+reindexSlice env slice sign =
+  -- precondition of `fromDistinctAscList` is that the keys are in ascending order
+  IntMap.fromDistinctAscList
+    [ ( reindexRefU
+          env
+          (Slice.sliceRefU slice)
+          i,
+        if sign then 2 ^ i else -(2 ^ i)
+      )
+      | i <- [Slice.sliceStart slice .. Slice.sliceEnd slice - 1]
+    ]
 
 reindexRefF :: Env -> RefF -> Var
 reindexRefF env (RefFO x) = x + getOffset (envOldCounters env) (Output, ReadField)

@@ -10,6 +10,7 @@ import Data.Field.Galois (GaloisField)
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.Reference
+import Keelung.Data.Slice (Slice)
 
 --------------------------------------------------------------------------------
 
@@ -45,6 +46,7 @@ data Constraint n
   | CRefEq Ref Ref -- Ref equality
   | CLimbEq Limb Limb -- Limb equality
   | CRefUEq RefU RefU -- RefU equality
+  | CSliceEq Slice Slice -- Slice equality
   | CRefBNEq RefB RefB -- RefB negation
   | CRefFVal Ref n -- x = val
   | CLimbVal Limb Integer -- x = val
@@ -65,6 +67,7 @@ instance Functor Constraint where
   fmap _ (CRefEq x y) = CRefEq x y
   fmap _ (CLimbEq x y) = CLimbEq x y
   fmap _ (CRefUEq x y) = CRefUEq x y
+  fmap _ (CSliceEq x y) = CSliceEq x y
   fmap _ (CRefBNEq x y) = CRefBNEq x y
   fmap f (CRefFVal x y) = CRefFVal x (f y)
   fmap _ (CLimbVal x y) = CLimbVal x y
@@ -77,6 +80,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CRefEq x y) = "EQ " <> show x <> " = " <> show y
   show (CLimbEq x y) = "EL " <> show x <> " = " <> show y
   show (CRefUEq x y) = "EU " <> show x <> " = " <> show y
+  show (CSliceEq x y) = "ES " <> show x <> " = " <> show y
   show (CRefBNEq x y) = "NB " <> show x <> " = ¬ " <> show y
   show (CRefFVal x n) = "VF " <> show x <> " = " <> show n
   show (CLimbVal x n) = "VL " <> show x <> " = " <> show n

@@ -22,6 +22,7 @@ import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
@@ -389,10 +390,13 @@ assign (F var) value = do
 assignL :: (GaloisField n, Integral n) => Limb -> Integer -> RoundM n ()
 assignL var value = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ 
-      if Options.optUseUIntUnionFind (cmOptions cm) 
-        then Relations.assignS var value (cmRelations cm)
-        else Relations.assignL var value (cmRelations cm)
+  result <-
+    lift $
+      lift $
+        EquivClass.runM $
+          if Options.optUseUIntUnionFind (cmOptions cm)
+            then Relations.assignS var value (cmRelations cm)
+            else Relations.assignL var value (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -420,7 +424,7 @@ relateL var1 var2 = do
       lift $
         EquivClass.runM $
           if Options.optUseUIntUnionFind (cmOptions cm)
-            then Relations.relateS var1 var2 (cmRelations cm)
+            then Relations.relateS (Slice.fromLimb var1) (Slice.fromLimb var2) (cmRelations cm)
             else Relations.relateL var1 var2 (cmRelations cm)
   case result of
     Nothing -> return False
