@@ -51,6 +51,7 @@ data Constraint n
   | CRefFVal Ref n -- x = val
   | CLimbVal Limb Integer -- x = val
   | CRefUVal RefU Integer -- x = val
+  | CSliceVal Slice Integer -- x = val
 
 instance GaloisField n => Eq (Constraint n) where
   xs == ys = case (xs, ys) of
@@ -60,6 +61,7 @@ instance GaloisField n => Eq (Constraint n) where
     (CRefFVal x y, CRefFVal u v) -> x == u && y == v
     (CLimbVal x y, CLimbVal u v) -> x == u && y == v
     (CRefUVal x y, CRefUVal u v) -> x == u && y == v
+    (CSliceVal x y, CSliceVal u v) -> x == u && y == v
     _ -> False
 
 instance Functor Constraint where
@@ -72,6 +74,7 @@ instance Functor Constraint where
   fmap f (CRefFVal x y) = CRefFVal x (f y)
   fmap _ (CLimbVal x y) = CLimbVal x y
   fmap _ (CRefUVal x y) = CRefUVal x y
+  fmap _ (CSliceVal x y) = CSliceVal x y
   fmap f (CMulL x y (Left z)) = CMulL (fmap f x) (fmap f y) (Left (f z))
   fmap f (CMulL x y (Right z)) = CMulL (fmap f x) (fmap f y) (Right (fmap f z))
 
@@ -85,4 +88,5 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CRefFVal x n) = "VF " <> show x <> " = " <> show n
   show (CLimbVal x n) = "VL " <> show x <> " = " <> show n
   show (CRefUVal x n) = "VU " <> show x <> " = " <> show n
+  show (CSliceVal x n) = "VS " <> show x <> " = " <> show n
   show (CMulL aV bV cV) = "ML " <> show aV <> " * " <> show bV <> " = " <> show cV

@@ -395,7 +395,7 @@ assignL var value = do
       lift $
         EquivClass.runM $
           if Options.optUseUIntUnionFind (cmOptions cm)
-            then Relations.assignS var value (cmRelations cm)
+            then Relations.assignS (Slice.fromLimb var) value (cmRelations cm)
             else Relations.assignL var value (cmRelations cm)
   case result of
     Nothing -> return ()

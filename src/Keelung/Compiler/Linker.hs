@@ -264,6 +264,14 @@ linkConstraint env (CRefUVal x n) =
           chunks = map U.uValue (U.chunks (envFieldWidth env) number)
           cLimbVals = zipWith CLimbVal (Limb.refUToLimbs (envFieldWidth env) x) chunks
        in cLimbVals >>= linkConstraint env
+linkConstraint env (CSliceVal x n) =
+  -- "ArithException: arithmetic underflow" will be thrown if `n` is negative in Binary fields
+  let negatedConstant = case FieldInfo.fieldTypeData (envFieldInfo env) of
+        Prime _ -> fromInteger (-n)
+        Binary _ -> fromInteger n
+   in case Poly.buildWithIntMap negatedConstant (reindexSlice env x True) of
+        Left _ -> error "CSliceVal: impossible"
+        Right xs -> [Linked.CAdd xs]
 linkConstraint env (CMulL as bs cs) =
   [ Linked.CMul
       (linkPolyLUnsafe env as)

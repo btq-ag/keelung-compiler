@@ -32,7 +32,6 @@ import Control.Monad.Except
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict (Map)
 import GHC.Generics (Generic)
-import Keelung (widthOf)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Options
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
@@ -122,8 +121,8 @@ assignL var val relations = case UInt.lookupRefU (exportUIntRelations relations)
 assignU :: (GaloisField n, Integral n) => RefU -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignU var val = updateRelationsU $ UInt.assignRefU var val
 
-assignS :: (GaloisField n, Integral n) => Limb -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
-assignS limb int = updateRelationsS $ return . SliceRelations.assign (Slice.fromLimb limb) (U.new (widthOf limb) int)
+assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
+assignS slice int = updateRelationsS $ return . SliceRelations.assign slice (U.new (Slice.sliceEnd slice - Slice.sliceStart slice) int)
 
 relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateB refA (polarity, refB) = updateRelationsR (Ref.relateB refA (polarity, refB))
