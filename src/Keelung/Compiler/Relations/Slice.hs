@@ -1,8 +1,4 @@
-{-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE LambdaCase #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Redundant if" #-}
 
 module Keelung.Compiler.Relations.Slice
   ( SliceRelations,
@@ -10,7 +6,6 @@ module Keelung.Compiler.Relations.Slice
     assign,
     relate,
     lookup,
-    toAlignedSegmentPairs,
     -- Testing
     isValid,
     Failure (..),
@@ -31,7 +26,6 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup (Segment, SliceLookup (..))
 import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
-import Keelung.Syntax (Var, Width)
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -47,23 +41,61 @@ data SliceRelations = SliceRelations
 new :: SliceRelations
 new = SliceRelations (Mapping mempty) (Mapping mempty) (Mapping mempty) (Mapping mempty)
 
+-- | Given a Slice and a value, assign the value to all members of the equivalence class of th Slice
 assign :: Slice -> U -> SliceRelations -> SliceRelations
-assign slice value relations = foldr applyEdit relations (assignmentToEdits slice value relations)
+assign slice value relations = flip execState relations $ do
+  family <- getFamilyM slice
+  mapM_ (assignValueSegment value) family
 
+-- | Given 2 Slices, modify the SliceRelations so that they are related
+relate :: Slice -> Slice -> SliceRelations -> SliceRelations
+relate slice1 slice2 relations =
+  let -- modify the slices if they are overlapping
+      (slice1', slice2') =
+        if Slice.overlaps slice1 slice2
+          then modifyOverlappingSlices slice1 slice2
+          else (slice1, slice2)
+      pairs = toAlignedSegmentPairs (lookup slice1' relations) (lookup slice2' relations)
+   in execState (mapM_ relateSegment pairs) relations
+  where
+    -- When 2 Slices belong to the same variable and they are overlapping
+    -- We return only the Slices that are affected by the overlap
+    --    Example:
+    --      slice1     ├───────────╠═════════════════╣─────┤
+    --      slice2     ├─────╠═════════════════╣───────────┤
+    --              =>
+    --                                   ┌──w──┬──w──┐
+    --      result     ├─────╠═══════════╬═════╬═════╣─────┤
+    --                                   ↑     ↑     ↑
+    --                                  new    rE    cE
+    modifyOverlappingSlices :: Slice -> Slice -> (Slice, Slice)
+    modifyOverlappingSlices sliceA sliceB =
+      let (root, child) = if sliceA > sliceB then (sliceA, sliceB) else (sliceB, sliceA)
+          newEndpoint = sliceEnd root - (sliceEnd child - sliceEnd root)
+          rootEnd = sliceEnd root
+          childEnd = sliceEnd child
+       in ( Slice (sliceRefU sliceA) newEndpoint rootEnd,
+            Slice (sliceRefU sliceB) rootEnd childEnd
+          )
+
+-- | Given a Slice, return the SliceLookup of the Slice
 lookup :: Slice -> SliceRelations -> SliceLookup
-lookup slice relations = lookupMapping slice (getMapping slice relations)
+lookup (Slice ref start end) relations = lookupMapping (getMapping ref)
+  where
+    getMapping :: RefU -> Mapping
+    getMapping (RefUO _ _) = srRefO relations
+    getMapping (RefUI _ _) = srRefI relations
+    getMapping (RefUP _ _) = srRefP relations
+    getMapping (RefUX _ _) = srRefX relations
 
-getMapping :: Slice -> SliceRelations -> Mapping
-getMapping (Slice (RefUO _ _) _ _) relations = srRefO relations
-getMapping (Slice (RefUI _ _) _ _) relations = srRefI relations
-getMapping (Slice (RefUP _ _) _ _) relations = srRefP relations
-getMapping (Slice (RefUX _ _) _ _) relations = srRefX relations
-
-modifyMapping' :: Slice -> (Mapping -> Mapping) -> SliceRelations -> SliceRelations
-modifyMapping' (Slice (RefUO _ _) _ _) f relations = relations {srRefO = f (srRefO relations)}
-modifyMapping' (Slice (RefUI _ _) _ _) f relations = relations {srRefI = f (srRefI relations)}
-modifyMapping' (Slice (RefUP _ _) _ _) f relations = relations {srRefP = f (srRefP relations)}
-modifyMapping' (Slice (RefUX _ _) _ _) f relations = relations {srRefX = f (srRefX relations)}
+    lookupMapping :: Mapping -> SliceLookup
+    lookupMapping (Mapping xs) =
+      let width = widthOf ref
+       in SliceLookup.splice (start, end) $ case IntMap.lookup width xs of
+            Nothing -> SliceLookup.fromRefU ref
+            Just varMap -> case IntMap.lookup (refUVar ref) varMap of
+              Nothing -> SliceLookup.fromRefU ref
+              Just lookups -> lookups
 
 -- | Fold over all Segments in a SliceRelations
 fold :: (a -> Slice -> Segment -> a) -> a -> SliceRelations -> a
@@ -114,37 +146,6 @@ collectFailure relations = fromKinshipConstruction <> fromInvalidSliceLookup
       Just x -> [InvalidKinship x]
 
 --------------------------------------------------------------------------------
-
--- | Given 2 Slices, modify the SliceRelations so that they are related
-relate :: Slice -> Slice -> SliceRelations -> SliceRelations
-relate slice1 slice2 relations =
-  let -- modify the slices if they are overlapping
-      (slice1', slice2') =
-        if Slice.overlaps slice1 slice2
-          then modifyOverlappingSlices slice1 slice2
-          else (slice1, slice2)
-      pairs = toAlignedSegmentPairs (lookup slice1' relations) (lookup slice2' relations)
-   in execState (mapM_ relateSegment pairs) relations
-  where
-    -- When 2 Slices belong to the same variable and they are overlapping
-    -- We return only the Slices that are affected by the overlap
-    --    Example:
-    --      slice1     ├───────────╠═════════════════╣─────┤
-    --      slice2     ├─────╠═════════════════╣───────────┤
-    --              =>
-    --                                   ┌──w──┬──w──┐
-    --      result     ├─────╠═══════════╬═════╬═════╣─────┤
-    --                                   ↑     ↑     ↑
-    --                                  new    rE    cE
-    modifyOverlappingSlices :: Slice -> Slice -> (Slice, Slice)
-    modifyOverlappingSlices sliceA sliceB =
-      let (root, child) = if sliceA > sliceB then (sliceA, sliceB) else (sliceB, sliceA)
-          newEndpoint = sliceEnd root - (sliceEnd child - sliceEnd root)
-          rootEnd = sliceEnd root
-          childEnd = sliceEnd child
-       in ( Slice (sliceRefU sliceA) newEndpoint rootEnd,
-            Slice (sliceRefU sliceB) rootEnd childEnd
-          )
 
 type M = State SliceRelations
 
@@ -201,18 +202,21 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
       else assignRootSegment slice2 slice1
 
 assignValueSegment :: U -> Slice -> M ()
-assignValueSegment val slice = modify (modifyMapping' slice (assignMapping slice val))
+assignValueSegment val slice@(Slice ref start end) =
+  modify $
+    modifySliceLookup
+      slice
+      (mapSliceLookup (SliceLookup.fromRefU ref))
+      mapSliceLookup
+  where
+    mapSliceLookup :: SliceLookup -> SliceLookup
+    mapSliceLookup = SliceLookup.mapInterval (const (SliceLookup.Constant val)) (start, end)
 
 -- | Relate a child Slice with a parent Slice
 assignRootSegment :: Slice -> Slice -> M ()
 assignRootSegment root child = do
-  -- relations <- get
-  -- traceM $ "\nroot:         " <> show root
-  -- traceM $ "\nroot lookup:  " <> show (lookup root relations)
-  -- traceM $ "\nchild:        " <> show child
-  -- traceM $ "\nchild lookup: " <> show (lookup child relations)
-  modify (modifySegment addRootToChild child)
-  modify (modifySegment addChildToRoot root)
+  modifySegment addRootToChild child
+  modifySegment addChildToRoot root
   where
     addRootToChild :: Maybe Segment -> Segment
     addRootToChild _ = SliceLookup.ChildOf root
@@ -220,35 +224,21 @@ assignRootSegment root child = do
     addChildToRoot :: Maybe Segment -> Segment
     addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
     addChildToRoot (Just (SliceLookup.Parent width children)) = SliceLookup.Parent width (Map.insertWith (<>) (sliceRefU child) (Set.singleton child) children)
-    addChildToRoot (Just (SliceLookup.ChildOf anotherRoot)) =
-      if sliceRefU root == sliceRefU anotherRoot
-        then -- "root" has self reference to itself, convert it to a Parent node
-          SliceLookup.Parent (widthOf root) mempty
-        else error "[ panic ] assignRootSegment: child already has a parent"
-    addChildToRoot (Just (SliceLookup.Constant _)) = error "[ panic ] assignRootSegment: child already has a value"
+    addChildToRoot (Just (SliceLookup.ChildOf _)) = error "[ panic ] assignRootSegment: the root already has a parent"
+    addChildToRoot (Just (SliceLookup.Constant _)) = error "[ panic ] assignRootSegment: the root already has a value"
     addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
 
-modifySegment :: (Maybe Segment -> Segment) -> Slice -> SliceRelations -> SliceRelations
-modifySegment f slice xs = case sliceRefU slice of
-  RefUO width var -> xs {srRefO = modifyMapping width var (srRefO xs)}
-  RefUI width var -> xs {srRefI = modifyMapping width var (srRefI xs)}
-  RefUP width var -> xs {srRefP = modifyMapping width var (srRefP xs)}
-  RefUX width var -> xs {srRefX = modifyMapping width var (srRefX xs)}
-  where
-    modifyMapping :: Width -> Var -> Mapping -> Mapping
-    modifyMapping width var (Mapping mapping) = Mapping $ IntMap.alter alterVarMap width mapping
-      where
-        alterVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
-        alterVarMap Nothing = pure (IntMap.singleton var (SliceLookup.fromSegment slice (f Nothing)))
-        alterVarMap (Just varMap) = Just $ IntMap.alter alterSliceLookup var varMap
-
-        alterSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
-        alterSliceLookup Nothing = pure (SliceLookup.fromSegment slice (f Nothing))
-        alterSliceLookup (Just lookups) = Just $ SliceLookup.mapIntervalWithSlice (const (f . Just)) slice lookups
+    modifySegment :: (Maybe Segment -> Segment) -> Slice -> M ()
+    modifySegment f slice =
+      modify $
+        modifySliceLookup
+          slice
+          (SliceLookup.fromSegment slice (f Nothing)) -- what to do if the SliceLookup does not exist
+          (SliceLookup.mapIntervalWithSlice (const (f . Just)) slice)
 
 --------------------------------------------------------------------------------
 
-newtype Mapping = Mapping (IntMap (IntMap SliceLookup))
+newtype Mapping = Mapping {unMapping :: IntMap (IntMap SliceLookup)}
   deriving (Eq)
 
 instance Show Mapping where
@@ -266,56 +256,26 @@ instance Show Mapping where
           then ""
           else unlines (map (\(_, slice) -> "    " <> show slice) (IntMap.toList varMap))
 
-assignMapping :: Slice -> U -> Mapping -> Mapping
-assignMapping (Slice ref start end) val (Mapping xs) = Mapping (IntMap.alter assignVarMap width xs)
+-- | Given a Slice, modify the SliceLookup referenced by the Slice
+--   Insert a new SliceLookup if it does not exist
+modifySliceLookup :: Slice -> SliceLookup -> (SliceLookup -> SliceLookup) -> SliceRelations -> SliceRelations
+modifySliceLookup (Slice var _ _) e f relations = case var of
+  RefUO width _ -> relations {srRefO = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefO relations)))}
+  RefUI width _ -> relations {srRefI = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefI relations)))}
+  RefUP width _ -> relations {srRefP = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefP relations)))}
+  RefUX width _ -> relations {srRefX = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefX relations)))}
   where
-    width :: Width
-    width = widthOf ref
+    alterSliceLookups :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
+    alterSliceLookups Nothing = Just (IntMap.singleton (refUVar var) e) -- insert a new SliceLookup if it does not exist
+    alterSliceLookups (Just x) = Just (IntMap.alter alterSliceLookup (refUVar var) x)
 
-    var :: Var
-    var = refUVar ref
-
-    mapSliceLookup :: SliceLookup -> SliceLookup
-    mapSliceLookup = SliceLookup.mapInterval (const (SliceLookup.Constant val)) (start, end)
-
-    assignVarMap :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
-    assignVarMap Nothing = Just (IntMap.singleton var (mapSliceLookup (SliceLookup.fromRefU ref)))
-    assignVarMap (Just varMap) = Just (IntMap.alter assignSliceLookup var varMap)
-
-    assignSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
-    assignSliceLookup Nothing = Just (mapSliceLookup (SliceLookup.fromRefU ref))
-    assignSliceLookup (Just lookups) = Just (mapSliceLookup lookups)
-
--- | Lookup a slice of a variable
-lookupMapping :: Slice -> Mapping -> SliceLookup
-lookupMapping (Slice ref start end) (Mapping xs) =
-  let width = widthOf ref
-   in SliceLookup.splice (start, end) $ case IntMap.lookup width xs of
-        Nothing -> SliceLookup.fromRefU ref
-        Just varMap -> case IntMap.lookup (refUVar ref) varMap of
-          Nothing -> SliceLookup.fromRefU ref
-          Just lookups -> lookups
+    alterSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
+    alterSliceLookup Nothing = Just e -- insert a new SliceLookup if it does not exist
+    alterSliceLookup (Just x) = Just (f x)
 
 --------------------------------------------------------------------------------
 
-assignmentToEdits :: Slice -> U -> SliceRelations -> [Edit]
-assignmentToEdits slice value relations = map (`AssignValue` value) (getFamily slice relations)
-
-data Edit
-  = AssignValue Slice U -- assign the slice itself the value
-  | AssignRootValue Slice U -- assign the slice itself (root) and all its children the value, needs further lookup
-
--- \| RelateTo Slice Slice -- relate the slice itself to the other slice
--- \| RelateRootTo Slice Slice -- relate the slice itself (root) and all its children to the other slice, needs further lookup
-
-applyEdits :: [Edit] -> SliceRelations -> SliceRelations
-applyEdits edits relations = foldr applyEdit relations edits
-
-applyEdit :: Edit -> SliceRelations -> SliceRelations
-applyEdit (AssignValue slice val) relations = modifyMapping' slice (assignMapping slice val) relations
-applyEdit (AssignRootValue root val) relations = applyEdits (map (`AssignValue` val) (getFamily root relations)) relations
-
--- | Given the slice, return all members of the equivalence class (including the slice itself)
+-- | Given a Slice, return all members of the equivalence class (including the slice itself)
 getFamily :: Slice -> SliceRelations -> [Slice]
 getFamily slice relations =
   let SliceLookup _ segments = lookup slice relations
