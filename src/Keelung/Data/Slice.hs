@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Keelung.Data.Slice
   ( -- * Construction
     Slice (..),
@@ -13,6 +15,8 @@ module Keelung.Data.Slice
   )
 where
 
+import Control.DeepSeq (NFData)
+import GHC.Generics (Generic)
 import Keelung (HasWidth, widthOf)
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
@@ -27,7 +31,9 @@ data Slice = Slice
     sliceStart :: Int, -- the starting offset of the slice
     sliceEnd :: Int -- the ending offset of the slice
   }
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance NFData Slice
 
 instance Show Slice where
   show (Slice ref start end) = show ref <> " [" <> show start <> " ... " <> show end <> ")"

@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use list comprehension" #-}
@@ -39,6 +40,7 @@ module Keelung.Data.SliceLookup
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.Either qualified as Either
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -46,6 +48,7 @@ import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
+import GHC.Generics (Generic)
 import Keelung (HasWidth, widthOf)
 import Keelung.Data.Reference (RefU)
 import Keelung.Data.Slice (Slice (..))
@@ -65,7 +68,9 @@ data Segment
       (Map RefU (Set Slice)) -- children
   | Empty
       Int -- length of this segment
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance NFData Segment
 
 instance Show Segment where
   show (Constant u) = "Constant[" <> show (widthOf u) <> "] " <> show u
@@ -110,7 +115,9 @@ data SliceLookup = SliceLookup
   { lookupSlice :: Slice, -- the Slice these segments belong to
     lookupSegments :: IntMap Segment -- the segments
   }
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance NFData SliceLookup
 
 instance Show SliceLookup where
   show (SliceLookup slice xs) = "SliceLookup " <> show slice <> " " <> show (IntMap.toList xs)

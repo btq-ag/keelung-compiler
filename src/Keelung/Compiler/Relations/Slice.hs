@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 
 module Keelung.Compiler.Relations.Slice
@@ -5,6 +6,7 @@ module Keelung.Compiler.Relations.Slice
     new,
     assign,
     relate,
+    size,
     lookup,
     -- Testing
     isValid,
@@ -13,12 +15,14 @@ module Keelung.Compiler.Relations.Slice
   )
 where
 
+import Control.DeepSeq (NFData)
 import Control.Monad.State
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
+import GHC.Generics (Generic)
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
@@ -36,7 +40,9 @@ data SliceRelations = SliceRelations
     srRefP :: Mapping,
     srRefX :: Mapping
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance NFData SliceRelations
 
 new :: SliceRelations
 new = SliceRelations (Mapping mempty) (Mapping mempty) (Mapping mempty) (Mapping mempty)
@@ -77,6 +83,15 @@ relate slice1 slice2 relations =
        in ( Slice (sliceRefU sliceA) newEndpoint rootEnd,
             Slice (sliceRefU sliceB) rootEnd childEnd
           )
+
+size :: SliceRelations -> Int
+size (SliceRelations refO refI refP refX) = sum (map sizeMapping [refO, refI, refP, refX])
+  where
+    sizeMapping :: Mapping -> Int
+    sizeMapping (Mapping xs) = sum (map sizeVarMap (IntMap.elems xs))
+
+    sizeVarMap :: IntMap SliceLookup -> Int
+    sizeVarMap = sum . map (\x -> if SliceLookup.null x then 1 else 0) . IntMap.elems
 
 -- | Given a Slice, return the SliceLookup of the Slice
 lookup :: Slice -> SliceRelations -> SliceLookup
@@ -239,7 +254,9 @@ assignRootSegment root child = do
 --------------------------------------------------------------------------------
 
 newtype Mapping = Mapping {unMapping :: IntMap (IntMap SliceLookup)}
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance NFData Mapping
 
 instance Show Mapping where
   show (Mapping xs) =

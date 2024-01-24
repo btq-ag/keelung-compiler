@@ -34,6 +34,7 @@ import Keelung.Compiler.Options
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Limb qualified as LimbRelations
 import Keelung.Compiler.Relations.Reference qualified as Ref
+import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
@@ -46,15 +47,17 @@ data Relations n = Relations
   { relationsR :: Ref.RefRelations n,
     relationsL :: LimbRelations.LimbRelations,
     relationsU :: UInt.UIntRelations,
+    relationsS :: SliceRelations.SliceRelations,
     relationsOptions :: Options
   }
   deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (Relations n) where
-  show (Relations f l u _) =
+  show (Relations f l u s _) =
     (if EquivClass.size f == 0 then "" else show f)
       <> (if EquivClass.size l == 0 then "" else show l)
       <> (if EquivClass.size u == 0 then "" else show u)
+      <> (if SliceRelations.size s == 0 then "" else show u)
 
 updateRelationsR ::
   (Ref.RefRelations n -> EquivClass.M (Error n) (Ref.RefRelations n)) ->
@@ -83,7 +86,7 @@ updateRelationsU f xs = do
 --------------------------------------------------------------------------------
 
 new :: Options -> Relations n
-new = Relations Ref.new LimbRelations.new UInt.new
+new = Relations Ref.new LimbRelations.new UInt.new SliceRelations.new
 
 assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignR var val = updateRelationsR $ Ref.assignF var val
@@ -155,7 +158,7 @@ toInt :: (Ref -> Bool) -> Relations n -> Map Ref (Either (n, Ref, n) n)
 toInt shouldBeKept = Ref.toInt shouldBeKept . relationsR
 
 size :: Relations n -> Int
-size (Relations f l u _) = EquivClass.size f + LimbRelations.size l + UInt.size u
+size (Relations f l u s _) = EquivClass.size f + LimbRelations.size l + UInt.size u + SliceRelations.size s
 
 --------------------------------------------------------------------------------
 
