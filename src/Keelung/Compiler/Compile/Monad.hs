@@ -238,18 +238,6 @@ writeRefB :: (GaloisField n, Integral n) => RefB -> Either RefB Bool -> M n ()
 writeRefB a (Left b) = writeRefBEq a b
 writeRefB a (Right b) = writeRefBVal a b
 
--- | Assign a Integer to a RefU
-writeRefUVal :: (GaloisField n, Integral n) => RefU -> U -> M n ()
-writeRefUVal a x = addC [CRefUVal a (toInteger x)]
-
--- | Assign an Integer to a Limb
-writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
-writeLimbVal a x = addC [CLimbVal a x]
-
--- | Assign an Integer to a Slice
-writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
-writeSliceVal a x = addC [CSliceVal a x]
-
 -- | Assert that two Refs are equal
 writeRefEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
 writeRefEq a b = addC [CRefEq a b]
@@ -262,6 +250,26 @@ writeRefFEq a b = addC [CRefEq (F a) (F b)]
 writeRefBNEq :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
 writeRefBNEq a b = addC [CRefBNEq a b]
 
+-- | Assign a Integer to a RefU
+writeRefUVal :: (GaloisField n, Integral n) => RefU -> U -> M n ()
+writeRefUVal a x = do
+  useUIntUnionFind <- gets (optUseUIntUnionFind . cmOptions)
+  if useUIntUnionFind
+    then addC [CSliceVal (Slice.fromRefU a) (toInteger x)]
+    else addC [CRefUVal a (toInteger x)]
+
+-- | Assign an Integer to a Limb
+writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
+writeLimbVal a x = do
+  useUIntUnionFind <- gets (optUseUIntUnionFind . cmOptions)
+  if useUIntUnionFind
+    then addC [CSliceVal (Slice.fromLimb a) x]
+    else addC [CLimbVal a x]
+
+-- | Assign an Integer to a Slice
+writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
+writeSliceVal a x = addC [CSliceVal a x]
+
 -- | Assert that two RefUs are equal
 writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
 writeRefUEq a b = do 
@@ -272,7 +280,11 @@ writeRefUEq a b = do
 
 -- | Assert that two Limbs are equal
 writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
-writeLimbEq a b = addC [CLimbEq a b]
+writeLimbEq a b =  do
+  useUIntUnionFind <- gets (optUseUIntUnionFind . cmOptions)
+  if useUIntUnionFind
+    then addC [CSliceEq (Slice.fromLimb a) (Slice.fromLimb b)]
+    else addC [CLimbEq a b]
 
 -- | Assert that two Slices are equal
 writeSliceEq :: (GaloisField n, Integral n) => Slice -> Slice -> M n ()

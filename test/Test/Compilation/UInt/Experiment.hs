@@ -41,12 +41,26 @@ tests = describe "Compilation Experiment" $ do
   --     let expected = [toInteger (Data.Bits.shift x i)]
   --     testCompilerWithOpts options gf181 (program i) [toInteger x] [] expected
 
-  describe "shift" $ do
-    describe "constant / byte" $ do
-      let program constant i = return $ shift (constant :: UInt 8) i
+  describe "DivMod" $ do
+    it "constant dividend / constant divisor" $ do
+      let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
+      let dividend = 143
+      let divisor = 128
+      let expected = [dividend `div` divisor, dividend `mod` divisor]
+      -- forM_ [gf181, Prime 17] $ \field -> do
+      --     let options = defaultOptions {optDisableTestingOnO0 = True}
+      --     testCompilerWithOpts options field (program dividend divisor) [] [] expected
+      -- forM_ [Binary 7] $ \field -> do
+      testCompiler gf181 (program dividend divisor) [] [] expected
 
-      -- it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
-      --   let expected = [toInteger (Data.Bits.shift x i)]
-      it "GF181" $
-
-        testCompilerWithOpts options gf181 (program 1 0) [] [] [1]
+      -- let genPair = do
+      --       dividend <- choose (0, 255)
+      --       divisor <- choose (1, 255)
+      --       return (dividend, divisor)
+      -- forAll genPair $ \(dividend, divisor) -> do
+      --   let expected = [dividend `div` divisor, dividend `mod` divisor]
+      --   forM_ [gf181, Prime 17] $ \field -> do
+      --     let options = defaultOptions {optDisableTestingOnO0 = True}
+      --     testCompilerWithOpts options field (program dividend divisor) [] [] expected
+      --   forM_ [Binary 7] $ \field -> do
+      --     testCompiler field (program dividend divisor) [] [] expected
