@@ -36,7 +36,7 @@ tests = describe "Compilation Experiment" $ do
             x <- inputUInt Public :: Comp (UInt 8)
             return $ shift x i
 
-      let i = 1
+      let i = -8
       -- let expected = [toInteger (Data.Bits.shift x i)]
       -- testCompiler gf181 (program (fromIntegral x) i) [] [] expected
       let options =

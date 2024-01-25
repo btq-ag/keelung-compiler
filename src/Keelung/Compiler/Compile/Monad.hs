@@ -24,6 +24,7 @@ import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Slice (Slice)
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
@@ -244,6 +245,10 @@ writeRefUVal a x = addC [CRefUVal a (toInteger x)]
 writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
 writeLimbVal a x = addC [CLimbVal a x]
 
+-- | Assign an Integer to a Slice
+writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
+writeSliceVal a x = addC [CSliceVal a x]
+
 -- | Assert that two Refs are equal
 writeRefEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
 writeRefEq a b = addC [CRefEq a b]
@@ -263,6 +268,13 @@ writeRefUEq a b = addC [CRefUEq a b]
 -- | Assert that two Limbs are equal
 writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
 writeLimbEq a b = addC [CLimbEq a b]
+
+-- | Assert that two Slices are equal
+writeSliceEq :: (GaloisField n, Integral n) => Slice -> Slice -> M n ()
+writeSliceEq a b =
+  if widthOf a == widthOf b
+    then addC [CSliceEq a b]
+    else error $ "[ panic ] writeSliceEq: width mismatch, " <> show (widthOf a) <> " /= " <> show (widthOf b)
 
 --------------------------------------------------------------------------------
 

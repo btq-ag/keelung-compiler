@@ -27,6 +27,7 @@ import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung (widthOf)
+import Keelung.Compiler.Util (indent)
 import Keelung.Data.Constraint
 import Keelung.Data.Reference (RefU (..), refUVar)
 import Keelung.Data.Slice (Slice (..))
@@ -44,9 +45,32 @@ data SliceRelations = SliceRelations
     srRefP :: Mapping,
     srRefX :: Mapping
   }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Generic)
 
 instance NFData SliceRelations
+
+instance Show SliceRelations where
+  show (SliceRelations o i p x) =
+    "UInt Relations:\n"
+      <> showMapping o
+      <> showMapping i
+      <> showMapping p
+      <> showMapping x
+    where
+      showMapping :: Mapping -> String
+      showMapping = indent . mconcat . map showVarMap . IntMap.elems . unMapping
+
+      showVarMap :: IntMap SliceLookup -> String
+      showVarMap varMap =
+        if IntMap.null varMap
+          then ""
+          else unlines (map showSliceLookup (IntMap.elems varMap))
+
+      showSliceLookup :: SliceLookup -> String
+      showSliceLookup (SliceLookup slice segments) =
+        show (sliceRefU slice)
+          <> ": "
+          <> show (IntMap.elems segments)
 
 new :: SliceRelations
 new = SliceRelations (Mapping mempty) (Mapping mempty) (Mapping mempty) (Mapping mempty)
@@ -95,7 +119,7 @@ size (SliceRelations refO refI refP refX) = sum (map sizeMapping [refO, refI, re
     sizeMapping (Mapping xs) = sum (map sizeVarMap (IntMap.elems xs))
 
     sizeVarMap :: IntMap SliceLookup -> Int
-    sizeVarMap = sum . map (\x -> if SliceLookup.null x then 1 else 0) . IntMap.elems
+    sizeVarMap = sum . map (\x -> if SliceLookup.null x then 0 else 1) . IntMap.elems
 
 -- | Given a Slice, return the SliceLookup of the Slice
 lookup :: Slice -> SliceRelations -> SliceLookup
@@ -129,10 +153,10 @@ toConstraints refUShouldBeKept = fold step mempty
     -- see if a Segment should be converted to a Constraint
     convert :: Slice -> Segment -> Seq (Constraint n)
     convert slice segment = case segment of
-      SliceLookup.Constant val -> Seq.singleton (CLimbVal (Slice.toLimb slice) (toInteger val))
+      SliceLookup.Constant val -> Seq.singleton (CSliceVal slice (toInteger val))
       SliceLookup.ChildOf root ->
         if refUShouldBeKept (sliceRefU root)
-          then Seq.singleton (CLimbEq (Slice.toLimb slice) (Slice.toLimb root))
+          then Seq.singleton (CSliceEq slice root)
           else mempty
       SliceLookup.Parent _ _ -> mempty
       SliceLookup.Empty _ -> mempty

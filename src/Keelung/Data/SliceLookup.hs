@@ -79,7 +79,7 @@ instance Show Segment where
     "Parent["
       <> show len
       <> "] "
-      <> show (Map.toList children)
+      <> show (fmap Set.toList (Map.elems children))
   show (Empty len) = "Empty[" <> show len <> "]"
 
 instance HasWidth Segment where
@@ -120,7 +120,7 @@ data SliceLookup = SliceLookup
 instance NFData SliceLookup
 
 instance Show SliceLookup where
-  show (SliceLookup slice xs) = "SliceLookup " <> show slice <> " " <> show (IntMap.toList xs)
+  show (SliceLookup slice segments) = show (sliceRefU slice) <> ": " <> show (IntMap.elems segments)
 
 instance HasWidth SliceLookup where
   widthOf (SliceLookup slice _) = widthOf slice
