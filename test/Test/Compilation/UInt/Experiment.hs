@@ -3,13 +3,10 @@
 
 module Test.Compilation.UInt.Experiment (tests, run) where
 
-import Data.Binary
-import Data.Bits qualified
 import Keelung hiding (compile)
 import Keelung.Compiler.Options
 import Test.Compilation.Util
 import Test.Hspec
-import Test.QuickCheck
 
 run :: IO ()
 run = hspec tests
@@ -35,11 +32,17 @@ tests = describe "Compilation Experiment" $ do
 
   let options = defaultOptions {optUseUIntUnionFind = True}
 
-  describe "variable / byte" $ do
-    let program i = do
-          x <- inputUInt Public :: Comp (UInt 8)
-          return $ shift x i
+  -- describe "variable / byte" $ do
+  --   let program i = do
+  --         x <- inputUInt Public :: Comp (UInt 8)
+  --         return $ shift x i
 
-    it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
-      let expected = [toInteger (Data.Bits.shift x i)]
-      testCompilerWithOpts options gf181 (program i) [toInteger x] [] expected
+  --   it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
+  --     let expected = [toInteger (Data.Bits.shift x i)]
+  --     testCompilerWithOpts options gf181 (program i) [toInteger x] [] expected
+
+  describe "Big Int I/O" $ do
+    it "10 bit / GF257" $ do
+      let program = inputUInt Public :: Comp (UInt 10)
+      debugWithOpts options (Prime 1031) program
+      -- testCompilerWithOpts options (Prime 257) program [300] [] [300]

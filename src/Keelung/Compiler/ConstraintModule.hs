@@ -74,7 +74,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
   show cm =
     "Constraint Module {\n"
       <> showFieldInfo
-      <> showVarEqF
+      <> showRelations
       <> showAddL
       <> showMulL
       <> showEqs
@@ -113,7 +113,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
           then ""
           else "  ModInv hints:\n" <> indent (indent (showList' (map (\(a, _aainv, _n, p) -> show a <> "⁻¹ = (mod " <> show p <> ")") (cmModInvs cm))))
 
-      showVarEqF =
+      showRelations =
         if Relations.size (cmRelations cm) == 0
           then ""
           else "  Relations:\n" <> indent (indent (show (cmRelations cm)))

@@ -28,6 +28,7 @@ import Keelung.Data.Slice (Slice)
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
+import qualified Keelung.Data.Slice as Slice
 
 --------------------------------------------------------------------------------
 
@@ -263,7 +264,11 @@ writeRefBNEq a b = addC [CRefBNEq a b]
 
 -- | Assert that two RefUs are equal
 writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
-writeRefUEq a b = addC [CRefUEq a b]
+writeRefUEq a b = do 
+  useUIntUnionFind <- gets (optUseUIntUnionFind . cmOptions)
+  if useUIntUnionFind
+    then addC [CSliceEq (Slice.fromRefU a) (Slice.fromRefU b)]
+    else addC [CRefUEq a b]
 
 -- | Assert that two Limbs are equal
 writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()

@@ -3,6 +3,7 @@
 module Keelung.Data.Slice
   ( -- * Construction
     Slice (..),
+    fromRefU,
 
     -- * Conversion
     fromLimb,
@@ -59,10 +60,15 @@ instance Semigroup Slice where
 
 --------------------------------------------------------------------------------
 
+-- | Construct a "Slice" from a "Refu"
+fromRefU :: RefU -> Slice
+fromRefU ref = Slice ref 0 (widthOf ref)
+
 -- | Construct a "Slice" from a "Limb"
 fromLimb :: Limb -> Slice
 fromLimb limb = Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb)
 
+-- | Convert a "Slice" to a "Limb"
 toLimb :: Slice -> Limb
 toLimb (Slice ref start end) = Limb.new ref start (end - start) (Left True)
 
