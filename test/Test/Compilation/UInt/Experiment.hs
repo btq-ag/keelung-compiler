@@ -41,8 +41,12 @@ tests = describe "Compilation Experiment" $ do
   --     let expected = [toInteger (Data.Bits.shift x i)]
   --     testCompilerWithOpts options gf181 (program i) [toInteger x] [] expected
 
-  describe "Big Int I/O" $ do
-    it "10 bit / GF257" $ do
-      let program = inputUInt Public :: Comp (UInt 10)
-      debugWithOpts options (Prime 1031) program
-      -- testCompilerWithOpts options (Prime 257) program [300] [] [300]
+  describe "shift" $ do
+    describe "constant / byte" $ do
+      let program constant i = return $ shift (constant :: UInt 8) i
+
+      -- it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
+      --   let expected = [toInteger (Data.Bits.shift x i)]
+      it "GF181" $
+
+        testCompilerWithOpts options gf181 (program 1 0) [] [] [1]

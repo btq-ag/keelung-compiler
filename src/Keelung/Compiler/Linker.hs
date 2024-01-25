@@ -273,7 +273,7 @@ linkConstraint env (CSliceVal x n) =
       constantChunks = zip [0 ..] (U.chunks (envFieldWidth env) (U.new (widthOf x) constant))
       pairs = [(Slice (sliceRefU x) (sliceStart x + width * i) ((sliceStart x + width * (i + 1)) `min` sliceEnd x), chunk) | (i, chunk) <- constantChunks]
    in pairs >>= \(slice, c) ->
-        case Poly.buildWithIntMap (fromIntegral c) (reindexSlice env slice True) of
+        case Poly.buildWithIntMap (fromIntegral c) (reindexSlice env slice False) of
           Left _ -> error "CSliceVal: impossible"
           Right xs -> [Linked.CAdd xs]
 linkConstraint env (CMulL as bs cs) =
