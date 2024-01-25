@@ -45,7 +45,7 @@ import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Reference
-import Keelung.Data.Slice (Slice)
+import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
@@ -227,21 +227,21 @@ linkConstraint env (CSliceEq x y) =
       widthY = Slice.sliceEnd y - Slice.sliceStart y
    in if widthX /= widthY
         then error "[ panic ] CSliceEq: Slices are of different width"
-        else do
-          case FieldInfo.fieldTypeData (envFieldInfo env) of
-            Binary _ -> do
-              i <- [0 .. widthX - 1]
-              let pair = [(reindexRefU env (Slice.sliceRefU x) (Slice.sliceStart x + i), 1), (reindexRefU env (Slice.sliceRefU y) (Slice.sliceStart y + i), -1)]
-              case Poly.buildEither 0 pair of
-                Left _ -> error "CSliceEq: two variables are the same"
-                Right xs -> [Linked.CAdd xs]
-            Prime _ -> do
-              let pairsX = reindexSlice env x True
-              let pairsY = reindexSlice env y False
-              let pairs = IntMap.unionWith (+) pairsX pairsY
-              case Poly.buildWithIntMap 0 pairs of
-                Left _ -> error "CSliceEq: two variables are the same"
-                Right xs -> [Linked.CAdd xs]
+        else
+          let width = envFieldWidth env
+              -- split both Slices into smaller chunks of size `width`
+              pairs =
+                [ ( Slice (sliceRefU x) (sliceStart x + i) ((sliceStart x + i + width) `min` sliceEnd x),
+                    Slice (sliceRefU y) (sliceStart y + i) ((sliceStart y + i + width) `min` sliceEnd y)
+                  )
+                  | i <- [0, width .. widthOf x - 1]
+                ]
+           in pairs >>= \(sliceX, sliceY) ->
+                let sliceX' = reindexSlice env sliceX True
+                    sliceY' = reindexSlice env sliceY False
+                 in case Poly.buildWithIntMap 0 (IntMap.unionWith (+) sliceX' sliceY') of
+                      Left _ -> error "CSliceEq: impossible"
+                      Right xs -> [Linked.CAdd xs]
 linkConstraint env (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef env x, 1)] of
   Left _ -> error "CRefFVal: impossible"
   Right xs -> [Linked.CAdd xs]
@@ -265,13 +265,17 @@ linkConstraint env (CRefUVal x n) =
           cLimbVals = zipWith CLimbVal (Limb.refUToLimbs (envFieldWidth env) x) chunks
        in cLimbVals >>= linkConstraint env
 linkConstraint env (CSliceVal x n) =
-  -- "ArithException: arithmetic underflow" will be thrown if `n` is negative in Binary fields
-  let negatedConstant = case FieldInfo.fieldTypeData (envFieldInfo env) of
-        Prime _ -> fromInteger (-n)
-        Binary _ -> fromInteger n
-   in case Poly.buildWithIntMap negatedConstant (reindexSlice env x True) of
-        Left _ -> error "CSliceVal: impossible"
-        Right xs -> [Linked.CAdd xs]
+  let constant = case FieldInfo.fieldTypeData (envFieldInfo env) of
+        Binary _ -> fromInteger (if n < 0 then -n else n)
+        Prime _ -> fromInteger n
+      width = envFieldWidth env
+      -- split `n` into smaller chunks of size `width`
+      constantChunks = zip [0 ..] (U.chunks (envFieldWidth env) (U.new (widthOf x) constant))
+      pairs = [(Slice (sliceRefU x) (sliceStart x + width * i) ((sliceStart x + width * (i + 1)) `min` sliceEnd x), chunk) | (i, chunk) <- constantChunks]
+   in pairs >>= \(slice, c) ->
+        case Poly.buildWithIntMap (fromIntegral c) (reindexSlice env slice True) of
+          Left _ -> error "CSliceVal: impossible"
+          Right xs -> [Linked.CAdd xs]
 linkConstraint env (CMulL as bs cs) =
   [ Linked.CMul
       (linkPolyLUnsafe env as)
@@ -354,10 +358,10 @@ reindexSlice env slice sign =
     [ ( reindexRefU
           env
           (Slice.sliceRefU slice)
-          i,
+          (Slice.sliceStart slice + i),
         if sign then 2 ^ i else -(2 ^ i)
       )
-      | i <- [Slice.sliceStart slice .. Slice.sliceEnd slice - 1]
+      | i <- [0 .. Slice.sliceEnd slice - Slice.sliceStart slice - 1]
     ]
 
 reindexRefF :: Env -> RefF -> Var

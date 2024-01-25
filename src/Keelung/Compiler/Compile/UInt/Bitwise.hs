@@ -47,26 +47,31 @@ compileShiftL width out n (Left var) = do
           -- fill upper bits with 0s
         forM_ [width + n .. width - 1] $ \i -> do
           writeRefBVal (RefUBit out i) False -- out[i] = 0
-          
 compileShiftL width out n (Right val) = do
-  case compare n 0 of
-    EQ -> writeRefUVal out val
-    GT -> do
-      -- fill lower bits with 0s
-      forM_ [0 .. n - 1] $ \i -> do
-        writeRefBVal (RefUBit out i) False -- out[i] = 0
-        -- shift upper bits
-      forM_ [n .. width - 1] $ \i -> do
-        let i' = (i - n) `mod` width
-        writeRefBVal (RefUBit out i) (Data.Bits.testBit val i') -- out[i] = x'[i']
-    LT -> do
-      -- shift lower bits
-      forM_ [0 .. width + n - 1] $ \i -> do
-        let i' = (i - n) `mod` width
-        writeRefBVal (RefUBit out i) (Data.Bits.testBit val i') -- out[i] = x'[i']
-        -- fill upper bits with 0s
-      forM_ [width + n .. width - 1] $ \i -> do
-        writeRefBVal (RefUBit out i) False -- out[i] = 0
+  useUIntUnionFind <- gets (optUseUIntUnionFind . cmOptions)
+  if useUIntUnionFind
+    then case compare n 0 of
+      EQ -> writeSliceVal (Slice out 0 width) (toInteger val)
+      GT -> writeSliceVal (Slice out 0 width) (toInteger (val `Data.Bits.shiftL` n))
+      LT -> writeSliceVal (Slice out 0 width) (toInteger (val `Data.Bits.shiftR` (-n)))
+    else case compare n 0 of
+      EQ -> writeRefUVal out val
+      GT -> do
+        -- fill lower bits with 0s
+        forM_ [0 .. n - 1] $ \i -> do
+          writeRefBVal (RefUBit out i) False -- out[i] = 0
+          -- shift upper bits
+        forM_ [n .. width - 1] $ \i -> do
+          let i' = (i - n) `mod` width
+          writeRefBVal (RefUBit out i) (Data.Bits.testBit val i') -- out[i] = x'[i']
+      LT -> do
+        -- shift lower bits
+        forM_ [0 .. width + n - 1] $ \i -> do
+          let i' = (i - n) `mod` width
+          writeRefBVal (RefUBit out i) (Data.Bits.testBit val i') -- out[i] = x'[i']
+          -- fill upper bits with 0s
+        forM_ [width + n .. width - 1] $ \i -> do
+          writeRefBVal (RefUBit out i) False -- out[i] = 0
 
 -- | Compile a rotate left operation
 compileRotateL :: (GaloisField n, Integral n) => Width -> RefU -> Int -> Either RefU U -> M n ()
