@@ -44,14 +44,11 @@ tests = describe "Compilation Experiment" $ do
   describe "DivMod" $ do
     it "constant dividend / constant divisor" $ do
       let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
-      let dividend = 143
-      let divisor = 128
+      let dividend = 21
+      let divisor = 64
       let expected = [dividend `div` divisor, dividend `mod` divisor]
-      -- forM_ [gf181, Prime 17] $ \field -> do
-      --     let options = defaultOptions {optDisableTestingOnO0 = True}
-      --     testCompilerWithOpts options field (program dividend divisor) [] [] expected
-      -- forM_ [Binary 7] $ \field -> do
-      testCompilerWithOpts options gf181 (program dividend divisor) [] [] expected
+      -- testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+      debugWithOpts options (Binary 7) (program dividend divisor)
 
       -- let genPair = do
       --       dividend <- choose (0, 255)

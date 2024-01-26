@@ -286,7 +286,7 @@ type DivMod = (Either RefU U, Either RefU U, Either RefU U, Either RefU U)
 
 reduceDivMod :: (GaloisField n, Integral n) => DivMod -> RoundM n (Maybe DivMod)
 reduceDivMod (a, b, q, r) = do
-  relations <- gets (Relations.exportUIntRelations . cmRelations)
+  relations <- gets (Relations.relationsU . cmRelations)
   return $
     Just
       ( a `bind` UInt.lookupRefU relations,
@@ -536,7 +536,7 @@ substPolyL relations poly = do
   let constant = PolyL.polyConstant poly
       initState = (Left constant, Nothing)
       -- afterSubstRefU = foldl (substRefU (Relations.exportUIntRelations relations)) initState (PolyL.polyLimbs poly)
-      afterSubstLimb = foldl (substLimb (Relations.exportLimbRelations relations)) initState (PolyL.polyLimbs poly)
+      afterSubstLimb = foldl (substLimb (Relations.relationsL relations)) initState (PolyL.polyLimbs poly)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstLimb (PolyL.polyRefs poly)
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed

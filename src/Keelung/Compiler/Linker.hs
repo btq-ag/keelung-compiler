@@ -171,9 +171,9 @@ linkConstraintModule cm =
     extractSliceRelations relations = SliceRelations.toConstraints refUShouldBeKept relations >>= Seq.fromList . linkConstraint env
 
     varEqFs = extractRefRelations (cmRelations cm)
-    varEqLs = extractLimbRelations (Relations.exportLimbRelations (cmRelations cm))
-    varEqUs = extractUIntRelations (Relations.exportUIntRelations (cmRelations cm))
-    varEqSs = extractSliceRelations (Relations.exportSliceRelations (cmRelations cm))
+    varEqLs = extractLimbRelations (Relations.relationsL (cmRelations cm))
+    varEqUs = extractUIntRelations (Relations.relationsU (cmRelations cm))
+    varEqSs = extractSliceRelations (Relations.relationsS (cmRelations cm))
 
     addLs = Seq.fromList $ linkConstraint env . CAddL =<< cmAddL cm
     mulLs = Seq.fromList $ linkConstraint env . uncurry3 CMulL =<< cmMulL cm

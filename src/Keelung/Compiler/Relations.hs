@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Keelung.Compiler.Relations
-  ( Relations,
+  ( Relations (..),
     new,
     assignR,
     assignB,
@@ -21,9 +21,6 @@ module Keelung.Compiler.Relations
     size,
     lookup,
     Ref.Lookup (..),
-    exportLimbRelations,
-    exportUIntRelations,
-    exportSliceRelations,
   )
 where
 
@@ -102,7 +99,7 @@ assignB ref val = assignR (B ref) (if val then 1 else 0)
 
 -- | Lookup the RefU of the Limb first before assigning value to it
 assignL :: (GaloisField n, Integral n) => Limb -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
-assignL var val relations = case UInt.lookupRefU (exportUIntRelations relations) (Limb.lmbRef var) of
+assignL var val relations = case UInt.lookupRefU (relationsU relations) (Limb.lmbRef var) of
   Left rootVar -> updateRelationsL (LimbRelations.assign (var {Limb.lmbRef = rootVar}) val) relations
   Right rootVal ->
     -- the parent of this limb turned out to be a constant
@@ -129,7 +126,7 @@ relateL limb1 limb2 relations =
   let result1 = lookupLimb limb1 relations
       result2 = lookupLimb limb2 relations
    in case (result1, result2) of
-        (Left limb1', Left limb2') -> case EquivClass.relationBetween (UInt.Ref (Limb.lmbRef limb1)) (UInt.Ref (Limb.lmbRef limb2)) (exportUIntRelations relations) of
+        (Left limb1', Left limb2') -> case EquivClass.relationBetween (UInt.Ref (Limb.lmbRef limb1)) (UInt.Ref (Limb.lmbRef limb2)) (relationsU relations) of
           Nothing ->
             -- no relations between the RefUs of the Limbs, so we relate the Limbs instead
             updateRelationsL (LimbRelations.relate limb1' limb2') relations
@@ -141,7 +138,7 @@ relateL limb1 limb2 relations =
         (Right val1', Right val2') -> if val1' == val2' then return relations else throwError $ ConflictingValuesU (toInteger val1') (toInteger val2')
 
 lookupLimb :: (GaloisField n, Integral n) => Limb -> Relations n -> Either Limb U
-lookupLimb limb relations = case UInt.lookupRefU (exportUIntRelations relations) (Limb.lmbRef limb) of
+lookupLimb limb relations = case UInt.lookupRefU (relationsU relations) (Limb.lmbRef limb) of
   Left rootVar -> Left (limb {Limb.lmbRef = rootVar}) -- replace the RefU of the Limb with the root of that RefU
   Right rootVal -> Right (U.slice rootVal (Limb.lmbOffset limb) (Limb.lmbWidth limb)) -- the parent of this limb turned out to be a constant
 
@@ -172,15 +169,4 @@ size (Relations f l u s options) = EquivClass.size f + LimbRelations.size l + UI
 --------------------------------------------------------------------------------
 
 lookup :: (GaloisField n) => Ref -> Relations n -> Ref.Lookup n
-lookup var xs = Ref.lookup (relationsOptions xs) (relationsU xs) var (relationsR xs)
-
---------------------------------------------------------------------------------
-
-exportLimbRelations :: Relations n -> LimbRelations.LimbRelations
-exportLimbRelations = relationsL
-
-exportUIntRelations :: Relations n -> UInt.UIntRelations
-exportUIntRelations = relationsU
-
-exportSliceRelations :: Relations n -> SliceRelations.SliceRelations
-exportSliceRelations = relationsS
+lookup var xs = Ref.lookup2 (relationsOptions xs) (relationsU xs) (relationsS xs) var (relationsR xs)
