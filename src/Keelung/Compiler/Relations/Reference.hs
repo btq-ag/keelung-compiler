@@ -12,6 +12,7 @@ module Keelung.Compiler.Relations.Reference
     relationBetween,
     toInt,
     lookup,
+    lookup2,
     Lookup (..),
   )
 where
@@ -27,6 +28,7 @@ import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Options
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Reference
@@ -123,6 +125,36 @@ lookup _ _ var relations = case EquivClass.lookup var relations of
 
 -- fromBooleanLookup :: GaloisField n => EquivClass.VarStatus RefB Bool Boolean.Polarity -> EquivClass.VarStatus Ref n (LinRel n)
 -- fromBooleanLookup (EquivClass.IsRoot children) = EquivClass.IsRoot $ Map.mapKeys B $ Map.map (\b -> if Boolean.unPolarity b then LinRel 1 0 else LinRel (-1) 1) children
+
+lookup2 :: (GaloisField n) => Options -> UIntRelations -> SliceRelations -> Ref -> RefRelations n -> Lookup n
+lookup2 _options relationsU _relationsS (B (RefUBit refU index)) _relations =
+  -- if optUseUIntUnionFind options
+  --   then
+  --     let SliceLookup _ segments = SliceRelations.lookup (Slice.fromRefU refU) relationsS
+  --      in case IntMap.lookupLE index segments of
+  --           Nothing -> Root
+  --           Just (start, segment) -> case segment of
+  --             SliceLookup.Constant value -> Root -- Value (if Data.Bits.testBit value index then 1 else 0)
+  --             SliceLookup.ChildOf parent -> Root -- ChildOf 1 (B (RefUBit (Slice.sliceRefU parent) (index - start + Slice.sliceStart parent))) 0
+  --             SliceLookup.Parent _ _ -> Root
+  --             SliceLookup.Empty _ -> Root
+  --   else do
+  case EquivClass.lookup (UInt.Ref refU) relationsU of
+    EquivClass.IsConstant value -> Value (if Data.Bits.testBit value index then 1 else 0)
+    EquivClass.IsRoot toChildren ->
+      if Map.null toChildren
+        then -- cannot find any result in the UIntRelations, so we look in the RefRelations instead
+        case EquivClass.lookup (B (RefUBit refU index)) _relations of
+          EquivClass.IsConstant value -> Value value
+          EquivClass.IsRoot _ -> Root
+          EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
+        else Root
+    EquivClass.IsChildOf (UInt.Ref parent) UInt.Equal -> ChildOf 1 (B (RefUBit parent index)) 0
+lookup2 _ _ _ var relations =
+  case EquivClass.lookup var relations of
+    EquivClass.IsConstant value -> Value value
+    EquivClass.IsRoot _ -> Root
+    EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
 
 --------------------------------------------------------------------------------
 

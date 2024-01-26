@@ -51,7 +51,7 @@ tests = describe "Compilation Experiment" $ do
       --     let options = defaultOptions {optDisableTestingOnO0 = True}
       --     testCompilerWithOpts options field (program dividend divisor) [] [] expected
       -- forM_ [Binary 7] $ \field -> do
-      testCompiler gf181 (program dividend divisor) [] [] expected
+      testCompilerWithOpts options gf181 (program dividend divisor) [] [] expected
 
       -- let genPair = do
       --       dividend <- choose (0, 255)
