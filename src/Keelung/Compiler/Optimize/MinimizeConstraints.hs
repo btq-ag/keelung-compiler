@@ -284,20 +284,44 @@ reduceMulLCPP a polyB polyC = do
 
 type DivMod = (Either RefU U, Either RefU U, Either RefU U, Either RefU U)
 
+-- | Subsitute variables in polynomials of DivMod with their corresponding values or roots
 reduceDivMod :: (GaloisField n, Integral n) => DivMod -> RoundM n (Maybe DivMod)
 reduceDivMod (a, b, q, r) = do
-  relations <- gets (Relations.relationsU . cmRelations)
-  return $
-    Just
-      ( a `bind` UInt.lookupRefU relations,
-        b `bind` UInt.lookupRefU relations,
-        q `bind` UInt.lookupRefU relations,
-        r `bind` UInt.lookupRefU relations
-      )
+  optUseUIntUnionFind <- gets (Options.optUseUIntUnionFind . cmOptions)
+  if optUseUIntUnionFind
+    then do
+      relationsS <- gets (Relations.relationsS . cmRelations)
+      return $
+        Just
+          ( lookupRefU relationsS a,
+            lookupRefU relationsS b,
+            lookupRefU relationsS q,
+            lookupRefU relationsS r
+          )
+    else do
+      relationsU <- gets (Relations.relationsU . cmRelations)
+      return $
+        Just
+          ( a `bind` UInt.lookupRefU relationsU,
+            b `bind` UInt.lookupRefU relationsU,
+            q `bind` UInt.lookupRefU relationsU,
+            r `bind` UInt.lookupRefU relationsU
+          )
   where
     bind :: Either RefU U -> (RefU -> Either RefU U) -> Either RefU U
     bind (Right val) _ = Right val
     bind (Left var) f = f var
+
+    lookupRefU :: SliceRelations -> Either RefU U -> Either RefU U
+    lookupRefU _ (Right val) = Right val
+    lookupRefU relations (Left var) =
+      let SliceLookup _ segments = SliceRelations.lookup (Slice.fromRefU var) relations
+       in case IntMap.elems segments of
+            [SliceLookup.ChildOf root] -> Left (Slice.sliceRefU root)
+            [SliceLookup.Constant value] -> Right value
+            [SliceLookup.Parent _ _] -> Left var
+            [SliceLookup.Empty _] -> Left var
+            _ -> Left var
 
 ------------------------------------------------------------------------------
 

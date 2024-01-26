@@ -31,6 +31,7 @@ tests = describe "Compilation Experiment" $ do
   --         testCompilerWithOpts options (Binary 283) (program 254) [toInteger n] [] [toInteger (n ^ (254 :: Int))]
 
   let options = defaultOptions {optUseUIntUnionFind = True}
+  -- let options = defaultOptions {optUseUIntUnionFind = False}
 
   -- describe "variable / byte" $ do
   --   let program i = do
@@ -47,8 +48,8 @@ tests = describe "Compilation Experiment" $ do
       let dividend = 21
       let divisor = 64
       let expected = [dividend `div` divisor, dividend `mod` divisor]
-      -- testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
-      debugWithOpts options (Binary 7) (program dividend divisor)
+      testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+      -- debugWithOpts options (Binary 7) (program dividend divisor)
 
       -- let genPair = do
       --       dividend <- choose (0, 255)

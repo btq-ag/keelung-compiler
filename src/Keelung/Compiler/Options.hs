@@ -39,7 +39,7 @@ defaultOptions =
       optConstProp = True,
       optOptimize = True,
       optUseNewLinker = False,
-      optUseUIntUnionFind = True,
+      optUseUIntUnionFind = False,
       optDisableTestingOnO0 = False
     }
 
