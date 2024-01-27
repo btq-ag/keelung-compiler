@@ -211,21 +211,27 @@ tests =
             []
             []
             (InterpreterError (Interpreter.DivModQuotientError False 7 3 2 3))
-            (CompilerError (Compiler.ConflictingValuesU 9 6) :: Error GF181)
+            (if optUseUIntUnionFind defaultOptions
+              then SolverError Solver.ConflictingValues  
+              else CompilerError (Compiler.ConflictingValuesU 9 6) :: Error GF181)
           throwBoth
             (Prime 17)
             program
             []
             []
             (InterpreterError (Interpreter.DivModQuotientError False 7 3 2 3))
-            (CompilerError (Compiler.ConflictingValuesU 9 2) :: Error (Prime 17))
+            (if optUseUIntUnionFind defaultOptions
+              then SolverError Solver.ConflictingValues  
+              else CompilerError (Compiler.ConflictingValuesU 9 2) :: Error (Prime 17))
           throwBoth
             (Binary 7)
             program
             []
             []
             (InterpreterError (Interpreter.DivModQuotientError False 7 3 2 3))
-            (CompilerError (Compiler.ConflictingValuesU 9 6) :: Error (Binary 7))
+            (if optUseUIntUnionFind defaultOptions
+              then SolverError Solver.ConflictingValues  
+              else CompilerError (Compiler.ConflictingValuesU 9 6) :: Error (Binary 7))
 
         it "with wrong remainder constant" $ do
           let program = assertDivMod 7 (3 :: UInt 4) 2 0
@@ -235,7 +241,9 @@ tests =
             []
             []
             (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
-            (CompilerError (Compiler.ConflictingValuesU 6 7) :: Error GF181)
+            (if optUseUIntUnionFind defaultOptions
+              then SolverError Solver.ConflictingValues  
+              else CompilerError (Compiler.ConflictingValuesU 6 7) :: Error GF181)
           -- (SolverError Solver.ConflictingValues :: Error GF181)
           throwBoth
             (Prime 17)
@@ -243,14 +251,18 @@ tests =
             []
             []
             (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
-            (CompilerError (Compiler.ConflictingValuesU 6 3) :: Error (Prime 17))
+            (if optUseUIntUnionFind defaultOptions
+              then SolverError Solver.ConflictingValues  
+              else CompilerError (Compiler.ConflictingValuesU 6 3) :: Error (Prime 17))
           throwBoth
             (Binary 7)
             program
             []
             []
             (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
-            (CompilerError (Compiler.ConflictingValuesU 6 7) :: Error (Binary 7))
+            (if optUseUIntUnionFind defaultOptions
+              then SolverError Solver.ConflictingValues  
+              else CompilerError (Compiler.ConflictingValuesU 6 7) :: Error (Binary 7))
 
         it "assertDivMod (divisor & remainder unknown & quotient = 0)" $ do
           let program = do

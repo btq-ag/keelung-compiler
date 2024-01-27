@@ -31,8 +31,18 @@ tests = describe "UInt" $ do
       cs `shouldHaveSize` 37
       cs' `shouldHaveSize` 37
 
-    it "keelung Issue #17" $ do
-      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
+    it "keelung Issue #17 (new linker, with UInt union find)" $ do
+      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = True}) $ do
+        a <- input Private :: Comp (UInt 5)
+        b <- input Private
+        c <- reuse $ a * b
+        return $ c .&. 5
+      cs `shouldHaveSize` 32
+      -- TODO: should be 24
+      cs' `shouldHaveSize` 32
+
+    it "keelung Issue #17 (new linker, without UInt union find)" $ do
+      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = False}) $ do
         a <- input Private :: Comp (UInt 5)
         b <- input Private
         c <- reuse $ a * b
@@ -128,13 +138,22 @@ tests = describe "UInt" $ do
         return $ x * y
       cs `shouldHaveSize` 42
       cs' `shouldHaveSize` 42 -- TODO: should've been 33
-    it "2 variables / byte / GF181" $ do
-      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
+      
+    it "2 variables / byte / GF181 (new linker, with UInt union find)" $ do
+      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = True}) $ do
         x <- inputUInt @8 Public
         y <- inputUInt @8 Public
         return $ x * y
       cs `shouldHaveSize` 42
-      cs' `shouldHaveSize` 33 -- TODO: should've been 33
+      cs' `shouldHaveSize` 42 -- TODO: should've been 33
+
+    it "2 variables / byte / GF181 (new linker, without UInt union find)" $ do
+      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = False}) $ do
+        x <- inputUInt @8 Public
+        y <- inputUInt @8 Public
+        return $ x * y
+      cs `shouldHaveSize` 42
+      cs' `shouldHaveSize` 33
 
     -- 8 * 3 for input / output
     -- 4 * 5 for intermediate limbs
@@ -159,13 +178,21 @@ tests = describe "UInt" $ do
         return $ x * y
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 55 -- TODO: should've been 50
-    it "2 variables / byte / Prime 257" $ do
-      (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True}) 257 $ do
+    it "2 variables / byte / Prime 257 (new linker, with UInt union find)" $ do
+      (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = True}) 257 $ do
         x <- inputUInt @8 Public
         y <- inputUInt @8 Public
         return $ x * y
       cs `shouldHaveSize` 55
-      cs' `shouldHaveSize` 50 -- TODO: should've been 50
+      cs' `shouldHaveSize` 55 -- TODO: should've been 50
+    it "2 variables / byte / Prime 257 (new linker, without UInt union find)" $ do
+      (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = False}) 257 $ do
+        x <- inputUInt @8 Public
+        y <- inputUInt @8 Public
+        return $ x * y
+      cs `shouldHaveSize` 55
+      cs' `shouldHaveSize` 50
+    
     it "2 variables / byte / Prime 1031 (old linker)" $ do
       (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = False}) 1031 $ do
         x <- inputUInt @8 Public
@@ -173,13 +200,21 @@ tests = describe "UInt" $ do
         return $ x * y
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 55 -- TODO: should've been 50
-    it "2 variables / byte / Prime 1031" $ do
-      (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True}) 1031 $ do
+    it "2 variables / byte / Prime 1031 (new linker, with UInt union find)" $ do
+      (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = True}) 1031 $ do
         x <- inputUInt @8 Public
         y <- inputUInt @8 Public
         return $ x * y
       cs `shouldHaveSize` 55
-      cs' `shouldHaveSize` 50 -- TODO: should've been 50
+      cs' `shouldHaveSize` 55 -- TODO: should've been 50
+    it "2 variables / byte / Prime 1031 (new linker, without UInt union find)" $ do
+      (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = False}) 1031 $ do
+        x <- inputUInt @8 Public
+        y <- inputUInt @8 Public
+        return $ x * y
+      cs `shouldHaveSize` 55
+      cs' `shouldHaveSize` 50
+    
 
     -- TODO: can be lower
     it "variable / constant (old linker)" $ do
@@ -188,12 +223,18 @@ tests = describe "UInt" $ do
         return $ x * 4
       cs `shouldHaveSize` 18
       cs' `shouldHaveSize` 18 -- TODO: should've been 13
-    it "variable / constant" $ do
-      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
+    it "variable / constant (new linker, with UInt union find)" $ do
+      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = True}) $ do
         x <- inputUInt @4 Public
         return $ x * 4
       cs `shouldHaveSize` 18
-      cs' `shouldHaveSize` 13 -- TODO: should've been 13
+      cs' `shouldHaveSize` 18 -- TODO: should've been 13
+    it "variable / constant (new linker, without UInt union find)" $ do
+      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = False}) $ do
+        x <- inputUInt @4 Public
+        return $ x * 4
+      cs `shouldHaveSize` 18
+      cs' `shouldHaveSize` 13
 
     -- TODO: should've been just 4
     it "constant / constant" $ do
