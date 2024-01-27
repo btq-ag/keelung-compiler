@@ -5,6 +5,7 @@ module Test.Compilation.UInt.Experiment (tests, run) where
 
 import Keelung hiding (compile)
 import Keelung.Compiler.Options
+import Keelung.Data.U qualified as U
 import Test.Compilation.Util
 import Test.Hspec
 
@@ -43,22 +44,20 @@ tests = describe "Compilation Experiment" $ do
   --     testCompilerWithOpts options gf181 (program i) [toInteger x] [] expected
 
   describe "DivMod" $ do
-    it "constant dividend / constant divisor" $ do
-      let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
-      let dividend = 21
-      let divisor = 64
-      let expected = [dividend `div` divisor, dividend `mod` divisor]
-      testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
-      -- debugWithOpts options (Binary 7) (program dividend divisor)
+    it "performCLDivMod (dividend unknown)" $ do
+      let program dividend divisor = performCLDivMod (fromInteger dividend) (fromInteger divisor :: UInt 4)
+      let dividend = 0
+      let divisor = 1
+      let expected = [clDiv 4 dividend divisor, clMod 4 dividend divisor]
+      testCompilerWithOpts options gf181 (program dividend divisor) [] [] expected
 
-      -- let genPair = do
-      --       dividend <- choose (0, 255)
-      --       divisor <- choose (1, 255)
-      --       return (dividend, divisor)
-      -- forAll genPair $ \(dividend, divisor) -> do
-      --   let expected = [dividend `div` divisor, dividend `mod` divisor]
-      --   forM_ [gf181, Prime 17] $ \field -> do
-      --     let options = defaultOptions {optDisableTestingOnO0 = True}
-      --     testCompilerWithOpts options field (program dividend divisor) [] [] expected
-      --   forM_ [Binary 7] $ \field -> do
-      --     testCompiler field (program dividend divisor) [] [] expected
+-- debugWithOpts options gf181 (program dividend divisor)
+-- testCompilerWithOpts options (Prime 17) (program dividend divisor) [] [] expected
+
+-- | Carry-less division on Integer
+clDiv :: Width -> Integer -> Integer -> Integer
+clDiv width x y = U.uValue (U.new width x `U.clDiv` U.new width y)
+
+-- | Carry-less modolu on Integer
+clMod :: Width -> Integer -> Integer -> Integer
+clMod width x y = U.uValue (U.new width x `U.clMod` U.new width y)

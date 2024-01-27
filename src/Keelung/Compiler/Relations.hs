@@ -17,7 +17,7 @@ module Keelung.Compiler.Relations
     relateR,
     relateS,
     relationBetween,
-    toInt,
+    toMap,
     size,
     lookup,
     Ref.Lookup (..),
@@ -147,7 +147,7 @@ relateU var1 var2 = updateRelationsU $ UInt.relateRefU var1 var2
 
 -- var = slope * var2 + intercept
 relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateR x slope y intercept xs = updateRelationsR (Ref.relateR (relationsOptions xs) (relationsU xs) x slope y intercept) xs
+relateR x slope y intercept xs = updateRelationsR (Ref.relateR (relationsOptions xs) (relationsU xs) (relationsS xs) x slope y intercept) xs
 
 relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateS slice1 slice2 relations = do
@@ -160,8 +160,8 @@ relateS slice1 slice2 relations = do
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> Maybe (n, n)
 relationBetween var1 var2 = Ref.relationBetween var1 var2 . relationsR
 
-toInt :: (Ref -> Bool) -> Relations n -> Map Ref (Either (n, Ref, n) n)
-toInt shouldBeKept = Ref.toInt shouldBeKept . relationsR
+toMap :: (GaloisField n, Integral n) => (Ref -> Bool) -> Relations n -> Map Ref (Either (n, Ref, n) n)
+toMap shouldBeKept = Ref.toMap shouldBeKept . relationsR
 
 size :: Relations n -> Int
 size (Relations f l u s options) = EquivClass.size f + LimbRelations.size l + UInt.size u + (if optUseUIntUnionFind options then SliceRelations.size s else 0)
@@ -169,4 +169,4 @@ size (Relations f l u s options) = EquivClass.size f + LimbRelations.size l + UI
 --------------------------------------------------------------------------------
 
 lookup :: (GaloisField n) => Ref -> Relations n -> Ref.Lookup n
-lookup var xs = Ref.lookup2 (relationsOptions xs) (relationsU xs) (relationsS xs) var (relationsR xs)
+lookup var xs = Ref.lookup (relationsOptions xs) (relationsU xs) (relationsS xs) var (relationsR xs)

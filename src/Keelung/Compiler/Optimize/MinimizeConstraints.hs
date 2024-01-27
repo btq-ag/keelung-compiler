@@ -560,7 +560,8 @@ substPolyL relations poly = do
   let constant = PolyL.polyConstant poly
       initState = (Left constant, Nothing)
       -- afterSubstRefU = foldl (substRefU (Relations.exportUIntRelations relations)) initState (PolyL.polyLimbs poly)
-      afterSubstLimb = foldl (substLimb (Relations.relationsL relations)) initState (PolyL.polyLimbs poly)
+      afterSubstLimb =
+        foldl (substLimb (Relations.relationsL relations)) initState (PolyL.polyLimbs poly)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstLimb (PolyL.polyRefs poly)
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed

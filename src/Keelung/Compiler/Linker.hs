@@ -92,7 +92,7 @@ linkConstraintModule cm =
                 Left _ -> error "[ panic ] extractRefRelations: failed to build polynomial"
                 Right poly -> CAddL poly
 
-          result = map convert $ Map.toList $ Relations.toInt shouldBeKept relations
+          result = map convert $ Map.toList $ Relations.toMap shouldBeKept relations
        in Seq.fromList (linkConstraint env =<< result)
 
     shouldBeKept :: Ref -> Bool
@@ -149,7 +149,6 @@ linkConstraintModule cm =
         if envUseNewLinker env
           then refUBitShouldBeKept var i
           else --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
-          --  the UInt variable should be kept
             refUShouldBeKept var
       _ ->
         -- it's a pinned Field variable
@@ -411,7 +410,8 @@ data Env = Env
     envFieldInfo :: !FieldInfo,
     envFieldWidth :: !Width,
     -- other options
-    envUseNewLinker :: !Bool
+    envUseNewLinker :: !Bool,
+    envUseUIntUnionFind :: !Bool
   }
   deriving (Show)
 
@@ -436,5 +436,6 @@ constructEnv options oldCounters newCounters occurF occurB occurU occurUB =
           envPinnedSize = getCount oldCounters Output + getCount oldCounters PublicInput + getCount oldCounters PrivateInput,
           envFieldInfo = optFieldInfo options,
           envFieldWidth = FieldInfo.fieldWidth (optFieldInfo options),
-          envUseNewLinker = optUseNewLinker options
+          envUseNewLinker = optUseNewLinker options,
+          envUseUIntUnionFind = optUseUIntUnionFind options
         }

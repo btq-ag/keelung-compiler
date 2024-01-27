@@ -25,10 +25,10 @@ import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
-import qualified Keelung.Data.Slice as Slice
 
 --------------------------------------------------------------------------------
 
@@ -272,7 +272,7 @@ writeSliceVal a x = addC [CSliceVal a x]
 
 -- | Assert that two RefUs are equal
 writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
-writeRefUEq a b = do 
+writeRefUEq a b = do
   useUIntUnionFind <- gets (optUseUIntUnionFind . cmOptions)
   if useUIntUnionFind
     then addC [CSliceEq (Slice.fromRefU a) (Slice.fromRefU b)]
@@ -280,7 +280,7 @@ writeRefUEq a b = do
 
 -- | Assert that two Limbs are equal
 writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
-writeLimbEq a b =  do
+writeLimbEq a b = do
   useUIntUnionFind <- gets (optUseUIntUnionFind . cmOptions)
   if useUIntUnionFind
     then addC [CSliceEq (Slice.fromLimb a) (Slice.fromLimb b)]
