@@ -16,48 +16,31 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Compilation Experiment" $ do
-  -- describe "Field pow" $ do
-  --   let program power = do
-  --         n <- input Public
-  --         return (n `pow` power)
-  --   describe "Frobenius endomorphism" $ do
-  --     it "n^256 = n (Binary 283)" $ do
-  --       property $ \(n :: Binary 283) -> do
-  --         testCompilerWithOpts options (Binary 283) (program 256) [toInteger n] [] [toInteger n]
-  --     it "n^255 = n (Binary 283)" $ do
-  --       property $ \(n :: Binary 283) -> do
-  --         testCompilerWithOpts options (Binary 283) (program 255) [toInteger n] [] [1]
-  --     it "n^254 = n (Binary 283)" $ do
-  --       property $ \(n :: Binary 283) -> do
-  --         testCompilerWithOpts options (Binary 283) (program 254) [toInteger n] [] [toInteger (n ^ (254 :: Int))]
+  -- let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = False, optOptimize = False}
+  let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True}
+  -- let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True, optOptimize = False}
+  describe "Addition" $ do
+    it "1 variable / 1 constant" $ do
+      let program y = do
+            x <- input Public
+            return (x .*. fromInteger y :: UInt 8)
+      let x = 0
+      let y = 0
+      let expected = [U.uValue (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
+      debugWithOpts options gf181 (program y)
+      testCompilerWithOpts options gf181 (program y) [x] [] expected
 
-  let options = defaultOptions {optUseUIntUnionFind = True}
-  -- let options = defaultOptions {optUseUIntUnionFind = False}
-
-  -- describe "variable / byte" $ do
-  --   let program i = do
-  --         x <- inputUInt Public :: Comp (UInt 8)
-  --         return $ shift x i
-
-  --   it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
-  --     let expected = [toInteger (Data.Bits.shift x i)]
-  --     testCompilerWithOpts options gf181 (program i) [toInteger x] [] expected
-
-  describe "DivMod" $ do
-    it "performCLDivMod (dividend unknown)" $ do
-      let program dividend divisor = performCLDivMod (fromInteger dividend) (fromInteger divisor :: UInt 4)
-      let dividend = 0
-      let divisor = 1
-      let expected = [clDiv 4 dividend divisor, clMod 4 dividend divisor]
-      testCompilerWithOpts options gf181 (program dividend divisor) [] [] expected
-
--- debugWithOpts options gf181 (program dividend divisor)
--- testCompilerWithOpts options (Prime 17) (program dividend divisor) [] [] expected
-
--- | Carry-less division on Integer
-clDiv :: Width -> Integer -> Integer -> Integer
-clDiv width x y = U.uValue (U.new width x `U.clDiv` U.new width y)
-
--- | Carry-less modolu on Integer
-clMod :: Width -> Integer -> Integer -> Integer
-clMod width x y = U.uValue (U.new width x `U.clMod` U.new width y)
+-- describe "DivMod" $ do
+--   it "constant dividend / constant divisor" $ do
+--     let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
+--     -- let genPair = do
+--     --       dividend <- choose (0, 255)
+--     --       divisor <- choose (1, 255)
+--     --       return (dividend, divisor)
+--     -- forAll genPair $ \(dividend, divisor) -> do
+--     let dividend = 3
+--         divisor = 20
+--     let expected = [dividend `div` divisor, dividend `mod` divisor]
+--     forM_ [Prime 17] $ \field -> do
+--       debugWithOpts options field (program dividend divisor)
+--       testCompilerWithOpts options field (program dividend divisor) [] [] expected

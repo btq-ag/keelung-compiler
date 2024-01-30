@@ -38,6 +38,8 @@ import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
+import Data.Sequence (Seq)
+import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
@@ -54,19 +56,19 @@ data ConstraintModule n = ConstraintModule
     cmOccurrenceUB :: !OccurUB,
     cmRelations :: Relations n,
     -- addative constraints
-    cmAddL :: [PolyL n],
+    cmAddL :: Seq (PolyL n),
     -- multiplicative constraints
-    cmMulL :: [(PolyL n, PolyL n, Either n (PolyL n))],
+    cmMulL :: Seq (PolyL n, PolyL n, Either n (PolyL n)),
     -- hits for computing equality
-    cmEqZeros :: [(PolyL n, RefF)],
+    cmEqZeros :: Seq (PolyL n, RefF),
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
-    cmDivMods :: [(Either RefU U, Either RefU U, Either RefU U, Either RefU U)],
+    cmDivMods :: Seq (Either RefU U, Either RefU U, Either RefU U, Either RefU U),
     -- hints for generating witnesses for carry-less DivMod constraints
     -- a = b .*. q .^. r
-    cmCLDivMods :: [(Either RefU U, Either RefU U, Either RefU U, Either RefU U)],
+    cmCLDivMods :: Seq (Either RefU U, Either RefU U, Either RefU U, Either RefU U),
     -- hints for generating witnesses for ModInv constraints
-    cmModInvs :: [(Either RefU U, Either RefU U, Either RefU U, U)]
+    cmModInvs :: Seq (Either RefU U, Either RefU U, Either RefU U, U)
   }
   deriving (Eq, Generic, NFData)
 
@@ -88,12 +90,12 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> prettyVariables (cmCounters cm)
       <> "}"
     where
-      adapt :: String -> [a] -> (a -> String) -> String
+      adapt :: String -> Seq a -> (a -> String) -> String
       adapt name xs f =
         let size = length xs
          in if size == 0
               then ""
-              else "  " <> name <> " (" <> show size <> "):\n\n" <> unlines (map (("    " <>) . f) xs) <> "\n"
+              else "  " <> name <> " (" <> show size <> "):\n\n" <> unlines (map (("    " <>) . f) (toList xs)) <> "\n"
 
       showFieldInfo :: String
       showFieldInfo = "  Field: " <> show (fieldTypeData (optFieldInfo (cmOptions cm))) <> "\n"
@@ -101,17 +103,17 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       showDivModHints =
         if null $ cmDivMods cm
           then ""
-          else "  DivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (cmDivMods cm))))
+          else "  DivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (toList $ cmDivMods cm))))
 
       showCLDivModHints =
         if null $ cmCLDivMods cm
           then ""
-          else "  CLDivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (cmCLDivMods cm))))
+          else "  CLDivMod hints:\n" <> indent (indent (showList' (map (\(x, y, q, r) -> show x <> " = " <> show y <> " * " <> show q <> " + " <> show r) (toList $ cmCLDivMods cm))))
 
       showModInvHints =
         if null $ cmModInvs cm
           then ""
-          else "  ModInv hints:\n" <> indent (indent (showList' (map (\(a, _aainv, _n, p) -> show a <> "⁻¹ = (mod " <> show p <> ")") (cmModInvs cm))))
+          else "  ModInv hints:\n" <> indent (indent (showList' (map (\(a, _aainv, _n, p) -> show a <> "⁻¹ = (mod " <> show p <> ")") (toList $ cmModInvs cm))))
 
       showRelations =
         if Relations.size (cmRelations cm) == 0

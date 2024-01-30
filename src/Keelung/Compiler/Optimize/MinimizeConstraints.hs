@@ -6,9 +6,12 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
+import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
@@ -94,28 +97,28 @@ runStateMachine cm action = do
 
 optimizeAddL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeAddL cm = runOptiM cm $ runRoundM $ do
-  result <- foldMaybeM reduceAddL [] (cmAddL cm)
+  result <- foldMaybeM reduceAddL mempty (cmAddL cm)
   modify' $ \cm' -> cm' {cmAddL = result}
 
 optimizeMulL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeMulL cm = runOptiM cm $ runRoundM $ do
-  cmMulL' <- foldMaybeM reduceMulL [] (cmMulL cm)
+  cmMulL' <- foldMaybeM reduceMulL mempty (cmMulL cm)
   modify' $ \cm' -> cm' {cmMulL = cmMulL'}
 
 optimizeDivMod :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeDivMod cm = runOptiM cm $ runRoundM $ do
-  result <- foldMaybeM reduceDivMod [] (cmDivMods cm)
+  result <- foldMaybeM reduceDivMod mempty (cmDivMods cm)
   modify' $ \cm' -> cm' {cmDivMods = result}
 
 optimizeCLDivMod :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeCLDivMod cm = runOptiM cm $ runRoundM $ do
-  result <- foldMaybeM reduceDivMod [] (cmCLDivMods cm)
+  result <- foldMaybeM reduceDivMod mempty (cmCLDivMods cm)
   modify' $ \cm' -> cm' {cmCLDivMods = result}
 
 goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughEqZeros cm =
   let relations = cmRelations cm
-   in cm {cmEqZeros = mapMaybe (reduceEqZeros relations) (cmEqZeros cm)}
+   in cm {cmEqZeros = Seq.fromList $ mapMaybe (reduceEqZeros relations) (toList $ cmEqZeros cm)}
   where
     reduceEqZeros :: (GaloisField n, Integral n) => Relations n -> (PolyL n, RefF) -> Maybe (PolyL n, RefF)
     reduceEqZeros relations (polynomial, m) = case substPolyL relations polynomial of
@@ -126,14 +129,14 @@ goThroughEqZeros cm =
 goThroughModInvs :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughModInvs cm =
   let substModInv (a, b, c, d) = (a, b, c, d)
-   in cm {cmModInvs = map substModInv (cmModInvs cm)}
+   in cm {cmModInvs = fmap substModInv (cmModInvs cm)}
 
-foldMaybeM :: (Monad m) => (a -> m (Maybe a)) -> [a] -> [a] -> m [a]
+foldMaybeM :: (Monad m) => (a -> m (Maybe a)) -> Seq a -> Seq a -> m (Seq a)
 foldMaybeM f = foldM $ \acc x -> do
   result <- f x
   case result of
     Nothing -> return acc
-    Just x' -> return (x' : acc)
+    Just x' -> return (x' Seq.<| acc)
 
 ------------------------------------------------------------------------------
 
@@ -493,7 +496,7 @@ addAddL poly = case PolyL.view poly of
     void $ relateF var1 (-coeff2 / coeff1, var2, -constant / coeff1)
   PolyL.RefPolynomial _ _ -> do
     markChanged AdditiveFieldConstraintChanged
-    modify' $ \cm' -> cm' {cmAddL = poly : cmAddL cm'}
+    modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
   PolyL.LimbMonomial constant (var1, multiplier1) -> do
     --  constant + var1 * multiplier1  = 0
     --    =>
@@ -506,13 +509,13 @@ addAddL poly = case PolyL.view poly of
         void $ relateL var1 var2
       else do
         markChanged AdditiveLimbConstraintChanged
-        modify' $ \cm' -> cm' {cmAddL = poly : cmAddL cm'}
+        modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
   PolyL.LimbPolynomial _ _ -> do
     markChanged AdditiveLimbConstraintChanged
-    modify' $ \cm' -> cm' {cmAddL = poly : cmAddL cm'}
+    modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
   PolyL.MixedPolynomial {} -> do
     markChanged AdditiveFieldConstraintChanged
-    modify' $ \cm' -> cm' {cmAddL = poly : cmAddL cm'}
+    modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
 
 --------------------------------------------------------------------------------
 

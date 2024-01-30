@@ -29,6 +29,7 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
+import qualified Data.Sequence as Seq
 
 --------------------------------------------------------------------------------
 
@@ -167,7 +168,7 @@ addC = mapM_ addOne
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddL xs) = do
-      modify' (\cs -> addOccurrencesTuple (PolyL.varsSet xs) $ cs {cmAddL = xs : cmAddL cs})
+      modify' (\cs -> addOccurrencesTuple (PolyL.varsSet xs) $ cs {cmAddL =  xs Seq.<| cmAddL cs})
     addOne (CRefFVal x c) = do
       execRelations $ Relations.assignR x c
     addOne (CLimbVal x c) = do
@@ -190,8 +191,8 @@ addC = mapM_ addOne
       countBitTestAsOccurU (B x)
       countBitTestAsOccurU (B y)
       execRelations $ Relations.relateB x (False, y)
-    addOne (CMulL x y (Left c)) = modify' (\cs -> addOccurrencesTuple (PolyL.varsSet x) $ addOccurrencesTuple (PolyL.varsSet y) $ cs {cmMulL = (x, y, Left c) : cmMulL cs})
-    addOne (CMulL x y (Right z)) = modify (\cs -> addOccurrencesTuple (PolyL.varsSet x) $ addOccurrencesTuple (PolyL.varsSet y) $ addOccurrencesTuple (PolyL.varsSet z) $ cs {cmMulL = (x, y, Right z) : cmMulL cs})
+    addOne (CMulL x y (Left c)) = modify' (\cs -> addOccurrencesTuple (PolyL.varsSet x) $ addOccurrencesTuple (PolyL.varsSet y) $ cs {cmMulL = (x, y, Left c) Seq.<| cmMulL cs})
+    addOne (CMulL x y (Right z)) = modify (\cs -> addOccurrencesTuple (PolyL.varsSet x) $ addOccurrencesTuple (PolyL.varsSet y) $ addOccurrencesTuple (PolyL.varsSet z) $ cs {cmMulL = (x, y, Right z) Seq.<| cmMulL cs})
 
 --------------------------------------------------------------------------------
 
@@ -300,22 +301,22 @@ addEqZeroHint :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> RefF -> M n (
 addEqZeroHint c xs m = case PolyL.fromRefs c xs of
   Left 0 -> writeRefFVal m 0
   Left constant -> writeRefFVal m (recip constant)
-  Right poly -> modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
+  Right poly -> modify' $ \cs -> cs {cmEqZeros = (poly, m) Seq.<| cmEqZeros cs}
 
 addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyL n) -> RefF -> M n ()
 addEqZeroHintWithPoly (Left 0) m = writeRefFVal m 0
 addEqZeroHintWithPoly (Left constant) m = writeRefFVal m (recip constant)
-addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) : cmEqZeros cs}
+addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) Seq.<| cmEqZeros cs}
 
 addDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
-addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (x, y, q, r) : cmDivMods cs}
+addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (x, y, q, r) Seq.<| cmDivMods cs}
 
 addCLDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
-addCLDivModHint x y q r = modify' $ \cs -> cs {cmCLDivMods = (x, y, q, r) : cmCLDivMods cs}
+addCLDivModHint x y q r = modify' $ \cs -> cs {cmCLDivMods = (x, y, q, r) Seq.<| cmCLDivMods cs}
 
 -- | Width of all values are doubled in this hint
 addModInvHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> U -> M n ()
-addModInvHint a output n p = modify' $ \cs -> cs {cmModInvs = (right (U.widen (widthOf p)) a, right (U.widen (widthOf p)) output, right (U.widen (widthOf p)) n, U.widen (widthOf p) p) : cmModInvs cs}
+addModInvHint a output n p = modify' $ \cs -> cs {cmModInvs = (right (U.widen (widthOf p)) a, right (U.widen (widthOf p)) output, right (U.widen (widthOf p)) n, U.widen (widthOf p) p) Seq.<| cmModInvs cs}
 
 --------------------------------------------------------------------------------
 

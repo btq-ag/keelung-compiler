@@ -29,7 +29,6 @@ import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.Limb (LimbRelations)
 import Keelung.Compiler.Relations.Limb qualified as LimbRelations
-import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
@@ -59,17 +58,17 @@ linkConstraintModule cm =
     { csOptions = cmOptions cm,
       csCounters = counters,
       csConstraints =
-        varEqFs
+        fromRefRelations
           <> ( if optUseUIntUnionFind (cmOptions cm)
-                 then varEqSs
-                 else varEqLs <> varEqUs
+                 then fromSliceRelations
+                 else fromUIntAndLimbRelations
              )
           <> addLs
           <> mulLs,
       csEqZeros = toList eqZeros,
-      csDivMods = map (\(a, b, c, d) -> ([a], [b], [c], [d])) divMods,
-      csCLDivMods = map (\(a, b, c, d) -> ([a], [b], [c], [d])) clDivMods,
-      csModInvs = map (\(a, b, c, d) -> ([a], [b], [c], d)) modInvs
+      csDivMods = toList $ fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) divMods,
+      csCLDivMods = toList $ fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) clDivMods,
+      csModInvs = toList $ fmap (\(a, b, c, d) -> ([a], [b], [c], d)) modInvs
     }
   where
     -- new counters after linking
@@ -77,8 +76,6 @@ linkConstraintModule cm =
 
     !env = constructEnv (cmOptions cm) (cmCounters cm) counters (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
     uncurry3 f (a, b, c) = f a b c
-
-    -- fieldWidth = FieldInfo.fieldWidth ((optFieldInfo . cmOptions) cm)
 
     extractRefRelations :: (GaloisField n, Integral n) => Relations n -> Seq (Linked.Constraint n)
     extractRefRelations relations =
@@ -92,8 +89,8 @@ linkConstraintModule cm =
                 Left _ -> error "[ panic ] extractRefRelations: failed to build polynomial"
                 Right poly -> CAddL poly
 
-          result = map convert $ Map.toList $ Relations.toMap shouldBeKept relations
-       in Seq.fromList (linkConstraint env =<< result)
+          result = Seq.fromList $ map convert $ Map.toList $ Relations.toMap shouldBeKept relations
+       in linkConstraint env =<< result
 
     shouldBeKept :: Ref -> Bool
     shouldBeKept (F ref) = refFShouldBeKept ref
@@ -154,72 +151,79 @@ linkConstraintModule cm =
         -- it's a pinned Field variable
         True
 
+    -- \| optUseUIntUnionFind = False
     extractLimbRelations :: (GaloisField n, Integral n) => LimbRelations -> Seq (Linked.Constraint n)
     extractLimbRelations relations =
       let convert :: (GaloisField n, Integral n) => (Limb, Either Limb Integer) -> Constraint n
           convert (var, Right val) = CLimbVal var val
           convert (var, Left root) = CLimbEq var root
 
-          result = map convert $ Map.toList $ LimbRelations.toMap limbShouldBeKept relations
-       in Seq.fromList (linkConstraint env =<< result)
+          result = Seq.fromList $ map convert $ Map.toList $ LimbRelations.toMap limbShouldBeKept relations
+       in linkConstraint env =<< result
 
+    -- optUseUIntUnionFind = False
     extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
-    extractUIntRelations relations = UIntRelations.toConstraints refUShouldBeKept relations >>= Seq.fromList . linkConstraint env
+    extractUIntRelations relations = UIntRelations.toConstraints refUShouldBeKept relations >>= linkConstraint env
 
-    extractSliceRelations :: (GaloisField n, Integral n) => SliceRelations -> Seq (Linked.Constraint n)
-    extractSliceRelations relations = SliceRelations.toConstraints refUShouldBeKept relations >>= Seq.fromList . linkConstraint env
+    -- constraints extracted from relations between Refs
+    fromRefRelations = extractRefRelations (cmRelations cm)
 
-    varEqFs = extractRefRelations (cmRelations cm)
-    varEqLs = extractLimbRelations (Relations.relationsL (cmRelations cm))
-    varEqUs = extractUIntRelations (Relations.relationsU (cmRelations cm))
-    varEqSs = extractSliceRelations (Relations.relationsS (cmRelations cm))
+    -- constraints extracted from relations between UInts & Limbs (only when optUseUIntUnionFind = False)
+    fromUIntAndLimbRelations :: (GaloisField n, Integral n) => Seq (Linked.Constraint n)
+    fromUIntAndLimbRelations =
+      extractUIntRelations (Relations.relationsU (cmRelations cm))
+        <> extractLimbRelations (Relations.relationsL (cmRelations cm))
 
-    addLs = Seq.fromList $ linkConstraint env . CAddL =<< cmAddL cm
-    mulLs = Seq.fromList $ linkConstraint env . uncurry3 CMulL =<< cmMulL cm
-    eqZeros = Seq.fromList $ map (bimap (linkPolyLUnsafe env) (reindexRefF env)) $ cmEqZeros cm
+    -- constraints extracted from relations between Slices (only when optUseUIntUnionFind = True)
+    fromSliceRelations :: (GaloisField n, Integral n) => Seq (Linked.Constraint n)
+    fromSliceRelations = SliceRelations.toConstraints refUShouldBeKept (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
+
+    addLs = linkConstraint env . CAddL =<< cmAddL cm
+    mulLs = linkConstraint env . uncurry3 CMulL =<< cmMulL cm
+    eqZeros = bimap (linkPolyLUnsafe env) (reindexRefF env) <$> cmEqZeros cm
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
     fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB env (RefUBit var 0)))
     fromEitherRefU (Right val) = let width = widthOf val in (width, Right (U.uValue val))
 
-    divMods = map (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) $ cmDivMods cm
-    clDivMods = map (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) $ cmCLDivMods cm
-    modInvs = map (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, U.uValue p)) $ cmModInvs cm
+    divMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmDivMods cm
+    clDivMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmCLDivMods cm
+    modInvs = (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, U.uValue p)) <$> cmModInvs cm
 
 -------------------------------------------------------------------------------
 
 -- | Link a specialized constraint to a list of constraints
-linkConstraint :: (GaloisField n, Integral n) => Env -> Constraint n -> [Linked.Constraint n]
-linkConstraint env (CAddL as) = [Linked.CAdd (linkPolyLUnsafe env as)]
+linkConstraint :: (GaloisField n, Integral n) => Env -> Constraint n -> Seq (Linked.Constraint n)
+linkConstraint env (CAddL as) = Seq.fromList [Linked.CAdd (linkPolyLUnsafe env as)]
 linkConstraint env (CRefEq x y) =
   case Poly.buildEither 0 [(reindexRef env x, 1), (reindexRef env y, -1)] of
     Left _ -> error "CRefEq: two references are the same"
-    Right xs -> [Linked.CAdd xs]
+    Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CRefBNEq x y) =
   case Poly.buildEither 1 [(reindexRefB env x, -1), (reindexRefB env y, -1)] of
     Left _ -> error "CRefBNEq: two variables are the same"
-    Right xs -> [Linked.CAdd xs]
+    Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CLimbEq x y) =
   if lmbWidth x /= lmbWidth y
     then error "[ panic ] CLimbEq: Limbs are of different width"
     else do
       case FieldInfo.fieldTypeData (envFieldInfo env) of
         Binary _ -> do
-          i <- [0 .. lmbWidth x - 1]
+          i <- Seq.fromList [0 .. lmbWidth x - 1]
           let pair = [(reindexRefU env (lmbRef x) (lmbOffset x + i), 1), (reindexRefU env (lmbRef y) (lmbOffset y + i), -1)]
           case Poly.buildEither 0 pair of
             Left _ -> error "CLimbEq: two variables are the same"
-            Right xs -> [Linked.CAdd xs]
+            Right xs -> Seq.fromList [Linked.CAdd xs]
         Prime _ -> do
           let pairsX = reindexLimb env x 1
           let pairsY = reindexLimb env y (-1)
           let pairs = IntMap.unionWith (+) pairsX pairsY
           case Poly.buildWithIntMap 0 pairs of
             Left _ -> error "CLimbEq: two variables are the same"
-            Right xs -> [Linked.CAdd xs]
+            Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CRefUEq x y) =
   -- split `x` and `y` into smaller limbs and pair them up with `CLimbEq`
-  let cVarEqLs = zipWith CLimbEq (Limb.refUToLimbs (envFieldWidth env) x) (Limb.refUToLimbs (envFieldWidth env) y)
+  let cVarEqLs = Seq.fromList $ zipWith CLimbEq (Limb.refUToLimbs (envFieldWidth env) x) (Limb.refUToLimbs (envFieldWidth env) y)
    in cVarEqLs >>= linkConstraint env
 linkConstraint env (CSliceEq x y) =
   let widthX = Slice.sliceEnd x - Slice.sliceStart x
@@ -230,20 +234,21 @@ linkConstraint env (CSliceEq x y) =
           let width = envFieldWidth env
               -- split both Slices into smaller chunks of size `width`
               pairs =
-                [ ( Slice (sliceRefU x) (sliceStart x + i) ((sliceStart x + i + width) `min` sliceEnd x),
-                    Slice (sliceRefU y) (sliceStart y + i) ((sliceStart y + i + width) `min` sliceEnd y)
-                  )
-                  | i <- [0, width .. widthOf x - 1]
-                ]
+                Seq.fromList $
+                  [ ( Slice (sliceRefU x) (sliceStart x + i) ((sliceStart x + i + width) `min` sliceEnd x),
+                      Slice (sliceRefU y) (sliceStart y + i) ((sliceStart y + i + width) `min` sliceEnd y)
+                    )
+                    | i <- [0, width .. widthOf x - 1]
+                  ]
            in pairs >>= \(sliceX, sliceY) ->
                 let sliceX' = reindexSlice env sliceX True
                     sliceY' = reindexSlice env sliceY False
                  in case Poly.buildWithIntMap 0 (IntMap.unionWith (+) sliceX' sliceY') of
                       Left _ -> error "CSliceEq: impossible"
-                      Right xs -> [Linked.CAdd xs]
+                      Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef env x, 1)] of
   Left _ -> error "CRefFVal: impossible"
-  Right xs -> [Linked.CAdd xs]
+  Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CLimbVal x n) =
   -- "ArithException: arithmetic underflow" will be thrown if `n` is negative in Binary fields
   let negatedConstant = case FieldInfo.fieldTypeData (envFieldInfo env) of
@@ -251,17 +256,17 @@ linkConstraint env (CLimbVal x n) =
         Binary _ -> fromInteger n
    in case Poly.buildWithIntMap negatedConstant (reindexLimb env x 1) of
         Left _ -> error "CLimbVal: impossible"
-        Right xs -> [Linked.CAdd xs]
+        Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CRefUVal x n) =
   case FieldInfo.fieldTypeData (envFieldInfo env) of
     Binary _ ->
-      let cRefFVals = [CRefFVal (B (RefUBit x i)) (if Data.Bits.testBit n i then 1 else 0) | i <- [0 .. widthOf x - 1]]
+      let cRefFVals = Seq.fromList [CRefFVal (B (RefUBit x i)) (if Data.Bits.testBit n i then 1 else 0) | i <- [0 .. widthOf x - 1]]
        in cRefFVals >>= linkConstraint env
     Prime _ -> do
       -- split the Integer into smaller chunks of size `fieldWidth`
       let number = U.new (widthOf x) n
           chunks = map U.uValue (U.chunks (envFieldWidth env) number)
-          cLimbVals = zipWith CLimbVal (Limb.refUToLimbs (envFieldWidth env) x) chunks
+          cLimbVals = Seq.fromList $ zipWith CLimbVal (Limb.refUToLimbs (envFieldWidth env) x) chunks
        in cLimbVals >>= linkConstraint env
 linkConstraint env (CSliceVal x n) =
   let constant = case FieldInfo.fieldTypeData (envFieldInfo env) of
@@ -270,20 +275,21 @@ linkConstraint env (CSliceVal x n) =
       width = envFieldWidth env
       -- split `n` into smaller chunks of size `width`
       constantChunks = zip [0 ..] (U.chunks (envFieldWidth env) (U.new (widthOf x) constant))
-      pairs = [(Slice (sliceRefU x) (sliceStart x + width * i) ((sliceStart x + width * (i + 1)) `min` sliceEnd x), chunk) | (i, chunk) <- constantChunks]
+      pairs = Seq.fromList [(Slice (sliceRefU x) (sliceStart x + width * i) ((sliceStart x + width * (i + 1)) `min` sliceEnd x), chunk) | (i, chunk) <- constantChunks]
    in pairs >>= \(slice, c) ->
         case Poly.buildWithIntMap (fromIntegral c) (reindexSlice env slice False) of
           Left _ -> error "CSliceVal: impossible"
-          Right xs -> [Linked.CAdd xs]
+          Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CMulL as bs cs) =
-  [ Linked.CMul
-      (linkPolyLUnsafe env as)
-      (linkPolyLUnsafe env bs)
-      ( case cs of
-          Left n -> Left n
-          Right xs -> linkPolyL env xs
-      )
-  ]
+  Seq.fromList
+    [ Linked.CMul
+        (linkPolyLUnsafe env as)
+        (linkPolyLUnsafe env bs)
+        ( case cs of
+            Left n -> Left n
+            Right xs -> linkPolyL env xs
+        )
+    ]
 
 updateCounters :: ConstraintModule n -> Counters
 updateCounters cm =
@@ -334,7 +340,7 @@ reindexLimb env limb multiplier = case lmbSigns limb of
             env
             (lmbRef limb)
             (i + lmbOffset limb),
-          (2 ^ i) * if sign then multiplier else (-multiplier)
+          2 ^ i * if sign then multiplier else (-multiplier)
         )
         | i <- [0 .. lmbWidth limb - 1]
       ]
@@ -345,7 +351,7 @@ reindexLimb env limb multiplier = case lmbSigns limb of
             env
             (lmbRef limb)
             (i + lmbOffset limb),
-          (2 ^ i) * if sign then multiplier else (-multiplier)
+          2 ^ i * if sign then multiplier else (-multiplier)
         )
         | (i, sign) <- zip [0 .. lmbWidth limb - 1] signs
       ]
@@ -377,18 +383,18 @@ reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOf
 reindexRefB env (RefUBit x i) = reindexRefU env x i
 
 reindexRefU :: Env -> RefU -> Int -> Var
-reindexRefU env (RefUO w x) i = w * x + (i `mod` w) + getOffset (envOldCounters env) (Output, ReadAllUInts)
-reindexRefU env (RefUI w x) i = w * x + (i `mod` w) + getOffset (envOldCounters env) (PublicInput, ReadAllUInts)
-reindexRefU env (RefUP w x) i = w * x + (i `mod` w) + getOffset (envOldCounters env) (PrivateInput, ReadAllUInts)
+reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envOldCounters env) (Output, ReadAllUInts)
+reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envOldCounters env) (PublicInput, ReadAllUInts)
+reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envOldCounters env) (PrivateInput, ReadAllUInts)
 reindexRefU env (RefUX w x) i =
   let result =
         if envUseNewLinker env
           then case IntMap.lookup w (envIndexTableUBWithOffsets env) of
             Nothing -> error "[ panic ] reindexRefU: impossible"
-            Just (offset, table) -> IntervalTable.reindex table (w * x + (i `mod` w)) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
+            Just (offset, table) -> IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
           else
             let offset = getOffset (envOldCounters env) (Intermediate, ReadUInt w) + w * x
-             in IntervalTable.reindex (envIndexTable env) (offset - envPinnedSize env) + envPinnedSize env + (i `mod` w)
+             in IntervalTable.reindex (envIndexTable env) (offset - envPinnedSize env) + envPinnedSize env + i `mod` w
    in result
 
 -------------------------------------------------------------------------------
