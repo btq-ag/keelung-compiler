@@ -10,8 +10,9 @@ module Keelung.Compiler.Relations.Reference
     relateB,
     relateR,
     relationBetween,
-    toMap,
+    toConstraints,
     lookup,
+    LinRel (..),
     Lookup (..),
   )
 where
@@ -20,9 +21,11 @@ import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
-import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
@@ -32,6 +35,8 @@ import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UInt
+import Keelung.Data.Constraint
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup (SliceLookup (SliceLookup))
@@ -74,19 +79,25 @@ relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
   Nothing -> Nothing
   Just (LinRel a b) -> Just (a, b)
 
-toMap :: (GaloisField n, Integral n) => (Ref -> Bool) -> RefRelations n -> Map Ref (Either (n, Ref, n) n)
-toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
+-- | Convert the relations to specialized constraints
+toConstraints :: (GaloisField n, Integral n) => (Ref -> Bool) -> RefRelations n -> Seq (Constraint n)
+toConstraints shouldBeKept = Seq.fromList . toList . Map.mapMaybeWithKey convert . EquivClass.toMap
   where
-    convert var status = do
-      if shouldBeKept var
-        then case status of
-          EquivClass.IsConstant val -> Just (Right val)
+    convert :: (GaloisField n, Integral n) => Ref -> EquivClass.VarStatus Ref n (LinRel n) -> Maybe (Constraint n)
+    convert var status
+      | shouldBeKept var = case status of
+          EquivClass.IsConstant val -> Just (CRefFVal var val)
           EquivClass.IsRoot _ -> Nothing
           EquivClass.IsChildOf parent (LinRel slope intercept) ->
             if shouldBeKept parent
-              then Just $ Left (slope, parent, intercept)
+              then case (slope, intercept) of
+                (0, _) -> Just (CRefFVal var intercept)
+                (1, 0) -> Just (CRefEq var parent)
+                (_, _) -> case PolyL.fromRefs intercept [(var, -1), (parent, slope)] of
+                  Left _ -> error "[ panic ] extractRefRelations: failed to build polynomial"
+                  Right poly -> Just (CAddL poly)
               else Nothing
-        else Nothing
+      | otherwise = Nothing
 
 --------------------------------------------------------------------------------
 

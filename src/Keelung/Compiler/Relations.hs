@@ -17,7 +17,6 @@ module Keelung.Compiler.Relations
     relateR,
     relateS,
     relationBetween,
-    toMap,
     size,
     lookup,
     Ref.Lookup (..),
@@ -27,7 +26,6 @@ where
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Data.Field.Galois (GaloisField)
-import Data.Map.Strict (Map)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Options
@@ -159,9 +157,6 @@ relateS slice1 slice2 relations = do
 
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> Maybe (n, n)
 relationBetween var1 var2 = Ref.relationBetween var1 var2 . relationsR
-
-toMap :: (GaloisField n, Integral n) => (Ref -> Bool) -> Relations n -> Map Ref (Either (n, Ref, n) n)
-toMap shouldBeKept = Ref.toMap shouldBeKept . relationsR
 
 size :: Relations n -> Int
 size (Relations f l u s options) = EquivClass.size f + LimbRelations.size l + UInt.size u + (if optUseUIntUnionFind options then SliceRelations.size s else 0)

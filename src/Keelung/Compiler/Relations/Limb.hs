@@ -6,18 +6,23 @@ module Keelung.Compiler.Relations.Limb
     assign,
     relate,
     relationBetween,
-    toMap,
+    toConstraints,
     size,
     isValid,
   )
 where
 
 -- import Control.DeepSeq (NFData)
-import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as Map
+
 -- import GHC.Generics (Generic)
+
+import Data.Foldable (toList)
+import Data.Map.Strict qualified as Map
+import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
+import Keelung.Data.Constraint (Constraint (..))
 import Keelung.Data.Limb (Limb (..))
 import Prelude hiding (lookup)
 
@@ -47,20 +52,20 @@ relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
   Nothing -> False
   Just () -> True
 
--- | Given a predicate, convert the relations to a mapping of Limbs to either some other Limb or a constant value
-toMap :: (Limb -> Bool) -> LimbRelations -> Map Limb (Either Limb Integer)
-toMap shouldBeKept xs = Map.mapMaybeWithKey convert $ EquivClass.toMap xs
+-- | Convert the relations to specialized constraints
+toConstraints :: (Limb -> Bool) -> LimbRelations -> Seq (Constraint n)
+toConstraints limbShouldBeKept = Seq.fromList . toList . Map.mapMaybeWithKey convert . EquivClass.toMap
   where
-    convert var status = do
-      if shouldBeKept var
-        then case status of
-          EquivClass.IsConstant val -> Just (Right val)
+    convert :: Limb -> EquivClass.VarStatus Limb Integer () -> Maybe (Constraint n)
+    convert limb status
+      | limbShouldBeKept limb = case status of
+          EquivClass.IsConstant val -> Just $ CLimbVal limb val
           EquivClass.IsRoot _ -> Nothing
           EquivClass.IsChildOf parent () ->
-            if shouldBeKept parent
-              then Just $ Left parent
+            if limbShouldBeKept parent
+              then Just $ CLimbEq limb parent
               else Nothing
-        else Nothing
+      | otherwise = Nothing
 
 -- | Helper function for lifting errors
 mapError :: EquivClass.M (Integer, Integer) a -> EquivClass.M (Error n) a

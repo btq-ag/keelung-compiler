@@ -4,7 +4,6 @@ module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Env, construct
 
 import Data.Bifunctor (Bifunctor (bimap, first))
 import Data.Bits qualified
-import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
@@ -25,12 +24,10 @@ import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Optimize.OccurUB (OccurUB)
 import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Options
-import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
-import Keelung.Compiler.Relations.Limb (LimbRelations)
 import Keelung.Compiler.Relations.Limb qualified as LimbRelations
+import Keelung.Compiler.Relations.Reference qualified as RefRelations
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
-import Keelung.Compiler.Relations.UInt (UIntRelations)
 import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo (FieldInfo)
@@ -63,12 +60,12 @@ linkConstraintModule cm =
                  then fromSliceRelations
                  else fromUIntAndLimbRelations
              )
-          <> addLs
-          <> mulLs,
-      csEqZeros = toList eqZeros,
-      csDivMods = toList $ fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) divMods,
-      csCLDivMods = toList $ fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) clDivMods,
-      csModInvs = toList $ fmap (\(a, b, c, d) -> ([a], [b], [c], d)) modInvs
+          <> fromAddativeConstraints
+          <> fromMultiplicativeConstraints,
+      csEqZeros = eqZeros,
+      csDivMods = fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) divMods,
+      csCLDivMods = fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) clDivMods,
+      csModInvs = fmap (\(a, b, c, d) -> ([a], [b], [c], d)) modInvs
     }
   where
     -- new counters after linking
@@ -77,34 +74,36 @@ linkConstraintModule cm =
     !env = constructEnv (cmOptions cm) (cmCounters cm) counters (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
     uncurry3 f (a, b, c) = f a b c
 
-    extractRefRelations :: (GaloisField n, Integral n) => Relations n -> Seq (Linked.Constraint n)
-    extractRefRelations relations =
-      let convert :: (GaloisField n, Integral n) => (Ref, Either (n, Ref, n) n) -> Constraint n
-          convert (var, Right val) = CRefFVal var val
-          convert (var, Left (slope, root, intercept)) =
-            case (slope, intercept) of
-              (0, _) -> CRefFVal var intercept
-              (1, 0) -> CRefEq var root
-              (_, _) -> case PolyL.fromRefs intercept [(var, -1), (root, slope)] of
-                Left _ -> error "[ panic ] extractRefRelations: failed to build polynomial"
-                Right poly -> CAddL poly
-
-          result = Seq.fromList $ map convert $ Map.toList $ Relations.toMap shouldBeKept relations
-       in linkConstraint env =<< result
-
     shouldBeKept :: Ref -> Bool
-    shouldBeKept (F ref) = refFShouldBeKept ref
-    shouldBeKept (B ref) = refBShouldBeKept ref
-
-    refFShouldBeKept :: RefF -> Bool
-    refFShouldBeKept ref = case ref of
+    shouldBeKept (F ref) = case ref of
       RefFX var ->
         -- it's a Field intermediate variable that occurs in the circuit
         var `IntSet.member` envRefFsInEnvF env
       _ ->
         -- it's a pinned Field variable
         True
+    shouldBeKept (B ref) = case ref of
+      RefBX var ->
+        --  it's a Boolean intermediate variable that occurs in the circuit
+        var `IntSet.member` envRefBsInEnvB env
+      RefUBit var i ->
+        if envUseNewLinker env
+          then refUBitShouldBeKept var i
+          else --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
+            refUShouldBeKept var
+      _ ->
+        -- it's a pinned Field variable
+        True
 
+    refUBitShouldBeKept :: RefU -> Int -> Bool
+    refUBitShouldBeKept refU i = case refU of
+      RefUX width var ->
+        if envUseNewLinker env
+          then case IntMap.lookup width (envRefBsInEnvUB env) of
+            Nothing -> False
+            Just table -> IntervalTable.member (width * var + i, width * var + i + 1) table
+          else refUShouldBeKept refU
+      _ -> True -- it's a pinned UInt variable
     refUShouldBeKept :: RefU -> Bool
     refUShouldBeKept ref = case ref of
       RefUX width var ->
@@ -127,68 +126,32 @@ linkConstraintModule cm =
           _ -> True -- it's a pinned UInt variable
         else refUShouldBeKept (lmbRef limb)
 
-    refUBitShouldBeKept :: RefU -> Int -> Bool
-    refUBitShouldBeKept refU i = case refU of
-      RefUX width var ->
-        if envUseNewLinker env
-          then case IntMap.lookup width (envRefBsInEnvUB env) of
-            Nothing -> False
-            Just table -> IntervalTable.member (width * var + i, width * var + i + 1) table
-          else refUShouldBeKept refU
-      _ -> True -- it's a pinned UInt variable
-    refBShouldBeKept :: RefB -> Bool
-    refBShouldBeKept ref = case ref of
-      RefBX var ->
-        --  it's a Boolean intermediate variable that occurs in the circuit
-        var `IntSet.member` envRefBsInEnvB env
-      -- \|| RefBX var `Set.member` refBsInEnvF env
-      RefUBit var i ->
-        if envUseNewLinker env
-          then refUBitShouldBeKept var i
-          else --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
-            refUShouldBeKept var
-      _ ->
-        -- it's a pinned Field variable
-        True
-
-    -- \| optUseUIntUnionFind = False
-    extractLimbRelations :: (GaloisField n, Integral n) => LimbRelations -> Seq (Linked.Constraint n)
-    extractLimbRelations relations =
-      let convert :: (GaloisField n, Integral n) => (Limb, Either Limb Integer) -> Constraint n
-          convert (var, Right val) = CLimbVal var val
-          convert (var, Left root) = CLimbEq var root
-
-          result = Seq.fromList $ map convert $ Map.toList $ LimbRelations.toMap limbShouldBeKept relations
-       in linkConstraint env =<< result
-
-    -- optUseUIntUnionFind = False
-    extractUIntRelations :: (GaloisField n, Integral n) => UIntRelations -> Seq (Linked.Constraint n)
-    extractUIntRelations relations = UIntRelations.toConstraints refUShouldBeKept relations >>= linkConstraint env
-
     -- constraints extracted from relations between Refs
-    fromRefRelations = extractRefRelations (cmRelations cm)
+    fromRefRelations = RefRelations.toConstraints shouldBeKept (Relations.relationsR (cmRelations cm)) >>= linkConstraint env
 
     -- constraints extracted from relations between UInts & Limbs (only when optUseUIntUnionFind = False)
     fromUIntAndLimbRelations :: (GaloisField n, Integral n) => Seq (Linked.Constraint n)
     fromUIntAndLimbRelations =
-      extractUIntRelations (Relations.relationsU (cmRelations cm))
-        <> extractLimbRelations (Relations.relationsL (cmRelations cm))
+      (LimbRelations.toConstraints limbShouldBeKept (Relations.relationsL (cmRelations cm)) >>= linkConstraint env)
+        <> (UIntRelations.toConstraints refUShouldBeKept (Relations.relationsU (cmRelations cm)) >>= linkConstraint env)
 
     -- constraints extracted from relations between Slices (only when optUseUIntUnionFind = True)
     fromSliceRelations :: (GaloisField n, Integral n) => Seq (Linked.Constraint n)
     fromSliceRelations = SliceRelations.toConstraints refUShouldBeKept (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
 
-    addLs = linkConstraint env . CAddL =<< cmAddL cm
-    mulLs = linkConstraint env . uncurry3 CMulL =<< cmMulL cm
+    -- constraints extracted from specialized constraints
+    fromAddativeConstraints = linkConstraint env . CAddL =<< cmAddL cm
+    fromMultiplicativeConstraints = linkConstraint env . uncurry3 CMulL =<< cmMulL cm
     eqZeros = bimap (linkPolyLUnsafe env) (reindexRefF env) <$> cmEqZeros cm
+
+    -- constraints extracted from hints
+    divMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmDivMods cm
+    clDivMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmCLDivMods cm
+    modInvs = (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, U.uValue p)) <$> cmModInvs cm
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
     fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB env (RefUBit var 0)))
     fromEitherRefU (Right val) = let width = widthOf val in (width, Right (U.uValue val))
-
-    divMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmDivMods cm
-    clDivMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmCLDivMods cm
-    modInvs = (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, U.uValue p)) <$> cmModInvs cm
 
 -------------------------------------------------------------------------------
 

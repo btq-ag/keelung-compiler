@@ -28,10 +28,10 @@ toR1CS cs =
     { r1csField = optFieldInfo (csOptions cs),
       r1csConstraints = map toR1C (toList (csConstraints cs)),
       r1csCounters = csCounters cs,
-      r1csEqZeros = csEqZeros cs,
-      r1csDivMods = csDivMods cs,
-      r1csCLDivMods = csCLDivMods cs,
-      r1csModInvs = csModInvs cs
+      r1csEqZeros = toList $ csEqZeros cs,
+      r1csDivMods = toList $ csDivMods cs,
+      r1csCLDivMods = toList $ csCLDivMods cs,
+      r1csModInvs = toList $ csModInvs cs
     }
   where
     toR1C :: (GaloisField n) => Constraint n -> R1C n

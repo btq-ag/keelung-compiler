@@ -92,10 +92,10 @@ data ConstraintSystem n = ConstraintSystem
     -- | Constraints
     csConstraints :: !(Seq (Constraint n)),
     csCounters :: Counters,
-    csEqZeros :: [(Poly n, Var)],
-    csDivMods :: [(Limbs, Limbs, Limbs, Limbs)],
-    csCLDivMods :: [(Limbs, Limbs, Limbs, Limbs)],
-    csModInvs :: [(Limbs, Limbs, Limbs, Integer)]
+    csEqZeros :: Seq (Poly n, Var),
+    csDivMods :: Seq (Limbs, Limbs, Limbs, Limbs),
+    csCLDivMods :: Seq (Limbs, Limbs, Limbs, Limbs),
+    csModInvs :: Seq (Limbs, Limbs, Limbs, Integer)
   }
   deriving (Eq, Generic, NFData, Functor)
 
