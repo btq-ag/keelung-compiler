@@ -37,4 +37,4 @@ tests = describe "Carry-less Div/Mod" $ do
       y <- input Public :: Comp (UInt 2)
       performCLDivMod x y
     _cs2 `shouldHaveSize` 31
-    cs2' `shouldHaveSize` 19
+    cs2' `shouldHaveSize` 18

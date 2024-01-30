@@ -5,6 +5,7 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
+import Data.Sequence qualified as Seq
 import Keelung (widthOf)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.ConstraintModule
@@ -29,7 +30,6 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
-import qualified Data.Sequence as Seq
 
 --------------------------------------------------------------------------------
 
@@ -162,13 +162,16 @@ addC = mapM_ addOne
         Just relations -> put cs {cmRelations = relations}
 
     countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
-    countBitTestAsOccurU (B (RefUBit (RefUX width var) _)) =
-      modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cs)})
+    countBitTestAsOccurU (B (RefUBit (RefUX width var) _)) = do
+      useNewLinker <- gets (optUseNewLinker . cmOptions)
+      if useNewLinker
+        then return ()
+        else modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cs)})
     countBitTestAsOccurU _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
     addOne (CAddL xs) = do
-      modify' (\cs -> addOccurrencesTuple (PolyL.varsSet xs) $ cs {cmAddL =  xs Seq.<| cmAddL cs})
+      modify' (\cs -> addOccurrencesTuple (PolyL.varsSet xs) $ cs {cmAddL = xs Seq.<| cmAddL cs})
     addOne (CRefFVal x c) = do
       execRelations $ Relations.assignR x c
     addOne (CLimbVal x c) = do

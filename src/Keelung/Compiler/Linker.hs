@@ -79,9 +79,7 @@ linkConstraintModule cm =
       RefFX var ->
         -- it's a Field intermediate variable that occurs in the circuit
         var `IntSet.member` envRefFsInEnvF env
-      _ ->
-        -- it's a pinned Field variable
-        True
+      _ -> True -- it's a pinned Field variable
     shouldBeKept (B ref) = case ref of
       RefBX var ->
         --  it's a Boolean intermediate variable that occurs in the circuit
@@ -91,10 +89,7 @@ linkConstraintModule cm =
           then refUBitShouldBeKept var i
           else --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
             refUShouldBeKept var
-      _ ->
-        -- it's a pinned Field variable
-        True
-
+      _ -> True -- it's a pinned Field variable
     refUBitShouldBeKept :: RefU -> Int -> Bool
     refUBitShouldBeKept refU i = case refU of
       RefUX width var ->
@@ -112,10 +107,7 @@ linkConstraintModule cm =
             Nothing -> False
             Just xs -> IntSet.member var xs
         )
-      _ ->
-        -- it's a pinned UInt variable
-        True
-
+      _ -> True -- it's a pinned UInt variable
     limbShouldBeKept :: Limb -> Bool
     limbShouldBeKept limb =
       if envUseNewLinker env
