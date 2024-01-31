@@ -31,10 +31,10 @@ import Keelung.Syntax.Counters
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
 compilerVersion :: (Int, Int)
-compilerVersion = (0, 19)
+compilerVersion = (0, 20)
 
 patchVersion :: Int
-patchVersion = 1
+patchVersion = 0
 
 versionString :: String
 versionString = intercalate "." [show (fst compilerVersion), show (snd compilerVersion), show patchVersion]
