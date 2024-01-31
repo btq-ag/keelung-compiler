@@ -20,11 +20,11 @@ run = hspec tests
 
 -- | Carry-less division on Integer
 clDiv :: Width -> Integer -> Integer -> Integer
-clDiv width x y = U.uValue (U.new width x `U.clDiv` U.new width y)
+clDiv width x y = toInteger (U.new width x `U.clDiv` U.new width y)
 
 -- | Carry-less modolu on Integer
 clMod :: Width -> Integer -> Integer -> Integer
-clMod width x y = U.uValue (U.new width x `U.clMod` U.new width y)
+clMod width x y = toInteger (U.new width x `U.clMod` U.new width y)
 
 tests :: SpecWith ()
 tests =

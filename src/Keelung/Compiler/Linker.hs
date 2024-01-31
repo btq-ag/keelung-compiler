@@ -139,11 +139,11 @@ linkConstraintModule cm =
     -- constraints extracted from hints
     divMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmDivMods cm
     clDivMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmCLDivMods cm
-    modInvs = (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, U.uValue p)) <$> cmModInvs cm
+    modInvs = (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, toInteger p)) <$> cmModInvs cm
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
     fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB env (RefUBit var 0)))
-    fromEitherRefU (Right val) = let width = widthOf val in (width, Right (U.uValue val))
+    fromEitherRefU (Right val) = let width = widthOf val in (width, Right (toInteger val))
 
 -------------------------------------------------------------------------------
 
@@ -220,7 +220,7 @@ linkConstraint env (CRefUVal x n) =
     Prime _ -> do
       -- split the Integer into smaller chunks of size `fieldWidth`
       let number = U.new (widthOf x) n
-          chunks = map U.uValue (U.chunks (envFieldWidth env) number)
+          chunks = map toInteger (U.chunks (envFieldWidth env) number)
           cLimbVals = Seq.fromList $ zipWith CLimbVal (Limb.refUToLimbs (envFieldWidth env) x) chunks
        in cLimbVals >>= linkConstraint env
 linkConstraint env (CSliceVal x n) =

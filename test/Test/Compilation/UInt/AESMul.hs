@@ -26,7 +26,7 @@ tests =
       let program x y = do
             return $ x `aesMul` (y :: UInt 8)
       property $ \(x :: Word8, y :: Word8) -> do
-        let expected = [U.uValue (U.aesMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
+        let expected = [toInteger (U.aesMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
         forM_ [gf181, Prime 5] $ \field -> do
           testCompiler field (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
@@ -35,7 +35,7 @@ tests =
             x <- inputUInt @8 Public
             return $ x `aesMul` fromInteger constant
       property $ \(x :: Word8, constant :: Word8) -> do
-        let expected = [U.uValue (U.aesMul (U.new 8 (toInteger x)) (U.new 8 (toInteger constant)))]
+        let expected = [toInteger (U.aesMul (U.new 8 (toInteger x)) (U.new 8 (toInteger constant)))]
         forM_ [gf181, Prime 17] $ \field -> do
           testCompiler field (program (fromIntegral constant)) (map toInteger [x]) [] expected
 

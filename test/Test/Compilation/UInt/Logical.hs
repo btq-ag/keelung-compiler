@@ -26,7 +26,7 @@ tests = describe "logical" $ do
             return $ complement (x :: UInt 8)
       forAll (choose (0, 255)) $ \x -> do
         let uint = U.new 8 x
-        let expected = [U.uValue (Data.Bits.complement uint)]
+        let expected = [toInteger (Data.Bits.complement uint)]
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           testCompiler field (program (fromInteger x)) [] [] expected
 
@@ -36,9 +36,9 @@ tests = describe "logical" $ do
             return $ complement x
       forAll (choose (0, 255)) $ \x -> do
         let uint = U.new 8 x
-        let expected = [U.uValue (Data.Bits.complement uint)]
+        let expected = [toInteger (Data.Bits.complement uint)]
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-          testCompiler field program [U.uValue uint] [] expected
+          testCompiler field program [toInteger uint] [] expected
 
   describe "conjunction" $ do
     it "1~10 variables + constant / byte" $ do

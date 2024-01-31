@@ -27,7 +27,6 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.U (U)
-import Keelung.Data.U qualified as U
 import Keelung.Data.VarGroup
 import Keelung.Syntax
 import Keelung.Syntax.Counters
@@ -73,7 +72,7 @@ bindLimbs msg limbs val = foldM_ bindLimb 0 limbs
     bindLimb :: (GaloisField n, Integral n) => Int -> (Width, Either Var Integer) -> M n Int
     bindLimb offset (width, Left var) = do
       forM_ [0 .. width - 1] $ \i -> do
-        bindVar msg (var + i) (if Data.Bits.testBit (U.uValue val) (offset + i) then 1 else 0)
+        bindVar msg (var + i) (if Data.Bits.testBit (toInteger val) (offset + i) then 1 else 0)
       return (offset + width)
     bindLimb offset (width, Right _) = return (offset + width)
 
@@ -92,7 +91,7 @@ data Constraint n
   | ModInvConstraint (Limbs, Limbs, Limbs, Integer)
   deriving (Eq, Generic, NFData)
 
-instance Serialize n => Serialize (Constraint n)
+instance (Serialize n) => Serialize (Constraint n)
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (MulConstraint a b (Left c)) = "(Mul)       (" <> show a <> ") * (" <> show b <> ") = (" <> show c <> ")"
@@ -145,7 +144,7 @@ data Error n
   | QuotientIsZeroError Limbs
   deriving (Eq, Generic, NFData, Functor)
 
-instance Serialize n => Serialize (Error n)
+instance (Serialize n) => Serialize (Error n)
 
 instance (GaloisField n, Integral n) => Show (Error n) where
   show (VarUnassignedError unboundVariables) =
@@ -229,7 +228,7 @@ instance (Integral n, GaloisField n) => Show (Log n) where
 data Result a = Shrinked a | Stuck a | Eliminated | NothingToDo
   deriving (Eq, Show)
 
-instance Semigroup a => Semigroup (Result a) where
+instance (Semigroup a) => Semigroup (Result a) where
   NothingToDo <> x = x
   x <> NothingToDo = x
   Shrinked x <> Shrinked y = Shrinked (x <> y)
@@ -242,7 +241,7 @@ instance Semigroup a => Semigroup (Result a) where
   Eliminated <> Stuck x = Shrinked x
   Eliminated <> Eliminated = Eliminated
 
-instance Monoid a => Monoid (Result a) where
+instance (Monoid a) => Monoid (Result a) where
   mempty = NothingToDo
 
 instance Functor Result where

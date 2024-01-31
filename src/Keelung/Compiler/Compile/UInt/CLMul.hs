@@ -26,6 +26,20 @@ compileCLMulU width out (Left a) (Right b) = do
   compileCLMul width out a temp
 compileCLMulU width out (Left a) (Left b) = compileCLMul width out a b
 
+--  Elementary school multiplication:
+--
+--                      x₃    x₂    x₁    x₀
+--             ×)       y₃    y₂    y₁    y₀
+-- -------------------------------------------
+--                      x₃y₀  x₂y₀  x₁y₀  x₀y₀
+--                      x₂y₁  x₁y₁  x₀y₁
+--                      x₁y₂  x₀y₂
+--                      x₀y₃
+--
+--  1. get pairs of bits to be conjuncted
+--  2. conjunct the pairs
+--  3. xor the conjuncted pairs
+--  4. write the result
 compileCLMul :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> RefU -> M n ()
 compileCLMul width out x y = forM_ [0 .. width - 1] $ \i -> do
   -- pairs of bits to be conjuncted

@@ -316,7 +316,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisorResult, quotientResult, remainderResult) of
         (Just divisorVal, Just actualQuotientVal, Just actualRemainderVal) -> do
-          when (U.uValue divisorVal == 0) $
+          when (toInteger divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
@@ -326,7 +326,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
             throwError ConflictingValues
           return Eliminated
         (Just divisorVal, Just actualQuotientVal, Nothing) -> do
-          when (U.uValue divisorVal == 0) $
+          when (toInteger divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
@@ -335,7 +335,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
           bindLimbs "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
-          when (U.uValue divisorVal == 0) $
+          when (toInteger divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
@@ -344,7 +344,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
           bindLimbs "quotient" quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
-          when (U.uValue divisorVal == 0) $
+          when (toInteger divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
@@ -363,10 +363,10 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
           --  1. the remainder = the dividend
           --  2. the divisor > the dividend
           (expectedDivisorVal, expectedRemainderVal) <-
-            if U.uValue actualQuotientVal == 0
+            if toInteger actualQuotientVal == 0
               then throwError $ QuotientIsZeroError quotientVar
               else
-                if U.uValue dividendVal == 0
+                if toInteger dividendVal == 0
                   then throwError $ DividendIsZeroError dividendVar
                   else return $ if isCarryLess then dividendVal `U.clDivMod` actualQuotientVal else dividendVal `divMod` actualQuotientVal
           bindLimbs "divisor" divisorVar expectedDivisorVal
@@ -407,11 +407,11 @@ shrinkModInv (aLimbs, outLimbs, nLimbs, p) = do
   aResult <- lookupLimbs aLimbs
   case aResult of
     Just aVal -> do
-      case U.modInv (U.uValue aVal) p of
+      case U.modInv (toInteger aVal) p of
         Just result -> do
           let width = sum (map fst aLimbs)
           -- aVal * result = n * p + 1
-          let nVal = U.new width ((U.uValue aVal * result - 1) `div` p)
+          let nVal = U.new width ((toInteger aVal * result - 1) `div` p)
           bindLimbs "ModInv n" nLimbs nVal
           bindLimbs "ModInv" outLimbs (U.new width result)
           return Eliminated

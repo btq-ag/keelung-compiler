@@ -57,7 +57,7 @@ interpretExpr expr = case expr of
       [True] -> return [1]
       _ -> return [0]
   Field e -> map toInteger <$> interpret e
-  UInt e -> map U.uValue <$> interpretU e
+  UInt e -> map toInteger <$> interpretU e
   Array xs -> do
     result <- mapM interpretExpr xs
     return $ concat result
@@ -89,7 +89,7 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
           let dividendVal =
                 if isCarryLess
                   then U.clMul quotientVal divisorVal `U.clAdd` remainderVal
-                  else U.new width (U.uValue divisorVal * U.uValue quotientVal + U.uValue remainderVal)
+                  else U.new width (toInteger divisorVal * toInteger quotientVal + toInteger remainderVal)
           addU width dividendVar [dividendVal]
         (Right _, Right _, Left _) -> throwError $ DivModCannotInferDividendError True True False
         (Right _, Left _, Right _) -> throwError $ DivModCannotInferDividendError True False True
@@ -102,7 +102,7 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
       case (divisor, quotient, remainder) of
         (Right divisorVal, Right actualQuotientVal, Right actualRemainderVal) -> do
-          when (U.uValue divisorVal == 0) $
+          when (toInteger divisorVal == 0) $
             throwError DivModDivisorIsZeroError
           let (expectedQuotientVal, expectedRemainderVal) =
                 if isCarryLess
@@ -110,12 +110,12 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
                   else dividendVal `divMod` divisorVal
           if expectedQuotientVal == actualQuotientVal
             then return ()
-            else throwError $ DivModQuotientError isCarryLess (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedQuotientVal) (U.uValue actualQuotientVal)
+            else throwError $ DivModQuotientError isCarryLess (toInteger dividendVal) (toInteger divisorVal) (toInteger expectedQuotientVal) (toInteger actualQuotientVal)
           if expectedRemainderVal == actualRemainderVal
             then return ()
-            else throwError $ DivModRemainderError isCarryLess (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedRemainderVal) (U.uValue actualRemainderVal)
+            else throwError $ DivModRemainderError isCarryLess (toInteger dividendVal) (toInteger divisorVal) (toInteger expectedRemainderVal) (toInteger actualRemainderVal)
         (Right divisorVal, Right quotientVal, Left remainderVar) -> do
-          when (U.uValue divisorVal == 0) $
+          when (toInteger divisorVal == 0) $
             throwError DivModDivisorIsZeroError
           let (expectedQuotientVal, expectedRemainderVal) =
                 if isCarryLess
@@ -123,9 +123,9 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
                   else dividendVal `divMod` divisorVal
           if expectedQuotientVal == quotientVal
             then addU width remainderVar [expectedRemainderVal]
-            else throwError $ DivModQuotientError isCarryLess (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedQuotientVal) (U.uValue quotientVal)
+            else throwError $ DivModQuotientError isCarryLess (toInteger dividendVal) (toInteger divisorVal) (toInteger expectedQuotientVal) (toInteger quotientVal)
         (Right divisorVal, Left quotientVar, Right actualRemainderVal) -> do
-          when (U.uValue divisorVal == 0) $
+          when (toInteger divisorVal == 0) $
             throwError DivModDivisorIsZeroError
           let (quotientVal, expectedRemainderVal) =
                 if isCarryLess
@@ -133,9 +133,9 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
                   else dividendVal `divMod` divisorVal
           if expectedRemainderVal == actualRemainderVal
             then addU width quotientVar [quotientVal]
-            else throwError $ DivModRemainderError isCarryLess (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedRemainderVal) (U.uValue actualRemainderVal)
+            else throwError $ DivModRemainderError isCarryLess (toInteger dividendVal) (toInteger divisorVal) (toInteger expectedRemainderVal) (toInteger actualRemainderVal)
         (Right divisorVal, Left quotientVar, Left remainderVar) -> do
-          when (U.uValue divisorVal == 0) $
+          when (toInteger divisorVal == 0) $
             throwError DivModDivisorIsZeroError
           let (quotientVal, remainderVal) =
                 if isCarryLess
@@ -154,16 +154,16 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
                   else dividendVal `mod` divisorVal
           if expectedRemainderVal == actualRemainderVal
             then addU width divisorVar [divisorVal]
-            else throwError $ DivModRemainderError isCarryLess (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedRemainderVal) (U.uValue actualRemainderVal)
+            else throwError $ DivModRemainderError isCarryLess (toInteger dividendVal) (toInteger divisorVal) (toInteger expectedRemainderVal) (toInteger actualRemainderVal)
         (Left divisorVar, Right quotientVal, Left remainderVar) -> do
           -- we cannot solve this relation if:
           --  1. quotient = 0
           --  2. dividend = 0 but quotient != 0
           (divisorVal, remainderVal) <-
-            if U.uValue quotientVal == 0
+            if toInteger quotientVal == 0
               then throwError DivModQuotientIsZeroError
               else
-                if U.uValue dividendVal == 0
+                if toInteger dividendVal == 0
                   then throwError DivModDividendIsZeroError
                   else
                     if isCarryLess
@@ -204,37 +204,37 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
 --       -- now that we know the dividend, we can solve the relation if we know either the divisor or the quotient
 --       case (divisor, quotient, remainder) of
 --         (Right divisorVal, Right actualQuotientVal, Right actualRemainderVal) -> do
---           when (U.uValue divisorVal == 0) $
+--           when (toInteger divisorVal == 0) $
 --             throwError DivModDivisorIsZeroError
 --           let (expectedQuotientVal, expectedRemainderVal) = dividendVal `U.clDivMod` divisorVal
 --           if expectedQuotientVal == actualQuotientVal
 --             then return ()
---             else throwError $ DivModQuotientError True (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedQuotientVal) (U.uValue actualQuotientVal)
+--             else throwError $ DivModQuotientError True (toInteger dividendVal) (toInteger divisorVal) (toInteger expectedQuotientVal) (toInteger actualQuotientVal)
 --           if expectedRemainderVal == actualRemainderVal
 --             then return ()
---             else throwError $ DivModRemainderError True (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedRemainderVal) (U.uValue actualRemainderVal)
+--             else throwError $ DivModRemainderError True (toInteger dividendVal) (toInteger divisorVal) (toInteger expectedRemainderVal) (toInteger actualRemainderVal)
 --         (Right divisorVal, Left quotientVar, Left remainderVar) -> do
---           when (U.uValue divisorVal == 0) $
+--           when (toInteger divisorVal == 0) $
 --             throwError DivModDivisorIsZeroError
 --           let (quotientVal, remainderVal) = dividendVal `U.clDivMod` divisorVal
 --           addU width quotientVar [quotientVal]
 --           addU width remainderVar [remainderVal]
 --         (Right divisorVal, Left quotientVar, Right actualRemainderVal) -> do
---           when (U.uValue divisorVal == 0) $
+--           when (toInteger divisorVal == 0) $
 --             throwError DivModDivisorIsZeroError
 --           let (quotientVal, expectedRemainderVal) = dividendVal `U.clDivMod` divisorVal
 --           if expectedRemainderVal == actualRemainderVal
 --             then addU width quotientVar [quotientVal]
---             else throwError $ DivModRemainderError True (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedRemainderVal) (U.uValue actualRemainderVal)
+--             else throwError $ DivModRemainderError True (toInteger dividendVal) (toInteger divisorVal) (toInteger expectedRemainderVal) (toInteger actualRemainderVal)
 --         (Left divisorVar, Right quotientVal, Left remainderVar) -> do
 --           -- we cannot solve this relation if:
 --           --  1. quotient = 0
 --           --  2. dividend = 0 but quotient != 0
 --           (divisorVal, remainderVal) <-
---             if U.uValue quotientVal == 0
+--             if toInteger quotientVal == 0
 --               then throwError DivModQuotientIsZeroError
 --               else
---                 if U.uValue dividendVal == 0
+--                 if toInteger dividendVal == 0
 --                   then throwError DivModDividendIsZeroError
 --                   else return (dividendVal `divMod` quotientVal)
 --           addU width divisorVar [divisorVal]
@@ -244,7 +244,7 @@ interpretDivModPrim isCarryLess width (dividendExpr, divisorExpr, quotientExpr, 
 --               expectedRemainderVal = dividendVal `U.clMod` divisorVal
 --           if expectedRemainderVal == actualRemainderVal
 --             then addU width divisorVar [divisorVal]
---             else throwError $ DivModRemainderError True (U.uValue dividendVal) (U.uValue divisorVal) (U.uValue expectedRemainderVal) (U.uValue actualRemainderVal)
+--             else throwError $ DivModRemainderError True (toInteger dividendVal) (toInteger divisorVal) (toInteger expectedRemainderVal) (toInteger actualRemainderVal)
 --         _ -> do
 --           let unsolvedVars = Either.lefts [divisor, quotient, remainder]
 --           throwError $ DivModStuckError True unsolvedVars
@@ -326,7 +326,7 @@ instance (GaloisField n, Integral n) => InterpretU SideEffect n where
     value' <- interpretU value
     case value' of
       [v] -> do
-        when (U.uValue v > bound) $ throwError $ AssertLTEError (U.uValue v) bound
+        when (toInteger v > bound) $ throwError $ AssertLTEError (toInteger v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
   interpretU (AssertLT width value bound) = do
@@ -340,7 +340,7 @@ instance (GaloisField n, Integral n) => InterpretU SideEffect n where
     value' <- interpretU value
     case value' of
       [v] -> do
-        when (U.uValue v >= bound) $ throwError $ AssertLTError (U.uValue v) bound
+        when (toInteger v >= bound) $ throwError $ AssertLTError (toInteger v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
   interpretU (AssertGTE width value bound) = do
@@ -354,7 +354,7 @@ instance (GaloisField n, Integral n) => InterpretU SideEffect n where
     value' <- interpretU value
     case value' of
       [v] -> do
-        when (U.uValue v < bound) $ throwError $ AssertGTEError (U.uValue v) bound
+        when (toInteger v < bound) $ throwError $ AssertGTEError (toInteger v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
   interpretU (AssertGT width value bound) = do
@@ -368,7 +368,7 @@ instance (GaloisField n, Integral n) => InterpretU SideEffect n where
     value' <- interpretU value
     case value' of
       [v] -> do
-        when (U.uValue v <= bound) $ throwError $ AssertGTError (U.uValue v) bound
+        when (toInteger v <= bound) $ throwError $ AssertGTError (toInteger v) bound
         return []
       _ -> throwError $ ResultSizeError 1 (length value')
 
@@ -421,7 +421,7 @@ instance (GaloisField n, Integral n) => InterpretB Boolean n where
       interpretB (x' >= y')
     BitU width x i -> do
       xs <- interpretU x
-      if Data.Bits.testBit (U.uValue (head xs)) (i `mod` width)
+      if Data.Bits.testBit (toInteger (head xs)) (i `mod` width)
         then return [one]
         else return [zero]
 
@@ -464,7 +464,7 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
     MulU _ x y -> zipWith (*) <$> interpretU x <*> interpretU y
     AESMulU _ x y -> zipWith U.aesMul <$> interpretU x <*> interpretU y
     MMIU w x p -> do
-      x' <- map U.uValue <$> interpretU x
+      x' <- map toInteger <$> interpretU x
       case x' of
         [x''] -> case U.modInv x'' p of
           Just v -> do
@@ -498,7 +498,7 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
 --         [True] -> return [one]
 --         _ -> return [zero]
 --     Field e -> interpret e
---     UInt e -> map (fromInteger . U.uValue) <$> interpretU e
+--     UInt e -> map (fromInteger . toInteger) <$> interpretU e
 --     Array xs -> concat <$> mapM interpret xs
 
 --------------------------------------------------------------------------------

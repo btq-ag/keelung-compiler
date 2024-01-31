@@ -162,11 +162,12 @@ addC = mapM_ addOne
         Just relations -> put cs {cmRelations = relations}
 
     countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
-    countBitTestAsOccurU (B (RefUBit (RefUX width var) _)) = do
+    countBitTestAsOccurU (B (RefUBit (RefUX width var) i)) = do
       useNewLinker <- gets (optUseNewLinker . cmOptions)
       if useNewLinker
-        then return ()
-        else modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cs)})
+        then modify' (\cs -> cs {cmOccurrenceUB = OccurUB.increase width var (i, i + 1) (cmOccurrenceUB cs)})
+        else -- then return ()
+          modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cs)})
     countBitTestAsOccurU _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()

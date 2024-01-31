@@ -26,7 +26,7 @@ tests = describe "Compilation Experiment" $ do
             return (x .*. fromInteger y :: UInt 8)
       let x = 0
       let y = 0
-      let expected = [U.uValue (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
+      let expected = [toInteger (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
       debugWithOpts options gf181 (program y)
       testCompilerWithOpts options gf181 (program y) [x] [] expected
 

@@ -38,7 +38,7 @@ defaultOptions =
     { optFieldInfo = gf181Info,
       optConstProp = True,
       optOptimize = True,
-      optUseNewLinker = True,
+      optUseNewLinker = False,
       optUseUIntUnionFind = True,
       optDisableTestingOnO0 = False
     }

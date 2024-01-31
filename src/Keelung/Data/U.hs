@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Data.U
-  ( U (uValue),
+  ( U,
     new,
     widen,
     mapWidth,

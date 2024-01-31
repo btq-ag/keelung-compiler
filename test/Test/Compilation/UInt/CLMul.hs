@@ -28,7 +28,7 @@ tests =
             y <- choose (-63, 63)
             return (x, y)
       forAll genPair $ \(x, y) -> do
-        let expected = [U.uValue (U.clMul (U.new 6 x) (U.new 6 y))]
+        let expected = [toInteger (U.clMul (U.new 6 x) (U.new 6 y))]
         testCompiler (Prime 5) (program (fromInteger x) (fromInteger y)) [] [] expected
         testCompiler (Prime 257) (program (fromInteger x) (fromInteger y)) [] [] expected
 
@@ -38,7 +38,7 @@ tests =
             y <- inputUInt @8 Public
             return $ x .*. y
       property $ \(x, y :: Word8) -> do
-        let expected = [U.uValue (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
+        let expected = [toInteger (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
         forM_ [gf181, Prime 17] $ \field -> do
           testCompiler field program (map toInteger [x, y]) [] expected
 
@@ -47,7 +47,7 @@ tests =
             x <- inputUInt @8 Public
             return $ x .*. fromInteger y
       property $ \(x :: Word8, y :: Word8) -> do
-        let expected = [U.uValue (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
+        let expected = [toInteger (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
         forM_ [gf181, Prime 17] $ \field -> do
           testCompiler field (program (fromIntegral y)) [toInteger x] [] expected
 
@@ -57,7 +57,7 @@ tests =
             y <- inputUInt @8 Public
             return $ x .*. y .*. fromInteger c
       property $ \(x, y :: Word8, c :: Word8) -> do
-        let expected = [U.uValue (U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger c))]
+        let expected = [toInteger (U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger c))]
         forM_ [gf181, Prime 17] $ \field -> do
           testCompiler field (program (fromIntegral c)) (map toInteger [x, y]) [] expected
 
@@ -68,6 +68,6 @@ tests =
             z <- inputUInt @8 Public
             return $ x .*. y .*. z .*. fromInteger c
       property $ \(x, y, z :: Word8, c :: Word8) -> do
-        let expected = [U.uValue (U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger z) `U.clMul` U.new 8 (toInteger c))]
+        let expected = [toInteger (U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger z) `U.clMul` U.new 8 (toInteger c))]
         forM_ [gf181, Prime 17] $ \field -> do
           testCompiler field (program (fromIntegral c)) (map toInteger [x, y, z]) [] expected
