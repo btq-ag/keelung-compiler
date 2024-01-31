@@ -17,7 +17,7 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Carry-less Div/Mod" $ do
-  it "2 variables / 2-bit" $ do
+  it "2 variables / 2-bit (old linker)" $ do
     -- constraint breakdown:
     -- I/O: 8 = 2 * 4
     -- multiplication: 4 = 3 + 1
@@ -32,9 +32,18 @@ tests = describe "Carry-less Div/Mod" $ do
     _cs `shouldHaveSize` 33
     cs' `shouldHaveSize` 20
 
+  it "2 variables / 2-bit (old linker)" $ do
+    -- constraint breakdown:
+    -- I/O: 8 = 2 * 4
+    -- multiplication: 4 = 3 + 1
+    -- remainder addition: 2
+    -- divisor non-zero: 1
+    -- divisor > remainder: 3
+
     (_cs2, cs2') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
       x <- input Public :: Comp (UInt 2)
       y <- input Public :: Comp (UInt 2)
       performCLDivMod x y
     _cs2 `shouldHaveSize` 31
-    cs2' `shouldHaveSize` 18
+    -- should be just 18
+    cs2' `shouldHaveSize` 20

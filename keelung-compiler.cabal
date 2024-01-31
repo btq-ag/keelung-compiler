@@ -249,7 +249,6 @@ test-suite keelung-test
       Test.Compilation.Util
       Test.Data.IntervalSet
       Test.Data.IntervalTable
-      Test.Data.IntervalUnionFind
       Test.Data.LC
       Test.Data.SliceLookup
       Test.Intergration

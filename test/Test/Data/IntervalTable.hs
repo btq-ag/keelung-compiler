@@ -176,7 +176,7 @@ tests =
         reindexRef env (B (RefUBit intermediateVar0 2)) `shouldBe` 11
         reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 12
 
-      it "Bit test / and 1" $ do
+      it "Bit test / and 1 (new linker)" $ do
         (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
@@ -194,9 +194,9 @@ tests =
         reindexRef env (B (RefUBit inputVar1 2)) `shouldBe` 7
         reindexRef env (B (RefUBit inputVar1 3)) `shouldBe` 8
         let intermediateVar0 = RefUX 4 0
-        reindexRef env (B (RefUBit intermediateVar0 1)) `shouldBe` 9
-        reindexRef env (B (RefUBit intermediateVar0 2)) `shouldBe` 10
-        reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 11
+        reindexRef env (B (RefUBit intermediateVar0 1)) `shouldBe` 10
+        reindexRef env (B (RefUBit intermediateVar0 2)) `shouldBe` 11
+        reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 12
 
       it "Bit test / and 2 (old linker)" $ do
         (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
