@@ -183,14 +183,14 @@ toConstraintsWithNewLinker occurrence refUShouldBeKept = fold step mempty
           -- only export part of slice that is used
           case sliceRefU slice of
             RefUX width var ->
-                Seq.fromList
+              Seq.fromList
                 [CSliceVal (slice {sliceStart = i, sliceEnd = i + 1}) (if Data.Bits.testBit val i then 1 else 0) | i <- [sliceStart slice .. sliceEnd slice], OccurUB.member occurrence width var i]
             _ ->
               -- pinned reference, all bits needs to be exported
               Seq.singleton (CSliceVal slice (toInteger val))
         -- Seq.singleton (CSliceVal slice (toInteger val))
         SliceLookup.ChildOf root ->
-          if refUShouldBeKept (sliceRefU root)
+          if refUShouldBeKept (sliceRefU slice) && refUShouldBeKept (sliceRefU root)
             then Seq.singleton (CSliceEq slice root)
             else mempty
         SliceLookup.Parent _ _ -> mempty
