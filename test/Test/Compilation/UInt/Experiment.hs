@@ -15,21 +15,17 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Compilation Experiment" $ do
-  -- let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = False, optOptimize = False}
-  let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True}
-  -- let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True, optOptimize = False}
+  let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = False}
+  -- let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True}
 
   describe "Binary field" $ do
-    it "2 positive variables / Byte" $ do
+    it "mixed (positive / negative / constnat) / Byte" $ do
       let program = do
-            x <- input Public :: Comp (UInt 4)
-            y <- input Public
-            return $ x + y
-      let x = 0
-      let y = 0
-      let expected = [toInteger (x + y)]
+            x <- input Public :: Comp (UInt 2)
+            return (-x)
       debugWithOpts options (Binary 7) program
-      testCompilerWithOpts options (Binary 7) program [x, y] [] expected
+
+-- testCompilerWithOpts options (Binary 7) (program signs) values [] expected
 
 -- describe "Addition" $ do
 --     it "1 variable / 1 constant" $ do

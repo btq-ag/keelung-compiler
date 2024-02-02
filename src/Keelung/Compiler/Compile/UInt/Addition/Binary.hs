@@ -145,7 +145,6 @@ compileAddBNegConst width out as bs = do
     let c = B (RefUBit out index)
     let prevCarry = if index == 0 then Nothing else Just (B (RefUBit carryBits (index - 1)))
     let nextCarry = if index == width - 1 then Nothing else Just (B (RefUBit carryBits index))
-
     -- out[index] = a + b + prevCarry + 1
     -- nextCarry = a * b + a * prevCarry + b * prevCarry + b + prevCarry
     case (prevCarry, nextCarry) of

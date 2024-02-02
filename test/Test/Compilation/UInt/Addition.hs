@@ -274,6 +274,19 @@ tests = describe "Addition / Subtraction" $ do
         let expected = [toInteger (-x)]
         testCompiler (Binary 7) program [toInteger x] [] expected
 
+    it "2 negative variables / UInt 2" $ do
+      let program = do
+            x <- input Public :: Comp (UInt 2)
+            y <- input Public
+            return $ -x - y
+      let genPair = do
+            x <- choose (0, 3)
+            y <- choose (0, 3)
+            return (x, y)
+      forAll genPair $ \(x, y) -> do
+        let expected = [toInteger (-x - y) `mod` 4]
+        testCompiler (Binary 7) program [x, y] [] expected
+
     it "mixed (positive / negative / constnat) / Byte" $ do
       let program constant signs = do
             inputs <- replicateM (length signs) (inputUInt @8 Public)
