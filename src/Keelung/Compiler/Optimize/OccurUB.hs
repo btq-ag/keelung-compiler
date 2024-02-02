@@ -4,7 +4,7 @@
 module Keelung.Compiler.Optimize.OccurUB
   ( OccurUB,
     new,
-    -- member,
+    member,
     -- size,
     null,
     -- fromIntervalSet,
@@ -63,15 +63,11 @@ instance Show OccurUB where
 new :: OccurUB
 new = OccurUB mempty
 
--- | O(min(n, W)): Is this Limb bit used somewhere?
--- member :: OccurUB -> Width -> Var -> Int -> Bool
--- member (OccurUB xs) width var index = case IntMap.lookup width xs of
---   Nothing -> False
---   Just varMap -> case IntMap.lookup var varMap of
---     Nothing -> False
---     Just (_, intervals) -> case IntMap.lookupLE index intervals of
---       Nothing -> False
---       Just (start, len) -> start <= index && index < start + len
+-- | O(min(n, W)): Is this bit used somewhere?
+member :: OccurUB -> Width -> Var -> Int -> Bool
+member (OccurUB xs) width var index = case IntMap.lookup width xs of
+  Nothing -> False
+  Just intervals -> IntervalSet.member intervals (width * var + index)
 
 -- | O(min(n, W)): Get the total number of bits used in this OccurUB
 -- size :: OccurUB -> Int

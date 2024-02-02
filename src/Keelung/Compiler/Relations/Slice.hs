@@ -9,7 +9,7 @@ module Keelung.Compiler.Relations.Slice
     size,
     lookup,
     toConstraints,
-    -- toConstraintsWithNewLinker,
+    toConstraintsWithNewLinker,
     -- Testing
     isValid,
     Failure (..),
@@ -19,6 +19,7 @@ where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.State
+import Data.Bits qualified
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
@@ -28,9 +29,11 @@ import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung (widthOf)
+import Keelung.Compiler.Optimize.OccurUB (OccurUB)
+import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Util (indent)
 import Keelung.Data.Constraint
-import Keelung.Data.Reference (RefU (..), refUVar)
+import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup (Segment, SliceLookup (..))
@@ -162,27 +165,36 @@ toConstraints refUShouldBeKept = fold step mempty
       SliceLookup.Parent _ _ -> mempty
       SliceLookup.Empty _ -> mempty
 
--- toConstraintsWithNewLinker :: OccurUB -> SliceRelations -> Seq (Constraint n)
--- toConstraintsWithNewLinker occurrence = fold step mempty
---   where
---     step :: Seq (Constraint n) -> Slice -> Segment -> Seq (Constraint n)
---     step acc slice segment = acc <> convert slice segment
+toConstraintsWithNewLinker :: OccurUB -> (RefU -> Bool) -> SliceRelations -> Seq (Constraint n)
+toConstraintsWithNewLinker occurrence refUShouldBeKept = fold step mempty
+  where
+    step :: Seq (Constraint n) -> Slice -> Segment -> Seq (Constraint n)
+    step acc slice segment = acc <> convert slice segment
 
---     -- see if a Segment should be converted to a Constraint
---     convert :: Slice -> Segment -> Seq (Constraint n)
---     convert slice segment = case IntMap.lookup (widthOf (sliceRefU slice)) table of
---       Nothing -> error $ "[ panic ] toConstraintsWithNewLinker: the linker lookup table does not contain the slice of RefU of bit width " <> show (widthOf (sliceRefU slice))
---       Just (offset, table) -> _
---       -- Just (offset, table) -> IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
-
---       -- case segment of
---       -- SliceLookup.Constant val -> Seq.singleton (CSliceVal slice (toInteger val))
---       -- SliceLookup.ChildOf root ->
---       --   if sliceShouldBeKept root
---       --     then Seq.singleton (CSliceEq slice root)
---       --     else mempty
---       -- SliceLookup.Parent _ _ -> mempty
---       -- SliceLookup.Empty _ -> mempty
+    -- see if a Segment should be converted to a Constraint
+    convert :: Slice -> Segment -> Seq (Constraint n)
+    convert slice segment =
+      -- case OccurB.member occurrence of
+      -- Nothing -> error $ "[ panic ] toConstraintsWithNewLinker: the linker lookup table does not contain the slice of RefU of bit width " <> show (widthOf (sliceRefU slice))
+      -- Just (offset, table) -> _
+      -- Just (offset, table) -> IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
+      case segment of
+        SliceLookup.Constant val ->
+          -- only export part of slice that is used
+          case sliceRefU slice of
+            RefUX width var ->
+                Seq.fromList
+                [CSliceVal (slice {sliceStart = i, sliceEnd = i + 1}) (if Data.Bits.testBit val i then 1 else 0) | i <- [sliceStart slice .. sliceEnd slice], OccurUB.member occurrence width var i]
+            _ ->
+              -- pinned reference, all bits needs to be exported
+              Seq.singleton (CSliceVal slice (toInteger val))
+        -- Seq.singleton (CSliceVal slice (toInteger val))
+        SliceLookup.ChildOf root ->
+          if refUShouldBeKept (sliceRefU root)
+            then Seq.singleton (CSliceEq slice root)
+            else mempty
+        SliceLookup.Parent _ _ -> mempty
+        SliceLookup.Empty _ -> mempty
 
 -- | Fold over all Segments in a SliceRelations
 fold :: (a -> Slice -> Segment -> a) -> a -> SliceRelations -> a

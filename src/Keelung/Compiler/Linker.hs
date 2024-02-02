@@ -129,10 +129,10 @@ linkConstraintModule cm =
 
     -- constraints extracted from relations between Slices (only when optUseUIntUnionFind = True)
     fromSliceRelations :: (GaloisField n, Integral n) => Seq (Linked.Constraint n)
-    fromSliceRelations = SliceRelations.toConstraints refUShouldBeKept (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
-    -- if envUseNewLinker env
-    --   then SliceRelations.toConstraintsWithNewLinker (envIndexTableUBWithOffsets env) (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
-    --   else SliceRelations.toConstraints refUShouldBeKept (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
+    fromSliceRelations =
+      if envUseNewLinker env
+        then SliceRelations.toConstraintsWithNewLinker (cmOccurrenceUB cm) refUShouldBeKept (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
+        else SliceRelations.toConstraints refUShouldBeKept (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
 
     -- constraints extracted from specialized constraints
     fromAddativeConstraints = linkConstraint env . CAddL =<< cmAddL cm

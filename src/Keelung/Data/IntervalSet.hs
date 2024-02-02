@@ -1,7 +1,7 @@
 -- For RefU Limb segement reference counting
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Data.IntervalSet (IntervalSet, new, adjust, toIntervalTable, count, isValid) where
+module Keelung.Data.IntervalSet (IntervalSet, new, adjust, toIntervalTable, count, member, isValid) where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
@@ -56,6 +56,12 @@ toIntervalTable domainSize (IntervalSet intervals) =
       FoldState
         (IntMap.insert start (end, start - occupiedSize) acc) -- insert the total size of "holes" before this interval
         (occupiedSize + end - start)
+
+-- | O(min(n, W)): Check if a variable is in the interval set
+member :: IntervalSet -> Int -> Bool
+member (IntervalSet xs) x = case IntMap.lookupLE x xs of
+  Nothing -> False
+  Just (_, (end, _)) -> x < end
 
 -- | O(n): Check if these intervals are valid (for testing purposes)
 --   Invariants:

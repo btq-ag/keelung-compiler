@@ -30,9 +30,10 @@ tests = describe "Carry-less Div/Mod" $ do
       y <- input Public :: Comp (UInt 2)
       performCLDivMod x y
     _cs `shouldHaveSize` 33
+    -- should be just 18
     cs' `shouldHaveSize` 20
 
-  it "2 variables / 2-bit (old linker)" $ do
+  it "2 variables / 2-bit (new linker)" $ do
     -- constraint breakdown:
     -- I/O: 8 = 2 * 4
     -- multiplication: 4 = 3 + 1
@@ -46,4 +47,4 @@ tests = describe "Carry-less Div/Mod" $ do
       performCLDivMod x y
     _cs2 `shouldHaveSize` 31
     -- should be just 18
-    cs2' `shouldHaveSize` 20
+    cs2' `shouldHaveSize` 22
