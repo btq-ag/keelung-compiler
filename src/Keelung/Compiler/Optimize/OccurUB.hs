@@ -42,8 +42,7 @@ instance Show OccurUB where
             ( showList'
                 ( map
                     ( \(width, intervalSet) ->
-                        "UInt bits "
-                          <> show width
+                        show width
                           <> ": "
                           <> show intervalSet
                           -- showList'
@@ -64,7 +63,7 @@ instance Show OccurUB where
 new :: OccurUB
 new = OccurUB mempty
 
--- -- | O(min(n, W)): Is this Limb bit used somewhere?
+-- | O(min(n, W)): Is this Limb bit used somewhere?
 -- member :: OccurUB -> Width -> Var -> Int -> Bool
 -- member (OccurUB xs) width var index = case IntMap.lookup width xs of
 --   Nothing -> False

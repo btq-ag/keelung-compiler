@@ -130,6 +130,9 @@ linkConstraintModule cm =
     -- constraints extracted from relations between Slices (only when optUseUIntUnionFind = True)
     fromSliceRelations :: (GaloisField n, Integral n) => Seq (Linked.Constraint n)
     fromSliceRelations = SliceRelations.toConstraints refUShouldBeKept (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
+    -- if envUseNewLinker env
+    --   then SliceRelations.toConstraintsWithNewLinker (envIndexTableUBWithOffsets env) (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
+    --   else SliceRelations.toConstraints refUShouldBeKept (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
 
     -- constraints extracted from specialized constraints
     fromAddativeConstraints = linkConstraint env . CAddL =<< cmAddL cm
@@ -314,15 +317,17 @@ reindexLimb env limb multiplier = case lmbSigns limb of
 reindexSlice :: (Integral n, GaloisField n) => Env -> Slice -> Bool -> IntMap n
 reindexSlice env slice sign =
   -- precondition of `fromDistinctAscList` is that the keys are in ascending order
-  IntMap.fromDistinctAscList
-    [ ( reindexRefU
-          env
-          (Slice.sliceRefU slice)
-          (Slice.sliceStart slice + i),
-        if sign then 2 ^ i else -(2 ^ i)
-      )
-      | i <- [0 .. Slice.sliceEnd slice - Slice.sliceStart slice - 1]
-    ]
+  let result =
+        IntMap.fromDistinctAscList
+          [ ( reindexRefU
+                env
+                (Slice.sliceRefU slice)
+                (Slice.sliceStart slice + i),
+              if sign then 2 ^ i else -(2 ^ i)
+            )
+            | i <- [0 .. Slice.sliceEnd slice - Slice.sliceStart slice - 1]
+          ]
+   in result
 
 reindexRefF :: Env -> RefF -> Var
 reindexRefF env (RefFO x) = x + getOffset (envOldCounters env) (Output, ReadField)

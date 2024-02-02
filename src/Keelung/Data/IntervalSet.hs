@@ -17,7 +17,15 @@ import Keelung.Data.IntervalTable (IntervalTable (IntervalTable))
 newtype IntervalSet = IntervalSet (IntMap (Int, Int)) deriving (Eq, Generic)
 
 instance Show IntervalSet where
-  show (IntervalSet xs) = showList' $ map (\(start, (end, _)) -> show start <> " ~ " <> show end) $ IntMap.toList xs
+  show (IntervalSet xs) =
+    showList'
+      $ map
+        ( \(start, (end, _)) ->
+            if end - start == 1
+              then show start
+              else show start <> " ~ " <> show (end - 1)
+        )
+      $ IntMap.toList xs
 
 instance NFData IntervalSet
 

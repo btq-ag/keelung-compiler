@@ -9,6 +9,7 @@ module Keelung.Compiler.Relations.Slice
     size,
     lookup,
     toConstraints,
+    -- toConstraintsWithNewLinker,
     -- Testing
     isValid,
     Failure (..),
@@ -160,6 +161,28 @@ toConstraints refUShouldBeKept = fold step mempty
           else mempty
       SliceLookup.Parent _ _ -> mempty
       SliceLookup.Empty _ -> mempty
+
+-- toConstraintsWithNewLinker :: OccurUB -> SliceRelations -> Seq (Constraint n)
+-- toConstraintsWithNewLinker occurrence = fold step mempty
+--   where
+--     step :: Seq (Constraint n) -> Slice -> Segment -> Seq (Constraint n)
+--     step acc slice segment = acc <> convert slice segment
+
+--     -- see if a Segment should be converted to a Constraint
+--     convert :: Slice -> Segment -> Seq (Constraint n)
+--     convert slice segment = case IntMap.lookup (widthOf (sliceRefU slice)) table of
+--       Nothing -> error $ "[ panic ] toConstraintsWithNewLinker: the linker lookup table does not contain the slice of RefU of bit width " <> show (widthOf (sliceRefU slice))
+--       Just (offset, table) -> _
+--       -- Just (offset, table) -> IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
+
+--       -- case segment of
+--       -- SliceLookup.Constant val -> Seq.singleton (CSliceVal slice (toInteger val))
+--       -- SliceLookup.ChildOf root ->
+--       --   if sliceShouldBeKept root
+--       --     then Seq.singleton (CSliceEq slice root)
+--       --     else mempty
+--       -- SliceLookup.Parent _ _ -> mempty
+--       -- SliceLookup.Empty _ -> mempty
 
 -- | Fold over all Segments in a SliceRelations
 fold :: (a -> Slice -> Segment -> a) -> a -> SliceRelations -> a
