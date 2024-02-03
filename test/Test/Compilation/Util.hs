@@ -18,6 +18,7 @@ module Test.Compilation.Util
 where
 
 import Control.Arrow (left)
+import Control.Monad (when)
 import Data.Field.Galois
 import Data.Foldable (toList)
 import Data.Proxy (Proxy (..))
@@ -27,6 +28,7 @@ import Keelung.Compiler (Error (..), toR1CS)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.ConstraintModule (ConstraintModule)
 import Keelung.Compiler.ConstraintSystem qualified as CS
+import Keelung.Compiler.Linker.ReindexReport qualified as ReindexReport
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Util (gf181Info)
@@ -45,6 +47,8 @@ interpretSyntaxTree fieldInfo prog rawPublicInputs rawPrivateInputs = do
   elab <- left LangError (elaborateAndEncode prog)
   inputs <- left InputError (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
   left InterpreterError (Interpreter.run fieldInfo elab inputs)
+
+--------------------------------------------------------------------------------
 
 -- | R1CS witness solver (on optimized R1CS)
 solveR1CSWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
@@ -73,26 +77,13 @@ solveR1CSAndCollectLogWithOpts options prog rawPublicInputs rawPrivateInputs = c
     (Left err, logs) -> (Just (SolverError err), logs)
     (Right _, logs) -> (Nothing, logs)
 
--- solveR1CSAndCollectLog :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
--- solveR1CSAndCollectLog fieldInfo prog rawPublicInputs rawPrivateInputs = case do
---   r1cs <- toR1CS <$> Compiler.compileAndLinkO1 fieldInfo prog
---   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
---   return (r1cs, inputs) of
---   Left err -> (Just err, Nothing)
---   Right (r1cs, inputs) -> case Solver.debug r1cs inputs of
---     (Left err, logs) -> (Just (SolverError err), logs)
---     (Right _, logs) -> (Nothing, logs)
+--------------------------------------------------------------------------------
 
--- -- | Generate R1CS witness solver report (on unoptimized R1CS)
--- solveR1CSAndCollectLogO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
--- solveR1CSAndCollectLogO0 fieldInfo prog rawPublicInputs rawPrivateInputs = case do
---   r1cs <- toR1CS <$> Compiler.compileAndLinkO0 fieldInfo prog
---   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
---   return (r1cs, inputs) of
---   Left err -> (Just err, Nothing)
---   Right (r1cs, inputs) -> case Solver.debug r1cs inputs of
---     (Left err, logs) -> (Just (SolverError err), logs)
---     (Right _, logs) -> (Nothing, logs)
+-- | Generate and test the report of variable reindexing
+testReindexReportWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> Either (Error n) (Maybe ReindexReport.Error)
+testReindexReportWithOpts options prog = do
+  constraintModule <- Compiler.compileWithOpts options prog
+  return $ ReindexReport.test constraintModule
 
 --------------------------------------------------------------------------------
 
@@ -124,15 +115,19 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
       -- overwrite fieldInfo & optimization level
       let optionsO0 = options {optFieldInfo = fieldInfo, optOptimize = False}
       let optionsO1 = options {optFieldInfo = fieldInfo, optOptimize = True}
+      -- interpreter
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
-      -- constraint system interpreters
+      -- constraint system solvers
       solveR1CSWithOpts optionsO1 program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+      -- tests for variable reindexing (only when optUseNewLinker is True)
+      when (optUseNewLinker options) $
+        testReindexReportWithOpts optionsO1 program `shouldBe` (Right Nothing :: Either (Error (Prime n)) (Maybe ReindexReport.Error))
 
       if optDisableTestingOnO0 options
         then return ()
         else do
-          -- constraint system interpreters
+          -- constraint system solvers
           solveR1CSWithOpts optionsO0 program rawPublicInputs rawPrivateInputs
             `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
 
@@ -141,12 +136,16 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
       -- overwrite fieldInfo & optimization level
       let optionsO0 = options {optFieldInfo = fieldInfo, optOptimize = False}
       let optionsO1 = options {optFieldInfo = fieldInfo, optOptimize = True}
+      -- interpreter
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
-      -- constraint system interpreters
+      -- constraint system solvers
       solveR1CSWithOpts optionsO1 program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
       solveR1CSWithOpts optionsO0 program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
+      -- tests for variable reindexing (only when optUseNewLinker is True)
+      when (optUseNewLinker options) $
+        testReindexReportWithOpts optionsO1 program `shouldBe` (Right Nothing :: Either (Error (Binary n)) (Maybe ReindexReport.Error))
 
 testCompiler :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
 testCompiler = testCompilerWithOpts defaultOptions
