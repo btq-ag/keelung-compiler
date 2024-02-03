@@ -49,6 +49,7 @@ library
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Linker
+      Keelung.Compiler.Linker.Coverage
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
@@ -141,6 +142,7 @@ executable keelungc
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Linker
+      Keelung.Compiler.Linker.Coverage
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints
@@ -291,6 +293,7 @@ test-suite keelung-test
       Keelung.Compiler.ConstraintSystem
       Keelung.Compiler.Error
       Keelung.Compiler.Linker
+      Keelung.Compiler.Linker.Coverage
       Keelung.Compiler.Optimize
       Keelung.Compiler.Optimize.ConstantPropagation
       Keelung.Compiler.Optimize.MinimizeConstraints

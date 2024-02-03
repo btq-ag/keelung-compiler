@@ -1,9 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
 
-module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Env, constructEnv, updateCounters) where
+module Keelung.Compiler.Linker (linkConstraintModule, reindexRef, Env, constructEnv, updateCounters, coverageIsValid) where
 
 import Data.Bifunctor (Bifunctor (bimap, first))
 import Data.Bits qualified
+import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
@@ -11,6 +13,8 @@ import Data.IntSet qualified as IntSet
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Keelung
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
@@ -74,65 +78,21 @@ linkConstraintModule cm =
     !env = constructEnv (cmOptions cm) (cmCounters cm) counters (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
     uncurry3 f (a, b, c) = f a b c
 
-    shouldBeKept :: Ref -> Bool
-    shouldBeKept (F ref) = case ref of
-      RefFX var ->
-        -- it's a Field intermediate variable that occurs in the circuit
-        var `IntSet.member` envRefFsInEnvF env
-      _ -> True -- it's a pinned Field variable
-    shouldBeKept (B ref) = case ref of
-      RefBX var ->
-        --  it's a Boolean intermediate variable that occurs in the circuit
-        var `IntSet.member` envRefBsInEnvB env
-      RefUBit var i ->
-        if envUseNewLinker env
-          then refUBitShouldBeKept var i
-          else --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
-            refUShouldBeKept var
-      _ -> True -- it's a pinned Field variable
-    refUBitShouldBeKept :: RefU -> Int -> Bool
-    refUBitShouldBeKept refU i = case refU of
-      RefUX width var ->
-        if envUseNewLinker env
-          then case IntMap.lookup width (envRefBsInEnvUB env) of
-            Nothing -> False
-            Just table -> IntervalTable.member (width * var + i, width * var + i + 1) table
-          else refUShouldBeKept refU
-      _ -> True -- it's a pinned UInt variable
-    refUShouldBeKept :: RefU -> Bool
-    refUShouldBeKept ref = case ref of
-      RefUX width var ->
-        -- it's a UInt intermediate variable that occurs in the circuit
-        ( case IntMap.lookup width (envRefUsInEnvU env) of
-            Nothing -> False
-            Just xs -> IntSet.member var xs
-        )
-      _ -> True -- it's a pinned UInt variable
-    limbShouldBeKept :: Limb -> Bool
-    limbShouldBeKept limb =
-      if envUseNewLinker env
-        then case lmbRef limb of
-          RefUX width var -> case IntMap.lookup width (envRefBsInEnvUB env) of
-            Nothing -> False
-            Just table -> IntervalTable.member (width * var + lmbOffset limb, width * var + lmbOffset limb + lmbWidth limb) table
-          _ -> True -- it's a pinned UInt variable
-        else refUShouldBeKept (lmbRef limb)
-
     -- constraints extracted from relations between Refs
-    fromRefRelations = RefRelations.toConstraints shouldBeKept (Relations.relationsR (cmRelations cm)) >>= linkConstraint env
+    fromRefRelations = RefRelations.toConstraints (shouldBeKept env) (Relations.relationsR (cmRelations cm)) >>= linkConstraint env
 
     -- constraints extracted from relations between UInts & Limbs (only when optUseUIntUnionFind = False)
     fromUIntAndLimbRelations :: (GaloisField n, Integral n) => Seq (Linked.Constraint n)
     fromUIntAndLimbRelations =
-      (LimbRelations.toConstraints limbShouldBeKept (Relations.relationsL (cmRelations cm)) >>= linkConstraint env)
-        <> (UIntRelations.toConstraints refUShouldBeKept (Relations.relationsU (cmRelations cm)) >>= linkConstraint env)
+      (LimbRelations.toConstraints (limbShouldBeKept env) (Relations.relationsL (cmRelations cm)) >>= linkConstraint env)
+        <> (UIntRelations.toConstraints (refUShouldBeKept env) (Relations.relationsU (cmRelations cm)) >>= linkConstraint env)
 
     -- constraints extracted from relations between Slices (only when optUseUIntUnionFind = True)
     fromSliceRelations :: (GaloisField n, Integral n) => Seq (Linked.Constraint n)
     fromSliceRelations =
       if envUseNewLinker env
-        then SliceRelations.toConstraintsWithNewLinker (cmOccurrenceUB cm) refUShouldBeKept (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
-        else SliceRelations.toConstraints refUShouldBeKept (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
+        then SliceRelations.toConstraintsWithNewLinker (cmOccurrenceUB cm) (refUShouldBeKept env) (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
+        else SliceRelations.toConstraints (refUShouldBeKept env) (Relations.relationsS (cmRelations cm)) >>= linkConstraint env
 
     -- constraints extracted from specialized constraints
     fromAddativeConstraints = linkConstraint env . CAddL =<< cmAddL cm
@@ -147,6 +107,57 @@ linkConstraintModule cm =
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
     fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB env (RefUBit var 0)))
     fromEitherRefU (Right val) = let width = widthOf val in (width, Right (toInteger val))
+
+-------------------------------------------------------------------------------
+
+-- | Predicate on whether a Limb should be exported as constraints
+limbShouldBeKept :: Env -> Limb -> Bool
+limbShouldBeKept env limb =
+  if envUseNewLinker env
+    then case lmbRef limb of
+      RefUX width var -> case IntMap.lookup width (envRefBsInEnvUB env) of
+        Nothing -> False
+        Just table -> IntervalTable.member (width * var + lmbOffset limb, width * var + lmbOffset limb + lmbWidth limb) table
+      _ -> True -- it's a pinned UInt variable
+    else refUShouldBeKept env (lmbRef limb)
+
+-- | Predicate on whether a RefU should be exported as constraints
+refUShouldBeKept :: Env -> RefU -> Bool
+refUShouldBeKept env ref = case ref of
+  RefUX width var ->
+    -- it's a UInt intermediate variable that occurs in the circuit
+    ( case IntMap.lookup width (envRefUsInEnvU env) of
+        Nothing -> False
+        Just xs -> IntSet.member var xs
+    )
+  _ -> True -- it's a pinned UInt variable
+
+shouldBeKept :: Env -> Ref -> Bool
+shouldBeKept env (F ref) = case ref of
+  RefFX var ->
+    -- it's a Field intermediate variable that occurs in the circuit
+    var `IntSet.member` envRefFsInEnvF env
+  _ -> True -- it's a pinned Field variable
+shouldBeKept env (B ref) = case ref of
+  RefBX var ->
+    --  it's a Boolean intermediate variable that occurs in the circuit
+    var `IntSet.member` envRefBsInEnvB env
+  RefUBit var i ->
+    if envUseNewLinker env
+      then refUBitShouldBeKept var i
+      else --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
+        refUShouldBeKept env var
+  _ -> True -- it's a pinned Field variable
+  where
+    refUBitShouldBeKept :: RefU -> Int -> Bool
+    refUBitShouldBeKept refU i = case refU of
+      RefUX width var ->
+        if envUseNewLinker env
+          then case IntMap.lookup width (envRefBsInEnvUB env) of
+            Nothing -> False
+            Just table -> IntervalTable.member (width * var + i, width * var + i + 1) table
+          else refUShouldBeKept env refU
+      _ -> True -- it's a pinned UInt variable
 
 -------------------------------------------------------------------------------
 
@@ -317,17 +328,15 @@ reindexLimb env limb multiplier = case lmbSigns limb of
 reindexSlice :: (Integral n, GaloisField n) => Env -> Slice -> Bool -> IntMap n
 reindexSlice env slice sign =
   -- precondition of `fromDistinctAscList` is that the keys are in ascending order
-  let result =
-        IntMap.fromDistinctAscList
-          [ ( reindexRefU
-                env
-                (Slice.sliceRefU slice)
-                (Slice.sliceStart slice + i),
-              if sign then 2 ^ i else -(2 ^ i)
-            )
-            | i <- [0 .. Slice.sliceEnd slice - Slice.sliceStart slice - 1]
-          ]
-   in result
+  IntMap.fromDistinctAscList
+    [ ( reindexRefU
+          env
+          (Slice.sliceRefU slice)
+          (Slice.sliceStart slice + i),
+        if sign then 2 ^ i else -(2 ^ i)
+      )
+      | i <- [0 .. Slice.sliceEnd slice - Slice.sliceStart slice - 1]
+    ]
 
 reindexRefF :: Env -> RefF -> Var
 reindexRefF env (RefFO x) = x + getOffset (envOldCounters env) (Output, ReadField)
@@ -405,3 +414,131 @@ constructEnv options oldCounters newCounters occurF occurB occurU occurUB =
           envUseNewLinker = optUseNewLinker options,
           envUseUIntUnionFind = optUseUIntUnionFind options
         }
+
+--------------------------------------------------------------------------------
+
+-- | Datatype for keeping track of which Ref is mapped to which Var
+newtype Coverage = Coverage (IntMap (Set Ref))
+
+-- | A Coverage is valid if:
+--      1. no Var is skipped, i.e. there are no gaps in the IntMap
+--      3. no Var is mapped to multiple Refs
+coverageIsValid :: Coverage -> Bool
+coverageIsValid (Coverage xs) =
+  let noSkipped = case IntMap.maxViewWithKey xs of
+        Nothing -> True -- empty IntMap
+        Just ((k, _), _) -> k == IntMap.size xs - 1
+      noMultipleRefs = all (\s -> Set.size s == 1) xs
+   in noSkipped && noMultipleRefs
+
+-- | How to combine two coverages
+instance Semigroup Coverage where
+  Coverage a <> Coverage b = Coverage (IntMap.unionWith (<>) a b)
+
+-- | The empty coverage
+instance Monoid Coverage where
+  mempty = Coverage IntMap.empty
+
+-- | Typeclass for generating Coverage reports
+class GenerateCoverage a where
+  generateCoverage :: Env -> a -> Coverage
+
+instance GenerateCoverage Limb where
+  generateCoverage env limb =
+    Coverage $
+      -- precondition of `fromDistinctAscList` is that the keys are in ascending order
+      IntMap.fromDistinctAscList
+        [ ( reindexRefU
+              env
+              (lmbRef limb)
+              (i + lmbOffset limb),
+            Set.singleton (B (RefUBit (lmbRef limb) i))
+          )
+          | i <- [0 .. lmbWidth limb - 1]
+        ]
+
+instance GenerateCoverage Slice where
+  generateCoverage env slice =
+    Coverage $
+      -- precondition of `fromDistinctAscList` is that the keys are in ascending order
+      IntMap.fromDistinctAscList
+        [ ( reindexRefU
+              env
+              (Slice.sliceRefU slice)
+              i,
+            Set.singleton (B (RefUBit (Slice.sliceRefU slice) i))
+          )
+          | i <- [Slice.sliceStart slice .. Slice.sliceEnd slice - 1]
+        ]
+
+instance (GenerateCoverage a) => GenerateCoverage (Seq a) where
+  generateCoverage env xs = mconcat $ map (generateCoverage env) (toList xs)
+
+instance (GenerateCoverage a) => GenerateCoverage [a] where
+  generateCoverage env xs = mconcat $ map (generateCoverage env) xs
+
+instance GenerateCoverage RefF where
+  generateCoverage env ref = Coverage $ IntMap.singleton (reindexRefF env ref) (Set.singleton (F ref))
+
+instance GenerateCoverage RefB where
+  generateCoverage env ref = Coverage $ IntMap.singleton (reindexRefB env ref) (Set.singleton (B ref))
+
+instance GenerateCoverage Ref where
+  generateCoverage env (F refF) = generateCoverage env refF
+  generateCoverage env (B refB) = generateCoverage env refB
+
+instance GenerateCoverage RefU where
+  generateCoverage env refU = generateCoverage env (Limb.refUToLimbs (envFieldWidth env) refU)
+
+instance GenerateCoverage (PolyL n) where
+  generateCoverage env poly =
+    let limbCoverage = generateCoverage env (fmap fst (PolyL.polyLimbs poly))
+        refCoverage = generateCoverage env (Map.keys (PolyL.polyRefs poly))
+     in limbCoverage <> refCoverage
+
+instance GenerateCoverage (Constraint n) where
+  generateCoverage env (CAddL poly) = generateCoverage env poly
+  generateCoverage env (CRefEq x y) = generateCoverage env x <> generateCoverage env y
+  generateCoverage env (CRefBNEq x y) = generateCoverage env x <> generateCoverage env y
+  generateCoverage env (CLimbEq x y) = generateCoverage env x <> generateCoverage env y
+  generateCoverage env (CRefUEq x y) = generateCoverage env x <> generateCoverage env y
+  generateCoverage env (CSliceEq x y) = generateCoverage env x <> generateCoverage env y
+  generateCoverage env (CRefFVal x _) = generateCoverage env x
+  generateCoverage env (CLimbVal x _) = generateCoverage env x
+  generateCoverage env (CRefUVal x _) = generateCoverage env x
+  generateCoverage env (CMulL a b (Left _)) = generateCoverage env a <> generateCoverage env b
+  generateCoverage env (CMulL a b (Right c)) = generateCoverage env a <> generateCoverage env b <> generateCoverage env c
+  generateCoverage env (CSliceVal x _) = generateCoverage env x
+
+instance GenerateCoverage (Either RefU U) where
+  generateCoverage env (Left refU) = generateCoverage env refU
+  generateCoverage _ (Right _) = mempty
+
+instance (Integral n, GaloisField n) => GenerateCoverage (ConstraintModule n) where
+  generateCoverage env cm =
+    let refConstraints = RefRelations.toConstraints (shouldBeKept env) (Relations.relationsR (cmRelations cm))
+
+        sliceRelations = SliceRelations.toConstraints (refUShouldBeKept env) (Relations.relationsS (cmRelations cm))
+        limbAndUIntRelations =
+          LimbRelations.toConstraints (limbShouldBeKept env) (Relations.relationsL (cmRelations cm))
+            <> UIntRelations.toConstraints (refUShouldBeKept env) (Relations.relationsU (cmRelations cm))
+
+        fromMultiplicativeConstraints (a, b, Left _) = generateCoverage env a <> generateCoverage env b
+        fromMultiplicativeConstraints (a, b, Right c) = generateCoverage env a <> generateCoverage env b <> generateCoverage env c
+        fromModInvs (a, b, c, _) = generateCoverage env a <> generateCoverage env b <> generateCoverage env c
+        fromCLDivMods (a, b, c, d) = generateCoverage env a <> generateCoverage env b <> generateCoverage env c <> generateCoverage env d
+        fromDivMods (a, b, c, d) = generateCoverage env a <> generateCoverage env b <> generateCoverage env c <> generateCoverage env d
+        fromEqZeros (a, b) = generateCoverage env a <> generateCoverage env b
+     in mconcat $
+          toList $
+            fmap (generateCoverage env) refConstraints
+              <> ( if optUseUIntUnionFind (cmOptions cm)
+                     then fmap (generateCoverage env) sliceRelations
+                     else fmap (generateCoverage env) limbAndUIntRelations
+                 )
+              <> fmap (generateCoverage env) (cmAddL cm)
+              <> fmap fromMultiplicativeConstraints (cmMulL cm)
+              <> fmap fromEqZeros (cmEqZeros cm)
+              <> fmap fromDivMods (cmDivMods cm)
+              <> fmap fromCLDivMods (cmCLDivMods cm)
+              <> fmap fromModInvs (cmModInvs cm)
