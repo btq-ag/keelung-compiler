@@ -93,21 +93,20 @@ class GenerateReindexReport a where
 instance GenerateReindexReport Limb where
   generateReindexReport env limb =
     ReindexReport $
-      -- precondition of `fromDistinctAscList` is that the keys are in ascending order
       IntMap.fromDistinctAscList
         [ ( reindexRefU
               env
               (Limb.lmbRef limb)
               (i + Limb.lmbOffset limb),
-            Set.singleton (B (RefUBit (Limb.lmbRef limb) i))
+            Set.singleton (B (RefUBit (Limb.lmbRef limb) (i + Limb.lmbOffset limb)))
           )
           | i <- [0 .. Limb.lmbWidth limb - 1]
         ]
 
 instance GenerateReindexReport Slice where
   generateReindexReport env slice =
+    -- precondition of `fromDistinctAscList` is that the keys are in ascending order
     ReindexReport $
-      -- precondition of `fromDistinctAscList` is that the keys are in ascending order
       IntMap.fromDistinctAscList
         [ ( reindexRefU
               env

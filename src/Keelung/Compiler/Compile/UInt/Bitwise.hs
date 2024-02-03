@@ -20,32 +20,36 @@ compileShiftL width out n (Left var) = do
     then case compare n 0 of
       EQ -> writeSliceEq (Slice out 0 width) (Slice var 0 width)
       GT -> do
+        let n' = n `min` width
         -- fill lower bits with 0s
-        writeSliceVal (Slice out 0 n) 0
+        writeSliceVal (Slice out 0 n') 0
         -- shift upper bits
-        writeSliceEq (Slice out n width) (Slice var 0 (width - n))
+        writeSliceEq (Slice out n' width) (Slice var 0 (width - n'))
       LT -> do
+        let n' = n `max` (-width)
         -- shift lower bits
-        writeSliceEq (Slice out 0 (width + n)) (Slice var (-n) width)
+        writeSliceEq (Slice out 0 (width + n')) (Slice var (-n') width)
         -- fill upper bits with 0s
-        writeSliceVal (Slice out (width + n) width) 0
+        writeSliceVal (Slice out (width + n') width) 0
     else case compare n 0 of
       EQ -> writeRefUEq out var
       GT -> do
+        let n' = n `min` width
         -- fill lower bits with 0s
-        forM_ [0 .. n - 1] $ \i -> do
+        forM_ [0 .. n' - 1] $ \i -> do
           writeRefBVal (RefUBit out i) False -- out[i] = 0
           -- shift upper bits
-        forM_ [n .. width - 1] $ \i -> do
-          let i' = (i - n) `mod` width
+        forM_ [n' .. width - 1] $ \i -> do
+          let i' = (i - n') `mod` width
           writeRefBEq (RefUBit out i) (RefUBit var i') -- out[i] = x'[i']
       LT -> do
+        let n' = n `max` (-width)
         -- shift lower bits
-        forM_ [0 .. width + n - 1] $ \i -> do
-          let i' = (i - n) `mod` width
+        forM_ [0 .. width + n' - 1] $ \i -> do
+          let i' = (i - n') `mod` width
           writeRefBEq (RefUBit out i) (RefUBit var i') -- out[i] = x'[i']
           -- fill upper bits with 0s
-        forM_ [width + n .. width - 1] $ \i -> do
+        forM_ [width + n' .. width - 1] $ \i -> do
           writeRefBVal (RefUBit out i) False -- out[i] = 0
 compileShiftL width out n (Right val) = do
   useUIntUnionFind <- gets (optUseUIntUnionFind . cmOptions)

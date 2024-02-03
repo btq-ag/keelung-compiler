@@ -295,7 +295,10 @@ writeLimbEq a b = do
 writeSliceEq :: (GaloisField n, Integral n) => Slice -> Slice -> M n ()
 writeSliceEq a b =
   if widthOf a == widthOf b
-    then addC [CSliceEq a b]
+    then
+      if widthOf a == 0
+        then return () -- no need to add a constraint for slices of width 0
+        else addC [CSliceEq a b]
     else error $ "[ panic ] writeSliceEq: width mismatch, " <> show (widthOf a) <> " /= " <> show (widthOf b)
 
 --------------------------------------------------------------------------------

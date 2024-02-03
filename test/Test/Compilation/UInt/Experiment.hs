@@ -3,12 +3,11 @@
 
 module Test.Compilation.UInt.Experiment (tests, run) where
 
+import Data.Word
 import Keelung hiding (compile)
 import Keelung.Compiler.Options
 import Test.Compilation.Util
 import Test.Hspec
-import Data.Word
-import qualified Data.Bits
 
 run :: IO ()
 run = hspec tests
@@ -20,18 +19,16 @@ tests = describe "Compilation Experiment" $ do
   -- let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = False}
   let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True}
 
-  describe "shift" $ do
-    describe "variable / byte" $ do
-      let program i = do
-            x <- input Public :: Comp (UInt 8)
-            return $ shift x i
-
-      it "GF181" $ do
-        let i = -1
-        let x = 0 :: Word8
-        let expected = [toInteger (Data.Bits.shift x i)]
-        debugWithOpts options gf181 (program i)
-        testCompilerWithOpts options gf181 (program i) [toInteger x] [] expected
+  describe "Multiplication" $ do
+    it "1 constant + 1 variable / Byte" $ do
+      let program x = do
+            y <- input Public :: Comp (UInt 8)
+            return $ x * y
+      let x = 49 :: Word8
+      let y = 0
+      let expected = [toInteger (x * y)]
+      debugWithOpts options (Prime 17) (program (fromIntegral x))
+      testCompilerWithOpts options (Prime 17) (program (fromIntegral x)) [toInteger y] [] expected
 
 -- describe "Binary field" $ do
 --   it "variable dividend / variable divisor" $ do
