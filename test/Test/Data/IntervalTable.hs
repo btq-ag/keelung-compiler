@@ -6,8 +6,7 @@ module Test.Data.IntervalTable (tests, run) where
 import Control.Monad (forM_)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung
-import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
-import Keelung.Compiler.Linker (constructEnv, reindexRef, updateCounters)
+import Keelung.Compiler.Linker (constructEnv, reindexRef)
 import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Options
 import Keelung.Data.IntervalTable (IntervalTable (..))
@@ -139,7 +138,7 @@ tests =
         (_cm, cm) <- executeGF181 $ do
           x <- inputUInt @4 Public
           assert $ 2 `eq` (x + 1)
-        let env = constructEnv (cmOptions cm) (cmCounters cm) (updateCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
+        let env = constructEnv cm
         let inputVar = RefUI 4 0
         reindexRef env (B (RefUBit inputVar 0)) `shouldBe` 0
         reindexRef env (B (RefUBit inputVar 1)) `shouldBe` 1
@@ -158,7 +157,7 @@ tests =
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           return $ (x .&. y) !!! 0
-        let env = constructEnv (cmOptions cm) (cmCounters cm) (updateCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
+        let env = constructEnv cm
         reindexRef env (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
         reindexRef env (B (RefUBit inputVar0 0)) `shouldBe` 1
@@ -181,7 +180,7 @@ tests =
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           return $ (x .&. y) !!! 0
-        let env = constructEnv (cmOptions cm) (cmCounters cm) (updateCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
+        let env = constructEnv cm
         reindexRef env (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
         reindexRef env (B (RefUBit inputVar0 0)) `shouldBe` 1
@@ -204,7 +203,7 @@ tests =
           y <- inputUInt @4 Private
           z <- inputUInt @4 Public
           return $ (x .&. y .&. z) !!! 0
-        let env = constructEnv (cmOptions cm) (cmCounters cm) (updateCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
+        let env = constructEnv cm
 
         reindexRef env (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
@@ -237,7 +236,7 @@ tests =
           y <- inputUInt @4 Private
           z <- inputUInt @4 Public
           return $ (x .&. y .&. z) !!! 0
-        let env = constructEnv (cmOptions cm) (cmCounters cm) (updateCounters cm) (cmOccurrenceF cm) (cmOccurrenceB cm) (cmOccurrenceU cm) (cmOccurrenceUB cm)
+        let env = constructEnv cm
 
         reindexRef env (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
