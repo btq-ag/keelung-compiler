@@ -25,9 +25,11 @@ import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
+import Keelung.Syntax.Counters (Counters)
+import Keelung.Syntax.Counters qualified as Counters
 
 test :: (Integral n, GaloisField n) => ConstraintModule n -> Maybe Error
-test cm = checkReport $ generateReindexReport (constructEnv cm) cm
+test cm = checkReport (cmCounters cm) $ generateReindexReport (constructEnv cm) cm
 
 --------------------------------------------------------------------------------
 
@@ -66,11 +68,16 @@ data Error
   | MultipleRefs [(Var, Set Ref)] -- Multiple refs mapped to the same Var
   deriving (Show, Eq)
 
-checkReport :: ReindexReport -> Maybe Error
-checkReport (ReindexReport xs) =
+-- | See if the report is valid, else return an error:
+--      1. Check if any vars are skipped (except for pinned vars like public inputs, private inputs, and outputs)
+--      2. Check if any vars correspond to multiple refs
+checkReport :: Counters -> ReindexReport -> Maybe Error
+checkReport counters (ReindexReport xs) =
   let skippedVars = IntSet.fromDistinctAscList [0 .. IntMap.size xs - 1] IntSet.\\ IntMap.keysSet xs
+      pinnedVarCount = Counters.getCount counters Counters.Output + Counters.getCount counters Counters.PublicInput + Counters.getCount counters Counters.PrivateInput
+      skippedVarsExcludingPinnedVars = IntSet.filter (>= pinnedVarCount) skippedVars
       multipleRefs = filter (\(_, s) -> Set.size s > 1) (IntMap.toList xs)
-   in if IntSet.null skippedVars
+   in if IntSet.null skippedVarsExcludingPinnedVars
         then
           if null multipleRefs
             then Nothing

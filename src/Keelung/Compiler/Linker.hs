@@ -61,7 +61,7 @@ linkConstraintModule cm =
   ConstraintSystem
     { csOptions = cmOptions cm,
       csCounters = updateCounters cm,
-      csConstraints = toConstraints cm env >>= linkConstraint env,
+      csConstraints = constraints >>= linkConstraint env,
       csEqZeros = eqZeros,
       csDivMods = fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) divMods,
       csCLDivMods = fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) clDivMods,
@@ -69,6 +69,9 @@ linkConstraintModule cm =
     }
   where
     !env = constructEnv cm
+    -- constraints extracted from the constraint module
+    constraints = toConstraints cm env
+
     -- constraints extracted from hints
     eqZeros = bimap (linkPolyLUnsafe env) (reindexRefF env) <$> cmEqZeros cm
     divMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmDivMods cm

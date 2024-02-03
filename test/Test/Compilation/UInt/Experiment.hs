@@ -28,9 +28,9 @@ tests = describe "Compilation Experiment" $ do
 
       it "GF181" $ do
         let i = -1
-        -- debugWithOpts options gf181 (program i)
         let x = 0 :: Word8
         let expected = [toInteger (Data.Bits.shift x i)]
+        debugWithOpts options gf181 (program i)
         testCompilerWithOpts options gf181 (program i) [toInteger x] [] expected
 
 -- describe "Binary field" $ do
