@@ -24,4 +24,5 @@ tests = describe "Compilation Experiment" $ do
       let dividend = 124
       let divisor = 36
       let expected = [dividend `div` divisor, dividend `mod` divisor]
+      -- debugWithOpts options (Prime 17) (program dividend divisor)
       testCompilerWithOpts options (Prime 17) (program dividend divisor) [] [] expected

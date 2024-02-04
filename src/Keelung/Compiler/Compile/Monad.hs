@@ -30,6 +30,7 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
+import qualified Data.Set as Set
 
 --------------------------------------------------------------------------------
 
@@ -316,7 +317,10 @@ addEqZeroHintWithPoly (Left constant) m = writeRefFVal m (recip constant)
 addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) Seq.<| cmEqZeros cs}
 
 addDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
-addDivModHint x y q r = modify' $ \cs -> cs {cmDivMods = (x, y, q, r) Seq.<| cmDivMods cs}
+addDivModHint x y q r = modify' $ \cs ->
+   addOccurrences (Set.fromList [Hint x, Hint y, Hint q, Hint r]) $
+   
+   cs {cmDivMods = (x, y, q, r) Seq.<| cmDivMods cs}
 
 addCLDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
 addCLDivModHint x y q r = modify' $ \cs -> cs {cmCLDivMods = (x, y, q, r) Seq.<| cmCLDivMods cs}

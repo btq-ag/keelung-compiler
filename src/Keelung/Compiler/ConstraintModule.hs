@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Keelung.Compiler.ConstraintModule
   ( ConstraintModule (..),
@@ -9,13 +10,16 @@ module Keelung.Compiler.ConstraintModule
     UpdateOccurrences (..),
     addOccurrencesTuple,
     removeOccurrencesTuple,
+    Hint (..),
   )
 where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet qualified as IntSet
+import Data.Sequence (Seq)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
@@ -38,8 +42,6 @@ import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
-import Data.Sequence (Seq)
-import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
@@ -223,6 +225,36 @@ addOccurrencesTuple (refUs, limbs, refs) = addOccurrences refUs . addOccurrences
 removeOccurrencesTuple :: (GaloisField n, Integral n) => (Set RefU, Set Limb, Set Ref) -> ConstraintModule n -> ConstraintModule n
 removeOccurrencesTuple (refUs, limbs, refs) = removeOccurrences refUs . removeOccurrences limbs . removeOccurrences refs
 
+newtype Hint = Hint (Either RefU U)
+  deriving (Show, Eq, Ord)
+
+-- | For hints
+instance UpdateOccurrences Hint where
+  addOccurrences =
+    flip
+      ( foldl
+          ( \cm ref ->
+              case ref of
+                Hint (Left (RefUX width var)) ->
+                  cm
+                    { cmOccurrenceUB = OccurUB.increase width var (0, width) (cmOccurrenceUB cm)
+                    }
+                _ -> cm
+          )
+      )
+  removeOccurrences =
+    flip
+      ( foldl
+          ( \cm ref ->
+              case ref of
+                Hint (Left (RefUX width var)) ->
+                  cm
+                    { cmOccurrenceUB = OccurUB.decrease width var (0, width) (cmOccurrenceUB cm)
+                    }
+                _ -> cm
+          )
+      )
+
 instance UpdateOccurrences Ref where
   addOccurrences =
     flip
@@ -356,6 +388,3 @@ instance UpdateOccurrences Limb where
                 _ -> cm
           )
       )
-
--- addOccurrences = addOccurrences . Set.map Limb.lmbRef
--- removeOccurrences = removeOccurrences . Set.map Limb.lmbRef
