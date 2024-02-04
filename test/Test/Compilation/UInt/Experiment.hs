@@ -7,8 +7,6 @@ import Keelung hiding (compile)
 import Keelung.Compiler.Options
 import Test.Compilation.Util
 import Test.Hspec
-import Data.Word
-import Test.QuickCheck
 
 run :: IO ()
 run = hspec tests

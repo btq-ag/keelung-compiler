@@ -117,12 +117,12 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
       let optionsO1 = options {optFieldInfo = fieldInfo, optOptimize = True}
       -- interpreter
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
-      -- constraint system solvers
-      solveR1CSWithOpts optionsO1 program rawPublicInputs rawPrivateInputs
-        `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- tests for variable reindexing (only when optUseNewLinker is True)
       when (optUseNewLinker options) $
         testReindexReportWithOpts optionsO1 program `shouldBe` (Right Nothing :: Either (Error (Prime n)) (Maybe ReindexReport.Error))
+      -- constraint system solvers
+      solveR1CSWithOpts optionsO1 program rawPublicInputs rawPrivateInputs
+        `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
 
       if optDisableTestingOnO0 options
         then return ()
@@ -138,15 +138,15 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
       let optionsO1 = options {optFieldInfo = fieldInfo, optOptimize = True}
       -- interpreter
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
+      -- tests for variable reindexing (only when optUseNewLinker is True)
+      when (optUseNewLinker options) $
+        testReindexReportWithOpts optionsO1 program `shouldBe` (Right Nothing :: Either (Error (Binary n)) (Maybe ReindexReport.Error))
       -- constraint system solvers
       solveR1CSWithOpts optionsO1 program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
       solveR1CSWithOpts optionsO0 program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
-      -- tests for variable reindexing (only when optUseNewLinker is True)
-      when (optUseNewLinker options) $
-        testReindexReportWithOpts optionsO1 program `shouldBe` (Right Nothing :: Either (Error (Binary n)) (Maybe ReindexReport.Error))
-
+      
 testCompiler :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
 testCompiler = testCompilerWithOpts defaultOptions
 

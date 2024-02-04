@@ -29,12 +29,25 @@ import Keelung.Syntax.Counters (Counters)
 import Keelung.Syntax.Counters qualified as Counters
 
 test :: (Integral n, GaloisField n) => ConstraintModule n -> Maybe Error
-test cm = checkReport (cmCounters cm) $ generateReindexReport (constructEnv cm) cm
+test cm = checkReport (cmCounters cm) $ generateReindexReport (constructEnv cm) [] cm
 
 --------------------------------------------------------------------------------
 
+-- | Ref with a String tag
+data TaggedRef = TaggedRef Ref [String]
+
+instance Show TaggedRef where
+  show (TaggedRef ref []) = show ref
+  show (TaggedRef ref tags) = show ref <> " " <> show tags
+
+instance Eq TaggedRef where
+  TaggedRef ref1 _ == TaggedRef ref2 _ = ref1 == ref2
+
+instance Ord TaggedRef where
+  TaggedRef ref1 _ `compare` TaggedRef ref2 _ = ref1 `compare` ref2
+
 -- | Datatype for keeping track of which Ref is mapped to which Var
-newtype ReindexReport = ReindexReport (IntMap (Set Ref))
+newtype ReindexReport = ReindexReport (IntMap (Set TaggedRef))
 
 -- | How to show a ReindexReport
 instance Show ReindexReport where
@@ -65,7 +78,7 @@ instance Monoid ReindexReport where
 
 data Error
   = VarSkipped IntSet -- Vars skipped after reindexing
-  | MultipleRefs [(Var, Set Ref)] -- Multiple refs mapped to the same Var
+  | MultipleRefs [(Var, Set TaggedRef)] -- Multiple refs mapped to the same Var
   deriving (Show, Eq)
 
 -- | See if the report is valid, else return an error:
@@ -88,23 +101,23 @@ checkReport counters (ReindexReport xs) =
 
 -- | Typeclass for generating ReindexReport
 class GenerateReindexReport a where
-  generateReindexReport :: Env -> a -> ReindexReport
+  generateReindexReport :: Env -> [String] -> a -> ReindexReport
 
 instance GenerateReindexReport Limb where
-  generateReindexReport env limb =
+  generateReindexReport env tags limb =
     ReindexReport $
       IntMap.fromDistinctAscList
         [ ( reindexRefU
               env
               (Limb.lmbRef limb)
               (i + Limb.lmbOffset limb),
-            Set.singleton (B (RefUBit (Limb.lmbRef limb) (i + Limb.lmbOffset limb)))
+            Set.singleton (TaggedRef (B (RefUBit (Limb.lmbRef limb) (i + Limb.lmbOffset limb))) tags)
           )
           | i <- [0 .. Limb.lmbWidth limb - 1]
         ]
 
 instance GenerateReindexReport Slice where
-  generateReindexReport env slice =
+  generateReindexReport env tags slice =
     -- precondition of `fromDistinctAscList` is that the keys are in ascending order
     ReindexReport $
       IntMap.fromDistinctAscList
@@ -112,63 +125,63 @@ instance GenerateReindexReport Slice where
               env
               (Slice.sliceRefU slice)
               i,
-            Set.singleton (B (RefUBit (Slice.sliceRefU slice) i))
+            Set.singleton (TaggedRef (B (RefUBit (Slice.sliceRefU slice) i)) tags)
           )
           | i <- [Slice.sliceStart slice .. Slice.sliceEnd slice - 1]
         ]
 
 instance (GenerateReindexReport a) => GenerateReindexReport (Seq a) where
-  generateReindexReport env xs = mconcat $ map (generateReindexReport env) (toList xs)
+  generateReindexReport env tags xs = mconcat $ map (generateReindexReport env tags) (toList xs)
 
 instance (GenerateReindexReport a) => GenerateReindexReport [a] where
-  generateReindexReport env xs = mconcat $ map (generateReindexReport env) xs
+  generateReindexReport env tags xs = mconcat $ map (generateReindexReport env tags) xs
 
 instance GenerateReindexReport RefF where
-  generateReindexReport env ref = ReindexReport $ IntMap.singleton (reindexRefF env ref) (Set.singleton (F ref))
+  generateReindexReport env tags ref = ReindexReport $ IntMap.singleton (reindexRefF env ref) (Set.singleton (TaggedRef (F ref) tags))
 
 instance GenerateReindexReport RefB where
-  generateReindexReport env ref = ReindexReport $ IntMap.singleton (reindexRefB env ref) (Set.singleton (B ref))
+  generateReindexReport env tags ref = ReindexReport $ IntMap.singleton (reindexRefB env ref) (Set.singleton (TaggedRef (B ref) tags))
 
 instance GenerateReindexReport Ref where
-  generateReindexReport env (F refF) = generateReindexReport env refF
-  generateReindexReport env (B refB) = generateReindexReport env refB
+  generateReindexReport env tags (F refF) = generateReindexReport env tags refF
+  generateReindexReport env tags (B refB) = generateReindexReport env tags refB
 
 instance GenerateReindexReport RefU where
-  generateReindexReport env refU = generateReindexReport env (Limb.refUToLimbs (envFieldWidth env) refU)
+  generateReindexReport env tags refU = generateReindexReport env tags (Limb.refUToLimbs (envFieldWidth env) refU)
 
 instance GenerateReindexReport (PolyL n) where
-  generateReindexReport env poly =
-    let limbReindexReport = generateReindexReport env (fmap fst (PolyL.polyLimbs poly))
-        refReindexReport = generateReindexReport env (Map.keys (PolyL.polyRefs poly))
+  generateReindexReport env tags poly =
+    let limbReindexReport = generateReindexReport env tags (fmap fst (PolyL.polyLimbs poly))
+        refReindexReport = generateReindexReport env tags (Map.keys (PolyL.polyRefs poly))
      in limbReindexReport <> refReindexReport
 
 instance GenerateReindexReport (Constraint n) where
-  generateReindexReport env (CAddL poly) = generateReindexReport env poly
-  generateReindexReport env (CRefEq x y) = generateReindexReport env x <> generateReindexReport env y
-  generateReindexReport env (CRefBNEq x y) = generateReindexReport env x <> generateReindexReport env y
-  generateReindexReport env (CLimbEq x y) = generateReindexReport env x <> generateReindexReport env y
-  generateReindexReport env (CRefUEq x y) = generateReindexReport env x <> generateReindexReport env y
-  generateReindexReport env (CSliceEq x y) = generateReindexReport env x <> generateReindexReport env y
-  generateReindexReport env (CRefFVal x _) = generateReindexReport env x
-  generateReindexReport env (CLimbVal x _) = generateReindexReport env x
-  generateReindexReport env (CRefUVal x _) = generateReindexReport env x
-  generateReindexReport env (CMulL a b (Left _)) = generateReindexReport env a <> generateReindexReport env b
-  generateReindexReport env (CMulL a b (Right c)) = generateReindexReport env a <> generateReindexReport env b <> generateReindexReport env c
-  generateReindexReport env (CSliceVal x _) = generateReindexReport env x
+  generateReindexReport env tags (CAddL poly) = generateReindexReport env ("CAddL":tags) poly
+  generateReindexReport env tags (CRefEq x y) = generateReindexReport env ("CRefEq L":tags) x <> generateReindexReport env ("CRefEq R":tags) y
+  generateReindexReport env tags (CRefBNEq x y) = generateReindexReport env ("CRefBNEq L":tags) x <> generateReindexReport env ("CRefBNEq R":tags) y
+  generateReindexReport env tags (CLimbEq x y) = generateReindexReport env ("CLimbEq L":tags) x <> generateReindexReport env ("CLimbEq R":tags) y
+  generateReindexReport env tags (CRefUEq x y) = generateReindexReport env ("CRefUEq L":tags) x <> generateReindexReport env ("CRefUEq R":tags) y
+  generateReindexReport env tags (CSliceEq x y) = generateReindexReport env ("CSliceEq L":tags) x <> generateReindexReport env ("CSliceEq R":tags) y
+  generateReindexReport env tags (CRefFVal x _) = generateReindexReport env ("CRefFVal":tags) x
+  generateReindexReport env tags (CLimbVal x _) = generateReindexReport env ("CLimbVal":tags) x
+  generateReindexReport env tags (CRefUVal x _) = generateReindexReport env ("CRefUVal":tags) x
+  generateReindexReport env tags (CMulL a b (Left _)) = generateReindexReport env ("CMulL a":tags) a <> generateReindexReport env ("CMulL b":tags) b
+  generateReindexReport env tags (CMulL a b (Right c)) = generateReindexReport env ("CMulL a":tags) a <> generateReindexReport env ("CMulL b":tags) b <> generateReindexReport env ("CMulL c":tags) c
+  generateReindexReport env tags (CSliceVal x _) = generateReindexReport env ("CSliceVal":tags) x
 
 instance GenerateReindexReport (Either RefU U) where
-  generateReindexReport env (Left refU) = generateReindexReport env refU
-  generateReindexReport _ (Right _) = mempty
+  generateReindexReport env tags (Left refU) = generateReindexReport env tags refU
+  generateReindexReport _ _ (Right _) = mempty
 
 instance (Integral n, GaloisField n) => GenerateReindexReport (ConstraintModule n) where
-  generateReindexReport env cm =
-    let fromModInvs (a, b, c, _) = generateReindexReport env a <> generateReindexReport env b <> generateReindexReport env c
-        fromCLDivMods (a, b, c, d) = generateReindexReport env a <> generateReindexReport env b <> generateReindexReport env c <> generateReindexReport env d
-        fromDivMods (a, b, c, d) = generateReindexReport env a <> generateReindexReport env b <> generateReindexReport env c <> generateReindexReport env d
-        fromEqZeros (a, b) = generateReindexReport env a <> generateReindexReport env b
+  generateReindexReport env tags cm =
+    let fromModInvs (a, b, c, _) = generateReindexReport env ("ModInv a":tags) a <> generateReindexReport env ("ModInv b":tags) b <> generateReindexReport env ("ModInv c":tags) c
+        fromCLDivMods (a, b, c, d) = generateReindexReport env ("ClDivMod a":tags) a <> generateReindexReport env ("ClDivMod b":tags) b <> generateReindexReport env ("ClDivMod c":tags) c <> generateReindexReport env ("ClDivMod d":tags) d
+        fromDivMods (a, b, c, d) = generateReindexReport env ("DivMod a":tags) a <> generateReindexReport env ("DivMod b":tags) b <> generateReindexReport env ("DivMod c":tags) c <> generateReindexReport env ("DivMod d":tags) d
+        fromEqZeros (a, b) = generateReindexReport env ("EqZero a":tags) a <> generateReindexReport env ("EqZero b":tags) b
      in mconcat $
           toList $
-            fmap (generateReindexReport env) (toConstraints cm env)
+            fmap (generateReindexReport env tags) (toConstraints cm env)
               <> fmap fromEqZeros (cmEqZeros cm)
               <> fmap fromDivMods (cmDivMods cm)
               <> fmap fromCLDivMods (cmCLDivMods cm)
