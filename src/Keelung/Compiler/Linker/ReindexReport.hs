@@ -98,7 +98,7 @@ instance GenerateReindexReport Limb where
               env
               (Limb.lmbRef limb)
               (i + Limb.lmbOffset limb),
-            Set.singleton (B (RefUBit (Limb.lmbRef limb) (i + Limb.lmbOffset limb)))
+            Set.singleton (B (RefUBit (Limb.lmbRef limb) i))
           )
           | i <- [0 .. Limb.lmbWidth limb - 1]
         ]

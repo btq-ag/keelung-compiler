@@ -329,6 +329,14 @@ reindexRefU :: Env -> RefU -> Int -> Var
 reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envOldCounters env) (Output, ReadAllUInts)
 reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envOldCounters env) (PublicInput, ReadAllUInts)
 reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envOldCounters env) (PrivateInput, ReadAllUInts)
+reindexRefU env (RefUX 3 4) i =
+  let w = 3
+      x = 4
+      result =
+        case IntMap.lookup w (envIndexTableUBWithOffsets env) of
+            Nothing -> error "[ panic ] reindexRefU: impossible"
+            Just (offset, table) -> IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
+   in result
 reindexRefU env (RefUX w x) i =
   let result =
         if envUseNewLinker env
@@ -348,7 +356,10 @@ toConstraints cm env =
   let -- constraints extracted from relations between Refs
       refConstraints = RefRelations.toConstraints (shouldBeKept env) (Relations.relationsR (cmRelations cm))
       -- constraints extracted from relations between Slices (only when optUseUIntUnionFind = True)
-      sliceConstraints = SliceRelations.toConstraints (refUShouldBeKept env) (Relations.relationsS (cmRelations cm))
+      sliceConstraints = 
+        if optUseNewLinker (cmOptions cm) 
+          then SliceRelations.toConstraintsWithNewLinker (cmOccurrenceUB cm) (refUShouldBeKept env) (Relations.relationsS (cmRelations cm))
+          else SliceRelations.toConstraints (refUShouldBeKept env) (Relations.relationsS (cmRelations cm))
       -- constraints extracted from relations between UInts & Limbs (only when optUseUIntUnionFind = False)
       limbAndUIntConstraints =
         LimbRelations.toConstraints (limbShouldBeKept env) (Relations.relationsL (cmRelations cm))

@@ -3,7 +3,6 @@
 
 module Test.Compilation.UInt.Experiment (tests, run) where
 
-import Data.Word
 import Keelung hiding (compile)
 import Keelung.Compiler.Options
 import Test.Compilation.Util
@@ -20,15 +19,13 @@ tests = describe "Compilation Experiment" $ do
   let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True}
 
   describe "Multiplication" $ do
-    it "1 constant + 1 variable / Byte" $ do
-      let program x = do
-            y <- input Public :: Comp (UInt 8)
-            return $ x * y
-      let x = 49 :: Word8
-      let y = 0
-      let expected = [toInteger (x * y)]
-      debugWithOpts options (Prime 17) (program (fromIntegral x))
-      testCompilerWithOpts options (Prime 17) (program (fromIntegral x)) [toInteger y] [] expected
+    it "2 variables / 1 constant" $ do
+      let program c = do
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
+            return $ x .*. y .*. fromInteger c
+      -- debugWithOpts options gf181 (program 0)
+      testCompilerWithOpts options gf181 (program 0) [0, 0] [] [0]
 
 -- describe "Binary field" $ do
 --   it "variable dividend / variable divisor" $ do

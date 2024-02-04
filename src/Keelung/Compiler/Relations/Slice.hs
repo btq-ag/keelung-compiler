@@ -174,21 +174,16 @@ toConstraintsWithNewLinker occurrence refUShouldBeKept = fold step mempty
     -- see if a Segment should be converted to a Constraint
     convert :: Slice -> Segment -> Seq (Constraint n)
     convert slice segment =
-      -- case OccurB.member occurrence of
-      -- Nothing -> error $ "[ panic ] toConstraintsWithNewLinker: the linker lookup table does not contain the slice of RefU of bit width " <> show (widthOf (sliceRefU slice))
-      -- Just (offset, table) -> _
-      -- Just (offset, table) -> IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
       case segment of
         SliceLookup.Constant val ->
           -- only export part of slice that is used
           case sliceRefU slice of
             RefUX width var ->
               Seq.fromList
-                [CSliceVal (slice {sliceStart = i, sliceEnd = i + 1}) (if Data.Bits.testBit val i then 1 else 0) | i <- [sliceStart slice .. sliceEnd slice], OccurUB.member occurrence width var i]
+                [CSliceVal (slice {sliceStart = i, sliceEnd = i + 1}) (if Data.Bits.testBit val i then 1 else 0) | i <- [sliceStart slice .. sliceEnd slice - 1], OccurUB.member occurrence width var i]
             _ ->
               -- pinned reference, all bits needs to be exported
               Seq.singleton (CSliceVal slice (toInteger val))
-        -- Seq.singleton (CSliceVal slice (toInteger val))
         SliceLookup.ChildOf root ->
           if refUShouldBeKept (sliceRefU slice) && refUShouldBeKept (sliceRefU root)
             then Seq.singleton (CSliceEq slice root)
